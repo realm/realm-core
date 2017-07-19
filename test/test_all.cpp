@@ -21,6 +21,12 @@
 #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 
+#ifdef _WIN32
+// Using GetModuleFileName() and PathRemoveFileSpec()
+#include <Shlwapi.h>
+#pragma comment(lib, "shlwapi.lib")
+#endif
+
 #include <ctime>
 #include <cstring>
 #include <cstdlib>
@@ -518,12 +524,19 @@ int test_all(int argc, char* argv[], util::Logger* logger)
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
 #ifdef _MSC_VER
-    // we're in /build/ on Windows if we're in the Visual Studio IDE. Some Github clients on Windows will interfere
-    // with the .realm files created by unit tests, so we need to make a special directory for them and add it to
-    // .gitignore
-    util::try_make_dir("../test/tmp");
-    set_test_resource_path("../test/");
-    set_test_path_prefix("../test/tmp/");
+    // Following SetCurrentDirectory() call makes sure we can run the unit test suite with no problems regardless
+    // if we use the Visual Studio IDE or command line
+    char dest[MAX_PATH];
+    DWORD length = GetModuleFileNameA(NULL, dest, MAX_PATH);
+    PathRemoveFileSpec(dest);
+    SetCurrentDirectory(dest);
+
+    // Some Github clients on Windows will interfere with the .realm files created by unit tests (the git client will
+    // attempt to access the files when it sees that new files have been created), so we need to make a special 
+    // directory for them and add it to .gitignore
+    util::try_make_dir("../../test/tmp");
+    set_test_resource_path("../../test/");
+    set_test_path_prefix("../../test/tmp/");
 #endif
 
     set_random_seed();

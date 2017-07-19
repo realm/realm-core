@@ -10544,7 +10544,7 @@ void do_read_verify(std::string path) {
             REALM_ASSERT_EX(t->get_column_name(0) == StringData("count"), t->get_column_name(0).data());
             REALM_ASSERT_EX(t->get_column_name(1) == StringData("char"), t->get_column_name(1).data());
             REALM_ASSERT_EX(t->get_column_name(2) == StringData("payload"), t->get_column_name(2).data());
-            std::string std_validator(num_chars, c[0]);
+            std::string std_validator(unsigned int(num_chars), c[0]);
             StringData validator(std_validator);
             StringData s = t->get_string(2, r);
             REALM_ASSERT_EX(s.size() == validator.size(), r, s.size(), validator.size());

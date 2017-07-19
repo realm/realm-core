@@ -17,7 +17,10 @@
  **************************************************************************/
 
 #include "testsettings.hpp"
-#ifdef TEST_ENCRYPTED_FILE_MAPPING
+
+// FIXME: Unit tests use POSIX not compatible with Visual Studio and 
+// should be updated
+#if defined(TEST_ENCRYPTED_FILE_MAPPING) && !defined(_WIN32)
 
 #include <realm/util/aes_cryptor.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
