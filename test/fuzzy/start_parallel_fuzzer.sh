@@ -64,7 +64,7 @@ mkdir -p "${FINDINGS_DIR}"
 
 # see also stop_parallel_fuzzer.sh
 time_out="1000" # ms
-memory="100" # MB
+memory="1000" # MB
 
 # if we have only one fuzzer
 if [ "${num_fuzzers}" -eq 1 ]; then
