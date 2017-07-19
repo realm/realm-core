@@ -61,6 +61,9 @@
 * Add method to get total count of backlinks for a row
   PR [#2672](https://github.com/realm/realm-core/pull/2672).
 * Add try_remove_dir() and try_remove_dir_recursive() functions.
+* Add method to recursively delete an object tree
+  PR [#2752](https://github.com/realm/realm-core/pull/2752)
+  Issue [#2718](https://github.com/realm/realm-core/issues/2718)
 
 -----------
 
