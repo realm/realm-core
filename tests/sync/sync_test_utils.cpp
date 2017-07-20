@@ -37,9 +37,10 @@ void reset_test_directory(const std::string& base_path) {
     util::make_dir(base_path);
 }
 
-bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity) {
+bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity, const std::string& auth_server) {
     for (size_t i = 0; i < results.size(); i++) {
-        if (results.get(i).identity() == identity) {
+        auto this_result = results.get(i);
+        if (this_result.identity() == identity && this_result.auth_server_url() == auth_server) {
             return true;
         }
     }

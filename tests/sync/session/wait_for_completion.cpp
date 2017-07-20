@@ -31,6 +31,8 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
+    const std::string dummy_auth_url = "https://realm.example.org";
+
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
@@ -39,7 +41,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     std::atomic<bool> handler_called(false);
 
     SECTION("works properly when called after the session is bound") {
-        auto user = SyncManager::shared().get_user("user-async-wait-download-1", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user-async-wait-download-1", dummy_auth_url }, "not_a_real_token");
         auto session = sync_session(server, user, "/async-wait-download-1",
                                     [](const std::string&, const std::string&) { return s_test_token; },
                                     [](auto, auto) { });
@@ -52,7 +54,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     }
 
     SECTION("works properly when called on a session waiting for its access token") {
-        auto user = SyncManager::shared().get_user("user-async-wait-download-2", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user-async-wait-download-2", dummy_auth_url }, "not_a_real_token");
         std::atomic<bool> login_handler_called(false);
         auto server_path = "/async-wait-download-2";
         std::shared_ptr<SyncSession> session = sync_session_with_bind_handler(server, user, server_path,
@@ -78,7 +80,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
 
     SECTION("works properly when called on a logged-out session") {
         const auto user_id = "user-async-wait-download-3";
-        auto user = SyncManager::shared().get_user(user_id, "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ user_id, dummy_auth_url }, "not_a_real_token");
         auto session = sync_session(server, user, "/user-async-wait-download-3",
                                     [](auto&, auto&) { return s_test_token; },
                                     [](auto, auto) { });
@@ -93,7 +95,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
         spin_runloop();
         REQUIRE(handler_called == false);
         // Log the user back in
-        user = SyncManager::shared().get_user(user_id, "not_a_real_token_either");
+        user = SyncManager::shared().get_user({ user_id, dummy_auth_url }, "not_a_real_token_either");
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Now, wait for the completion handler to be called.
         EventLoop::main().run_until([&] { return handler_called == true; });
@@ -101,7 +103,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
 
     SECTION("aborts properly when queued and the session errors out") {
         using ProtocolError = realm::sync::ProtocolError;
-        auto user = SyncManager::shared().get_user("user-async-wait-download-4", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user-async-wait-download-4", dummy_auth_url }, "not_a_real_token");
         std::atomic<bool> login_handler_called(false);
         std::atomic<int> error_count(0);
         auto server_path = "/async-wait-download-4";
@@ -126,7 +128,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     }
 
     SECTION("properly rejects any callbacks when session is errored") {
-        auto user = SyncManager::shared().get_user("user-async-wait-download-5", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user-async-wait-download-5", dummy_auth_url }, "not_a_real_token");
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
                                     [](const std::string&, const std::string&) { return "this is not a valid access token"; },
@@ -141,6 +143,8 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
+    const std::string dummy_auth_url = "https://realm.example.org";
+
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
@@ -149,7 +153,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
     std::atomic<bool> handler_called(false);
 
     SECTION("works properly when called after the session is bound") {
-        auto user = SyncManager::shared().get_user("user-async-wait-upload-1", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user-async-wait-upload-1", dummy_auth_url }, "not_a_real_token");
         auto session = sync_session(server, user, "/async-wait-upload-1",
                                     [](const std::string&, const std::string&) { return s_test_token; },
                                     [](auto, auto) { });
@@ -162,7 +166,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
     }
 
     SECTION("works properly when called on a session waiting for its access token") {
-        auto user = SyncManager::shared().get_user("user-async-wait-upload-2", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user-async-wait-upload-2", dummy_auth_url }, "not_a_real_token");
         std::atomic<bool> login_handler_called(false);
         auto server_path = "/async-wait-upload-2";
         std::shared_ptr<SyncSession> session = sync_session_with_bind_handler(server, user, server_path,
@@ -188,7 +192,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
 
     SECTION("works properly when called on a logged-out session") {
         const auto user_id = "user-async-wait-upload-3";
-        auto user = SyncManager::shared().get_user(user_id, "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ user_id, dummy_auth_url }, "not_a_real_token");
         auto session = sync_session(server, user, "/user-async-wait-upload-3",
                                     [](auto&, auto&) { return s_test_token; },
                                     [](auto, auto) { });
@@ -203,7 +207,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
         spin_runloop();
         REQUIRE(handler_called == false);
         // Log the user back in
-        user = SyncManager::shared().get_user(user_id, "not_a_real_token_either");
+        user = SyncManager::shared().get_user({ user_id, dummy_auth_url }, "not_a_real_token_either");
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Now, wait for the completion handler to be called.
         EventLoop::main().run_until([&] { return handler_called == true; });
@@ -211,7 +215,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
 
     SECTION("aborts properly when queued and the session errors out") {
         using ProtocolError = realm::sync::ProtocolError;
-        auto user = SyncManager::shared().get_user("user-async-wait-upload-4", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user-async-wait-upload-4", dummy_auth_url }, "not_a_real_token");
         std::atomic<bool> login_handler_called(false);
         std::atomic<int> error_count(0);
         auto server_path = "/async-wait-upload-4";
@@ -236,7 +240,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
     }
 
     SECTION("properly rejects any callbacks when session is errored") {
-        auto user = SyncManager::shared().get_user("user-async-wait-upload-5", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user-async-wait-upload-5", dummy_auth_url }, "not_a_real_token");
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
                                     [](const std::string&, const std::string&) { return "this is not a valid access token"; },

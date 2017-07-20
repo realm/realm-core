@@ -44,13 +44,14 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
 
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
+    const std::string dummy_auth_url = "https://realm.example.org";
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
     const std::string realm_base_url = server.base_url();
 
     SECTION("a SyncUser can properly retrieve its owned sessions") {
         std::string path_1;
         std::string path_2;
-        auto user = SyncManager::shared().get_user("user1a", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user1a", dummy_auth_url }, "not_a_real_token");
         auto session1 = sync_session(server, user, "/test1a-1",
                                      [](auto&, auto&) { return s_test_token; },
                                      [](auto, auto) { },
@@ -74,7 +75,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
     }
 
     SECTION("a SyncUser properly unbinds its sessions upon logging out") {
-        auto user = SyncManager::shared().get_user("user1b", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user1b", dummy_auth_url }, "not_a_real_token");
         auto session1 = sync_session(server, user, "/test1b-1",
                                      [](auto&, auto&) { return s_test_token; },
                                      [](auto, auto) { });
@@ -92,7 +93,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
 
     SECTION("a SyncUser defers binding new sessions until it is logged in") {
         const std::string user_id = "user1c";
-        auto user = SyncManager::shared().get_user(user_id, "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ user_id, dummy_auth_url }, "not_a_real_token");
         user->log_out();
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
         auto session1 = sync_session(server, user, "/test1c-1",
@@ -107,14 +108,14 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         REQUIRE(sessions_are_inactive(*session2));
         REQUIRE(user->all_sessions().size() == 0);
         // Log the user back in via the sync manager.
-        user = SyncManager::shared().get_user(user_id, "not_a_real_token_either");
+        user = SyncManager::shared().get_user({ user_id, dummy_auth_url }, "not_a_real_token_either");
         EventLoop::main().run_until([&] { return sessions_are_active(*session1, *session2); });
         REQUIRE(user->all_sessions().size() == 2);
     }
 
     SECTION("a SyncUser properly rebinds existing sessions upon logging back in") {
         const std::string user_id = "user1d";
-        auto user = SyncManager::shared().get_user(user_id, "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ user_id, dummy_auth_url }, "not_a_real_token");
         auto session1 = sync_session(server, user, "/test1d-1",
                                      [](auto&, auto&) { return s_test_token; },
                                      [](auto, auto) { });
@@ -133,7 +134,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         REQUIRE(sessions_are_inactive(*session2));
         REQUIRE(user->all_sessions().size() == 0);
         // Log the user back in via the sync manager.
-        user = SyncManager::shared().get_user(user_id, "not_a_real_token_either");
+        user = SyncManager::shared().get_user({ user_id, dummy_auth_url }, "not_a_real_token_either");
         EventLoop::main().run_until([&] { return sessions_are_active(*session1, *session2); });
         REQUIRE(user->all_sessions().size() == 2);
     }
@@ -143,7 +144,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         std::weak_ptr<SyncSession> weak_session;
         std::string on_disk_path;
         SyncConfig config;
-        auto user = SyncManager::shared().get_user("user1e", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user1e", dummy_auth_url }, "not_a_real_token");
         {
             // Create the session within a nested scope, so we can control its lifetime.
             auto session = sync_session(server, user, path,
@@ -169,7 +170,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
     }
 
     SECTION("a user can create multiple sessions for the same URL") {
-        auto user = SyncManager::shared().get_user("user", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user", dummy_auth_url }, "not_a_real_token");
         auto create_session = [&]() {
             // Note that this should put the sessions at different paths.
             return sync_session(server, user, "/test",
@@ -188,9 +189,10 @@ TEST_CASE("sync: log-in", "[sync]") {
 
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
+    const std::string dummy_auth_url = "https://realm.example.org";
     // Disable file-related functionality and metadata functionality for testing purposes.
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
-    auto user = SyncManager::shared().get_user("user", "not_a_real_token");
+    auto user = SyncManager::shared().get_user({ "user", dummy_auth_url }, "not_a_real_token");
 
     SECTION("Can log in") {
         std::atomic<int> error_count(0);
@@ -227,9 +229,10 @@ TEST_CASE("sync: token refreshing", "[sync]") {
 
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
+    const std::string dummy_auth_url = "https://realm.example.org";
     // Disable file-related functionality and metadata functionality for testing purposes.
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
-    auto user = SyncManager::shared().get_user("user-token-refreshing", "not_a_real_token");
+    auto user = SyncManager::shared().get_user({ "user-token-refreshing", dummy_auth_url }, "not_a_real_token");
 
     SECTION("Can preemptively refresh token while session is active.") {
         auto session = sync_session(server, user, "/test-token-refreshing",
@@ -273,7 +276,7 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
 
-    auto user = SyncManager::shared().get_user("close-api-tests-user", "not_a_real_token");
+    auto user = SyncManager::shared().get_user({ "close-api-tests-user", "https://realm.example.org" }, "not_a_real_token");
 
     SECTION("Behaves properly when called on session in the 'waiting for token' state for Immediate") {
         std::atomic<bool> bind_function_called(false);
@@ -331,7 +334,7 @@ TEST_CASE("sync: error handling", "[sync]") {
     std::function<void(std::shared_ptr<SyncSession>, SyncError)> error_handler = [](auto, auto) { };
     const std::string user_id = "user1d";
     std::string on_disk_path;
-    auto user = SyncManager::shared().get_user(user_id, "not_a_real_token");
+    auto user = SyncManager::shared().get_user({ user_id, "https://realm.example.org" }, "not_a_real_token");
     auto session = sync_session(server, user, "/test1e",
                                  [](auto&, auto&) { return s_test_token; },
                                  [&](auto session, SyncError error) { 
@@ -399,6 +402,7 @@ TEST_CASE("sync: error handling", "[sync]") {
 
 TEST_CASE("sync: stop policy behavior", "[sync]") {
     using ProtocolError = realm::sync::ProtocolError;
+    const std::string dummy_auth_url = "https://realm.example.org";
     if (!EventLoop::has_implementation())
         return;
 
@@ -427,7 +431,7 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
     };
 
     SECTION("properly transitions from active directly to inactive, and nothing bad happens", "[Immediately]") {
-        auto user = SyncManager::shared().get_user("user-dying-state-1", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user-dying-state-1", dummy_auth_url }, "not_a_real_token");
         Realm::Config config;
         auto session = sync_session(server, user, "/test-dying-state-1",
                                     [](auto&, auto&) { return s_test_token; },
@@ -443,7 +447,7 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
     }
 
     SECTION("properly transitions from active to dying to inactive if nothing bad happens", "[AfterChangesUploaded]") {
-        auto user = SyncManager::shared().get_user("user-dying-state-2", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user-dying-state-2", dummy_auth_url }, "not_a_real_token");
         Realm::Config config;
         auto session = sync_session(server, user, "/test-dying-state-2",
                                     [](auto&, auto&) { return s_test_token; },
@@ -464,7 +468,7 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
 
     SECTION("properly transitions from active to dying to inactive if a fatal error happens", "[AfterChangesUploaded]") {
         std::atomic<bool> error_handler_invoked(false);
-        auto user = SyncManager::shared().get_user("user-dying-state-3", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user-dying-state-3", dummy_auth_url }, "not_a_real_token");
         Realm::Config config;
         auto session = sync_session(server, user, "/test-dying-state-3",
                                     [](auto&, auto&) { return s_test_token; },
@@ -488,7 +492,7 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
 
     SECTION("ignores and swallows non-fatal errors if in the dying state.", "[AfterChangesUploaded]") {
         std::atomic<bool> error_handler_invoked(false);
-        auto user = SyncManager::shared().get_user("user-dying-state-4", "not_a_real_token");
+        auto user = SyncManager::shared().get_user({ "user-dying-state-4", dummy_auth_url }, "not_a_real_token");
         Realm::Config config;
         auto session = sync_session(server, user, "/test-dying-state-4",
                                     [](auto&, auto&) { return s_test_token; },
