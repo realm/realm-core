@@ -105,7 +105,7 @@ size_t TableViewBase::find_first(size_t column_ndx, T value) const
 
     for (size_t i = 0, num_rows = m_row_indexes.size(); i < num_rows; ++i) {
         const int64_t real_ndx = m_row_indexes.get(i);
-        if (real_ndx != detached_ref && m_table->get<T>(column_ndx, i) == value)
+        if (real_ndx != detached_ref && m_table->get<T>(column_ndx, real_ndx) == value)
             return i;
     }
 
