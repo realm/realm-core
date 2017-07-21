@@ -1406,6 +1406,14 @@ public:
         return true;
     }
 
+    bool move_row(size_t from_ndx, size_t to_ndx) noexcept
+    {
+        using tf = _impl::TableFriend;
+        if (m_table)
+            tf::adj_acc_move_row(*m_table, from_ndx, to_ndx);
+        return true;
+    }
+
     bool merge_rows(size_t row_ndx, size_t new_row_ndx) noexcept
     {
         typedef _impl::TableFriend tf;

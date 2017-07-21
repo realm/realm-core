@@ -55,31 +55,32 @@ enum Instruction {
     instr_InsertEmptyRows = 13,
     instr_EraseRows = 14, // Remove (multiple) rows
     instr_SwapRows = 15,
-    instr_MergeRows = 16,  // Replace links pointing to row A with links to row B
-    instr_ClearTable = 17, // Remove all rows in selected table
-    instr_OptimizeTable = 18,
-    instr_SelectDescriptor = 19, // Select descriptor from currently selected root table
+    instr_MoveRow = 16,
+    instr_MergeRows = 17,  // Replace links pointing to row A with links to row B
+    instr_ClearTable = 18, // Remove all rows in selected table
+    instr_OptimizeTable = 19,
+    instr_SelectDescriptor = 20, // Select descriptor from currently selected root table
     instr_InsertColumn =
-        20, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
-    instr_InsertLinkColumn = 21,     // do, but for a link-type column
-    instr_InsertNullableColumn = 22, // Insert nullable column
-    instr_EraseColumn = 23,          // Remove column from selected descriptor
-    instr_EraseLinkColumn = 24,      // Remove link-type column from selected descriptor
-    instr_RenameColumn = 25,         // Rename column in selected descriptor
-    instr_MoveColumn = 26,           // Move column in selected descriptor
-    instr_AddSearchIndex = 27,       // Add a search index to a column
-    instr_RemoveSearchIndex = 28,    // Remove a search index from a column
-    instr_SetLinkType = 29,          // Strong/weak
-    instr_SelectLinkList = 30,
-    instr_LinkListSet = 31,     // Assign to link list entry
-    instr_LinkListInsert = 32,  // Insert entry into link list
-    instr_LinkListMove = 33,    // Move an entry within a link list
-    instr_LinkListSwap = 34,    // Swap two entries within a link list
-    instr_LinkListErase = 35,   // Remove an entry from a link list
-    instr_LinkListNullify = 36, // Remove an entry from a link list due to linked row being erased
-    instr_LinkListClear = 37,   // Ramove all entries from a link list
-    instr_LinkListSetAll = 38,  // Assign to link list entry
-    instr_AddRowWithKey = 39,   // Insert a row with a given key
+        21, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
+    instr_InsertLinkColumn = 22,     // do, but for a link-type column
+    instr_InsertNullableColumn = 23, // Insert nullable column
+    instr_EraseColumn = 24,          // Remove column from selected descriptor
+    instr_EraseLinkColumn = 25,      // Remove link-type column from selected descriptor
+    instr_RenameColumn = 26,         // Rename column in selected descriptor
+    instr_MoveColumn = 27,           // Move column in selected descriptor
+    instr_AddSearchIndex = 28,       // Add a search index to a column
+    instr_RemoveSearchIndex = 29,    // Remove a search index from a column
+    instr_SetLinkType = 30,          // Strong/weak
+    instr_SelectLinkList = 31,
+    instr_LinkListSet = 32,     // Assign to link list entry
+    instr_LinkListInsert = 33,  // Insert entry into link list
+    instr_LinkListMove = 34,    // Move an entry within a link list
+    instr_LinkListSwap = 35,    // Swap two entries within a link list
+    instr_LinkListErase = 36,   // Remove an entry from a link list
+    instr_LinkListNullify = 37, // Remove an entry from a link list due to linked row being erased
+    instr_LinkListClear = 38,   // Ramove all entries from a link list
+    instr_LinkListSetAll = 39,  // Assign to link list entry
+    instr_AddRowWithKey = 40,   // Insert a row with a given key
 };
 
 class TransactLogStream {
@@ -166,6 +167,10 @@ public:
         return true;
     }
     bool swap_rows(size_t, size_t)
+    {
+        return true;
+    }
+    bool move_row(size_t, size_t)
     {
         return true;
     }
@@ -342,6 +347,7 @@ public:
     bool add_row_with_key(size_t row_ndx, size_t prior_num_rows, size_t key_col_ndx, int64_t key);
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows, bool unordered);
     bool swap_rows(size_t row_ndx_1, size_t row_ndx_2);
+    bool move_row(size_t from_ndx, size_t to_ndx);
     bool merge_rows(size_t row_ndx, size_t new_row_ndx);
     bool clear_table(size_t old_table_size);
 
@@ -514,6 +520,7 @@ public:
                             bool is_move_last_over);
 
     virtual void swap_rows(const Table*, size_t row_ndx_1, size_t row_ndx_2);
+    virtual void move_row(const Table*, size_t from_ndx, size_t to_ndx);
     virtual void merge_rows(const Table*, size_t row_ndx, size_t new_row_ndx);
     virtual void add_search_index(const Descriptor&, size_t col_ndx);
     virtual void remove_search_index(const Descriptor&, size_t col_ndx);
@@ -1512,6 +1519,19 @@ inline void TransactLogConvenientEncoder::swap_rows(const Table* t, size_t row_n
     m_encoder.swap_rows(row_ndx_1, row_ndx_2);
 }
 
+inline bool TransactLogEncoder::move_row(size_t from_ndx, size_t to_ndx)
+{
+    append_simple_instr(instr_MoveRow, from_ndx, to_ndx); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::move_row(const Table* t, size_t from_ndx, size_t to_ndx)
+{
+    REALM_ASSERT(from_ndx != to_ndx);
+    select_table(t); // Throws
+    m_encoder.move_row(from_ndx, to_ndx);
+}
+
 inline bool TransactLogEncoder::merge_rows(size_t row_ndx, size_t new_row_ndx)
 {
     append_simple_instr(instr_MergeRows, row_ndx, new_row_ndx); // Throws
@@ -1913,6 +1933,13 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t row_ndx_1 = read_int<size_t>();        // Throws
             size_t row_ndx_2 = read_int<size_t>();        // Throws
             if (!handler.swap_rows(row_ndx_1, row_ndx_2)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_MoveRow: {
+            size_t from_ndx = read_int<size_t>();    // Throws
+            size_t to_ndx = read_int<size_t>();      // Throws
+            if (!handler.move_row(from_ndx, to_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -2469,6 +2496,13 @@ public:
     bool swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     {
         m_encoder.swap_rows(row_ndx_1, row_ndx_2);
+        append_instruction();
+        return true;
+    }
+
+    bool move_row(size_t from_ndx, size_t to_ndx)
+    {
+        m_encoder.move_row(to_ndx, from_ndx);
         append_instruction();
         return true;
     }
