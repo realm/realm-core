@@ -928,9 +928,7 @@ TEST(Links_LinkList_SwapRows)
     CHECK_EQUAL(1, links1->get_origin_row_index());
     CHECK_EQUAL(2, links2->get_origin_row_index());
 
-    // FIXME: Table::swap_rows does not currently exist, so call through the
-    // private API for now.
-    _impl::TableFriend::do_swap_rows(*origin, 1, 2);
+    origin->swap_rows(1, 2);
 
     // Check that accessors were updated
     CHECK_EQUAL(0, links0->get_origin_row_index());
@@ -956,12 +954,12 @@ TEST(Links_LinkList_SwapRows)
     links0.reset();
 
     // Row 0 has no accessor.
-    _impl::TableFriend::do_swap_rows(*origin, 0, 1);
+    origin->swap_rows(0, 1);
     CHECK_EQUAL(2, links1->get_origin_row_index());
     CHECK_EQUAL(0, links2->get_origin_row_index());
 
     // Row 1 has no accessor.
-    _impl::TableFriend::do_swap_rows(*origin, 0, 1);
+    origin->swap_rows(0, 1);
     CHECK_EQUAL(2, links1->get_origin_row_index());
     CHECK_EQUAL(1, links2->get_origin_row_index());
 }
