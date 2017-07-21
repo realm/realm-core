@@ -115,3 +115,5 @@ Realm Object Store is published under the Apache 2.0 license. The [underlying co
 **This product is not being made available to any person located in Cuba, Iran,
 North Korea, Sudan, Syria or the Crimea region, or to any other person that is
 not eligible to receive the product under U.S. law.**
+
+![analytics](https://ga-beacon.appspot.com/UA-50247013-2/realm-object-store/README?pixel)
