@@ -134,6 +134,12 @@
         }                                                                                                            \
     } while (false)
 
+#if REALM_VALGRIND
+static const bool running_with_valgrind = true;
+#else
+static const bool running_with_valgrind = false;
+#endif
+
 
 //@{
 

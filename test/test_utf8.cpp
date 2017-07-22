@@ -228,8 +228,8 @@ NONCONCURRENT_TEST(UTF8_Compare_Core_utf8_invalid)
 }
 
 
-/* shows uninitialized data access i Valgrind (by design). Disabled until supressed or we find another way to test
-NONCONCURRENT_TEST(Compare_Core_utf8_invalid_crash)
+// Shows uninitialized data access i Valgrind (by design).
+NONCONCURRENT_TEST_IF(Compare_Core_utf8_invalid_crash, !running_with_valgrind)
 {
     // See if we can crash Realm with random data
     char str1[20];
@@ -248,7 +248,6 @@ NONCONCURRENT_TEST(Compare_Core_utf8_invalid_crash)
         utf8_compare(str2, str1);
     }
 }
-*/
 
 
 TEST(UTF8_Compare_Core_utf8_zero)

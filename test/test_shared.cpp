@@ -2237,9 +2237,9 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
 
 #endif
 
-// FIXME: This test does not work with valgrind
+// This test does not work with valgrind
 // This test will hang infinitely instead of failing!!!
-TEST(Shared_WaitForChange)
+TEST_IF(Shared_WaitForChange, !running_with_valgrind)
 {
     const int num_threads = 3;
     Mutex mutex;
