@@ -575,6 +575,74 @@ TEST_CASE("sync: encrypt local realm file", "[sync]") {
     }
 }
 
+TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema changes", "[sync]") {
+    if (!EventLoop::has_implementation())
+        return;
+
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    SyncServer server;
+    // Disable file-related functionality and metadata functionality for testing purposes.
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+
+    auto session_for_realm = [](Realm& realm) {
+        auto& user = *realm.config().sync_config->user;
+        REQUIRE(user.state() != SyncUser::State::Error);
+        return user.session_for_on_disk_path(realm.config().path);
+    };
+
+    auto wait_for_upload_completion = [=](Realm& realm) {
+        std::atomic<bool> complete{false};
+        session_for_realm(realm)->wait_for_upload_completion([&](std::error_code) { complete = true; });
+        EventLoop::main().run_until([&] { return complete == true; });
+    };
+
+    auto wait_for_download_completion = [=](Realm& realm) {
+        std::atomic<bool> complete{false};
+        session_for_realm(realm)->wait_for_download_completion([&](std::error_code) { complete = true; });
+        EventLoop::main().run_until([&] { return complete == true; });
+    };
+
+    // Create a synced Realm containing a class with two properties.
+    {
+        SyncTestFile config1(server, "schema-version-test");
+        config1.schema_version = 1;
+        config1.schema = Schema{
+            {"object", {
+                {"property1", PropertyType::Int},
+                {"property2", PropertyType::Int}
+            }},
+        };
+
+        auto realm1 = Realm::get_shared_realm(config1);
+        wait_for_upload_completion(*realm1);
+    }
+
+    // Download the existing Realm into a second local file without specifying a schema,
+    // mirroring how `openAsync` works.
+    SyncTestFile config2(server, "schema-version-test");
+    config2.schema_version = 1;
+    {
+        auto realm2 = Realm::get_shared_realm(config2);
+        wait_for_download_completion(*realm2);
+    }
+
+    // Open the just-downloaded Realm while specifying a schema that contains a class with
+    // only a single property. This should not result in us trying to remove `property2`,
+    // and will throw an exception if it does.
+    {
+        SyncTestFile config3(server, "schema-version-test");
+        config3.path = config2.path;
+        config3.schema_version = 1;
+        config3.schema = Schema{
+            {"object", {
+                {"property1", PropertyType::Int}
+            }},
+        };
+
+        auto realm3 = Realm::get_shared_realm(config3);
+    }
+}
+
 #if REALM_HAVE_SYNC_STABLE_IDS
 
 TEST_CASE("sync: stable IDs", "[sync]") {
