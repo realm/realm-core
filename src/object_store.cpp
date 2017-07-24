@@ -689,19 +689,30 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
 {
     create_metadata_tables(group);
 
-    if (schema_version == ObjectStore::NotVersioned) {
-        create_initial_tables(group, changes);
-        set_schema_version(group, target_schema_version);
+    if (mode == SchemaMode::Additive) {
+        bool target_schema_is_newer = (schema_version < target_schema_version
+            || schema_version == ObjectStore::NotVersioned);
+
+#if REALM_HAVE_SYNC_STABLE_IDS
+        // With sync v2.x, indexes are no longer synced, so there's no reason to avoid creating them.
+        bool update_indexes = true;
+#else
+        // With sync v1.x, indexes are synced, so we only want to update them if the schema version number
+        // has been bumped. This prevents multiple clients with different opinions about indexes from fighting.
+        bool update_indexes = target_schema_is_newer;
+#endif
+        apply_additive_changes(group, changes, update_indexes);
+
+        if (target_schema_is_newer)
+            set_schema_version(group, target_schema_version);
+
         set_schema_columns(group, target_schema);
         return;
     }
 
-    if (mode == SchemaMode::Additive) {
-        apply_additive_changes(group, changes, schema_version < target_schema_version);
-
-        if (schema_version < target_schema_version)
-            set_schema_version(group, target_schema_version);
-
+    if (schema_version == ObjectStore::NotVersioned) {
+        create_initial_tables(group, changes);
+        set_schema_version(group, target_schema_version);
         set_schema_columns(group, target_schema);
         return;
     }
