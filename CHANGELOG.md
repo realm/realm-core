@@ -16,6 +16,7 @@
 * Fix incorrect results from TableView::find_first().
 * Fix crash on rollback of Table::optimize(). Currently unused by bindings.
   PR [#2753](https://github.com/realm/realm-core/pull/2753).
+* Update frozen TableViews when Table::swap() is called.
 
 ### Breaking changes
 

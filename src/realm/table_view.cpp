@@ -597,6 +597,25 @@ void TableViewBase::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx
 }
 
 
+void TableViewBase::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
+{
+    // Always adjust only the earliest ref which matches either ndx_1 or ndx_2
+    // to avoid double-swapping the refs
+    size_t it_1 = m_row_indexes.find_first(row_ndx_1, 0);
+    size_t it_2 =  m_row_indexes.find_first(row_ndx_2, 0);
+    while (it_1 != not_found || it_2 != not_found) {
+        if (it_1 < it_2) {
+            m_row_indexes.set(it_1, row_ndx_2);
+            it_1 = m_row_indexes.find_first(row_ndx_1, it_1);
+        }
+        else {
+            m_row_indexes.set(it_2, row_ndx_1);
+            it_2 = m_row_indexes.find_first(row_ndx_2, it_2);
+        }
+    }
+}
+
+
 void TableViewBase::adj_row_acc_clear() noexcept
 {
     m_num_detached_refs = m_row_indexes.size();
