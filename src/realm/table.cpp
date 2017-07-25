@@ -5738,6 +5738,11 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
         }
         row = row->m_next;
     }
+
+    // Adjust rows in tableviews after row swap
+    for (auto& view : m_views) {
+        view->adj_row_acc_swap_rows(row_ndx_1, row_ndx_2);
+    }
 }
 
 
