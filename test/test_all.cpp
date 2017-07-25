@@ -21,6 +21,12 @@
 #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 
+#ifdef _WIN32
+// Using GetModuleFileName() and PathRemoveFileSpec()
+#include <Shlwapi.h>
+#pragma comment(lib, "shlwapi.lib")
+#endif
+
 #include <ctime>
 #include <cstring>
 #include <cstdlib>
@@ -504,6 +510,12 @@ bool run_tests(util::Logger* logger)
 
 int test_all(int argc, char* argv[], util::Logger* logger)
 {
+    // General note: Some Github clients on Windows will interfere with the .realm files created by unit tests (the
+    // git client will attempt to access the files when it sees that new files have been created). This may cause
+    // very rare/sporadic segfaults and asserts. If the temporary directory path is outside revision control, there
+    // is no problem. Otherwise we need two things fulfilled: 1) The directory must be in .gitignore, and also 2) 
+    // The directory must be newly created and not added to git.
+
     // Disable buffering on std::cout so that progress messages can be related to
     // error messages.
     std::cout.setf(std::ios::unitbuf);
@@ -518,12 +530,15 @@ int test_all(int argc, char* argv[], util::Logger* logger)
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
 #ifdef _MSC_VER
-    // we're in /build/ on Windows if we're in the Visual Studio IDE. Some Github clients on Windows will interfere
-    // with the .realm files created by unit tests, so we need to make a special directory for them and add it to
-    // .gitignore
-    util::try_make_dir("../test/tmp");
-    set_test_resource_path("../test/");
-    set_test_path_prefix("../test/tmp/");
+    // Set CurrentDirectory to the same directory as the binary, so that we can run the unit test suite with no
+    // problems regardless if we use the Visual Studio IDE or command line
+    char dest[MAX_PATH];
+    DWORD length = GetModuleFileNameA(NULL, dest, MAX_PATH);
+    PathRemoveFileSpec(dest);
+    SetCurrentDirectory(dest);
+
+    set_test_resource_path("../");
+    set_test_path_prefix("../");
 #endif
 
     set_random_seed();
