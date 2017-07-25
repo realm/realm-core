@@ -90,7 +90,7 @@ public:
     ColumnRandIterator<ColumnDataType> operator--(int);
     ColumnRandIterator<ColumnDataType> operator+(ptrdiff_t movement);
     ColumnRandIterator<ColumnDataType> operator-(ptrdiff_t movement);
-    ptrdiff_t operator-(const ColumnRandIterator<ColumnDataType>& rawIterator);
+    ptrdiff_t operator-(const ColumnRandIterator<ColumnDataType>& right) const;
     const ColumnDataType operator*() const;
     const ColumnDataType operator->() const;
     const ColumnDataType operator[](ptrdiff_t offset) const;
@@ -1811,9 +1811,9 @@ ColumnRandIterator<ColumnDataType> ColumnRandIterator<ColumnDataType>::operator-
 }
 
 template <class ColumnDataType>
-ptrdiff_t ColumnRandIterator<ColumnDataType>::operator-(const ColumnRandIterator<ColumnDataType>& other)
+ptrdiff_t ColumnRandIterator<ColumnDataType>::operator-(const ColumnRandIterator<ColumnDataType>& right) const
 {
-    return m_col_ndx - other.m_col_ndx;
+    return m_col_ndx - right.m_col_ndx;
 }
 
 template <class ColumnDataType>

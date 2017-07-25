@@ -251,16 +251,18 @@ def doBuildWindows(String buildType, boolean isUWP, String platform) {
             getArchive()
 
             dir('build-dir') {
-                runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: """
-                    "${tool 'cmake'}" ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} -D REALM_ENABLE_ENCRYPTION=OFF ..
-                    "${tool 'cmake'}" --build . --config ${buildType}
-                    "${tool 'cmake'}\\..\\cpack.exe" -C ${buildType} -D CPACK_GENERATOR=TGZ
-                """)
-                archiveArtifacts('*.tar.gz')
-                if (gitTag) {
-                    def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
-                    stash includes:'*.tar.gz', name:stashName
-                    publishingStashes << stashName
+                withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
+                    runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: """
+                        "${tool 'cmake'}" ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} -D REALM_ENABLE_ENCRYPTION=OFF ..
+                        "${tool 'cmake'}" --build . --config ${buildType}
+                        "${tool 'cmake'}\\..\\cpack.exe" -C ${buildType} -D CPACK_GENERATOR=TGZ
+                    """)
+                    archiveArtifacts('*.tar.gz')
+                    if (gitTag) {
+                        def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
+                        stash includes:'*.tar.gz', name:stashName
+                        publishingStashes << stashName
+                    }
                 }
             }
         }
@@ -542,7 +544,7 @@ def getSourceArchive() {
           $class           : 'GitSCM',
           branches         : scm.branches,
           gitTool          : 'native git',
-          extensions       : scm.extensions + [[$class: 'CleanCheckout']],
+          extensions       : scm.extensions + [[$class: 'CleanCheckout'], [$class: 'CloneOption', depth: 0, noTags: false, reference: '', shallow: false]],
           userRemoteConfigs: scm.userRemoteConfigs
         ]
     )
