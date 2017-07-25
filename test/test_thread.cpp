@@ -38,7 +38,6 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/interprocess_condvar.hpp>
-#endif
 #include <realm/util/interprocess_mutex.hpp>
 
 #include <iostream>
@@ -885,7 +884,6 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
 }
 
 
-
 // Test that the unlock+wait operation of wait() takes part atomically, i.e. that there is no time
 // gap between them where another thread could invoke signal() which could go undetected by the wait.
 TEST(Thread_CondvarAtomicWaitUnlock)
@@ -966,3 +964,5 @@ TEST(Thread_CondvarAtomicWaitUnlock)
         threads[i].join();
     }
 }
+
+#endif // TEST_THREAD
