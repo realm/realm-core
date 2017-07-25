@@ -118,7 +118,7 @@ for building and running tests for both the Linux and Android platforms.
 docker build -t "objectstore" .
 # Run bash interactively from the built Docker image,
 # mounting the current directory
-docker run -it -v `pwd`:`pwd` -w `pwd` objectstore bash
+docker run --rm -it -v $(pwd):/tmp -w /tmp objectstore bash
 # Build the object store for Linux and run tests
 > cmake .
 > make
