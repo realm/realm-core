@@ -12584,6 +12584,63 @@ TEST(LangBindHelper_IsRowAttachedAfterClear)
 }
 
 
+TEST(LangBindHelper_TableViewUpdateAfterSwap)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+
+    TableRef t = g.add_table("t");
+    size_t col_id = t->add_column(type_Int, "id");
+
+    t->add_empty_row(10);
+    for (int i = 0; i < 10; ++i)
+        t->set_int(col_id, i, i);
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    TableView tv = t->where().find_all();
+    TableView tv_r = g_r.get_table(0)->where().find_all();
+
+    LangBindHelper::promote_to_write(sg_w);
+    for (int i = 0; i < 5; ++i)
+        t->swap_rows(i, 9 - i);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    for (int i = 0; i < 10; ++i) {
+        CHECK_EQUAL(tv.get_int(0, i), i);
+        CHECK_EQUAL(tv_r.get_int(0, i), i);
+        CHECK_EQUAL(tv.get(i).get_index(), 9 - i);
+        CHECK_EQUAL(tv_r.get(i).get_index(), 9 - i);
+    }
+
+    LangBindHelper::promote_to_write(sg_w);
+    for (int i = 0; i < 5; ++i)
+        t->swap_rows(i, 9 - i);
+    for (int i = 0; i < 10; ++i) {
+        CHECK_EQUAL(tv.get_int(0, i), i);
+        CHECK_EQUAL(tv.get(i).get_index(), i);
+    }
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+
+    for (int i = 0; i < 10; ++i) {
+        CHECK_EQUAL(tv.get_int(0, i), i);
+        CHECK_EQUAL(tv.get(i).get_index(), 9 - i);
+    }
+}
+
+
 TEST(LangBindHelper_RollbackRemoveZeroRows)
 {
     SHARED_GROUP_TEST_PATH(path)
