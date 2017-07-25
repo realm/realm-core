@@ -481,19 +481,124 @@ TEST(TableView_Min2)
 TEST(TableView_Find)
 {
     TestTable table;
-    table.add_column(type_Int, "first");
+    table.add_column(type_Int, "int");
+    table.add_column(type_Int, "int?", true);
+    table.add_column(type_Bool, "bool");
+    table.add_column(type_Bool, "bool?", true);
+    table.add_column(type_Float, "float");
+    table.add_column(type_Float, "float?", true);
+    table.add_column(type_Double, "double");
+    table.add_column(type_Double, "double?", true);
+    table.add_column(type_Timestamp, "timestamp");
+    table.add_column(type_Timestamp, "timestamp?", true);
+    table.add_column(type_String, "string");
+    table.add_column(type_String, "string?", true);
+    table.add_column(type_Binary, "binary");
+    table.add_column(type_Binary, "binary?", true);
 
     add(table, 0);
-    add(table, 0);
-    add(table, 0);
+    add(table, 1, 1, false, false, 1.1f, 1.1f, 1.1, 1.1, Timestamp(1, 1), Timestamp(1, 1),
+        "a", "a", BinaryData("a", 1), BinaryData("a", 1));
+    add(table, 2, nullptr, true, nullptr, 2.2f, nullptr, 2.2, nullptr, Timestamp(2, 2), nullptr,
+        "b", nullptr, BinaryData("b", 1), nullptr);
+    add(table, -1);
 
-    TableView v = table.find_all_int(0, 0);
-    v[0].set_int(0, 5);
-    v[1].set_int(0, 4);
-    v[2].set_int(0, 4);
+    // TV where index in TV equals the index in the table
+    TableView all = table.where().find_all();
+    // TV where index in TV is offset by one from the index in the table
+    TableView after_first = table.where().find_all(1);
 
-    size_t r = v.find_first_int(0, 4);
-    CHECK_EQUAL(1, r);
+    // Ensure the TVs have a detached ref to deal with
+    table.remove(3);
+
+    // Look for the values in the second row
+    CHECK_EQUAL(1, all.find_first_int(0, 1));
+    CHECK_EQUAL(1, all.find_first(1, util::Optional<int64_t>(1)));
+    CHECK_EQUAL(0, all.find_first(2, false));
+    CHECK_EQUAL(1, all.find_first(3, util::make_optional(false)));
+    CHECK_EQUAL(1, all.find_first(4, 1.1f));
+    CHECK_EQUAL(1, all.find_first(5, util::make_optional(1.1f)));
+    CHECK_EQUAL(1, all.find_first(6, 1.1));
+    CHECK_EQUAL(1, all.find_first(7, util::make_optional(1.1)));
+    CHECK_EQUAL(1, all.find_first(8, Timestamp(1, 1)));
+    CHECK_EQUAL(1, all.find_first(9, Timestamp(1, 1)));
+    CHECK_EQUAL(1, all.find_first(10, StringData("a")));
+    CHECK_EQUAL(1, all.find_first(11, StringData("a")));
+    CHECK_EQUAL(1, all.find_first(12, BinaryData("a", 1)));
+    CHECK_EQUAL(1, all.find_first(13, BinaryData("a", 1)));
+
+    CHECK_EQUAL(0, after_first.find_first_int(0, 1));
+    CHECK_EQUAL(0, after_first.find_first(1, util::Optional<int64_t>(1)));
+    CHECK_EQUAL(0, after_first.find_first(2, false));
+    CHECK_EQUAL(0, after_first.find_first(3, util::make_optional(false)));
+    CHECK_EQUAL(0, after_first.find_first(4, 1.1f));
+    CHECK_EQUAL(0, after_first.find_first(5, util::make_optional(1.1f)));
+    CHECK_EQUAL(0, after_first.find_first(6, 1.1));
+    CHECK_EQUAL(0, after_first.find_first(7, util::make_optional(1.1)));
+    CHECK_EQUAL(0, after_first.find_first(8, Timestamp(1, 1)));
+    CHECK_EQUAL(0, after_first.find_first(9, Timestamp(1, 1)));
+    CHECK_EQUAL(0, after_first.find_first(10, StringData("a")));
+    CHECK_EQUAL(0, after_first.find_first(11, StringData("a")));
+    CHECK_EQUAL(0, after_first.find_first(12, BinaryData("a", 1)));
+    CHECK_EQUAL(0, after_first.find_first(13, BinaryData("a", 1)));
+
+    // Look for the values in the third row
+    CHECK_EQUAL(2, all.find_first_int(0, 2));
+    CHECK_EQUAL(0, all.find_first(1, util::Optional<int64_t>()));
+    CHECK_EQUAL(2, all.find_first(2, true));
+    CHECK_EQUAL(0, all.find_first(3, util::Optional<bool>()));
+    CHECK_EQUAL(2, all.find_first(4, 2.2f));
+    CHECK_EQUAL(0, all.find_first(5, util::Optional<float>()));
+    CHECK_EQUAL(2, all.find_first(6, 2.2));
+    CHECK_EQUAL(0, all.find_first(7, util::Optional<double>()));
+    CHECK_EQUAL(2, all.find_first(8, Timestamp(2, 2)));
+    CHECK_EQUAL(0, all.find_first(9, Timestamp()));
+    CHECK_EQUAL(2, all.find_first(10, StringData("b")));
+    CHECK_EQUAL(0, all.find_first(11, StringData()));
+    CHECK_EQUAL(2, all.find_first(12, BinaryData("b", 1)));
+    CHECK_EQUAL(0, all.find_first(13, BinaryData()));
+
+    CHECK_EQUAL(1, after_first.find_first_int(0, 2));
+    CHECK_EQUAL(1, after_first.find_first(1, util::Optional<int64_t>()));
+    CHECK_EQUAL(1, after_first.find_first(2, true));
+    CHECK_EQUAL(1, after_first.find_first(3, util::Optional<bool>()));
+    CHECK_EQUAL(1, after_first.find_first(4, 2.2f));
+    CHECK_EQUAL(1, after_first.find_first(5, util::Optional<float>()));
+    CHECK_EQUAL(1, after_first.find_first(6, 2.2));
+    CHECK_EQUAL(1, after_first.find_first(7, util::Optional<double>()));
+    CHECK_EQUAL(1, after_first.find_first(8, Timestamp(2, 2)));
+    CHECK_EQUAL(1, after_first.find_first(9, Timestamp()));
+    CHECK_EQUAL(1, after_first.find_first(10, StringData("b")));
+    CHECK_EQUAL(1, after_first.find_first(11, StringData()));
+    CHECK_EQUAL(1, after_first.find_first(12, BinaryData("b", 1)));
+    CHECK_EQUAL(1, after_first.find_first(13, BinaryData()));
+
+    // Look for values that aren't present
+    CHECK_EQUAL(npos, all.find_first_int(0, 5));
+    CHECK_EQUAL(npos, all.find_first(1, util::Optional<int64_t>(5)));
+    CHECK_EQUAL(npos, all.find_first(4, 3.3f));
+    CHECK_EQUAL(npos, all.find_first(5, util::make_optional(3.3f)));
+    CHECK_EQUAL(npos, all.find_first(6, 3.3));
+    CHECK_EQUAL(npos, all.find_first(7, util::make_optional(3.3)));
+    CHECK_EQUAL(npos, all.find_first(8, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, all.find_first(9, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, all.find_first(10, StringData("c")));
+    CHECK_EQUAL(npos, all.find_first(11, StringData("c")));
+    CHECK_EQUAL(npos, all.find_first(12, BinaryData("c", 1)));
+    CHECK_EQUAL(npos, all.find_first(13, BinaryData("c", 1)));
+
+    CHECK_EQUAL(npos, after_first.find_first_int(0, 5));
+    CHECK_EQUAL(npos, after_first.find_first(1, util::Optional<int64_t>(5)));
+    CHECK_EQUAL(npos, after_first.find_first(4, 3.3f));
+    CHECK_EQUAL(npos, after_first.find_first(5, util::make_optional(3.3f)));
+    CHECK_EQUAL(npos, after_first.find_first(6, 3.3));
+    CHECK_EQUAL(npos, after_first.find_first(7, util::make_optional(3.3)));
+    CHECK_EQUAL(npos, after_first.find_first(8, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, after_first.find_first(9, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, after_first.find_first(10, StringData("c")));
+    CHECK_EQUAL(npos, after_first.find_first(11, StringData("c")));
+    CHECK_EQUAL(npos, after_first.find_first(12, BinaryData("c", 1)));
+    CHECK_EQUAL(npos, after_first.find_first(13, BinaryData("c", 1)));
 }
 
 
