@@ -13082,6 +13082,26 @@ TEST(LangBindHelper_MixedStringRollback)
 }
 
 
+TEST(LangBindHelper_RollbackOptimize)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = crypt_key();
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = sg_w.begin_write();
+
+    g.insert_table(0, "t0");
+    g.get_table(0)->add_column(type_String, "str_col_0", true);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    g.get_table(0)->add_empty_row(198);
+    g.get_table(0)->optimize(true);
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+}
+
+
 TEST(LangBindHelper_BinaryReallocOverMax)
 {
     SHARED_GROUP_TEST_PATH(path);

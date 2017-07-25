@@ -14,6 +14,8 @@
   Fixes issue [#2724](https://github.com/realm/realm-core/issues/2724).
   PR [#2726](https://github.com/realm/realm-core/pull/2726).
 * Fix incorrect results from TableView::find_first().
+* Fix crash on rollback of Table::optimize(). Currently unused by bindings.
+  PR [#2753](https://github.com/realm/realm-core/pull/2753).
 
 ### Breaking changes
 
