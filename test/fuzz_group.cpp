@@ -93,6 +93,7 @@ enum INS {
     MOVE_COLUMN,
     SET_UNIQUE,
     IS_NULL,
+    OPTIMIZE_TABLE,
 
     COUNT
 };
@@ -883,6 +884,15 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     t->swap_rows(row_ndx1, row_ndx2);
                 }
+            }
+            else if (instr == OPTIMIZE_TABLE && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                // Force creation of a string enum column
+                if (log) {
+                    *log << "g.get_table(" << table_ndx << ")->optimize(true);\n";
+                }
+                g.get_table(table_ndx)->optimize(true);
             }
             else if (instr == COMMIT) {
                 if (log) {

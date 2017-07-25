@@ -6161,6 +6161,20 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                 // before the refresh operation is complete.
                 m_cols[col_ndx] = nullptr;
             }
+        } else if (dynamic_cast<StringEnumColumn*>(col) != nullptr) {
+            // If the current column accessor is StringEnumColumn, but the
+            // underlying column has changed to a StringColumn (which can occur
+            // in a rollback), then we need to replace the accessor with an
+            // instance of StringColumn.
+            ColumnType col_type = m_spec.get_column_type(col_ndx);
+            if (col_type == col_type_String) {
+                delete col;
+                col = nullptr;
+                // We need to store null in `m_cols` to avoid a crash during
+                // destruction of the table accessor in case an error occurs
+                // before the refresh operation is complete.
+                m_cols[col_ndx] = nullptr;
+            }
         }
 
         if (col) {
