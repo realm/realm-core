@@ -108,6 +108,26 @@ adb push tests/tests /data/local/tmp
 adb shell /data/local/tmp/tests
 ```
 
+## Using Docker
+
+The `Dockerfile` included in this repo will provision a Docker image suitable
+for building and running tests for both the Linux and Android platforms.
+
+```
+# Build Docker image from Dockerfile
+docker build -t "objectstore" .
+# Run bash interactively from the built Docker image,
+# mounting the current directory
+docker run -it -v `pwd`:`pwd` -w `pwd` objectstore bash
+# Build the object store for Linux and run tests
+> cmake .
+> make
+> make run-tests
+```
+
+Refer to the rest of this document for instructions to build/test in other
+configurations.
+
 ## License
 
 Realm Object Store is published under the Apache 2.0 license. The [underlying core](https://github.com/realm/realm-core) is also published under the Apache 2.0 license.
