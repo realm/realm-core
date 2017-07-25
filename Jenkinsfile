@@ -251,7 +251,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform) {
             getArchive()
 
             dir('build-dir') {
-                withEnv(["_MSPDBSRV_ENDPOINT_=${env.BUILD_TAG}"]) {
+                withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
                     runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: """
                         "${tool 'cmake'}" ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} -D REALM_ENABLE_ENCRYPTION=OFF ..
                         "${tool 'cmake'}" --build . --config ${buildType}
