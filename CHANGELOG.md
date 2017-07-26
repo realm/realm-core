@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.9.0 Release notes
 
 ### Bugfixes
 
@@ -18,10 +18,6 @@
   PR [#2753](https://github.com/realm/realm-core/pull/2753).
 * Update frozen TableViews when Table::swap() is called.
   PR [#2757](https://github.com/realm/realm-core/pull/2757).
-
-### Breaking changes
-
-* Lorem ipsum.
 
 ### Enhancements
 
