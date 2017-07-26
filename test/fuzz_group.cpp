@@ -66,13 +66,13 @@ enum INS {
     REMOVE_TABLE,
     INSERT_ROW,
     ADD_EMPTY_ROW,
+    ADD_ROW_WITH_KEY,
     INSERT_COLUMN,
     RENAME_COLUMN,
     ADD_COLUMN,
     REMOVE_COLUMN,
     SET,
     REMOVE_ROW,
-    MERGE_ROWS,
     ADD_COLUMN_LINK,
     ADD_COLUMN_LINK_LIST,
     CLEAR_TABLE,
@@ -93,6 +93,7 @@ enum INS {
     MOVE_COLUMN,
     SET_UNIQUE,
     IS_NULL,
+    OPTIMIZE_TABLE,
 
     COUNT
 };
@@ -431,6 +432,26 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         }
                         g.get_table(table_ndx)->add_empty_row(num_rows % add_empty_row_max);
                     }
+                }
+            }
+            else if (instr == ADD_ROW_WITH_KEY && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef table = g.get_table(table_ndx);
+                size_t nb_columns = table->get_column_count();
+                size_t col = 0;
+                while (col < nb_columns) {
+                    if (table->get_column_type(col) == type_Int && !table->is_nullable(col)) {
+                        break;
+                    }
+                    col++;
+                }
+                if (col < nb_columns) {
+                    int64_t value = get_int64(s);
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->add_row_with_key"
+                             << "(" << col << ", " << value << ");\n";
+                    }
+                    g.get_table(table_ndx)->add_row_with_key(col, value);
                 }
             }
             else if (instr == ADD_COLUMN && g.size() > 0) {
@@ -840,34 +861,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     t->remove(row_ndx);
                 }
             }
-            else if (instr == MERGE_ROWS && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
-                TableRef t = g.get_table(table_ndx);
-                if (t->size() > 1) {
-                    size_t row_ndx1 = get_next(s) % t->size();
-                    size_t row_ndx2 = get_next(s) % t->size();
-                    if (row_ndx1 == row_ndx2) {
-                        row_ndx2 = (row_ndx2 + 1) % t->size();
-                    }
-                    // A restriction of merge_rows is that any linklists in the
-                    // "to" row must be empty because merging lists is not defined.
-                    for (size_t col_ndx = 0; col_ndx != t->get_column_count(); ++col_ndx) {
-                        if (t->get_column_type(col_ndx) == DataType::type_LinkList) {
-                            if (!t->get_linklist(col_ndx, row_ndx2)->is_empty()) {
-                                if (log) {
-                                    *log << "g.get_table(" << table_ndx << ")->get_linklist("
-                                    << col_ndx << ", " << row_ndx2 << ")->clear();\n";
-                                }
-                                t->get_linklist(col_ndx, row_ndx2)->clear();
-                            }
-                        }
-                    }
-                    if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->merge_rows(" << row_ndx1 << ", " << row_ndx2 << ");\n";
-                    }
-                    t->merge_rows(row_ndx1, row_ndx2);
-                }
-            }
             else if (instr == MOVE_LAST_OVER && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 TableRef t = g.get_table(table_ndx);
@@ -891,6 +884,15 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     t->swap_rows(row_ndx1, row_ndx2);
                 }
+            }
+            else if (instr == OPTIMIZE_TABLE && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                // Force creation of a string enum column
+                if (log) {
+                    *log << "g.get_table(" << table_ndx << ")->optimize(true);\n";
+                }
+                g.get_table(table_ndx)->optimize(true);
             }
             else if (instr == COMMIT) {
                 if (log) {

@@ -3056,6 +3056,34 @@ TEST(Table_SubtableIndex)
     }
 }
 
+TEST(LangBindHelper_SubtableSizeIncorrect)
+{
+    // Based on finding from AFL
+    // Problem was that creating a subtable if both search index and nullable flag
+    // was set in column attributes would clear the nullable flag. This would prevent
+    // accessors to already existing subtables to be created correctly (IntegerColumn on
+    // a IntNullColumn structure).
+    Table table;
+    DescriptorRef subdescr;
+    table.add_column(type_Table, "col", true, &subdescr);
+    // add int column that is nullable
+    subdescr->add_column(type_Int, "integers", nullptr, true);
+    table.add_empty_row(2);
+    // Create subtable entry
+    table.get_subtable(0, 1)->clear();
+    // Now we have one degenerate and one proper table
+    table.get_subdescriptor(0)->add_search_index(0);
+    table.add_empty_row();
+
+    // Before the fix this operation cleared the nullable flag in the spec
+    table.get_subtable(0, 2)->clear();
+    // Create subtable accessor
+    TableRef sub1 = table.get_subtable(0, 1);
+    CHECK_EQUAL(sub1->size(), 0);
+    sub1->add_empty_row(1);
+    sub1->set_int(0, 0, 7, false);
+}
+
 TEST(Table_SpecColumnPath)
 {
     Group group;
@@ -6230,6 +6258,10 @@ TEST(Table_RowAccessorLinks)
     CHECK(source_row_2.linklist_is_empty(1));
     CHECK_EQUAL(0, source_row_1.get_link_count(1));
     CHECK_EQUAL(0, source_row_2.get_link_count(1));
+    CHECK_EQUAL(0, target_table->get(7).get_backlink_count());
+    CHECK_EQUAL(0, target_table->get(13).get_backlink_count());
+    CHECK_EQUAL(0, target_table->get(11).get_backlink_count());
+    CHECK_EQUAL(0, target_table->get(15).get_backlink_count());
     CHECK_EQUAL(0, target_table->get(7).get_backlink_count(*origin_table, 0));
     CHECK_EQUAL(0, target_table->get(13).get_backlink_count(*origin_table, 0));
     CHECK_EQUAL(0, target_table->get(11).get_backlink_count(*origin_table, 1));
@@ -6265,12 +6297,18 @@ TEST(Table_RowAccessorLinks)
     CHECK(!source_row_2.linklist_is_empty(1));
     CHECK_EQUAL(1, source_row_1.get_link_count(1));
     CHECK_EQUAL(2, source_row_2.get_link_count(1));
+    CHECK_EQUAL(1, target_table->get(11).get_backlink_count());
+    CHECK_EQUAL(2, target_table->get(15).get_backlink_count());
     CHECK_EQUAL(1, target_table->get(11).get_backlink_count(*origin_table, 1));
     CHECK_EQUAL(2, target_table->get(15).get_backlink_count(*origin_table, 1));
     CHECK_EQUAL(1, target_table->get(11).get_backlink(*origin_table, 1, 0));
     size_t back_link_1 = target_table->get(15).get_backlink(*origin_table, 1, 0);
     size_t back_link_2 = target_table->get(15).get_backlink(*origin_table, 1, 1);
     CHECK((back_link_1 == 0 && back_link_2 == 1) || (back_link_1 == 1 && back_link_2 == 0));
+
+    // Links from multiple columns (count total)
+    source_row_1.set_link(0, 15);
+    CHECK_EQUAL(3, target_table->get(15).get_backlink_count());
 
     // Clear link lists
     link_list_1->clear();
@@ -7202,6 +7240,55 @@ TEST(Table_IndexStringDelete)
     }
 }
 
+TEST(Table_NullableChecks)
+{
+    Table t;
+    TableView tv;
+    constexpr bool nullable = true;
+    size_t str_col = t.add_column(type_String, "str", nullable);
+    size_t int_col = t.add_column(type_Int, "int", nullable);
+    size_t bool_col = t.add_column(type_Bool, "bool", nullable);
+    size_t ts_col = t.add_column(type_Timestamp, "timestamp", nullable);
+    size_t float_col = t.add_column(type_Float, "float", nullable);
+    size_t double_col = t.add_column(type_Double, "double", nullable);
+    size_t binary_col = t.add_column(type_Binary, "binary", nullable);
+
+    t.add_empty_row();
+    StringData sd; // construct a null reference
+    Timestamp ts; // null
+    BinaryData bd;; // null
+    t.set(str_col, 0, sd);
+    t.set(int_col, 0, realm::null());
+    t.set(bool_col, 0, realm::null());
+    t.set(ts_col, 0, ts);
+    t.set(float_col, 0, realm::null());
+    t.set(double_col, 0, realm::null());
+    t.set(binary_col, 0, bd);
+
+    // is_null is always reliable regardless of type
+    CHECK(t.is_null(str_col, 0));
+    CHECK(t.is_null(int_col, 0));
+    CHECK(t.is_null(bool_col, 0));
+    CHECK(t.is_null(ts_col, 0));
+    CHECK(t.is_null(float_col, 0));
+    CHECK(t.is_null(double_col, 0));
+    CHECK(t.is_null(binary_col, 0));
+
+    StringData str0 = t.get_string(str_col, 0);
+    CHECK(str0.is_null());
+    util::Optional<int64_t> int0 = t.get<util::Optional<int64_t>>(int_col, 0);
+    CHECK(!int0);
+    util::Optional<bool> bool0 = t.get<util::Optional<bool>>(bool_col, 0);
+    CHECK(!bool0);
+    Timestamp ts0 = t.get_timestamp(ts_col, 0);
+    CHECK(ts0.is_null());
+    util::Optional<float> float0 = t.get<util::Optional<float>>(float_col, 0);
+    CHECK(!float0);
+    util::Optional<double> double0 = t.get<util::Optional<double>>(double_col, 0);
+    CHECK(!double0);
+    BinaryData binary0 = t.get_binary(binary_col, 0);
+    CHECK(binary0.is_null());
+}
 
 TEST(Table_Nulls)
 {
@@ -8127,5 +8214,21 @@ TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
     check_column_sizes(10 * REALM_MAX_BPNODE_SIZE);
 }
 
+TEST(Table_KeyRow)
+{
+    Table table;
+    table.add_column(type_Int, "int");
+    table.add_column(type_String, "string");
+    table.add_search_index(0);
+
+    size_t ndx = table.add_row_with_key(0, 123);
+    table.set_string(1, ndx, "Hello, ");
+    table.add_row_with_key(0, 456);
+
+    size_t i = table.find_first_int(0, 123);
+    CHECK_EQUAL(i, 0);
+    i = table.find_first_int(0, 456);
+    CHECK_EQUAL(i, 1);
+}
 
 #endif // TEST_TABLE

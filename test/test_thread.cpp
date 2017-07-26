@@ -24,19 +24,20 @@
 #include <queue>
 #include <functional>
 #include <mutex>
+#include <thread>
+#include <atomic>
 
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/time.h>
+#include <realm/utilities.hpp> // gettimeofday()
 #endif
 
 #include <realm/group_shared_options.hpp>
 #include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
-#ifndef _WIN32
 #include <realm/util/interprocess_condvar.hpp>
-#endif
 #include <realm/util/interprocess_mutex.hpp>
 
 #include <iostream>
@@ -603,8 +604,8 @@ TEST(Thread_RobustMutexTryLock)
     m.unlock();
 }
 
-#ifndef _WIN32 // trylock on process-shared mutexes not supported on Windows
-
+#ifndef _WIN32 // FIXME: trylock is not supported by the win32-pthread lib on Windows. No need to fix this
+               // because we are going to switch to native API soon and discard win32-pthread entirely
 NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
 {
     Thread thread;
@@ -641,8 +642,6 @@ NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
 }
 
 #endif
-
-#ifndef _WIN32 // interprocess condvars not suported in Windows yet
 
 // Detect and flag trivial implementations of condvars.
 namespace {
@@ -885,6 +884,85 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
 }
 
 
-#endif // _WIN32
+// Test that the unlock+wait operation of wait() takes part atomically, i.e. that there is no time
+// gap between them where another thread could invoke signal() which could go undetected by the wait.
+TEST(Thread_CondvarAtomicWaitUnlock)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    const int iter = 10000;
+
+    // It's nice to have many threads to trigger preemption (see notes inside the t1 thread)
+    const int thread_pair_count = 2; // std::thread::hardware_concurrency();
+    std::vector<std::thread> threads;
+    for (int tpc = 0; tpc < thread_pair_count; tpc++) {
+
+        threads.push_back(std::thread([&]() {
+            InterprocessMutex mutex;
+            InterprocessMutex::SharedPart mutex_part;
+            InterprocessCondVar condvar;
+            InterprocessCondVar::SharedPart condvar_part;
+            SharedGroupOptions default_options;
+
+            std::stringstream ss;
+            ss << std::this_thread::get_id();
+            std::string id = ss.str();
+
+            mutex.set_shared_part(mutex_part, path, "mutex" + id);
+            condvar.set_shared_part(condvar_part, path, "sema" + id, default_options.temp_dir);
+            InterprocessCondVar::init_shared_part(condvar_part);
+
+            std::atomic<bool> signal(false);
+            std::atomic<bool> end(false);
+
+            std::thread t1([&]() {
+                for (int i = 0; i < iter; i++) {
+                    mutex.lock();
+                    signal = true;
+
+                    // A gap in wait() could be very tight, so we need a way to preemt it between two instructions.
+                    // Problem is that we have so many/frequent operating system wait calls in this that they might 
+                    // be invoked closer than a thread time slice, so preemption would never occur. So we create 
+                    // some work that some times willsome times bring the current time slice close to its end.
+
+                    // Wait between 0 and number of clocks on 100 ms on a on 3 GHz machine (100 ms is Linux default
+                    // time slice)
+                    uint64_t clocks_to_wait = fastrand(3ULL * 1000000000ULL / 1000000ULL * 100ULL); 
+
+                    // This loop can wait alot more than 100 ms because each iteration takes many more clocks than 
+                    // just 1. That's intentional and will cover other OS'es with bigger time slices.
+                    volatile int sum = 0; // must be volatile, else it compiles into no-op
+                    for (uint64_t t = 0; t < clocks_to_wait; t++) {
+                        sum++;
+                    }
+
+                    condvar.wait(mutex, nullptr);
+                    mutex.unlock();
+                }
+            });
+
+            // This thread calls notify() exactly one time after the other thread has invoked wait() and has
+            // released the mutex. If wait() misses the notify() then there is a bug, which will reveal itself 
+            // by both threads hanging infinitely.
+            std::thread t2([&]() {
+                for (int i = 0; i < iter; i++) {
+                    while (!signal) {
+                    }
+                    signal = false;
+                    mutex.lock();
+                    condvar.notify();
+                    mutex.unlock();
+                }
+            });
+            
+            t1.join();
+            t2.join();
+        }));
+    }
+
+    for (int i = 0; i < thread_pair_count; i++) {
+        threads[i].join();
+    }
+}
 
 #endif // TEST_THREAD

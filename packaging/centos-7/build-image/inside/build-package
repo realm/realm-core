@@ -5,146 +5,139 @@ set -e
 # we should always set proper ownership before exiting, otherwise
 # the created packages will have root:root ownership and we'll be unable
 # to delete them from our host.
-trap 'code=$?; chown -R --reference /inside/build-package /out/; exit $code' EXIT
+trap 'chown -R --reference /inside/build-package /out/' EXIT
 
-clean_binaries() {
-  # Remove unneeded information from binaries
-  for path in $*; do
-    cd "$path"
-
-    rm -rf usr/{lib64,libexec,bin}/*-dbg*
-
-    for file in usr/{lib64,libexec,bin}/*; do
-        if [ -f "$file"  ];then
-            strip --strip-debug --strip-unneeded "$file"
-            chrpath -d "$file" || true
-        fi
-    done
-
-    cd - >/dev/null
-  done
-}
-
-VERSION=$(echo ${VERSION} | tr - _)
+# RPMs do not allow dashes in the version string, so we replace it here with an underscore.
+# This would have been done automatically by fpm, but not for dependencies.
+VERSION=${VERSION/-/_}
 
 # the source directory is mounted read-only to prevent issues where the build
 # could alter the source; we should copy it somewhere inside the container
 cp -a /source /tmp/build
 cd /tmp/build
 
-# Configure the build
-REALM_ENABLE_ENCRYPTION=yes sh build.sh config /usr
-# Build and install
-sh build.sh build
-sh build.sh build-node
-DESTDIR=/prod sh build.sh install-prod
-DESTDIR=/devel sh build.sh install-devel
-
-mkdir -p /node-devel/usr/lib64
-cp src/realm/librealm-node* /node-devel/usr/lib64
-
-clean_binaries /prod /devel /node-devel
-
-# Reorganise a few files
-mkdir -p /utils/usr/bin
-mv /prod/usr/bin/realm-import /utils/usr/bin
-mv /prod/usr/lib64/*.so /devel/usr/lib64
-
-# Realm-node package
-doc_folder=usr/share/doc/realm-node-$VERSION
-mkdir -p /node/$doc_folder
-echo "The realm-node package is empty at the moment." > /node/$doc_folder/README
+rm -rf build-dir
+mkdir build-dir
+cd build-dir
+cmake3 -DREALM_ENABLE_ENCRYPTION=1 \
+      -DREALM_NO_TESTS=1 \
+      -DCMAKE_INSTALL_PREFIX=/prod \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_MAKE_PROGRAM=ninja-build \
+      -GNinja ..
+ninja-build
+ninja-build install/strip
 
 echo "ldconfig" > /tmp/post-ldconf
 echo "echo >/dev/null" >> /tmp/post-ldconf
 
+(
 cd /out
 
-# don't forget to list all runtime dependencies for your package (i.e. all the
-# shared libraries you link to!)
 fpm \
     -t rpm \
     -s dir \
     -n realm \
     --rpm-dist el7 \
-    --license "Realm License" \
-    --version ${VERSION} \
-    --iteration ${ITERATION} \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
     --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    --after-install /tmp/post-ldconf \
-    --after-remove /tmp/post-ldconf \
-    -d "openssl-libs" \
-    -C /prod \
-    usr/lib64 usr/libexec
+    --after-install "/tmp/post-ldconf" \
+    --after-remove "/tmp/post-ldconf" \
+    -d "openssl" \
+    -C "/prod" \
+    lib64/librealm.so=/usr/lib64/librealm.so \
+    libexec=/usr
 
 fpm \
     -t rpm \
     -s dir \
     -n realm-devel \
     --rpm-dist el7 \
-    --license "Realm License" \
-    --version ${VERSION} \
-    --iteration ${ITERATION} \
-    --description "Development headers and tools for the realm-core database component" \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
+    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
     -d "realm = ${VERSION}-${ITERATION}.el7" \
     -d "openssl-devel" \
-    -C /devel \
-    usr/lib64 usr/include usr/bin
-
-fpm \
-    -t rpm \
-    -s dir \
-    -n realm-node \
-    --rpm-dist el7 \
-    --license "Realm License" \
-    --version ${VERSION} \
-    --iteration ${ITERATION} \
-    --description "Realm-core database component for node" \
-    --url "https://realm.io" \
-    --category "System Environment/Libraries" \
-    --vendor "Realm" \
-    --maintainer "Realm <help@realm.io>" \
-    -C /node \
-    $doc_folder
-
-fpm \
-    -t rpm \
-    -s dir \
-    -n realm-node-devel \
-    --rpm-dist el7 \
-    --license "Realm License" \
-    --version ${VERSION} \
-    --iteration ${ITERATION} \
-    --description "Development realm-core database component for node" \
-    --url "https://realm.io" \
-    --category "System Environment/Libraries" \
-    --vendor "Realm" \
-    --maintainer "Realm <help@realm.io>" \
-    -d "realm-devel = ${VERSION}-${ITERATION}.el7" \
-    -C /node-devel \
-    usr/lib64
+    -C "/prod" \
+    /include=/usr \
+    /lib64/librealm.a=/usr/lib64/librealm.a \
+    /bin/realm-config=/usr/bin/realm-config
 
 fpm \
     -t rpm \
     -s dir \
     -n realm-utils \
     --rpm-dist el7 \
-    --license "Realm License" \
-    --version ${VERSION} \
-    --iteration ${ITERATION} \
-    --description "Utilities to work with Realm files" \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
+    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
     --url "https://realm.io" \
-    --category "Applications/Databases" \
+    --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
     -d "realm = ${VERSION}-${ITERATION}.el7" \
-    -C /utils \
-    usr/bin
+    -C "/prod" \
+    /bin/realm-importer=/usr/bin/realm-importer
+)
+
+rm -rf -- * /prod/*
+cmake3 -DREALM_ENABLE_ENCRYPTION=1 \
+       -DREALM_NO_TESTS=1 \
+       -DCMAKE_INSTALL_PREFIX=/prod \
+       -DCMAKE_BUILD_TYPE=Debug \
+       -DCMAKE_MAKE_PROGRAM=ninja-build \
+       -GNinja ..
+ninja-build
+ninja-build install
+
+cd /out
+
+fpm \
+    -t rpm \
+    -s dir \
+    -n realm-debug \
+    --rpm-dist el7 \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
+    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
+    --url "https://realm.io" \
+    --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Realm <help@realm.io>" \
+    --after-install "/tmp/post-ldconf" \
+    --after-remove "/tmp/post-ldconf" \
+    -d "openssl" \
+    -C "/prod" \
+    lib64/librealm-dbg.so=/usr/lib64/librealm-dbg.so \
+    libexec=/usr
+
+fpm \
+    -t rpm \
+    -s dir \
+    -n realm-devel-debug \
+    --rpm-dist el7 \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
+    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
+    --url "https://realm.io" \
+    --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Realm <help@realm.io>" \
+    -d "realm-devel = ${VERSION}-${ITERATION}.el7" \
+    -d "openssl-devel" \
+    -C "/prod" \
+    lib64/librealm-dbg.so=/usr/lib64/librealm-dbg.a

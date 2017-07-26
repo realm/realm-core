@@ -481,19 +481,124 @@ TEST(TableView_Min2)
 TEST(TableView_Find)
 {
     TestTable table;
-    table.add_column(type_Int, "first");
+    table.add_column(type_Int, "int");
+    table.add_column(type_Int, "int?", true);
+    table.add_column(type_Bool, "bool");
+    table.add_column(type_Bool, "bool?", true);
+    table.add_column(type_Float, "float");
+    table.add_column(type_Float, "float?", true);
+    table.add_column(type_Double, "double");
+    table.add_column(type_Double, "double?", true);
+    table.add_column(type_Timestamp, "timestamp");
+    table.add_column(type_Timestamp, "timestamp?", true);
+    table.add_column(type_String, "string");
+    table.add_column(type_String, "string?", true);
+    table.add_column(type_Binary, "binary");
+    table.add_column(type_Binary, "binary?", true);
 
     add(table, 0);
-    add(table, 0);
-    add(table, 0);
+    add(table, 1, 1, false, false, 1.1f, 1.1f, 1.1, 1.1, Timestamp(1, 1), Timestamp(1, 1),
+        "a", "a", BinaryData("a", 1), BinaryData("a", 1));
+    add(table, 2, nullptr, true, nullptr, 2.2f, nullptr, 2.2, nullptr, Timestamp(2, 2), nullptr,
+        "b", nullptr, BinaryData("b", 1), nullptr);
+    add(table, -1);
 
-    TableView v = table.find_all_int(0, 0);
-    v[0].set_int(0, 5);
-    v[1].set_int(0, 4);
-    v[2].set_int(0, 4);
+    // TV where index in TV equals the index in the table
+    TableView all = table.where().find_all();
+    // TV where index in TV is offset by one from the index in the table
+    TableView after_first = table.where().find_all(1);
 
-    size_t r = v.find_first_int(0, 4);
-    CHECK_EQUAL(1, r);
+    // Ensure the TVs have a detached ref to deal with
+    table.remove(3);
+
+    // Look for the values in the second row
+    CHECK_EQUAL(1, all.find_first_int(0, 1));
+    CHECK_EQUAL(1, all.find_first(1, util::Optional<int64_t>(1)));
+    CHECK_EQUAL(0, all.find_first(2, false));
+    CHECK_EQUAL(1, all.find_first(3, util::make_optional(false)));
+    CHECK_EQUAL(1, all.find_first(4, 1.1f));
+    CHECK_EQUAL(1, all.find_first(5, util::make_optional(1.1f)));
+    CHECK_EQUAL(1, all.find_first(6, 1.1));
+    CHECK_EQUAL(1, all.find_first(7, util::make_optional(1.1)));
+    CHECK_EQUAL(1, all.find_first(8, Timestamp(1, 1)));
+    CHECK_EQUAL(1, all.find_first(9, Timestamp(1, 1)));
+    CHECK_EQUAL(1, all.find_first(10, StringData("a")));
+    CHECK_EQUAL(1, all.find_first(11, StringData("a")));
+    CHECK_EQUAL(1, all.find_first(12, BinaryData("a", 1)));
+    CHECK_EQUAL(1, all.find_first(13, BinaryData("a", 1)));
+
+    CHECK_EQUAL(0, after_first.find_first_int(0, 1));
+    CHECK_EQUAL(0, after_first.find_first(1, util::Optional<int64_t>(1)));
+    CHECK_EQUAL(0, after_first.find_first(2, false));
+    CHECK_EQUAL(0, after_first.find_first(3, util::make_optional(false)));
+    CHECK_EQUAL(0, after_first.find_first(4, 1.1f));
+    CHECK_EQUAL(0, after_first.find_first(5, util::make_optional(1.1f)));
+    CHECK_EQUAL(0, after_first.find_first(6, 1.1));
+    CHECK_EQUAL(0, after_first.find_first(7, util::make_optional(1.1)));
+    CHECK_EQUAL(0, after_first.find_first(8, Timestamp(1, 1)));
+    CHECK_EQUAL(0, after_first.find_first(9, Timestamp(1, 1)));
+    CHECK_EQUAL(0, after_first.find_first(10, StringData("a")));
+    CHECK_EQUAL(0, after_first.find_first(11, StringData("a")));
+    CHECK_EQUAL(0, after_first.find_first(12, BinaryData("a", 1)));
+    CHECK_EQUAL(0, after_first.find_first(13, BinaryData("a", 1)));
+
+    // Look for the values in the third row
+    CHECK_EQUAL(2, all.find_first_int(0, 2));
+    CHECK_EQUAL(0, all.find_first(1, util::Optional<int64_t>()));
+    CHECK_EQUAL(2, all.find_first(2, true));
+    CHECK_EQUAL(0, all.find_first(3, util::Optional<bool>()));
+    CHECK_EQUAL(2, all.find_first(4, 2.2f));
+    CHECK_EQUAL(0, all.find_first(5, util::Optional<float>()));
+    CHECK_EQUAL(2, all.find_first(6, 2.2));
+    CHECK_EQUAL(0, all.find_first(7, util::Optional<double>()));
+    CHECK_EQUAL(2, all.find_first(8, Timestamp(2, 2)));
+    CHECK_EQUAL(0, all.find_first(9, Timestamp()));
+    CHECK_EQUAL(2, all.find_first(10, StringData("b")));
+    CHECK_EQUAL(0, all.find_first(11, StringData()));
+    CHECK_EQUAL(2, all.find_first(12, BinaryData("b", 1)));
+    CHECK_EQUAL(0, all.find_first(13, BinaryData()));
+
+    CHECK_EQUAL(1, after_first.find_first_int(0, 2));
+    CHECK_EQUAL(1, after_first.find_first(1, util::Optional<int64_t>()));
+    CHECK_EQUAL(1, after_first.find_first(2, true));
+    CHECK_EQUAL(1, after_first.find_first(3, util::Optional<bool>()));
+    CHECK_EQUAL(1, after_first.find_first(4, 2.2f));
+    CHECK_EQUAL(1, after_first.find_first(5, util::Optional<float>()));
+    CHECK_EQUAL(1, after_first.find_first(6, 2.2));
+    CHECK_EQUAL(1, after_first.find_first(7, util::Optional<double>()));
+    CHECK_EQUAL(1, after_first.find_first(8, Timestamp(2, 2)));
+    CHECK_EQUAL(1, after_first.find_first(9, Timestamp()));
+    CHECK_EQUAL(1, after_first.find_first(10, StringData("b")));
+    CHECK_EQUAL(1, after_first.find_first(11, StringData()));
+    CHECK_EQUAL(1, after_first.find_first(12, BinaryData("b", 1)));
+    CHECK_EQUAL(1, after_first.find_first(13, BinaryData()));
+
+    // Look for values that aren't present
+    CHECK_EQUAL(npos, all.find_first_int(0, 5));
+    CHECK_EQUAL(npos, all.find_first(1, util::Optional<int64_t>(5)));
+    CHECK_EQUAL(npos, all.find_first(4, 3.3f));
+    CHECK_EQUAL(npos, all.find_first(5, util::make_optional(3.3f)));
+    CHECK_EQUAL(npos, all.find_first(6, 3.3));
+    CHECK_EQUAL(npos, all.find_first(7, util::make_optional(3.3)));
+    CHECK_EQUAL(npos, all.find_first(8, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, all.find_first(9, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, all.find_first(10, StringData("c")));
+    CHECK_EQUAL(npos, all.find_first(11, StringData("c")));
+    CHECK_EQUAL(npos, all.find_first(12, BinaryData("c", 1)));
+    CHECK_EQUAL(npos, all.find_first(13, BinaryData("c", 1)));
+
+    CHECK_EQUAL(npos, after_first.find_first_int(0, 5));
+    CHECK_EQUAL(npos, after_first.find_first(1, util::Optional<int64_t>(5)));
+    CHECK_EQUAL(npos, after_first.find_first(4, 3.3f));
+    CHECK_EQUAL(npos, after_first.find_first(5, util::make_optional(3.3f)));
+    CHECK_EQUAL(npos, after_first.find_first(6, 3.3));
+    CHECK_EQUAL(npos, after_first.find_first(7, util::make_optional(3.3)));
+    CHECK_EQUAL(npos, after_first.find_first(8, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, after_first.find_first(9, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, after_first.find_first(10, StringData("c")));
+    CHECK_EQUAL(npos, after_first.find_first(11, StringData("c")));
+    CHECK_EQUAL(npos, after_first.find_first(12, BinaryData("c", 1)));
+    CHECK_EQUAL(npos, after_first.find_first(13, BinaryData("c", 1)));
 }
 
 
@@ -668,6 +773,7 @@ NONCONCURRENT_TEST(TableView_StringSort)
 
     // Should be exactly the same as above because 0 was default already
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
+    v = table.where().find_all();
     v.sort(0);
     CHECK_EQUAL("alpha", v[0].get_string(0));
     CHECK_EQUAL("ALPHA", v[1].get_string(0));
@@ -675,6 +781,7 @@ NONCONCURRENT_TEST(TableView_StringSort)
     CHECK_EQUAL("ZEBRA", v[3].get_string(0));
 
     // Test descending mode
+    v = table.where().find_all();
     v.sort(0, false);
     CHECK_EQUAL("alpha", v[3].get_string(0));
     CHECK_EQUAL("ALPHA", v[2].get_string(0));
@@ -691,6 +798,7 @@ NONCONCURRENT_TEST(TableView_StringSort)
 
     // Test if callback comparer works. Our callback is a primitive dummy-comparer
     set_string_compare_method(STRING_COMPARE_CALLBACK, comparer);
+    v = table.where().find_all();
     v.sort(0);
     CHECK_EQUAL("ALPHA", v[0].get_string(0));
     CHECK_EQUAL("ZEBRA", v[1].get_string(0));
@@ -704,6 +812,7 @@ NONCONCURRENT_TEST(TableView_StringSort)
     got_called = false;
     bool available = set_string_compare_method(STRING_COMPARE_CPP11, nullptr);
     if (available) {
+        v = table.where().find_all();
         v.sort(0);
         CHECK_EQUAL("alpha", v[0].get_string(0));
         CHECK_EQUAL("ALPHA", v[1].get_string(0));
@@ -1395,6 +1504,7 @@ TEST(TableView_MultiColSort)
     CHECK_EQUAL(tv.get_float(1, 2), 2.f);
 
     std::vector<bool> a_descending = {false, false};
+    tv = table.where().find_all();
     tv.sort(SortDescriptor{table, v, a_descending});
 
     CHECK_EQUAL(tv.get_float(1, 0), 2.f);
@@ -1402,6 +1512,7 @@ TEST(TableView_MultiColSort)
     CHECK_EQUAL(tv.get_float(1, 2), 0.f);
 
     std::vector<bool> a_ascdesc = {true, false};
+    tv = table.where().find_all();
     tv.sort(SortDescriptor{table, v, a_ascdesc});
 
     CHECK_EQUAL(tv.get_float(1, 0), 0.f);
@@ -1820,12 +1931,20 @@ struct DistinctDirect {
     {
     }
 
-    SortDescriptor operator()(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
+    SortDescriptor get_sort(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
     {
         std::vector<std::vector<size_t>> column_indices;
         for (size_t col : columns)
             column_indices.push_back({col});
         return SortDescriptor(table, column_indices, ascending);
+    }
+
+    DistinctDescriptor get_distinct(std::initializer_list<size_t> columns) const
+    {
+        std::vector<std::vector<size_t>> column_indices;
+        for (size_t col : columns)
+            column_indices.push_back({col});
+        return DistinctDescriptor(table, column_indices);
     }
 
     size_t get_source_ndx(const TableView& tv, size_t ndx) const
@@ -1851,12 +1970,20 @@ struct DistinctOverLink {
     {
     }
 
-    SortDescriptor operator()(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
+    SortDescriptor get_sort(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
     {
         std::vector<std::vector<size_t>> column_indices;
         for (size_t col : columns)
             column_indices.push_back({0, col});
         return SortDescriptor(table, column_indices, ascending);
+    }
+
+    DistinctDescriptor get_distinct(std::initializer_list<size_t> columns) const
+    {
+        std::vector<std::vector<size_t>> column_indices;
+        for (size_t col : columns)
+            column_indices.push_back({0, col});
+        return DistinctDescriptor(table, column_indices);
     }
 
     size_t get_source_ndx(const TableView& tv, size_t ndx) const
@@ -1879,10 +2006,10 @@ struct DistinctOverLink {
 TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
 {
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
-    // If multiple rows are indentical for the given set of distinct-columns, then only the first is kept.
+    // If multiple rows are identical for the given set of distinct-columns, then only the first is kept.
     // You can call sync_if_needed() to update the distinct view, just like you can for a sorted view.
-    // Each time you call distinct() it will first fetch the full original TableView contents and then apply
-    // distinct() on that. So it distinct() does not filter the result of the previous distinct().
+    // Each time you call distinct() it will compound on the previous call.
+    // Results of distinct are affected by a previously applied sort order.
 
     // distinct() is internally based on the existing sort() method which is well tested. Hence it's not required
     // to test distinct() with all possible Realm data types.
@@ -1935,7 +2062,7 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
 
     TableView tv;
     tv = h.find_all();
-    tv.distinct(h({0}));
+    tv.distinct(h.get_distinct({0}));
     CHECK_EQUAL(tv.size(), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 0);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 1);
@@ -1943,8 +2070,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     CHECK_EQUAL(h.get_source_ndx(tv, 3), 6);
 
     tv = h.find_all();
-    tv.sort(h({0}));
-    tv.distinct(h({0}));
+    tv.distinct(h.get_distinct({0}));
+    tv.sort(h.get_sort({0}));
     CHECK_EQUAL(tv.size(), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 1);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 0);
@@ -1952,8 +2079,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     CHECK_EQUAL(h.get_source_ndx(tv, 3), 4);
 
     tv = h.find_all();
-    tv.sort(h({0}, {false}));
-    tv.distinct(h({0}));
+    tv.distinct(h.get_distinct({0}));
+    tv.sort(h.get_sort({0}, {false}));
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 6);
     CHECK_EQUAL(h.get_source_ndx(tv, 2), 0);
@@ -1961,8 +2088,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
 
     // Note here that our stable sort will sort the two "foo"s like row {4, 5}
     tv = h.find_all();
-    tv.sort(h({0}, {false}));
-    tv.distinct(h({0, 1}));
+    tv.distinct(h.get_distinct({0, 1}));
+    tv.sort(h.get_sort({0}, {false}));
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
@@ -1974,8 +2101,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     // Now try distinct on string+float column. The float column has the same values as the int column
     // so the result should equal the test above
     tv = h.find_all();
-    tv.sort(h({0}, {false}));
-    tv.distinct(h({0, 1}));
+    tv.distinct(h.get_distinct({0, 1}));
+    tv.sort(h.get_sort({0}, {false}));
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
@@ -1987,8 +2114,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     // Same as previous test, but with string column being Enum
     t.optimize(true); // true = enforce regardless if Realm thinks it pays off or not
     tv = h.find_all();
-    tv.sort(h({0}, {false}));
-    tv.distinct(h({0, 1}));
+    tv.distinct(h.get_distinct({0, 1}));
+    tv.sort(h.get_sort({0}, {false}));
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
@@ -2001,20 +2128,15 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     tv = h.find_all();
     // "", null, "", null, "foo", "foo", "bar"
 
-    tv.sort(h({0}, {false}));
-    // "foo", "foo", "bar", "", "", null, null
-
-    CHECK_EQUAL(tv.size(), 7);
-    CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
-    CHECK_EQUAL(h.get_string(tv, 0, 1), "foo");
-    CHECK_EQUAL(h.get_string(tv, 0, 2), "bar");
-    CHECK_EQUAL(h.get_string(tv, 0, 3), "");
-    CHECK_EQUAL(h.get_string(tv, 0, 4), "");
-    CHECK(h.get_string(tv, 0, 5).is_null());
-    CHECK(h.get_string(tv, 0, 6).is_null());
-
-    tv.distinct(h({0}));
+    tv.distinct(h.get_distinct({0}));
+    tv.sort(h.get_sort({0}, {false}));
     // "foo", "bar", "", null
+
+    CHECK_EQUAL(tv.size(), 4);
+    CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
+    CHECK_EQUAL(h.get_string(tv, 0, 1), "bar");
+    CHECK_EQUAL(h.get_string(tv, 0, 2), "");
+    CHECK(h.get_string(tv, 0, 3).is_null());
 
     // remove "bar"
     origin->remove(6);
@@ -2028,18 +2150,6 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
     CHECK_EQUAL(h.get_string(tv, 0, 1), "");
     CHECK(h.get_string(tv, 0, 2).is_null());
-
-    // Remove distinct property by providing empty column list. Now TableView should look like it
-    // did just after our last tv.sort(0, false) above, but after having executed table.remove(6)
-    tv.distinct(SortDescriptor{});
-    // "foo", "foo", "", "", null, null
-    CHECK_EQUAL(tv.size(), 6);
-    CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
-    CHECK_EQUAL(h.get_string(tv, 0, 1), "foo");
-    CHECK_EQUAL(h.get_string(tv, 0, 2), "");
-    CHECK_EQUAL(h.get_string(tv, 0, 3), "");
-    CHECK(h.get_string(tv, 0, 4).is_null());
-    CHECK(h.get_string(tv, 0, 5).is_null());
 }
 
 TEST(TableView_DistinctOverNullLink)
@@ -2061,7 +2171,7 @@ TEST(TableView_DistinctOverNullLink)
     // 4 is null
 
     auto tv = origin->where().find_all();
-    tv.distinct(SortDescriptor(*origin, {{0, 0}}));
+    tv.distinct(DistinctDescriptor(*origin, {{0, 0}}));
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get_source_ndx(0), 0);
     CHECK_EQUAL(tv.get_source_ndx(1), 1);

@@ -27,8 +27,25 @@
 #include <functional>
 
 #ifdef _MSC_VER
-#include <intrin.h>
+
+#if REALM_UWP
+struct timeval {
+    long tv_sec;
+    long tv_usec;
+};
 #endif
+
+#include <windows.h>
+#include <intrin.h>
+#include <BaseTsd.h>
+
+#if !defined(_SSIZE_T_) && !defined(_SSIZE_T_DEFINED)
+typedef SSIZE_T ssize_t;
+#define _SSIZE_T_
+#define _SSIZE_T_DEFINED
+#endif
+
+#endif // _MSC_VER
 
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
@@ -114,6 +131,11 @@ void* round_down(void* p, size_t align);
 size_t round_up(size_t p, size_t align);
 size_t round_down(size_t p, size_t align);
 void millisleep(unsigned long milliseconds);
+
+#ifdef _WIN32
+int gettimeofday(struct timeval * tp, struct timezone * tzp);
+#endif
+
 
 #ifdef REALM_SLAB_ALLOC_TUNE
 void process_mem_usage(double& vm_usage, double& resident_set);
@@ -282,6 +304,13 @@ struct PlacementDelete {
         v->~T();
     }
 };
+
+#ifdef _WIN32
+typedef void* FileDesc;
+#else
+typedef int FileDesc;
+#endif
+
 
 } // namespace realm
 

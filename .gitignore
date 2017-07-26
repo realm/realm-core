@@ -4,11 +4,25 @@
 *~
 cscope.*
 tags
+GPATH
+GRTAGS
+GTAGS
 
 /cover_html
 /gcovr.xml
 /tmp
 doc/html
+
+# CMake artifacts
+CMakeFiles
+CMakeCache.txt
+Testing
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+Realm.xcodeproj
+CMakeScripts
+/build*
 
 # Ignore all user files except one which includes execution path for test
 *.user
@@ -21,35 +35,12 @@ doc/html
 Thumbs.db
 
 # Ignore files build by Visual Studio
-*.obj
-*.exe
-*.pdb
-*.aps
-*.pch
-*.vspscc
-*_i.c
-*_p.c
-*.tlb
-*.tlh
-*.bak
-*.cache
-*.ilk
-*.log
-[Bb]in
-[Dd]ebug*/
-*.lib
-*.sbr
-obj/
-ipch/
-[Rr]elease*/
-_ReSharper*/
-[Tt]est[Rr]esult*
-Static library*/
-*.opensdf
-*.sdf
+/.vs
+/Visual\ Studio
 
-/realm.xcodeproj/project.xcworkspace
-/realm.xcodeproj/xcuserdata
+# Ignore Eclipse settings
+/.settings
+
 *.dSYM
 
 # Ignore KDevelop4 user files
@@ -57,9 +48,6 @@ Static library*/
 
 # ref doc
 /doc/ref_cpp/html/*
-
-# sh build.sh config
-/src/config.mk
 
 # sh build.sh build-cocoa
 /core-*.zip
@@ -92,3 +80,4 @@ Static library*/
 
 # Ignore python compiled files
 *.pyc
+/test/android/jni/#Android.mk#

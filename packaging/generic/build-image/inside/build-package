@@ -17,21 +17,25 @@ name="realm-core-${VERSION}"
 cp -a /source /tmp/build
 cd /tmp/build
 
-# Configure the build
-REALM_ENABLE_ENCRYPTION=yes sh build.sh config /
-# Build and install
-sh build.sh build
-sh build.sh build-node
-DESTDIR=/dest/${name} sh build.sh install-prod
-DESTDIR=/dest/${name} sh build.sh install-devel
-cp src/realm/librealm-node* /dest/${name}/lib
+rm -rf build-dir
+mkdir build-dir
+cd build-dir
+cmake -DREALM_ENABLE_ENCRYPTION=1 \
+      -DREALM_NO_TESTS=1 \
+      -DCMAKE_INSTALL_PREFIX="/dest/${name}" \
+      -DCMAKE_BUILD_TYPE=Release \
+      -GNinja ..
+ninja
+ninja install/strip
 
-find /dest
-
-cd /dest/${name}/lib
-for file in *; do
-  strip --strip-debug --strip-unneeded "$file"
-done
+rm -rf -- *
+cmake -DREALM_ENABLE_ENCRYPTION=1 \
+      -DREALM_NO_TESTS=1 \
+      -DCMAKE_INSTALL_PREFIX="/dest/${name}" \
+      -DCMAKE_BUILD_TYPE=Debug \
+      -GNinja ..
+ninja
+ninja install
 
 cd /dest
-tar -zcf /out/${name}.tgz ${name}
+tar -zcf "/out/${name}.tgz" "${name}"

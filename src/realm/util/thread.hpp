@@ -137,6 +137,7 @@ public:
 
     friend class LockGuard;
     friend class UniqueLock;
+    friend class InterprocessCondVar;
 
     void lock() noexcept;
     bool try_lock() noexcept;

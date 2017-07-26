@@ -1,17 +1,19 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
+SCRIPT=$(basename "${BASH_SOURCE[0]}")
+ROOT_DIR=$(git rev-parse --show-toplevel)
+BUILD_DIR="build.afl"
+
 if [ "$#" -ne 2 ]; then
-    echo "Usage sh $0 num_fuzzers executable_path (e.g. ./fuzz-group-dbg)"
+    echo "Usage: ${SCRIPT} <num_fuzzers> <fuzz_test>"
+    echo "          num_fuzzers: the number of fuzzers to run in parallel"
+    echo "          fuzz_test  : fuzz-group or fuzz-transact-log"
     exit 1
 fi
 num_fuzzers="$1"
-executable_path="$2"
-
-compiler="afl-g++"
-flags="COMPILER_IS_GCC_LIKE=yes"
+fuzz_test="$2"
 
 if [ "$(uname)" = "Darwin" ]; then
-    compiler="afl-clang++"
-
     # FIXME: Consider detecting if ReportCrash was already unloaded and skip this message
     #        or print and don't try to run AFL.
     echo "----------------------------------------------------------------------------------------"
@@ -33,40 +35,59 @@ else
     fi
 fi
 
-echo "Building core"
+echo "Building..."
 
-cd ../../
-RAND_NODE_SIZE=$(python -c "import random; print (random.randint(4,999), 1000)[bool(random.randint(0,1))]")
-REALM_MAX_BPNODE_SIZE_DEBUG="$RAND_NODE_SIZE" REALM_ENABLE_ENCRYPTION=yes sh build.sh config
-CXX="$compiler" REALM_HAVE_CONFIG=yes make -j $num_fuzzers fuzz-debug "$flags"
+cd "${ROOT_DIR}" || exit
+mkdir -p "${BUILD_DIR}"
+cd "${BUILD_DIR}" || exit
+if [ -z ${REALM_MAX_BPNODE_SIZE} ]; then
+    REALM_MAX_BPNODE_SIZE=$(python -c "import random; print (random.randint(4,999), 1000)[bool(random.randint(0,1))]")
+fi
+cmake -D REALM_AFL=ON \
+      -D CMAKE_C_COMPILER=afl-gcc \
+      -D CMAKE_CXX_COMPILER=afl-g++ \
+      -D REALM_MAX_BPNODE_SIZE="${REALM_MAX_BPNODE_SIZE}" \
+      -D REALM_ENABLE_ENCRYPTION=ON \
+      -G Ninja \
+      ..
 
-cd -
+ninja "${fuzz_test}"
 
 echo "Cleaning up the findings directory"
 
+FINDINGS_DIR="findings"
+EXEC=$(find -name ${fuzz_test})
+
 pkill afl-fuzz
-rm -rf findings/*
+rm -rf "${FINDINGS_DIR}"
+mkdir -p "${FINDINGS_DIR}"
 
 # see also stop_parallel_fuzzer.sh
 time_out="1000" # ms
-memory="150" # MB
-
-echo "Starting $num_fuzzers fuzzers in parallel"
+memory="1000" # MB
 
 # if we have only one fuzzer
-if [ $num_fuzzers -eq 1 ]; then
-    afl-fuzz -t "$time_out" -m "$memory" -i testcases -o findings "$executable_path" @@
+if [ "${num_fuzzers}" -eq 1 ]; then
+    afl-fuzz -t "$time_out" \
+             -m "$memory" \
+             -i "${ROOT_DIR}/test/fuzzy/testcases" \
+             -o "${FINDINGS_DIR}" \
+             ${EXEC} @@
     exit 0
 fi
 
 # start the fuzzers in parallel
-afl-fuzz -t "$time_out" -m "$memory" -i testcases -o findings -M "fuzzer1" "$executable_path" @@ --name "fuzzer1" >/dev/null 2>&1 &
-
-for i in $(seq 2 $num_fuzzers);
-do
-    afl-fuzz -t "$time_out" -m "$memory" -i testcases -o findings -S "fuzzer$i" "$executable_path" @@ --name "fuzzer$i" >/dev/null 2>&1 &
+echo "Starting $num_fuzzers fuzzers in parallel"
+for i in $(seq 1 ${num_fuzzers}); do
+    [[ $i -eq 1 ]] && flag="-M" || flag="-S"
+    afl-fuzz -t "$time_out" \
+             -m "$memory" \
+             -i "${ROOT_DIR}/test/fuzzy/testcases" \
+             -o "${FINDINGS_DIR}" \
+             "${flag}" "fuzzer$i" \
+             ${EXEC} @@ --name "fuzzer$i" >/dev/null 2>&1 &
 done
 
 echo
-echo "Use afl-whatsup findings/ to check progress"
+echo "Use 'afl-whatsup ${ROOT_DIR}/${BUILD_DIR}/${FINDINGS_DIR}' to check progress"
 echo

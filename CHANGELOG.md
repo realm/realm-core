@@ -2,32 +2,39 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Attempting to open a small unencrypted Realm file with an encryption key would
+  produce an empty encrypted Realm file. Fixed by detecting the case and
+  throwing an exception.
+  PR [#2645](https://github.com/realm/realm-core/pull/2645)
+* Querying SharedGroup::wait_for_change() immediately after a commit()
+  would return instead of waiting for the next change.
+  PR [#2563](https://github.com/realm/realm-core/pull/2563).
+* Opening a second SharedGroup may trigger a file format upgrade if the history
+  schema version is non-zero.
+  Fixes issue [#2724](https://github.com/realm/realm-core/issues/2724).
+  PR [#2726](https://github.com/realm/realm-core/pull/2726).
+* Fix incorrect results from TableView::find_first().
+* Fix crash on rollback of Table::optimize(). Currently unused by bindings.
+  PR [#2753](https://github.com/realm/realm-core/pull/2753).
+* Update frozen TableViews when Table::swap() is called.
+  PR [#2757](https://github.com/realm/realm-core/pull/2757).
 
 ### Breaking changes
 
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* win32+UWP: Switched from pthread-win32 to native API PR [#2602](https://github.com/realm/realm-core/pull/2602)
-
-----------------------------------------------
-
-# 3.0.0-rc1 Release notes
-
-### Breaking changes
-
+* Added support for compound sort and distinct queries.
+    - Multiple consecutive calls to sort or distinct compound on each other
+      in the order applied rather than replacing the previous one.
+    - The order that sort and distinct are applied can change the query result.
+    - Applying an empty sort or distinct descriptor is now a no-op, this
+      could previously be used to clear a sort or distinct operation.
+  PR [#2644](https://github.com/realm/realm-core/pull/2644)
 * Support for size query on LinkedList removed. This is perhaps not so 
   breaking after all since it is probably not used.
+  PR [#2532](https://github.com/realm/realm-core/pull/2532).
 * Replication interface changed. The search index functions now operate
   on a descriptor and not a table.
+  PR [#2561](https://github.com/realm/realm-core/pull/2561).
+* New replication instruction: instr_AddRowWithKey
 
 ### Enhancements
 
@@ -35,10 +42,10 @@
   Query q = table->column<SubTable>(0).list<Int>() == 5;
   Query q = table->column<SubTable>(0).list<Int>().min() >= 2;
   Query q = table->column<SubTable>(1).list<String>().begins_with("Bar");
-  PR [#2532](https://github.com/realm/realm-core/pull/2532)
+  PR [#2532](https://github.com/realm/realm-core/pull/2532).
 * Subtable column can now be nullable. You can use `is_null()` and `set_null()`
   on a subtable element.
-  PR [#2560](https://github.com/realm/realm-core/pull/2560)
+  PR [#2560](https://github.com/realm/realm-core/pull/2560).
 * Support for search index on subtable columns. Only one level of subtables
   are currently supported, that is, you cannot create a search index in a
   subtable of a subtable (will throw exception). NOTE: Core versions prior to
@@ -46,17 +53,103 @@
   this Core version has added such indexes. Adding or removing an index will
   take place for *all* subtables in a subtable column. There is no way to add
   or remove it from single individual subtables.
-  PR [#2561](https://github.com/realm/realm-core/pull/2561)
+  PR [#2561](https://github.com/realm/realm-core/pull/2561).
+* Support for encryption on Windows (Win32 + UWP).
+  PR [#2643](https://github.com/realm/realm-core/pull/2643).
+* Add Table::add_row_with_key(). Adds a row and fills an integer column with
+  a value in one operation.
+  PR [#2596](https://github.com/realm/realm-core/pull/2596)
+  Issue [#2585](https://github.com/realm/realm-core/issues/2585)
+* Add more overloads with realm::null - PR [#2669](https://github.com/realm/realm-core/pull/2669)
+  - `size_t Table::find_first(size_t col_ndx, null)`
+  - `OutputStream& operator<<(OutputStream& os, const null&)`
+* Add method to get total count of backlinks for a row
+  PR [#2672](https://github.com/realm/realm-core/pull/2672).
+* Add try_remove_dir() and try_remove_dir_recursive() functions.
 
 -----------
 
 ### Internals
 
-* The RuntimeLibrary of the Windows build is changed from MultiThreadedDLL to just MultiThreaded so as to statically link
-  the Visual C++ runtime libraries, removing the onus on end-users to have the correct runtime redistributable package
-  or satellite assembly pack installed. Libraries that link against Core on Windows will have to adjust their compiler flags accordingly.
-  PR [#2611](https://github.com/realm/realm-core/pull/2611)
-  
+* The RuntimeLibrary of the Windows build is changed from MultiThreadedDLL to
+  just MultiThreaded so as to statically link the Visual C++ runtime libraries,
+  removing the onus on end-users to have the correct runtime redistributable
+  package or satellite assembly pack installed. Libraries that link against Core
+  on Windows will have to adjust their compiler flags accordingly.
+  PR [#2611](https://github.com/realm/realm-core/pull/2611).
+* Win32+UWP: Switched from pthread-win32 to native API.
+  PR [#2602](https://github.com/realm/realm-core/pull/2602).
+* Implemented inter-process CondVars on Windows (Win32 + UWP). They should be
+  fair and robust.
+  PR [#2497](https://github.com/realm/realm-core/pull/2497).
+* On Apple platforms, use `os_log` instead of `asl_log` when possible.
+  PR [#2722](https://github.com/realm/realm-core/pull/2722).
+
+----------------------------------------------
+
+# 2.8.6 Release notes
+
+### Bugfixes
+* Fixed a bug where case insensitive queries wouldn't return all results.
+  PR [#2675](https://github.com/realm/realm-core/pull/2675).
+
+----------------------------------------------
+
+# 2.8.5 Release notes
+
+### Internals
+
+* `_impl::GroupFriend::get_top_ref()` was added.
+  PR [#2683](https://github.com/realm/realm-core/pull/2683).
+
+----------------------------------------------
+
+# 2.8.4 Release notes
+
+### Bugfixes
+
+* Fixes bug in encryption that could cause deadlocks/hangs and possibly
+  other bugs too.
+  Fixes issue [#2650](https://github.com/realm/realm-core/pull/2650).
+  PR [#2668](https://github.com/realm/realm-core/pull/2668).
+
+-----------
+
+### Internals
+
+* Fix an assert that prevented `Group::commit()` from discarding history from a
+  Realm file opened in nonshared mode (via `Group::open()`, as opposed to
+  `SharedGroup::open()`).
+  PR [#2655](https://github.com/realm/realm-core/pull/2655).
+* Improve ASAN and TSAN build modes (`sh build.sh asan` and `sh build.sh tsan`)
+  such that they do not clobber the files produced during regular builds, and
+  also do not clobber each others files. Also `UNITTEST_THREADS` and
+  `UNITTEST_PROGRESS` options are no longer hard-coded in ASAN and TSAN build
+  modes.
+  PR [#2660](https://github.com/realm/realm-core/pull/2660).
+
+----------------------------------------------
+
+# 2.8.3 Release notes
+
+### Internals
+
+* Disabled a sleep in debug mode that was impairing external tests.
+  PR [#2651](https://github.com/realm/realm-core/pull/2651).
+
+----------------------------------------------
+
+# 2.8.2 Release notes
+
+### Bugfixes
+
+* Now rejecting a Realm file specifying a history schema version that is newer
+  than the one expected by the code.
+  PR [#2642](https://github.com/realm/realm-core/pull/2642).
+* No longer triggering a history schema upgrade when opening an empty Realm file
+  (when `top_ref` is zero).
+  PR [#2642](https://github.com/realm/realm-core/pull/2642).
+
 ----------------------------------------------
 
 # 2.8.1 Release notes
@@ -115,6 +208,7 @@
 -----------
 
 ### Internals
+
 * Make `Array::stats()` available in release mode builds (not just in debug mode
   builds).
   PR [#2591](https://github.com/realm/realm-core/pull/2591).

@@ -376,6 +376,7 @@ public:
 
     size_t add_empty_row(size_t num_rows = 1);
     void insert_empty_row(size_t row_ndx, size_t num_rows = 1);
+    size_t add_row_with_key(size_t col_ndx, int64_t key);
     void remove(size_t row_ndx);
     void remove_last();
     void move_last_over(size_t row_ndx);
@@ -395,7 +396,22 @@ public:
     /// \sa Table::set_null_unique()
     void merge_rows(size_t row_ndx, size_t new_row_ndx);
 
-    // Get cell values. Will assert if the requested type does not match the column type
+    //@{
+
+    /// Get cell values.
+    /// Will assert if the requested type does not match the column type.
+    ///
+    /// When fetching from a nullable column and the value is null, a default
+    /// value will be returned, except for object like types (StringData,
+    /// BinaryData, Timestamp) which have support for storing nulls. In that
+    /// case, call the `is_null()` method on the returned object to check
+    /// whether the stored value was null. If nullability matters and returning
+    /// a default value is unacceptable, check Table::is_null() before getting a
+    /// cell value.
+    ///
+    /// \sa Table::is_nullable(size_t col_ndx)
+    /// \sa Table::is_null(size_t col_ndx, size_t row_ndx)
+    /// \sa StringData::is_null()
     int64_t get_int(size_t column_ndx, size_t row_ndx) const noexcept;
     bool get_bool(size_t column_ndx, size_t row_ndx) const noexcept;
     OldDateTime get_olddatetime(size_t column_ndx, size_t row_ndx) const noexcept;
@@ -406,6 +422,8 @@ public:
     Mixed get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
     Timestamp get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
+
+    //@}
 
     /// Return data from position 'pos' and onwards. If the blob is distributed
     /// across multiple arrays, you will only get data from one array. 'pos'
@@ -550,6 +568,7 @@ public:
     void clear_subtable(size_t column_ndx, size_t row_ndx);
 
     // Backlinks
+    size_t get_backlink_count(size_t row_ndx) const noexcept;
     size_t get_backlink_count(size_t row_ndx, const Table& origin, size_t origin_col_ndx) const noexcept;
     size_t get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const
         noexcept;

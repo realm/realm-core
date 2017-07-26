@@ -16,7 +16,6 @@
  *
  **************************************************************************/
 
-#define _CRT_SECURE_NO_WARNINGS
 #include <limits>
 #include <stdexcept>
 
@@ -291,6 +290,20 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
     get_descriptor()->insert_column_link(col_ndx, type, name, target, link_type); // Throws
 }
 
+
+size_t Table::get_backlink_count(size_t row_ndx) const noexcept
+{
+    size_t backlink_columns_begin = m_spec->first_backlink_column_index();
+    size_t backlink_columns_end = backlink_columns_begin + m_spec->backlink_column_count();
+    size_t ref_count = 0;
+
+    for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
+        const BacklinkColumn& backlink_col = get_column_backlink(i);
+        ref_count += backlink_col.get_backlink_count(row_ndx);
+    }
+
+    return ref_count;
+}
 
 size_t Table::get_backlink_count(size_t row_ndx, const Table& origin, size_t origin_col_ndx) const noexcept
 {
@@ -857,18 +870,18 @@ void Table::do_add_search_index(Descriptor& descr, size_t column_ndx)
 
         size_t sz = root_table.size();
         for (size_t r = 0; r < sz; r++) {
-            // Clear index bit from shared spec because we're now going to operate on the next subtable
-            // object which has no index yet (because various method calls may crash if attributes are
-            // wrong)
-            spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
-
             TableRef sub = root_table.get_subtable(parent_col, r);
-            sub->_add_search_index(column_ndx);
+            // No reason to create search index for a degenerate table
+            if (!sub->is_degenerate()) {
+                sub->_add_search_index(column_ndx);
+                // Clear index bit from shared spec because we're now going to operate on the next subtable
+                // object which has no index yet (because various method calls may crash if attributes are
+                // wrong)
+                spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+            }
         }
     }
 
-    // Set shared attributes here also, in case there was no rows to iterate through in the for-loop
-    // above
     spec.set_column_attr(column_ndx, ColumnAttr(attr | col_attr_Indexed)); // Throws
 
     if (Replication* repl = root_table.get_repl())
@@ -907,20 +920,20 @@ void Table::do_remove_search_index(Descriptor& descr, size_t column_ndx)
         // for-loop are safe to call despite of this.
         size_t sz = root_table.size();
         for (size_t r = 0; r < sz; r++) {
-            // Set index bit from shared spec because we're now going to operate on the next subtable
-            // object which still has an index (because various method calls may crash if attributes are
-            // wrong)
-            spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
-
             // Destroy search index. This will update shared attributes in case refresh_column_accessors()
             // should depend on them being correct
             TableRef sub = root_table.get_subtable(parent_col, r);
-            sub->_remove_search_index(column_ndx);
+            // No reason to remove search index for a degenerate table
+            if (!sub->is_degenerate()) {
+                sub->_remove_search_index(column_ndx);
+                // Set index bit from shared spec because we're now going to operate on the next subtable
+                // object which still has an index (because various method calls may crash if attributes are
+                // wrong)
+                spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+            }
         }
     }
 
-    // Set shared attributes here also, in case there was no rows to iterate through in the for-loop
-    // above
     spec.set_column_attr(column_ndx, ColumnAttr(attr & ~col_attr_Indexed)); // Throws
 
     if (Replication* repl = root_table.get_repl())
@@ -1407,7 +1420,6 @@ void Table::create_degen_subtab_columns()
         // Create empty search index if required and add it to m_columns
         if (attr & col_attr_Indexed) {
             m_columns.add(StringIndex::create_empty(get_alloc()));
-            m_spec->set_column_attr(i, ColumnAttr(attr & col_attr_Indexed));
         }
     }
 
@@ -2266,6 +2278,38 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
         size_t prior_num_rows = m_size - num_rows;
         repl->insert_empty_rows(this, row_ndx, num_rows_to_insert, prior_num_rows); // Throws
     }
+}
+
+size_t Table::add_row_with_key(size_t key_col_ndx, int64_t key)
+{
+    size_t num_cols = m_spec->get_column_count();
+    size_t row_ndx = m_size;
+
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(key_col_ndx, <, num_cols);
+    REALM_ASSERT(!is_nullable(key_col_ndx));
+
+    bump_version();
+
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        if (col_ndx == key_col_ndx) {
+            IntegerColumn& col = get_column(key_col_ndx);
+            col.insert(row_ndx, key, 1);
+        }
+        else {
+            ColumnBase& col = get_column_base(col_ndx);
+            bool insert_nulls = is_nullable(col_ndx);
+            col.insert_rows(row_ndx, 1, m_size, insert_nulls); // Throws
+        }
+    }
+    m_size++;
+
+    if (Replication* repl = get_repl()) {
+        size_t prior_num_rows = m_size - 1;
+        repl->add_row_with_key(this, row_ndx, prior_num_rows, key_col_ndx, key); // Throws
+    }
+
+    return row_ndx;
 }
 
 
@@ -4066,6 +4110,12 @@ size_t Table::find_first(size_t col_ndx, util::Optional<double> value) const
     return value ? find_first(col_ndx, *value) : find_first_null(col_ndx);
 }
 
+template <>
+size_t Table::find_first(size_t col_ndx, null) const
+{
+    return find_first_null(col_ndx);
+}
+
 // Explicitly instantiate the generic case of the template for the types we care about.
 template size_t Table::find_first(size_t col_ndx, bool) const;
 template size_t Table::find_first(size_t col_ndx, int64_t) const;
@@ -4904,6 +4954,7 @@ void Table::write(std::ostream& out, size_t offset, size_t slice_size, StringDat
 void Table::update_from_parent(size_t old_baseline) noexcept
 {
     REALM_ASSERT(is_attached());
+    bool spec_might_have_changed = false;
 
     // There is no top for sub-tables sharing spec
     if (m_top.is_attached()) {
@@ -4913,11 +4964,12 @@ void Table::update_from_parent(size_t old_baseline) noexcept
         // subspecs may be deleted here ...
         if (m_spec->update_from_parent(old_baseline)) {
             // ... so get rid of cached entries here
-            DescriptorRef desc = m_descriptor.lock();
-            if (desc) {
+            if (DescriptorRef desc = m_descriptor.lock()) {
                 using df = _impl::DescriptorFriend;
                 df::detach_subdesc_accessors(*desc);
             }
+            // and remember to update mappings in subtable columns
+            spec_might_have_changed = true;
         }
     }
     else {
@@ -4927,13 +4979,21 @@ void Table::update_from_parent(size_t old_baseline) noexcept
     if (!m_columns.is_attached())
         return; // Degenerate subtable
 
-    if (!m_columns.update_from_parent(old_baseline))
-        return;
-
-    // Update column accessors
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->update_from_parent(old_baseline);
+    if (m_columns.update_from_parent(old_baseline)) {
+        // Update column accessors
+        for (auto& col : m_cols) {
+            if (col != nullptr) {
+                col->update_from_parent(old_baseline);
+            }
+        }
+    }
+    else if (spec_might_have_changed) {
+        size_t sz = m_cols.size();
+        for (size_t i = 0; i < sz; i++) {
+            // Only relevant for subtable columns
+            if (auto col = dynamic_cast<SubtableColumn*>(m_cols[i])) {
+                col->refresh_subtable_map();
+            }
         }
     }
 }
@@ -4970,7 +5030,7 @@ inline void out_olddatetime(std::ostream& out, OldDateTime value)
 inline void out_timestamp(std::ostream& out, Timestamp value)
 {
     // FIXME: Do we want to output the full precision to json?
-    time_t rawtime = value.get_seconds();
+    time_t rawtime = time_t(value.get_seconds());
     struct tm* t = gmtime(&rawtime);
     if (t) {
         // We need a buffer for formatting dates (and binary to hex). Max
@@ -5853,6 +5913,11 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
         }
         row = row->m_next;
     }
+
+    // Adjust rows in tableviews after row swap
+    for (auto& view : m_views) {
+        view->adj_row_acc_swap_rows(row_ndx_1, row_ndx_2);
+    }
 }
 
 
@@ -6017,7 +6082,14 @@ void Table::refresh_accessor_tree()
         // Root table (free-standing table, group-level table, or subtable with
         // independent descriptor)
         m_top.init_from_parent();
-        m_spec->init_from_parent();
+        // subspecs may be deleted here ...
+        if (m_spec->init_from_parent()) {
+            // ... so get rid of cached entries here
+            if (DescriptorRef desc = m_descriptor.lock()) {
+                using df = _impl::DescriptorFriend;
+                df::detach_subdesc_accessors(*desc);
+            }
+        }
         m_columns.init_from_parent();
     }
     else {
@@ -6089,6 +6161,20 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             if (col_type == col_type_StringEnum) {
                 delete col;
                 col = 0;
+                // We need to store null in `m_cols` to avoid a crash during
+                // destruction of the table accessor in case an error occurs
+                // before the refresh operation is complete.
+                m_cols[col_ndx] = nullptr;
+            }
+        } else if (dynamic_cast<StringEnumColumn*>(col) != nullptr) {
+            // If the current column accessor is StringEnumColumn, but the
+            // underlying column has changed to a StringColumn (which can occur
+            // in a rollback), then we need to replace the accessor with an
+            // instance of StringColumn.
+            ColumnType col_type = m_spec.get_column_type(col_ndx);
+            if (col_type == col_type_String) {
+                delete col;
+                col = nullptr;
                 // We need to store null in `m_cols` to avoid a crash during
                 // destruction of the table accessor in case an error occurs
                 // before the refresh operation is complete.

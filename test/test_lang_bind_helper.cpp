@@ -16,8 +16,6 @@
  *
  **************************************************************************/
 
-// All unit tests here suddenly broke on Windows, maybe after encryption was added
-
 #include <map>
 #include <sstream>
 #include <mutex>
@@ -2643,9 +2641,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Int, "a");
         parent_w->add_search_index(0);
-        parent_w->add_empty_row(2);
-        parent_w->set_int(0, 0, 27);
-        parent_w->set_int(0, 1, 227);
+        parent_w->add_row_with_key(0, 27);
+        parent_w->add_row_with_key(0, 227);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2682,6 +2679,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(3, row_2.get_index());
     CHECK_EQUAL(27, row_1.get_int(0));
     CHECK_EQUAL(227, row_2.get_int(0));
+
     {
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.get_table("parent");
@@ -7758,6 +7756,10 @@ public:
     {
         return false;
     }
+    bool add_row_with_key(size_t, size_t, size_t, int64_t)
+    {
+        return false;
+    }
     bool erase_rows(size_t, size_t, size_t, bool)
     {
         return false;
@@ -10542,7 +10544,7 @@ void do_read_verify(std::string path) {
             REALM_ASSERT_EX(t->get_column_name(0) == StringData("count"), t->get_column_name(0).data());
             REALM_ASSERT_EX(t->get_column_name(1) == StringData("char"), t->get_column_name(1).data());
             REALM_ASSERT_EX(t->get_column_name(2) == StringData("payload"), t->get_column_name(2).data());
-            std::string std_validator(num_chars, c[0]);
+            std::string std_validator(static_cast<unsigned int>(num_chars), c[0]);
             StringData validator(std_validator);
             StringData s = t->get_string(2, r);
             REALM_ASSERT_EX(s.size() == validator.size(), r, s.size(), validator.size());
@@ -10900,11 +10902,6 @@ TEST(LangBindHelper_HandoverDistinctView)
             tv2->sync_if_needed();
             CHECK_EQUAL(tv2->size(), 1);
             CHECK_EQUAL(tv2->get_source_ndx(0), 0);
-
-            // Remove distinct property
-            tv2->distinct(SortDescriptor{});
-            tv2->sync_if_needed();
-            CHECK_EQUAL(tv2->size(), 2);
         }
     }
 }
@@ -12587,6 +12584,63 @@ TEST(LangBindHelper_IsRowAttachedAfterClear)
 }
 
 
+TEST(LangBindHelper_TableViewUpdateAfterSwap)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+
+    TableRef t = g.add_table("t");
+    size_t col_id = t->add_column(type_Int, "id");
+
+    t->add_empty_row(10);
+    for (int i = 0; i < 10; ++i)
+        t->set_int(col_id, i, i);
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    TableView tv = t->where().find_all();
+    TableView tv_r = g_r.get_table(0)->where().find_all();
+
+    LangBindHelper::promote_to_write(sg_w);
+    for (int i = 0; i < 5; ++i)
+        t->swap_rows(i, 9 - i);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    for (int i = 0; i < 10; ++i) {
+        CHECK_EQUAL(tv.get_int(0, i), i);
+        CHECK_EQUAL(tv_r.get_int(0, i), i);
+        CHECK_EQUAL(tv.get(i).get_index(), 9 - i);
+        CHECK_EQUAL(tv_r.get(i).get_index(), 9 - i);
+    }
+
+    LangBindHelper::promote_to_write(sg_w);
+    for (int i = 0; i < 5; ++i)
+        t->swap_rows(i, 9 - i);
+    for (int i = 0; i < 10; ++i) {
+        CHECK_EQUAL(tv.get_int(0, i), i);
+        CHECK_EQUAL(tv.get(i).get_index(), i);
+    }
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+
+    for (int i = 0; i < 10; ++i) {
+        CHECK_EQUAL(tv.get_int(0, i), i);
+        CHECK_EQUAL(tv.get(i).get_index(), 9 - i);
+    }
+}
+
+
 TEST(LangBindHelper_RollbackRemoveZeroRows)
 {
     SHARED_GROUP_TEST_PATH(path)
@@ -13094,6 +13148,26 @@ TEST(LangBindHelper_MixedStringRollback)
 }
 
 
+TEST(LangBindHelper_RollbackOptimize)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = crypt_key();
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = sg_w.begin_write();
+
+    g.insert_table(0, "t0");
+    g.get_table(0)->add_column(type_String, "str_col_0", true);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    g.get_table(0)->add_empty_row(198);
+    g.get_table(0)->optimize(true);
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+}
+
+
 TEST(LangBindHelper_BinaryReallocOverMax)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -13187,6 +13261,145 @@ TEST(LangBindHelper_MixedTimestampTransaction)
     ConstTableRef t = g.get_table("table");
     CHECK(t->get_mixed(0, 0) == time);
     CHECK(t->get_mixed(0, 1) == neg_time);
+}
+
+
+// This test verifies that small unencrypted files are treated correctly if
+// opened as encrypted. 
+#ifdef REALM_ENABLE_ENCRYPTION
+TEST(LangBindHelper_OpenAsEncrypted)
+{
+
+    {
+        SHARED_GROUP_TEST_PATH(path);
+        ShortCircuitHistory hist(path);
+        SharedGroup sg_clear(hist);
+
+        {
+            WriteTransaction wt(sg_clear);
+            Group& group = wt.get_group();
+            TableRef target = group.add_table("table");
+            target->add_column(type_String, "mixed_col");
+            target->add_empty_row();
+            wt.commit();
+        }
+
+        sg_clear.close();
+
+        const char* key = crypt_key(true);
+        std::unique_ptr<Replication> hist_encrypt(make_in_realm_history(path));
+        bool is_okay = false;
+        try {
+            SharedGroup sg_encrypt(*hist_encrypt, SharedGroupOptions(key));
+        } catch (std::runtime_error&) {
+            is_okay = true;
+        }
+        CHECK(is_okay);
+    }
+}
+#endif
+
+
+TEST(LangBindHelper_NonsharedAccessToRealmWithHistory)
+{
+    // Create a Realm file with a history (history_type !=
+    // Reaplication::hist_None).
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        std::unique_ptr<Replication> history(make_in_realm_history(path));
+        SharedGroup sg{*history};
+        WriteTransaction wt{sg};
+        wt.add_table("foo");
+        wt.commit();
+    }
+
+    // Since the stored history type is now Replication::hist_InRealm, it should
+    // now be impossible to open in shared mode with no replication plugin
+    // (Replication::hist_None).
+    CHECK_THROW(SharedGroup{path}, IncompatibleHistories);
+
+    // Now modify the file in nonshared mode, which will discard the history (as
+    // nonshared mode does not understand how to update it correctly).
+    {
+        const char* crypt_key = nullptr;
+        Group group{path, crypt_key, Group::mode_ReadWriteNoCreate};
+        group.commit();
+    }
+
+    // Check the the history was actually discarded (reset to
+    // Replication::hist_None).
+    SharedGroup sg{path};
+    ReadTransaction rt{sg};
+    CHECK(rt.has_table("foo"));
+}
+
+TEST(LangBindHelper_UpdateSubtableMap)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w);
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    TableRef target = g.add_table("target");
+    DescriptorRef subdescr;
+    target->add_column(type_Table, "subtables", true, &subdescr);
+    subdescr->add_column(type_Int, "integers", nullptr, true);
+
+    TableRef origin = g.add_table("origin");
+    target->add_empty_row(10);
+    origin->add_column_link(type_LinkList, "links", *target);
+
+    // Make sure to create an entry in the subtable map
+    TableRef sub = target->get_subtable(0, 6);
+    sub->clear();
+    sub->add_empty_row(1);
+    sub->set_int(0, 0, 53, false);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    // This will have the effect that the spec of the target table will be updated
+    // but not the columns. The cached table pointer to entry 6 must be updated.
+    g.insert_table(0, "another");
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+}
+
+TEST(LangBindHelper_UpdateDescriptor)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w);
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    TableRef target = g.add_table("target");
+    DescriptorRef subdescr;
+    target->add_column(type_Table, "subtables", true, &subdescr);
+    subdescr->add_column(type_Int, "integers", nullptr, true);
+
+    TableRef origin = g.add_table("origin");
+    target->add_empty_row(10);
+    origin->add_column_link(type_LinkList, "links", *target);
+
+    // Make sure to create an entry in the subtable map
+    TableRef sub = target->get_subtable(0, 6);
+    sub->clear();
+    sub->add_empty_row(1);
+    sub->set_int(0, 0, 53, false);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    // This will have the effect that the spec of the target table will be updated
+    g.insert_table(0, "another");
+    // Now the spec of the target table will be cached in target->m_descriptor.
+    TableView tv = sub->where().equal(0, 53).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    // Here the cached values should be destroyed
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+
+    // Try again. The Descriptor should be created again
+    tv = sub->where().equal(0, 53).find_all();
+    CHECK_EQUAL(tv.size(), 1);
 }
 
 #endif
