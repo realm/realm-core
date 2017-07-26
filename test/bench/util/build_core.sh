@@ -81,7 +81,7 @@ checkout () {
   # Check if given "ref" is a (remote) branch, and prepend origin/ if it is.
   # Otherwise, git-checkout will complain about updating paths and switching
   # branches at the same time.
-  if [ "$(git branch -r | grep -q "^\\s*origin/${ref}$")" ]; then
+  if git branch -r | grep -q "^\\s*origin/${ref}$"; then
     remoteref="origin/${ref}"
   else
     remoteref="${ref}"
@@ -95,13 +95,13 @@ checkout () {
 }
 
 clean () {
-  if [ "$build_system" == "cmake" ]; then
+  if [ "$build_system" = "cmake" ]; then
     mkdir -p build
-    pushd build
+    cd build || exit 1
     cmake ..
     make clean
-    popd
-  elif [ "$build_system" == "shell" ]; then
+    cd .. || exit 1
+  elif [ "$build_system" = "shell" ]; then
     sh build.sh clean
   else
     echo "Unknown build system!"
@@ -110,9 +110,9 @@ clean () {
 }
 
 configure () {
-  if [ "$build_system" == "cmake" ]; then
+  if [ "$build_system" = "cmake" ]; then
     : # this was taken care of by cmake
-  elif [ "$build_system" == "shell" ]; then
+  elif [ "$build_system" = "shell" ]; then
     sh build.sh config "${basedir}"
   else
     echo "Unknown build system!"
@@ -121,12 +121,12 @@ configure () {
 }
 
 build () {
-  if [ "$build_system" == "cmake" ]; then
+  if [ "$build_system" = "cmake" ]; then
     mkdir -p build
-    pushd build
+    cd build || exit 1
     make
-    popd
-  elif [ "$build_system" == "shell" ]; then
+    cd .. || exit 1
+  elif [ "$build_system" = "shell" ]; then
     sh build.sh build
   else
     echo "Unknown build system!"
@@ -140,12 +140,12 @@ if [ ! -d "${srcdir}" ]; then
   else
     git clone https://github.com/realm/realm-core.git --reference "${localrepo}" "${srcdir}"
   fi
-  cd "${srcdir}"
+  cd "${srcdir}" || exit 1
   checkout
   clean
   configure
 else
-  cd "${srcdir}"
+  cd "${srcdir}" || exit 1
   git fetch
   checkout
 fi

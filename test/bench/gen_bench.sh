@@ -82,7 +82,7 @@ if [ $ret -gt 0 ]; then
     echo "could not parse ref ${ref} exiting"
     exit 1
 fi
-unixtime=$(git show -s --format=%at ${remoteref})
+unixtime=$(git show -s --format=%at "${remoteref}")
 
 if [ -z "$REALM_BENCH_DIR" ]; then
     REALM_BENCH_DIR=~/.realm/core/benchmarks
@@ -92,12 +92,14 @@ get_machid
 basedir="${REALM_BENCH_DIR}/${BENCH_VERSION}/${machid}"
 mkdir -p "${basedir}"
 outputfile="${basedir}/${unixtime}_${remoteref}.csv"
+statsfile="${basedir}/${unixtime}_${remoteref}.stats"
 
 # if the file doesn't exist, create it and write the output dir as the first line
 if [ ! -e "recent_results.txt" ] ; then
     echo "${basedir}" > recent_results.txt
 fi
 echo "${outputfile}" >> recent_results.txt
+echo "${statsfile}" >> recent_results.txt
 
 if [ -f "${outputfile}" ]; then
     echo "found results, skipping ${outputfile}"
@@ -106,7 +108,7 @@ else
     build_bench_script=$(pwd)/util/build_benchmarks.sh
     if [ "${headref}" = "${remoteref}" ]; then
         echo "building HEAD"
-        cd ../..
+        cd ../.. || exit 1
     else
         rootdir=$(git rev-parse --show-toplevel)
         REALM_BENCH_CHECKOUT_ONLY=1 sh ./util/build_core.sh "${remoteref}" "${rootdir}"
@@ -115,8 +117,12 @@ else
             ls -lah
             exit 0
         fi
-        cd ../benchmark-common-tasks
-        cp main.cpp compatibility.hpp Makefile "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
+        cd ../benchmark-common-tasks || exit 1
+        cp main.cpp compatibility.hpp stats.cpp collect_stats.py "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
+        # we need to modify the build rules to build stats on old core versions
+        # we will either need the makefile (with build.sh) or the CMakeLists.txt (with cmake)
+        cp compatibility_makefile "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks/Makefile"
+        cp CMakeLists.txt "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks/"
         echo "unix timestamp of build is ${unixtime}"
         # The breaking change of SharedGroup construction syntax occured after tags/v2.0.0-rc2, we must use a legacy
         # adaptor for constructing SharedGroups in revisions of core before this time.
@@ -127,11 +133,11 @@ else
             echo "Using normal compatibility of SharedGroup"
             cp compatibility.cpp "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks/"
         fi
-        cd ../benchmark-crud
-        cp main.cpp Makefile "../bench/core-builds/${remoteref}/src/test/benchmark-crud/"
-        cd ../util
+        cd ../benchmark-crud || exit 1
+        cp main.cpp "../bench/core-builds/${remoteref}/src/test/benchmark-crud/"
+        cd ../util || exit 1
         cp benchmark_results.hpp benchmark_results.cpp "../bench/core-builds/${remoteref}/src/test/util/"
-        cd "../bench/core-builds/${remoteref}/src/"
+        cd "../bench/core-builds/${remoteref}/src/" || exit 1
     fi
     # input 1: path to top level of checkout to build, input 2: destination for results
     sh "${build_bench_script}" . bench_results
@@ -147,8 +153,11 @@ else
     tail -n +2 "bench_results/benchmark-common-tasks/results.latest.csv" | perl -wpe "s/^\"(((?!EncryptionO[nf]+).)*)\"/\"\$1_EncryptionOff\"/" >> "${outputfile}"
     tail -n +2 "bench_results/benchmark-crud/results.latest.csv" | perl -wpe "s/^\"(((?!EncryptionO[nf]+).)*)\"/\"\$1_EncryptionOff\"/" >> "${outputfile}"
 
+    # copy the statistics file to the results directory
+    cp "bench_results/benchmark-common-tasks/stats.txt" "${statsfile}"
+
     if [ "${headref}" != "${remoteref}" ]; then
-        cd ../..
+        cd ../.. || exit 1
         pwd
         echo "cleaning up: ${remoteref}"
         rm -rf "${remoteref}"

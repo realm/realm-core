@@ -31,3 +31,6 @@ tags/v2.3.3
 tags/v2.4.0
 tags/v2.5.1
 tags/v2.6.0
+tags/v2.7.0
+tags/v2.8.0
+tags/v3.0.0-rc1
