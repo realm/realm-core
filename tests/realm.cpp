@@ -1117,7 +1117,9 @@ TEST_CASE("SharedRealm: compact on launch") {
             {"value", PropertyType::String}
         }},
     };
+    REQUIRE(num_opens == 0);
     auto r = Realm::get_shared_realm(config);
+    REQUIRE(num_opens == 1);
     r->begin_transaction();
     auto table = r->read_group().get_table("class_object");
     size_t count = 1000;
@@ -1128,20 +1130,41 @@ TEST_CASE("SharedRealm: compact on launch") {
     REQUIRE(table->size() == count);
     r->close();
 
-    // Confirm expected sizes before and after opening the Realm
-    size_t size_before = size_t(File(config.path).get_size());
-    r = Realm::get_shared_realm(config);
-    r->close();
-    REQUIRE(size_t(File(config.path).get_size()) == size_before); // File size after returning false
-    r = Realm::get_shared_realm(config);
-    REQUIRE(size_t(File(config.path).get_size()) < size_before); // File size after returning true
+    SECTION("compact reduces the file size") {
+        // Confirm expected sizes before and after opening the Realm
+        size_t size_before = size_t(File(config.path).get_size());
+        r = Realm::get_shared_realm(config);
+        REQUIRE(num_opens == 2);
+        r->close();
+        REQUIRE(size_t(File(config.path).get_size()) == size_before); // File size after returning false
+        r = Realm::get_shared_realm(config);
+        REQUIRE(num_opens == 3);
+        REQUIRE(size_t(File(config.path).get_size()) < size_before); // File size after returning true
 
-    // Validate that the file still contains what it should
-    REQUIRE(r->read_group().get_table("class_object")->size() == count);
+        // Validate that the file still contains what it should
+        REQUIRE(r->read_group().get_table("class_object")->size() == count);
 
-    // Registering for a collection notification shouldn't crash when compact on launch is used.
-    Results results(r, *r->read_group().get_table("class_object"));
-    results.async([](std::exception_ptr) { });
+        // Registering for a collection notification shouldn't crash when compact on launch is used.
+        Results results(r, *r->read_group().get_table("class_object"));
+        results.async([](std::exception_ptr) { });
+        r->close();
+    }
+
+    SECTION("compact function does not get invoked if realm is open on another thread") {
+        // Confirm expected sizes before and after opening the Realm
+        size_t size_before = size_t(File(config.path).get_size());
+        r = Realm::get_shared_realm(config);
+        REQUIRE(num_opens == 2);
+        std::thread([&]{
+            auto r2 = Realm::get_shared_realm(config);
+            REQUIRE(num_opens == 2);
+        }).join();
+        r->close();
+        std::thread([&]{
+            auto r3 = Realm::get_shared_realm(config);
+            REQUIRE(num_opens == 3);
+        }).join();
+    }
 }
 #endif
 
