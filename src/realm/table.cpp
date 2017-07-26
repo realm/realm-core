@@ -6171,7 +6171,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             // underlying column has changed to a StringColumn (which can occur
             // in a rollback), then we need to replace the accessor with an
             // instance of StringColumn.
-            ColumnType col_type = m_spec.get_column_type(col_ndx);
+            ColumnType col_type = m_spec->get_column_type(col_ndx);
             if (col_type == col_type_String) {
                 delete col;
                 col = nullptr;
