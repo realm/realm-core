@@ -16,7 +16,9 @@
 
 ### Internals
 
-* Lorem ipsum.
+* The archives produced by the packaging process for Mac builds are now
+  .tar.gz files rather than .tar.xz files, with the exception of the aggregate
+  realm-core-cocoa-VERSION.tar.xz archive, which remains as a .tar.xz file.
 
 ----------------------------------------------
 
