@@ -42,6 +42,7 @@ if [[ ! -z $BUILD ]]; then
                 cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${p}.toolchain.cmake" \
                       -D CMAKE_BUILD_TYPE="${prefix}${bt}" \
                       -D REALM_VERSION="$(git describe)" \
+                      -D REALM_BUILD_LIB_ONLY=1 \
                       -G Xcode ..
                 cmake --build . --config "${prefix}${bt}" --target package
             )

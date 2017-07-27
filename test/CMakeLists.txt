@@ -81,8 +81,6 @@ file(GLOB REQUIRED_TEST_FILES
      "*.json"
      "*.realm"
      "expect_string.txt")
-file(COPY ${REQUIRED_TEST_FILES}
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 # FIXME: Benchmarks
 
@@ -98,6 +96,9 @@ if(CMAKE_GENERATOR STREQUAL Xcode)
     set_target_properties(realm-tests PROPERTIES
                           MACOSX_BUNDLE YES
                           RESOURCE "${REQUIRED_TEST_FILES}")
+else()
+file(COPY ${REQUIRED_TEST_FILES}
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
 target_link_libraries(realm-tests
