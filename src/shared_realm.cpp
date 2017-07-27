@@ -226,6 +226,7 @@ void Realm::set_schema(Schema const& reference, Schema schema)
     m_dynamic_schema = false;
     schema.copy_table_columns_from(reference);
     m_schema = std::move(schema);
+    notify_schema_changed();
 }
 
 void Realm::read_schema_from_group_if_needed()
@@ -260,6 +261,7 @@ void Realm::read_schema_from_group_if_needed()
         ObjectStore::verify_valid_external_changes(m_schema.compare(schema));
         m_schema.copy_table_columns_from(schema);
     }
+    notify_schema_changed();
 }
 
 bool Realm::reset_file(Schema& schema, std::vector<SchemaChange>& required_changes)
@@ -460,6 +462,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     m_schema_version = ObjectStore::get_schema_version(read_group());
     m_dynamic_schema = false;
     m_coordinator->clear_schema_cache_and_set_schema_version(version);
+    notify_schema_changed();
 }
 
 void Realm::add_schema_change_handler()
@@ -476,6 +479,8 @@ void Realm::add_schema_change_handler()
         }
         else
             m_schema.copy_table_columns_from(*m_new_schema);
+
+        notify_schema_changed();
     });
 }
 
@@ -493,6 +498,12 @@ void Realm::cache_new_schema()
     }
     m_schema_transaction_version = new_version;
     m_new_schema = util::none;
+}
+
+void Realm::notify_schema_changed() {
+    if (m_binding_context) {
+        m_binding_context->schema_did_change(m_schema);
+    }
 }
 
 static void check_read_write(Realm *realm)

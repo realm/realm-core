@@ -1100,6 +1100,120 @@ TEST_CASE("SharedRealm: dynamic schema mode doesn't invalidate object schema poi
     REQUIRE(object_schema == &*r2->schema().find("object"));
 }
 
+TEST_CASE("SharedRealm: SchemaChangedFunction") {
+    struct Context : BindingContext {
+        size_t* change_count;
+        Schema* schema;
+        Context(size_t* count_out, Schema* schema_out) : change_count(count_out), schema(schema_out) { }
+
+        void schema_did_change(Schema const& changed_schema) override
+        {
+            ++*change_count;
+            *schema = changed_schema;
+        }
+    };
+
+    size_t schema_changed_called = 0;
+    Schema changed_fixed_schema;
+    TestFile config;
+    config.cache = false;
+    auto dynamic_config = config;
+
+    config.schema = Schema{
+        {"object1", {
+            {"value", PropertyType::Int},
+        }},
+        {"object2", {
+            {"value", PropertyType::Int},
+        }}
+    };
+    config.schema_version = 1;
+    auto r1 = Realm::get_shared_realm(config);
+    r1->m_binding_context.reset(new Context(&schema_changed_called, &changed_fixed_schema));
+
+    SECTION("Fixed schema") {
+        SECTION("update_schema") {
+            auto new_schema = Schema{
+                {"object3", {
+                    {"value", PropertyType::Int},
+                }}
+            };
+            r1->update_schema(new_schema, 2);
+            REQUIRE(schema_changed_called == 1);
+            REQUIRE(changed_fixed_schema.find("object3")->property_for_name("value")->table_column == 0);
+        }
+
+        SECTION("Open a new Realm instance with same config won't trigger") {
+            auto r2 = Realm::get_shared_realm(config);
+            REQUIRE(schema_changed_called == 0);
+        }
+
+        SECTION("Non schema related transaction doesn't trigger") {
+            auto r2 = Realm::get_shared_realm(config);
+            r2->begin_transaction();
+            r2->commit_transaction();
+            r1->refresh();
+            REQUIRE(schema_changed_called == 0);
+        }
+
+        SECTION("Schema is changed by another Realm") {
+            auto r2 = Realm::get_shared_realm(config);
+            r2->begin_transaction();
+            r2->read_group().get_table("class_object1")->insert_column(0, type_String, "new col");
+            r2->commit_transaction();
+            r1->refresh();
+            REQUIRE(schema_changed_called == 1);
+            REQUIRE(changed_fixed_schema.find("object1")->property_for_name("value")->table_column == 1);
+        }
+
+        // This is not a valid use case. m_schema won't be refreshed.
+        SECTION("Schema is changed by this Realm won't trigger") {
+            r1->begin_transaction();
+            r1->read_group().get_table("class_object1")->insert_column(0, type_String, "new col");
+            r1->commit_transaction();
+            REQUIRE(schema_changed_called == 0);
+        }
+    }
+
+    SECTION("Dynamic schema") {
+        size_t dynamic_schema_changed_called = 0;
+        Schema changed_dynamic_schema;
+        auto r2 = Realm::get_shared_realm(dynamic_config);
+        r2->m_binding_context.reset(new Context(&dynamic_schema_changed_called, &changed_dynamic_schema));
+
+        SECTION("set_schema_subset") {
+            auto new_schema = Schema{
+                {"object1", {
+                    {"value", PropertyType::Int},
+                }}
+            };
+            r2->set_schema_subset(new_schema);
+            REQUIRE(schema_changed_called == 0);
+            REQUIRE(dynamic_schema_changed_called == 1);
+            REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->table_column == 0);
+        }
+
+        SECTION("Non schema related transaction will alway trigger in dynamic mode") {
+            auto r1 = Realm::get_shared_realm(config);
+            // An empty transaction will trigger the schema changes always in dynamic mode.
+            r1->begin_transaction();
+            r1->commit_transaction();
+            r2->refresh();
+            REQUIRE(dynamic_schema_changed_called == 1);
+            REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->table_column == 0);
+        }
+
+        SECTION("Schema is changed by another Realm") {
+            r1->begin_transaction();
+            r1->read_group().get_table("class_object1")->insert_column(0, type_String, "new col");
+            r1->commit_transaction();
+            r2->refresh();
+            REQUIRE(dynamic_schema_changed_called == 1);
+            REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->table_column == 1);
+        }
+    }
+}
+
 #ifndef _WIN32
 TEST_CASE("SharedRealm: compact on launch") {
     // Make compactable Realm

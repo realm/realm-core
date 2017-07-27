@@ -158,7 +158,7 @@ public:
         // Optional schema for the file.
         // If the schema and schema version are supplied, update_schema() is
         // called with the supplied schema, version and migration function when
-        // the Realm is actually opened and not just retreived from the cache
+        // the Realm is actually opened and not just retrieved from the cache
         util::Optional<Schema> schema;
         uint64_t schema_version = -1;
         MigrationFunction migration_function;
@@ -371,6 +371,7 @@ private:
 
     void add_schema_change_handler();
     void cache_new_schema();
+    void notify_schema_changed();
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;
