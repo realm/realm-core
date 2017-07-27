@@ -391,10 +391,10 @@ def doBuildMacOs(String buildType) {
                             """)
                 }
             }
-            archiveArtifacts("build-macos-${buildType}/*.tar.xz")
+            archiveArtifacts("build-macos-${buildType}/*.tar.gz")
 
             def stashName = "macos___${buildType}"
-            stash includes:"build-macos-${buildType}/*.tar.xz", name:stashName
+            stash includes:"build-macos-${buildType}/*.tar.gz", name:stashName
             cocoaStashes << stashName
             publishingStashes << stashName
         }
@@ -416,9 +416,9 @@ def doBuildAppleDevice(String sdk, String buildType) {
                     }
                 }
             }
-            archiveArtifacts("build-${sdk}-${buildType}/*.tar.xz")
+            archiveArtifacts("build-${sdk}-${buildType}/*.tar.gz")
             def stashName = "${sdk}___${buildType}"
-            stash includes:"build-${sdk}-${buildType}/*.tar.xz", name:stashName
+            stash includes:"build-${sdk}-${buildType}/*.tar.gz", name:stashName
             cocoaStashes << stashName
             if(gitTag) {
                 publishingStashes << stashName
