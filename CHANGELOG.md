@@ -2,22 +2,7 @@
 
 ### Bugfixes
 
-* Attempting to open a small unencrypted Realm file with an encryption key would
-  produce an empty encrypted Realm file. Fixed by detecting the case and
-  throwing an exception.
-  PR [#2645](https://github.com/realm/realm-core/pull/2645)
-* Querying SharedGroup::wait_for_change() immediately after a commit()
-  would return instead of waiting for the next change.
-  PR [#2563](https://github.com/realm/realm-core/pull/2563).
-* Opening a second SharedGroup may trigger a file format upgrade if the history
-  schema version is non-zero.
-  Fixes issue [#2724](https://github.com/realm/realm-core/issues/2724).
-  PR [#2726](https://github.com/realm/realm-core/pull/2726).
-* Fix incorrect results from TableView::find_first().
-* Fix crash on rollback of Table::optimize(). Currently unused by bindings.
-  PR [#2753](https://github.com/realm/realm-core/pull/2753).
-* Update frozen TableViews when Table::swap() is called.
-  PR [#2757](https://github.com/realm/realm-core/pull/2757).
+* Lorem ipsum.
 
 ### Breaking changes
 
@@ -63,9 +48,6 @@
 * Add more overloads with realm::null - PR [#2669](https://github.com/realm/realm-core/pull/2669)
   - `size_t Table::find_first(size_t col_ndx, null)`
   - `OutputStream& operator<<(OutputStream& os, const null&)`
-* Add method to get total count of backlinks for a row
-  PR [#2672](https://github.com/realm/realm-core/pull/2672).
-* Add try_remove_dir() and try_remove_dir_recursive() functions.
 
 -----------
 
@@ -82,6 +64,43 @@
 * Implemented inter-process CondVars on Windows (Win32 + UWP). They should be
   fair and robust.
   PR [#2497](https://github.com/realm/realm-core/pull/2497).
+* The archives produced by the packaging process for Mac builds are now
+  .tar.gz files rather than .tar.xz files, with the exception of the aggregate
+  realm-core-cocoa-VERSION.tar.xz archive, which remains as a .tar.xz file.
+
+----------------------------------------------
+
+# 2.9.0 Release notes
+
+### Bugfixes
+
+* Attempting to open a small unencrypted Realm file with an encryption key would
+  produce an empty encrypted Realm file. Fixed by detecting the case and
+  throwing an exception.
+  PR [#2645](https://github.com/realm/realm-core/pull/2645)
+* Querying SharedGroup::wait_for_change() immediately after a commit()
+  would return instead of waiting for the next change.
+  PR [#2563](https://github.com/realm/realm-core/pull/2563).
+* Opening a second SharedGroup may trigger a file format upgrade if the history
+  schema version is non-zero.
+  Fixes issue [#2724](https://github.com/realm/realm-core/issues/2724).
+  PR [#2726](https://github.com/realm/realm-core/pull/2726).
+* Fix incorrect results from TableView::find_first().
+* Fix crash on rollback of Table::optimize(). Currently unused by bindings.
+  PR [#2753](https://github.com/realm/realm-core/pull/2753).
+* Update frozen TableViews when Table::swap() is called.
+  PR [#2757](https://github.com/realm/realm-core/pull/2757).
+
+### Enhancements
+
+* Add method to get total count of backlinks for a row.
+  PR [#2672](https://github.com/realm/realm-core/pull/2672).
+* Add try_remove_dir() and try_remove_dir_recursive() functions.
+
+-----------
+
+### Internals
+
 * On Apple platforms, use `os_log` instead of `asl_log` when possible.
   PR [#2722](https://github.com/realm/realm-core/pull/2722).
 
