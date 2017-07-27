@@ -136,7 +136,7 @@ endif()
 install(FILES LICENSE CHANGELOG.md DESTINATION . COMPONENT devel)
 
 if(APPLE)
-    set(CPACK_GENERATOR "TXZ")
+    set(CPACK_GENERATOR "TGZ")
 elseif(ANDROID)
     set(CPACK_GENERATOR "TGZ")
 else()
