@@ -33,23 +33,27 @@ BUILD_TYPES=( Release Debug )
 
 if [[ ! -z $BUILD ]]; then
     for bt in "${BUILD_TYPES[@]}"; do
-        for p in "${PLATFORMS[@]}"; do
-            [[ $p != "macos" && $bt = "Debug" ]] && prefix="MinSize" || prefix=""
-            folder_name="build-${p}-${prefix}${bt}"
-            mkdir -p "${folder_name}"
-            (
-                cd "${folder_name}" || exit 1
-                rm -f realm-core-*-devel.tar.gz
-                cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${p}.toolchain.cmake" \
-                      -D CMAKE_BUILD_TYPE="${prefix}${bt}" \
-                      -D REALM_VERSION="$(git describe)" \
-                      -D REALM_SKIP_SHARED_LIB=ON \
-                      -D REALM_BUILD_LIB_ONLY=ON \
-                      -G Xcode ..
-                cmake --build . --config "${prefix}${bt}" --target package
-            )
-        done
+        folder_name="build-macos-${bt}"
+        mkdir -p "${folder_name}"
+        (
+            cd "${folder_name}" || exit 1
+            rm -f realm-core-*-devel.tar.gz
+            cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/macos.toolchain.cmake" \
+                  -D CMAKE_BUILD_TYPE="${bt}" \
+                  -D REALM_VERSION="$(git describe)" \
+                  -D REALM_SKIP_SHARED_LIB=ON \
+                  -D REALM_BUILD_LIB_ONLY=ON \
+                  -G Xcode ..
+            cmake --build . --config "${bt}" --target package
+        )
     done
+    if [[ -z $MACOS_ONLY ]]; then
+        for os in ios watchos tvos; do
+            for bt in Release MinSizeDebug; do
+                tools/cross_compile.sh -o $os -t $bt -v $(git describe)
+            done
+        done
+    fi
 fi
 
 rm -rf core
