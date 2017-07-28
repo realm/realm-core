@@ -31,6 +31,9 @@ std::function<bool (size_t)>
 CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
                                              Table const& root_table)
 {
+    if (info.schema_changed)
+        set_table(root_table);
+
     // First check if any of the tables accessible from the root table were
     // actually modified. This can be false if there were only insertions, or
     // deletions which were not linked to by any row in the linking table

@@ -582,6 +582,8 @@ public:
 
     bool insert_column(size_t ndx, DataType, StringData, bool)
     {
+        m_info.schema_changed = true;
+
         if (m_active_descriptor)
             m_active_descriptor->insert_column(ndx);
         if (m_active_descriptor != m_active_table || !m_is_top_level_table)
@@ -609,6 +611,8 @@ public:
 
     bool insert_group_level_table(size_t ndx, size_t, StringData)
     {
+        m_info.schema_changed = true;
+
         for (auto& list : m_info.lists) {
             if (list.table_ndx >= ndx)
                 ++list.table_ndx;
@@ -623,6 +627,8 @@ public:
 
     bool move_column(size_t from, size_t to)
     {
+        m_info.schema_changed = true;
+
         if (m_active_descriptor)
             m_active_descriptor->move_column(from, to);
         if (m_active_descriptor != m_active_table || !m_is_top_level_table)
@@ -640,6 +646,8 @@ public:
 
     bool move_group_level_table(size_t from, size_t to)
     {
+        m_info.schema_changed = true;
+
         for (auto& list : m_info.lists)
             adjust_for_move(list.table_ndx, from, to);
 

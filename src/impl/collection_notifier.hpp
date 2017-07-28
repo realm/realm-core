@@ -53,6 +53,7 @@ struct TransactionChangeInfo {
     std::vector<std::vector<size_t>> column_indices;
     std::vector<size_t> table_indices;
     bool track_all;
+    bool schema_changed;
 };
 
 class DeepChangeChecker {

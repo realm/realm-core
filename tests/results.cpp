@@ -1108,9 +1108,12 @@ TEST_CASE("notifications: results") {
     auto table = r->read_group().get_table("class_object");
 
     r->begin_transaction();
+    r->read_group().get_table("class_linked to object")->add_empty_row(10);
     table->add_empty_row(10);
-    for (int i = 0; i < 10; ++i)
+    for (int i = 0; i < 10; ++i) {
         table->set_int(0, i, i * 2);
+        table->set_link(1, i, i);
+    }
     r->commit_transaction();
 
     auto r2 = coordinator->get_realm();
@@ -1653,6 +1656,81 @@ TEST_CASE("notifications: results") {
             });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 0);
+        }
+    }
+
+    SECTION("schema changes") {
+        CollectionChangeSet change;
+        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            change = c;
+        });
+        advance_and_notify(*r);
+
+        auto write = [&](auto&& f) {
+            r->begin_transaction();
+            f();
+            r->commit_transaction();
+            advance_and_notify(*r);
+        };
+
+        SECTION("insert table before observed table") {
+            write([&] {
+                size_t row = table->add_empty_row();
+                table->set_int(0, row, 5);
+                r->read_group().insert_table(0, "new table");
+                table->insert_empty_row(0);
+                table->set_int(0, 0, 5);
+            });
+            REQUIRE_INDICES(change.insertions, 0, 5);
+        }
+
+        SECTION("move observed table") {
+            write([&] {
+                size_t row = table->add_empty_row();
+                table->set_int(0, row, 5);
+                r->read_group().move_table(table->get_index_in_group(), 0);
+                table->insert_empty_row(0);
+                table->set_int(0, 0, 5);
+            });
+            REQUIRE_INDICES(change.insertions, 0, 5);
+        }
+
+        auto linked_table = table->get_link_target(1);
+        SECTION("insert new column before link column") {
+            write([&] {
+                linked_table->set_int(0, 1, 5);
+                table->insert_column(0, type_Int, "new col");
+                linked_table->set_int(0, 2, 5);
+            });
+            REQUIRE_INDICES(change.modifications, 0, 1);
+        }
+
+        SECTION("move link column") {
+            write([&] {
+                linked_table->set_int(0, 1, 5);
+                _impl::TableFriend::move_column(*table->get_descriptor(), 1, 0);
+                linked_table->set_int(0, 2, 5);
+            });
+            REQUIRE_INDICES(change.modifications, 0, 1);
+        }
+
+        SECTION("insert table before link target") {
+            write([&] {
+                linked_table->set_int(0, 1, 5);
+                r->read_group().insert_table(0, "new table");
+                linked_table->set_int(0, 2, 5);
+            });
+            REQUIRE_INDICES(change.modifications, 0, 1);
+        }
+
+        SECTION("move link target") {
+            write([&] {
+                linked_table->set_int(0, 1, 5);
+                r->read_group().move_table(linked_table->get_index_in_group(), 0);
+                linked_table->set_int(0, 2, 5);
+            });
+            REQUIRE_INDICES(change.modifications, 0, 1);
         }
     }
 }
