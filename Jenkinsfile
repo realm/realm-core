@@ -363,7 +363,7 @@ def buildPerformance() {
 def doBuildMacOs(String buildType) {
     def sdk = 'macosx'
     return {
-        node('macos') {
+        node('macos || osx') {
             getArchive()
 
             dir("build-macos-${buildType}") {
@@ -403,7 +403,7 @@ def doBuildMacOs(String buildType) {
 
 def doBuildAppleDevice(String sdk, String buildType) {
     return {
-        node('macos') {
+        node('macos || osx') {
             getArchive()
 
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {
