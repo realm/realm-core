@@ -209,7 +209,7 @@ Mixed construct_mixed(State& s, util::Optional<std::ostream&> log, std::string& 
         }
         case 5: {
             size_t rand_char = get_next(s);
-            size_t blob_size = get_int64(s) % ArrayBlob::max_binary_size;
+            size_t blob_size = static_cast<uint64_t>(get_int64(s)) % ArrayBlob::max_binary_size;
             buffer = std::string(blob_size, static_cast<unsigned char>(rand_char));
             if (log) {
                 *log << "std::string blob(" << blob_size << ", static_cast<unsigned char>(" << rand_char << "));\n"
