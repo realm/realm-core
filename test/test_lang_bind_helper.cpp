@@ -13291,6 +13291,29 @@ TEST(LangBindHelper_OpenAsEncrypted)
 #endif
 
 
+TEST(LangBindHelper_IndexedStringEnumColumnSwapRows)
+{
+    // Test case generated in [realm-core-2.8.6] on Wed Jul 26 17:33:36 2017.
+    // The problem was that StringEnumColumn must override the default
+    // implementation of Column::swap_rows()
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = nullptr;
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = sg_w.begin_write();
+    try { g.insert_table(0, "t0"); } catch (const TableNameInUse&) { }
+    g.get_table(0)->insert_column(0, DataType(2), "", true);
+    g.get_table(0)->add_search_index(0);
+    g.get_table(0)->optimize(true);
+    g.get_table(0)->insert_empty_row(0, 128);
+    g.verify();
+    g.get_table(0)->swap_rows(127, 30);
+    g.get_table(0)->insert_empty_row(95, 5);
+    g.get_table(0)->remove(30);
+    g.verify();
+}
+
+
 TEST(LangBindHelper_NonsharedAccessToRealmWithHistory)
 {
     // Create a Realm file with a history (history_type !=
