@@ -178,7 +178,7 @@ public:
     struct UnsupportedColumnTypeException : public std::logic_error {
         size_t column_index;
         StringData column_name;
-        DataType column_type;
+        PropertyType property_type;
 
         UnsupportedColumnTypeException(size_t column, const Table* table, const char* operation);
     };

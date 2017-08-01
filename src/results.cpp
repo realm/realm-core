@@ -745,6 +745,6 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(size_t c
                                 string_for_property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column))))
 , column_index(column)
 , column_name(table->get_column_name(column))
-, column_type(table->get_column_type(column))
+, property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column))
 {
 }
