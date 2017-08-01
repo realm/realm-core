@@ -158,7 +158,8 @@ public:
 
     void verify() const;
 #ifdef REALM_DEBUG
-    void verify_entries(const StringColumn& column) const;
+    template <typename T>
+    void verify_entries(const T& column) const;
     void do_dump_node_structure(std::ostream&, int) const;
     void to_dot() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
