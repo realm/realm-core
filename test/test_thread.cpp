@@ -890,7 +890,7 @@ TEST(Thread_CondvarAtomicWaitUnlock)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    const int iter = 10000;
+    const int iter = 100;
 
     // It's nice to have many threads to trigger preemption (see notes inside the t1 thread)
     const int thread_pair_count = 2; // std::thread::hardware_concurrency();

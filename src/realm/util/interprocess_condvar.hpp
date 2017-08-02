@@ -130,12 +130,13 @@ private:
 #ifdef _WIN32
     // Semaphore used to queue up threads waiting for the condition to
     // become signaled. 
-    HANDLE m_sema;
-
+    HANDLE m_sema = 0;
     // An auto-reset event used by the broadcast/signal thread to wait
     // for all the waiting thread(s) to wake up and be released from the
     // semaphore. 
-    HANDLE m_waiters_done;
+    HANDLE m_waiters_done = 0;
+    std::string m_name;
+
 #endif
 
 #endif

@@ -133,6 +133,7 @@ private:
     SharedPart* m_shared_part = nullptr;
 #endif
     friend class InterprocessCondVar;
+    friend class InterprocessMutex;
 };
 
 inline InterprocessMutex::InterprocessMutex()
@@ -213,6 +214,16 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
     m_shared_part = &shared_part;
     static_cast<void>(path);
     static_cast<void>(mutex_name);
+
+    uint64_t a = 1;
+
+    for (size_t t = 0; t < path.size(); t++)
+        a += (a * (t + t * path[t]));
+    for (size_t t = 0; t < mutex_name.size(); t++)
+        a += (a * (t + t * mutex_name[t]));
+
+    sprintf_s(m_shared_part->m_shared_name, sizeof(m_shared_part->m_shared_name), "Local\\%I64X", a);
+
 #endif
 }
 

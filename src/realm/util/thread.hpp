@@ -20,6 +20,7 @@
 #define REALM_UTIL_THREAD_HPP
 
 #include <exception>
+#include <iostream>
 
 #ifdef _WIN32
 #include <thread>
@@ -177,10 +178,12 @@ private:
     // expensive, so we cache the translation for each process (each process has its own HANDLE for the same mutex)
     HANDLE m_cached_handle;
     DWORD m_cached_pid;
+
 #endif
 
     friend class CondVar;
     friend class RobustMutex;
+    friend class InterprocessMutex;
 };
 
 
@@ -318,6 +321,7 @@ public:
     bool is_valid() noexcept;
 
     friend class CondVar;
+    friend class InterprocessMutex;
 };
 
 class RobustMutex::NotRecoverable : public std::exception {
@@ -477,20 +481,9 @@ inline Mutex::Mutex(process_shared_tag)
 inline Mutex::~Mutex() noexcept
 {
 #ifdef _WIN32
-    if (m_is_shared && m_cached_pid == GetCurrentProcessId()) {
-        CloseHandle(m_cached_handle);
-    }
-    else {
-        // If this is a shared mutex (m_is_shared) then we leak a handle and there's nothing 
-        // we can do about it because the mutex was constructed in another process 
-        // (m_cached_pid != _getpid()) which we don't have access to. Once all processes
-        // that are accessing the mutex are terminated, it will be freed automatically by
-        // Windows, so it's not severe. Only mutexes in the .lock files are interprocess, so
-        // the handle leaks do not accumulate over time.
-        //
-        // Non-interprocess mutexes are using std::mutex which is an object member to Mutex
-        // which does not have this handle leak issue.
-    }
+//    if (m_is_shared) {
+//        CloseHandle(m_handle);
+//    }
 #else
     int r = pthread_mutex_destroy(&m_impl);
     if (REALM_UNLIKELY(r != 0))
@@ -519,18 +512,20 @@ inline void Mutex::lock() noexcept
         HANDLE h;
         DWORD pid = GetCurrentProcessId();
 
-        if (m_cached_pid != pid)
-            h = OpenMutexA(MUTEX_ALL_ACCESS, 1, m_shared_name);
-        else
-            h = m_cached_handle;
+//        if (m_cached_pid != pid) {
+            h = CreateMutexA(0, false, m_shared_name);
+//        }
+//        else
+//            h = m_cached_handle;
 
         if (h == NULL)
             lock_failed(EINVAL);
 
         d = WaitForSingleObject(h, INFINITE);
 
-        if (m_cached_pid != pid)
+//        if (m_cached_pid != pid) {
             CloseHandle(h);
+//        }
 
         // If WaitForSingleObject() returned any other value, it means it succeeded
         if (d == (DWORD)0xFFFFFFFF)
@@ -555,23 +550,25 @@ inline bool Mutex::try_lock() noexcept
         HANDLE h;
         DWORD pid = GetCurrentProcessId();
 
-        if (m_cached_pid != pid)
-            h = OpenMutexA(MUTEX_ALL_ACCESS, 1, m_shared_name);
-        else
-            h = m_cached_handle;
+//        if (m_cached_pid != pid)
+            h = CreateMutexA(0, false, m_shared_name);
+//        else
+//            h = m_cached_handle;
 
         if (h == NULL)
             lock_failed(0);
 
         d = WaitForSingleObject(h, 0);
 
-        if (m_cached_pid != pid)
-            CloseHandle(h);
+//        if (m_cached_pid != pid)
+         //   CloseHandle(h);
 
         if (d == WAIT_OBJECT_0)
             return true;
-        else
+        else {
+            CloseHandle(h);
             return false;
+        }
     }
 #else
     int r = pthread_mutex_trylock(&m_impl);
@@ -597,21 +594,21 @@ inline void Mutex::unlock() noexcept
         HANDLE h;
         DWORD pid = GetCurrentProcessId();
 
-        if (m_cached_pid != pid)
-            h = OpenMutexA(MUTEX_ALL_ACCESS, 1, m_shared_name);
-        else
-            h = m_cached_handle;
+//        if (m_cached_pid != pid)
+            h = CreateMutexA(0, true, m_shared_name);
+//        else
+//            h = m_cached_handle;
 
         if (h == NULL)
             lock_failed(0);
 
         d = ReleaseMutex(h);
 
-        if (m_cached_pid != pid)
+//        if (m_cached_pid != pid)
             CloseHandle(h);
 
-        if (d == 0)
-            lock_failed(0);   // Best probability why ReleaseMutex would fail on valid mutex
+//        if (d == 0)
+//            lock_failed(0);   // Best probability why ReleaseMutex would fail on valid mutex
     }
 #else
     int r = pthread_mutex_unlock(&m_impl);

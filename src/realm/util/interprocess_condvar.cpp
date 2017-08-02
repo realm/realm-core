@@ -33,6 +33,10 @@
 #include <sys/time.h>
 #endif
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 
 using namespace realm;
 using namespace realm::util;
@@ -95,12 +99,15 @@ void InterprocessCondVar::close() noexcept
 #endif
 #endif
     // we don't do anything to the shared part, other CondVars may share it
+
     m_shared_part = nullptr;
 }
 
 
 InterprocessCondVar::~InterprocessCondVar() noexcept
 {
+    CloseHandle(m_sema);
+    CloseHandle(m_waiters_done);
     close();
 }
 
@@ -199,6 +206,10 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     // same object. If not then they are created. When the last process that has handles to an object 
     // terminates, the objects are destructed automatically by the kernel, so there will be no handle 
     // leaks or other kinds of leak.
+
+    if (base_path + condvar_name == m_name)
+        return;
+
     std::string sem = "realm_sema_" + base_path + condvar_name;
     std::string eve = "realm_event_" + base_path + condvar_name;
 
@@ -206,18 +217,29 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     std::wstring se = std::wstring(sem.begin(), sem.end());
     std::wstring ev = std::wstring(eve.begin(), eve.end());
 
+    CloseHandle(m_sema);
+
     m_sema = CreateSemaphoreW(
         nullptr,     // no security
         0,           // initially 0
         0x7fffffff,  // max count
         LPWSTR(se.c_str()));
 
+    CloseHandle(m_waiters_done);
     m_waiters_done = CreateEventW(
         nullptr,    // no security
         false,      // auto-reset
         false,      // non-signaled initially
         LPWSTR(ev.c_str()));
+    
+    uint64_t a = 1;
 
+    std::string mname = "cv" + base_path + condvar_name;
+    for (size_t t = 0; t < mname.size(); t++)
+        a += (a * (t + t * mname[t]));
+
+    sprintf_s(m_shared_part->m_waiters_countlock.m_shared_name, sizeof(m_shared_part->m_waiters_countlock.m_shared_name), "Local\\%I64X", a);
+    m_shared_part->m_waiters_countlock.m_is_shared = true;
 #endif // _WIN32
 #endif // REALM_CONDVAR_EMULATION
 }

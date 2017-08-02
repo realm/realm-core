@@ -82,7 +82,8 @@ namespace util {
 // A list of all of the active encrypted mappings for a single file
 struct mappings_for_file {
 #ifdef _WIN32
-    HANDLE handle;
+    HANDLE handle; // file handle
+    HANDLE mapping_handle;
 #else
     dev_t device;
     ino_t inode;
@@ -117,7 +118,7 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 }
 
 EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t file_offset, File::AccessMode access,
-                                  const char* encryption_key)
+                                  const char* encryption_key, HANDLE mh = 0)
 {
 #ifndef _WIN32
     struct stat st;
@@ -168,6 +169,7 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
 
 #ifdef _WIN32
         f.handle = fd;
+        f.mapping_handle = mh;
 #else
         f.device = st.st_dev;
         f.inode = st.st_ino;
@@ -224,6 +226,7 @@ void remove_mapping(void* addr, size_t size)
     for (std::vector<mappings_for_file>::iterator it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->info->mappings.empty()) {
 #ifdef _WIN32
+
             if (!CloseHandle(it->info->fd))
                 throw std::runtime_error(get_errno_msg("CloseHandle() failed: ", GetLastError()));
 
@@ -240,7 +243,7 @@ void remove_mapping(void* addr, size_t size)
     }
 }
 
-void* mmap_anon(size_t size)
+void* mmap_anon(size_t size, HANDLE* ret = nullptr)
 {
 #ifdef _WIN32
     HANDLE hMapFile;
@@ -252,7 +255,7 @@ void* mmap_anon(size_t size)
     pBuf = (LPTSTR)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, size);
     if (pBuf == nullptr)
         throw std::runtime_error(get_errno_msg("MapViewOfFile() failed: ", GetLastError()));
-
+    CloseHandle(hMapFile);
     return (void*)pBuf;
 #else
     void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
@@ -278,8 +281,9 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
 {
     if (encryption_key) {
         size = round_up_to_page_size(size);
-        void* addr = mmap_anon(size);
-        mapping = add_mapping(addr, size, fd, offset, access, encryption_key);
+        HANDLE h;
+        void* addr = mmap_anon(size, &h);
+        mapping = add_mapping(addr, size, fd, offset, access, encryption_key, h);
         return addr;
     }
     else {
