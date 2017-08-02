@@ -1304,9 +1304,14 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function",
     TestFile config;
     config.schema_mode = TestType::mode();
     bool initialization_function_called = false;
-    auto initialization_function = [&initialization_function_called](auto shared_realm) {
+    uint64_t schema_version_in_callback = -1;
+    Schema schema_in_callback;
+    auto initialization_function = [&initialization_function_called, &schema_version_in_callback,
+                                    &schema_in_callback](auto shared_realm) {
         REQUIRE(shared_realm->is_in_transaction());
         initialization_function_called = true;
+        schema_version_in_callback = shared_realm->schema_version();
+        schema_in_callback = shared_realm->schema();
     };
 
     Schema schema{
@@ -1322,6 +1327,8 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function",
 
         realm->update_schema(schema, 0, nullptr, initialization_function);
         REQUIRE(initialization_function_called);
+        REQUIRE(schema_version_in_callback == 0);
+        REQUIRE(schema_in_callback.compare(schema).size() == 0);
     }
 
     config.schema_version = 0;
@@ -1330,7 +1337,9 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function",
     SECTION("initialization function should be called for unversioned realm") {
         config.initialization_function = initialization_function;
         Realm::get_shared_realm(config);
-        REQUIRE(initialization_function_called == true);
+        REQUIRE(initialization_function_called);
+        REQUIRE(schema_version_in_callback == 0);
+        REQUIRE(schema_in_callback.compare(schema).size() == 0);
     }
 
     SECTION("initialization function for versioned realm") {
@@ -1341,5 +1350,9 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function",
         config.initialization_function = initialization_function;
         Realm::get_shared_realm(config);
         REQUIRE(initialization_function_called == TestType::should_call_init_on_version_bump());
+        if (TestType::should_call_init_on_version_bump()) {
+            REQUIRE(schema_version_in_callback == 1);
+            REQUIRE(schema_in_callback.compare(schema).size() == 0);
+        }
     }
 }

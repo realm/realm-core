@@ -451,6 +451,14 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     }
 
     if (initialization_function && old_schema_version == ObjectStore::NotVersioned) {
+        // Initialization function needs to see the latest schema
+        uint64_t temp_version = ObjectStore::get_schema_version(read_group());
+        std::swap(m_schema, schema);
+        std::swap(m_schema_version, temp_version);
+        auto restore = util::make_scope_exit([&]() noexcept {
+            std::swap(m_schema, schema);
+            std::swap(m_schema_version, temp_version);
+        });
         initialization_function(shared_from_this());
     }
 
