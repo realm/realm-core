@@ -24,7 +24,7 @@
 // The current type is exposed inside the test as `TestType`
 #define TEMPLATE_TEST_CASE(name, ...) \
     REALM_EXPAND(REALM_TEMPLATE_TEST_CASE(name, INTERNAL_CATCH_UNIQUE_NAME(REALM_TEMPLATE_TEST_), \
-                                          __VA_ARGS__, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0))
+                                          __VA_ARGS__, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1))
 
 #define REALM_TEMPLATE_TEST_CASE(name, fn, T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, n, ...) \
     template<typename> static void fn(); \
