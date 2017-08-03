@@ -594,9 +594,16 @@ TEST(Thread_RobustMutexTryLock)
     CHECK(times_recover_function_was_called == 0);
 
     bool init_done = false;
+    std::mutex control_mutex;
+    std::condition_variable control_cv;
+
     auto do_async = [&]() {
         CHECK(!m.try_lock(recover_function));
-        init_done = true;
+        {
+            std::lock_guard<std::mutex> guard(control_mutex);
+            init_done = true;
+        }
+        control_cv.notify_one();
         while(!m.try_lock(recover_function)) { millisleep(1); }
         // exit the thread with the lock held to check robustness
     };
@@ -604,7 +611,10 @@ TEST(Thread_RobustMutexTryLock)
     // Check basic locking across threads.
     CHECK(m.try_lock(recover_function));
     thread.start(do_async);
-    while (!init_done) { millisleep(1); }
+    {
+        std::unique_lock<std::mutex> lock(control_mutex);
+        control_cv.wait(lock, [&]{ return init_done; });
+    }
     m.unlock();
     thread.join();
     CHECK(times_recover_function_was_called == 0);
