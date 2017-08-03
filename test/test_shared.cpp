@@ -2414,8 +2414,8 @@ TEST(Shared_EncryptionKeyCheck_3)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* first_key = crypt_key(true);
-    char second_key[32];
-    memcpy(second_key, first_key, 32);
+    char second_key[64];
+    memcpy(second_key, first_key, 64);
     second_key[3] = ~second_key[3];
     SharedGroup sg(path, false, SharedGroupOptions(first_key));
     bool ok = false;
