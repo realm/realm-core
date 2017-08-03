@@ -158,9 +158,9 @@ def doBuildInDocker(String buildType) {
 
             def buildEnv = docker.build 'realm-core:snapshot'
             def environment = environment()
+            environment << 'UNITTEST_PROGRESS=1'
             if (buildType.contains('sanitizer')) {
                 environment << 'UNITTEST_THREADS=1'
-                environment << 'UNITTEST_PROGRESS=1'
             }
             withEnv(environment) {
                 buildEnv.inside {
@@ -193,6 +193,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             def buildDir = "build-${stashName}".replaceAll('___', '-')
             def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
             def environment = environment()
+            environment << 'UNITTEST_PROGRESS=1'
             withEnv(environment) {
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
@@ -276,6 +277,7 @@ def buildDiffCoverage() {
 
             def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
             def environment = environment()
+            environment << 'UNITTEST_PROGRESS=1'
             withEnv(environment) {
                 buildEnv.inside {
                     sh '''
