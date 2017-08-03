@@ -104,18 +104,10 @@ option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode." OFF)
 option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations." OFF)
 option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
 option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
-option(REALM_SANITIZE_ADDRESS "Enable the GCC/Clang address sanitizer." OFF)
-option(REALM_SANITIZE_THREAD "Enable the GCC/Clang thread sanitizer." OFF)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
 if (CMAKE_SYSTEM_NAME MATCHES "^Windows")
 	set(REALM_ENABLE_ENCRYPTION OFF)
-endif()
-
-if(REALM_SANITIZE_THREAD)
-    set(CMAKE_CXX_FLAGS "-fsanitize=thread")
-elseif(REALM_SANITIZE_ADDRESS)
-    set(CMAKE_CXX_FLAGS "-fsanitize=address")
 endif()
 
 check_include_files(malloc.h HAVE_MALLOC_H)

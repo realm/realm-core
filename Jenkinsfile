@@ -163,10 +163,10 @@ def doBuildInDocker(String buildType, String sanitizeMode) {
             environment << 'UNITTEST_PROGRESS=1'
             if (sanitizeMode.contains('thread')) {
                 environment << 'UNITTEST_THREADS=1'
-                sanitizeFlags = '-D REALM_SANITIZE_THREAD=ON'
+                sanitizeFlags = '-D REALM_TSAN=ON'
             } else if (sanitizeMode.contains('address')) {
                 environment << 'UNITTEST_THREADS=1'
-                sanitizeFlags = '-D REALM_SANITIZE_ADDRESS=ON'
+                sanitizeFlags = '-D REALM_ASAN=ON'
             }
             withEnv(environment) {
                 buildEnv.inside {
