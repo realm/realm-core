@@ -19,6 +19,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_THREAD
 
+#include <condition_variable>
 #include <cstring>
 #include <algorithm>
 #include <queue>
@@ -535,6 +536,9 @@ TEST(Thread_MutexTryLock)
     Mutex base_mutex;
     std::unique_lock<Mutex> m(base_mutex, std::defer_lock);
 
+    std::condition_variable cv;
+    std::mutex cv_lock;
+
     // basic same thread try_lock
     CHECK(m.try_lock());
     CHECK(m.owns_lock());
@@ -546,7 +550,11 @@ TEST(Thread_MutexTryLock)
         std::unique_lock<Mutex> mutex2(base_mutex, std::defer_lock);
         CHECK(!mutex2.owns_lock());
         CHECK(!mutex2.try_lock());
-        init_done = true;
+        {
+            std::lock_guard<std::mutex> guard(cv_lock);
+            init_done = true;
+        }
+        cv.notify_one();
         while(!mutex2.try_lock()) { millisleep(1); }
         CHECK(mutex2.owns_lock());
         mutex2.unlock();
@@ -557,7 +565,10 @@ TEST(Thread_MutexTryLock)
     CHECK(m.try_lock());
     CHECK(m.owns_lock());
     thread.start(do_async);
-    while (!init_done) { millisleep(1); }
+    {
+        std::unique_lock<std::mutex> guard(cv_lock);
+        cv.wait(guard, [&]{return init_done;});
+    }
     m.unlock();
     thread.join();
 }
@@ -619,12 +630,18 @@ NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
     m.unlock();
 
     bool init_done = false;
+    std::condition_variable cv;
+    std::mutex cv_mutex;
     auto do_async = [&]() {
         InterprocessMutex m2;
         m2.set_shared_part(mutex_part, path, mutex_file_name);
 
         CHECK(!m2.try_lock());
-        init_done = true;
+        {
+            std::lock_guard<std::mutex> guard(cv_mutex);
+            init_done = true;
+        }
+        cv.notify_one();
         while(!m2.try_lock()) { millisleep(1); }
         m2.unlock();
     };
@@ -632,7 +649,10 @@ NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
     // Check basic locking across threads.
     CHECK(m.try_lock());
     thread.start(do_async);
-    while (!init_done) { millisleep(1); }
+    {
+        std::unique_lock<std::mutex> ul(cv_mutex);
+        cv.wait(ul, [&]{return init_done;});
+    }
     m.unlock();
     thread.join();
     m.release_shared_part();
@@ -696,9 +716,17 @@ void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter, In
 }
 
 
-void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
+void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv, std::mutex* control_mutex,
+            std::condition_variable* control_cv, size_t* num_threads_holding_lock)
 {
     std::lock_guard<InterprocessMutex> l(*mutex);
+
+    {
+        std::lock_guard<std::mutex> guard(*control_mutex);
+        *num_threads_holding_lock = (*num_threads_holding_lock) + 1;
+    }
+    control_cv->notify_one();
+
     cv->wait(*mutex, nullptr);
 }
 }
@@ -818,13 +846,26 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
     SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
     changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
+
+    size_t num_threads_holding_lock = 0;
+    std::mutex control_mutex;
+    std::condition_variable control_cv;
+
     const int num_waiters = 10;
     Thread waiters[num_waiters];
     for (int i = 0; i < num_waiters; ++i) {
-        waiters[i].start(std::bind(waiter, &mutex, &changed));
+        waiters[i].start(std::bind(waiter, &mutex, &changed, &control_mutex, &control_cv, &num_threads_holding_lock));
     }
-    millisleep(1000); // allow time for all waiters to wait
+    {
+        // allow all waiters to start and obtain the InterprocessCondVar
+        std::unique_lock<std::mutex> unique_lock(control_mutex);
+        control_cv.wait(unique_lock, [&]{ return num_threads_holding_lock == num_waiters; });
+    }
+
+    mutex.lock();
     changed.notify_all();
+    mutex.unlock();
+
     for (int i = 0; i < num_waiters; ++i) {
         waiters[i].join();
     }
