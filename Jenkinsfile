@@ -43,8 +43,8 @@ timeout(time: 5, unit: 'HOURS') {
     }
 
     stage('check') {
-        parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
-                             checkLinuxDebug     : doBuildInDocker('Debug'),
+        parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release', ''),
+                             checkLinuxDebug     : doBuildInDocker('Debug', ''),
                              buildMacOsDebug     : doBuildMacOs('Debug'),
                              buildMacOsRelease   : doBuildMacOs('Release'),
                              buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
@@ -60,8 +60,9 @@ timeout(time: 5, unit: 'HOURS') {
                              packageGeneric      : doBuildPackage('generic', 'tgz'),
                              packageCentos7      : doBuildPackage('centos-7', 'rpm'),
                              packageCentos6      : doBuildPackage('centos-6', 'rpm'),
-                             packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb')
-                             //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
+                             packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
+                             threadSanitizer     : doBuildInDocker('Debug', 'thread'),
+                             addressSanitizer    : doBuildInDocker('Debug', 'address')
             ]
 
         androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
@@ -151,16 +152,21 @@ def buildDockerEnv(name) {
     return docker.image(name)
 }
 
-def doBuildInDocker(String buildType) {
+def doBuildInDocker(String buildType, String sanitizeMode) {
     return {
         node('docker') {
             getArchive()
 
             def buildEnv = docker.build 'realm-core:snapshot'
             def environment = environment()
+            def sanitizeFlags = ''
             environment << 'UNITTEST_PROGRESS=1'
-            if (buildType.contains('sanitizer')) {
+            if (sanitizeMode.contains('thread')) {
                 environment << 'UNITTEST_THREADS=1'
+                sanitizeFlags = '-D REALM_SANITIZE_THREAD=ON'
+            } else if (sanitizeMode.contains('address')) {
+                environment << 'UNITTEST_THREADS=1'
+                sanitizeFlags = '-D REALM_SANITIZE_ADDRESS=ON'
             }
             withEnv(environment) {
                 buildEnv.inside {
@@ -168,7 +174,7 @@ def doBuildInDocker(String buildType) {
                         sh """
                            mkdir build-dir
                            cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType} -G Ninja ..
+                           cmake -D CMAKE_BUILD_TYPE=${buildType} ${sanitizeFlags} -G Ninja ..
                         """
                         runAndCollectWarnings(script: "cd build-dir && ninja")
                         sh """
