@@ -67,6 +67,22 @@ int64_t ns_since_unix_epoch(const system_clock::time_point& point)
 
 // MARK: - Permission
 
+Permission::Permission(Object& permission)
+{
+    CppContext context;
+    path = any_cast<std::string>(permission.get_property_value<util::Any>(context, "path"));
+    access = extract_access_level(permission, context);
+    condition = Condition(any_cast<std::string>(permission.get_property_value<util::Any>(context, "userId")));
+    updated_at = any_cast<Timestamp>(permission.get_property_value<util::Any>(context, "updatedAt"));
+}
+
+Permission::Permission(std::string path, AccessLevel access, Condition condition, Timestamp updated_at)
+: path(std::move(path))
+, access(access)
+, condition(std::move(condition))
+, updated_at(std::move(updated_at))
+{ }
+
 std::string Permission::description_for_access_level(AccessLevel level)
 {
     switch (level) {
@@ -150,7 +166,7 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
     // unregistered by nulling out the `results_wrapper` container.
     auto async = [results, callback=std::move(callback)](CollectionChangeSet, std::exception_ptr ex) mutable {
         if (ex) {
-            callback(nullptr, ex);
+            callback(Results(), ex);
             results.reset();
             return;
         }
@@ -163,7 +179,7 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                            || table->column<StringData>(col_idx).ends_with("/__management"));
             // Call the callback with our new permissions object. This object will exclude the
             // private Realms.
-            callback(std::make_unique<PermissionResults>(results->filter(std::move(query))), nullptr);
+            callback(results->filter(std::move(query)), nullptr);
             results.reset();
         }
     };
