@@ -43,8 +43,8 @@ timeout(time: 5, unit: 'HOURS') {
     }
 
     stage('check') {
-        parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release', ''),
-                             checkLinuxDebug     : doBuildInDocker('Debug', ''),
+        parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
+                             checkLinuxDebug     : doBuildInDocker('Debug'),
                              buildMacOsDebug     : doBuildMacOs('Debug'),
                              buildMacOsRelease   : doBuildMacOs('Release'),
                              buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
@@ -152,7 +152,7 @@ def buildDockerEnv(name) {
     return docker.image(name)
 }
 
-def doBuildInDocker(String buildType, String sanitizeMode) {
+def doBuildInDocker(String buildType, String sanitizeMode='') {
     return {
         node('docker') {
             getArchive()
