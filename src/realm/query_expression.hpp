@@ -2209,7 +2209,7 @@ private:
 
 template <typename T>
 class ListColumns;
-template <typename T, typename Operation>
+template <typename T, template <typename> class Operation>
 class ListColumnAggregate;
 namespace aggregate_operations {
 template <typename T>
@@ -2278,7 +2278,7 @@ private:
     friend class Table;
     template <class T>
     friend class ListColumnsBase;
-    template <class T, class U>
+    template <class T, template <class> class U>
     friend class ListColumnAggregate;
 
     Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links = {})
@@ -2360,28 +2360,7 @@ public:
         destination.import(v);
     }
 
-    ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
-    {
-        return {m_column_ndx, m_subtable_column};
-    }
-
-    ListColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
-    {
-        return {m_column_ndx, m_subtable_column};
-    }
-
-    ListColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
-    {
-        return {m_column_ndx, m_subtable_column};
-    }
-
-    ListColumnAggregate<T, aggregate_operations::Average<T>> average() const
-    {
-        return {m_column_ndx, m_subtable_column};
-    }
-
-
-private:
+protected:
     // Storing the column index here could be a potential problem if the column
     // changes id due to insertion/deletion.
     size_t m_column_ndx;
@@ -2389,9 +2368,53 @@ private:
 };
 
 template <class T>
+class AggregatableListColumns : public ListColumnsBase<T> {
+public:
+    using ListColumnsBase<T>::ListColumnsBase;
+
+    ListColumnAggregate<T, aggregate_operations::Minimum> min() const
+    {
+        return {this->m_column_ndx, this->m_subtable_column};
+    }
+
+    ListColumnAggregate<T, aggregate_operations::Maximum> max() const
+    {
+        return {this->m_column_ndx, this->m_subtable_column};
+    }
+
+    ListColumnAggregate<T, aggregate_operations::Sum> sum() const
+    {
+        return {this->m_column_ndx, this->m_subtable_column};
+    }
+
+    ListColumnAggregate<T, aggregate_operations::Average> average() const
+    {
+        return {this->m_column_ndx, this->m_subtable_column};
+    }
+};
+
+template <class T>
 class ListColumns : public ListColumnsBase<T> {
 public:
     using ListColumnsBase<T>::ListColumnsBase;
+};
+
+template <>
+class ListColumns<Int> : public AggregatableListColumns<Int> {
+public:
+    using AggregatableListColumns<Int>::AggregatableListColumns;
+};
+
+template <>
+class ListColumns<Float> : public AggregatableListColumns<Float> {
+public:
+    using AggregatableListColumns<Float>::AggregatableListColumns;
+};
+
+template <>
+class ListColumns<Double> : public AggregatableListColumns<Double> {
+public:
+    using AggregatableListColumns<Double>::AggregatableListColumns;
 };
 
 template <>
@@ -2413,10 +2436,10 @@ public:
     }
 };
 
-template <typename T, typename Operation>
-class ListColumnAggregate : public Subexpr2<typename Operation::ResultType> {
+template <typename T, template <typename> class Operation>
+class ListColumnAggregate : public Subexpr2<typename Operation<T>::ResultType> {
 public:
-    using R = typename Operation::ResultType;
+    using R = typename Operation<T>::ResultType;
 
     ListColumnAggregate(size_t column_ndx, Columns<SubTable> column)
         : m_column_ndx(column_ndx)
@@ -2460,7 +2483,7 @@ public:
         auto v = make_value_for_link<R>(!subtables.m_from_link_list, sz);
         for (unsigned i = 0; i < sz; i++) {
             auto table = subtables.m_storage[i];
-            Operation op;
+            Operation<T> op;
             if (table) {
                 size_t s = table->size();
                 for (unsigned j = 0; j < s; j++) {
@@ -2762,13 +2785,13 @@ private:
     }
 };
 
-template <typename T, typename Operation>
+template <typename T, template <typename> class Operation>
 class SubColumnAggregate;
 
 template <typename T>
-class SubColumns : public Subexpr {
+class SubColumnsBase : public Subexpr {
 public:
-    SubColumns(Columns<T> column, LinkMap link_map)
+    SubColumnsBase(Columns<T> column, LinkMap link_map)
         : m_column(std::move(column))
         , m_link_map(std::move(link_map))
     {
@@ -2802,33 +2825,63 @@ public:
         REALM_ASSERT(false);
     }
 
-    SubColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
-    {
-        return {m_column, m_link_map};
-    }
-
-    SubColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
-    {
-        return {m_column, m_link_map};
-    }
-
-    SubColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
-    {
-        return {m_column, m_link_map};
-    }
-
-    SubColumnAggregate<T, aggregate_operations::Average<T>> average() const
-    {
-        return {m_column, m_link_map};
-    }
-
-private:
+protected:
     Columns<T> m_column;
     LinkMap m_link_map;
 };
 
-template <typename T, typename Operation>
-class SubColumnAggregate : public Subexpr2<typename Operation::ResultType> {
+template <typename T>
+class AggregatableSubColumns : public SubColumnsBase<T> {
+public:
+    using SubColumnsBase<T>::SubColumnsBase;
+
+    SubColumnAggregate<T, aggregate_operations::Minimum> min() const
+    {
+        return {this->m_column, this->m_link_map};
+    }
+
+    SubColumnAggregate<T, aggregate_operations::Maximum> max() const
+    {
+        return {this->m_column, this->m_link_map};
+    }
+
+    SubColumnAggregate<T, aggregate_operations::Sum> sum() const
+    {
+        return {this->m_column, this->m_link_map};
+    }
+
+    SubColumnAggregate<T, aggregate_operations::Average> average() const
+    {
+        return {this->m_column, this->m_link_map};
+    }
+};
+
+template <typename T>
+class SubColumns : public SubColumnsBase<T> {
+public:
+    using SubColumnsBase<T>::SubColumnsBase;
+};
+
+template <>
+class SubColumns<Int> : public AggregatableSubColumns<Int> {
+public:
+    using AggregatableSubColumns::AggregatableSubColumns;
+};
+
+template <>
+class SubColumns<Float> : public AggregatableSubColumns<Float> {
+public:
+    using AggregatableSubColumns::AggregatableSubColumns;
+};
+
+template <>
+class SubColumns<Double> : public AggregatableSubColumns<Double> {
+public:
+    using AggregatableSubColumns::AggregatableSubColumns;
+};
+
+template <typename T, template <typename> class Operation>
+class SubColumnAggregate : public Subexpr2<typename Operation<T>::ResultType> {
 public:
     SubColumnAggregate(Columns<T> column, LinkMap link_map)
         : m_column(std::move(column))
@@ -2868,7 +2921,7 @@ public:
         std::vector<size_t> links = m_link_map.get_links(index);
         std::sort(links.begin(), links.end());
 
-        Operation op;
+        Operation<T> op;
         for (size_t link_index = 0; link_index < links.size();) {
             Value<T> value;
             size_t link = links[link_index];
@@ -2894,7 +2947,7 @@ public:
             destination.import(Value<null>(false, 1, null()));
         }
         else {
-            destination.import(Value<typename Operation::ResultType>(false, 1, op.result()));
+            destination.import(Value<typename Operation<T>::ResultType>(false, 1, op.result()));
         }
     }
 
@@ -2999,9 +3052,6 @@ private:
 namespace aggregate_operations {
 template <typename T, typename Derived, typename R = T>
 class BaseAggregateOperation {
-    static_assert(std::is_same<T, Int>::value || std::is_same<T, Float>::value || std::is_same<T, Double>::value,
-                  "Numeric aggregates can only be used with subcolumns of numeric types");
-
 public:
     using ResultType = R;
 
