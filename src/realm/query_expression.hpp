@@ -154,60 +154,6 @@ T minimum(T a, T b)
     return a < b ? a : b;
 }
 
-#ifdef REALM_OLDQUERY_FALLBACK
-// Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify only_numeric somehow
-namespace _impl {
-
-template <class T, class U>
-inline T only_numeric(U in)
-{
-    return static_cast<T>(util::unwrap(in));
-}
-
-template <class T>
-inline int only_numeric(const StringData&)
-{
-    REALM_ASSERT(false);
-    return 0;
-}
-
-template <class T>
-inline int only_numeric(const BinaryData&)
-{
-    REALM_ASSERT(false);
-    return 0;
-}
-
-template <class T>
-inline StringData only_string(T in)
-{
-    REALM_ASSERT(false);
-    static_cast<void>(in);
-    return StringData();
-}
-
-inline StringData only_string(StringData in)
-{
-    return in;
-}
-
-template <class T, class U>
-inline T no_timestamp(U in)
-{
-    return static_cast<T>(util::unwrap(in));
-}
-
-template <class T>
-inline int no_timestamp(const Timestamp&)
-{
-    REALM_ASSERT(false);
-    return 0;
-}
-
-} // namespace _impl
-
-#endif // REALM_OLDQUERY_FALLBACK
-
 template <class T>
 struct Plus {
     T operator()(T v1, T v2) const
@@ -429,6 +375,141 @@ template <bool has_links>
 class UnaryLinkCompare;
 class ColumnAccessorBase;
 
+namespace _impl {
+template <typename L, typename R>
+constexpr bool is_query_engine_type() {
+    return (std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer)
+        || (std::is_same<L, double>::value && std::is_same<R, double>::value)
+        || (std::is_same<L, float>::value && std::is_same<R, float>::value)
+        || (std::is_same<L, Timestamp>::value && std::is_same<R, Timestamp>::value)
+        || (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value)
+        || (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value);
+}
+
+template <class T>
+Query create(T left, const Columns<T>& column, Query& (Query::*fn)(size_t, T))
+{
+    return (Query(*column.get_base_table()).*fn)(column.column_ndx(), left);
+}
+
+template <class Cond>
+struct ConditionBuilder {
+    template <class L, class R>
+    static Query call(L left, const Columns<R>& column)
+    {
+        using CommonType = typename Common<L, R>::type;
+        using ValueType = typename std::conditional<std::is_same<L, StringData>::value, ConstantStringValue, Value<L>>::type;
+        return make_expression<Compare<Cond, CommonType>>(make_subexpr<ValueType>(left), column.clone());
+    }
+};
+
+template <>
+template <class L, class R>
+Query ConditionBuilder<Less>::call(L left, const Columns<R>& column)
+{
+    return Query(*column.get_base_table()).greater(column.column_ndx(), static_cast<R>(util::unwrap(left)));
+}
+
+template <>
+template <class L, class R>
+Query ConditionBuilder<LessEqual>::call(L left, const Columns<R>& column)
+{
+    return Query(*column.get_base_table()).greater_equal(column.column_ndx(), static_cast<R>(util::unwrap(left)));
+}
+
+template <>
+template <class L, class R>
+Query ConditionBuilder<Greater>::call(L left, const Columns<R>& column)
+{
+    return Query(*column.get_base_table()).less(column.column_ndx(), static_cast<R>(util::unwrap(left)));
+}
+
+template <>
+template <class L, class R>
+Query ConditionBuilder<GreaterEqual>::call(L left, const Columns<R>& column)
+{
+    return Query(*column.get_base_table()).less_equal(column.column_ndx(), static_cast<R>(util::unwrap(left)));
+}
+
+template <>
+template <class L, class R>
+Query ConditionBuilder<Equal>::call(L left, const Columns<R>& column)
+{
+    return Query(*column.get_base_table()).equal(column.column_ndx(), static_cast<R>(util::unwrap(left)));
+}
+
+template <>
+template <class L, class R>
+Query ConditionBuilder<NotEqual>::call(L left, const Columns<R>& column)
+{
+    return Query(*column.get_base_table()).not_equal(column.column_ndx(), static_cast<R>(util::unwrap(left)));
+}
+
+Query do_create_string(StringData left, const Columns<StringData>& column,
+                       bool case_sensitive, Query& (Query::*fn)(size_t, StringData, bool));
+
+template <>
+template <class L, class R>
+Query ConditionBuilder<EqualIns>::call(L left, const Columns<R>& column)
+{
+    return do_create_string(left, column, false, &Query::equal);
+}
+template <>
+template <class L, class R>
+Query ConditionBuilder<NotEqualIns>::call(L left, const Columns<R>& column)
+{
+    return do_create_string(left, column, false, &Query::not_equal);
+}
+template <>
+template <class L, class R>
+Query ConditionBuilder<BeginsWith>::call(L left, const Columns<R>& column)
+{
+    return do_create_string(left, column, true, &Query::begins_with);
+}
+template <>
+template <class L, class R>
+Query ConditionBuilder<BeginsWithIns>::call(L left, const Columns<R>& column)
+{
+    return do_create_string(left, column, false, &Query::begins_with);
+}
+template <>
+template <class L, class R>
+Query ConditionBuilder<EndsWith>::call(L left, const Columns<R>& column)
+{
+    return do_create_string(left, column, true, &Query::ends_with);
+}
+template <>
+template <class L, class R>
+Query ConditionBuilder<EndsWithIns>::call(L left, const Columns<R>& column)
+{
+    return do_create_string(left, column, false, &Query::ends_with);
+}
+template <>
+template <class L, class R>
+Query ConditionBuilder<Contains>::call(L left, const Columns<R>& column)
+{
+    return do_create_string(left, column, true, &Query::contains);
+}
+template <>
+template <class L, class R>
+Query ConditionBuilder<ContainsIns>::call(L left, const Columns<R>& column)
+{
+    return do_create_string(left, column, false, &Query::contains);
+}
+template <>
+template <class L, class R>
+Query ConditionBuilder<Like>::call(L left, const Columns<R>& column)
+{
+    return do_create_string(left, column, true, &Query::like);
+}
+template <>
+template <class L, class R>
+Query ConditionBuilder<LikeIns>::call(L left, const Columns<R>& column)
+{
+    return do_create_string(left, column, false, &Query::like);
+}
+}
+
 
 // Handle cases where left side is a constant (int, float, int64_t, double, StringData)
 template <class Cond, class L, class R>
@@ -441,55 +522,92 @@ Query create(L left, const Subexpr2<R>& right)
 // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere.
 
 #ifdef REALM_OLDQUERY_FALLBACK // if not defined, then never fallback to query_engine.hpp; always use query_expression
-    const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
     // TODO: recognize size operator expressions
     // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
+    if (_impl::is_query_engine_type<L, R>()) {
+        const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
+        if (column && !column->links_exist())
+            return _impl::ConditionBuilder<Cond>::call(left, *column);
 
-    if (column && ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
-                   (std::is_same<L, double>::value && std::is_same<R, double>::value) ||
-                   (std::is_same<L, float>::value && std::is_same<R, float>::value) ||
-                   (std::is_same<L, Timestamp>::value && std::is_same<R, Timestamp>::value) ||
-                   (std::is_same<L, StringData>::value && std::is_same<R, StringData>::value) ||
-                   (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value)) &&
-        !column->links_exist()) {
-        const Table* t = column->get_base_table();
+    }
+#endif
+
+    // Return query_expression.hpp node
+    using CommonType = typename Common<L, R>::type;
+    using ValueType = typename std::conditional<std::is_same<L, StringData>::value, ConstantStringValue, Value<L>>::type;
+    return make_expression<Compare<Cond, CommonType>>(make_subexpr<ValueType>(left), right.clone());
+}
+
+// This method intercepts Subexpr2 <cond> Subexpr2 only. Value <cond> Subexpr2 is intercepted elsewhere.
+template <class Cond, class L, class R>
+Query create2(const Subexpr2<L>& left, const Subexpr2<R>& right)
+{
+#ifdef REALM_OLDQUERY_FALLBACK // if not defined, never fallback query_engine; always use query_expression
+    // Test if expressions are of type Columns. Other possibilities are Value and Operator.
+    const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(&left);
+    const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
+
+    // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=,
+    // >=},
+    // but only if both columns are non-nullable, and aren't in linked tables.
+    if (left_col && right_col && std::is_same<L, R>::value && !left_col->is_nullable() &&
+        !right_col->is_nullable() && !left_col->links_exist() && !right_col->links_exist() &&
+        !std::is_same<L, Timestamp>::value) {
+        const Table* t = left_col->get_base_table();
         Query q = Query(*t);
 
-        if (std::is_same<Cond, Less>::value)
-            q.greater(column->column_ndx(), _impl::only_numeric<R>(left));
-        else if (std::is_same<Cond, Greater>::value)
-            q.less(column->column_ndx(), _impl::only_numeric<R>(left));
-        else if (std::is_same<Cond, Equal>::value)
-            q.equal(column->column_ndx(), left);
-        else if (std::is_same<Cond, NotEqual>::value)
-            q.not_equal(column->column_ndx(), left);
-        else if (std::is_same<Cond, LessEqual>::value)
-            q.greater_equal(column->column_ndx(), _impl::only_numeric<R>(left));
-        else if (std::is_same<Cond, GreaterEqual>::value)
-            q.less_equal(column->column_ndx(), _impl::only_numeric<R>(left));
-        else if (std::is_same<Cond, EqualIns>::value)
-            q.equal(column->column_ndx(), _impl::only_string(left), false);
-        else if (std::is_same<Cond, NotEqualIns>::value)
-            q.not_equal(column->column_ndx(), _impl::only_string(left), false);
-        else if (std::is_same<Cond, BeginsWith>::value)
-            q.begins_with(column->column_ndx(), _impl::only_string(left));
-        else if (std::is_same<Cond, BeginsWithIns>::value)
-            q.begins_with(column->column_ndx(), _impl::only_string(left), false);
-        else if (std::is_same<Cond, EndsWith>::value)
-            q.ends_with(column->column_ndx(), _impl::only_string(left));
-        else if (std::is_same<Cond, EndsWithIns>::value)
-            q.ends_with(column->column_ndx(), _impl::only_string(left), false);
-        else if (std::is_same<Cond, Contains>::value)
-            q.contains(column->column_ndx(), _impl::only_string(left));
-        else if (std::is_same<Cond, ContainsIns>::value)
-            q.contains(column->column_ndx(), _impl::only_string(left), false);
-        else if (std::is_same<Cond, Like>::value)
-            q.like(column->column_ndx(), _impl::only_string(left));
-        else if (std::is_same<Cond, LikeIns>::value)
-            q.like(column->column_ndx(), _impl::only_string(left), false);
+        if (std::numeric_limits<L>::is_integer || std::is_same<L, OldDateTime>::value) {
+            if (std::is_same<Cond, Less>::value)
+                q.less_int(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, Greater>::value)
+                q.greater_int(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, Equal>::value)
+                q.equal_int(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, NotEqual>::value)
+                q.not_equal_int(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, LessEqual>::value)
+                q.less_equal_int(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, GreaterEqual>::value)
+                q.greater_equal_int(left_col->column_ndx(), right_col->column_ndx());
+            else {
+                REALM_ASSERT(false);
+            }
+        }
+        else if (std::is_same<L, float>::value) {
+            if (std::is_same<Cond, Less>::value)
+                q.less_float(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, Greater>::value)
+                q.greater_float(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, Equal>::value)
+                q.equal_float(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, NotEqual>::value)
+                q.not_equal_float(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, LessEqual>::value)
+                q.less_equal_float(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, GreaterEqual>::value)
+                q.greater_equal_float(left_col->column_ndx(), right_col->column_ndx());
+            else {
+                REALM_ASSERT(false);
+            }
+        }
+        else if (std::is_same<L, double>::value) {
+            if (std::is_same<Cond, Less>::value)
+                q.less_double(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, Greater>::value)
+                q.greater_double(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, Equal>::value)
+                q.equal_double(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, NotEqual>::value)
+                q.not_equal_double(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, LessEqual>::value)
+                q.less_equal_double(left_col->column_ndx(), right_col->column_ndx());
+            else if (std::is_same<Cond, GreaterEqual>::value)
+                q.greater_equal_double(left_col->column_ndx(), right_col->column_ndx());
+            else {
+                REALM_ASSERT(false);
+            }
+        }
         else {
-            // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
-            // fallback to using use 'return new Compare<>' instead.
             REALM_ASSERT(false);
         }
         // Return query_engine.hpp node
@@ -499,10 +617,7 @@ Query create(L left, const Subexpr2<R>& right)
 #endif
     {
         // Return query_expression.hpp node
-        using CommonType = typename Common<L, R>::type;
-        using ValueType =
-            typename std::conditional<std::is_same<L, StringData>::value, ConstantStringValue, Value<L>>::type;
-        return make_expression<Compare<Cond, CommonType>>(make_subexpr<ValueType>(left), right.clone());
+        return make_expression<Compare<Cond, typename Common<L, R>::type>>(left.clone(), right.clone());
     }
 }
 
@@ -559,143 +674,30 @@ public:
         return {clone_subexpr(), right.clone()};
     }
 
-    // Compare, right side constant
-    Query operator>(R right)
-    {
-        return create<Less>(right, static_cast<Subexpr2<L>&>(*this));
-    }
-    Query operator<(R right)
-    {
-        return create<Greater>(right, static_cast<Subexpr2<L>&>(*this));
-    }
-    Query operator>=(R right)
-    {
-        return create<LessEqual>(right, static_cast<Subexpr2<L>&>(*this));
-    }
-    Query operator<=(R right)
-    {
-        return create<GreaterEqual>(right, static_cast<Subexpr2<L>&>(*this));
-    }
-    Query operator==(R right)
-    {
-        return create<Equal>(right, static_cast<Subexpr2<L>&>(*this));
-    }
-    Query operator!=(R right)
-    {
-        return create<NotEqual>(right, static_cast<Subexpr2<L>&>(*this));
-    }
-
-    // Purpose of this method is to intercept the creation of a condition and test if it's supported by the old
-    // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a
-    // query_expression.hpp node.
-    //
-    // This method intercepts Subexpr2 <cond> Subexpr2 only. Value <cond> Subexpr2 is intercepted elsewhere.
-    template <class Cond>
-    Query create2(const Subexpr2<R>& right)
-    {
-#ifdef REALM_OLDQUERY_FALLBACK // if not defined, never fallback query_engine; always use query_expression
-        // Test if expressions are of type Columns. Other possibilities are Value and Operator.
-        const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(static_cast<Subexpr2<L>*>(this));
-        const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
-
-        // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=,
-        // >=},
-        // but only if both columns are non-nullable, and aren't in linked tables.
-        if (left_col && right_col && std::is_same<L, R>::value && !left_col->is_nullable() &&
-            !right_col->is_nullable() && !left_col->links_exist() && !right_col->links_exist() &&
-            !std::is_same<L, Timestamp>::value) {
-            const Table* t = left_col->get_base_table();
-            Query q = Query(*t);
-
-            if (std::numeric_limits<L>::is_integer || std::is_same<L, OldDateTime>::value) {
-                if (std::is_same<Cond, Less>::value)
-                    q.less_int(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, Greater>::value)
-                    q.greater_int(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, Equal>::value)
-                    q.equal_int(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, NotEqual>::value)
-                    q.not_equal_int(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, LessEqual>::value)
-                    q.less_equal_int(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, GreaterEqual>::value)
-                    q.greater_equal_int(left_col->column_ndx(), right_col->column_ndx());
-                else {
-                    REALM_ASSERT(false);
-                }
-            }
-            else if (std::is_same<L, float>::value) {
-                if (std::is_same<Cond, Less>::value)
-                    q.less_float(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, Greater>::value)
-                    q.greater_float(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, Equal>::value)
-                    q.equal_float(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, NotEqual>::value)
-                    q.not_equal_float(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, LessEqual>::value)
-                    q.less_equal_float(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, GreaterEqual>::value)
-                    q.greater_equal_float(left_col->column_ndx(), right_col->column_ndx());
-                else {
-                    REALM_ASSERT(false);
-                }
-            }
-            else if (std::is_same<L, double>::value) {
-                if (std::is_same<Cond, Less>::value)
-                    q.less_double(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, Greater>::value)
-                    q.greater_double(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, Equal>::value)
-                    q.equal_double(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, NotEqual>::value)
-                    q.not_equal_double(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, LessEqual>::value)
-                    q.less_equal_double(left_col->column_ndx(), right_col->column_ndx());
-                else if (std::is_same<Cond, GreaterEqual>::value)
-                    q.greater_equal_double(left_col->column_ndx(), right_col->column_ndx());
-                else {
-                    REALM_ASSERT(false);
-                }
-            }
-            else {
-                REALM_ASSERT(false);
-            }
-            // Return query_engine.hpp node
-            return q;
-        }
-        else
-#endif
-        {
-            // Return query_expression.hpp node
-            return make_expression<Compare<Cond, typename Common<L, R>::type>>(clone_subexpr(), right.clone());
-        }
-    }
-
     // Compare, right side subexpression
     Query operator==(const Subexpr2<R>& right)
     {
-        return create2<Equal>(right);
+        return create2<Equal>(static_cast<const Subexpr2<L>&>(*this), right);
     }
     Query operator!=(const Subexpr2<R>& right)
     {
-        return create2<NotEqual>(right);
+        return create2<NotEqual>(static_cast<const Subexpr2<L>&>(*this), right);
     }
     Query operator>(const Subexpr2<R>& right)
     {
-        return create2<Greater>(right);
+        return create2<Greater>(static_cast<const Subexpr2<L>&>(*this), right);
     }
     Query operator<(const Subexpr2<R>& right)
     {
-        return create2<Less>(right);
+        return create2<Less>(static_cast<const Subexpr2<L>&>(*this), right);
     }
     Query operator>=(const Subexpr2<R>& right)
     {
-        return create2<GreaterEqual>(right);
+        return create2<GreaterEqual>(static_cast<const Subexpr2<L>&>(*this), right);
     }
     Query operator<=(const Subexpr2<R>& right)
     {
-        return create2<LessEqual>(right);
+        return create2<LessEqual>(static_cast<const Subexpr2<L>&>(*this), right);
     }
 };
 
@@ -715,10 +717,6 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, OldDateTime>,
                  public Overloads<T, null> {
 public:
-    virtual ~Subexpr2()
-    {
-    }
-
 #define RLM_U2(t, o) using Overloads<T, t>::operator o;
 #define RLM_U(o)                                                                                                     \
     RLM_U2(int, o)                                                                                                   \
@@ -1346,238 +1344,88 @@ private:
 //
 // For L = R = {int, int64_t, float, double, Timestamp}:
 // Compare numeric values
-template <class R>
-Query operator>(double left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(Query().greater(0, static_cast<R>(util::unwrap(L()))))>
+Query operator>(L left, const Subexpr2<R>& right)
 {
-    return create<Greater>(left, right);
+    return create<Greater>(static_cast<R>(util::unwrap(left)), right);
 }
-template <class R>
-Query operator>(float left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(Query().greater(0, static_cast<R>(util::unwrap(L()))))>
+Query operator<(L left, const Subexpr2<R>& right)
 {
-    return create<Greater>(left, right);
+    return create<Less>(static_cast<R>(util::unwrap(left)), right);
 }
-template <class R>
-Query operator>(int left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(Query().equal(0, static_cast<R>(util::unwrap(L()))))>
+Query operator==(L left, const Subexpr2<R>& right)
 {
-    return create<Greater>(left, right);
+    return create<Equal>(static_cast<R>(util::unwrap(left)), right);
 }
-template <class R>
-Query operator>(int64_t left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(Query().greater(0, static_cast<R>(util::unwrap(L()))))>
+Query operator>=(L left, const Subexpr2<R>& right)
 {
-    return create<Greater>(left, right);
+    return create<GreaterEqual>(static_cast<R>(util::unwrap(left)), right);
 }
-template <class R>
-Query operator>(Timestamp left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(Query().greater(0, static_cast<R>(util::unwrap(L()))))>
+Query operator<=(L left, const Subexpr2<R>& right)
 {
-    return create<Greater>(left, right);
+    return create<LessEqual>(static_cast<R>(util::unwrap(left)), right);
+}
+template <class L, class R, typename = decltype(Query().equal(0, static_cast<R>(util::unwrap(L()))))>
+Query operator!=(L left, const Subexpr2<R>& right)
+{
+    return create<NotEqual>(static_cast<R>(util::unwrap(left)), right);
 }
 
-template <class R>
-Query operator<(double left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(Query().greater(0, static_cast<R>(util::unwrap(L()))))>
+Query operator>(const Subexpr2<R>& right, L left)
 {
-    return create<Less>(left, right);
+    return create<Less>(static_cast<R>(util::unwrap(left)), right);
 }
-template <class R>
-Query operator<(float left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(Query().greater(0, static_cast<R>(util::unwrap(L()))))>
+Query operator<(const Subexpr2<R>& right, L left)
 {
-    return create<Less>(left, right);
+    return create<Greater>(static_cast<R>(util::unwrap(left)), right);
 }
-template <class R>
-Query operator<(int left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(Query().equal(0, static_cast<R>(util::unwrap(L()))))>
+Query operator==(const Subexpr2<R>& right, L left)
 {
-    return create<Less>(left, right);
+    return create<Equal>(static_cast<R>(util::unwrap(left)), right);
 }
-template <class R>
-Query operator<(int64_t left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(Query().greater(0, static_cast<R>(util::unwrap(L()))))>
+Query operator>=(const Subexpr2<R>& right, L left)
 {
-    return create<Less>(left, right);
+    return create<LessEqual>(static_cast<R>(util::unwrap(left)), right);
 }
-template <class R>
-Query operator<(Timestamp left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(Query().greater(0, static_cast<R>(util::unwrap(L()))))>
+Query operator<=(const Subexpr2<R>& right, L left)
 {
-    return create<Less>(left, right);
+    return create<GreaterEqual>(static_cast<R>(util::unwrap(left)), right);
 }
-template <class R>
-Query operator==(double left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(Query().equal(0, static_cast<R>(util::unwrap(L()))))>
+Query operator!=(const Subexpr2<R>& right, L left)
 {
-    return create<Equal>(left, right);
-}
-template <class R>
-Query operator==(float left, const Subexpr2<R>& right)
-{
-    return create<Equal>(left, right);
-}
-template <class R>
-Query operator==(int left, const Subexpr2<R>& right)
-{
-    return create<Equal>(left, right);
-}
-template <class R>
-Query operator==(int64_t left, const Subexpr2<R>& right)
-{
-    return create<Equal>(left, right);
-}
-template <class R>
-Query operator==(Timestamp left, const Subexpr2<R>& right)
-{
-    return create<Equal>(left, right);
-}
-template <class R>
-Query operator>=(double left, const Subexpr2<R>& right)
-{
-    return create<GreaterEqual>(left, right);
-}
-template <class R>
-Query operator>=(float left, const Subexpr2<R>& right)
-{
-    return create<GreaterEqual>(left, right);
-}
-template <class R>
-Query operator>=(int left, const Subexpr2<R>& right)
-{
-    return create<GreaterEqual>(left, right);
-}
-template <class R>
-Query operator>=(int64_t left, const Subexpr2<R>& right)
-{
-    return create<GreaterEqual>(left, right);
-}
-template <class R>
-Query operator>=(Timestamp left, const Subexpr2<R>& right)
-{
-    return create<GreaterEqual>(left, right);
-}
-template <class R>
-Query operator<=(double left, const Subexpr2<R>& right)
-{
-    return create<LessEqual>(left, right);
-}
-template <class R>
-Query operator<=(float left, const Subexpr2<R>& right)
-{
-    return create<LessEqual>(left, right);
-}
-template <class R>
-Query operator<=(int left, const Subexpr2<R>& right)
-{
-    return create<LessEqual>(left, right);
-}
-template <class R>
-Query operator<=(int64_t left, const Subexpr2<R>& right)
-{
-    return create<LessEqual>(left, right);
-}
-template <class R>
-Query operator<=(Timestamp left, const Subexpr2<R>& right)
-{
-    return create<LessEqual>(left, right);
-}
-template <class R>
-Query operator!=(double left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
-}
-template <class R>
-Query operator!=(float left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
-}
-template <class R>
-Query operator!=(int left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
-}
-template <class R>
-Query operator!=(int64_t left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
-}
-template <class R>
-Query operator!=(Timestamp left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
+    return create<NotEqual>(static_cast<R>(util::unwrap(left)), right);
 }
 
 // Arithmetic
-template <class R>
-Operator<Plus<typename Common<R, double>::type>> operator+(double left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(static_cast<R>(L()))>
+Operator<Plus<typename Common<R, L>::type>> operator+(L left, const Subexpr2<R>& right)
 {
-    return {make_subexpr<Value<double>>(left), right.clone()};
+    return {make_subexpr<Value<L>>(left), right.clone()};
 }
-template <class R>
-Operator<Plus<typename Common<R, float>::type>> operator+(float left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(static_cast<R>(L()))>
+Operator<Minus<typename Common<R, L>::type>> operator-(L left, const Subexpr2<R>& right)
 {
-    return {make_subexpr<Value<float>>(left), right.clone()};
+    return {make_subexpr<Value<L>>(left), right.clone()};
 }
-template <class R>
-Operator<Plus<typename Common<R, int>::type>> operator+(int left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(static_cast<R>(L()))>
+Operator<Mul<typename Common<R, L>::type>> operator*(L left, const Subexpr2<R>& right)
 {
-    return {make_subexpr<Value<int>>(left), right.clone()};
+    return {make_subexpr<Value<L>>(left), right.clone()};
 }
-template <class R>
-Operator<Plus<typename Common<R, int64_t>::type>> operator+(int64_t left, const Subexpr2<R>& right)
+template <class L, class R, typename = decltype(static_cast<R>(L()))>
+Operator<Div<typename Common<R, L>::type>> operator/(L left, const Subexpr2<R>& right)
 {
-    return {make_subexpr<Value<int64_t>>(left), right.clone()};
-}
-template <class R>
-Operator<Minus<typename Common<R, double>::type>> operator-(double left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<double>>(left), right.clone()};
-}
-template <class R>
-Operator<Minus<typename Common<R, float>::type>> operator-(float left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<float>>(left), right.clone()};
-}
-template <class R>
-Operator<Minus<typename Common<R, int>::type>> operator-(int left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int>>(left), right.clone()};
-}
-template <class R>
-Operator<Minus<typename Common<R, int64_t>::type>> operator-(int64_t left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int64_t>>(left), right.clone()};
-}
-template <class R>
-Operator<Mul<typename Common<R, double>::type>> operator*(double left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<double>>(left), right.clone()};
-}
-template <class R>
-Operator<Mul<typename Common<R, float>::type>> operator*(float left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<float>>(left), right.clone()};
-}
-template <class R>
-Operator<Mul<typename Common<R, int>::type>> operator*(int left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int>>(left), right.clone()};
-}
-template <class R>
-Operator<Mul<typename Common<R, int64_t>::type>> operator*(int64_t left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int64_t>>(left), right.clone()};
-}
-template <class R>
-Operator<Div<typename Common<R, double>::type>> operator/(double left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<double>>(left), right.clone()};
-}
-template <class R>
-Operator<Div<typename Common<R, float>::type>> operator/(float left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<float>>(left), right.clone()};
-}
-template <class R>
-Operator<Div<typename Common<R, int>::type>> operator/(int left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int>>(left), right.clone()};
-}
-template <class R>
-Operator<Div<typename Common<R, int64_t>::type>> operator/(int64_t left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int64_t>>(left), right.clone()};
+    return {make_subexpr<Value<L>>(left), right.clone()};
 }
 
 // Unary operators
@@ -2017,35 +1865,6 @@ inline Query operator!=(const Columns<StringData>& left, const Columns<StringDat
     return string_compare<NotEqual, NotEqualIns>(left, right, true);
 }
 
-// String == Columns<String>
-template <class T>
-Query operator==(T left, const Columns<StringData>& right)
-{
-    return operator==(right, left);
-}
-
-// String != Columns<String>
-template <class T>
-Query operator!=(T left, const Columns<StringData>& right)
-{
-    return operator!=(right, left);
-}
-
-// Columns<String> == String
-template <class T>
-Query operator==(const Columns<StringData>& left, T right)
-{
-    return string_compare<T, Equal, EqualIns>(left, right, true);
-}
-
-// Columns<String> != String
-template <class T>
-Query operator!=(const Columns<StringData>& left, T right)
-{
-    return string_compare<T, NotEqual, NotEqualIns>(left, right, true);
-}
-
-
 inline Query operator==(const Columns<BinaryData>& left, BinaryData right)
 {
     return create<Equal>(right, left);
@@ -2357,6 +2176,11 @@ public:
     void verify_column() const override
     {
         m_link_map.verify_columns();
+    }
+
+    bool links_exist() const
+    {
+        return m_link_map.m_link_columns.size() > 0;
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -2777,7 +2601,7 @@ public:
         return *this;
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches=nullptr) const override
     {
         return make_subexpr<Columns<T>>(*this, patches);
     }

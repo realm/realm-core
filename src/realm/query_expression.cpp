@@ -20,6 +20,16 @@
 
 namespace realm {
 
+namespace _impl {
+Query do_create_string(StringData left, const Columns<StringData>& column,
+                       bool case_sensitive, Query& (Query::*fn)(size_t, StringData, bool))
+{
+    Query q(*column.get_base_table());
+    (q.*fn)(column.column_ndx(), left, case_sensitive);
+    return q;
+}
+}
+
 void Columns<Link>::evaluate(size_t index, ValueBase& destination)
 {
     std::vector<size_t> links = m_link_map.get_links(index);
