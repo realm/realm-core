@@ -1390,7 +1390,7 @@ public:
         return true;
     }
 
-    bool clear_table() noexcept
+    bool clear_table(size_t) noexcept
     {
         typedef _impl::TableFriend tf;
         if (m_table)

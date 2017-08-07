@@ -20,6 +20,7 @@
   on a descriptor and not a table.
   PR [#2561](https://github.com/realm/realm-core/pull/2561).
 * New replication instruction: instr_AddRowWithKey
+* Add the old table size to the instr_TableClear replication instruction.
 
 ### Enhancements
 

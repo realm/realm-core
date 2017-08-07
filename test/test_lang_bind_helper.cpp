@@ -7772,7 +7772,7 @@ public:
     {
         return false;
     }
-    bool clear_table() noexcept
+    bool clear_table(size_t) noexcept
     {
         return false;
     }
