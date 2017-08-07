@@ -115,20 +115,6 @@ bool Permission::paths_are_equivalent(std::string path_1, std::string path_2,
     return path_1 == path_2;
 }
 
-// MARK: - PermissionResults
-
-Permission PermissionResults::get(size_t index)
-{
-    Object permission(m_results.get_realm(), m_results.get_object_schema(), m_results.get(index));
-    CppContext context;
-    return Permission{
-        any_cast<std::string>(permission.get_property_value<util::Any>(context, "path")),
-        extract_access_level(permission, context),
-        {any_cast<std::string>(permission.get_property_value<util::Any>(context, "userId"))},
-        any_cast<Timestamp>(permission.get_property_value<util::Any>(context, "updatedAt"))
-    };
-}
-
 // MARK: - Permissions
 
 // A wrapper that stores a value and an associated notification token.

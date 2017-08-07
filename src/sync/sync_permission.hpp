@@ -96,59 +96,6 @@ struct Permission {
     Permission(std::string path, AccessLevel, Condition, Timestamp updated_at=Timestamp());
 };
 
-class PermissionResults {
-public:
-    // The number of permissions represented by this PermissionResults.
-    size_t size()
-    {
-        return m_results.size();
-    }
-
-    // Get the permission value at the given index.
-    // Throws an `OutOfBoundsIndexException` if the index is invalid.
-    Permission get(size_t index);
-
-    // Create an async query from this Results.
-    // The query will be run on a background thread and delivered to the callback,
-    // and then rerun after each commit (if needed) and redelivered if it changed
-    NotificationToken async(std::function<void(std::exception_ptr)> target)
-    {
-        return m_results.async(std::move(target));
-    }
-
-    // Add a notification callback to this Results.
-    NotificationToken add_notification_callback(CollectionChangeCallback cb) &
-    {
-        return m_results.add_notification_callback(std::move(cb));
-    }
-
-    // Create a new instance by further filtering this instance.
-    PermissionResults filter(Query&& q) const
-    {
-        return PermissionResults(m_results.filter(std::move(q)));
-    }
-
-    // Create a new instance by sorting this instance.
-    PermissionResults sort(SortDescriptor&& s) const
-    {
-        return PermissionResults(m_results.sort(std::move(s)));
-    }
-
-    // Get the results.
-    Results& results()
-    {
-        return m_results;
-    }
-
-    // Don't use this constructor directly. Publicly exposed so `make_unique` can see it.
-    PermissionResults(Results&& results)
-    : m_results(results)
-    { }
-
-protected:
-    Results m_results;
-};
-
 class Permissions {
 public:
     // Consumers of these APIs need to pass in a method which creates a Config with the proper
