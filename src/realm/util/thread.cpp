@@ -17,6 +17,8 @@
  **************************************************************************/
 
 #include <cstring>
+#include <sstream>
+#include <iomanip>
 #include <stdexcept>
 
 #include <realm/util/thread.hpp>
@@ -131,14 +133,12 @@ REALM_NORETURN void Thread::join_failed(int)
 
 void Mutex::init_as_process_shared(bool robust_if_available)
 {
+#ifndef _WIN32
     // IF YOU PAGEFAULT HERE, IT'S LIKELY CAUSED BY DATABASE RESIDING ON NETWORK SHARE (WINDOWS + *NIX). Memory 
     // mapping is not coherent there. Note that this issue is NOT pthread related. Only reason why it happens in 
     // this mutex->is_shared is that mutex coincidentally happens to be the first member that shared group accesses.
     m_is_shared = true; // <-- look above!
     // ^^^^ Look above
-
-#ifdef _WIN32
-    return;
 #endif
 
 #ifdef REALM_HAVE_PTHREAD_PROCESS_SHARED
@@ -222,10 +222,7 @@ bool RobustMutex::is_robust_on_this_platform() noexcept
 bool RobustMutex::low_level_lock()
 {
 #ifdef _WIN32
-    REALM_ASSERT_RELEASE(Mutex::m_is_shared);
-    // Returns void. Error handling takes place inside lock()
-    Mutex::lock();
-    return true;
+    REALM_ASSERT_RELEASE(false);
 #else
     int r = pthread_mutex_lock(&m_impl);
     if (REALM_LIKELY(r == 0))
@@ -243,8 +240,7 @@ bool RobustMutex::low_level_lock()
 int RobustMutex::try_low_level_lock()
 {
 #ifdef _WIN32
-    REALM_ASSERT_RELEASE(Mutex::m_is_shared);
-    return Mutex::try_lock();
+    REALM_ASSERT_RELEASE(false);
 #else
     int r = pthread_mutex_trylock(&m_impl);
     if (REALM_LIKELY(r == 0))
@@ -264,15 +260,7 @@ int RobustMutex::try_low_level_lock()
 bool RobustMutex::is_valid() noexcept
 {
 #ifdef _WIN32    
-    REALM_ASSERT_RELEASE(Mutex::m_is_shared);
-    HANDLE h = CreateMutexA(0, false, m_shared_name);
-    if (h) {
-        CloseHandle(h);
-        return true;
-    }
-    else {
-        return false;
-    }
+    REALM_ASSERT_RELEASE(false);
 #else
     // FIXME: This check tries to lock the mutex, and only unlocks it if the
     // return value is zero. If pthread_mutex_trylock() fails with EOWNERDEAD,

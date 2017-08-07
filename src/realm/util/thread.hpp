@@ -165,22 +165,6 @@ protected:
     REALM_NORETURN static void lock_failed(int) noexcept;
 
 private:
-    bool m_is_shared = false;
-
-#ifdef _WIN32
-    // All below members are used for interprocess Windows-API mutexes only. Needs to be declared unconditionally
-    // because these are setup on runtime through Mutex(process_shared_tag).
-
-    // Windows-API mutexes can be addressed through string names.
-    char m_shared_name[33 + 1];
-
-    // We need to translate the name to a HANDLE in order to pass it to the Windows API. This translation is
-    // expensive, so we cache the translation for each process (each process has its own HANDLE for the same mutex)
-    HANDLE m_cached_handle;
-    DWORD m_cached_pid;
-
-#endif
-
     friend class CondVar;
     friend class RobustMutex;
     friend class InterprocessMutex;
@@ -480,11 +464,7 @@ inline Mutex::Mutex(process_shared_tag)
 
 inline Mutex::~Mutex() noexcept
 {
-#ifdef _WIN32
-//    if (m_is_shared) {
-//        CloseHandle(m_handle);
-//    }
-#else
+#ifndef _WIN32
     int r = pthread_mutex_destroy(&m_impl);
     if (REALM_UNLIKELY(r != 0))
         destroy_failed(r);
@@ -503,34 +483,8 @@ inline void Mutex::init_as_regular()
 inline void Mutex::lock() noexcept
 {
 #ifdef _WIN32
-    if(!m_is_shared) {
-        m_std_mutex.lock();
-        return;
-    }
-    else {
-        DWORD d;
-        HANDLE h;
-        DWORD pid = GetCurrentProcessId();
-
-//        if (m_cached_pid != pid) {
-            h = CreateMutexA(0, false, m_shared_name);
-//        }
-//        else
-//            h = m_cached_handle;
-
-        if (h == NULL)
-            lock_failed(EINVAL);
-
-        d = WaitForSingleObject(h, INFINITE);
-
-//        if (m_cached_pid != pid) {
-            CloseHandle(h);
-//        }
-
-        // If WaitForSingleObject() returned any other value, it means it succeeded
-        if (d == (DWORD)0xFFFFFFFF)
-            lock_failed(EDEADLK);
-    }
+    m_std_mutex.lock();
+    return;
 #else
     int r = pthread_mutex_lock(&m_impl);
     if (REALM_LIKELY(r == 0))
@@ -542,34 +496,7 @@ inline void Mutex::lock() noexcept
 inline bool Mutex::try_lock() noexcept
 {
 #ifdef _WIN32
-    if (!m_is_shared) {
-        return m_std_mutex.try_lock();
-    }
-    else {
-        DWORD d;
-        HANDLE h;
-        DWORD pid = GetCurrentProcessId();
-
-//        if (m_cached_pid != pid)
-            h = CreateMutexA(0, false, m_shared_name);
-//        else
-//            h = m_cached_handle;
-
-        if (h == NULL)
-            lock_failed(0);
-
-        d = WaitForSingleObject(h, 0);
-
-//        if (m_cached_pid != pid)
-         //   CloseHandle(h);
-
-        if (d == WAIT_OBJECT_0)
-            return true;
-        else {
-            CloseHandle(h);
-            return false;
-        }
-    }
+    return m_std_mutex.try_lock();
 #else
     int r = pthread_mutex_trylock(&m_impl);
     if (r == EBUSY) {
@@ -585,31 +512,7 @@ inline bool Mutex::try_lock() noexcept
 inline void Mutex::unlock() noexcept
 {
 #ifdef _WIN32
-    if (!m_is_shared) {
-        m_std_mutex.unlock();
-        return;
-    }
-    else {
-        BOOL d;
-        HANDLE h;
-        DWORD pid = GetCurrentProcessId();
-
-//        if (m_cached_pid != pid)
-            h = CreateMutexA(0, true, m_shared_name);
-//        else
-//            h = m_cached_handle;
-
-        if (h == NULL)
-            lock_failed(0);
-
-        d = ReleaseMutex(h);
-
-//        if (m_cached_pid != pid)
-            CloseHandle(h);
-
-//        if (d == 0)
-//            lock_failed(0);   // Best probability why ReleaseMutex would fail on valid mutex
-    }
+    m_std_mutex.unlock();
 #else
     int r = pthread_mutex_unlock(&m_impl);
     REALM_ASSERT(r == 0);

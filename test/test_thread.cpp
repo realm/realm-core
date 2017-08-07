@@ -313,7 +313,7 @@ TEST(Thread_MutexLock)
     }
 }
 
-
+/*
 TEST(Thread_ProcessSharedMutex)
 {
     Mutex mutex((Mutex::process_shared_tag()));
@@ -324,7 +324,7 @@ TEST(Thread_ProcessSharedMutex)
         LockGuard lock(mutex);
     }
 }
-
+*/
 
 TEST(Thread_CriticalSection)
 {
@@ -708,7 +708,7 @@ void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
 // Verify, that a wait on a condition variable actually waits
 // - this test relies on assumptions about scheduling, which
 //   may not hold on a heavily loaded system.
-NONCONCURRENT_TEST(Thread_CondvarWaits)
+TEST(Thread_CondvarWaits)
 {
     int signals = 0;
     InterprocessMutex mutex;
@@ -717,8 +717,8 @@ NONCONCURRENT_TEST(Thread_CondvarWaits)
     InterprocessCondVar::SharedPart condvar_part;
     TEST_PATH(path);
     SharedGroupOptions default_options;
-    mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
+    mutex.set_shared_part(mutex_part, path, "Thread_CondvarWaits_Mutex");
+    changed.set_shared_part(condvar_part, path, "Thread_CondvarWaits_CondVar", default_options.temp_dir);
     changed.init_shared_part(condvar_part);
     Thread signal_thread;
     signals = 0;
@@ -749,8 +749,10 @@ NONCONCURRENT_TEST(Thread_CondvarIsStateless)
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
     SharedGroupOptions default_options;
-    mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
+
+    // Must have names because default_options.temp_dir is empty string on Windows
+    mutex.set_shared_part(mutex_part, path, "Thread_CondvarIsStateless_Mutex");
+    changed.set_shared_part(condvar_part, path, "Thread_CondvarIsStateless_CondVar", default_options.temp_dir);
     Thread signal_thread;
     signal_state = 1;
     // send some signals:
@@ -785,8 +787,8 @@ NONCONCURRENT_TEST(Thread_CondvarTimeout)
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
     SharedGroupOptions default_options;
-    mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
+    mutex.set_shared_part(mutex_part, path, "Thread_CondvarTimeout_Mutex");
+    changed.set_shared_part(condvar_part, path, "Thread_CondvarTimeout_CondVar", default_options.temp_dir);
     struct timespec time_limit;
     timeval tv;
     gettimeofday(&tv, nullptr);
@@ -818,8 +820,8 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
     SharedGroupOptions default_options;
-    mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
+    mutex.set_shared_part(mutex_part, path, "Thread_CondvarNotifyAllWakeup_Mutex");
+    changed.set_shared_part(condvar_part, path, "Thread_CondvarNotifyAllWakeup_CondVar", default_options.temp_dir);
     const int num_waiters = 10;
     Thread waiters[num_waiters];
     for (int i = 0; i < num_waiters; ++i) {
@@ -851,8 +853,8 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
     bowl_of_stones_semaphore feedback(0);
     SHARED_GROUP_TEST_PATH(path);
     SharedGroupOptions default_options;
-    mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
+    mutex.set_shared_part(mutex_part, path, "Thread_CondvarNotifyWakeup_Mutex");
+    changed.set_shared_part(condvar_part, path, "Thread_CondvarNotifyWakeup_CondVar", default_options.temp_dir);
     const int num_waiters = 10;
     Thread waiters[num_waiters];
     for (int i = 0; i < num_waiters; ++i) {

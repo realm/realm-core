@@ -68,10 +68,6 @@ public:
 #ifdef _WIN32
         // Number of waiting threads.
         int32_t m_waiters_count;
-
-        // Serialize access to <m_waiters_count>.
-        Mutex m_waiters_countlock;
-
         size_t m_was_broadcast;
 #else
         uint64_t signal_counter;
@@ -137,6 +133,8 @@ private:
     HANDLE m_waiters_done = 0;
     std::string m_name;
 
+    // Serialize access to m_waiters_count
+    InterprocessMutex m_waiters_lockcount;
 #endif
 
 #endif

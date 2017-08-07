@@ -25,6 +25,7 @@
 #include <realm/utilities.hpp>
 #include <mutex>
 #include <map>
+#include <iostream>
 
 // Enable this only on platforms where it might be needed
 #if REALM_PLATFORM_APPLE || REALM_ANDROID
@@ -55,7 +56,7 @@ public:
     InterprocessMutex(const InterprocessMutex&) = delete;
     InterprocessMutex& operator=(const InterprocessMutex&) = delete;
 
-#ifdef REALM_ROBUST_MUTEX_EMULATION
+#if defined(REALM_ROBUST_MUTEX_EMULATION) || defined(_WIN32)
     struct SharedPart {
     };
 #else
@@ -131,6 +132,11 @@ private:
     void free_lock_info();
 #else
     SharedPart* m_shared_part = nullptr;
+
+#ifdef _WIN32
+    HANDLE m_handle = 0;
+#endif
+
 #endif
     friend class InterprocessCondVar;
     friend class InterprocessMutex;
@@ -145,6 +151,10 @@ inline InterprocessMutex::InterprocessMutex()
 
 inline InterprocessMutex::~InterprocessMutex() noexcept
 {
+#ifdef _WIN32
+    CloseHandle(m_handle);
+#endif
+
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     free_lock_info();
 #endif
@@ -215,14 +225,9 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
     static_cast<void>(path);
     static_cast<void>(mutex_name);
 
-    uint64_t a = 1;
+    std::string name = "Local\\realm_named_intermutex_" + path + mutex_name;
+    m_handle = CreateMutexA(0, false, name.c_str());
 
-    for (size_t t = 0; t < path.size(); t++)
-        a += (a * (t + t * path[t]));
-    for (size_t t = 0; t < mutex_name.size(); t++)
-        a += (a * (t + t * mutex_name[t]));
-
-    sprintf_s(m_shared_part->m_shared_name, sizeof(m_shared_part->m_shared_name), "Local\\%I64X", a);
 
 #endif
 }
@@ -273,8 +278,14 @@ inline void InterprocessMutex::lock()
     m_lock_info->m_file.lock_exclusive();
     mutex_lock.release();
 #else
+
+#ifdef _WIN32
+    WaitForSingleObject(m_handle, INFINITE);
+    return;
+#else
     REALM_ASSERT(m_shared_part);
     m_shared_part->lock([]() {});
+#endif
 #endif
 }
 
@@ -294,8 +305,20 @@ inline bool InterprocessMutex::try_lock()
         return false;
     }
 #else
+
+#ifdef _WIN32
+    DWORD d = WaitForSingleObject(m_handle, 0);
+
+    if (d == WAIT_OBJECT_0) {
+        return true;
+    }
+    else {
+        return false;
+    }
+#else
     REALM_ASSERT(m_shared_part);
     return m_shared_part->try_lock([]() {});
+#endif
 #endif
 }
 
@@ -306,8 +329,14 @@ inline void InterprocessMutex::unlock()
     m_lock_info->m_file.unlock();
     m_lock_info->m_local_mutex.unlock();
 #else
+
+#ifdef _WIN32
+    ReleaseMutex(m_handle);
+    return;
+#else
     REALM_ASSERT(m_shared_part);
     m_shared_part->unlock();
+#endif
 #endif
 }
 
@@ -315,6 +344,8 @@ inline void InterprocessMutex::unlock()
 inline bool InterprocessMutex::is_valid() noexcept
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
+    return true;
+#elif defined(_WIN32)
     return true;
 #else
     REALM_ASSERT(m_shared_part);
