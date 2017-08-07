@@ -161,6 +161,7 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/misc_errors.hpp
     util/miscellaneous.hpp
     util/optional.hpp
+    util/overload.hpp
     util/priority_queue.hpp
     util/safe_int_ops.hpp
     util/scope_exit.hpp
