@@ -134,7 +134,7 @@ private:
     SharedPart* m_shared_part = nullptr;
 
 #ifdef _WIN32
-    HANDLE m_handle;
+    HANDLE m_handle = 0;
 #endif
 
 #endif
@@ -221,6 +221,10 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
 
     (*s_info_map)[m_fileuid] = m_lock_info;
 #elif defined(_WIN32)
+    if (m_handle != 0) {
+        bool b = CloseHandle(m_handle);
+        REALM_ASSERT_RELEASE(b);
+    }
     std::string name = "Local\\realm_named_intermutex_" + path + mutex_name;
     m_handle = CreateMutexA(0, false, name.c_str());
     REALM_ASSERT_RELEASE(m_handle);

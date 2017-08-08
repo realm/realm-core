@@ -96,6 +96,19 @@ void InterprocessCondVar::close() noexcept
         ::close(m_fd_write);
         m_fd_write = -1;
     }
+#else
+    if (m_sema) {
+        bool b = CloseHandle(m_sema);
+        REALM_ASSERT_RELEASE(b);
+        REALM_ASSERT_RELEASE(m_waiters_done);
+    }
+    if (m_waiters_done) {
+        bool b = CloseHandle(m_waiters_done);
+        REALM_ASSERT_RELEASE(b);
+        REALM_ASSERT_RELEASE(m_sema);
+    }
+    m_waiters_done = 0;
+    m_sema = 0;
 #endif
 #endif
     // we don't do anything to the shared part, other CondVars may share it
@@ -106,14 +119,7 @@ void InterprocessCondVar::close() noexcept
 
 InterprocessCondVar::~InterprocessCondVar() noexcept
 {
-#ifdef _WIN32
-    bool b = CloseHandle(m_sema);
-    REALM_ASSERT_RELEASE(b);
-    b = CloseHandle(m_waiters_done);
-    REALM_ASSERT_RELEASE(b);
-#else
     close();
-#endif
 }
 
 #ifdef REALM_CONDVAR_EMULATION
