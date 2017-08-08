@@ -134,7 +134,7 @@ private:
     SharedPart* m_shared_part = nullptr;
 
 #ifdef _WIN32
-    HANDLE m_handle = 0;
+    HANDLE m_handle;
 #endif
 
 #endif
