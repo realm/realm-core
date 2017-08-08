@@ -178,7 +178,8 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
         }
         catch (...) {
 #ifdef _WIN32
-            CloseHandle(fd);
+            bool b = CloseHandle(fd);
+            REALM_ASSERT_RELEASE(b);
 #else
             ::close(fd);
 #endif
@@ -201,7 +202,8 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
     catch (...) {
         if (it->info->mappings.empty()) {
 #ifdef _WIN32
-            CloseHandle(it->info->fd);
+            bool b = CloseHandle(it->info->fd);
+            REALM_ASSERT_RELEASE(b);
 #else
             ::close(it->info->fd);
 #endif

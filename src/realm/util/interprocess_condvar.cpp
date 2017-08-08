@@ -107,8 +107,10 @@ void InterprocessCondVar::close() noexcept
 InterprocessCondVar::~InterprocessCondVar() noexcept
 {
 #ifdef _WIN32
-    CloseHandle(m_sema);
-    CloseHandle(m_waiters_done);
+    bool b = CloseHandle(m_sema);
+    REALM_ASSERT_RELEASE(b);
+    b = CloseHandle(m_waiters_done);
+    REALM_ASSERT_RELEASE(b);
     close();
 #endif
 }
@@ -295,7 +297,8 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
 
     m.unlock();
 
-    WaitForSingleObject(m_sema, DWORD(wait_milliseconds));
+    DWORD d = WaitForSingleObject(m_sema, DWORD(wait_milliseconds));
+    REALM_ASSERT_RELEASE(d != (DWORD)0xFFFFFFFF);
 
     // Reacquire lock to avoid race conditions.
     m_waiters_lockcount.lock();
@@ -491,7 +494,8 @@ void InterprocessCondVar::notify_all() noexcept
 
         // Wait for all the awakened threads to acquire the counting
         // semaphore. 
-        WaitForSingleObject(m_waiters_done, INFINITE);
+        DWORD d = WaitForSingleObject(m_waiters_done, INFINITE);
+        REALM_ASSERT_RELEASE(d != (DWORD)0xFFFFFFFF);
 
         // This assignment is okay, even without the <m_waiters_countlock> held 
         // because no other waiter threads can wake up to access it.
