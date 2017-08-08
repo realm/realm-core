@@ -43,8 +43,7 @@ if(REALM_ASAN)
         message(FATAL_ERROR
                 "The Address Sanitizer is not yet supported on Visual Studio builds")
     else()
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointern -O1 -g")
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -O1 -g")
     endif()
 endif()
 
@@ -57,8 +56,12 @@ if(REALM_TSAN)
         message(FATAL_ERROR
                 "The Thread Sanitizer is not yet supported on Visual Studio builds")
     else()
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread -fno-omit-frame-pointer -O2 -g -fPIE -pie")
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=thread")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread -O2 -g -fPIE")
+        # According to the clang docs, if -fsanitize=thread is specified then compiling
+        # and linking with PIE is turned on automatically.
+        if (CMAKE_COMPILER_IS_GNUXX)
+            set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pie")
+        endif()
     endif()
 endif()
 
