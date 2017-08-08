@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed handle leak on Windows (https://github.com/realm/realm-core/pull/2781)
 
 ### Breaking changes
 
