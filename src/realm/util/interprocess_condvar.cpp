@@ -320,12 +320,10 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
         // that we cannot take m.lock earlier and this in turn forces us to add an additional mutex, 
         // m_waiters_countlock.
         SetEvent(m_waiters_done);
-        m.lock();
     }
-    else {
-        // Always regain the external mutex since that's the guarantee we give to our callers. 
-        m.lock();
-    }
+
+    // Always regain the external mutex since that's the guarantee we give to our callers. 
+    m.lock();
     return;
 #else
     // indicate arrival of a new waiter (me) and get our own number in the
