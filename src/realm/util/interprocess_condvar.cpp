@@ -111,6 +111,7 @@ InterprocessCondVar::~InterprocessCondVar() noexcept
     REALM_ASSERT_RELEASE(b);
     b = CloseHandle(m_waiters_done);
     REALM_ASSERT_RELEASE(b);
+#else
     close();
 #endif
 }
