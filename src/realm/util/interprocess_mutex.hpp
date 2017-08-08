@@ -139,7 +139,6 @@ private:
 
 #endif
     friend class InterprocessCondVar;
-    friend class InterprocessMutex;
 };
 
 inline InterprocessMutex::InterprocessMutex()
@@ -220,15 +219,13 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
     m_fileuid = m_lock_info->m_file.get_unique_id();
 
     (*s_info_map)[m_fileuid] = m_lock_info;
+#elif defined(_WIN32)
+    std::string name = "Local\\realm_named_intermutex_" + path + mutex_name;
+    m_handle = CreateMutexA(0, false, name.c_str());
 #else
     m_shared_part = &shared_part;
     static_cast<void>(path);
     static_cast<void>(mutex_name);
-
-    std::string name = "Local\\realm_named_intermutex_" + path + mutex_name;
-    m_handle = CreateMutexA(0, false, name.c_str());
-
-
 #endif
 }
 
