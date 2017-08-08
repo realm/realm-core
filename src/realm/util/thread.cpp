@@ -133,14 +133,6 @@ REALM_NORETURN void Thread::join_failed(int)
 
 void Mutex::init_as_process_shared(bool robust_if_available)
 {
-#ifndef _WIN32
-    // IF YOU PAGEFAULT HERE, IT'S LIKELY CAUSED BY DATABASE RESIDING ON NETWORK SHARE (WINDOWS + *NIX). Memory 
-    // mapping is not coherent there. Note that this issue is NOT pthread related. Only reason why it happens in 
-    // this mutex->is_shared is that mutex coincidentally happens to be the first member that shared group accesses.
-    m_is_shared = true; // <-- look above!
-    // ^^^^ Look above
-#endif
-
 #ifdef REALM_HAVE_PTHREAD_PROCESS_SHARED
     pthread_mutexattr_t attr;
     int r = pthread_mutexattr_init(&attr);

@@ -106,9 +106,11 @@ void InterprocessCondVar::close() noexcept
 
 InterprocessCondVar::~InterprocessCondVar() noexcept
 {
+#ifdef _WIN32
     CloseHandle(m_sema);
     CloseHandle(m_waiters_done);
     close();
+#endif
 }
 
 #ifdef REALM_CONDVAR_EMULATION
