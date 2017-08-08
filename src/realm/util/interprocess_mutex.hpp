@@ -347,6 +347,9 @@ inline bool InterprocessMutex::is_valid() noexcept
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     return true;
 #elif defined(_WIN32)
+    // There is no safe way of testing if the m_handle mutex handle is valid on Windows, without having bad side effects
+    // for the cases where it is indeed invalid. If m_handle contains an arbitrary value, it might by coincidence be equal
+    // to a real live handle of another kind. This excludes a try_lock implementation and many other ideas.
     return true;
 #else
     REALM_ASSERT(m_shared_part);
