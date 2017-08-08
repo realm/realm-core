@@ -382,7 +382,7 @@ bool run_tests(util::Logger* logger)
 
     // Set number of threads
     {
-        const char* str = "10";// getenv("UNITTEST_THREADS");
+        const char* str = getenv("UNITTEST_THREADS");
         if (str && strlen(str) != 0) {
             std::istringstream in(str);
             in.imbue(std::locale::classic());
@@ -428,7 +428,7 @@ bool run_tests(util::Logger* logger)
 #endif
     std::vector<std::unique_ptr<Reporter>> reporters;
     {
-        const char* str = "1"; getenv("UNITTEST_PROGRESS");
+        const char* str = getenv("UNITTEST_PROGRESS");
         bool report_progress = str && strlen(str) != 0;
         std::unique_ptr<Reporter> reporter = std::make_unique<CustomReporter>(report_progress);
         reporters.push_back(std::move(reporter));

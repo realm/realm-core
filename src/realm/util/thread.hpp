@@ -167,7 +167,6 @@ protected:
 private:
     friend class CondVar;
     friend class RobustMutex;
-    friend class InterprocessMutex;
 };
 
 
@@ -305,7 +304,6 @@ public:
     bool is_valid() noexcept;
 
     friend class CondVar;
-    friend class InterprocessMutex;
 };
 
 class RobustMutex::NotRecoverable : public std::exception {

@@ -675,7 +675,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             t->set_string(col_ndx, row_ndx, str);
                         }
                         else if (type == type_Binary) {
-                            bool insert_big_blob = true; // get_next(s) % 2 == 0;
+                            bool insert_big_blob = get_next(s) % 2 == 0;
                             if (insert_big_blob) {
                                 size_t rand_char = get_next(s);
                                 size_t blob_size = get_next(s) + ArrayBlob::max_binary_size;
@@ -892,7 +892,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 if (log) {
                     *log << "g.get_table(" << table_ndx << ")->optimize(true);\n";
                 }
-              //  g.get_table(table_ndx)->optimize(true);
+                g.get_table(table_ndx)->optimize(true);
             }
             else if (instr == COMMIT) {
                 if (log) {

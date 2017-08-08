@@ -3204,13 +3204,13 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
     }
     else {
         // Number of fuzzy tests
-        const size_t iterations = 10;
+        const size_t iterations = 100;
 
         // Number of instructions in each test
         // Changing this strongly affects the test suite run time
-        const size_t instructions = 2000;
+        const size_t instructions = 200;
 
-        for (size_t counter = 7; counter < iterations; counter++) {
+        for (size_t counter = 0; counter < iterations; counter++) {
             // You can use your own seed if you have observed a crashing unit test that
             // printed out some specific seed (the "Unit test random seed:" part that appears).
             // fastrand(534653645, true);

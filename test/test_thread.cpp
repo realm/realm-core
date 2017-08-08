@@ -313,7 +313,7 @@ TEST(Thread_MutexLock)
     }
 }
 
-/*
+#ifdef REALM_HAVE_PTHREAD_PROCESS_SHARED
 TEST(Thread_ProcessSharedMutex)
 {
     Mutex mutex((Mutex::process_shared_tag()));
@@ -324,7 +324,7 @@ TEST(Thread_ProcessSharedMutex)
         LockGuard lock(mutex);
     }
 }
-*/
+#endif
 
 TEST(Thread_CriticalSection)
 {
@@ -708,7 +708,7 @@ void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
 // Verify, that a wait on a condition variable actually waits
 // - this test relies on assumptions about scheduling, which
 //   may not hold on a heavily loaded system.
-TEST(Thread_CondvarWaits)
+NONCONCURRENT_TEST(Thread_CondvarWaits)
 {
     int signals = 0;
     InterprocessMutex mutex;
@@ -892,7 +892,7 @@ TEST(Thread_CondvarAtomicWaitUnlock)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    const int iter = 100;
+    const int iter = 10000;
 
     // It's nice to have many threads to trigger preemption (see notes inside the t1 thread)
     const int thread_pair_count = 2; // std::thread::hardware_concurrency();
