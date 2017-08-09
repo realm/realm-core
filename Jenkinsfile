@@ -44,7 +44,6 @@ jobWrapper {
       }
 
       stage('check') {
-          throw new IllegalStateException("This is just a test!")
           parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
                                checkLinuxDebug     : doBuildInDocker('Debug'),
                                buildMacOsDebug     : doBuildMacOs('Debug'),
