@@ -164,35 +164,33 @@ void StringEnumColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 
 void StringEnumColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
-    REALM_ASSERT_3(row_ndx_1, <=, size());
-    REALM_ASSERT_3(row_ndx_2, <=, size());
+    REALM_ASSERT_3(row_ndx_1, <, size());
+    REALM_ASSERT_3(row_ndx_2, <, size());
     REALM_ASSERT_DEBUG(row_ndx_1 != row_ndx_2);
+
+    size_t key_ndx_1 = to_size_t(IntegerColumn::get(row_ndx_1));
+    size_t key_ndx_2 = to_size_t(IntegerColumn::get(row_ndx_2));
 
     StringData value_1 = get(row_ndx_1);
     StringData value_2 = get(row_ndx_2);
 
-    if (value_1.is_null() && value_2.is_null()) {
+    if (value_1 == value_2) {
         return;
     }
 
-    std::string buffer_1{value_1.data(), value_1.size()};
-    std::string buffer_2{value_2.data(), value_2.size()};
+    // Update search index
+    // (it is important here that we do it before actually setting
+    //  the value, or the index would not be able to find the correct
+    //  position to update (as it looks for the old value))
+    if (m_search_index) {
+        // We don't need a deep copy of the values here because the shallow copies
+        // point into the StringColumn data which is not affected by updating the index.
+        m_search_index->set(row_ndx_1, value_2);
+        m_search_index->set(row_ndx_2, value_1);
+    }
 
-    if (value_1.is_null()) {
-        set(row_ndx_2, realm::null());
-    }
-    else {
-        StringData copy{buffer_1.data(), buffer_1.size()};
-        set(row_ndx_2, copy);
-    }
-
-    if (value_2.is_null()) {
-        set(row_ndx_1, realm::null());
-    }
-    else {
-        StringData copy{buffer_2.data(), buffer_2.size()};
-        set(row_ndx_1, copy);
-    }
+    IntegerColumn::set(row_ndx_2, key_ndx_1);
+    IntegerColumn::set(row_ndx_1, key_ndx_2);
 }
 
 
