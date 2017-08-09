@@ -312,10 +312,10 @@ inline bool InterprocessMutex::try_lock()
 #else
 
 #ifdef _WIN32
-    DWORD d = WaitForSingleObject(m_handle, 0);
-    REALM_ASSERT_RELEASE(d != WAIT_FAILED);
+    DWORD ret = WaitForSingleObject(m_handle, 0);
+    REALM_ASSERT_RELEASE(ret != WAIT_FAILED);
 
-    if (d == WAIT_OBJECT_0) {
+    if (ret == WAIT_OBJECT_0) {
         return true;
     }
     else {
