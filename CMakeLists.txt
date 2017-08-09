@@ -85,6 +85,18 @@ if(MSVC)
     add_compile_options(
         /MP # Enable multi-processor compilation
     )
+    if(NOT WINDOWS_STORE)
+        # Statically link the run-time library
+        # https://docs.microsoft.com/bg-bg/cpp/build/reference/md-mt-ld-use-run-time-library
+        # https://cmake.org/Wiki/CMake_FAQ#How_can_I_build_my_MSVC_application_with_a_static_runtime.3F
+        foreach(flag_var
+            CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+            CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+           if(${flag_var} MATCHES "/MD")
+              string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+           endif()
+        endforeach()
+    endif()
 endif()
 
 # Platform-specific build configuration
@@ -98,6 +110,7 @@ endif()
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+list(APPEND PLATFORM_LIBRARIES Threads::Threads)
 
 # Options (passed to CMake)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode." OFF)
