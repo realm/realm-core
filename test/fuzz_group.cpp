@@ -207,7 +207,7 @@ Mixed construct_mixed(State& s, util::Optional<std::ostream&> log, std::string& 
         }
         case 5: {
             size_t rand_char = get_next(s);
-            size_t blob_size = static_cast<uint64_t>(get_int64(s)) % ArrayBlob::max_binary_size;
+            size_t blob_size = static_cast<uint64_t>(get_int64(s)) % (ArrayBlob::max_binary_size + 1);
             buffer = std::string(blob_size, static_cast<unsigned char>(rand_char));
             if (log) {
                 *log << "std::string blob(" << blob_size << ", static_cast<unsigned char>(" << rand_char << "));\n"
@@ -597,7 +597,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             bool insert_big_blob = get_next(s) % 2 == 0;
                             if (insert_big_blob) {
                                 size_t rand_char = get_next(s);
-                                size_t blob_size = get_next(s) + ArrayBlob::max_binary_size;
+                                size_t blob_size = get_next(s) + (ArrayBlob::max_binary_size + 1);
                                 std::string blob(blob_size, static_cast<unsigned char>(rand_char));
                                 if (log) {
                                     *log << "{\n\tstd::string data(" << blob_size << ", static_cast<unsigned char>(" << rand_char << "));\n\t"
