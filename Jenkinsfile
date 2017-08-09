@@ -44,7 +44,7 @@ try {
       }
 
       stage('check') {
-          throw IllegalStateException("This is just a test!")
+          throw new IllegalStateException("This is just a test!")
           parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
                                checkLinuxDebug     : doBuildInDocker('Debug'),
                                buildMacOsDebug     : doBuildMacOs('Debug'),
