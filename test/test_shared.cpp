@@ -171,7 +171,7 @@ void writer(std::string path, int id)
             if (i & 1) {
                 t1->add_int(0, id, 1);
             }
-            std::this_thread::yield(); // increase chance of signal arriving in the middle of a transaction
+            Thread::yield(); // increase chance of signal arriving in the middle of a transaction
             wt.commit();
         }
         // std::cerr << "Ended pid " << getpid() << std::endl;
@@ -191,7 +191,7 @@ void killer(TestContext& test_context, int pid, std::string path, int id)
         SharedGroup sg(path, true, SharedGroupOptions(crypt_key()));
         bool done = false;
         do {
-            sched_yield();
+            Thread::yield();
             // pseudo randomized wait (to prevent unwanted synchronization effects of yield):
             int n = random() % 10000;
             volatile int thing = 0;
@@ -315,7 +315,7 @@ TEST(Shared_CompactingOnTheFly)
             // make sure writer has started:
             bool waiting = true;
             while (waiting) {
-                std::this_thread::yield();
+                Thread::yield();
                 ReadTransaction rt(sg);
                 auto t1 = rt.get_table("test");
                 waiting = t1->get_int(0, 41) == 0;

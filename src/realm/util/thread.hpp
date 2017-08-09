@@ -91,6 +91,9 @@ public:
     // and returns false.
     static bool get_name(std::string& name);
 
+    // Yield the current thread
+    static void yield();
+
 private:
 
 #ifdef _WIN32

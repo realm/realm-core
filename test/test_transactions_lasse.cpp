@@ -91,7 +91,7 @@ REALM_FORCEINLINE void rand_sleep(Random& random)
     }
     else if (r <= 252) {
         // Release current time slice but get next available
-        std::this_thread::yield();
+        Thread::yield();
     }
     else if (r <= 254) {
 // Release current time slice and get time slice according to normal scheduling

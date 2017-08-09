@@ -387,7 +387,7 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
         // hopefully advancing the point in time, where the rightful reciever
         // acts on the notification.
         if (my_signal_counter < my_wait_counter) {
-            sched_yield();
+            Thread::yield();
             continue;
         }
         // Acting on the notification:

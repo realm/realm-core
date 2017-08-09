@@ -118,6 +118,17 @@ bool Thread::get_name(std::string& name)
 }
 
 
+void Thread::yield()
+{
+#ifdef _WIN32
+    std::this_thread::yield();
+#else
+    // POSIX
+    sched_yield();
+#endif
+}
+
+
 REALM_NORETURN void Thread::create_failed(int)
 {
     throw std::runtime_error("pthread_create() failed");
