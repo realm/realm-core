@@ -145,7 +145,11 @@ try {
       }
   }
 } catch (Exception all) {
-  all.printStackTrace()
+  ByteArrayOutputStream baos = new ByteArrayOutputStream()
+  PrintStream ps = new PrintStream(baos)
+  all.printStackTrace(ps)
+  String content = new String(baos.toByteArray(), StandardCharsets.UTF_8)
+  echo content
   throw all
 }
 
