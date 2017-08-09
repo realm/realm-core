@@ -6,7 +6,7 @@ cocoaStashes = []
 androidStashes = []
 publishingStashes = []
 
-try {
+jobWrapper {
   timeout(time: 5, unit: 'HOURS') {
       stage('gather-info') {
           node('docker') {
@@ -144,13 +144,6 @@ try {
           }
       }
   }
-} catch (Exception all) {
-  ByteArrayOutputStream baos = new ByteArrayOutputStream()
-  PrintStream ps = new PrintStream(baos)
-  all.printStackTrace(ps)
-  String content = new String(baos.toByteArray(), StandardCharsets.UTF_8)
-  echo content
-  throw all
 }
 
 def buildDockerEnv(name) {
