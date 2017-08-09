@@ -249,10 +249,17 @@ void* mmap_anon(size_t size)
 
     ULARGE_INTEGER s;
     s.QuadPart = size;
+    
     hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, s.HighPart, s.LowPart, nullptr);
+    if (hMapFile == NULL) {
+        throw std::runtime_error(get_errno_msg("CreateFileMapping() failed: ", GetLastError()));
+    }
+
     pBuf = (LPTSTR)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, size);
-    if (pBuf == nullptr)
+    if (pBuf == nullptr) {
         throw std::runtime_error(get_errno_msg("MapViewOfFile() failed: ", GetLastError()));
+    }
+
     CloseHandle(hMapFile);
     return (void*)pBuf;
 #else

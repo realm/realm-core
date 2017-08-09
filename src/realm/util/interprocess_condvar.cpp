@@ -305,7 +305,7 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
     m.unlock();
 
     DWORD d = WaitForSingleObject(m_sema, DWORD(wait_milliseconds));
-    REALM_ASSERT_RELEASE(d != (DWORD)0xFFFFFFFF);
+    REALM_ASSERT_RELEASE(d != WAIT_FAILED);
 
     // Reacquire lock to avoid race conditions.
     m_waiters_lockcount.lock();
@@ -500,7 +500,7 @@ void InterprocessCondVar::notify_all() noexcept
         // Wait for all the awakened threads to acquire the counting
         // semaphore. 
         DWORD d = WaitForSingleObject(m_waiters_done, INFINITE);
-        REALM_ASSERT_RELEASE(d != (DWORD)0xFFFFFFFF);
+        REALM_ASSERT_RELEASE(d != WAIT_FAILED);
 
         // This assignment is okay, even without the <m_waiters_countlock> held 
         // because no other waiter threads can wake up to access it.

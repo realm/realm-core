@@ -17,8 +17,6 @@
  **************************************************************************/
 
 #include <cstring>
-#include <sstream>
-#include <iomanip>
 #include <stdexcept>
 
 #include <realm/util/thread.hpp>

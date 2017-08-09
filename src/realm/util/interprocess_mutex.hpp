@@ -151,8 +151,10 @@ inline InterprocessMutex::InterprocessMutex()
 inline InterprocessMutex::~InterprocessMutex() noexcept
 {
 #ifdef _WIN32
-    bool b = CloseHandle(m_handle);
-    REALM_ASSERT_RELEASE(b);
+    if (m_handle) {
+        bool b = CloseHandle(m_handle);
+        REALM_ASSERT_RELEASE(b);
+    }
 #endif
 
 #ifdef REALM_ROBUST_MUTEX_EMULATION
@@ -221,7 +223,7 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
 
     (*s_info_map)[m_fileuid] = m_lock_info;
 #elif defined(_WIN32)
-    if (m_handle != 0) {
+    if (m_handle) {
         bool b = CloseHandle(m_handle);
         REALM_ASSERT_RELEASE(b);
     }
@@ -284,7 +286,7 @@ inline void InterprocessMutex::lock()
 
 #ifdef _WIN32
     DWORD d = WaitForSingleObject(m_handle, INFINITE);
-    REALM_ASSERT_RELEASE(d != (DWORD)0xFFFFFFFF);
+    REALM_ASSERT_RELEASE(d != WAIT_FAILED);
 #else
     REALM_ASSERT(m_shared_part);
     m_shared_part->lock([]() {});
@@ -311,7 +313,7 @@ inline bool InterprocessMutex::try_lock()
 
 #ifdef _WIN32
     DWORD d = WaitForSingleObject(m_handle, 0);
-    REALM_ASSERT_RELEASE(d != (DWORD)0xFFFFFFFF);
+    REALM_ASSERT_RELEASE(d != WAIT_FAILED);
 
     if (d == WAIT_OBJECT_0) {
         return true;
@@ -333,11 +335,9 @@ inline void InterprocessMutex::unlock()
     m_lock_info->m_file.unlock();
     m_lock_info->m_local_mutex.unlock();
 #else
-
 #ifdef _WIN32
     bool b = ReleaseMutex(m_handle);
     REALM_ASSERT_RELEASE(b);
-    return;
 #else
     REALM_ASSERT(m_shared_part);
     m_shared_part->unlock();

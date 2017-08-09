@@ -20,7 +20,6 @@
 #define REALM_UTIL_THREAD_HPP
 
 #include <exception>
-#include <iostream>
 
 #ifdef _WIN32
 #include <thread>
