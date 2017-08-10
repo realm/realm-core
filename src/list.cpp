@@ -369,7 +369,6 @@ Results List::sort(SortDescriptor order) const
 
 Results List::sort(std::vector<std::pair<std::string, bool>> const& keypaths) const
 {
-    verify_attached();
     return as_results().sort(keypaths);
 }
 
