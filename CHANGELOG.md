@@ -2,7 +2,11 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed various crashes like segmentation faults and
+  "Assertion failed: pos + size <= to_size_t(m_group.m_top.get(2) / 2)"
+  on some 32-bit devices when the Realm size would get close to 2 GB in
+  size.
+  PR [#2981] https://github.com/realm/realm-core/pull/2791
 
 ### Breaking changes
 
