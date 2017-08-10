@@ -344,7 +344,7 @@ size_t Results::index_of(Query&& q)
     auto query = get_query().and_query(std::move(q));
     query.sync_view_if_needed();
     size_t row = query.find();
-    return row != realm::not_found ? index_of(m_table->get(row)) : row;
+    return row != not_found ? index_of(m_table->get(row)) : row;
 }
 
 void Results::prepare_for_aggregate(size_t column, const char* name)
@@ -481,7 +481,7 @@ PropertyType Results::get_type() const
         case Mode::Query:
         case Mode::TableView:
         case Mode::Table:
-            if (m_table->get_index_in_group() != realm::npos)
+            if (m_table->get_index_in_group() != npos)
                 return PropertyType::Object;
             return ObjectSchema::from_core_type(*m_table->get_descriptor(), 0);
     }
@@ -600,7 +600,7 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
     return sort({*m_table, std::move(column_indices), std::move(ascending)});
 }
 
-Results Results::sort(realm::SortDescriptor&& sort) const
+Results Results::sort(SortDescriptor&& sort) const
 {
     if (m_mode == Mode::LinkView)
         return Results(m_realm, m_link_view, util::none, std::move(sort));
@@ -614,11 +614,28 @@ Results Results::filter(Query&& q) const
     return Results(m_realm, get_query().and_query(std::move(q)), m_descriptor_ordering);
 }
 
-Results Results::distinct(realm::DistinctDescriptor&& uniqueness)
+Results Results::distinct(DistinctDescriptor&& uniqueness) const
 {
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_distinct(std::move(uniqueness));
     return Results(m_realm, get_query(), std::move(new_order));
+}
+
+Results Results::distinct(std::vector<std::string> const& keypaths) const
+{
+    if (keypaths.empty())
+        return *this;
+    if (get_type() != PropertyType::Object) {
+        if (keypaths.size() != 1 || keypaths[0] != "self")
+            throw std::invalid_argument("bad");
+        return distinct({*m_table, {{0}}});
+    }
+
+    std::vector<std::vector<size_t>> column_indices;
+    column_indices.reserve(keypaths.size());
+    for (auto& keypath : keypaths)
+        column_indices.push_back(parse_keypath(keypath, m_realm->schema(), &get_object_schema()));
+    return distinct({*m_table, std::move(column_indices)});
 }
 
 Results Results::snapshot() const &
@@ -693,7 +710,7 @@ bool Results::is_in_table_order() const
     REALM_UNREACHABLE(); // keep gcc happy
 }
 
-void Results::Internal::set_table_view(Results& results, realm::TableView &&tv)
+void Results::Internal::set_table_view(Results& results, TableView &&tv)
 {
     REALM_ASSERT(results.m_update_policy != UpdatePolicy::Never);
     // If the previous TableView was never actually used, then stop generating

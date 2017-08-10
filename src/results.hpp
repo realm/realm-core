@@ -118,7 +118,8 @@ public:
     Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;
 
     // Create a new Results by removing duplicates
-    Results distinct(DistinctDescriptor&& uniqueness);
+    Results distinct(DistinctDescriptor&& uniqueness) const;
+    Results distinct(std::vector<std::string> const& keypaths) const;
 
     // Return a snapshot of this Results that never updates to reflect changes in the underlying data.
     Results snapshot() const &;
