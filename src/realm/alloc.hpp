@@ -35,6 +35,10 @@ class Replication;
 
 using ref_type = size_t;
 
+// Maximum .realm file size and also maximum in-memory transaction snapshot size. On 32-bit architectures we need 
+// to cap it to 2^31 * 0.80 bytes because arithmetic on references can otherwise overflow in various places.
+constexpr size_t maximum_realm_size = static_cast<size_t>((std::numeric_limits<ref_type>::max() >> 1) * 0.8);
+
 int_fast64_t from_ref(ref_type) noexcept;
 ref_type to_ref(int_fast64_t) noexcept;
 int64_t to_int64(size_t value) noexcept;
