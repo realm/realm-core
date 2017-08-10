@@ -2593,8 +2593,7 @@ void Table::clear()
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
-    if (Replication* repl = get_repl())
-        repl->clear_table(this); // Throws
+    size_t old_size = m_size;
 
     size_t table_ndx = get_index_in_group();
     if (table_ndx == realm::npos) {
@@ -2618,6 +2617,9 @@ void Table::clear()
 
         remove_backlink_broken_rows(state); // Throws
     }
+
+    if (Replication* repl = get_repl())
+        repl->clear_table(this, old_size); // Throws
 }
 
 

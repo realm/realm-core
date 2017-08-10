@@ -518,7 +518,7 @@ public:
     virtual void add_search_index(const Descriptor&, size_t col_ndx);
     virtual void remove_search_index(const Descriptor&, size_t col_ndx);
     virtual void set_link_type(const Table*, size_t col_ndx, LinkType);
-    virtual void clear_table(const Table*);
+    virtual void clear_table(const Table*, size_t prior_num_rows);
     virtual void optimize_table(const Table*);
 
     virtual void link_list_set(const LinkView&, size_t link_ndx, size_t value);
@@ -1568,10 +1568,10 @@ inline bool TransactLogEncoder::clear_table(size_t old_size)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::clear_table(const Table* t)
+inline void TransactLogConvenientEncoder::clear_table(const Table* t, size_t prior_num_rows)
 {
     select_table(t);         // Throws
-    m_encoder.clear_table(t->size()); // Throws
+    m_encoder.clear_table(prior_num_rows); // Throws
 }
 
 inline bool TransactLogEncoder::optimize_table()
