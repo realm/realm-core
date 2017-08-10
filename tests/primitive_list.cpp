@@ -536,7 +536,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
     SECTION("sorted index_of()") {
         auto subtable = table->get_subtable(0, 0);
 
-        auto sorted = list.sort(SortDescriptor(*subtable, {{0}}, {true}));
+        auto sorted = list.sort({{"self", true}});
         std::sort(begin(values), end(values), std::less<>());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
@@ -544,7 +544,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
             REQUIRE(sorted.index_of(std::move(q)) == i);
         }
 
-        sorted = list.sort(SortDescriptor(*subtable, {{0}}, {false}));
+        sorted = list.sort({{"self", false}});
         std::sort(begin(values), end(values), std::greater<>());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
@@ -566,6 +566,9 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
     SECTION("sort()") {
         auto subtable = table->get_subtable(0, 0);
 
+        auto unsorted = list.sort(std::vector<std::pair<std::string, bool>>{});
+        REQUIRE(unsorted == values);
+
         auto sorted = list.sort(SortDescriptor(*subtable, {{0}}, {true}));
         auto sorted2 = list.sort({{"self", true}});
         std::sort(begin(values), end(values), std::less<>());
@@ -577,6 +580,37 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         std::sort(begin(values), end(values), std::greater<>());
         REQUIRE(sorted == values);
         REQUIRE(sorted2 == values);
+
+        REQUIRE_THROWS_WITH(list.sort({{"not self", true}}),
+                            util::format("Cannot sort on key path 'not self': arrays of '%1' can only be sorted on 'self'",
+                                         string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
+        REQUIRE_THROWS_WITH(list.sort({{"self", true}, {"self", false}}),
+                            util::format("Cannot sort array of '%1' on more than one key path",
+                                         string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
+    }
+
+    SECTION("distinct()") {
+        for (T value : values)
+            list.add(value);
+        auto values2 = values;
+        values2.insert(values2.end(), values.begin(), values.end());
+
+        auto subtable = table->get_subtable(0, 0);
+
+        auto undistinct = list.as_results().distinct(std::vector<std::string>{});
+        REQUIRE(undistinct == values2);
+
+        auto distinct = results.distinct(SortDescriptor(*subtable, {{0}}, {true}));
+        auto distinct2 = results.distinct({"self"});
+        REQUIRE(distinct == values);
+        REQUIRE(distinct2 == values);
+
+        REQUIRE_THROWS_WITH(results.distinct({{"not self"}}),
+                            util::format("Cannot sort on key path 'not self': arrays of '%1' can only be sorted on 'self'",
+                                         string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
+        REQUIRE_THROWS_WITH(results.distinct({{"self"}, {"self"}}),
+                            util::format("Cannot sort array of '%1' on more than one key path",
+                                         string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
     }
 
     SECTION("filter()") {

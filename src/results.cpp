@@ -583,8 +583,12 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
     if (keypaths.empty())
         return *this;
     if (get_type() != PropertyType::Object) {
-        if (keypaths.size() != 1 || keypaths[0].first != "self")
-            throw std::invalid_argument("bad");
+        if (keypaths.size() != 1)
+            throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
+                                                     string_for_property_type(get_type())));
+        if (keypaths[0].first != "self")
+            throw std::invalid_argument(util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
+                                                     keypaths[0].first, string_for_property_type(get_type())));
         return sort({*m_table, {{0}}, {keypaths[0].second}});
     }
 
@@ -626,8 +630,12 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     if (keypaths.empty())
         return *this;
     if (get_type() != PropertyType::Object) {
-        if (keypaths.size() != 1 || keypaths[0] != "self")
-            throw std::invalid_argument("bad");
+        if (keypaths.size() != 1)
+            throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
+                                                     string_for_property_type(get_type())));
+        if (keypaths[0] != "self")
+            throw std::invalid_argument(util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
+                                                     keypaths[0], string_for_property_type(get_type())));
         return distinct({*m_table, {{0}}});
     }
 
