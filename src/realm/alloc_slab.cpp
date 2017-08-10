@@ -338,6 +338,10 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     // Round upwards to nearest page size
     new_size = ((new_size - 1) | (page_size() - 1)) + 1;
 
+    if (ref + new_size > maximum_realm_size) {
+        throw std::runtime_error("Realm size exceeded " + realm::util::to_string(maximum_realm_size) + " bytes");
+    }
+
 #ifdef REALM_SLAB_ALLOC_TUNE
     {
         const size_t update = 5000000;
@@ -1172,8 +1176,13 @@ size_t SlabAlloc::find_section_in_range(size_t start_pos, size_t free_chunk_size
 
 void SlabAlloc::resize_file(size_t new_file_size)
 {
-    std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
     REALM_ASSERT(matches_section_boundary(new_file_size));
+
+    if (new_file_size > maximum_realm_size) {
+        throw std::runtime_error("Realm size exceeded " + realm::util::to_string(maximum_realm_size) + " bytes");
+    }
+
+    std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
     m_file_mappings->m_file.prealloc(0, new_file_size); // Throws
 
     bool disable_sync = get_disable_sync_to_disk();
