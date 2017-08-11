@@ -171,10 +171,7 @@ void StringEnumColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     size_t key_ndx_1 = to_size_t(IntegerColumn::get(row_ndx_1));
     size_t key_ndx_2 = to_size_t(IntegerColumn::get(row_ndx_2));
 
-    StringData value_1 = get(row_ndx_1);
-    StringData value_2 = get(row_ndx_2);
-
-    if (value_1 == value_2) {
+    if (key_ndx_1 == key_ndx_2) {
         return;
     }
 
@@ -185,12 +182,15 @@ void StringEnumColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     if (m_search_index) {
         // We don't need a deep copy of the values here because the shallow copies
         // point into the StringColumn data which is not affected by updating the index.
+        StringData value_1 = get(row_ndx_1);
+        StringData value_2 = get(row_ndx_2);
+
         m_search_index->set(row_ndx_1, value_2);
         m_search_index->set(row_ndx_2, value_1);
     }
 
-    IntegerColumn::set(row_ndx_2, key_ndx_1);
-    IntegerColumn::set(row_ndx_1, key_ndx_2);
+    set_without_updating_index(row_ndx_1, key_ndx_2);
+    set_without_updating_index(row_ndx_2, key_ndx_1);
 }
 
 

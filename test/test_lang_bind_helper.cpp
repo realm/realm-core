@@ -13314,6 +13314,26 @@ TEST(LangBindHelper_IndexedStringEnumColumnSwapRows)
 }
 
 
+TEST(LangBindHelper_IndexedStringEnumColumnSwapRowsWithValue)
+{
+    // Test case generated in [realm-core-2.9.0] on Fri Aug 11 14:40:03 2017.
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = crypt_key();
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = sg_w.begin_write();
+
+    try { g.add_table("table"); } catch (const TableNameInUse&) { }
+    g.get_table(0)->add_column(type_String, "str_col", true);
+    g.get_table(0)->add_search_index(0);
+    g.get_table(0)->insert_empty_row(0, 16);
+    g.get_table(0)->optimize(true);
+    g.get_table(0)->set_string(0, 2, "some string payload");
+    g.get_table(0)->swap_rows(2, 6);
+    g.verify();
+}
+
+
 TEST(LangBindHelper_NonsharedAccessToRealmWithHistory)
 {
     // Create a Realm file with a history (history_type !=
