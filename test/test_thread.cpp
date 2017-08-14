@@ -939,7 +939,8 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
 
 // Test that the unlock+wait operation of wait() takes part atomically, i.e. that there is no time
 // gap between them where another thread could invoke signal() which could go undetected by the wait.
-TEST(Thread_CondvarAtomicWaitUnlock)
+// This test takes more than 3 days with valgrind.
+TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind)
 {
     SHARED_GROUP_TEST_PATH(path);
 
