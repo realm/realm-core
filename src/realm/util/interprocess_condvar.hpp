@@ -68,10 +68,6 @@ public:
 #ifdef _WIN32
         // Number of waiting threads.
         int32_t m_waiters_count;
-
-        // Serialize access to <m_waiters_count>.
-        Mutex m_waiters_countlock;
-
         size_t m_was_broadcast;
 #else
         uint64_t signal_counter;
@@ -130,12 +126,15 @@ private:
 #ifdef _WIN32
     // Semaphore used to queue up threads waiting for the condition to
     // become signaled. 
-    HANDLE m_sema;
-
+    HANDLE m_sema = 0;
     // An auto-reset event used by the broadcast/signal thread to wait
     // for all the waiting thread(s) to wake up and be released from the
     // semaphore. 
-    HANDLE m_waiters_done;
+    HANDLE m_waiters_done = 0;
+    std::string m_name;
+
+    // Serialize access to m_waiters_count
+    InterprocessMutex m_waiters_lockcount;
 #endif
 
 #endif

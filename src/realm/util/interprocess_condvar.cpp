@@ -33,6 +33,10 @@
 #include <sys/time.h>
 #endif
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 
 using namespace realm;
 using namespace realm::util;
@@ -92,9 +96,23 @@ void InterprocessCondVar::close() noexcept
         ::close(m_fd_write);
         m_fd_write = -1;
     }
+#else
+    if (m_sema) {
+        bool b = CloseHandle(m_sema);
+        REALM_ASSERT_RELEASE(b);
+        REALM_ASSERT_RELEASE(m_waiters_done);
+    }
+    if (m_waiters_done) {
+        bool b = CloseHandle(m_waiters_done);
+        REALM_ASSERT_RELEASE(b);
+        REALM_ASSERT_RELEASE(m_sema);
+    }
+    m_waiters_done = 0;
+    m_sema = 0;
 #endif
 #endif
     // we don't do anything to the shared part, other CondVars may share it
+
     m_shared_part = nullptr;
 }
 
@@ -199,6 +217,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     // same object. If not then they are created. When the last process that has handles to an object 
     // terminates, the objects are destructed automatically by the kernel, so there will be no handle 
     // leaks or other kinds of leak.
+
     std::string sem = "realm_sema_" + base_path + condvar_name;
     std::string eve = "realm_event_" + base_path + condvar_name;
 
@@ -217,6 +236,9 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
         false,      // auto-reset
         false,      // non-signaled initially
         LPWSTR(ev.c_str()));
+    
+    // InterprocessMutex::SharedPart() is an unused dummy object
+    m_waiters_lockcount.set_shared_part(InterprocessMutex::SharedPart(), base_path, condvar_name);
 
 #endif // _WIN32
 #endif // REALM_CONDVAR_EMULATION
@@ -227,7 +249,6 @@ void InterprocessCondVar::init_shared_part(SharedPart& shared_part)
 {
 #ifdef REALM_CONDVAR_EMULATION
 #ifdef _WIN32
-    shared_part.m_waiters_countlock.init_as_process_shared(true);
     shared_part.m_waiters_count = 0;
     shared_part.m_was_broadcast = 0;
 #else
@@ -277,15 +298,17 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
             wait_milliseconds = 0;
     }
 
-    m_shared_part->m_waiters_countlock.lock();
+    m_waiters_lockcount.lock();
     m_shared_part->m_waiters_count++;
-    m_shared_part->m_waiters_countlock.unlock();
+    m_waiters_lockcount.unlock();
 
     m.unlock();
-    WaitForSingleObject(m_sema, DWORD(wait_milliseconds));
+
+    DWORD d = WaitForSingleObject(m_sema, DWORD(wait_milliseconds));
+    REALM_ASSERT_RELEASE(d != WAIT_FAILED);
 
     // Reacquire lock to avoid race conditions.
-    m_shared_part->m_waiters_countlock.lock();
+    m_waiters_lockcount.lock();
 
     // We're no longer waiting...
     m_shared_part->m_waiters_count--;
@@ -293,7 +316,8 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
     // Check to see if we're the last waiter after notify_all().
     bool last_waiter = m_shared_part->m_was_broadcast && m_shared_part->m_waiters_count == 0;
 
-    m_shared_part->m_waiters_countlock.unlock();
+   // m_shared_part->m_waiters_countlock.unlock();
+    m_waiters_lockcount.unlock();
 
     // If we're the last waiter thread during this particular broadcast then let all the other threads proceed.
     if (last_waiter) {
@@ -302,12 +326,10 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
         // that we cannot take m.lock earlier and this in turn forces us to add an additional mutex, 
         // m_waiters_countlock.
         SetEvent(m_waiters_done);
-        m.lock();
     }
-    else {
-        // Always regain the external mutex since that's the guarantee we give to our callers. 
-        m.lock();
-    }
+
+    // Always regain the external mutex since that's the guarantee we give to our callers. 
+    m.lock();
     return;
 #else
     // indicate arrival of a new waiter (me) and get our own number in the
@@ -424,9 +446,11 @@ void InterprocessCondVar::notify() noexcept
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION
 #ifdef _WIN32
-    m_shared_part->m_waiters_countlock.lock();
+    m_waiters_lockcount.lock();
+
     bool have_waiters = m_shared_part->m_waiters_count > 0;
-    m_shared_part->m_waiters_countlock.unlock();
+
+    m_waiters_lockcount.unlock();
 
     // If there aren't any waiters, then this is a no-op.  
     if (have_waiters) {
@@ -456,7 +480,8 @@ void InterprocessCondVar::notify_all() noexcept
 #ifdef _WIN32
     // This is needed to ensure that <m_waiters_count> and <m_was_broadcast> are
     // consistent relative to each other.
-    m_shared_part->m_waiters_countlock.lock();
+    m_waiters_lockcount.lock();
+
     bool have_waiters = false;
 
     if (m_shared_part->m_waiters_count > 0) {
@@ -470,18 +495,19 @@ void InterprocessCondVar::notify_all() noexcept
     if (have_waiters) {
         // Wake up all the waiters atomically.
         ReleaseSemaphore(m_sema, m_shared_part->m_waiters_count, 0);
-        m_shared_part->m_waiters_countlock.unlock();
+        m_waiters_lockcount.unlock();
 
         // Wait for all the awakened threads to acquire the counting
         // semaphore. 
-        WaitForSingleObject(m_waiters_done, INFINITE);
+        DWORD d = WaitForSingleObject(m_waiters_done, INFINITE);
+        REALM_ASSERT_RELEASE(d != WAIT_FAILED);
 
         // This assignment is okay, even without the <m_waiters_countlock> held 
         // because no other waiter threads can wake up to access it.
         m_shared_part->m_was_broadcast = 0;
     }
     else {
-        m_shared_part->m_waiters_countlock.unlock();
+        m_waiters_lockcount.unlock();
     }
 #else
     while (m_shared_part->wait_counter > m_shared_part->signal_counter) {
