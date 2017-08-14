@@ -103,7 +103,7 @@ size_t TableViewBase::find_first(size_t column_ndx, T value) const
 
     for (size_t i = 0, num_rows = m_row_indexes.size(); i < num_rows; ++i) {
         const int64_t real_ndx = m_row_indexes.get(i);
-        if (real_ndx != detached_ref && m_table->get<T>(column_ndx, i) == value)
+        if (real_ndx != detached_ref && m_table->get<T>(column_ndx, to_size_t(real_ndx)) == value)
             return i;
     }
 
@@ -591,6 +591,25 @@ void TableViewBase::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx
         if (it == not_found)
             break;
         m_row_indexes.set(it, to_row_ndx);
+    }
+}
+
+
+void TableViewBase::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
+{
+    // Always adjust only the earliest ref which matches either ndx_1 or ndx_2
+    // to avoid double-swapping the refs
+    size_t it_1 = m_row_indexes.find_first(row_ndx_1, 0);
+    size_t it_2 =  m_row_indexes.find_first(row_ndx_2, 0);
+    while (it_1 != not_found || it_2 != not_found) {
+        if (it_1 < it_2) {
+            m_row_indexes.set(it_1, row_ndx_2);
+            it_1 = m_row_indexes.find_first(row_ndx_1, it_1);
+        }
+        else {
+            m_row_indexes.set(it_2, row_ndx_1);
+            it_2 = m_row_indexes.find_first(row_ndx_2, it_2);
+        }
     }
 }
 

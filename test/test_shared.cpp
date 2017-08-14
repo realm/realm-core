@@ -19,6 +19,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_SHARED
 
+#include <condition_variable>
 #include <streambuf>
 #include <fstream>
 #include <tuple>
@@ -658,6 +659,8 @@ TEST(Shared_try_begin_write)
     // Create a new shared db
     SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
     std::mutex thread_obtains_write_lock;
+    std::condition_variable cv;
+    std::mutex cv_lock;
     bool init_complete = false;
 
     auto do_async = [&]() {
@@ -666,7 +669,11 @@ TEST(Shared_try_begin_write)
         bool success = sg2.try_begin_write(gw);
         CHECK(success);
         CHECK(gw != nullptr);
-        init_complete = true;
+        {
+            std::lock_guard<std::mutex> lock(cv_lock);
+            init_complete = true;
+        }
+        cv.notify_one();
         TableRef t = gw->add_table(StringData("table"));
         t->insert_column(0, type_String, StringData("string_col"));
         t->add_empty_row(1000);
@@ -680,7 +687,8 @@ TEST(Shared_try_begin_write)
     async_writer.start(do_async);
 
     // wait for the thread to start a write transaction
-    while (!init_complete) { millisleep(1); }
+    std::unique_lock<std::mutex> lock(cv_lock);
+    cv.wait(lock, [&]{ return init_complete; });
 
     // Try to also obtain a write lock. This should fail but not block.
     Group* g = nullptr;
@@ -2570,8 +2578,8 @@ TEST(Shared_EncryptionKeyCheck_3)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* first_key = crypt_key(true);
-    char second_key[32];
-    memcpy(second_key, first_key, 32);
+    char second_key[64];
+    memcpy(second_key, first_key, 64);
     second_key[3] = ~second_key[3];
     SharedGroup sg(path, false, SharedGroupOptions(first_key));
     bool ok = false;

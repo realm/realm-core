@@ -10544,7 +10544,7 @@ void do_read_verify(std::string path) {
             REALM_ASSERT_EX(t->get_column_name(0) == StringData("count"), t->get_column_name(0).data());
             REALM_ASSERT_EX(t->get_column_name(1) == StringData("char"), t->get_column_name(1).data());
             REALM_ASSERT_EX(t->get_column_name(2) == StringData("payload"), t->get_column_name(2).data());
-            std::string std_validator(num_chars, c[0]);
+            std::string std_validator(static_cast<unsigned int>(num_chars), c[0]);
             StringData validator(std_validator);
             StringData s = t->get_string(2, r);
             REALM_ASSERT_EX(s.size() == validator.size(), r, s.size(), validator.size());
@@ -12584,6 +12584,63 @@ TEST(LangBindHelper_IsRowAttachedAfterClear)
 }
 
 
+TEST(LangBindHelper_TableViewUpdateAfterSwap)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+
+    TableRef t = g.add_table("t");
+    size_t col_id = t->add_column(type_Int, "id");
+
+    t->add_empty_row(10);
+    for (int i = 0; i < 10; ++i)
+        t->set_int(col_id, i, i);
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    TableView tv = t->where().find_all();
+    TableView tv_r = g_r.get_table(0)->where().find_all();
+
+    LangBindHelper::promote_to_write(sg_w);
+    for (int i = 0; i < 5; ++i)
+        t->swap_rows(i, 9 - i);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    for (int i = 0; i < 10; ++i) {
+        CHECK_EQUAL(tv.get_int(0, i), i);
+        CHECK_EQUAL(tv_r.get_int(0, i), i);
+        CHECK_EQUAL(tv.get(i).get_index(), 9 - i);
+        CHECK_EQUAL(tv_r.get(i).get_index(), 9 - i);
+    }
+
+    LangBindHelper::promote_to_write(sg_w);
+    for (int i = 0; i < 5; ++i)
+        t->swap_rows(i, 9 - i);
+    for (int i = 0; i < 10; ++i) {
+        CHECK_EQUAL(tv.get_int(0, i), i);
+        CHECK_EQUAL(tv.get(i).get_index(), i);
+    }
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+
+    for (int i = 0; i < 10; ++i) {
+        CHECK_EQUAL(tv.get_int(0, i), i);
+        CHECK_EQUAL(tv.get(i).get_index(), 9 - i);
+    }
+}
+
+
 TEST(LangBindHelper_RollbackRemoveZeroRows)
 {
     SHARED_GROUP_TEST_PATH(path)
@@ -13088,6 +13145,26 @@ TEST(LangBindHelper_MixedStringRollback)
     t->set_mixed(0, 0, BinaryData("any binary data"));
     LangBindHelper::rollback_and_continue_as_read(sg_w);
     g.verify();
+}
+
+
+TEST(LangBindHelper_RollbackOptimize)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = crypt_key();
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = sg_w.begin_write();
+
+    g.insert_table(0, "t0");
+    g.get_table(0)->add_column(type_String, "str_col_0", true);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    g.get_table(0)->add_empty_row(198);
+    g.get_table(0)->optimize(true);
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
 }
 
 

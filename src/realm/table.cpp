@@ -5929,6 +5929,11 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
         }
         row = row->m_next;
     }
+
+    // Adjust rows in tableviews after row swap
+    for (auto& view : m_views) {
+        view->adj_row_acc_swap_rows(row_ndx_1, row_ndx_2);
+    }
 }
 
 
@@ -6172,6 +6177,20 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             if (col_type == col_type_StringEnum) {
                 delete col;
                 col = 0;
+                // We need to store null in `m_cols` to avoid a crash during
+                // destruction of the table accessor in case an error occurs
+                // before the refresh operation is complete.
+                m_cols[col_ndx] = nullptr;
+            }
+        } else if (dynamic_cast<StringEnumColumn*>(col) != nullptr) {
+            // If the current column accessor is StringEnumColumn, but the
+            // underlying column has changed to a StringColumn (which can occur
+            // in a rollback), then we need to replace the accessor with an
+            // instance of StringColumn.
+            ColumnType col_type = m_spec->get_column_type(col_ndx);
+            if (col_type == col_type_String) {
+                delete col;
+                col = nullptr;
                 // We need to store null in `m_cols` to avoid a crash during
                 // destruction of the table accessor in case an error occurs
                 // before the refresh operation is complete.

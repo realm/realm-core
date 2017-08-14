@@ -55,6 +55,7 @@ set(NORMAL_TESTS
     test_util_inspect.cpp
     test_util_logger.cpp
     test_util_memory_stream.cpp
+    test_util_overload.cpp
     test_util_scope_exit.cpp
     test_util_stringbuffer.cpp
     test_util_to_string.cpp

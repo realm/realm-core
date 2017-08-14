@@ -94,6 +94,7 @@ enum INS {
     MOVE_COLUMN,
     SET_UNIQUE,
     IS_NULL,
+    OPTIMIZE_TABLE,
 
     COUNT
 };
@@ -209,7 +210,7 @@ Mixed construct_mixed(State& s, util::Optional<std::ostream&> log, std::string& 
         }
         case 5: {
             size_t rand_char = get_next(s);
-            size_t blob_size = get_int64(s) % ArrayBlob::max_binary_size;
+            size_t blob_size = static_cast<uint64_t>(get_int64(s)) % ArrayBlob::max_binary_size;
             buffer = std::string(blob_size, static_cast<unsigned char>(rand_char));
             if (log) {
                 *log << "std::string blob(" << blob_size << ", static_cast<unsigned char>(" << rand_char << "));\n"
@@ -895,6 +896,15 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     t->swap_rows(row_ndx1, row_ndx2);
                 }
+            }
+            else if (instr == OPTIMIZE_TABLE && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                // Force creation of a string enum column
+                if (log) {
+                    *log << "g.get_table(" << table_ndx << ")->optimize(true);\n";
+                }
+                g.get_table(table_ndx)->optimize(true);
             }
             else if (instr == COMMIT) {
                 if (log) {

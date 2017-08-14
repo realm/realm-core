@@ -161,6 +161,7 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/misc_errors.hpp
     util/miscellaneous.hpp
     util/optional.hpp
+    util/overload.hpp
     util/priority_queue.hpp
     util/safe_int_ops.hpp
     util/scope_exit.hpp
@@ -276,7 +277,7 @@ if(REALM_ENABLE_ENCRYPTION AND NOT APPLE)
 
         target_include_directories(realm-objects PUBLIC ${OPENSSL_INCLUDE_DIR})
         target_link_libraries(realm crypto)
-    else()
+    elseif(NOT MSVC)
         include(FindOpenSSL)
         target_link_libraries(realm ${OPENSSL_LIBRARIES})
         if(NOT REALM_SKIP_SHARED_LIB)

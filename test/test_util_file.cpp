@@ -42,6 +42,9 @@ using namespace realm::util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+// FIXME: Methods on File are not yet implemented on Windows
+#ifndef _WIN32
+
 TEST(Utils_File_dir)
 {
 #ifndef _WIN32
@@ -244,5 +247,7 @@ TEST(Utils_File_ForEach)
         CHECK_EQUAL("file_6", files[5].second);
     }
 }
+
+#endif // _WIN32
 
 #endif

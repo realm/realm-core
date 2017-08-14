@@ -78,7 +78,7 @@ struct Person {
 
     std::string m_name;
     int m_age = 0;
-    int m_married = false;
+    bool m_married = false;
     std::map<int, Person> m_children;
 };
 
