@@ -2,6 +2,16 @@ import os
 import sys
 import getopt
 
+def get_zero_bytes_of_file(filename):
+    count = 0
+    print "entering::"
+    with open(filename, "rb") as f:
+        byte = f.read(1)
+        while byte:
+            if byte == '\0':
+                count = count + 1
+            byte = f.read(1)
+    return count
 
 def get_file_size(filename):
     statinfo = os.stat(filename)
@@ -37,14 +47,28 @@ def get_lines_of_test_code(rootSourceDir):
     return loc
 
 
-def get_realm_sizes(rootBuildDir):
+def get_binary_sizes(rootBuildDir):
     pathPrefix = os.path.join(rootBuildDir, "test/benchmark-common-tasks/")
     results = []
     sizes = [0, 1000, 2000, 4000, 8000, 10000]
     for size in sizes:
         name = str(size) + "bytes.realm"
-        os.system(pathPrefix + "realm-stats " + name + " " + str(size))
+        os.system(pathPrefix + "realm-stats store_binary " + name + " " + str(size))
         results.append((str(size) + " byte blob", get_file_size(name)))
+    return results
+
+
+def get_transaction_sizes(rootBuildDir):
+    pathPrefix = os.path.join(rootBuildDir, "test/benchmark-common-tasks/")
+    results = []
+    # stores (num_transactions, num_rows)
+    tests = [(100, 10)]
+    for test in tests:
+        name = str(test[0]) + "transactions_" + str(test[1]) + "rows.realm"
+        os.system(pathPrefix + "realm-stats make_transactions " + name
+                  + " " + str(test[0]) + " " + str(test[1]))
+        results.append((name, get_file_size(name)))
+        results.append((name + "empty space", get_zero_bytes_of_file(name)))
     return results
 
 
@@ -54,12 +78,14 @@ def format(description, values):
 
 def do_collect_stats(rootBuildDir, rootSourceDir):
     library_sizes = [("librealm.a", get_library_size(rootBuildDir))]
-    file_sizes = get_realm_sizes(rootBuildDir)
+    binary_sizes = get_binary_sizes(rootBuildDir)
+    transaction_sizes = get_transaction_sizes(rootBuildDir)
     loc = [("Realm Code", get_lines_of_code(rootSourceDir)),
            ("Test Code", get_lines_of_test_code(rootSourceDir))]
     stats = [
         ("Realm Library Size", library_sizes),
-        ("Size of a Realm File Containing Blobs", file_sizes),
+        ("Size of a Realm File Containing Blobs", binary_sizes),
+        ("Size of a Realm File With Many Transactions", transaction_sizes),
         ("Lines of Code", loc)]
     output = ""
     for s in stats:
