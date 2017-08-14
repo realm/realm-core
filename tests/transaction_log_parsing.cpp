@@ -2127,6 +2127,8 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 
         // ----------------------------------------------------------------------
 
+#if REALM_VERSION_MAJOR > 2
+
         SECTION("int array: add()") {
             auto changes = observe({r}, [&] {
                 tr->add_empty_row();
@@ -2341,6 +2343,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             });
             REQUIRE(changes.array_change(0, 3) == (ArrayChange{Kind::SetAll, {}}));
         }
+#endif // REALM_VERSION_MAJOR > 2
     }
 }
 

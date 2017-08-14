@@ -616,12 +616,14 @@ TEST_CASE("list") {
         REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
         REQUIRE(results.get_mode() == Results::Mode::TableView);
 
+#if REALM_VERSION_MAJOR > 2
         // Zero sort columns should leave it in LinkView mode
         results = list.sort({*target, {}, {}});
         for (size_t i = 0; i < 10; ++i)
             REQUIRE(results.get(i).get_index() == i);
         REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
         REQUIRE(results.get_mode() == Results::Mode::LinkView);
+#endif
     }
 
     SECTION("filter()") {
