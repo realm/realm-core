@@ -61,17 +61,9 @@ bool PrimitiveListNotifier::do_add_required_change_info(TransactionChangeInfo& i
         return false; // origin row was deleted after the notification was added
     }
 
-    // Find the tables's column, since that isn't tracked directly
     auto& table = *m_table->get_parent_table();
     size_t row_ndx = m_table->get_parent_row_index();
-    size_t col_ndx = not_found;
-    for (size_t i = 0, count = table.get_column_count(); i != count; ++i) {
-        if (table.get_column_type(i) == type_Table && table.get_subtable(i, row_ndx) == m_table) {
-            col_ndx = i;
-            break;
-        }
-    }
-    REALM_ASSERT(col_ndx != not_found);
+    size_t col_ndx = find_container_column(table, row_ndx, m_table, type_Table, &Table::get_subtable);
     info.lists.push_back({table.get_index_in_group(), row_ndx, col_ndx, &m_change});
 
     m_info = &info;

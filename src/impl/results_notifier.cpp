@@ -78,22 +78,13 @@ bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
         return false;
 
     auto table_ndx = table.get_index_in_group();
-    if (table_ndx == npos) {
-        // is a subtable
-        // Find the tables's column, since that isn't tracked directly
+    if (table_ndx == npos) { // is a subtable
         auto& parent = *table.get_parent_table();
         size_t row_ndx = table.get_parent_row_index();
-        size_t col_ndx = not_found;
-        for (size_t i = 0, count = parent.get_column_count(); i != count; ++i) {
-            if (parent.get_column_type(i) == type_Table && parent.get_subtable(i, row_ndx) == &table) {
-                col_ndx = i;
-                break;
-            }
-        }
-        REALM_ASSERT(col_ndx != not_found);
+        size_t col_ndx = find_container_column(parent, row_ndx, &table, type_Table, &Table::get_subtable);
         info.lists.push_back({parent.get_index_in_group(), row_ndx, col_ndx, &m_changes});
     }
-    else {
+    else { // is a top-level table
         if (info.table_moves_needed.size() <= table_ndx)
             info.table_moves_needed.resize(table_ndx + 1);
         info.table_moves_needed[table_ndx] = true;
