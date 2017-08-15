@@ -228,24 +228,24 @@ NONCONCURRENT_TEST(UTF8_Compare_Core_utf8_invalid)
 }
 
 
-// Shows uninitialized data access i Valgrind (by design).
-NONCONCURRENT_TEST_IF(Compare_Core_utf8_invalid_crash, !running_with_valgrind)
+NONCONCURRENT_TEST(Compare_Core_utf8_invalid_crash)
 {
     // See if we can crash Realm with random data
-    char str1[20];
-    char str2[20];
+    constexpr size_t str_len = 20;
+    char str1[str_len];
+    char str2[str_len];
     using namespace realm::test_util;
     Random r;
 
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 
     for (size_t t = 0; t < 10000; t++) {
-        for (size_t i = 0; i < sizeof(str1); i++) {
+        for (size_t i = 0; i < str_len; i++) {
             str1[i] = r.draw_int(0, 255);
             str2[i] = r.draw_int(0, 255);
         }
-        utf8_compare(str1, str2);
-        utf8_compare(str2, str1);
+        utf8_compare(StringData(str1, str_len), StringData(str2, str_len));
+        utf8_compare(StringData(str2, str_len), StringData(str1, str_len));
     }
 }
 
