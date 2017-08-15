@@ -379,11 +379,11 @@ ref_type GroupWriter::write_group()
         if (ndx > 0) {
             ref_type prev_ref = to_ref(m_free_positions.get(ndx - 1));
             size_t prev_size = to_size_t(m_free_lengths.get(ndx - 1));
-            REALM_ASSERT_RELEASE(prev_ref + prev_size <= ref);
+            REALM_ASSERT_RELEASE_EX(prev_ref + prev_size <= ref, prev_ref, prev_size, ref, ndx, m_free_positions.size());
         }
         if (ndx < m_free_positions.size()) {
             ref_type after_ref = to_ref(m_free_positions.get(ndx));
-            REALM_ASSERT_RELEASE(ref + size <= after_ref);
+            REALM_ASSERT_RELEASE_EX(ref + size <= after_ref, ref, size, after_ref, ndx, m_free_positions.size());
         }
         m_free_positions.insert(ndx, ref); // Throws
         m_free_lengths.insert(ndx, size);  // Throws
@@ -687,8 +687,12 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // extended the file size. It can also happen as part of initial file expansion
     // during attach_file().
     size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
-    size_t extend_size = requested_size;
-    size_t new_file_size = logical_file_size + extend_size;
+    size_t new_file_size = logical_file_size;
+    if (REALM_UNLIKELY(int_add_with_overflow_detect(new_file_size, requested_size))) {
+        throw MaxAddressBreached("GroupWriter cannot extend free space: " + util::to_string(logical_file_size) + " + "
+                                 + util::to_string(requested_size));
+    }
+
     if (!alloc.matches_section_boundary(new_file_size)) {
         new_file_size = alloc.get_upper_section_boundary(new_file_size);
     }

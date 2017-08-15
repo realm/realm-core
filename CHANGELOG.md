@@ -21,6 +21,9 @@
   PR [#2561](https://github.com/realm/realm-core/pull/2561).
 * New replication instruction: instr_AddRowWithKey
 * Add the old table size to the instr_TableClear replication instruction.
+* Throw a MaxAddressBreached exception in some places instead of wrapping around.
+  This would mostly affect large Realm files on 32 bit OS.
+  PR [#2792](https://github.com/realm/realm-core/pull/2792).
 
 ### Enhancements
 

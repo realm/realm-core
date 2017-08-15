@@ -324,6 +324,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     else {
         // Find size of memory that has been modified (through copy-on-write) in current write transaction
         ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
+        REALM_ASSERT_DEBUG_EX(curr_ref_end >= m_baseline, curr_ref_end, m_baseline);
         size_t copy_on_write = curr_ref_end - m_baseline;
 
         // Allocate 20% of that (for the first few number of slabs the math below will just result in 1 page each)
@@ -360,7 +361,11 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     // Add to list of slabs
     Slab slab;
     slab.addr = mem.get();
-    slab.ref_end = ref + new_size;
+    slab.ref_end = ref;
+    if (REALM_UNLIKELY(int_add_with_overflow_detect(slab.ref_end, new_size))) {
+        throw MaxAddressBreached("AllocSlab slab ref_end size overflow: " + util::to_string(ref) + " + "
+                                 + util::to_string(new_size));
+    }
     m_slabs.push_back(slab); // Throws
     mem.release();
 
@@ -368,7 +373,11 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     size_t unused = new_size - size;
     if (0 < unused) {
         Chunk chunk;
-        chunk.ref = ref + size;
+        chunk.ref = ref;
+        if (REALM_UNLIKELY(int_add_with_overflow_detect(chunk.ref, size))) {
+            throw MaxAddressBreached("AllocSlab free list ref size overflow: " + util::to_string(ref) + " + "
+                                     + util::to_string(size));
+        }
         chunk.size = unused;
         m_free_space.push_back(chunk); // Throws
     }
