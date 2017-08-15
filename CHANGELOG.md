@@ -1,8 +1,4 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* Fixed handle leak on Windows (https://github.com/realm/realm-core/pull/2781)
+# 3.0.0 Release notes
 
 ### Breaking changes
 
