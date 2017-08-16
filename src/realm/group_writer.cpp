@@ -697,6 +697,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     REALM_ASSERT_3(new_file_size % 8, ==, 0);
     REALM_ASSERT_3(logical_file_size, <, new_file_size);
 
+
     // Note: File::prealloc() may misbehave under race conditions (see
     // documentation of File::prealloc()). Fortunately, no race conditions can
     // occur, because in transactional mode we hold a write lock at this time,
