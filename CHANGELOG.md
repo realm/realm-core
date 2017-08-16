@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 3.0.0-rc5 Release notes
 
 ### Bugfixes
 
