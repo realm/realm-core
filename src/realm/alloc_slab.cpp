@@ -317,6 +317,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 
     // Allocate new slab. To avoid wasting physical memory, we allocate a page
     size_t new_size = size > page_size() ? size : page_size();
+
     ref_type ref;
     if (m_slabs.empty()) {
         ref = m_baseline;
@@ -337,6 +338,10 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 
     // Round upwards to nearest page size
     new_size = ((new_size - 1) | (page_size() - 1)) + 1;
+
+    if (ref + new_size > std::numeric_limits<size_t>::max() * 0.8) {
+        throw std::runtime_error("Realm size overflow");
+    }
 
 #ifdef REALM_SLAB_ALLOC_TUNE
     {
