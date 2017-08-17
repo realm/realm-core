@@ -764,10 +764,18 @@ Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c
 : std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
 , requested(r), valid_count(c) {}
 
+static std::string unsupported_operation_msg(size_t column, const Table* table, const char* operation)
+{
+    const char* column_type = string_for_property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column));
+    if (table->is_group_level())
+        return util::format("Cannot %1 property '%2': operation not supported for '%3' properties",
+                            operation, table->get_column_name(column), column_type);
+    return util::format("Cannot %1 '%2' array: operation not supported",
+                        operation, column_type);
+}
+
 Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(size_t column, const Table* table, const char* operation)
-: std::logic_error(util::format("Cannot %1 property '%2': operation not supported for '%3' properties",
-                                operation, table->get_column_name(column),
-                                string_for_property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column))))
+: std::logic_error(unsupported_operation_msg(column, table, operation))
 , column_index(column)
 , column_name(table->get_column_name(column))
 , property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column))
