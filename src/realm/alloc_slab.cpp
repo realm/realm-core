@@ -90,10 +90,13 @@ SlabAlloc::SlabAlloc()
     m_section_shifts = log2(m_initial_section_size);
     size_t max = std::numeric_limits<size_t>::max();
     m_num_section_bases = 1 + get_section_index(max);
-    m_section_bases.reset(new size_t[m_num_section_bases]);
+    // Allocate one more element than necessary, this is so that get_upper_section_boundary() still functions
+    // as expected on addresses in the last working base.
+    m_section_bases.reset(new size_t[m_num_section_bases + 1]);
     for (size_t i = 0; i < m_num_section_bases; ++i) {
         m_section_bases[i] = compute_section_base(i);
     }
+    m_section_bases[m_num_section_bases] = max;
 }
 
 util::File& SlabAlloc::get_file()

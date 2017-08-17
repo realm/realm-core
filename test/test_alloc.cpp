@@ -331,7 +331,7 @@ public:
 } // end anonymous namespace
 
 
-ONLY(Alloc_MaxSectionBoundaryOverflow)
+TEST(Alloc_MaxSectionBoundaryOverflow)
 {
     TestSlabAlloc alloc;
 
