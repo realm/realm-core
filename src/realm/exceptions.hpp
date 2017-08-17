@@ -86,9 +86,9 @@ public:
 };
 
 /// Thrown when creating references that are too large to be contained in our ref_type (size_t)
-class MaxAddressBreached : public std::runtime_error {
+class MaximumFileSizeExceeded : public std::runtime_error {
 public:
-    MaxAddressBreached(const std::string& msg);
+    MaximumFileSizeExceeded(const std::string& msg);
     /// runtime_error::what() returns the msg provided in the constructor.
 };
 
@@ -272,7 +272,7 @@ inline AddressSpaceExhausted::AddressSpaceExhausted(const std::string& msg)
 {
 }
 
-inline MaxAddressBreached::MaxAddressBreached(const std::string& msg)
+inline MaximumFileSizeExceeded::MaximumFileSizeExceeded(const std::string& msg)
     : std::runtime_error(msg)
 {
 }

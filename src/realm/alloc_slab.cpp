@@ -355,17 +355,19 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 #endif
 
     REALM_ASSERT(0 < new_size);
+    size_t ref_end = ref;
+    if (REALM_UNLIKELY(int_add_with_overflow_detect(ref_end, new_size))) {
+        throw MaximumFileSizeExceeded("AllocSlab slab ref_end size overflow: " + util::to_string(ref) + " + "
+                                 + util::to_string(new_size));
+    }
+
     std::unique_ptr<char[]> mem(new char[new_size]); // Throws
     std::fill(mem.get(), mem.get() + new_size, 0);
 
     // Add to list of slabs
     Slab slab;
     slab.addr = mem.get();
-    slab.ref_end = ref;
-    if (REALM_UNLIKELY(int_add_with_overflow_detect(slab.ref_end, new_size))) {
-        throw MaxAddressBreached("AllocSlab slab ref_end size overflow: " + util::to_string(ref) + " + "
-                                 + util::to_string(new_size));
-    }
+    slab.ref_end = ref_end;
     m_slabs.push_back(slab); // Throws
     mem.release();
 
@@ -375,7 +377,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
         Chunk chunk;
         chunk.ref = ref;
         if (REALM_UNLIKELY(int_add_with_overflow_detect(chunk.ref, size))) {
-            throw MaxAddressBreached("AllocSlab free list ref size overflow: " + util::to_string(ref) + " + "
+            throw MaximumFileSizeExceeded("AllocSlab free list ref size overflow: " + util::to_string(ref) + " + "
                                      + util::to_string(size));
         }
         chunk.size = unused;

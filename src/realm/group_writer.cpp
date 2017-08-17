@@ -689,8 +689,8 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
     size_t new_file_size = logical_file_size;
     if (REALM_UNLIKELY(int_add_with_overflow_detect(new_file_size, requested_size))) {
-        throw MaxAddressBreached("GroupWriter cannot extend free space: " + util::to_string(logical_file_size) + " + "
-                                 + util::to_string(requested_size));
+        throw MaximumFileSizeExceeded("GroupWriter cannot extend free space: " + util::to_string(logical_file_size)
+                                      + " + " + util::to_string(requested_size));
     }
 
     if (!alloc.matches_section_boundary(new_file_size)) {
