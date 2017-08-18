@@ -456,7 +456,6 @@ void SyncSession::handle_error(SyncError error)
             // Connection level errors
             case ProtocolError::connection_closed:
             case ProtocolError::other_error:
-            case ProtocolError::pong_timeout:
                 // Not real errors, don't need to be reported to the binding.
                 return;
             case ProtocolError::unknown_message:
@@ -467,7 +466,6 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::reuse_of_session_ident:
             case ProtocolError::bound_in_other_session:
             case ProtocolError::bad_message_order:
-            case ProtocolError::malformed_http_request:
                 break;
             // Session errors
             case ProtocolError::session_closed:
@@ -518,6 +516,7 @@ void SyncSession::handle_error(SyncError error)
         using ClientError = realm::sync::Client::Error;
         switch (static_cast<ClientError>(error_code.value())) {
             case ClientError::connection_closed:
+            case ClientError::pong_timeout:
                 // Not real errors, don't need to be reported to the binding.
                 return;
             case ClientError::unknown_message:
@@ -536,6 +535,7 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::bad_error_code:
             case ClientError::bad_compression:
             case ClientError::bad_client_version:
+            case ClientError::ssl_server_cert_rejected:
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.
