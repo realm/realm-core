@@ -22,6 +22,7 @@
 #include <memory>
 #include <mutex>
 #include <map>
+#include <iostream>
 
 #ifdef REALM_DEBUG
 #include <iostream>
@@ -337,6 +338,15 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 
     // Round upwards to nearest page size
     new_size = ((new_size - 1) | (page_size() - 1)) + 1;
+
+    if (ref + new_size > std::numeric_limits<size_t>::max() / 2 * 0.8) {
+//        throw std::runtime_error("Realm size exceeded ");
+    }
+
+	
+//std::cerr << "sizeof(" << sizeof(size_t);
+//   std::cerr << "mem=" << ref + new_size << " ";
+
 
 #ifdef REALM_SLAB_ALLOC_TUNE
     {

@@ -677,6 +677,9 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 // extend_free_space may be needed, before an allocation can succeed.
 std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 {
+
+//    std::cerr << requested_size << " ";
+
     bool is_shared = m_group.m_is_shared;
     SlabAlloc& alloc = m_group.m_alloc;
 
@@ -689,13 +692,18 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
     size_t extend_size = requested_size;
     size_t new_file_size = logical_file_size + extend_size;
-    if (!alloc.matches_section_boundary(new_file_size)) {
+  
+std::cerr << new_file_size << "/";
+
+  if (!alloc.matches_section_boundary(new_file_size)) {
         new_file_size = alloc.get_upper_section_boundary(new_file_size);
     }
     // The size must be a multiple of 8. This is guaranteed as long as
     // the initial size is a multiple of 8.
     REALM_ASSERT_3(new_file_size % 8, ==, 0);
     REALM_ASSERT_3(logical_file_size, <, new_file_size);
+
+std::cerr << new_file_size << " ";
 
     // Note: File::prealloc() may misbehave under race conditions (see
     // documentation of File::prealloc()). Fortunately, no race conditions can
