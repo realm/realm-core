@@ -157,12 +157,7 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
             session.m_session->refresh(std::move(access_token));
             session.m_session->cancel_reconnect_delay();
         } else {
-#if REALM_SSL_SETTING_IN_SESSION_CONFIG
             session.m_session->bind(*session.m_server_url, std::move(access_token));
-#else
-            session.m_session->bind(*session.m_server_url, std::move(access_token),
-                                    session.m_config.client_validate_ssl, session.m_config.ssl_trust_certificate_path);
-#endif
             session.m_session_has_been_bound = true;
         }
 
@@ -461,7 +456,6 @@ void SyncSession::handle_error(SyncError error)
             // Connection level errors
             case ProtocolError::connection_closed:
             case ProtocolError::other_error:
-            case ProtocolError::pong_timeout:
                 // Not real errors, don't need to be reported to the binding.
                 return;
             case ProtocolError::unknown_message:
@@ -472,7 +466,6 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::reuse_of_session_ident:
             case ProtocolError::bound_in_other_session:
             case ProtocolError::bad_message_order:
-            case ProtocolError::malformed_http_request:
                 break;
             // Session errors
             case ProtocolError::session_closed:
@@ -523,6 +516,7 @@ void SyncSession::handle_error(SyncError error)
         using ClientError = realm::sync::Client::Error;
         switch (static_cast<ClientError>(error_code.value())) {
             case ClientError::connection_closed:
+            case ClientError::pong_timeout:
                 // Not real errors, don't need to be reported to the binding.
                 return;
             case ClientError::unknown_message:
@@ -541,6 +535,7 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::bad_error_code:
             case ClientError::bad_compression:
             case ClientError::bad_client_version:
+            case ClientError::ssl_server_cert_rejected:
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.
@@ -637,10 +632,8 @@ void SyncSession::create_sync_session()
     sync::Session::Config session_config;
     session_config.changeset_cooker = m_config.transformer;
     session_config.encryption_key = m_config.realm_encryption_key;
-#if REALM_SSL_SETTING_IN_SESSION_CONFIG
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
-#endif
     m_session = std::make_unique<sync::Session>(m_client.client, m_realm_path, session_config);
 
     // The next time we get a token, call `bind()` instead of `refresh()`.

@@ -32,15 +32,9 @@
 #include <realm/sync/version.hpp>
 #define REALM_HAVE_SYNC_STABLE_IDS (REALM_SYNC_VER_MAJOR > 1)
 
-// FIXME: Remove this macro after sync 2.x.x with https://github.com/realm/realm-sync/pull/1435 released.
-#define REALM_SSL_SETTING_IN_SESSION_CONFIG                                                                          \
-    (REALM_SYNC_VER_MAJOR == 1 && REALM_SYNC_VER_MINOR >= 10 && REALM_SYNC_VER_PATCH >= 5)
-
 #else
 
 #define REALM_HAVE_SYNC_STABLE_IDS 0
-
-#define REALM_SSL_SETTING_IN_SESSION_CONFIG 0
 
 #endif // REALM_ENABLE_SYNC
 
