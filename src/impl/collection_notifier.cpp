@@ -134,7 +134,7 @@ bool DeepChangeChecker::check_row(Table const& table, size_t idx, size_t depth)
     if (depth >= m_current_path.size()) {
         // Don't mark any of the intermediate rows checked along the path as
         // not modified, as a search starting from them might hit a modification
-        for (size_t i = 1; i < m_current_path.size(); ++i)
+        for (size_t i = 0; i < m_current_path.size(); ++i)
             m_current_path[i].depth_exceeded = true;
         return false;
     }
