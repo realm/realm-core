@@ -2,8 +2,8 @@
 
 ### Bugfixes
 
-* Fix corruption caused by `swap_rows()` operations applied to a StringEnumColumn.
-  Currently unused by bindings.
+* Fix corruption caused by `swap_rows()` and `move_column()` operations applied
+  to a StringEnumColumn. Currently unused by bindings.
   PR [#2780](https://github.com/realm/realm-core/pull/2780).
 
 ### Breaking changes

@@ -288,6 +288,18 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
         }
     }
 
+    if (type == col_type_StringEnum) {
+        REALM_ASSERT(m_enumkeys.is_attached());
+        REALM_ASSERT(m_enumkeys.size() != 0);
+
+        size_t from_enums_ndx = get_enumkeys_ndx(from_ndx);
+        size_t to_enums_ndx = get_enumkeys_ndx(to_ndx);
+        if (to_enums_ndx >= m_enumkeys.size()) {
+            to_enums_ndx = m_enumkeys.size() - 1;
+        }
+        m_enumkeys.move_rotate(from_enums_ndx, to_enums_ndx);
+    }
+
     if (type != col_type_BackLink)
         m_names.move_rotate(from_ndx, to_ndx);
     m_types.move_rotate(from_ndx, to_ndx);

@@ -6890,6 +6890,140 @@ TEST(Table_MultipleLinkColumnsMoveTablesCrossLinks)
 }
 
 
+TEST(Table_MoveEnumColumns)
+{
+    Table t;
+    t.add_column(type_String, "0");
+    t.add_column(type_String, "1");
+    t.add_empty_row(1);
+    t.set_string(0, 0, "hello");
+    t.set_string(1, 0, "world");
+    bool enforce = true;
+    t.optimize(enforce);
+
+    CHECK(t.get_string(0, 0) == "hello");
+    CHECK(t.get_string(1, 0) == "world");
+    t.verify();
+    _impl::TableFriend::move_column(*t.get_descriptor(), 1, 0);
+    CHECK(t.get_string(0, 0) == "world");
+    CHECK(t.get_string(1, 0) == "hello");
+    t.verify();
+    _impl::TableFriend::move_column(*t.get_descriptor(), 0, 1);
+    CHECK(t.get_string(0, 0) == "hello");
+    CHECK(t.get_string(1, 0) == "world");
+    t.verify();
+    _impl::TableFriend::move_column(*t.get_descriptor(), 1, 1);
+    CHECK(t.get_string(0, 0) == "hello");
+    CHECK(t.get_string(1, 0) == "world");
+    t.verify();
+}
+
+
+TEST(LangBindHelper_StringEnumMoveOutOfBounds)
+{
+    Table t;
+    t.add_column(type_String, "str_col");
+    t.add_empty_row(1);
+    bool enforce = true;
+    t.optimize(enforce);
+    t.add_column(type_String, "str_col2");
+    StringData enum_0("enum 0");
+    StringData str_1("string 1");
+    StringData str_2("string 2");
+    StringData enum_1("enum 1");
+    StringData enum_2("enum 2");
+    t.set_string(0, 0, enum_0);
+    t.set_string(1, 0, str_1);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 1);
+    t.verify();
+    CHECK(t.get_string(0, 0) == str_1);
+    CHECK(t.get_string(1, 0) == enum_0);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 1, 1);
+    t.verify();
+    CHECK(t.get_string(0, 0) == str_1);
+    CHECK(t.get_string(1, 0) == enum_0);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 0);
+    t.verify();
+    CHECK(t.get_string(0, 0) == str_1);
+    CHECK(t.get_string(1, 0) == enum_0);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 1, 0);
+    t.verify();
+    CHECK(t.get_string(0, 0) == enum_0);
+    CHECK(t.get_string(1, 0) == str_1);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 1, 0);
+    t.verify();
+    CHECK(t.get_string(0, 0) == str_1);
+    CHECK(t.get_string(1, 0) == enum_0);
+
+    t.optimize(enforce);
+    t.add_column(type_String, "str_col3");
+    t.set_string(0, 0, enum_1);
+    t.set_string(2, 0, str_2);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 2, 1);
+    t.verify();
+    CHECK(t.get_string(0, 0) == enum_1);
+    CHECK(t.get_string(1, 0) == str_2);
+    CHECK(t.get_string(2, 0) == enum_0);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 2, 1);
+    t.verify();
+    CHECK(t.get_string(0, 0) == enum_1);
+    CHECK(t.get_string(1, 0) == enum_0);
+    CHECK(t.get_string(2, 0) == str_2);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 2);
+    t.verify();
+    CHECK(t.get_string(0, 0) == enum_0);
+    CHECK(t.get_string(1, 0) == str_2);
+    CHECK(t.get_string(2, 0) == enum_1);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 2);
+    t.verify();
+    CHECK(t.get_string(0, 0) == str_2);
+    CHECK(t.get_string(1, 0) == enum_1);
+    CHECK(t.get_string(2, 0) == enum_0);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 2, 0);
+    t.verify();
+    CHECK(t.get_string(0, 0) == enum_0);
+    CHECK(t.get_string(1, 0) == str_2);
+    CHECK(t.get_string(2, 0) == enum_1);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 2);
+    t.verify();
+    CHECK(t.get_string(0, 0) == str_2);
+    CHECK(t.get_string(1, 0) == enum_1);
+    CHECK(t.get_string(2, 0) == enum_0);
+
+    t.optimize(enforce);
+    t.set_string(0, 0, enum_2);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 2);
+    t.verify();
+    CHECK(t.get_string(0, 0) == enum_1);
+    CHECK(t.get_string(1, 0) == enum_0);
+    CHECK(t.get_string(2, 0) == enum_2);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 2, 0);
+    t.verify();
+    CHECK(t.get_string(0, 0) == enum_2);
+    CHECK(t.get_string(1, 0) == enum_1);
+    CHECK(t.get_string(2, 0) == enum_0);
+
+    _impl::TableFriend::move_column(*(t.get_descriptor()), 1, 2);
+    t.verify();
+    CHECK(t.get_string(0, 0) == enum_2);
+    CHECK(t.get_string(1, 0) == enum_0);
+    CHECK(t.get_string(2, 0) == enum_1);
+}
+
+
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
