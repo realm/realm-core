@@ -157,12 +157,7 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
             session.m_session->refresh(std::move(access_token));
             session.m_session->cancel_reconnect_delay();
         } else {
-#if REALM_SSL_SETTING_IN_SESSION_CONFIG
             session.m_session->bind(*session.m_server_url, std::move(access_token));
-#else
-            session.m_session->bind(*session.m_server_url, std::move(access_token),
-                                    session.m_config.client_validate_ssl, session.m_config.ssl_trust_certificate_path);
-#endif
             session.m_session_has_been_bound = true;
         }
 
@@ -637,10 +632,8 @@ void SyncSession::create_sync_session()
     sync::Session::Config session_config;
     session_config.changeset_cooker = m_config.transformer;
     session_config.encryption_key = m_config.realm_encryption_key;
-#if REALM_SSL_SETTING_IN_SESSION_CONFIG
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
-#endif
     m_session = std::make_unique<sync::Session>(m_client.client, m_realm_path, session_config);
 
     // The next time we get a token, call `bind()` instead of `refresh()`.
