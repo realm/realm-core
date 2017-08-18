@@ -30,7 +30,7 @@
 
 #include <realm/link_view.hpp>
 
-using namespace realm;
+namespace realm {
 using namespace realm::_impl;
 
 List::List() noexcept = default;
@@ -177,7 +177,7 @@ template<typename T>
 T List::get(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
-    return ::get<T>(*m_table, to_table_ndx(row_ndx));
+    return realm::get<T>(*m_table, to_table_ndx(row_ndx));
 }
 
 template RowExpr List::get(size_t) const;
@@ -413,17 +413,10 @@ util::Optional<double> List::average(size_t column)
     return as_results().average(column);
 }
 
-// These definitions rely on that LinkViews are interned by core
+// These definitions rely on that LinkViews and Tables are interned by core
 bool List::operator==(List const& rgt) const noexcept
 {
     return m_link_view == rgt.m_link_view && m_table.get() == rgt.m_table.get();
-}
-
-namespace std {
-size_t hash<realm::List>::operator()(realm::List const& list) const
-{
-    return std::hash<void*>()(list.m_link_view ? list.m_link_view.get() : (void*)list.m_table.get());
-}
 }
 
 NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
@@ -443,7 +436,6 @@ List::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
 : std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
 , requested(r), valid_count(c) {}
 
-namespace realm {
 #define REALM_PRIMITIVE_LIST_TYPE(T) \
     template T List::get<T>(size_t) const; \
     template size_t List::find<T>(T const&) const; \
@@ -464,4 +456,11 @@ REALM_PRIMITIVE_LIST_TYPE(util::Optional<float>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<double>)
 
 #undef REALM_PRIMITIVE_LIST_TYPE
+} // namespace realm
+
+namespace std {
+size_t hash<realm::List>::operator()(realm::List const& list) const
+{
+    return std::hash<void*>()(list.m_link_view ? list.m_link_view.get() : (void*)list.m_table.get());
+}
 }

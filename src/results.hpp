@@ -257,7 +257,7 @@ private:
 template<typename Func>
 NotificationToken Results::async(Func&& target)
 {
-    return add_notification_callback([target = std::forward<Func>(target)](CollectionChangeSet const&, std::exception_ptr e) {
+    return this->add_notification_callback([target = std::forward<Func>(target)](CollectionChangeSet const&, std::exception_ptr e) {
         target(e);
     });
 }
@@ -271,14 +271,14 @@ auto Results::dispatch(Fn&& fn) const
 template<typename Context>
 auto Results::get(Context& ctx, size_t row_ndx)
 {
-    return dispatch([&](auto t) { return ctx.box(get<std::decay_t<decltype(*t)>>(row_ndx)); });
+    return dispatch([&](auto t) { return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx)); });
 }
 
 template<typename Context>
 auto Results::first(Context& ctx)
 {
     return dispatch([&](auto t) {
-        auto value = first<std::decay_t<decltype(*t)>>();
+        auto value = this->first<std::decay_t<decltype(*t)>>();
         return value ? static_cast<decltype(ctx.no_value())>(ctx.box(*value)) : ctx.no_value();
     });
 }
@@ -287,7 +287,7 @@ template<typename Context>
 auto Results::last(Context& ctx)
 {
     return dispatch([&](auto t) {
-        auto value = last<std::decay_t<decltype(*t)>>();
+        auto value = this->last<std::decay_t<decltype(*t)>>();
         return value ? static_cast<decltype(ctx.no_value())>(ctx.box(*value)) : ctx.no_value();
     });
 }
@@ -295,7 +295,7 @@ auto Results::last(Context& ctx)
 template<typename Context, typename T>
 size_t Results::index_of(Context& ctx, T value)
 {
-    return dispatch([&](auto t) { return index_of(ctx.template unbox<std::decay_t<decltype(*t)>>(value)); });
+    return dispatch([&](auto t) { return this->index_of(ctx.template unbox<std::decay_t<decltype(*t)>>(value)); });
 }
 } // namespace realm
 

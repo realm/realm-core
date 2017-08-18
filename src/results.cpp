@@ -28,7 +28,7 @@
 
 #include <stdexcept>
 
-using namespace realm;
+namespace realm {
 
 Results::Results() = default;
 Results::~Results() = default;
@@ -141,7 +141,7 @@ size_t Results::size()
             update_tableview();
             return m_table_view.size();
     }
-    REALM_UNREACHABLE();
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 const ObjectSchema& Results::get_object_schema() const
@@ -168,6 +168,7 @@ StringData Results::get_object_type() const noexcept
     return ObjectStore::object_type_for_table_name(m_table->get_name());
 }
 
+namespace {
 template<typename T>
 auto get(Table& table, size_t row)
 {
@@ -179,6 +180,7 @@ auto get<RowExpr>(Table& table, size_t row)
 {
     return table.get(row);
 }
+}
 
 template<typename T>
 util::Optional<T> Results::try_get(size_t row_ndx)
@@ -188,12 +190,12 @@ util::Optional<T> Results::try_get(size_t row_ndx)
         case Mode::Empty: break;
         case Mode::Table:
             if (row_ndx < m_table->size())
-                return ::get<T>(*m_table, row_ndx);
+                return realm::get<T>(*m_table, row_ndx);
             break;
         case Mode::LinkView:
             if (update_linkview()) {
                 if (row_ndx < m_link_view->size())
-                    return ::get<T>(*m_table, m_link_view->get(row_ndx).get_index());
+                    return realm::get<T>(*m_table, m_link_view->get(row_ndx).get_index());
                 break;
             }
             REALM_FALLTHROUGH;
@@ -204,7 +206,7 @@ util::Optional<T> Results::try_get(size_t row_ndx)
                 break;
             if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(row_ndx))
                 return T{};
-            return ::get<T>(*m_table, m_table_view.get(row_ndx).get_index());
+            return realm::get<T>(*m_table, m_table_view.get(row_ndx).get_index());
     }
     return util::none;
 }
@@ -313,7 +315,7 @@ size_t Results::index_of(RowExpr const& row)
             update_tableview();
             return m_table_view.find_by_source_ndx(row.get_index());
     }
-    REALM_UNREACHABLE();
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 template<typename T>
@@ -332,6 +334,7 @@ size_t Results::index_of(T const& value)
             update_tableview();
             return m_table_view.find_first(0, value);
     }
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 size_t Results::index_of(Query&& q)
@@ -485,6 +488,7 @@ PropertyType Results::get_type() const
                 return PropertyType::Object;
             return ObjectSchema::from_core_type(*m_table->get_descriptor(), 0);
     }
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 Query Results::get_query() const
@@ -514,7 +518,7 @@ Query Results::get_query() const
         case Mode::Table:
             return m_table->where();
     }
-    REALM_UNREACHABLE();
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 TableView Results::get_tableview()
@@ -534,7 +538,7 @@ TableView Results::get_tableview()
         case Mode::Table:
             return m_table->where().find_all();
     }
-    REALM_UNREACHABLE();
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 static std::vector<size_t> parse_keypath(StringData keypath, Schema const& schema, const ObjectSchema *object_schema)
@@ -673,7 +677,7 @@ Results Results::snapshot() &&
             m_update_policy = UpdatePolicy::Never;
             return std::move(*this);
     }
-    REALM_UNREACHABLE();
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 void Results::prepare_async()
@@ -715,7 +719,7 @@ bool Results::is_in_table_order() const
         case Mode::TableView:
             return m_table_view.is_in_table_order();
     }
-    REALM_UNREACHABLE(); // keep gcc happy
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 void Results::Internal::set_table_view(Results& results, TableView &&tv)
@@ -734,7 +738,6 @@ void Results::Internal::set_table_view(Results& results, TableView &&tv)
     REALM_ASSERT(results.m_table_view.is_attached());
 }
 
-namespace realm {
 #define REALM_RESULTS_TYPE(T) \
     template T Results::get<T>(size_t); \
     template util::Optional<T> Results::first<T>(); \
@@ -758,7 +761,6 @@ REALM_RESULTS_TYPE(util::Optional<float>)
 REALM_RESULTS_TYPE(util::Optional<double>)
 
 #undef REALM_RESULTS_TYPE
-}
 
 Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
 : std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
@@ -781,3 +783,5 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(size_t c
 , property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column))
 {
 }
+
+} // namespace realm

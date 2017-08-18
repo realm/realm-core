@@ -245,7 +245,7 @@ struct StringMaker<util::None> {
 
 namespace std {
 template<>
-constexpr bool less<void>::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const
+bool less<void>::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const
 {
     if (b.is_null())
         return false;
@@ -255,7 +255,7 @@ constexpr bool less<void>::operator()<Timestamp&, Timestamp&>(Timestamp& a, Time
 }
 
 template<>
-constexpr bool greater<void>::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const
+bool greater<void>::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const
 {
     if (a.is_null())
         return false;

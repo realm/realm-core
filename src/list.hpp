@@ -173,31 +173,31 @@ auto List::dispatch(Fn&& fn) const
 template<typename Context>
 auto List::get(Context& ctx, size_t row_ndx) const
 {
-    return dispatch([&](auto t) { return ctx.box(get<std::decay_t<decltype(*t)>>(row_ndx)); });
+    return dispatch([&](auto t) { return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx)); });
 }
 
 template<typename T, typename Context>
 size_t List::find(Context& ctx, T&& value) const
 {
-    return dispatch([&](auto t) { return find(ctx.template unbox<std::decay_t<decltype(*t)>>(value)); });
+    return dispatch([&](auto t) { return this->find(ctx.template unbox<std::decay_t<decltype(*t)>>(value)); });
 }
 
 template<typename T, typename Context>
 void List::add(Context& ctx, T&& value, bool update)
 {
-    dispatch([&](auto t) { add(ctx.template unbox<std::decay_t<decltype(*t)>>(value, true, update)); });
+    dispatch([&](auto t) { this->add(ctx.template unbox<std::decay_t<decltype(*t)>>(value, true, update)); });
 }
 
 template<typename T, typename Context>
 void List::insert(Context& ctx, size_t list_ndx, T&& value, bool update)
 {
-    dispatch([&](auto t) { insert(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, true, update)); });
+    dispatch([&](auto t) { this->insert(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, true, update)); });
 }
 
 template<typename T, typename Context>
 void List::set(Context& ctx, size_t row_ndx, T&& value, bool update)
 {
-    dispatch([&](auto t) { set(row_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, true, update)); });
+    dispatch([&](auto t) { this->set(row_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, true, update)); });
 }
 } // namespace realm
 
