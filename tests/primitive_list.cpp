@@ -51,7 +51,6 @@ struct Base {
     using Boxed = T;
 
     static PropertyType property_type() { return prop_type; }
-    static std::vector<int64_t> values() { return {3, 1, 2}; }
     static util::Any to_any(T value) { return value; }
 
     template<typename Fn>
