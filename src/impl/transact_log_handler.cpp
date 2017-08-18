@@ -171,6 +171,12 @@ void KVOAdapter::before(SharedGroup& sg)
             changes.indices = builder.modifications;
             changes.indices.add(builder.deletions);
 
+            // Iterate over each of the rows which may have been shifted by
+            // the moves and check if it actually has been, or if it's ended
+            // up in the same place as it started (either because the moves were
+            // actually a swap that doesn't effect the rows in between, or the
+            // combination of moves happen to leave some intermediate rows in
+            // the same place)
             auto in_range = [](auto& it, auto end, size_t i) {
                 if (it != end && i >= it->second)
                     ++it;

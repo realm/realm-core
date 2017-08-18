@@ -403,7 +403,8 @@ util::Optional<Mixed> List::min(size_t column)
 
 Mixed List::sum(size_t column)
 {
-    // Results::sum() returns none only for Empty results
+    // Results::sum() returns none only for Mode::Empty Results, so we can
+    // safely ignore that possibility here
     return *as_results().sum(column);
 }
 

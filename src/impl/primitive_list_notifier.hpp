@@ -30,7 +30,7 @@ public:
     PrimitiveListNotifier(TableRef lv, std::shared_ptr<Realm> realm);
 
 private:
-    // The linkview, in handover form if this has not been attached to the main
+    // The subtable, in handover form if this has not been attached to the main
     // SharedGroup yet
     TableRef m_table;
     std::unique_ptr<SharedGroup::Handover<Table>> m_table_handover;
