@@ -90,7 +90,7 @@ private:
         size_t col;
         bool depth_exceeded;
     };
-    std::array<Path, 16> m_current_path;
+    std::array<Path, 4> m_current_path;
 
     bool check_row(Table const& table, size_t row_ndx, size_t depth = 0);
     bool check_outgoing_links(size_t table_ndx, Table const& table,

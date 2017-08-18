@@ -2032,56 +2032,68 @@ TEST_CASE("DeepChangeChecker") {
     SECTION("changes over links are tracked") {
         SECTION("first link set") {
             r->begin_transaction();
-            for (int i = 0; i < 8; ++i)
-                table->set_link(1, i, i + 1 + (i == 7));
+            table->set_link(1, 0, 1);
+            table->set_link(1, 1, 2);
+            table->set_link(1, 2, 4);
             r->commit_transaction();
         }
         SECTION("second link set") {
             r->begin_transaction();
-            for (int i = 0; i < 8; ++i)
-                table->set_link(2, i, i + 1 + (i == 7));
+            table->set_link(2, 0, 1);
+            table->set_link(2, 1, 2);
+            table->set_link(2, 2, 4);
             r->commit_transaction();
         }
         SECTION("both set") {
             r->begin_transaction();
-            for (int i = 0; i < 8; ++i) {
-                table->set_link(1, i, 8);
-                table->set_link(2, i, i + 1 + (i == 7));
-            }
+            table->set_link(1, 0, 1);
+            table->set_link(1, 1, 2);
+            table->set_link(1, 2, 4);
+
+            table->set_link(2, 0, 1);
+            table->set_link(2, 1, 2);
+            table->set_link(2, 2, 4);
             r->commit_transaction();
         }
         SECTION("circular link") {
             r->begin_transaction();
-            for (int i = 0; i < 8; ++i) {
-                table->set_link(1, i, i);
-                table->set_link(2, i, i + 1 + (i == 7));
-            }
+            table->set_link(1, 0, 0);
+            table->set_link(1, 1, 1);
+            table->set_link(1, 2, 2);
+            table->set_link(1, 3, 3);
+            table->set_link(1, 4, 4);
+
+            table->set_link(2, 0, 1);
+            table->set_link(2, 1, 2);
+            table->set_link(2, 2, 4);
             r->commit_transaction();
         }
 
         auto info = track_changes([&] {
-            table->set_int(0, 9, 10);
+            table->set_int(0, 4, 10);
         });
 
-        // link chain should cascade to all but #8 being marked as modified
+        // link chain should cascade to all but #3 being marked as modified
         REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
-        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(8));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(3));
     }
 
     SECTION("changes over linklists are tracked") {
         r->begin_transaction();
-        for (int i = 0; i < 8; ++i) {
+        for (int i = 0; i < 3; ++i) {
             table->get_linklist(3, i)->add(i);
-            table->get_linklist(3, i)->add(i + 1 + (i == 7));
+            table->get_linklist(3, i)->add(i + 1 + (i == 2));
         }
         r->commit_transaction();
 
         auto info = track_changes([&] {
-            table->set_int(0, 9, 10);
+            table->set_int(0, 4, 10);
         });
 
         REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
-        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(8));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(3));
     }
 
     SECTION("cycles over links do not loop forever") {
@@ -2106,7 +2118,7 @@ TEST_CASE("DeepChangeChecker") {
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(0));
     }
 
-    SECTION("link chains are tracked up to 16 levels deep") {
+    SECTION("link chains are tracked up to 4 levels deep") {
         r->begin_transaction();
         table->add_empty_row(10);
         for (int i = 0; i < 19; ++i)
@@ -2120,23 +2132,20 @@ TEST_CASE("DeepChangeChecker") {
         _impl::DeepChangeChecker checker(info, *table, tables);
         CHECK(checker(19));
         CHECK(checker(18));
-        CHECK(checker(4));
-        CHECK_FALSE(checker(3));
-        CHECK_FALSE(checker(2));
+        CHECK(checker(16));
+        CHECK_FALSE(checker(15));
 
         // Check in other orders to make sure that the caching doesn't effect
         // the results
         _impl::DeepChangeChecker checker2(info, *table, tables);
-        CHECK_FALSE(checker2(2));
-        CHECK_FALSE(checker2(3));
-        CHECK(checker2(4));
+        CHECK_FALSE(checker2(15));
+        CHECK(checker2(16));
         CHECK(checker2(18));
         CHECK(checker2(19));
 
         _impl::DeepChangeChecker checker3(info, *table, tables);
-        CHECK(checker3(4));
-        CHECK_FALSE(checker3(3));
-        CHECK_FALSE(checker3(2));
+        CHECK(checker3(16));
+        CHECK_FALSE(checker3(15));
         CHECK(checker3(18));
         CHECK(checker3(19));
     }
