@@ -189,7 +189,7 @@ struct StringifyingContext {
         return ss.str();
     }
 
-    std::string box(RowExpr row) { return std::to_string(row.get_index()); }
+    std::string box(RowExpr row) { return util::to_string(row.get_index()); }
 };
 
 namespace Catch {
