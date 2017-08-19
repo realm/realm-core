@@ -19,6 +19,7 @@
 #include "catch.hpp"
 
 #include "object_schema.hpp"
+#include "object_store.hpp"
 #include "property.hpp"
 #include "schema.hpp"
 #include "util/format.hpp"
@@ -122,7 +123,7 @@ TEST_CASE("ObjectSchema") {
 
         auto add_list = [](TableRef table, DataType type, StringData name, bool nullable) {
             size_t col = table->add_column(type_Table, name);
-            table->get_subdescriptor(col)->add_column(type, "!ARRAY_VALUE", nullptr, nullable);
+            table->get_subdescriptor(col)->add_column(type, ObjectStore::ArrayColumnName, nullptr, nullable);
         };
 
         add_list(table, type_Int, "int array", false);

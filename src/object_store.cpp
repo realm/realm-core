@@ -120,7 +120,7 @@ void insert_column(Group& group, Table& table, Property const& property, size_t 
     else if (is_array(property.type)) {
         DescriptorRef desc;
         table.insert_column(col_ndx, type_Table, property.name, &desc);
-        desc->add_column(to_core_type(property.type & ~PropertyType::Flags), "!ARRAY_VALUE",
+        desc->add_column(to_core_type(property.type & ~PropertyType::Flags), ObjectStore::ArrayColumnName,
                          nullptr, is_nullable(property.type));
     }
     else {

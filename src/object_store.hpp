@@ -44,6 +44,9 @@ public:
     // Schema version used for uninitialized Realms
     static const uint64_t NotVersioned;
 
+    // Column name used for subtables which store an array
+    static constexpr const char* const ArrayColumnName = "!ARRAY_VALUE";
+
     // get the last set schema version
     static uint64_t get_schema_version(Group const& group);
 

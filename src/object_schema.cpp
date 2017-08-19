@@ -100,7 +100,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, size_t index) : 
 
         if (table->get_column_type(col) == type_Table) {
             auto subdesc = table->get_subdescriptor(col);
-            if (subdesc->get_column_count() != 1 || subdesc->get_column_name(0) != "!ARRAY_VALUE")
+            if (subdesc->get_column_count() != 1 || subdesc->get_column_name(0) != ObjectStore::ArrayColumnName)
                 continue;
         }
 
