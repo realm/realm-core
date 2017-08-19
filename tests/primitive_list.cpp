@@ -559,6 +559,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         }
     }
 
+#if REALM_VERSION_MAJOR > 2
     SECTION("filtered index_of()") {
         REQUIRE_THROWS(results.index_of(table->get(0)));
         auto q = TestType::unwrap(values[0], [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) != v; });
@@ -568,6 +569,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
             REQUIRE(filtered.index_of(static_cast<T>(values[i])) == i - 1);
         }
     }
+#endif
 
     SECTION("sort()") {
         auto subtable = table->get_subtable(0, 0);
