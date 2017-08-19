@@ -701,6 +701,16 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     REALM_ASSERT_3(new_file_size % 8, ==, 0);
     REALM_ASSERT_3(logical_file_size, <, new_file_size);
 
+    size_t stored_logical_file_size = new_file_size;
+    // We store the logical file size as a ref (tagged) we can't store sizes that overflow in the following
+    // calculation so we check it here before actually changing the file size.
+    // m_top[2] = (new_file_size * 2) + 1
+    if (int_shift_left_with_overflow_detect(stored_logical_file_size, 1)
+        || int_add_with_overflow_detect(stored_logical_file_size, 1)) {
+        throw MaximumFileSizeExceeded("GroupWriter cannot extend free space: " + util::to_string(logical_file_size)
+                                      + " + " + util::to_string(requested_size));
+    }
+
     // Note: File::prealloc() may misbehave under race conditions (see
     // documentation of File::prealloc()). Fortunately, no race conditions can
     // occur, because in transactional mode we hold a write lock at this time,
@@ -718,8 +728,9 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     if (is_shared)
         m_free_versions.add(0); // new space is always free for writing
 
+
     // Update the logical file size
-    m_group.m_top.set(2, 1 + 2 * new_file_size); // Throws
+    m_group.m_top.set(2, stored_logical_file_size); // Throws
     REALM_ASSERT(chunk_size != 0);
     REALM_ASSERT((chunk_size % 8) == 0);
     return std::make_pair(chunk_ndx, chunk_size);
