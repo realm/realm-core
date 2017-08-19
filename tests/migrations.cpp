@@ -514,7 +514,7 @@ TEST_CASE("migration: Automatic") {
             realm->commit_transaction();
 
             realm->update_schema(set_optional(schema, "object", "value", true), 2);
-            for (int64_t i = 0; i < 10; ++i)
+            for (int i = 0; i < 10; ++i)
                 REQUIRE(table->get_int(0, i) == i);
         }
 

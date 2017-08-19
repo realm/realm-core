@@ -84,9 +84,9 @@ struct Bool : Base<PropertyType::Bool, bool> {
 struct Float : Base<PropertyType::Float, float> {
     static std::vector<float> values() { return {3.3f, 1.1f, 2.2f}; }
     static float min() { return 1.1f; }
-    static float max() { return 3.3; }
+    static float max() { return 3.3f; }
     static auto sum() { return Approx(6.6f); }
-    static auto average() { return Approx(2.2); }
+    static auto average() { return Approx(2.2f); }
 };
 
 struct Double : Base<PropertyType::Double, double> {
@@ -151,7 +151,7 @@ template<typename T>
 T get(Mixed) { abort(); }
 
 template<> int64_t get(Mixed m) { return m.get_int(); }
-template<> float get(Mixed m) { return m.get_type() == type_Float ? m.get_float() : m.get_double(); }
+template<> float get(Mixed m) { return m.get_type() == type_Float ? m.get_float() : static_cast<float>(m.get_double()); }
 template<> double get(Mixed m) { return m.get_double(); }
 template<> Timestamp get(Mixed m) { return m.get_timestamp(); }
 
@@ -242,9 +242,17 @@ struct StringMaker<util::None> {
 };
 } // namespace Catch
 
-namespace std {
+struct less {
+    template<class T, class U>
+    auto operator()(T&& a, U&& b) const noexcept { return a < b; }
+};
+struct greater {
+    template<class T, class U>
+    auto operator()(T&& a, U&& b) const noexcept { return a > b; }
+};
+
 template<>
-bool less<void>::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const
+auto less::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const noexcept
 {
     if (b.is_null())
         return false;
@@ -254,14 +262,13 @@ bool less<void>::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) 
 }
 
 template<>
-bool greater<void>::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const
+auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const noexcept
 {
     if (a.is_null())
         return false;
     if (b.is_null())
         return true;
     return a > b;
-}
 }
 
 TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary, ::Date,
@@ -536,7 +543,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         auto subtable = table->get_subtable(0, 0);
 
         auto sorted = list.sort({{"self", true}});
-        std::sort(begin(values), end(values), std::less<>());
+        std::sort(begin(values), end(values), less());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             auto q = TestType::unwrap(values[i], [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) == v; });
@@ -544,7 +551,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         }
 
         sorted = list.sort({{"self", false}});
-        std::sort(begin(values), end(values), std::greater<>());
+        std::sort(begin(values), end(values), greater());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             auto q = TestType::unwrap(values[i], [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) == v; });
@@ -570,13 +577,13 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
 
         auto sorted = list.sort(SortDescriptor(*subtable, {{0}}, {true}));
         auto sorted2 = list.sort({{"self", true}});
-        std::sort(begin(values), end(values), std::less<>());
+        std::sort(begin(values), end(values), less());
         REQUIRE(sorted == values);
         REQUIRE(sorted2 == values);
 
         sorted = list.sort(SortDescriptor(*subtable, {{0}}, {false}));
         sorted2 = list.sort({{"self", false}});
-        std::sort(begin(values), end(values), std::greater<>());
+        std::sort(begin(values), end(values), greater());
         REQUIRE(sorted == values);
         REQUIRE(sorted2 == values);
 
