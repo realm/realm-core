@@ -456,6 +456,9 @@ void SyncSession::handle_error(SyncError error)
             // Connection level errors
             case ProtocolError::connection_closed:
             case ProtocolError::other_error:
+#if REALM_SYNC_VER_MAJOR == 1
+            case ProtocolError::pong_timeout:
+#endif
                 // Not real errors, don't need to be reported to the binding.
                 return;
             case ProtocolError::unknown_message:
@@ -466,6 +469,9 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::reuse_of_session_ident:
             case ProtocolError::bound_in_other_session:
             case ProtocolError::bad_message_order:
+#if REALM_SYNC_VER_MAJOR == 1
+            case ProtocolError::malformed_http_request:
+#endif
                 break;
             // Session errors
             case ProtocolError::session_closed:
@@ -516,7 +522,9 @@ void SyncSession::handle_error(SyncError error)
         using ClientError = realm::sync::Client::Error;
         switch (static_cast<ClientError>(error_code.value())) {
             case ClientError::connection_closed:
+#if REALM_SYNC_VER_MAJOR > 1
             case ClientError::pong_timeout:
+#endif
                 // Not real errors, don't need to be reported to the binding.
                 return;
             case ClientError::unknown_message:
