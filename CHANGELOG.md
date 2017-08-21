@@ -3,6 +3,8 @@
 ### Bugfixes
 
 * Fixed handle leak on Windows (https://github.com/realm/realm-core/pull/2781)
+* Fixed a use-after-free when a TableRef for a table containing a subtable
+  outlives the owning group.
 
 ### Breaking changes
 

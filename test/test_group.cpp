@@ -903,8 +903,8 @@ TEST(Group_TableAccessorLeftBehind)
     TableRef table;
     TableRef subtable;
     {
-        Group group;
-        table = group.add_table("test");
+        auto group = std::make_unique<Group>();
+        table = group->add_table("test");
         CHECK(table->is_attached());
         table->add_column(type_Table, "sub");
         table->add_empty_row();

@@ -956,7 +956,7 @@ private:
         void detach()
         {
             if (m_is_managed) {
-                m_p->m_top.detach();
+                m_p->detach();
             }
         }
         SpecPtr& operator=(Spec* ptr)
