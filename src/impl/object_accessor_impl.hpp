@@ -38,7 +38,7 @@ public:
     // (i.e. prop.type will always be Object or Array).
     CppContext(CppContext& c, Property const& prop)
     : realm(c.realm)
-    , object_schema(&*realm->schema().find(prop.object_type))
+    , object_schema(prop.type == PropertyType::Object ? &*realm->schema().find(prop.object_type) : c.object_schema)
     { }
 
     CppContext() = default;
