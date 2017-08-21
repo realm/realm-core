@@ -84,8 +84,14 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
 
+        SECTION("migration function for immutable") {
+            config.schema_mode = SchemaMode::Immutable;
+            config.migration_function = [](auto, auto, auto) { };
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+
         SECTION("migration function for read-only") {
-            config.schema_mode = SchemaMode::ReadOnly;
+            config.schema_mode = SchemaMode::ReadOnlyAlternative;
             config.migration_function = [](auto, auto, auto) { };
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
@@ -96,8 +102,14 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
 
+        SECTION("initialization function for immutable") {
+            config.schema_mode = SchemaMode::Immutable;
+            config.initialization_function = [](auto) { };
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+
         SECTION("initialization function for read-only") {
-            config.schema_mode = SchemaMode::ReadOnly;
+            config.schema_mode = SchemaMode::ReadOnlyAlternative;
             config.initialization_function = [](auto) { };
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
@@ -275,10 +287,10 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(realm2->schema_version() == 1);
     }
 
-    SECTION("should populate the table columns in the schema when opening as read-only") {
+    SECTION("should populate the table columns in the schema when opening as immutable") {
         Realm::get_shared_realm(config);
 
-        config.schema_mode = SchemaMode::ReadOnly;
+        config.schema_mode = SchemaMode::Immutable;
         auto realm = Realm::get_shared_realm(config);
         auto it = realm->schema().find("object");
         REQUIRE(it != realm->schema().end());
@@ -636,10 +648,10 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
         auto realm = Realm::get_shared_realm(config);
         OwnedBinaryData realm_buffer = realm->write_copy();
 
-        // Open the buffer as a new (read-only in-memory) Realm
+        // Open the buffer as a new (immutable in-memory) Realm
         realm::Realm::Config config2;
         config2.in_memory = true;
-        config2.schema_mode = SchemaMode::ReadOnly;
+        config2.schema_mode = SchemaMode::Immutable;
         config2.realm_data = realm_buffer.get();
 
         auto realm2 = Realm::get_shared_realm(config2);
@@ -655,10 +667,10 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
         // Test invalid configs
         realm::Realm::Config config3;
         config3.realm_data = realm_buffer.get();
-        REQUIRE_THROWS(Realm::get_shared_realm(config3)); // missing in_memory and read-only
+        REQUIRE_THROWS(Realm::get_shared_realm(config3)); // missing in_memory and immutable
 
         config3.in_memory = true;
-        config3.schema_mode = SchemaMode::ReadOnly;
+        config3.schema_mode = SchemaMode::Immutable;
         config3.path = "path";
         REQUIRE_THROWS(Realm::get_shared_realm(config3)); // both buffer and path
 

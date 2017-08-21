@@ -78,11 +78,26 @@ enum class SchemaMode : uint8_t {
     // identical.
     Automatic,
 
-    // Open the file in read-only mode. Schema version must match the
+    // Open the file in immutable mode. Schema version must match the
     // version in the file, and all tables present in the file must
     // exactly match the specified schema, except for indexes. Tables
     // are allowed to be missing from the file.
-    ReadOnly,
+    // WARNING: This is the original ReadOnly mode.
+    Immutable,
+
+    // Open the Realm in read-only mode, transactions are not allowed to
+    // be performed on the Realm instance. The schema of the existing Realm
+    // file won't be changed through this Realm instance. Extra tables and
+    // extra properties are allowed in the existing Realm schema. The
+    // difference of indexes is allowed as well. Other schema differences
+    // than those will cause an exception. This is different from Immutable
+    // mode, sync Realm can be opened with ReadOnly mode. Changes
+    // can be made to the Realm file through another writable Realm instance.
+    // Thus, notifications are also allowed in this mode.
+    // FIXME: Rename this to ReadOnly
+    // WARNING: This is not the original ReadOnly mode. The original ReadOnly
+    // has been renamed to Immutable.
+    ReadOnlyAlternative,
 
     // If the schema version matches and the only schema changes are new
     // tables and indexes being added or removed, apply the changes to
@@ -176,7 +191,10 @@ public:
         // because it's not crash safe! It may corrupt your database if something fails
         ShouldCompactOnLaunchFunction should_compact_on_launch_function;
 
-        bool read_only() const { return schema_mode == SchemaMode::ReadOnly; }
+        // WARNING: The original read_only() has been renamed to immutable().
+        bool immutable() const { return schema_mode == SchemaMode::Immutable; }
+        // FIXME: Rename this to read_only().
+        bool read_only_alternative() const { return schema_mode == SchemaMode::ReadOnlyAlternative; }
 
         // The following are intended for internal/testing purposes and
         // should not be publicly exposed in binding APIs

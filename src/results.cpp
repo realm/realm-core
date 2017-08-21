@@ -633,8 +633,8 @@ void Results::prepare_async()
     if (m_notifier) {
         return;
     }
-    if (m_realm->config().read_only()) {
-        throw InvalidTransactionException("Cannot create asynchronous query for read-only Realms");
+    if (m_realm->config().immutable()) {
+        throw InvalidTransactionException("Cannot create asynchronous query for immutable Realms");
     }
     if (m_realm->is_in_transaction()) {
         throw InvalidTransactionException("Cannot create asynchronous query while in a write transaction");

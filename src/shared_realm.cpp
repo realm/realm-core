@@ -78,7 +78,7 @@ Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator
     m_coordinator = std::move(coordinator);
 }
 
-REALM_NOINLINE static void translate_file_exception(StringData path, bool read_only=false)
+REALM_NOINLINE static void translate_file_exception(StringData path, bool immutable=false)
 {
     try {
         throw;
@@ -86,7 +86,7 @@ REALM_NOINLINE static void translate_file_exception(StringData path, bool read_o
     catch (util::File::PermissionDenied const& ex) {
         throw RealmFileException(RealmFileException::Kind::PermissionDenied, ex.get_path(),
                                  util::format("Unable to open a realm at path '%1'. Please use a path where your app has %2 permissions.",
-                                              ex.get_path(), read_only ? "read" : "read-write"),
+                                              ex.get_path(), immutable ? "read" : "read-write"),
                                  ex.what());
     }
     catch (util::File::Exists const& ex) {
@@ -137,7 +137,7 @@ void Realm::open_with_config(const Config& config,
                              Realm* realm)
 {
     try {
-        if (config.read_only()) {
+        if (config.immutable()) {
             if (config.realm_data.is_null()) {
                 read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
             }
@@ -176,13 +176,13 @@ void Realm::open_with_config(const Config& config,
     }
     catch (realm::FileFormatUpgradeRequired const&) {
         if (config.schema_mode != SchemaMode::ResetFile) {
-            translate_file_exception(config.path, config.read_only());
+            translate_file_exception(config.path, config.immutable());
         }
         util::File::remove(config.path);
         open_with_config(config, history, shared_group, read_only_group, realm);
     }
     catch (...) {
-        translate_file_exception(config.path, config.read_only());
+        translate_file_exception(config.path, config.immutable());
     }
 }
 
@@ -296,10 +296,12 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema,
                 throw InvalidSchemaVersionException(m_schema_version, version);
             return true;
 
-        case SchemaMode::ReadOnly:
+        case SchemaMode::Immutable:
             if (version != m_schema_version)
                 throw InvalidSchemaVersionException(m_schema_version, version);
-            ObjectStore::verify_compatible_for_read_only(changes);
+            REALM_FALLTHROUGH;
+        case SchemaMode::ReadOnlyAlternative:
+            ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
             return false;
 
         case SchemaMode::ResetFile:
@@ -365,8 +367,9 @@ void Realm::set_schema_subset(Schema schema)
             ObjectStore::verify_no_migration_required(changes);
             break;
 
-        case SchemaMode::ReadOnly:
-            ObjectStore::verify_compatible_for_read_only(changes);
+        case SchemaMode::Immutable:
+        case SchemaMode::ReadOnlyAlternative:
+            ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
             break;
 
         case SchemaMode::Additive:
@@ -427,7 +430,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
             SharedRealm old_realm(new Realm(m_config, nullptr));
             // Need to open in read-write mode so that it uses a SharedGroup, but
             // users shouldn't actually be able to write via the old realm
-            old_realm->m_config.schema_mode = SchemaMode::ReadOnly;
+            old_realm->m_config.schema_mode = SchemaMode::Immutable;
             migration_function(old_realm, shared_from_this(), m_schema);
         };
 
@@ -475,7 +478,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
 void Realm::add_schema_change_handler()
 {
-    if (m_config.read_only())
+    if (m_config.immutable())
         return;
     m_group->set_schema_change_notification_handler([&] {
         m_new_schema = ObjectStore::schema_from_group(read_group());
@@ -516,7 +519,14 @@ void Realm::notify_schema_changed() {
 
 static void check_read_write(Realm *realm)
 {
-    if (realm->config().read_only()) {
+    if (realm->config().immutable()) {
+        throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
+    }
+}
+
+static void check_write(Realm* realm)
+{
+    if (realm->config().immutable() || realm->config().read_only_alternative()) {
         throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
     }
 }
@@ -555,7 +565,7 @@ bool Realm::is_in_transaction() const noexcept
 
 void Realm::begin_transaction()
 {
-    check_read_write(this);
+    check_write(this);
     verify_thread();
 
     if (is_in_transaction()) {
@@ -588,7 +598,7 @@ void Realm::begin_transaction()
 
 void Realm::commit_transaction()
 {
-    check_read_write(this);
+    check_write(this);
     verify_thread();
 
     if (!is_in_transaction()) {
@@ -601,7 +611,7 @@ void Realm::commit_transaction()
 
 void Realm::cancel_transaction()
 {
-    check_read_write(this);
+    check_write(this);
     verify_thread();
 
     if (!is_in_transaction()) {
@@ -636,7 +646,7 @@ bool Realm::compact()
 {
     verify_thread();
 
-    if (m_config.read_only()) {
+    if (m_config.immutable() || m_config.read_only_alternative()) {
         throw InvalidTransactionException("Can't compact a read-only Realm");
     }
     if (is_in_transaction()) {
@@ -765,7 +775,7 @@ bool Realm::refresh()
 
 bool Realm::can_deliver_notifications() const noexcept
 {
-    if (m_config.read_only()) {
+    if (m_config.immutable()) {
         return false;
     }
 
