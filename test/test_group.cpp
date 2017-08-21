@@ -2621,6 +2621,12 @@ TEST(Group_SetNullUniqueLimitation)
     }
 }
 
+// This test ensures that cascading delete works by testing that
+// a linked row is deleted when the parent row is deleted, but only
+// if it is the only parent row. It is also tested that an optional
+// notification handler is called appropriately.
+// It is tested that it works both with one and two levels of links
+// and also if the links creates a circle
 TEST(Group_RemoveRecursive)
 {
     Group g;
@@ -2645,7 +2651,7 @@ TEST(Group_RemoveRecursive)
     // Now it should be gone
     CHECK_EQUAL(target->size(), 0);
 
-    // 3 rows linked together
+    // 3 rows linked together in a list
     target->add_empty_row(3);
     target->set_link(1, 0, 1);
     target->set_link(1, 1, 2);
