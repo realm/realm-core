@@ -116,15 +116,15 @@ struct Date : Base<PropertyType::Date, Timestamp> {
     static Timestamp max() { return Timestamp(1, 1); }
 };
 
-template<typename Base>
-struct BoxedOptional : Base {
-    using Type = util::Optional<typename Base::Type>;
+template<typename BaseT>
+struct BoxedOptional : BaseT {
+    using Type = util::Optional<typename BaseT::Type>;
     using Boxed = Type;
-    static PropertyType property_type() { return Base::property_type()|PropertyType::Nullable; }
+    static PropertyType property_type() { return BaseT::property_type()|PropertyType::Nullable; }
     static std::vector<Type> values()
     {
         std::vector<Type> ret;
-        for (auto v : Base::values())
+        for (auto v : BaseT::values())
             ret.push_back(Type(v));
         ret.push_back(util::none);
         return ret;
@@ -136,13 +136,13 @@ struct BoxedOptional : Base {
     static auto unwrap(Type value, Fn&& fn) { return value ? fn(*value) : fn(null()); }
 };
 
-template<typename Base>
-struct UnboxedOptional : Base {
-    static PropertyType property_type() { return Base::property_type()|PropertyType::Nullable; }
-    static auto values()
+template<typename BaseT>
+struct UnboxedOptional : BaseT {
+    static PropertyType property_type() { return BaseT::property_type()|PropertyType::Nullable; }
+    static auto values() -> decltype(BaseT::values())
     {
-        auto ret = Base::values();
-        ret.push_back(typename Base::Type());
+        auto ret = BaseT::values();
+        ret.push_back(typename BaseT::Type());
         return ret;
     }
 };
