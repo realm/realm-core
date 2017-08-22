@@ -214,7 +214,7 @@ GroupWriter::GroupWriter(Group& group)
         }
         else {
             int_fast64_t value = int_fast64_t(initial_version); // FIXME: Problematic unsigned -> signed conversion
-            top.set(6, 1 + 2 * value);                          // Throws
+            top.set(6, 1 + 2 * uint64_t(value));                          // Throws
             size_t n = m_free_positions.size();
             bool context_flag = false;
             m_free_versions.Array::create(Array::type_Normal, context_flag, n, value); // Throws
@@ -687,11 +687,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // extended the file size. It can also happen as part of initial file expansion
     // during attach_file().
     size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
-    size_t new_file_size = logical_file_size;
-    if (REALM_UNLIKELY(int_add_with_overflow_detect(new_file_size, requested_size))) {
-        throw MaximumFileSizeExceeded("GroupWriter cannot extend free space: " + util::to_string(logical_file_size)
-                                      + " + " + util::to_string(requested_size));
-    }
+    size_t new_file_size = logical_file_size + requested_size;
 
     if (!alloc.matches_section_boundary(new_file_size)) {
         new_file_size = alloc.get_upper_section_boundary(new_file_size);
@@ -700,16 +696,6 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // the initial size is a multiple of 8.
     REALM_ASSERT_3(new_file_size % 8, ==, 0);
     REALM_ASSERT_3(logical_file_size, <, new_file_size);
-
-    size_t stored_logical_file_size = new_file_size;
-    // We store the logical file size as a ref (tagged) we can't store sizes that overflow in the following
-    // calculation so we check it here before actually changing the file size.
-    // m_top[2] = (new_file_size * 2) + 1
-    if (int_shift_left_with_overflow_detect(stored_logical_file_size, 1)
-        || int_add_with_overflow_detect(stored_logical_file_size, 1)) {
-        throw MaximumFileSizeExceeded("GroupWriter cannot extend free space: " + util::to_string(logical_file_size)
-                                      + " + " + util::to_string(requested_size));
-    }
 
     // Note: File::prealloc() may misbehave under race conditions (see
     // documentation of File::prealloc()). Fortunately, no race conditions can
@@ -730,7 +716,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 
 
     // Update the logical file size
-    m_group.m_top.set(2, stored_logical_file_size); // Throws
+    m_group.m_top.set(2, 1 + 2 * uint64_t(new_file_size)); // Throws
     REALM_ASSERT(chunk_size != 0);
     REALM_ASSERT((chunk_size % 8) == 0);
     return std::make_pair(chunk_ndx, chunk_size);
