@@ -735,6 +735,23 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
             REQUIRE_INDICES(rchange.insertions, 0);
         }
 
+        SECTION("clear list") {
+            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                rchange = c;
+            });
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            list.remove_all();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(change.deletions.count() == values.size());
+            REQUIRE(rchange.deletions.count() == values.size());
+        }
+
         SECTION("delete containing row") {
             size_t calls = 0;
             auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {

@@ -85,6 +85,11 @@ void PrimitiveListNotifier::run()
         return;
     }
 
+    if (!m_change.deletions.empty() && m_change.deletions.begin()->second == std::numeric_limits<size_t>::max()) {
+        // Table was cleared, so set the deletions to the actual previous size
+        m_change.deletions.set(m_prev_size);
+    }
+
     m_prev_size = m_table->size();
 }
 
