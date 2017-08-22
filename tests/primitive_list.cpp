@@ -335,11 +335,13 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
             REQUIRE_FALSE(results.is_valid());
         }
 
+#if 0 // FIXME: depends on https://github.com/realm/realm-core/pull/2807
         SECTION("close") {
             r->close();
             REQUIRE_FALSE(list.is_valid());
             REQUIRE_FALSE(results.is_valid());
         }
+#endif
 
         SECTION("delete row") {
             table->move_last_over(0);
@@ -362,10 +364,12 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
             REQUIRE_THROWS(list.verify_attached());
         }
 
+#if 0 // FIXME: depends on https://github.com/realm/realm-core/pull/2807
         SECTION("close") {
             r->close();
             REQUIRE_THROWS(list.verify_attached());
         }
+#endif
 
         SECTION("delete row") {
             table->move_last_over(0);
@@ -386,10 +390,12 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
             REQUIRE_THROWS(list.verify_in_transaction());
         }
 
+#if 0 // FIXME: depends on https://github.com/realm/realm-core/pull/2807
         SECTION("close") {
             r->close();
             REQUIRE_THROWS(list.verify_in_transaction());
         }
+#endif
 
         SECTION("delete row") {
             table->move_last_over(0);
