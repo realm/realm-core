@@ -199,17 +199,15 @@ target_compile_definitions(realm-objects PUBLIC
   "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
   "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>")
 
+  set(REALM_OBJECT_FILES $<TARGET_OBJECTS:realm-objects>)
+
 if(COMMAND set_target_xcode_attributes)
     set_target_xcode_attributes(realm-objects)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_dependencies(realm-objects sha_win32 getopt_win32)
-    set_property(TARGET realm-objects APPEND PROPERTY COMPILE_DEFINITIONS PTW32_STATIC_LIB)
-    include_directories(realm-objects INTERFACE
-                        ${CMAKE_SOURCE_DIR}/src/win32
-                        ${CMAKE_SOURCE_DIR}/src/win32/kalven-sha2)
-    list(APPEND REALM_EXTRA_LIBS sha_win32 getopt_win32)
+    list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:sha_win32> $<TARGET_OBJECTS:getopt_win32>)
 elseif(ANDROID)
     list(APPEND REALM_EXTRA_LIBS atomic)
 endif()
@@ -230,7 +228,7 @@ if(CMAKE_GENERATOR STREQUAL Xcode)
     )
 endif()
 
-add_library(realm STATIC $<TARGET_OBJECTS:realm-objects> ${REALM_XCODE_DEPENDENCY})
+add_library(realm STATIC ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
 
 target_link_libraries(
         realm
@@ -243,7 +241,7 @@ if(ANDROID OR CMAKE_SYSTEM_NAME MATCHES "^Windows")
 endif()
 
 if(NOT REALM_SKIP_SHARED_LIB)
-    add_library(realm-shared SHARED $<TARGET_OBJECTS:realm-objects> ${REALM_XCODE_DEPENDENCY})
+    add_library(realm-shared SHARED ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
 
     set_target_properties(
             realm-shared PROPERTIES
