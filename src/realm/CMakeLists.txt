@@ -33,6 +33,9 @@ set(REALM_SOURCES
     index_string.cpp
     lang_bind_helper.cpp
     link_view.cpp
+    metrics/metrics.cpp
+    metrics/query_info.cpp
+    metrics/transaction_info.cpp
     query.cpp
     query_engine.cpp
     query_expression.cpp
@@ -175,6 +178,12 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/utf8.hpp
 ) # REALM_INSTALL_UTIL_HEADERS
 
+set(REALM_METRICS_HEADERS
+    metrics/metrics.hpp
+    metrics/query_info.hpp
+    metrics/transaction_info.hpp
+) # REALM_METRICS_HEADERS
+
 set(REALM_OTHER_UTIL_HEADERS
     util/aes_cryptor.hpp
     util/errno.hpp
@@ -185,6 +194,7 @@ set(REALM_INSTALL_ALL_HEADERS
     ${REALM_INSTALL_UTIL_HEADERS}
     ${REALM_INSTALL_IMPL_HEADERS}
     ${REALM_OTHER_UTIL_HEADERS}
+    ${REALM_METRICS_HEADERS}
 )
 
 if(NOT MSVC)
