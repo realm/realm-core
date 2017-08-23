@@ -60,7 +60,7 @@ rm -rf core
 mkdir core
 
 filename=$(find "build-macos-Release" -maxdepth 1 -type f -name "realm-core-Release-*-Darwin-devel.tar.gz")
-tar -C core -zxvf "${filename}" include LICENSE CHANGELOG.md
+tar -C core -zxvf "${filename}" include doc
 
 for bt in "${BUILD_TYPES[@]}"; do
     [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"

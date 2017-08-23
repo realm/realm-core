@@ -40,7 +40,7 @@ rm -rf core-android
 mkdir core-android
 
 filename=$(find "build-android-armeabi-v7a-Release" -maxdepth 1 -type f -name "realm-core-Release-*-devel.tar.gz")
-tar -C core-android -zxvf "${filename}" include LICENSE CHANGELOG.md
+tar -C core-android -zxvf "${filename}" include doc
 
 for bt in "${BUILD_TYPES[@]}"; do
     [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
