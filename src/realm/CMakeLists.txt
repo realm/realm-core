@@ -294,6 +294,11 @@ endif(APPLE)
 install(TARGETS realm
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
 
+# include .pdb files with debug symbols on Windows
+if(MSVC)
+    install(FILES $<TARGET_PDB_FILE:realm-objects> DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
+endif()
+
 install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm
         COMPONENT devel)
