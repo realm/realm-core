@@ -19,6 +19,7 @@
 #include "catch.hpp"
 
 #include "object_schema.hpp"
+#include "object_store.hpp"
 #include "property.hpp"
 #include "schema.hpp"
 #include "util/format.hpp"
@@ -116,8 +117,29 @@ TEST_CASE("ObjectSchema") {
         table->add_column(type_Binary, "data?", true);
         table->add_column(type_Timestamp, "date?", true);
 
-        size_t col = table->add_column(type_Table, "subtable");
+        table->add_column(type_Table, "subtable 1");
+        size_t col = table->add_column(type_Table, "subtable 2");
         table->get_subdescriptor(col)->add_column(type_Int, "value");
+
+        auto add_list = [](TableRef table, DataType type, StringData name, bool nullable) {
+            size_t col = table->add_column(type_Table, name);
+            table->get_subdescriptor(col)->add_column(type, ObjectStore::ArrayColumnName, nullptr, nullable);
+        };
+
+        add_list(table, type_Int, "int array", false);
+        add_list(table, type_Bool, "bool array", false);
+        add_list(table, type_Float, "float array", false);
+        add_list(table, type_Double, "double array", false);
+        add_list(table, type_String, "string array", false);
+        add_list(table, type_Binary, "data array", false);
+        add_list(table, type_Timestamp, "date array", false);
+        add_list(table, type_Int, "int? array", true);
+        add_list(table, type_Bool, "bool? array", true);
+        add_list(table, type_Float, "float? array", true);
+        add_list(table, type_Double, "double? array", true);
+        add_list(table, type_String, "string? array", true);
+        add_list(table, type_Binary, "data? array", true);
+        add_list(table, type_Timestamp, "date? array", true);
 
         size_t indexed_start = table->get_column_count();
         table->add_column(type_Int, "indexed int");
@@ -136,8 +158,8 @@ TEST_CASE("ObjectSchema") {
         ObjectSchema os(g, "table");
 
 #define REQUIRE_PROPERTY(name, type, ...) do { \
-    auto prop = os.property_for_name(name); \
-    REQUIRE(prop); \
+    Property* prop; \
+    REQUIRE((prop = os.property_for_name(name))); \
     REQUIRE((*prop == Property{name, PropertyType::type, __VA_ARGS__})); \
     REQUIRE(prop->table_column == expected_col++); \
 } while (0)
@@ -146,7 +168,6 @@ TEST_CASE("ObjectSchema") {
 
         REQUIRE(os.property_for_name("nonexistent property") == nullptr);
 
-        // bools are (primary, indexed, nullable)
         REQUIRE_PROPERTY("pk", Int, Property::IsPrimary{true});
 
         REQUIRE_PROPERTY("int", Int);
@@ -169,8 +190,24 @@ TEST_CASE("ObjectSchema") {
         REQUIRE_PROPERTY("date?", Date|PropertyType::Nullable);
 
         // Unsupported column type should be skipped entirely
-        REQUIRE(os.property_for_name("subtable") == nullptr);
-        ++expected_col;
+        REQUIRE(os.property_for_name("subtable 1") == nullptr);
+        REQUIRE(os.property_for_name("subtable 2") == nullptr);
+        expected_col += 2;
+
+        REQUIRE_PROPERTY("int array", Int|PropertyType::Array);
+        REQUIRE_PROPERTY("bool array", Bool|PropertyType::Array);
+        REQUIRE_PROPERTY("float array", Float|PropertyType::Array);
+        REQUIRE_PROPERTY("double array", Double|PropertyType::Array);
+        REQUIRE_PROPERTY("string array", String|PropertyType::Array);
+        REQUIRE_PROPERTY("data array", Data|PropertyType::Array);
+        REQUIRE_PROPERTY("date array", Date|PropertyType::Array);
+        REQUIRE_PROPERTY("int? array", Int|PropertyType::Array|PropertyType::Nullable);
+        REQUIRE_PROPERTY("bool? array", Bool|PropertyType::Array|PropertyType::Nullable);
+        REQUIRE_PROPERTY("float? array", Float|PropertyType::Array|PropertyType::Nullable);
+        REQUIRE_PROPERTY("double? array", Double|PropertyType::Array|PropertyType::Nullable);
+        REQUIRE_PROPERTY("string? array", String|PropertyType::Array|PropertyType::Nullable);
+        REQUIRE_PROPERTY("data? array", Data|PropertyType::Array|PropertyType::Nullable);
+        REQUIRE_PROPERTY("date? array", Date|PropertyType::Array|PropertyType::Nullable);
 
         REQUIRE_PROPERTY("indexed int", Int, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed bool", Bool, Property::IsPrimary{false}, Property::IsIndexed{true});
@@ -469,15 +506,6 @@ TEST_CASE("Schema") {
                 }}
             };
             REQUIRE_NOTHROW(schema.validate());
-        }
-
-        SECTION("rejects non-object arrays") {
-            Schema schema = {
-                {"object", {
-                    {"int", PropertyType::Int|PropertyType::Array},
-                }}
-            };
-            REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.int' has unsupported type 'array<int>'");
         }
     }
 

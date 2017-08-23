@@ -92,7 +92,33 @@ TEST_CASE("object") {
             {"data", PropertyType::Data},
             {"date", PropertyType::Date},
             {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
-            {"array", PropertyType::Object|PropertyType::Array, "array target"},
+
+            {"bool array", PropertyType::Array|PropertyType::Bool},
+            {"int array", PropertyType::Array|PropertyType::Int},
+            {"float array", PropertyType::Array|PropertyType::Float},
+            {"double array", PropertyType::Array|PropertyType::Double},
+            {"string array", PropertyType::Array|PropertyType::String},
+            {"data array", PropertyType::Array|PropertyType::Data},
+            {"date array", PropertyType::Array|PropertyType::Date},
+            {"object array", PropertyType::Array|PropertyType::Object, "array target"},
+        }},
+        {"all optional types", {
+            {"pk", PropertyType::Int|PropertyType::Nullable, Property::IsPrimary{true}},
+            {"bool", PropertyType::Bool|PropertyType::Nullable},
+            {"int", PropertyType::Int|PropertyType::Nullable},
+            {"float", PropertyType::Float|PropertyType::Nullable},
+            {"double", PropertyType::Double|PropertyType::Nullable},
+            {"string", PropertyType::String|PropertyType::Nullable},
+            {"data", PropertyType::Data|PropertyType::Nullable},
+            {"date", PropertyType::Date|PropertyType::Nullable},
+
+            {"bool array", PropertyType::Array|PropertyType::Bool|PropertyType::Nullable},
+            {"int array", PropertyType::Array|PropertyType::Int|PropertyType::Nullable},
+            {"float array", PropertyType::Array|PropertyType::Float|PropertyType::Nullable},
+            {"double array", PropertyType::Array|PropertyType::Double|PropertyType::Nullable},
+            {"string array", PropertyType::Array|PropertyType::String|PropertyType::Nullable},
+            {"data array", PropertyType::Array|PropertyType::Data|PropertyType::Nullable},
+            {"date array", PropertyType::Array|PropertyType::Date|PropertyType::Nullable},
         }},
         {"link target", {
             {"value", PropertyType::Int},
@@ -275,7 +301,15 @@ TEST_CASE("object") {
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
-            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
+
+            {"bool array", AnyVec{true, false}},
+            {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
+            {"float array", AnyVec{1.1f, 2.2f}},
+            {"double array", AnyVec{3.3, 4.4}},
+            {"string array", AnyVec{"a"s, "b"s, "c"s}},
+            {"data array", AnyVec{"d"s, "e"s, "f"s}},
+            {"date array", AnyVec{}},
+            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
         }, false);
 
         auto row = obj.row();
@@ -292,7 +326,24 @@ TEST_CASE("object") {
         auto link_target = r->read_group().get_table("class_link target")->get(0);
         REQUIRE(link_target.get_int(0) == 10);
 
-        auto list = row.get_linklist(9);
+        auto check_array = [&](size_t col, auto... values) {
+            auto table = row.get_subtable(col);
+            size_t i = 0;
+            for (auto& value : {values...}) {
+                CAPTURE(i);
+                REQUIRE(i < row.get_subtable_size(col));
+                REQUIRE(value == table->get<typename std::decay<decltype(value)>::type>(0, i));
+                ++i;
+            }
+        };
+        check_array(9, true, false);
+        check_array(10, INT64_C(5), INT64_C(6));
+        check_array(11, 1.1f, 2.2f);
+        check_array(12, 3.3, 4.4);
+        check_array(13, StringData("a"), StringData("b"), StringData("c"));
+        check_array(14, BinaryData("d", 1), BinaryData("e", 1), BinaryData("f", 1));
+
+        auto list = row.get_linklist(16);
         REQUIRE(list->size() == 1);
         REQUIRE(list->get(0).get_int(0) == 20);
     }
@@ -307,7 +358,15 @@ TEST_CASE("object") {
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
-            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
+
+            {"bool array", AnyVec{true, false}},
+            {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
+            {"float array", AnyVec{1.1f, 2.2f}},
+            {"double array", AnyVec{3.3, 4.4}},
+            {"string array", AnyVec{"a"s, "b"s, "c"s}},
+            {"data array", AnyVec{"d"s, "e"s, "f"s}},
+            {"date array", AnyVec{}},
+            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
         };
 
         auto obj = create(AnyDict{
@@ -324,6 +383,15 @@ TEST_CASE("object") {
         REQUIRE(row.get_string(5) == "hello");
         REQUIRE(row.get_binary(6) == BinaryData("olleh", 5));
         REQUIRE(row.get_timestamp(7) == Timestamp(10, 20));
+
+        REQUIRE(row.get_subtable(9)->size() == 2);
+        REQUIRE(row.get_subtable(10)->size() == 2);
+        REQUIRE(row.get_subtable(11)->size() == 2);
+        REQUIRE(row.get_subtable(12)->size() == 2);
+        REQUIRE(row.get_subtable(13)->size() == 3);
+        REQUIRE(row.get_subtable(14)->size() == 3);
+        REQUIRE(row.get_subtable(15)->size() == 0);
+        REQUIRE(row.get_linklist(16)->size() == 1);
     }
 
     SECTION("create can use defaults for primary key") {
@@ -344,6 +412,30 @@ TEST_CASE("object") {
 
         auto row = obj.row();
         REQUIRE(row.get_int(0) == 10);
+    }
+
+    SECTION("create does not complain about missing values for nullable fields") {
+        r->begin_transaction();
+        realm::Object obj;
+        REQUIRE_NOTHROW(obj = Object::create(d, r, *r->schema().find("all optional types"), util::Any(AnyDict{}), false));
+        r->commit_transaction();
+
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "pk").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "bool").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "int").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "float").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "double").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "string").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "data").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "date").has_value());
+
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 0);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).size() == 0);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).size() == 0);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array")).size() == 0);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).size() == 0);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "data array")).size() == 0);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
     }
 
     SECTION("create throws for missing values if there is no default") {
@@ -377,7 +469,15 @@ TEST_CASE("object") {
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
-            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
+
+            {"bool array", AnyVec{true, false}},
+            {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
+            {"float array", AnyVec{1.1f, 2.2f}},
+            {"double array", AnyVec{3.3, 4.4}},
+            {"string array", AnyVec{"a"s, "b"s, "c"s}},
+            {"data array", AnyVec{"d"s, "e"s, "f"s}},
+            {"date array", AnyVec{}},
+            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
         }, false);
         create(AnyDict{
             {"pk", INT64_C(1)},
@@ -394,6 +494,83 @@ TEST_CASE("object") {
         REQUIRE(row.get_string(5) == "a");
         REQUIRE(row.get_binary(6) == BinaryData("olleh", 5));
         REQUIRE(row.get_timestamp(7) == Timestamp(10, 20));
+    }
+
+    SECTION("set existing fields to null with update") {
+        AnyDict initial_values{
+            {"pk", INT64_C(1)},
+            {"bool", true},
+            {"int", INT64_C(5)},
+            {"float", 2.2f},
+            {"double", 3.3},
+            {"string", "hello"s},
+            {"data", "olleh"s},
+            {"date", Timestamp(10, 20)},
+
+            {"bool array", AnyVec{true, false}},
+            {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
+            {"float array", AnyVec{1.1f, 2.2f}},
+            {"double array", AnyVec{3.3, 4.4}},
+            {"string array", AnyVec{"a"s, "b"s, "c"s}},
+            {"data array", AnyVec{"d"s, "e"s, "f"s}},
+            {"date array", AnyVec{}},
+            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
+        };
+        r->begin_transaction();
+        auto obj = Object::create(d, r, *r->schema().find("all optional types"), util::Any(initial_values));
+
+        // Missing fields in dictionary do not update anything
+        Object::create(d, r, *r->schema().find("all optional types"), util::Any(AnyDict{{"pk", INT64_C(1)}}), true);
+
+        REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(d, "bool")) == true);
+        REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(d, "int")) == 5);
+        REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(d, "float")) == 2.2f);
+        REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 3.3);
+        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "hello");
+        REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(10, 20));
+
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) == true);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) == 5);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) == 1.1f);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array")).get<util::Optional<double>>(0) == 3.3);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == "a");
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
+
+        AnyDict null_values{
+            {"pk", INT64_C(1)},
+            {"bool", util::Any()},
+            {"int", util::Any()},
+            {"float", util::Any()},
+            {"double", util::Any()},
+            {"string", util::Any()},
+            {"data", util::Any()},
+            {"date", util::Any()},
+
+            {"bool array", AnyVec{util::Any()}},
+            {"int array", AnyVec{util::Any()}},
+            {"float array", AnyVec{util::Any()}},
+            {"double array", AnyVec{util::Any()}},
+            {"string array", AnyVec{util::Any()}},
+            {"data array", AnyVec{util::Any()}},
+            {"date array", AnyVec{Timestamp()}},
+        };
+        Object::create(d, r, *r->schema().find("all optional types"), util::Any(null_values), true);
+
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "bool").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "int").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "float").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "double").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "string").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "data").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "date").has_value());
+
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) == util::none);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) == util::none);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) == util::none);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array")).get<util::Optional<double>>(0) == util::none);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == StringData());
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "data array")).get<BinaryData>(0) == BinaryData());
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).get<Timestamp>(0) == Timestamp());
     }
 
     SECTION("create throws for duplicate pk if update is not specified") {

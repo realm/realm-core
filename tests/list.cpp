@@ -20,6 +20,7 @@
 
 #include "util/test_file.hpp"
 #include "util/index_helpers.hpp"
+#include "util/templated_test_case.hpp"
 
 #include "binding_context.hpp"
 #include "list.hpp"
@@ -602,11 +603,27 @@ TEST_CASE("list") {
         REQUIRE(&results.get_object_schema() == objectschema);
         REQUIRE(results.get_mode() == Results::Mode::LinkView);
         REQUIRE(results.size() == 10);
-        REQUIRE(results.sum(0) == 45);
 
-        for (size_t i = 0; i < 10; ++i) {
+        // Aggregates don't inherently have to convert to TableView, but do
+        // because aggregates aren't implemented for LinkView
+        REQUIRE(results.sum(0) == 45);
+        REQUIRE(results.get_mode() == Results::Mode::TableView);
+
+        // Reset to LinkView mode to test implicit conversion to TableView on get()
+        results = list.sort({*target, {{0}}, {false}});
+        for (size_t i = 0; i < 10; ++i)
             REQUIRE(results.get(i).get_index() == 9 - i);
-        }
+        REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
+        REQUIRE(results.get_mode() == Results::Mode::TableView);
+
+#if REALM_VERSION_MAJOR > 2
+        // Zero sort columns should leave it in LinkView mode
+        results = list.sort({*target, {}, {}});
+        for (size_t i = 0; i < 10; ++i)
+            REQUIRE(results.get(i).get_index() == i);
+        REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
+        REQUIRE(results.get_mode() == Results::Mode::LinkView);
+#endif
     }
 
     SECTION("filter()") {
@@ -660,13 +677,43 @@ TEST_CASE("list") {
         REQUIRE(&list.get_object_schema() == objectschema);
     }
 
+    SECTION("delete_all()") {
+        List list(r, lv);
+        r->begin_transaction();
+        list.delete_all();
+        REQUIRE(lv->size() == 0);
+        REQUIRE(target->size() == 0);
+        r->cancel_transaction();
+    }
+
+    SECTION("as_results().clear()") {
+        List list(r, lv);
+        r->begin_transaction();
+        list.as_results().clear();
+        REQUIRE(lv->size() == 0);
+        REQUIRE(target->size() == 0);
+        r->cancel_transaction();
+    }
+
+    SECTION("snapshot().clear()") {
+        List list(r, lv);
+        r->begin_transaction();
+        auto snapshot = list.snapshot();
+        snapshot.clear();
+        REQUIRE(snapshot.size() == 10);
+        REQUIRE(list.size() == 0);
+        REQUIRE(lv->size() == 0);
+        REQUIRE(target->size() == 0);
+        r->cancel_transaction();
+    }
+
     SECTION("add(RowExpr)") {
         List list(r, lv);
         r->begin_transaction();
         SECTION("adds rows from the correct table") {
             list.add(target->get(5));
             REQUIRE(list.size() == 11);
-            REQUIRE(list.get_unchecked(10) == 5);
+            REQUIRE(list.get(10).get_index() == 5);
         }
 
         SECTION("throws for rows from the wrong table") {
@@ -682,7 +729,7 @@ TEST_CASE("list") {
         SECTION("insert rows from the correct table") {
             list.insert(0, target->get(5));
             REQUIRE(list.size() == 11);
-            REQUIRE(list.get_unchecked(0) == 5);
+            REQUIRE(list.get(0).get_index() == 5);
         }
 
         SECTION("throws for rows from the wrong table") {
@@ -703,7 +750,7 @@ TEST_CASE("list") {
         SECTION("assigns for rows from the correct table") {
             list.set(0, target->get(5));
             REQUIRE(list.size() == 10);
-            REQUIRE(list.get_unchecked(0) == 5);
+            REQUIRE(list.get(0).get_index() == 5);
         }
 
         SECTION("throws for rows from the wrong table") {
@@ -723,15 +770,44 @@ TEST_CASE("list") {
             REQUIRE(list.find(target->get(5)) == 5);
         }
 
+        SECTION("returns index in list and not index in table") {
+            r->begin_transaction();
+            list.remove(1);
+            REQUIRE(list.find(target->get(5)) == 4);
+            REQUIRE(list.as_results().index_of(target->get(5)) == 4);
+            r->cancel_transaction();
+        }
+
         SECTION("returns npos for values not in the list") {
             r->begin_transaction();
             list.remove(1);
             REQUIRE(list.find(target->get(1)) == npos);
+            REQUIRE(list.as_results().index_of(target->get(1)) == npos);
             r->cancel_transaction();
         }
 
         SECTION("throws for row in wrong table") {
             REQUIRE_THROWS(list.find(origin->get(0)));
+            REQUIRE_THROWS(list.as_results().index_of(origin->get(0)));
+        }
+    }
+
+    SECTION("find(Query)") {
+        List list(r, lv);
+
+        SECTION("returns index in list for values in the list") {
+            REQUIRE(list.find(std::move(target->where().equal(0, 5))) == 5);
+        }
+
+        SECTION("returns index in list and not index in table") {
+            r->begin_transaction();
+            list.remove(1);
+            REQUIRE(list.find(std::move(target->where().equal(0, 5))) == 4);
+            r->cancel_transaction();
+        }
+
+        SECTION("returns npos for values not in the list") {
+            REQUIRE(list.find(std::move(target->where().equal(0, 11))) == npos);
         }
     }
 
@@ -743,14 +819,14 @@ TEST_CASE("list") {
         SECTION("adds boxed RowExpr") {
             list.add(ctx, util::Any(target->get(5)));
             REQUIRE(list.size() == 11);
-            REQUIRE(list.get_unchecked(10) == 5);
+            REQUIRE(list.get(10).get_index() == 5);
         }
 
         SECTION("adds boxed realm::Object") {
             realm::Object obj(r, list.get_object_schema(), target->get(5));
             list.add(ctx, util::Any(obj));
             REQUIRE(list.size() == 11);
-            REQUIRE(list.get_unchecked(10) == 5);
+            REQUIRE(list.get(10).get_index() == 5);
         }
 
         SECTION("creates new object for dictionary") {

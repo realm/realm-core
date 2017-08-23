@@ -28,7 +28,7 @@
 
 #include <stdexcept>
 
-using namespace realm;
+namespace realm {
 
 Results::Results() = default;
 Results::~Results() = default;
@@ -141,7 +141,7 @@ size_t Results::size()
             update_tableview();
             return m_table_view.size();
     }
-    REALM_UNREACHABLE();
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 const ObjectSchema& Results::get_object_schema() const
@@ -168,19 +168,34 @@ StringData Results::get_object_type() const noexcept
     return ObjectStore::object_type_for_table_name(m_table->get_name());
 }
 
-RowExpr Results::get(size_t row_ndx)
+namespace {
+template<typename T>
+auto get(Table& table, size_t row)
+{
+    return table.get<T>(0, row);
+}
+
+template<>
+auto get<RowExpr>(Table& table, size_t row)
+{
+    return table.get(row);
+}
+}
+
+template<typename T>
+util::Optional<T> Results::try_get(size_t row_ndx)
 {
     validate_read();
     switch (m_mode) {
         case Mode::Empty: break;
         case Mode::Table:
             if (row_ndx < m_table->size())
-                return m_table->get(row_ndx);
+                return realm::get<T>(*m_table, row_ndx);
             break;
         case Mode::LinkView:
             if (update_linkview()) {
                 if (row_ndx < m_link_view->size())
-                    return m_link_view->get(row_ndx);
+                    return realm::get<T>(*m_table, m_link_view->get(row_ndx).get_index());
                 break;
             }
             REALM_FALLTHROUGH;
@@ -190,60 +205,33 @@ RowExpr Results::get(size_t row_ndx)
             if (row_ndx >= m_table_view.size())
                 break;
             if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(row_ndx))
-                return {};
-            return m_table_view.get(row_ndx);
+                return T{};
+            return realm::get<T>(*m_table, m_table_view.get(row_ndx).get_index());
     }
+    return util::none;
+}
 
+template<typename T>
+T Results::get(size_t row_ndx)
+{
+    if (auto row = try_get<T>(row_ndx))
+        return *row;
     throw OutOfBoundsIndexException{row_ndx, size()};
 }
 
-util::Optional<RowExpr> Results::first()
+template<typename T>
+util::Optional<T> Results::first()
 {
-    validate_read();
-    switch (m_mode) {
-        case Mode::Empty:
-            return none;
-        case Mode::Table:
-            return m_table->size() == 0 ? util::none : util::make_optional(m_table->front());
-        case Mode::LinkView:
-            if (update_linkview())
-                return m_link_view->size() == 0 ? util::none : util::make_optional(m_link_view->get(0));
-            REALM_FALLTHROUGH;
-        case Mode::Query:
-        case Mode::TableView:
-            update_tableview();
-            if (m_table_view.size() == 0)
-                return util::none;
-            else if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(0))
-                return RowExpr();
-            return m_table_view.front();
-    }
-    REALM_UNREACHABLE();
+    return try_get<T>(0);
 }
 
-util::Optional<RowExpr> Results::last()
+template<typename T>
+util::Optional<T> Results::last()
 {
     validate_read();
-    switch (m_mode) {
-        case Mode::Empty:
-            return none;
-        case Mode::Table:
-            return m_table->size() == 0 ? util::none : util::make_optional(m_table->back());
-        case Mode::LinkView:
-            if (update_linkview())
-                return m_link_view->size() == 0 ? util::none : util::make_optional(m_link_view->get(m_link_view->size() - 1));
-            REALM_FALLTHROUGH;
-        case Mode::Query:
-        case Mode::TableView:
-            update_tableview();
-            auto s = m_table_view.size();
-            if (s == 0)
-                return util::none;
-            else if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(s - 1))
-                return RowExpr();
-            return m_table_view.back();
-    }
-    REALM_UNREACHABLE();
+    if (m_mode == Mode::Query)
+        update_tableview(); // avoid running the query twice (for size() and for get())
+    return try_get<T>(size() - 1);
 }
 
 bool Results::update_linkview()
@@ -298,7 +286,8 @@ void Results::update_tableview(bool wants_notifications)
     }
 }
 
-size_t Results::index_of(Row const& row)
+template<>
+size_t Results::index_of(RowExpr const& row)
 {
     validate_read();
     if (!row) {
@@ -311,43 +300,78 @@ size_t Results::index_of(Row const& row)
             "Attempting to get the index of a Row of the wrong type"
         );
     }
-    return index_of(row.get_index());
+
+    switch (m_mode) {
+        case Mode::Empty:
+            return not_found;
+        case Mode::Table:
+            return row.get_index();
+        case Mode::LinkView:
+            if (update_linkview())
+                return m_link_view->find(row.get_index());
+            REALM_FALLTHROUGH;
+        case Mode::Query:
+        case Mode::TableView:
+            update_tableview();
+            return m_table_view.find_by_source_ndx(row.get_index());
+    }
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
-size_t Results::index_of(size_t row_ndx)
+template<typename T>
+size_t Results::index_of(T const& value)
 {
     validate_read();
     switch (m_mode) {
         case Mode::Empty:
             return not_found;
         case Mode::Table:
-            return row_ndx;
+            return m_table->find_first(0, value);
         case Mode::LinkView:
-            if (update_linkview())
-                return m_link_view->find(row_ndx);
-            REALM_FALLTHROUGH;
+            REALM_UNREACHABLE();
         case Mode::Query:
         case Mode::TableView:
             update_tableview();
-            return m_table_view.find_by_source_ndx(row_ndx);
+            return m_table_view.find_first(0, value);
     }
-    REALM_UNREACHABLE();
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 size_t Results::index_of(Query&& q)
 {
-    size_t row;
-    if (!m_descriptor_ordering.will_apply_sort()) {
-        auto query = get_query().and_query(std::move(q));
-        query.sync_view_if_needed();
-        row = query.find();
-    }
-    else {
+    if (m_descriptor_ordering.will_apply_sort()) {
         auto first = filter(std::move(q)).first();
-        row = first ? first->get_index() : realm::not_found;
+        return first ? index_of(*first) : not_found;
     }
 
-    return row != realm::not_found ? index_of(row) : row;
+    auto query = get_query().and_query(std::move(q));
+    query.sync_view_if_needed();
+    size_t row = query.find();
+    return row != not_found ? index_of(m_table->get(row)) : row;
+}
+
+void Results::prepare_for_aggregate(size_t column, const char* name)
+{
+    if (column > m_table->get_column_count())
+        throw OutOfBoundsIndexException{column, m_table->get_column_count()};
+    switch (m_mode) {
+        case Mode::Empty: break;
+        case Mode::Table: break;
+        case Mode::LinkView:
+            m_query = this->get_query();
+            m_mode = Mode::Query;
+            REALM_FALLTHROUGH;
+        case Mode::Query:
+        case Mode::TableView:
+            update_tableview();
+            break;
+        default:
+            REALM_COMPILER_HINT_UNREACHABLE();
+    }
+    switch (m_table->get_column_type(column)) {
+        case type_Timestamp: case type_Double: case type_Float: case type_Int: break;
+        default: throw UnsupportedColumnTypeException{column, m_table.get(), name};
+    }
 }
 
 template<typename Int, typename Float, typename Double, typename Timestamp>
@@ -359,36 +383,17 @@ util::Optional<Mixed> Results::aggregate(size_t column,
     validate_read();
     if (!m_table)
         return none;
-    if (column > m_table->get_column_count())
-        throw OutOfBoundsIndexException{column, m_table->get_column_count()};
+    prepare_for_aggregate(column, name);
 
-    auto do_agg = [&](auto const& getter) -> util::Optional<Mixed> {
-        switch (m_mode) {
-            case Mode::Empty:
-                return none;
-            case Mode::Table:
-                return util::Optional<Mixed>(getter(*m_table));
-            case Mode::LinkView:
-                m_query = this->get_query();
-                m_mode = Mode::Query;
-                REALM_FALLTHROUGH;
-            case Mode::Query:
-            case Mode::TableView:
-                this->update_tableview();
-                return util::Optional<Mixed>(getter(m_table_view));
-        }
-
-        REALM_UNREACHABLE();
+    auto do_agg = [&](auto const& getter) {
+        return Mixed(m_mode == Mode::Table ? getter(*m_table) : getter(m_table_view));
     };
-
-    switch (m_table->get_column_type(column))
-    {
+    switch (m_table->get_column_type(column)) {
         case type_Timestamp: return do_agg(agg_timestamp);
-        case type_Double: return do_agg(agg_double);
-        case type_Float: return do_agg(agg_float);
-        case type_Int: return do_agg(agg_int);
-        default:
-            throw UnsupportedColumnTypeException{column, m_table.get(), name};
+        case type_Double:    return do_agg(agg_double);
+        case type_Float:     return do_agg(agg_float);
+        case type_Int:       return do_agg(agg_int);
+        default: REALM_COMPILER_HINT_UNREACHABLE();
     }
 }
 
@@ -420,19 +425,18 @@ util::Optional<Mixed> Results::sum(size_t column)
                      [=](auto const& table) { return table.sum_int(column); },
                      [=](auto const& table) { return table.sum_float(column); },
                      [=](auto const& table) { return table.sum_double(column); },
-                     [=](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table.get(), "sum"}; });
+                     [=](auto const&) -> Timestamp { throw UnsupportedColumnTypeException{column, m_table.get(), "sum"}; });
 }
 
-util::Optional<Mixed> Results::average(size_t column)
+util::Optional<double> Results::average(size_t column)
 {
-    // Initial value to make gcc happy
     size_t value_count = 0;
     auto results = aggregate(column, "average",
                              [&](auto const& table) { return table.average_int(column, &value_count); },
                              [&](auto const& table) { return table.average_float(column, &value_count); },
                              [&](auto const& table) { return table.average_double(column, &value_count); },
-                             [&](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table.get(), "average"}; });
-    return value_count == 0 ? none : results;
+                             [&](auto const&) -> Timestamp { throw UnsupportedColumnTypeException{column, m_table.get(), "average"}; });
+    return value_count == 0 ? none : util::make_optional(results->get_double());
 }
 
 void Results::clear()
@@ -470,6 +474,23 @@ void Results::clear()
     }
 }
 
+PropertyType Results::get_type() const
+{
+    validate_read();
+    switch (m_mode) {
+        case Mode::Empty:
+        case Mode::LinkView:
+            return PropertyType::Object;
+        case Mode::Query:
+        case Mode::TableView:
+        case Mode::Table:
+            if (m_table->get_index_in_group() != npos)
+                return PropertyType::Object;
+            return ObjectSchema::from_core_type(*m_table->get_descriptor(), 0);
+    }
+    REALM_COMPILER_HINT_UNREACHABLE();
+}
+
 Query Results::get_query() const
 {
     validate_read();
@@ -497,7 +518,7 @@ Query Results::get_query() const
         case Mode::Table:
             return m_table->where();
     }
-    REALM_UNREACHABLE();
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 TableView Results::get_tableview()
@@ -517,7 +538,7 @@ TableView Results::get_tableview()
         case Mode::Table:
             return m_table->where().find_all();
     }
-    REALM_UNREACHABLE();
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 static std::vector<size_t> parse_keypath(StringData keypath, Schema const& schema, const ObjectSchema *object_schema)
@@ -565,6 +586,15 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
 {
     if (keypaths.empty())
         return *this;
+    if (get_type() != PropertyType::Object) {
+        if (keypaths.size() != 1)
+            throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
+                                                     string_for_property_type(get_type())));
+        if (keypaths[0].first != "self")
+            throw std::invalid_argument(util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
+                                                     keypaths[0].first, string_for_property_type(get_type())));
+        return sort({*m_table, {{0}}, {keypaths[0].second}});
+    }
 
     std::vector<std::vector<size_t>> column_indices;
     std::vector<bool> ascending;
@@ -578,8 +608,10 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
     return sort({*m_table, std::move(column_indices), std::move(ascending)});
 }
 
-Results Results::sort(realm::SortDescriptor&& sort) const
+Results Results::sort(SortDescriptor&& sort) const
 {
+    if (m_mode == Mode::LinkView)
+        return Results(m_realm, m_link_view, util::none, std::move(sort));
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_sort(std::move(sort));
     return Results(m_realm, get_query(), std::move(new_order));
@@ -590,17 +622,37 @@ Results Results::filter(Query&& q) const
     return Results(m_realm, get_query().and_query(std::move(q)), m_descriptor_ordering);
 }
 
-Results Results::distinct(realm::DistinctDescriptor&& uniqueness)
+Results Results::distinct(DistinctDescriptor&& uniqueness) const
 {
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_distinct(std::move(uniqueness));
     return Results(m_realm, get_query(), std::move(new_order));
 }
 
+Results Results::distinct(std::vector<std::string> const& keypaths) const
+{
+    if (keypaths.empty())
+        return *this;
+    if (get_type() != PropertyType::Object) {
+        if (keypaths.size() != 1)
+            throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
+                                                     string_for_property_type(get_type())));
+        if (keypaths[0] != "self")
+            throw std::invalid_argument(util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
+                                                     keypaths[0], string_for_property_type(get_type())));
+        return distinct({*m_table, {{0}}});
+    }
+
+    std::vector<std::vector<size_t>> column_indices;
+    column_indices.reserve(keypaths.size());
+    for (auto& keypath : keypaths)
+        column_indices.push_back(parse_keypath(keypath, m_realm->schema(), &get_object_schema()));
+    return distinct({*m_table, std::move(column_indices)});
+}
+
 Results Results::snapshot() const &
 {
     validate_read();
-
     return Results(*this).snapshot();
 }
 
@@ -625,7 +677,7 @@ Results Results::snapshot() &&
             m_update_policy = UpdatePolicy::Never;
             return std::move(*this);
     }
-    REALM_UNREACHABLE();
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 void Results::prepare_async()
@@ -648,13 +700,6 @@ void Results::prepare_async()
     _impl::RealmCoordinator::register_notifier(m_notifier);
 }
 
-NotificationToken Results::async(std::function<void (std::exception_ptr)> target)
-{
-    prepare_async();
-    auto wrap = [=](CollectionChangeSet, std::exception_ptr e) { target(e); };
-    return {m_notifier, m_notifier->add_callback(wrap)};
-}
-
 NotificationToken Results::add_notification_callback(CollectionChangeCallback cb) &
 {
     prepare_async();
@@ -674,10 +719,10 @@ bool Results::is_in_table_order() const
         case Mode::TableView:
             return m_table_view.is_in_table_order();
     }
-    REALM_UNREACHABLE(); // keep gcc happy
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
-void Results::Internal::set_table_view(Results& results, realm::TableView &&tv)
+void Results::Internal::set_table_view(Results& results, TableView &&tv)
 {
     REALM_ASSERT(results.m_update_policy != UpdatePolicy::Never);
     // If the previous TableView was never actually used, then stop generating
@@ -693,16 +738,50 @@ void Results::Internal::set_table_view(Results& results, realm::TableView &&tv)
     REALM_ASSERT(results.m_table_view.is_attached());
 }
 
+#define REALM_RESULTS_TYPE(T) \
+    template T Results::get<T>(size_t); \
+    template util::Optional<T> Results::first<T>(); \
+    template util::Optional<T> Results::last<T>(); \
+    template size_t Results::index_of<T>(T const&);
+
+template RowExpr Results::get<RowExpr>(size_t);
+template util::Optional<RowExpr> Results::first<RowExpr>();
+template util::Optional<RowExpr> Results::last<RowExpr>();
+
+REALM_RESULTS_TYPE(bool)
+REALM_RESULTS_TYPE(int64_t)
+REALM_RESULTS_TYPE(float)
+REALM_RESULTS_TYPE(double)
+REALM_RESULTS_TYPE(StringData)
+REALM_RESULTS_TYPE(BinaryData)
+REALM_RESULTS_TYPE(Timestamp)
+REALM_RESULTS_TYPE(util::Optional<bool>)
+REALM_RESULTS_TYPE(util::Optional<int64_t>)
+REALM_RESULTS_TYPE(util::Optional<float>)
+REALM_RESULTS_TYPE(util::Optional<double>)
+
+#undef REALM_RESULTS_TYPE
+
 Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
-: std::out_of_range(util::format("Requested index %1 greater than max %2", r, c))
+: std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
 , requested(r), valid_count(c) {}
 
+static std::string unsupported_operation_msg(size_t column, const Table* table, const char* operation)
+{
+    const char* column_type = string_for_property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column));
+    if (table->is_group_level())
+        return util::format("Cannot %1 property '%2': operation not supported for '%3' properties",
+                            operation, table->get_column_name(column), column_type);
+    return util::format("Cannot %1 '%2' array: operation not supported",
+                        operation, column_type);
+}
+
 Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(size_t column, const Table* table, const char* operation)
-: std::logic_error(util::format("Cannot %1 property '%2': operation not supported for '%3' properties",
-                                operation, table->get_column_name(column),
-                                string_for_property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column))))
+: std::logic_error(unsupported_operation_msg(column, table, operation))
 , column_index(column)
 , column_name(table->get_column_name(column))
-, column_type(table->get_column_type(column))
+, property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column))
 {
 }
+
+} // namespace realm

@@ -24,6 +24,7 @@
 #include "shared_realm.hpp"
 #include "util/format.hpp"
 
+#include <realm/descriptor.hpp>
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/table_view.hpp>
@@ -115,6 +116,12 @@ void insert_column(Group& group, Table& table, Property const& property, size_t 
         REALM_ASSERT(link_table);
         table.insert_column_link(col_ndx, is_array(property.type) ? type_LinkList : type_Link,
                                  property.name, *link_table);
+    }
+    else if (is_array(property.type)) {
+        DescriptorRef desc;
+        table.insert_column(col_ndx, type_Table, property.name, &desc);
+        desc->add_column(to_core_type(property.type & ~PropertyType::Flags), ObjectStore::ArrayColumnName,
+                         nullptr, is_nullable(property.type));
     }
     else {
         table.insert_column(col_ndx, to_core_type(property.type), property.name, is_nullable(property.type));

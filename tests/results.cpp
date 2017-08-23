@@ -1062,15 +1062,7 @@ TEST_CASE("notifications: sync") {
         // Start the server and wait for the Realm to be uploaded so that sync
         // makes some writes to the Realm and bumps the version
         server.start();
-        std::condition_variable cv;
-        std::mutex wait_mutex;
-        std::atomic<bool> wait_flag(false);
-        SyncManager::shared().get_session(config.path, *config.sync_config)->wait_for_upload_completion([&](auto) {
-            wait_flag = true;
-            cv.notify_one();
-        });
-        std::unique_lock<std::mutex> lock(wait_mutex);
-        cv.wait(lock, [&]() { return wait_flag == true; });
+        wait_for_upload(*r);
 
         // Make sure that the notifications still get delivered rather than
         // waiting forever due to that we don't get a commit notification from
@@ -1851,7 +1843,7 @@ TEST_CASE("results: error messages") {
     r->commit_transaction();
 
     SECTION("out of bounds access") {
-        REQUIRE_THROWS_WITH(results.get(5), "Requested index 5 greater than max 1");
+        REQUIRE_THROWS_WITH(results.get(5), "Requested index 5 greater than max 0");
     }
 
     SECTION("unsupported aggregate operation") {
@@ -2759,9 +2751,9 @@ TEMPLATE_TEST_CASE("results: aggregate", ResultsFromTable, ResultsFromQuery, Res
         }
 
         SECTION("average") {
-            REQUIRE(results.average(0)->get_double() == 1.0);
-            REQUIRE(results.average(1)->get_double() == 1.0);
-            REQUIRE(results.average(2)->get_double() == 1.0);
+            REQUIRE(results.average(0) == 1.0);
+            REQUIRE(results.average(1) == 1.0);
+            REQUIRE(results.average(2) == 1.0);
             REQUIRE_THROWS_AS(results.average(3), Results::UnsupportedColumnTypeException);
         }
 

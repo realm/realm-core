@@ -89,9 +89,6 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, size_t index) : 
     size_t count = table->get_column_count();
     persisted_properties.reserve(count);
     for (size_t col = 0; col < count; col++) {
-        if (table->get_column_type(col) == type_Table)
-            continue;
-
         StringData column_name = table->get_column_name(col);
 
 #if REALM_HAVE_SYNC_STABLE_IDS
@@ -100,6 +97,12 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, size_t index) : 
         if (column_name == sync::object_id_column_name)
             continue;
 #endif
+
+        if (table->get_column_type(col) == type_Table) {
+            auto subdesc = table->get_subdescriptor(col);
+            if (subdesc->get_column_count() != 1 || subdesc->get_column_name(0) != ObjectStore::ArrayColumnName)
+                continue;
+        }
 
         Property property;
         property.name = column_name;
@@ -157,14 +160,7 @@ static void validate_property(Schema const& schema,
                               Property const** primary,
                               std::vector<ObjectSchemaValidationException>& exceptions)
 {
-    // currently only arrays of objects are allowed
-    if (is_array(prop.type)) {
-        if (prop.type != PropertyType::Object && prop.type != PropertyType::LinkingObjects) {
-            exceptions.emplace_back("Property '%1.%2' has unsupported type '%3'.",
-                                    object_name, prop.name, prop.type_string());
-        }
-    }
-    else if (prop.type == PropertyType::LinkingObjects) {
+    if (prop.type == PropertyType::LinkingObjects && !is_array(prop.type)) {
         exceptions.emplace_back("Linking Objects property '%1.%2' must be an array.",
                                 object_name, prop.name);
     }

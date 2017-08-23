@@ -153,6 +153,7 @@ SyncServer::SyncServer(bool start_immediately)
 SyncServer::~SyncServer()
 {
     stop();
+    SyncManager::shared().reset_for_testing();
 }
 
 void SyncServer::start()
@@ -172,6 +173,31 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
 {
     return util::format("%1/%2", m_url, realm_name);
 }
+
+static void wait_for_session(Realm& realm, bool (SyncSession::*fn)(std::function<void(std::error_code)>))
+{
+    std::condition_variable cv;
+    std::mutex wait_mutex;
+    std::atomic<bool> wait_flag(false);
+    auto& session = *SyncManager::shared().get_session(realm.config().path, *realm.config().sync_config);
+    (session.*fn)([&](auto) {
+        wait_flag = true;
+        cv.notify_one();
+    });
+    std::unique_lock<std::mutex> lock(wait_mutex);
+    cv.wait(lock, [&]() { return wait_flag == true; });
+}
+
+void wait_for_upload(Realm& realm)
+{
+    wait_for_session(realm, &SyncSession::wait_for_upload_completion);
+}
+
+void wait_for_download(Realm& realm)
+{
+    wait_for_session(realm, &SyncSession::wait_for_upload_completion);
+}
+
 
 #endif // REALM_ENABLE_SYNC
 

@@ -102,6 +102,9 @@ struct SyncTestFile : TestFile {
     SyncTestFile(SyncServer& server, std::string name="");
 };
 
+void wait_for_upload(realm::Realm& realm);
+void wait_for_download(realm::Realm& realm);
+
 #endif // REALM_ENABLE_SYNC
 
 #endif
