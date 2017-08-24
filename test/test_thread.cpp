@@ -1019,4 +1019,19 @@ TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind)
     }
 }
 
+#ifdef _WIN32
+TEST(Thread_Win32InterprocessBackslashes)
+{
+    InterprocessMutex mutex;
+    InterprocessMutex::SharedPart mutex_part;
+    InterprocessCondVar condvar;
+    InterprocessCondVar::SharedPart condvar_part;
+    InterprocessCondVar::init_shared_part(condvar_part);
+    SharedGroupOptions default_options;
+
+    mutex.set_shared_part(mutex_part, "Path\\With\\Slashes", "my_mutex");
+    condvar.set_shared_part(condvar_part, "Path\\With\\Slashes", "my_condvar", default_options.temp_dir);
+}
+#endif
+
 #endif // TEST_THREAD

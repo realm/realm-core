@@ -227,9 +227,16 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const st
         bool b = CloseHandle(m_handle);
         REALM_ASSERT_RELEASE(b);
     }
-    std::string name = "Local\\realm_named_intermutex_" + path + mutex_name;
-    m_handle = CreateMutexA(0, false, name.c_str());
-    REALM_ASSERT_RELEASE(m_handle);
+    // replace backslashes because they're significant in object namespace names
+    std::string path_escaped = path;
+    std::replace(path_escaped.begin(), path_escaped.end(), '\\', '/');
+    std::string name = "Local\\realm_named_intermutex_" + path_escaped + mutex_name;
+
+    std::wstring wname(name.begin(), name.end());
+    m_handle = CreateMutexW(0, false, wname.c_str());
+    if (!m_handle) {
+        throw std::system_error(std::error_code(::GetLastError(), std::system_category()), "Error opening mutex");
+    }
 #else
     m_shared_part = &shared_part;
     static_cast<void>(path);

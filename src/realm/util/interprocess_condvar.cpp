@@ -218,8 +218,12 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     // terminates, the objects are destructed automatically by the kernel, so there will be no handle 
     // leaks or other kinds of leak.
 
-    std::string sem = "realm_sema_" + base_path + condvar_name;
-    std::string eve = "realm_event_" + base_path + condvar_name;
+    // replace backslashes because they're significant in object namespace names
+    std::string base_path_escaped = base_path;
+    std::replace(base_path_escaped.begin(), base_path_escaped.end(), '\\', '/');
+
+    std::string sem = "Local\\realm_sema_" + base_path_escaped + condvar_name;
+    std::string eve = "Local\\realm_event_" + base_path_escaped + condvar_name;
 
     // UWP only has W versions of API.
     std::wstring se = std::wstring(sem.begin(), sem.end());
@@ -230,12 +234,18 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
         0,           // initially 0
         0x7fffffff,  // max count
         LPWSTR(se.c_str()));
+    if (!m_sema) {
+        throw std::system_error(std::error_code(::GetLastError(), std::system_category()), "Error opening semaphore");
+    }
 
     m_waiters_done = CreateEventW(
         nullptr,    // no security
         false,      // auto-reset
         false,      // non-signaled initially
         LPWSTR(ev.c_str()));
+    if (!m_waiters_done) {
+        throw std::system_error(std::error_code(::GetLastError(), std::system_category()), "Error opening event");
+    }
     
     // InterprocessMutex::SharedPart() is an unused dummy object
     m_waiters_lockcount.set_shared_part(InterprocessMutex::SharedPart(), base_path, condvar_name);
