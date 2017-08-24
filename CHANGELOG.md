@@ -48,6 +48,9 @@
 * Add more overloads with realm::null - PR [#2669](https://github.com/realm/realm-core/pull/2669)
   - `size_t Table::find_first(size_t col_ndx, null)`
   - `OutputStream& operator<<(OutputStream& os, const null&)`
+* Add method to recursively delete an object tree
+  PR [#2752](https://github.com/realm/realm-core/pull/2752)
+  Issue [#2718](https://github.com/realm/realm-core/issues/2718)
 
 -----------
 

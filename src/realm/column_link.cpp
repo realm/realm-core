@@ -151,7 +151,7 @@ void LinkColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
     size_t target_row_ndx = to_size_t(value - 1);
     m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
 
-    if (m_weak_links)
+    if (m_weak_links && state.only_strong_links)
         return;
     if (m_target_table == state.stop_on_table)
         return;

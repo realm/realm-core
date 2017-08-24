@@ -73,6 +73,7 @@ enum INS {
     REMOVE_COLUMN,
     SET,
     REMOVE_ROW,
+    REMOVE_RECURSIVE,
     ADD_COLUMN_LINK,
     ADD_COLUMN_LINK_LIST,
     CLEAR_TABLE,
@@ -859,6 +860,17 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "g.get_table(" << table_ndx << ")->remove(" << row_ndx << ");\n";
                     }
                     t->remove(row_ndx);
+                }
+            }
+            else if (instr == REMOVE_RECURSIVE && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->size() > 0) {
+                    size_t row_ndx = get_next(s) % t->size();
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->remove_recursive(" << row_ndx << ");\n";
+                    }
+                    t->remove_recursive(row_ndx);
                 }
             }
             else if (instr == MOVE_LAST_OVER && g.size() > 0) {
