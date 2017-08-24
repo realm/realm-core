@@ -328,7 +328,7 @@ if(ANDROID)
             COMPONENT devel)
 endif()
 
-if(NOT APPLE AND NOT ANDROID AND NOT REALM_BUILD_LIB_ONLY)
+if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT REALM_BUILD_LIB_ONLY)
     add_executable(realm-config config_tool.cpp)
     set_target_properties(realm-config PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
 

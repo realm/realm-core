@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <ctime>
+#include <chrono>
 #include <cstring>
 #include <algorithm>
 #include <locale>
@@ -27,7 +27,17 @@
 #include <cmath>
 #include <cfloat> // DBL_MIN, DBL_MAX
 
-#include <unistd.h> // link, unlink
+#ifndef _WIN32
+#   include <unistd.h> // link, unlink
+#else
+#   include <Windows.h>
+#   define unlink _unlink
+    static inline int link(const char* oldpath, const char* newpath) {
+        if (::CreateHardLinkA(oldpath, newpath, 0) == 0)
+            return ::GetLastError();
+        return 0;
+    }
+#endif
 
 #include <realm/util/file.hpp>
 
@@ -330,10 +340,13 @@ void BenchmarkResults::try_load_baseline_results()
 
 void BenchmarkResults::save_results()
 {
-    time_t now = time(nullptr);
-    localtime(&now);
-    struct tm local;
-    localtime_r(&now, &local);
+    std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::tm local;
+#ifdef _WIN32
+    ::localtime_s(&local, &now);
+#else
+    ::localtime_r(&now, &local);
+#endif
     std::ostringstream name_out;
     name_out << m_results_file_stem << ".";
     // Format: YYYYMMDD_hhmmss;

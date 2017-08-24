@@ -1,4 +1,5 @@
 set(TEST_UTIL_SOURCES
+    benchmark_results.cpp
     demangle.cpp
     mem.cpp
     timer.cpp
@@ -15,10 +16,6 @@ set(TEST_UTIL_SOURCES
     resource_limits.cpp
     jsmn.cpp
 ) # TEST_UTIL_SOURCES
-
-if (NOT MSVC)
-    list(APPEND TEST_UTIL_SOURCES benchmark_results.cpp)
-endif()
 
 add_library(test-util ${TEST_UTIL_SOURCES})
 
