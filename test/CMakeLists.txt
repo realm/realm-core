@@ -1,5 +1,10 @@
 add_subdirectory(util)
-add_subdirectory(fuzzy)
+
+# AFL not yet supported by Windows
+if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    add_subdirectory(fuzzy)
+endif()
+
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
 # FIXME: Add other benchmarks
