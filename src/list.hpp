@@ -130,6 +130,10 @@ public:
     template<typename T, typename Context>
     void set(Context&, size_t row_ndx, T&& value, bool update=false);
 
+    // Replace the values in this list with the values from an enumerable object
+    template<typename T, typename Context>
+    void assign(Context&, T&& value, bool update=false);
+
     // The List object has been invalidated (due to the Realm being invalidated,
     // or the containing object being deleted)
     // All non-noexcept functions can throw this
@@ -198,6 +202,21 @@ template<typename T, typename Context>
 void List::set(Context& ctx, size_t row_ndx, T&& value, bool update)
 {
     dispatch([&](auto t) { this->set(row_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, true, update)); });
+}
+
+template<typename T, typename Context>
+void List::assign(Context& ctx, T&& values, bool update)
+{
+    if (ctx.is_same_list(*this, values))
+        return;
+
+    remove_all();
+    if (ctx.is_null(values))
+        return;
+
+    ctx.enumerate_list(values, [&](auto&& element) {
+        this->add(ctx, element, update);
+    });
 }
 } // namespace realm
 

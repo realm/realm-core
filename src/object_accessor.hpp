@@ -89,14 +89,9 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
         if (property.type == PropertyType::LinkingObjects)
             throw ReadOnlyPropertyException(m_object_schema->name, property.name);
 
+        ContextType child_ctx(ctx, property);
         List list(m_realm, *m_row.get_table(), col, m_row.get_index());
-        list.remove_all();
-        if (!ctx.is_null(value)) {
-            ContextType child_ctx(ctx, property);
-            ctx.enumerate_list(value, [&](auto&& element) {
-                list.add(child_ctx, element, try_update);
-            });
-        }
+        list.assign(child_ctx, value, try_update);
         ctx.did_change();
         return;
     }

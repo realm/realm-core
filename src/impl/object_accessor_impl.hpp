@@ -82,6 +82,14 @@ public:
             fn(v);
     }
 
+    // Determine if `value` boxes the same List as `list`
+    bool is_same_list(List const& list, util::Any const& value)
+    {
+        if (auto list2 = any_cast<List>(&value))
+            return list == *list2;
+        return false;
+    }
+
     // Convert from core types to the boxed type
     util::Any box(BinaryData v) const { return std::string(v); }
     util::Any box(List v) const { return v; }

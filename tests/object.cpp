@@ -673,6 +673,33 @@ TEST_CASE("object") {
         REQUIRE_THROWS(obj.set_property_value(d, "int", util::Any(INT64_C(5)), false));
     }
 
+    SECTION("list property self-assign is a no-op") {
+        auto obj = create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"bool", true},
+            {"int", INT64_C(5)},
+            {"float", 2.2f},
+            {"double", 3.3},
+            {"string", "hello"s},
+            {"data", "olleh"s},
+            {"date", Timestamp(10, 20)},
+
+            {"bool array", AnyVec{true, false}},
+            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
+        }, false);
+
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 2);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object array")).size() == 1);
+
+        r->begin_transaction();
+        obj.set_property_value(d, "bool array", obj.get_property_value<util::Any>(d, "bool array"), false);
+        obj.set_property_value(d, "object array", obj.get_property_value<util::Any>(d, "object array"), false);
+        r->commit_transaction();
+
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 2);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object array")).size() == 1);
+    }
+
 #if REALM_ENABLE_SYNC
     if (!util::EventLoop::has_implementation())
         return;
