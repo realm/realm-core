@@ -1841,6 +1841,11 @@ SharedGroup::version_type SharedGroup::commit()
     release_read_lock(lock_after_commit);
 
     do_end_write();
+
+    // Free memory that was allocated during the write transaction.
+    using gf = _impl::GroupFriend;
+    gf::reset_free_space_tracking(m_group); // Throws
+
     do_end_read();
     m_read_lock = lock_after_commit;
     m_transact_stage = transact_Ready;
