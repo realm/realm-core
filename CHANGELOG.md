@@ -23,6 +23,10 @@
   PR [#2561](https://github.com/realm/realm-core/pull/2561).
 * New replication instruction: instr_AddRowWithKey
 * Add the old table size to the instr_TableClear replication instruction.
+* Throw a MaximumFileSizeExceeded exception during commits or allocations
+  instead of causing corruption or asserting. This would most likely be
+  seen when creating large Realm files on 32 bit OS.
+  PR [#2795](https://github.com/realm/realm-core/pull/2795).
 
 ### Enhancements
 
