@@ -35,6 +35,7 @@
 #include <realm/mixed.hpp>
 #include <realm/query.hpp>
 #include <realm/column.hpp>
+#include <realm/cluster.hpp>
 
 namespace realm {
 
@@ -63,6 +64,7 @@ struct Link {
 };
 typedef Link LinkList;
 typedef Link BackLink;
+
 
 namespace _impl {
 class TableFriend;
@@ -377,8 +379,13 @@ public:
     size_t add_empty_row(size_t num_rows = 1);
     void insert_empty_row(size_t row_ndx, size_t num_rows = 1);
     size_t add_row_with_key(size_t col_ndx, int64_t key);
+    Obj create_object(Key key = {});
+    Obj get_object(Key key);
+    void dump_objects();
+    ConstObj get_object(Key key) const;
     void remove(size_t row_ndx);
     void remove_last();
+    void remove_object(Key key);
     void move_last_over(size_t row_ndx);
     void clear();
     void swap_rows(size_t row_ndx_1, size_t row_ndx_2);
@@ -1000,6 +1007,7 @@ private:
     };
 
     SpecPtr m_spec; // 1st slot in m_top (for root tables)
+    ClusterTree m_clusters;
 
     // Is guaranteed to be empty for a detached accessor. Otherwise it is empty
     // when the table accessor is attached to a degenerate subtable (unattached
@@ -1559,6 +1567,7 @@ private:
     friend class LinkMap;
     friend class LinkView;
     friend class Group;
+    friend class ClusterTree;
 };
 
 class Table::Parent : public ArrayParent {
@@ -1820,6 +1829,7 @@ private:
 inline Table::Table(Allocator& alloc)
     : m_top(alloc)
     , m_columns(alloc)
+    , m_clusters(this, alloc)
 {
     m_ref_count = 1; // Explicitly managed lifetime
 
@@ -1832,6 +1842,7 @@ inline Table::Table(Allocator& alloc)
 inline Table::Table(const Table& t, Allocator& alloc)
     : m_top(alloc)
     , m_columns(alloc)
+    , m_clusters(this, alloc)
 {
     m_ref_count = 1; // Explicitly managed lifetime
 
@@ -1844,6 +1855,7 @@ inline Table::Table(const Table& t, Allocator& alloc)
 inline Table::Table(ref_count_tag, Allocator& alloc)
     : m_top(alloc)
     , m_columns(alloc)
+    , m_clusters(this, alloc)
 {
     m_ref_count = 0; // Lifetime managed by reference counting
 }
@@ -2180,7 +2192,6 @@ template<> void Table::set<null>(size_t, size_t, null, bool);
 template<> size_t Table::set_unique<int64_t>(size_t, size_t, int64_t);
 template<> size_t Table::set_unique<StringData>(size_t, size_t, StringData);
 template<> size_t Table::set_unique<null>(size_t, size_t, null);
-
 
 inline int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
 {
