@@ -19,6 +19,7 @@
 #ifndef REALM_METRICS_HPP
 #define REALM_METRICS_HPP
 
+#include <memory>
 #include <vector>
 
 #include <realm/metrics/query_info.hpp>
@@ -33,10 +34,12 @@ namespace metrics {
 class Metrics {
 public:
     ~Metrics() noexcept;
+    size_t num_query_metrics() const;
+    size_t num_transaction_metrics() const;
 
 private:
-    std::vector<QueryInfo> m_query_info;
-    std::vector<TransactionInfo> m_transaction_info;
+    std::unique_ptr<std::vector<QueryInfo>> m_query_info;
+    std::unique_ptr<std::vector<TransactionInfo>> m_transaction_info;
 };
 
 

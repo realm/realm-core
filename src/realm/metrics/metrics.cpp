@@ -27,4 +27,15 @@ Metrics::~Metrics() noexcept
 {
 }
 
+size_t Metrics::num_query_metrics() const
+{
+    return bool(m_query_info) ? m_query_info->size() : 0;
+}
+
+size_t Metrics::num_transaction_metrics() const
+{
+    return bool(m_transaction_info) ? m_transaction_info->size() : 0;
+}
+
+
 #endif // REALM_METRICS

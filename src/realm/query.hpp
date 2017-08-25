@@ -57,6 +57,10 @@ class Expression;
 class SequentialGetterBase;
 class Group;
 
+namespace metrics {
+class QueryInfo;
+}
+
 struct QueryGroup {
     enum class State {
         Default,
@@ -429,6 +433,7 @@ private:
 
     friend class Table;
     friend class TableViewBase;
+    friend class metrics::QueryInfo;
 
     std::string error_code;
 

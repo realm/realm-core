@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/metrics/query_info.hpp>
+#include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/query.hpp>
 
@@ -27,7 +28,9 @@ using namespace realm::metrics;
 
 QueryInfo::QueryInfo(const Query* query)
 {
+    REALM_ASSERT(query);
 
+    const Group* group = query->m_table->get_parent_group();
 }
 
 QueryInfo::~QueryInfo() noexcept
