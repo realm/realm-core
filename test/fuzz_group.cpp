@@ -33,7 +33,7 @@ using namespace realm::util;
 
 // Determines whether or not to run the shared group verify function
 // after each transaction. This will find errors earlier but is expensive.
-#define REALM_VERIFY true
+#define REALM_VERIFY false
 
 #if REALM_VERIFY
 #define REALM_DO_IF_VERIFY(log, op)                                                                                  \
@@ -124,6 +124,8 @@ unsigned char get_next(State& s)
 
 const char* get_encryption_key()
 {
+    return 0;
+
 #if REALM_ENABLE_ENCRYPTION
     return "1234567890123456789012345678901123456789012345678901234567890123";
 #else
@@ -295,7 +297,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
     // Max number of rows in a table. Overridden only by add_empty_row_max() and only in the case where
     // max_rows is not exceeded *prior* to executing add_empty_row.
-    const size_t max_rows = 100000;
+    const size_t max_rows = 100000000;
 
     try {
         State s;
@@ -371,6 +373,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 catch (const TableNameInUse&) {
                 }
             }
+
+            /*
             else if (instr == REMOVE_TABLE && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 if (log) {
@@ -381,13 +385,14 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 catch (const CrossTableLinkTarget&) {
                 }
-            }
+            }*/
+
             else if (instr == CLEAR_TABLE && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 if (log) {
                     *log << "g.get_table(" << table_ndx << ")->clear();\n";
                 }
-                g.get_table(table_ndx)->clear();
+            //    g.get_table(table_ndx)->clear();
             }
             else if (instr == MOVE_TABLE && g.size() >= 2) {
                 size_t from_ndx = get_next(s) % g.size();
@@ -457,6 +462,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             else if (instr == ADD_COLUMN && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 DataType type = get_type(get_next(s));
+
+                if ((rand() % 100) > 10)
+                    type = type_Binary;
+
                 std::string name = create_column_name(s);
                 // Mixed cannot be nullable. For other types, chose nullability randomly
                 bool nullable = (type == type_Mixed) ? false : (get_next(s) % 2 == 0);
@@ -487,6 +496,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t table_ndx = get_next(s) % g.size();
                 size_t col_ndx = get_next(s) % (g.get_table(table_ndx)->get_column_count() + 1);
                 DataType type = get_type(get_next(s));
+
+                if ((rand() % 100) > 10)
+                    type = type_Binary;
+
                 std::string name = create_column_name(s);
                 bool nullable = (type == type_Mixed) ? false : (get_next(s) % 2 == 0);
                 if (type != type_Table) {
@@ -515,7 +528,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             else if (instr == REMOVE_COLUMN && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 TableRef t = g.get_table(table_ndx);
-                if (t->get_column_count() > 0) {
+                if (t->get_column_count() > 3) {
                     size_t col_ndx = get_next(s) % t->get_column_count();
                     if (log) {
                         *log << "g.get_table(" << table_ndx << ")->remove_column(" << col_ndx << ");\n";
@@ -550,7 +563,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     _impl::TableFriend::move_column(*(t->get_descriptor()), col_ndx1, col_ndx2);
                 }
-            }
+            } /*
             else if (instr == ADD_SEARCH_INDEX && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 TableRef t = g.get_table(table_ndx);
@@ -578,6 +591,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                 }
             }
+
+            */
             else if (instr == REMOVE_SEARCH_INDEX && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 TableRef t = g.get_table(table_ndx);
@@ -675,10 +690,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             t->set_string(col_ndx, row_ndx, str);
                         }
                         else if (type == type_Binary) {
-                            bool insert_big_blob = get_next(s) % 2 == 0;
+                            bool insert_big_blob = true;// get_next(s) % 2 == 0;
                             if (insert_big_blob) {
                                 size_t rand_char = get_next(s);
-                                size_t blob_size = get_next(s) + ArrayBlob::max_binary_size;
+                                size_t blob_size = ArrayBlob::max_binary_size;
                                 std::string blob(blob_size, static_cast<unsigned char>(rand_char));
                                 if (log) {
                                     *log << "{\n\tstd::string data(" << blob_size << ", static_cast<unsigned char>(" << rand_char << "));\n\t"
@@ -850,7 +865,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                 }
             }
-            else if (instr == REMOVE_ROW && g.size() > 0) {
+            else if (instr == REMOVE_ROW && g.size() > 0 && rand() % 100 > 50) {
                 size_t table_ndx = get_next(s) % g.size();
                 TableRef t = g.get_table(table_ndx);
                 if (t->size() > 0) {
@@ -1007,7 +1022,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 if (log) {
                     *log << "REALM_ASSERT_RELEASE(sg_w.compact());\n";
                 }
-                REALM_ASSERT_RELEASE(sg_w.compact());
+           //     REALM_ASSERT_RELEASE(sg_w.compact());
 
                 if (log) {
                     *log << "sg_w.begin_write();\n";
