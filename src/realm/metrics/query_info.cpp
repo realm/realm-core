@@ -17,10 +17,18 @@
  **************************************************************************/
 
 #include <realm/metrics/query_info.hpp>
+#include <realm/table.hpp>
+#include <realm/query.hpp>
 
 #if REALM_METRICS
 
 using namespace realm;
+using namespace realm::metrics;
+
+QueryInfo::QueryInfo(const Query* query)
+{
+
+}
 
 QueryInfo::~QueryInfo() noexcept
 {

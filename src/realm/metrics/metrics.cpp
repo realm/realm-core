@@ -21,6 +21,7 @@
 #if REALM_METRICS
 
 using namespace realm;
+using namespace realm::metrics;
 
 Metrics::~Metrics() noexcept
 {

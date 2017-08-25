@@ -19,17 +19,30 @@
 #ifndef REALM_QUERY_INFO_HPP
 #define REALM_QUERY_INFO_HPP
 
+#include <string>
+
 #include <realm/util/features.h>
 
 #if REALM_METRICS
 
-#include <string>
-
 namespace realm {
 
+class Query; // forward declare in namespace realm
+
+namespace metrics {
+
+enum QueryType {
+    query_find,
+    query_find_all,
+    query_count,
+    query_sum,
+    query_average,
+    query_maximum
+};
 
 class QueryInfo {
 public:
+    QueryInfo(const Query* query);
     ~QueryInfo() noexcept;
 
 private:
@@ -38,6 +51,7 @@ private:
     double m_end_time;
 };
 
+} // namespace metrics
 } // namespace realm
 
 #endif // REALM_METRICS

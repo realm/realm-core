@@ -19,14 +19,14 @@
 #ifndef REALM_TRANSACTION_INFO_HPP
 #define REALM_TRANSACTION_INFO_HPP
 
+#include <string>
+
 #include <realm/util/features.h>
 
 #if REALM_METRICS
 
-#include <string>
-
 namespace realm {
-
+namespace metrics {
 
 class TransactionInfo {
 public:
@@ -43,6 +43,7 @@ private:
     size_t m_total_rows;
 };
 
+} // namespace metrics
 } // namespace realm
 
 #endif // REALM_METRICS

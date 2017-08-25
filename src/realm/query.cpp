@@ -31,6 +31,7 @@
 
 
 using namespace realm;
+using namespace realm::metrics;
 
 Query::Query()
 {
@@ -1322,6 +1323,10 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
             return (limit < end - start ? limit : end - start);
         }
     }
+
+#if REALM_METRICS
+    QueryInfo info(this);
+#endif
 
     init();
     size_t cnt = 0;

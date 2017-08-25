@@ -30,6 +30,7 @@
 #include <realm/impl/input_stream.hpp>
 #include <realm/impl/output_stream.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
+#include <realm/metrics/metrics.hpp>
 #include <realm/table.hpp>
 #include <realm/alloc_slab.hpp>
 
@@ -601,6 +602,7 @@ private:
 
     std::function<void(const CascadeNotification&)> m_notify_handler;
     std::function<void()> m_schema_change_handler;
+    std::shared_ptr<metrics::Metrics> m_metrics;
 
     struct shared_tag {
     };
@@ -689,6 +691,8 @@ private:
 
     Replication* get_replication() const noexcept;
     void set_replication(Replication*) noexcept;
+    std::shared_ptr<metrics::Metrics> get_metrics() const noexcept;
+    void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
     class TransactAdvancer;
     void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&);
     void refresh_dirty_accessors();
@@ -1142,6 +1146,16 @@ inline Replication* Group::get_replication() const noexcept
 inline void Group::set_replication(Replication* repl) noexcept
 {
     m_alloc.set_replication(repl);
+}
+
+inline std::shared_ptr<metrics::Metrics> Group::get_metrics() const noexcept
+{
+    return m_metrics;
+}
+
+inline void Group::set_metrics(std::shared_ptr<metrics::Metrics> shared) noexcept
+{
+    m_metrics = shared;
 }
 
 // The purpose of this class is to give internal access to some, but

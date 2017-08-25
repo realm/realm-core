@@ -21,6 +21,7 @@
 #if REALM_METRICS
 
 using namespace realm;
+using namespace metrics;
 
 TransactionInfo::~TransactionInfo() noexcept
 {

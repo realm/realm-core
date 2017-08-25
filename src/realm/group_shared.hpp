@@ -29,6 +29,7 @@
 #include <realm/group_shared_options.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/impl/transact_log.hpp>
+#include <realm/metrics/metrics.hpp>
 #include <realm/replication.hpp>
 #include <realm/version_id.hpp>
 
@@ -526,6 +527,11 @@ public:
     // Release pinned version (not thread safe)
     void unpin_version(VersionID version);
 
+#if REALM_METRICS
+    std::shared_ptr<metrics::Metrics> get_metrics();
+#endif // REALM_METRICS
+
+
 private:
     struct SharedInfo;
     struct ReadCount;
@@ -566,6 +572,11 @@ private:
     util::InterprocessCondVar m_new_commit_available;
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
+
+    bool m_enable_metrics;
+#if REALM_METRICS
+    std::shared_ptr<metrics::Metrics> m_metrics;
+#endif // REALM_METRICS
 
     void do_open(const std::string& file, bool no_create, bool is_backend, const SharedGroupOptions options);
 

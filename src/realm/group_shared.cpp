@@ -50,6 +50,7 @@
 
 
 using namespace realm;
+using namespace realm::metrics;
 using namespace realm::util;
 using Durability = SharedGroupOptions::Durability;
 
@@ -769,8 +770,16 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
     m_lockfile_path = path + ".lock";
     try_make_dir(m_coordination_dir);
     m_key = options.encryption_key;
+    m_enable_metrics = options.enable_metrics;
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     SlabAlloc& alloc = m_group.m_alloc;
+
+#if REALM_METRICS
+    if (m_enable_metrics) {
+        m_metrics = std::make_shared<Metrics>();
+        m_group.set_metrics(m_metrics);
+    }
+#endif // REALM_METRICS
 
     Replication::HistoryType openers_hist_type = Replication::hist_None;
     int openers_hist_schema_version = 0;
@@ -1898,6 +1907,12 @@ void SharedGroup::unpin_version(VersionID token)
     release_read_lock(read_lock);
 }
 
+#if REALM_METRICS
+std::shared_ptr<Metrics> SharedGroup::get_metrics()
+{
+    return m_metrics;
+}
+#endif // REALM_METRICS
 
 void SharedGroup::do_begin_read(VersionID version_id, bool writable)
 {

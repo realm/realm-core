@@ -19,17 +19,16 @@
 #ifndef REALM_METRICS_HPP
 #define REALM_METRICS_HPP
 
-#include <realm/util/features.h>
-
-#if REALM_METRICS
-
 #include <vector>
 
 #include <realm/metrics/query_info.hpp>
 #include <realm/metrics/transaction_info.hpp>
+#include <realm/util/features.h>
 
 namespace realm {
+namespace metrics {
 
+#if REALM_METRICS
 
 class Metrics {
 public:
@@ -40,8 +39,18 @@ private:
     std::vector<TransactionInfo> m_transaction_info;
 };
 
+
+#else
+
+struct Metrics
+{
+};
+
+#endif // REALM_METRICS
+
+} // namespace metrics
 } // namespace realm
 
-#endif //REALM_METRICS
+
 
 #endif // REALM_METRICS_HPP
