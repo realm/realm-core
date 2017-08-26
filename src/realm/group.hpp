@@ -43,6 +43,10 @@ class TransactLogConvenientEncoder;
 class TransactLogParser;
 }
 
+namespace metrics {
+class QueryInfo;
+}
+
 
 /// A group is a collection of named tables.
 ///
@@ -793,6 +797,7 @@ private:
     friend class _impl::TransactLogParser;
     friend class Replication;
     friend class TrivialReplication;
+    friend class metrics::QueryInfo;
 };
 
 

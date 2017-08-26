@@ -31,10 +31,33 @@ QueryInfo::QueryInfo(const Query* query)
     REALM_ASSERT(query);
 
     const Group* group = query->m_table->get_parent_group();
+    REALM_ASSERT(group);
+
+    StringData table_name = group->get_table_name(query->m_table->get_index_in_group());
+
+    m_type = table_name;
 }
 
 QueryInfo::~QueryInfo() noexcept
 {
 }
+
+std::unique_ptr<MetricTimer> QueryInfo::track(const Query* query)
+{
+    REALM_ASSERT(query);
+    const Group* group = query->m_table->get_parent_group();
+    REALM_ASSERT(group);
+
+    std::shared_ptr<Metrics> metrics = group->get_metrics();
+    if (!metrics)
+        return nullptr;
+
+    QueryInfo info(query);
+    info.m_query_time = std::make_shared<MetricTimerResult>();
+    metrics->add_query(info);
+
+    return std::make_unique<MetricTimer>(info.m_query_time);
+}
+
 
 #endif // REALM_METRICS

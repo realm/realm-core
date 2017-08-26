@@ -34,6 +34,7 @@ set(REALM_SOURCES
     lang_bind_helper.cpp
     link_view.cpp
     metrics/metrics.cpp
+    metrics/metric_timer.cpp
     metrics/query_info.cpp
     metrics/transaction_info.cpp
     query.cpp
@@ -180,6 +181,7 @@ set(REALM_INSTALL_UTIL_HEADERS
 
 set(REALM_METRICS_HEADERS
     metrics/metrics.hpp
+    metrics/metric_timer.hpp
     metrics/query_info.hpp
     metrics/transaction_info.hpp
 ) # REALM_METRICS_HEADERS

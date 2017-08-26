@@ -109,7 +109,7 @@ TEST(Metrics_HasReportsWhenEnabled)
     sg.end_read();
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
-    //CHECK(metrics->num_query_metrics() != 0);
+    CHECK(metrics->num_query_metrics() != 0);
     //CHECK(metrics->num_transaction_metrics() != 0);
 }
 

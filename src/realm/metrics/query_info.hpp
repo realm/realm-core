@@ -19,9 +19,11 @@
 #ifndef REALM_QUERY_INFO_HPP
 #define REALM_QUERY_INFO_HPP
 
+#include <memory>
 #include <string>
 
 #include <realm/util/features.h>
+#include <realm/metrics/metric_timer.hpp>
 
 #if REALM_METRICS
 
@@ -45,10 +47,11 @@ public:
     QueryInfo(const Query* query);
     ~QueryInfo() noexcept;
 
+    static std::unique_ptr<MetricTimer> track(const Query* query);
+
 private:
     std::string m_type;
-    double m_start_time;
-    double m_end_time;
+    std::shared_ptr<MetricTimerResult> m_query_time;
 };
 
 } // namespace metrics

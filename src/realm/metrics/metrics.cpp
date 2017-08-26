@@ -29,12 +29,22 @@ Metrics::~Metrics() noexcept
 
 size_t Metrics::num_query_metrics() const
 {
-    return bool(m_query_info) ? m_query_info->size() : 0;
+    return m_query_info.size();
 }
 
 size_t Metrics::num_transaction_metrics() const
 {
-    return bool(m_transaction_info) ? m_transaction_info->size() : 0;
+    return m_transaction_info.size();
+}
+
+void Metrics::add_query(QueryInfo info)
+{
+    m_query_info.push_back(info);
+}
+
+void Metrics::add_transaction(TransactionInfo info)
+{
+    m_transaction_info.push_back(info);
 }
 
 

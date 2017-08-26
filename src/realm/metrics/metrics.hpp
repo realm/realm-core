@@ -37,9 +37,12 @@ public:
     size_t num_query_metrics() const;
     size_t num_transaction_metrics() const;
 
+    void add_query(QueryInfo info);
+    void add_transaction(TransactionInfo info);
+
 private:
-    std::unique_ptr<std::vector<QueryInfo>> m_query_info;
-    std::unique_ptr<std::vector<TransactionInfo>> m_transaction_info;
+    std::vector<QueryInfo> m_query_info;
+    std::vector<TransactionInfo> m_transaction_info;
 };
 
 

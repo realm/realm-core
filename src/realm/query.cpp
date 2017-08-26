@@ -1325,7 +1325,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     }
 
 #if REALM_METRICS
-    QueryInfo info(this);
+    auto metric_timer = QueryInfo::track(this);
 #endif
 
     init();
