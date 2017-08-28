@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <realm/impl/continuous_transactions_history.hpp>
+#include <realm/impl/cont_transactions_history.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/replication.hpp>
