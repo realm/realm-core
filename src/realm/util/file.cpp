@@ -965,6 +965,8 @@ bool File::is_dir(const std::string& path)
     }
     std::string msg = get_errno_msg("stat() failed: ", err);
     throw std::runtime_error(msg);
+#elif REALM_HAVE_STD_FILESYSTEM
+    return std::filesystem::is_directory(path);
 #else
     static_cast<void>(path);
     throw std::runtime_error("Not yet supported");
@@ -1198,6 +1200,12 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
     }
     */
     return base_dir_2 + path_2;
+#elif REALM_HAVE_STD_FILESYSTEM
+    std::filesystem::path path_(path.empty() ? "." : path);
+    if (path_.is_absolute())
+        return path;
+
+    return (std::filesystem::path(base_dir) / path_).u8string();
 #else
     static_cast<void>(path);
     static_cast<void>(base_dir);
@@ -1291,6 +1299,34 @@ bool DirScanner::next(std::string& name)
             return true;
         }
     }
+}
+
+#elif REALM_HAVE_STD_FILESYSTEM
+
+DirScanner::DirScanner(const std::string& path, bool allow_missing)
+{
+    try {
+        m_iterator = std::filesystem::directory_iterator(path);
+    }
+    catch (const std::filesystem::filesystem_error& e) {
+        static std::error_condition no_such_directory(std::errc::no_such_file_or_directory);
+        if (e.code() != no_such_directory || !allow_missing)
+            throw;
+    }
+}
+
+DirScanner::~DirScanner() = default;
+
+bool DirScanner::next(std::string& name)
+{
+    static std::filesystem::directory_iterator end;
+    if (m_iterator != end) {
+        name = m_iterator->path().filename().u8string();
+        m_iterator++;
+        return true;
+    }
+
+    return false;
 }
 
 #else
