@@ -87,7 +87,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
     config.schema_mode = SchemaMode::Automatic;
 #if REALM_PLATFORM_APPLE
     if (should_encrypt && !encryption_key) {
-        encryption_key = keychain::metadata_realm_encryption_key();
+        encryption_key = keychain::metadata_realm_encryption_key(File::exists(path));
     }
 #endif
     if (should_encrypt) {
