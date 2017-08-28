@@ -207,7 +207,7 @@ endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_dependencies(realm-objects sha_win32 getopt_win32)
-    list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:sha_win32> $<TARGET_OBJECTS:getopt_win32>)
+    list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:sha_win32>)
 elseif(ANDROID)
     list(APPEND REALM_EXTRA_LIBS atomic)
 endif()
