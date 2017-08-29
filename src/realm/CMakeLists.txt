@@ -296,7 +296,10 @@ install(TARGETS realm
 
 # include .pdb files with debug symbols on Windows
 if(CMAKE_GENERATOR MATCHES "^Visual Studio")
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/realm-objects.dir/$<CONFIG>/realm-objects.pdb DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/realm-objects.dir/$<CONFIG>/realm-objects.pdb
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            COMPONENT devel
+            OPTIONAL)
 endif()
 
 install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
