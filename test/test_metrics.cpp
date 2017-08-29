@@ -123,7 +123,10 @@ TEST(Metrics_QueryTypes)
     CHECK(sg.get_metrics());
     Group& g = sg.begin_write();
     auto table = g.add_table("table");
-    table->add_column(type_Int, "first");
+    size_t int_col = table->add_column(type_Int, "col_int");
+    size_t double_col = table->add_column(type_Double, "col_double");
+    size_t float_col = table->add_column(type_Float, "col_float");
+    size_t timestamp_col = table->add_column(type_Timestamp, "col_timestamp");
     table->add_empty_row(10);
     sg.commit();
     sg.begin_read();
@@ -133,17 +136,32 @@ TEST(Metrics_QueryTypes)
     query.find();
     query.find_all();
     query.count();
-    query.sum_int(0);
-    query.average_int(0);
-    query.maximum_int(0);
-    query.minimum_int(0);
+    query.sum_int(int_col);
+    query.average_int(int_col);
+    query.maximum_int(int_col);
+    query.minimum_int(int_col);
+
+    query.sum_double(double_col);
+    query.average_double(double_col);
+    query.maximum_double(double_col);
+    query.minimum_double(double_col);
+
+    query.sum_float(float_col);
+    query.average_float(float_col);
+    query.maximum_float(float_col);
+    query.minimum_float(float_col);
+
+    size_t return_dummy;
+    query.maximum_timestamp(timestamp_col, &return_dummy);
+    query.minimum_timestamp(timestamp_col, &return_dummy);
+
     sg.end_read();
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
-    CHECK(metrics->num_query_metrics() == 7);
+    CHECK(metrics->num_query_metrics() == 17);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(metrics->num_query_metrics() == 0);
-    CHECK(queries && queries->size() == 7);
+    CHECK(queries && queries->size() == 17);
     CHECK(queries->at(0).get_type() == QueryInfo::type_Find);
     CHECK(queries->at(1).get_type() == QueryInfo::type_FindAll);
     CHECK(queries->at(2).get_type() == QueryInfo::type_Count);
@@ -151,6 +169,19 @@ TEST(Metrics_QueryTypes)
     CHECK(queries->at(4).get_type() == QueryInfo::type_Average);
     CHECK(queries->at(5).get_type() == QueryInfo::type_Maximum);
     CHECK(queries->at(6).get_type() == QueryInfo::type_Minimum);
+
+    CHECK(queries->at(7).get_type() == QueryInfo::type_Sum);
+    CHECK(queries->at(8).get_type() == QueryInfo::type_Average);
+    CHECK(queries->at(9).get_type() == QueryInfo::type_Maximum);
+    CHECK(queries->at(10).get_type() == QueryInfo::type_Minimum);
+
+    CHECK(queries->at(11).get_type() == QueryInfo::type_Sum);
+    CHECK(queries->at(12).get_type() == QueryInfo::type_Average);
+    CHECK(queries->at(13).get_type() == QueryInfo::type_Maximum);
+    CHECK(queries->at(14).get_type() == QueryInfo::type_Minimum);
+
+    CHECK(queries->at(15).get_type() == QueryInfo::type_Maximum);
+    CHECK(queries->at(16).get_type() == QueryInfo::type_Minimum);
 }
 
 

@@ -86,6 +86,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 
 #include <algorithm>
 #include <functional>
+#include <sstream>
 #include <string>
 #include <array>
 
@@ -137,6 +138,16 @@ const size_t bitwidth_time_unit = 64;
 
 typedef bool (*CallbackDummy)(int64_t);
 
+
+namespace metrics {
+    template <typename T>
+    std::string print_value(T value)
+    {
+        std::stringstream ss;
+        ss << value;
+        return ss.str();
+    }
+} // end namespace metrics
 
 class ParentNode {
     typedef ParentNode ThisType;
@@ -265,6 +276,13 @@ public:
     }
 
     virtual void verify_column() const = 0;
+    virtual std::string describe(std::string s) const
+    {
+        if (m_table && m_condition_column_idx != npos) {
+            s = s + std::string(m_table->get_name()) + "." + std::string(m_table->get_column_name(m_condition_column_idx));
+        }
+        return s;
+    }
 
     std::unique_ptr<ParentNode> m_child;
     std::vector<ParentNode*> m_children;
@@ -377,6 +395,11 @@ public:
         else
             return m_condition->validate();
     }
+    std::string describe(std::string s) const override
+    {
+        return "subtable " + s;
+    }
+
 
     size_t find_first_local(size_t start, size_t end) override
     {
@@ -696,6 +719,7 @@ protected:
     TFind_callback_specialized m_find_callback_specialized = nullptr;
 };
 
+
 // FIXME: Add specialization that uses index for TConditionFunction = Equal
 template <class ColType, class TConditionFunction>
 class IntegerNode : public IntegerNodeBase<ColType> {
@@ -763,6 +787,12 @@ public:
         }
 
         return not_found;
+    }
+
+    virtual std::string describe(std::string s) const override
+    {
+        s = IntegerNodeBase<ColType>::describe(s);
+        return s + " " + TConditionFunction::description() + " " + metrics::print_value(IntegerNodeBase<ColType>::m_value);
     }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
@@ -833,6 +863,7 @@ protected:
         }
     }
 };
+
 
 // This node is currently used for floats and doubles only
 template <class ColType, class TConditionFunction>
@@ -1116,6 +1147,11 @@ public:
     {
         do_verify_column(m_condition_column);
     }
+    std::string describe(std::string s) const override
+    {
+        return "stringnodebase " + s;
+    }
+
 
     void init() override
     {
@@ -1536,6 +1572,11 @@ public:
             condition->verify_column();
         }
     }
+    std::string describe(std::string s) const override
+    {
+        return " or " + s;
+    }
+
 
     void init() override
     {
@@ -1695,6 +1736,12 @@ public:
             return s;
         return "";
     }
+
+    std::string describe(std::string s) const override
+    {
+        return " or " + s;
+    }
+
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
@@ -1897,6 +1944,11 @@ public:
     void verify_column() const override
     {
         do_verify_column(m_column, m_origin_column);
+    }
+
+    std::string describe(std::string s) const override
+    {
+        return " links to " + s;
     }
 
     size_t find_first_local(size_t start, size_t end) override

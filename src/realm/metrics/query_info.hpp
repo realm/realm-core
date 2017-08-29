@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 
+#include <realm/array.hpp>
 #include <realm/util/features.h>
 #include <realm/metrics/metric_timer.hpp>
 
@@ -33,24 +34,31 @@ class Query; // forward declare in namespace realm
 
 namespace metrics {
 
-enum QueryType {
-    query_find,
-    query_find_all,
-    query_count,
-    query_sum,
-    query_average,
-    query_maximum
-};
-
 class QueryInfo {
 public:
-    QueryInfo(const Query* query);
+
+    enum QueryType {
+        type_Find,
+        type_FindAll,
+        type_Count,
+        type_Sum,
+        type_Average,
+        type_Maximum,
+        type_Minimum,
+        type_Invalid
+    };
+
+    QueryInfo(const Query* query, QueryType type);
     ~QueryInfo() noexcept;
 
-    static std::unique_ptr<MetricTimer> track(const Query* query);
+    QueryType get_type() const;
+
+    static std::unique_ptr<MetricTimer> track(const Query* query, QueryType type);
+    static QueryType type_from_action(Action action);
 
 private:
-    std::string m_type;
+    std::string m_description;
+    QueryType m_type;
     std::shared_ptr<MetricTimerResult> m_query_time;
 };
 

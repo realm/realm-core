@@ -20,44 +20,79 @@
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/query.hpp>
+#include <realm/query_engine.hpp>
 
 #if REALM_METRICS
 
 using namespace realm;
 using namespace realm::metrics;
 
-QueryInfo::QueryInfo(const Query* query)
+QueryInfo::QueryInfo(const Query* query, QueryType type)
+    : m_type(type)
 {
     REALM_ASSERT(query);
 
     const Group* group = query->m_table->get_parent_group();
     REALM_ASSERT(group);
 
-    StringData table_name = group->get_table_name(query->m_table->get_index_in_group());
-
-    m_type = table_name;
+    m_description = query->root_node()->describe("");
 }
 
 QueryInfo::~QueryInfo() noexcept
 {
 }
 
-std::unique_ptr<MetricTimer> QueryInfo::track(const Query* query)
+QueryInfo::QueryType QueryInfo::get_type() const
 {
-    REALM_ASSERT(query);
+    return m_type;
+}
+
+std::unique_ptr<MetricTimer> QueryInfo::track(const Query* query, QueryType type)
+{
+    REALM_ASSERT_DEBUG(query);
     const Group* group = query->m_table->get_parent_group();
-    REALM_ASSERT(group);
+
+    // If the table is not attached to a group we cannot track it's metrics.
+    if (!group)
+        return nullptr;
 
     std::shared_ptr<Metrics> metrics = group->get_metrics();
     if (!metrics)
         return nullptr;
 
-    QueryInfo info(query);
+    QueryInfo info(query, type);
     info.m_query_time = std::make_shared<MetricTimerResult>();
     metrics->add_query(info);
 
     return std::make_unique<MetricTimer>(info.m_query_time);
 }
 
+QueryInfo::QueryType QueryInfo::type_from_action(Action action)
+{
+    switch (action)
+    {
+        case act_ReturnFirst:
+            return type_Find;
+        case act_Sum:
+            return type_Sum;
+        case act_Max:
+            return type_Maximum;
+        case act_Min:
+            return type_Minimum;
+        case act_Average:
+            return type_Average;
+        case act_Count:
+            return type_Count;
+        case act_FindAll:
+            return type_FindAll;
+        case act_CallIdx:
+        case act_CallbackIdx:
+        case act_CallbackVal:
+        case act_CallbackNone:
+        case act_CallbackBoth:
+            return type_Invalid;
+    };
+    REALM_UNREACHABLE();
+}
 
 #endif // REALM_METRICS
