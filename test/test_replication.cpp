@@ -3578,6 +3578,38 @@ TEST(Replication_SetUnique)
 }
 
 
+TEST(Replication_AddRowWithKey)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    util::Logger& replay_logger = test_context.logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("table");
+        table1->add_column(type_Int, "c1");
+        table1->add_search_index(0);
+        table1->add_row_with_key(0, 123);
+        table1->add_row_with_key(0, 456);
+        CHECK_EQUAL(table1->size(), 2);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table2 = rt.get_table("table");
+
+        CHECK_EQUAL(table2->find_first_int(0, 123), 0);
+        CHECK_EQUAL(table2->find_first_int(0, 456), 1);
+    }
+}
+
+
 TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColumn)
 {
     SHARED_GROUP_TEST_PATH(path_1);
@@ -3791,6 +3823,70 @@ TEST(Replication_MoveSelectedLinkView)
     // link list to a new row or column index.
 }
 
+TEST(Replication_SubtableSearchIndex)
+{
+    // 1st: Create table with two rows
+    // 2nd: Select link list via 2nd row
+    // 3rd: Delete first row by move last over (which moves the row of the selected link list)
+    // 4th: Modify the selected link list.
+    // 5th: Replay changeset on different Realm
+
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    util::Logger& replay_logger = test_context.logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        DescriptorRef subdesc;
+        TableRef table = wt.add_table("first");
+        table->add_column(type_Table, "sub", &subdesc);
+        subdesc->add_column(type_String, "strings");
+        wt.commit();
+    }
+
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table = rt.get_table("first");
+        ConstDescriptorRef sub = table->get_subdescriptor(0);
+        CHECK(!sub->has_search_index(0));
+    }
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("first");
+        DescriptorRef sub = table->get_subdescriptor(0);
+        sub->add_search_index(0);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table = rt.get_table("first");
+        ConstDescriptorRef sub = table->get_subdescriptor(0);
+        CHECK(sub->has_search_index(0));
+    }
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("first");
+        DescriptorRef sub = table->get_subdescriptor(0);
+        sub->remove_search_index(0);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table = rt.get_table("first");
+        ConstDescriptorRef sub = table->get_subdescriptor(0);
+        CHECK(!sub->has_search_index(0));
+    }
+}
 
 TEST(Replication_HistorySchemaVersionNormal)
 {

@@ -36,6 +36,7 @@ Thumbs.db
 
 # Ignore files build by Visual Studio
 /.vs
+/Visual\ Studio
 
 # Ignore Eclipse settings
 /.settings

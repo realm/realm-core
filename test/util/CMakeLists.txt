@@ -1,9 +1,9 @@
 set(TEST_UTIL_SOURCES
+    benchmark_results.cpp
     demangle.cpp
     mem.cpp
     timer.cpp
     random.cpp
-    benchmark_results.cpp
     quote.cpp
     wildcard.cpp
     unit_test.cpp

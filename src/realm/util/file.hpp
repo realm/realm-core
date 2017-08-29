@@ -31,6 +31,7 @@
 #include <dirent.h> // POSIX.1-2001
 #endif
 
+#include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -203,6 +204,7 @@ public:
     /// Calling this function on an instance, that is not currently
     /// attached to an open file, has undefined behavior.
     size_t read(char* data, size_t size);
+    static size_t read_static(FileDesc fd, char* data, size_t size);
 
     /// Write the specified data to this file.
     ///
@@ -212,6 +214,10 @@ public:
     /// Calling this function on an instance, that was opened in
     /// read-only mode, has undefined behavior.
     void write(const char* data, size_t size);
+    static void write_static(FileDesc fd, const char* data, size_t size);
+
+    // Tells current file pointer of fd
+    static uint64_t get_file_pos(FileDesc fd);
 
     /// Calls write(s.data(), s.size()).
     void write(const std::string& s)
@@ -239,6 +245,7 @@ public:
     /// Calling this function on an instance that is not attached to
     /// an open file has undefined behavior.
     SizeType get_size() const;
+    static SizeType get_size_static(FileDesc fd);
 
     /// If this causes the file to grow, then the new section will
     /// have undefined contents. Setting the size with this function
@@ -295,6 +302,7 @@ public:
     /// instance. Distinct File instances have separate independent
     /// offsets, as long as the cucrrent process is not forked.
     void seek(SizeType);
+    static void seek_static(FileDesc, SizeType);
 
     /// Flush in-kernel buffers to disk. This blocks the caller until the
     /// synchronization operation is complete. On POSIX systems this function
@@ -470,6 +478,7 @@ public:
     /// Both instances have to be attached to open files. If they are
     /// not, this function has undefined behavior.
     bool is_same_file(const File&) const;
+    static bool is_same_file_static(FileDesc f1, FileDesc f2);
 
     // FIXME: Get rid of this method
     bool is_removed() const;
@@ -558,14 +567,11 @@ public:
 
 private:
 #ifdef _WIN32
-    void* m_handle;
-    bool m_have_lock; // Only valid when m_handle is not null
-
-    SizeType get_file_position(); // POSIX version not needed because it's only used by Windows version of resize().
+    void* m_fd;
+    bool m_have_lock; // Only valid when m_fd is not null
 #else
     int m_fd;
 #endif
-
     std::unique_ptr<const char[]> m_encryption_key = nullptr;
 
     bool lock(bool exclusive, bool non_blocking);
@@ -917,7 +923,7 @@ private:
 inline File::File(const std::string& path, Mode m)
 {
 #ifdef _WIN32
-    m_handle = nullptr;
+    m_fd = nullptr;
 #else
     m_fd = -1;
 #endif
@@ -928,7 +934,7 @@ inline File::File(const std::string& path, Mode m)
 inline File::File() noexcept
 {
 #ifdef _WIN32
-    m_handle = nullptr;
+    m_fd = nullptr;
 #else
     m_fd = -1;
 #endif
@@ -942,9 +948,9 @@ inline File::~File() noexcept
 inline File::File(File&& f) noexcept
 {
 #ifdef _WIN32
-    m_handle = f.m_handle;
+    m_fd = f.m_fd;
     m_have_lock = f.m_have_lock;
-    f.m_handle = nullptr;
+    f.m_fd = nullptr;
 #else
     m_fd = f.m_fd;
     f.m_fd = -1;
@@ -956,9 +962,9 @@ inline File& File::operator=(File&& f) noexcept
 {
     close();
 #ifdef _WIN32
-    m_handle = f.m_handle;
+    m_fd = f.m_fd;
     m_have_lock = f.m_have_lock;
-    f.m_handle = nullptr;
+    f.m_fd = nullptr;
 #else
     m_fd = f.m_fd;
     f.m_fd = -1;
@@ -1016,7 +1022,7 @@ inline void File::open(const std::string& path, bool& was_created)
 inline bool File::is_attached() const noexcept
 {
 #ifdef _WIN32
-    return (m_handle != nullptr);
+    return (m_fd != nullptr);
 #else
     return 0 <= m_fd;
 #endif

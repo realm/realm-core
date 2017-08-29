@@ -49,7 +49,7 @@ TEST(ThreadSafety_LinkViewDestruction)
         }
     });
 
-    for (int k = 0; k < 50; ++k) {
+    for (int k = 0; k < 5; ++k) {
         auto group = std::make_shared<Group>();
 
         TableRef table = group->add_table("table");
@@ -105,12 +105,12 @@ TEST(ThreadSafety_TableViewDestruction)
         }
     });
 
-    for (int k = 0; k < 20; ++k) {
+    for (int k = 0; k < 4; ++k) {
         auto group = std::make_shared<Group>();
 
         TableRef table = group->add_table("table");
         table->add_column(type_Int, "int");
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < 1000; i++) {
             auto table_view = std::make_shared<TableView>(table->where().find_all());
             {
                 LockGuard lock(mutex);

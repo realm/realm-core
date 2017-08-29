@@ -16,14 +16,12 @@
  *
  **************************************************************************/
 
-// All unit tests here suddenly broke on Windows, maybe after encryption was added
-
 #include <map>
 #include <sstream>
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
-
+#include <thread>
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
 
@@ -1554,6 +1552,17 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
+    // Check that subtable accessors are updated with respect to spec reference
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        DescriptorRef subdesc;
+        parent_w->add_column(type_Table, "c", &subdesc);
+        subdesc->add_column(type_Int, "y");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
     CHECK_EQUAL(3, parent->size());
     CHECK(subtab_0_0->is_attached());
     CHECK(subtab_0_1->is_attached());
@@ -1572,6 +1581,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     {
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.get_table("parent");
+        parent_w->remove_column(2);
         parent_w->insert_column(0, type_Table, "dummy_1");
         parent_w->insert_empty_row(0);
         TableRef subtab_0_0_w = parent_w->get_subtable(1, 1);
@@ -2631,9 +2641,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Int, "a");
         parent_w->add_search_index(0);
-        parent_w->add_empty_row(2);
-        parent_w->set_int(0, 0, 27);
-        parent_w->set_int(0, 1, 227);
+        parent_w->add_row_with_key(0, 27);
+        parent_w->add_row_with_key(0, 227);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2670,6 +2679,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(3, row_2.get_index());
     CHECK_EQUAL(27, row_1.get_int(0));
     CHECK_EQUAL(227, row_2.get_int(0));
+
     {
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.get_table("parent");
@@ -7746,6 +7756,10 @@ public:
     {
         return false;
     }
+    bool add_row_with_key(size_t, size_t, size_t, int64_t)
+    {
+        return false;
+    }
     bool erase_rows(size_t, size_t, size_t, bool)
     {
         return false;
@@ -7758,7 +7772,7 @@ public:
     {
         return false;
     }
-    bool clear_table() noexcept
+    bool clear_table(size_t) noexcept
     {
         return false;
     }
@@ -9131,7 +9145,7 @@ void multiple_trackers_writer_thread(std::string path)
             insert(tr, idx, 0);
         }
         wt.commit();
-        sched_yield();
+        std::this_thread::yield();
     }
 }
 
@@ -9159,7 +9173,7 @@ void multiple_trackers_reader_thread(TestContext& test_context, std::string path
         CHECK_EQUAL(1, tv.size());
         CHECK_EQUAL(42, tv.get_int(0, 0));
         while (!sg.has_changed())
-            sched_yield();
+            std::this_thread::yield();
         LangBindHelper::advance_read(sg);
     }
     CHECK_EQUAL(0, tv.size());
@@ -9190,7 +9204,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     Thread threads[write_thread_count + read_thread_count];
     for (int i = 0; i < write_thread_count; ++i)
         threads[i].start([&] { multiple_trackers_writer_thread(path); });
-    sched_yield();
+    std::this_thread::yield();
     for (int i = 0; i < read_thread_count; ++i) {
         threads[write_thread_count + i].start([&] { multiple_trackers_reader_thread(test_context, path); });
     }
@@ -9205,7 +9219,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
         ConstTableRef tr = rt.get_table("table");
         if (tr->get_int(0, 0) == read_thread_count)
             break;
-        sched_yield();
+        std::this_thread::yield();
     }
     // signal to all readers to complete
     {
@@ -10179,7 +10193,7 @@ void handover_writer(std::string path)
         // improve chance of consumers running concurrently with
         // new writes:
         for (int n = 0; n < 10; ++n)
-            sched_yield();
+            std::this_thread::yield();
     }
     LangBindHelper::promote_to_write(sg);
     table->set_int(0, 0, 0); // <---- signals other threads to stop
@@ -10205,7 +10219,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
         // wait here for writer to change the database. Kind of wasteful, but wait_for_change()
         // is not available on osx.
         if (!sg.has_changed()) {
-            sched_yield();
+            std::this_thread::yield();
             continue;
         }
         LangBindHelper::advance_read(sg);
@@ -10217,7 +10231,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
         // here we need to allow the reciever to get hold on the proper version before
         // we go through the loop again and advance_read().
         control->wait_feedback();
-        sched_yield();
+        std::this_thread::yield();
 
         if (table->size() > 0 && table->get_int(0, 0) == 0)
             break;
@@ -10530,7 +10544,7 @@ void do_read_verify(std::string path) {
             REALM_ASSERT_EX(t->get_column_name(0) == StringData("count"), t->get_column_name(0).data());
             REALM_ASSERT_EX(t->get_column_name(1) == StringData("char"), t->get_column_name(1).data());
             REALM_ASSERT_EX(t->get_column_name(2) == StringData("payload"), t->get_column_name(2).data());
-            std::string std_validator(num_chars, c[0]);
+            std::string std_validator(static_cast<unsigned int>(num_chars), c[0]);
             StringData validator(std_validator);
             StringData s = t->get_string(2, r);
             REALM_ASSERT_EX(s.size() == validator.size(), r, s.size(), validator.size());
@@ -10888,11 +10902,6 @@ TEST(LangBindHelper_HandoverDistinctView)
             tv2->sync_if_needed();
             CHECK_EQUAL(tv2->size(), 1);
             CHECK_EQUAL(tv2->get_source_ndx(0), 0);
-
-            // Remove distinct property
-            tv2->distinct(SortDescriptor{});
-            tv2->sync_if_needed();
-            CHECK_EQUAL(tv2->size(), 2);
         }
     }
 }
@@ -13322,6 +13331,75 @@ TEST(LangBindHelper_NonsharedAccessToRealmWithHistory)
     SharedGroup sg{path};
     ReadTransaction rt{sg};
     CHECK(rt.has_table("foo"));
+}
+
+TEST(LangBindHelper_UpdateSubtableMap)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w);
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    TableRef target = g.add_table("target");
+    DescriptorRef subdescr;
+    target->add_column(type_Table, "subtables", true, &subdescr);
+    subdescr->add_column(type_Int, "integers", nullptr, true);
+
+    TableRef origin = g.add_table("origin");
+    target->add_empty_row(10);
+    origin->add_column_link(type_LinkList, "links", *target);
+
+    // Make sure to create an entry in the subtable map
+    TableRef sub = target->get_subtable(0, 6);
+    sub->clear();
+    sub->add_empty_row(1);
+    sub->set_int(0, 0, 53, false);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    // This will have the effect that the spec of the target table will be updated
+    // but not the columns. The cached table pointer to entry 6 must be updated.
+    g.insert_table(0, "another");
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+}
+
+TEST(LangBindHelper_UpdateDescriptor)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w);
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    TableRef target = g.add_table("target");
+    DescriptorRef subdescr;
+    target->add_column(type_Table, "subtables", true, &subdescr);
+    subdescr->add_column(type_Int, "integers", nullptr, true);
+
+    TableRef origin = g.add_table("origin");
+    target->add_empty_row(10);
+    origin->add_column_link(type_LinkList, "links", *target);
+
+    // Make sure to create an entry in the subtable map
+    TableRef sub = target->get_subtable(0, 6);
+    sub->clear();
+    sub->add_empty_row(1);
+    sub->set_int(0, 0, 53, false);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    // This will have the effect that the spec of the target table will be updated
+    g.insert_table(0, "another");
+    // Now the spec of the target table will be cached in target->m_descriptor.
+    TableView tv = sub->where().equal(0, 53).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    // Here the cached values should be destroyed
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+
+    // Try again. The Descriptor should be created again
+    tv = sub->where().equal(0, 53).find_all();
+    CHECK_EQUAL(tv.size(), 1);
 }
 
 #endif

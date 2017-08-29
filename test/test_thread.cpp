@@ -25,19 +25,20 @@
 #include <queue>
 #include <functional>
 #include <mutex>
+#include <thread>
+#include <atomic>
 
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/time.h>
+#include <realm/utilities.hpp> // gettimeofday()
 #endif
 
 #include <realm/group_shared_options.hpp>
 #include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
-#ifndef _WIN32
 #include <realm/util/interprocess_condvar.hpp>
-#endif
 #include <realm/util/interprocess_mutex.hpp>
 
 #include <iostream>
@@ -313,7 +314,7 @@ TEST(Thread_MutexLock)
     }
 }
 
-
+#ifdef REALM_HAVE_PTHREAD_PROCESS_SHARED
 TEST(Thread_ProcessSharedMutex)
 {
     Mutex mutex((Mutex::process_shared_tag()));
@@ -324,7 +325,7 @@ TEST(Thread_ProcessSharedMutex)
         LockGuard lock(mutex);
     }
 }
-
+#endif
 
 TEST(Thread_CriticalSection)
 {
@@ -624,6 +625,8 @@ TEST(Thread_RobustMutexTryLock)
     m.unlock();
 }
 
+#ifndef _WIN32 // FIXME: trylock is not supported by the win32-pthread lib on Windows. No need to fix this
+               // because we are going to switch to native API soon and discard win32-pthread entirely
 NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
 {
     Thread thread;
@@ -668,8 +671,7 @@ NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
     m.release_shared_part();
 }
 
-
-#ifndef _WIN32 // interprocess condvars not suported in Windows yet
+#endif
 
 // Detect and flag trivial implementations of condvars.
 namespace {
@@ -753,8 +755,8 @@ NONCONCURRENT_TEST(Thread_CondvarWaits)
     InterprocessCondVar::SharedPart condvar_part;
     TEST_PATH(path);
     SharedGroupOptions default_options;
-    mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
+    mutex.set_shared_part(mutex_part, path, "Thread_CondvarWaits_Mutex");
+    changed.set_shared_part(condvar_part, path, "Thread_CondvarWaits_CondVar", default_options.temp_dir);
     changed.init_shared_part(condvar_part);
     Thread signal_thread;
     signals = 0;
@@ -785,8 +787,10 @@ NONCONCURRENT_TEST(Thread_CondvarIsStateless)
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
     SharedGroupOptions default_options;
-    mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
+
+    // Must have names because default_options.temp_dir is empty string on Windows
+    mutex.set_shared_part(mutex_part, path, "Thread_CondvarIsStateless_Mutex");
+    changed.set_shared_part(condvar_part, path, "Thread_CondvarIsStateless_CondVar", default_options.temp_dir);
     Thread signal_thread;
     signal_state = 1;
     // send some signals:
@@ -821,8 +825,8 @@ NONCONCURRENT_TEST(Thread_CondvarTimeout)
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
     SharedGroupOptions default_options;
-    mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
+    mutex.set_shared_part(mutex_part, path, "Thread_CondvarTimeout_Mutex");
+    changed.set_shared_part(condvar_part, path, "Thread_CondvarTimeout_CondVar", default_options.temp_dir);
     struct timespec time_limit;
     timeval tv;
     gettimeofday(&tv, nullptr);
@@ -854,8 +858,8 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
     SharedGroupOptions default_options;
-    mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
+    mutex.set_shared_part(mutex_part, path, "Thread_CondvarNotifyAllWakeup_Mutex");
+    changed.set_shared_part(condvar_part, path, "Thread_CondvarNotifyAllWakeup_CondVar", default_options.temp_dir);
 
     size_t num_threads_holding_lock = 0;
     std::mutex control_mutex;
@@ -900,8 +904,8 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
     bowl_of_stones_semaphore feedback(0);
     SHARED_GROUP_TEST_PATH(path);
     SharedGroupOptions default_options;
-    mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
+    mutex.set_shared_part(mutex_part, path, "Thread_CondvarNotifyWakeup_Mutex");
+    changed.set_shared_part(condvar_part, path, "Thread_CondvarNotifyWakeup_CondVar", default_options.temp_dir);
     const int num_waiters = 10;
     Thread waiters[num_waiters];
     for (int i = 0; i < num_waiters; ++i) {
@@ -933,6 +937,101 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
 }
 
 
-#endif // _WIN32
+// Test that the unlock+wait operation of wait() takes part atomically, i.e. that there is no time
+// gap between them where another thread could invoke signal() which could go undetected by the wait.
+// This test takes more than 3 days with valgrind.
+TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    const int iter = 10000;
+
+    // It's nice to have many threads to trigger preemption (see notes inside the t1 thread)
+    const int thread_pair_count = 2; // std::thread::hardware_concurrency();
+    std::vector<std::thread> threads;
+    for (int tpc = 0; tpc < thread_pair_count; tpc++) {
+
+        threads.push_back(std::thread([&]() {
+            InterprocessMutex mutex;
+            InterprocessMutex::SharedPart mutex_part;
+            InterprocessCondVar condvar;
+            InterprocessCondVar::SharedPart condvar_part;
+            SharedGroupOptions default_options;
+
+            std::stringstream ss;
+            ss << std::this_thread::get_id();
+            std::string id = ss.str();
+
+            mutex.set_shared_part(mutex_part, path, "mutex" + id);
+            condvar.set_shared_part(condvar_part, path, "sema" + id, default_options.temp_dir);
+            InterprocessCondVar::init_shared_part(condvar_part);
+
+            std::atomic<bool> signal(false);
+            std::atomic<bool> end(false);
+
+            std::thread t1([&]() {
+                for (int i = 0; i < iter; i++) {
+                    mutex.lock();
+                    signal = true;
+
+                    // A gap in wait() could be very tight, so we need a way to preemt it between two instructions.
+                    // Problem is that we have so many/frequent operating system wait calls in this that they might 
+                    // be invoked closer than a thread time slice, so preemption would never occur. So we create 
+                    // some work that some times willsome times bring the current time slice close to its end.
+
+                    // Wait between 0 and number of clocks on 100 ms on a on 3 GHz machine (100 ms is Linux default
+                    // time slice)
+                    uint64_t clocks_to_wait = fastrand(3ULL * 1000000000ULL / 1000000ULL * 100ULL); 
+
+                    // This loop can wait alot more than 100 ms because each iteration takes many more clocks than 
+                    // just 1. That's intentional and will cover other OS'es with bigger time slices.
+                    volatile int sum = 0; // must be volatile, else it compiles into no-op
+                    for (uint64_t t = 0; t < clocks_to_wait; t++) {
+                        sum++;
+                    }
+
+                    condvar.wait(mutex, nullptr);
+                    mutex.unlock();
+                }
+            });
+
+            // This thread calls notify() exactly one time after the other thread has invoked wait() and has
+            // released the mutex. If wait() misses the notify() then there is a bug, which will reveal itself 
+            // by both threads hanging infinitely.
+            std::thread t2([&]() {
+                for (int i = 0; i < iter; i++) {
+                    while (!signal) {
+                    }
+                    signal = false;
+                    mutex.lock();
+                    condvar.notify();
+                    mutex.unlock();
+                }
+            });
+            
+            t1.join();
+            t2.join();
+        }));
+    }
+
+    for (int i = 0; i < thread_pair_count; i++) {
+        threads[i].join();
+    }
+}
+
+#ifdef _WIN32
+TEST(Thread_Win32InterprocessBackslashes)
+{
+    InterprocessMutex mutex;
+    InterprocessMutex::SharedPart mutex_part;
+    InterprocessCondVar condvar;
+    InterprocessCondVar::SharedPart condvar_part;
+    InterprocessCondVar::init_shared_part(condvar_part);
+    SharedGroupOptions default_options;
+
+    mutex.set_shared_part(mutex_part, "Path\\With\\Slashes", "my_mutex");
+    condvar.set_shared_part(condvar_part, "Path\\With\\Slashes", "my_condvar", default_options.temp_dir);
+}
+#endif
 
 #endif // TEST_THREAD
