@@ -29,7 +29,7 @@
 #include <realm/exceptions.hpp>
 #include <realm/impl/input_stream.hpp>
 #include <realm/impl/output_stream.hpp>
-#include <realm/impl/cont_transactions_history.hpp>
+#include <realm/impl/continuous_transactions_history.hpp>
 #include <realm/table.hpp>
 #include <realm/alloc_slab.hpp>
 

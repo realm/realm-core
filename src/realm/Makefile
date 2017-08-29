@@ -65,7 +65,7 @@ descriptor.hpp \
 group.hpp \
 group_shared.hpp \
 group_shared_options.hpp \
-impl/cont_transactions_history.hpp \
+impl/continuous_transactions_history.hpp \
 handover_defs.hpp \
 replication.hpp \
 impl/sequential_getter.hpp \
