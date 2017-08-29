@@ -33,6 +33,7 @@ namespace metrics {
 
 class Metrics {
 public:
+    Metrics();
     ~Metrics() noexcept;
     size_t num_query_metrics() const;
     size_t num_transaction_metrics() const;
@@ -40,9 +41,15 @@ public:
     void add_query(QueryInfo info);
     void add_transaction(TransactionInfo info);
 
+    using QueryInfoList = std::vector<QueryInfo>;
+    using TransactionInfoList = std::vector<TransactionInfo>;
+
+    // Get the list of metric objects tracked since the last take
+    std::unique_ptr<QueryInfoList> take_queries();
+    std::unique_ptr<TransactionInfoList> take_transactions();
 private:
-    std::vector<QueryInfo> m_query_info;
-    std::vector<TransactionInfo> m_transaction_info;
+    std::unique_ptr<QueryInfoList> m_query_info;
+    std::unique_ptr<TransactionInfoList> m_transaction_info;
 };
 
 

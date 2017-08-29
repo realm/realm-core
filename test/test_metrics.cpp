@@ -113,7 +113,46 @@ TEST(Metrics_HasReportsWhenEnabled)
     //CHECK(metrics->num_transaction_metrics() != 0);
 }
 
+TEST(Metrics_QueryTypes)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    SharedGroup sg(*hist, options);
+    CHECK(sg.get_metrics());
+    Group& g = sg.begin_write();
+    auto table = g.add_table("table");
+    table->add_column(type_Int, "first");
+    table->add_empty_row(10);
+    sg.commit();
+    sg.begin_read();
+    table = g.get_table("table");
+    CHECK(bool(table));
+    Query query = table->column<int64_t>(0) == 0;
+    query.find();
+    query.find_all();
+    query.count();
+    query.sum_int(0);
+    query.average_int(0);
+    query.maximum_int(0);
+    query.minimum_int(0);
+    sg.end_read();
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+    CHECK(metrics->num_query_metrics() == 7);
+    std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
+    CHECK(metrics->num_query_metrics() == 0);
+    CHECK(queries && queries->size() == 7);
+    CHECK(queries->at(0).get_type() == QueryInfo::type_Find);
+    CHECK(queries->at(1).get_type() == QueryInfo::type_FindAll);
+    CHECK(queries->at(2).get_type() == QueryInfo::type_Count);
+    CHECK(queries->at(3).get_type() == QueryInfo::type_Sum);
+    CHECK(queries->at(4).get_type() == QueryInfo::type_Average);
+    CHECK(queries->at(5).get_type() == QueryInfo::type_Maximum);
+    CHECK(queries->at(6).get_type() == QueryInfo::type_Minimum);
+}
+
 
 #endif // REALM_METRICS
 #endif // TEST_METRICS
-

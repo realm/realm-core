@@ -23,29 +23,53 @@
 using namespace realm;
 using namespace realm::metrics;
 
+Metrics::Metrics()
+{
+    m_query_info = std::make_unique<QueryInfoList>();
+    m_transaction_info = std::make_unique<TransactionInfoList>();
+}
+
 Metrics::~Metrics() noexcept
 {
 }
 
 size_t Metrics::num_query_metrics() const
 {
-    return m_query_info.size();
+    return m_query_info ? m_query_info->size() : 0;
 }
 
 size_t Metrics::num_transaction_metrics() const
 {
-    return m_transaction_info.size();
+    return m_transaction_info ? m_transaction_info->size() : 0;
 }
 
 void Metrics::add_query(QueryInfo info)
 {
-    m_query_info.push_back(info);
+    REALM_ASSERT_DEBUG(m_query_info);
+    m_query_info->push_back(info);
 }
 
 void Metrics::add_transaction(TransactionInfo info)
 {
-    m_transaction_info.push_back(info);
+    REALM_ASSERT_DEBUG(m_transaction_info);
+    m_transaction_info->push_back(info);
 }
+
+std::unique_ptr<Metrics::QueryInfoList> Metrics::take_queries()
+{
+
+    std::unique_ptr<QueryInfoList> values = std::make_unique<QueryInfoList>();
+    values.swap(m_query_info);
+    return values;
+}
+
+std::unique_ptr<Metrics::TransactionInfoList> Metrics::take_transactions()
+{
+    std::unique_ptr<TransactionInfoList> values = std::make_unique<TransactionInfoList>();
+    values.swap(m_transaction_info);
+    return values;
+}
+
 
 
 #endif // REALM_METRICS
