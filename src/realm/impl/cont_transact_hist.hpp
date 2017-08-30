@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#ifndef REALM_IMPL_CONTINUOUS_TRANSACTIONS_HISTORY_HPP
-#define REALM_IMPL_CONTINUOUS_TRANSACTIONS_HISTORY_HPP
+#ifndef REALM_IMPL_CONT_TRANSACT_HIST_HPP
+#define REALM_IMPL_CONT_TRANSACT_HIST_HPP
 
 #include <cstdint>
 #include <memory>
