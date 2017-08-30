@@ -1,16 +1,9 @@
-# NEXT RELEASE
+# 2.9.1 Release notes
 
 ### Bugfixes
 
-* Lorem ipsum.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
+* Add an explicit instantiation of Table::find_first for BinaryData
+  PR [#2823](https://github.com/realm/realm-core/pull/2823)
 
 -----------
 
