@@ -42,6 +42,11 @@ QueryInfo::~QueryInfo() noexcept
 {
 }
 
+std::string QueryInfo::get_description() const
+{
+    return m_description;
+}
+
 QueryInfo::QueryType QueryInfo::get_type() const
 {
     return m_type;

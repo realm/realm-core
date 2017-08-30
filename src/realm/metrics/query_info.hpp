@@ -51,6 +51,7 @@ public:
     QueryInfo(const Query* query, QueryType type);
     ~QueryInfo() noexcept;
 
+    std::string get_description() const;
     QueryType get_type() const;
 
     static std::unique_ptr<MetricTimer> track(const Query* query, QueryType type);

@@ -276,6 +276,19 @@ public:
     }
 
     virtual void verify_column() const = 0;
+
+    virtual std::string describe_column() const
+    {
+        return describe_column(m_condition_column_idx);
+    }
+    virtual std::string describe_column(size_t col_ndx) const
+    {
+        std::string s;
+        if (m_table && col_ndx != npos) {
+            s = s + std::string(m_table->get_name()) + "." + std::string(m_table->get_column_name(col_ndx));
+        }
+        return s;
+    }
     virtual std::string describe(std::string s) const
     {
         if (m_table && m_condition_column_idx != npos) {
@@ -283,6 +296,12 @@ public:
         }
         return s;
     }
+
+    virtual std::string describe_condition() const
+    {
+        return "matches";
+    }
+
 
     std::unique_ptr<ParentNode> m_child;
     std::vector<ParentNode*> m_children;
@@ -791,9 +810,13 @@ public:
 
     virtual std::string describe(std::string s) const override
     {
-        s = IntegerNodeBase<ColType>::describe(s);
-        return s + " " + TConditionFunction::description() + " " + metrics::print_value(IntegerNodeBase<ColType>::m_value);
+        return ParentNode::describe_column() + " " + describe_condition() + " " + metrics::print_value(IntegerNodeBase<ColType>::m_value);
     }
+    virtual std::string describe_condition() const override
+    {
+        return TConditionFunction::description();
+    }
+
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
@@ -923,6 +946,15 @@ public:
             return find(false);
     }
 
+    virtual std::string describe(std::string s) const override
+    {
+        return this->describe_column() + " " + describe_condition() + " " + metrics::print_value(FloatDoubleNode::m_value);
+    }
+    virtual std::string describe_condition() const override
+    {
+        return TConditionFunction::description();
+    }
+
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
         return std::unique_ptr<ParentNode>(new FloatDoubleNode(*this, patches));
@@ -1047,6 +1079,12 @@ public:
         return not_found;
     }
 
+    virtual std::string describe(std::string s) const override
+    {
+        return this->describe_column() + " " + TConditionFunction::description() + " \""
+            + metrics::print_value(BinaryNode::m_value.data()) + "\"";
+    }
+
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
         return std::unique_ptr<ParentNode>(new BinaryNode(*this, patches));
@@ -1107,6 +1145,11 @@ public:
         return ret;
     }
 
+    virtual std::string describe(std::string s) const override
+    {
+        return this->describe_column() + " " + TConditionFunction::description() + " " + metrics::print_value(TimestampNode::m_value);
+    }
+
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
         return std::unique_ptr<ParentNode>(new TimestampNode(*this, patches));
@@ -1147,11 +1190,6 @@ public:
     {
         do_verify_column(m_condition_column);
     }
-    std::string describe(std::string s) const override
-    {
-        return "stringnodebase " + s;
-    }
-
 
     void init() override
     {
@@ -1179,6 +1217,11 @@ public:
     {
         if (m_condition_column && patches)
             m_condition_column_idx = m_condition_column->get_column_index();
+    }
+
+    virtual std::string describe(std::string s) const override
+    {
+        return this->describe_column() + " " + describe_condition() + " \"" + metrics::print_value(StringNodeBase::m_value) + "\"";
     }
 
 protected:
@@ -1273,6 +1316,11 @@ public:
         return not_found;
     }
 
+    virtual std::string describe_condition() const override
+    {
+        return TConditionFunction::description();
+    }
+
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
         return std::unique_ptr<ParentNode>(new StringNode<TConditionFunction>(*this, patches));
@@ -1334,7 +1382,13 @@ public:
         }
         return not_found;
     }
-    
+
+    virtual std::string describe_condition() const override
+    {
+        return Contains::description();
+    }
+
+
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
         return std::unique_ptr<ParentNode>(new StringNode<Contains>(*this, patches));
@@ -1407,7 +1461,12 @@ public:
         }
         return not_found;
     }
-    
+
+    virtual std::string describe_condition() const override
+    {
+        return ContainsIns::description();
+    }
+
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
         return std::unique_ptr<ParentNode>(new StringNode<ContainsIns>(*this, patches));
@@ -1446,6 +1505,10 @@ public:
     void init() override;
     size_t find_first_local(size_t start, size_t end) override;
 
+    virtual std::string describe_condition() const override
+    {
+        return Equal::description();
+    }
 
 protected:
     inline BinaryData str_to_bin(const StringData& s) noexcept
@@ -1512,6 +1575,11 @@ public:
     }
 
     void _search_index_init() override;
+
+    virtual std::string describe_condition() const override
+    {
+        return EqualIns::description();
+    }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
@@ -1946,10 +2014,15 @@ public:
         do_verify_column(m_column, m_origin_column);
     }
 
-    std::string describe(std::string s) const override
+    virtual std::string describe(std::string s) const override
     {
-        return " links to " + s;
+        return ParentNode::describe_column(m_origin_column) + " " + describe_condition() + " " + metrics::print_value(m_target_row.get_index());
     }
+    virtual std::string describe_condition() const override
+    {
+        return "links to";
+    }
+
 
     size_t find_first_local(size_t start, size_t end) override
     {
