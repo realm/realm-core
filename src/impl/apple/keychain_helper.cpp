@@ -41,6 +41,7 @@ namespace {
 
 constexpr size_t key_size = 64;
 
+#if !TARGET_IPHONE_SIMULATOR
 CFPtr<CFStringRef> convert_string(const std::string& string)
 {
     auto result = adoptCF(CFStringCreateWithBytes(nullptr, reinterpret_cast<const UInt8*>(string.data()),
@@ -50,6 +51,7 @@ CFPtr<CFStringRef> convert_string(const std::string& string)
     }
     return result;
 }
+#endif
 
 CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStringRef service,
                                                       __unused util::Optional<std::string> group)
@@ -64,8 +66,7 @@ CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStr
     CFDictionaryAddValue(d.get(), kSecAttrAccessible, kSecAttrAccessibleAlways);
     CFDictionaryAddValue(d.get(), kSecAttrAccount, account);
     CFDictionaryAddValue(d.get(), kSecAttrService, service);
-#if TARGET_IPHONE_SIMULATOR
-#else
+#if !TARGET_IPHONE_SIMULATOR
     if (group)
         CFDictionaryAddValue(d.get(), kSecAttrAccessGroup, convert_string(*group).get());
 #endif
