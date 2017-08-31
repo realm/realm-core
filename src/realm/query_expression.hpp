@@ -336,11 +336,25 @@ struct RowIndex {
     {
         return !(*this == other);
     }
+    template <class C, class T>
+    friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const RowIndex&);
 
 private:
     util::Optional<size_t> m_row_index;
 };
 
+template <class C, class T>
+inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const RowIndex& r)
+{
+    if (!r.is_attached()) {
+        out << "detached row";
+    } else if (r.is_null()) {
+        out << "null row";
+    } else {
+        out << r.m_row_index;
+    }
+    return out;
+}
 
 struct ValueBase {
     static const size_t default_size = 8;
@@ -1132,7 +1146,14 @@ public:
 
     virtual std::string description() const override
     {
-        return util::to_string(ValueBase::m_values) + (ValueBase::m_values == 1 ? " value" : " values");
+        if (ValueBase::m_from_link_list) {
+            return metrics::print_value(util::to_string(ValueBase::m_values)
+                                        + (ValueBase::m_values == 1 ? " value" : " values"));
+        }
+        if (m_storage.m_size > 0) {
+            return metrics::print_value(m_storage[0]);
+        }
+        return "";
     }
 
     void evaluate(size_t, ValueBase& destination) override
@@ -2175,7 +2196,7 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description();
+        return m_link_map.description() + metrics::value_separator + (has_links ? "is_not_null()" : "is_null()");
     }
 
     std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override
@@ -3262,7 +3283,7 @@ public:
 
     virtual std::string description() const override
     {
-        return "(" + m_query.get_description() + ")" + m_link_map.description()
+        return m_link_map.description() + metrics::value_separator + "(where " + m_query.get_description() + ")"
             + metrics::value_separator + "count()";
     }
 

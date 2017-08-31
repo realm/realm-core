@@ -273,8 +273,8 @@ TEST(Metrics_QueryEqual)
     std::string query_search_term = "equal";
 
     Group& g = sg.begin_write();
-    TableRef person = g.get_table("person");
-    TableRef pet = g.get_table("pet");
+    TableRef person = g.get_table(person_table_name);
+    TableRef pet = g.get_table(pet_table_name);
     CHECK(bool(person));
 
     CHECK_EQUAL(person->get_column_count(), 8);
@@ -345,8 +345,8 @@ TEST(Metrics_QueryOrAndNot)
     std::string query_search_term = "equal";
 
     Group& g = sg.begin_write();
-    TableRef person = g.get_table("person");
-    TableRef pet = g.get_table("pet");
+    TableRef person = g.get_table(person_table_name);
+    TableRef pet = g.get_table(pet_table_name);
     CHECK(bool(person));
 
     CHECK_EQUAL(person->get_column_count(), 8);
@@ -462,6 +462,80 @@ TEST(Metrics_QueryOrAndNot)
     CHECK_EQUAL(find_count(not_and_nested_description, and_nested_description), 1);
     CHECK_EQUAL(find_count(not_and_nested_description, "not"), 1);
 }
+
+
+TEST(Metrics_LinkQueries)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    SharedGroup sg(*hist, options);
+    populate(sg);
+
+    std::string person_table_name = "person";
+    std::string pet_table_name = "pet";
+    std::string query_search_term = "equal";
+
+    Group& g = sg.begin_write();
+    TableRef person = g.get_table(person_table_name);
+    TableRef pet = g.get_table(pet_table_name);
+    CHECK(bool(person));
+
+    CHECK_EQUAL(person->get_column_count(), 8);
+    std::vector<std::string> column_names;
+    for (size_t i = 0; i < person->get_column_count(); ++i) {
+        column_names.push_back(person->get_column_name(i));
+    }
+
+    std::string pet_link_col_name = pet->get_column_name(1);
+
+    Query q0 = pet->column<Link>(1).is_null();
+    Query q1 = pet->column<Link>(1).is_not_null();
+    Query q2 = pet->column<Link>(1).count() == 1;
+    Query q3 = pet->column<Link>(1, person->column<int64_t>(0) >= 27).count() == 1;
+
+    q0.find_all();
+    q1.find_all();
+    q2.find_all();
+    q3.find_all();
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+    std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
+    CHECK(queries);
+
+    // FIXME: q3 adds 6 queries: the find_all() + 1 sub query per row in person
+    // that's how subqueries across links are executed currently so it is accurate
+    // but not sure if this is acceptable for how we track queries
+    CHECK_EQUAL(queries->size(), 10);
+
+    std::string null_links_description = queries->at(0).get_description();
+    CHECK_EQUAL(find_count(null_links_description, "is_null"), 1);
+    CHECK_EQUAL(find_count(null_links_description, pet_link_col_name), 1);
+    CHECK_EQUAL(find_count(null_links_description, pet_table_name), 1);
+
+    std::string not_null_links_description = queries->at(1).get_description();
+    CHECK_EQUAL(find_count(not_null_links_description, "is_not_null"), 1);
+    CHECK_EQUAL(find_count(not_null_links_description, pet_link_col_name), 1);
+    CHECK_EQUAL(find_count(not_null_links_description, pet_table_name), 1);
+
+    std::string count_link_description = queries->at(2).get_description();
+    CHECK_EQUAL(find_count(count_link_description, "count"), 1);
+    CHECK_EQUAL(find_count(count_link_description, pet_link_col_name), 1);
+    CHECK_EQUAL(find_count(count_link_description, pet_table_name), 1);
+    CHECK_EQUAL(find_count(count_link_description, "equal"), 1);
+
+    std::string link_subquery_description = queries->at(3).get_description();
+    CHECK_EQUAL(find_count(link_subquery_description, "count"), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, pet_link_col_name), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, pet_table_name), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, "equal"), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, person_table_name), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, column_names[0]), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, "greater"), 1);
+}
+
 
 #endif // REALM_METRICS
 #endif // TEST_METRICS
