@@ -599,6 +599,67 @@ TEST_CASE("thread safe reference") {
         }
     }
 
+    SECTION("resolve at version where handed over thing has been deleted") {
+        Object obj;
+        auto delete_and_resolve = [&](auto&& list) {
+            auto ref = r->obtain_thread_safe_reference(list);
+
+            r->begin_transaction();
+            obj.row().move_last_over();
+            r->commit_transaction();
+
+            return r->resolve_thread_safe_reference(std::move(ref));
+        };
+
+        SECTION("object") {
+            r->begin_transaction();
+            obj = create_object(r, "int object", {{"value", INT64_C(7)}});
+            r->commit_transaction();
+
+            REQUIRE(!delete_and_resolve(obj).is_valid());
+        }
+
+        SECTION("object list") {
+            r->begin_transaction();
+            obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+            List list(r, *get_table(*r, "int array object"), 0, 0);
+            r->commit_transaction();
+
+            REQUIRE(!delete_and_resolve(list).is_valid());
+        }
+
+        SECTION("int list") {
+            r->begin_transaction();
+            obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(1)}}});
+            List list(r, *get_table(*r, "int array"), 0, 0);
+            r->commit_transaction();
+
+            REQUIRE(!delete_and_resolve(list).is_valid());
+        }
+
+        SECTION("object results") {
+            r->begin_transaction();
+            obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+            List list(r, *get_table(*r, "int array object"), 0, 0);
+            r->commit_transaction();
+
+            auto results = delete_and_resolve(list.sort({{"value", true}}));
+            REQUIRE(results.is_valid());
+            REQUIRE(results.size() == 0);
+        }
+
+        SECTION("int results") {
+            r->begin_transaction();
+            obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(1)}}});
+            List list(r, *get_table(*r, "int array"), 0, 0);
+            r->commit_transaction();
+
+            auto results = delete_and_resolve(list.sort({{"self", true}}));
+            REQUIRE(results.is_valid());
+            REQUIRE(results.size() == 0);
+        }
+    }
+
     SECTION("lifetime") {
         SECTION("retains source realm") { // else version will become unpinned
             auto ref = r->obtain_thread_safe_reference(foo);

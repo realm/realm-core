@@ -120,6 +120,8 @@ void List::validate(RowExpr row) const
 
 bool List::is_valid() const
 {
+    if (!m_realm)
+        return false;
     m_realm->verify_thread();
     if (m_link_view)
         return m_link_view->is_attached();

@@ -881,6 +881,8 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
             // With reference imported, advance temporary Realm to our version
             T imported_value = std::move(reference).import_into_realm(temporary_realm);
             transaction::advance(*temporary_realm->m_shared_group, nullptr, current_version);
+            if (!imported_value.is_valid())
+                return T{};
             reference = ThreadSafeReference<T>(imported_value);
         }
     }
