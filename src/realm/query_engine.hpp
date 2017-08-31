@@ -107,7 +107,6 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/link_view.hpp>
 #include <realm/metrics/query_info.hpp>
 #include <realm/query_conditions.hpp>
-#include <realm/query_expression.hpp>
 #include <realm/query_operators.hpp>
 #include <realm/table.hpp>
 #include <realm/unicode.hpp>
@@ -1989,15 +1988,7 @@ public:
     void table_changed() override;
     void verify_column() const override;
 
-    virtual std::string describe() const override
-    {
-        if (m_expression) {
-            return m_expression->description();
-        }
-        else {
-            return "empty expression";
-        }
-    }
+    virtual std::string describe() const override;
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override;
     void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override;
