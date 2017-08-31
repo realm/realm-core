@@ -102,7 +102,7 @@ struct PropertyExpression
         KeyPath key_path = key_path_from_string(key_path_string);
         for (size_t index = 0; index < key_path.size(); index++) {
             if (prop) {
-                precondition(prop->type == PropertyType::Object || prop->type == PropertyType::Array,
+                precondition(prop->type == PropertyType::Object,
                              util::format("Property '%1' is not a link in object of type '%2'", key_path[index], desc->name));
                 indexes.push_back(prop->table_column);
 
@@ -393,7 +393,7 @@ void do_add_comparison_to_query(Query &query, Predicate::Comparison cmp,
                                 const PropertyExpression &expr, A &lhs, B &rhs, Arguments &args)
 {
     auto type = expr.prop->type;
-    switch (type) {
+    switch (type & ~PropertyType::Flags) {
         case PropertyType::Bool:
             add_bool_constraint_to_query(query, cmp.op, value_of_type_for_query<bool>(expr.table_getter, lhs, args),
                                                         value_of_type_for_query<bool>(expr.table_getter, rhs, args));
@@ -423,7 +423,6 @@ void do_add_comparison_to_query(Query &query, Predicate::Comparison cmp,
                                                           value_of_type_for_query<Binary>(expr.table_getter, rhs, args));
             break;
         case PropertyType::Object:
-        case PropertyType::Array:
             add_link_constraint_to_query(query, cmp.op, expr, link_argument(lhs, rhs, args));
             break;
         default:
@@ -483,7 +482,10 @@ void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op,
 void do_add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, const PropertyExpression &expr)
 {
     auto type = expr.prop->type;
-    switch (type) {
+    if (is_array(type)) {
+        throw std::logic_error("Comparing Lists to 'null' is not supported");
+    }
+    switch (type & ~PropertyType::Flags) {
         case realm::PropertyType::Bool:
             do_add_null_comparison_to_query<bool>(query, cmp.op, expr);
             break;
@@ -508,8 +510,6 @@ void do_add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, co
         case realm::PropertyType::Object:
             do_add_null_comparison_to_query<Link>(query, cmp.op, expr);
             break;
-        case realm::PropertyType::Array:
-            throw std::logic_error("Comparing Lists to 'null' is not supported");
         default:
             throw std::logic_error(util::format("Object type '%1' not supported", expr.prop->type_string()));
     }
