@@ -114,7 +114,6 @@ std::vector<char> metadata_realm_encryption_key(bool check_legacy_service)
     CFStringRef legacy_service = CFSTR("io.realm.sync.keychain");
 
     CFPtr<CFStringRef> service;
-    CFStringRef bundle_id = CFBundleGetIdentifier(CFBundleGetMainBundle());
     if (CFStringRef bundle_id = CFBundleGetIdentifier(CFBundleGetMainBundle()))
         service = adoptCF(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id));
     else {
