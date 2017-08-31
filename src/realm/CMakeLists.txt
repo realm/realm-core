@@ -132,7 +132,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
 
 set(REALM_INSTALL_IMPL_HEADERS
     impl/array_writer.hpp
-    impl/continuous_transactions_history.hpp
+    impl/cont_transact_hist.hpp
     impl/destroy_guard.hpp
     impl/input_stream.hpp
     impl/output_stream.hpp
