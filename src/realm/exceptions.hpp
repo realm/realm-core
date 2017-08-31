@@ -85,6 +85,13 @@ public:
     /// runtime_error::what() returns the msg provided in the constructor.
 };
 
+/// Thrown when creating references that are too large to be contained in our ref_type (size_t)
+class MaximumFileSizeExceeded : public std::runtime_error {
+public:
+    MaximumFileSizeExceeded(const std::string& msg);
+    /// runtime_error::what() returns the msg provided in the constructor.
+};
+
 
 /// The \c LogicError exception class is intended to be thrown only when
 /// applications (or bindings) violate rules that are stated (or ought to have
@@ -258,6 +265,11 @@ inline const char* MultipleSyncAgents::what() const noexcept
 // LCOV_EXCL_STOP
 
 inline AddressSpaceExhausted::AddressSpaceExhausted(const std::string& msg)
+    : std::runtime_error(msg)
+{
+}
+
+inline MaximumFileSizeExceeded::MaximumFileSizeExceeded(const std::string& msg)
     : std::runtime_error(msg)
 {
 }
