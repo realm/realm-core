@@ -1570,6 +1570,14 @@ std::string Query::validate()
     return root_node()->validate(); // errors detected by QueryEngine
 }
 
+std::string Query::get_description() const
+{
+    if (root_node()) {
+        return root_node()->describe_expression();
+    }
+    return "";
+}
+
 void Query::init() const
 {
     REALM_ASSERT(m_table);

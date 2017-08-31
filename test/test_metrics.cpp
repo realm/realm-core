@@ -161,30 +161,45 @@ TEST(Metrics_QueryTypes)
     sg.end_read();
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
-    CHECK(metrics->num_query_metrics() == 17);
+    CHECK_EQUAL(metrics->num_query_metrics(), 17);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
-    CHECK(metrics->num_query_metrics() == 0);
-    CHECK(queries && queries->size() == 17);
-    CHECK(queries->at(0).get_type() == QueryInfo::type_Find);
-    CHECK(queries->at(1).get_type() == QueryInfo::type_FindAll);
-    CHECK(queries->at(2).get_type() == QueryInfo::type_Count);
-    CHECK(queries->at(3).get_type() == QueryInfo::type_Sum);
-    CHECK(queries->at(4).get_type() == QueryInfo::type_Average);
-    CHECK(queries->at(5).get_type() == QueryInfo::type_Maximum);
-    CHECK(queries->at(6).get_type() == QueryInfo::type_Minimum);
+    CHECK_EQUAL(metrics->num_query_metrics(), 0);
+    CHECK(queries);
+    CHECK_EQUAL(queries->size(), 17);
+    CHECK_EQUAL(queries->at(0).get_type(), QueryInfo::type_Find);
+    CHECK_EQUAL(queries->at(1).get_type(), QueryInfo::type_FindAll);
+    CHECK_EQUAL(queries->at(2).get_type(), QueryInfo::type_Count);
+    CHECK_EQUAL(queries->at(3).get_type(), QueryInfo::type_Sum);
+    CHECK_EQUAL(queries->at(4).get_type(), QueryInfo::type_Average);
+    CHECK_EQUAL(queries->at(5).get_type(), QueryInfo::type_Maximum);
+    CHECK_EQUAL(queries->at(6).get_type(), QueryInfo::type_Minimum);
 
-    CHECK(queries->at(7).get_type() == QueryInfo::type_Sum);
-    CHECK(queries->at(8).get_type() == QueryInfo::type_Average);
-    CHECK(queries->at(9).get_type() == QueryInfo::type_Maximum);
-    CHECK(queries->at(10).get_type() == QueryInfo::type_Minimum);
+    CHECK_EQUAL(queries->at(7).get_type(), QueryInfo::type_Sum);
+    CHECK_EQUAL(queries->at(8).get_type(), QueryInfo::type_Average);
+    CHECK_EQUAL(queries->at(9).get_type(), QueryInfo::type_Maximum);
+    CHECK_EQUAL(queries->at(10).get_type(), QueryInfo::type_Minimum);
 
-    CHECK(queries->at(11).get_type() == QueryInfo::type_Sum);
-    CHECK(queries->at(12).get_type() == QueryInfo::type_Average);
-    CHECK(queries->at(13).get_type() == QueryInfo::type_Maximum);
-    CHECK(queries->at(14).get_type() == QueryInfo::type_Minimum);
+    CHECK_EQUAL(queries->at(11).get_type(), QueryInfo::type_Sum);
+    CHECK_EQUAL(queries->at(12).get_type(), QueryInfo::type_Average);
+    CHECK_EQUAL(queries->at(13).get_type(), QueryInfo::type_Maximum);
+    CHECK_EQUAL(queries->at(14).get_type(), QueryInfo::type_Minimum);
 
-    CHECK(queries->at(15).get_type() == QueryInfo::type_Maximum);
-    CHECK(queries->at(16).get_type() == QueryInfo::type_Minimum);
+    CHECK_EQUAL(queries->at(15).get_type(), QueryInfo::type_Maximum);
+    CHECK_EQUAL(queries->at(16).get_type(), QueryInfo::type_Minimum);
+}
+
+size_t find_count(std::string haystack, std::string needle)
+{
+    size_t find_pos = 0;
+    size_t count = 0;
+    while (find_pos < haystack.size()) {
+        find_pos = haystack.find(needle, find_pos);
+        if (find_pos == std::string::npos)
+            break;
+        ++find_pos;
+        ++count;
+    }
+    return count;
 }
 
 void populate(SharedGroup& sg)
@@ -244,7 +259,7 @@ void populate(SharedGroup& sg)
     sg.commit();
 }
 
-ONLY(Metrics_QueryEqual)
+TEST(Metrics_QueryEqual)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
@@ -277,7 +292,8 @@ ONLY(Metrics_QueryEqual)
     Query q5 = person->column<bool>(5) == false;
     BinaryData bd("");
     Query q6 = person->column<BinaryData>(6) == bd;
-    Query q7 = pet->column<Link>(1) == person->get(0);
+    Query q7 = person->column<LinkList>(7) == person->get(0);
+    Query q8 = pet->column<Link>(1) == person->get(0);
 
     q0.find_all();
     q1.find_all();
@@ -287,25 +303,165 @@ ONLY(Metrics_QueryEqual)
     q5.find_all();
     q6.find_all();
     q7.find_all();
+    q8.find_all();
 
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
-    CHECK(queries && queries->size() == 8);
+    CHECK(queries);
+    CHECK_EQUAL(queries->size(), 9);
 
     for (size_t i = 0; i < 7; ++i) {
         std::string description = queries->at(i).get_description();
-        CHECK_NOT_EQUAL(description.find(person_table_name), std::string::npos);
-        CHECK_NOT_EQUAL(description.find(column_names[i]), std::string::npos);
-        CHECK_NOT_EQUAL(description.find(query_search_term), std::string::npos);
+        CHECK_EQUAL(find_count(description, person_table_name), 1);
+        CHECK_EQUAL(find_count(description, column_names[i]), 1);
+        CHECK_EQUAL(find_count(description, query_search_term), 1);
     }
-    std::string description = queries->at(7).get_description();
-    CHECK_NOT_EQUAL(description.find(pet_table_name), std::string::npos);
-    CHECK_NOT_EQUAL(description.find("owner"), std::string::npos);
-    CHECK_NOT_EQUAL(description.find("links to"), std::string::npos);
-
+    {
+        std::string description = queries->at(7).get_description();
+        CHECK_EQUAL(find_count(description, person_table_name), 1);
+        CHECK_EQUAL(find_count(description, column_names[7]), 1);
+        CHECK_EQUAL(find_count(description, "links to"), 1);
+    }
+    {
+        std::string description = queries->at(8).get_description();
+        CHECK_EQUAL(find_count(description, pet_table_name), 1);
+        CHECK_EQUAL(find_count(description, "owner"), 1);
+        CHECK_EQUAL(find_count(description, "links to"), 1);
+    }
 }
 
+TEST(Metrics_QueryOrAndNot)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    SharedGroup sg(*hist, options);
+    populate(sg);
+
+    std::string person_table_name = "person";
+    std::string pet_table_name = "pet";
+    std::string query_search_term = "equal";
+
+    Group& g = sg.begin_write();
+    TableRef person = g.get_table("person");
+    TableRef pet = g.get_table("pet");
+    CHECK(bool(person));
+
+    CHECK_EQUAL(person->get_column_count(), 8);
+    std::vector<std::string> column_names;
+    for (size_t i = 0; i < person->get_column_count(); ++i) {
+        column_names.push_back(person->get_column_name(i));
+    }
+
+    Query q0 = person->column<int64_t>(0) == 0;
+    Query q1 = person->column<double>(1) == 0.0;
+    Query q2 = person->column<float>(2) == 0.1f;
+
+    Query simple_and = q0 && q1;
+    Query simple_or = q0 || q1;
+    Query simple_not = !q0;
+
+    Query or_and = q2 || (simple_and);
+    Query and_or = simple_and || q2;
+    Query or_nested = q2 || simple_or;
+    Query and_nested = q2 && simple_and;
+    Query not_simple_and = !(simple_and);
+    Query not_simple_or = !(simple_or);
+    Query not_or_and = !(or_and);
+    Query not_and_or = !(and_or);
+    Query not_or_nested = !(or_nested);
+    Query not_and_nested = !(and_nested);
+
+    simple_and.find_all();
+    simple_or.find_all();
+    simple_not.find_all();
+    or_and.find_all();
+    and_or.find_all();
+    or_nested.find_all();
+    and_nested.find_all();
+    not_simple_and.find_all();
+    not_simple_or.find_all();
+    not_or_and.find_all();
+    not_and_or.find_all();
+    not_or_nested.find_all();
+    not_and_nested.find_all();
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+    std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
+    CHECK(queries);
+    CHECK_EQUAL(queries->size(), 13);
+
+    std::string and_description = queries->at(0).get_description();
+    CHECK_EQUAL(find_count(and_description, " and "), 1);
+    CHECK_EQUAL(find_count(and_description, column_names[0]), 1);
+    CHECK_EQUAL(find_count(and_description, column_names[1]), 1);
+    CHECK_EQUAL(find_count(and_description, person_table_name), 2);
+    CHECK_EQUAL(find_count(and_description, query_search_term), 2);
+
+    std::string or_description = queries->at(1).get_description();
+    CHECK_EQUAL(find_count(or_description, " or "), 1);
+    CHECK_EQUAL(find_count(or_description, column_names[0]), 1);
+    CHECK_EQUAL(find_count(or_description, column_names[1]), 1);
+    CHECK_EQUAL(find_count(or_description, person_table_name), 2);
+    CHECK_EQUAL(find_count(or_description, query_search_term), 2);
+
+    std::string not_description = queries->at(2).get_description();
+    CHECK_EQUAL(find_count(not_description, "not"), 1);
+    CHECK_EQUAL(find_count(not_description, column_names[0]), 1);
+    CHECK_EQUAL(find_count(not_description, person_table_name), 1);
+    CHECK_EQUAL(find_count(not_description, query_search_term), 1);
+
+    std::string or_and_description = queries->at(3).get_description();
+    CHECK_EQUAL(find_count(or_and_description, and_description), 1);
+    CHECK_EQUAL(find_count(or_and_description, " or "), 1);
+    CHECK_EQUAL(find_count(or_and_description, column_names[2]), 1);
+    CHECK_EQUAL(find_count(or_and_description, person_table_name), 3);
+
+    std::string and_or_description = queries->at(4).get_description();
+    CHECK_EQUAL(find_count(and_or_description, and_description), 1);
+    CHECK_EQUAL(find_count(and_or_description, " or "), 1);
+    CHECK_EQUAL(find_count(and_or_description, column_names[2]), 1);
+    CHECK_EQUAL(find_count(and_or_description, person_table_name), 3);
+
+    std::string or_nested_description = queries->at(5).get_description();
+    CHECK_EQUAL(find_count(or_nested_description, or_description), 1);
+    CHECK_EQUAL(find_count(or_nested_description, " or "), 2);
+    CHECK_EQUAL(find_count(or_nested_description, column_names[2]), 1);
+    CHECK_EQUAL(find_count(or_nested_description, person_table_name), 3);
+
+    std::string and_nested_description = queries->at(6).get_description();
+    CHECK_EQUAL(find_count(and_nested_description, and_description), 1);
+    CHECK_EQUAL(find_count(and_nested_description, " and "), 2);
+    CHECK_EQUAL(find_count(and_nested_description, column_names[2]), 1);
+    CHECK_EQUAL(find_count(and_nested_description, person_table_name), 3);
+
+    std::string not_simple_and_description = queries->at(7).get_description();
+    CHECK_EQUAL(find_count(not_simple_and_description, and_description), 1);
+    CHECK_EQUAL(find_count(not_simple_and_description, "not"), 1);
+
+    std::string not_simple_or_description = queries->at(8).get_description();
+    CHECK_EQUAL(find_count(not_simple_or_description, or_description), 1);
+    CHECK_EQUAL(find_count(not_simple_or_description, "not"), 1);
+
+    std::string not_or_and_description = queries->at(9).get_description();
+    CHECK_EQUAL(find_count(not_or_and_description, or_and_description), 1);
+    CHECK_EQUAL(find_count(not_or_and_description, "not"), 1);
+
+    std::string not_and_or_description = queries->at(10).get_description();
+    CHECK_EQUAL(find_count(not_and_or_description, and_or_description), 1);
+    CHECK_EQUAL(find_count(not_and_or_description, "not"), 1);
+
+    std::string not_or_nested_description = queries->at(11).get_description();
+    CHECK_EQUAL(find_count(not_or_nested_description, or_nested_description), 1);
+    CHECK_EQUAL(find_count(not_or_nested_description, "not"), 1);
+
+    std::string not_and_nested_description = queries->at(12).get_description();
+    CHECK_EQUAL(find_count(not_and_nested_description, and_nested_description), 1);
+    CHECK_EQUAL(find_count(not_and_nested_description, "not"), 1);
+}
 
 #endif // REALM_METRICS
 #endif // TEST_METRICS

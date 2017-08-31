@@ -341,6 +341,8 @@ public:
 
     std::string validate();
 
+    std::string get_description() const;
+
 private:
     Query(Table& table, TableViewBase* tv = nullptr);
     void create();

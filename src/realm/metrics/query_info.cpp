@@ -35,7 +35,7 @@ QueryInfo::QueryInfo(const Query* query, QueryType type)
     const Group* group = query->m_table->get_parent_group();
     REALM_ASSERT(group);
 
-    m_description = query->root_node()->describe("");
+    m_description = query->get_description();
 }
 
 QueryInfo::~QueryInfo() noexcept
@@ -55,6 +55,11 @@ QueryInfo::QueryType QueryInfo::get_type() const
 std::unique_ptr<MetricTimer> QueryInfo::track(const Query* query, QueryType type)
 {
     REALM_ASSERT_DEBUG(query);
+
+    if (!bool(query->m_table) || !query->m_table->is_attached()) {
+        return nullptr;
+    }
+
     const Group* group = query->m_table->get_parent_group();
 
     // If the table is not attached to a group we cannot track it's metrics.

@@ -105,7 +105,9 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/column_type_traits.hpp>
 #include <realm/impl/sequential_getter.hpp>
 #include <realm/link_view.hpp>
+#include <realm/metrics/query_info.hpp>
 #include <realm/query_conditions.hpp>
+#include <realm/query_expression.hpp>
 #include <realm/query_operators.hpp>
 #include <realm/table.hpp>
 #include <realm/unicode.hpp>
@@ -137,17 +139,6 @@ const size_t probe_matches = 4;
 const size_t bitwidth_time_unit = 64;
 
 typedef bool (*CallbackDummy)(int64_t);
-
-
-namespace metrics {
-    template <typename T>
-    std::string print_value(T value)
-    {
-        std::stringstream ss;
-        ss << value;
-        return ss.str();
-    }
-} // end namespace metrics
 
 class ParentNode {
     typedef ParentNode ThisType;
@@ -281,20 +272,19 @@ public:
     {
         return describe_column(m_condition_column_idx);
     }
+
     virtual std::string describe_column(size_t col_ndx) const
     {
-        std::string s;
         if (m_table && col_ndx != npos) {
-            s = s + std::string(m_table->get_name()) + "." + std::string(m_table->get_column_name(col_ndx));
+            return std::string(m_table->get_name()) + metrics::value_separator
+                + std::string(m_table->get_column_name(col_ndx));
         }
-        return s;
+        return "";
     }
-    virtual std::string describe(std::string s) const
+
+    virtual std::string describe() const
     {
-        if (m_table && m_condition_column_idx != npos) {
-            s = s + std::string(m_table->get_name()) + "." + std::string(m_table->get_column_name(m_condition_column_idx));
-        }
-        return s;
+        return "";
     }
 
     virtual std::string describe_condition() const
@@ -302,6 +292,15 @@ public:
         return "matches";
     }
 
+    virtual std::string describe_expression() const
+    {
+        std::string s;
+        s = describe();
+        if (m_child) {
+            s = s + " and " + m_child->describe_expression();
+        }
+        return s;
+    }
 
     std::unique_ptr<ParentNode> m_child;
     std::vector<ParentNode*> m_children;
@@ -414,9 +413,9 @@ public:
         else
             return m_condition->validate();
     }
-    std::string describe(std::string s) const override
+    std::string describe() const override
     {
-        return "subtable " + s;
+        return "subtable expression";
     }
 
 
@@ -808,15 +807,15 @@ public:
         return not_found;
     }
 
-    virtual std::string describe(std::string s) const override
+    virtual std::string describe() const override
     {
-        return ParentNode::describe_column() + " " + describe_condition() + " " + metrics::print_value(IntegerNodeBase<ColType>::m_value);
+        return this->describe_column() + " " + describe_condition() + " " + metrics::print_value(IntegerNodeBase<ColType>::m_value);
     }
+
     virtual std::string describe_condition() const override
     {
         return TConditionFunction::description();
     }
-
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
@@ -946,7 +945,7 @@ public:
             return find(false);
     }
 
-    virtual std::string describe(std::string s) const override
+    virtual std::string describe() const override
     {
         return this->describe_column() + " " + describe_condition() + " " + metrics::print_value(FloatDoubleNode::m_value);
     }
@@ -1079,7 +1078,7 @@ public:
         return not_found;
     }
 
-    virtual std::string describe(std::string s) const override
+    virtual std::string describe() const override
     {
         return this->describe_column() + " " + TConditionFunction::description() + " \""
             + metrics::print_value(BinaryNode::m_value.data()) + "\"";
@@ -1145,7 +1144,7 @@ public:
         return ret;
     }
 
-    virtual std::string describe(std::string s) const override
+    virtual std::string describe() const override
     {
         return this->describe_column() + " " + TConditionFunction::description() + " " + metrics::print_value(TimestampNode::m_value);
     }
@@ -1219,7 +1218,7 @@ public:
             m_condition_column_idx = m_condition_column->get_column_index();
     }
 
-    virtual std::string describe(std::string s) const override
+    virtual std::string describe() const override
     {
         return this->describe_column() + " " + describe_condition() + " \"" + metrics::print_value(StringNodeBase::m_value) + "\"";
     }
@@ -1606,10 +1605,8 @@ private:
 //
 // For 'second.equal(23).begin_group().first.equal(111).Or().first.equal(222).end_group().third().equal(555)', this
 // will first set m_conditions[0] = left-hand-side through constructor, and then later, when .first.equal(222) is
-// invoked,
-// invocation will set m_conditions[1] = right-hand-side through Query& Query::Or() (see query.cpp). In there, m_child
-// is
-// also set to next AND condition (if any exists) following the OR.
+// invoked, invocation will set m_conditions[1] = right-hand-side through Query& Query::Or() (see query.cpp).
+// In there, m_child is also set to next AND condition (if any exists) following the OR.
 class OrNode : public ParentNode {
 public:
     OrNode(std::unique_ptr<ParentNode> condition)
@@ -1640,9 +1637,21 @@ public:
             condition->verify_column();
         }
     }
-    std::string describe(std::string s) const override
+    std::string describe() const override
     {
-        return " or " + s;
+        if (m_conditions.size() >= 2) {
+
+        }
+        std::string s;
+        for (size_t i = 0; i < m_conditions.size(); ++i) {
+            if (m_conditions[i]) {
+                s += m_conditions[i]->describe_expression();
+                if (i != m_conditions.size() - 1) {
+                    s += " or ";
+                }
+            }
+        }
+        return s;
     }
 
 
@@ -1805,9 +1814,12 @@ public:
         return "";
     }
 
-    std::string describe(std::string s) const override
+    virtual std::string describe() const override
     {
-        return " or " + s;
+        if (m_condition) {
+            return "not(" + m_condition->describe_expression() + ")";
+        }
+        return "not()";
     }
 
 
@@ -1977,6 +1989,16 @@ public:
     void table_changed() override;
     void verify_column() const override;
 
+    virtual std::string describe() const override
+    {
+        if (m_expression) {
+            return m_expression->description();
+        }
+        else {
+            return "empty expression";
+        }
+    }
+
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override;
     void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override;
 
@@ -2014,9 +2036,9 @@ public:
         do_verify_column(m_column, m_origin_column);
     }
 
-    virtual std::string describe(std::string s) const override
+    virtual std::string describe() const override
     {
-        return ParentNode::describe_column(m_origin_column) + " " + describe_condition() + " " + metrics::print_value(m_target_row.get_index());
+        return this->describe_column(m_origin_column) + " " + describe_condition() + " " + metrics::print_value(m_target_row.get_index());
     }
     virtual std::string describe_condition() const override
     {
