@@ -61,7 +61,9 @@
 #include <realm/replication.hpp>
 #include <realm/history.hpp>
 
+#include <chrono>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace realm;
@@ -113,7 +115,7 @@ TEST(Metrics_HasReportsWhenEnabled)
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
     CHECK(metrics->num_query_metrics() != 0);
-    //CHECK(metrics->num_transaction_metrics() != 0);
+    CHECK(metrics->num_transaction_metrics() != 0);
 }
 
 TEST(Metrics_QueryTypes)
@@ -534,6 +536,93 @@ TEST(Metrics_LinkQueries)
     CHECK_EQUAL(find_count(link_subquery_description, person_table_name), 1);
     CHECK_EQUAL(find_count(link_subquery_description, column_names[0]), 1);
     CHECK_EQUAL(find_count(link_subquery_description, "greater"), 1);
+}
+
+
+TEST(Metrics_TransactionTimings)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    SharedGroup sg(*hist, options);
+    CHECK(sg.get_metrics());
+    Group& g = sg.begin_write();
+    auto table = g.add_table("table");
+    table->add_column(type_Int, "first");
+    table->add_empty_row(10);
+    sg.commit();
+    sg.begin_read();
+    table = g.get_table("table");
+    CHECK(bool(table));
+    Query query = table->column<int64_t>(0) == 0;
+    query.count();
+    sg.end_read();
+
+    using namespace std::literals::chrono_literals;
+    {
+        ReadTransaction rt(sg);
+        std::this_thread::sleep_for(60ms);
+    }
+    {
+        WriteTransaction wt(sg);
+        std::this_thread::sleep_for(80ms);
+    }
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+    CHECK_NOT_EQUAL(metrics->num_query_metrics(), 0);
+    CHECK_NOT_EQUAL(metrics->num_transaction_metrics(), 0);
+
+    std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+    CHECK(transactions);
+    CHECK_EQUAL(metrics->num_transaction_metrics(), 0);
+
+    CHECK_EQUAL(transactions->size(), 4);
+
+    for (auto t : *transactions) {
+        CHECK_GREATER(t.get_transaction_time(), 0);
+    }
+    // give a margin of 20ms for transactions
+    CHECK_GREATER(transactions->at(2).get_transaction_time(), 0.060);
+    CHECK_LESS(transactions->at(2).get_transaction_time(), 0.080);
+    CHECK_GREATER(transactions->at(3).get_transaction_time(), 0.080);
+    CHECK_LESS(transactions->at(3).get_transaction_time(), 0.100);
+}
+
+
+TEST(Metrics_TransactionData)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    SharedGroup sg(*hist, options);
+    populate(sg);
+
+    {
+        ReadTransaction rt(sg);
+    }
+    {
+        WriteTransaction wt(sg);
+        TableRef t0 = wt.get_table(0);
+        TableRef t1 = wt.get_table(1);
+        t0->add_empty_row(3);
+        t1->add_empty_row(7);
+        wt.commit();
+    }
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+
+    std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+    CHECK(transactions);
+    CHECK_EQUAL(metrics->num_transaction_metrics(), 0);
+
+    CHECK_EQUAL(transactions->size(), 3);
+
+    CHECK_EQUAL(transactions->at(0).get_total_objects(), 11);
+    CHECK_EQUAL(transactions->at(1).get_total_objects(), 11);
+    CHECK_EQUAL(transactions->at(2).get_total_objects(), 11 + 3 + 7);
 }
 
 

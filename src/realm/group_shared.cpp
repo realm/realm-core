@@ -1242,7 +1242,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         break;
     }
 
-    m_transact_stage = transact_Ready;
+    set_transact_stage(transact_Ready);
 // std::cerr << "open completed" << std::endl;
 
 #ifdef REALM_ASYNC_DAEMON
@@ -1385,7 +1385,7 @@ void SharedGroup::close() noexcept
             break;
     }
     m_group.detach();
-    m_transact_stage = transact_Ready;
+    set_transact_stage(transact_Ready);
     SharedInfo* info = m_file_map.get_addr();
     {
         bool is_sync_agent = false;
@@ -1467,6 +1467,34 @@ void SharedGroup::enable_wait_for_change()
 {
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = true;
+}
+
+void SharedGroup::set_transact_stage(SharedGroup::TransactStage stage) noexcept
+{
+#if REALM_METRICS
+    if (m_metrics) { // null if metrics are disabled
+        size_t total_size = m_used_space + m_free_space;
+        size_t free_space = m_free_space;
+        size_t num_objects = m_group.m_total_rows;
+
+        if (stage == transact_Reading) {
+            if (m_transact_stage == transact_Writing) {
+                m_metrics->end_write_transaction(total_size, free_space, num_objects);
+            }
+            m_metrics->start_read_transaction();
+        } else if (stage == transact_Writing) {
+            if (m_transact_stage == transact_Reading) {
+                m_metrics->end_read_transaction(total_size, free_space, num_objects);
+            }
+            m_metrics->start_write_transaction();
+        } else if (stage == transact_Ready) {
+            m_metrics->end_read_transaction(total_size, free_space, num_objects);
+            m_metrics->end_write_transaction(total_size, free_space, num_objects);
+        }
+    }
+#endif
+
+    m_transact_stage = stage;
 }
 
 #ifdef REALM_ASYNC_DAEMON
@@ -1747,7 +1775,7 @@ const Group& SharedGroup::begin_read(VersionID version_id)
     bool writable = false;
     do_begin_read(version_id, writable); // Throws
 
-    m_transact_stage = transact_Reading;
+    set_transact_stage(transact_Reading);
     return m_group;
 }
 
@@ -1764,7 +1792,7 @@ void SharedGroup::end_read() noexcept
 
     do_end_read();
 
-    m_transact_stage = transact_Ready;
+    set_transact_stage(transact_Ready);
 }
 #ifdef _MSC_VER
 #pragma warning (default: 4297)
@@ -1796,7 +1824,7 @@ Group& SharedGroup::begin_write()
         throw;
     }
 
-    m_transact_stage = transact_Writing;
+    set_transact_stage(transact_Writing);
     return m_group;
 }
 
@@ -1826,7 +1854,7 @@ bool SharedGroup::try_begin_write(Group* &group)
         throw;
     }
 
-    m_transact_stage = transact_Writing;
+    set_transact_stage(transact_Writing);
     group = &m_group;
     return true;
 }
@@ -1857,7 +1885,7 @@ SharedGroup::version_type SharedGroup::commit()
 
     do_end_read();
     m_read_lock = lock_after_commit;
-    m_transact_stage = transact_Ready;
+    set_transact_stage(transact_Ready);
     return new_version;
 }
 
@@ -1880,7 +1908,7 @@ void SharedGroup::rollback() noexcept
     if (Replication* repl = m_group.get_replication())
         repl->abort_transact();
 
-    m_transact_stage = transact_Ready;
+    set_transact_stage(transact_Ready);
 }
 #ifdef _MSC_VER
 #pragma warning (default: 4297)
@@ -2109,7 +2137,7 @@ SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
     // Remap file if it has grown, and update refs in underlying node structure
     gf::remap_and_update_refs(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size); // Throws
 
-    m_transact_stage = transact_Reading;
+    set_transact_stage(transact_Reading);
 
     return version;
 }
@@ -2196,6 +2224,10 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     // Do the actual commit
     REALM_ASSERT(m_group.m_top.is_attached());
     REALM_ASSERT(oldest_version <= new_version);
+
+#if REALM_METRICS
+    m_group.update_num_objects();
+#endif // REALM_METRICS
     // info->readers.dump();
     GroupWriter out(m_group); // Throws
     out.set_versions(new_version, oldest_version);

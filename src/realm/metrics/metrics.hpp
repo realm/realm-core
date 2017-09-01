@@ -41,6 +41,11 @@ public:
     void add_query(QueryInfo info);
     void add_transaction(TransactionInfo info);
 
+    void start_read_transaction();
+    void start_write_transaction();
+    void end_read_transaction(size_t total_size, size_t free_space, size_t num_objects);
+    void end_write_transaction(size_t total_size, size_t free_space, size_t num_objects);
+
     using QueryInfoList = std::vector<QueryInfo>;
     using TransactionInfoList = std::vector<TransactionInfo>;
 
@@ -50,6 +55,9 @@ public:
 private:
     std::unique_ptr<QueryInfoList> m_query_info;
     std::unique_ptr<TransactionInfoList> m_transaction_info;
+
+    std::unique_ptr<TransactionInfo> m_pending_read;
+    std::unique_ptr<TransactionInfo> m_pending_write;
 };
 
 

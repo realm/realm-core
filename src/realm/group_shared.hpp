@@ -618,6 +618,7 @@ private:
     void do_begin_write();
     version_type do_commit();
     void do_end_write() noexcept;
+    void set_transact_stage(TransactStage stage) noexcept;
 
     /// Returns the version of the latest snapshot.
     version_type get_version_of_latest_snapshot();
@@ -978,7 +979,7 @@ inline void SharedGroup::promote_to_write(O* observer)
         throw;
     }
 
-    m_transact_stage = transact_Writing;
+    set_transact_stage(transact_Writing);
 }
 
 template <class O>
@@ -1022,7 +1023,7 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
     REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
     repl->abort_transact();
 
-    m_transact_stage = transact_Reading;
+    set_transact_stage(transact_Reading);
 }
 
 template <class O>

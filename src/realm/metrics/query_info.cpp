@@ -52,6 +52,14 @@ QueryInfo::QueryType QueryInfo::get_type() const
     return m_type;
 }
 
+double QueryInfo::get_query_time() const
+{
+    if (m_query_time) {
+        return m_query_time->get_elapsed_seconds();
+    }
+    return 0;
+}
+
 std::unique_ptr<MetricTimer> QueryInfo::track(const Query* query, QueryType type)
 {
     REALM_ASSERT_DEBUG(query);

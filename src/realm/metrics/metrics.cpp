@@ -55,6 +55,40 @@ void Metrics::add_transaction(TransactionInfo info)
     m_transaction_info->push_back(info);
 }
 
+void Metrics::start_read_transaction()
+{
+    REALM_ASSERT_DEBUG(!m_pending_read);
+    m_pending_read = std::make_unique<TransactionInfo>(TransactionInfo::read_transaction);
+}
+
+void Metrics::start_write_transaction()
+{
+    REALM_ASSERT_DEBUG(!m_pending_write);
+    m_pending_write = std::make_unique<TransactionInfo>(TransactionInfo::write_transaction);
+}
+
+void Metrics::end_read_transaction(size_t total_size, size_t free_space, size_t num_objects)
+{
+    REALM_ASSERT_DEBUG(m_transaction_info);
+    if (m_pending_read) {
+        m_pending_read->update_stats(total_size, free_space, num_objects);
+        m_pending_read->finish_timer();
+        m_transaction_info->push_back(*m_pending_read);
+        m_pending_read.reset(nullptr);
+    }
+}
+
+void Metrics::end_write_transaction(size_t total_size, size_t free_space, size_t num_objects)
+{
+    REALM_ASSERT_DEBUG(m_transaction_info);
+    if (m_pending_write) {
+        m_pending_write->update_stats(total_size, free_space, num_objects);
+        m_pending_write->finish_timer();
+        m_transaction_info->push_back(*m_pending_write);
+        m_pending_write.reset(nullptr);
+    }
+}
+
 std::unique_ptr<Metrics::QueryInfoList> Metrics::take_queries()
 {
 

@@ -607,6 +607,7 @@ private:
     std::function<void(const CascadeNotification&)> m_notify_handler;
     std::function<void()> m_schema_change_handler;
     std::shared_ptr<metrics::Metrics> m_metrics;
+    size_t m_total_rows;
 
     struct shared_tag {
     };
@@ -697,6 +698,7 @@ private:
     void set_replication(Replication*) noexcept;
     std::shared_ptr<metrics::Metrics> get_metrics() const noexcept;
     void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
+    void update_num_objects();
     class TransactAdvancer;
     void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&);
     void refresh_dirty_accessors();
@@ -809,6 +811,7 @@ inline Group::Group(const std::string& file, const char* key, OpenMode mode)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
     , m_is_shared(false)
+    , m_total_rows(0)
 {
     init_array_parents();
 
@@ -821,6 +824,7 @@ inline Group::Group(BinaryData buffer, bool take_ownership)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
     , m_is_shared(false)
+    , m_total_rows(0)
 {
     init_array_parents();
     open(buffer, take_ownership); // Throws
@@ -833,6 +837,7 @@ inline Group::Group(unattached_tag) noexcept
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
     , m_is_shared(false)
+    , m_total_rows(0)
 {
     init_array_parents();
 }
@@ -849,6 +854,7 @@ inline Group::Group(shared_tag) noexcept
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
     , m_is_shared(true)
+    , m_total_rows(0)
 {
     init_array_parents();
 }

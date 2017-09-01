@@ -38,6 +38,11 @@ MetricTimerResult::~MetricTimerResult()
 {
 }
 
+double MetricTimerResult::get_elapsed_seconds() const
+{
+    return m_elapsed_seconds;
+}
+
 void MetricTimerResult::report_seconds(double time)
 {
     m_elapsed_seconds = time;

@@ -19,8 +19,10 @@
 #ifndef REALM_TRANSACTION_INFO_HPP
 #define REALM_TRANSACTION_INFO_HPP
 
+#include <memory>
 #include <string>
 
+#include <realm/metrics/metric_timer.hpp>
 #include <realm/util/features.h>
 
 #if REALM_METRICS
@@ -28,19 +30,37 @@
 namespace realm {
 namespace metrics {
 
+class Metrics;
+
 class TransactionInfo {
 public:
+    enum TransactionType {
+        read_transaction,
+        write_transaction
+    };
+    TransactionInfo(TransactionType type);
+    TransactionInfo(const TransactionInfo&) = default;
     ~TransactionInfo() noexcept;
 
-private:
+    TransactionType get_transaction_type() const;
+    double get_transaction_time() const;
+    size_t get_disk_size() const;
+    size_t get_free_space() const;
+    size_t get_total_objects() const;
 
-    double m_start_time;
-    double m_end_time;
-    size_t m_num_inserts;
-    size_t m_num_sets;
+private:
+    MetricTimerResult m_transaction_time;
+    MetricTimer m_transact_timer;
+
     size_t m_realm_disk_size;
     size_t m_realm_free_space;
-    size_t m_total_rows;
+    size_t m_total_objects;
+    TransactionType m_type;
+
+    friend class Metrics;
+    void update_stats(size_t disk_size, size_t free_space, size_t total_objects);
+    void finish_timer();
+
 };
 
 } // namespace metrics

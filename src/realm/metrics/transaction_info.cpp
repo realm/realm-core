@@ -23,8 +23,52 @@
 using namespace realm;
 using namespace metrics;
 
+TransactionInfo::TransactionInfo(TransactionInfo::TransactionType type)
+    : m_realm_disk_size(0)
+    , m_realm_free_space(0)
+    , m_total_objects(0)
+    , m_type(type)
+{
+}
+
 TransactionInfo::~TransactionInfo() noexcept
 {
+}
+
+TransactionInfo::TransactionType TransactionInfo::get_transaction_type() const
+{
+    return m_type;
+}
+
+double TransactionInfo::get_transaction_time() const
+{
+    return m_transaction_time.get_elapsed_seconds();
+}
+
+size_t TransactionInfo::get_disk_size() const
+{
+    return m_realm_disk_size;
+}
+
+size_t TransactionInfo::get_free_space() const
+{
+    return m_realm_free_space;
+}
+
+size_t TransactionInfo::get_total_objects() const
+{
+    return m_total_objects;
+}
+
+void TransactionInfo::update_stats(size_t disk_size, size_t free_space, size_t total_objects)
+{
+    m_realm_disk_size = disk_size;
+    m_realm_free_space = free_space;
+    m_total_objects = total_objects;
+}
+void TransactionInfo::finish_timer()
+{
+    m_transaction_time.report_seconds(m_transact_timer.get_elapsed_time());
 }
 
 #endif // REALM_METRICS

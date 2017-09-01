@@ -64,6 +64,7 @@ public:
 
     std::string get_description() const;
     QueryType get_type() const;
+    double get_query_time() const;
 
     static std::unique_ptr<MetricTimer> track(const Query* query, QueryType type);
     static QueryType type_from_action(Action action);
@@ -81,11 +82,15 @@ private:
 
 namespace realm {
 namespace metrics {
-    template <typename T>
-    std::string print_value(T value)
-    {
-        return "";
-    }
+
+template <typename T>
+std::string print_value(T value)
+{
+    return "";
+}
+
+const std::string value_separator = ".";
+
 } // end namespace metrics
 } // end namespace realm
 
