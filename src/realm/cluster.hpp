@@ -154,6 +154,8 @@ public:
     template <typename U>
     U get(size_t col_ndx) const;
 
+    bool is_null(size_t col_ndx) const;
+
 protected:
     ClusterTree* m_tree_top;
     Key m_key;
@@ -212,6 +214,8 @@ public:
     {
         return m_owner;
     }
+    const Spec& get_spec() const;
+
     void init_from_parent();
     bool update_from_parent(size_t old_baseline) noexcept
     {
@@ -258,11 +262,7 @@ private:
         return create_root_from_mem(alloc, MemRef{alloc.translate(ref), ref, alloc});
     }
     std::unique_ptr<ClusterNode> get_node(ref_type ref);
-    const Spec& get_spec();
 };
-
-template <>
-int64_t ConstObj::get<int64_t>(size_t) const;
 
 template <>
 Obj& Obj::set<int64_t>(size_t, int64_t value, bool is_default);

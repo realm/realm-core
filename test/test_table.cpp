@@ -8239,7 +8239,7 @@ TEST(Table_object_basic)
 {
     Table table;
     table.add_column(type_Int, "int1");
-    table.add_column(type_Int, "int2");
+    table.add_column(type_Int, "int2", true);
 
     table.create_object(Key(5)).set_all(5, 7);
     table.create_object(Key(2));
@@ -8249,11 +8249,16 @@ TEST(Table_object_basic)
     table.create_object(Key(6));
 
     Obj y = table.get_object(Key(5));
-    CHECK_EQUAL(7, y.get<int64_t>(1));
+    CHECK(!y.is_null(1));
+    CHECK_EQUAL(7, y.get<util::Optional<int64_t>>(1));
     CHECK_EQUAL(100, x.get<int64_t>(0));
+    y.set_null(1);
+    CHECK(y.is_null(1));
 
     table.remove_object(Key(5));
     CHECK_THROW(y.get<int64_t>(1), InvalidKey);
+
+    CHECK(table.get_object(Key(8)).is_null(1));
 }
 
 TEST(Table_object_sequential)
@@ -8261,7 +8266,7 @@ TEST(Table_object_sequential)
     int nb_rows = 1024;
     Table table;
     table.add_column(type_Int, "int1");
-    table.add_column(type_Int, "int2");
+    table.add_column(type_Int, "int2", true);
 
     auto t1 = steady_clock::now();
 
@@ -8274,7 +8279,7 @@ TEST(Table_object_sequential)
     for (int i = 0; i < nb_rows; i++) {
         Obj o = table.get_object(Key(i));
         CHECK_EQUAL(i << 1, o.get<int64_t>(0));
-        CHECK_EQUAL(i << 2, o.get<int64_t>(1));
+        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(1));
     }
 
     auto t3 = steady_clock::now();
@@ -8284,7 +8289,7 @@ TEST(Table_object_sequential)
         for (int j = i + 1; j < nb_rows; j++) {
             Obj o = table.get_object(Key(j));
             CHECK_EQUAL(j << 1, o.get<int64_t>(0));
-            CHECK_EQUAL(j << 2, o.get<int64_t>(1));
+            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(1));
         }
     }
 
@@ -8320,7 +8325,7 @@ TEST(Table_object_random)
 
     Table table;
     table.add_column(type_Int, "int1");
-    table.add_column(type_Int, "int2");
+    table.add_column(type_Int, "int2", true);
 
     auto t1 = steady_clock::now();
 
@@ -8333,7 +8338,7 @@ TEST(Table_object_random)
     for (int i = 0; i < nb_rows; i++) {
         Obj o = table.get_object(Key(key_values[i]));
         CHECK_EQUAL(i << 1, o.get<int64_t>(0));
-        CHECK_EQUAL(i << 2, o.get<int64_t>(1));
+        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(1));
     }
 
     auto t3 = steady_clock::now();
@@ -8343,7 +8348,7 @@ TEST(Table_object_random)
         for (int j = i + 1; j < nb_rows; j++) {
             Obj o = table.get_object(Key(key_values[j]));
             CHECK_EQUAL(j << 1, o.get<int64_t>(0));
-            CHECK_EQUAL(j << 2, o.get<int64_t>(1));
+            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(1));
         }
     }
 
