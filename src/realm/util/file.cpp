@@ -1241,12 +1241,14 @@ DirScanner::DirScanner(const std::string& path, bool allow_missing)
 {
 #ifdef _WIN32
     WIN32_FIND_DATA file;
-    HANDLE search_handle = FindFirstFile(path.c_str(), &file);
+    HANDLE search_handle = FindFirstFile((path + "\\*").c_str(), &file);
     if (search_handle)
     {
         do
         {
-            m_results.push_back(file.cFileName);
+            if(std::string(file.cFileName) != "." && std::string(file.cFileName) != "..") {
+                m_results.push_back(file.cFileName);
+            }
         } while (FindNextFile(search_handle, &file));
         FindClose(search_handle);
     }
