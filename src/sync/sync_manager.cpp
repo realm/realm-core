@@ -212,14 +212,12 @@ void SyncManager::reset_for_testing()
         {
             std::lock_guard<std::mutex> lock(m_session_mutex);
 
-#if REALM_ASSERTIONS_ENABLED
             // Callers of `SyncManager::reset_for_testing` should ensure there are no active sessions
             // prior to calling `reset_for_testing`.
             auto no_active_sessions = std::none_of(m_sessions.begin(), m_sessions.end(), [](auto& element){
                 return element.second->existing_external_reference();
             });
-            REALM_ASSERT(no_active_sessions);
-#endif
+            REALM_ASSERT_RELEASE(no_active_sessions);
 
             // Destroy any inactive sessions.
             // FIXME: We shouldn't have any inactive sessions at this point! Sessions are expected to
