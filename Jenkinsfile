@@ -6,6 +6,11 @@ cocoaStashes = []
 androidStashes = []
 publishingStashes = []
 
+tokens = "${env.JOB_NAME}".tokenize('/')
+org = tokens[tokens.size()-3]
+repo = tokens[tokens.size()-2]
+branch = tokens[tokens.size()-1]
+
 jobWrapper {
   timeout(time: 5, unit: 'HOURS') {
       stage('gather-info') {
@@ -331,7 +336,7 @@ def buildDiffCoverage() {
                         sh """
                            curl -H \"Authorization: token ${env.githubToken}\" \\
                                 -d '{ \"body\": \"${coverageResults}\\n\\nPlease check your coverage here: ${env.BUILD_URL}Diff_Coverage\"}' \\
-                                \"https://api.github.com/repos/realm/realm-core/issues/${env.CHANGE_ID}/comments\"
+                                \"https://api.github.com/repos/realm/${repo}/issues/${env.CHANGE_ID}/comments\"
                         """
                     }
                 }
@@ -373,7 +378,7 @@ def buildPerformance() {
           withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
               sh "curl -H \"Authorization: token ${env.githubToken}\" " +
                  "-d '{ \"body\": \"Check the performance result here: ${env.BUILD_URL}Performance_Report\"}' " +
-                 "\"https://api.github.com/repos/realm/realm-core/issues/${env.CHANGE_ID}/comments\""
+                 "\"https://api.github.com/repos/realm/${repo}/issues/${env.CHANGE_ID}/comments\""
           }
         }
       }
