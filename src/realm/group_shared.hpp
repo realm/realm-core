@@ -526,6 +526,19 @@ public:
     // Release pinned version (not thread safe)
     void unpin_version(VersionID version);
 
+    // Delete the realm file and coordination files. The lock file is not deleted,
+    // as that cannot be done without opening for race conditions. Fails and returns
+    // false if the realm file is in use by any thread or process. Otherwise removes
+    // as much as possible of the realm file and the files in the management directory
+    // as well as the management directory itself. After removal potentially callback
+    // the supplied cleanup function allowing the caller to remove other files while
+    // still operating under lock. The lock taken precludes races with other threads
+    // or processes accessing the files through a SharedGroup. However, no coordination
+    // is attempted with accesses through lower level primitives, e.g. Group.
+    using cleanup_func = void (*)(const std::string);
+    static bool delete_realm(const std::string path, cleanup_func cleanup);
+
+
 private:
     struct SharedInfo;
     struct ReadCount;

@@ -749,6 +749,30 @@ std::string SharedGroupOptions::sys_tmp_dir = "";
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
+bool SharedGroup::delete_realm(const std::string path, cleanup_func cleanup) {
+    // auto coordination_dir = path + ".management";
+    auto lockfile_path(path + ".lock");
+
+    File lockfile;
+    lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
+    File::CloseGuard fcg(lockfile);
+
+    if (lockfile.try_lock_exclusive()) { // Throws
+        File::UnlockGuard ulg(lockfile);
+        std::remove(path.c_str()); // ignore result, file may not exist
+
+        // TODO: remove coordination directory.
+
+        // allow caller to do furter cleanup under lock
+        if (cleanup)
+            cleanup(path);
+
+        return true;
+    }
+    return false;
+}
+
+
 void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_backend,
                           const SharedGroupOptions options)
 {
