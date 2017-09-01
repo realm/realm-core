@@ -334,6 +334,36 @@ protected:
     void do_free(ref_type, const char*) noexcept override;
     char* do_translate(ref_type) const noexcept override;
 
+    /// Returns the first section boundary *above* the given position.
+    size_t get_upper_section_boundary(size_t start_pos) const noexcept;
+
+    /// Returns the first section boundary *at or below* the given position.
+    size_t get_lower_section_boundary(size_t start_pos) const noexcept;
+
+    /// Returns true if the given position is at a section boundary
+    bool matches_section_boundary(size_t pos) const noexcept;
+
+    /// Returns the index of the section holding a given address.
+    /// The section index is determined solely by the minimal section size,
+    /// and does not necessarily reflect the mapping. A mapping may
+    /// cover multiple sections - the initial mapping often does.
+    size_t get_section_index(size_t pos) const noexcept;
+
+    /// Reverse: get the base offset of a section at a given index. Since the
+    /// computation is very time critical, this method just looks it up in
+    /// a table. The actual computation and setup of that table is done
+    /// during initialization with the help of compute_section_base() below.
+    inline size_t get_section_base(size_t index) const noexcept;
+
+    /// Actually compute the starting offset of a section. Only used to initialize
+    /// a table of predefined results, which are then used by get_section_base().
+    size_t compute_section_base(size_t index) const noexcept;
+
+    /// Find a possible allocation of 'request_size' that will fit into a section
+    /// which is inside the range from 'start_pos' to 'start_pos'+'free_chunk_size'
+    /// If found return the position, if not return 0.
+    size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
+
 private:
     void internal_invalidate_cache() noexcept;
     enum AttachMode {
@@ -466,36 +496,6 @@ private:
     {
         m_replication = r;
     }
-
-    /// Returns the first section boundary *above* the given position.
-    size_t get_upper_section_boundary(size_t start_pos) const noexcept;
-
-    /// Returns the first section boundary *at or below* the given position.
-    size_t get_lower_section_boundary(size_t start_pos) const noexcept;
-
-    /// Returns true if the given position is at a section boundary
-    bool matches_section_boundary(size_t pos) const noexcept;
-
-    /// Returns the index of the section holding a given address.
-    /// The section index is determined solely by the minimal section size,
-    /// and does not necessarily reflect the mapping. A mapping may
-    /// cover multiple sections - the initial mapping often does.
-    size_t get_section_index(size_t pos) const noexcept;
-
-    /// Reverse: get the base offset of a section at a given index. Since the
-    /// computation is very time critical, this method just looks it up in
-    /// a table. The actual computation and setup of that table is done
-    /// during initialization with the help of compute_section_base() below.
-    inline size_t get_section_base(size_t index) const noexcept;
-
-    /// Actually compute the starting offset of a section. Only used to initialize
-    /// a table of predefined results, which are then used by get_section_base().
-    size_t compute_section_base(size_t index) const noexcept;
-
-    /// Find a possible allocation of 'request_size' that will fit into a section
-    /// which is inside the range from 'start_pos' to 'start_pos'+'free_chunk_size'
-    /// If found return the position, if not return 0.
-    size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
 
     friend class Group;
     friend class SharedGroup;

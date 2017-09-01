@@ -1,22 +1,11 @@
-# NEXT RELEASE
+# 2.9.2 Release notes
 
 ### Bugfixes
 
-* Lorem ipsum.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
+* Throw a MaximumFileSizeExceeded exception during commits or allocations
+  instead of causing corruption or asserting. This would most likely be
+  seen when creating large Realm files on 32 bit OS.
+  PR [#2795](https://github.com/realm/realm-core/pull/2795).
 
 ----------------------------------------------
 

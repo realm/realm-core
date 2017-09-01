@@ -90,10 +90,13 @@ SlabAlloc::SlabAlloc()
     m_section_shifts = log2(m_initial_section_size);
     size_t max = std::numeric_limits<size_t>::max();
     m_num_section_bases = 1 + get_section_index(max);
-    m_section_bases.reset(new size_t[m_num_section_bases]);
+    // Allocate one more element than necessary, this is so that get_upper_section_boundary() still functions
+    // as expected on addresses in the last working base.
+    m_section_bases.reset(new size_t[m_num_section_bases + 1]);
     for (size_t i = 0; i < m_num_section_bases; ++i) {
         m_section_bases[i] = compute_section_base(i);
     }
+    m_section_bases[m_num_section_bases] = max;
 }
 
 util::File& SlabAlloc::get_file()
@@ -324,6 +327,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     else {
         // Find size of memory that has been modified (through copy-on-write) in current write transaction
         ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
+        REALM_ASSERT_DEBUG_EX(curr_ref_end >= m_baseline, curr_ref_end, m_baseline);
         size_t copy_on_write = curr_ref_end - m_baseline;
 
         // Allocate 20% of that (for the first few number of slabs the math below will just result in 1 page each)
@@ -354,13 +358,19 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 #endif
 
     REALM_ASSERT(0 < new_size);
+    size_t ref_end = ref;
+    if (REALM_UNLIKELY(int_add_with_overflow_detect(ref_end, new_size))) {
+        throw MaximumFileSizeExceeded("AllocSlab slab ref_end size overflow: " + util::to_string(ref) + " + "
+                                 + util::to_string(new_size));
+    }
+
     std::unique_ptr<char[]> mem(new char[new_size]); // Throws
     std::fill(mem.get(), mem.get() + new_size, 0);
 
     // Add to list of slabs
     Slab slab;
     slab.addr = mem.get();
-    slab.ref_end = ref + new_size;
+    slab.ref_end = ref_end;
     m_slabs.push_back(slab); // Throws
     mem.release();
 
@@ -368,7 +378,11 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     size_t unused = new_size - size;
     if (0 < unused) {
         Chunk chunk;
-        chunk.ref = ref + size;
+        chunk.ref = ref;
+        if (REALM_UNLIKELY(int_add_with_overflow_detect(chunk.ref, size))) {
+            throw MaximumFileSizeExceeded("AllocSlab free list ref size overflow: " + util::to_string(ref) + " + "
+                                     + util::to_string(size));
+        }
         chunk.size = unused;
         m_free_space.push_back(chunk); // Throws
     }
