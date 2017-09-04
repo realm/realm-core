@@ -530,12 +530,14 @@ public:
     // as that cannot be done without opening for race conditions. Fails and returns
     // false if the realm file is in use by any thread or process. Otherwise removes
     // as much as possible of the realm file and the files in the management directory
-    // as well as the management directory itself. After removal potentially callback
-    // the supplied cleanup function allowing the caller to remove other files while
-    // still operating under lock. The lock taken precludes races with other threads
-    // or processes accessing the files through a SharedGroup. However, no coordination
-    // is attempted with accesses through lower level primitives, e.g. Group.
-    using cleanup_func = void (*)(const std::string);
+    // as well as the management directory itself. Before removal, call the supplied
+    // cleanup function object, allowing the caller to remove other files while
+    // still operating under lock. Doing the callback before removing the files allow
+    // the caller to maintain state in files in the management directory and use it
+    // for the cleanup process if desired.
+    // The lock taken precludes races with other threads or processes accessing the 
+    // files through a SharedGroup. However, no coordination is attempted with accesses 
+    // through lower level primitives, e.g. Group.
     template <typename TFunc>
     static bool delete_realm(const std::string path, TFunc cleanup);
 
