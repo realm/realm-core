@@ -13402,4 +13402,18 @@ TEST(LangBindHelper_UpdateDescriptor)
     CHECK_EQUAL(tv.size(), 1);
 }
 
+ONLY(LangBindHelper_DeleteRealm)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+        SharedGroup sg_w(*hist_w);
+        sg_w.begin_write();
+        CHECK(!SharedGroup::delete_realm(path, [](std::string){}));
+        sg_w.commit();
+        CHECK(!SharedGroup::delete_realm(path, [](std::string){}));
+    }
+    CHECK(SharedGroup::delete_realm(path, [](std::string){}));
+}
+
 #endif
