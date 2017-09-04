@@ -1166,7 +1166,7 @@ bool File::is_removed() const
 std::string File::resolve(const std::string& path, const std::string& base_dir)
 {
 #ifdef _WIN32
-    char dir_sep[2] = { '\\', '/' };
+    char dir_sep[2] = { '/', '\\' };
 #else
     char dir_sep[2] = { '/', 0 };
 #endif
@@ -1242,7 +1242,7 @@ DirScanner::DirScanner(const std::string& path, bool allow_missing)
 #ifdef _WIN32
     WIN32_FIND_DATA file;
     HANDLE search_handle = FindFirstFile((path + "\\*").c_str(), &file);
-    if (search_handle)
+    if (search_handle != INVALID_HANDLE_VALUE)
     {
         do
         {
