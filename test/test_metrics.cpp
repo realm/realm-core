@@ -477,7 +477,6 @@ TEST(Metrics_LinkQueries)
 
     std::string person_table_name = "person";
     std::string pet_table_name = "pet";
-    std::string query_search_term = "equal";
 
     Group& g = sg.begin_write();
     TableRef person = g.get_table(person_table_name);
@@ -536,6 +535,94 @@ TEST(Metrics_LinkQueries)
     CHECK_EQUAL(find_count(link_subquery_description, person_table_name), 1);
     CHECK_EQUAL(find_count(link_subquery_description, column_names[0]), 1);
     CHECK_EQUAL(find_count(link_subquery_description, "greater"), 1);
+}
+
+
+TEST(Metrics_LinkListQueries)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    SharedGroup sg(*hist, options);
+    populate(sg);
+
+    std::string person_table_name = "person";
+    std::string pet_table_name = "pet";
+    size_t ll_col_ndx = 7;
+    size_t str_col_ndx = 4;
+    size_t double_col_ndx = 1;
+
+    Group& g = sg.begin_write();
+    TableRef person = g.get_table(person_table_name);
+    TableRef pet = g.get_table(pet_table_name);
+    CHECK(bool(person));
+
+    CHECK_EQUAL(person->get_column_count(), 8);
+    std::vector<std::string> column_names;
+    for (size_t i = 0; i < person->get_column_count(); ++i) {
+        column_names.push_back(person->get_column_name(i));
+    }
+
+    std::string pet_link_col_name = pet->get_column_name(1);
+
+    Query q0 = person->column<LinkList>(ll_col_ndx).is_null();
+    Query q1 = person->column<LinkList>(ll_col_ndx).is_not_null();
+    Query q2 = person->column<LinkList>(ll_col_ndx).count() == 1;
+    Query q3 = person->column<LinkList>(ll_col_ndx) == person->get(0);
+    Query q4 = person->column<LinkList>(ll_col_ndx).column<double>(double_col_ndx).sum() >= 1;
+    Query q5 = person->column<LinkList>(ll_col_ndx, person->column<String>(str_col_ndx) == "Bob").count() == 1;
+
+    q0.find_all();
+    q1.find_all();
+    q2.find_all();
+    q3.find_all();
+    q4.find_all();
+    q5.find_all();
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+    std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
+    CHECK(queries);
+
+    // q4 adds a subquery which is executed once per link in the linklist column
+    size_t num_total_links = 11;
+    CHECK_EQUAL(queries->size(), 6 + num_total_links);
+
+    std::string null_links_description = queries->at(0).get_description();
+    CHECK_EQUAL(find_count(null_links_description, "is_null"), 1);
+    CHECK_EQUAL(find_count(null_links_description, column_names[ll_col_ndx]), 1);
+    CHECK_EQUAL(find_count(null_links_description, person_table_name), 1);
+
+    std::string not_null_links_description = queries->at(1).get_description();
+    CHECK_EQUAL(find_count(not_null_links_description, "is_not_null"), 1);
+    CHECK_EQUAL(find_count(not_null_links_description, column_names[ll_col_ndx]), 1);
+    CHECK_EQUAL(find_count(not_null_links_description, person_table_name), 1);
+
+    std::string count_link_description = queries->at(2).get_description();
+    CHECK_EQUAL(find_count(count_link_description, "count"), 1);
+    CHECK_EQUAL(find_count(count_link_description, column_names[ll_col_ndx]), 1);
+    CHECK_EQUAL(find_count(count_link_description, person_table_name), 1);
+    CHECK_EQUAL(find_count(count_link_description, "equal"), 1);
+
+    std::string equal_link_description = queries->at(3).get_description();
+    CHECK_EQUAL(find_count(equal_link_description, column_names[ll_col_ndx]), 1);
+    CHECK_EQUAL(find_count(equal_link_description, person_table_name), 1);
+    CHECK_EQUAL(find_count(equal_link_description, "links to"), 1);
+
+    std::string sum_link_description = queries->at(4).get_description();
+    CHECK_EQUAL(find_count(sum_link_description, "sum"), 1);
+    CHECK_EQUAL(find_count(sum_link_description, column_names[ll_col_ndx]), 1);
+    CHECK_EQUAL(find_count(sum_link_description, column_names[double_col_ndx]), 1);
+    CHECK_EQUAL(find_count(sum_link_description, person_table_name), 2);
+    CHECK_EQUAL(find_count(sum_link_description, "equal"), 1);
+
+    std::string link_subquery_description = queries->at(5).get_description();
+    CHECK_EQUAL(find_count(link_subquery_description, "count"), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, column_names[ll_col_ndx]), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, "equal"), 2);
+    CHECK_EQUAL(find_count(link_subquery_description, person_table_name), 2);
+    CHECK_EQUAL(find_count(link_subquery_description, column_names[str_col_ndx]), 1);
 }
 
 

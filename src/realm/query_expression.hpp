@@ -3233,8 +3233,7 @@ public:
 
     virtual std::string description() const override
     {
-        return m_column.description() + metrics::value_separator + m_link_map.description()
-            + metrics::value_separator + Operation::description();
+        return m_link_map.description() + "(" + m_column.description() + ")" + metrics::value_separator + Operation::description() + "()";
     }
 
 private:
