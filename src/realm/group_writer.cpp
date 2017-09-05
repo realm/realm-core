@@ -274,7 +274,9 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 
 ref_type GroupWriter::write_group()
 {
+#if REALM_METRICS
     std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_write_time(m_group);
+#endif // REALM_METRICS
 
     merge_free_space(); // Throws
 
@@ -804,7 +806,9 @@ void GroupWriter::commit(ref_type new_top_ref)
     // When running the test suite, device synchronization is disabled
     bool disable_sync = get_disable_sync_to_disk();
 
+#if REALM_METRICS
     std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_fsync_time(m_group);
+#endif // REALM_METRICS
 
     // Make sure that that all data relating to the new snapshot is written to
     // stable storage before flipping the slot selector

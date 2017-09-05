@@ -84,7 +84,7 @@ namespace realm {
 namespace metrics {
 
 template <typename T>
-std::string print_value(T value)
+std::string print_value(T)
 {
     return "";
 }

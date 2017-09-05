@@ -68,7 +68,7 @@ private:
 
 #else
 
-struct Metrics
+class Metrics
 {
 };
 
