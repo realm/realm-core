@@ -1476,20 +1476,21 @@ void SharedGroup::set_transact_stage(SharedGroup::TransactStage stage) noexcept
         size_t total_size = m_used_space + m_free_space;
         size_t free_space = m_free_space;
         size_t num_objects = m_group.m_total_rows;
+        size_t num_available_versions = get_number_of_versions();
 
         if (stage == transact_Reading) {
             if (m_transact_stage == transact_Writing) {
-                m_metrics->end_write_transaction(total_size, free_space, num_objects);
+                m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions);
             }
             m_metrics->start_read_transaction();
         } else if (stage == transact_Writing) {
             if (m_transact_stage == transact_Reading) {
-                m_metrics->end_read_transaction(total_size, free_space, num_objects);
+                m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions);
             }
             m_metrics->start_write_transaction();
         } else if (stage == transact_Ready) {
-            m_metrics->end_read_transaction(total_size, free_space, num_objects);
-            m_metrics->end_write_transaction(total_size, free_space, num_objects);
+            m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions);
+            m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions);
         }
     }
 #endif

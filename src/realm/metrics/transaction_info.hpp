@@ -43,24 +43,30 @@ public:
     ~TransactionInfo() noexcept;
 
     TransactionType get_transaction_type() const;
+    // the transaction time is a total amount which includes fsync_time + write_time + user_time
     double get_transaction_time() const;
+    double get_fsync_time() const;
+    double get_write_time() const;
     size_t get_disk_size() const;
     size_t get_free_space() const;
     size_t get_total_objects() const;
+    size_t get_num_available_versions() const;
 
 private:
     MetricTimerResult m_transaction_time;
+    std::shared_ptr<MetricTimerResult> m_fsync_time;
+    std::shared_ptr<MetricTimerResult> m_write_time;
     MetricTimer m_transact_timer;
 
     size_t m_realm_disk_size;
     size_t m_realm_free_space;
     size_t m_total_objects;
     TransactionType m_type;
+    size_t m_num_versions;
 
     friend class Metrics;
-    void update_stats(size_t disk_size, size_t free_space, size_t total_objects);
+    void update_stats(size_t disk_size, size_t free_space, size_t total_objects, size_t available_versions);
     void finish_timer();
-
 };
 
 } // namespace metrics

@@ -27,6 +27,9 @@
 #include <realm/util/features.h>
 
 namespace realm {
+
+class Group;
+
 namespace metrics {
 
 #if REALM_METRICS
@@ -43,8 +46,10 @@ public:
 
     void start_read_transaction();
     void start_write_transaction();
-    void end_read_transaction(size_t total_size, size_t free_space, size_t num_objects);
-    void end_write_transaction(size_t total_size, size_t free_space, size_t num_objects);
+    void end_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions);
+    void end_write_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions);
+    static std::unique_ptr<MetricTimer> report_fsync_time(const Group& g);
+    static std::unique_ptr<MetricTimer> report_write_time(const Group& g);
 
     using QueryInfoList = std::vector<QueryInfo>;
     using TransactionInfoList = std::vector<TransactionInfo>;

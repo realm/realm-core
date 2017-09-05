@@ -566,7 +566,10 @@ TEST(Metrics_TransactionTimings)
     }
     {
         WriteTransaction wt(sg);
+        TableRef t = wt.get_table(0);
+        t->add_empty_row(1);
         std::this_thread::sleep_for(80ms);
+        wt.commit();
     }
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
@@ -581,6 +584,17 @@ TEST(Metrics_TransactionTimings)
 
     for (auto t : *transactions) {
         CHECK_GREATER(t.get_transaction_time(), 0);
+
+        if (t.get_transaction_type() == TransactionInfo::read_transaction) {
+            CHECK_EQUAL(t.get_fsync_time(), 0.0);
+            CHECK_EQUAL(t.get_write_time(), 0.0);
+        }
+        else {
+            CHECK_NOT_EQUAL(t.get_fsync_time(), 0.0);
+            CHECK_NOT_EQUAL(t.get_write_time(), 0.0);
+            CHECK_LESS(t.get_fsync_time(), t.get_transaction_time());
+            CHECK_LESS(t.get_write_time(), t.get_transaction_time());
+        }
     }
     // give a margin of 20ms for transactions
     CHECK_GREATER(transactions->at(2).get_transaction_time(), 0.060);
@@ -624,6 +638,62 @@ TEST(Metrics_TransactionData)
     CHECK_EQUAL(transactions->at(1).get_total_objects(), 11);
     CHECK_EQUAL(transactions->at(2).get_total_objects(), 11 + 3 + 7);
 }
+
+TEST(Metrics_TransactionVersions)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    SharedGroup sg(*hist, options);
+    populate(sg);
+    const size_t num_writes_while_pinned = 10;
+
+    {
+        ReadTransaction rt(sg);
+    }
+    {
+        WriteTransaction wt(sg);
+        TableRef t0 = wt.get_table(0);
+        TableRef t1 = wt.get_table(1);
+        t0->add_empty_row(3);
+        t1->add_empty_row(7);
+        wt.commit();
+    }
+    {
+        std::unique_ptr<Replication> hist2(make_in_realm_history(path));
+        SharedGroup sg2(*hist2);
+
+        // Pin this version. Note that since this read transaction is against a different shared group
+        // it doesn't get tracked in the transaction metrics of the original shared group.
+        ReadTransaction rt(sg2);
+
+        for (size_t i = 0; i < num_writes_while_pinned; ++i) {
+            WriteTransaction wt(sg);
+            TableRef t0 = wt.get_table(0);
+            t0->add_empty_row(1);
+            wt.commit();
+        }
+    }
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+
+    std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
+    CHECK(transactions);
+    CHECK_EQUAL(metrics->num_transaction_metrics(), 0);
+
+    CHECK_EQUAL(transactions->size(), 3 + num_writes_while_pinned);
+
+    CHECK_EQUAL(transactions->at(0).get_num_available_versions(), 2);
+    CHECK_EQUAL(transactions->at(1).get_num_available_versions(), 2);
+    CHECK_EQUAL(transactions->at(2).get_num_available_versions(), 2);
+
+    for (size_t i = 0; i < num_writes_while_pinned; ++i) {
+        CHECK_EQUAL(transactions->at(3 + i).get_num_available_versions(), 2 + i);
+    }
+}
+
 
 
 #endif // REALM_METRICS

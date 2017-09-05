@@ -28,9 +28,11 @@
 #include <realm/group_shared.hpp>
 #include <realm/alloc_slab.hpp>
 #include <realm/disable_sync_to_disk.hpp>
+#include <realm/metrics/metric_timer.hpp>
 
 using namespace realm;
 using namespace realm::util;
+using namespace realm::metrics;
 
 // Class controlling a memory mapped window into a file
 class GroupWriter::MapWindow {
@@ -272,6 +274,8 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 
 ref_type GroupWriter::write_group()
 {
+    std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_write_time(m_group);
+
     merge_free_space(); // Throws
 
     Array& top = m_group.m_top;
@@ -799,6 +803,8 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // When running the test suite, device synchronization is disabled
     bool disable_sync = get_disable_sync_to_disk();
+
+    std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_fsync_time(m_group);
 
     // Make sure that that all data relating to the new snapshot is written to
     // stable storage before flipping the slot selector
