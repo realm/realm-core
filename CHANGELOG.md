@@ -14,6 +14,8 @@
 
 * Implemented `realm::util::File::is_dir`, `realm::util::File::resolve`,
   and `realm::util::DirScanner` on Windows.
+* Added metrics tracking as an optional SharedGroup feature.
+  PR [#2840](https://github.com/realm/realm-core/pull/2840).
 
 -----------
 
