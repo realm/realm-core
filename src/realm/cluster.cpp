@@ -53,12 +53,18 @@ public:
     {
         return false;
     }
+    size_t get_tree_size() const override;
 
     void insert_column(size_t ndx) override;
     ref_type insert(Key k, State& state) override;
     void get(Key k, State& state) const override;
     unsigned erase(Key k) override;
     void add(ref_type ref, int64_t key_value = 0);
+
+    ref_type get_child(size_t ndx) const
+    {
+        return m_children.get_as_ref(ndx);
+    }
 
     // Reset first (and only!) child ref and return the previous value
     ref_type clear_first_child_ref()
@@ -73,6 +79,8 @@ public:
     {
         return m_keys.get(0);
     }
+
+    void get_leaf(size_t ndx, ClusterNode::IteratorState& state) const noexcept;
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
@@ -102,6 +110,14 @@ private:
     template <class T, class F>
     T recurse(Key key, F func);
 };
+}
+
+
+void ClusterNode::IteratorState::clear()
+{
+    m_current_leaf.detach();
+    m_key_offset = 0;
+    m_leaf_start_ndx = 0;
 }
 
 /***************************** ClusterNodeInner ******************************/
@@ -142,7 +158,7 @@ T ClusterNodeInner::recurse(Key key, F func)
     ChildInfo child_info = find_child(key);
 
     ref_type child_ref = m_children.get_as_ref(child_info.ndx);
-    char* child_header = static_cast<char*>(m_alloc.translate(child_ref));
+    char* child_header = m_alloc.translate(child_ref);
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
         Cluster leaf(m_alloc, m_tree_top);
@@ -261,6 +277,38 @@ void ClusterNodeInner::add(ref_type ref, int64_t key_value)
     m_keys.add(key_value);
 }
 
+void ClusterNodeInner::get_leaf(size_t ndx, ClusterNode::IteratorState& state) const noexcept
+{
+    unsigned sz = node_size();
+    for (unsigned i = 0; i < sz; i++) {
+        ref_type ref = m_children.get_as_ref(i);
+        char* header = m_alloc.translate(ref);
+        bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
+        size_t child_size;
+        if (child_is_leaf) {
+            state.m_current_leaf.init(MemRef(header, ref, m_alloc));
+            child_size = state.m_current_leaf.node_size();
+            state.m_leaf_end_ndx = state.m_leaf_start_ndx + child_size;
+            if (ndx < state.m_leaf_end_ndx) {
+                state.m_key_offset += get_key(i);
+                return;
+            }
+        }
+        else {
+            ClusterNodeInner inner_node(m_alloc, m_tree_top);
+            inner_node.init(MemRef(header, ref, m_alloc));
+
+            child_size = inner_node.get_tree_size();
+            if (ndx < state.m_leaf_start_ndx + child_size) {
+                state.m_key_offset += get_key(i);
+                auto node = m_tree_top.get_node(ref);
+                return inner_node.get_leaf(ndx, state);
+            }
+        }
+        state.m_leaf_start_ndx += child_size;
+    }
+}
+
 void ClusterNodeInner::dump_objects(int64_t key_offset, std::string lead) const
 {
     std::cout << lead << "node" << std::endl;
@@ -282,6 +330,30 @@ void ClusterNodeInner::move(size_t ndx, ClusterNode* new_node, int64_t key_adj)
     }
     m_children.truncate(ndx);
     m_keys.truncate(ndx);
+}
+
+size_t ClusterNodeInner::get_tree_size() const
+{
+    size_t tree_size = 0;
+    unsigned sz = node_size();
+
+    for (unsigned i = 0; i < sz; i++) {
+        ref_type ref = m_children.get_as_ref(i);
+        char* header = m_alloc.translate(ref);
+        bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
+        MemRef mem(header, ref, m_alloc);
+        if (child_is_leaf) {
+            Cluster leaf(m_alloc, m_tree_top);
+            leaf.init(mem);
+            tree_size += leaf.node_size();
+        }
+        else {
+            ClusterNodeInner node(m_alloc, m_tree_top);
+            node.init(mem);
+            tree_size += node.get_tree_size();
+        }
+    }
+    return tree_size;
 }
 
 /********************************* Cluster ***********************************/
@@ -556,7 +628,7 @@ ConstObj::ConstObj(const ClusterTree* tree_top, ref_type ref, Key key, size_t ro
     m_version = m_tree_top->get_version_counter();
 }
 
-inline Obj::Obj(ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx)
+Obj::Obj(ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx)
     : ConstObj(tree_top, ref, key, row_ndx)
     , m_writeable(!tree_top->get_alloc().is_read_only(ref))
 {
@@ -641,6 +713,7 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
     fields.init_from_mem(m_mem);
+    REALM_ASSERT(col_ndx + 1 < fields.size());
     Array values(alloc);
     values.set_parent(&fields, col_ndx + 1);
     values.init_from_parent();
@@ -755,11 +828,23 @@ void ClusterTree::init_from_parent()
         auto new_root = create_root_from_ref(m_root->get_alloc(), ref);
         new_root->set_parent(parent, ndx_in_parent);
         m_root = std::move(new_root);
+        m_size = m_root->get_tree_size();
     }
     else {
         m_root->detach();
+        m_size = 0;
     }
 }
+
+bool ClusterTree::update_from_parent(size_t old_baseline) noexcept
+{
+    bool was_updated = m_root->update_from_parent(old_baseline);
+    if (was_updated) {
+        m_size = m_root->get_tree_size();
+    }
+    return was_updated;
+}
+
 
 uint64_t ClusterTree::bump_version()
 {
@@ -779,6 +864,7 @@ void ClusterTree::clear()
     std::unique_ptr<ClusterNode> leaf = std::make_unique<Cluster>(m_root->get_alloc(), *this);
     leaf->create();
     replace_root(std::move(leaf));
+    m_size = 0;
 }
 
 Obj ClusterTree::insert(Key k)
@@ -794,7 +880,7 @@ Obj ClusterTree::insert(Key k)
 
         replace_root(std::move(new_root));
     }
-
+    m_size++;
     return Obj(this, state.ref, k, state.index);
 }
 
@@ -815,6 +901,7 @@ Obj ClusterTree::get(Key k)
 void ClusterTree::erase(Key k)
 {
     unsigned root_size = m_root->erase(k);
+    m_size--;
     while (!m_root->is_leaf() && root_size == 1) {
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
 
@@ -827,6 +914,20 @@ void ClusterTree::erase(Key k)
 
         replace_root(std::move(new_root));
         root_size = m_root->node_size();
+    }
+}
+
+void ClusterTree::get_leaf(size_t ndx, ClusterNode::IteratorState& state) const noexcept
+{
+    state.clear();
+
+    if (m_root->is_leaf()) {
+        state.m_current_leaf.init(m_root->get_mem());
+    }
+    else {
+        ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
+        state.m_root_index = 0;
+        node->get_leaf(ndx, state);
     }
 }
 
@@ -852,4 +953,50 @@ const Spec& ClusterTree::get_spec() const
 {
     typedef _impl::TableFriend tf;
     return tf::get_spec(*m_owner);
+}
+
+ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
+    : m_tree(t)
+    , m_leaf(t.get_alloc(), t)
+    , m_state(m_leaf)
+    , m_ndx(ndx)
+{
+}
+
+void ClusterTree::ConstIterator::load_leaf() const
+{
+    if (m_ndx < m_tree.size()) {
+        m_tree.get_leaf(m_ndx, m_state);
+        m_version = m_tree.get_version_counter();
+    }
+    else {
+        m_state.clear();
+    }
+}
+
+Table::ConstIterator::pointer Table::ConstIterator::operator->() const
+{
+    if (m_version != m_tree.get_version_counter()) {
+        load_leaf();
+    }
+
+    REALM_ASSERT(m_leaf.is_attached());
+    size_t index = m_ndx - m_state.m_leaf_start_ndx;
+    Key k = Key(m_leaf.get_key(index) + m_state.m_key_offset);
+
+    return new (&m_obj_cache_storage) Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_ref(), k, index);
+}
+
+Table::ConstIterator& Table::ConstIterator::operator++()
+{
+    m_ndx++;
+    if (m_ndx == m_state.m_leaf_end_ndx) {
+        if (m_ndx < m_tree.size()) {
+            load_leaf();
+        }
+        else {
+            m_state.clear();
+        }
+    }
+    return *this;
 }

@@ -8295,6 +8295,32 @@ TEST(Table_object_merge_nodes)
     }
 }
 
+TEST(Table_object_forward_iterator)
+{
+    int nb_rows = 1024;
+    Table table;
+    table.add_column(type_Int, "int1");
+    table.add_column(type_Int, "int2", true);
+
+    for (int i = 0; i < nb_rows; i++) {
+        table.create_object(Key(i));
+    }
+
+    for (Obj o : table) {
+        int64_t key_value = o.get_key().value;
+        o.set_all(key_value << 1, key_value << 2);
+    }
+
+    // table.dump_objects();
+
+    for (Obj o : table) {
+        int64_t key_value = o.get_key().value;
+        // std::cout << "Key value: " << std::hex << key_value << std::dec << std::endl;
+        CHECK_EQUAL(key_value << 1, o.get<int64_t>(0));
+        CHECK_EQUAL(key_value << 2, o.get<util::Optional<int64_t>>(1));
+    }
+}
+
 TEST(Table_object_sequential)
 {
     int nb_rows = 1024;

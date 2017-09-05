@@ -21,7 +21,6 @@
 
 #include <realm/array.hpp>
 #include <realm/data_type.hpp>
-#include <map>
 
 namespace realm {
 
@@ -72,6 +71,33 @@ public:
         ref_type ref;      // Ref to the Cluster holding the new/found object
         size_t index;      // The index within the Cluster at which the object is stored.
     };
+
+    struct IteratorState {
+        struct NodeInfo {
+            NodeInfo(std::unique_ptr<ClusterNode> n, size_t s, size_t i)
+                : node(std::move(n))
+                , size(s)
+                , index(i)
+            {
+            }
+            std::unique_ptr<ClusterNode> node;
+            size_t size;
+            size_t index;
+        };
+        IteratorState(Cluster& leaf)
+            : m_current_leaf(leaf)
+        {
+        }
+        IteratorState(const IteratorState&);
+        void clear();
+
+        Cluster& m_current_leaf;
+        int64_t m_key_offset = 0;
+        size_t m_leaf_start_ndx = 0;
+        size_t m_leaf_end_ndx = 0;
+        size_t m_root_index = 0;
+    };
+
     ClusterNode(Allocator& allocator, const ClusterTree& tree_top)
         : Array(allocator)
         , m_tree_top(tree_top)
@@ -90,7 +116,12 @@ public:
     }
     unsigned node_size() const
     {
-        return unsigned(m_keys.size());
+        return is_attached() ? unsigned(m_keys.size()) : 0;
+    }
+
+    int64_t get_key(size_t ndx) const
+    {
+        return m_keys.get(ndx);
     }
     void adjust_keys(int64_t offset)
     {
@@ -98,6 +129,8 @@ public:
     }
 
     virtual bool is_leaf() const = 0;
+    /// Number of elements in this subtree
+    virtual size_t get_tree_size() const = 0;
 
     /// Create an empty node
     virtual void create() = 0;
@@ -143,12 +176,13 @@ public:
     }
     MemRef ensure_writeable(Key k) override;
 
-    Key get_key(size_t row_ndx) const;
-    size_t get_row_ndx(Key key) const;
-
     bool is_leaf() const override
     {
         return true;
+    }
+    size_t get_tree_size() const override
+    {
+        return node_size();
     }
     void insert_column(size_t ndx) override;
     ref_type insert(Key k, State& state) override;
@@ -166,6 +200,7 @@ private:
 class ConstObj {
 public:
     ConstObj(const ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx);
+    ConstObj& operator=(const ConstObj&) = delete;
 
     Key get_key() const
     {
@@ -216,6 +251,9 @@ private:
 
 class ClusterTree {
 public:
+    class ConstIterator;
+    class Iterator;
+
     ClusterTree(Table* owner, Allocator& alloc);
     static MemRef create_empty_cluster(Allocator& alloc);
 
@@ -245,12 +283,12 @@ public:
     const Spec& get_spec() const;
 
     void init_from_parent();
-    bool update_from_parent(size_t old_baseline) noexcept
-    {
-        return m_root->update_from_parent(old_baseline);
-    }
+    bool update_from_parent(size_t old_baseline) noexcept;
 
-    size_t size() const noexcept;
+    size_t size() const noexcept
+    {
+        return m_size;
+    }
     void clear();
     bool is_empty() const noexcept
     {
@@ -271,6 +309,7 @@ public:
     void erase(Key k);
     ConstObj get(Key k) const;
     Obj get(Key k);
+    void get_leaf(size_t ndx, ClusterNode::IteratorState& state) const noexcept;
     void dump_objects()
     {
         m_root->dump_objects(0, "");
@@ -282,6 +321,7 @@ private:
     friend class ClusterNodeInner;
     Table* m_owner;
     std::unique_ptr<ClusterNode> m_root;
+    size_t m_size = 0;
 
     void replace_root(std::unique_ptr<ClusterNode> leaf);
 
@@ -291,6 +331,60 @@ private:
         return create_root_from_mem(alloc, MemRef{alloc.translate(ref), ref, alloc});
     }
     std::unique_ptr<ClusterNode> get_node(ref_type ref) const;
+};
+
+class ClusterTree::ConstIterator {
+public:
+    typedef std::output_iterator_tag iterator_category;
+    typedef const Obj value_type;
+    typedef ptrdiff_t difference_type;
+    typedef const Obj* pointer;
+    typedef const Obj& reference;
+
+    ConstIterator(const ClusterTree& t, size_t ndx);
+    ConstIterator(Iterator&&);
+    ConstIterator(const ConstIterator& other)
+        : ConstIterator(other.m_tree, other.m_ndx)
+    {
+    }
+    reference operator*() const
+    {
+        return *operator->();
+    }
+    pointer operator->() const;
+    ConstIterator& operator++();
+    bool operator!=(const ConstIterator& rhs) const
+    {
+        return m_ndx != rhs.m_ndx;
+    }
+
+protected:
+    const ClusterTree& m_tree;
+    mutable uint64_t m_version = uint64_t(-1);
+    mutable Cluster m_leaf;
+    mutable ClusterNode::IteratorState m_state;
+    mutable size_t m_ndx;
+    mutable std::aligned_storage<sizeof(Obj), alignof(Obj)>::type m_obj_cache_storage;
+
+    void load_leaf() const;
+};
+
+class ClusterTree::Iterator : public ClusterTree::ConstIterator {
+public:
+    typedef std::forward_iterator_tag iterator_category;
+    typedef Obj value_type;
+    typedef Obj* pointer;
+    typedef Obj& reference;
+
+    using ConstIterator::ConstIterator;
+    reference operator*() const
+    {
+        return *operator->();
+    }
+    pointer operator->() const
+    {
+        return const_cast<pointer>(ConstIterator::operator->());
+    }
 };
 
 template <>

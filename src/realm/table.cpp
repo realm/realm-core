@@ -2454,8 +2454,8 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
             state.rows.push_back(row); // Throws
         }
     }
-    sort(begin(state.rows), end(state.rows));
-    state.rows.erase(unique(begin(state.rows), end(state.rows)), end(state.rows));
+    sort(std::begin(state.rows), std::end(state.rows));
+    state.rows.erase(unique(std::begin(state.rows), std::end(state.rows)), std::end(state.rows));
 
     if (Group* g = get_parent_group())
         state.track_link_nullifications = g->has_cascade_notification_handler();
@@ -6274,6 +6274,10 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         ColumnBase* first_col = m_cols[0];
         m_size = first_col->size();
     }
+    size_t sz = m_clusters.size();
+    if (sz > m_size) {
+        m_size = sz;
+    }
 }
 
 
@@ -6653,12 +6657,35 @@ void Table::dump_node_structure(std::ostream& out, int level) const
 Obj Table::create_object(Key key)
 {
     REALM_ASSERT(key != null_key);
+    Obj obj = m_clusters.insert(key);
     bump_version();
-    return m_clusters.insert(key);
+    m_size++; // TODO: Redundant
+    return obj;
 }
 
 void Table::remove_object(Key key)
 {
+    m_clusters.erase(key);
     bump_version();
-    return m_clusters.erase(key);
+    m_size--; // TODO: Redundant
+}
+
+Table::ConstIterator Table::begin() const
+{
+    return ConstIterator(m_clusters, 0);
+}
+
+Table::ConstIterator Table::end() const
+{
+    return ConstIterator(m_clusters, size());
+}
+
+Table::Iterator Table::begin()
+{
+    return Iterator(m_clusters, 0);
+}
+
+Table::Iterator Table::end()
+{
+    return Iterator(m_clusters, size());
 }

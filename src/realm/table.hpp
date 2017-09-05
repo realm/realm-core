@@ -392,12 +392,20 @@ public:
     {
         return m_clusters.dump_objects();
     }
+
     void remove(size_t row_ndx);
     void remove_last();
     void remove_object(Key key);
     void move_last_over(size_t row_ndx);
     void clear();
     void swap_rows(size_t row_ndx_1, size_t row_ndx_2);
+    using Iterator = ClusterTree::Iterator;
+    using ConstIterator = ClusterTree::ConstIterator;
+    ConstIterator begin() const;
+    ConstIterator end() const;
+    Iterator begin();
+    Iterator end();
+
     //@}
 
     /// Replaces all links to \a row_ndx with links to \a new_row_ndx.
