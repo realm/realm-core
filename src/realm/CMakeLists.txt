@@ -33,10 +33,6 @@ set(REALM_SOURCES
     index_string.cpp
     lang_bind_helper.cpp
     link_view.cpp
-    metrics/metrics.cpp
-    metrics/metric_timer.cpp
-    metrics/query_info.cpp
-    metrics/transaction_info.cpp
     query.cpp
     query_engine.cpp
     query_expression.cpp
@@ -198,6 +194,14 @@ set(REALM_INSTALL_ALL_HEADERS
     ${REALM_OTHER_UTIL_HEADERS}
     ${REALM_METRICS_HEADERS}
 )
+
+if(REALM_METRICS)
+    list(APPEND REALM_SOURCES
+        metrics/metrics.cpp
+        metrics/metric_timer.cpp
+        metrics/query_info.cpp
+        metrics/transaction_info.cpp)
+endif()
 
 if(NOT MSVC)
     list(APPEND REALM_SOURCES util/interprocess_mutex.cpp)
