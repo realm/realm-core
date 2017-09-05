@@ -13402,4 +13402,32 @@ TEST(LangBindHelper_UpdateDescriptor)
     CHECK_EQUAL(tv.size(), 1);
 }
 
+TEST(LangBindHelper_DeleteRealm)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+        SharedGroup sg_w(*hist_w);
+        sg_w.begin_write();
+        {
+            File f(path);
+        }
+        CHECK(!SharedGroup::delete_realm(path, [](std::string){}));
+        {
+            File f(path);
+        }
+        sg_w.commit();
+        {
+            File f(path);
+        }
+        CHECK(!SharedGroup::delete_realm(path, [](std::string){}));
+        {
+            File f(path);
+        }
+    }
+    CHECK(SharedGroup::delete_realm(path, [](std::string){}));
+    File f;
+    CHECK_THROW(f.open(path), File::NotFound);
+}
+
 #endif

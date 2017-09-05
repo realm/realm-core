@@ -26,6 +26,7 @@
 #include <stdexcept>
 #include <string>
 #include <streambuf>
+#include <vector>
 
 #ifndef _WIN32
 #include <dirent.h> // POSIX.1-2001
@@ -914,6 +915,9 @@ public:
 private:
 #ifndef _WIN32
     DIR* m_dirp;
+#else
+    std::vector<std::string> m_results;
+    size_t m_next = 0;
 #endif
 };
 

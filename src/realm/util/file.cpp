@@ -952,10 +952,16 @@ bool File::exists(const std::string& path)
 
 bool File::is_dir(const std::string& path)
 {
-#ifndef _WIN32
     struct stat statbuf;
-    if (::stat(path.c_str(), &statbuf) == 0)
+
+    if (::stat(path.c_str(), &statbuf) == 0) {
+#ifdef _WIN32
+        return S_IFDIR & statbuf.st_mode;
+#else
         return S_ISDIR(statbuf.st_mode);
+#endif
+    }
+
     int err = errno; // Eliminate any risk of clobbering
     switch (err) {
         case EACCES:
@@ -965,10 +971,6 @@ bool File::is_dir(const std::string& path)
     }
     std::string msg = get_errno_msg("stat() failed: ", err);
     throw std::runtime_error(msg);
-#else
-    static_cast<void>(path);
-    throw std::runtime_error("Not yet supported");
-#endif
 }
 
 
@@ -1163,17 +1165,20 @@ bool File::is_removed() const
 
 std::string File::resolve(const std::string& path, const std::string& base_dir)
 {
-#ifndef _WIN32
-    char dir_sep = '/';
+#ifdef _WIN32
+    char dir_sep[2] = { '/', '\\' };
+#else
+    char dir_sep[2] = { '/', 0 };
+#endif
     std::string path_2 = path;
     std::string base_dir_2 = base_dir;
-    bool is_absolute = (!path_2.empty() && path_2.front() == dir_sep);
+    bool is_absolute = (!path_2.empty() && (path_2.front() == dir_sep[0] || path_2.front() == dir_sep[1]));
     if (is_absolute)
         return path_2;
     if (path_2.empty())
         path_2 = ".";
-    if (!base_dir_2.empty() && base_dir_2.back() != dir_sep)
-        base_dir_2.push_back(dir_sep);
+    if (!base_dir_2.empty() && (base_dir_2.back() != dir_sep[0] && base_dir_2.back() != dir_sep[1]))
+        base_dir_2.push_back(dir_sep[0]);
     /*
     // Abbreviate
     for (;;) {
@@ -1198,11 +1203,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
     }
     */
     return base_dir_2 + path_2;
-#else
-    static_cast<void>(path);
-    static_cast<void>(base_dir);
-    throw std::runtime_error("Not yet supported");
-#endif
+
 }
 
 
@@ -1236,10 +1237,25 @@ const char* File::get_encryption_key()
 }
 
 
-#ifndef _WIN32
-
 DirScanner::DirScanner(const std::string& path, bool allow_missing)
 {
+#ifdef _WIN32
+    WIN32_FIND_DATA file;
+    HANDLE search_handle = FindFirstFile((path + "\\*").c_str(), &file);
+    if (search_handle != INVALID_HANDLE_VALUE)
+    {
+        do
+        {
+            if(std::string(file.cFileName) != "." && std::string(file.cFileName) != "..") {
+                m_results.push_back(file.cFileName);
+            }
+        } while (FindNextFile(search_handle, &file));
+        FindClose(search_handle);
+    }
+    else if (!allow_missing) {
+        throw File::NotFound("No directories found: ", path);
+    }
+#else
     m_dirp = opendir(path.c_str());
     if (!m_dirp) {
         int err = errno; // Eliminate any risk of clobbering
@@ -1255,18 +1271,32 @@ DirScanner::DirScanner(const std::string& path, bool allow_missing)
                 throw File::AccessError(msg, path);
         }
     }
+#endif
 }
 
 DirScanner::~DirScanner() noexcept
 {
+#ifdef _WIN32
+#else
     if (m_dirp) {
         int r = closedir(m_dirp);
         REALM_ASSERT_RELEASE(r == 0);
     }
+#endif
 }
 
 bool DirScanner::next(std::string& name)
 {
+#ifdef _WIN32
+    if (m_next == m_results.size()) {
+        return false;
+    }
+    else {
+        name = m_results[m_next];
+        m_next++;
+        return true;
+    }
+#else
     if (!m_dirp)
         return false;
 
@@ -1291,22 +1321,5 @@ bool DirScanner::next(std::string& name)
             return true;
         }
     }
-}
-
-#else
-
-DirScanner::DirScanner(const std::string&, bool)
-{
-    throw std::runtime_error("Not yet supported");
-}
-
-DirScanner::~DirScanner() noexcept
-{
-}
-
-bool DirScanner::next(std::string&)
-{
-    return false;
-}
-
 #endif
+}

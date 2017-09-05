@@ -749,6 +749,7 @@ std::string SharedGroupOptions::sys_tmp_dir = "";
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
+
 void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_backend,
                           const SharedGroupOptions options)
 {

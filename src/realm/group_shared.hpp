@@ -526,6 +526,22 @@ public:
     // Release pinned version (not thread safe)
     void unpin_version(VersionID version);
 
+    // Delete the realm file and coordination files. The lock file is not deleted,
+    // as that cannot be done without opening for race conditions. Fails and returns
+    // false if the realm file is in use by any thread or process. Otherwise removes
+    // as much as possible of the realm file and the files in the management directory
+    // as well as the management directory itself. Before removal, call the supplied
+    // cleanup function object, allowing the caller to remove other files while
+    // still operating under lock. Doing the callback before removing the files allow
+    // the caller to maintain state in files in the management directory and use it
+    // for the cleanup process if desired.
+    // The lock taken precludes races with other threads or processes accessing the 
+    // files through a SharedGroup. However, no coordination is attempted with accesses 
+    // through lower level primitives, e.g. Group.
+    template <typename TFunc>
+    static bool delete_realm(const std::string path, TFunc cleanup);
+
+
 private:
     struct SharedInfo;
     struct ReadCount;
@@ -663,6 +679,30 @@ private:
 inline void SharedGroup::get_stats(size_t& free_space, size_t& used_space) {
     free_space = m_free_space;
     used_space = m_used_space;
+}
+
+template <typename TFunc>
+bool SharedGroup::delete_realm(const std::string path, TFunc cleanup) {
+    // auto coordination_dir = path + ".management";
+    auto lockfile_path(path + ".lock");
+    auto management_dir = path + ".management";
+
+    File lockfile;
+    lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
+    File::CloseGuard fcg(lockfile);
+
+    if (lockfile.try_lock_exclusive()) { // Throws
+        File::UnlockGuard ulg(lockfile);
+        std::remove(path.c_str()); // ignore result, file may not exist
+
+        // allow caller to do furter cleanup under lock
+        cleanup(management_dir);
+
+        // remove coordination directory.
+        util::try_remove_dir_recursive(management_dir);
+        return true;
+    }
+    return false;
 }
 
 
