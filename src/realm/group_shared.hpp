@@ -573,7 +573,6 @@ private:
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
 
-    bool m_enable_metrics;
 #if REALM_METRICS
     std::shared_ptr<metrics::Metrics> m_metrics;
 #endif // REALM_METRICS

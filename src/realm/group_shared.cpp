@@ -770,12 +770,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
     m_lockfile_path = path + ".lock";
     try_make_dir(m_coordination_dir);
     m_key = options.encryption_key;
-    m_enable_metrics = options.enable_metrics;
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     SlabAlloc& alloc = m_group.m_alloc;
 
 #if REALM_METRICS
-    if (m_enable_metrics) {
+    if (options.enable_metrics) {
         m_metrics = std::make_shared<Metrics>();
         m_group.set_metrics(m_metrics);
     }
