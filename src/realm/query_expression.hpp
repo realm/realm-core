@@ -2658,11 +2658,19 @@ public:
     virtual std::string description() const override
     {
         const Table* table = get_base_table();
+        std::string description;
         if (table && table->is_attached()) {
-            return std::string(table->get_name()) + metrics::value_separator
-                + std::string(table->get_column_name(m_column_ndx));
+            if (m_subtable_column.m_column) {
+                description = std::string(table->get_name()) + metrics::value_separator
+                    + std::string(table->get_column_name(m_subtable_column.m_column_ndx));
+
+            }
+            else {
+                description = std::string(table->get_name()) + metrics::value_separator
+                    + std::string(table->get_column_name(m_column_ndx));
+            }
         }
-        return "";
+        return description;
     }
 
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
@@ -2787,7 +2795,7 @@ public:
         const Table* table = get_base_table();
         if (table && table->is_attached()) {
             return std::string(table->get_name()) + metrics::value_separator
-            + std::string(table->get_column_name(m_column_ndx)) + metrics::value_separator + Operation::description();
+            + std::string(table->get_column_name(m_column_ndx)) + metrics::value_separator + Operation::description() + "()";
         }
         return "";
     }

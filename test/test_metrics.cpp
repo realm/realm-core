@@ -626,6 +626,106 @@ TEST(Metrics_LinkListQueries)
 }
 
 
+TEST(Metrics_SubQueries)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroupOptions options(crypt_key());
+    options.enable_metrics = true;
+    SharedGroup sg(*hist, options);
+
+    Group& g = sg.begin_write();
+
+    std::string table_name = "table";
+    std::string int_col_name = "integers";
+    std::string str_col_name = "strings";
+
+    TableRef table = g.add_table(table_name);
+
+    DescriptorRef subdescr;
+    table->add_column(type_Table, int_col_name, &subdescr);
+    subdescr->add_column(type_Int, "list");
+    table->add_column(type_Table, str_col_name, &subdescr);
+    subdescr->add_column(type_String, "list", nullptr, true);
+    table->add_column(type_String, "other");
+
+    table->add_empty_row(4);
+
+    // see Query_SubtableExpression
+    auto set_int_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
+        size_t sz = value_list.size();
+        subtable->clear();
+        if (sz) {
+            subtable->add_empty_row(sz);
+            for (size_t i = 0; i < sz; i++) {
+                subtable->set_int(0, i, value_list[i]);
+            }
+        }
+    };
+    auto set_string_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
+        size_t sz = value_list.size();
+        subtable->clear();
+        subtable->add_empty_row(sz);
+        for (size_t i = 0; i < sz; i++) {
+            if (value_list[i] < 100) {
+                std::string str("Str_");
+                str += util::to_string(value_list[i]);
+                subtable->set_string(0, i, str);
+            }
+        }
+    };
+    set_int_list(table->get_subtable(0, 0), std::vector<Int>({0, 1}));
+    set_int_list(table->get_subtable(0, 1), std::vector<Int>({2, 3, 4, 5}));
+    set_int_list(table->get_subtable(0, 2), std::vector<Int>({6, 7, 8, 9}));
+    set_int_list(table->get_subtable(0, 3), std::vector<Int>({}));
+    set_string_list(table->get_subtable(1, 0), std::vector<Int>({0, 1}));
+    set_string_list(table->get_subtable(1, 1), std::vector<Int>({2, 3, 4, 5}));
+    set_string_list(table->get_subtable(1, 2), std::vector<Int>({6, 7, 100, 8, 9}));
+    table->set_string(2, 0, StringData("foo"));
+    table->set_string(2, 1, StringData("str"));
+    table->set_string(2, 2, StringData("str_9_baa"));
+
+    Query q0 = table->column<SubTable>(0).list<Int>() == 10;
+    Query q1 = table->column<SubTable>(0).list<Int>().max() > 5;
+    Query q2 = table->column<SubTable>(1).list<String>().begins_with("Str");
+    Query q3 = table->column<SubTable>(1).list<String>() == "Str_0";
+
+    q0.find_all();
+    q1.find_all();
+    q2.find_all();
+    q3.find_all();
+
+    sg.commit();
+
+    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    CHECK(metrics);
+    std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
+    CHECK(queries);
+
+    CHECK_EQUAL(queries->size(), 4);
+
+    std::string int_equal_description = queries->at(0).get_description();
+    CHECK_EQUAL(find_count(int_equal_description, "equal"), 1);
+    CHECK_EQUAL(find_count(int_equal_description, int_col_name), 1);
+    CHECK_EQUAL(find_count(int_equal_description, table_name), 1);
+
+    std::string int_max_description = queries->at(1).get_description();
+    CHECK_EQUAL(find_count(int_max_description, "max"), 1);
+    CHECK_EQUAL(find_count(int_max_description, int_col_name), 1);
+    CHECK_EQUAL(find_count(int_max_description, table_name), 1);
+
+    std::string str_begins_description = queries->at(2).get_description();
+    CHECK_EQUAL(find_count(str_begins_description, "begins"), 1);
+    CHECK_EQUAL(find_count(str_begins_description, str_col_name), 1);
+    CHECK_EQUAL(find_count(str_begins_description, table_name), 1);
+
+    std::string str_equal_description = queries->at(3).get_description();
+    CHECK_EQUAL(find_count(str_equal_description, "equal"), 1);
+    CHECK_EQUAL(find_count(str_equal_description, str_col_name), 1);
+    CHECK_EQUAL(find_count(str_equal_description, table_name), 1);
+}
+
+
 TEST(Metrics_TransactionTimings)
 {
     SHARED_GROUP_TEST_PATH(path);
