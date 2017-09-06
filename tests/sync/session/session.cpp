@@ -413,13 +413,20 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
     constexpr int count = 2;
     auto add_objects = [](Realm::Config& config) {
         auto r = Realm::get_shared_realm(config);
+        const auto& object_schema = *r->schema().find("sync_session_object");
+        const auto& property1 = *object_schema.property_for_name("value 1");
+        const auto& property2 = *object_schema.property_for_name("value 2");
         TableRef table = ObjectStore::table_for_object_type(r->read_group(), "sync_session_object");
         REQUIRE(table);
         r->begin_transaction();
         for (int i = 0; i < count; ++i) {
-            uint64_t row_idx = table->add_empty_row();
-            table->set_int(0, row_idx, i * 2);
-            table->set_int(1, row_idx, (count - i) * 2);
+    #if REALM_HAVE_SYNC_STABLE_IDS
+            size_t row_idx = sync::create_object(r->read_group(), *table);
+    #else
+            size_t row_idx = table->add_empty_row();
+    #endif // REALM_HAVE_SYNC_STABLE_IDS
+            table->set_int(property1.table_column, row_idx, i * 2);
+            table->set_int(property2.table_column, row_idx, (count - i) * 2);
         }
         r->commit_transaction();
     };
