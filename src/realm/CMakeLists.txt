@@ -6,6 +6,7 @@ set(REALM_SOURCES
     array_blob.cpp
     array_blobs_big.cpp
     array_integer.cpp
+    array_string.cpp
     array_string_short.cpp
     array_string_long.cpp
     bptree.cpp
@@ -72,6 +73,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_blobs_big.hpp
     array_direct.hpp
     array_integer.hpp
+    array_string.hpp
     array_string_short.hpp
     array_string_long.hpp
     binary_data.hpp

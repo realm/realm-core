@@ -20,6 +20,7 @@
 #include "realm/table.hpp"
 #include "realm/replication.hpp"
 #include "realm/array_integer.hpp"
+#include "realm/array_string.hpp"
 #include "realm/column_type_traits.hpp"
 #include <iostream>
 
@@ -113,7 +114,6 @@ private:
     T recurse(Key key, F func);
 };
 }
-
 
 void ClusterNode::IteratorState::clear()
 {
@@ -397,20 +397,27 @@ void Cluster::create()
     // Create array with the required size
     size_t nb_columns = m_tree_top.get_spec().get_column_count();
     Array::create(type_HasRefs, false, nb_columns + 1);
+
     m_keys.create(Array::type_Normal);
     m_keys.update_parent();
-
     for (size_t i = 0; i < nb_columns; i++) {
+        bool nullable = m_tree_top.get_spec().get_column_attr(i) & col_attr_Nullable;
         switch (m_tree_top.get_spec().get_column_type(i)) {
             case col_type_Int: {
                 Array arr(m_alloc);
-                bool nullable = m_tree_top.get_spec().get_column_attr(i) & col_attr_Nullable;
                 if (nullable) {
                     reinterpret_cast<ArrayIntNull*>(&arr)->create(Array::type_Normal);
                 }
                 else {
                     arr.create(Array::type_Normal);
                 }
+                arr.set_parent(this, i + 1);
+                arr.update_parent();
+                break;
+            }
+            case col_type_String: {
+                ArrayString arr(m_alloc);
+                arr.create();
                 arr.set_parent(this, i + 1);
                 arr.update_parent();
                 break;
@@ -447,9 +454,9 @@ void Cluster::insert_row(size_t ndx, Key k)
     m_keys.insert(ndx, k.value);
     size_t sz = size();
     for (size_t i = 1; i < sz; i++) {
+        bool nullable = m_tree_top.get_spec().get_column_attr(i - 1) & col_attr_Nullable;
         switch (m_tree_top.get_spec().get_column_type(i - 1)) {
             case col_type_Int: {
-                bool nullable = m_tree_top.get_spec().get_column_attr(i - 1) & col_attr_Nullable;
                 Array arr(m_alloc);
                 arr.set_parent(this, i);
                 arr.init_from_parent();
@@ -460,6 +467,13 @@ void Cluster::insert_row(size_t ndx, Key k)
                 else {
                     arr.insert(ndx, 0);
                 }
+                break;
+            }
+            case col_type_String: {
+                ArrayString arr(m_alloc);
+                arr.set_parent(this, i);
+                arr.init_from_parent();
+                arr.insert(ndx, nullable ? StringData{} : StringData{""});
                 break;
             }
             default:
@@ -500,6 +514,21 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 }
                 break;
             }
+            case col_type_String: {
+                ArrayString src(m_alloc);
+                src.set_parent(this, i);
+                src.init_from_parent();
+
+                ArrayString dst(m_alloc);
+                dst.set_parent(new_leaf, i);
+                dst.init_from_parent();
+
+                for (size_t j = ndx; j < end; j++) {
+                    dst.add(src.get(j));
+                }
+                src.truncate_and_destroy_children(ndx);
+                break;
+            }
             default:
                 break;
         }
@@ -518,23 +547,31 @@ Cluster::~Cluster()
 void Cluster::insert_column(size_t ndx)
 {
     size_t sz = node_size();
+    bool nullable = m_tree_top.get_spec().get_column_attr(ndx) & col_attr_Nullable;
 
     switch (m_tree_top.get_spec().get_column_type(ndx)) {
         case col_type_Int: {
-            bool nullable = m_tree_top.get_spec().get_column_attr(ndx) & col_attr_Nullable;
             Array arr(m_alloc);
+            int64_t value = 0;
             if (nullable) {
                 auto arr_int_null = reinterpret_cast<ArrayIntNull*>(&arr);
                 arr_int_null->create(Array::type_Normal);
-                for (size_t i = 0; i < sz; i++) {
-                    arr_int_null->set_null(i);
-                }
+                value = arr.get(0);
             }
             else {
                 arr.create(Array::type_Normal);
-                for (size_t i = 0; i < sz; i++) {
-                    arr.set(i, 0);
-                }
+            }
+            for (size_t i = 0; i < sz; i++) {
+                arr.add(value);
+            }
+            Array::insert(ndx + 1, from_ref(arr.get_ref()));
+            break;
+        }
+        case col_type_String: {
+            ArrayString arr(m_alloc);
+            arr.create();
+            for (size_t i = 0; i < sz; i++) {
+                arr.add(nullable ? StringData{} : StringData{""});
             }
             // Insert the reference to the newly created array in parent
             Array::insert(ndx + 1, from_ref(arr.get_ref()));
@@ -626,6 +663,13 @@ unsigned Cluster::erase(Key k)
                 }
                 break;
             }
+            case col_type_String: {
+                ArrayString values(m_alloc);
+                values.set_parent(this, i);
+                values.init_from_parent();
+                values.erase(ndx);
+                break;
+            }
             default:
                 break;
         }
@@ -663,6 +707,13 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                         arr.init_from_ref(ref);
                         std::cout << ", " << arr.get(i);
                     }
+                    break;
+                }
+                case col_type_String: {
+                    ArrayString arr(m_alloc);
+                    ref_type ref = Array::get_as_ref(j);
+                    arr.init_from_ref(ref);
+                    std::cout << ", " << arr.get(i);
                     break;
                 }
                 default:
@@ -714,7 +765,8 @@ T ConstObj::get(size_t col_ndx) const
 
     update_if_needed();
 
-    typename ColumnTypeTraits<T>::leaf_type values(m_tree_top->get_alloc());
+    REALM_ASSERT(m_tree_top->get_spec().get_column_type(col_ndx) == ColumnTypeTraits<T>::column_id);
+    typename ColumnTypeTraits<T>::cluster_leaf_type values(m_tree_top->get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
     values.init_from_ref(ref);
 
@@ -736,6 +788,13 @@ bool ConstObj::is_null(size_t col_ndx) const
                 values.init_from_ref(ref);
                 return values.is_null(m_row_ndx);
             }
+            case col_type_String: {
+                ArrayString values(m_tree_top->get_alloc());
+                ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
+                values.init_from_ref(ref);
+                return values.is_null(m_row_ndx);
+                break;
+            }
             default:
                 break;
         }
@@ -745,6 +804,7 @@ bool ConstObj::is_null(size_t col_ndx) const
 
 template int64_t ConstObj::get<int64_t>(size_t col_ndx) const;
 template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(size_t col_ndx) const;
+template StringData ConstObj::get<StringData>(size_t col_ndx) const;
 }
 
 inline void Obj::update_if_needed() const
@@ -788,7 +848,8 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
     return *this;
 }
 
-Obj& Obj::set_null(size_t col_ndx, bool is_default)
+template <>
+Obj& Obj::set<StringData>(size_t col_ndx, StringData value, bool is_default)
 {
     if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
@@ -798,18 +859,50 @@ Obj& Obj::set_null(size_t col_ndx, bool is_default)
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
     fields.init_from_mem(m_mem);
-    if (m_tree_top->get_spec().get_column_attr(col_ndx) & col_attr_Nullable) {
-        switch (m_tree_top->get_spec().get_column_type(col_ndx)) {
-            case col_type_Int: {
-                ArrayIntNull values(alloc);
-                values.set_parent(&fields, col_ndx + 1);
-                values.init_from_parent();
-                values.set_null(m_row_ndx);
-                break;
-            }
-            default:
-                break;
-        }
+    REALM_ASSERT(col_ndx + 1 < fields.size());
+    ArrayString values(alloc);
+    values.set_parent(&fields, col_ndx + 1);
+    values.init_from_parent();
+    values.set(m_row_ndx, value);
+
+    if (Replication* repl = alloc.get_replication())
+        repl->set_string(m_tree_top->get_owner(), col_ndx, m_row_ndx, value,
+                         is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+
+    return *this;
+}
+
+template <class T>
+inline void Obj::do_set_null(Array& fields, size_t col_ndx)
+{
+    T values(fields.get_alloc());
+    values.set_parent(&fields, col_ndx);
+    values.init_from_parent();
+    values.set_null(m_row_ndx);
+}
+
+Obj& Obj::set_null(size_t col_ndx, bool is_default)
+{
+    if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+    if (REALM_UNLIKELY((m_tree_top->get_spec().get_column_attr(col_ndx) & col_attr_Nullable)) == 0) {
+        throw LogicError(LogicError::column_not_nullable);
+    }
+
+    update_if_needed();
+
+    Allocator& alloc = m_tree_top->get_alloc();
+    Array fields(alloc);
+    fields.init_from_mem(m_mem);
+    switch (m_tree_top->get_spec().get_column_type(col_ndx)) {
+        case col_type_Int:
+            do_set_null<ArrayIntNull>(fields, col_ndx + 1);
+            break;
+        case col_type_String:
+            do_set_null<ArrayString>(fields, col_ndx + 1);
+            break;
+        default:
+            break;
     }
 
     if (Replication* repl = alloc.get_replication())

@@ -87,11 +87,16 @@ public:
     size_t size() const noexcept;
 
     BinaryData get(size_t ndx) const noexcept;
+    StringData get_string(size_t ndx);
+    bool is_null(size_t ndx) const;
     size_t read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept;
 
     void add(BinaryData value, bool add_zero_term = false);
     void set(size_t ndx, BinaryData value, bool add_zero_term = false);
     void insert(size_t ndx, BinaryData value, bool add_zero_term = false);
+    void add_string(StringData value);
+    void set_string(size_t ndx, StringData value);
+    void insert_string(size_t ndx, StringData value);
     void erase(size_t ndx);
     void truncate(size_t new_size);
     void clear();
@@ -204,6 +209,43 @@ inline BinaryData ArrayBinary::get(size_t ndx) const noexcept
         REALM_ASSERT(!bd.is_null());
         return bd;
     }
+}
+
+inline bool ArrayBinary::is_null(size_t ndx) const
+{
+    REALM_ASSERT_3(ndx, <, m_offsets.size());
+
+    if (!legacy_array_type() && m_nulls.get(ndx)) {
+        return true;
+    }
+    else {
+        // Old database file (non-nullable column should never return null)
+        return false;
+    }
+}
+
+inline StringData ArrayBinary::get_string(size_t ndx)
+{
+    BinaryData bin = get(ndx);
+    if (bin.is_null())
+        return realm::null();
+    else
+        return StringData(bin.data(), bin.size() - 1); // Do not include terminating zero
+}
+
+inline void ArrayBinary::add_string(StringData value)
+{
+    add(BinaryData(value.data(), value.size()), true);
+}
+
+inline void ArrayBinary::set_string(size_t ndx, StringData value)
+{
+    set(ndx, BinaryData(value.data(), value.size()), true);
+}
+
+inline void ArrayBinary::insert_string(size_t ndx, StringData value)
+{
+    insert(ndx, BinaryData(value.data(), value.size()), true);
 }
 
 inline void ArrayBinary::truncate(size_t new_size)

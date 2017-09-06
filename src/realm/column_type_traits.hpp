@@ -28,6 +28,7 @@ namespace realm {
 
 class OldDateTime;
 class ArrayBinary;
+class ArrayString;
 class ArrayInteger;
 class ArrayIntNull;
 template <class>
@@ -40,6 +41,7 @@ template <>
 struct ColumnTypeTraits<int64_t> {
     using column_type = Column<int64_t>;
     using leaf_type = ArrayInteger;
+    using cluster_leaf_type = ArrayInteger;
     using sum_type = int64_t;
     using minmax_type = int64_t;
     static const DataType id = type_Int;
@@ -51,6 +53,7 @@ template <>
 struct ColumnTypeTraits<util::Optional<int64_t>> {
     using column_type = Column<util::Optional<int64_t>>;
     using leaf_type = ArrayIntNull;
+    using cluster_leaf_type = ArrayIntNull;
     using sum_type = int64_t;
     using minmax_type = int64_t;
     static const DataType id = type_Int;
@@ -106,6 +109,7 @@ struct ColumnTypeTraits<util::Optional<OldDateTime>> : ColumnTypeTraits<util::Op
 
 template <>
 struct ColumnTypeTraits<StringData> {
+    using cluster_leaf_type = ArrayString;
     static const DataType id = type_String;
     static const ColumnType column_id = col_type_String;
 };

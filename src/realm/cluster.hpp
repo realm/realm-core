@@ -257,6 +257,8 @@ private:
     template <class Head, class... Tail>
     Obj& _set(size_t col_ndx, Head v, Tail... tail);
     void update_if_needed() const;
+    template <class T>
+    void do_set_null(Array& fields, size_t col_ndx);
 };
 
 class ClusterTree {
@@ -402,6 +404,9 @@ public:
 
 template <>
 Obj& Obj::set<int64_t>(size_t, int64_t value, bool is_default);
+
+template <>
+Obj& Obj::set<StringData>(size_t, StringData value, bool is_default);
 
 template <>
 inline Obj& Obj::set(size_t col_ndx, int value, bool is_default)

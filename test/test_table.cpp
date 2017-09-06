@@ -8749,28 +8749,53 @@ TEST(Table_KeyRow)
 TEST(Table_object_basic)
 {
     Table table;
-    table.add_column(type_Int, "int1");
-    table.add_column(type_Int, "int2", true);
+    auto int_col = table.add_column(type_Int, "int");
+    auto intnull_col = table.add_column(type_Int, "intnull", true);
+    auto str_col = table.add_column(type_String, "str");
+    auto strnull_col = table.add_column(type_String, "strnull", true);
 
-    table.create_object(Key(5)).set_all(5, 7);
+    table.create_object(Key(5)).set_all(100, 7, "Hello", "World");
     CHECK_EQUAL(table.size(), 1);
     CHECK_THROW(table.create_object(Key(5)), InvalidKey);
     CHECK_EQUAL(table.size(), 1);
     table.create_object(Key(2));
-    Obj x = table.create_object(Key(7)).set(0, 100);
+    Obj x = table.create_object(Key(7));
     table.create_object(Key(8));
     table.create_object(Key(10));
     table.create_object(Key(6));
 
     Obj y = table.get_object(Key(5));
-    CHECK(!y.is_null(1));
-    CHECK_EQUAL(y.get<util::Optional<int64_t>>(1), 7);
-    CHECK_EQUAL(x.get<int64_t>(0), 100);
-    y.set_null(1);
-    CHECK(y.is_null(1));
 
+    // Int
+    CHECK(!x.is_null(int_col));
+    CHECK_EQUAL(0, x.get<int64_t>(int_col));
+    CHECK(x.is_null(intnull_col));
+
+    CHECK_EQUAL(100, y.get<int64_t>(int_col));
+    CHECK(!y.is_null(intnull_col));
+    CHECK_EQUAL(7, y.get<util::Optional<int64_t>>(intnull_col));
+    y.set_null(intnull_col);
+    CHECK(y.is_null(intnull_col));
+
+    // String
+    CHECK(!x.is_null(str_col));
+    CHECK_EQUAL("", x.get<String>(str_col));
+    CHECK(x.is_null(strnull_col));
+
+    CHECK_EQUAL("Hello", y.get<String>(str_col));
+    CHECK(!y.is_null(strnull_col));
+    CHECK_EQUAL("World", y.get<String>(strnull_col));
+    y.set_null(strnull_col);
+    CHECK(y.is_null(strnull_col));
+
+    // Upgrade to medium leaf
+    y.set(str_col, "This is a fine day");
+    CHECK_EQUAL("This is a fine day", y.get<String>(str_col));
+    CHECK(!y.is_null(str_col));
+
+    // Check that accessing a removed object will throw
     table.remove_object(Key(5));
-    CHECK_THROW(y.get<int64_t>(1), InvalidKey);
+    CHECK_THROW(y.get<int64_t>(intnull_col), InvalidKey);
 
     CHECK(table.get_object(Key(8)).is_null(1));
 

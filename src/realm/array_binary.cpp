@@ -67,13 +67,12 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
         throw LogicError(LogicError::column_not_nullable);
 
     m_blob.add(value.data(), value.size(), add_zero_term);
-    size_t stored_size = value.size();
+    size_t end = value.size();
     if (add_zero_term)
-        ++stored_size;
-    size_t offset = stored_size;
+        ++end;
     if (!m_offsets.is_empty())
-        offset += to_size_t(m_offsets.back());
-    m_offsets.add(offset);
+        end += to_size_t(m_offsets.back());
+    m_offsets.add(end);
 
     if (!legacy_array_type())
         m_nulls.add(value.is_null());
