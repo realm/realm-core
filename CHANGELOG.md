@@ -12,7 +12,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Implemented `realm::util::File::is_dir`, `realm::util::File::resolve`,
+  and `realm::util::DirScanner` on Windows.
 
 -----------
 
