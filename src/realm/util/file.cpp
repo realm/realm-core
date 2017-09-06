@@ -1322,7 +1322,7 @@ DirScanner::~DirScanner() = default;
 
 bool DirScanner::next(std::string& name)
 {
-    std::filesystem::directory_iterator end;
+    const std::filesystem::directory_iterator end;
     if (m_iterator != end) {
         name = m_iterator->path().filename().u8string();
         m_iterator++;
