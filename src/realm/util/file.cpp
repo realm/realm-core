@@ -1012,6 +1012,10 @@ bool File::try_remove(const std::string& path)
 
 void File::move(const std::string& old_path, const std::string& new_path)
 {
+#ifdef _WIN32
+    // Can't rename to existing file on Windows
+    try_remove(new_path);
+#endif
     int r = rename(old_path.c_str(), new_path.c_str());
     if (r == 0)
         return;
