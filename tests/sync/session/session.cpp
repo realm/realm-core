@@ -33,6 +33,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <fstream>
 #include <unistd.h>
 
 using namespace realm;
@@ -655,6 +656,66 @@ TEST_CASE("sync: stable IDs", "[sync]") {
         REQUIRE(object_schema.property_for_name(sync::object_id_column_name) == nullptr);
         REQUIRE(object_schema == *config.schema->find("object"));
     }
+}
+
+TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync][ONLY]") {
+    if (!EventLoop::has_implementation())
+        return;
+
+    SyncServer server;
+    // Disable file-related functionality and metadata functionality for testing purposes.
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+
+
+    SyncTestFile config(server, "migration-test");
+    config.schema_version = 1;
+
+    {
+        std::ifstream src("sync-1.x.realm", std::ios::binary);
+        std::ofstream dst(config.path, std::ios::binary);
+
+        dst << src.rdbuf();
+    }
+
+    auto check = [&](auto f) {
+        bool exception_thrown = false;
+        try {
+            f();
+        } catch (RealmFileException const& ex) {
+            REQUIRE(ex.kind() == RealmFileException::Kind::IncompatibleSyncedRealm);
+            exception_thrown = true;
+
+            SECTION("We should be able to open and read from the recovered Realm file") {
+                Realm::Config config;
+                config.path = ex.path();
+                config.schema_mode = SchemaMode::Immutable;
+                auto recovered_realm = Realm::get_shared_realm(config);
+
+                TableRef table = ObjectStore::table_for_object_type(recovered_realm->read_group(), "object");
+                REQUIRE(table);
+                REQUIRE(table->size() == 2);
+            }
+
+            SECTION("We should be able to successfully open the Realm after the recovery") {
+                auto result = f();
+                REQUIRE(result);
+            }
+        }
+        REQUIRE(exception_thrown);
+    };
+
+    SECTION("Realm::get_shared_realm allows recovery from Sync 1.x to Sync 2.x migration") {
+        check([&]{
+            return Realm::get_shared_realm(config);
+        });
+    }
+
+    SECTION("SyncManager::get_session allows recovery from Sync 1.x to Sync 2.x migration") {
+        check([&]{
+            return SyncManager::shared().get_session(config.path, *config.sync_config);
+        });
+    }
+
 }
 
 #endif // REALM_HAVE_SYNC_STABLE_IDS

@@ -16,5 +16,31 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#define CATCH_CONFIG_MAIN
+#define CATCH_CONFIG_RUNNER
 #include "catch.hpp"
+
+#include <limits.h>
+
+#ifndef _MSC_VER
+#include <libgen.h>
+#endif
+
+int main(int argc, char** argv) {
+#ifdef _MSC_VER
+    char path[MAX_PATH];
+    if (GetModuleFileNameA(NULL, path, sizeof(path)) > 0) {
+        PathRemoveFileSpec(path);
+        SetCurrentDirectory(path);
+    }
+    else
+#endif
+    {
+        char executable[PATH_MAX];
+        realpath(argv[0], executable);
+        const char* directory = dirname(executable);
+        chdir(directory);
+    }
+
+    int result = Catch::Session().run(argc, argv);
+    return result < 0xff ? result : 0xff;
+}
