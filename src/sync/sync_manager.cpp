@@ -461,14 +461,14 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
         return session->external_reference();
     }
 
-    std::shared_ptr<SyncSession> shared_session(new SyncSession(client, path, sync_config));
+    auto shared_session = SyncSession::create(client, path, sync_config);
     m_sessions[path] = shared_session;
 
     // Create the external reference immediately to ensure that the session will become
     // inactive if an exception is thrown in the following code.
     auto external_reference = shared_session->external_reference();
 
-    sync_config.user->register_session(shared_session);
+    sync_config.user->register_session(std::move(shared_session));
 
     return external_reference;
 }

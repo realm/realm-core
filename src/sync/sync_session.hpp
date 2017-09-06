@@ -226,9 +226,18 @@ private:
 
     friend class realm::SyncManager;
     // Called by SyncManager {
-    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig);
+    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path, SyncConfig config)
+    {
+        struct MakeSharedEnabler : public SyncSession {
+            MakeSharedEnabler(_impl::SyncClient& client, std::string realm_path, SyncConfig config)
+            : SyncSession(client, std::move(realm_path), std::move(config))
+            {}
+        };
+        return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config));
+    }
     // }
 
+    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig);
 
     void handle_error(SyncError);
     enum class ShouldBackup { yes, no };
