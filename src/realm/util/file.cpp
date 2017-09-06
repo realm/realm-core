@@ -1313,9 +1313,9 @@ DirScanner::DirScanner(const std::string& path, bool allow_missing)
         m_iterator = std::filesystem::directory_iterator(path);
     }
     catch (const std::filesystem::filesystem_error& e) {
-        static std::error_condition no_such_directory(std::errc::no_such_file_or_directory);
-        if (e.code() != no_such_directory || !allow_missing)
+        if (e.code() != std::errc::no_such_file_or_directory || !allow_missing) {
             throw;
+        }
     }
 }
 
@@ -1323,13 +1323,12 @@ DirScanner::~DirScanner() = default;
 
 bool DirScanner::next(std::string& name)
 {
-    static std::filesystem::directory_iterator end;
+    std::filesystem::directory_iterator end;
     if (m_iterator != end) {
         name = m_iterator->path().filename().u8string();
         m_iterator++;
         return true;
     }
-
     return false;
 }
 
