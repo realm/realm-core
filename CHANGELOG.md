@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* A linker error in some configurations was addressed by adding an explicit
+  instantiation of `Table::find_first` for `BinaryData`.
+  [#2823](https://github.com/realm/realm-core/pull/2823)
 
 ### Breaking changes
 

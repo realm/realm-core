@@ -4125,6 +4125,7 @@ template size_t Table::find_first(size_t col_ndx, float) const;
 template size_t Table::find_first(size_t col_ndx, double) const;
 template size_t Table::find_first(size_t col_ndx, util::Optional<bool>) const;
 template size_t Table::find_first(size_t col_ndx, util::Optional<int64_t>) const;
+template size_t Table::find_first(size_t col_ndx, BinaryData) const;
 
 } // namespace realm
 
