@@ -38,7 +38,7 @@ namespace {
 const size_t small_string_max_size = 15;  // ArrayString
 const size_t medium_string_max_size = 63; // ArrayStringLong
 
-void copy_leaf(const ArrayString& from, ArrayStringLong& to)
+void copy_leaf(const ArrayStringShort& from, ArrayStringLong& to)
 {
     size_t n = from.size();
     for (size_t i = 0; i != n; ++i) {
@@ -47,7 +47,7 @@ void copy_leaf(const ArrayString& from, ArrayStringLong& to)
     }
 }
 
-void copy_leaf(const ArrayString& from, ArrayBigBlobs& to)
+void copy_leaf(const ArrayStringShort& from, ArrayBigBlobs& to)
 {
     size_t n = from.size();
     for (size_t i = 0; i != n; ++i) {
@@ -89,7 +89,7 @@ StringColumn::StringColumn(Allocator& alloc, ref_type ref, bool nullable, size_t
     switch (type) {
         case Array::type_Normal: {
             // Small strings root leaf
-            ArrayString* root = new ArrayString(alloc, nullable); // Throws
+            ArrayStringShort* root = new ArrayStringShort(alloc, nullable); // Throws
             root->init_from_mem(mem);
             m_array.reset(root);
             return;
@@ -146,7 +146,7 @@ StringData StringColumn::get(size_t ndx) const noexcept
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             return leaf->get(ndx);
         }
         bool is_big = m_array->get_context_flag();
@@ -167,7 +167,7 @@ StringData StringColumn::get(size_t ndx) const noexcept
     bool long_strings = Array::get_hasrefs_from_header(leaf_header);
     if (!long_strings) {
         // Small strings
-        return ArrayString::get(leaf_header, ndx_in_leaf, m_nullable);
+        return ArrayStringShort::get(leaf_header, ndx_in_leaf, m_nullable);
     }
     Allocator& alloc = m_array->get_alloc();
     bool is_big = Array::get_context_flag_from_header(leaf_header);
@@ -266,7 +266,7 @@ void StringColumn::update_from_parent(size_t old_baseline) noexcept
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             leaf->update_from_parent(old_baseline);
         }
         else {
@@ -336,7 +336,7 @@ public:
             new_leaf.set_string(elem_ndx_in_leaf, m_value); // Throws
             return;
         }
-        ArrayString leaf(m_alloc, m_nullable);
+        ArrayStringShort leaf(m_alloc, m_nullable);
         leaf.init_from_mem(mem);
         leaf.set_parent(parent, ndx_in_parent);
         if (m_value.size() <= small_string_max_size) {
@@ -388,7 +388,7 @@ void StringColumn::set(size_t ndx, StringData value)
         LeafType leaf_type = upgrade_root_leaf(value.size()); // Throws
         switch (leaf_type) {
             case leaf_type_Small: {
-                ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+                ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
                 leaf->set(ndx, value); // Throws
                 return;
             }
@@ -425,7 +425,7 @@ public:
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
         if (!long_strings) {
             // Small strings
-            ArrayString leaf(m_column.get_alloc(), m_nullable);
+            ArrayStringShort leaf(m_column.get_alloc(), m_nullable);
             leaf.init_from_mem(leaf_mem);
             leaf.set_parent(parent, leaf_ndx_in_parent);
             REALM_ASSERT_3(leaf.size(), >=, 1);
@@ -478,7 +478,7 @@ public:
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
         if (!long_strings) {
             // Small strings
-            ArrayString* leaf_2 = new ArrayString(m_column.get_alloc(), m_nullable); // Throws
+            ArrayStringShort* leaf_2 = new ArrayStringShort(m_column.get_alloc(), m_nullable); // Throws
             leaf_2->init_from_mem(leaf_mem);
             leaf.reset(leaf_2);
         }
@@ -501,8 +501,8 @@ public:
     }
     void replace_root_by_empty_leaf() override
     {
-        std::unique_ptr<ArrayString> leaf;
-        leaf.reset(new ArrayString(m_column.get_alloc(), m_nullable)); // Throws
+        std::unique_ptr<ArrayStringShort> leaf;
+        leaf.reset(new ArrayStringShort(m_column.get_alloc(), m_nullable)); // Throws
         leaf->create();                                                // Throws
         m_column.replace_root_array(std::move(leaf)); // Throws, but accessor ownership is passed to callee
     }
@@ -529,7 +529,7 @@ void StringColumn::do_erase(size_t ndx, bool is_last)
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             leaf->erase(ndx); // Throws
             return;
         }
@@ -593,7 +593,7 @@ void StringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             leaf->set(row_ndx, copy_of_value); // Throws
             leaf->erase(last_row_ndx);         // Throws
             return;
@@ -661,7 +661,7 @@ void StringColumn::do_clear()
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             leaf->clear(); // Throws
         }
         else {
@@ -681,8 +681,8 @@ void StringColumn::do_clear()
     else {
         // Non-leaf root - revert to small strings leaf
         Allocator& alloc = m_array->get_alloc();
-        std::unique_ptr<ArrayString> array;
-        array.reset(new ArrayString(alloc, m_nullable)); // Throws
+        std::unique_ptr<ArrayStringShort> array;
+        array.reset(new ArrayStringShort(alloc, m_nullable)); // Throws
         array->create();                                 // Throws
         array->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
         array->update_parent(); // Throws
@@ -706,7 +706,7 @@ size_t StringColumn::count(StringData value) const
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             return leaf->count(value);
         }
         bool is_big = m_array->get_context_flag();
@@ -737,7 +737,7 @@ size_t StringColumn::count(StringData value) const
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
         if (!long_strings) {
             // Small strings
-            ArrayString leaf(m_array->get_alloc(), m_nullable);
+            ArrayStringShort leaf(m_array->get_alloc(), m_nullable);
             leaf.init_from_mem(leaf_mem);
             num_matches += leaf.count(value);
             begin += leaf.size();
@@ -777,7 +777,7 @@ size_t StringColumn::find_first(StringData value, size_t begin, size_t end) cons
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             return leaf->find_first(value, begin, end);
         }
         bool is_big = m_array->get_context_flag();
@@ -811,7 +811,7 @@ size_t StringColumn::find_first(StringData value, size_t begin, size_t end) cons
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
         if (!long_strings) {
             // Small strings
-            ArrayString leaf(m_array->get_alloc(), m_nullable);
+            ArrayStringShort leaf(m_array->get_alloc(), m_nullable);
             leaf.init_from_mem(leaf_mem);
             end_in_leaf = std::min(leaf.size(), end - leaf_offset);
             size_t ndx = leaf.find_first(value, ndx_in_leaf, end_in_leaf);
@@ -863,7 +863,7 @@ void StringColumn::find_all(IntegerColumn& result, StringData value, size_t begi
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             leaf->find_all(result, value, leaf_offset, begin, end); // Throws
             return;
         }
@@ -900,7 +900,7 @@ void StringColumn::find_all(IntegerColumn& result, StringData value, size_t begi
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
         if (!long_strings) {
             // Small strings
-            ArrayString leaf(m_array->get_alloc(), m_nullable);
+            ArrayStringShort leaf(m_array->get_alloc(), m_nullable);
             leaf.init_from_mem(leaf_mem);
             end_in_leaf = std::min(leaf.size(), end - leaf_offset);
             leaf.find_all(result, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
@@ -972,7 +972,7 @@ size_t StringColumn::lower_bound_string(StringData value) const noexcept
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             return ColumnBase::lower_bound(*leaf, value);
         }
         bool is_big = m_array->get_context_flag();
@@ -996,7 +996,7 @@ size_t StringColumn::upper_bound_string(StringData value) const noexcept
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             return ColumnBase::upper_bound(*leaf, value);
         }
         bool is_big = m_array->get_context_flag();
@@ -1106,7 +1106,7 @@ void StringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_ro
             switch (leaf_type) {
                 case leaf_type_Small: {
                     // Small strings root leaf
-                    ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+                    ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
                     new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state); // Throws
                     break;
                 }
@@ -1171,7 +1171,7 @@ ref_type StringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t 
         leaf.destroy();
         return new_leaf.bptree_leaf_insert_string(insert_ndx, state.m_value, state); // Throws
     }
-    ArrayString leaf(alloc, state.m_nullable);
+    ArrayStringShort leaf(alloc, state.m_nullable);
     leaf.init_from_mem(leaf_mem);
     leaf.set_parent(&parent, ndx_in_parent);
     if (state.m_value.size() <= small_string_max_size)
@@ -1225,7 +1225,7 @@ StringColumn::LeafType StringColumn::upgrade_root_leaf(size_t value_size)
     }
     if (value_size <= small_string_max_size)
         return leaf_type_Small;
-    ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+    ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
     ArrayParent* parent = leaf->get_parent();
     size_t ndx_in_parent = leaf->get_ndx_in_parent();
     Allocator& alloc = leaf->get_alloc();
@@ -1285,7 +1285,7 @@ StringColumn::LeafType StringColumn::get_block(size_t ndx, ArrayParent** ap, siz
             *ap = asl2;
             return leaf_type_Medium;
         }
-        ArrayString* as2 = new ArrayString(alloc, m_nullable); // Throws
+        ArrayStringShort* as2 = new ArrayStringShort(alloc, m_nullable); // Throws
         as2->init_from_mem(m_array->get_mem());
         *ap = as2;
         return leaf_type_Small;
@@ -1307,7 +1307,7 @@ StringColumn::LeafType StringColumn::get_block(size_t ndx, ArrayParent** ap, siz
         *ap = asl2;
         return leaf_type_Medium;
     }
-    ArrayString* as2 = new ArrayString(alloc, m_nullable);
+    ArrayStringShort* as2 = new ArrayStringShort(alloc, m_nullable);
     as2->init_from_mem(p.first);
     *ap = as2;
     return leaf_type_Small;
@@ -1322,7 +1322,7 @@ public:
     }
     ref_type create_leaf(size_t size) override
     {
-        MemRef mem = ArrayString::create_array(size, m_alloc); // Throws
+        MemRef mem = ArrayStringShort::create_array(size, m_alloc); // Throws
         return mem.get_ref();
     }
 
@@ -1349,7 +1349,7 @@ public:
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
         if (!long_strings) {
             // Small strings
-            ArrayString leaf(m_alloc, m_nullable);
+            ArrayStringShort leaf(m_alloc, m_nullable);
             leaf.init_from_mem(leaf_mem);
             return leaf.slice(offset, size, target_alloc); // Throws
         }
@@ -1381,7 +1381,7 @@ ref_type StringColumn::write(size_t slice_offset, size_t slice_size, size_t tabl
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             mem = leaf->slice(slice_offset, slice_size, alloc); // Throws
         }
         else {
@@ -1454,7 +1454,7 @@ void StringColumn::refresh_root_accessor()
         if (old_root_is_leaf) {
             if (old_root_is_small) {
                 // Root is 'small strings' leaf
-                ArrayString* root = static_cast<ArrayString*>(m_array.get());
+                ArrayStringShort* root = static_cast<ArrayStringShort*>(m_array.get());
                 root->init_from_parent();
                 return;
             }
@@ -1481,7 +1481,7 @@ void StringColumn::refresh_root_accessor()
     if (new_root_is_leaf) {
         if (new_root_is_small) {
             // New root is 'small strings' leaf
-            ArrayString* root = new ArrayString(alloc, m_nullable); // Throws
+            ArrayStringShort* root = new ArrayStringShort(alloc, m_nullable); // Throws
             root->init_from_mem(root_mem);
             new_root = root;
         }
@@ -1523,7 +1523,7 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
     bool long_strings = Array::get_hasrefs_from_header(mem.get_addr());
     if (!long_strings) {
         // Small strings
-        ArrayString leaf(alloc, false);
+        ArrayStringShort leaf(alloc, false);
         leaf.init_from_mem(mem);
         leaf.verify();
         return leaf.size();
@@ -1554,7 +1554,7 @@ void StringColumn::verify() const
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             leaf->verify();
         }
         else {
@@ -1627,7 +1627,7 @@ void StringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_
     bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
     if (!long_strings) {
         // Small strings
-        ArrayString leaf(m_array->get_alloc(), m_nullable);
+        ArrayStringShort leaf(m_array->get_alloc(), m_nullable);
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(parent, ndx_in_parent);
         leaf.to_dot(out);
@@ -1668,7 +1668,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
     bool long_strings = Array::get_hasrefs_from_header(mem.get_addr());
     if (!long_strings) {
         // Small strings
-        ArrayString leaf(alloc, false);
+        ArrayStringShort leaf(alloc, false);
         leaf.init_from_mem(mem);
         leaf_size = leaf.size();
         leaf_type = "Small strings leaf";

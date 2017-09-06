@@ -16,15 +16,15 @@
  *
  **************************************************************************/
 
-#ifndef REALM_ARRAY_STRING_HPP
-#define REALM_ARRAY_STRING_HPP
+#ifndef REALM_ARRAY_STRING_SHORT_HPP
+#define REALM_ARRAY_STRING_SHORT_HPP
 
 #include <realm/array.hpp>
 
 namespace realm {
 
 /*
-ArrayString stores strings as a concecutive list of fixed-length blocks of m_width bytes. The
+ArrayStringShort stores strings as a concecutive list of fixed-length blocks of m_width bytes. The
 longest string it can store is (m_width - 1) bytes before it needs to expand.
 
 An example of the format for m_width = 4 is following sequence of bytes, where x is payload:
@@ -39,15 +39,15 @@ New: If m_witdh = 0, then all elements are realm::null(). So to add an empty str
 New: StringData is null() if-and-only-if StringData::data() == 0.
 */
 
-class ArrayString : public Array {
+class ArrayStringShort : public Array {
 public:
     static const size_t max_width = 64;
 
     typedef StringData value_type;
-    // Constructor defaults to non-nullable because we use non-nullable ArrayString so many places internally in core
-    // (data which isn't user payload) where null isn't needed.
-    explicit ArrayString(Allocator&, bool nullable = false) noexcept;
-    ~ArrayString() noexcept override
+    // Constructor defaults to non-nullable because we use non-nullable ArrayStringShort so many places internally
+    // in core (data which isn't user payload) where null isn't needed.
+    explicit ArrayStringShort(Allocator&, bool nullable = false) noexcept;
+    ~ArrayStringShort() noexcept override
     {
     }
 
@@ -66,7 +66,7 @@ public:
                   size_t end = npos);
 
     /// Compare two string arrays for equality.
-    bool compare_string(const ArrayString&) const noexcept;
+    bool compare_string(const ArrayStringShort&) const noexcept;
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -109,27 +109,27 @@ private:
 // Implementation:
 
 // Creates new array (but invalid, call init_from_ref() to init)
-inline ArrayString::ArrayString(Allocator& allocator, bool nullable) noexcept
+inline ArrayStringShort::ArrayStringShort(Allocator& allocator, bool nullable) noexcept
     : Array(allocator)
     , m_nullable(nullable)
 {
 }
 
-inline void ArrayString::create()
+inline void ArrayStringShort::create()
 {
     size_t init_size = 0;
     MemRef mem = create_array(init_size, get_alloc()); // Throws
     init_from_mem(mem);
 }
 
-inline MemRef ArrayString::create_array(size_t init_size, Allocator& allocator)
+inline MemRef ArrayStringShort::create_array(size_t init_size, Allocator& allocator)
 {
     bool context_flag = false;
     int_fast64_t value = 0;
     return Array::create(type_Normal, context_flag, wtype_Multiply, init_size, value, allocator); // Throws
 }
 
-inline StringData ArrayString::get(size_t ndx) const noexcept
+inline StringData ArrayStringShort::get(size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_size);
     if (m_width == 0)
@@ -146,18 +146,18 @@ inline StringData ArrayString::get(size_t ndx) const noexcept
     return StringData(data, array_size);
 }
 
-inline void ArrayString::add(StringData value)
+inline void ArrayStringShort::add(StringData value)
 {
     REALM_ASSERT(!(!m_nullable && value.is_null()));
     insert(m_size, value); // Throws
 }
 
-inline void ArrayString::add()
+inline void ArrayStringShort::add()
 {
     add(m_nullable ? realm::null() : StringData("")); // Throws
 }
 
-inline StringData ArrayString::get(const char* header, size_t ndx, bool nullable) noexcept
+inline StringData ArrayStringShort::get(const char* header, size_t ndx, bool nullable) noexcept
 {
     REALM_ASSERT(ndx < get_size_from_header(header));
     uint_least8_t width = get_width_from_header(header);

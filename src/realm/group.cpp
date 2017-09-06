@@ -400,7 +400,7 @@ void Group::create_empty_group()
     _impl::DeepArrayDestroyGuard dg_top(&m_top);
     {
         m_table_names.create(); // Throws
-        _impl::DestroyGuard<ArrayString> dg(&m_table_names);
+        _impl::DestroyGuard<ArrayStringShort> dg(&m_table_names);
         m_top.add(m_table_names.get_ref()); // Throws
         dg.release();
     }

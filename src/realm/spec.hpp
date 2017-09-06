@@ -21,7 +21,7 @@
 
 #include <realm/util/features.h>
 #include <realm/array.hpp>
-#include <realm/array_string.hpp>
+#include <realm/array_string_short.hpp>
 #include <realm/array_integer.hpp>
 #include <realm/data_type.hpp>
 #include <realm/column_type.hpp>
@@ -131,7 +131,7 @@ private:
     // origin table.
     Array m_top;
     ArrayInteger m_types; // 1st slot in m_top
-    ArrayString m_names;  // 2nd slot in m_top
+    ArrayStringShort m_names; // 2nd slot in m_top
     ArrayInteger m_attr;  // 3rd slot in m_top
     Array m_subspecs;     // 4th slot in m_top (optional)
     Array m_enumkeys;     // 5th slot in m_top (optional)

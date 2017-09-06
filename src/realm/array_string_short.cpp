@@ -27,7 +27,7 @@
 #endif
 
 #include <realm/utilities.hpp>
-#include <realm/array_string.hpp>
+#include <realm/array_string_short.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/column.hpp>
 
@@ -55,21 +55,21 @@ size_t round_up(size_t size)
 
 } // anonymous namespace
 
-bool ArrayString::is_null(size_t ndx) const
+bool ArrayStringShort::is_null(size_t ndx) const
 {
     REALM_ASSERT_3(ndx, <, m_size);
     StringData sd = get(ndx);
     return sd.is_null();
 }
 
-void ArrayString::set_null(size_t ndx)
+void ArrayStringShort::set_null(size_t ndx)
 {
     REALM_ASSERT_3(ndx, <, m_size);
     StringData sd = realm::null();
     set(ndx, sd);
 }
 
-void ArrayString::set(size_t ndx, StringData value)
+void ArrayStringShort::set(size_t ndx, StringData value)
 {
     REALM_ASSERT_3(ndx, <, m_size);
     REALM_ASSERT_3(value.size(), <, max_width); // otherwise we have to use another column type
@@ -150,7 +150,7 @@ void ArrayString::set(size_t ndx, StringData value)
 }
 
 
-void ArrayString::insert(size_t ndx, StringData value)
+void ArrayStringShort::insert(size_t ndx, StringData value)
 {
     REALM_ASSERT_3(ndx, <=, m_size);
     REALM_ASSERT(value.size() < max_width); // otherwise we have to use another column type
@@ -172,7 +172,7 @@ void ArrayString::insert(size_t ndx, StringData value)
     return;
 }
 
-void ArrayString::erase(size_t ndx)
+void ArrayStringShort::erase(size_t ndx)
 {
     REALM_ASSERT_3(ndx, <, m_size);
 
@@ -193,12 +193,12 @@ void ArrayString::erase(size_t ndx)
     set_header_size(m_size);
 }
 
-size_t ArrayString::calc_byte_len(size_t num_items, size_t width) const
+size_t ArrayStringShort::calc_byte_len(size_t num_items, size_t width) const
 {
     return header_size + (num_items * width);
 }
 
-size_t ArrayString::calc_item_count(size_t bytes, size_t width) const noexcept
+size_t ArrayStringShort::calc_item_count(size_t bytes, size_t width) const noexcept
 {
     if (width == 0)
         return size_t(-1); // zero-width gives infinite space
@@ -207,7 +207,7 @@ size_t ArrayString::calc_item_count(size_t bytes, size_t width) const noexcept
     return bytes_without_header / width;
 }
 
-size_t ArrayString::count(StringData value, size_t begin, size_t end) const noexcept
+size_t ArrayStringShort::count(StringData value, size_t begin, size_t end) const noexcept
 {
     size_t num_matches = 0;
 
@@ -223,7 +223,7 @@ size_t ArrayString::count(StringData value, size_t begin, size_t end) const noex
     return num_matches;
 }
 
-size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const noexcept
+size_t ArrayStringShort::find_first(StringData value, size_t begin, size_t end) const noexcept
 {
     if (end == size_t(-1))
         end = m_size;
@@ -277,7 +277,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
     return not_found;
 }
 
-void ArrayString::find_all(IntegerColumn& result, StringData value, size_t add_offset, size_t begin, size_t end)
+void ArrayStringShort::find_all(IntegerColumn& result, StringData value, size_t add_offset, size_t begin, size_t end)
 {
     size_t begin_2 = begin;
     for (;;) {
@@ -289,7 +289,7 @@ void ArrayString::find_all(IntegerColumn& result, StringData value, size_t add_o
     }
 }
 
-bool ArrayString::compare_string(const ArrayString& c) const noexcept
+bool ArrayStringShort::compare_string(const ArrayStringShort& c) const noexcept
 {
     if (c.size() != size())
         return false;
@@ -302,7 +302,7 @@ bool ArrayString::compare_string(const ArrayString& c) const noexcept
     return true;
 }
 
-ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
+ref_type ArrayStringShort::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
     REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
@@ -314,7 +314,7 @@ ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInser
     }
 
     // Split leaf node
-    ArrayString new_leaf(m_alloc, m_nullable);
+    ArrayStringShort new_leaf(m_alloc, m_nullable);
     new_leaf.create(); // Throws
     if (ndx == leaf_size) {
         new_leaf.add(value); // Throws
@@ -332,13 +332,13 @@ ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInser
 }
 
 
-MemRef ArrayString::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
+MemRef ArrayStringShort::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
     REALM_ASSERT(is_attached());
 
     // FIXME: This can be optimized as a single contiguous copy
     // operation.
-    ArrayString array_slice(target_alloc, m_nullable);
+    ArrayStringShort array_slice(target_alloc, m_nullable);
     _impl::ShallowArrayDestroyGuard dg(&array_slice);
     array_slice.create(); // Throws
     size_t begin = offset;
@@ -354,7 +354,7 @@ MemRef ArrayString::slice(size_t offset, size_t slice_size, Allocator& target_al
 
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
-void ArrayString::string_stats() const
+void ArrayStringShort::string_stats() const
 {
     size_t total = 0;
     size_t longest = 0;
@@ -382,7 +382,7 @@ void ArrayString::string_stats() const
 }
 
 
-void ArrayString::to_dot(std::ostream& out, StringData title) const
+void ArrayStringShort::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 

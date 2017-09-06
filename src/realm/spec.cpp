@@ -185,7 +185,7 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
     {
         size_t size = 0;
         // One name for each column
-        MemRef mem = ArrayString::create_array(size, alloc); // Throws
+        MemRef mem = ArrayStringShort::create_array(size, alloc); // Throws
         dg_2.reset(mem.get_ref());
         int_fast64_t v = from_ref(mem.get_ref());
         spec_set.add(v); // Throws

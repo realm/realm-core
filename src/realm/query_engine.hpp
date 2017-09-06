@@ -91,7 +91,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <array>
 
 #include <realm/array_basic.hpp>
-#include <realm/array_string.hpp>
+#include <realm/array_string_short.hpp>
 #include <realm/column_binary.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/column_link.hpp>
@@ -1259,7 +1259,7 @@ protected:
                 m_leaf_start = s - ndx_in_leaf;
                 
                 if (m_leaf_type == StringColumn::leaf_type_Small)
-                    m_end_s = m_leaf_start + static_cast<const ArrayString&>(*m_leaf).size();
+                    m_end_s = m_leaf_start + static_cast<const ArrayStringShort&>(*m_leaf).size();
                 else if (m_leaf_type == StringColumn::leaf_type_Medium)
                     m_end_s = m_leaf_start + static_cast<const ArrayStringLong&>(*m_leaf).size();
                 else
@@ -1267,7 +1267,7 @@ protected:
             }
             
             if (m_leaf_type == StringColumn::leaf_type_Small)
-                t = static_cast<const ArrayString&>(*m_leaf).get(s - m_leaf_start);
+                t = static_cast<const ArrayStringShort&>(*m_leaf).get(s - m_leaf_start);
             else if (m_leaf_type == StringColumn::leaf_type_Medium)
                 t = static_cast<const ArrayStringLong&>(*m_leaf).get(s - m_leaf_start);
             else

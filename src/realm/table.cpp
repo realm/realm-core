@@ -4951,9 +4951,9 @@ public:
     ref_type write_names(_impl::OutputStream& out) override
     {
         Allocator& alloc = Allocator::get_default();
-        ArrayString table_names(alloc);
+        ArrayStringShort table_names(alloc);
         table_names.create(); // Throws
-        _impl::DestroyGuard<ArrayString> dg(&table_names);
+        _impl::DestroyGuard<ArrayStringShort> dg(&table_names);
         table_names.add(m_table_name);                                 // Throws
         bool deep = true;                                              // Deep
         bool only_if_modified = false;                                 // Always

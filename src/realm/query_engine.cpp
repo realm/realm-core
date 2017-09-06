@@ -336,7 +336,7 @@ size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
             m_leaf = asc->get_leaf(s, ndx_in_leaf, m_leaf_type);
             m_leaf_start = s - ndx_in_leaf;
             if (m_leaf_type == StringColumn::leaf_type_Small)
-                m_leaf_end = m_leaf_start + static_cast<const ArrayString&>(*m_leaf).size();
+                m_leaf_end = m_leaf_start + static_cast<const ArrayStringShort&>(*m_leaf).size();
             else if (m_leaf_type == StringColumn::leaf_type_Medium)
                 m_leaf_end = m_leaf_start + static_cast<const ArrayStringLong&>(*m_leaf).size();
             else
@@ -346,7 +346,7 @@ size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
         size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
 
         if (m_leaf_type == StringColumn::leaf_type_Small)
-            s = static_cast<const ArrayString&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
+            s = static_cast<const ArrayStringShort&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
         else if (m_leaf_type == StringColumn::leaf_type_Medium)
             s = static_cast<const ArrayStringLong&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
         else
