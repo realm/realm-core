@@ -2,9 +2,7 @@
 
 ### Bugfixes
 
-* A linker error in some configurations was addressed by adding an explicit
-  instantiation of `Table::find_first` for `BinaryData`.
-  [#2823](https://github.com/realm/realm-core/pull/2823)
+* Lorem ipsum.
 
 ### Breaking changes
 
@@ -14,12 +12,42 @@
 
 * Implemented `realm::util::File::is_dir`, `realm::util::File::resolve`,
   and `realm::util::DirScanner` on Windows.
+  PR [#2824](https://github.com/realm/realm-core/pull/2824).
 
 -----------
 
 ### Internals
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 2.9.2 Release notes
+
+### Bugfixes
+
+* Throw a MaximumFileSizeExceeded exception during commits or allocations
+  instead of causing corruption or asserting. This would most likely be
+  seen when creating large Realm files on 32 bit OS.
+  PR [#2795](https://github.com/realm/realm-core/pull/2795).
+
+----------------------------------------------
+
+# 2.9.1 Release notes
+
+### Bugfixes
+
+* A linker error in some configurations was addressed by adding an explicit
+  instantiation of `Table::find_first` for `BinaryData`.
+  [#2823](https://github.com/realm/realm-core/pull/2823).
+
+-----------
+
+### Internals
+
+* The archives produced by the packaging process for Mac builds are now
+  .tar.gz files rather than .tar.xz files, with the exception of the aggregate
+  realm-core-cocoa-VERSION.tar.xz archive, which remains as a .tar.xz file.
 
 ----------------------------------------------
 
