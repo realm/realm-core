@@ -1313,9 +1313,8 @@ DirScanner::DirScanner(const std::string& path, bool allow_missing)
         m_iterator = std::filesystem::directory_iterator(path);
     }
     catch (const std::filesystem::filesystem_error& e) {
-        if (e.code() != std::errc::no_such_file_or_directory || !allow_missing) {
+        if (e.code() != std::errc::no_such_file_or_directory || !allow_missing)
             throw;
-        }
     }
 }
 

@@ -144,7 +144,7 @@ protected:
 #ifdef _WIN32
     // Used for non-process-shared mutex. We only know at runtime whether or not to use it, depending on if we call
     // Mutex::Mutex(process_shared_tag)
-    std::mutex m_std_mutex;
+    CRITICAL_SECTION m_critical_section;
 #else
     pthread_mutex_t m_impl = PTHREAD_MUTEX_INITIALIZER;
 #endif
@@ -363,7 +363,7 @@ public:
 
 private:
 #ifdef _WIN32
-    std::condition_variable_any m_std_condvar;
+    CONDITION_VARIABLE m_condvar = CONDITION_VARIABLE_INIT;
 #else
     pthread_cond_t m_impl;
 #endif
@@ -465,6 +465,8 @@ inline Mutex::~Mutex() noexcept
     int r = pthread_mutex_destroy(&m_impl);
     if (REALM_UNLIKELY(r != 0))
         destroy_failed(r);
+#else
+    DeleteCriticalSection(&m_critical_section);
 #endif
 }
 
@@ -474,14 +476,15 @@ inline void Mutex::init_as_regular()
     int r = pthread_mutex_init(&m_impl, 0);
     if (REALM_UNLIKELY(r != 0))
         init_failed(r);
+#else
+    InitializeCriticalSection(&m_critical_section);
 #endif
 }
 
 inline void Mutex::lock() noexcept
 {
 #ifdef _WIN32
-    m_std_mutex.lock();
-    return;
+    EnterCriticalSection(&m_critical_section);
 #else
     int r = pthread_mutex_lock(&m_impl);
     if (REALM_LIKELY(r == 0))
@@ -493,7 +496,7 @@ inline void Mutex::lock() noexcept
 inline bool Mutex::try_lock() noexcept
 {
 #ifdef _WIN32
-    return m_std_mutex.try_lock();
+    return TryEnterCriticalSection(&m_critical_section);
 #else
     int r = pthread_mutex_trylock(&m_impl);
     if (r == EBUSY) {
@@ -509,7 +512,7 @@ inline bool Mutex::try_lock() noexcept
 inline void Mutex::unlock() noexcept
 {
 #ifdef _WIN32
-    m_std_mutex.unlock();
+    LeaveCriticalSection(&m_critical_section);
 #else
     int r = pthread_mutex_unlock(&m_impl);
     REALM_ASSERT(r == 0);
@@ -667,7 +670,7 @@ inline CondVar::~CondVar() noexcept
 inline void CondVar::wait(LockGuard& l) noexcept
 {
 #ifdef _WIN32
-    m_std_condvar.wait(l.m_mutex.m_std_mutex);
+    SleepConditionVariableCS(&m_condvar, &l.m_mutex.m_critical_section, INFINITE);
 #else
     int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
     if (REALM_UNLIKELY(r != 0))
@@ -682,20 +685,28 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
 
     if (!tp) {
 #ifdef _WIN32
-        r = 0;
-        m_std_condvar.wait(m.m_std_mutex);
+        if (!SleepConditionVariableCS(&m_condvar, &m.m_critical_section, INFINITE))
+            r = GetLastError();
+        else
+            r = 0;
 #else
         r = pthread_cond_wait(&m_impl, &m.m_impl);
 #endif
     }
     else {
 #ifdef _WIN32
-        r = 0;
+        if (!SleepConditionVariableCS(&m_condvar, &m.m_critical_section, tp->tv_sec / 1000)) {
+            r = GetLastError();
+            if (r == ERROR_TIMEOUT)
+                return;
+        } else {
+            r = 0
+        }
 #else
         r = pthread_cond_timedwait(&m_impl, &m.m_impl, tp);
-#endif
         if (r == ETIMEDOUT)
             return;
+#endif
     }
 
     if (REALM_LIKELY(r == 0))
@@ -724,7 +735,7 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
 inline void CondVar::notify() noexcept
 {
 #ifdef _WIN32
-    m_std_condvar.notify_one();
+    WakeConditionVariable(&m_condvar);
 #else
     int r = pthread_cond_signal(&m_impl);
     REALM_ASSERT(r == 0);
@@ -734,7 +745,7 @@ inline void CondVar::notify() noexcept
 inline void CondVar::notify_all() noexcept
 {
 #ifdef _WIN32
-    m_std_condvar.notify_all();
+    WakeAllConditionVariable(&m_condvar);
 #else
     int r = pthread_cond_broadcast(&m_impl);
     REALM_ASSERT(r == 0);

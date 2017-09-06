@@ -132,7 +132,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
 
 set(REALM_INSTALL_IMPL_HEADERS
     impl/array_writer.hpp
-    impl/continuous_transactions_history.hpp
+    impl/cont_transact_hist.hpp
     impl/destroy_guard.hpp
     impl/input_stream.hpp
     impl/output_stream.hpp
@@ -207,7 +207,7 @@ endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_dependencies(realm-objects sha_win32 getopt_win32)
-    list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:sha_win32> $<TARGET_OBJECTS:getopt_win32>)
+    list(APPEND REALM_OBJECT_FILES $<TARGET_OBJECTS:sha_win32>)
 elseif(ANDROID)
     list(APPEND REALM_EXTRA_LIBS atomic)
 endif()
@@ -293,6 +293,14 @@ endif(APPLE)
 
 install(TARGETS realm
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
+
+# include .pdb files with debug symbols on Windows
+if(CMAKE_GENERATOR MATCHES "^Visual Studio")
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/realm-objects.dir/$<CONFIG>/realm-objects.pdb
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            COMPONENT devel
+            OPTIONAL)
+endif()
 
 install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm
