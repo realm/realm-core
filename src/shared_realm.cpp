@@ -38,6 +38,8 @@
 #include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
+#include "sync/impl/sync_file.hpp"
+#include "sync/sync_manager.hpp"
 #include <realm/sync/history.hpp>
 #endif
 
@@ -130,12 +132,21 @@ REALM_NOINLINE static void translate_file_exception(StringData path, bool immuta
     }
 }
 
+#if REALM_ENABLE_SYNC
+static bool is_nonupgradable_history(IncompatibleHistories const& ex)
+{
+    // FIXME: Replace this with a proper specific exception type once Core adds support for it.
+    return ex.what() == std::string("Incompatible histories. Nonupgradable history schema");
+}
+#endif
+
 void Realm::open_with_config(const Config& config,
                              std::unique_ptr<Replication>& history,
                              std::unique_ptr<SharedGroup>& shared_group,
                              std::unique_ptr<Group>& read_only_group,
                              Realm* realm)
 {
+    bool server_synchronization_mode = bool(config.sync_config) || config.force_sync_history;
     try {
         if (config.immutable()) {
             if (config.realm_data.is_null()) {
@@ -147,7 +158,6 @@ void Realm::open_with_config(const Config& config,
             }
         }
         else {
-            bool server_synchronization_mode = bool(config.sync_config) || config.force_sync_history;
             if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
                 history = realm::sync::make_client_history(config.path);
@@ -181,6 +191,24 @@ void Realm::open_with_config(const Config& config,
         util::File::remove(config.path);
         open_with_config(config, history, shared_group, read_only_group, realm);
     }
+#if REALM_ENABLE_SYNC
+    catch (IncompatibleHistories const& ex) {
+        if (!server_synchronization_mode || !is_nonupgradable_history(ex))
+            translate_file_exception(config.path, config.immutable()); // Throws
+
+        // Move the Realm file into the recovery directory.
+        std::string recovery_directory = SyncManager::shared().recovery_directory_path();
+        std::string new_realm_path = util::reserve_unique_file_name(recovery_directory, "synced-realm-XXXXXXX");
+        util::File::move(config.path, new_realm_path);
+
+        std::string message = util::format("The local copy of this synced Realm was created with an incompatible "
+                                           "version of Realm. It has been moved to '%1', and can be opened as a "
+                                           "read-only, non-synced Realm to recover any pending changes. You may "
+                                           "now retry opening the synced Realm.", new_realm_path);
+        throw RealmFileException(RealmFileException::Kind::IncompatibleSyncedRealm, std::move(new_realm_path),
+                                 std::move(message), ex.what());
+    }
+#endif // REALM_ENABLE_SYNC
     catch (...) {
         translate_file_exception(config.path, config.immutable());
     }
