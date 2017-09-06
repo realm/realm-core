@@ -1475,7 +1475,7 @@ void SharedGroup::set_transact_stage(SharedGroup::TransactStage stage) noexcept
         size_t total_size = m_used_space + m_free_space;
         size_t free_space = m_free_space;
         size_t num_objects = m_group.m_total_rows;
-        size_t num_available_versions = get_number_of_versions();
+        size_t num_available_versions = static_cast<size_t>(get_number_of_versions());
 
         if (stage == transact_Reading) {
             if (m_transact_stage == transact_Writing) {

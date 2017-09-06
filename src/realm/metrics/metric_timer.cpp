@@ -81,11 +81,15 @@ std::string MetricTimer::format(double seconds)
 }
 
 namespace {
-    int64_t round_to_int64(double x)
-    {
-        return std::llround(x);
-    }
+
+int64_t round_to_int64(double x)
+{
+    // Note: this is std::llround() from <cmath> as of c++11,
+    // but this will actually use a native implementation on android.
+    return llround(x);
 }
+
+} // end anonymous namespace
 
 // see also test/util/Timer.cpp
 void MetricTimer::format(double seconds_float, std::ostream& out)
