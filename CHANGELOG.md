@@ -16,7 +16,8 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Improve crash durability on windows.
+  PR [#2845](https://github.com/realm/realm-core/pull/2845).
 
 ----------------------------------------------
 

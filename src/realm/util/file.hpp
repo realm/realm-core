@@ -423,7 +423,7 @@ public:
     /// the synchronization operation is complete. The specified
     /// address range must be (a subset of) one that was previously returned by
     /// map().
-    static void sync_map(void* addr, size_t size);
+    static void sync_map(FileDesc fd, void* addr, size_t size);
 
     /// Check whether the specified file or directory exists. Note
     /// that a file or directory that resides in a directory that the
@@ -590,6 +590,7 @@ private:
     struct MapBase {
         void* m_addr = nullptr;
         size_t m_size = 0;
+        FileDesc m_fd;
 
         MapBase() noexcept;
         ~MapBase() noexcept;
@@ -1063,6 +1064,7 @@ inline bool File::try_lock_shared()
 inline File::MapBase::MapBase() noexcept
 {
     m_addr = nullptr;
+    m_fd = 0;
 }
 
 inline File::MapBase::~MapBase() noexcept
@@ -1079,6 +1081,7 @@ inline void File::MapBase::map(const File& f, AccessMode a, size_t size, int map
     m_addr = f.map(a, size, map_flags, offset);
 #endif
     m_size = size;
+    m_fd = f.m_fd;
 }
 
 inline void File::MapBase::unmap() noexcept
@@ -1090,6 +1093,7 @@ inline void File::MapBase::unmap() noexcept
 #if REALM_ENABLE_ENCRYPTION
     m_encrypted_mapping = nullptr;
 #endif
+    m_fd = 0;
 }
 
 inline void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flags)
@@ -1098,13 +1102,14 @@ inline void File::MapBase::remap(const File& f, AccessMode a, size_t size, int m
 
     m_addr = f.remap(m_addr, m_size, a, size, map_flags);
     m_size = size;
+    m_fd = f.m_fd;
 }
 
 inline void File::MapBase::sync()
 {
     REALM_ASSERT(m_addr);
 
-    File::sync_map(m_addr, m_size);
+    File::sync_map(m_fd, m_addr, m_size);
 }
 
 template <class T>
@@ -1178,6 +1183,7 @@ inline T* File::Map<T>::release() noexcept
 {
     T* addr = static_cast<T*>(m_addr);
     m_addr = nullptr;
+    m_fd = 0;
     return addr;
 }
 

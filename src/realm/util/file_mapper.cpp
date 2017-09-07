@@ -470,7 +470,7 @@ void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, F
     return new_addr;
 }
 
-void msync(void* addr, size_t size)
+void msync(FileDesc fd, void* addr, size_t size)
 {
 #if REALM_ENABLE_ENCRYPTION
     {
@@ -497,10 +497,15 @@ void msync(void* addr, size_t size)
     // for a discussion of this related to core data.
 
 #ifdef _WIN32
-    if (FlushViewOfFile(addr, size))
-        return;
-    throw std::runtime_error("FlushViewOfFile() failed");
+    if (!FlushViewOfFile(addr, size)) {
+        throw std::runtime_error("FlushViewOfFile() failed");
+    }
+    if (!FlushFileBuffers(fd)) {
+        throw std::runtime_error("FlushFileBuffers() failed");
+    }
+    return;
 #else
+    static_cast<void>(fd);
     if (::msync(addr, size, MS_SYNC) != 0) {
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("msync() failed: ", err));
