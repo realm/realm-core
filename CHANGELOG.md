@@ -19,6 +19,8 @@
 
 * Improve crash durability on windows.
   PR [#2845](https://github.com/realm/realm-core/pull/2845).
+* Removed incorrect string column type traits, which could cause errors.
+  They were unused. PR [#2846](https://github.com/realm/realm-core/pull/2846).
 
 ----------------------------------------------
 
