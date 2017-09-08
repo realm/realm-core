@@ -923,9 +923,9 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
 }
 
 
-void File::sync_map(void* addr, size_t size)
+void File::sync_map(FileDesc fd, void* addr, size_t size)
 {
-    realm::util::msync(addr, size);
+    realm::util::msync(fd, addr, size);
 }
 
 

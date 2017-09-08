@@ -2,9 +2,7 @@
 
 ### Bugfixes
 
-* A linker error in some configurations was addressed by adding an explicit
-  instantiation of `Table::find_first` for `BinaryData`.
-  [#2823](https://github.com/realm/realm-core/pull/2823)
+* Lorem ipsum.
 
 ### Breaking changes
 
@@ -12,8 +10,6 @@
 
 ### Enhancements
 
-* Implemented `realm::util::File::is_dir`, `realm::util::File::resolve`,
-  and `realm::util::DirScanner` on Windows.
 * Added metrics tracking as an optional SharedGroup feature.
   PR [#2840](https://github.com/realm/realm-core/pull/2840).
 
@@ -21,7 +17,23 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Improve crash durability on windows.
+  PR [#2845](https://github.com/realm/realm-core/pull/2845).
+
+----------------------------------------------
+
+# 3.1.0 Release notes
+
+### Bugfixes
+
+* A linker error in some configurations was addressed by adding an explicit
+  instantiation of `Table::find_first` for `BinaryData`.
+  [#2823](https://github.com/realm/realm-core/pull/2823)
+
+### Enhancements
+
+* Implemented `realm::util::File::is_dir`, `realm::util::File::resolve`,
+  and `realm::util::DirScanner` on Windows.
 
 ----------------------------------------------
 
