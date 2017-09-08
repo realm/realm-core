@@ -785,11 +785,11 @@ TEST(Metrics_TransactionTimings)
             CHECK_LESS(t.get_write_time(), t.get_transaction_time());
         }
     }
-    // give a margin of 20ms for transactions
+    // give a margin of 100ms for transactions
     CHECK_GREATER(transactions->at(2).get_transaction_time(), 0.060);
-    CHECK_LESS(transactions->at(2).get_transaction_time(), 0.080);
+    CHECK_LESS(transactions->at(2).get_transaction_time(), 0.160);
     CHECK_GREATER(transactions->at(3).get_transaction_time(), 0.080);
-    CHECK_LESS(transactions->at(3).get_transaction_time(), 0.100);
+    CHECK_LESS(transactions->at(3).get_transaction_time(), 0.180);
 }
 
 
