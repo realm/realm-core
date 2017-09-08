@@ -238,12 +238,17 @@ int fast_popcount64(int64_t x)
     return fast_popcount32(static_cast<int32_t>(x)) + fast_popcount32(static_cast<int32_t>(x >> 32));
 }
 
+// Mutex only to make Helgrind happy
+// If it was declared inside fastrand() then it could have a race being initialised and
+// being locked because a static inside a function is constructed the first time execution
+// hits the function declaration (lazily). To avoid that race we declare it outside the function
+// which means it will be constructed on program start.
+static util::Mutex fastrand_mutex;
+
 // A fast, thread safe, mediocre-quality random number generator named Xorshift
 uint64_t fastrand(uint64_t max, bool is_seed)
 {
-    // Mutex only to make Helgrind happy
-    static util::Mutex m;
-    util::LockGuard lg(m);
+    util::LockGuard lg(fastrand_mutex);
 
     // All the atomics (except the add) may be eliminated completely by the compiler on x64
     static std::atomic<uint64_t> state(is_seed ? max : 1);
