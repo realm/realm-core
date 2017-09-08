@@ -116,7 +116,7 @@ public:
         if (primary_key) {
             std::string table_name = table.get_name();
 
-            if (primary_key->is_nullable) {
+            if (is_nullable(primary_key->type)) {
                 auto& null_primaries = m_null_primaries[table_name];
                 auto it = null_primaries.find(object_id);
                 if (it != null_primaries.end())
@@ -132,7 +132,7 @@ public:
 
                 size_t row = sync::row_for_object_id(m_group, table, object_id);
                 REALM_ASSERT(row != npos);
-                if (primary_key->is_nullable && table.is_null(primary_key->table_column, row)) {
+                if (is_nullable(primary_key->type) && table.is_null(primary_key->table_column, row)) {
                     return nullptr;
                 }
                 return table.get_int(primary_key->table_column, row);
