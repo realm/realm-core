@@ -10,44 +10,29 @@
 
 ### Enhancements
 
-* Implemented `realm::util::File::is_dir`, `realm::util::File::resolve`,
-  and `realm::util::DirScanner` on Windows.
-  PR [#2824](https://github.com/realm/realm-core/pull/2824).
+* Lorem ipsum.
 
 -----------
 
 ### Internals
 
-* Lorem ipsum.
+* Improve crash durability on windows.
+  PR [#2845](https://github.com/realm/realm-core/pull/2845).
 
 ----------------------------------------------
 
-# 2.9.2 Release notes
-
-### Bugfixes
-
-* Throw a MaximumFileSizeExceeded exception during commits or allocations
-  instead of causing corruption or asserting. This would most likely be
-  seen when creating large Realm files on 32 bit OS.
-  PR [#2795](https://github.com/realm/realm-core/pull/2795).
-
-----------------------------------------------
-
-# 2.9.1 Release notes
+# 3.1.0 Release notes
 
 ### Bugfixes
 
 * A linker error in some configurations was addressed by adding an explicit
   instantiation of `Table::find_first` for `BinaryData`.
-  [#2823](https://github.com/realm/realm-core/pull/2823).
+  [#2823](https://github.com/realm/realm-core/pull/2823)
 
------------
+### Enhancements
 
-### Internals
-
-* The archives produced by the packaging process for Mac builds are now
-  .tar.gz files rather than .tar.xz files, with the exception of the aggregate
-  realm-core-cocoa-VERSION.tar.xz archive, which remains as a .tar.xz file.
+* Implemented `realm::util::File::is_dir`, `realm::util::File::resolve`,
+  and `realm::util::DirScanner` on Windows.
 
 ----------------------------------------------
 
@@ -124,6 +109,35 @@
 * Implemented inter-process CondVars on Windows (Win32 + UWP). They should be
   fair and robust.
   PR [#2497](https://github.com/realm/realm-core/pull/2497).
+* The archives produced by the packaging process for Mac builds are now
+  .tar.gz files rather than .tar.xz files, with the exception of the aggregate
+  realm-core-cocoa-VERSION.tar.xz archive, which remains as a .tar.xz file.
+
+----------------------------------------------
+
+# 2.9.2 Release notes
+
+### Bugfixes
+
+* Throw a MaximumFileSizeExceeded exception during commits or allocations
+  instead of causing corruption or asserting. This would most likely be
+  seen when creating large Realm files on 32 bit OS.
+  PR [#2795](https://github.com/realm/realm-core/pull/2795).
+
+----------------------------------------------
+
+# 2.9.1 Release notes
+
+### Bugfixes
+
+* A linker error in some configurations was addressed by adding an explicit
+  instantiation of `Table::find_first` for `BinaryData`.
+  [#2823](https://github.com/realm/realm-core/pull/2823).
+
+-----------
+
+### Internals
+
 * The archives produced by the packaging process for Mac builds are now
   .tar.gz files rather than .tar.xz files, with the exception of the aggregate
   realm-core-cocoa-VERSION.tar.xz archive, which remains as a .tar.xz file.
