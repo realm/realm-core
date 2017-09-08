@@ -777,7 +777,9 @@ TEST(Metrics_TransactionTimings)
             CHECK_EQUAL(t.get_write_time(), 0.0);
         }
         else {
-            CHECK_NOT_EQUAL(t.get_fsync_time(), 0.0);
+            if (!get_disable_sync_to_disk()) {
+                CHECK_NOT_EQUAL(t.get_fsync_time(), 0.0);
+            }
             CHECK_NOT_EQUAL(t.get_write_time(), 0.0);
             CHECK_LESS(t.get_fsync_time(), t.get_transaction_time());
             CHECK_LESS(t.get_write_time(), t.get_transaction_time());
