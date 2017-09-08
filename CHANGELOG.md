@@ -10,7 +10,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Added metrics tracking as an optional SharedGroup feature.
+  PR [#2840](https://github.com/realm/realm-core/pull/2840).
 
 -----------
 
