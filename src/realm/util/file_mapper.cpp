@@ -497,9 +497,11 @@ void msync(FileDesc fd, void* addr, size_t size)
     // for a discussion of this related to core data.
 
 #ifdef _WIN32
+    // FlushViewOfFile() is asynchronous and won't flush metadata (file size, etc)
     if (!FlushViewOfFile(addr, size)) {
         throw std::runtime_error("FlushViewOfFile() failed");
     }
+    // Block until data and metadata is written physically to the media
     if (!FlushFileBuffers(fd)) {
         throw std::runtime_error("FlushFileBuffers() failed");
     }
