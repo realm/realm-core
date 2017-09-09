@@ -223,30 +223,25 @@ bool try_remove_dir_recursive(const std::string& path)
 std::string make_temp_dir()
 {
 #ifdef _WIN32 // Windows version
+    std::filesystem::path temp = std::filesystem::temp_directory_path();
 
-#if REALM_UWP
-    throw std::runtime_error("File::make_temp_dir() not yet supported on Windows 10 UWP");
-#else
-    StringBuffer buffer1;
-    buffer1.resize(MAX_PATH + 1);
-
-    if (GetTempPathA(MAX_PATH + 1, buffer1.data()) == 0)
-        throw std::runtime_error("CreateDirectory() failed");
-
-    StringBuffer buffer2;
-    buffer2.resize(MAX_PATH);
+    WCHAR buffer[MAX_PATH];
+    std::filesystem::path path;
     for (;;) {
-        if (GetTempFileNameA(buffer1.c_str(), "rlm", 0, buffer2.data()) == 0)
+        if (GetTempFileNameW(temp.c_str(), L"rlm", 0, buffer) == 0)
             throw std::runtime_error("GetTempFileName() failed");
-        if (DeleteFileA(buffer2.c_str()) == 0)
-            throw std::runtime_error("DeleteFile() failed");
-        if (CreateDirectoryA(buffer2.c_str(), 0) != 0)
+        path = buffer;
+        std::filesystem::remove(path);
+        try {
+            std::filesystem::create_directory(path);
             break;
-        if (GetLastError() != ERROR_ALREADY_EXISTS)
-            throw std::runtime_error("CreateDirectory() failed");
+        }
+        catch (const std::filesystem::filesystem_error& ex) {
+            if (ex.code() != std::errc::file_exists)
+                throw;
+        }
     }
-    return std::string(buffer2.c_str());
-#endif
+    return path.u8string();
 
 #else // POSIX.1-2008 version
 
