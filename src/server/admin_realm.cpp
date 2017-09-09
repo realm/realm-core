@@ -57,10 +57,10 @@ AdminRealmListener::AdminRealmListener(std::string local_root, std::string serve
     );
     config.schema = Schema{
         {"RealmFile", {
-            {"path", PropertyType::String, Property::IsPrimary{true}, Property::IsIndexed{false}},
-            {"creatorId", PropertyType::String, Property::IsPrimary{false}, Property::IsIndexed{false}},
-            {"creationDate", PropertyType::Date, Property::IsPrimary{false}, Property::IsIndexed{false}},
-            {"syncLabel", PropertyType::String, Property::IsPrimary{false}, Property::IsIndexed{false}}
+            {"path", PropertyType::String, Property::IsPrimary{true}}},
+            {"creatorId", PropertyType::String},
+            {"creationDate", PropertyType::Date},
+            {"syncLabel", PropertyType::String}
         }}
     };
     config.schema_version = 2;
