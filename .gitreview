@@ -1,0 +1,5 @@
+[gerrit]
+host=edelbo.net
+port=29418
+project=realm-core
+defaultbranch=feature/stable-keys
