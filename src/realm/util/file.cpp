@@ -225,7 +225,7 @@ std::string make_temp_dir()
 #ifdef _WIN32 // Windows version
     std::filesystem::path temp = std::filesystem::temp_directory_path();
 
-    WCHAR buffer[MAX_PATH];
+    wchar_t buffer[MAX_PATH];
     std::filesystem::path path;
     for (;;) {
         if (GetTempFileNameW(temp.c_str(), L"rlm", 0, buffer) == 0)

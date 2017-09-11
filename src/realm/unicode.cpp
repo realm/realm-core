@@ -376,7 +376,7 @@ util::Optional<std::string> case_map(StringData source, bool upper)
         // null-chacarcter, which is perfectly fine.
 
         wchar_t mapped_tmp[2];
-        LCMapStringEx(LOCALE_NAME_INVARIANT, upper ? LCMAP_UPPERCASE : LCMAP_LOWERCASE, tmp, 2, mapped_tmp, 2, nullptr, nullptr, 0);
+        LCMapStringEx(LOCALE_NAME_INVARIANT, upper ? LCMAP_UPPERCASE : LCMAP_LOWERCASE, tmp, 1, mapped_tmp, 2, nullptr, nullptr, 0);
 
         // FIXME: The intention is to use flag 'WC_ERR_INVALID_CHARS'
         // to catch invalid UTF-8. Even though the documentation says
