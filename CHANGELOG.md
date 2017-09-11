@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 3.1.0 Release notes
 
 ### Bugfixes
 
@@ -6,19 +6,10 @@
   instantiation of `Table::find_first` for `BinaryData`.
   [#2823](https://github.com/realm/realm-core/pull/2823)
 
-### Breaking changes
-
-* Lorem ipsum.
-
 ### Enhancements
 
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
+* Implemented `realm::util::File::is_dir`, `realm::util::File::resolve`,
+  and `realm::util::DirScanner` on Windows.
 
 ----------------------------------------------
 

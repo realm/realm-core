@@ -965,6 +965,8 @@ bool File::is_dir(const std::string& path)
     }
     std::string msg = get_errno_msg("stat() failed: ", err);
     throw std::runtime_error(msg);
+#elif REALM_HAVE_STD_FILESYSTEM
+    return std::filesystem::is_directory(path);
 #else
     static_cast<void>(path);
     throw std::runtime_error("Not yet supported");
@@ -1010,6 +1012,10 @@ bool File::try_remove(const std::string& path)
 
 void File::move(const std::string& old_path, const std::string& new_path)
 {
+#ifdef _WIN32
+    // Can't rename to existing file on Windows
+    try_remove(new_path);
+#endif
     int r = rename(old_path.c_str(), new_path.c_str());
     if (r == 0)
         return;
@@ -1198,6 +1204,12 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
     }
     */
     return base_dir_2 + path_2;
+#elif REALM_HAVE_STD_FILESYSTEM
+    std::filesystem::path path_(path.empty() ? "." : path);
+    if (path_.is_absolute())
+        return path;
+
+    return (std::filesystem::path(base_dir) / path_).u8string();
 #else
     static_cast<void>(path);
     static_cast<void>(base_dir);
@@ -1291,6 +1303,32 @@ bool DirScanner::next(std::string& name)
             return true;
         }
     }
+}
+
+#elif REALM_HAVE_STD_FILESYSTEM
+
+DirScanner::DirScanner(const std::string& path, bool allow_missing)
+{
+    try {
+        m_iterator = std::filesystem::directory_iterator(path);
+    }
+    catch (const std::filesystem::filesystem_error& e) {
+        if (e.code() != std::errc::no_such_file_or_directory || !allow_missing)
+            throw;
+    }
+}
+
+DirScanner::~DirScanner() = default;
+
+bool DirScanner::next(std::string& name)
+{
+    const std::filesystem::directory_iterator end;
+    if (m_iterator != end) {
+        name = m_iterator->path().filename().u8string();
+        m_iterator++;
+        return true;
+    }
+    return false;
 }
 
 #else
