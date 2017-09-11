@@ -677,6 +677,17 @@ TEST_CASE("list") {
         REQUIRE(&list.get_object_schema() == objectschema);
     }
 
+    SECTION("delete_at()") {
+        List list(r, lv);
+        r->begin_transaction();
+        auto initial_view_size = lv->size();
+        auto initial_target_size = target->size();
+        list.delete_at(1);
+        REQUIRE(lv->size() == initial_view_size - 1);
+        REQUIRE(target->size() == initial_target_size - 1);
+        r->cancel_transaction();
+    }
+
     SECTION("delete_all()") {
         List list(r, lv);
         r->begin_transaction();

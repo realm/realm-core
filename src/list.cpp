@@ -349,6 +349,16 @@ void List::swap(size_t ndx1, size_t ndx2)
         m_table->swap_rows(ndx1, ndx2);
 }
 
+void List::delete_at(size_t row_ndx)
+{
+    verify_in_transaction();
+    verify_valid_row(row_ndx);
+    if (m_link_view)
+        m_link_view->remove_target_row(row_ndx);
+    else
+        m_table->remove(row_ndx);
+}
+
 void List::delete_all()
 {
     verify_in_transaction();
