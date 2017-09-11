@@ -44,11 +44,13 @@ using namespace realm::_impl;
 
 GlobalNotifier::GlobalNotifier(std::unique_ptr<Callback> async_target,
                                std::string local_root_dir, std::string server_base_url,
-                               std::shared_ptr<SyncUser> user, std::shared_ptr<ChangesetTransformer> transformer)
-: m_admin(local_root_dir, server_base_url, user)
+                               std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback,
+                               std::shared_ptr<ChangesetTransformer> transformer)
+: m_admin(local_root_dir, server_base_url, user, bind_callback)
 , m_target(std::move(async_target))
 , m_server_base_url(std::move(server_base_url))
 , m_user(std::move(user))
+, m_bind_callback(std::move(bind_callback))
 , m_regular_realms_dir(util::File::resolve("realms", local_root_dir)) // Throws
 , m_transformer(transformer)
 {
@@ -56,9 +58,10 @@ GlobalNotifier::GlobalNotifier(std::unique_ptr<Callback> async_target,
 }
 
 std::shared_ptr<GlobalNotifier> GlobalNotifier::shared_notifier(std::unique_ptr<Callback> callback, std::string local_root_dir,
-                                                                           std::string server_base_url, std::shared_ptr<SyncUser> user,
-                                                                           std::shared_ptr<ChangesetTransformer> transformer) {
-    auto notifier = std::shared_ptr<GlobalNotifier>(new GlobalNotifier(std::move(callback), local_root_dir, server_base_url, user, transformer));
+                                                                std::string server_base_url, std::shared_ptr<SyncUser> user,
+                                                                std::function<SyncBindSessionHandler> bind_callback,
+                                                                std::shared_ptr<ChangesetTransformer> transformer) {
+    auto notifier = std::shared_ptr<GlobalNotifier>(new GlobalNotifier(std::move(callback), local_root_dir, server_base_url, user, std::move(bind_callback), transformer));
     notifier->m_signal = std::make_shared<util::EventLoopSignal<SignalCallback>>(SignalCallback{std::weak_ptr<GlobalNotifier>(notifier), &GlobalNotifier::on_change});
     return notifier;
 }
@@ -175,12 +178,7 @@ realm::Realm::Config GlobalNotifier::get_config(std::string path,
     config.path = file_path + ".realm";
     config.sync_config = std::shared_ptr<SyncConfig>(
         new SyncConfig{m_user, m_server_base_url + path.data(), SyncSessionStopPolicy::AfterChangesUploaded,
-            [&](auto, const auto& config, auto session) {
-                session->bind_with_admin_token(config.user->refresh_token(), config.realm_url);
-            }, 
-            [&](auto, auto) {
-            }, 
-            m_transformer}
+                       m_bind_callback, nullptr, m_transformer}
     );
     config.schema_mode = SchemaMode::Additive;
     config.cache = false;

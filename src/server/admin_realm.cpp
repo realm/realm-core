@@ -42,20 +42,20 @@
 using namespace realm;
 using namespace realm::_impl;
 
-AdminRealmListener::AdminRealmListener(std::string local_root, std::string server_base_url, std::shared_ptr<SyncUser> user)
+AdminRealmListener::AdminRealmListener(std::string local_root, std::string server_base_url, std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback)
 {
     Realm::Config config;
     config.cache = false;
     config.path = util::File::resolve("realms.realm", local_root);
     config.schema_mode = SchemaMode::Additive;
     config.sync_config = std::shared_ptr<SyncConfig>(
-        new SyncConfig{user, server_base_url + "/__permissions", SyncSessionStopPolicy::AfterChangesUploaded,
+        new SyncConfig{user, server_base_url + "/__admin", SyncSessionStopPolicy::AfterChangesUploaded,
            [&](auto, const auto& config, auto session) {
                 session->bind_with_admin_token(config.user->refresh_token(), config.realm_url);
 
            }}
     );
-    config.schema = Schema{ 
+    config.schema = Schema{
         {"RealmFile", {
             {"path", PropertyType::String, Property::IsPrimary{true}}},
             {"creatorId", PropertyType::String},

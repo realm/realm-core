@@ -33,7 +33,7 @@ class SyncUser;
 class Adapter {
 public:
     Adapter(std::function<void(std::string)> realm_changed, std::string local_root_dir,
-            std::string server_base_url, std::shared_ptr<SyncUser> user, std::regex regex);
+            std::string server_base_url, std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback, std::regex regex);
 
     enum class InstructionType {
         Insert,

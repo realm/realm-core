@@ -500,10 +500,10 @@ public:
 
 Adapter::Adapter(std::function<void(std::string)> realm_changed,
                  std::string local_root_dir, std::string server_base_url,
-                 std::shared_ptr<SyncUser> user, std::regex regex)
+                 std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback, std::regex regex)
 : m_global_notifier(GlobalNotifier::shared_notifier(
     std::make_unique<Adapter::Callback>([=](auto info) { realm_changed(info.second); }, regex),
-                                        local_root_dir, server_base_url, user,
+                                        local_root_dir, server_base_url, user, std::move(bind_callback),
                                         std::make_shared<ChangesetCooker>()))
 {
     m_global_notifier->start();

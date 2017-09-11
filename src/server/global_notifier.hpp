@@ -48,6 +48,7 @@ public:
     using ChangesetTransformer = sync::ClientHistory::ChangesetCooker;
     static std::shared_ptr<GlobalNotifier> shared_notifier(std::unique_ptr<Callback> callback, std::string local_root_dir,
                                                            std::string server_base_url, std::shared_ptr<SyncUser> user,
+                                                           std::function<SyncBindSessionHandler> bind_callback,
                                                            std::shared_ptr<ChangesetTransformer> transformer = nullptr);
     ~GlobalNotifier();
 
@@ -123,12 +124,14 @@ public:
 private:
     GlobalNotifier(std::unique_ptr<Callback>, std::string local_root_dir,
                    std::string server_base_url, std::shared_ptr<SyncUser> user,
+                   std::function<SyncBindSessionHandler> bind_callback,
                    std::shared_ptr<ChangesetTransformer> transformer);
 
     AdminRealmListener m_admin;
     const std::unique_ptr<Callback> m_target;
     const std::string m_server_base_url;
     std::shared_ptr<SyncUser> m_user;
+    std::function<SyncBindSessionHandler> m_bind_callback;
     std::string m_regular_realms_dir;
 
     std::unordered_map<std::string, std::shared_ptr<_impl::RealmCoordinator>> m_listen_entries;
