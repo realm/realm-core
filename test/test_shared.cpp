@@ -95,7 +95,7 @@ using unit_test::TestContext;
 // check-testcase` (or one of its friends) from the command line.
 
 
-#ifdef _WIN32 && !REALM_UWP
+#if REALM_WINDOWS
 namespace {
 // NOTE: This does not work like on POSIX: The child will begin execution from
 // the unit test entry point, not from where fork() took place.
