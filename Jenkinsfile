@@ -273,10 +273,14 @@ def doBuildWindows(String buildType, boolean isUWP, String platform) {
                 }
             }
             if(!isUWP) {
-                def environment = environment()
+                def environment = environment() << "TMP=${env.WORKSPACE}\\temp"
                 withEnv(environment) {
                     dir("build-dir/test/${buildType}") {
-                        bat 'realm-tests.exe --no-error-exit-code'
+                        bat '''
+                          mkdir %TMP%
+                          realm-tests.exe --no-error-exit-code
+                          rmdir /Q /S %TMP%
+                        '''
                     }
                 }
                 recordTests("Windows-${platform}-${buildType}")

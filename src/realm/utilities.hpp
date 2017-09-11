@@ -26,16 +26,9 @@
 #include <algorithm>
 #include <functional>
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 
-#if REALM_UWP
-struct timeval {
-    long tv_sec;
-    long tv_usec;
-};
-#endif
-
-#include <windows.h>
+#include <WinSock2.h>
 #include <intrin.h>
 #include <BaseTsd.h>
 
@@ -45,7 +38,7 @@ typedef SSIZE_T ssize_t;
 #define _SSIZE_T_DEFINED
 #endif
 
-#endif // _MSC_VER
+#endif // _WIN32
 
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
