@@ -57,29 +57,10 @@ AdminRealmListener::AdminRealmListener(std::string local_root, std::string serve
     );
     config.schema = Schema{
         {"RealmFile", {
-            {"id", PropertyType::String, "", "", true, true, false},
-            {"path", PropertyType::String, "", "", false, false, false},
-            {"owner", PropertyType::Object, "User", "", false, false, true},
-        }},
-        {"User", {
-            {"id", PropertyType::String, "", "", true, true, false},
-            {"accounts", PropertyType::Array, "Account", "", false, false, false},
-            {"isAdmin", PropertyType::Bool, "", "", false, false, false}
-        }},
-        {"Account", {
-            {"provider", PropertyType::String, "", "", false, false, false},
-            {"provider_id", PropertyType::String, "", "", false, true, false},
-            {"data", PropertyType::String, "", "", false, false, true},
-            {"tokens", PropertyType::Array, "Token", "", false, false, false},
-            {"user", PropertyType::Object, "User", "", false, false, true}
-        }},
-        {"Token", {
-            {"token", PropertyType::String, "", "", true, true, false},
-            {"expires", PropertyType::Date, "", "", false, false, false},
-            {"revoked", PropertyType::Date, "", "", false, false, true},
-            {"files", PropertyType::Array, "RealmFile", "", false, false, false},
-            {"account", PropertyType::Object, "Account", "", false, false, true},
-            {"app_id", PropertyType::String, "", "", false, false, false},
+            {"path", PropertyType::String, Property::IsPrimary{true}, Property::IsIndexed{false}},
+            {"creatorId", PropertyType::String, Property::IsPrimary{false}, Property::IsIndexed{false}},
+            {"creationDate", PropertyType::Date, Property::IsPrimary{false}, Property::IsIndexed{false}},
+            {"syncLabel", PropertyType::String, Property::IsPrimary{false}, Property::IsIndexed{false}}
         }}
     };
     config.schema_version = 2;
@@ -91,7 +72,7 @@ void AdminRealmListener::start(std::function<void(std::vector<RealmInfo>)> callb
     m_results = Results(m_realm, *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile"));
     m_notification_token = m_results.add_notification_callback([=](CollectionChangeSet changes, std::exception_ptr) {
         auto& table = *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile");
-        size_t id_col_ndx   = table.get_column_index("id");
+        size_t id_col_ndx   = table.get_column_index("creatorId");
         size_t name_col_ndx = table.get_column_index("path");
         std::vector<RealmInfo> realms;
 
@@ -122,7 +103,7 @@ void AdminRealmListener::create_realm(StringData realm_id, StringData realm_name
     m_realm->begin_transaction();
     auto& table = *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile");
     size_t row_ndx      = table.add_empty_row();
-    size_t id_col_ndx   = table.get_column_index("id");
+    size_t id_col_ndx   = table.get_column_index("creatorId");
     size_t name_col_ndx = table.get_column_index("path");
     table.set_string(id_col_ndx, row_ndx, realm_id);
     table.set_string(name_col_ndx, row_ndx, realm_name);
