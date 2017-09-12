@@ -4,6 +4,8 @@
 
 * Compact now throws an exception if writing fails for some reason
   instead of ignoring errors and possibly causing corruption.
+  In particular, this solves file truncation causing "bad header" exceptions
+  after a compact operation on a file system that is running out of disk space.
   PR [#2852](https://github.com/realm/realm-core/pull/2852).
 
 ### Breaking changes
