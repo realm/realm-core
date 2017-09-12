@@ -148,6 +148,11 @@ endif()
 
 # CPack
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
+export(TARGETS realm FILE realm-config.cmake)
+install(EXPORT realm
+        FILE realm-config.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
+        COMPONENT devel)
 
 if(APPLE)
     set(CPACK_GENERATOR "TGZ")
