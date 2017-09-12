@@ -173,5 +173,51 @@ TEST(ThreadSafety_RowDestruction)
     thread.join();
 }
 
+// Tests thread safety of subtable desctruction
+ONLY(ThreadSafety_SubTableDestruction)
+{
+    std::vector<TableRef> ptrs;
+    Mutex mutex;
+    Mutex destruct_mutex;
+    test_util::ThreadWrapper thread;
+    bool done = false;
+
+    thread.start([&mutex, &destruct_mutex, &ptrs, &done] {
+        while (true) {
+            LockGuard lock(mutex);
+            LockGuard lock1(destruct_mutex);
+            ptrs.clear();
+            if (done)
+                break;
+        }
+    });
+
+    for (int k = 0; k < 100; ++k) {
+        auto group = std::make_shared<Group>();
+
+        TableRef table = group->add_table("table");
+        DescriptorRef desc;
+        auto subtable_col = table->add_column(type_Table, "list", &desc);
+        desc->add_column(type_Int, "ARRAY_VALUE", nullptr, true);
+
+        auto row_ndx = table->add_empty_row();
+        for (int i = 0; i < 10000; i++) {
+            TableRef subtable_ref = table->get_subtable(subtable_col, row_ndx);
+            {
+                LockGuard lock(mutex);
+                ptrs.push_back(subtable_ref);
+            }
+        }
+        {
+            LockGuard lock(destruct_mutex);
+            group.reset();
+        }
+    }
+    {
+        LockGuard lock(destruct_mutex);
+        done = true;
+    }
+    thread.join();
+}
 
 #endif
