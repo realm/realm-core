@@ -8261,6 +8261,40 @@ TEST(Table_object_basic)
     CHECK(table.get_object(Key(8)).is_null(1));
 }
 
+TEST(Table_object_merge_nodes)
+{
+    // This test works best for REALM_MAX_BPNODE_SIZE == 8.
+    // To be used mostly as a help when debugging new implementation
+
+    int nb_rows = REALM_MAX_BPNODE_SIZE * 8;
+    Table table;
+    std::vector<int64_t> key_set;
+    table.add_column(type_Int, "int1");
+    table.add_column(type_Int, "int2", true);
+
+    for (int i = 0; i < nb_rows; i++) {
+        table.create_object(Key(i)).set_all(i << 1, i << 2);
+        key_set.push_back(i);
+    }
+
+    for (int i = 0; i < nb_rows; i++) {
+        auto key_index = test_util::random_int<int64_t>(0, key_set.size() - 1);
+        auto it = key_set.begin() + key_index;
+
+        // table.dump_objects();
+        // std::cout << "Key to remove: " << std::hex << *it << std::dec << std::endl;
+
+        table.remove_object(Key(*it));
+        key_set.erase(it);
+        for (unsigned j = 0; j < key_set.size(); j++) {
+            int64_t key_val = key_set[j];
+            Obj o = table.get_object(Key(key_val));
+            CHECK_EQUAL(key_val << 1, o.get<int64_t>(0));
+            CHECK_EQUAL(key_val << 2, o.get<util::Optional<int64_t>>(1));
+        }
+    }
+}
+
 TEST(Table_object_sequential)
 {
     int nb_rows = 1024;

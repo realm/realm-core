@@ -82,25 +82,46 @@ public:
     virtual ~ClusterNode()
     {
     }
-    size_t leaf_size() const
+    void init_from_parent()
     {
-        return m_keys.size();
+        ref_type ref = get_ref_from_parent();
+        char* header = m_alloc.translate(ref);
+        init(MemRef(header, ref, m_alloc));
+    }
+    unsigned node_size() const
+    {
+        return unsigned(m_keys.size());
     }
     void adjust_keys(int64_t offset)
     {
         m_keys.adjust(0, m_keys.size(), offset);
     }
 
-
-    virtual void create() = 0;
-    virtual void init(MemRef mem) = 0;
-    virtual MemRef ensure_writeable(Key k) = 0;
     virtual bool is_leaf() = 0;
 
+    /// Create an empty node
+    virtual void create() = 0;
+    /// Initialize node from 'mem'
+    virtual void init(MemRef mem) = 0;
+    /// Descend the tree from the root and copy-on-write the leaf
+    /// This will update all parents accordingly
+    virtual MemRef ensure_writeable(Key k) = 0;
+
+    /// Insert a column at position 'ndx'
     virtual void insert_column(size_t ndx) = 0;
+    /// Create a new object identified by 'key' and update 'state' accordingly
+    /// Return reference to new node created (if any)
     virtual ref_type insert(Key k, State& state) = 0;
-    virtual void get(Key k, State& state) const = 0;
-    virtual bool erase(Key k) = 0;
+    /// Locate object identified by 'key' and update 'state' accordingly
+    virtual void get(Key key, State& state) const = 0;
+
+    /// Erase element identified by 'key'
+    virtual unsigned erase(Key key) = 0;
+
+    /// Move elements from position 'ndx' to 'new_node'. The new node is supposed
+    /// to be a sibling positioned right after this one. All key values must
+    /// be subtracted 'key_adj'
+    virtual void move(size_t ndx, ClusterNode* new_leaf, int64_t key_adj) = 0;
 
     virtual void dump_objects(int64_t key_offset, std::string lead) const = 0;
 
@@ -132,13 +153,13 @@ public:
     void insert_column(size_t ndx) override;
     ref_type insert(Key k, State& state) override;
     void get(Key k, State& state) const override;
-    bool erase(Key k) override;
+    unsigned erase(Key k) override;
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
 private:
     void insert_row(size_t ndx, Key k);
-    void move(size_t ndx, Cluster& new_leaf, int64_t offset);
+    void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
 };
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore

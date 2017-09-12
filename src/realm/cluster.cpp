@@ -34,6 +34,8 @@ using namespace realm;
  * So all elements that should come after the new element are moved to the new node.
  * Split key is the key of the first element that is moved. (First key that comes
  * after the new element).
+ * Merging is done when a node is less than half full and the combined size will be
+ * less than 3/4 of the max size.
  */
 
 namespace realm {
@@ -55,7 +57,7 @@ public:
     void insert_column(size_t ndx) override;
     ref_type insert(Key k, State& state) override;
     void get(Key k, State& state) const override;
-    bool erase(Key k) override;
+    unsigned erase(Key k) override;
     void add(ref_type ref, int64_t key_value = 0);
 
     // Reset first (and only!) child ref and return the previous value
@@ -94,7 +96,8 @@ private:
         ret.key = Key(key.value - ret.offset);
         return ret;
     }
-    void move(size_t ndx, ClusterNodeInner& new_leaf, int64_t offset);
+
+    void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
 
     template <class T, class F>
     T recurse(Key key, F func);
@@ -187,7 +190,7 @@ ref_type ClusterNodeInner::insert(Key key, ClusterNode::State& state)
         }
         else {
             int64_t first_key_value = m_keys.get(new_ref_ndx);
-            move(new_ref_ndx, child, first_key_value);
+            move(new_ref_ndx, &child, first_key_value);
             add(new_sibling_ref, split_key_value); // Throws
             state.split_key = first_key_value;
         }
@@ -202,23 +205,43 @@ void ClusterNodeInner::get(Key key, ClusterNode::State& state) const
         key, [&state](const ClusterNode* node, ChildInfo& child_info) { return node->get(child_info.key, state); });
 }
 
-bool ClusterNodeInner::erase(Key key)
+unsigned ClusterNodeInner::erase(Key key)
 {
-    return recurse<bool>(key, [this](ClusterNode* node, ChildInfo& child_info) {
-        bool destroy_child = node->erase(child_info.key);
-        // At this point, nodes are not merged, but they are deleted when empty
-        if (destroy_child) {
-            size_t num_children = m_children.size();
-            if (num_children == 1)
-                return true; // Destroy this node too
+    return recurse<unsigned>(key, [this](ClusterNode* erase_node, ChildInfo& child_info) {
+        unsigned erase_node_size = erase_node->erase(child_info.key);
 
-            ref_type child_ref = m_children.get_as_ref(child_info.ndx);
-            Array::destroy_deep(child_ref, m_alloc);
+        if (erase_node_size == 0) {
+            erase_node->destroy_deep();
             m_children.erase(child_info.ndx);
             m_keys.erase(child_info.ndx);
         }
+        else if (erase_node_size < REALM_MAX_BPNODE_SIZE / 2 && child_info.ndx < (node_size() - 1)) {
+            // Candidate for merge. First calculate if the combined size of current and
+            // next sibling is small enough.
+            size_t sibling_ndx = child_info.ndx + 1;
+            Cluster l2(m_alloc, m_tree_top);
+            ClusterNodeInner n2(m_alloc, m_tree_top);
+            ClusterNode* sibling_node = erase_node->is_leaf() ? (ClusterNode*)&l2 : (ClusterNode*)&n2;
+            sibling_node->set_parent(&m_children, sibling_ndx);
+            sibling_node->init_from_parent();
 
-        return false;
+            unsigned combined_size = sibling_node->node_size() + erase_node_size;
+
+            if (combined_size < REALM_MAX_BPNODE_SIZE * 3 / 4) {
+                // Calculate value that must be subtracted from the moved keys
+                // (will be negative as the sibling has bigger keys)
+                int64_t key_adj = m_keys.get(child_info.ndx) - m_keys.get(sibling_ndx);
+                // And then move all elements into current node
+                sibling_node->move(0, erase_node, key_adj);
+
+                // Destroy sibling
+                sibling_node->destroy_deep();
+                m_children.erase(sibling_ndx);
+                m_keys.erase(sibling_ndx);
+            }
+        }
+
+        return node_size();
     });
 }
 
@@ -248,13 +271,14 @@ void ClusterNodeInner::dump_objects(int64_t key_offset, std::string lead) const
     }
 }
 
-void ClusterNodeInner::move(size_t ndx, ClusterNodeInner& new_leaf, int64_t offset)
+void ClusterNodeInner::move(size_t ndx, ClusterNode* new_node, int64_t key_adj)
 {
+    auto new_cluster_node_inner = static_cast<ClusterNodeInner*>(new_node);
     for (size_t i = ndx; i < m_children.size(); i++) {
-        new_leaf.m_children.add(m_children.get(i));
+        new_cluster_node_inner->m_children.add(m_children.get(i));
     }
     for (size_t i = ndx; i < m_keys.size(); i++) {
-        new_leaf.m_keys.add(m_keys.get(i) - offset);
+        new_cluster_node_inner->m_keys.add(m_keys.get(i) - key_adj);
     }
     m_children.truncate(ndx);
     m_keys.truncate(ndx);
@@ -329,9 +353,11 @@ void Cluster::insert_row(size_t ndx, Key k)
     }
 }
 
-void Cluster::move(size_t ndx, Cluster& new_leaf, int64_t offset)
+void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
 {
-    size_t end = leaf_size();
+    auto new_leaf = static_cast<Cluster*>(new_node);
+    size_t end = node_size();
+
     size_t sz = size();
     for (size_t i = 1; i < sz; i++) {
         switch (m_tree_top.get_spec().get_column_type(i - 1)) {
@@ -341,7 +367,7 @@ void Cluster::move(size_t ndx, Cluster& new_leaf, int64_t offset)
                 src.set_parent(this, i);
                 src.init_from_parent();
                 Array dst(m_alloc);
-                dst.set_parent(&new_leaf, i);
+                dst.set_parent(new_leaf, i);
                 dst.init_from_parent();
                 if (nullable) {
                     auto arr_src = reinterpret_cast<ArrayIntNull*>(&src);
@@ -365,7 +391,7 @@ void Cluster::move(size_t ndx, Cluster& new_leaf, int64_t offset)
     }
 
     for (size_t i = ndx; i < m_keys.size(); i++) {
-        new_leaf.m_keys.add(m_keys.get(i) - offset);
+        new_leaf->m_keys.add(m_keys.get(i) - offset);
     }
     m_keys.truncate(ndx);
 }
@@ -376,7 +402,7 @@ Cluster::~Cluster()
 
 void Cluster::insert_column(size_t ndx)
 {
-    size_t sz = leaf_size();
+    size_t sz = node_size();
 
     switch (m_tree_top.get_spec().get_column_type(ndx)) {
         case col_type_Int: {
@@ -409,7 +435,7 @@ ref_type Cluster::insert(Key k, ClusterNode::State& state)
 {
     int64_t current_key_value = -1;
     size_t ndx = m_keys.lower_bound_int(k.value);
-    size_t sz = leaf_size();
+    size_t sz = node_size();
     if (ndx < sz) {
         current_key_value = m_keys.get(ndx);
         if (k.value == current_key_value) {
@@ -435,7 +461,7 @@ ref_type Cluster::insert(Key k, ClusterNode::State& state)
         state.index = 0;
     }
     else {
-        move(ndx, new_leaf, current_key_value);
+        move(ndx, &new_leaf, current_key_value);
         insert_row(ndx, k); // Throws
         state.ref = get_ref();
         state.split_key = current_key_value;
@@ -453,7 +479,7 @@ void Cluster::get(Key k, ClusterNode::State& state) const
     }
 }
 
-bool Cluster::erase(Key k)
+unsigned Cluster::erase(Key k)
 {
     size_t ndx = m_keys.lower_bound_int(k.value);
     if (ndx == m_keys.size() || m_keys.get(ndx) != k.value) {
@@ -480,13 +506,13 @@ bool Cluster::erase(Key k)
                 break;
         }
     }
-    return leaf_size() == 0;
+    return node_size();
 }
 
 void Cluster::dump_objects(int64_t key_offset, std::string lead) const
 {
-    std::cout << lead << "leaf - size: " << leaf_size() << std::endl;
-    for (unsigned i = 0; i < leaf_size(); i++) {
+    std::cout << lead << "leaf - size: " << node_size() << std::endl;
+    for (unsigned i = 0; i < node_size(); i++) {
         std::cout << lead << "key: " << std::hex << m_keys.get(i) + key_offset << std::dec;
         for (size_t j = 1; j < size(); j++) {
             switch (m_tree_top.get_spec().get_column_type(j - 1)) {
@@ -784,8 +810,8 @@ Obj ClusterTree::get(Key k)
 
 void ClusterTree::erase(Key k)
 {
-    m_root->erase(k);
-    while (!m_root->is_leaf() && m_root->leaf_size() == 1) {
+    unsigned root_size = m_root->erase(k);
+    while (!m_root->is_leaf() && root_size == 1) {
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
 
         uint64_t offset = node->get_first_key_value();
@@ -796,6 +822,7 @@ void ClusterTree::erase(Key k)
         new_root->adjust_keys(offset);
 
         replace_root(std::move(new_root));
+        root_size = m_root->node_size();
     }
 }
 
