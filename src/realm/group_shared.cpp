@@ -1320,7 +1320,7 @@ bool SharedGroup::compact()
         // so it becomes the database file, replacing the old one in the process.
         File file;
         file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
-        m_group.write(file, m_key, info->latest_version_number);
+        m_group.write(file, m_key, info->latest_version_number); // Throws
         // Data needs to be flushed to the disk before renaming.
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)

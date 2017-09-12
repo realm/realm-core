@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Compact now throws an exception if writing fails for some reason
+  instead of ignoring errors and possibly causing corruption.
+  PR [#2852](https://github.com/realm/realm-core/pull/2852).
 
 ### Breaking changes
 
