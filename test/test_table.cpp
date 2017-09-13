@@ -8242,6 +8242,9 @@ TEST(Table_object_basic)
     table.add_column(type_Int, "int2", true);
 
     table.create_object(Key(5)).set_all(5, 7);
+    CHECK_EQUAL(table.size(), 1);
+    CHECK_THROW(table.create_object(Key(5)), InvalidKey);
+    CHECK_EQUAL(table.size(), 1);
     table.create_object(Key(2));
     Obj x = table.create_object(Key(7)).set(0, 100);
     table.create_object(Key(8));
@@ -8250,8 +8253,8 @@ TEST(Table_object_basic)
 
     Obj y = table.get_object(Key(5));
     CHECK(!y.is_null(1));
-    CHECK_EQUAL(7, y.get<util::Optional<int64_t>>(1));
-    CHECK_EQUAL(100, x.get<int64_t>(0));
+    CHECK_EQUAL(y.get<util::Optional<int64_t>>(1), 7);
+    CHECK_EQUAL(x.get<int64_t>(0), 100);
     y.set_null(1);
     CHECK(y.is_null(1));
 
@@ -8259,6 +8262,11 @@ TEST(Table_object_basic)
     CHECK_THROW(y.get<int64_t>(1), InvalidKey);
 
     CHECK(table.get_object(Key(8)).is_null(1));
+
+    Key k11 = table.create_object().get_key();
+    Key k12 = table.create_object().get_key();
+    CHECK_EQUAL(k11.value, 11);
+    CHECK_EQUAL(k12.value, 12);
 }
 
 TEST(Table_object_merge_nodes)

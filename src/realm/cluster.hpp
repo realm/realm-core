@@ -131,6 +131,8 @@ public:
     virtual bool is_leaf() const = 0;
     /// Number of elements in this subtree
     virtual size_t get_tree_size() const = 0;
+    /// Last key in this subtree
+    virtual int64_t get_last_key() const = 0;
 
     /// Create an empty node
     virtual void create() = 0;
@@ -184,6 +186,11 @@ public:
     {
         return node_size();
     }
+    int64_t get_last_key() const override
+    {
+        return m_keys.size() ? get_key(m_keys.size() - 1) : 0;
+    }
+
     void insert_column(size_t ndx) override;
     ref_type insert(Key k, State& state) override;
     void get(Key k, State& state) const override;
@@ -294,7 +301,10 @@ public:
     {
         return size() == 0;
     }
-
+    int64_t get_last_key() const
+    {
+        return m_root->get_last_key();
+    }
     MemRef ensure_writeable(Key k)
     {
         return m_root->ensure_writeable(k);

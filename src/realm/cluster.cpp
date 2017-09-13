@@ -54,6 +54,7 @@ public:
         return false;
     }
     size_t get_tree_size() const override;
+    int64_t get_last_key() const override;
 
     void insert_column(size_t ndx) override;
     ref_type insert(Key k, State& state) override;
@@ -354,6 +355,27 @@ size_t ClusterNodeInner::get_tree_size() const
         }
     }
     return tree_size;
+}
+
+int64_t ClusterNodeInner::get_last_key() const
+{
+    unsigned last_ndx = node_size() - 1;
+
+    ref_type ref = m_children.get_as_ref(last_ndx);
+    char* header = m_alloc.translate(ref);
+    bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
+    MemRef mem(header, ref, m_alloc);
+    int64_t offset = m_keys.get(last_ndx);
+    if (child_is_leaf) {
+        Cluster leaf(m_alloc, m_tree_top);
+        leaf.init(mem);
+        return offset + leaf.get_last_key();
+    }
+    else {
+        ClusterNodeInner node(m_alloc, m_tree_top);
+        node.init(mem);
+        return offset + node.get_last_key();
+    }
 }
 
 /********************************* Cluster ***********************************/

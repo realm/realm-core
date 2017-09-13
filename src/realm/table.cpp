@@ -6656,10 +6656,17 @@ void Table::dump_node_structure(std::ostream& out, int level) const
 
 Obj Table::create_object(Key key)
 {
-    REALM_ASSERT(key != null_key);
+    if (key == null_key) {
+        if (m_next_key_value == -1) {
+            m_next_key_value = m_clusters.get_last_key() + 1;
+        }
+        key = Key(m_next_key_value++);
+    }
+
     Obj obj = m_clusters.insert(key);
     bump_version();
-    m_size++; // TODO: Redundant
+    m_size++;
+
     return obj;
 }
 
