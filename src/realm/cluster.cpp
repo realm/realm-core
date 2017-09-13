@@ -537,31 +537,39 @@ ref_type Cluster::insert(Key k, ClusterNode::State& state)
         }
     }
 
+    ref_type ret = 0;
+
     REALM_ASSERT_DEBUG(sz <= REALM_MAX_BPNODE_SIZE);
     if (REALM_LIKELY(sz < REALM_MAX_BPNODE_SIZE)) {
         insert_row(ndx, k); // Throws
         state.ref = get_ref();
         state.index = ndx;
-        return 0; // Leaf was not split
-    }
-
-    // Split leaf node
-    Cluster new_leaf(m_alloc, m_tree_top);
-    new_leaf.create();
-    if (ndx == sz) {
-        new_leaf.insert_row(0, Key(0)); // Throws
-        state.split_key = k.value;
-        state.ref = new_leaf.get_ref();
-        state.index = 0;
     }
     else {
-        move(ndx, &new_leaf, current_key_value);
-        insert_row(ndx, k); // Throws
-        state.ref = get_ref();
-        state.split_key = current_key_value;
-        state.index = ndx;
+        // Split leaf node
+        Cluster new_leaf(m_alloc, m_tree_top);
+        new_leaf.create();
+        if (ndx == sz) {
+            new_leaf.insert_row(0, Key(0)); // Throws
+            state.split_key = k.value;
+            state.ref = new_leaf.get_ref();
+            state.index = 0;
+        }
+        else {
+            move(ndx, &new_leaf, current_key_value);
+            insert_row(ndx, k); // Throws
+            state.ref = get_ref();
+            state.split_key = current_key_value;
+            state.index = ndx;
+        }
+        ret = new_leaf.get_ref();
     }
-    return new_leaf.get_ref();
+
+    if (Replication* repl = m_alloc.get_replication()) {
+        repl->create_object(m_tree_top.get_owner(), k);
+    }
+
+    return ret;
 }
 
 void Cluster::get(Key k, ClusterNode::State& state) const
@@ -580,6 +588,7 @@ unsigned Cluster::erase(Key k)
         throw InvalidKey("Key not found");
     }
     m_keys.erase(ndx);
+
     size_t sz = size();
     for (size_t i = 1; i < sz; i++) {
         switch (m_tree_top.get_spec().get_column_type(i - 1)) {
@@ -600,6 +609,11 @@ unsigned Cluster::erase(Key k)
                 break;
         }
     }
+
+    if (Replication* repl = m_alloc.get_replication()) {
+        repl->remove_object(m_tree_top.get_owner(), k);
+    }
+
     return node_size();
 }
 
@@ -747,7 +761,7 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
     }
 
     if (Replication* repl = alloc.get_replication())
-        repl->set_int(m_tree_top->get_owner(), col_ndx, m_row_ndx, value,
+        repl->set_int(m_tree_top->get_owner(), col_ndx, size_t(m_key.value), value,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     return *this;

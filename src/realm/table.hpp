@@ -396,7 +396,10 @@ public:
 
     void remove(size_t row_ndx);
     void remove_last();
-    void remove_object(Key key);
+    void remove_object(Key key)
+    {
+        do_remove_object(key, false);
+    }
     void move_last_over(size_t row_ndx);
     void clear();
     void swap_rows(size_t row_ndx_1, size_t row_ndx_2);
@@ -1077,6 +1080,7 @@ private:
     void erase_row(size_t row_ndx, bool is_move_last_over);
     void batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over);
     void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
+    void do_remove_object(Key key, bool broken_reciprocal_backlinks);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     void do_merge_rows(size_t row_ndx, size_t new_row_ndx);
@@ -2473,6 +2477,12 @@ public:
     {
         bool broken_reciprocal_backlinks = false;
         table.do_remove(row_ndx, broken_reciprocal_backlinks); // Throws
+    }
+
+    static void do_remove_object(Table& table, Key key)
+    {
+        bool broken_reciprocal_backlinks = false;
+        table.do_remove_object(key, broken_reciprocal_backlinks); // Throws
     }
 
     static void do_move_last_over(Table& table, size_t row_ndx)

@@ -602,7 +602,7 @@ TEST(Transactions_General)
     // End of read transaction
 }
 
-TEST(Transactions_RollbackAddRows)
+TEST(Transactions_RollbackCreateObject)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
@@ -616,16 +616,13 @@ TEST(Transactions_RollbackAddRows)
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
 
-    g.get_table(0)->add_empty_row();
-    g.get_table(0)->add_row_with_key(0, 45);
-    Row r0 = g.get_table(0)->get(0);
-    Row r1 = g.get_table(0)->get(1);
-    CHECK(r0.is_attached());
-    CHECK(r1.is_attached());
+    g.get_table(0)->create_object(Key(0)).set(0, 5);
+    auto o = g.get_table(0)->get_object(Key(0));
+    CHECK_EQUAL(o.get<int64_t>(0), 5);
     LangBindHelper::rollback_and_continue_as_read(sg_w);
 
-    CHECK(!r0.is_attached());
-    CHECK(!r1.is_attached());
+
+    CHECK_THROW(o.get<int64_t>(0), InvalidKey);
     g.verify();
 
     LangBindHelper::promote_to_write(sg_w);

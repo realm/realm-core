@@ -3117,10 +3117,13 @@ size_t Table::set_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
         ndx = do_set_unique(col, ndx, value, conflict); // Throws
     }
 
+    /*
+    // TODO: reintroduce replication
     if (!conflict) {
         if (Replication* repl = get_repl())
             repl->set_int(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
     }
+    */
 
     return ndx;
 }
@@ -3208,7 +3211,7 @@ size_t Table::set_unique(size_t col_ndx, size_t row_ndx, null)
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool /* is_default */)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -3223,8 +3226,11 @@ void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
         col.set(ndx, value);
     }
 
+    /*
+    // TODO: reintroduce replication
     if (Replication* repl = get_repl())
         repl->set_int(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+    */
 }
 
 template <>
@@ -6670,7 +6676,7 @@ Obj Table::create_object(Key key)
     return obj;
 }
 
-void Table::remove_object(Key key)
+void Table::do_remove_object(Key key, bool /* broken_reciprocal_backlinks */)
 {
     m_clusters.erase(key);
     bump_version();
