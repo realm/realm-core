@@ -201,12 +201,13 @@ void Realm::open_with_config(const Config& config,
         std::string new_realm_path = util::reserve_unique_file_name(recovery_directory, "synced-realm-XXXXXXX");
         util::File::move(config.path, new_realm_path);
 
-        std::string message = util::format("The local copy of this synced Realm was created with an incompatible "
-                                           "version of Realm. It has been moved to '%1', and can be opened as a "
-                                           "read-only, non-synced Realm to recover any pending changes. You may "
-                                           "now retry opening the synced Realm.", new_realm_path);
+        const char* message = "The local copy of this synced Realm was created with an incompatible version of "
+                              "Realm. It has been moved aside, and the Realm will be re-downloaded the next time it "
+                              "is opened. You should write a handler for this error that uses the provided "
+                              "configuration to open the old Realm in read-only mode to recover any pending changes "
+                              "and then remove the Realm file.";
         throw RealmFileException(RealmFileException::Kind::IncompatibleSyncedRealm, std::move(new_realm_path),
-                                 std::move(message), ex.what());
+                                 message, ex.what());
     }
 #endif // REALM_ENABLE_SYNC
     catch (...) {
