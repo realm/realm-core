@@ -239,11 +239,14 @@ int fast_popcount64(int64_t x)
 }
 
 // Mutex only to make Helgrind happy
-// If it was declared inside fastrand() then it could have a race being initialised and
+// If it was declared as a static inside fastrand() then it could have a race being initialised and
 // being locked because a static inside a function is constructed the first time execution
 // hits the function declaration (lazily). To avoid that race we declare it outside the function
-// which means it will be constructed on program start.
-static util::Mutex fastrand_mutex;
+// which means it will be constructed on program start. Post C++11, there should be no race on a
+// construction of a local static, but tsan seems to report this as a false positive sometimes.
+namespace {
+util::Mutex fastrand_mutex;
+} // end anonymous namespace
 
 // A fast, thread safe, mediocre-quality random number generator named Xorshift
 uint64_t fastrand(uint64_t max, bool is_seed)
