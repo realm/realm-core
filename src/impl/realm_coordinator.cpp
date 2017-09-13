@@ -91,7 +91,9 @@ void RealmCoordinator::create_sync_session()
         throw std::logic_error("The realm encryption key specified in SyncConfig does not match the one in Realm::Config");
     }
 
-    m_sync_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
+    auto sync_config = *m_config.sync_config;
+    sync_config.validate_sync_history = false;
+    m_sync_session = SyncManager::shared().get_session(m_config.path, sync_config);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
     SyncSession::Internal::set_sync_transact_callback(*m_sync_session,
@@ -181,12 +183,6 @@ void RealmCoordinator::set_config(const Realm::Config& config)
 
         // Realm::update_schema() handles complaining about schema mismatches
     }
-
-#if REALM_ENABLE_SYNC
-    if (config.sync_config) {
-        create_sync_session();
-    }
-#endif
 }
 
 std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
@@ -240,6 +236,9 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
         }
         m_weak_realm_notifiers.emplace_back(realm, m_config.cache);
     }
+
+    if (realm->config().sync_config)
+        create_sync_session();
 
     if (schema) {
         lock.unlock();

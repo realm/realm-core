@@ -16,5 +16,34 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#define CATCH_CONFIG_MAIN
+#define CATCH_CONFIG_RUNNER
 #include "catch.hpp"
+
+#include <limits.h>
+
+#ifdef _MSC_VER
+#include <Shlwapi.h>
+#pragma comment(lib, "Shlwapi.lib")
+#else
+#include <libgen.h>
+#endif
+
+int main(int argc, char** argv) {
+#ifdef _MSC_VER
+    char path[MAX_PATH];
+    if (GetModuleFileNameA(NULL, path, sizeof(path)) == 0) {
+        fprintf(stderr, "Failed to retrieve path to exectuable.\n");
+        return 1;
+    }
+    PathRemoveFileSpecA(path);
+    SetCurrentDirectoryA(path);
+#else
+    char executable[PATH_MAX];
+    realpath(argv[0], executable);
+    const char* directory = dirname(executable);
+    chdir(directory);
+#endif
+
+    int result = Catch::Session().run(argc, argv);
+    return result < 0xff ? result : 0xff;
+}

@@ -109,6 +109,7 @@ struct SyncConfig {
     bool client_validate_ssl = true;
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<sync::Session::SSLVerifyCallback> ssl_verify_callback;
+    bool validate_sync_history = true;
 #if __GNUC__ < 5
     // GCC 4.9 does not support C++14 braced-init
     SyncConfig(std::shared_ptr<SyncUser> user, std::string realm_url, SyncSessionStopPolicy stop_policy,
