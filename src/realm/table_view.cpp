@@ -38,8 +38,8 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSo
 
     Table::generate_patch(src.m_table.get(), patch.m_table);
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
-    SortDescriptor::generate_patch(src.m_sorting_predicate, patch.sort_patch);
-    SortDescriptor::generate_patch(src.m_distinct_predicate, patch.distinct_patch);
+    DescriptorOrdering::generate_patch(src.m_descriptor_ordering, patch.descriptors_patch);
+
     if (src.m_linked_column) {
         ConstRow::generate_patch(src.m_linked_row, patch.linked_row);
         patch.linked_col = src.m_linked_column->get_origin_column_index();
@@ -67,8 +67,7 @@ TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch, Con
         patch.linked_col = src.m_linked_column->get_origin_column_index();
     }
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
-    SortDescriptor::generate_patch(src.m_sorting_predicate, patch.sort_patch);
-    SortDescriptor::generate_patch(src.m_distinct_predicate, patch.distinct_patch);
+    DescriptorOrdering::generate_patch(src.m_descriptor_ordering, patch.descriptors_patch);
 
     m_last_seen_version = 0;
     m_start = src.m_start;
@@ -82,8 +81,7 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
     m_table->register_view(this);
     m_query.apply_patch(patch.query_patch, group);
     m_linkview_source = LinkView::create_from_and_consume_patch(patch.linkview_patch, group);
-    m_sorting_predicate = SortDescriptor::create_from_and_consume_patch(patch.sort_patch, *m_table);
-    m_distinct_predicate = SortDescriptor::create_from_and_consume_patch(patch.distinct_patch, *m_table);
+    m_descriptor_ordering = DescriptorOrdering::create_from_and_consume_patch(patch.descriptors_patch, *m_table);
 
     if (patch.linked_row) {
         m_linked_column = &m_table->get_column_link_base(patch.linked_col).get_backlink_column();
@@ -680,17 +678,22 @@ void TableView::clear(RemoveMode underlying_mode)
 
 void TableViewBase::distinct(size_t column)
 {
-    distinct(SortDescriptor(*m_table, {{column}}));
+    distinct(DistinctDescriptor(*m_table, {{column}}));
 }
 
 /// Remove rows that are duplicated with respect to the column set passed as argument.
 /// Will keep original sorting order so that you can both have a distinct and sorted view.
-void TableViewBase::distinct(SortDescriptor columns)
+void TableViewBase::distinct(DistinctDescriptor columns)
 {
-    m_distinct_predicate = std::move(columns);
+    m_descriptor_ordering.append_distinct(std::move(columns));
     do_sync();
 }
 
+void TableViewBase::apply_descriptor_ordering(DescriptorOrdering new_ordering)
+{
+    m_descriptor_ordering = new_ordering;
+    do_sync();
+}
 
 // Sort according to one column
 void TableViewBase::sort(size_t column, bool ascending)
@@ -701,9 +704,10 @@ void TableViewBase::sort(size_t column, bool ascending)
 // Sort according to multiple columns, user specified order on each column
 void TableViewBase::sort(SortDescriptor order)
 {
-    m_sorting_predicate = std::move(order);
-    do_sort(m_sorting_predicate, m_distinct_predicate);
+    m_descriptor_ordering.append_sort(std::move(order));
+    do_sort(m_descriptor_ordering);
 }
+
 
 void TableViewBase::do_sync()
 {
@@ -753,7 +757,7 @@ void TableViewBase::do_sync()
     }
     m_num_detached_refs = 0;
 
-    do_sort(m_sorting_predicate, m_distinct_predicate);
+    do_sort(m_descriptor_ordering);
 
     m_last_seen_version = outside_version();
 }
@@ -767,13 +771,13 @@ bool TableViewBase::is_in_table_order() const
         return false;
     }
     else if (m_distinct_column_source != npos) {
-        return !m_sorting_predicate;
+        return !m_descriptor_ordering.will_apply_sort();
     }
     else if (m_linked_column) {
         return false;
     }
     else {
         REALM_ASSERT(m_query.m_table);
-        return m_query.produces_results_in_table_order() && !m_sorting_predicate;
+        return m_query.produces_results_in_table_order() && !m_descriptor_ordering.will_apply_sort();
     }
 }

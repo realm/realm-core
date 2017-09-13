@@ -28,9 +28,11 @@
 #include <realm/group_shared.hpp>
 #include <realm/alloc_slab.hpp>
 #include <realm/disable_sync_to_disk.hpp>
+#include <realm/metrics/metric_timer.hpp>
 
 using namespace realm;
 using namespace realm::util;
+using namespace realm::metrics;
 
 // Class controlling a memory mapped window into a file
 class GroupWriter::MapWindow {
@@ -214,7 +216,7 @@ GroupWriter::GroupWriter(Group& group)
         }
         else {
             int_fast64_t value = int_fast64_t(initial_version); // FIXME: Problematic unsigned -> signed conversion
-            top.set(6, 1 + 2 * value);                          // Throws
+            top.set(6, 1 + 2 * uint64_t(initial_version));      // Throws
             size_t n = m_free_positions.size();
             bool context_flag = false;
             m_free_versions.Array::create(Array::type_Normal, context_flag, n, value); // Throws
@@ -272,6 +274,10 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 
 ref_type GroupWriter::write_group()
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_write_time(m_group);
+#endif // REALM_METRICS
+
     merge_free_space(); // Throws
 
     Array& top = m_group.m_top;
@@ -379,11 +385,11 @@ ref_type GroupWriter::write_group()
         if (ndx > 0) {
             ref_type prev_ref = to_ref(m_free_positions.get(ndx - 1));
             size_t prev_size = to_size_t(m_free_lengths.get(ndx - 1));
-            REALM_ASSERT_RELEASE(prev_ref + prev_size <= ref);
+            REALM_ASSERT_RELEASE_EX(prev_ref + prev_size <= ref, prev_ref, prev_size, ref, ndx, m_free_positions.size());
         }
         if (ndx < m_free_positions.size()) {
             ref_type after_ref = to_ref(m_free_positions.get(ndx));
-            REALM_ASSERT_RELEASE(ref + size <= after_ref);
+            REALM_ASSERT_RELEASE_EX(ref + size <= after_ref, ref, size, after_ref, ndx, m_free_positions.size());
         }
         m_free_positions.insert(ndx, ref); // Throws
         m_free_lengths.insert(ndx, size);  // Throws
@@ -687,8 +693,12 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // extended the file size. It can also happen as part of initial file expansion
     // during attach_file().
     size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
-    size_t extend_size = requested_size;
-    size_t new_file_size = logical_file_size + extend_size;
+    size_t new_file_size = logical_file_size;
+    if (REALM_UNLIKELY(int_add_with_overflow_detect(new_file_size, requested_size))) {
+        throw MaximumFileSizeExceeded("GroupWriter cannot extend free space: " + util::to_string(logical_file_size)
+                                      + " + " + util::to_string(requested_size));
+    }
+
     if (!alloc.matches_section_boundary(new_file_size)) {
         new_file_size = alloc.get_upper_section_boundary(new_file_size);
     }
@@ -714,8 +724,9 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     if (is_shared)
         m_free_versions.add(0); // new space is always free for writing
 
+
     // Update the logical file size
-    m_group.m_top.set(2, 1 + 2 * new_file_size); // Throws
+    m_group.m_top.set(2, 1 + 2 * uint64_t(new_file_size)); // Throws
     REALM_ASSERT(chunk_size != 0);
     REALM_ASSERT((chunk_size % 8) == 0);
     return std::make_pair(chunk_ndx, chunk_size);
@@ -786,7 +797,7 @@ void GroupWriter::commit(ref_type new_top_ref)
     int slot_selector = ((new_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
 
     // Update top ref and file format version
-    int file_format_version = m_alloc.get_file_format_version();
+    int file_format_version = m_group.get_file_format_version();
     using type_1 = std::remove_reference<decltype(file_header.m_file_format[0])>::type;
     REALM_ASSERT(!util::int_cast_has_overflow<type_1>(file_format_version));
     file_header.m_top_ref[slot_selector] = new_top_ref;
@@ -794,6 +805,10 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // When running the test suite, device synchronization is disabled
     bool disable_sync = get_disable_sync_to_disk();
+
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_fsync_time(m_group);
+#endif // REALM_METRICS
 
     // Make sure that that all data relating to the new snapshot is written to
     // stable storage before flipping the slot selector

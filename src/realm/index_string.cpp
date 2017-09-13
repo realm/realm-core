@@ -634,6 +634,10 @@ IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
     return top.release();
 }
 
+ref_type StringIndex::create_empty(Allocator& alloc)
+{
+    return StringIndex(nullptr, alloc).get_ref(); // Throws
+}
 
 void StringIndex::set_target(ColumnBase* target_column) noexcept
 {
@@ -1691,7 +1695,7 @@ void StringIndex::to_dot_2(std::ostream& out, StringData title) const
     ref_type ref = get_ref();
 
     out << "subgraph cluster_string_index" << ref << " {" << std::endl;
-    out << " label = \"String index";
+    out << " label = \"Search index";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
     out << "\";" << std::endl;

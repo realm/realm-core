@@ -31,6 +31,7 @@
 
 
 using namespace realm;
+using namespace realm::metrics;
 
 Query::Query()
 {
@@ -871,9 +872,6 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
                    size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                    size_t* return_ndx) const
 {
-    if (!m_table->is_attached()) {
-        throw LogicError{LogicError::detached_accessor};
-    }
     if (limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
             *resultcount = 0;
@@ -988,6 +986,10 @@ void Query::aggregate_internal(Action TAction, DataType TSourceColumn, bool null
 
 int64_t Query::sum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
+#endif
+
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Sum, int64_t>(&IntNullColumn::sum, column_ndx, resultcount, start, end, limit);
     }
@@ -995,10 +997,18 @@ int64_t Query::sum_int(size_t column_ndx, size_t* resultcount, size_t start, siz
 }
 double Query::sum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
+#endif
+
     return aggregate<act_Sum, float>(&FloatColumn::sum, column_ndx, resultcount, start, end, limit);
 }
 double Query::sum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
+#endif
+
     return aggregate<act_Sum, double>(&DoubleColumn::sum, column_ndx, resultcount, start, end, limit);
 }
 
@@ -1007,6 +1017,10 @@ double Query::sum_double(size_t column_ndx, size_t* resultcount, size_t start, s
 int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                            size_t* return_ndx) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
+#endif
+
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, resultcount, start, end, limit,
                                            return_ndx);
@@ -1018,6 +1032,10 @@ int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start,
 OldDateTime Query::maximum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                                        size_t* return_ndx) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
+#endif
+
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, resultcount, start, end, limit,
                                            return_ndx);
@@ -1029,11 +1047,19 @@ OldDateTime Query::maximum_olddatetime(size_t column_ndx, size_t* resultcount, s
 float Query::maximum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                            size_t* return_ndx) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
+#endif
+
     return aggregate<act_Max, float>(&FloatColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                              size_t* return_ndx) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
+#endif
+
     return aggregate<act_Max, double>(&DoubleColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
@@ -1043,6 +1069,10 @@ double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t star
 int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                            size_t* return_ndx) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
+#endif
+
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit,
                                            return_ndx);
@@ -1053,17 +1083,29 @@ int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start,
 float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                            size_t* return_ndx) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
+#endif
+
     return aggregate<act_Min, float>(&FloatColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                              size_t* return_ndx) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
+#endif
+
     return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
 OldDateTime Query::minimum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                                        size_t* return_ndx) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
+#endif
+
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit,
                                            return_ndx);
@@ -1074,15 +1116,23 @@ OldDateTime Query::minimum_olddatetime(size_t column_ndx, size_t* resultcount, s
 
 Timestamp Query::minimum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start, size_t end, size_t limit)
 {
-    ConstTableView tv;
-    tv = find_all(start, end, limit);
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
+#endif
+    TableView tv(*m_table, *this, start, end, limit);
+    find_all(tv, start, end, limit);
     Timestamp ts = tv.minimum_timestamp(column_ndx, return_ndx);
     return ts;
 }
 
 Timestamp Query::maximum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start, size_t end, size_t limit)
 {
-    ConstTableView tv = find_all(start, end, limit);
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
+#endif
+
+    TableView tv(*m_table, *this, start, end, limit);
+    find_all(tv, start, end, limit);
     Timestamp ts = tv.maximum_timestamp(column_ndx, return_ndx);
     return ts;
 }
@@ -1093,6 +1143,10 @@ Timestamp Query::maximum_timestamp(size_t column_ndx, size_t* return_ndx, size_t
 template <typename T, bool Nullable>
 double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
+#endif
+
     if (limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
             *resultcount = 0;
@@ -1228,6 +1282,10 @@ Query& Query::end_subtable()
 // todo, add size_t end? could be useful
 size_t Query::find(size_t begin)
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Find);
+#endif
+
     if (m_table->is_degenerate())
         return not_found;
 
@@ -1302,6 +1360,10 @@ void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit)
 
 TableView Query::find_all(size_t start, size_t end, size_t limit)
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
+#endif
+
     TableView ret(*m_table, *this, start, end, limit);
     find_all(ret, start, end, limit);
     return ret;
@@ -1310,6 +1372,10 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
 size_t Query::count(size_t start, size_t end, size_t limit) const
 {
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
+#endif
+
     if (limit == 0 || m_table->is_degenerate())
         return 0;
 
@@ -1502,6 +1568,14 @@ std::string Query::validate()
         return "Syntax error";
 
     return root_node()->validate(); // errors detected by QueryEngine
+}
+
+std::string Query::get_description() const
+{
+    if (root_node()) {
+        return root_node()->describe_expression();
+    }
+    return "";
 }
 
 void Query::init() const

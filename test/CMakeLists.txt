@@ -1,5 +1,10 @@
 add_subdirectory(util)
-add_subdirectory(fuzzy)
+
+# AFL not yet supported by Windows
+if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    add_subdirectory(fuzzy)
+endif()
+
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
 # FIXME: Add other benchmarks
@@ -26,7 +31,6 @@ set(NORMAL_TESTS
     test_descriptor.cpp
     test_destroy_guard.cpp
     test_destructor_thread_safety.cpp
-    test_encrypted_file_mapping.cpp
     test_file.cpp
     test_file_locks.cpp
     test_group.cpp
@@ -36,6 +40,7 @@ set(NORMAL_TESTS
     test_lang_bind_helper.cpp
     test_link_query_view.cpp
     test_links.cpp
+    test_metrics.cpp
     test_optional.cpp
     test_priority_queue.cpp
     test_query.cpp
@@ -56,11 +61,16 @@ set(NORMAL_TESTS
     test_util_inspect.cpp
     test_util_logger.cpp
     test_util_memory_stream.cpp
+    test_util_overload.cpp
     test_util_scope_exit.cpp
     test_util_stringbuffer.cpp
     test_util_to_string.cpp
     test_util_type_list.cpp
     test_version.cpp)
+
+if (REALM_ENABLE_ENCRYPTION)
+	list(APPEND NORMAL_TESTS test_encrypted_file_mapping.cpp)
+endif()
 
 set(LARGE_TESTS
     large_tests/test_column_large.cpp
@@ -100,6 +110,10 @@ if(CMAKE_GENERATOR STREQUAL Xcode)
     set(MAIN_FILE main.mm)
 else()
     set(MAIN_FILE main.cpp)
+endif()
+
+if (MSVC)
+    set_source_files_properties(test_query.cpp PROPERTIES COMPILE_FLAGS /bigobj)
 endif()
 
 add_executable(realm-tests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})

@@ -56,44 +56,21 @@
 using namespace realm;
 using namespace realm::util;
 
-
-namespace {
-
-// Valgrind can show still-reachable leaks for pthread_create() on many systems (AIX, Debian, etc) because
-// glibc declares a static memory pool for threads which are free'd by the OS on process termination. See
-// http://www.network-theory.co.uk/docs/valgrind/valgrind_20.html under --run-libc-freeres=<yes|no>.
-// This can give false positives because of missing suppression, etc (not real leaks!). It's also a problem
-// on Windows, so we have written our own clean-up method for the Windows port.
-#if defined _WIN32 && defined REALM_DEBUG
-void free_threadpool();
-
-class Initialization {
-public:
-    ~Initialization()
-    {
-        free_threadpool();
-    }
-};
-
-Initialization initialization;
-
-void free_threadpool()
-{
-    pthread_cleanup();
-}
-#endif
-
-} // anonymous namespace
-
-
 void Thread::join()
 {
     if (!m_joinable)
         throw std::runtime_error("Thread is not joinable");
+
+#ifdef _WIN32
+    // Returns void; error handling not possible
+    m_std_thread.join();
+#else
     void** value_ptr = nullptr; // Ignore return value
     int r = pthread_join(m_id, value_ptr);
     if (REALM_UNLIKELY(r != 0))
         join_failed(r); // Throws
+#endif
+
     m_joinable = false;
 }
 
@@ -234,6 +211,9 @@ bool RobustMutex::is_robust_on_this_platform() noexcept
 
 bool RobustMutex::low_level_lock()
 {
+#ifdef _WIN32
+    REALM_ASSERT_RELEASE(false);
+#else
     int r = pthread_mutex_lock(&m_impl);
     if (REALM_LIKELY(r == 0))
         return true;
@@ -244,10 +224,14 @@ bool RobustMutex::low_level_lock()
         throw NotRecoverable();
 #endif
     lock_failed(r);
+#endif // _WIN32
 }
 
 int RobustMutex::try_low_level_lock()
 {
+#ifdef _WIN32
+    REALM_ASSERT_RELEASE(false);
+#else
     int r = pthread_mutex_trylock(&m_impl);
     if (REALM_LIKELY(r == 0))
         return 1;
@@ -260,10 +244,14 @@ int RobustMutex::try_low_level_lock()
         throw NotRecoverable();
 #endif
     lock_failed(r);
+#endif // _WIN32
 }
 
 bool RobustMutex::is_valid() noexcept
 {
+#ifdef _WIN32    
+    REALM_ASSERT_RELEASE(false);
+#else
     // FIXME: This check tries to lock the mutex, and only unlocks it if the
     // return value is zero. If pthread_mutex_trylock() fails with EOWNERDEAD,
     // this leads to deadlock during the following propper attempt to lock. This
@@ -277,6 +265,7 @@ bool RobustMutex::is_valid() noexcept
         return true;
     }
     return r != EINVAL;
+#endif
 }
 
 
@@ -303,7 +292,7 @@ CondVar::CondVar(process_shared_tag)
     REALM_ASSERT(r2 == 0);
     if (REALM_UNLIKELY(r != 0))
         init_failed(r);
-#else // !REALM_HAVE_PTHREAD_PROCESS_SHARED
+#else
     throw std::runtime_error("No support for process-shared condition variables");
 #endif
 }
