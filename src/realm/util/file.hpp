@@ -1235,8 +1235,10 @@ inline File::Streambuf::pos_type File::Streambuf::seekpos(pos_type pos, std::ios
 inline void File::Streambuf::flush()
 {
     size_t n = pptr() - pbase();
-    m_file.write(pbase(), n);
-    setp(m_buffer.get(), epptr());
+    if (n > 0) {
+        m_file.write(pbase(), n);
+        setp(m_buffer.get(), epptr());
+    }
 }
 
 inline File::AccessError::AccessError(const std::string& msg, const std::string& path)

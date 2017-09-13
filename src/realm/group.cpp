@@ -810,7 +810,10 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
     file.set_encryption_key(encryption_key);
     File::Streambuf streambuf(&file);
     std::ostream out(&streambuf);
+    out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
     write(out, encryption_key != 0, version_number);
+    int sync_status = streambuf.pubsync();
+    REALM_ASSERT(sync_status == 0);
 }
 
 BinaryData Group::write_to_mem() const
