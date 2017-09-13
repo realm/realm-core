@@ -1318,13 +1318,20 @@ bool SharedGroup::compact()
 
         // Compact by writing a new file holding only live data, then renaming the new file
         // so it becomes the database file, replacing the old one in the process.
-        File file;
-        file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
-        m_group.write(file, m_key, info->latest_version_number);
-        // Data needs to be flushed to the disk before renaming.
-        bool disable_sync = get_disable_sync_to_disk();
-        if (!disable_sync)
-            file.sync(); // Throws
+        try {
+            File file;
+            file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
+            m_group.write(file, m_key, info->latest_version_number); // Throws
+            // Data needs to be flushed to the disk before renaming.
+            bool disable_sync = get_disable_sync_to_disk();
+            if (!disable_sync)
+                file.sync(); // Throws
+            }
+        catch (...)
+        {
+            File::try_remove(tmp_path);
+            throw;
+        }
 #ifndef _WIN32
         util::File::move(tmp_path, m_db_path);
 #endif
