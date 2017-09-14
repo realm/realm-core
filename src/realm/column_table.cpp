@@ -78,18 +78,18 @@ void SubtableColumnBase::verify(const Table& table, size_t col_ndx) const
 }
 
 
-Table* SubtableColumnBase::get_subtable_ptr(size_t subtable_ndx)
+TableRef SubtableColumnBase::get_subtable_tableref(size_t subtable_ndx)
 {
     LockGuard lg(m_subtable_map_lock);
     REALM_ASSERT_3(subtable_ndx, <, size());
     if (Table* subtable = m_subtable_map.find(subtable_ndx))
-        return subtable;
+        return TableRef(subtable);
 
     typedef _impl::TableFriend tf;
     ref_type top_ref = get_as_ref(subtable_ndx);
     Allocator& alloc = get_alloc();
     SubtableColumnBase* parent = this;
-    std::unique_ptr<Table> subtable(tf::create_accessor(alloc, top_ref, parent, subtable_ndx)); // Throws
+    TableRef subtable(tf::create_accessor(alloc, top_ref, parent, subtable_ndx)); // Throws
     // FIXME: Note that if the following map insertion fails, then the
     // destructor of the newly created child will call
     // SubtableColumnBase::child_accessor_destroyed() with a pointer that is not
@@ -98,20 +98,21 @@ Table* SubtableColumnBase::get_subtable_ptr(size_t subtable_ndx)
     m_subtable_map.add(subtable_ndx, subtable.get()); // Throws
     if (was_empty && m_table)
         tf::bind_ptr(*m_table);
-    return subtable.release();
+    return subtable;
 }
 
 
-Table* SubtableColumn::get_subtable_ptr(size_t subtable_ndx)
+TableRef SubtableColumn::get_subtable_tableref(size_t subtable_ndx)
 {
+    LockGuard lg(m_subtable_map_lock);
     REALM_ASSERT_3(subtable_ndx, <, size());
     if (Table* subtable = m_subtable_map.find(subtable_ndx))
-        return subtable;
+        return TableRef(subtable);
 
     typedef _impl::TableFriend tf;
     Spec* shared_subspec = get_subtable_spec();
     SubtableColumn* parent = this;
-    std::unique_ptr<Table> subtable(tf::create_accessor(shared_subspec, parent, subtable_ndx)); // Throws
+    TableRef subtable(tf::create_accessor(shared_subspec, parent, subtable_ndx)); // Throws
     // FIXME: Note that if the following map insertion fails, then the
     // destructor of the newly created child will call
     // SubtableColumnBase::child_accessor_destroyed() with a pointer that is not
@@ -120,7 +121,7 @@ Table* SubtableColumn::get_subtable_ptr(size_t subtable_ndx)
     m_subtable_map.add(subtable_ndx, subtable.get()); // Throws
     if (was_empty && m_table)
         tf::bind_ptr(*m_table);
-    return subtable.release();
+    return subtable;
 }
 
 
@@ -391,8 +392,8 @@ bool SubtableColumn::compare_table(const SubtableColumn& c) const
     if (c.size() != n)
         return false;
     for (size_t i = 0; i != n; ++i) {
-        ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();   // Throws
-        ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref(); // throws
+        ConstTableRef t1 = get_subtable_tableref(i);   // Throws
+        ConstTableRef t2 = c.get_subtable_tableref(i); // throws
         if (!compare_subtable_rows(*t1, *t2))
             return false;
     }

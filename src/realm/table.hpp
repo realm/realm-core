@@ -891,10 +891,10 @@ protected:
     ///
     /// The returned table pointer must **always** end up being
     /// wrapped in some instantiation of BasicTableRef<>.
-    Table* get_subtable_ptr(size_t col_ndx, size_t row_ndx);
+    TableRef get_subtable_tableref(size_t col_ndx, size_t row_ndx);
 
-    /// See non-const get_subtable_ptr().
-    const Table* get_subtable_ptr(size_t col_ndx, size_t row_ndx) const;
+    /// See non-const get_subtable_tableref().
+    ConstTableRef get_subtable_tableref(size_t col_ndx, size_t row_ndx) const;
 
     /// Compare the rows of two tables under the assumption that the two tables
     /// have the same number of columns, and the same data type at each column
@@ -2017,9 +2017,9 @@ inline size_t Table::add_empty_row(size_t num_rows)
     return row_ndx;                      // Return index of first new row
 }
 
-inline const Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx) const
+inline ConstTableRef Table::get_subtable_tableref(size_t col_ndx, size_t row_ndx) const
 {
-    return const_cast<Table*>(this)->get_subtable_ptr(col_ndx, row_ndx); // Throws
+    return const_cast<Table*>(this)->get_subtable_tableref(col_ndx, row_ndx); // Throws
 }
 
 inline bool Table::is_null_link(size_t col_ndx, size_t row_ndx) const noexcept
@@ -2045,12 +2045,12 @@ inline void Table::nullify_link(size_t col_ndx, size_t row_ndx)
 
 inline TableRef Table::get_subtable(size_t column_ndx, size_t row_ndx)
 {
-    return TableRef(get_subtable_ptr(column_ndx, row_ndx));
+    return get_subtable_tableref(column_ndx, row_ndx);
 }
 
 inline ConstTableRef Table::get_subtable(size_t column_ndx, size_t row_ndx) const
 {
-    return ConstTableRef(get_subtable_ptr(column_ndx, row_ndx));
+    return get_subtable_tableref(column_ndx, row_ndx);
 }
 
 inline ConstTableRef Table::get_parent_table(size_t* column_ndx_out) const noexcept

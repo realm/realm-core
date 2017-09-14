@@ -138,12 +138,9 @@ protected:
     /// Get a pointer to the accessor of the specified subtable. The
     /// accessor will be created if it does not already exist.
     ///
-    /// The returned table pointer must **always** end up being
-    /// wrapped in some instantiation of BasicTableRef<>.
-    ///
     /// NOTE: This method must be used only for subtables with
     /// independent specs, i.e. for elements of a MixedColumn.
-    Table* get_subtable_ptr(size_t subtable_ndx);
+    TableRef get_subtable_tableref(size_t subtable_ndx);
 
     // Overriding method in ArrayParent
     void update_child_ref(size_t, ref_type) override;
@@ -217,10 +214,9 @@ public:
 
     /// Get a pointer to the accessor of the specified subtable. The
     /// accessor will be created if it does not already exist.
-    ///
-    /// The returned table pointer must **always** end up being
-    /// wrapped in some instantiation of BasicTableRef<>.
-    Table* get_subtable_ptr(size_t subtable_ndx);
+    TableRef get_subtable_tableref(size_t subtable_ndx);
+
+    ConstTableRef get_subtable_tableref(size_t subtable_ndx) const;
 
     /// This is to be used by the query system that does not need to
     /// modify the subtable. Will return a ref object containing a
@@ -229,12 +225,10 @@ public:
     {
         int64_t ref = IntegerColumn::get(subtable_ndx);
         if (ref)
-            return ConstTableRef(get_subtable_ptr(subtable_ndx));
+            return get_subtable_tableref(subtable_ndx);
         else
             return {};
     }
-
-    const Table* get_subtable_ptr(size_t subtable_ndx) const;
 
     // When passing a table to add() or insert() it is assumed that
     // the table spec is compatible with this column. The number of
@@ -607,9 +601,9 @@ inline SubtableColumn::SubtableColumn(Allocator& alloc, ref_type ref, Table* tab
 {
 }
 
-inline const Table* SubtableColumn::get_subtable_ptr(size_t subtable_ndx) const
+inline ConstTableRef SubtableColumn::get_subtable_tableref(size_t subtable_ndx) const
 {
-    return const_cast<SubtableColumn*>(this)->get_subtable_ptr(subtable_ndx);
+    return const_cast<SubtableColumn*>(this)->get_subtable_tableref(subtable_ndx);
 }
 
 inline void SubtableColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)

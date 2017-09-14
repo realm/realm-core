@@ -78,17 +78,17 @@ inline void MixedColumn::discard_subtable_accessor(size_t row_ndx) noexcept
     m_data->discard_subtable_accessor(row_ndx);
 }
 
-inline Table* MixedColumn::get_subtable_ptr(size_t row_ndx)
+inline TableRef MixedColumn::get_subtable_tableref(size_t row_ndx)
 {
     REALM_ASSERT_3(row_ndx, <, m_types->size());
     if (m_types->get(row_ndx) != type_Table)
-        return 0;
-    return m_data->get_subtable_ptr(row_ndx); // Throws
+        return TableRef();
+    return m_data->get_subtable_tableref(row_ndx); // Throws
 }
 
-inline const Table* MixedColumn::get_subtable_ptr(size_t subtable_ndx) const
+inline ConstTableRef MixedColumn::get_subtable_tableref(size_t subtable_ndx) const
 {
-    return const_cast<MixedColumn*>(this)->get_subtable_ptr(subtable_ndx);
+    return const_cast<MixedColumn*>(this)->get_subtable_tableref(subtable_ndx);
 }
 
 inline void MixedColumn::discard_child_accessors() noexcept

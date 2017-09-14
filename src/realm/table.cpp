@@ -1357,7 +1357,7 @@ void Table::update_subtables(const size_t* col_path_begin, const size_t* col_pat
                 // preexisting accessors
                 if (!updater)
                     continue;
-                subtable.reset(subtables.get_subtable_ptr(row_ndx)); // Throws
+                subtable = subtables.get_subtable_tableref(row_ndx); // Throws
             }
             subtable->update_subtables(col_path_begin + 1, col_path_end, updater); // Throws
         }
@@ -2763,7 +2763,7 @@ void Table::discard_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
 }
 
 
-Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx)
+TableRef Table::get_subtable_tableref(size_t col_ndx, size_t row_ndx)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(row_ndx, <, m_size);
@@ -2771,14 +2771,14 @@ Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx)
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_Table) {
         SubtableColumn& subtables = get_column_table(col_ndx);
-        return subtables.get_subtable_ptr(row_ndx); // Throws
+        return subtables.get_subtable_tableref(row_ndx); // Throws
     }
     if (type == col_type_Mixed) {
         MixedColumn& subtables = get_column_mixed(col_ndx);
-        return subtables.get_subtable_ptr(row_ndx); // Throws
+        return subtables.get_subtable_tableref(row_ndx); // Throws
     }
     REALM_ASSERT(false);
-    return 0;
+    return TableRef();
 }
 
 
