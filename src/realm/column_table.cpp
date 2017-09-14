@@ -80,6 +80,7 @@ void SubtableColumnBase::verify(const Table& table, size_t col_ndx) const
 
 Table* SubtableColumnBase::get_subtable_ptr(size_t subtable_ndx)
 {
+    LockGuard lg(m_subtable_map_lock);
     REALM_ASSERT_3(subtable_ndx, <, size());
     if (Table* subtable = m_subtable_map.find(subtable_ndx))
         return subtable;

@@ -1433,7 +1433,6 @@ void Table::detach() noexcept
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
-
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
     m_spec.detach();
@@ -1619,6 +1618,21 @@ void Table::destroy_column_accessors() noexcept
     m_cols.clear();
 }
 
+Mutex* Table::get_parent_accessor_management_lock() const
+{
+    if (!is_attached())
+        return nullptr;
+    if (!m_top.is_attached()) {
+        ArrayParent* parent = m_columns.get_parent();
+        REALM_ASSERT(dynamic_cast<Parent*>(parent));
+        return static_cast<Parent*>(parent)->get_accessor_management_lock();
+    }
+    if (ArrayParent* parent = m_top.get_parent()) {
+        REALM_ASSERT(dynamic_cast<Parent*>(parent));
+        return static_cast<Parent*>(parent)->get_accessor_management_lock();
+    }
+    return nullptr;
+}
 
 Table::~Table() noexcept
 {

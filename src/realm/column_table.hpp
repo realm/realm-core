@@ -131,6 +131,7 @@ protected:
     /// additional referece count on `*m_table` when, and only when the map is
     /// non-empty.
     mutable SubtableMap m_subtable_map;
+    Mutex m_subtable_map_lock;
 
     SubtableColumnBase(Allocator&, ref_type, Table*, size_t column_ndx);
 
@@ -155,6 +156,10 @@ protected:
 
     // Overriding method in Table::Parent
     void child_accessor_destroyed(Table*) noexcept override;
+
+    // Overriding method in Table::Parent
+    Mutex* get_accessor_management_lock() noexcept override
+    { return &m_subtable_map_lock; }
 
     /// Assumes that the two tables have the same spec.
     static bool compare_subtable_rows(const Table&, const Table&);
@@ -546,6 +551,7 @@ inline void SubtableColumnBase::discard_child_accessors() noexcept
 
 inline SubtableColumnBase::~SubtableColumnBase() noexcept
 {
+    LockGuard lg(m_subtable_map_lock);
     discard_child_accessors();
 }
 
