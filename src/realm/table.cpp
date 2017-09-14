@@ -6657,18 +6657,8 @@ Obj Table::create_object(Key key)
     return m_clusters.insert(key);
 }
 
-Obj Table::get_object(Key key)
-{
-    return m_clusters.get(key);
-}
-
 void Table::remove_object(Key key)
 {
     bump_version();
     return m_clusters.erase(key);
-}
-
-void Table::dump_objects()
-{
-    return m_clusters.dump_objects();
 }

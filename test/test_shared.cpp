@@ -3455,4 +3455,22 @@ NONCONCURRENT_TEST(SharedGroupOptions_tmp_dir)
     SharedGroupOptions::set_sys_tmp_dir(initial_system_dir);
 }
 
+TEST(Shared_ConstObject)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg_w(path);
+    Group& g = sg_w.begin_write();
+
+    TableRef t = g.add_table("Foo");
+    t->add_column(type_Int, "");
+    t->create_object(Key(47)).set(0, 5);
+    sg_w.commit();
+
+    SharedGroup sg_r(path);
+    const Group& g2 = sg_r.begin_read();
+    ConstTableRef t2 = g2.get_table("Foo");
+    ConstObj obj = t2->get_object(Key(47));
+    CHECK_EQUAL(obj.get<int64_t>(0), 5);
+}
+
 #endif // TEST_SHARED

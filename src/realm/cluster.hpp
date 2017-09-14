@@ -72,7 +72,7 @@ public:
         ref_type ref;      // Ref to the Cluster holding the new/found object
         size_t index;      // The index within the Cluster at which the object is stored.
     };
-    ClusterNode(Allocator& allocator, ClusterTree& tree_top)
+    ClusterNode(Allocator& allocator, const ClusterTree& tree_top)
         : Array(allocator)
         , m_tree_top(tree_top)
         , m_keys(allocator)
@@ -97,7 +97,7 @@ public:
         m_keys.adjust(0, m_keys.size(), offset);
     }
 
-    virtual bool is_leaf() = 0;
+    virtual bool is_leaf() const = 0;
 
     /// Create an empty node
     virtual void create() = 0;
@@ -126,7 +126,7 @@ public:
     virtual void dump_objects(int64_t key_offset, std::string lead) const = 0;
 
 protected:
-    ClusterTree& m_tree_top;
+    const ClusterTree& m_tree_top;
     Array m_keys;
 };
 
@@ -146,7 +146,7 @@ public:
     Key get_key(size_t row_ndx) const;
     size_t get_row_ndx(Key key) const;
 
-    bool is_leaf() override
+    bool is_leaf() const override
     {
         return true;
     }
@@ -165,7 +165,7 @@ private:
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class ConstObj {
 public:
-    ConstObj(ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx);
+    ConstObj(const ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx);
 
     Key get_key() const
     {
@@ -178,12 +178,19 @@ public:
     bool is_null(size_t col_ndx) const;
 
 protected:
-    ClusterTree* m_tree_top;
+    const ClusterTree* m_tree_top;
     Key m_key;
-    MemRef m_mem;
-    size_t m_row_ndx;
-    uint64_t m_version;
+    mutable MemRef m_mem;
+    mutable size_t m_row_ndx;
+    mutable uint64_t m_version;
     bool update_if_needed() const;
+
+    void update(ConstObj other) const
+    {
+        m_mem = other.m_mem;
+        m_row_ndx = other.m_row_ndx;
+        m_version = other.m_version;
+    }
 };
 
 class Obj : public ConstObj {
@@ -227,7 +234,7 @@ public:
     {
         return m_root->is_attached();
     }
-    Allocator& get_alloc()
+    Allocator& get_alloc() const
     {
         return m_root->get_alloc();
     }
@@ -262,6 +269,7 @@ public:
     }
     Obj insert(Key k);
     void erase(Key k);
+    ConstObj get(Key k) const;
     Obj get(Key k);
     void dump_objects()
     {
@@ -282,7 +290,7 @@ private:
     {
         return create_root_from_mem(alloc, MemRef{alloc.translate(ref), ref, alloc});
     }
-    std::unique_ptr<ClusterNode> get_node(ref_type ref);
+    std::unique_ptr<ClusterNode> get_node(ref_type ref) const;
 };
 
 template <>

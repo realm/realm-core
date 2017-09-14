@@ -42,14 +42,14 @@ namespace realm {
 
 class ClusterNodeInner : public ClusterNode {
 public:
-    ClusterNodeInner(Allocator& allocator, ClusterTree& tree_top);
+    ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top);
     ~ClusterNodeInner() override;
 
     void create() override;
     void init(MemRef mem) override;
     MemRef ensure_writeable(Key k) override;
 
-    bool is_leaf() override
+    bool is_leaf() const override
     {
         return false;
     }
@@ -106,7 +106,7 @@ private:
 
 /***************************** ClusterNodeInner ******************************/
 
-ClusterNodeInner::ClusterNodeInner(Allocator& allocator, ClusterTree& tree_top)
+ClusterNodeInner::ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top)
     : ClusterNode(allocator, tree_top)
     , m_children(allocator)
 {
@@ -547,7 +547,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
 
 /********************************* ConstObj **********************************/
 
-ConstObj::ConstObj(ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx)
+ConstObj::ConstObj(const ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx)
     : m_tree_top(tree_top)
     , m_key(key)
     , m_mem(ref, tree_top->get_alloc())
@@ -566,8 +566,10 @@ inline bool ConstObj::update_if_needed() const
 {
     auto current_version = m_tree_top->get_version_counter();
     if (current_version != m_version) {
-        Obj o = m_tree_top->get(m_key);
-        *const_cast<ConstObj*>(this) = o;
+        // Get a new object from key
+        ConstObj new_obj = m_tree_top->get(m_key);
+        update(new_obj);
+
         return true;
     }
     return false;
@@ -621,6 +623,11 @@ inline void Obj::update_if_needed() const
     if (ConstObj::update_if_needed()) {
         m_writeable = !m_tree_top->get_alloc().is_read_only(m_mem.get_ref());
     }
+    if (!m_writeable) {
+        m_mem = const_cast<ClusterTree*>(m_tree_top)->ensure_writeable(m_key);
+        m_writeable = true;
+    }
+    m_version = const_cast<ClusterTree*>(m_tree_top)->bump_version();
 }
 
 template <>
@@ -630,11 +637,6 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
         throw LogicError(LogicError::column_index_out_of_range);
 
     update_if_needed();
-    if (!m_writeable) {
-        m_mem = m_tree_top->ensure_writeable(m_key);
-        m_writeable = true;
-    }
-    m_version = m_tree_top->bump_version();
 
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
@@ -662,11 +664,6 @@ Obj& Obj::set_null(size_t col_ndx, bool is_default)
         throw LogicError(LogicError::column_index_out_of_range);
 
     update_if_needed();
-    if (!m_writeable) {
-        m_mem = m_tree_top->ensure_writeable(m_key);
-        m_writeable = true;
-    }
-    m_version = m_tree_top->bump_version();
 
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
@@ -801,6 +798,13 @@ Obj ClusterTree::insert(Key k)
     return Obj(this, state.ref, k, state.index);
 }
 
+ConstObj ClusterTree::get(Key k) const
+{
+    ClusterNode::State state;
+    m_root->get(k, state);
+    return ConstObj(this, state.ref, k, state.index);
+}
+
 Obj ClusterTree::get(Key k)
 {
     ClusterNode::State state;
@@ -826,7 +830,7 @@ void ClusterTree::erase(Key k)
     }
 }
 
-std::unique_ptr<ClusterNode> ClusterTree::get_node(ref_type ref)
+std::unique_ptr<ClusterNode> ClusterTree::get_node(ref_type ref) const
 {
     std::unique_ptr<ClusterNode> node;
     Allocator& alloc = m_root->get_alloc();

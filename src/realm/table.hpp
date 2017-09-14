@@ -380,9 +380,18 @@ public:
     void insert_empty_row(size_t row_ndx, size_t num_rows = 1);
     size_t add_row_with_key(size_t col_ndx, int64_t key);
     Obj create_object(Key key = {});
-    Obj get_object(Key key);
-    void dump_objects();
-    ConstObj get_object(Key key) const;
+    Obj get_object(Key key)
+    {
+        return m_clusters.get(key);
+    }
+    ConstObj get_object(Key key) const
+    {
+        return m_clusters.get(key);
+    }
+    void dump_objects()
+    {
+        return m_clusters.dump_objects();
+    }
     void remove(size_t row_ndx);
     void remove_last();
     void remove_object(Key key);
