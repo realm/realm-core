@@ -20,7 +20,8 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Moved object store's true and false query expressions down to core.
+  PR [#2857](https://github.com/realm/realm-core/pull/2857).
 
 ----------------------------------------------
 

@@ -375,6 +375,8 @@ TEST(Metrics_QueryOrAndNot)
     Query not_and_or = !(and_or);
     Query not_or_nested = !(or_nested);
     Query not_and_nested = !(and_nested);
+    Query and_true = q0 && std::unique_ptr<realm::Expression>(new TrueExpression);
+    Query and_false = q0 && std::unique_ptr<realm::Expression>(new FalseExpression);
 
     simple_and.find_all();
     simple_or.find_all();
@@ -389,12 +391,14 @@ TEST(Metrics_QueryOrAndNot)
     not_and_or.find_all();
     not_or_nested.find_all();
     not_and_nested.find_all();
+    and_true.find_all();
+    and_false.find_all();
 
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
-    CHECK_EQUAL(queries->size(), 13);
+    CHECK_EQUAL(queries->size(), 15);
 
     std::string and_description = queries->at(0).get_description();
     CHECK_EQUAL(find_count(and_description, " and "), 1);
@@ -463,6 +467,14 @@ TEST(Metrics_QueryOrAndNot)
     std::string not_and_nested_description = queries->at(12).get_description();
     CHECK_EQUAL(find_count(not_and_nested_description, and_nested_description), 1);
     CHECK_EQUAL(find_count(not_and_nested_description, "not"), 1);
+
+    std::string and_true_description = queries->at(13).get_description();
+    CHECK_EQUAL(find_count(and_true_description, "and"), 1);
+    CHECK_EQUAL(find_count(and_true_description, "TRUEPREDICATE"), 1);
+
+    std::string and_false_description = queries->at(14).get_description();
+    CHECK_EQUAL(find_count(and_false_description, "and"), 1);
+    CHECK_EQUAL(find_count(and_false_description, "FALSEPREDICATE"), 1);
 }
 
 
