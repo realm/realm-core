@@ -424,7 +424,7 @@ void SubtableColumn::verify(const Table& table, size_t col_ndx) const
     for (size_t i = 0; i != n; ++i) {
         // We want to verify any cached table accessors so we do not
         // want to skip null refs here.
-        ConstTableRef subtable = get_subtable_ptr(i)->get_table_ref();
+        ConstTableRef subtable = get_subtable_tableref(i);
         REALM_ASSERT_3(tf::get_spec(*subtable).get_ndx_in_parent(), ==, subspec_ndx);
         REALM_ASSERT_3(subtable->get_parent_row_index(), ==, i);
         subtable->verify();
@@ -447,7 +447,7 @@ void SubtableColumn::to_dot(std::ostream& out, StringData title) const
     for (size_t i = 0; i != n; ++i) {
         if (get_as_ref(i) == 0)
             continue;
-        ConstTableRef subtable = get_subtable_ptr(i)->get_table_ref();
+        ConstTableRef subtable = get_subtable_tableref(i);
         subtable->to_dot(out);
     }
 }
