@@ -38,3 +38,5 @@ tags/v2.8.6
 tags/v2.9.0
 tags/v2.9.2
 tags/v3.0.0
+tags/v3.1.0
+tags/v3.2.0
