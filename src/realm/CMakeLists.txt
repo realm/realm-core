@@ -346,7 +346,6 @@ if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NO
 
     add_executable(realm-trawler realm_trawler.cpp)
     set_target_properties(realm-trawler PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
-    target_link_libraries(realm-trawler realm)
 
     install(TARGETS realm-config realm-importer
             COMPONENT runtime
