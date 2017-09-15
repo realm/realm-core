@@ -24,6 +24,7 @@
 #include <utility>
 #include <typeinfo>
 #include <memory>
+#include <mutex>
 
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
@@ -1537,7 +1538,7 @@ private:
     void refresh_link_target_accessors(size_t col_ndx_begin = 0);
 
     bool is_cross_table_link_target() const noexcept;
-    Mutex* get_parent_accessor_management_lock() const;
+    std::recursive_mutex* get_parent_accessor_management_lock() const;
 #ifdef REALM_DEBUG
     void to_dot_internal(std::ostream&) const;
 #endif
@@ -1597,7 +1598,7 @@ protected:
 
 
     virtual size_t* record_subtable_path(size_t* begin, size_t* end) noexcept;
-    virtual Mutex* get_accessor_management_lock() noexcept = 0;
+    virtual std::recursive_mutex* get_accessor_management_lock() noexcept = 0;
 
     friend class Table;
 };
@@ -1663,8 +1664,6 @@ inline void Table::bind_ptr() const noexcept
 
 inline void Table::unbind_ptr() const noexcept
 {
-    Mutex* lock = get_parent_accessor_management_lock();
-    if (lock) lock->lock();
     // The delete operation runs the destructor, and the destructor
     // must always see all changes to the object being deleted.
     // Within each thread, we know that unbind_ptr will always happen after
@@ -1672,13 +1671,17 @@ inline void Table::unbind_ptr() const noexcept
     // The release will then be observed by the acquire fence in
     // the case where delete is actually called (the count reaches 0)
     if (m_ref_count.fetch_sub(1, std::memory_order_release) != 1) {
-        if (lock) lock->unlock();
         return;
     }
 
     std::atomic_thread_fence(std::memory_order_acquire);
-    delete this;
-    if (lock) lock->unlock();
+    {
+        std::recursive_mutex* lock = get_parent_accessor_management_lock();
+        if (lock) lock->lock();
+        if (m_ref_count == 0)
+            delete this;
+        if (lock) lock->unlock();
+    }
 }
 
 inline void Table::register_view(const TableViewBase* view)

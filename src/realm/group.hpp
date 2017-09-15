@@ -658,7 +658,7 @@ private:
     void child_accessor_destroyed(Table*) noexcept override;
 
     // Overriding method in Table::Parent
-    Mutex* get_accessor_management_lock() noexcept override
+    std::recursive_mutex* get_accessor_management_lock() noexcept override
     { return nullptr; } // we don't need locking for group!
 
     // Overriding method in Table::Parent

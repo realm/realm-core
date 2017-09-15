@@ -20,6 +20,7 @@
 #define REALM_COLUMN_TABLE_HPP
 
 #include <vector>
+#include <mutex>
 
 #include <realm/util/features.h>
 #include <memory>
@@ -131,7 +132,7 @@ protected:
     /// additional referece count on `*m_table` when, and only when the map is
     /// non-empty.
     mutable SubtableMap m_subtable_map;
-    Mutex m_subtable_map_lock;
+    std::recursive_mutex m_subtable_map_lock;
 
     SubtableColumnBase(Allocator&, ref_type, Table*, size_t column_ndx);
 
@@ -155,7 +156,7 @@ protected:
     void child_accessor_destroyed(Table*) noexcept override;
 
     // Overriding method in Table::Parent
-    Mutex* get_accessor_management_lock() noexcept override
+    std::recursive_mutex* get_accessor_management_lock() noexcept override
     { return &m_subtable_map_lock; }
 
     /// Assumes that the two tables have the same spec.
@@ -545,7 +546,7 @@ inline void SubtableColumnBase::discard_child_accessors() noexcept
 
 inline SubtableColumnBase::~SubtableColumnBase() noexcept
 {
-    LockGuard lg(m_subtable_map_lock);
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     discard_child_accessors();
 }
 

@@ -1618,7 +1618,7 @@ void Table::destroy_column_accessors() noexcept
     m_cols.clear();
 }
 
-Mutex* Table::get_parent_accessor_management_lock() const
+std::recursive_mutex* Table::get_parent_accessor_management_lock() const
 {
     if (!is_attached())
         return nullptr;

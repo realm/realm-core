@@ -174,7 +174,7 @@ TEST(ThreadSafety_RowDestruction)
 }
 
 // Tests thread safety of subtable desctruction
-ONLY(ThreadSafety_SubTableDestruction)
+TEST(ThreadSafety_SubTableDestruction)
 {
     std::vector<TableRef> ptrs;
     Mutex mutex;
