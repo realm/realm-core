@@ -92,12 +92,12 @@ public:
     /// contain a subtable.
     size_t get_subtable_size(size_t row_ndx) const noexcept;
 
-    Table* get_subtable_accessor(size_t row_ndx) const noexcept override;
+    TableRef get_subtable_accessor(size_t row_ndx) const noexcept override;
 
     void discard_subtable_accessor(size_t row_ndx) noexcept override;
 
     /// If the value at the specified index is a subtable, return a
-    /// pointer to that accessor for that subtable. Otherwise return
+    /// TableRef to that accessor for that subtable. Otherwise return
     /// null. The accessor will be created if it does not already
     /// exist.
     TableRef get_subtable_tableref(size_t row_ndx);

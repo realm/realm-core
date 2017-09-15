@@ -1414,7 +1414,7 @@ private:
     /// that the specified column index in a valid index into `m_cols` but does
     /// not otherwise assume more than minimal accessor consistency (see
     /// AccessorConsistencyLevels.)
-    Table* get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept;
+    TableRef get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept;
 
     /// Unless the column accessor is missing, this function returns the
     /// accessor for the target table of the specified link-type column. The
@@ -2557,7 +2557,7 @@ public:
         table.batch_erase_rows(row_indexes, is_move_last_over); // Throws
     }
 
-    static Table* get_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx) noexcept
+    static TableRef get_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx) noexcept
     {
         return table.get_subtable_accessor(col_ndx, row_ndx);
     }

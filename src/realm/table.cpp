@@ -2715,7 +2715,7 @@ void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
 }
 
 
-Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
+TableRef Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
     // If this table is not a degenerate subtable, then `col_ndx` must be a
@@ -2729,7 +2729,7 @@ Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
         if (ColumnBase* col = m_cols[col_ndx])
             return col->get_subtable_accessor(row_ndx);
     }
-    return 0;
+    return {};
 }
 
 

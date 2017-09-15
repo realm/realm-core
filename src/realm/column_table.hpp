@@ -40,7 +40,7 @@ public:
 
     static ref_type create(Allocator&, size_t size = 0);
 
-    Table* get_subtable_accessor(size_t) const noexcept override;
+    TableRef get_subtable_accessor(size_t) const noexcept override;
 
     void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
@@ -132,11 +132,11 @@ protected:
     /// additional referece count on `*m_table` when, and only when the map is
     /// non-empty.
     mutable SubtableMap m_subtable_map;
-    std::recursive_mutex m_subtable_map_lock;
+    mutable std::recursive_mutex m_subtable_map_lock;
 
     SubtableColumnBase(Allocator&, ref_type, Table*, size_t column_ndx);
 
-    /// Get a pointer to the accessor of the specified subtable. The
+    /// Get a TableRef to the accessor of the specified subtable. The
     /// accessor will be created if it does not already exist.
     ///
     /// NOTE: This method must be used only for subtables with
@@ -213,7 +213,7 @@ public:
 
     size_t get_subtable_size(size_t ndx) const noexcept;
 
-    /// Get a pointer to the accessor of the specified subtable. The
+    /// Get a TableRef to the accessor of the specified subtable. The
     /// accessor will be created if it does not already exist.
     TableRef get_subtable_tableref(size_t subtable_ndx);
 
@@ -290,6 +290,7 @@ inline void SubtableColumnBase::erase_rows(size_t row_ndx, size_t num_rows_to_er
 {
     IntegerColumn::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, broken_reciprocal_backlinks); // Throws
 
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     const bool fix_ndx_in_parent = true;
     bool last_entry_removed = m_subtable_map.adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_to_erase);
     typedef _impl::TableFriend tf;
@@ -303,6 +304,7 @@ inline void SubtableColumnBase::move_last_row_over(size_t row_ndx, size_t prior_
 {
     IntegerColumn::move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
 
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     const bool fix_ndx_in_parent = true;
     size_t last_row_ndx = prior_num_rows - 1;
     bool last_entry_removed = m_subtable_map.adj_move_over<fix_ndx_in_parent>(last_row_ndx, row_ndx);
@@ -325,14 +327,17 @@ inline void SubtableColumnBase::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
     IntegerColumn::swap_rows(row_ndx_1, row_ndx_2); // Throws
 
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     const bool fix_ndx_in_parent = true;
     m_subtable_map.adj_swap_rows<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
 }
 
 inline void SubtableColumnBase::mark(int type) noexcept
 {
-    if (type & mark_Recursive)
+    if (type & mark_Recursive) {
+        std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
         m_subtable_map.recursive_mark();
+    }
 }
 
 inline void SubtableColumnBase::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
@@ -341,6 +346,7 @@ inline void SubtableColumnBase::adj_acc_insert_rows(size_t row_ndx, size_t num_r
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     const bool fix_ndx_in_parent = false;
     m_subtable_map.adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows);
 }
@@ -351,6 +357,7 @@ inline void SubtableColumnBase::adj_acc_erase_row(size_t row_ndx) noexcept
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     const bool fix_ndx_in_parent = false;
     size_t num_rows_erased = 1;
     bool last_entry_removed = m_subtable_map.adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_erased);
@@ -365,6 +372,7 @@ inline void SubtableColumnBase::adj_acc_move_over(size_t from_row_ndx, size_t to
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     const bool fix_ndx_in_parent = false;
     bool last_entry_removed = m_subtable_map.adj_move_over<fix_ndx_in_parent>(from_row_ndx, to_row_ndx);
     typedef _impl::TableFriend tf;
@@ -384,17 +392,18 @@ inline void SubtableColumnBase::adj_acc_clear_root_table() noexcept
 
 inline void SubtableColumnBase::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 {
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     const bool fix_ndx_in_parent = false;
     m_subtable_map.adj_swap_rows<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
 }
 
-inline Table* SubtableColumnBase::get_subtable_accessor(size_t row_ndx) const noexcept
+inline TableRef SubtableColumnBase::get_subtable_accessor(size_t row_ndx) const noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
-
-    Table* subtable = m_subtable_map.find(row_ndx);
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
+    TableRef subtable(m_subtable_map.find(row_ndx));
     return subtable;
 }
 
@@ -404,6 +413,7 @@ inline void SubtableColumnBase::discard_subtable_accessor(size_t row_ndx) noexce
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     bool last_entry_removed = m_subtable_map.detach_and_remove(row_ndx);
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
@@ -539,6 +549,7 @@ inline ref_type SubtableColumnBase::get_child_ref(size_t child_ndx) const noexce
 
 inline void SubtableColumnBase::discard_child_accessors() noexcept
 {
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     bool last_entry_removed = m_subtable_map.detach_and_remove_all();
     if (last_entry_removed && m_table)
         _impl::TableFriend::unbind_ptr(*m_table);
@@ -546,7 +557,6 @@ inline void SubtableColumnBase::discard_child_accessors() noexcept
 
 inline SubtableColumnBase::~SubtableColumnBase() noexcept
 {
-    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     discard_child_accessors();
 }
 
@@ -611,11 +621,13 @@ inline void SubtableColumn::refresh_accessor_tree(size_t col_ndx, const Spec& sp
 {
     SubtableColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
     m_subspec_ndx = spec.get_subspec_ndx(col_ndx);
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     m_subtable_map.refresh_accessor_tree(); // Throws
 }
 
 inline void SubtableColumn::refresh_subtable_map()
 {
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     m_subtable_map.refresh_accessor_tree(); // Throws
 }
 

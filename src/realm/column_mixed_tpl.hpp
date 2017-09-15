@@ -68,7 +68,7 @@ inline size_t MixedColumn::get_subtable_size(size_t row_ndx) const noexcept
     return _impl::TableFriend::get_size_from_ref(top_ref, m_data->get_alloc());
 }
 
-inline Table* MixedColumn::get_subtable_accessor(size_t row_ndx) const noexcept
+inline TableRef MixedColumn::get_subtable_accessor(size_t row_ndx) const noexcept
 {
     return m_data->get_subtable_accessor(row_ndx);
 }
@@ -82,7 +82,7 @@ inline TableRef MixedColumn::get_subtable_tableref(size_t row_ndx)
 {
     REALM_ASSERT_3(row_ndx, <, m_types->size());
     if (m_types->get(row_ndx) != type_Table)
-        return TableRef();
+        return {};
     return m_data->get_subtable_tableref(row_ndx); // Throws
 }
 

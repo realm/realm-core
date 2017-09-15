@@ -30,6 +30,7 @@ using namespace realm::util;
 void SubtableColumnBase::update_from_parent(size_t old_baseline) noexcept
 {
     IntegerColumn::update_from_parent(old_baseline);
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     m_subtable_map.update_from_parent(old_baseline);
 }
 
@@ -127,6 +128,8 @@ TableRef SubtableColumn::get_subtable_tableref(size_t subtable_ndx)
 
 void SubtableColumnBase::child_accessor_destroyed(Table* child) noexcept
 {
+    // m_subtable_map_lock must be locked by calling functions
+
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
@@ -334,6 +337,7 @@ void SubtableColumn::set(size_t row_ndx, const Table* subtable)
     set_as_ref(row_ndx, columns_ref); // Throws
 
     // Refresh the accessors, if present
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     if (Table* table = m_subtable_map.find(row_ndx)) {
         TableRef table_2;
         table_2.reset(table); // Must hold counted reference
