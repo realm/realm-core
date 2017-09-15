@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 3.2.1 Release notes
 
 ### Bugfixes
 
@@ -7,14 +7,6 @@
   In particular, this solves file truncation causing "bad header" exceptions
   after a compact operation on a file system that is running out of disk space.
   PR [#2852](https://github.com/realm/realm-core/pull/2852).
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
 
 -----------
 
