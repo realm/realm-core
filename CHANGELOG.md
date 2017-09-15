@@ -2,11 +2,6 @@
 
 ### Bugfixes
 
-* Compact now throws an exception if writing fails for some reason
-  instead of ignoring errors and possibly causing corruption.
-  In particular, this solves file truncation causing "bad header" exceptions
-  after a compact operation on a file system that is running out of disk space.
-  PR [#2852](https://github.com/realm/realm-core/pull/2852).
 * Fix corruption caused by `swap_rows()` and `move_column()` operations applied
   to a StringEnumColumn. Currently unused by bindings.
   PR [#2780](https://github.com/realm/realm-core/pull/2780).
@@ -24,6 +19,25 @@
 ### Internals
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 3.2.1 Release notes
+
+### Bugfixes
+
+* Compact now throws an exception if writing fails for some reason
+  instead of ignoring errors and possibly causing corruption.
+  In particular, this solves file truncation causing "bad header" exceptions
+  after a compact operation on a file system that is running out of disk space.
+  PR [#2852](https://github.com/realm/realm-core/pull/2852).
+
+-----------
+
+### Internals
+
+* Moved object store's true and false query expressions down to core.
+  PR [#2857](https://github.com/realm/realm-core/pull/2857).
 
 ----------------------------------------------
 
