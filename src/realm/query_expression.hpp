@@ -1104,6 +1104,7 @@ struct OperatorOptionalAdapter {
 struct TrueExpression : Expression {
     size_t find_first(size_t start, size_t end) const override
     {
+        REALM_ASSERT(start <= end);
         if (start != end)
             return start;
 
