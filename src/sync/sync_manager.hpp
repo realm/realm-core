@@ -133,7 +133,7 @@ public:
     std::shared_ptr<SyncUser> get_current_user() const;
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
-    std::string path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const;
+    std::string path_for_realm(const SyncUser& user, const std::string& raw_realm_url, bool partial_sync) const;
 
     // Get the path of the recovery directory for backed-up or recovered Realms.
     std::string recovery_directory_path() const;

@@ -101,6 +101,7 @@ struct SyncError {
 struct SyncConfig {
     std::shared_ptr<SyncUser> user;
     std::string realm_url;
+    bool is_partial;
     SyncSessionStopPolicy stop_policy;
     std::function<SyncBindSessionHandler> bind_session_handler;
     std::function<SyncSessionErrorHandler> error_handler;
@@ -112,7 +113,8 @@ struct SyncConfig {
     bool validate_sync_history = true;
 #if __GNUC__ < 5
     // GCC 4.9 does not support C++14 braced-init
-    SyncConfig(std::shared_ptr<SyncUser> user, std::string realm_url, SyncSessionStopPolicy stop_policy,
+    SyncConfig(std::shared_ptr<SyncUser> user, std::string realm_url, bool is_partial,
+               SyncSessionStopPolicy stop_policy,
                std::function<SyncBindSessionHandler> bind_session_handler,
                std::function<SyncSessionErrorHandler> error_handler = nullptr,
                std::shared_ptr<ChangesetTransformer> transformer = nullptr,
@@ -120,6 +122,7 @@ struct SyncConfig {
                bool client_validate_ssl = true, util::Optional<std::string> ssl_trust_certificate_path = util::none, std::function<realm::sync::Session::SSLVerifyCallback> ssl_verify_callback = nullptr)
         : user(std::move(user))
         , realm_url(std::move(realm_url))
+        , is_partial(is_partial)
         , stop_policy(stop_policy)
         , bind_session_handler(std::move(bind_session_handler))
         , error_handler(std::move(error_handler))

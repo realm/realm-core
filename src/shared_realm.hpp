@@ -34,6 +34,8 @@
 namespace realm {
 class BindingContext;
 class Group;
+class List;
+class PartialSyncHelper;
 class Realm;
 class Replication;
 class SharedGroup;
@@ -327,6 +329,11 @@ public:
         static void begin_read(Realm&, VersionID);
     };
 
+    using PartialSyncResultCallback = void(List results, std::exception_ptr error);
+    void register_partial_sync_query(const std::string& object_class,
+                                     const std::string& query,
+                                     std::function<PartialSyncResultCallback>);
+
     static void open_with_config(const Config& config,
                                  std::unique_ptr<Replication>& history,
                                  std::unique_ptr<SharedGroup>& shared_group,
@@ -384,6 +391,8 @@ private:
     void add_schema_change_handler();
     void cache_new_schema();
     void notify_schema_changed();
+
+    std::unique_ptr<PartialSyncHelper> m_partial_sync_helper;
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;

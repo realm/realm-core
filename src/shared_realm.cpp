@@ -38,7 +38,9 @@
 #include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
+#include "sync/impl/partial_sync_helper.hpp"
 #include "sync/impl/sync_file.hpp"
+#include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include <realm/sync/history.hpp>
 #endif
@@ -213,6 +215,10 @@ void Realm::open_with_config(const Config& config,
     catch (...) {
         translate_file_exception(config.path, config.immutable());
     }
+#if REALM_ENABLE_SYNC
+    if (bool(config.sync_config) && config.sync_config->is_partial)
+        realm->m_partial_sync_helper = std::make_unique<PartialSyncHelper>(realm);
+#endif
 }
 
 Realm::~Realm()
@@ -220,6 +226,21 @@ Realm::~Realm()
     if (m_coordinator) {
         m_coordinator->unregister_realm(this);
     }
+}
+
+void Realm::register_partial_sync_query(const std::string& object_class,
+                                        const std::string& query,
+                                        std::function<PartialSyncResultCallback> callback)
+{
+#if REALM_ENABLE_SYNC
+    if (m_partial_sync_helper) {
+        m_partial_sync_helper->register_query(object_class, query, std::move(callback));
+    } else {
+        throw std::runtime_error("This Realm is not a partially synced Realm.");
+    }
+#else
+    REALM_TERMINATE("Realm was not built with sync enabled; this method cannot be used.");
+#endif
 }
 
 Group& Realm::read_group()
