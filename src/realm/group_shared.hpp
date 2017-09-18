@@ -29,6 +29,7 @@
 #include <realm/group_shared_options.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/impl/transact_log.hpp>
+#include <realm/metrics/metrics.hpp>
 #include <realm/replication.hpp>
 #include <realm/version_id.hpp>
 
@@ -526,6 +527,11 @@ public:
     // Release pinned version (not thread safe)
     void unpin_version(VersionID version);
 
+#if REALM_METRICS
+    std::shared_ptr<metrics::Metrics> get_metrics();
+#endif // REALM_METRICS
+
+
 private:
     struct SharedInfo;
     struct ReadCount;
@@ -567,6 +573,10 @@ private:
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
 
+#if REALM_METRICS
+    std::shared_ptr<metrics::Metrics> m_metrics;
+#endif // REALM_METRICS
+
     void do_open(const std::string& file, bool no_create, bool is_backend, const SharedGroupOptions options);
 
     // Ring buffer management
@@ -607,6 +617,7 @@ private:
     void do_begin_write();
     version_type do_commit();
     void do_end_write() noexcept;
+    void set_transact_stage(TransactStage stage) noexcept;
 
     /// Returns the version of the latest snapshot.
     version_type get_version_of_latest_snapshot();
@@ -967,7 +978,7 @@ inline void SharedGroup::promote_to_write(O* observer)
         throw;
     }
 
-    m_transact_stage = transact_Writing;
+    set_transact_stage(transact_Writing);
 }
 
 template <class O>
@@ -1011,7 +1022,7 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
     REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
     repl->abort_transact();
 
-    m_transact_stage = transact_Reading;
+    set_transact_stage(transact_Reading);
 }
 
 template <class O>

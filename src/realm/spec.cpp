@@ -31,6 +31,12 @@ Spec::~Spec() noexcept
     }
 }
 
+void Spec::detach() noexcept
+{
+    m_top.detach();
+    m_subspec_ptrs.clear();
+}
+
 bool Spec::init(ref_type ref) noexcept
 {
     // Needs only initialization if not previously initialized

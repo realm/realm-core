@@ -2609,6 +2609,8 @@ void Table::clear()
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
+    size_t old_size = m_size;
+
     size_t table_ndx = get_index_in_group();
     if (table_ndx == realm::npos) {
         bool broken_reciprocal_backlinks = false;
@@ -2633,7 +2635,7 @@ void Table::clear()
     }
 
     if (Replication* repl = get_repl())
-        repl->clear_table(this); // Throws
+        repl->clear_table(this, old_size); // Throws
 }
 
 
@@ -4139,6 +4141,7 @@ template size_t Table::find_first(size_t col_ndx, float) const;
 template size_t Table::find_first(size_t col_ndx, double) const;
 template size_t Table::find_first(size_t col_ndx, util::Optional<bool>) const;
 template size_t Table::find_first(size_t col_ndx, util::Optional<int64_t>) const;
+template size_t Table::find_first(size_t col_ndx, BinaryData) const;
 
 } // namespace realm
 

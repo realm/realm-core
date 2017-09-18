@@ -178,7 +178,8 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
         }
         catch (...) {
 #ifdef _WIN32
-            CloseHandle(fd);
+            bool b = CloseHandle(fd);
+            REALM_ASSERT_RELEASE(b);
 #else
             ::close(fd);
 #endif
@@ -201,7 +202,8 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
     catch (...) {
         if (it->info->mappings.empty()) {
 #ifdef _WIN32
-            CloseHandle(it->info->fd);
+            bool b = CloseHandle(it->info->fd);
+            REALM_ASSERT_RELEASE(b);
 #else
             ::close(it->info->fd);
 #endif
@@ -226,7 +228,6 @@ void remove_mapping(void* addr, size_t size)
 #ifdef _WIN32
             if (!CloseHandle(it->info->fd))
                 throw std::runtime_error(get_errno_msg("CloseHandle() failed: ", GetLastError()));
-
 #else
             if (::close(it->info->fd) != 0) {
                 int err = errno;                // Eliminate any risk of clobbering
@@ -248,11 +249,18 @@ void* mmap_anon(size_t size)
 
     ULARGE_INTEGER s;
     s.QuadPart = size;
+    
     hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, s.HighPart, s.LowPart, nullptr);
-    pBuf = (LPTSTR)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, size);
-    if (pBuf == nullptr)
-        throw std::runtime_error(get_errno_msg("MapViewOfFile() failed: ", GetLastError()));
+    if (hMapFile == NULL) {
+        throw std::runtime_error(get_errno_msg("CreateFileMapping() failed: ", GetLastError()));
+    }
 
+    pBuf = (LPTSTR)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, size);
+    if (pBuf == nullptr) {
+        throw std::runtime_error(get_errno_msg("MapViewOfFile() failed: ", GetLastError()));
+    }
+
+    CloseHandle(hMapFile);
     return (void*)pBuf;
 #else
     void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
@@ -462,7 +470,7 @@ void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, F
     return new_addr;
 }
 
-void msync(void* addr, size_t size)
+void msync(FileDesc fd, void* addr, size_t size)
 {
 #if REALM_ENABLE_ENCRYPTION
     {
@@ -489,10 +497,17 @@ void msync(void* addr, size_t size)
     // for a discussion of this related to core data.
 
 #ifdef _WIN32
-    if (FlushViewOfFile(addr, size))
-        return;
-    throw std::runtime_error("FlushViewOfFile() failed");
+    // FlushViewOfFile() is asynchronous and won't flush metadata (file size, etc)
+    if (!FlushViewOfFile(addr, size)) {
+        throw std::runtime_error("FlushViewOfFile() failed");
+    }
+    // Block until data and metadata is written physically to the media
+    if (!FlushFileBuffers(fd)) {
+        throw std::runtime_error("FlushFileBuffers() failed");
+    }
+    return;
 #else
+    static_cast<void>(fd);
     if (::msync(addr, size, MS_SYNC) != 0) {
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("msync() failed: ", err));

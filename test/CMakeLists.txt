@@ -1,5 +1,10 @@
 add_subdirectory(util)
-add_subdirectory(fuzzy)
+
+# AFL not yet supported by Windows
+if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    add_subdirectory(fuzzy)
+endif()
+
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
 # FIXME: Add other benchmarks
@@ -35,6 +40,7 @@ set(NORMAL_TESTS
     test_lang_bind_helper.cpp
     test_link_query_view.cpp
     test_links.cpp
+    test_metrics.cpp
     test_optional.cpp
     test_priority_queue.cpp
     test_query.cpp

@@ -67,6 +67,9 @@ typedef Link BackLink;
 namespace _impl {
 class TableFriend;
 }
+namespace metrics {
+class QueryInfo;
+}
 
 class Replication;
 
@@ -960,7 +963,7 @@ private:
         void detach()
         {
             if (m_is_managed) {
-                m_p->m_top.detach();
+                m_p->detach();
             }
         }
         SpecPtr& operator=(Spec* ptr)
@@ -1544,6 +1547,7 @@ private:
     friend class SubtableNode;
     friend class _impl::TableFriend;
     friend class Query;
+    friend class metrics::QueryInfo;
     template <class>
     friend class util::bind_ptr;
     template <class>

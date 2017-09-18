@@ -253,26 +253,37 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
 }
 
 def doBuildWindows(String buildType, boolean isUWP, String platform) {
-    def cmakeDefinitions = isUWP ? '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0' : ''
+    def cmakeDefinitions = isUWP ? '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 -DREALM_BUILD_LIB_ONLY=1' : ''
 
     return {
         node('windows') {
             getArchive()
 
             dir('build-dir') {
+                bat "\"${tool 'cmake'}\" ${cmakeDefinitions} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} .."
                 withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
-                    runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: """
-                        "${tool 'cmake'}" ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} -D REALM_ENABLE_ENCRYPTION=OFF ..
-                        "${tool 'cmake'}" --build . --config ${buildType}
-                        "${tool 'cmake'}\\..\\cpack.exe" -C ${buildType} -D CPACK_GENERATOR=TGZ
-                    """)
-                    archiveArtifacts('*.tar.gz')
-                    if (gitTag) {
-                        def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
-                        stash includes:'*.tar.gz', name:stashName
-                        publishingStashes << stashName
+                    runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: "\"${tool 'cmake'}\" --build . --config ${buildType}")
+                }
+                bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
+                archiveArtifacts('*.tar.gz')
+                if (gitTag) {
+                    def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
+                    stash includes:'*.tar.gz', name:stashName
+                    publishingStashes << stashName
+                }
+            }
+            if(!isUWP) {
+                def environment = environment() << "TMP=${env.WORKSPACE}\\temp"
+                withEnv(environment) {
+                    dir("build-dir/test/${buildType}") {
+                        bat '''
+                          mkdir %TMP%
+                          realm-tests.exe --no-error-exit-code
+                          rmdir /Q /S %TMP%
+                        '''
                     }
                 }
+                recordTests("Windows-${platform}-${buildType}")
             }
         }
     }
@@ -373,7 +384,7 @@ def buildPerformance() {
 def doBuildMacOs(String buildType) {
     def sdk = 'macosx'
     return {
-        node('macos || osx') {
+        node('osx') {
             getArchive()
 
             dir("build-macos-${buildType}") {
@@ -413,7 +424,7 @@ def doBuildMacOs(String buildType) {
 
 def doBuildAppleDevice(String sdk, String buildType) {
     return {
-        node('macos || osx') {
+        node('osx') {
             getArchive()
 
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {

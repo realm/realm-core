@@ -144,7 +144,7 @@ protected:
 #ifdef _WIN32
     // Used for non-process-shared mutex. We only know at runtime whether or not to use it, depending on if we call
     // Mutex::Mutex(process_shared_tag)
-    std::mutex m_std_mutex;
+    CRITICAL_SECTION m_critical_section;
 #else
     pthread_mutex_t m_impl = PTHREAD_MUTEX_INITIALIZER;
 #endif
@@ -164,21 +164,6 @@ protected:
     REALM_NORETURN static void lock_failed(int) noexcept;
 
 private:
-    bool m_is_shared = false;
-
-#ifdef _WIN32
-    // All below members are used for interprocess Windows-API mutexes only. Needs to be declared unconditionally
-    // because these are setup on runtime through Mutex(process_shared_tag).
-
-    // Windows-API mutexes can be addressed through string names.
-    char m_shared_name[33 + 1];
-
-    // We need to translate the name to a HANDLE in order to pass it to the Windows API. This translation is
-    // expensive, so we cache the translation for each process (each process has its own HANDLE for the same mutex)
-    HANDLE m_cached_handle;
-    DWORD m_cached_pid;
-#endif
-
     friend class CondVar;
     friend class RobustMutex;
 };
@@ -378,7 +363,7 @@ public:
 
 private:
 #ifdef _WIN32
-    std::condition_variable_any m_std_condvar;
+    CONDITION_VARIABLE m_condvar = CONDITION_VARIABLE_INIT;
 #else
     pthread_cond_t m_impl;
 #endif
@@ -476,25 +461,12 @@ inline Mutex::Mutex(process_shared_tag)
 
 inline Mutex::~Mutex() noexcept
 {
-#ifdef _WIN32
-    if (m_is_shared && m_cached_pid == GetCurrentProcessId()) {
-        CloseHandle(m_cached_handle);
-    }
-    else {
-        // If this is a shared mutex (m_is_shared) then we leak a handle and there's nothing 
-        // we can do about it because the mutex was constructed in another process 
-        // (m_cached_pid != _getpid()) which we don't have access to. Once all processes
-        // that are accessing the mutex are terminated, it will be freed automatically by
-        // Windows, so it's not severe. Only mutexes in the .lock files are interprocess, so
-        // the handle leaks do not accumulate over time.
-        //
-        // Non-interprocess mutexes are using std::mutex which is an object member to Mutex
-        // which does not have this handle leak issue.
-    }
-#else
+#ifndef _WIN32
     int r = pthread_mutex_destroy(&m_impl);
     if (REALM_UNLIKELY(r != 0))
         destroy_failed(r);
+#else
+    DeleteCriticalSection(&m_critical_section);
 #endif
 }
 
@@ -504,38 +476,15 @@ inline void Mutex::init_as_regular()
     int r = pthread_mutex_init(&m_impl, 0);
     if (REALM_UNLIKELY(r != 0))
         init_failed(r);
+#else
+    InitializeCriticalSection(&m_critical_section);
 #endif
 }
 
 inline void Mutex::lock() noexcept
 {
 #ifdef _WIN32
-    if(!m_is_shared) {
-        m_std_mutex.lock();
-        return;
-    }
-    else {
-        DWORD d;
-        HANDLE h;
-        DWORD pid = GetCurrentProcessId();
-
-        if (m_cached_pid != pid)
-            h = OpenMutexA(MUTEX_ALL_ACCESS, 1, m_shared_name);
-        else
-            h = m_cached_handle;
-
-        if (h == NULL)
-            lock_failed(EINVAL);
-
-        d = WaitForSingleObject(h, INFINITE);
-
-        if (m_cached_pid != pid)
-            CloseHandle(h);
-
-        // If WaitForSingleObject() returned any other value, it means it succeeded
-        if (d == (DWORD)0xFFFFFFFF)
-            lock_failed(EDEADLK);
-    }
+    EnterCriticalSection(&m_critical_section);
 #else
     int r = pthread_mutex_lock(&m_impl);
     if (REALM_LIKELY(r == 0))
@@ -547,32 +496,7 @@ inline void Mutex::lock() noexcept
 inline bool Mutex::try_lock() noexcept
 {
 #ifdef _WIN32
-    if (!m_is_shared) {
-        return m_std_mutex.try_lock();
-    }
-    else {
-        DWORD d;
-        HANDLE h;
-        DWORD pid = GetCurrentProcessId();
-
-        if (m_cached_pid != pid)
-            h = OpenMutexA(MUTEX_ALL_ACCESS, 1, m_shared_name);
-        else
-            h = m_cached_handle;
-
-        if (h == NULL)
-            lock_failed(0);
-
-        d = WaitForSingleObject(h, 0);
-
-        if (m_cached_pid != pid)
-            CloseHandle(h);
-
-        if (d == WAIT_OBJECT_0)
-            return true;
-        else
-            return false;
-    }
+    return TryEnterCriticalSection(&m_critical_section);
 #else
     int r = pthread_mutex_trylock(&m_impl);
     if (r == EBUSY) {
@@ -588,31 +512,7 @@ inline bool Mutex::try_lock() noexcept
 inline void Mutex::unlock() noexcept
 {
 #ifdef _WIN32
-    if (!m_is_shared) {
-        m_std_mutex.unlock();
-        return;
-    }
-    else {
-        BOOL d;
-        HANDLE h;
-        DWORD pid = GetCurrentProcessId();
-
-        if (m_cached_pid != pid)
-            h = OpenMutexA(MUTEX_ALL_ACCESS, 1, m_shared_name);
-        else
-            h = m_cached_handle;
-
-        if (h == NULL)
-            lock_failed(0);
-
-        d = ReleaseMutex(h);
-
-        if (m_cached_pid != pid)
-            CloseHandle(h);
-
-        if (d == 0)
-            lock_failed(0);   // Best probability why ReleaseMutex would fail on valid mutex
-    }
+    LeaveCriticalSection(&m_critical_section);
 #else
     int r = pthread_mutex_unlock(&m_impl);
     REALM_ASSERT(r == 0);
@@ -770,7 +670,7 @@ inline CondVar::~CondVar() noexcept
 inline void CondVar::wait(LockGuard& l) noexcept
 {
 #ifdef _WIN32
-    m_std_condvar.wait(l.m_mutex.m_std_mutex);
+    SleepConditionVariableCS(&m_condvar, &l.m_mutex.m_critical_section, INFINITE);
 #else
     int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
     if (REALM_UNLIKELY(r != 0))
@@ -785,20 +685,28 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
 
     if (!tp) {
 #ifdef _WIN32
-        r = 0;
-        m_std_condvar.wait(m.m_std_mutex);
+        if (!SleepConditionVariableCS(&m_condvar, &m.m_critical_section, INFINITE))
+            r = GetLastError();
+        else
+            r = 0;
 #else
         r = pthread_cond_wait(&m_impl, &m.m_impl);
 #endif
     }
     else {
 #ifdef _WIN32
-        r = 0;
+        if (!SleepConditionVariableCS(&m_condvar, &m.m_critical_section, tp->tv_sec / 1000)) {
+            r = GetLastError();
+            if (r == ERROR_TIMEOUT)
+                return;
+        } else {
+            r = 0
+        }
 #else
         r = pthread_cond_timedwait(&m_impl, &m.m_impl, tp);
-#endif
         if (r == ETIMEDOUT)
             return;
+#endif
     }
 
     if (REALM_LIKELY(r == 0))
@@ -827,7 +735,7 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
 inline void CondVar::notify() noexcept
 {
 #ifdef _WIN32
-    m_std_condvar.notify_one();
+    WakeConditionVariable(&m_condvar);
 #else
     int r = pthread_cond_signal(&m_impl);
     REALM_ASSERT(r == 0);
@@ -837,7 +745,7 @@ inline void CondVar::notify() noexcept
 inline void CondVar::notify_all() noexcept
 {
 #ifdef _WIN32
-    m_std_condvar.notify_all();
+    WakeAllConditionVariable(&m_condvar);
 #else
     int r = pthread_cond_broadcast(&m_impl);
     REALM_ASSERT(r == 0);
