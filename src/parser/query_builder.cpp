@@ -18,6 +18,7 @@
 
 #include "query_builder.hpp"
 
+#include "feature_checks.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "parser.hpp"
@@ -51,7 +52,8 @@ T stot(std::string const& s) {
 // of the function checking its preconditions
 #define precondition(condition, message) if (!REALM_LIKELY(condition)) { throw std::logic_error(message); }
 
-// FIXME: TrueExpression and FalseExpression should be supported by core in some way
+// realm-core comes with TrueExpression and FalseExpression as of version 3.2.1
+#if REALM_VERSION_MAJOR < 3
 struct TrueExpression : realm::Expression {
     size_t find_first(size_t start, size_t end) const override
     {
@@ -79,6 +81,7 @@ struct FalseExpression : realm::Expression {
         return std::unique_ptr<Expression>(new FalseExpression(*this));
     }
 };
+#endif
 
 using KeyPath = std::vector<std::string>;
 KeyPath key_path_from_string(const std::string &s) {

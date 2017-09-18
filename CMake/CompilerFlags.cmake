@@ -43,7 +43,7 @@ endif()
 if(MSVC)
     add_definitions(
         /D_UNICODE
-        /DPTW32_STATIC_LIB
+        /DWIN32_LEAN_AND_MEAN
         /D_CRT_SECURE_NO_WARNINGS
         /D_SCL_SECURE_NO_WARNINGS
     )
