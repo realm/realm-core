@@ -104,6 +104,7 @@ SyncTestFile::SyncTestFile(SyncServer& server, std::string name)
     sync_config = std::make_shared<SyncConfig>(SyncConfig{
         SyncManager::shared().get_user({ "user", url }, "not_a_real_token"),
         url,
+        false,
         SyncSessionStopPolicy::Immediately,
         [=](auto&, auto&, auto session) { session->refresh_access_token(s_test_token, url); },
         [](auto, auto) { abort(); }

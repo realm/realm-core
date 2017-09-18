@@ -105,6 +105,7 @@ if(REALM_ENABLE_SYNC)
         sync/sync_permission.hpp
         sync/sync_session.hpp
         sync/sync_user.hpp
+        sync/impl/partial_sync_helper.hpp
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp)
@@ -113,6 +114,7 @@ if(REALM_ENABLE_SYNC)
         sync/sync_permission.cpp
         sync/sync_session.cpp
         sync/sync_user.cpp
+        sync/impl/partial_sync_helper.cpp
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp)
     if(APPLE)
