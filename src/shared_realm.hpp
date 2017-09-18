@@ -30,6 +30,7 @@
 #endif
 
 #include <memory>
+#include <functional>
 
 namespace realm {
 class BindingContext;
@@ -392,7 +393,9 @@ private:
     void cache_new_schema();
     void notify_schema_changed();
 
+#if REALM_ENABLE_SYNC
     std::unique_ptr<PartialSyncHelper> m_partial_sync_helper;
+#endif
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;
