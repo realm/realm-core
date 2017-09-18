@@ -19,7 +19,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_BINARY
 
-#include <realm/array_binary.hpp>
+#include <realm/array_blobs_small.hpp>
 
 #include "test.hpp"
 
@@ -56,12 +56,12 @@ using namespace realm;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(ArrayBinary_Basic)
+TEST(ArraySmallBlobs_Basic)
 {
-    ArrayBinary c(Allocator::get_default());
+    ArraySmallBlobs c(Allocator::get_default());
     c.create();
 
-    // TEST(ArrayBinary_MultiEmpty)
+    // TEST(ArraySmallBlobs_MultiEmpty)
 
     c.add(BinaryData());
     c.add(BinaryData());
@@ -80,7 +80,7 @@ TEST(ArrayBinary_Basic)
     CHECK_EQUAL(0, c.get(5).size());
 
 
-    // TEST(ArrayBinary_Set)
+    // TEST(ArraySmallBlobs_Set)
 
     c.set(0, BinaryData("hey", 4));
 
@@ -95,7 +95,7 @@ TEST(ArrayBinary_Basic)
     CHECK_EQUAL(0, c.get(5).size());
 
 
-    // TEST(ArrayBinary_Add)
+    // TEST(ArraySmallBlobs_Add)
 
     c.clear();
     CHECK_EQUAL(0, c.size());
@@ -113,7 +113,7 @@ TEST(ArrayBinary_Basic)
     CHECK_EQUAL(2, c.size());
 
 
-    // TEST(ArrayBinary_Set2)
+    // TEST(ArraySmallBlobs_Set2)
 
     // {shrink, grow} x {first, middle, last, single}
     c.clear();
@@ -168,7 +168,7 @@ TEST(ArrayBinary_Basic)
     CHECK_EQUAL(3, c.size());
 
 
-    // TEST(ArrayBinary_Insert)
+    // TEST(ArraySmallBlobs_Insert)
 
     c.clear();
 
@@ -203,7 +203,7 @@ TEST(ArrayBinary_Basic)
     CHECK_EQUAL(5, c.size());
 
 
-    // TEST(ArrayBinary_Erase)
+    // TEST(ArraySmallBlobs_Erase)
 
     c.clear();
 
@@ -242,9 +242,9 @@ TEST(ArrayBinary_Basic)
     c.destroy();
 }
 
-TEST(ArrayBinary_Nulls)
+TEST(ArraySmallBlobs_Nulls)
 {
-    ArrayBinary c(Allocator::get_default());
+    ArraySmallBlobs c(Allocator::get_default());
     c.create();
 
     c.add(BinaryData());

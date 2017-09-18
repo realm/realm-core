@@ -20,7 +20,7 @@
 #define SRC_REALM_ARRAY_STRING_HPP_
 
 #include <realm/array_string_short.hpp>
-#include <realm/array_binary.hpp>
+#include <realm/array_blobs_small.hpp>
 #include <realm/array_blobs_big.hpp>
 
 namespace realm {
@@ -73,7 +73,7 @@ private:
     static constexpr size_t medium_string_max_size = 63; // ArrayStringLong
     union Storage {
         std::aligned_storage<sizeof(ArrayStringShort), alignof(ArrayStringShort)>::type m_string_short;
-        std::aligned_storage<sizeof(ArrayBinary), alignof(ArrayBinary)>::type m_string_long;
+        std::aligned_storage<sizeof(ArraySmallBlobs), alignof(ArraySmallBlobs)>::type m_string_long;
         std::aligned_storage<sizeof(ArrayBigBlobs), alignof(ArrayBigBlobs)>::type m_big_blobs;
     };
     enum class Type {

@@ -18,14 +18,14 @@
 
 #include <utility> // pair
 
-#include <realm/array_binary.hpp>
+#include <realm/array_blobs_small.hpp>
 #include <realm/array_blob.hpp>
 #include <realm/array_integer.hpp>
 #include <realm/impl/destroy_guard.hpp>
 
 using namespace realm;
 
-void ArrayBinary::init_from_mem(MemRef mem) noexcept
+void ArraySmallBlobs::init_from_mem(MemRef mem) noexcept
 {
     Array::init_from_mem(mem);
     ref_type offsets_ref = get_as_ref(0);
@@ -40,7 +40,7 @@ void ArrayBinary::init_from_mem(MemRef mem) noexcept
     }
 }
 
-size_t ArrayBinary::read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept
+size_t ArraySmallBlobs::read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
@@ -59,7 +59,7 @@ size_t ArrayBinary::read(size_t ndx, size_t pos, char* buffer, size_t max_size) 
     }
 }
 
-void ArrayBinary::add(BinaryData value, bool add_zero_term)
+void ArraySmallBlobs::add(BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT_7(value.size(), ==, 0, ||, value.data(), !=, 0);
 
@@ -78,7 +78,7 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
         m_nulls.add(value.is_null());
 }
 
-void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
+void ArraySmallBlobs::set(size_t ndx, BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
     REALM_ASSERT_3(value.size(), == 0 ||, value.data());
@@ -99,7 +99,7 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
         m_nulls.set(ndx, value.is_null());
 }
 
-void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
+void ArraySmallBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT_3(ndx, <=, m_offsets.size());
     REALM_ASSERT_3(value.size(), == 0 ||, value.data());
@@ -120,7 +120,7 @@ void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
         m_nulls.insert(ndx, value.is_null());
 }
 
-void ArrayBinary::erase(size_t ndx)
+void ArraySmallBlobs::erase(size_t ndx)
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
@@ -135,7 +135,7 @@ void ArrayBinary::erase(size_t ndx)
         m_nulls.erase(ndx);
 }
 
-BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) noexcept
+BinaryData ArraySmallBlobs::get(const char* header, size_t ndx, Allocator& alloc) noexcept
 {
     // Column *may* be nullable if top has 3 refs (3'rd being m_nulls). Else, if it has 2, it's non-nullable
     // See comment in legacy_array_type() and also in array_binary.hpp.
@@ -171,7 +171,7 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) no
 }
 
 // FIXME: Not exception safe (leaks are possible).
-ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_zero_term, TreeInsertBase& state)
+ref_type ArraySmallBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_zero_term, TreeInsertBase& state)
 {
     size_t leaf_size = size();
     REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
@@ -183,7 +183,7 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
     }
 
     // Split leaf node
-    ArrayBinary new_leaf(get_alloc());
+    ArraySmallBlobs new_leaf(get_alloc());
     new_leaf.create(); // Throws
     if (ndx == leaf_size) {
         new_leaf.add(value, add_zero_term); // Throws
@@ -201,7 +201,7 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
 }
 
 
-MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, BinaryData values)
+MemRef ArraySmallBlobs::create_array(size_t size, Allocator& alloc, BinaryData values)
 {
     // Only null and zero-length non-null allowed as initialization value
     REALM_ASSERT(values.size() == 0);
@@ -230,7 +230,7 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, BinaryData value
     {
         // Always create a m_nulls array, regardless if its column is marked as nullable or not. NOTE: This is new
         // - existing binary arrays from earier versions of core will not have this third array. All methods on
-        // ArrayBinary must thus check if this array exists before trying to access it. If it doesn't, it must be
+        // ArraySmallBlobs must thus check if this array exists before trying to access it. If it doesn't, it must be
         // interpreted as if its column isn't nullable.
         bool context_flag = false;
         int64_t value = values.is_null() ? 1 : 0;
@@ -246,11 +246,11 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, BinaryData value
 }
 
 
-MemRef ArrayBinary::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
+MemRef ArraySmallBlobs::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
     REALM_ASSERT(is_attached());
 
-    ArrayBinary array_slice(target_alloc);
+    ArraySmallBlobs array_slice(target_alloc);
     _impl::ShallowArrayDestroyGuard dg(&array_slice);
     array_slice.create(); // Throws
     size_t begin = offset;
@@ -266,7 +266,7 @@ MemRef ArrayBinary::slice(size_t offset, size_t slice_size, Allocator& target_al
 
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
-void ArrayBinary::to_dot(std::ostream& out, bool, StringData title) const
+void ArraySmallBlobs::to_dot(std::ostream& out, bool, StringData title) const
 {
     ref_type ref = get_ref();
 

@@ -27,7 +27,7 @@
 namespace realm {
 
 class OldDateTime;
-class ArrayBinary;
+class ArraySmallBlobs;
 class ArrayString;
 class ArrayStringShort;
 class ArrayInteger;
@@ -118,7 +118,7 @@ struct ColumnTypeTraits<StringData> {
 template <>
 struct ColumnTypeTraits<BinaryData> {
     using column_type = BinaryColumn;
-    using leaf_type = ArrayBinary;
+    using leaf_type = ArraySmallBlobs;
     static const DataType id = type_Binary;
     static const ColumnType column_id = col_type_Binary;
     static const ColumnType real_column_type = col_type_Binary;

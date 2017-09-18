@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#ifndef REALM_ARRAY_BINARY_HPP
-#define REALM_ARRAY_BINARY_HPP
+#ifndef REALM_ARRAY_BLOBS_SMALL_HPP
+#define REALM_ARRAY_BLOBS_SMALL_HPP
 
 #include <realm/binary_data.hpp>
 #include <realm/array_blob.hpp>
@@ -29,7 +29,7 @@ namespace realm {
 /*
 STORAGE FORMAT
 ---------------------------------------------------------------------------------------
-ArrayBinary stores binary elements using two ArrayInteger and one ArrayBlob. The ArrayBlob can only store one
+ArraySmallBlobs stores binary elements using two ArrayInteger and one ArrayBlob. The ArrayBlob can only store one
 single concecutive array of bytes (contrary to its 'Array' name that misleadingly indicates it could store multiple
 elements).
 
@@ -42,7 +42,7 @@ ArrayInteger    m_nulls     0, 0, 0, 1, 0 // 1 indicates null, 0 indicates non-n
 So for each element the ArrayInteger, the ArrayInteger points into the ArrayBlob at the position of the first
 byte of the next element.
 
-m_nulls is always present (except for old database files; see below), so any ArrayBinary is always nullable!
+m_nulls is always present (except for old database files; see below), so any ArraySmallBlobs is always nullable!
 The nullable property (such as throwing exception upon set(null) on non-nullable column, etc) is handled on
 column level only.
 
@@ -53,16 +53,16 @@ Old database files do not have any m_nulls array. To be backwardscompatible, man
 in set(), etc). This way no file format upgrade is needed to support nulls for BinaryData.
 */
 
-class ArrayBinary : public Array {
+class ArraySmallBlobs : public Array {
 public:
-    explicit ArrayBinary(Allocator&) noexcept;
-    ~ArrayBinary() noexcept override
+    explicit ArraySmallBlobs(Allocator&) noexcept;
+    ~ArraySmallBlobs() noexcept override
     {
     }
 
     // Disable copying, this is not allowed.
-    ArrayBinary& operator=(const ArrayBinary&) = delete;
-    ArrayBinary(const ArrayBinary&) = delete;
+    ArraySmallBlobs& operator=(const ArraySmallBlobs&) = delete;
+    ArraySmallBlobs(const ArraySmallBlobs&) = delete;
 
     /// Create a new empty binary array and attach this accessor to
     /// it. This does not modify the parent reference information of
@@ -137,7 +137,7 @@ private:
 
 // Implementation:
 
-inline ArrayBinary::ArrayBinary(Allocator& allocator) noexcept
+inline ArraySmallBlobs::ArraySmallBlobs(Allocator& allocator) noexcept
     : Array(allocator)
     , m_offsets(allocator)
     , m_blob(allocator)
@@ -148,7 +148,7 @@ inline ArrayBinary::ArrayBinary(Allocator& allocator) noexcept
     m_nulls.set_parent(this, 2);
 }
 
-inline void ArrayBinary::create()
+inline void ArraySmallBlobs::create()
 {
     size_t init_size = 0;
     BinaryData defaults = BinaryData{};                          // This init value is ignored because size = 0
@@ -156,28 +156,28 @@ inline void ArrayBinary::create()
     init_from_mem(mem);
 }
 
-inline void ArrayBinary::init_from_ref(ref_type ref) noexcept
+inline void ArraySmallBlobs::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT(ref);
     char* header = get_alloc().translate(ref);
     init_from_mem(MemRef(header, ref, m_alloc));
 }
 
-inline void ArrayBinary::init_from_parent() noexcept
+inline void ArraySmallBlobs::init_from_parent() noexcept
 {
     ref_type ref = get_ref_from_parent();
     init_from_ref(ref);
 }
 
-inline bool ArrayBinary::is_empty() const noexcept
+inline bool ArraySmallBlobs::is_empty() const noexcept
 {
     return m_offsets.is_empty();
 }
 
 // Old database files will not have the m_nulls array, so we need code paths for
 // backwards compatibility for these cases. We can test if m_nulls exists by looking
-// at number of references in this ArrayBinary.
-inline bool ArrayBinary::legacy_array_type() const noexcept
+// at number of references in this ArraySmallBlobs.
+inline bool ArraySmallBlobs::legacy_array_type() const noexcept
 {
     if (Array::size() == 3)
         return false; // New database file
@@ -188,12 +188,12 @@ inline bool ArrayBinary::legacy_array_type() const noexcept
     return false;
 }
 
-inline size_t ArrayBinary::size() const noexcept
+inline size_t ArraySmallBlobs::size() const noexcept
 {
     return m_offsets.size();
 }
 
-inline BinaryData ArrayBinary::get(size_t ndx) const noexcept
+inline BinaryData ArraySmallBlobs::get(size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
@@ -211,7 +211,7 @@ inline BinaryData ArrayBinary::get(size_t ndx) const noexcept
     }
 }
 
-inline bool ArrayBinary::is_null(size_t ndx) const
+inline bool ArraySmallBlobs::is_null(size_t ndx) const
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
@@ -224,7 +224,7 @@ inline bool ArrayBinary::is_null(size_t ndx) const
     }
 }
 
-inline StringData ArrayBinary::get_string(size_t ndx)
+inline StringData ArraySmallBlobs::get_string(size_t ndx)
 {
     BinaryData bin = get(ndx);
     if (bin.is_null())
@@ -233,22 +233,22 @@ inline StringData ArrayBinary::get_string(size_t ndx)
         return StringData(bin.data(), bin.size() - 1); // Do not include terminating zero
 }
 
-inline void ArrayBinary::add_string(StringData value)
+inline void ArraySmallBlobs::add_string(StringData value)
 {
     add(BinaryData(value.data(), value.size()), true);
 }
 
-inline void ArrayBinary::set_string(size_t ndx, StringData value)
+inline void ArraySmallBlobs::set_string(size_t ndx, StringData value)
 {
     set(ndx, BinaryData(value.data(), value.size()), true);
 }
 
-inline void ArrayBinary::insert_string(size_t ndx, StringData value)
+inline void ArraySmallBlobs::insert_string(size_t ndx, StringData value)
 {
     insert(ndx, BinaryData(value.data(), value.size()), true);
 }
 
-inline void ArrayBinary::truncate(size_t new_size)
+inline void ArraySmallBlobs::truncate(size_t new_size)
 {
     REALM_ASSERT_3(new_size, <, m_offsets.size());
 
@@ -260,7 +260,7 @@ inline void ArrayBinary::truncate(size_t new_size)
         m_nulls.truncate(new_size);
 }
 
-inline void ArrayBinary::clear()
+inline void ArraySmallBlobs::clear()
 {
     m_blob.clear();
     m_offsets.clear();
@@ -268,7 +268,7 @@ inline void ArrayBinary::clear()
         m_nulls.clear();
 }
 
-inline void ArrayBinary::destroy()
+inline void ArraySmallBlobs::destroy()
 {
     m_blob.destroy();
     m_offsets.destroy();
@@ -277,14 +277,14 @@ inline void ArrayBinary::destroy()
     Array::destroy();
 }
 
-inline size_t ArrayBinary::get_size_from_header(const char* header, Allocator& alloc) noexcept
+inline size_t ArraySmallBlobs::get_size_from_header(const char* header, Allocator& alloc) noexcept
 {
     ref_type offsets_ref = to_ref(Array::get(header, 0));
     const char* offsets_header = alloc.translate(offsets_ref);
     return Array::get_size_from_header(offsets_header);
 }
 
-inline bool ArrayBinary::update_from_parent(size_t old_baseline) noexcept
+inline bool ArraySmallBlobs::update_from_parent(size_t old_baseline) noexcept
 {
     bool res = Array::update_from_parent(old_baseline);
     if (res) {
