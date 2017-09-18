@@ -2626,7 +2626,7 @@ TEST(Group_SetNullUniqueLimitation)
 // if it is the only parent row. It is also tested that an optional
 // notification handler is called appropriately.
 // It is tested that it works both with one and two levels of links
-// and also if the links creates a circle
+// and also if the links creates a cycle
 TEST(Group_RemoveRecursive)
 {
     Group g;

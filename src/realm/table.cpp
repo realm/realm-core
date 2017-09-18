@@ -3712,7 +3712,8 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool
     if (col.get_weak_links())
         return;
 
-    size_t num_remaining = target_table.get_backlink_count(old_target_row_ndx, true);
+    size_t num_remaining = target_table.get_backlink_count(old_target_row_ndx,
+                                                           /* only strong links:*/ true);
     if (num_remaining > 0)
         return;
 
