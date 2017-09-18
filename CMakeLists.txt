@@ -76,9 +76,8 @@ set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE true)
 
-# Add REALM_UWP=1 to compile with Windows UWP support
-if(WINDOWS_STORE AND CMAKE_SYSTEM_VERSION STREQUAL 10.0)
-    add_definitions(-DREALM_UWP=1 -D_SCL_SECURE_NO_WARNINGS)
+if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    add_definitions(-D_SCL_SECURE_NO_WARNINGS -DWIN32_LEAN_AND_MEAN)
 endif()
 
 if(MSVC)
@@ -118,6 +117,7 @@ option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations." OFF)
 option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
 option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
 option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
+option(REALM_METRICS "Enable various metric tracking" ON)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
 check_include_files(malloc.h HAVE_MALLOC_H)
@@ -148,6 +148,11 @@ endif()
 
 # CPack
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
+export(TARGETS realm FILE realm-config.cmake)
+install(EXPORT realm
+        FILE realm-config.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
+        COMPONENT devel)
 
 if(APPLE)
     set(CPACK_GENERATOR "TGZ")

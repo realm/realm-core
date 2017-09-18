@@ -55,6 +55,7 @@
 #define TEST_GROUP
 #define TEST_INDEX_STRING
 #define TEST_LANG_BIND_HELPER
+#define TEST_METRICS
 #define TEST_QUERY
 #define TEST_SHARED
 #define TEST_STRING_DATA

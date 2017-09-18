@@ -273,10 +273,14 @@ def doBuildWindows(String buildType, boolean isUWP, String platform) {
                 }
             }
             if(!isUWP) {
-                def environment = environment()
+                def environment = environment() << "TMP=${env.WORKSPACE}\\temp"
                 withEnv(environment) {
                     dir("build-dir/test/${buildType}") {
-                        bat 'realm-tests.exe --no-error-exit-code'
+                        bat '''
+                          mkdir %TMP%
+                          realm-tests.exe --no-error-exit-code
+                          rmdir /Q /S %TMP%
+                        '''
                     }
                 }
                 recordTests("Windows-${platform}-${buildType}")
@@ -380,7 +384,7 @@ def buildPerformance() {
 def doBuildMacOs(String buildType) {
     def sdk = 'macosx'
     return {
-        node('macos || osx') {
+        node('osx') {
             getArchive()
 
             dir("build-macos-${buildType}") {
@@ -420,7 +424,7 @@ def doBuildMacOs(String buildType) {
 
 def doBuildAppleDevice(String sdk, String buildType) {
     return {
-        node('macos || osx') {
+        node('osx') {
             getArchive()
 
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {

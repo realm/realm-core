@@ -67,6 +67,9 @@ typedef Link BackLink;
 namespace _impl {
 class TableFriend;
 }
+namespace metrics {
+class QueryInfo;
+}
 
 class Replication;
 
@@ -1542,6 +1545,7 @@ private:
     friend class SubtableNode;
     friend class _impl::TableFriend;
     friend class Query;
+    friend class metrics::QueryInfo;
     template <class>
     friend class util::bind_ptr;
     template <class>

@@ -40,6 +40,7 @@ set(NORMAL_TESTS
     test_lang_bind_helper.cpp
     test_link_query_view.cpp
     test_links.cpp
+    test_metrics.cpp
     test_optional.cpp
     test_priority_queue.cpp
     test_query.cpp

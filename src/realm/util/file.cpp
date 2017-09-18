@@ -223,30 +223,25 @@ bool try_remove_dir_recursive(const std::string& path)
 std::string make_temp_dir()
 {
 #ifdef _WIN32 // Windows version
+    std::filesystem::path temp = std::filesystem::temp_directory_path();
 
-#if REALM_UWP
-    throw std::runtime_error("File::make_temp_dir() not yet supported on Windows 10 UWP");
-#else
-    StringBuffer buffer1;
-    buffer1.resize(MAX_PATH + 1);
-
-    if (GetTempPathA(MAX_PATH + 1, buffer1.data()) == 0)
-        throw std::runtime_error("CreateDirectory() failed");
-
-    StringBuffer buffer2;
-    buffer2.resize(MAX_PATH);
+    wchar_t buffer[MAX_PATH];
+    std::filesystem::path path;
     for (;;) {
-        if (GetTempFileNameA(buffer1.c_str(), "rlm", 0, buffer2.data()) == 0)
+        if (GetTempFileNameW(temp.c_str(), L"rlm", 0, buffer) == 0)
             throw std::runtime_error("GetTempFileName() failed");
-        if (DeleteFileA(buffer2.c_str()) == 0)
-            throw std::runtime_error("DeleteFile() failed");
-        if (CreateDirectoryA(buffer2.c_str(), 0) != 0)
+        path = buffer;
+        std::filesystem::remove(path);
+        try {
+            std::filesystem::create_directory(path);
             break;
-        if (GetLastError() != ERROR_ALREADY_EXISTS)
-            throw std::runtime_error("CreateDirectory() failed");
+        }
+        catch (const std::filesystem::filesystem_error& ex) {
+            if (ex.code() != std::errc::file_exists)
+                throw;
+        }
     }
-    return std::string(buffer2.c_str());
-#endif
+    return path.u8string();
 
 #else // POSIX.1-2008 version
 
@@ -923,9 +918,9 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
 }
 
 
-void File::sync_map(void* addr, size_t size)
+void File::sync_map(FileDesc fd, void* addr, size_t size)
 {
-    realm::util::msync(addr, size);
+    realm::util::msync(fd, addr, size);
 }
 
 
@@ -965,6 +960,8 @@ bool File::is_dir(const std::string& path)
     }
     std::string msg = get_errno_msg("stat() failed: ", err);
     throw std::runtime_error(msg);
+#elif REALM_HAVE_STD_FILESYSTEM
+    return std::filesystem::is_directory(path);
 #else
     static_cast<void>(path);
     throw std::runtime_error("Not yet supported");
@@ -1010,6 +1007,10 @@ bool File::try_remove(const std::string& path)
 
 void File::move(const std::string& old_path, const std::string& new_path)
 {
+#ifdef _WIN32
+    // Can't rename to existing file on Windows
+    try_remove(new_path);
+#endif
     int r = rename(old_path.c_str(), new_path.c_str());
     if (r == 0)
         return;
@@ -1198,6 +1199,12 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
     }
     */
     return base_dir_2 + path_2;
+#elif REALM_HAVE_STD_FILESYSTEM
+    std::filesystem::path path_(path.empty() ? "." : path);
+    if (path_.is_absolute())
+        return path;
+
+    return (std::filesystem::path(base_dir) / path_).u8string();
 #else
     static_cast<void>(path);
     static_cast<void>(base_dir);
@@ -1291,6 +1298,32 @@ bool DirScanner::next(std::string& name)
             return true;
         }
     }
+}
+
+#elif REALM_HAVE_STD_FILESYSTEM
+
+DirScanner::DirScanner(const std::string& path, bool allow_missing)
+{
+    try {
+        m_iterator = std::filesystem::directory_iterator(path);
+    }
+    catch (const std::filesystem::filesystem_error& e) {
+        if (e.code() != std::errc::no_such_file_or_directory || !allow_missing)
+            throw;
+    }
+}
+
+DirScanner::~DirScanner() = default;
+
+bool DirScanner::next(std::string& name)
+{
+    const std::filesystem::directory_iterator end;
+    if (m_iterator != end) {
+        name = m_iterator->path().filename().u8string();
+        m_iterator++;
+        return true;
+    }
+    return false;
 }
 
 #else

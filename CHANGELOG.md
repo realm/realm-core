@@ -2,9 +2,7 @@
 
 ### Bugfixes
 
-* A linker error in some configurations was addressed by adding an explicit
-  instantiation of `Table::find_first` for `BinaryData`.
-  [#2823](https://github.com/realm/realm-core/pull/2823)
+* Lorem ipsum.
 
 ### Breaking changes
 
@@ -19,6 +17,58 @@
 ### Internals
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 3.2.1 Release notes
+
+### Bugfixes
+
+* Compact now throws an exception if writing fails for some reason
+  instead of ignoring errors and possibly causing corruption.
+  In particular, this solves file truncation causing "bad header" exceptions
+  after a compact operation on a file system that is running out of disk space.
+  PR [#2852](https://github.com/realm/realm-core/pull/2852).
+
+-----------
+
+### Internals
+
+* Moved object store's true and false query expressions down to core.
+  PR [#2857](https://github.com/realm/realm-core/pull/2857).
+
+----------------------------------------------
+
+# 3.2.0 Release notes
+
+### Enhancements
+
+* Added metrics tracking as an optional SharedGroup feature.
+  PR [#2840](https://github.com/realm/realm-core/pull/2840).
+
+-----------
+
+### Internals
+
+* Improve crash durability on windows.
+  PR [#2845](https://github.com/realm/realm-core/pull/2845).
+* Removed incorrect string column type traits, which could cause errors.
+  They were unused. PR [#2846](https://github.com/realm/realm-core/pull/2846).
+
+----------------------------------------------
+
+# 3.1.0 Release notes
+
+### Bugfixes
+
+* A linker error in some configurations was addressed by adding an explicit
+  instantiation of `Table::find_first` for `BinaryData`.
+  [#2823](https://github.com/realm/realm-core/pull/2823)
+
+### Enhancements
+
+* Implemented `realm::util::File::is_dir`, `realm::util::File::resolve`,
+  and `realm::util::DirScanner` on Windows.
 
 ----------------------------------------------
 
