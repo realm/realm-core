@@ -39,6 +39,7 @@
 #include <sys/file.h> // BSD / Linux flock()
 #endif
 
+#include <realm/exceptions.hpp>
 #include <realm/util/errno.hpp>
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -518,6 +519,9 @@ void File::write_static(FileDesc fd, const char* data, size_t size)
 error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     std::string msg = get_last_error_msg("WriteFile() failed: ", err);
+    if (err == ERROR_HANDLE_DISK_FULL || err == ERROR_DISK_FULL) {
+        throw OutOfDiskSpace(msg);
+    }
     throw std::runtime_error(msg);
 #else
     while (0 < size) {
@@ -537,6 +541,9 @@ error:
     // LCOV_EXCL_START
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("write(): failed: ", err);
+    if (err == ENOSPC || err == EDQUOT) {
+        throw OutOfDiskSpace(msg);
+    }
     throw std::runtime_error(msg);
 // LCOV_EXCL_STOP
 
