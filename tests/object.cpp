@@ -280,6 +280,13 @@ TEST_CASE("object") {
             write([&] { row.move_last_over(); });
             REQUIRE_INDICES(change.deletions, 0);
         }
+
+        SECTION("observing deleted object throws") {
+            write([&] {
+                row.move_last_over();
+            });
+            REQUIRE_THROWS(require_change());
+        }
     }
 
     TestContext d(r);
