@@ -119,6 +119,11 @@ public:
         return m_server_url;
     }
 
+    // For normal (non-admin token) users, the local identity is a locally generated
+    // UUID string that is used to uniquely identify the user on the filesystem.
+    // Some users created prior to certain versions of the Realm Object Server may
+    // share their local identity and actual identity. In this case the local identity
+    // will still be a UUID string.
     const std::string& local_identity() const noexcept
     {
         return m_local_identity;

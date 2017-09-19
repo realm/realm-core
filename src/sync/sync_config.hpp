@@ -19,6 +19,8 @@
 #ifndef REALM_OS_SYNC_CONFIG_HPP
 #define REALM_OS_SYNC_CONFIG_HPP
 
+#include "sync_user.hpp"
+
 #include <realm/util/assert.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
@@ -111,6 +113,25 @@ struct SyncConfig {
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<sync::Session::SSLVerifyCallback> ssl_verify_callback;
     bool validate_sync_history = true;
+    util::Optional<std::string> custom_partial_sync_identifier;
+
+    std::string resolved_realm_url() const
+    {
+        REALM_ASSERT(realm_url.length() > 0);
+        REALM_ASSERT(user);
+        std::string base_url = realm_url;
+        if (base_url.back() == '/')
+            base_url.pop_back();
+
+        if (!is_partial)
+            return base_url;
+
+        if (custom_partial_sync_identifier)
+            return base_url + "/__partial/" + *custom_partial_sync_identifier;
+
+        return base_url + "/__partial/" + user->local_identity();
+    }
+
 #if __GNUC__ < 5
     // GCC 4.9 does not support C++14 braced-init
     SyncConfig(std::shared_ptr<SyncUser> user, std::string realm_url, bool is_partial,
@@ -119,7 +140,11 @@ struct SyncConfig {
                std::function<SyncSessionErrorHandler> error_handler = nullptr,
                std::shared_ptr<ChangesetTransformer> transformer = nullptr,
                util::Optional<std::array<char, 64>> realm_encryption_key = util::none,
-               bool client_validate_ssl = true, util::Optional<std::string> ssl_trust_certificate_path = util::none, std::function<realm::sync::Session::SSLVerifyCallback> ssl_verify_callback = nullptr)
+               bool client_validate_ssl = true, 
+               util::Optional<std::string> ssl_trust_certificate_path = util::none, 
+               std::function<realm::sync::Session::SSLVerifyCallback> ssl_verify_callback = nullptr,
+               util::Optional<std::string> custom_partial_sync_identifier = util::none
+        )
         : user(std::move(user))
         , realm_url(std::move(realm_url))
         , is_partial(is_partial)
@@ -131,10 +156,11 @@ struct SyncConfig {
         , client_validate_ssl(client_validate_ssl)
         , ssl_trust_certificate_path(std::move(ssl_trust_certificate_path))
         , ssl_verify_callback(std::move(ssl_verify_callback))
+        , custom_partial_sync_identifier(std::move(custom_partial_sync_identifier))
     {
     }
 
-     SyncConfig() {}
+    SyncConfig() {}
 
 #endif
 };

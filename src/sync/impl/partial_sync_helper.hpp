@@ -23,12 +23,14 @@
 #include <string>
 #include <unordered_map>
 
+#include <realm/table_ref.hpp>
+
 namespace realm {
     
 class Realm;
-class List;
+class Results;
 
-using PartialSyncResultCallback = void(List results, std::exception_ptr error);
+namespace _impl {
 
 class PartialSyncHelper {
 public:
@@ -37,13 +39,13 @@ public:
     // Register an object class and query for use with partial synchronization.
     // The callback will be called exactly once: upon either the successful completion
     // of the query, or upon its failure.
-    // Bindings can take the `List` passed into the callback and construct a binding
+    // Bindings can take the `Results` passed into the callback and construct a binding
     // level collection from it that can be used by the host application. They can
     // then observe the collection themselves if they wish to be notified about
     // further changes to it.
     void register_query(const std::string& object_class,
                         const std::string& query,
-                        std::function<PartialSyncResultCallback>);
+                        std::function<void(Results, std::exception_ptr)>);
 
 private:
     // The schema that describes the common properties on `__ResultSets`.
@@ -56,6 +58,7 @@ private:
 
     Realm *m_parent_realm;
     PartialSyncHelper::Schema m_common_schema;
+    std::string m_table_name;
     std::unordered_map<std::string, size_t> m_object_type_schema;
 
     // Register an object class (specified by its raw, user-facing class name) with the
@@ -63,9 +66,10 @@ private:
     // More specifically, if necessary the __ResultSets schema is modified to add a
     // property of type Array<class> named "<class>_matches".
     // Returns the column index of the "<class>_matches" property.
-    size_t get_matches_column_idx_for_object_class(const std::string&);
+    size_t get_matches_column_idx_for_object_class(const std::string&, TableRef);
 };
 
-}
+} // namespace _impl
+} // namespace realm
 
 #endif /* partial_sync_helper_hpp */

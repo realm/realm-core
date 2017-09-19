@@ -406,7 +406,7 @@ std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const SyncUse
     return user->state() == SyncUser::State::Active ? user : nullptr;
 }
 
-std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& raw_realm_url, bool partial_sync) const
+std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
@@ -415,11 +415,7 @@ std::string SyncManager::path_for_realm(const SyncUser& user, const std::string&
     if (user.token_type() == SyncUser::TokenType::Normal)
         user_info = SyncUserIdentifier{ user.identity(), user.server_url() };
 
-    // FIXME: check for forward slash
-    // FIXME: how to derive unique identifier?
-    return m_file_manager->path(user_local_identity,
-                                partial_sync ? raw_realm_url + "/__partial/123456" : raw_realm_url,
-                                std::move(user_info));
+    return m_file_manager->path(user_local_identity, raw_realm_url, std::move(user_info));
 }
 
 std::string SyncManager::recovery_directory_path() const

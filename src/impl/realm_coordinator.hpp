@@ -28,17 +28,16 @@
 
 namespace realm {
 class Replication;
+class Results;
 class Schema;
 class SharedGroup;
 class StringData;
 class SyncSession;
 
-// FIXME: move into _impl namespace
-class PartialSyncHelper;
-
 namespace _impl {
 class CollectionNotifier;
 class ExternalCommitHelper;
+class PartialSyncHelper;
 class WeakRealmNotifier;
 
 // RealmCoordinator manages the weak cache of Realm instances and communication
@@ -140,17 +139,15 @@ public:
     template<typename Pred>
     std::unique_lock<std::mutex> wait_for_notifiers(Pred&& wait_predicate);
 
-    using PartialSyncResultCallback = void(List results, std::exception_ptr error);
+    // If this Realm represents a partially-synced Realm, register a partial sync
+    // query, and report the results in the provided callback block.
+    // If this Realm is not a partially-synced Realm, an exception will be thrown.
     void register_partial_sync_query(const std::string& object_class,
                                      const std::string& query,
-                                     std::function<PartialSyncResultCallback>);
+                                     std::function<void(Results, std::exception_ptr)>);
 
 private:
     Realm::Config m_config;
-
-#if REALM_ENABLE_SYNC
-    std::unique_ptr<PartialSyncHelper> m_partial_sync_helper;
-#endif
 
     mutable std::mutex m_schema_cache_mutex;
     util::Optional<Schema> m_cached_schema;
@@ -183,6 +180,7 @@ private:
     std::function<void(VersionID, VersionID)> m_transaction_callback;
 
     std::shared_ptr<SyncSession> m_sync_session;
+    std::unique_ptr<PartialSyncHelper> m_partial_sync_helper;
 
     // must be called with m_notifier_mutex locked
     void pin_version(VersionID version);

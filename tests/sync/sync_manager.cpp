@@ -81,7 +81,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         const std::string identity = "foobarbaz";
         auto user = SyncManager::shared().get_user({ identity, auth_server_url }, "dummy_token");
         const auto expected = base_path + "realm-object-server/foobarbaz/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz";
-        REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url, false) == expected);
+        REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "realm-object-server/foobarbaz/");
     }
@@ -92,7 +92,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         auto user = SyncManager::shared().get_user({ identity, auth_server_url }, "dummy_token");
         auto local_identity = user->local_identity();
         const auto expected = base_path + "realm-object-server/" + local_identity + "/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz";
-        REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url, false) == expected);
+        REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "realm-object-server/" + local_identity + "/");
     }

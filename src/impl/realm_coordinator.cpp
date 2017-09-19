@@ -238,12 +238,14 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
         m_weak_realm_notifiers.emplace_back(realm, m_config.cache);
     }
 
-    if (realm->config().sync_config) {
+#if REALM_ENABLE_SYNC
+    if (auto sync_config = realm->config().sync_config) {
         create_sync_session();
-        if (realm->config().sync_config->is_partial)
+        if (sync_config->is_partial)
             m_partial_sync_helper = std::make_unique<PartialSyncHelper>(&(*realm));
 
     }
+#endif
 
     if (schema) {
         lock.unlock();
@@ -899,14 +901,13 @@ void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, Ve
 
 void RealmCoordinator::register_partial_sync_query(const std::string& object_class,
                                                    const std::string& query,
-                                                   std::function<PartialSyncResultCallback> callback)
+                                                   std::function<void(Results, std::exception_ptr)> callback)
 {
 #if REALM_ENABLE_SYNC
-    if (m_partial_sync_helper) {
+    if (m_partial_sync_helper)
         m_partial_sync_helper->register_query(object_class, query, std::move(callback));
-    } else {
+    else
         throw std::runtime_error("This Realm is not a partially synced Realm.");
-    }
 #else
     REALM_TERMINATE("Realm was not built with sync enabled; this method cannot be used.");
 #endif

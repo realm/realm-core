@@ -18,7 +18,6 @@
 
 #include "sync_test_utils.hpp"
 
-#include "list.hpp"
 #include "shared_realm.hpp"
 #include "object.hpp"
 #include "object_schema.hpp"
@@ -48,7 +47,7 @@ namespace {
 
 Schema partial_sync_schema()
 {
-	return Schema{
+    return Schema{
         {"partial_sync_object_a", {
             {"first_number", PropertyType::Int},
             {"second_number", PropertyType::Int},
@@ -63,17 +62,17 @@ Schema partial_sync_schema()
 }
 
 void populate_realm(Realm::Config& config, std::vector<TypeATuple> a={}, std::vector<TypeBTuple> b={})
-{	
-	auto r = Realm::get_shared_realm(config);
-	r->begin_transaction();
+{    
+    auto r = Realm::get_shared_realm(config);
+    r->begin_transaction();
     {   
         const auto& object_schema = *r->schema().find("partial_sync_object_a");
         const auto& first_number_prop = *object_schema.property_for_name("first_number");
         const auto& second_number_prop = *object_schema.property_for_name("second_number");
         const auto& string_prop = *object_schema.property_for_name("string");
         TableRef table = ObjectStore::table_for_object_type(r->read_group(), "partial_sync_object_a");
-    	for (size_t i = 0; i < a.size(); ++i) {
-    		auto current = a[i];
+        for (size_t i = 0; i < a.size(); ++i) {
+            auto current = a[i];
             size_t row_idx = sync::create_object(r->read_group(), *table);
             table->set_int(first_number_prop.table_column, row_idx, std::get<0>(current));
             table->set_int(second_number_prop.table_column, row_idx, std::get<1>(current));
@@ -94,7 +93,7 @@ void populate_realm(Realm::Config& config, std::vector<TypeATuple> a={}, std::ve
             table->set_string(second_string_prop.table_column, row_idx, std::get<2>(current));
         }
     }
-	r->commit_transaction();
+    r->commit_transaction();
     // Wait for uploads
     std::atomic<bool> upload_done(false);
     auto session = SyncManager::shared().get_existing_active_session(config.path);
@@ -107,17 +106,16 @@ void run_query(const std::string& query, const Realm::Config& partial_config, Pa
 {
     std::atomic<bool> partial_sync_done(false);
     auto r = Realm::get_shared_realm(partial_config);
-    util::Optional<List> results;
+    Results results;
     r->register_partial_sync_query(
         type == PartialSyncTestObjects::A ? "partial_sync_object_a" : "partial_sync_object_b",
         query, 
-        [&](List list, std::exception_ptr) {
+        [&](Results r, std::exception_ptr) {
             partial_sync_done = true;
-            results = list;
+            results = std::move(r);
     });
     EventLoop::main().run_until([&] { return partial_sync_done.load(); });
-    REQUIRE(bool(results));
-    check(results->as_results());
+    check(std::move(results));
 }
 
 bool results_contains(Results& r, TypeATuple a)
@@ -155,26 +153,26 @@ bool results_contains(Results& r, TypeBTuple b)
 }
 
 TEST_CASE("Partial sync", "[sync]") {
-	if (!EventLoop::has_implementation())
+    if (!EventLoop::has_implementation())
         return;
 
-	SyncServer server;
-	SyncTestFile config(server, "test", partial_sync_schema());
-	SyncTestFile partial_config(server, "test/__partial/123456", partial_sync_schema(), true);
+    SyncServer server;
+    SyncTestFile config(server, "test", partial_sync_schema());
+    SyncTestFile partial_config(server, "test/__partial/123456", partial_sync_schema(), true);
     // Add some objects for test purposes.
     populate_realm(config, 
         {{1, 10, "partial"}, {2, 2, "partial"}, {3, 8, "sync"}},
         {{3, "meela", "orange"}, {4, "jyaku", "kiwi"}, {5, "meela", "cherry"}, {6, "meela", "kiwi"}, {7, "jyaku", "orange"}}
         );
 
-	SECTION("works in the most basic case") {
+    SECTION("works in the most basic case") {
         // Open the partially synced Realm and run a query.
         run_query("string = \"partial\"", partial_config, PartialSyncTestObjects::A, [](Results results) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {1, 10, "partial"}));
             REQUIRE(results_contains(results, {2, 2, "partial"}));
         });
-	}
+    }
 
     SECTION("works when multiple queries are made on the same property") {
         run_query("first_number > 1", partial_config, PartialSyncTestObjects::A, [](Results results) {

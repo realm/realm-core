@@ -226,7 +226,7 @@ Realm::~Realm()
 
 void Realm::register_partial_sync_query(const std::string& object_class,
                                         const std::string& query,
-                                        std::function<PartialSyncResultCallback> callback)
+                                        std::function<void(Results, std::exception_ptr)> callback)
 {
     if (m_coordinator)
         m_coordinator->register_partial_sync_query(object_class, query, std::move(callback));
