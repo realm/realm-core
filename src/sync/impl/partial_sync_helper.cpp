@@ -51,7 +51,6 @@ PartialSyncHelper::PartialSyncHelper(Realm* realm)
     REALM_ASSERT(!table->has_shared_type());
     if (table_was_added) {
         // Set up the initial schema.
-        // FIXME: tests are failing on schema change error.
         m_common_schema = {
             table->add_column(DataType::type_String, "matches_property"),
             table->add_column(DataType::type_String, "query"),
@@ -90,30 +89,36 @@ void PartialSyncHelper::register_query(const std::string& object_class,
 
     // Observe the new object and notify listener when the results are complete (status != 0).
     auto notifier = std::make_shared<_impl::ObjectNotifier>(row, m_parent_realm->shared_from_this());
-    auto notification_callback = [&,
+    auto notification_callback = [idx_status=m_common_schema.idx_status,
+                                  idx_error_message=m_common_schema.idx_error_message,
+                                  realm=m_parent_realm->shared_from_this(),
                                   row=std::move(row),
                                   link_view=std::move(link_view),
                                   notifier=notifier,
-                                  callback=std::move(callback)](CollectionChangeSet, std::exception_ptr error) {
+                                  callback=std::move(callback)](CollectionChangeSet, std::exception_ptr error) mutable {
         if (error) {
+            realm = {};
             callback(Results(), error);
             notifier->unregister();
+            notifier = {};
             return;
         }
         // Get the status.
-        size_t status = row.get_int(m_common_schema.idx_status);
+        size_t status = row.get_int(idx_status);
         if (status == 0) {
             // Still computing...
             return;
         } else if (status == 1) {
             // Finished successfully.
-            callback(List(m_parent_realm->shared_from_this(), std::move(link_view)).as_results(), nullptr);
+            callback(List(std::move(realm), std::move(link_view)).as_results(), nullptr);
         } else {
             // Finished with error.
-            std::string message = row.get_string(m_common_schema.idx_error_message);
+            realm = {};
+            std::string message = row.get_string(idx_error_message);
             callback(Results(), std::make_exception_ptr(std::runtime_error(std::move(message))));
         }
         notifier->unregister();
+        notifier = {};
     };
     _impl::RealmCoordinator::register_notifier(notifier);
     notifier->add_callback(std::move(notification_callback));
