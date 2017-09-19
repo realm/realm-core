@@ -37,7 +37,11 @@ class SyncSession;
 namespace _impl {
 class CollectionNotifier;
 class ExternalCommitHelper;
+#if REALM_ENABLE_SYNC
 class PartialSyncHelper;
+#else
+class PartialSyncHelper { };
+#endif
 class WeakRealmNotifier;
 
 // RealmCoordinator manages the weak cache of Realm instances and communication

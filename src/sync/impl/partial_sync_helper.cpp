@@ -38,6 +38,7 @@ inline std::string matches_property_for_object(const std::string& name)
 PartialSyncHelper::PartialSyncHelper(Realm* realm)
 : m_table_name(ObjectStore::table_name_for_object_type("__ResultSets"))
 {
+#if REALM_HAVE_SYNC_STABLE_IDS
     // Get or create the `__ResultSets` table within the Realm.
     bool table_was_added = false;
     m_parent_realm = realm;
@@ -68,12 +69,17 @@ PartialSyncHelper::PartialSyncHelper(Realm* realm)
             table->get_column_index("error_message"),
         };
     }
+#else
+    // Cannot use this feature with older versions of sync.
+    REALM_ASSERT(false);
+#endif
 }
 
 void PartialSyncHelper::register_query(const std::string& object_class,
                                        const std::string& query,
                                        std::function<void(Results, std::exception_ptr)> callback)
 {
+#if REALM_HAVE_SYNC_STABLE_IDS
     auto table = m_parent_realm->read_group().get_table(m_table_name);
     size_t link_column = get_matches_column_idx_for_object_class(object_class, table);
     auto matches_name = matches_property_for_object(object_class);
@@ -122,10 +128,12 @@ void PartialSyncHelper::register_query(const std::string& object_class,
     };
     _impl::RealmCoordinator::register_notifier(notifier);
     notifier->add_callback(std::move(notification_callback));
+#endif
 }
 
 size_t PartialSyncHelper::get_matches_column_idx_for_object_class(const std::string& object_class, TableRef table)
 {
+#if REALM_HAVE_SYNC_STABLE_IDS
     auto it = m_object_type_schema.find(object_class);
     size_t idx = npos;
     if (it == m_object_type_schema.end()) {
@@ -148,6 +156,9 @@ size_t PartialSyncHelper::get_matches_column_idx_for_object_class(const std::str
         // We previously registered the object class.
         return it->second;
     }
+#else
+    return npos;
+#endif
 }
 
 } // namespace _impl
