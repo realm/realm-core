@@ -640,8 +640,15 @@ void File::resize(SizeType size)
         size = data_size_to_encrypted_size(size);
 
     seek(size);
-    if (!SetEndOfFile(m_fd))
-        throw std::runtime_error("SetEndOfFile() failed");
+
+    if (!SetEndOfFile(m_fd)) {
+        DWORD err = GetLastError(); // Eliminate any risk of clobbering
+        std::string msg = get_last_error_msg("SetEndOfFile() failed: ", err);
+        if (err == ERROR_HANDLE_DISK_FULL || err == ERROR_DISK_FULL) {
+            throw OutOfDiskSpace(msg);
+        }
+        throw std::runtime_error(msg);
+    }
 
     // Restore file position
     seek(p);
@@ -659,7 +666,11 @@ void File::resize(SizeType size)
     // required by File::resize().
     if (::ftruncate(m_fd, size2) != 0) {
         int err = errno; // Eliminate any risk of clobbering
-        throw std::runtime_error(get_errno_msg("ftruncate() failed: ", err));
+        std::string msg = get_errno_msg("ftruncate() failed: ", err);
+        if (err == ENOSPC || err == EDQUOT) {
+            throw OutOfDiskSpace(msg);
+        }
+        throw std::runtime_error(msg);
     }
 
 #endif
@@ -704,6 +715,9 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
         return;
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("posix_fallocate() failed: ", err);
+    if (err == ENOSPC || err == EDQUOT) {
+        throw OutOfDiskSpace(msg);
+    }
     throw std::runtime_error(msg);
 
 // FIXME: OS X does not have any version of fallocate, but see
