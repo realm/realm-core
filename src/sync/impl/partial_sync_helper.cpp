@@ -36,16 +36,22 @@ inline std::string matches_property_for_object(const std::string& name)
 PartialSyncHelper::PartialSyncHelper(Realm* realm)
 {
     // Get or create the `__ResultSets` table within the Realm.
+    // FIXME: why are we calculating this three separate places?
     auto table_name = ObjectStore::table_name_for_object_type("__ResultSets");
     bool table_was_added = false;
     m_parent_realm = realm;
 
     realm->begin_transaction();
-    auto table = realm->read_group().get_or_add_table(table_name, &table_was_added);
+
+    auto table = realm->read_group().get_table(table_name);
+    if (!table) {
+        table = sync::create_table(realm->read_group(), table_name);
+        table_was_added = true;
+    }
     REALM_ASSERT(!table->has_shared_type());
-    m_result_sets_table = std::move(table);
     if (table_was_added) {
         // Set up the initial schema.
+        // FIXME: tests are failing on schema change error.
         m_common_schema = {
             table->add_column(DataType::type_String, "matches_property"),
             table->add_column(DataType::type_String, "query"),
@@ -71,10 +77,12 @@ void PartialSyncHelper::register_query(const std::string& object_class,
 {
     size_t link_column = get_matches_column_idx_for_object_class(object_class);
     auto matches_name = matches_property_for_object(object_class);
+    auto table_name = ObjectStore::table_name_for_object_type("__ResultSets");
+    auto table = m_parent_realm->read_group().get_table(table_name);
 
     // Create a new __ResultSets object, and stick it in the Realm.
     m_parent_realm->begin_transaction();
-    Row row = m_result_sets_table->get(m_result_sets_table->add_empty_row());
+    Row row = table->get(sync::create_object(m_parent_realm->read_group(), *table));
     auto link_view = row.get_linklist(link_column);
     row.set_int(m_common_schema.idx_status, 0);
     row.set_string(m_common_schema.idx_query, query);
@@ -84,6 +92,7 @@ void PartialSyncHelper::register_query(const std::string& object_class,
     // Observe the new object and notify listener when the results are complete (status != 0)
     auto notifier = std::make_shared<_impl::ObjectNotifier>(row, m_parent_realm->shared_from_this());
     auto notification_callback = [&,
+                                  row=std::move(row),
                                   link_view=std::move(link_view),
                                   notifier=notifier,
                                   callback=std::move(callback)](CollectionChangeSet, std::exception_ptr error) {
@@ -113,17 +122,20 @@ void PartialSyncHelper::register_query(const std::string& object_class,
 
 size_t PartialSyncHelper::get_matches_column_idx_for_object_class(const std::string& object_class)
 {
+    // FIXME: make this less inefficient
+    auto table_name = ObjectStore::table_name_for_object_type("__ResultSets");
+    auto table = m_parent_realm->read_group().get_table(table_name);
     auto it = m_object_type_schema.find(object_class);
     size_t idx = npos;
     if (it == m_object_type_schema.end()) {
         // Look up the schema in the table.
         auto raw_name = matches_property_for_object(object_class);
         m_parent_realm->begin_transaction();
-        idx = m_result_sets_table->get_column_index(raw_name);
+        idx = table->get_column_index(raw_name);
         // If it's not there, add a new column.
         if (idx == npos) {
             TableRef target_table = ObjectStore::table_for_object_type(m_parent_realm->read_group(), object_class);
-            idx = m_result_sets_table->add_column_link(DataType::type_LinkList, raw_name, *target_table);
+            idx = table->add_column_link(DataType::type_LinkList, raw_name, *target_table);
             m_parent_realm->commit_transaction();
         } else {
             m_parent_realm->cancel_transaction();

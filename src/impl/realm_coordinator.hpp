@@ -33,6 +33,9 @@ class SharedGroup;
 class StringData;
 class SyncSession;
 
+// FIXME: move into _impl namespace
+class PartialSyncHelper;
+
 namespace _impl {
 class CollectionNotifier;
 class ExternalCommitHelper;
@@ -137,8 +140,17 @@ public:
     template<typename Pred>
     std::unique_lock<std::mutex> wait_for_notifiers(Pred&& wait_predicate);
 
+    using PartialSyncResultCallback = void(List results, std::exception_ptr error);
+    void register_partial_sync_query(const std::string& object_class,
+                                     const std::string& query,
+                                     std::function<PartialSyncResultCallback>);
+
 private:
     Realm::Config m_config;
+
+#if REALM_ENABLE_SYNC
+    std::unique_ptr<PartialSyncHelper> m_partial_sync_helper;
+#endif
 
     mutable std::mutex m_schema_cache_mutex;
     util::Optional<Schema> m_cached_schema;

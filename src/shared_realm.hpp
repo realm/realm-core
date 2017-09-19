@@ -36,7 +36,6 @@ namespace realm {
 class BindingContext;
 class Group;
 class List;
-class PartialSyncHelper;
 class Realm;
 class Replication;
 class SharedGroup;
@@ -392,10 +391,6 @@ private:
     void add_schema_change_handler();
     void cache_new_schema();
     void notify_schema_changed();
-
-#if REALM_ENABLE_SYNC
-    std::unique_ptr<PartialSyncHelper> m_partial_sync_helper;
-#endif
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;

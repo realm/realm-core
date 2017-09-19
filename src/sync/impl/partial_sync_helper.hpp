@@ -19,10 +19,9 @@
 #ifndef partial_sync_helper_hpp
 #define partial_sync_helper_hpp
 
+#include <functional>
 #include <string>
 #include <unordered_map>
-
-#include <realm/table_ref.hpp>
 
 namespace realm {
     
@@ -57,7 +56,6 @@ private:
 
     Realm *m_parent_realm;
     PartialSyncHelper::Schema m_common_schema;
-    TableRef m_result_sets_table;
     std::unordered_map<std::string, size_t> m_object_type_schema;
 
     // Register an object class (specified by its raw, user-facing class name) with the
