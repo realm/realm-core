@@ -16,6 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "feature_checks.hpp"
+
 #if REALM_HAVE_SYNC_STABLE_IDS
 
 #include "sync_test_utils.hpp"
@@ -218,4 +220,4 @@ TEST_CASE("Partial sync", "[sync]") {
     }
 }
 
-#endif // Don't run these tests for ROS 1
+#endif // REALM_HAVE_SYNC_STABLE_IDS
