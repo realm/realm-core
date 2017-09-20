@@ -399,7 +399,7 @@ inline void Cluster::do_create(size_t col_ndx)
 {
     T arr(m_alloc);
     arr.create();
-    arr.set_parent(this, col_ndx);
+    arr.set_parent(this, col_ndx + 1);
     arr.update_parent();
 }
 
@@ -408,36 +408,27 @@ void Cluster::create()
     // Create array with the required size
     size_t nb_columns = m_tree_top.get_spec().get_column_count();
     Array::create(type_HasRefs, false, nb_columns + 1);
-
     m_keys.create(Array::type_Normal);
     m_keys.update_parent();
-    for (size_t i = 0; i < nb_columns; i++) {
-        bool nullable = m_tree_top.get_spec().get_column_attr(i) & col_attr_Nullable;
-        switch (m_tree_top.get_spec().get_column_type(i)) {
-            case col_type_Int: {
-                Array arr(m_alloc);
-                if (nullable) {
-                    reinterpret_cast<ArrayIntNull*>(&arr)->create(Array::type_Normal);
+    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
+        switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
+            case col_type_Int:
+                if (m_tree_top.get_spec().get_column_attr(col_ndx) & col_attr_Nullable) {
+                    do_create<ArrayIntNull>(col_ndx);
                 }
                 else {
-                    arr.create(Array::type_Normal);
+                    do_create<ArrayInteger>(col_ndx);
                 }
-                arr.set_parent(this, i + 1);
-                arr.update_parent();
                 break;
-            }
-            case col_type_String: {
-                do_create<ArrayString>(i + 1);
+            case col_type_String:
+                do_create<ArrayString>(col_ndx);
                 break;
-            }
-            case col_type_Binary: {
-                do_create<ArrayBinary>(i + 1);
+            case col_type_Binary:
+                do_create<ArrayBinary>(col_ndx);
                 break;
-            }
-            case col_type_Timestamp: {
-                do_create<ArrayTimestamp>(i + 1);
+            case col_type_Timestamp:
+                do_create<ArrayTimestamp>(col_ndx);
                 break;
-            }
             default:
                 break;
         }
@@ -469,7 +460,7 @@ template <class T>
 inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, bool nullable)
 {
     T arr(m_alloc);
-    arr.set_parent(this, col_ndx);
+    arr.set_parent(this, col_ndx + 1);
     arr.init_from_parent();
     arr.insert(ndx, T::default_value(nullable));
 }
@@ -477,35 +468,27 @@ inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, bool nullable)
 void Cluster::insert_row(size_t ndx, Key k)
 {
     m_keys.insert(ndx, k.value);
-    size_t sz = size();
-    for (size_t i = 1; i < sz; i++) {
-        bool nullable = m_tree_top.get_spec().get_column_attr(i - 1) & col_attr_Nullable;
-        switch (m_tree_top.get_spec().get_column_type(i - 1)) {
-            case col_type_Int: {
-                Array arr(m_alloc);
-                arr.set_parent(this, i);
-                arr.init_from_parent();
+    size_t nb_columns = size() - 1;
+    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
+        bool nullable = m_tree_top.get_spec().get_column_attr(col_ndx) & col_attr_Nullable;
+        switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
+            case col_type_Int:
                 if (nullable) {
-                    auto arr_int_null = reinterpret_cast<ArrayIntNull*>(&arr);
-                    arr_int_null->insert(ndx, util::none);
+                    do_insert_row<ArrayIntNull>(ndx, col_ndx, nullable);
                 }
                 else {
-                    arr.insert(ndx, 0);
+                    do_insert_row<ArrayInteger>(ndx, col_ndx, nullable);
                 }
                 break;
-            }
-            case col_type_String: {
-                do_insert_row<ArrayString>(ndx, i, nullable);
+            case col_type_String:
+                do_insert_row<ArrayString>(ndx, col_ndx, nullable);
                 break;
-            }
-            case col_type_Binary: {
-                do_insert_row<ArrayBinary>(ndx, i, nullable);
+            case col_type_Binary:
+                do_insert_row<ArrayBinary>(ndx, col_ndx, nullable);
                 break;
-            }
-            case col_type_Timestamp: {
-                do_insert_row<ArrayTimestamp>(ndx, i, nullable);
+            case col_type_Timestamp:
+                do_insert_row<ArrayTimestamp>(ndx, col_ndx, nullable);
                 break;
-            }
             default:
                 break;
         }
@@ -517,11 +500,11 @@ inline void Cluster::do_move(size_t ndx, size_t col_ndx, Cluster* to)
 {
     size_t end = node_size();
     T src(m_alloc);
-    src.set_parent(this, col_ndx);
+    src.set_parent(this, col_ndx + 1);
     src.init_from_parent();
 
     T dst(m_alloc);
-    dst.set_parent(to, col_ndx);
+    dst.set_parent(to, col_ndx + 1);
     dst.init_from_parent();
 
     for (size_t j = ndx; j < end; j++) {
@@ -533,47 +516,27 @@ inline void Cluster::do_move(size_t ndx, size_t col_ndx, Cluster* to)
 void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
 {
     auto new_leaf = static_cast<Cluster*>(new_node);
-    size_t end = node_size();
 
-    size_t sz = size();
-    for (size_t i = 1; i < sz; i++) {
-        switch (m_tree_top.get_spec().get_column_type(i - 1)) {
-            case col_type_Int: {
-                bool nullable = m_tree_top.get_spec().get_column_attr(i - 1) & col_attr_Nullable;
-                Array src(m_alloc);
-                src.set_parent(this, i);
-                src.init_from_parent();
-                Array dst(m_alloc);
-                dst.set_parent(new_leaf, i);
-                dst.init_from_parent();
-                if (nullable) {
-                    auto arr_src = reinterpret_cast<ArrayIntNull*>(&src);
-                    auto arr_dst = reinterpret_cast<ArrayIntNull*>(&dst);
-                    for (size_t j = ndx; j < end; j++) {
-                        arr_dst->add(arr_src->get(j));
-                    }
-                    arr_src->truncate(ndx);
+    size_t nb_columns = size() - 1;
+    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
+        switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
+            case col_type_Int:
+                if (m_tree_top.get_spec().get_column_attr(col_ndx) & col_attr_Nullable) {
+                    do_move<ArrayIntNull>(ndx, col_ndx, new_leaf);
                 }
                 else {
-                    for (size_t j = ndx; j < end; j++) {
-                        dst.add(src.get(j));
-                    }
-                    src.truncate(ndx);
+                    do_move<ArrayInteger>(ndx, col_ndx, new_leaf);
                 }
                 break;
-            }
-            case col_type_String: {
-                do_move<ArrayString>(ndx, i, new_leaf);
+            case col_type_String:
+                do_move<ArrayString>(ndx, col_ndx, new_leaf);
                 break;
-            }
-            case col_type_Binary: {
-                do_move<ArrayBinary>(ndx, i, new_leaf);
+            case col_type_Binary:
+                do_move<ArrayBinary>(ndx, col_ndx, new_leaf);
                 break;
-            }
-            case col_type_Timestamp: {
-                do_move<ArrayTimestamp>(ndx, i, new_leaf);
+            case col_type_Timestamp:
+                do_move<ArrayTimestamp>(ndx, col_ndx, new_leaf);
                 break;
-            }
             default:
                 break;
         }
@@ -589,59 +552,44 @@ Cluster::~Cluster()
 {
 }
 
-void Cluster::insert_column(size_t ndx)
+template <class T>
+inline void Cluster::do_insert_column(size_t col_ndx, bool nullable)
 {
     size_t sz = node_size();
-    bool nullable = m_tree_top.get_spec().get_column_attr(ndx) & col_attr_Nullable;
 
-    switch (m_tree_top.get_spec().get_column_type(ndx)) {
-        case col_type_Int: {
-            Array arr(m_alloc);
-            int64_t value = 0;
+    T arr(m_alloc);
+    arr.create();
+    auto val = T::default_value(nullable);
+    for (size_t i = 0; i < sz; i++) {
+        arr.add(val);
+    }
+    Array::insert(col_ndx + 1, from_ref(arr.get_ref()));
+}
+
+void Cluster::insert_column(size_t col_ndx)
+{
+    bool nullable = m_tree_top.get_spec().get_column_attr(col_ndx) & col_attr_Nullable;
+
+    switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
+        case col_type_Int:
             if (nullable) {
-                auto arr_int_null = reinterpret_cast<ArrayIntNull*>(&arr);
-                arr_int_null->create(Array::type_Normal);
-                value = arr.get(0);
+                do_insert_column<ArrayIntNull>(col_ndx, nullable);
             }
             else {
-                arr.create(Array::type_Normal);
+                do_insert_column<ArrayInteger>(col_ndx, nullable);
             }
-            for (size_t i = 0; i < sz; i++) {
-                arr.add(value);
-            }
-            Array::insert(ndx + 1, from_ref(arr.get_ref()));
             break;
-        }
-        case col_type_String: {
-            ArrayString arr(m_alloc);
-            arr.create();
-            for (size_t i = 0; i < sz; i++) {
-                arr.add(nullable ? StringData{} : StringData{""});
-            }
-            // Insert the reference to the newly created array in parent
-            Array::insert(ndx + 1, from_ref(arr.get_ref()));
+        case col_type_String:
+            do_insert_column<ArrayString>(col_ndx, nullable);
             break;
-        }
-        case col_type_Binary: {
-            ArrayBinary arr(m_alloc);
-            arr.create();
-            for (size_t i = 0; i < sz; i++) {
-                arr.add(nullable ? BinaryData{} : BinaryData{"", 0});
-            }
-            Array::insert(ndx + 1, from_ref(arr.get_ref()));
+        case col_type_Binary:
+            do_insert_column<ArrayBinary>(col_ndx, nullable);
             break;
-        }
-        case col_type_Timestamp: {
-            ArrayTimestamp arr(m_alloc);
-            arr.create();
-            for (size_t i = 0; i < sz; i++) {
-                arr.add(nullable ? Timestamp{} : Timestamp{0, 0});
-            }
-            Array::insert(ndx + 1, from_ref(arr.get_ref()));
+        case col_type_Timestamp:
+            do_insert_column<ArrayTimestamp>(col_ndx, nullable);
             break;
-        }
         default:
-            Array::insert(ndx + 1, 0);
+            Array::insert(col_ndx + 1, 0);
             break;
     }
 }
@@ -706,7 +654,7 @@ template <class T>
 inline void Cluster::do_erase(size_t ndx, size_t col_ndx)
 {
     T values(m_alloc);
-    values.set_parent(this, col_ndx);
+    values.set_parent(this, col_ndx + 1);
     values.init_from_parent();
     values.erase(ndx);
 }
@@ -718,35 +666,26 @@ unsigned Cluster::erase(Key k)
         throw InvalidKey("Key not found");
     }
     m_keys.erase(ndx);
-
-    size_t sz = size();
-    for (size_t i = 1; i < sz; i++) {
-        switch (m_tree_top.get_spec().get_column_type(i - 1)) {
-            case col_type_Int: {
-                bool nullable = m_tree_top.get_spec().get_column_attr(i - 1) & col_attr_Nullable;
-                Array values(m_alloc);
-                values.set_parent(this, i);
-                values.init_from_parent();
-                if (nullable) {
-                    reinterpret_cast<ArrayIntNull*>(&values)->erase(ndx);
+    size_t nb_columns = size() - 1;
+    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
+        switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
+            case col_type_Int:
+                if (m_tree_top.get_spec().get_column_attr(col_ndx) & col_attr_Nullable) {
+                    do_erase<ArrayIntNull>(ndx, col_ndx);
                 }
                 else {
-                    values.erase(ndx);
+                    do_erase<ArrayInteger>(ndx, col_ndx);
                 }
                 break;
-            }
-            case col_type_String: {
-                do_erase<ArrayString>(ndx, i);
+            case col_type_String:
+                do_erase<ArrayString>(ndx, col_ndx);
                 break;
-            }
-            case col_type_Binary: {
-                do_erase<ArrayBinary>(ndx, i);
+            case col_type_Binary:
+                do_erase<ArrayBinary>(ndx, col_ndx);
                 break;
-            }
-            case col_type_Timestamp: {
-                do_erase<ArrayTimestamp>(ndx, i);
+            case col_type_Timestamp:
+                do_erase<ArrayTimestamp>(ndx, col_ndx);
                 break;
-            }
             default:
                 break;
         }
@@ -866,7 +805,7 @@ template <class T>
 inline bool ConstObj::do_is_null(size_t col_ndx) const
 {
     T values(m_tree_top->get_alloc());
-    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx));
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
     values.init_from_ref(ref);
     return values.is_null(m_row_ndx);
 }
@@ -881,13 +820,13 @@ bool ConstObj::is_null(size_t col_ndx) const
     if (m_tree_top->get_spec().get_column_attr(col_ndx) & col_attr_Nullable) {
         switch (m_tree_top->get_spec().get_column_type(col_ndx)) {
             case col_type_Int:
-                return do_is_null<ArrayIntNull>(col_ndx + 1);
+                return do_is_null<ArrayIntNull>(col_ndx);
             case col_type_String:
-                return do_is_null<ArrayString>(col_ndx + 1);
+                return do_is_null<ArrayString>(col_ndx);
             case col_type_Binary:
-                return do_is_null<ArrayBinary>(col_ndx + 1);
+                return do_is_null<ArrayBinary>(col_ndx);
             case col_type_Timestamp:
-                return do_is_null<ArrayTimestamp>(col_ndx + 1);
+                return do_is_null<ArrayTimestamp>(col_ndx);
             default:
                 break;
         }
@@ -981,7 +920,7 @@ inline void Obj::do_set_null(size_t col_ndx)
     fields.init_from_mem(m_mem);
 
     T values(alloc);
-    values.set_parent(&fields, col_ndx);
+    values.set_parent(&fields, col_ndx + 1);
     values.init_from_parent();
     values.set_null(m_row_ndx);
 }
@@ -998,16 +937,16 @@ Obj& Obj::set_null(size_t col_ndx, bool is_default)
 
     switch (m_tree_top->get_spec().get_column_type(col_ndx)) {
         case col_type_Int:
-            do_set_null<ArrayIntNull>(col_ndx + 1);
+            do_set_null<ArrayIntNull>(col_ndx);
             break;
         case col_type_String:
-            do_set_null<ArrayString>(col_ndx + 1);
+            do_set_null<ArrayString>(col_ndx);
             break;
         case col_type_Binary:
-            do_set_null<ArrayBinary>(col_ndx + 1);
+            do_set_null<ArrayBinary>(col_ndx);
             break;
         case col_type_Timestamp:
-            do_set_null<ArrayTimestamp>(col_ndx + 1);
+            do_set_null<ArrayTimestamp>(col_ndx);
             break;
         default:
             break;

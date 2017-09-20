@@ -207,6 +207,8 @@ private:
     template <class T>
     void do_create(size_t col_ndx);
     template <class T>
+    void do_insert_column(size_t col_ndx, bool nullable);
+    template <class T>
     void do_insert_row(size_t ndx, size_t col_ndx, bool nullable);
     template <class T>
     void do_move(size_t ndx, size_t col_ndx, Cluster* to);

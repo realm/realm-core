@@ -8751,20 +8751,13 @@ TEST(Table_object_basic)
     Table table;
     auto int_col = table.add_column(type_Int, "int");
     auto intnull_col = table.add_column(type_Int, "intnull", true);
-    auto str_col = table.add_column(type_String, "str");
-    auto strnull_col = table.add_column(type_String, "strnull", true);
-    auto bin_col = table.add_column(type_Binary, "bin");
-    auto binnull_col = table.add_column(type_Binary, "binnull", true);
-    auto ts_col = table.add_column(type_Timestamp, "ts");
-    auto tsnull_col = table.add_column(type_Timestamp, "tsnull", true);
 
     char data[10];
     memset(data, 0x5a, 10);
     BinaryData bin_data(data, 10);
     BinaryData bin_zero(data, 0);
 
-    table.create_object(Key(5)).set_all(100, 7, "Hello", "World", bin_data, bin_data, Timestamp(123, 456),
-                                        Timestamp(789, 10));
+    table.create_object(Key(5)).set_all(100, 7);
     CHECK_EQUAL(table.size(), 1);
     CHECK_THROW(table.create_object(Key(5)), InvalidKey);
     CHECK_EQUAL(table.size(), 1);
@@ -8788,6 +8781,11 @@ TEST(Table_object_basic)
     CHECK(y.is_null(intnull_col));
 
     // String
+    auto str_col = table.add_column(type_String, "str");
+    auto strnull_col = table.add_column(type_String, "strnull", true);
+    y.set(str_col, "Hello");
+    y.set(strnull_col, "World");
+
     CHECK(!x.is_null(str_col));
     CHECK_EQUAL("", x.get<String>(str_col));
     CHECK(x.is_null(strnull_col));
@@ -8804,6 +8802,11 @@ TEST(Table_object_basic)
     CHECK(!y.is_null(str_col));
 
     // Binary
+    auto bin_col = table.add_column(type_Binary, "bin");
+    auto binnull_col = table.add_column(type_Binary, "binnull", true);
+    y.set(bin_col, bin_data);
+    y.set(binnull_col, bin_data);
+
     CHECK(!x.is_null(bin_col));
     CHECK_EQUAL(bin_zero, x.get<Binary>(bin_col));
     CHECK(x.is_null(binnull_col));
@@ -8825,6 +8828,11 @@ TEST(Table_object_basic)
     CHECK(!y.is_null(bin_col));
 
     // Timestamp
+    auto ts_col = table.add_column(type_Timestamp, "ts");
+    auto tsnull_col = table.add_column(type_Timestamp, "tsnull", true);
+    y.set(ts_col, Timestamp(123, 456));
+    y.set(tsnull_col, Timestamp(789, 10));
+
     CHECK(!x.is_null(ts_col));
     CHECK_EQUAL(Timestamp(0, 0), x.get<Timestamp>(ts_col));
     CHECK(x.is_null(tsnull_col));
