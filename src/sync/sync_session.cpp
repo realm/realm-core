@@ -454,7 +454,7 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
                                                    original_path=std::move(original_path),
                                                    recovery_path=std::move(recovery_path)](const auto& manager) {
         manager.make_file_action_metadata(original_path,
-                                          m_config.realm_url,
+                                          m_config.resolved_realm_url(),
                                           m_config.user->identity(),
                                           action,
                                           util::Optional<std::string>(std::move(recovery_path)));
