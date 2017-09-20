@@ -107,20 +107,23 @@ void populate_realm(Realm::Config& config, std::vector<TypeATuple> a={}, std::ve
 }
 
 /// Run a partial sync query, wait for the results, and then perform checks.
-void run_query(const std::string& query, const Realm::Config& partial_config, PartialSyncTestObjects type, std::function<void(Results)> check)
+void run_query(const std::string& query, const Realm::Config& partial_config, PartialSyncTestObjects type,
+                   std::function<void(Results, std::exception_ptr)> check)
 {
     std::atomic<bool> partial_sync_done(false);
     auto r = Realm::get_shared_realm(partial_config);
     Results results;
+    std::exception_ptr exception;
     partial_sync::register_query(r,
                                  type == PartialSyncTestObjects::A ? "partial_sync_object_a" : "partial_sync_object_b",
                                  query,
-                                 [&](Results r, std::exception_ptr) {
+                                 [&](Results r, std::exception_ptr e) {
                                      partial_sync_done = true;
                                      results = std::move(r);
+                                     exception = std::move(e);
                                  });
     EventLoop::main().run_until([&] { return partial_sync_done.load(); });
-    check(std::move(results));
+    check(std::move(results), std::move(exception));
 }
 
 bool results_contains(Results& r, TypeATuple a)
@@ -172,7 +175,7 @@ TEST_CASE("Partial sync", "[sync]") {
 
     SECTION("works in the most basic case") {
         // Open the partially synced Realm and run a query.
-        run_query("string = \"partial\"", partial_config, PartialSyncTestObjects::A, [](Results results) {
+        run_query("string = \"partial\"", partial_config, PartialSyncTestObjects::A, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {1, 10, "partial"}));
             REQUIRE(results_contains(results, {2, 2, "partial"}));
@@ -180,43 +183,49 @@ TEST_CASE("Partial sync", "[sync]") {
     }
 
     SECTION("works when multiple queries are made on the same property") {
-        run_query("first_number > 1", partial_config, PartialSyncTestObjects::A, [](Results results) {
+        run_query("first_number > 1", partial_config, PartialSyncTestObjects::A, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {2, 2, "partial"}));
             REQUIRE(results_contains(results, {3, 8, "sync"}));
         });
 
-        run_query("first_number = 1", partial_config, PartialSyncTestObjects::A, [](Results results) {
+        run_query("first_number = 1", partial_config, PartialSyncTestObjects::A, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 1);
             REQUIRE(results_contains(results, {1, 10, "partial"}));
         });
     }
 
     SECTION("works when queries are made on different properties") {
-        run_query("first_string = \"jyaku\"", partial_config, PartialSyncTestObjects::B, [](Results results) {
+        run_query("first_string = \"jyaku\"", partial_config, PartialSyncTestObjects::B, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {4, "jyaku", "kiwi"}));
             REQUIRE(results_contains(results, {7, "jyaku", "orange"}));
         });
 
-        run_query("second_string = \"cherry\"", partial_config, PartialSyncTestObjects::B, [](Results results) {
+        run_query("second_string = \"cherry\"", partial_config, PartialSyncTestObjects::B, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 1);
             REQUIRE(results_contains(results, {5, "meela", "cherry"}));
         });
     }
 
     SECTION("works when queries are made on different object types") {
-        run_query("second_number < 9", partial_config, PartialSyncTestObjects::A, [](Results results) {
+        run_query("second_number < 9", partial_config, PartialSyncTestObjects::A, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {2, 2, "partial"}));
             REQUIRE(results_contains(results, {3, 8, "sync"}));
         });
 
-        run_query("first_string = \"meela\"", partial_config, PartialSyncTestObjects::B, [](Results results) {
+        run_query("first_string = \"meela\"", partial_config, PartialSyncTestObjects::B, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 3);
             REQUIRE(results_contains(results, {3, "meela", "orange"}));
             REQUIRE(results_contains(results, {5, "meela", "cherry"}));
             REQUIRE(results_contains(results, {6, "meela", "kiwi"}));
+        });
+    }
+
+    SECTION("invalid queries") {
+        run_query("this isn't a valid query!", partial_config, PartialSyncTestObjects::A, [](Results, std::exception_ptr e) {
+            REQUIRE(e);
         });
     }
 }
