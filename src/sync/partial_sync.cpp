@@ -44,7 +44,6 @@ Schema add_result_sets_to_schema(const Schema& source_schema, Property matches_p
     std::vector<ObjectSchema> schema;
     schema.reserve(source_schema.size());
     std::copy(source_schema.begin(), source_schema.end(), std::back_inserter(schema));
-
     ObjectSchema result_sets_schema(result_sets_type_name, {
         {"matches_property", PropertyType::String},
         {"query", PropertyType::String},
@@ -63,8 +62,7 @@ void register_query(std::shared_ptr<Realm> realm, const std::string &object_clas
 {
     auto matches_property = matches_property_name_for_object(object_class);
 
-    auto schema = add_result_sets_to_schema(realm->schema(),
-                                            {matches_property, PropertyType::Object|PropertyType::Array, object_class});
+    
 
     Object raw_object;
     {
@@ -74,9 +72,23 @@ void register_query(std::shared_ptr<Realm> realm, const std::string &object_clas
                 realm->cancel_transaction();
         });
 
-        // FIXME: Is it ok for us to modify the schema of the Realm like this?
-        // It will invalidate any references the binding may have stored to object schemas.
-        realm->update_schema(schema, ObjectStore::NotVersioned, nullptr, nullptr, true);
+        auto& group = realm->read_group();
+        ObjectSchema result_sets_schema(result_sets_type_name, {
+            {"matches_property", PropertyType::String},
+            {"query", PropertyType::String},
+            {"status", PropertyType::Int},
+            {"error_message", PropertyType::String},
+            {matches_property, PropertyType::Object|PropertyType::Array, object_class},
+        });
+        if (group.has_table(result_sets_type_name)) {
+            auto required_changes = Schema{{ObjectSchema{group, result_sets_type_name}}}.compare(Schema{{result_sets_schema}});
+            if (!required_changes.empty())
+                ObjectStore::apply_additive_changes(group, required_changes, true);
+        } else {
+            auto schema = add_result_sets_to_schema(realm->schema(), 
+                {matches_property, PropertyType::Object|PropertyType::Array, object_class});
+            realm->update_schema(schema, ObjectStore::NotVersioned, nullptr, nullptr, true);
+        }
 
         CppContext context;
         raw_object = Object::create<util::Any>(context, realm, *realm->schema().find(result_sets_type_name),

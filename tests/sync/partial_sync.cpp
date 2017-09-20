@@ -109,7 +109,7 @@ void populate_realm(Realm::Config& config, std::vector<TypeA> a={}, std::vector<
     // Wait for uploads
     std::atomic<bool> upload_done(false);
     auto session = SyncManager::shared().get_existing_active_session(config.path);
-    session->wait_for_download_completion([&](auto) { upload_done = true; });
+    session->wait_for_upload_completion([&](auto) { upload_done = true; });
     EventLoop::main().run_until([&] { return upload_done.load(); });
 }
 

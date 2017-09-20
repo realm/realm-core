@@ -579,7 +579,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
     }
 }
 
-static void apply_additive_changes(Group& group, std::vector<SchemaChange> const& changes, bool update_indexes)
+void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange> const& changes, bool update_indexes)
 {
     using namespace schema_change;
     struct Applier {
