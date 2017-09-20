@@ -39,19 +39,23 @@ std::string matches_property_name_for_object(const std::string& name)
     return name + "_matches";
 }
 
-Schema add_result_sets_to_schema(const Schema& source_schema, Property matches_property)
+ObjectSchema result_sets_schema_with(Property matches_property)
 {
-    std::vector<ObjectSchema> schema;
-    schema.reserve(source_schema.size());
-    std::copy(source_schema.begin(), source_schema.end(), std::back_inserter(schema));
-    ObjectSchema result_sets_schema(result_sets_type_name, {
+    return ObjectSchema(result_sets_type_name, {
         {"matches_property", PropertyType::String},
         {"query", PropertyType::String},
         {"status", PropertyType::Int},
         {"error_message", PropertyType::String},
         std::move(matches_property),
     });
-    schema.push_back(std::move(result_sets_schema));
+}
+
+Schema add_result_sets_to_schema(const Schema& source_schema, Property matches_property)
+{
+    std::vector<ObjectSchema> schema;
+    schema.reserve(source_schema.size());
+    std::copy(source_schema.begin(), source_schema.end(), std::back_inserter(schema));
+    schema.push_back(result_sets_schema_with(std::move(matches_property)));
     return schema;
 }
 
@@ -61,9 +65,6 @@ void register_query(std::shared_ptr<Realm> realm, const std::string &object_clas
                     std::function<void (Results, std::exception_ptr)> callback)
 {
     auto matches_property = matches_property_name_for_object(object_class);
-
-    
-
     Object raw_object;
     {
         realm->begin_transaction();
@@ -73,20 +74,14 @@ void register_query(std::shared_ptr<Realm> realm, const std::string &object_clas
         });
 
         auto& group = realm->read_group();
-        ObjectSchema result_sets_schema(result_sets_type_name, {
-            {"matches_property", PropertyType::String},
-            {"query", PropertyType::String},
-            {"status", PropertyType::Int},
-            {"error_message", PropertyType::String},
-            {matches_property, PropertyType::Object|PropertyType::Array, object_class},
-        });
+        auto prop = Property{matches_property, PropertyType::Object|PropertyType::Array, object_class};
         if (group.has_table(result_sets_type_name)) {
+            auto result_sets_schema = result_sets_schema_with(std::move(prop));
             auto required_changes = Schema{{ObjectSchema{group, result_sets_type_name}}}.compare(Schema{{result_sets_schema}});
             if (!required_changes.empty())
                 ObjectStore::apply_additive_changes(group, required_changes, true);
         } else {
-            auto schema = add_result_sets_to_schema(realm->schema(), 
-                {matches_property, PropertyType::Object|PropertyType::Array, object_class});
+            auto schema = add_result_sets_to_schema(realm->schema(), std::move(prop));
             realm->update_schema(schema, ObjectStore::NotVersioned, nullptr, nullptr, true);
         }
 
