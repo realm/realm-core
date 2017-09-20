@@ -755,8 +755,6 @@ inline bool ConstObj::update_if_needed() const
     return false;
 }
 
-namespace realm {
-
 template <class T>
 T ConstObj::get(size_t col_ndx) const
 {
@@ -802,11 +800,6 @@ bool ConstObj::is_null(size_t col_ndx) const
     return false;
 }
 
-template int64_t ConstObj::get<int64_t>(size_t col_ndx) const;
-template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(size_t col_ndx) const;
-template StringData ConstObj::get<StringData>(size_t col_ndx) const;
-}
-
 inline void Obj::update_if_needed() const
 {
     if (ConstObj::update_if_needed()) {
@@ -848,8 +841,8 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
     return *this;
 }
 
-template <>
-Obj& Obj::set<StringData>(size_t col_ndx, StringData value, bool is_default)
+template <class T>
+Obj& Obj::set(size_t col_ndx, T value, bool is_default)
 {
     if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
@@ -860,16 +853,25 @@ Obj& Obj::set<StringData>(size_t col_ndx, StringData value, bool is_default)
     Array fields(alloc);
     fields.init_from_mem(m_mem);
     REALM_ASSERT(col_ndx + 1 < fields.size());
-    ArrayString values(alloc);
+    typename ColumnTypeTraits<T>::cluster_leaf_type values(alloc);
     values.set_parent(&fields, col_ndx + 1);
     values.init_from_parent();
     values.set(m_row_ndx, value);
 
     if (Replication* repl = alloc.get_replication())
-        repl->set_string(m_tree_top->get_owner(), col_ndx, m_row_ndx, value,
-                         is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        repl->set<T>(m_tree_top->get_owner(), col_ndx, m_row_ndx, value,
+                     is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     return *this;
+}
+
+namespace realm {
+
+template int64_t ConstObj::get<int64_t>(size_t col_ndx) const;
+template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(size_t col_ndx) const;
+template StringData ConstObj::get<StringData>(size_t col_ndx) const;
+
+template Obj& Obj::set<StringData>(size_t, StringData, bool);
 }
 
 template <class T>

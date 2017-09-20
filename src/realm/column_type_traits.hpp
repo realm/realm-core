@@ -29,6 +29,7 @@ namespace realm {
 class OldDateTime;
 class ArrayBinary;
 class ArrayString;
+class ArrayStringShort;
 class ArrayInteger;
 class ArrayIntNull;
 template <class>

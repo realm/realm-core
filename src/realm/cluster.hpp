@@ -403,10 +403,7 @@ public:
 };
 
 template <>
-Obj& Obj::set<int64_t>(size_t, int64_t value, bool is_default);
-
-template <>
-Obj& Obj::set<StringData>(size_t, StringData value, bool is_default);
+Obj& Obj::set(size_t, int64_t value, bool is_default);
 
 template <>
 inline Obj& Obj::set(size_t col_ndx, int value, bool is_default)
