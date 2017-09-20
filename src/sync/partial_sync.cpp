@@ -34,29 +34,25 @@ namespace {
 
 constexpr const char* result_sets_type_name = "__ResultSets";
 
-std::string matches_property_name_for_object(const std::string& name)
+void update_schema(Group& group, Property matches_property)
 {
-    return name + "_matches";
-}
+    Schema current_schema;
+    std::string table_name = ObjectStore::table_name_for_object_type(result_sets_type_name);
+    if (group.has_table(table_name))
+        current_schema = {ObjectSchema{group, result_sets_type_name}};
 
-ObjectSchema result_sets_schema_with(Property matches_property)
-{
-    return ObjectSchema(result_sets_type_name, {
-        {"matches_property", PropertyType::String},
-        {"query", PropertyType::String},
-        {"status", PropertyType::Int},
-        {"error_message", PropertyType::String},
-        std::move(matches_property),
+    Schema desired_schema({
+        ObjectSchema(result_sets_type_name, {
+            {"matches_property", PropertyType::String},
+            {"query", PropertyType::String},
+            {"status", PropertyType::Int},
+            {"error_message", PropertyType::String},
+            std::move(matches_property)
+        })
     });
-}
-
-Schema add_result_sets_to_schema(const Schema& source_schema, Property matches_property)
-{
-    std::vector<ObjectSchema> schema;
-    schema.reserve(source_schema.size());
-    std::copy(source_schema.begin(), source_schema.end(), std::back_inserter(schema));
-    schema.push_back(result_sets_schema_with(std::move(matches_property)));
-    return schema;
+    auto required_changes = current_schema.compare(desired_schema);
+    if (!required_changes.empty())
+        ObjectStore::apply_additive_changes(group, required_changes, true);
 }
 
 } // unnamed namespace
@@ -64,7 +60,10 @@ Schema add_result_sets_to_schema(const Schema& source_schema, Property matches_p
 void register_query(std::shared_ptr<Realm> realm, const std::string &object_class, const std::string &query,
                     std::function<void (Results, std::exception_ptr)> callback)
 {
-    auto matches_property = matches_property_name_for_object(object_class);
+    auto matches_property = object_class + "_matches";
+
+    // The object schema must outlive `object` below.
+    std::unique_ptr<ObjectSchema> result_sets_schema;
     Object raw_object;
     {
         realm->begin_transaction();
@@ -73,20 +72,13 @@ void register_query(std::shared_ptr<Realm> realm, const std::string &object_clas
                 realm->cancel_transaction();
         });
 
-        auto& group = realm->read_group();
-        auto prop = Property{matches_property, PropertyType::Object|PropertyType::Array, object_class};
-        if (group.has_table(result_sets_type_name)) {
-            auto result_sets_schema = result_sets_schema_with(std::move(prop));
-            auto required_changes = Schema{{ObjectSchema{group, result_sets_type_name}}}.compare(Schema{{result_sets_schema}});
-            if (!required_changes.empty())
-                ObjectStore::apply_additive_changes(group, required_changes, true);
-        } else {
-            auto schema = add_result_sets_to_schema(realm->schema(), std::move(prop));
-            realm->update_schema(schema, ObjectStore::NotVersioned, nullptr, nullptr, true);
-        }
+        update_schema(realm->read_group(),
+                      Property(matches_property, PropertyType::Object|PropertyType::Array, object_class));
+
+        result_sets_schema = std::make_unique<ObjectSchema>(realm->read_group(), result_sets_type_name);
 
         CppContext context;
-        raw_object = Object::create<util::Any>(context, realm, *realm->schema().find(result_sets_type_name),
+        raw_object = Object::create<util::Any>(context, realm, *result_sets_schema,
                                                AnyDict{
                                                    {"matches_property", matches_property},
                                                    {"query", query},
@@ -101,6 +93,7 @@ void register_query(std::shared_ptr<Realm> realm, const std::string &object_clas
 
     // Observe the new object and notify listener when the results are complete (status != 0).
     auto notification_callback = [object, matches_property,
+                                  result_sets_schema=std::move(result_sets_schema),
                                   callback=std::move(callback)](CollectionChangeSet, std::exception_ptr error) mutable {
         if (error) {
             callback(Results(), error);
