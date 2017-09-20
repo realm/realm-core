@@ -38,9 +38,7 @@
 #include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
-#include "sync/impl/partial_sync_helper.hpp"
 #include "sync/impl/sync_file.hpp"
-#include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include <realm/sync/history.hpp>
 #endif
@@ -222,14 +220,6 @@ Realm::~Realm()
     if (m_coordinator) {
         m_coordinator->unregister_realm(this);
     }
-}
-
-void Realm::register_partial_sync_query(const std::string& object_class,
-                                        const std::string& query,
-                                        std::function<void(Results, std::exception_ptr)> callback)
-{
-    if (m_coordinator)
-        m_coordinator->register_partial_sync_query(object_class, query, std::move(callback));
 }
 
 Group& Realm::read_group()

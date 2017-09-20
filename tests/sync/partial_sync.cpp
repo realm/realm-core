@@ -30,6 +30,7 @@
 #include "schema.hpp"
 
 #include "impl/object_accessor_impl.hpp"
+#include "sync/partial_sync.hpp"
 
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
@@ -111,13 +112,13 @@ void run_query(const std::string& query, const Realm::Config& partial_config, Pa
     std::atomic<bool> partial_sync_done(false);
     auto r = Realm::get_shared_realm(partial_config);
     Results results;
-    r->register_partial_sync_query(
-        type == PartialSyncTestObjects::A ? "partial_sync_object_a" : "partial_sync_object_b",
-        query, 
-        [&](Results r, std::exception_ptr) {
-            partial_sync_done = true;
-            results = std::move(r);
-    });
+    partial_sync::register_query(r,
+                                 type == PartialSyncTestObjects::A ? "partial_sync_object_a" : "partial_sync_object_b",
+                                 query,
+                                 [&](Results r, std::exception_ptr) {
+                                     partial_sync_done = true;
+                                     results = std::move(r);
+                                 });
     EventLoop::main().run_until([&] { return partial_sync_done.load(); });
     check(std::move(results));
 }

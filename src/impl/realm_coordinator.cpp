@@ -31,7 +31,6 @@
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
-#include "sync/impl/partial_sync_helper.hpp"
 #endif
 
 #include <realm/group_shared.hpp>
@@ -238,14 +237,8 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
         m_weak_realm_notifiers.emplace_back(realm, m_config.cache);
     }
 
-#if REALM_ENABLE_SYNC
-    if (auto sync_config = realm->config().sync_config) {
+    if (realm->config().sync_config)
         create_sync_session();
-        if (sync_config->is_partial)
-            m_partial_sync_helper = std::make_unique<PartialSyncHelper>(&(*realm));
-
-    }
-#endif
 
     if (schema) {
         lock.unlock();
@@ -897,18 +890,4 @@ void RealmCoordinator::process_available_async(Realm& realm)
 void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)
 {
     m_transaction_callback = std::move(fn);
-}
-
-void RealmCoordinator::register_partial_sync_query(const std::string& object_class,
-                                                   const std::string& query,
-                                                   std::function<void(Results, std::exception_ptr)> callback)
-{
-#if REALM_ENABLE_SYNC
-    if (m_partial_sync_helper)
-        m_partial_sync_helper->register_query(object_class, query, std::move(callback));
-    else
-        throw std::runtime_error("This Realm is not a partially synced Realm.");
-#else
-    REALM_TERMINATE("Realm was not built with sync enabled; this method cannot be used.");
-#endif
 }

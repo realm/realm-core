@@ -30,14 +30,12 @@
 #endif
 
 #include <memory>
-#include <functional>
 
 namespace realm {
 class BindingContext;
 class Group;
 class Realm;
 class Replication;
-class Results;
 class SharedGroup;
 class StringData;
 class Table;
@@ -328,12 +326,6 @@ public:
 
         static void begin_read(Realm&, VersionID);
     };
-
-    // If the Realm is a partially synchronized Realm, register a new query for the given object class,
-    // and report the results in the provided callback.
-    void register_partial_sync_query(const std::string& object_class,
-                                     const std::string& query,
-                                     std::function<void(Results, std::exception_ptr)>);
 
     static void open_with_config(const Config& config,
                                  std::unique_ptr<Replication>& history,
