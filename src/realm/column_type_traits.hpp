@@ -85,6 +85,7 @@ template <>
 struct ColumnTypeTraits<float> {
     using column_type = FloatColumn;
     using leaf_type = BasicArray<float>;
+    using cluster_leaf_type = BasicArray<float>;
     using sum_type = double;
     using minmax_type = float;
     static const DataType id = type_Float;
@@ -96,6 +97,7 @@ template <>
 struct ColumnTypeTraits<double> {
     using column_type = DoubleColumn;
     using leaf_type = BasicArray<double>;
+    using cluster_leaf_type = BasicArray<double>;
     using sum_type = double;
     using minmax_type = double;
     static const DataType id = type_Double;

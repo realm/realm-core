@@ -424,6 +424,12 @@ void Cluster::create()
             case col_type_Bool:
                 do_create<ArrayBool>(col_ndx);
                 break;
+            case col_type_Float:
+                do_create<ArrayFloat>(col_ndx);
+                break;
+            case col_type_Double:
+                do_create<ArrayDouble>(col_ndx);
+                break;
             case col_type_String:
                 do_create<ArrayString>(col_ndx);
                 break;
@@ -487,6 +493,12 @@ void Cluster::insert_row(size_t ndx, Key k)
             case col_type_Bool:
                 do_insert_row<ArrayBool>(ndx, col_ndx, nullable);
                 break;
+            case col_type_Float:
+                do_insert_row<ArrayFloat>(ndx, col_ndx, nullable);
+                break;
+            case col_type_Double:
+                do_insert_row<ArrayDouble>(ndx, col_ndx, nullable);
+                break;
             case col_type_String:
                 do_insert_row<ArrayString>(ndx, col_ndx, nullable);
                 break;
@@ -537,6 +549,12 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 break;
             case col_type_Bool:
                 do_move<ArrayBool>(ndx, col_ndx, new_leaf);
+                break;
+            case col_type_Float:
+                do_move<ArrayFloat>(ndx, col_ndx, new_leaf);
+                break;
+            case col_type_Double:
+                do_move<ArrayDouble>(ndx, col_ndx, new_leaf);
                 break;
             case col_type_String:
                 do_move<ArrayString>(ndx, col_ndx, new_leaf);
@@ -591,6 +609,12 @@ void Cluster::insert_column(size_t col_ndx)
             break;
         case col_type_Bool:
             do_insert_column<ArrayBool>(col_ndx, nullable);
+            break;
+        case col_type_Float:
+            do_insert_column<ArrayFloat>(col_ndx, nullable);
+            break;
+        case col_type_Double:
+            do_insert_column<ArrayDouble>(col_ndx, nullable);
             break;
         case col_type_String:
             do_insert_column<ArrayString>(col_ndx, nullable);
@@ -693,6 +717,12 @@ unsigned Cluster::erase(Key k)
             case col_type_Bool:
                 do_erase<ArrayBool>(ndx, col_ndx);
                 break;
+            case col_type_Float:
+                do_erase<ArrayFloat>(ndx, col_ndx);
+                break;
+            case col_type_Double:
+                do_erase<ArrayDouble>(ndx, col_ndx);
+                break;
             case col_type_String:
                 do_erase<ArrayString>(ndx, col_ndx);
                 break;
@@ -747,6 +777,20 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     arr.init_from_ref(ref);
                     auto val = arr.get(i);
                     std::cout << ", " << (val ? (*val ? "true" : "false") : "null");
+                    break;
+                }
+                case col_type_Float: {
+                    ArrayFloat arr(m_alloc);
+                    ref_type ref = Array::get_as_ref(j);
+                    arr.init_from_ref(ref);
+                    std::cout << ", " << arr.get(i);
+                    break;
+                }
+                case col_type_Double: {
+                    ArrayDouble arr(m_alloc);
+                    ref_type ref = Array::get_as_ref(j);
+                    arr.init_from_ref(ref);
+                    std::cout << ", " << arr.get(i);
                     break;
                 }
                 case col_type_String: {
@@ -847,6 +891,10 @@ bool ConstObj::is_null(size_t col_ndx) const
                 return do_is_null<ArrayIntNull>(col_ndx);
             case col_type_Bool:
                 return do_is_null<ArrayBoolNull>(col_ndx);
+            case col_type_Float:
+                return do_is_null<ArrayFloat>(col_ndx);
+            case col_type_Double:
+                return do_is_null<ArrayDouble>(col_ndx);
             case col_type_String:
                 return do_is_null<ArrayString>(col_ndx);
             case col_type_Binary:
@@ -931,11 +979,15 @@ template int64_t ConstObj::get<int64_t>(size_t col_ndx) const;
 template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(size_t col_ndx) const;
 template bool ConstObj::get<Bool>(size_t col_ndx) const;
 template util::Optional<Bool> ConstObj::get<util::Optional<Bool>>(size_t col_ndx) const;
+template float ConstObj::get<float>(size_t col_ndx) const;
+template double ConstObj::get<double>(size_t col_ndx) const;
 template StringData ConstObj::get<StringData>(size_t col_ndx) const;
 template BinaryData ConstObj::get<BinaryData>(size_t col_ndx) const;
 template Timestamp ConstObj::get<Timestamp>(size_t col_ndx) const;
 
 template Obj& Obj::set<bool>(size_t, bool, bool);
+template Obj& Obj::set<float>(size_t, float, bool);
+template Obj& Obj::set<double>(size_t, double, bool);
 template Obj& Obj::set<StringData>(size_t, StringData, bool);
 template Obj& Obj::set<BinaryData>(size_t, BinaryData, bool);
 template Obj& Obj::set<Timestamp>(size_t, Timestamp, bool);
@@ -970,6 +1022,12 @@ Obj& Obj::set_null(size_t col_ndx, bool is_default)
             break;
         case col_type_Bool:
             do_set_null<ArrayBoolNull>(col_ndx);
+            break;
+        case col_type_Float:
+            do_set_null<ArrayFloat>(col_ndx);
+            break;
+        case col_type_Double:
+            do_set_null<ArrayDouble>(col_ndx);
             break;
         case col_type_String:
             do_set_null<ArrayString>(col_ndx);

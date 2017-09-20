@@ -8798,6 +8798,38 @@ TEST(Table_object_basic)
     y.set_null(boolnull_col);
     CHECK(y.is_null(boolnull_col));
 
+    // Float
+    auto float_col = table.add_column(type_Float, "float");
+    auto floatnull_col = table.add_column(type_Float, "floatnull", true);
+    y.set(float_col, 2.7182818f);
+    y.set(floatnull_col, 3.1415927f);
+
+    CHECK(!x.is_null(float_col));
+    CHECK_EQUAL(0.0f, x.get<Float>(float_col));
+    CHECK(x.is_null(floatnull_col));
+
+    CHECK_EQUAL(2.7182818f, y.get<Float>(float_col));
+    CHECK(!y.is_null(floatnull_col));
+    CHECK_EQUAL(3.1415927f, y.get<util::Optional<Float>>(floatnull_col));
+    y.set_null(floatnull_col);
+    CHECK(y.is_null(floatnull_col));
+
+    // Double
+    auto double_col = table.add_column(type_Double, "double");
+    auto doublenull_col = table.add_column(type_Double, "doublenull", true);
+    y.set(double_col, 2.718281828459045);
+    y.set(doublenull_col, 3.141592653589793);
+
+    CHECK(!x.is_null(double_col));
+    CHECK_EQUAL(0.0f, x.get<Double>(double_col));
+    CHECK(x.is_null(doublenull_col));
+
+    CHECK_EQUAL(2.718281828459045, y.get<Double>(double_col));
+    CHECK(!y.is_null(doublenull_col));
+    CHECK_EQUAL(3.141592653589793, y.get<util::Optional<Double>>(doublenull_col));
+    y.set_null(doublenull_col);
+    CHECK(y.is_null(doublenull_col));
+
     // String
     auto str_col = table.add_column(type_String, "str");
     auto strnull_col = table.add_column(type_String, "strnull", true);

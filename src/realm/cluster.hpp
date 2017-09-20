@@ -414,6 +414,20 @@ public:
 };
 
 template <>
+inline Optional<float> ConstObj::get<Optional<float>>(size_t col_ndx) const
+{
+    float f = get<float>(col_ndx);
+    return null::is_null_float(f) ? util::none : util::make_optional(f);
+}
+
+template <>
+inline Optional<double> ConstObj::get<Optional<double>>(size_t col_ndx) const
+{
+    double f = get<double>(col_ndx);
+    return null::is_null_float(f) ? util::none : util::make_optional(f);
+}
+
+template <>
 Obj& Obj::set(size_t, int64_t value, bool is_default);
 
 template <>
