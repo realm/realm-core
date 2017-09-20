@@ -47,6 +47,7 @@ void update_schema(Group& group, Property matches_property)
             {"query", PropertyType::String},
             {"status", PropertyType::Int},
             {"error_message", PropertyType::String},
+            {"query_parse_counter", PropertyType::Int},
             std::move(matches_property)
         })
     });
@@ -84,6 +85,7 @@ void register_query(std::shared_ptr<Realm> realm, const std::string &object_clas
                                                    {"query", query},
                                                    {"status", int64_t(0)},
                                                    {"error_message", std::string()},
+                                                   {"query_parse_counter", int64_t(0)},
                                                }, false);
 
         realm->commit_transaction();
