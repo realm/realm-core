@@ -1332,7 +1332,7 @@ public:
                     }
                     size_t col_ndx = path_begin[0];
                     size_t row_ndx = path_begin[1];
-                    table = std::move(tf::get_subtable_accessor(*table, col_ndx, row_ndx));
+                    table = tf::get_subtable_accessor(*table, col_ndx, row_ndx);
                     if (!table)
                         break;
                     path_begin += 2;
