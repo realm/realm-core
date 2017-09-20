@@ -12,7 +12,9 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Add method to recursively delete an object tree
+  PR [#2752](https://github.com/realm/realm-core/pull/2752)
+  Issue [#2718](https://github.com/realm/realm-core/issues/2718)
 
 -----------
 
