@@ -4021,6 +4021,8 @@ void my_table_3_add_columns(T t)
 
 } // anonymous namespace
 
+// Disabled because we do not support nested subtables ATM
+#if 0
 TEST(Table_HighLevelSubtables)
 {
     Table t;
@@ -4074,7 +4076,7 @@ TEST(Table_HighLevelSubtables)
     t.get_subtable(0, 0)->set_int(0, 0, 1);
     CHECK_EQUAL(t.get_subtable(0, 0)->get_int(0, 0), 1);
 }
-
+#endif
 
 TEST(Table_SubtableCopyOnSetAndInsert)
 {

@@ -566,6 +566,7 @@ public:
     // 'mixed', for a value in a mixed column that is not a subtable,
     // get_subtable() returns null, get_subtable_size() returns zero,
     // and clear_subtable() replaces the value with an empty table.)
+    // Currently, subtables of subtables are not supported.
     TableRef get_subtable(size_t column_ndx, size_t row_ndx);
     ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
     size_t get_subtable_size(size_t column_ndx, size_t row_ndx) const noexcept;
@@ -1675,12 +1676,15 @@ inline void Table::unbind_ptr() const noexcept
     }
 
     std::atomic_thread_fence(std::memory_order_acquire);
-    {
-        std::recursive_mutex* lock = get_parent_accessor_management_lock();
-        if (lock) lock->lock();
+
+    std::recursive_mutex* lock = get_parent_accessor_management_lock();
+    if (lock) {
+        std::lock_guard<std::recursive_mutex> lg(*lock);
         if (m_ref_count == 0)
             delete this;
-        if (lock) lock->unlock();
+    }
+    else {
+        delete this;
     }
 }
 
