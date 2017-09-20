@@ -42,8 +42,17 @@
 
 using namespace realm;
 
-using TypeATuple = std::tuple<size_t, size_t, std::string>;
-using TypeBTuple = std::tuple<size_t, std::string, std::string>;
+struct TypeA {
+    size_t first_number;
+    size_t second_number;
+    std::string string;
+};
+
+struct TypeB {
+    size_t number;
+    std::string first_string;
+    std::string second_string;
+};
 
 enum class PartialSyncTestObjects { A, B };
 
@@ -66,7 +75,7 @@ Schema partial_sync_schema()
     };
 }
 
-void populate_realm(Realm::Config& config, std::vector<TypeATuple> a={}, std::vector<TypeBTuple> b={})
+void populate_realm(Realm::Config& config, std::vector<TypeA> a={}, std::vector<TypeB> b={})
 {    
     auto r = Realm::get_shared_realm(config);
     r->begin_transaction();
@@ -76,12 +85,11 @@ void populate_realm(Realm::Config& config, std::vector<TypeATuple> a={}, std::ve
         const auto& second_number_prop = *object_schema.property_for_name("second_number");
         const auto& string_prop = *object_schema.property_for_name("string");
         TableRef table = ObjectStore::table_for_object_type(r->read_group(), "partial_sync_object_a");
-        for (size_t i = 0; i < a.size(); ++i) {
-            auto current = a[i];
+        for (auto& current : a) {
             size_t row_idx = sync::create_object(r->read_group(), *table);
-            table->set_int(first_number_prop.table_column, row_idx, std::get<0>(current));
-            table->set_int(second_number_prop.table_column, row_idx, std::get<1>(current));
-            table->set_string(string_prop.table_column, row_idx, std::get<2>(current));
+            table->set_int(first_number_prop.table_column, row_idx, current.first_number);
+            table->set_int(second_number_prop.table_column, row_idx, current.second_number);
+            table->set_string(string_prop.table_column, row_idx, current.string);
         }
     }
     {
@@ -90,12 +98,11 @@ void populate_realm(Realm::Config& config, std::vector<TypeATuple> a={}, std::ve
         const auto& first_string_prop = *object_schema.property_for_name("first_string");
         const auto& second_string_prop = *object_schema.property_for_name("second_string");
         TableRef table = ObjectStore::table_for_object_type(r->read_group(), "partial_sync_object_b");
-        for (size_t i = 0; i < b.size(); ++i) {
-            auto current = b[i];
+        for (auto& current : b) {
             size_t row_idx = sync::create_object(r->read_group(), *table);
-            table->set_int(number_prop.table_column, row_idx, std::get<0>(current));
-            table->set_string(first_string_prop.table_column, row_idx, std::get<1>(current));
-            table->set_string(second_string_prop.table_column, row_idx, std::get<2>(current));
+            table->set_int(number_prop.table_column, row_idx, current.number);
+            table->set_string(first_string_prop.table_column, row_idx, current.first_string);
+            table->set_string(second_string_prop.table_column, row_idx, current.second_string);
         }
     }
     r->commit_transaction();
@@ -126,33 +133,33 @@ void run_query(const std::string& query, const Realm::Config& partial_config, Pa
     check(std::move(results), std::move(exception));
 }
 
-bool results_contains(Results& r, TypeATuple a)
+bool results_contains(Results& r, TypeA a)
 {
     CppContext ctx;
     SharedRealm realm = r.get_realm();
     const ObjectSchema os = *realm->schema().find("partial_sync_object_a");
-    for (size_t i=0; i<r.size(); ++i) {
+    for (size_t i = 0; i < r.size(); ++i) {
         Object obj(realm, os, r.get(i));
         size_t first = any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "first_number"));
         size_t second = any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "second_number"));
         auto str = any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string"));
-        if (first == std::get<0>(a) && second == std::get<1>(a) && str == std::get<2>(a))
+        if (first == a.first_number && second == a.second_number && str == a.string)
             return true;
     }
     return false;
 }
 
-bool results_contains(Results& r, TypeBTuple b)
+bool results_contains(Results& r, TypeB b)
 {
     CppContext ctx;
     SharedRealm realm = r.get_realm();
     const ObjectSchema os = *realm->schema().find("partial_sync_object_b");
-    for (size_t i=0; i<r.size(); ++i) {
+    for (size_t i = 0;  i < r.size(); ++i) {
         Object obj(realm, os, r.get(i));
         size_t number = any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "number"));
         auto first_str = any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "first_string"));
         auto second_str = any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "second_string"));
-        if (number == std::get<0>(b) && first_str == std::get<1>(b) && second_str == std::get<2>(b))
+        if (number == b.number && first_str == b.first_string && second_str == b.second_string)
             return true;
     }
     return false;
