@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix corruption caused by `swap_rows()` and `move_column()` operations applied
+  to a StringEnumColumn. Currently unused by bindings.
+  PR [#2780](https://github.com/realm/realm-core/pull/2780).
 
 ### Breaking changes
 
@@ -10,7 +12,43 @@
 
 ### Enhancements
 
+* Add method to recursively delete an object tree
+  PR [#2752](https://github.com/realm/realm-core/pull/2752)
+  Issue [#2718](https://github.com/realm/realm-core/issues/2718)
+
+-----------
+
+### Internals
+
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 3.2.1 Release notes
+
+### Bugfixes
+
+* Compact now throws an exception if writing fails for some reason
+  instead of ignoring errors and possibly causing corruption.
+  In particular, this solves file truncation causing "bad header" exceptions
+  after a compact operation on a file system that is running out of disk space.
+  PR [#2852](https://github.com/realm/realm-core/pull/2852).
+
+-----------
+
+### Internals
+
+* Moved object store's true and false query expressions down to core.
+  PR [#2857](https://github.com/realm/realm-core/pull/2857).
+
+----------------------------------------------
+
+# 3.2.0 Release notes
+
+### Enhancements
+
+* Added metrics tracking as an optional SharedGroup feature.
+  PR [#2840](https://github.com/realm/realm-core/pull/2840).
 
 -----------
 
@@ -18,6 +56,8 @@
 
 * Improve crash durability on windows.
   PR [#2845](https://github.com/realm/realm-core/pull/2845).
+* Removed incorrect string column type traits, which could cause errors.
+  They were unused. PR [#2846](https://github.com/realm/realm-core/pull/2846).
 
 ----------------------------------------------
 

@@ -2621,5 +2621,76 @@ TEST(Group_SetNullUniqueLimitation)
     }
 }
 
+// This test ensures that cascading delete works by testing that
+// a linked row is deleted when the parent row is deleted, but only
+// if it is the only parent row. It is also tested that an optional
+// notification handler is called appropriately.
+// It is tested that it works both with one and two levels of links
+// and also if the links creates a cycle
+TEST(Group_RemoveRecursive)
+{
+    Group g;
+    TableRef target = g.add_table("target");
+    TableRef origin = g.add_table("origin");
+
+    target->add_column(type_Int, "integers", true);
+    target->add_column_link(type_Link, "links", *target);
+    origin->add_column_link(type_Link, "links", *target);
+
+    // Delete one at a time
+    target->add_empty_row();
+    origin->add_empty_row(2);
+    origin->set_link(0, 0, 0);
+    origin->set_link(0, 1, 0);
+    CHECK_EQUAL(target->size(), 1);
+    origin->remove_recursive(0);
+    // Should not have deleted child
+    CHECK_EQUAL(target->size(), 1);
+    // Delete last link
+    origin->remove_recursive(0);
+    // Now it should be gone
+    CHECK_EQUAL(target->size(), 0);
+
+    // 3 rows linked together in a list
+    target->add_empty_row(3);
+    target->set_link(1, 0, 1);
+    target->set_link(1, 1, 2);
+    bool called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(3, notification.rows.size());
+        CHECK_EQUAL(0, notification.rows[0].table_ndx);
+        CHECK_EQUAL(0, notification.rows[0].row_ndx);
+        CHECK_EQUAL(0, notification.rows[1].table_ndx);
+        CHECK_EQUAL(1, notification.rows[1].row_ndx);
+        CHECK_EQUAL(0, notification.rows[2].table_ndx);
+        CHECK_EQUAL(2, notification.rows[2].row_ndx);
+
+        CHECK_EQUAL(0, notification.links.size());
+    });
+    target->remove_recursive(0);
+    CHECK_EQUAL(target->size(), 0);
+
+    // 3 rows linked together in circle
+    target->add_empty_row(3);
+    target->set_link(1, 0, 1);
+    target->set_link(1, 1, 2);
+    target->set_link(1, 2, 0);
+    called = false;
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
+        called = true;
+        CHECK_EQUAL(3, notification.rows.size());
+        CHECK_EQUAL(0, notification.rows[0].table_ndx);
+        CHECK_EQUAL(0, notification.rows[0].row_ndx);
+        CHECK_EQUAL(0, notification.rows[1].table_ndx);
+        CHECK_EQUAL(1, notification.rows[1].row_ndx);
+        CHECK_EQUAL(0, notification.rows[2].table_ndx);
+        CHECK_EQUAL(2, notification.rows[2].row_ndx);
+
+        CHECK_EQUAL(0, notification.links.size());
+    });
+    target->remove_recursive(0);
+    CHECK_EQUAL(target->size(), 0);
+}
 
 #endif // TEST_GROUP
