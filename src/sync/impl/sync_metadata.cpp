@@ -36,6 +36,7 @@ static const char * const c_sync_userMetadata = "UserMetadata";
 static const char * const c_sync_marked_for_removal = "marked_for_removal";
 static const char * const c_sync_identity = "identity";
 static const char * const c_sync_local_uuid = "local_uuid";
+static const char * const c_sync_device_unique_uuid = "device_unique_uuid";
 static const char * const c_sync_auth_server_url = "auth_server_url";
 static const char * const c_sync_user_token = "user_token";
 static const char * const c_sync_user_is_admin = "user_is_admin";
@@ -53,6 +54,7 @@ realm::Schema make_schema()
         {c_sync_userMetadata, {
             {c_sync_identity, PropertyType::String},
             {c_sync_local_uuid, PropertyType::String},
+            {c_sync_device_unique_uuid, PropertyType::String},
             {c_sync_marked_for_removal, PropertyType::Bool},
             {c_sync_user_token, PropertyType::String|PropertyType::Nullable},
             {c_sync_auth_server_url, PropertyType::String},
@@ -78,7 +80,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
                                          bool should_encrypt,
                                          util::Optional<std::vector<char>> encryption_key)
 {
-    constexpr uint64_t SCHEMA_VERSION = 2;
+    constexpr uint64_t SCHEMA_VERSION = 3;
 
     Realm::Config config;
     config.path = std::move(path);
@@ -121,6 +123,27 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
                 table->set_string(idx_url, entry.get_index(), url.is_null() ? "" : url);
             }
         }
+        if (old_realm->schema_version() < 3) {
+            TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
+            size_t idx_identity = table->get_column_index(c_sync_identity);
+            size_t idx_local_uuid = table->get_column_index(c_sync_local_uuid);
+            size_t idx_device_unique_uuid = table->get_column_index(c_sync_device_unique_uuid);
+
+            // Get all the SyncUserMetadata objects.
+            Results results(realm, *table);
+            for (size_t i = 0; i < results.size(); i++) {
+                // Set the device local UUID, but only if the local UUID and the identity are identical.
+                RowExpr entry = results.get(i);
+                auto identity = entry.get_string(idx_identity);
+                auto local_uuid = entry.get_string(idx_local_uuid);
+                if (identity == local_uuid) {
+                    std::string uuid = util::uuid_string();
+                    table->set_string(idx_device_unique_uuid, entry.get_index(), uuid);
+                } else {
+                    table->set_string(idx_device_unique_uuid, entry.get_index(), local_uuid);
+                }
+            }
+        }
     };
 
     SharedRealm realm = Realm::get_shared_realm(config);
@@ -134,6 +157,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
         object_schema->persisted_properties[3].table_column,
         object_schema->persisted_properties[4].table_column,
         object_schema->persisted_properties[5].table_column,
+        object_schema->persisted_properties[6].table_column,
     };
 
     object_schema = realm->schema().find(c_sync_fileActionMetadata);
@@ -221,6 +245,7 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
             row.set_string(schema.idx_identity, identity);
             row.set_string(schema.idx_auth_server_url, url);
             row.set_string(schema.idx_local_uuid, uuid);
+            row.set_string(schema.idx_device_unique_uuid, uuid);
             row.set_bool(schema.idx_user_is_admin, false);
             row.set_bool(schema.idx_marked_for_removal, false);
             realm->commit_transaction();
@@ -318,6 +343,13 @@ std::string SyncUserMetadata::local_uuid() const
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     return m_row.get_string(m_schema.idx_local_uuid);
+}
+
+std::string SyncUserMetadata::device_unique_uuid() const
+{
+    REALM_ASSERT(m_realm);
+    m_realm->verify_thread();
+    return m_row.get_string(m_schema.idx_device_unique_uuid);
 }
 
 util::Optional<std::string> SyncUserMetadata::user_token() const

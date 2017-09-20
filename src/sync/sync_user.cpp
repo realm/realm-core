@@ -22,6 +22,8 @@
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
 
+#include "util/uuid.hpp"
+
 namespace realm {
 
 SyncUserContextFactory SyncUser::s_binding_context_factory;
@@ -51,12 +53,16 @@ SyncUser::SyncUser(std::string refresh_token,
             metadata->set_user_token(m_refresh_token);
             m_is_admin = metadata->is_admin();
             m_local_identity = metadata->local_uuid();
+            m_device_unique_uuid = metadata->device_unique_uuid();
         });
-        if (!updated)
+        if (!updated) {
             m_local_identity = m_identity;
+            m_device_unique_uuid = util::uuid_string();
+        }
     } else {
         // Admin token users. The local identity serves as the directory path.
         REALM_ASSERT(local_identity);
+        m_device_unique_uuid = *local_identity;
         m_local_identity = std::move(*local_identity);
     }
 }

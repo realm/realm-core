@@ -41,6 +41,10 @@ public:
         size_t idx_identity;
         // A locally issued UUID for the user. This is used to generate the on-disk user directory.
         size_t idx_local_uuid;
+        // Another UUID that is guaranteed (as far as UUIDs go) to be unique to this user and device.
+        // Used for partial sync. (Note that `idx_local_uuid` does NOT make this guarantee.)
+        // This property is identical to `idx_local_uuid` if that property does suffice.
+        size_t idx_device_unique_uuid;
         // Whether or not this user has been marked for removal.
         size_t idx_marked_for_removal;
         // The cached refresh token for this user.
@@ -56,6 +60,9 @@ public:
 
     // Cannot be set after creation.
     std::string local_uuid() const;
+
+    // Cannot be set after creation.
+    std::string device_unique_uuid() const;
 
     util::Optional<std::string> user_token() const;
     void set_user_token(util::Optional<std::string>);

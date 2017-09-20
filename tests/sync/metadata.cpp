@@ -76,7 +76,26 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
         }},
     };
 
-    SECTION("properly upgrades from v0 to v2") {
+    const Schema v2_schema{
+        {"UserMetadata", {
+            {"identity", PropertyType::String},
+            {"local_uuid", PropertyType::String},
+            {"marked_for_removal", PropertyType::Bool},
+            {"user_token", PropertyType::String|PropertyType::Nullable},
+            {"auth_server_url", PropertyType::String},
+            {"user_is_admin", PropertyType::Bool},
+        }},
+        {"FileActionMetadata", {
+            {"original_name", PropertyType::String, Property::IsPrimary{true}},
+            {"new_name", PropertyType::String|PropertyType::Nullable},
+            {"action", PropertyType::Int},
+            {"url", PropertyType::String},
+            {"identity", PropertyType::String},
+        }},
+    };
+
+    SECTION("properly upgrades from v0 to v3") {
+        reset_test_directory(base_path);
         // Open v0 metadata (create a Realm directly)
         {
             Realm::Config config;
@@ -103,7 +122,7 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
             }, false);
             realm->commit_transaction();
         }
-        // Open v2 metadata
+        // Open v3 metadata
         {
             SyncMetadataManager manager(metadata_path, false, none);
             SECTION("for existing entries") {
@@ -111,6 +130,7 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
                 REQUIRE(bool(md_1));
                 CHECK(md_1->identity() == identity_1);
                 CHECK(md_1->local_uuid() == identity_1);
+                CHECK(md_1->device_unique_uuid() != md_1->local_uuid());    // Should be generated
                 CHECK(md_1->auth_server_url() == "");
                 CHECK(md_1->user_token() == token);
                 CHECK(md_1->is_valid());
@@ -129,6 +149,7 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
                 CHECK(user_metadata->identity() == identity_3);
                 CHECK(user_metadata->local_uuid() != "");
                 CHECK(user_metadata->local_uuid() != identity_3);
+                CHECK(user_metadata->device_unique_uuid() == user_metadata->local_uuid());  // Shouldn't be generated
                 CHECK(!user_metadata->is_admin());
                 user_metadata->set_is_admin(true);
                 CHECK(user_metadata->is_admin());
@@ -137,7 +158,8 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
         }
     }
 
-    SECTION("properly upgrades from v1 to v2") {
+    SECTION("properly upgrades from v1 to v3") {
+        reset_test_directory(base_path);
         // Open v1 metadata (create a Realm directly)
         {
             Realm::Config config;
@@ -165,7 +187,7 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
             }, false);
             realm->commit_transaction();
         }
-        // Open v2 metadata
+        // Open v3 metadata
         {
             SyncMetadataManager manager(metadata_path, false, none);
             SECTION("for existing entries") {
@@ -194,6 +216,58 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
                 CHECK(user_metadata->local_uuid() != "");
                 CHECK(user_metadata->local_uuid() != identity_3);
                 CHECK(user_metadata->auth_server_url() == auth_server_url);
+            }
+        }
+
+        SECTION("properly upgrades from v2 to v3") {
+            reset_test_directory(base_path);
+            // Open v2 metadata (create a Realm directly)
+            {
+                Realm::Config config;
+                config.path = metadata_path;
+                config.schema = v2_schema;
+                config.schema_version = 2;
+                auto realm = Realm::get_shared_realm(std::move(config));
+                REQUIRE(realm);
+
+                // Add some v2 entries
+                CppContext context;
+                realm->begin_transaction();
+                auto user_metadata_schema = *realm->schema().find("UserMetadata");
+                const std::string u1_local_uuid = "1234567890";
+                Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
+                    { "identity", identity_1 },
+                    { "local_uuid", u1_local_uuid },
+                    { "marked_for_removal", false },
+                    { "user_token", token },
+                    { "auth_server_url", auth_server_url },
+                    { "user_is_admin", false }
+                }, false);
+                Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
+                    { "identity", identity_2 },
+                    { "local_uuid", identity_2 },
+                    { "marked_for_removal", false },
+                    { "auth_server_url", auth_server_url },
+                    { "user_is_admin", true }
+                }, false);
+                realm->commit_transaction();
+            }
+            // Open v3 metadata
+            {
+                SyncMetadataManager manager(metadata_path, false, none);
+                SECTION("for existing entries") {
+                    auto md_1 = manager.get_or_make_user_metadata(identity_1, auth_server_url, false);
+                    REQUIRE(bool(md_1));
+                    CHECK(md_1->device_unique_uuid() == md_1->local_uuid());
+                    auto md_2 = manager.get_or_make_user_metadata(identity_2, auth_server_url, false);
+                    REQUIRE(bool(md_2));
+                    CHECK(md_2->device_unique_uuid() != md_2->local_uuid());
+                }
+
+                SECTION("and creates new entries properly") {
+                    auto user_metadata = manager.get_or_make_user_metadata(identity_3, auth_server_url);
+                    CHECK(user_metadata->device_unique_uuid() == user_metadata->local_uuid());
+                }
             }
         }
     }

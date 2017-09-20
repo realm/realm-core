@@ -129,7 +129,7 @@ struct SyncConfig {
         if (custom_partial_sync_identifier)
             return base_url + "/__partial/" + *custom_partial_sync_identifier;
 
-        return base_url + "/__partial/" + user->local_identity();
+        return base_url + "/__partial/" + user->device_unique_uuid();
     }
 
 #if __GNUC__ < 5
