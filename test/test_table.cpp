@@ -8780,6 +8780,24 @@ TEST(Table_object_basic)
     y.set_null(intnull_col);
     CHECK(y.is_null(intnull_col));
 
+    // Boolean
+    auto bool_col = table.add_column(type_Bool, "bool");
+    auto boolnull_col = table.add_column(type_Bool, "boolnull", true);
+    y.set(bool_col, true);
+    y.set(boolnull_col, false);
+
+    CHECK(!x.is_null(bool_col));
+    CHECK_EQUAL(false, x.get<Bool>(bool_col));
+    CHECK(x.is_null(boolnull_col));
+
+    CHECK_EQUAL(true, y.get<Bool>(bool_col));
+    CHECK(!y.is_null(boolnull_col));
+    auto bool_val = y.get<util::Optional<Bool>>(boolnull_col);
+    CHECK_EQUAL(true, bool(bool_val));
+    CHECK_EQUAL(false, *bool_val);
+    y.set_null(boolnull_col);
+    CHECK(y.is_null(boolnull_col));
+
     // String
     auto str_col = table.add_column(type_String, "str");
     auto strnull_col = table.add_column(type_String, "strnull", true);

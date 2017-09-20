@@ -20,6 +20,7 @@
 #include "realm/table.hpp"
 #include "realm/replication.hpp"
 #include "realm/array_integer.hpp"
+#include "realm/array_bool.hpp"
 #include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
 #include "realm/array_timestamp.hpp"
@@ -420,6 +421,9 @@ void Cluster::create()
                     do_create<ArrayInteger>(col_ndx);
                 }
                 break;
+            case col_type_Bool:
+                do_create<ArrayBool>(col_ndx);
+                break;
             case col_type_String:
                 do_create<ArrayString>(col_ndx);
                 break;
@@ -480,6 +484,9 @@ void Cluster::insert_row(size_t ndx, Key k)
                     do_insert_row<ArrayInteger>(ndx, col_ndx, nullable);
                 }
                 break;
+            case col_type_Bool:
+                do_insert_row<ArrayBool>(ndx, col_ndx, nullable);
+                break;
             case col_type_String:
                 do_insert_row<ArrayString>(ndx, col_ndx, nullable);
                 break;
@@ -527,6 +534,9 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 else {
                     do_move<ArrayInteger>(ndx, col_ndx, new_leaf);
                 }
+                break;
+            case col_type_Bool:
+                do_move<ArrayBool>(ndx, col_ndx, new_leaf);
                 break;
             case col_type_String:
                 do_move<ArrayString>(ndx, col_ndx, new_leaf);
@@ -578,6 +588,9 @@ void Cluster::insert_column(size_t col_ndx)
             else {
                 do_insert_column<ArrayInteger>(col_ndx, nullable);
             }
+            break;
+        case col_type_Bool:
+            do_insert_column<ArrayBool>(col_ndx, nullable);
             break;
         case col_type_String:
             do_insert_column<ArrayString>(col_ndx, nullable);
@@ -677,6 +690,9 @@ unsigned Cluster::erase(Key k)
                     do_erase<ArrayInteger>(ndx, col_ndx);
                 }
                 break;
+            case col_type_Bool:
+                do_erase<ArrayBool>(ndx, col_ndx);
+                break;
             case col_type_String:
                 do_erase<ArrayString>(ndx, col_ndx);
                 break;
@@ -723,6 +739,14 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                         arr.init_from_ref(ref);
                         std::cout << ", " << arr.get(i);
                     }
+                    break;
+                }
+                case col_type_Bool: {
+                    ArrayBoolNull arr(m_alloc);
+                    ref_type ref = Array::get_as_ref(j);
+                    arr.init_from_ref(ref);
+                    auto val = arr.get(i);
+                    std::cout << ", " << (val ? (*val ? "true" : "false") : "null");
                     break;
                 }
                 case col_type_String: {
@@ -821,6 +845,8 @@ bool ConstObj::is_null(size_t col_ndx) const
         switch (m_tree_top->get_spec().get_column_type(col_ndx)) {
             case col_type_Int:
                 return do_is_null<ArrayIntNull>(col_ndx);
+            case col_type_Bool:
+                return do_is_null<ArrayBoolNull>(col_ndx);
             case col_type_String:
                 return do_is_null<ArrayString>(col_ndx);
             case col_type_Binary:
@@ -903,10 +929,13 @@ namespace realm {
 
 template int64_t ConstObj::get<int64_t>(size_t col_ndx) const;
 template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(size_t col_ndx) const;
+template bool ConstObj::get<Bool>(size_t col_ndx) const;
+template util::Optional<Bool> ConstObj::get<util::Optional<Bool>>(size_t col_ndx) const;
 template StringData ConstObj::get<StringData>(size_t col_ndx) const;
 template BinaryData ConstObj::get<BinaryData>(size_t col_ndx) const;
 template Timestamp ConstObj::get<Timestamp>(size_t col_ndx) const;
 
+template Obj& Obj::set<bool>(size_t, bool, bool);
 template Obj& Obj::set<StringData>(size_t, StringData, bool);
 template Obj& Obj::set<BinaryData>(size_t, BinaryData, bool);
 template Obj& Obj::set<Timestamp>(size_t, Timestamp, bool);
@@ -938,6 +967,9 @@ Obj& Obj::set_null(size_t col_ndx, bool is_default)
     switch (m_tree_top->get_spec().get_column_type(col_ndx)) {
         case col_type_Int:
             do_set_null<ArrayIntNull>(col_ndx);
+            break;
+        case col_type_Bool:
+            do_set_null<ArrayBoolNull>(col_ndx);
             break;
         case col_type_String:
             do_set_null<ArrayString>(col_ndx);

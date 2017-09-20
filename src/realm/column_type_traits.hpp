@@ -35,6 +35,8 @@ class ArrayBinary;
 class ArrayTimestamp;
 class ArrayInteger;
 class ArrayIntNull;
+class ArrayBool;
+class ArrayBoolNull;
 template <class>
 class BasicArray;
 
@@ -67,12 +69,14 @@ struct ColumnTypeTraits<util::Optional<int64_t>> {
 
 template <>
 struct ColumnTypeTraits<bool> : ColumnTypeTraits<int64_t> {
+    using cluster_leaf_type = ArrayBool;
     static const DataType id = type_Bool;
     static const ColumnType column_id = col_type_Bool;
 };
 
 template <>
 struct ColumnTypeTraits<util::Optional<bool>> : ColumnTypeTraits<util::Optional<int64_t>> {
+    using cluster_leaf_type = ArrayBoolNull;
     static const DataType id = type_Bool;
     static const ColumnType column_id = col_type_Bool;
 };

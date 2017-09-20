@@ -495,6 +495,12 @@ inline void Replication::set(const Table* table, size_t col_ndx, size_t ndx, Tim
     set_timestamp(table, col_ndx, ndx, value, variant);
 }
 
+template <>
+inline void Replication::set(const Table* table, size_t col_ndx, size_t ndx, bool value, _impl::Instruction variant)
+{
+    set_bool(table, col_ndx, ndx, value, variant);
+}
+
 inline TrivialReplication::TrivialReplication(const std::string& database_file)
     : m_database_file(database_file)
 {

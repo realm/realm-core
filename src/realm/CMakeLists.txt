@@ -76,6 +76,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_blobs_big.hpp
     array_direct.hpp
     array_integer.hpp
+    array_bool.hpp
     array_string.hpp
     array_string_short.hpp
     array_string_long.hpp
