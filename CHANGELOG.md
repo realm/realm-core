@@ -164,6 +164,8 @@
   seen when creating large Realm files on 32 bit OS.
   PR [#2795](https://github.com/realm/realm-core/pull/2795).
 
+**Note: This is a hotfix release built on top of 2.9.1. The above fixes are not present in version 3.0.0.**
+
 ----------------------------------------------
 
 # 2.9.1 Release notes
@@ -181,6 +183,8 @@
 * The archives produced by the packaging process for Mac builds are now
   .tar.gz files rather than .tar.xz files, with the exception of the aggregate
   realm-core-cocoa-VERSION.tar.xz archive, which remains as a .tar.xz file.
+
+**Note: This is a hotfix release built on top of 2.9.0. The above fixes are not present in version 3.0.0.**
 
 ----------------------------------------------
 
