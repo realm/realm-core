@@ -5,6 +5,9 @@
 * Fix corruption caused by `swap_rows()` and `move_column()` operations applied
   to a StringEnumColumn. Currently unused by bindings.
   PR [#2780](https://github.com/realm/realm-core/pull/2780).
+* Fix case insensitive contains query for null strings not returning all results and
+  Fix case insensitive equals query for null strings returning nothing when null strings exist.
+  PR [#2871](https://github.com/realm/realm-core/pull/2871).
 
 ### Breaking changes
 
