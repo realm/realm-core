@@ -526,6 +526,13 @@ TEST(Query_NextGen_StringConditions)
     m = table2->column<String>(0).not_equal(realm::null()).count();
     CHECK_EQUAL(m, 4);
 
+    m = table2->column<String>(0).contains(realm::null()).count();
+    CHECK_EQUAL(m, 5);
+
+    m = table2->column<String>(0).like(realm::null()).count();
+    CHECK_EQUAL(m, 1);
+
+
 
     m = table2->column<String>(0).contains(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
@@ -552,7 +559,7 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, 4);
 
     m = table2->column<String>(0).contains(realm::null(), false).count();
-    CHECK_EQUAL(m, 4);
+    CHECK_EQUAL(m, 5);
 
     m = table2->column<String>(0).like(realm::null(), false).count();
     CHECK_EQUAL(m, 1);
