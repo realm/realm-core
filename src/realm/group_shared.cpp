@@ -2352,3 +2352,26 @@ TableRef SharedGroup::import_table_from_handover(std::unique_ptr<Handover<Table>
     TableRef result = Table::create_from_and_consume_patch(handover->patch, m_group);
     return result;
 }
+
+bool SharedGroup::call_with_lock(const std::string& realm_path, CallbackWithLock callback)
+{
+    auto lockfile_path(realm_path + ".lock");
+
+    File lockfile;
+    lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
+    File::CloseGuard fcg(lockfile);
+
+    if (lockfile.try_lock_exclusive()) { // Throws
+        callback(realm_path);
+        return true;
+    }
+    return false;
+}
+
+std::vector<std::pair<std::string, bool>> SharedGroup::get_core_files(const std::string& realm_path)
+{
+    std::vector<std::pair<std::string, bool>> files;
+    files.emplace_back(std::make_pair(realm_path, false));
+    files.emplace_back(std::make_pair(realm_path + ".management", true));
+    return files;
+}
