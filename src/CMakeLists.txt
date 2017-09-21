@@ -111,6 +111,7 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_metadata.hpp)
     list(APPEND SOURCES
         sync/partial_sync.cpp
+        sync/sync_config.cpp
         sync/sync_manager.cpp
         sync/sync_permission.cpp
         sync/sync_session.cpp

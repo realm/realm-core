@@ -119,24 +119,9 @@ public:
         return m_server_url;
     }
 
-    // For normal (non-admin token) users, the local identity is a locally generated
-    // UUID string that is used to uniquely identify the user on the filesystem.
-    // Some users created prior to certain versions of the Realm Object Server may
-    // share their local identity and actual identity. In this case the local identity
-    // will still be a UUID string.
     const std::string& local_identity() const noexcept
     {
         return m_local_identity;
-    }
-
-    // A locally assigned UUID intended to be unique to the user and device. Identical to
-    // local_identity() if that UUID satisfies those conditions.
-    // Only guaranteed to be the same across application launches if the sync metadata system
-    // is enabled or the user is an admin token user. Otherwise, it will be generated anew
-    // upon user creation.
-    const std::string& device_unique_uuid() const noexcept
-    {
-        return m_device_unique_uuid;
     }
 
     std::string refresh_token() const;
@@ -170,8 +155,6 @@ private:
 
     // A locally assigned UUID intended to provide a level of indirection for various features.
     std::string m_local_identity;
-
-    std::string m_device_unique_uuid;
 
     std::weak_ptr<SyncSession> m_management_session;
     std::weak_ptr<SyncSession> m_permission_session;

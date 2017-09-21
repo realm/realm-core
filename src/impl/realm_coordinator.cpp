@@ -169,7 +169,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             if (m_config.sync_config->user != config.sync_config->user) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different sync user.", config.path);
             }
-            if (m_config.sync_config->resolved_realm_url() != config.sync_config->resolved_realm_url()) {
+            if (m_config.sync_config->realm_url() != config.sync_config->realm_url()) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different sync server URL.", config.path);
             }
             if (m_config.sync_config->transformer != config.sync_config->transformer) {

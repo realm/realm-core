@@ -41,10 +41,6 @@ public:
         size_t idx_identity;
         // A locally issued UUID for the user. This is used to generate the on-disk user directory.
         size_t idx_local_uuid;
-        // Another UUID that is guaranteed (as far as UUIDs go) to be unique to this user and device.
-        // Used for partial sync. (Note that `idx_local_uuid` does NOT make this guarantee.)
-        // This property is identical to `idx_local_uuid` if that property does suffice.
-        size_t idx_device_unique_uuid;
         // Whether or not this user has been marked for removal.
         size_t idx_marked_for_removal;
         // The cached refresh token for this user.
@@ -60,9 +56,6 @@ public:
 
     // Cannot be set after creation.
     std::string local_uuid() const;
-
-    // Cannot be set after creation.
-    std::string device_unique_uuid() const;
 
     util::Optional<std::string> user_token() const;
     void set_user_token(util::Optional<std::string>);
@@ -140,6 +133,14 @@ private:
     Row m_row;
 };
 
+class SyncClientMetadata {
+public:
+    struct Schema {
+        // A UUID that identifies this client.
+        size_t idx_uuid;
+    };
+};
+
 template<class T>
 class SyncMetadataResults {
 public:
@@ -203,6 +204,9 @@ public:
                                                      SyncFileActionMetadata::Action action,
                                                      util::Optional<std::string> new_name=none) const;
 
+    // Get the unique identifier of this client, generating one if it does not already exist.
+    std::string client_uuid() const;
+
     /// Construct the metadata manager.
     ///
     /// If the platform supports it, setting `should_encrypt` to `true` and not specifying an encryption key will make
@@ -217,6 +221,7 @@ private:
     Realm::Config m_metadata_config;
     SyncUserMetadata::Schema m_user_schema;
     SyncFileActionMetadata::Schema m_file_action_schema;
+    SyncClientMetadata::Schema m_client_schema;
 };
 
 }

@@ -102,7 +102,11 @@ struct SyncError {
 
 struct SyncConfig {
     std::shared_ptr<SyncUser> user;
-    std::string realm_url;
+    // The URL of the Realm, or of the reference Realm if partial sync is being used.
+    // The URL that will be used when connecting to the object server is that returned by `realm_url()`,
+    // and will differ from `reference_realm_url` if partial sync is being used.
+    // Set this field, but read from `realm_url()`.
+    std::string reference_realm_url;
     SyncSessionStopPolicy stop_policy;
     std::function<SyncBindSessionHandler> bind_session_handler;
     std::function<SyncSessionErrorHandler> error_handler;
@@ -115,26 +119,13 @@ struct SyncConfig {
     bool is_partial = false;
     util::Optional<std::string> custom_partial_sync_identifier;
 
-    std::string resolved_realm_url() const
-    {
-        REALM_ASSERT(realm_url.length() > 0);
-        REALM_ASSERT(user);
-        std::string base_url = realm_url;
-        if (base_url.back() == '/')
-            base_url.pop_back();
-
-        if (!is_partial)
-            return base_url;
-
-        if (custom_partial_sync_identifier)
-            return base_url + "/__partial/" + *custom_partial_sync_identifier;
-
-        return base_url + "/__partial/" + user->device_unique_uuid();
-    }
+    // The URL that will be used when connecting to the object server.
+    // This will differ from `reference_realm_url` when partial sync is being used.
+    std::string realm_url() const;
 
 #if __GNUC__ < 5
     // GCC 4.9 does not support C++14 braced-init
-    SyncConfig(std::shared_ptr<SyncUser> user, std::string realm_url,
+    SyncConfig(std::shared_ptr<SyncUser> user, std::string reference_realm_url,
                SyncSessionStopPolicy stop_policy,
                std::function<SyncBindSessionHandler> bind_session_handler,
                std::function<SyncSessionErrorHandler> error_handler = nullptr,
@@ -147,7 +138,7 @@ struct SyncConfig {
                util::Optional<std::string> custom_partial_sync_identifier = util::none
         )
         : user(std::move(user))
-        , realm_url(std::move(realm_url))
+        , reference_realm_url(std::move(reference_realm_url))
         , stop_policy(stop_policy)
         , bind_session_handler(std::move(bind_session_handler))
         , error_handler(std::move(error_handler))

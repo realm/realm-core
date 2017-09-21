@@ -112,7 +112,7 @@ SyncTestFile::SyncTestFile(SyncServer& server,
         SyncManager::shared().get_user({ "user", url }, "not_a_real_token"),
         url,
         SyncSessionStopPolicy::Immediately,
-        [=](auto&, auto&, auto session) { session->refresh_access_token(s_test_token, url); },
+        [=](auto&, auto& config, auto session) { session->refresh_access_token(s_test_token, config.realm_url()); },
         [](auto, auto) { abort(); }
     });
     sync_config->is_partial = is_partial;

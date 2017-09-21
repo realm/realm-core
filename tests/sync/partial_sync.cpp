@@ -171,9 +171,11 @@ TEST_CASE("Partial sync", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+
     SyncServer server;
     SyncTestFile config(server, "test", partial_sync_schema());
-    SyncTestFile partial_config(server, "test/__partial/123456", partial_sync_schema(), true);
+    SyncTestFile partial_config(server, "test", partial_sync_schema(), true);
     // Add some objects for test purposes.
     populate_realm(config, 
         {{1, 10, "partial"}, {2, 2, "partial"}, {3, 8, "sync"}},
