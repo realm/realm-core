@@ -138,9 +138,7 @@ void List::verify_attached() const
 void List::verify_in_transaction() const
 {
     verify_attached();
-    if (!m_realm->is_in_transaction()) {
-        throw InvalidTransactionException("Must be in a write transaction");
-    }
+    m_realm->verify_in_write();
 }
 
 size_t List::size() const
