@@ -10895,6 +10895,51 @@ TEST(Query_CaseInsensitiveIndexEquality_CommonNumericPrefix)
 }
 
 
+TEST_TYPES(Query_CaseInsensitiveNullable, std::true_type, std::false_type)
+{
+    Table table;
+    bool nullable = true;
+    constexpr bool with_index = TEST_TYPE::value;
+    size_t col_ndx = table.add_column(type_String, "id", nullable);
+    if (with_index) {
+        table.add_search_index(col_ndx);
+    }
+
+    table.add_empty_row(6);
+    table.set_string(col_ndx, 0, "test");
+    table.set_string(col_ndx, 1, "words");
+    table.set_null(col_ndx, 2);
+    table.set_null(col_ndx, 3);
+    table.set_string(col_ndx, 4, "");
+    table.set_string(col_ndx, 5, "");
+
+    bool case_sensitive = true;
+    StringData null_string;
+    Query q = table.where().equal(col_ndx, null_string, case_sensitive);
+    CHECK_EQUAL(q.count(), 2);
+    TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv[0].get_index(), 2);
+    CHECK_EQUAL(tv[1].get_index(), 3);
+    Query q2 = table.where().contains(col_ndx, null_string, case_sensitive);
+    CHECK_EQUAL(q2.count(), 6);
+    tv = q2.find_all();
+    CHECK_EQUAL(tv.size(), 6);
+
+    case_sensitive = false;
+    q = table.where().equal(col_ndx, null_string, case_sensitive);
+    CHECK_EQUAL(q.count(), 2);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv[0].get_index(), 2);
+    CHECK_EQUAL(tv[1].get_index(), 3);
+    q2 = table.where().contains(col_ndx, null_string, case_sensitive);
+    CHECK_EQUAL(q2.count(), 6);
+    tv = q2.find_all();
+    CHECK_EQUAL(tv.size(), 6);
+}
+
+
 TEST_TYPES(Query_Rover, std::true_type, std::false_type)
 {
     constexpr bool nullable = TEST_TYPE::value;
