@@ -111,11 +111,11 @@ SyncTestFile::SyncTestFile(SyncServer& server,
     sync_config = std::make_shared<SyncConfig>(SyncConfig{
         SyncManager::shared().get_user({ "user", url }, "not_a_real_token"),
         url,
-        is_partial,
         SyncSessionStopPolicy::Immediately,
         [=](auto&, auto&, auto session) { session->refresh_access_token(s_test_token, url); },
         [](auto, auto) { abort(); }
     });
+    sync_config->is_partial = is_partial;
     schema_mode = SchemaMode::Additive;
 }
 

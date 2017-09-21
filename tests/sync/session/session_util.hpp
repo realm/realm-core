@@ -68,7 +68,7 @@ std::shared_ptr<SyncSession> sync_session_with_bind_handler(SyncServer& server, 
                                                             Realm::Config* out_config=nullptr)
 {
     std::string url = server.base_url() + path;
-    SyncTestFile config({user, url, false, std::move(stop_policy),
+    SyncTestFile config({user, url, std::move(stop_policy),
         std::forward<BindCallback>(bind_callback), std::forward<ErrorHandler>(error_handler)});
     if (schema) {
         config.schema = *schema;

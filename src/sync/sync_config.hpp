@@ -103,7 +103,6 @@ struct SyncError {
 struct SyncConfig {
     std::shared_ptr<SyncUser> user;
     std::string realm_url;
-    bool is_partial;
     SyncSessionStopPolicy stop_policy;
     std::function<SyncBindSessionHandler> bind_session_handler;
     std::function<SyncSessionErrorHandler> error_handler;
@@ -113,6 +112,7 @@ struct SyncConfig {
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<sync::Session::SSLVerifyCallback> ssl_verify_callback;
     bool validate_sync_history = true;
+    bool is_partial = false;
     util::Optional<std::string> custom_partial_sync_identifier;
 
     std::string resolved_realm_url() const
@@ -134,7 +134,7 @@ struct SyncConfig {
 
 #if __GNUC__ < 5
     // GCC 4.9 does not support C++14 braced-init
-    SyncConfig(std::shared_ptr<SyncUser> user, std::string realm_url, bool is_partial,
+    SyncConfig(std::shared_ptr<SyncUser> user, std::string realm_url,
                SyncSessionStopPolicy stop_policy,
                std::function<SyncBindSessionHandler> bind_session_handler,
                std::function<SyncSessionErrorHandler> error_handler = nullptr,
@@ -143,11 +143,11 @@ struct SyncConfig {
                bool client_validate_ssl = true, 
                util::Optional<std::string> ssl_trust_certificate_path = util::none, 
                std::function<realm::sync::Session::SSLVerifyCallback> ssl_verify_callback = nullptr,
+               bool is_partial = false,
                util::Optional<std::string> custom_partial_sync_identifier = util::none
         )
         : user(std::move(user))
         , realm_url(std::move(realm_url))
-        , is_partial(is_partial)
         , stop_policy(stop_policy)
         , bind_session_handler(std::move(bind_session_handler))
         , error_handler(std::move(error_handler))
@@ -156,6 +156,7 @@ struct SyncConfig {
         , client_validate_ssl(client_validate_ssl)
         , ssl_trust_certificate_path(std::move(ssl_trust_certificate_path))
         , ssl_verify_callback(std::move(ssl_verify_callback))
+        , is_partial(is_partial)
         , custom_partial_sync_identifier(std::move(custom_partial_sync_identifier))
     {
     }
