@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync_config.hpp"
+#include "sync/sync_config.hpp"
 
-#include "sync_manager.hpp"
+#include "sync/sync_manager.hpp"
 
 #include <realm/sync/crypto.hpp>
 

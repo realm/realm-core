@@ -16,14 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "partial_sync.hpp"
+#include "sync/partial_sync.hpp"
 
 #include "impl/notification_wrapper.hpp"
 #include "impl/object_accessor_impl.hpp"
 #include "object_schema.hpp"
 #include "results.hpp"
 #include "shared_realm.hpp"
-#include "sync_config.hpp"
+#include "sync/sync_config.hpp"
 
 #include <realm/util/scope_exit.hpp>
 
