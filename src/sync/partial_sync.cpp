@@ -23,7 +23,7 @@
 #include "object_schema.hpp"
 #include "results.hpp"
 #include "shared_realm.hpp"
-#include "thread_safe_reference.hpp"
+#include "sync_config.hpp"
 
 #include <realm/util/scope_exit.hpp>
 
@@ -61,6 +61,13 @@ void update_schema(Group& group, Property matches_property)
 void register_query(std::shared_ptr<Realm> realm, const std::string &object_class, const std::string &query,
                     std::function<void (Results, std::exception_ptr)> callback)
 {
+    auto sync_config = realm->config().sync_config;
+    if (!sync_config || !sync_config->is_partial)
+        throw std::logic_error("A partial sync query can only be registered in a partially synced Realm");
+
+    if (realm->schema().find(object_class) == realm->schema().end())
+        throw std::logic_error("A partial sync query can only be registered for a type that exists in the Realm's schema");
+
     auto matches_property = object_class + "_matches";
 
     // The object schema must outlive `object` below.

@@ -239,4 +239,28 @@ TEST_CASE("Partial sync", "[sync]") {
     }
 }
 
+TEST_CASE("Partial sync error checking", "[sync]") {
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+
+    SECTION("non-synced Realm") {
+        TestFile config;
+        auto realm = Realm::get_shared_realm(config);
+        CHECK_THROWS(partial_sync::register_query(realm, "object", "query", [&](Results, std::exception_ptr) { }));
+    }
+
+    SECTION("synced, non-partial Realm") {
+        SyncServer server;
+        SyncTestFile config(server, "test");
+        auto realm = Realm::get_shared_realm(config);
+        CHECK_THROWS(partial_sync::register_query(realm, "object", "query", [&](Results, std::exception_ptr) { }));
+    }
+
+    SECTION("query on type that doesn't exist") {
+        SyncServer server;
+        SyncTestFile config(server, "test", partial_sync_schema(), true);
+        auto realm = Realm::get_shared_realm(config);
+        CHECK_THROWS(partial_sync::register_query(realm, "this type doesn't exist", "query",
+                                                  [&](Results, std::exception_ptr) { }));
+    }
+}
 #endif // REALM_HAVE_SYNC_STABLE_IDS
