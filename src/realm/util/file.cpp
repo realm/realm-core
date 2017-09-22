@@ -639,6 +639,9 @@ void File::resize(SizeType size)
     if (m_encryption_key)
         size = data_size_to_encrypted_size(size);
 
+    // Windows docs say "it is not an error to set the file pointer to a position beyond the end of the file."
+    // so seeking with SetFilePointerEx() will not error out even if there is no disk space left.
+    // In this scenario though, the following call to SedEndOfFile() will fail if there is no disk space left.
     seek(size);
 
     if (!SetEndOfFile(m_fd)) {
