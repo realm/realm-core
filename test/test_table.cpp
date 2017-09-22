@@ -75,6 +75,7 @@ using unit_test::TestContext;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+#ifdef LEGACY_TESTS
 
 #ifdef JAVA_MANY_COLUMNS_CRASH
 
@@ -8745,6 +8746,7 @@ TEST(Table_KeyRow)
     i = table.find_first_int(0, 456);
     CHECK_EQUAL(i, 1);
 }
+#endif
 
 TEST(Table_object_basic)
 {

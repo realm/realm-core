@@ -38,6 +38,8 @@ using namespace realm;
 using namespace test_util;
 using namespace realm::util;
 
+#ifdef LEGACY_TESTS
+
 namespace {
 
 void check_table_view(test_util::unit_test::TestContext& test_context, const char* file, long line,
@@ -2037,4 +2039,5 @@ TEST(BackLink_Query_MultipleLevelsAndTables)
     CHECK_TABLE_VIEW(q.find_all(), {1});
 }
 
+#endif
 #endif

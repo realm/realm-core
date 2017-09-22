@@ -67,6 +67,7 @@ using namespace realm::test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+#ifdef LEGACY_TESTS
 
 TEST(Query_NoConditions)
 {
@@ -10964,5 +10965,6 @@ TEST_TYPES(Query_Rover, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 2);
 }
 
+#endif
 
 #endif // TEST_QUERY

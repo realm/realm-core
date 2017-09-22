@@ -556,6 +556,7 @@ TEST_TYPES(TimestampColumn_ForceReallocate, std::true_type, std::false_type)
     c.destroy();
 }
 
+#ifdef LEGACY_TESTS
 TEST(TimestampColumn_FindFirst)
 {
     constexpr bool nullable = true;
@@ -594,6 +595,7 @@ TEST(TimestampColumn_FindFirst)
     CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(1, 1)), 4);
     CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(-1, 0)), 5);
 }
+#endif
 
 TEST(TimestampColumn_AddColumnAfterRows)
 {
@@ -614,6 +616,7 @@ TEST(TimestampColumn_AddColumnAfterRows)
 }
 
 // max/min on pure null timestamps must reuturn npos like for int, float and double
+#ifdef LEGACY_TESTS
 TEST(TimestampColumn_AggregateBug)
 {
     size_t index;
@@ -658,6 +661,7 @@ TEST(TimestampColumn_AggregateBug)
     CHECK_EQUAL(2, index);
     CHECK_EQUAL(ts, Timestamp(1, 0));
 }
+#endif
 
 TEST(Table_DistinctTimestamp)
 {
