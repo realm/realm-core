@@ -58,6 +58,9 @@ public:
     {
         return false;
     }
+
+    bool traverse(ClusterTree::TraverseFunction func, int64_t) const;
+
     size_t get_tree_size() const override;
     int64_t get_last_key() const override;
 
@@ -362,6 +365,17 @@ void ClusterNodeInner::move(size_t ndx, ClusterNode* new_node, int64_t key_adj)
 size_t ClusterNodeInner::get_tree_size() const
 {
     size_t tree_size = 0;
+    traverse(
+        [&tree_size](const Cluster* cluster, int64_t) {
+            tree_size += cluster->node_size();
+            return false;
+        },
+        0);
+    return tree_size;
+}
+
+bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction func, int64_t key_offset) const
+{
     unsigned sz = node_size();
 
     for (unsigned i = 0; i < sz; i++) {
@@ -369,18 +383,23 @@ size_t ClusterNodeInner::get_tree_size() const
         char* header = m_alloc.translate(ref);
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
         MemRef mem(header, ref, m_alloc);
+        int64_t offs = key_offset + get_key(i);
         if (child_is_leaf) {
             Cluster leaf(m_alloc, m_tree_top);
             leaf.init(mem);
-            tree_size += leaf.node_size();
+            if (func(&leaf, offs)) {
+                return true;
+            }
         }
         else {
             ClusterNodeInner node(m_alloc, m_tree_top);
             node.init(mem);
-            tree_size += node.get_tree_size();
+            if (node.traverse(func, offs)) {
+                return true;
+            }
         }
     }
-    return tree_size;
+    return false;
 }
 
 int64_t ClusterNodeInner::get_last_key() const
@@ -1236,6 +1255,16 @@ void ClusterTree::get_leaf(size_t ndx, ClusterNode::IteratorState& state) const 
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
         state.m_root_index = 0;
         node->get_leaf(ndx, state);
+    }
+}
+
+bool ClusterTree::traverse(TraverseFunction func) const
+{
+    if (m_root->is_leaf()) {
+        return func(static_cast<Cluster*>(m_root.get()), 0);
+    }
+    else {
+        return static_cast<ClusterNodeInner*>(m_root.get())->traverse(func, 0);
     }
 }
 

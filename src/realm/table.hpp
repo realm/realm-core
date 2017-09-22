@@ -401,6 +401,11 @@ public:
         return m_clusters.dump_objects();
     }
 
+    bool traverse_clusters(ClusterTree::TraverseFunction func) const
+    {
+        return m_clusters.traverse(func);
+    }
+
     void remove(size_t row_ndx);
     void remove_recursive(size_t row_ndx);
     void remove_last();

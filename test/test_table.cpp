@@ -8972,6 +8972,13 @@ TEST(Table_object_forward_iterator)
         table.create_object(Key(i));
     }
 
+    int tree_size = 0;
+    table.traverse_clusters([&tree_size](const Cluster* cluster, int64_t) {
+        tree_size += cluster->node_size();
+        return false;
+    });
+    CHECK_EQUAL(tree_size, nb_rows);
+
     for (Obj o : table) {
         int64_t key_value = o.get_key().value;
         o.set_all(key_value << 1, key_value << 2);

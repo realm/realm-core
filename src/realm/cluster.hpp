@@ -282,6 +282,7 @@ class ClusterTree {
 public:
     class ConstIterator;
     class Iterator;
+    using TraverseFunction = std::function<bool(const Cluster*, int64_t)>;
 
     ClusterTree(Table* owner, Allocator& alloc);
     static MemRef create_empty_cluster(Allocator& alloc);
@@ -346,6 +347,7 @@ public:
     ConstObj get(Key k) const;
     Obj get(Key k);
     void get_leaf(size_t ndx, ClusterNode::IteratorState& state) const noexcept;
+    bool traverse(TraverseFunction func) const;
     void dump_objects()
     {
         m_root->dump_objects(0, "");
