@@ -8,7 +8,8 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Add `Table::move_row()`.
+  PR [#2873](https://github.com/realm/realm-core/pull/2873).
 
 ### Enhancements
 
