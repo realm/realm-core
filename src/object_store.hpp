@@ -88,6 +88,8 @@ public:
                                      SchemaMode mode, std::vector<SchemaChange> const& changes,
                                      std::function<void()> migration_function={});
 
+    static void apply_additive_changes(Group&, std::vector<SchemaChange> const&, bool update_indexes);
+
     // get a table for an object type
     static realm::TableRef table_for_object_type(Group& group, StringData object_type);
     static realm::ConstTableRef table_for_object_type(Group const& group, StringData object_type);

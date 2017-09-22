@@ -18,6 +18,7 @@
 
 #include "sync/sync_permission.hpp"
 
+#include "impl/notification_wrapper.hpp"
 #include "impl/object_accessor_impl.hpp"
 #include "object_schema.hpp"
 #include "property.hpp"
@@ -117,34 +118,13 @@ bool Permission::paths_are_equivalent(std::string path_1, std::string path_2,
 
 // MARK: - Permissions
 
-// A wrapper that stores a value and an associated notification token.
-// The point of this type is to keep the notification token alive
-// until the value can be properly processed or handled.
-template<typename T>
-struct NotificationWrapper : public T {
-    using T::T;
-
-    NotificationWrapper(T&& object)
-    : T(object)
-    { }
-
-    template <typename F>
-    void add_notification_callback(F&& callback)
-    {
-        m_token = T::add_notification_callback(std::forward<F>(callback));
-    }
-
-private:
-    NotificationToken m_token;
-};
-
 void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                                   PermissionResultsCallback callback,
                                   const ConfigMaker& make_config)
 {
     auto realm = Permissions::permission_realm(user, make_config);
     auto table = ObjectStore::table_for_object_type(realm->read_group(), "Permission");
-    auto results = std::make_shared<NotificationWrapper<Results>>(std::move(realm), *table);
+    auto results = std::make_shared<_impl::NotificationWrapper<Results>>(std::move(realm), *table);
 
     // `get_permissions` works by temporarily adding an async notifier to the permission Realm.
     // This notifier will run the `async` callback until the Realm contains permissions or
@@ -209,7 +189,7 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
             break;
     }
 
-    auto object = std::make_shared<NotificationWrapper<Object>>(std::move(raw));
+    auto object = std::make_shared<_impl::NotificationWrapper<Object>>(std::move(raw));
     realm->commit_transaction();
 
     // Observe the permission object until the permission change has been processed or failed.

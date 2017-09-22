@@ -22,7 +22,7 @@
 #include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
 
-#include "sync_config.hpp"
+#include "sync/sync_config.hpp"
 
 #include <mutex>
 #include <unordered_map>

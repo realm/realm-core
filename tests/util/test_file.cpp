@@ -25,6 +25,7 @@
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
+#include "schema.hpp"
 #endif
 
 #include <realm/disable_sync_to_disk.hpp>
@@ -95,19 +96,26 @@ SyncTestFile::SyncTestFile(const SyncConfig& sync_config)
     schema_mode = SchemaMode::Additive;
 }
 
-SyncTestFile::SyncTestFile(SyncServer& server, std::string name)
+SyncTestFile::SyncTestFile(SyncServer& server, 
+    std::string name, 
+    realm::util::Optional<realm::Schema> realm_schema, 
+    bool is_partial)
 {
     if (name.empty())
         name = path.substr(path.rfind('/') + 1);
     auto url = server.url_for_realm(name);
 
+    if (realm_schema)
+        schema = std::move(realm_schema);
+
     sync_config = std::make_shared<SyncConfig>(SyncConfig{
         SyncManager::shared().get_user({ "user", url }, "not_a_real_token"),
         url,
         SyncSessionStopPolicy::Immediately,
-        [=](auto&, auto&, auto session) { session->refresh_access_token(s_test_token, url); },
+        [=](auto&, auto& config, auto session) { session->refresh_access_token(s_test_token, config.realm_url()); },
         [](auto, auto) { abort(); }
     });
+    sync_config->is_partial = is_partial;
     schema_mode = SchemaMode::Additive;
 }
 

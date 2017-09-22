@@ -43,7 +43,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     SECTION("works properly when called after the session is bound") {
         auto user = SyncManager::shared().get_user({ "user-async-wait-download-1", dummy_auth_url }, "not_a_real_token");
         auto session = sync_session(server, user, "/async-wait-download-1",
-                                    [](const std::string&, const std::string&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Register the download-completion notification
@@ -82,7 +82,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
         const auto user_id = "user-async-wait-download-3";
         auto user = SyncManager::shared().get_user({ user_id, dummy_auth_url }, "not_a_real_token");
         auto session = sync_session(server, user, "/user-async-wait-download-3",
-                                    [](auto&, auto&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Log the user out, and wait for the sessions to log out.
@@ -131,7 +131,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
         auto user = SyncManager::shared().get_user({ "user-async-wait-download-5", dummy_auth_url }, "not_a_real_token");
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
-                                    [](const std::string&, const std::string&) { return "this is not a valid access token"; },
+                                    [](const auto&, const auto&) { return "this is not a valid access token"; },
                                     [&](auto, auto) { ++error_count; });
 
         EventLoop::main().run_until([&] { return error_count > 0; });
@@ -155,7 +155,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
     SECTION("works properly when called after the session is bound") {
         auto user = SyncManager::shared().get_user({ "user-async-wait-upload-1", dummy_auth_url }, "not_a_real_token");
         auto session = sync_session(server, user, "/async-wait-upload-1",
-                                    [](const std::string&, const std::string&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Register the upload-completion notification
@@ -194,7 +194,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
         const auto user_id = "user-async-wait-upload-3";
         auto user = SyncManager::shared().get_user({ user_id, dummy_auth_url }, "not_a_real_token");
         auto session = sync_session(server, user, "/user-async-wait-upload-3",
-                                    [](auto&, auto&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Log the user out, and wait for the sessions to log out.
@@ -243,7 +243,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
         auto user = SyncManager::shared().get_user({ "user-async-wait-upload-5", dummy_auth_url }, "not_a_real_token");
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
-                                    [](const std::string&, const std::string&) { return "this is not a valid access token"; },
+                                    [](const auto&, const auto&) { return "this is not a valid access token"; },
                                     [&](auto, auto) { ++error_count; });
 
         EventLoop::main().run_until([&] { return error_count > 0; });

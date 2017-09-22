@@ -52,6 +52,7 @@ set(HEADERS
     impl/collection_notifier.hpp
     impl/external_commit_helper.hpp
     impl/list_notifier.hpp
+    impl/notification_wrapper.hpp
     impl/object_accessor_impl.hpp
     impl/object_notifier.hpp
     impl/primitive_list_notifier.hpp
@@ -98,8 +99,8 @@ set(INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(REALM_ENABLE_SYNC)
-    # Add the sync files separately to reduce merge conflicts.
     list(APPEND HEADERS
+        sync/partial_sync.hpp
         sync/sync_config.hpp
         sync/sync_manager.hpp
         sync/sync_permission.hpp
@@ -109,6 +110,8 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp)
     list(APPEND SOURCES
+        sync/partial_sync.cpp
+        sync/sync_config.cpp
         sync/sync_manager.cpp
         sync/sync_permission.cpp
         sync/sync_session.cpp

@@ -512,3 +512,9 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
     return std::make_unique<SyncClient>(std::move(logger),
                                         m_client_reconnect_mode);
 }
+
+std::string SyncManager::client_uuid() const
+{
+    REALM_ASSERT(m_metadata_manager);
+    return m_metadata_manager->client_uuid();
+}

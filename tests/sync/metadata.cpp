@@ -194,6 +194,8 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
                 CHECK(user_metadata->local_uuid() != "");
                 CHECK(user_metadata->local_uuid() != identity_3);
                 CHECK(user_metadata->auth_server_url() == auth_server_url);
+
+                CHECK(manager.client_uuid().size());
             }
         }
     }
@@ -462,12 +464,16 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
         REQUIRE(first->auth_server_url() == auth_server_url);
         REQUIRE(first->user_token() == sample_token);
         REQUIRE(first->is_admin());
+        auto first_client_uuid = first_manager.client_uuid();
+
         SyncMetadataManager second_manager(metadata_path, false);
         auto second = second_manager.get_or_make_user_metadata(identity, auth_server_url, false);
         REQUIRE(second->identity() == identity);
         REQUIRE(second->auth_server_url() == auth_server_url);
         REQUIRE(second->user_token() == sample_token);
         REQUIRE(second->is_admin());
+
+        REQUIRE(second_manager.client_uuid() == first_client_uuid);
     }
 }
 

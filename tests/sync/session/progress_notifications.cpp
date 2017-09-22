@@ -54,7 +54,7 @@ TEST_CASE("progress notification", "[sync]") {
     SECTION("runs at least once (initially when registered)") {
         auto user = SyncManager::shared().get_user({ "user-test-sync-1", dummy_auth_url }, "not_a_real_token");
         auto session = sync_session(server, user, "/test-sync-progress-1",
-                                    [](auto&, auto&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [](auto, auto) { },
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         wait_for_session_to_activate(*session);
@@ -91,7 +91,7 @@ TEST_CASE("progress notification", "[sync]") {
     SECTION("properly runs for streaming notifiers") {
         auto user = SyncManager::shared().get_user({ "user-test-sync-2", dummy_auth_url }, "not_a_real_token");
         auto session = sync_session(server, user, "/test-sync-progress-2",
-                                    [](auto&, auto&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [](auto, auto) { },
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         wait_for_session_to_activate(*session);
@@ -259,7 +259,7 @@ TEST_CASE("progress notification", "[sync]") {
     SECTION("properly runs for non-streaming notifiers") {
         auto user = SyncManager::shared().get_user({ "user-test-sync-3", dummy_auth_url }, "not_a_real_token");
         auto session = sync_session(server, user, "/test-sync-progress-3",
-                                    [](auto&, auto&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [](auto, auto) { },
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         wait_for_session_to_activate(*session);

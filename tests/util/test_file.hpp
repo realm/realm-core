@@ -23,6 +23,7 @@
 
 #include <realm/group_shared.hpp>
 #include <realm/util/logger.hpp>
+#include <realm/util/optional.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/sync/client.hpp>
@@ -30,6 +31,7 @@
 
 namespace realm {
 struct SyncConfig;
+class Schema;
 }
 
 // {"identity":"test", "access": ["download", "upload"]}
@@ -99,7 +101,10 @@ private:
 
 struct SyncTestFile : TestFile {
     SyncTestFile(const realm::SyncConfig&);
-    SyncTestFile(SyncServer& server, std::string name="");
+    SyncTestFile(SyncServer& server, 
+        std::string name="", 
+        realm::util::Optional<realm::Schema> realm_schema=none, 
+        bool is_partial=false);
 };
 
 void wait_for_upload(realm::Realm& realm);
