@@ -531,6 +531,22 @@ public:
     std::shared_ptr<metrics::Metrics> get_metrics();
 #endif // REALM_METRICS
 
+    // Try to grab a exclusive lock of the given realm path's lock file. If the lock
+    // can be acquired, the callback will be executed with the lock and then return true.
+    // Otherwise false will be returned directly.
+    // The lock taken precludes races with other threads or processes accessing the
+    // files through a SharedGroup.
+    // It is safe to delete/replace realm files inside the callback.
+    // WARNING: It is not safe to delete the lock file in the callback.
+    using CallbackWithLock = std::function<void(const std::string& realm_path)>;
+    static bool call_with_lock(const std::string& realm_path, CallbackWithLock callback);
+
+    // Return a list of files/directories core may use of the given realm file path.
+    // The first element of the pair in the returned list is the path string, the
+    // second one is to indicate the path is a directory or not.
+    // The temporary files are not returned by this function.
+    // It is safe to delete those returned files/directories in the call_with_lock's callback.
+    static std::vector<std::pair<std::string, bool>> get_core_files(const std::string& realm_path);
 
 private:
     struct SharedInfo;

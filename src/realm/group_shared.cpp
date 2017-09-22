@@ -1326,10 +1326,14 @@ bool SharedGroup::compact()
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync)
                 file.sync(); // Throws
-            }
+        }
         catch (...)
         {
-            File::try_remove(tmp_path);
+            // If writing the compact version failed in any way, delete the partially written file to clean up disk
+            // space. This is so that we don't fail with 100% disk space used when compacting on a mostly full disk.
+            if (File::exists(tmp_path)) {
+                File::remove(tmp_path);
+            }
             throw;
         }
 #ifndef _WIN32
@@ -2351,4 +2355,27 @@ TableRef SharedGroup::import_table_from_handover(std::unique_ptr<Handover<Table>
     }
     TableRef result = Table::create_from_and_consume_patch(handover->patch, m_group);
     return result;
+}
+
+bool SharedGroup::call_with_lock(const std::string& realm_path, CallbackWithLock callback)
+{
+    auto lockfile_path(realm_path + ".lock");
+
+    File lockfile;
+    lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
+    File::CloseGuard fcg(lockfile);
+
+    if (lockfile.try_lock_exclusive()) { // Throws
+        callback(realm_path);
+        return true;
+    }
+    return false;
+}
+
+std::vector<std::pair<std::string, bool>> SharedGroup::get_core_files(const std::string& realm_path)
+{
+    std::vector<std::pair<std::string, bool>> files;
+    files.emplace_back(std::make_pair(realm_path, false));
+    files.emplace_back(std::make_pair(realm_path + ".management", true));
+    return files;
 }

@@ -986,7 +986,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
 
     using int_type = decltype(Mixed().get_int());
 
-    auto set_subtab = [this](TableRef table_w, size_t col_ndx, size_t row_ndx, int_type value) {
+    auto set_subtab = [](TableRef table_w, size_t col_ndx, size_t row_ndx, int_type value) {
         table_w->set_mixed(col_ndx, row_ndx, Mixed(Mixed::subtable_tag()));
         TableRef subtab_w = table_w->get_subtable(col_ndx, row_ndx);
         subtab_w->add_column(type_Int, "");
@@ -13443,6 +13443,65 @@ TEST(LangBindHelper_UpdateDescriptor)
     // Try again. The Descriptor should be created again
     tv = sub->where().equal(0, 53).find_all();
     CHECK_EQUAL(tv.size(), 1);
+}
+
+TEST(LangBindHelper_callWithLock)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup::CallbackWithLock callback = [this, &path](const std::string& realm_path) {
+        CHECK(realm_path.compare(path) == 0);
+    };
+
+    SharedGroup::CallbackWithLock callback_not_called = [this, &path](const std::string&) {
+        CHECK(false);
+    };
+
+    // call_with_lock should run the callback if the lock file doesn't exist.
+    CHECK_NOT(File::exists(path.get_lock_path()));
+    CHECK(SharedGroup::call_with_lock(path, callback));
+    CHECK(File::exists(path.get_lock_path()));
+
+    {
+        std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+        SharedGroup sg_w(*hist_w);
+        sg_w.begin_write();
+        CHECK_NOT(SharedGroup::call_with_lock(path, callback_not_called));
+        sg_w.commit();
+        CHECK_NOT(SharedGroup::call_with_lock(path, callback_not_called));
+    }
+    CHECK(SharedGroup::call_with_lock(path, callback));
+}
+
+TEST(LangBindHelper_getCoreFiles)
+{
+    TEST_DIR(dir);
+    std::string realm_path = std::string(dir) + "/test.realm";
+
+    {
+        std::unique_ptr<Replication> hist_w(make_in_realm_history(realm_path));
+        SharedGroup sg_w(*hist_w);
+        sg_w.begin_write();
+        sg_w.commit();
+    }
+
+    auto core_files = SharedGroup::get_core_files(realm_path);
+    CHECK(core_files.size() > 0);
+
+    std::string file;
+    DirScanner scaner(dir);
+    while (scaner.next(file)) {
+        const std::string lock_suffix = ".lock";
+        if (file.size() >= lock_suffix.size() &&
+            file.compare(file.size() - lock_suffix.size(), lock_suffix.size(), lock_suffix) == 0) {
+            continue;
+        }
+        std::string path(std::string(dir) + "/" + file);
+        auto file_pair = std::make_pair(path, File::is_dir(path));
+        CHECK(core_files.size() != 0);
+        core_files.erase(std::remove(core_files.begin(), core_files.end(), file_pair), core_files.end());
+    }
+
+    CHECK(core_files.size() == 0);
 }
 
 #endif
