@@ -1453,7 +1453,8 @@ public:
 
         for (size_t s = start; s < end; ++s) {
             StringData t = get_string(s);
-            // current (questionable?) behaviour is to return all results when querying for a null string
+            // The current behaviour is to return all results when querying for a null string.
+            // See comment above Query_NextGen_StringConditions on why every string including "" contains null.
             if (!bool(m_value)) {
                 return s;
             }
