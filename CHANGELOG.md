@@ -20,7 +20,10 @@
 
 ### Internals
 
-* Lorem ipsum.
+* A specialised exception realm::OutOfDiskSpace is thrown instead of a generic
+  runtime exception when writing fails because the disk is full or the user exceeds
+  the allotted disk quota.
+  PR [#2861](https://github.com/realm/realm-core/pull/2861).
 
 ----------------------------------------------
 
