@@ -59,6 +59,12 @@ struct Key {
     int64_t value;
 };
 
+inline std::ostream& operator<<(std::ostream& ostr, Key key)
+{
+    ostr << key.value;
+    return ostr;
+}
+
 constexpr Key null_key;
 
 class ClusterNode : public Array {
@@ -202,6 +208,13 @@ public:
     void get(Key k, State& state) const override;
     unsigned erase(Key k) override;
 
+    template <class T>
+    void init_leaf(size_t col_ndx, T* leaf) const noexcept;
+    const Array* get_key_array() const
+    {
+        return &m_keys;
+    }
+
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
 private:
@@ -298,7 +311,7 @@ public:
     {
         m_root->set_parent(parent, ndx_in_parent);
     }
-    bool is_attached()
+    bool is_attached() const
     {
         return m_root->is_attached();
     }
@@ -426,6 +439,13 @@ public:
         return const_cast<pointer>(ConstIterator::operator->());
     }
 };
+
+template <class T>
+void Cluster::init_leaf(size_t col_ndx, T* leaf) const noexcept
+{
+    ref_type ref = to_ref(Array::get(col_ndx + 1));
+    leaf->init_from_ref(ref);
+}
 
 template <typename U>
 U ConstObj::get(StringData col_name) const

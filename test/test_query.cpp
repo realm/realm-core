@@ -67,7 +67,6 @@ using namespace realm::test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-#ifdef LEGACY_TESTS
 
 TEST(Query_NoConditions)
 {
@@ -75,22 +74,23 @@ TEST(Query_NoConditions)
     table.add_column(type_Int, "i");
     {
         Query query(table.where());
-        CHECK_EQUAL(not_found, query.find());
+        CHECK_EQUAL(null_key, query.find());
     }
     {
         Query query = table.where();
-        CHECK_EQUAL(not_found, query.find());
+        CHECK_EQUAL(null_key, query.find());
     }
-    table.add_empty_row();
+    table.create_object(Key(5));
     {
         Query query(table.where());
-        CHECK_EQUAL(0, query.find());
+        CHECK_EQUAL(5, query.find().value);
     }
     {
         Query query = table.where();
-        CHECK_EQUAL(0, query.find());
+        CHECK_EQUAL(5, query.find().value);
     }
 }
+
 
 TEST(Query_Count)
 {
@@ -105,16 +105,15 @@ TEST(Query_Count)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int j = 0; j < 100; j++) {
         Table table;
-        table.add_column(type_Int, "i");
+        auto col_ndx = table.add_column(type_Int, "i");
 
         size_t matching = 0;
         size_t not_matching = 0;
         size_t rows = random.draw_int_mod(5 * REALM_MAX_BPNODE_SIZE); // to cross some leaf boundaries
 
         for (size_t i = 0; i < rows; ++i) {
-            table.add_empty_row();
             int64_t val = random.draw_int_mod(5);
-            table.set_int(0, i, val);
+            table.create_object().set(col_ndx, val);
             if (val == 2)
                 matching++;
             else
@@ -126,6 +125,7 @@ TEST(Query_Count)
     }
 }
 
+#ifdef LEGACY_TESTS
 
 TEST(Query_NextGenSyntaxTypedString)
 {
@@ -10966,5 +10966,41 @@ TEST_TYPES(Query_Rover, std::true_type, std::false_type)
 }
 
 #endif
+
+TEST(Query_IntOnly)
+{
+    Table table;
+    table.add_column(type_Int, "i1");
+    table.add_column(type_Int, "i2");
+
+    table.create_object(Key(7)).set_all(7, 6);
+    table.create_object(Key(19)).set_all(19, 9);
+    table.create_object(Key(5)).set_all(19, 22);
+    table.create_object(Key(21)).set_all(2, 6);
+
+    auto q = table.column<Int>(1) == 6;
+    Key key = q.find();
+    CHECK_EQUAL(key, Key(7));
+
+    TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get(0).get_key(), Key(7));
+    CHECK_EQUAL(tv.get(1).get_key(), Key(21));
+
+    q = table.column<Int>(0) == 19 && table.column<Int>(1) == 9;
+    key = q.find();
+    CHECK_EQUAL(key.value, 19);
+
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get(0).get_key(), Key(19));
+
+    // Two column expression
+    q = table.column<Int>(0) < table.column<Int>(1);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get(0).get_key(), Key(5));
+    CHECK_EQUAL(tv.get(1).get_key(), Key(21));
+}
 
 #endif // TEST_QUERY

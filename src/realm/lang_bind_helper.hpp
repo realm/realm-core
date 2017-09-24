@@ -81,22 +81,6 @@ public:
 
     //@}
 
-    static Table* get_subtable_ptr(Table*, size_t column_ndx, size_t row_ndx);
-    static const Table* get_subtable_ptr(const Table*, size_t column_ndx, size_t row_ndx);
-
-    // FIXME: This is an 'oddball', do we really need it? If we do,
-    // please provide a comment that explains why it is needed!
-    static Table* get_subtable_ptr_during_insert(Table*, size_t col_ndx, size_t row_ndx);
-
-    static Table* get_subtable_ptr(TableView*, size_t column_ndx, size_t row_ndx);
-    static const Table* get_subtable_ptr(const TableView*, size_t column_ndx, size_t row_ndx);
-    static const Table* get_subtable_ptr(const ConstTableView*, size_t column_ndx, size_t row_ndx);
-
-    /// Calls parent.set_mixed_subtable(col_ndx, row_ndx, &source). Note
-    /// that the source table must have a descriptor that is
-    /// compatible with the target subtable column.
-    static void set_mixed_subtable(Table& parent, size_t col_ndx, size_t row_ndx, const Table& source);
-
     static const LinkViewRef& get_linklist_ptr(Row&, size_t col_ndx);
     static void unbind_linklist_ptr(const LinkViewRef&);
 
@@ -216,32 +200,6 @@ inline Table* LangBindHelper::copy_table(const Table& table)
     return copy_of_table;
 }
 
-inline Table* LangBindHelper::get_subtable_ptr(Table* t, size_t column_ndx, size_t row_ndx)
-{
-    TableRef subtab = t->get_subtable_tableref(column_ndx, row_ndx); // Throws
-    return subtab.release();
-}
-
-inline const Table* LangBindHelper::get_subtable_ptr(const Table* t, size_t column_ndx, size_t row_ndx)
-{
-    ConstTableRef subtab = t->get_subtable_tableref(column_ndx, row_ndx); // Throws
-    return subtab.release();
-}
-
-inline Table* LangBindHelper::get_subtable_ptr(TableView* tv, size_t column_ndx, size_t row_ndx)
-{
-    return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
-}
-
-inline const Table* LangBindHelper::get_subtable_ptr(const TableView* tv, size_t column_ndx, size_t row_ndx)
-{
-    return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
-}
-
-inline const Table* LangBindHelper::get_subtable_ptr(const ConstTableView* tv, size_t column_ndx, size_t row_ndx)
-{
-    return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
-}
 
 inline Table* LangBindHelper::get_table(Group& group, size_t index_in_group)
 {
@@ -301,11 +259,6 @@ inline void LangBindHelper::unbind_table_ptr(const Table* t) noexcept
 inline void LangBindHelper::bind_table_ptr(const Table* t) noexcept
 {
     t->bind_ptr();
-}
-
-inline void LangBindHelper::set_mixed_subtable(Table& parent, size_t col_ndx, size_t row_ndx, const Table& source)
-{
-    parent.set_mixed_subtable(col_ndx, row_ndx, &source);
 }
 
 inline const LinkViewRef& LangBindHelper::get_linklist_ptr(Row& row, size_t col_ndx)

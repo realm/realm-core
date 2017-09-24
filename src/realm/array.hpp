@@ -1074,6 +1074,8 @@ public:
     size_t m_match_count;
     size_t m_limit;
     size_t m_minmax_index; // used only for min/max, to save index of current min/max value
+    int64_t m_key_offset;
+    const Array* m_key_values;
 
     template <Action action>
     bool uses_val()
@@ -1089,6 +1091,7 @@ public:
         m_match_count = 0;
         m_limit = limit;
         m_minmax_index = not_found;
+        m_key_values = nullptr;
 
         if (action == act_Max)
             m_state = -0x7fffffffffffffffLL - 1LL;
@@ -1149,7 +1152,13 @@ public:
             m_match_count = size_t(m_state);
         }
         else if (action == act_FindAll) {
-            Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
+            if (m_key_values) {
+                int64_t key_value = m_key_values->get(index) + m_key_offset;
+                Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), key_value);
+            }
+            else {
+                Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
+            }
         }
         else if (action == act_ReturnFirst) {
             m_state = index;
@@ -1176,7 +1185,13 @@ public:
             m_match_count = size_t(m_state);
         }
         else if (action == act_FindAll) {
-            Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
+            if (m_key_values) {
+                int64_t key_value = m_key_values->get(index) + m_key_offset;
+                Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), key_value);
+            }
+            else {
+                Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
+            }
         }
         else if (action == act_ReturnFirst) {
             m_match_count++;

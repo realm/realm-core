@@ -1250,6 +1250,7 @@ void ClusterTree::get_leaf(size_t ndx, ClusterNode::IteratorState& state) const 
 
     if (m_root->is_leaf()) {
         state.m_current_leaf.init(m_root->get_mem());
+        state.m_leaf_end_ndx = state.m_current_leaf.node_size();
     }
     else {
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
@@ -1316,7 +1317,7 @@ void ClusterTree::ConstIterator::load_leaf() const
     }
 }
 
-Table::ConstIterator::pointer Table::ConstIterator::operator->() const
+ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
 {
     if (m_version != m_tree.get_version_counter()) {
         load_leaf();
@@ -1329,7 +1330,7 @@ Table::ConstIterator::pointer Table::ConstIterator::operator->() const
     return new (&m_obj_cache_storage) Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_ref(), k, index);
 }
 
-Table::ConstIterator& Table::ConstIterator::operator++()
+ClusterTree::ConstIterator& Table::ConstIterator::operator++()
 {
     m_ndx++;
     if (m_ndx == m_state.m_leaf_end_ndx) {

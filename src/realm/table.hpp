@@ -329,6 +329,10 @@ public:
     /// \sa Descriptor::is_root()
     bool has_shared_type() const noexcept;
 
+    bool has_clusters() const
+    {
+        return m_clusters.is_attached();
+    }
 
     template <class T>
     Columns<T> column(size_t column); // FIXME: Should this one have been declared noexcept?
@@ -673,18 +677,18 @@ public:
 
     // Searching
     template <class T>
-    size_t find_first(size_t column_ndx, T value) const;
+    Key find_first(size_t column_ndx, T value) const;
 
-    size_t find_first_link(size_t target_row_index) const;
-    size_t find_first_int(size_t column_ndx, int64_t value) const;
-    size_t find_first_bool(size_t column_ndx, bool value) const;
-    size_t find_first_olddatetime(size_t column_ndx, OldDateTime value) const;
-    size_t find_first_timestamp(size_t column_ndx, Timestamp value) const;
-    size_t find_first_float(size_t column_ndx, float value) const;
-    size_t find_first_double(size_t column_ndx, double value) const;
-    size_t find_first_string(size_t column_ndx, StringData value) const;
-    size_t find_first_binary(size_t column_ndx, BinaryData value) const;
-    size_t find_first_null(size_t column_ndx) const;
+    Key find_first_link(size_t target_row_index) const;
+    Key find_first_int(size_t column_ndx, int64_t value) const;
+    Key find_first_bool(size_t column_ndx, bool value) const;
+    Key find_first_olddatetime(size_t column_ndx, OldDateTime value) const;
+    Key find_first_timestamp(size_t column_ndx, Timestamp value) const;
+    Key find_first_float(size_t column_ndx, float value) const;
+    Key find_first_double(size_t column_ndx, double value) const;
+    Key find_first_string(size_t column_ndx, StringData value) const;
+    Key find_first_binary(size_t column_ndx, BinaryData value) const;
+    Key find_first_null(size_t column_ndx) const;
 
     TableView find_all_link(size_t target_row_index);
     ConstTableView find_all_link(size_t target_row_index) const;
@@ -1324,7 +1328,7 @@ private:
     const BacklinkColumn& get_column_backlink(size_t ndx) const noexcept;
     BacklinkColumn& get_column_backlink(size_t ndx);
 
-    void verify_column(size_t col_ndx, const ColumnBase* col) const;
+    void verify_column(size_t col_ndx) const;
 
     void instantiate_before_change();
     void validate_column_type(const ColumnBase& col, ColumnType expected_type, size_t ndx) const;
@@ -1823,16 +1827,12 @@ inline bool Table::has_shared_type() const noexcept
     return !m_top.is_attached();
 }
 
-inline void Table::verify_column(size_t col_ndx, const ColumnBase* col) const
+inline void Table::verify_column(size_t col_ndx) const
 {
-    // Check if the column exists at the expected location
-    if (REALM_LIKELY(col_ndx < m_cols.size() && m_cols[col_ndx] == col))
+    // TODO Check against spec
+    if (REALM_LIKELY(col_ndx < m_cols.size()))
         return;
-    // The column might be elsewhere in the list
-    for (auto c : m_cols) {
-        if (c == col)
-            return;
-    }
+
     throw LogicError(LogicError::column_does_not_exist);
 }
 

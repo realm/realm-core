@@ -45,6 +45,7 @@ set(REALM_SOURCES
     spec.cpp
     string_data.cpp
     table.cpp
+    obj_list.cpp
     table_view.cpp
     unicode.cpp
     util/basic_system_errors.cpp
@@ -130,6 +131,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     string_data.hpp
     table.hpp
     table_ref.hpp
+    obj_list.hpp
     table_view.hpp
     timestamp.hpp
     unicode.hpp

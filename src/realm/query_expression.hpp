@@ -391,6 +391,9 @@ public:
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_base_table(const Table* table) = 0;
+    virtual void set_cluster(const Cluster*)
+    {
+    }
     virtual void verify_column() const = 0;
     virtual const Table* get_base_table() const = 0;
     virtual std::string description() const = 0;
@@ -431,6 +434,10 @@ public:
 
     virtual void verify_column() const = 0;
     virtual std::string description() const = 0;
+
+    virtual void set_cluster(const Cluster*)
+    {
+    }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and
@@ -1828,7 +1835,7 @@ public:
     void verify_columns() const
     {
         for (size_t i = 0; i < m_link_column_indexes.size(); i++) {
-            m_tables[i]->verify_column(m_link_column_indexes[i], m_link_columns[i]);
+            m_tables[i]->verify_column(m_link_column_indexes[i]);
         }
     }
 
@@ -2019,7 +2026,7 @@ public:
         // verify target table
         const Table* target_table = m_link_map.target_table();
         if (target_table && m_column_ndx != npos) {
-            target_table->verify_column(m_column_ndx, m_column);
+            target_table->verify_column(m_column_ndx);
         }
     }
 
@@ -2589,7 +2596,7 @@ public:
     void verify_column() const override
     {
         m_link_map.verify_columns();
-        m_link_map.target_table()->verify_column(m_column_ndx, m_column);
+        m_link_map.target_table()->verify_column(m_column_ndx);
     }
 
     std::string description() const override
@@ -3013,7 +3020,7 @@ public:
         // verify target table
         const Table* target_table = m_link_map.target_table();
         if (target_table && m_column_ndx != npos) {
-            target_table->verify_column(m_column_ndx, &get_column_base());
+            target_table->verify_column(m_column_ndx);
         }
     }
 
@@ -3626,6 +3633,12 @@ public:
         m_right->set_base_table(table);
     }
 
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_left->set_cluster(cluster);
+        m_right->set_cluster(cluster);
+    }
+
     void verify_column() const override
     {
         m_left->verify_column();
@@ -3704,6 +3717,12 @@ public:
     {
         m_left->set_base_table(table);
         m_right->set_base_table(table);
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_left->set_cluster(cluster);
+        m_right->set_cluster(cluster);
     }
 
     void verify_column() const override

@@ -2722,14 +2722,6 @@ void Table::do_clear(bool broken_reciprocal_backlinks)
 
     discard_row_accessors();
 
-    {
-        LockGuard lock(m_accessor_mutex);
-
-        for (auto& view : m_views) {
-            view->adj_row_acc_clear();
-        }
-    }
-
     bump_version();
 }
 
@@ -4142,16 +4134,6 @@ Timestamp Table::maximum_timestamp(size_t col_ndx, size_t* return_ndx) const
 
 namespace {
 
-util::Optional<int64_t> upgrade_optional_int(util::Optional<bool> value)
-{
-    return value ? some<int64_t>(*value ? 1 : 0) : none;
-}
-
-util::Optional<int64_t> upgrade_optional_int(util::Optional<OldDateTime> value)
-{
-    return value ? some<int64_t>(value->get_olddatetime()) : none;
-}
-
 template <class T>
 T upgrade_optional_int(T value)
 {
@@ -4164,88 +4146,54 @@ T upgrade_optional_int(T value)
 
 namespace realm {
 template <class T>
-size_t Table::find_first(size_t col_ndx, T value) const
+Key Table::find_first(size_t, T) const
 {
-    using type_traits = ColumnTypeTraits<T>;
-    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, type_traits::column_id);
-
-    if (!m_columns.is_attached())
-        return not_found;
-
-    typedef typename type_traits::column_type ColType;
-    const ColType& column_type = get_column<ColType, type_traits::column_id>(col_ndx);
-    return column_type.find_first(upgrade_optional_int(value));
+    // TODO
+    return null_key;
 }
 
 template <>
-size_t Table::find_first(size_t col_ndx, Timestamp value) const
-{
-    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Timestamp);
-
-    if (!m_columns.is_attached())
-        return not_found;
-
-    const TimestampColumn& col = get_column_timestamp(col_ndx);
-    return col.find<realm::Equal>(value, 0, col.size());
-}
-
-template <>
-size_t Table::find_first(size_t col_ndx, StringData value) const
-{
-    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    if (!m_columns.is_attached())
-        return not_found;
-
-    ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
-        const StringColumn& col = get_column_string(col_ndx);
-        return col.find_first(value);
-    }
-    REALM_ASSERT_3(type, ==, col_type_StringEnum);
-    const StringEnumColumn& col = get_column_string_enum(col_ndx);
-    return col.find_first(value);
-}
-
-template <>
-size_t Table::find_first(size_t col_ndx, util::Optional<float> value) const
+Key Table::find_first(size_t col_ndx, util::Optional<float> value) const
 {
     return value ? find_first(col_ndx, *value) : find_first_null(col_ndx);
 }
 
 template <>
-size_t Table::find_first(size_t col_ndx, util::Optional<double> value) const
+Key Table::find_first(size_t col_ndx, util::Optional<double> value) const
 {
     return value ? find_first(col_ndx, *value) : find_first_null(col_ndx);
 }
 
 template <>
-size_t Table::find_first(size_t col_ndx, null) const
+Key Table::find_first(size_t col_ndx, null) const
 {
     return find_first_null(col_ndx);
 }
 
 // Explicitly instantiate the generic case of the template for the types we care about.
-template size_t Table::find_first(size_t col_ndx, bool) const;
-template size_t Table::find_first(size_t col_ndx, int64_t) const;
-template size_t Table::find_first(size_t col_ndx, float) const;
-template size_t Table::find_first(size_t col_ndx, double) const;
-template size_t Table::find_first(size_t col_ndx, util::Optional<bool>) const;
-template size_t Table::find_first(size_t col_ndx, util::Optional<int64_t>) const;
-template size_t Table::find_first(size_t col_ndx, BinaryData) const;
+template Key Table::find_first(size_t col_ndx, bool) const;
+template Key Table::find_first(size_t col_ndx, int64_t) const;
+template Key Table::find_first(size_t col_ndx, float) const;
+template Key Table::find_first(size_t col_ndx, double) const;
+template Key Table::find_first(size_t col_ndx, util::Optional<bool>) const;
+template Key Table::find_first(size_t col_ndx, util::Optional<int64_t>) const;
+template Key Table::find_first(size_t col_ndx, BinaryData) const;
 
 } // namespace realm
 
-size_t Table::find_first_link(size_t target_row_index) const
+Key Table::find_first_link(size_t) const
 {
-    auto target_row = get_link_target(m_link_chain[0])->get(target_row_index);
-    size_t ret = where().links_to(m_link_chain[0], target_row).find();
-    m_link_chain.clear();
-    return ret;
+    /*
+        auto target_row = get_link_target(m_link_chain[0])->get(target_row_index);
+        size_t ret = where().links_to(m_link_chain[0], target_row).find();
+        m_link_chain.clear();
+        return ret;
+    */
+    // TODO
+    return null_key;
 }
 
-size_t Table::find_first_int(size_t col_ndx, int64_t value) const
+Key Table::find_first_int(size_t col_ndx, int64_t value) const
 {
     if (is_nullable(col_ndx))
         return find_first<util::Optional<int64_t>>(col_ndx, value);
@@ -4253,7 +4201,7 @@ size_t Table::find_first_int(size_t col_ndx, int64_t value) const
         return find_first<int64_t>(col_ndx, value);
 }
 
-size_t Table::find_first_bool(size_t col_ndx, bool value) const
+Key Table::find_first_bool(size_t col_ndx, bool value) const
 {
     if (is_nullable(col_ndx))
         return find_first<util::Optional<bool>>(col_ndx, value);
@@ -4261,7 +4209,7 @@ size_t Table::find_first_bool(size_t col_ndx, bool value) const
         return find_first<bool>(col_ndx, value);
 }
 
-size_t Table::find_first_olddatetime(size_t col_ndx, OldDateTime value) const
+Key Table::find_first_olddatetime(size_t col_ndx, OldDateTime value) const
 {
     if (is_nullable(col_ndx))
         return find_first<util::Optional<OldDateTime>>(col_ndx, value);
@@ -4269,34 +4217,36 @@ size_t Table::find_first_olddatetime(size_t col_ndx, OldDateTime value) const
         return find_first<OldDateTime>(col_ndx, value);
 }
 
-size_t Table::find_first_timestamp(size_t col_ndx, Timestamp value) const
+Key Table::find_first_timestamp(size_t col_ndx, Timestamp value) const
 {
     return find_first(col_ndx, value);
 }
 
-size_t Table::find_first_float(size_t col_ndx, float value) const
+Key Table::find_first_float(size_t col_ndx, float value) const
 {
     return find_first<Float>(col_ndx, value);
 }
 
-size_t Table::find_first_double(size_t col_ndx, double value) const
+Key Table::find_first_double(size_t col_ndx, double value) const
 {
     return find_first<Double>(col_ndx, value);
 }
 
-size_t Table::find_first_string(size_t col_ndx, StringData value) const
+Key Table::find_first_string(size_t col_ndx, StringData value) const
 {
     return find_first(col_ndx, value);
 }
 
-size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const
+Key Table::find_first_binary(size_t col_ndx, BinaryData value) const
 {
     return find_first<BinaryData>(col_ndx, value);
 }
 
-size_t Table::find_first_null(size_t column_ndx) const
+Key Table::find_first_null(size_t) const
 {
-    return where().equal(column_ndx, null{}).find();
+    // return where().equal(column_ndx, null{}).find();
+    // TODO
+    return null_key;
 }
 
 template <class T>
@@ -5956,14 +5906,6 @@ void Table::adj_acc_clear_root_table() noexcept
             col->adj_acc_clear_root_table();
         }
     }
-
-    {
-        LockGuard lock(m_accessor_mutex);
-        // Adjust rows in tableviews after removal of all rows
-        for (auto& view : m_views) {
-            view->adj_row_acc_clear();
-        }
-    }
 }
 
 
@@ -5991,11 +5933,6 @@ void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
         if (row->m_row_ndx >= row_ndx)
             row->m_row_ndx += num_rows;
     }
-
-    // Adjust rows in tableviews after insertion of new rows
-    for (auto& view : m_views) {
-        view->adj_row_acc_insert_rows(row_ndx, num_rows);
-    }
 }
 
 
@@ -6019,11 +5956,6 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) noexcept
         }
         row = next;
     }
-
-    // Adjust rows in tableviews after removal of row
-    for (auto& view : m_views) {
-        view->adj_row_acc_erase_row(row_ndx);
-    }
 }
 
 void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
@@ -6043,11 +5975,6 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
             row->m_row_ndx = row_ndx_1;
         }
         row = row->m_next;
-    }
-
-    // Adjust rows in tableviews after row swap
-    for (auto& view : m_views) {
-        view->adj_row_acc_swap_rows(row_ndx_1, row_ndx_2);
     }
 }
 
@@ -6070,11 +5997,6 @@ void Table::adj_row_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
         else if (ndx >= to_ndx && ndx < from_ndx)
             row->m_row_ndx = ndx + 1;
         row = row->m_next;
-    }
-
-    // Adjust rows in tableviews after row move
-    for (auto& view : m_views) {
-        view->adj_row_acc_move_row(from_ndx, to_ndx);
     }
 }
 
@@ -6112,11 +6034,6 @@ void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexce
             row->m_row_ndx = to_row_ndx;
         }
         row = next;
-    }
-
-    // Adjust rows in tableviews after move over of new row
-    for (auto& view : m_views) {
-        view->adj_row_acc_move_over(from_row_ndx, to_row_ndx);
     }
 }
 

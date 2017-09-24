@@ -19,6 +19,7 @@
 #ifndef REALM_LINK_VIEW_HPP
 #define REALM_LINK_VIEW_HPP
 
+#include <realm/views.hpp>
 #include <realm/column.hpp>
 #include <realm/column_linklist.hpp>
 #include <realm/link_view_fwd.hpp>

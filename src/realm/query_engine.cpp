@@ -51,6 +51,11 @@ size_t ParentNode::find_first(size_t start, size_t end)
     return not_found;
 }
 
+bool ParentNode::match(ConstObj&)
+{
+    return false;
+}
+
 void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)
 {
     if (TAction == act_ReturnFirst) {
