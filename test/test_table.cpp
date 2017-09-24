@@ -75,6 +75,30 @@ using unit_test::TestContext;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+namespace {
+
+class TestTable01 : public realm::Table {
+public:
+    TestTable01(Allocator& a)
+        : Table(a)
+    {
+        init();
+    }
+    TestTable01()
+    {
+        init();
+    }
+    void init()
+    {
+        add_column(type_Int, "first");
+        add_column(type_Int, "second");
+        add_column(type_Bool, "third");
+        add_column(type_Int, "fourth");
+    }
+};
+
+} // anonymous namespace
+
 #ifdef LEGACY_TESTS
 
 #ifdef JAVA_MANY_COLUMNS_CRASH
@@ -911,30 +935,6 @@ TEST(Table_Floats)
 #endif
 }
 
-namespace {
-
-class TestTable01 : public TestTable {
-public:
-    TestTable01(Allocator& a)
-        : TestTable(a)
-    {
-        init();
-    }
-    TestTable01()
-    {
-        init();
-    }
-    void init()
-    {
-        add_column(type_Int, "first");
-        add_column(type_Int, "second");
-        add_column(type_Bool, "third");
-        add_column(type_Int, "fourth");
-    }
-};
-
-} // anonymous namespace
-
 TEST(Table_2)
 {
     TestTable01 table;
@@ -950,28 +950,6 @@ TEST(Table_2)
 #endif
 }
 
-TEST(Table_3)
-{
-    TestTable01 table;
-
-    for (size_t i = 0; i < 100; ++i) {
-        add(table, 0, 10, true, Wed);
-    }
-
-    // Test column searching
-    CHECK_EQUAL(size_t(0), table.find_first_int(0, 0));
-    CHECK_EQUAL(size_t(-1), table.find_first_int(0, 1));
-    CHECK_EQUAL(size_t(0), table.find_first_int(1, 10));
-    CHECK_EQUAL(size_t(-1), table.find_first_int(1, 100));
-    CHECK_EQUAL(size_t(0), table.find_first_bool(2, true));
-    CHECK_EQUAL(size_t(-1), table.find_first_bool(2, false));
-    CHECK_EQUAL(size_t(0), table.find_first_int(3, Wed));
-    CHECK_EQUAL(size_t(-1), table.find_first_int(3, Mon));
-
-#ifdef REALM_DEBUG
-    table.verify();
-#endif
-}
 
 namespace {
 
@@ -985,27 +963,6 @@ public:
 };
 
 } // anonymous namespace
-
-TEST(Table_4)
-{
-    TestTableEnum table;
-
-    add(table, Mon, "Hello");
-    add(table, Mon, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
-
-    CHECK_EQUAL(Mon, table.get_int(0, 0));
-    CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello",
-                table.get_string(1, 1));
-
-    // Test string column searching
-    CHECK_EQUAL(size_t(1), table.find_first_string(
-                               1, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
-    CHECK_EQUAL(size_t(-1), table.find_first_string(1, "Foo"));
-
-#ifdef REALM_DEBUG
-    table.verify();
-#endif
-}
 
 namespace {
 
@@ -9096,6 +9053,51 @@ TEST(Table_object_random)
               << std::endl;
     std::cout << "   erase time    : " << duration_cast<nanoseconds>(t4 - t3).count() / nb_rows << " ns/key"
               << std::endl;
+}
+
+TEST(Table_3)
+{
+    TestTable01 table;
+
+    for (int64_t i = 0; i < 100; ++i) {
+        table.create_object(Key(i)).set_all(i, 10, true, int(Wed));
+    }
+
+    // Test column searching
+    CHECK_EQUAL(Key(0), table.find_first_int(0, 0));
+    CHECK_EQUAL(Key(50), table.find_first_int(0, 50));
+    CHECK_EQUAL(null_key, table.find_first_int(0, 500));
+    CHECK_EQUAL(Key(0), table.find_first_int(1, 10));
+    CHECK_EQUAL(null_key, table.find_first_int(1, 100));
+    CHECK_EQUAL(Key(0), table.find_first_bool(2, true));
+    CHECK_EQUAL(null_key, table.find_first_bool(2, false));
+    CHECK_EQUAL(Key(0), table.find_first_int(3, Wed));
+    CHECK_EQUAL(null_key, table.find_first_int(3, Mon));
+
+#ifdef REALM_DEBUG
+    table.verify();
+#endif
+}
+
+TEST(Table_4)
+{
+    Table table;
+    table.add_column(type_String, "strings");
+
+    table.create_object(Key(5)).set(0, "Hello");
+    table.create_object(Key(7)).set(0, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
+
+    CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello",
+                table.get_object(Key(7)).get<String>(0));
+
+    // Test string column searching
+    CHECK_EQUAL(Key(7), table.find_first_string(
+                            0, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
+    CHECK_EQUAL(null_key, table.find_first_string(0, "Foo"));
+
+#ifdef REALM_DEBUG
+    table.verify();
+#endif
 }
 
 #endif // TEST_TABLE

@@ -78,6 +78,15 @@ public:
         m_nanoseconds.truncate(ndx);
     }
 
+    size_t find_first(Timestamp value, size_t begin, size_t end) const noexcept
+    {
+        for (size_t t = begin; t < end; t++) {
+            if (get(t) == value)
+                return t;
+        }
+        return not_found;
+    }
+
 private:
     ArrayIntNull m_seconds;
     ArrayInteger m_nanoseconds;

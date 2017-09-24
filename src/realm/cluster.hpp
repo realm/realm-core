@@ -365,6 +365,10 @@ public:
     {
         m_root->dump_objects(0, "");
     }
+    void verify() const
+    {
+        // TODO: implement
+    }
 
 private:
     friend class ConstObj;

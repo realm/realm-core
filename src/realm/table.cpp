@@ -46,6 +46,10 @@
 #include <realm/replication.hpp>
 #include <realm/table_view.hpp>
 #include <realm/query_engine.hpp>
+#include <realm/array_bool.hpp>
+#include <realm/array_binary.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_timestamp.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
@@ -4146,10 +4150,20 @@ T upgrade_optional_int(T value)
 
 namespace realm {
 template <class T>
-Key Table::find_first(size_t, T) const
+Key Table::find_first(size_t col_ndx, T value) const
 {
-    // TODO
-    return null_key;
+    Key key;
+    typename ColumnTypeTraits<T>::cluster_leaf_type leaf(get_alloc());
+    traverse_clusters([&key, &col_ndx, &value, &leaf](const Cluster* cluster, int64_t key_offset) {
+        cluster->template init_leaf(col_ndx, &leaf);
+        size_t row = leaf.find_first(value, 0, cluster->node_size());
+        if (row != realm::npos) {
+            key = Key(cluster->get_key(row) + key_offset);
+            return true;
+        }
+        return false;
+    });
+    return key;
 }
 
 template <>
@@ -4207,14 +4221,6 @@ Key Table::find_first_bool(size_t col_ndx, bool value) const
         return find_first<util::Optional<bool>>(col_ndx, value);
     else
         return find_first<bool>(col_ndx, value);
-}
-
-Key Table::find_first_olddatetime(size_t col_ndx, OldDateTime value) const
-{
-    if (is_nullable(col_ndx))
-        return find_first<util::Optional<OldDateTime>>(col_ndx, value);
-    else
-        return find_first<OldDateTime>(col_ndx, value);
 }
 
 Key Table::find_first_timestamp(size_t col_ndx, Timestamp value) const
@@ -6433,31 +6439,7 @@ void Table::verify() const
         m_top.verify();
     m_columns.verify();
     m_spec->verify();
-
-
-    // Verify row accessors
-    {
-        LockGuard lock(m_accessor_mutex);
-        for (RowBase* row = m_row_accessors; row; row = row->m_next) {
-            // Check that it is attached to this table
-            REALM_ASSERT_3(row->m_table.get(), ==, this);
-            // Check that its row index is not out of bounds
-            REALM_ASSERT_3(row->m_row_ndx, <, size());
-        }
-    }
-
-    // Verify column accessors
-    {
-        size_t n = m_spec->get_column_count();
-        REALM_ASSERT_3(n, ==, m_cols.size());
-        for (size_t i = 0; i != n; ++i) {
-            const ColumnBase& col = get_column_base(i);
-            size_t ndx_in_parent = m_spec->get_column_ndx_in_parent(i);
-            REALM_ASSERT_3(ndx_in_parent, ==, col.get_ndx_in_parent());
-            col.verify(*this, i);
-            REALM_ASSERT_3(col.size(), ==, m_size);
-        }
-    }
+    m_clusters.verify();
 #endif
 }
 
