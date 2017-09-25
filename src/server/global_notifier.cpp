@@ -177,7 +177,7 @@ void GlobalNotifier::register_realm(const std::string& path) {
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config);
     m_listen_entries[path] = coordinator;
 
-    auto realm = Realm::make_shared_realm(std::move(config));
+    auto realm = coordinator->get_realm(std::move(config));
     if (realm->read_group().is_empty())
         realm = nullptr;
 
