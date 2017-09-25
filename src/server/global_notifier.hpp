@@ -72,12 +72,10 @@ public:
     // Returns the target callback
     Callback *target() { return m_target.get(); }
 
-    // RealmInfo is combination of realm_id and realm_path
-    using RealmInfo = std::pair<std::string, std::string>;
-
     class ChangeNotification {
     public:
-        RealmInfo realm_info;
+        // The virtual server path of the Realm which changed.
+        std::string realm_path;
 
         // The Realm which changed, at the version immediately before the changes
         // made. `modifications` and `deletions` within the change sets are indices
@@ -90,9 +88,6 @@ public:
         // `modifications_new` and `insertions` within the change sets are indices
         // in this Realm.
         SharedRealm get_new_realm() const;
-
-        // The virtual server path of the Realm which changed.
-        std::string get_path() const;
 
         // The actual changes made, keyed on object name.
         // This will be empty if the Realm already existed before the
@@ -110,16 +105,14 @@ public:
         SharedRealm m_realm;
         std::unordered_map<std::string, CollectionChangeSet> m_changes;
 
-        ChangeNotification(GlobalNotifier::RealmInfo, VersionID old_version, VersionID new_version,
+        ChangeNotification(std::string, VersionID old_version, VersionID new_version,
                            SharedRealm, std::unordered_map<std::string, CollectionChangeSet>);
         ChangeNotification() = default;
 
         friend class GlobalNotifier;
     };
 
-    realm::Realm::Config get_config(std::string path,
-                                    util::Optional<std::string> realm_id = util::none,
-                                    util::Optional<Schema> schema = util::none);
+    realm::Realm::Config get_config(std::string path, util::Optional<Schema> schema = util::none);
 
 private:
     GlobalNotifier(std::unique_ptr<Callback>, std::string local_root_dir,
@@ -142,7 +135,7 @@ private:
     std::mutex m_work_queue_mutex;
     std::condition_variable m_work_queue_cv;
     struct RealmToCalculate {
-        RealmInfo info;
+        std::string path;
         std::shared_ptr<Realm> realm;
         VersionID target_version;
     };
@@ -155,8 +148,8 @@ private:
 
     bool m_waiting = false;
 
-    void register_realms(std::vector<RealmInfo>);
-    void register_realm(RealmInfo info);
+    void register_realms(std::vector<std::string>);
+    void register_realm(const std::string& path);
 
     void on_change();
     void calculate();
@@ -188,7 +181,7 @@ public:
     ///
     /// \param name The name (virtual path) by which the server knows that
     /// Realm.
-    virtual std::vector<bool> available(std::vector<GlobalNotifier::RealmInfo> realms) = 0;
+    virtual std::vector<bool> available(const std::vector<std::string>& realms) = 0;
 
     /// Called when a Realm  has changed due to a transaction performed on behalf
     /// of the synchronization mechanism. This function is not called as a

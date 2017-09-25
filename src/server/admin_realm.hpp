@@ -37,12 +37,11 @@ class SyncSession;
 
 class AdminRealmListener {
 public:
-    using RealmInfo = std::pair<std::string, std::string>;
     AdminRealmListener(std::string local_root, std::string server_base_url, std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback);
-    void start(std::function<void(std::vector<RealmInfo>)> register_callback);
-    void create_realm(StringData realm_id, StringData realm_name);
+    void start(std::function<void(std::vector<std::string>)> register_callback);
 
-private:    
+private:
+    Realm::Config m_config;
     SharedRealm m_realm;
     Results m_results;
     NotificationToken m_notification_token;

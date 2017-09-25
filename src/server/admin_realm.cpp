@@ -44,68 +44,49 @@ using namespace realm::_impl;
 
 AdminRealmListener::AdminRealmListener(std::string local_root, std::string server_base_url, std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback)
 {
-    Realm::Config config;
-    config.cache = false;
-    config.path = util::File::resolve("realms.realm", local_root);
-    config.schema_mode = SchemaMode::Additive;
-    config.sync_config = std::shared_ptr<SyncConfig>(
-        new SyncConfig{user, server_base_url + "/__admin", SyncSessionStopPolicy::AfterChangesUploaded,
-           [&](auto, const auto& config, auto session) {
-                session->bind_with_admin_token(config.user->refresh_token(), config.realm_url);
-
-           }}
-    );
-    config.schema = Schema{
-        {"RealmFile", {
-            {"path", PropertyType::String, Property::IsPrimary{true}}},
-            {"creatorId", PropertyType::String},
-            {"creationDate", PropertyType::Date},
-            {"syncLabel", PropertyType::String}
-        }}
-    };
-    config.schema_version = 2;
-    m_realm = Realm::get_shared_realm(std::move(config));
+    m_config.cache = false;
+    m_config.path = util::File::resolve("realms.realm", local_root);
+    m_config.schema_mode = SchemaMode::ReadOnlyAlternative;
+    m_config.sync_config = std::make_shared<SyncConfig>();
+    m_config.sync_config->user = user;
+    m_config.sync_config->realm_url = server_base_url + "/__admin";
+    m_config.sync_config->bind_session_handler = std::move(bind_callback);
 }
 
-void AdminRealmListener::start(std::function<void(std::vector<RealmInfo>)> callback)
+void AdminRealmListener::start(std::function<void(std::vector<std::string>)> callback)
 {
-    m_results = Results(m_realm, *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile"));
-    m_notification_token = m_results.add_notification_callback([=](CollectionChangeSet changes, std::exception_ptr) {
-        auto& table = *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile");
-        size_t id_col_ndx   = table.get_column_index("creatorId");
-        size_t name_col_ndx = table.get_column_index("path");
-        std::vector<RealmInfo> realms;
+    auto session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
+    bool result = session->wait_for_download_completion([this, callback](std::error_code ec) {
+        if (ec)
+            throw std::system_error(ec);
 
-        auto add_realm = [&](auto index) {
-            std::string realm_path = table.get_string(name_col_ndx, index);
-            realms.emplace_back(table.get_string(id_col_ndx, index), realm_path);
-        };
+        m_realm = m_realm = Realm::get_shared_realm(std::move(m_config));
+        m_results = Results(m_realm, *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile"));
+        m_notification_token = m_results.add_notification_callback([this, callback](CollectionChangeSet changes, std::exception_ptr) {
+            auto& table = *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile");
+            size_t path_col_ndx = table.get_column_index("path");
+            std::vector<std::string> realms;
 
-        if (changes.empty()) {
-            for (size_t i = 0, size = table.size(); i < size; ++i) {
-                add_realm(i);
+            auto add_realm = [&](auto index) {
+                std::string realm_path = table.get_string(path_col_ndx, index);
+                realms.emplace_back(std::move(realm_path));
+            };
+
+            if (changes.empty()) {
+                for (size_t i = 0, size = table.size(); i < size; ++i) {
+                    add_realm(i);
+                }
             }
-        }
-        else {
-            for (auto i : changes.insertions.as_indexes()) {
-                add_realm(i);
+            else {
+                for (auto i : changes.insertions.as_indexes()) {
+                    add_realm(i);
+                }
             }
-        }
 
-        if (realms.size()) {
-            callback(std::move(realms));
-        }
+            if (realms.size()) {
+                callback(std::move(realms));
+            }
+        });
     });
-}
-
-void AdminRealmListener::create_realm(StringData realm_id, StringData realm_name)
-{
-    m_realm->begin_transaction();
-    auto& table = *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile");
-    size_t row_ndx      = table.add_empty_row();
-    size_t id_col_ndx   = table.get_column_index("creatorId");
-    size_t name_col_ndx = table.get_column_index("path");
-    table.set_string(id_col_ndx, row_ndx, realm_id);
-    table.set_string(name_col_ndx, row_ndx, realm_name);
-    m_realm->commit_transaction();
+    REALM_ASSERT_RELEASE(result);
 }

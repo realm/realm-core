@@ -502,24 +502,24 @@ Adapter::Adapter(std::function<void(std::string)> realm_changed,
                  std::string local_root_dir, std::string server_base_url,
                  std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback, std::regex regex)
 : m_global_notifier(GlobalNotifier::shared_notifier(
-    std::make_unique<Adapter::Callback>([=](auto info) { realm_changed(info.second); }, regex),
+    std::make_unique<Adapter::Callback>(std::move(realm_changed), regex),
                                         local_root_dir, server_base_url, user, std::move(bind_callback),
                                         std::make_shared<ChangesetCooker>()))
 {
     m_global_notifier->start();
 }
 
-std::vector<bool> Adapter::Callback::available(std::vector<GlobalNotifier::RealmInfo> realms) {
+std::vector<bool> Adapter::Callback::available(const std::vector<std::string>& realms) {
     std::vector<bool> watch;
-    for (size_t i = 0; i < realms.size(); i++) {
-        watch.push_back(std::regex_match(realms[i].second, m_regex));
+    for (auto& realm_name : realms) {
+        watch.push_back(std::regex_match(realm_name, m_regex));
     }
     return watch;
 }
 
 void Adapter::Callback::realm_changed(GlobalNotifier::ChangeNotification changes) {
     if (m_realm_changed) {
-        m_realm_changed(changes.realm_info);
+        m_realm_changed(changes.realm_path);
     }
 }
 
@@ -551,8 +551,7 @@ void Adapter::advance(std::string realm_path) {
 }
 
 realm::Realm::Config Adapter::get_config(std::string path,
-                                         util::Optional<std::string> realm_id,
                                          util::Optional<Schema> schema) {
-    auto config = m_global_notifier->get_config(path, realm_id, std::move(schema));
+    auto config = m_global_notifier->get_config(path, std::move(schema));
     return config;
 }

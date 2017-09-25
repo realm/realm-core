@@ -73,9 +73,7 @@ public:
     util::Optional<ChangeSet> current(std::string realm_path);
     void advance(std::string realm_path);
 
-    realm::Realm::Config get_config(std::string path,
-                                    util::Optional<std::string> realm_id = util::none,
-                                    util::Optional<Schema> schema = util::none);
+    realm::Realm::Config get_config(std::string path, util::Optional<Schema> schema = util::none);
 
     void close() { m_global_notifier.reset(); }
 
@@ -84,12 +82,12 @@ private:
 
     class Callback : public GlobalNotifier::Callback {
     public:
-        Callback(std::function<void(GlobalNotifier::RealmInfo)> changed, std::regex regex) : m_realm_changed(changed), m_regex(regex) {}
-        virtual std::vector<bool> available(std::vector<GlobalNotifier::RealmInfo> realms);
+        Callback(std::function<void(std::string)> changed, std::regex regex) : m_realm_changed(changed), m_regex(regex) {}
+        virtual std::vector<bool> available(const std::vector<std::string>& realms);
         virtual void realm_changed(GlobalNotifier::ChangeNotification changes);
 
     private:
-        std::function<void(GlobalNotifier::RealmInfo)> m_realm_changed;
+        std::function<void(std::string)> m_realm_changed;
         std::regex m_regex;
     };
 };
