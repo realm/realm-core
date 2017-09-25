@@ -390,6 +390,7 @@ public:
     void move_last_over(size_t row_ndx);
     void clear();
     void swap_rows(size_t row_ndx_1, size_t row_ndx_2);
+    void move_row(size_t from_ndx, size_t to_ndx);
     //@}
 
     /// Replaces all links to \a row_ndx with links to \a new_row_ndx.
@@ -1061,6 +1062,7 @@ private:
     void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
+    void do_move_row(size_t from_ndx, size_t to_ndx);
     void do_merge_rows(size_t row_ndx, size_t new_row_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
@@ -1436,6 +1438,7 @@ private:
     void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_acc_erase_row(size_t row_ndx) noexcept;
     void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+    void adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept;
     void adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
 
     /// Adjust this table accessor and its subordinates after move_last_over()
@@ -1476,6 +1479,7 @@ private:
     void adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_row_acc_erase_row(size_t row_ndx) noexcept;
     void adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+    void adj_row_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept;
     void adj_row_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
 
     /// Called by adj_acc_move_over() to adjust row accessors.
@@ -2475,6 +2479,11 @@ public:
         table.do_swap_rows(row_ndx_1, row_ndx_2); // Throws
     }
 
+    static void do_move_row(Table& table, size_t from_ndx, size_t to_ndx)
+    {
+        table.do_move_row(from_ndx, to_ndx); // Throws
+    }
+
     static void do_merge_rows(Table& table, size_t row_ndx, size_t new_row_ndx)
     {
         table.do_merge_rows(row_ndx, new_row_ndx); // Throws
@@ -2591,6 +2600,11 @@ public:
     static void adj_acc_swap_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept
     {
         table.adj_acc_swap_rows(row_ndx_1, row_ndx_2);
+    }
+
+    static void adj_acc_move_row(Table& table, size_t from_ndx, size_t to_ndx) noexcept
+    {
+        table.adj_acc_move_row(from_ndx, to_ndx);
     }
 
     static void adj_acc_merge_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept

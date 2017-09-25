@@ -91,6 +91,7 @@ enum INS {
     CREATE_SUBTABLE_VIEW,
     COMPACT,
     SWAP_ROWS,
+    MOVE_ROWS,
     MOVE_COLUMN,
     SET_UNIQUE,
     IS_NULL,
@@ -904,6 +905,19 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                              << ");\n";
                     }
                     t->swap_rows(row_ndx1, row_ndx2);
+                }
+            }
+            else if (instr == MOVE_ROWS && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->size() > 0) {
+                    int32_t row_ndx1 = get_int32(s) % t->size();
+                    int32_t row_ndx2 = get_int32(s) % t->size();
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->move_row(" << row_ndx1 << ", " << row_ndx2
+                             << ");\n";
+                    }
+                    t->move_row(row_ndx1, row_ndx2);
                 }
             }
             else if (instr == OPTIMIZE_TABLE && g.size() > 0) {
