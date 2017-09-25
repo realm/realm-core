@@ -16,6 +16,9 @@
 * Add method to recursively delete an object tree
   PR [#2752](https://github.com/realm/realm-core/pull/2752)
   Issue [#2718](https://github.com/realm/realm-core/issues/2718)
+* Add method to safely delete or otherwise manipulate realm file
+  and management files.
+  PR [#2864](https://github.com/realm/realm-core/pull/2864)
 
 -----------
 
