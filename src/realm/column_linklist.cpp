@@ -244,7 +244,7 @@ void LinkListColumn::cascade_break_backlinks_to__leaf(size_t row_ndx, const Arra
         // Remove the reciprocal backlink at target_row_ndx that points to row_ndx
         m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
 
-        if (m_weak_links)
+        if (m_weak_links && state.only_strong_links)
             continue;
         if (m_target_table == state.stop_on_table)
             continue;

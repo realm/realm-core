@@ -1,5 +1,10 @@
 add_subdirectory(util)
-add_subdirectory(fuzzy)
+
+# AFL not yet supported by Windows
+if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    add_subdirectory(fuzzy)
+endif()
+
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
 # FIXME: Add other benchmarks
@@ -35,6 +40,7 @@ set(NORMAL_TESTS
     test_lang_bind_helper.cpp
     test_link_query_view.cpp
     test_links.cpp
+    test_metrics.cpp
     test_optional.cpp
     test_priority_queue.cpp
     test_query.cpp
@@ -55,6 +61,7 @@ set(NORMAL_TESTS
     test_util_inspect.cpp
     test_util_logger.cpp
     test_util_memory_stream.cpp
+    test_util_overload.cpp
     test_util_scope_exit.cpp
     test_util_stringbuffer.cpp
     test_util_to_string.cpp
@@ -68,6 +75,16 @@ endif()
 set(LARGE_TESTS
     large_tests/test_column_large.cpp
     large_tests/test_strings.cpp)
+
+set(REALM_TEST_HEADERS
+    fuzz_group.hpp
+    pthread_test.hpp
+    test.hpp
+    test_all.hpp
+    test_string_types.hpp
+    test_table_helper.hpp
+    testsettings.hpp
+) # REALM_TEST_HEADERS
 
 set(FUZZY_TESTS fuzz_group.cpp)
 
@@ -99,7 +116,7 @@ if (MSVC)
     set_source_files_properties(test_query.cpp PROPERTIES COMPILE_FLAGS /bigobj)
 endif()
 
-add_executable(realm-tests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES})
+add_executable(realm-tests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
 
 if(CMAKE_GENERATOR STREQUAL Xcode)
     set_target_properties(realm-tests PROPERTIES

@@ -31,6 +31,12 @@ Spec::~Spec() noexcept
     }
 }
 
+void Spec::detach() noexcept
+{
+    m_top.detach();
+    m_subspec_ptrs.clear();
+}
+
 bool Spec::init(ref_type ref) noexcept
 {
     // Needs only initialization if not previously initialized
@@ -371,6 +377,18 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
             std::rotate(first, middle, last);
             adj_subspec_ptrs();
         }
+    }
+
+    if (type == col_type_StringEnum) {
+        REALM_ASSERT(m_enumkeys.is_attached());
+        REALM_ASSERT(m_enumkeys.size() != 0);
+
+        size_t from_enums_ndx = get_enumkeys_ndx(from_ndx);
+        size_t to_enums_ndx = get_enumkeys_ndx(to_ndx);
+        if (to_enums_ndx >= m_enumkeys.size()) {
+            to_enums_ndx = m_enumkeys.size() - 1;
+        }
+        m_enumkeys.move_rotate(from_enums_ndx, to_enums_ndx);
     }
 
     if (type != col_type_BackLink)

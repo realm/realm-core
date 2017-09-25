@@ -73,6 +73,7 @@ enum INS {
     REMOVE_COLUMN,
     SET,
     REMOVE_ROW,
+    REMOVE_RECURSIVE,
     ADD_COLUMN_LINK,
     ADD_COLUMN_LINK_LIST,
     CLEAR_TABLE,
@@ -90,6 +91,7 @@ enum INS {
     CREATE_SUBTABLE_VIEW,
     COMPACT,
     SWAP_ROWS,
+    MOVE_ROWS,
     MOVE_COLUMN,
     SET_UNIQUE,
     IS_NULL,
@@ -165,6 +167,18 @@ std::pair<int64_t, int32_t> get_timestamp_values(State& s) {
     return {seconds, nanoseconds};
 }
 
+// returns random binary blob data in a string, logs to a variable called "blob" if logging is enabled
+std::string construct_binary_payload(State& s, util::Optional<std::ostream&> log)
+{
+    size_t rand_char = get_next(s);
+    size_t blob_size = static_cast<uint64_t>(get_int64(s)) % (ArrayBlob::max_binary_size + 1);
+    std::string buffer(blob_size, static_cast<unsigned char>(rand_char));
+    if (log) {
+        *log << "std::string blob(" << blob_size << ", static_cast<unsigned char>(" << rand_char << "));\n";
+    }
+    return buffer;
+}
+
 Mixed construct_mixed(State& s, util::Optional<std::ostream&> log, std::string& buffer)
 {
     // Mixed type has 8 constructors supporting different types.
@@ -208,12 +222,9 @@ Mixed construct_mixed(State& s, util::Optional<std::ostream&> log, std::string& 
             return Mixed(StringData(buffer));
         }
         case 5: {
-            size_t rand_char = get_next(s);
-            size_t blob_size = get_int64(s) % ArrayBlob::max_binary_size;
-            buffer = std::string(blob_size, static_cast<unsigned char>(rand_char));
+            buffer = construct_binary_payload(s, log);
             if (log) {
-                *log << "std::string blob(" << blob_size << ", static_cast<unsigned char>(" << rand_char << "));\n"
-                     << "Mixed mixed(BinaryData(blob));\n";
+                *log << "Mixed mixed(BinaryData(blob));\n";
             }
             return Mixed(BinaryData(buffer));
         }
@@ -677,15 +688,15 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         else if (type == type_Binary) {
                             bool insert_big_blob = get_next(s) % 2 == 0;
                             if (insert_big_blob) {
-                                size_t rand_char = get_next(s);
-                                size_t blob_size = get_next(s) + ArrayBlob::max_binary_size;
-                                std::string blob(blob_size, static_cast<unsigned char>(rand_char));
                                 if (log) {
-                                    *log << "{\n\tstd::string data(" << blob_size << ", static_cast<unsigned char>(" << rand_char << "));\n\t"
-                                    << "g.get_table(" << table_ndx << ")->set_binary_big(" << col_ndx << ", " << row_ndx
-                                    << ", BinaryData(data.data(), " << blob_size << "));\n}\n";
+                                    *log << "{\n\t";
                                 }
-                                t->set_binary_big(col_ndx, row_ndx, BinaryData(blob.data(), blob_size));
+                                std::string blob = construct_binary_payload(s, log);
+                                if (log) {
+                                    *log << "\tg.get_table(" << table_ndx << ")->set_binary_big(" << col_ndx << ", "
+                                         << row_ndx << ", BinaryData(blob));\n}\n";
+                                }
+                                t->set_binary_big(col_ndx, row_ndx, BinaryData(blob));
                             }
                             else {
                                 std::string str = create_string(get_next(s));
@@ -861,6 +872,17 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     t->remove(row_ndx);
                 }
             }
+            else if (instr == REMOVE_RECURSIVE && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->size() > 0) {
+                    size_t row_ndx = get_next(s) % t->size();
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->remove_recursive(" << row_ndx << ");\n";
+                    }
+                    t->remove_recursive(row_ndx);
+                }
+            }
             else if (instr == MOVE_LAST_OVER && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 TableRef t = g.get_table(table_ndx);
@@ -883,6 +905,19 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                              << ");\n";
                     }
                     t->swap_rows(row_ndx1, row_ndx2);
+                }
+            }
+            else if (instr == MOVE_ROWS && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->size() > 0) {
+                    int32_t row_ndx1 = get_int32(s) % t->size();
+                    int32_t row_ndx2 = get_int32(s) % t->size();
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->move_row(" << row_ndx1 << ", " << row_ndx2
+                             << ");\n";
+                    }
+                    t->move_row(row_ndx1, row_ndx2);
                 }
             }
             else if (instr == OPTIMIZE_TABLE && g.size() > 0) {

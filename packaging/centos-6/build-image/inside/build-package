@@ -19,7 +19,7 @@ cd /tmp/build
 rm -rf build-dir
 mkdir build-dir
 cd build-dir
-cmake3 -DREALM_ENABLE_ENCRYPTION=1 \
+cmake -DREALM_ENABLE_ENCRYPTION=1 \
       -DREALM_NO_TESTS=1 \
       -DCMAKE_INSTALL_PREFIX=/prod \
       -DCMAKE_BUILD_TYPE=Release \
@@ -93,7 +93,7 @@ fpm \
 
 
 rm -rf -- * /prod/*
-cmake3 -DREALM_ENABLE_ENCRYPTION=1 \
+cmake -DREALM_ENABLE_ENCRYPTION=1 \
        -DREALM_NO_TESTS=1 \
        -DCMAKE_INSTALL_PREFIX=/prod \
        -DCMAKE_BUILD_TYPE=Debug \

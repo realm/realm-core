@@ -315,6 +315,10 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
     }
 
     m_attached = true;
+
+#if REALM_METRICS
+    update_num_objects();
+#endif // REALM_METRICS
 }
 
 
@@ -328,6 +332,23 @@ void Group::detach() noexcept
     m_top.detach();
 
     m_attached = false;
+}
+
+void Group::update_num_objects()
+{
+#if REALM_METRICS
+    if (m_metrics) {
+        // FIXME: this is quite invasive and completely defeats the lazy loading mechanism
+        // where table accessors are only instantiated on demand, because they are all created here.
+
+        m_total_rows = 0;
+        size_t num_tables = size();
+        for (size_t i = 0; i < num_tables; ++i) {
+            ConstTableRef t = get_table(i);
+            m_total_rows += t->size();
+        }
+    }
+#endif // REALM_METRICS
 }
 
 
@@ -789,7 +810,10 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
     file.set_encryption_key(encryption_key);
     File::Streambuf streambuf(&file);
     std::ostream out(&streambuf);
+    out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
     write(out, encryption_key != 0, version_number);
+    int sync_status = streambuf.pubsync();
+    REALM_ASSERT(sync_status == 0);
 }
 
 BinaryData Group::write_to_mem() const
@@ -1398,7 +1422,7 @@ public:
         return true;
     }
 
-    bool clear_table() noexcept
+    bool clear_table(size_t) noexcept
     {
         typedef _impl::TableFriend tf;
         if (m_table)

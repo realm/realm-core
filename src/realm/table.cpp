@@ -291,7 +291,7 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
 }
 
 
-size_t Table::get_backlink_count(size_t row_ndx) const noexcept
+size_t Table::get_backlink_count(size_t row_ndx, bool only_strong_links) const noexcept
 {
     size_t backlink_columns_begin = m_spec->first_backlink_column_index();
     size_t backlink_columns_end = backlink_columns_begin + m_spec->backlink_column_count();
@@ -299,6 +299,11 @@ size_t Table::get_backlink_count(size_t row_ndx) const noexcept
 
     for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
         const BacklinkColumn& backlink_col = get_column_backlink(i);
+        if (only_strong_links) {
+            const LinkColumnBase& link_col = backlink_col.get_origin_column();
+            if (link_col.get_weak_links())
+                continue;
+        }
         ref_count += backlink_col.get_backlink_count(row_ndx);
     }
 
@@ -332,22 +337,6 @@ void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_tab
     link_col.set_backlink_column(backlink_col);
     backlink_col.set_origin_table(*this);
     backlink_col.set_origin_column(link_col);
-}
-
-
-size_t Table::get_num_strong_backlinks(size_t row_ndx) const noexcept
-{
-    size_t sum = 0;
-    size_t col_ndx_begin = m_spec->get_public_column_count();
-    size_t col_ndx_end = m_cols.size();
-    for (size_t i = col_ndx_begin; i < col_ndx_end; ++i) {
-        const BacklinkColumn& backlink_col = get_column_backlink(i);
-        const LinkColumnBase& link_col = backlink_col.get_origin_column();
-        if (link_col.get_weak_links())
-            continue;
-        sum += backlink_col.get_backlink_count(row_ndx);
-    }
-    return sum;
 }
 
 
@@ -2361,6 +2350,33 @@ void Table::erase_row(size_t row_ndx, bool is_move_last_over)
     remove_backlink_broken_rows(state); // Throws
 }
 
+void Table::remove_recursive(size_t row_ndx)
+{
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(row_ndx, <, m_size);
+
+    size_t table_ndx = get_index_in_group();
+    // Only group-level tables can have link columns
+    REALM_ASSERT(table_ndx != realm::npos);
+
+    CascadeState::row row;
+    row.table_ndx = table_ndx;
+    row.row_ndx = row_ndx;
+    CascadeState state;
+    state.rows.push_back(row); // Throws
+    state.only_strong_links = false;
+
+    if (Group* g = get_parent_group())
+        state.track_link_nullifications = g->has_cascade_notification_handler();
+
+    cascade_break_backlinks_to(row_ndx, state); // Throws
+
+    if (Group* g = get_parent_group())
+        _impl::GroupFriend::send_cascade_notification(*g, state);
+
+    remove_backlink_broken_rows(state); // Throws
+}
+
 void Table::merge_rows(size_t row_ndx, size_t new_row_ndx)
 {
     if (REALM_UNLIKELY(!is_attached()))
@@ -2625,6 +2641,8 @@ void Table::clear()
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
+    size_t old_size = m_size;
+
     size_t table_ndx = get_index_in_group();
     if (table_ndx == realm::npos) {
         bool broken_reciprocal_backlinks = false;
@@ -2649,7 +2667,7 @@ void Table::clear()
     }
 
     if (Replication* repl = get_repl())
-        repl->clear_table(this); // Throws
+        repl->clear_table(this, old_size); // Throws
 }
 
 
@@ -3741,7 +3759,8 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool
     if (col.get_weak_links())
         return;
 
-    size_t num_remaining = target_table.get_num_strong_backlinks(old_target_row_ndx);
+    size_t num_remaining = target_table.get_backlink_count(old_target_row_ndx,
+                                                           /* only strong links:*/ true);
     if (num_remaining > 0)
         return;
 
@@ -4170,6 +4189,7 @@ template size_t Table::find_first(size_t col_ndx, float) const;
 template size_t Table::find_first(size_t col_ndx, double) const;
 template size_t Table::find_first(size_t col_ndx, util::Optional<bool>) const;
 template size_t Table::find_first(size_t col_ndx, util::Optional<int64_t>) const;
+template size_t Table::find_first(size_t col_ndx, BinaryData) const;
 
 } // namespace realm
 

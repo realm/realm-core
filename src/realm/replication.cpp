@@ -377,7 +377,7 @@ public:
         return true;
     }
 
-    bool clear_table()
+    bool clear_table(size_t)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
             log("table->clear();"); // Throws

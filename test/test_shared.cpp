@@ -19,6 +19,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_SHARED
 
+#include <condition_variable>
 #include <streambuf>
 #include <fstream>
 #include <tuple>
@@ -94,10 +95,8 @@ using unit_test::TestContext;
 // check-testcase` (or one of its friends) from the command line.
 
 
-#ifdef _WIN32
+#if REALM_WINDOWS
 namespace {
-// NOTE: Unit tests must use NONCONCURRENT_TEST() macro if they use winfork!
-//
 // NOTE: This does not work like on POSIX: The child will begin execution from
 // the unit test entry point, not from where fork() took place.
 //
@@ -106,20 +105,28 @@ DWORD winfork(std::string unit_test_name)
     if (getenv("REALM_FORKED"))
         return GetCurrentProcessId();
 
-    remove("winfork.bat");
-    std::ofstream myfile("winfork.bat");
-    myfile << "set UNITTEST_FILTER=" << unit_test_name << "\n";
-    myfile << "set REALM_FORKED=1\n";
-    char buf[1024] = {0};
-    DWORD ret = GetModuleFileNameA(NULL, buf, sizeof(buf));
-    myfile << "\"" << buf << "\"\n";
-    myfile.close();
-    int64_t nRet = (int64_t)ShellExecuteA(0, "open", "winfork.bat", 0, 0, SW_SHOWNORMAL);
-    if (nRet <= 32) {
-        return -1;
-    }
-    return 0;
-    }
+    char filename[MAX_PATH];
+    GetModuleFileNameA(nullptr, filename, MAX_PATH);
+
+    StringBuffer environment;
+    environment.append("REALM_FORKED=1");
+    environment.append("\0", 1);
+    environment.append("UNITTEST_FILTER=" + unit_test_name);
+    environment.append("\0\0", 2);
+
+    PROCESS_INFORMATION process;
+    ZeroMemory(&process, sizeof(process));
+    STARTUPINFO info;
+    ZeroMemory(&info, sizeof(info));
+    info.cb = sizeof(info);
+
+    BOOL b = CreateProcessA(filename, nullptr, 0, 0, false, 0, environment.data(), nullptr, &info, &process);
+    REALM_ASSERT_RELEASE(b);
+
+    CloseHandle(process.hProcess);
+    CloseHandle(process.hThread);
+    return process.dwProcessId;
+}
 }
 #endif
 
@@ -658,6 +665,8 @@ TEST(Shared_try_begin_write)
     // Create a new shared db
     SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
     std::mutex thread_obtains_write_lock;
+    std::condition_variable cv;
+    std::mutex cv_lock;
     bool init_complete = false;
 
     auto do_async = [&]() {
@@ -666,7 +675,11 @@ TEST(Shared_try_begin_write)
         bool success = sg2.try_begin_write(gw);
         CHECK(success);
         CHECK(gw != nullptr);
-        init_complete = true;
+        {
+            std::lock_guard<std::mutex> lock(cv_lock);
+            init_complete = true;
+        }
+        cv.notify_one();
         TableRef t = gw->add_table(StringData("table"));
         t->insert_column(0, type_String, StringData("string_col"));
         t->add_empty_row(1000);
@@ -680,7 +693,8 @@ TEST(Shared_try_begin_write)
     async_writer.start(do_async);
 
     // wait for the thread to start a write transaction
-    while (!init_complete) { millisleep(1); }
+    std::unique_lock<std::mutex> lock(cv_lock);
+    cv.wait(lock, [&]{ return init_complete; });
 
     // Try to also obtain a write lock. This should fail but not block.
     Group* g = nullptr;
@@ -2162,7 +2176,7 @@ TEST(Shared_WaitForChangeAfterOwnCommit)
 
 #endif
 
-NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
+TEST(Shared_InterprocessWaitForChange)
 {
     // We can't use SHARED_GROUP_TEST_PATH() because it will attempt to clean up the .realm file at the end,
     // and hence throw if the other processstill has the .realm file open
@@ -2237,9 +2251,9 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
 
 #endif
 
-// FIXME: This test does not work with valgrind
+// This test does not work with valgrind
 // This test will hang infinitely instead of failing!!!
-TEST(Shared_WaitForChange)
+TEST_IF(Shared_WaitForChange, !running_with_valgrind)
 {
     const int num_threads = 3;
     Mutex mutex;
@@ -2570,8 +2584,8 @@ TEST(Shared_EncryptionKeyCheck_3)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* first_key = crypt_key(true);
-    char second_key[32];
-    memcpy(second_key, first_key, 32);
+    char second_key[64];
+    memcpy(second_key, first_key, 64);
     second_key[3] = ~second_key[3];
     SharedGroup sg(path, false, SharedGroupOptions(first_key));
     bool ok = false;

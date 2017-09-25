@@ -178,7 +178,7 @@ public:
     {
         return true;
     }
-    bool clear_table()
+    bool clear_table(size_t)
     {
         return true;
     }
@@ -349,7 +349,7 @@ public:
     bool swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     bool move_row(size_t from_ndx, size_t to_ndx);
     bool merge_rows(size_t row_ndx, size_t new_row_ndx);
-    bool clear_table();
+    bool clear_table(size_t old_table_size);
 
     bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t, Instruction = instr_Set, size_t = 0);
     bool add_int(size_t col_ndx, size_t row_ndx, int_fast64_t);
@@ -525,7 +525,7 @@ public:
     virtual void add_search_index(const Descriptor&, size_t col_ndx);
     virtual void remove_search_index(const Descriptor&, size_t col_ndx);
     virtual void set_link_type(const Table*, size_t col_ndx, LinkType);
-    virtual void clear_table(const Table*);
+    virtual void clear_table(const Table*, size_t prior_num_rows);
     virtual void optimize_table(const Table*);
 
     virtual void link_list_set(const LinkView&, size_t link_ndx, size_t value);
@@ -1582,16 +1582,16 @@ inline void TransactLogConvenientEncoder::set_link_type(const Table* t, size_t c
 }
 
 
-inline bool TransactLogEncoder::clear_table()
+inline bool TransactLogEncoder::clear_table(size_t old_size)
 {
-    append_simple_instr(instr_ClearTable); // Throws
+    append_simple_instr(instr_ClearTable, old_size); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::clear_table(const Table* t)
+inline void TransactLogConvenientEncoder::clear_table(const Table* t, size_t prior_num_rows)
 {
     select_table(t);         // Throws
-    m_encoder.clear_table(); // Throws
+    m_encoder.clear_table(prior_num_rows); // Throws
 }
 
 inline bool TransactLogEncoder::optimize_table()
@@ -1968,7 +1968,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_ClearTable: {
-            if (!handler.clear_table()) // Throws
+            size_t old_size = read_int<size_t>();   // Throws
+            if (!handler.clear_table(old_size)) // Throws
                 parser_error();
             return;
         }
@@ -2620,10 +2621,10 @@ public:
         return true; // No-op
     }
 
-    bool clear_table()
+    bool clear_table(size_t old_size)
     {
-        // FIXME: Add a comment on why we call insert_empty_rows() inside clear_table()
-        m_encoder.insert_empty_rows(0, 0, 0, true);
+        bool unordered = false;
+        m_encoder.insert_empty_rows(0, old_size, 0, unordered);
         append_instruction();
         return true;
     }
