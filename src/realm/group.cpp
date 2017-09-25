@@ -1322,14 +1322,15 @@ public:
         // have been created yet (all entries are null).
         REALM_ASSERT(m_group.m_table_accessors.empty() || group_level_ndx < m_group.m_table_accessors.size());
         if (group_level_ndx < m_group.m_table_accessors.size()) {
-            if (Table* table = m_group.m_table_accessors[group_level_ndx]) {
+            TableRef table(m_group.m_table_accessors[group_level_ndx]);
+            if (table) {
                 const size_t* path_begin = path;
                 const size_t* path_end = path_begin + 2 * levels;
                 for (;;) {
                     typedef _impl::TableFriend tf;
                     tf::mark(*table);
                     if (path_begin == path_end) {
-                        m_table.reset(table);
+                        m_table = std::move(table);
                         break;
                     }
                     size_t col_ndx = path_begin[0];
@@ -1471,7 +1472,8 @@ public:
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
-            if (Table* subtab = tf::get_subtable_accessor(*m_table, col_ndx, row_ndx)) {
+            TableRef subtab(tf::get_subtable_accessor(*m_table, col_ndx, row_ndx));
+            if (subtab) {
                 tf::mark(*subtab);
                 tf::adj_acc_clear_nonroot_table(*subtab);
             }
