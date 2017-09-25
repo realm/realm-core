@@ -424,11 +424,11 @@ public:
         REALM_ASSERT(m_condition);
 
         for (size_t s = start; s < end; ++s) {
-            const Table* subtable;
+            ConstTableRef subtable; // TBD: optimize this back to Table*
             if (m_col_type == col_type_Table)
-                subtable = static_cast<const SubtableColumn*>(m_column)->get_subtable_ptr(s);
+                subtable = static_cast<const SubtableColumn*>(m_column)->get_subtable_tableref(s);
             else {
-                subtable = static_cast<const MixedColumn*>(m_column)->get_subtable_ptr(s);
+                subtable = static_cast<const MixedColumn*>(m_column)->get_subtable_tableref(s);
                 if (!subtable)
                     continue;
             }

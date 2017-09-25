@@ -1346,7 +1346,7 @@ void Table::update_subtables(const size_t* col_path_begin, const size_t* col_pat
                 // preexisting accessors
                 if (!updater)
                     continue;
-                subtable.reset(subtables.get_subtable_ptr(row_ndx)); // Throws
+                subtable = subtables.get_subtable_tableref(row_ndx); // Throws
             }
             subtable->update_subtables(col_path_begin + 1, col_path_end, updater); // Throws
         }
@@ -1422,7 +1422,6 @@ void Table::detach() noexcept
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
-
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
     m_spec.detach();
@@ -1608,6 +1607,21 @@ void Table::destroy_column_accessors() noexcept
     m_cols.clear();
 }
 
+std::recursive_mutex* Table::get_parent_accessor_management_lock() const
+{
+    if (!is_attached())
+        return nullptr;
+    if (!m_top.is_attached()) {
+        ArrayParent* parent = m_columns.get_parent();
+        REALM_ASSERT(dynamic_cast<Parent*>(parent));
+        return static_cast<Parent*>(parent)->get_accessor_management_lock();
+    }
+    if (ArrayParent* parent = m_top.get_parent()) {
+        REALM_ASSERT(dynamic_cast<Parent*>(parent));
+        return static_cast<Parent*>(parent)->get_accessor_management_lock();
+    }
+    return nullptr;
+}
 
 Table::~Table() noexcept
 {
@@ -2764,7 +2778,7 @@ void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
 }
 
 
-Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
+TableRef Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
     // If this table is not a degenerate subtable, then `col_ndx` must be a
@@ -2778,7 +2792,7 @@ Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
         if (ColumnBase* col = m_cols[col_ndx])
             return col->get_subtable_accessor(row_ndx);
     }
-    return 0;
+    return {};
 }
 
 
@@ -2812,7 +2826,7 @@ void Table::discard_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
 }
 
 
-Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx)
+TableRef Table::get_subtable_tableref(size_t col_ndx, size_t row_ndx)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(row_ndx, <, m_size);
@@ -2820,14 +2834,14 @@ Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx)
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_Table) {
         SubtableColumn& subtables = get_column_table(col_ndx);
-        return subtables.get_subtable_ptr(row_ndx); // Throws
+        return subtables.get_subtable_tableref(row_ndx); // Throws
     }
     if (type == col_type_Mixed) {
         MixedColumn& subtables = get_column_mixed(col_ndx);
-        return subtables.get_subtable_ptr(row_ndx); // Throws
+        return subtables.get_subtable_tableref(row_ndx); // Throws
     }
     REALM_ASSERT(false);
-    return 0;
+    return TableRef();
 }
 
 

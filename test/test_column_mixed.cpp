@@ -353,8 +353,8 @@ TEST(MixedColumn_Table)
     for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Table, c.get_type(i));
 
-    std::unique_ptr<Table> t1(c.get_subtable_ptr(0));
-    std::unique_ptr<Table> t2(c.get_subtable_ptr(1));
+    TableRef t1(c.get_subtable_tableref(0));
+    TableRef t2(c.get_subtable_tableref(1));
     CHECK(t1->is_empty());
     CHECK(t2->is_empty());
 
@@ -442,14 +442,14 @@ TEST(MixedColumn_SubtableSize)
 
     {
         // Empty table (no columns)
-        TableRef t1 = c.get_subtable_ptr(1)->get_table_ref();
+        TableRef t1 = c.get_subtable_tableref(1);
         CHECK(t1->is_empty());
         CHECK_EQUAL(0, c.get_subtable_size(1));
     }
 
     {
         // Empty table (1 column, no rows)
-        TableRef t2 = c.get_subtable_ptr(2)->get_table_ref();
+        TableRef t2 = c.get_subtable_tableref(2);
         CHECK(t2->is_empty());
         t2->add_column(type_Int, "col1");
         CHECK_EQUAL(0, c.get_subtable_size(2));
@@ -457,7 +457,7 @@ TEST(MixedColumn_SubtableSize)
 
     {
         // Table with rows
-        TableRef t3 = c.get_subtable_ptr(3)->get_table_ref();
+        TableRef t3 = c.get_subtable_tableref(3);
         CHECK(t3->is_empty());
         t3->add_column(type_Int, "col1");
         t3->add_empty_row(10);
@@ -466,7 +466,7 @@ TEST(MixedColumn_SubtableSize)
 
     {
         // Table with mixed column first
-        TableRef t4 = c.get_subtable_ptr(4)->get_table_ref();
+        TableRef t4 = c.get_subtable_tableref(4);
         CHECK(t4->is_empty());
         t4->add_column(type_Mixed, "col1");
         t4->add_empty_row(10);

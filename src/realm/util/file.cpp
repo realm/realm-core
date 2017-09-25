@@ -39,6 +39,7 @@
 #include <sys/file.h> // BSD / Linux flock()
 #endif
 
+#include <realm/exceptions.hpp>
 #include <realm/util/errno.hpp>
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -518,6 +519,9 @@ void File::write_static(FileDesc fd, const char* data, size_t size)
 error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     std::string msg = get_last_error_msg("WriteFile() failed: ", err);
+    if (err == ERROR_HANDLE_DISK_FULL || err == ERROR_DISK_FULL) {
+        throw OutOfDiskSpace(msg);
+    }
     throw std::runtime_error(msg);
 #else
     while (0 < size) {
@@ -537,6 +541,9 @@ error:
     // LCOV_EXCL_START
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("write(): failed: ", err);
+    if (err == ENOSPC || err == EDQUOT) {
+        throw OutOfDiskSpace(msg);
+    }
     throw std::runtime_error(msg);
 // LCOV_EXCL_STOP
 
@@ -632,9 +639,19 @@ void File::resize(SizeType size)
     if (m_encryption_key)
         size = data_size_to_encrypted_size(size);
 
+    // Windows docs say "it is not an error to set the file pointer to a position beyond the end of the file."
+    // so seeking with SetFilePointerEx() will not error out even if there is no disk space left.
+    // In this scenario though, the following call to SedEndOfFile() will fail if there is no disk space left.
     seek(size);
-    if (!SetEndOfFile(m_fd))
-        throw std::runtime_error("SetEndOfFile() failed");
+
+    if (!SetEndOfFile(m_fd)) {
+        DWORD err = GetLastError(); // Eliminate any risk of clobbering
+        std::string msg = get_last_error_msg("SetEndOfFile() failed: ", err);
+        if (err == ERROR_HANDLE_DISK_FULL || err == ERROR_DISK_FULL) {
+            throw OutOfDiskSpace(msg);
+        }
+        throw std::runtime_error(msg);
+    }
 
     // Restore file position
     seek(p);
@@ -652,7 +669,11 @@ void File::resize(SizeType size)
     // required by File::resize().
     if (::ftruncate(m_fd, size2) != 0) {
         int err = errno; // Eliminate any risk of clobbering
-        throw std::runtime_error(get_errno_msg("ftruncate() failed: ", err));
+        std::string msg = get_errno_msg("ftruncate() failed: ", err);
+        if (err == ENOSPC || err == EDQUOT) {
+            throw OutOfDiskSpace(msg);
+        }
+        throw std::runtime_error(msg);
     }
 
 #endif
@@ -697,6 +718,9 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
         return;
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("posix_fallocate() failed: ", err);
+    if (err == ENOSPC || err == EDQUOT) {
+        throw OutOfDiskSpace(msg);
+    }
     throw std::runtime_error(msg);
 
 // FIXME: OS X does not have any version of fallocate, but see

@@ -1472,7 +1472,8 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 // not ios or android
 //#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 
-
+// Disabled because we do not support nested subtables ATM
+#if 0
 TEST(Shared_FormerErrorCase1)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1609,7 +1610,7 @@ TEST(Shared_FormerErrorCase1)
         wt.commit();
     }
 }
-
+#endif
 
 TEST(Shared_FormerErrorCase2)
 {

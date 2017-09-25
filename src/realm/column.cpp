@@ -39,6 +39,12 @@
 using namespace realm;
 using namespace realm::util;
 
+TableRef ColumnBase::get_subtable_accessor(size_t) const noexcept
+{
+    return {};
+}
+
+
 bool ColumnBase::is_nullable() const noexcept
 {
     return false;

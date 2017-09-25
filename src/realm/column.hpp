@@ -34,6 +34,7 @@
 #include <realm/index_string.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/exceptions.hpp>
+#include <realm/table_ref.hpp>
 
 namespace realm {
 
@@ -276,7 +277,7 @@ public:
     /// the pointer to the subtable accessor at the specified row index if it
     /// exists, otherwise it returns null. For other column types, this function
     /// returns null.
-    virtual Table* get_subtable_accessor(size_t row_ndx) const noexcept;
+    virtual TableRef get_subtable_accessor(size_t row_ndx) const noexcept;
 
     /// Detach and remove the subtable accessor at the specified row if it
     /// exists. For column types that are unable to contain subtable, this
@@ -815,11 +816,6 @@ inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, size_t)
 inline void ColumnBase::discard_child_accessors() noexcept
 {
     do_discard_child_accessors();
-}
-
-inline Table* ColumnBase::get_subtable_accessor(size_t) const noexcept
-{
-    return 0;
 }
 
 inline void ColumnBase::discard_subtable_accessor(size_t) noexcept

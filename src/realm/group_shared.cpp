@@ -1326,10 +1326,14 @@ bool SharedGroup::compact()
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync)
                 file.sync(); // Throws
-            }
+        }
         catch (...)
         {
-            File::try_remove(tmp_path);
+            // If writing the compact version failed in any way, delete the partially written file to clean up disk
+            // space. This is so that we don't fail with 100% disk space used when compacting on a mostly full disk.
+            if (File::exists(tmp_path)) {
+                File::remove(tmp_path);
+            }
             throw;
         }
 #ifndef _WIN32
