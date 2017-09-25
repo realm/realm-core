@@ -23,7 +23,7 @@
 #include "object_store.hpp"
 #include "results.hpp"
 #include "object_schema.hpp"
-#include "util/event_loop_signal.hpp"
+#include "event_loop_dispatcher.hpp"
 
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
@@ -56,7 +56,7 @@ AdminRealmListener::AdminRealmListener(std::string local_root, std::string serve
 void AdminRealmListener::start(std::function<void(std::vector<std::string>)> callback)
 {
     auto session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
-    bool result = session->wait_for_download_completion([this, callback](std::error_code ec) {
+    EventLoopDispatcher<void(std::error_code)> download_callback([this, callback, session](std::error_code ec) {
         if (ec)
             throw std::system_error(ec);
 
@@ -88,5 +88,6 @@ void AdminRealmListener::start(std::function<void(std::vector<std::string>)> cal
             }
         });
     });
+    bool result = session->wait_for_download_completion(std::move(download_callback));
     REALM_ASSERT_RELEASE(result);
 }
