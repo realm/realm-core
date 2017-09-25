@@ -2587,6 +2587,38 @@ void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 }
 
 
+void Table::do_move_row(size_t from_ndx, size_t to_ndx)
+{
+    // If to and from are next to each other we can just convert this to a swap
+    if (from_ndx == to_ndx + 1 || to_ndx == from_ndx + 1) {
+        if (from_ndx > to_ndx)
+            std::swap(from_ndx, to_ndx);
+        do_swap_rows(from_ndx, to_ndx);
+        return;
+    }
+
+    adj_row_acc_move_row(from_ndx, to_ndx);
+
+    // Adjust the row indexes to compensate for the temporary row used
+    if (from_ndx > to_ndx)
+        ++from_ndx;
+    else
+        ++to_ndx;
+
+    size_t num_cols = m_spec->get_column_count();
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        bool insert_nulls = m_spec->get_column_type(col_ndx) == col_type_Link;
+        bool broken_reciprocal_backlinks = true;
+
+        ColumnBase& col = get_column_base(col_ndx);
+        col.insert_rows(to_ndx, 1, m_size, insert_nulls);
+        col.swap_rows(from_ndx, to_ndx);
+        col.erase_rows(from_ndx, 1, m_size + 1, broken_reciprocal_backlinks);
+    }
+    bump_version();
+}
+
+
 void Table::do_merge_rows(size_t row_ndx, size_t new_row_ndx)
 {
     // This bypasses handling of cascading rows, and we have decided that this is OK, because
@@ -2696,6 +2728,21 @@ void Table::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 
     if (Replication* repl = get_repl())
         repl->swap_rows(this, row_ndx_1, row_ndx_2);
+}
+
+void Table::move_row(size_t from_ndx, size_t to_ndx)
+{
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(from_ndx >= m_size || to_ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+    if (from_ndx == to_ndx)
+        return;
+
+    do_move_row(from_ndx, to_ndx);
+
+    if (Replication* repl = get_repl())
+        repl->move_row(this, from_ndx, to_ndx);
 }
 
 
@@ -5813,6 +5860,23 @@ void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
+void Table::adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    adj_row_acc_move_row(from_ndx, to_ndx);
+
+    // Adjust subtable accessors after row move
+    for (auto& col : m_cols) {
+        if (col != nullptr) {
+            col->adj_acc_move_row(from_ndx, to_ndx);
+        }
+    }
+}
+
+
 void Table::adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
@@ -5951,6 +6015,33 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
     // Adjust rows in tableviews after row swap
     for (auto& view : m_views) {
         view->adj_row_acc_swap_rows(row_ndx_1, row_ndx_2);
+    }
+}
+
+
+void Table::adj_row_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    // Adjust row accessors after move
+    LockGuard lock(m_accessor_mutex);
+    RowBase* row = m_row_accessors;
+    while (row) {
+        size_t ndx = row->m_row_ndx;
+        if (ndx == from_ndx)
+            row->m_row_ndx = to_ndx;
+        else if (ndx > from_ndx && ndx <= to_ndx)
+            row->m_row_ndx = ndx - 1;
+        else if (ndx >= to_ndx && ndx < from_ndx)
+            row->m_row_ndx = ndx + 1;
+        row = row->m_next;
+    }
+
+    // Adjust rows in tableviews after row move
+    for (auto& view : m_views) {
+        view->adj_row_acc_move_row(from_ndx, to_ndx);
     }
 }
 

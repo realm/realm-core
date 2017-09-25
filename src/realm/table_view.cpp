@@ -614,6 +614,21 @@ void TableViewBase::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) no
 }
 
 
+void TableViewBase::adj_row_acc_move_row(size_t from_row_ndx, size_t to_row_ndx) noexcept
+{
+    if (from_row_ndx > to_row_ndx)
+        ++from_row_ndx;
+    else
+        ++to_row_ndx;
+
+    m_row_indexes.adjust_ge(int_fast64_t(to_row_ndx), 1);
+    size_t it = 0;
+    while ((it = m_row_indexes.find_first(from_row_ndx, it)) != not_found)
+        m_row_indexes.set(it, to_row_ndx);
+    m_row_indexes.adjust_ge(int_fast64_t(from_row_ndx), -1);
+}
+
+
 void TableViewBase::adj_row_acc_clear() noexcept
 {
     m_num_detached_refs = m_row_indexes.size();

@@ -42,6 +42,11 @@ inline void MixedColumn::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) n
     m_data->adj_acc_swap_rows(row_ndx_1, row_ndx_2);
 }
 
+inline void MixedColumn::adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
+{
+    m_data->adj_acc_move_row(from_ndx, to_ndx);
+}
+
 inline void MixedColumn::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     m_data->adj_acc_move_over(from_row_ndx, to_row_ndx);

@@ -266,7 +266,7 @@ TEST(Table_DateTimeMinMax)
     // We test different code paths of the internal Core minmax method. First a null value as initial "best candidate",
     // then non-null first. For each case we then try both a substitution of best candidate, then non-substitution. 4
     // permutations in total.
-    
+
     table->add_empty_row(3);
     table->set_null(0, 0);
     table->set_timestamp(0, 1, {0, 0});
@@ -697,7 +697,7 @@ TEST(Table_AggregateFuzz)
             ts = table.get()->where().maximum_timestamp(0, &ret);
             CHECK_EQUAL(ret, largest_pos);
             if (largest_pos != npos)
-                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest_pos)); 
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest_pos));
 
             // TableView::min
             ret = 123;
@@ -7870,6 +7870,380 @@ TEST(Table_MixedCrashValues)
 }
 
 
+TEST(Table_MoveRow)
+{
+    Group g;
+
+    // The things which need to be validated for moving rows:
+    // 1. Values are moved
+    // 2. Outgoing links/linklists to moved rows are updated
+    // 3. Backlinks to moved rows are updated
+    // 4. Row, LinkView and Subtable accessors for moved rows are updated
+    // 5. TableViews containing moved rows are updated
+
+    TableRef t0 = g.add_table("t0");
+    size_t col_value = t0->add_column(type_Int, "value");
+    size_t col_link = t0->add_column_link(type_Link, "self link", *t0);
+    size_t col_linklist = t0->add_column_link(type_LinkList, "self linklist", *t0);
+    size_t col_table = t0->add_column(type_Table, "subtable");
+    t0->get_subdescriptor(col_table)->add_column(type_Int, "value");
+
+    TableRef t1 = g.add_table("t1");
+    t1->add_column_link(type_Link, "link", *t0);
+    t1->add_column_link(type_LinkList, "linklist", *t0);
+
+    Row rows[5];
+    LinkViewRef t0_lvs[5];
+    LinkViewRef t1_lvs[5];
+    TableRef t0_subtables[5];
+
+    t0->add_empty_row(5);
+    t1->add_empty_row(5);
+    for (int i = 0; i < 5; ++i) {
+        rows[i] = t0->get(i);
+        t0_lvs[i] = t0->get_linklist(col_linklist, i);
+        t1_lvs[i] = t1->get_linklist(1, i);
+        t0_subtables[i] = t0->get_subtable(col_table, i);
+
+        t0->set_int(col_value, i, i);
+        t0->set_link(col_link, i, i);
+        for (int j = 0; j < 5; ++j) {
+            if (i != j)
+                t0_lvs[i]->add(j);
+        }
+        t0_subtables[i]->add_empty_row(i + 1);
+
+        t1->set_link(0, i, (i + 1) % 5);
+        t1_lvs[i]->add((i + 2) % 5);
+    }
+
+    TableView tv = t0->where().find_all();
+
+    CHECK_EQUAL(t1_lvs[0]->get(0).get_index(), 2);
+    CHECK_EQUAL(t1_lvs[1]->get(0).get_index(), 3);
+    CHECK_EQUAL(t1_lvs[2]->get(0).get_index(), 4);
+    CHECK_EQUAL(t1_lvs[3]->get(0).get_index(), 0);
+    CHECK_EQUAL(t1_lvs[4]->get(0).get_index(), 1);
+
+    // move from == to
+    t0->move_row(1, 1);
+    for (int i = 0; i < 5; ++i)
+        CHECK_EQUAL(t0->get_int(col_value, i), i);
+
+    // swap adjacent, from < to
+    t0->move_row(1, 2);
+    // 0, 2, 1, 3, 4
+
+    CHECK_EQUAL(rows[0].get_index(), 0);
+    CHECK_EQUAL(rows[1].get_index(), 2);
+    CHECK_EQUAL(rows[2].get_index(), 1);
+    CHECK_EQUAL(rows[3].get_index(), 3);
+    CHECK_EQUAL(rows[4].get_index(), 4);
+
+    CHECK_EQUAL(rows[0].get_int(col_value), 0);
+    CHECK_EQUAL(rows[1].get_int(col_value), 1);
+    CHECK_EQUAL(rows[2].get_int(col_value), 2);
+    CHECK_EQUAL(rows[3].get_int(col_value), 3);
+
+    CHECK_EQUAL(rows[0].get_link(col_link), 0);
+    CHECK_EQUAL(rows[1].get_link(col_link), 2);
+    CHECK_EQUAL(rows[2].get_link(col_link), 1);
+    CHECK_EQUAL(rows[3].get_link(col_link), 3);
+
+    CHECK_EQUAL(t0_lvs[0]->get(0).get_index(), 2);
+    CHECK_EQUAL(t0_lvs[0]->get(1).get_index(), 1);
+    CHECK_EQUAL(t0_lvs[0]->get(2).get_index(), 3);
+    CHECK_EQUAL(t0_lvs[1]->get(0).get_index(), 0);
+    CHECK_EQUAL(t0_lvs[1]->get(1).get_index(), 1);
+    CHECK_EQUAL(t0_lvs[1]->get(2).get_index(), 3);
+    CHECK_EQUAL(t0_lvs[2]->get(0).get_index(), 0);
+    CHECK_EQUAL(t0_lvs[2]->get(1).get_index(), 2);
+    CHECK_EQUAL(t0_lvs[2]->get(2).get_index(), 3);
+    CHECK_EQUAL(t0_lvs[3]->get(0).get_index(), 0);
+    CHECK_EQUAL(t0_lvs[3]->get(1).get_index(), 2);
+    CHECK_EQUAL(t0_lvs[3]->get(2).get_index(), 1);
+
+    CHECK_EQUAL(t0_subtables[0]->get_parent_row_index(), 0);
+    CHECK_EQUAL(t0_subtables[1]->get_parent_row_index(), 2);
+    CHECK_EQUAL(t0_subtables[2]->get_parent_row_index(), 1);
+    CHECK_EQUAL(t0_subtables[3]->get_parent_row_index(), 3);
+    CHECK_EQUAL(t0_subtables[0]->size(), 1);
+    CHECK_EQUAL(t0_subtables[1]->size(), 2);
+    CHECK_EQUAL(t0_subtables[2]->size(), 3);
+    CHECK_EQUAL(t0_subtables[3]->size(), 4);
+
+    CHECK_EQUAL(t0->get_backlink(0, *t1, 0, 0), 4);
+    CHECK_EQUAL(t0->get_backlink(1, *t1, 0, 0), 1);
+    CHECK_EQUAL(t0->get_backlink(2, *t1, 0, 0), 0);
+    CHECK_EQUAL(t0->get_backlink(3, *t1, 0, 0), 2);
+    CHECK_EQUAL(t0->get_backlink(4, *t1, 0, 0), 3);
+    CHECK_EQUAL(t0->get_backlink(0, *t1, 1, 0), 3);
+    CHECK_EQUAL(t0->get_backlink(1, *t1, 1, 0), 0);
+    CHECK_EQUAL(t0->get_backlink(2, *t1, 1, 0), 4);
+    CHECK_EQUAL(t0->get_backlink(3, *t1, 1, 0), 1);
+    CHECK_EQUAL(t0->get_backlink(4, *t1, 1, 0), 2);
+
+    CHECK(tv.is_row_attached(0));
+    CHECK(tv.is_row_attached(1));
+    CHECK(tv.is_row_attached(2));
+    CHECK(tv.is_row_attached(3));
+    CHECK_EQUAL(tv.get(0).get_index(), 0);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 1);
+    CHECK_EQUAL(tv.get(3).get_index(), 3);
+
+    CHECK_EQUAL(t1->get_link(0, 0), 2);
+    CHECK_EQUAL(t1->get_link(0, 1), 1);
+    CHECK_EQUAL(t1->get_link(0, 2), 3);
+    CHECK_EQUAL(t1->get_link(0, 3), 4);
+    CHECK_EQUAL(t1->get_link(0, 4), 0);
+
+    CHECK_EQUAL(t1_lvs[0]->get(0).get_index(), 1);
+    CHECK_EQUAL(t1_lvs[1]->get(0).get_index(), 3);
+    CHECK_EQUAL(t1_lvs[2]->get(0).get_index(), 4);
+    CHECK_EQUAL(t1_lvs[3]->get(0).get_index(), 0);
+    CHECK_EQUAL(t1_lvs[4]->get(0).get_index(), 2);
+
+    // swap adjacent, from > to
+    // 0, 2, 1, 3, 4
+    t0->move_row(3, 2);
+    // 0, 2, 3, 1, 4
+
+    CHECK_EQUAL(rows[0].get_index(), 0);
+    CHECK_EQUAL(rows[1].get_index(), 3);
+    CHECK_EQUAL(rows[2].get_index(), 1);
+    CHECK_EQUAL(rows[3].get_index(), 2);
+    CHECK_EQUAL(rows[4].get_index(), 4);
+
+    CHECK_EQUAL(rows[0].get_int(col_value), 0);
+    CHECK_EQUAL(rows[1].get_int(col_value), 1);
+    CHECK_EQUAL(rows[2].get_int(col_value), 2);
+    CHECK_EQUAL(rows[3].get_int(col_value), 3);
+
+    CHECK_EQUAL(rows[0].get_link(col_link), 0);
+    CHECK_EQUAL(rows[1].get_link(col_link), 3);
+    CHECK_EQUAL(rows[2].get_link(col_link), 1);
+    CHECK_EQUAL(rows[3].get_link(col_link), 2);
+
+    CHECK_EQUAL(t0_lvs[0]->get(0).get_index(), 3);
+    CHECK_EQUAL(t0_lvs[0]->get(1).get_index(), 1);
+    CHECK_EQUAL(t0_lvs[0]->get(2).get_index(), 2);
+    CHECK_EQUAL(t0_lvs[1]->get(0).get_index(), 0);
+    CHECK_EQUAL(t0_lvs[1]->get(1).get_index(), 1);
+    CHECK_EQUAL(t0_lvs[1]->get(2).get_index(), 2);
+    CHECK_EQUAL(t0_lvs[2]->get(0).get_index(), 0);
+    CHECK_EQUAL(t0_lvs[2]->get(1).get_index(), 3);
+    CHECK_EQUAL(t0_lvs[2]->get(2).get_index(), 2);
+    CHECK_EQUAL(t0_lvs[3]->get(0).get_index(), 0);
+    CHECK_EQUAL(t0_lvs[3]->get(1).get_index(), 3);
+    CHECK_EQUAL(t0_lvs[3]->get(2).get_index(), 1);
+
+    CHECK_EQUAL(t0_subtables[0]->get_parent_row_index(), 0);
+    CHECK_EQUAL(t0_subtables[1]->get_parent_row_index(), 3);
+    CHECK_EQUAL(t0_subtables[2]->get_parent_row_index(), 1);
+    CHECK_EQUAL(t0_subtables[3]->get_parent_row_index(), 2);
+    CHECK_EQUAL(t0_subtables[0]->size(), 1);
+    CHECK_EQUAL(t0_subtables[1]->size(), 2);
+    CHECK_EQUAL(t0_subtables[2]->size(), 3);
+    CHECK_EQUAL(t0_subtables[3]->size(), 4);
+
+    CHECK_EQUAL(t0->get_backlink(0, *t1, 0, 0), 4);
+    CHECK_EQUAL(t0->get_backlink(1, *t1, 0, 0), 1);
+    CHECK_EQUAL(t0->get_backlink(2, *t1, 0, 0), 2);
+    CHECK_EQUAL(t0->get_backlink(3, *t1, 0, 0), 0);
+    CHECK_EQUAL(t0->get_backlink(4, *t1, 0, 0), 3);
+    CHECK_EQUAL(t0->get_backlink(0, *t1, 1, 0), 3);
+    CHECK_EQUAL(t0->get_backlink(1, *t1, 1, 0), 0);
+    CHECK_EQUAL(t0->get_backlink(2, *t1, 1, 0), 1);
+    CHECK_EQUAL(t0->get_backlink(3, *t1, 1, 0), 4);
+    CHECK_EQUAL(t0->get_backlink(4, *t1, 1, 0), 2);
+
+    CHECK(tv.is_row_attached(0));
+    CHECK(tv.is_row_attached(1));
+    CHECK(tv.is_row_attached(2));
+    CHECK(tv.is_row_attached(3));
+    CHECK_EQUAL(tv.get(0).get_index(), 0);
+    CHECK_EQUAL(tv.get(1).get_index(), 3);
+    CHECK_EQUAL(tv.get(2).get_index(), 1);
+    CHECK_EQUAL(tv.get(3).get_index(), 2);
+    CHECK_EQUAL(tv.get(4).get_index(), 4);
+
+    CHECK_EQUAL(t1->get_link(0, 0), 3);
+    CHECK_EQUAL(t1->get_link(0, 1), 1);
+    CHECK_EQUAL(t1->get_link(0, 2), 2);
+    CHECK_EQUAL(t1->get_link(0, 3), 4);
+    CHECK_EQUAL(t1->get_link(0, 4), 0);
+
+    CHECK_EQUAL(t1_lvs[0]->get(0).get_index(), 1);
+    CHECK_EQUAL(t1_lvs[1]->get(0).get_index(), 2);
+    CHECK_EQUAL(t1_lvs[2]->get(0).get_index(), 4);
+    CHECK_EQUAL(t1_lvs[3]->get(0).get_index(), 0);
+    CHECK_EQUAL(t1_lvs[4]->get(0).get_index(), 3);
+
+    // non-adjacent, from < to
+    // 0, 2, 3, 1, 4
+    t0->move_row(1, 3);
+    // 0, 3, 1, 2, 4
+
+    CHECK_EQUAL(rows[0].get_index(), 0);
+    CHECK_EQUAL(rows[1].get_index(), 2);
+    CHECK_EQUAL(rows[2].get_index(), 3);
+    CHECK_EQUAL(rows[3].get_index(), 1);
+    CHECK_EQUAL(rows[4].get_index(), 4);
+
+    CHECK_EQUAL(rows[0].get_int(col_value), 0);
+    CHECK_EQUAL(rows[1].get_int(col_value), 1);
+    CHECK_EQUAL(rows[2].get_int(col_value), 2);
+    CHECK_EQUAL(rows[3].get_int(col_value), 3);
+    CHECK_EQUAL(rows[4].get_int(col_value), 4);
+
+    CHECK_EQUAL(rows[0].get_link(col_link), 0);
+    CHECK_EQUAL(rows[1].get_link(col_link), 2);
+    CHECK_EQUAL(rows[2].get_link(col_link), 3);
+    CHECK_EQUAL(rows[3].get_link(col_link), 1);
+    CHECK_EQUAL(rows[4].get_link(col_link), 4);
+
+    CHECK_EQUAL(t0_lvs[0]->get(0).get_index(), 2);
+    CHECK_EQUAL(t0_lvs[0]->get(1).get_index(), 3);
+    CHECK_EQUAL(t0_lvs[0]->get(2).get_index(), 1);
+    CHECK_EQUAL(t0_lvs[1]->get(0).get_index(), 0);
+    CHECK_EQUAL(t0_lvs[1]->get(1).get_index(), 3);
+    CHECK_EQUAL(t0_lvs[1]->get(2).get_index(), 1);
+    CHECK_EQUAL(t0_lvs[2]->get(0).get_index(), 0);
+    CHECK_EQUAL(t0_lvs[2]->get(1).get_index(), 2);
+    CHECK_EQUAL(t0_lvs[2]->get(2).get_index(), 1);
+    CHECK_EQUAL(t0_lvs[3]->get(0).get_index(), 0);
+    CHECK_EQUAL(t0_lvs[3]->get(1).get_index(), 2);
+    CHECK_EQUAL(t0_lvs[3]->get(2).get_index(), 3);
+
+    CHECK_EQUAL(t0_subtables[0]->get_parent_row_index(), 0);
+    CHECK_EQUAL(t0_subtables[1]->get_parent_row_index(), 2);
+    CHECK_EQUAL(t0_subtables[2]->get_parent_row_index(), 3);
+    CHECK_EQUAL(t0_subtables[3]->get_parent_row_index(), 1);
+    CHECK_EQUAL(t0_subtables[4]->get_parent_row_index(), 4);
+    CHECK_EQUAL(t0_subtables[0]->size(), 1);
+    CHECK_EQUAL(t0_subtables[1]->size(), 2);
+    CHECK_EQUAL(t0_subtables[2]->size(), 3);
+    CHECK_EQUAL(t0_subtables[3]->size(), 4);
+    CHECK_EQUAL(t0_subtables[4]->size(), 5);
+
+    CHECK_EQUAL(t0->get_backlink(0, *t1, 0, 0), 4);
+    CHECK_EQUAL(t0->get_backlink(1, *t1, 0, 0), 2);
+    CHECK_EQUAL(t0->get_backlink(2, *t1, 0, 0), 0);
+    CHECK_EQUAL(t0->get_backlink(3, *t1, 0, 0), 1);
+    CHECK_EQUAL(t0->get_backlink(4, *t1, 0, 0), 3);
+    CHECK_EQUAL(t0->get_backlink(0, *t1, 1, 0), 3);
+    CHECK_EQUAL(t0->get_backlink(1, *t1, 1, 0), 1);
+    CHECK_EQUAL(t0->get_backlink(2, *t1, 1, 0), 4);
+    CHECK_EQUAL(t0->get_backlink(3, *t1, 1, 0), 0);
+    CHECK_EQUAL(t0->get_backlink(4, *t1, 1, 0), 2);
+
+    CHECK(tv.is_row_attached(0));
+    CHECK(tv.is_row_attached(1));
+    CHECK(tv.is_row_attached(2));
+    CHECK(tv.is_row_attached(3));
+    CHECK(tv.is_row_attached(4));
+    CHECK_EQUAL(tv.get_int(0, 0), 0);
+    CHECK_EQUAL(tv.get_int(0, 1), 1);
+    CHECK_EQUAL(tv.get_int(0, 2), 2);
+    CHECK_EQUAL(tv.get_int(0, 3), 3);
+    CHECK_EQUAL(tv.get_int(0, 4), 4);
+    CHECK_EQUAL(tv.get(0).get_index(), 0);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 3);
+    CHECK_EQUAL(tv.get(3).get_index(), 1);
+    CHECK_EQUAL(tv.get(4).get_index(), 4);
+
+    CHECK_EQUAL(t1->get_link(0, 0), 2);
+    CHECK_EQUAL(t1->get_link(0, 1), 3);
+    CHECK_EQUAL(t1->get_link(0, 2), 1);
+    CHECK_EQUAL(t1->get_link(0, 3), 4);
+    CHECK_EQUAL(t1->get_link(0, 4), 0);
+
+    CHECK_EQUAL(t1_lvs[0]->get(0).get_index(), 3);
+    CHECK_EQUAL(t1_lvs[1]->get(0).get_index(), 1);
+    CHECK_EQUAL(t1_lvs[2]->get(0).get_index(), 4);
+    CHECK_EQUAL(t1_lvs[3]->get(0).get_index(), 0);
+    CHECK_EQUAL(t1_lvs[4]->get(0).get_index(), 2);
+
+    // non-adjacent, from > to
+    // 0, 3, 1, 2, 4
+    t0->move_row(3, 1);
+    // 0, 2, 3, 1, 4
+
+    CHECK_EQUAL(rows[0].get_index(), 0);
+    CHECK_EQUAL(rows[1].get_index(), 3);
+    CHECK_EQUAL(rows[2].get_index(), 1);
+    CHECK_EQUAL(rows[3].get_index(), 2);
+    CHECK_EQUAL(rows[4].get_index(), 4);
+
+    CHECK_EQUAL(rows[0].get_int(col_value), 0);
+    CHECK_EQUAL(rows[1].get_int(col_value), 1);
+    CHECK_EQUAL(rows[2].get_int(col_value), 2);
+    CHECK_EQUAL(rows[3].get_int(col_value), 3);
+
+    CHECK_EQUAL(rows[0].get_link(col_link), 0);
+    CHECK_EQUAL(rows[1].get_link(col_link), 3);
+    CHECK_EQUAL(rows[2].get_link(col_link), 1);
+    CHECK_EQUAL(rows[3].get_link(col_link), 2);
+
+    CHECK_EQUAL(t0_lvs[0]->get(0).get_index(), 3);
+    CHECK_EQUAL(t0_lvs[0]->get(1).get_index(), 1);
+    CHECK_EQUAL(t0_lvs[0]->get(2).get_index(), 2);
+    CHECK_EQUAL(t0_lvs[1]->get(0).get_index(), 0);
+    CHECK_EQUAL(t0_lvs[1]->get(1).get_index(), 1);
+    CHECK_EQUAL(t0_lvs[1]->get(2).get_index(), 2);
+    CHECK_EQUAL(t0_lvs[2]->get(0).get_index(), 0);
+    CHECK_EQUAL(t0_lvs[2]->get(1).get_index(), 3);
+    CHECK_EQUAL(t0_lvs[2]->get(2).get_index(), 2);
+    CHECK_EQUAL(t0_lvs[3]->get(0).get_index(), 0);
+    CHECK_EQUAL(t0_lvs[3]->get(1).get_index(), 3);
+    CHECK_EQUAL(t0_lvs[3]->get(2).get_index(), 1);
+
+    CHECK_EQUAL(t0_subtables[0]->get_parent_row_index(), 0);
+    CHECK_EQUAL(t0_subtables[1]->get_parent_row_index(), 3);
+    CHECK_EQUAL(t0_subtables[2]->get_parent_row_index(), 1);
+    CHECK_EQUAL(t0_subtables[3]->get_parent_row_index(), 2);
+    CHECK_EQUAL(t0_subtables[0]->size(), 1);
+    CHECK_EQUAL(t0_subtables[1]->size(), 2);
+    CHECK_EQUAL(t0_subtables[2]->size(), 3);
+    CHECK_EQUAL(t0_subtables[3]->size(), 4);
+
+    CHECK_EQUAL(t0->get_backlink(0, *t1, 0, 0), 4);
+    CHECK_EQUAL(t0->get_backlink(1, *t1, 0, 0), 1);
+    CHECK_EQUAL(t0->get_backlink(2, *t1, 0, 0), 2);
+    CHECK_EQUAL(t0->get_backlink(3, *t1, 0, 0), 0);
+    CHECK_EQUAL(t0->get_backlink(4, *t1, 0, 0), 3);
+    CHECK_EQUAL(t0->get_backlink(0, *t1, 1, 0), 3);
+    CHECK_EQUAL(t0->get_backlink(1, *t1, 1, 0), 0);
+    CHECK_EQUAL(t0->get_backlink(2, *t1, 1, 0), 1);
+    CHECK_EQUAL(t0->get_backlink(3, *t1, 1, 0), 4);
+    CHECK_EQUAL(t0->get_backlink(4, *t1, 1, 0), 2);
+
+    CHECK(tv.is_row_attached(0));
+    CHECK(tv.is_row_attached(1));
+    CHECK(tv.is_row_attached(2));
+    CHECK(tv.is_row_attached(3));
+    CHECK_EQUAL(tv.get(0).get_index(), 0);
+    CHECK_EQUAL(tv.get(1).get_index(), 3);
+    CHECK_EQUAL(tv.get(2).get_index(), 1);
+    CHECK_EQUAL(tv.get(3).get_index(), 2);
+    CHECK_EQUAL(tv.get(4).get_index(), 4);
+
+    CHECK_EQUAL(t1->get_link(0, 0), 3);
+    CHECK_EQUAL(t1->get_link(0, 1), 1);
+    CHECK_EQUAL(t1->get_link(0, 2), 2);
+    CHECK_EQUAL(t1->get_link(0, 3), 4);
+    CHECK_EQUAL(t1->get_link(0, 4), 0);
+
+    CHECK_EQUAL(t1_lvs[0]->get(0).get_index(), 1);
+    CHECK_EQUAL(t1_lvs[1]->get(0).get_index(), 2);
+    CHECK_EQUAL(t1_lvs[2]->get(0).get_index(), 4);
+    CHECK_EQUAL(t1_lvs[3]->get(0).get_index(), 0);
+    CHECK_EQUAL(t1_lvs[4]->get(0).get_index(), 3);
+}
+
+
 TEST(Table_MergeRows_Links)
 {
     Group g;
@@ -8082,6 +8456,7 @@ TEST(Table_DetachedAccessor)
     CHECK_LOGIC_ERROR(table->remove_search_index(0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->merge_rows(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->swap_rows(0, 1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->move_row(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_string(1, 0, ""), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_string_unique(1, 0, ""), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->insert_substring(1, 0, 0, "x"), LogicError::detached_accessor);

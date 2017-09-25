@@ -54,6 +54,7 @@ public:
     void adj_acc_move_over(size_t, size_t) noexcept override;
     void adj_acc_clear_root_table() noexcept override;
     void adj_acc_swap_rows(size_t, size_t) noexcept override;
+    void adj_acc_move_row(size_t, size_t) noexcept override;
     void mark(int) noexcept override;
     bool supports_search_index() const noexcept override
     {
@@ -77,9 +78,6 @@ protected:
     Table* const m_table;
 
     struct SubtableMap {
-        ~SubtableMap() noexcept
-        {
-        }
         bool empty() const noexcept
         {
             return m_entries.empty();
@@ -108,6 +106,8 @@ protected:
         bool adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
         template <bool fix_ndx_in_parent>
         void adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+        template <bool fix_ndx_in_parent>
+        void adj_move_row(size_t from_ndx, size_t to_ndx) noexcept;
         void adj_set_null(size_t row_ndx) noexcept;
 
         void update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
@@ -397,6 +397,12 @@ inline void SubtableColumnBase::adj_acc_swap_rows(size_t row_ndx_1, size_t row_n
     m_subtable_map.adj_swap_rows<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
 }
 
+inline void SubtableColumnBase::adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
+{
+    const bool fix_ndx_in_parent = false;
+    m_subtable_map.adj_move_row<fix_ndx_in_parent>(from_ndx, to_ndx);
+}
+
 inline TableRef SubtableColumnBase::get_subtable_accessor(size_t row_ndx) const noexcept
 {
     // This function must assume no more than minimal consistency of the
@@ -521,6 +527,20 @@ void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row
             if (fix_ndx_in_parent)
                 tf::set_ndx_in_parent(*(entry.m_table), entry.m_subtable_ndx);
         }
+    }
+}
+
+
+template <bool fix_ndx_in_parent>
+void SubtableColumnBase::SubtableMap::adj_move_row(size_t from_ndx, size_t to_ndx) noexcept
+{
+    if (from_ndx < to_ndx) {
+        adj_insert_rows<fix_ndx_in_parent>(to_ndx, 1);
+        adj_erase_rows<fix_ndx_in_parent>(from_ndx, 1);
+    }
+    else {
+        adj_erase_rows<fix_ndx_in_parent>(from_ndx, 1);
+        adj_insert_rows<fix_ndx_in_parent>(to_ndx, 1);
     }
 }
 
