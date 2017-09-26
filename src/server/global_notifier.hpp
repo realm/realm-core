@@ -105,7 +105,7 @@ public:
         SharedRealm m_realm;
         std::unordered_map<std::string, CollectionChangeSet> m_changes;
 
-        ChangeNotification(std::string, VersionID old_version, VersionID new_version,
+        ChangeNotification(std::string path, VersionID old_version, VersionID new_version,
                            SharedRealm, std::unordered_map<std::string, CollectionChangeSet>);
         ChangeNotification() = default;
 
