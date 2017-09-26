@@ -465,13 +465,13 @@ def doBuildCoverage() {
           cmake -G Ninja -D REALM_COVERAGE=ON ..
           ninja
           cd ..
-          lcov --no-external --capture --initial --directory . --output-file coverage-base.info
+          lcov --no-external --capture --initial --directory . --output-file ${workspace}/coverage-base.info
           cd build/test
           ./realm-tests
           cd ../..
-          lcov --no-external --directory . --capture --output-file coverage-test.info
-          lcov --add-tracefile coverage-base.info --add-tracefile coverage-test.info --output-file coverage-total.info
-          lcov --remove coverage-total.info '/usr/*' '${workspace}/test/*' --output-file coverage-filtered.info
+          lcov --no-external --directory . --capture --output-file ${workspace}/coverage-test.info
+          lcov --add-tracefile ${workspace}/coverage-base.info --add-tracefile coverage-test.info --output-file ${workspace}/coverage-total.info
+          lcov --remove ${workspace}/coverage-total.info '/usr/*' '${workspace}/test/*' --output-file ${workspace}/coverage-filtered.info
           rm coverage-base.info coverage-test.info coverage-total.info
         """
         withCredentials([[$class: 'StringBinding', credentialsId: 'codecov-token-core', variable: 'CODECOV_TOKEN']]) {
