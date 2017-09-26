@@ -468,8 +468,8 @@ def doBuildCoverage() {
           ./realm-tests
           cd ../..
           lcov --directory . --capture --output-file coverage.info
-          lcov --remove coverage.info '/usr/*' --output-file coverage.info
-          lcov --remove coverage.info '${workspace}/test/*' --output-file coverage.info
+          lcov --remove coverage.info '/usr/*'
+          lcov --remove coverage.info '${workspace}/test/*'
           lcov --list coverage.info
         """
         withCredentials([[$class: 'StringBinding', credentialsId: 'codecov-token-core', variable: 'CODECOV_TOKEN']]) {
