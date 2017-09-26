@@ -68,7 +68,8 @@ jobWrapper {
                                packageCentos6      : doBuildPackage('centos-6', 'rpm'),
                                packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
                                threadSanitizer     : doBuildInDocker('Debug', 'thread'),
-                               addressSanitizer    : doBuildInDocker('Debug', 'address')
+                               addressSanitizer    : doBuildInDocker('Debug', 'address'),
+                               coverage            : doBuildCoverage()
               ]
 
           androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
@@ -94,7 +95,6 @@ jobWrapper {
           }
 
           if (env.CHANGE_TARGET) {
-              parallelExecutors['diffCoverage'] = buildDiffCoverage()
               parallelExecutors['performance'] = buildPerformance()
           }
 
@@ -451,6 +451,34 @@ def doBuildAppleDevice(String sdk, String buildType) {
             }
         }
     }
+}
+
+def doBuildCoverage() {
+  return {
+    node('docker') {
+      getArchive()
+      docker.image('realm-core:snapshot').inside {
+        sh '''
+          mkdir build
+          cd build
+          cmake -G Ninja -D REALM_COVERAGE=ON ..
+          ninja
+          cd test
+          ./realm-tests
+          cd ../..
+          lcov --directory . --capture --output-file coverage.info
+          lcov --remove coverage.info '/usr/*' --output-file coverage.info
+          lcov --remove coverage.info "$(pwd)/test/*" --output-file coverage.info
+          lcov --list coverage.info
+        '''
+        withCredentials([[$class: 'StringBinding', credentialsId: 'codecov-token-core', variable: 'CODECOV_TOKEN']]) {
+          sh '''
+            bash <(curl -s https://codecov.io/bash)
+          '''
+        }
+      }
+    }
+  }
 }
 
 /**
