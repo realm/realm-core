@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 4.0.0 Release notes
 
 ### Bugfixes
 
