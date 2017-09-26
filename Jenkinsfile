@@ -458,7 +458,8 @@ def doBuildCoverage() {
     node('docker') {
       getArchive()
       docker.build('realm-core:snapshot').inside {
-        sh '''
+        def workspace = pwd()
+        sh """
           mkdir build
           cd build
           cmake -G Ninja -D REALM_COVERAGE=ON ..
@@ -468,9 +469,9 @@ def doBuildCoverage() {
           cd ../..
           lcov --directory . --capture --output-file coverage.info
           lcov --remove coverage.info '/usr/*' --output-file coverage.info
-          lcov --remove coverage.info "$(pwd)/test/*" --output-file coverage.info
+          lcov --remove coverage.info '${workspace}/test/*' --output-file coverage.info
           lcov --list coverage.info
-        '''
+        """
         withCredentials([[$class: 'StringBinding', credentialsId: 'codecov-token-core', variable: 'CODECOV_TOKEN']]) {
           sh '''
             bash <(curl -s https://codecov.io/bash)
