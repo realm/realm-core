@@ -672,6 +672,7 @@ TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
 
     {
         std::ifstream src("sync-1.x.realm", std::ios::binary);
+        REQUIRE(src.good());
         std::ofstream dst(config.path, std::ios::binary);
 
         dst << src.rdbuf();

@@ -59,7 +59,8 @@ if(REALM_ENABLE_SYNC)
 endif()
 
 target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm ${CMAKE_CURRENT_BINARY_DIR}/sync-1.x.realm COPYONLY)
+add_custom_command(TARGET tests POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:tests>)
 
 create_coverage_target(generate-coverage tests)
 
