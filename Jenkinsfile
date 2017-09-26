@@ -476,7 +476,7 @@ def doBuildCoverage() {
         """
         withCredentials([[$class: 'StringBinding', credentialsId: 'codecov-token-core', variable: 'CODECOV_TOKEN']]) {
           sh '''
-            bash <(curl -s https://codecov.io/bash)
+            curl -s https://codecov.io/bash | bash
           '''
         }
       }
