@@ -10,6 +10,9 @@
 
 * Add `Table::move_row()`.
   PR [#2873](https://github.com/realm/realm-core/pull/2873).
+* Changing instruction values for `Table::move_row()` requires a version bump to 9.
+  Version 8 files in read only mode without any history can be opened without upgrading.
+  PR [#2877](https://github.com/realm/realm-core/pull/2877).
 
 ### Enhancements
 
