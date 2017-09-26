@@ -457,7 +457,7 @@ def doBuildCoverage() {
   return {
     node('docker') {
       getArchive()
-      docker.image('realm-core:snapshot').inside {
+      docker.build('realm-core:snapshot').inside {
         sh '''
           mkdir build
           cd build
