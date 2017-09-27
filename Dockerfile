@@ -8,11 +8,11 @@ RUN apt-get update && apt-get install -y \
     gcovr \
     git \
     g++-4.9 \
+    lcov \
     libprocps4-dev \
     libssl-dev \
     ninja-build \
     pandoc \
-    python-cheetah \
     python-matplotlib \
     python-pip \
     pkg-config \
