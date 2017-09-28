@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Added mentioning of bugfix #2853 to this file for Core 4.0.0. (see below)
+  The mentioning of this fix for 4.0 was originally ommitted.
 
 ### Breaking changes
 
@@ -24,6 +25,9 @@
 
 ### Bugfixes
 
+* Fix a bug in subtable management which caused crashes if a subtable was destroyed
+  on a different thread.
+  PR [#2855](https://github.com/realm/realm-core/pull/2855).
 * Fix corruption caused by `swap_rows()` and `move_column()` operations applied
   to a StringEnumColumn. Currently unused by bindings.
   PR [#2780](https://github.com/realm/realm-core/pull/2780).
