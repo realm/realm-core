@@ -31,6 +31,7 @@
 #include "sync/sync_session.hpp"
 
 #include <realm/util/file.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/lang_bind_helper.hpp>
 
@@ -56,10 +57,14 @@ AdminRealmListener::AdminRealmListener(std::string local_root, std::string serve
 
 void AdminRealmListener::start(std::function<void(std::vector<std::string>)> callback)
 {
-    auto session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
-    EventLoopDispatcher<void(std::error_code)> download_callback([this, callback, session](std::error_code ec) {
-        if (ec)
+    m_downloading_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
+    EventLoopDispatcher<void(std::error_code)> download_callback([this, callback](std::error_code ec){
+        auto cleanup = util::make_scope_exit([&]() noexcept { m_downloading_session.reset(); });
+        if (ec) {
+            if (ec == util::error::operation_aborted)
+                return;
             throw std::system_error(ec);
+        }
 
         m_realm = Realm::get_shared_realm(m_config);
         m_results = Results(m_realm, *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile"));
@@ -89,6 +94,6 @@ void AdminRealmListener::start(std::function<void(std::vector<std::string>)> cal
             }
         });
     });
-    bool result = session->wait_for_download_completion(std::move(download_callback));
+    bool result = m_downloading_session->wait_for_download_completion(std::move(download_callback));
     REALM_ASSERT_RELEASE(result);
 }
