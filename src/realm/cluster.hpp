@@ -21,6 +21,7 @@
 
 #include <realm/array.hpp>
 #include <realm/data_type.hpp>
+#include <realm/column_type_traits.hpp>
 
 namespace realm {
 
@@ -29,6 +30,9 @@ class Table;
 class Cluster;
 class ClusterNodeInner;
 class ClusterTree;
+template <class>
+class List;
+
 
 struct Key {
     constexpr Key()
@@ -225,7 +229,7 @@ private:
     template <class T>
     void do_insert_column(size_t col_ndx, bool nullable);
     template <class T>
-    void do_insert_row(size_t ndx, size_t col_ndx, bool nullable);
+    void do_insert_row(size_t ndx, size_t col_ndx, int attr);
     template <class T>
     void do_move(size_t ndx, size_t col_ndx, Cluster* to);
     template <class T>
@@ -263,6 +267,9 @@ public:
     }
 
 protected:
+    template <class>
+    friend class List;
+
     const ClusterTree* m_tree_top;
     Key m_key;
     mutable MemRef m_mem;
@@ -288,19 +295,172 @@ public:
     Obj& set(size_t col_ndx, U value, bool is_default = false);
     Obj& set_null(size_t col_ndx, bool is_default = false);
 
+    template <typename U>
+    Obj& set_list_values(size_t col_ndx, std::vector<U>& values);
+
+    template <typename U>
+    std::vector<U> get_list_values(size_t col_ndx);
+
     template <class Head, class... Tail>
     Obj& set_all(Head v, Tail... tail);
 
+    template <typename U>
+    List<U> get_list(size_t col_ndx);
+
 private:
+    friend class ListBase;
+    template <class>
+    friend class List;
+
     mutable bool m_writeable;
 
     template <class Val>
     Obj& _set(size_t col_ndx, Val v);
     template <class Head, class... Tail>
     Obj& _set(size_t col_ndx, Head v, Tail... tail);
-    void update_if_needed() const;
+    bool update_if_needed() const;
     template <class T>
     void do_set_null(size_t col_ndx);
+
+    void set_int(size_t col_ndx, int64_t value);
+};
+
+class ListBase : public ArrayParent {
+protected:
+    ListBase(Obj& owner, size_t col_ndx);
+    virtual ~ListBase();
+
+    void update_child_ref(size_t, ref_type new_ref) override;
+    ref_type get_child_ref(size_t) const noexcept override;
+    std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
+
+    mutable Obj m_owner;
+    const size_t m_col_ndx;
+};
+
+/**
+ * Only member functions not referring to an index in the list will check if
+ * the object is up-to-date. The logic is that the user must always check the
+ * size before referring to a particular index, and size() will check for update.
+ */
+template <class T>
+class List : public ListBase {
+public:
+    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+
+    List(Obj& owner, size_t col_ndx);
+    List(List&&) = default;
+
+    ~List() override
+    {
+    }
+
+    ref_type get_ref() const
+    {
+        return m_leaf->get_ref();
+    }
+    void create()
+    {
+        m_leaf->create();
+    }
+    void init_from_ref(ref_type ref)
+    {
+        m_leaf->init_from_ref(ref);
+    }
+    size_t size() const
+    {
+        update_if_needed();
+        return m_leaf->size();
+    }
+    void resize(size_t new_size)
+    {
+        update_if_needed();
+        size_t current_size = m_leaf->size();
+        while (new_size > current_size) {
+            m_leaf->add(LeafType::default_value(false));
+            current_size++;
+        }
+        if (current_size > new_size) {
+            m_leaf->truncate_and_destroy_children(new_size);
+        }
+    }
+    T get(size_t ndx) const
+    {
+        return m_leaf->get(ndx);
+    }
+
+    void add(T value)
+    {
+        update_if_needed();
+        m_leaf->insert(m_leaf->size(), value);
+    }
+    T set(size_t ndx, T value)
+    {
+        T old = m_leaf->get(ndx);
+        if (old != value) {
+            m_leaf->set(ndx, value);
+        }
+        return old;
+    }
+    void insert(size_t ndx, T value)
+    {
+        m_leaf->insert(ndx, value);
+    }
+    T remove(size_t ndx)
+    {
+        T ret = m_leaf->get(ndx);
+        m_leaf->erase(ndx);
+        return ret;
+    }
+    void remove(size_t from, size_t to)
+    {
+        while (from < to) {
+            remove(--to);
+        }
+    }
+    void move(size_t from, size_t to)
+    {
+        if (from != to) {
+            T tmp = get(from);
+            int incr = (from < to) ? 1 : -1;
+            while (from != to) {
+                size_t neighbour = from + incr;
+                set(from, get(neighbour));
+                from = neighbour;
+            }
+            set(to, tmp);
+        }
+    }
+    void swap(size_t ndx1, size_t ndx2)
+    {
+        T tmp = get(ndx1);
+        set(ndx1, get(ndx2));
+        set(ndx2, tmp);
+    }
+    void clear()
+    {
+        update_if_needed();
+        m_leaf->truncate_and_destroy_children(0);
+    }
+    T operator[](size_t ndx) const
+    {
+        return get(ndx);
+    }
+
+private:
+    mutable std::unique_ptr<LeafType> m_leaf;
+    void update_if_needed() const
+    {
+        if (m_owner.ConstObj::update_if_needed()) {
+            m_leaf->init_from_parent();
+        }
+    }
+    void update_if_needed()
+    {
+        if (m_owner.update_if_needed()) {
+            m_leaf->init_from_parent();
+        }
+    }
 };
 
 class ClusterTree {
@@ -384,6 +544,7 @@ public:
 
 private:
     friend class ConstObj;
+    friend class Obj;
     friend class Cluster;
     friend class ClusterNodeInner;
     Table* m_owner;
@@ -463,6 +624,14 @@ void Cluster::init_leaf(size_t col_ndx, T* leaf) const noexcept
     leaf->init_from_ref(ref);
 }
 
+template <class T>
+List<T>::List(Obj& owner, size_t col_ndx)
+    : ListBase(owner, col_ndx)
+    , m_leaf(new LeafType(owner.m_tree_top->get_alloc()))
+{
+    m_leaf->set_parent(this, 0); // ndx not used, implicit in m_owner
+}
+
 template <typename U>
 U ConstObj::get(StringData col_name) const
 {
@@ -496,6 +665,29 @@ template <>
 inline Obj& Obj::set(size_t col_ndx, const char* str, bool is_default)
 {
     return set(col_ndx, StringData(str), is_default);
+}
+
+template <typename U>
+Obj& Obj::set_list_values(size_t col_ndx, std::vector<U>& values)
+{
+    size_t sz = values.size();
+    auto list = get_list<U>(col_ndx);
+    list.resize(sz);
+    for (size_t i = 0; i < sz; i++)
+        list.set(i, values[i]);
+
+    return *this;
+}
+
+template <typename U>
+std::vector<U> Obj::get_list_values(size_t col_ndx)
+{
+    std::vector<U> values;
+    auto list = get_list<U>(col_ndx);
+    for (auto v : list)
+        values.push_back(v);
+
+    return values;
 }
 
 template <class Val>

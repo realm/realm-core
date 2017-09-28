@@ -206,7 +206,7 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
 }
 
 
-void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, ColumnAttr attr)
+void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, int attr)
 {
     REALM_ASSERT(column_ndx <= m_types.size());
 

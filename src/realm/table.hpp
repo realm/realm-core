@@ -199,6 +199,7 @@ public:
     /// \sa get_descriptor()
 
     size_t add_column(DataType type, StringData name, bool nullable = false, DescriptorRef* subdesc = nullptr);
+    size_t add_column_list(DataType type, StringData name);
     void insert_column(size_t column_ndx, DataType type, StringData name, bool nullable = false,
                        DescriptorRef* subdesc = nullptr);
 
@@ -1160,7 +1161,7 @@ private:
     void init(Spec* shared_spec, ArrayParent* parent_column, size_t parent_row_ndx);
 
     static void do_insert_column(Descriptor&, size_t col_ndx, DataType type, StringData name,
-                                 LinkTargetInfo& link_target_info, bool nullable = false);
+                                 LinkTargetInfo& link_target_info, bool nullable = false, bool listtype = false);
     static void do_insert_column_unless_exists(Descriptor&, size_t col_ndx, DataType type, StringData name,
                                                LinkTargetInfo& link, bool nullable = false,
                                                bool* was_inserted = nullptr);
@@ -1177,10 +1178,11 @@ private:
     struct MoveSubtableColumns;
 
     void insert_root_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link_target,
-                            bool nullable = false);
+                            bool nullable = false, bool linktype = false);
     void erase_root_column(size_t col_ndx);
     void move_root_column(size_t from, size_t to);
-    void do_insert_root_column(size_t col_ndx, ColumnType, StringData name, bool nullable = false);
+    void do_insert_root_column(size_t col_ndx, ColumnType, StringData name, bool nullable = false,
+                               bool listtype = false);
     void do_erase_root_column(size_t col_ndx);
     void do_move_root_column(size_t from, size_t to);
     void do_set_link_type(size_t col_ndx, LinkType);
@@ -2546,9 +2548,9 @@ public:
     }
 
     static void insert_column(Descriptor& desc, size_t column_ndx, DataType type, StringData name,
-                              LinkTargetInfo& link, bool nullable = false)
+                              LinkTargetInfo& link, bool nullable = false, bool listtype = false)
     {
-        Table::do_insert_column(desc, column_ndx, type, name, link, nullable); // Throws
+        Table::do_insert_column(desc, column_ndx, type, name, link, nullable, listtype); // Throws
     }
 
     static void insert_column_unless_exists(Descriptor& desc, size_t column_ndx, DataType type, StringData name,

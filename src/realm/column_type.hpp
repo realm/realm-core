@@ -61,7 +61,10 @@ enum ColumnAttr {
     col_attr_StrongLinks = 8,
 
     /// Specifies that elements in the column can be null.
-    col_attr_Nullable = 16
+    col_attr_Nullable = 16,
+
+    /// Each element is a list of values
+    col_attr_List = 32
 };
 
 
