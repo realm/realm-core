@@ -61,7 +61,7 @@ void AdminRealmListener::start(std::function<void(std::vector<std::string>)> cal
         if (ec)
             throw std::system_error(ec);
 
-        m_realm = m_realm = Realm::get_shared_realm(std::move(m_config));
+        m_realm = Realm::get_shared_realm(m_config);
         m_results = Results(m_realm, *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile"));
         m_notification_token = m_results.add_notification_callback([this, callback](CollectionChangeSet changes, std::exception_ptr) {
             auto& table = *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile");
