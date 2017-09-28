@@ -16,14 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "global_notifier.hpp"
+#include "admin_realm.hpp"
 
-#include "impl/realm_coordinator.hpp"
-#include "impl/transact_log_handler.hpp"
+#include "event_loop_dispatcher.hpp"
 #include "object_store.hpp"
 #include "results.hpp"
-#include "object_schema.hpp"
-#include "event_loop_dispatcher.hpp"
 
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
@@ -33,10 +30,7 @@
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/uri.hpp>
-#include <realm/lang_bind_helper.hpp>
 
-#include <regex>
-#include <utility>
 #include <stdexcept>
 #include <vector>
 

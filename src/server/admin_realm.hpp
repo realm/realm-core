@@ -16,19 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_OBJECT_STORE_ADMIN_REALM_HPP
-#define REALM_OBJECT_STORE_ADMIN_REALM_HPP
+#ifndef REALM_JS_ADMIN_REALM_HPP
+#define REALM_JS_ADMIN_REALM_HPP
 
 #include "results.hpp"
 #include "shared_realm.hpp"
 #include "sync/sync_config.hpp"
 
-#include <realm/version_id.hpp>
-
-#include <condition_variable>
-#include <mutex>
-#include <queue>
-#include <unordered_map>
+#include <functional>
+#include <memory>
 
 namespace realm {
 
@@ -50,4 +46,4 @@ private:
 
 } // namespace realm
 
-#endif // REALM_OBJECT_STORE_ADMIN_REALM_HPP
+#endif // REALM_JS_ADMIN_REALM_HPP
