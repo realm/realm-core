@@ -276,7 +276,28 @@ void List::move(size_t source_ndx, size_t dest_ndx)
     if (m_link_view)
         m_link_view->move(source_ndx, dest_ndx);
     else {
+#if (REALM_VERSION_MAJOR >= 4)
+        // Core 4.0 and up has Table::move_row for use on subtables
         m_table->move_row(source_ndx, dest_ndx);
+#else
+	// Older versions of Core requires emulation using swap_rows().
+
+        // If to and from are next to each other we can just swap instead
+        if (source_ndx == dest_ndx + 1 || dest_ndx == source_ndx + 1) {
+            m_table->swap_rows(source_ndx, dest_ndx);
+            return;
+        }
+
+        // Adjust the row indexes to compensate for the temporary row used
+        if (source_ndx > dest_ndx)
+            ++source_ndx;
+        else
+            ++dest_ndx;
+
+        m_table->insert_empty_row(dest_ndx);
+        m_table->swap_rows(source_ndx, dest_ndx);
+        m_table->remove(source_ndx);
+#endif
     }
 }
 

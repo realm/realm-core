@@ -613,14 +613,8 @@ public:
     bool move_row(size_t from_ndx, size_t to_ndx) {
         if (m_active_table)
             m_active_table->move(from_ndx, to_ndx);
-	if (!m_is_top_level_table)
-	    return true;
-        for (auto& list : m_info.lists) {
-            if (list.table_ndx == current_table()) {
-	        if (list.row_ndx == from_ndx)
-		    list.row_ndx = to_ndx;
-	    }
-	}
+        // Move row is not supported for top level tables:
+	REALM_ASSERT(m_is_top_level_table);
         return true;
     }
   
