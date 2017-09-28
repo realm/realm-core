@@ -420,6 +420,12 @@ private:
 
 void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, ColumnBase* column) const
 {
+    if (value.is_null()) {
+        // we can't use case_map on null strings because it currently returns an
+        // empty string ("") in that case which is different than a null StringData
+        return index_string_all(value, result, column);
+    }
+
     const util::Optional<std::string> upper_value = case_map(value, true);
     const util::Optional<std::string> lower_value = case_map(value, false);
     SearchList search_list(upper_value, lower_value);

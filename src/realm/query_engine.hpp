@@ -1418,17 +1418,17 @@ public:
             m_ucase = std::move(*upper);
             m_lcase = std::move(*lower);
         }
-        
+
         if (v.size() == 0)
             return;
-        
+
         // Build a dictionary of char-to-last distances in the search string
         // (zero indicates that the char is not in needle)
         size_t last_char_pos = m_ucase.size()-1;
         for (size_t i = 0; i < last_char_pos; ++i) {
             // we never jump longer increments than 255 chars, even if needle is longer (to fit in one byte)
             uint8_t jump = last_char_pos-i < 255 ? static_cast<uint8_t>(last_char_pos-i) : 255;
-            
+
             unsigned char uc = m_ucase[i];
             unsigned char lc = m_lcase[i];
             m_charmap[uc] = jump;
@@ -1436,24 +1436,28 @@ public:
         }
 
     }
-    
+
     void init() override
     {
         clear_leaf_state();
-        
+
         m_dD = 100.0;
-        
+
         StringNodeBase::init();
     }
-    
-    
+
+
     size_t find_first_local(size_t start, size_t end) override
     {
         ContainsIns cond;
-        
+
         for (size_t s = start; s < end; ++s) {
             StringData t = get_string(s);
-            
+            // The current behaviour is to return all results when querying for a null string.
+            // See comment above Query_NextGen_StringConditions on why every string including "" contains null.
+            if (!bool(m_value)) {
+                return s;
+            }
             if (cond(StringData(m_value), m_ucase.data(), m_lcase.data(), m_charmap, t))
                 return s;
         }
@@ -1469,7 +1473,7 @@ public:
     {
         return std::unique_ptr<ParentNode>(new StringNode<ContainsIns>(*this, patches));
     }
-    
+
     StringNode(const StringNode& from, QueryNodeHandoverPatches* patches)
     : StringNodeBase(from, patches)
     , m_charmap(from.m_charmap)
@@ -1477,7 +1481,7 @@ public:
     , m_lcase(from.m_lcase)
     {
     }
-    
+
 protected:
     std::array<uint8_t, 256> m_charmap;
     std::string m_ucase;
