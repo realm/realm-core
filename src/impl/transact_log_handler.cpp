@@ -611,13 +611,14 @@ public:
     }
 
     bool move_row(size_t from_ndx, size_t to_ndx) {
+        // Move row is not supported for top level tables:
+        REALM_ASSERT(!m_active_table || !m_is_top_level_table);
+
         if (m_active_table)
             m_active_table->move(from_ndx, to_ndx);
-        // Move row is not supported for top level tables:
-	REALM_ASSERT(m_is_top_level_table);
         return true;
     }
-  
+
     bool merge_rows(size_t from, size_t to)
     {
         if (m_active_table)
