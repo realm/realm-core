@@ -13327,7 +13327,7 @@ TEST(LangBindHelper_MixedTimestampTransaction)
 
 // This test verifies that small unencrypted files are treated correctly if
 // opened as encrypted. 
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
 TEST(LangBindHelper_OpenAsEncrypted)
 {
 
