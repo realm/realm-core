@@ -316,6 +316,7 @@ public:
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return true; }
     bool erase_rows(size_t, size_t, size_t, bool) { return true; }
     bool swap_rows(size_t, size_t) { return true; }
+    bool move_row(size_t, size_t) { return true; }
     bool clear_table(size_t=0) noexcept { return true; }
     bool link_list_set(size_t, size_t, size_t) { return true; }
     bool link_list_insert(size_t, size_t, size_t) { return true; }
@@ -609,6 +610,20 @@ public:
         return true;
     }
 
+    bool move_row(size_t from_ndx, size_t to_ndx) {
+        if (m_active_table)
+            m_active_table->move(from_ndx, to_ndx);
+	if (!m_is_top_level_table)
+	    return true;
+        for (auto& list : m_info.lists) {
+            if (list.table_ndx == current_table()) {
+	        if (list.row_ndx == from_ndx)
+		    list.row_ndx = to_ndx;
+	    }
+	}
+        return true;
+    }
+  
     bool merge_rows(size_t from, size_t to)
     {
         if (m_active_table)
