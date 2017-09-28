@@ -2161,7 +2161,20 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.array_change(0, 3) == (ArrayChange{Kind::Set, {0, 2}}));
         }
 
+#if REALM_VERSION_MAJOR > 3
         SECTION("int array: move()") {
+            auto changes = observe({r}, [&] {
+                tr->move_row(8, 2);
+                tr->move_row(4, 6);
+
+                //      0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+                // Now: 0, 1, 8, 2, 4, 5, 3, 6, 7, 9
+            });
+            REQUIRE(changes.array_change(0, 3) == (ArrayChange{Kind::Set, {2, 3, 6, 7, 8}}));
+        }
+#endif
+
+        SECTION("int array: emulated move()") {
             auto changes = observe({r}, [&] {
                 // list.move(8, 2);
                 tr->insert_empty_row(2);
