@@ -45,7 +45,7 @@ AdminRealmListener::AdminRealmListener(std::string local_root, std::string serve
     m_config.sync_config = std::make_shared<SyncConfig>();
     m_config.sync_config->stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
     m_config.sync_config->user = user;
-    m_config.sync_config->realm_url = server_base_url + "/__admin";
+    m_config.sync_config->reference_realm_url = server_base_url + "/__admin";
     m_config.sync_config->bind_session_handler = std::move(bind_callback);
 }
 
