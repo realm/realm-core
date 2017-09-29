@@ -1,26 +1,12 @@
-# NEXT RELEASE
+# 4.0.1 Release notes
 
 ### Bugfixes
 
-* Added mentioning of bugfix #2853 to this file for Core 4.0.0. (see below)
-  The mentioning of this fix for 4.0 was originally ommitted.
 * Fix case insensitive contains query for null strings not returning all results and
   Fix case insensitive equals query for null strings returning nothing when null strings exist.
   PR [#2871](https://github.com/realm/realm-core/pull/2871).
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
+* Added mentioning of bugfix #2853 to this file for Core 4.0.0. (see 4.0.0 below)
+  The mentioning of this fix for 4.0 was originally ommitted.
 
 ----------------------------------------------
 
