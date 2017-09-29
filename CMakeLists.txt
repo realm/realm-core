@@ -146,14 +146,19 @@ if(NOT REALM_BUILD_LIB_ONLY AND NOT REALM_NO_TESTS)
     add_subdirectory(test)
 endif()
 
-# CPack
+# Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
+
+# Make the project importable from the build directory
 export(TARGETS realm FILE realm-config.cmake)
+
+# Make the project importable from the install directory
 install(EXPORT realm
         FILE realm-config.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
         COMPONENT devel)
 
+# CPack
 if(APPLE)
     set(CPACK_GENERATOR "TGZ")
 elseif(ANDROID)
