@@ -31,7 +31,7 @@ namespace realm {
 class SyncUser;
 class SyncSession;
 
-class AdminRealmListener {
+class AdminRealmListener : public std::enable_shared_from_this<AdminRealmListener> {
 public:
     AdminRealmListener(std::string local_root, std::string server_base_url, std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback);
     void start(std::function<void(std::vector<std::string>)> register_callback);

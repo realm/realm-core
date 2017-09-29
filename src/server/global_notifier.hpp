@@ -120,7 +120,7 @@ private:
                    std::function<SyncBindSessionHandler> bind_callback,
                    std::shared_ptr<ChangesetTransformer> transformer);
 
-    AdminRealmListener m_admin;
+    std::shared_ptr<AdminRealmListener> m_admin;
     const std::unique_ptr<Callback> m_target;
     const std::string m_server_base_url;
     std::shared_ptr<SyncUser> m_user;

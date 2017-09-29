@@ -46,7 +46,7 @@ GlobalNotifier::GlobalNotifier(std::unique_ptr<Callback> async_target,
                                std::string local_root_dir, std::string server_base_url,
                                std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback,
                                std::shared_ptr<ChangesetTransformer> transformer)
-: m_admin(local_root_dir, server_base_url, user, bind_callback)
+: m_admin(std::make_shared<AdminRealmListener>(local_root_dir, server_base_url, user, bind_callback))
 , m_target(std::move(async_target))
 , m_server_base_url(std::move(server_base_url))
 , m_user(std::move(user))
@@ -79,8 +79,10 @@ GlobalNotifier::~GlobalNotifier()
 
 void GlobalNotifier::start()
 {
-    m_admin.start([this](auto&& realms) {
-        this->register_realms(std::move(realms));
+    std::weak_ptr<GlobalNotifier> weak_self = shared_from_this();
+    m_admin->start([weak_self](auto&& realms) {
+        if (auto self = weak_self.lock())
+            self->register_realms(std::move(realms));
     });
     if (!m_work_thread.joinable()) {
         m_work_thread = std::thread([this] { calculate(); });

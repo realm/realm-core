@@ -52,7 +52,12 @@ AdminRealmListener::AdminRealmListener(std::string local_root, std::string serve
 void AdminRealmListener::start(std::function<void(std::vector<std::string>)> callback)
 {
     m_downloading_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
-    EventLoopDispatcher<void(std::error_code)> download_callback([this, callback](std::error_code ec){
+    std::weak_ptr<AdminRealmListener> weak_self = shared_from_this();
+    EventLoopDispatcher<void(std::error_code)> download_callback([weak_self, this, callback](std::error_code ec) {
+        auto self = weak_self.lock();
+        if (!self)
+            return;
+
         auto cleanup = util::make_scope_exit([&]() noexcept { m_downloading_session.reset(); });
         if (ec) {
             if (ec == util::error::operation_aborted)
@@ -62,7 +67,11 @@ void AdminRealmListener::start(std::function<void(std::vector<std::string>)> cal
 
         m_realm = Realm::get_shared_realm(m_config);
         m_results = Results(m_realm, *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile"));
-        m_notification_token = m_results.add_notification_callback([this, callback](CollectionChangeSet changes, std::exception_ptr) {
+        m_notification_token = m_results.add_notification_callback([weak_self, this, callback](CollectionChangeSet changes, std::exception_ptr) {
+            auto self = weak_self.lock();
+            if (!self)
+                return;
+
             auto& table = *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile");
             size_t path_col_ndx = table.get_column_index("path");
             std::vector<std::string> realms;
