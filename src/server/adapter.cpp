@@ -33,6 +33,24 @@ using namespace realm;
 using ObjectID = realm::sync::ObjectID;
 using Instruction = realm::sync::Instruction;
 
+static PropertyType from_core_type(DataType type)
+{
+    switch (type) {
+        case type_Int:       return PropertyType::Int;
+        case type_Float:     return PropertyType::Float;
+        case type_Double:    return PropertyType::Double;
+        case type_Bool:      return PropertyType::Bool;
+        case type_String:    return PropertyType::String;
+        case type_Binary:    return PropertyType::Data;
+        case type_Timestamp: return PropertyType::Date;
+        case type_Mixed:     return PropertyType::Any;
+        case type_Link:      return PropertyType::Object | PropertyType::Nullable;
+        case type_LinkList:  return PropertyType::Object | PropertyType::Array;
+        case type_Table:     REALM_ASSERT(false && "Use ObjectSchema::from_core_type if subtables are a possibility");
+        default: REALM_UNREACHABLE();
+    }
+}
+
 class ChangesetCookerInstructionHandler : public sync::InstructionHandler {
 public:
     friend Adapter;
@@ -52,7 +70,7 @@ public:
 
     nlohmann::json m_json_instructions;
 
-    std::string m_selected_table_name;
+    std::string m_selected_object_type;
     ConstTableRef m_selected_table;
     ObjectSchema *m_selected_object_schema = nullptr;
     Property *m_selected_primary = nullptr;
@@ -114,17 +132,17 @@ public:
 
     nlohmann::json get_identity(ObjectID object_id, const Table& table, Property *primary_key) {
         if (primary_key) {
-            std::string table_name = table.get_name();
+            std::string object_type = ObjectStore::object_type_for_table_name(table.get_name());
 
             if (is_nullable(primary_key->type)) {
-                auto& null_primaries = m_null_primaries[table_name];
+                auto& null_primaries = m_null_primaries[object_type];
                 auto it = null_primaries.find(object_id);
                 if (it != null_primaries.end())
                     return nullptr;
             }
 
             if (primary_key->type == PropertyType::Int) {
-                auto& int_primaries = m_int_primaries[table_name];
+                auto& int_primaries = m_int_primaries[object_type];
                 auto it = int_primaries.find(object_id);
                 if (it != int_primaries.end()) {
                     return it->second;
@@ -138,7 +156,7 @@ public:
                 return table.get_int(primary_key->table_column, row);
             }
             else if (primary_key->type == PropertyType::String) {
-                auto& string_primaries = m_string_primaries[table_name];
+                auto& string_primaries = m_string_primaries[object_type];
                 auto it = string_primaries.find(object_id);
                 if (it != string_primaries.end()) {
                     return it->second;
@@ -156,12 +174,11 @@ public:
         return object_id.to_string();
     }
 
-    void select(std::string &name, ObjectSchema *&out_object_schema, ConstTableRef &out_table, Property *&out_primary) {
+    void select(std::string &object_type, ObjectSchema *&out_object_schema, ConstTableRef &out_table, Property *&out_primary) {
         out_object_schema = nullptr;
         out_primary = nullptr;
         out_table = ConstTableRef();
 
-        std::string object_type = ObjectStore::object_type_for_table_name(name);
         if (object_type.size()) {
             auto object_schema = m_schema.find(object_type);
             if (object_schema != m_schema.end()) {
@@ -205,8 +222,8 @@ public:
     // No selection needed:
     void operator()(const Instruction::SelectTable& instr)
     {
-        m_selected_table_name = get_string(instr.table);
-        select(m_selected_table_name, m_selected_object_schema, m_selected_table, m_selected_primary);
+        m_selected_object_type = get_string(instr.table);
+        select(m_selected_object_type, m_selected_object_schema, m_selected_table, m_selected_primary);
     }
 
     void operator()(const Instruction::SelectContainer& instr)
@@ -215,8 +232,8 @@ public:
 
         m_list_parent_identity = get_identity(instr.object, *m_selected_table, m_selected_primary);
 
+        m_list_property = m_selected_object_schema->property_for_name(get_string(instr.field));
         size_t column_index = m_selected_table->get_column_index(get_string(instr.field));
-        m_list_property = &m_selected_object_schema->persisted_properties[column_index];
         REALM_ASSERT(m_list_property->table_column == column_index);
 
         std::string link_target_table = get_string(instr.link_target_table);
@@ -225,14 +242,14 @@ public:
 
     void operator()(const Instruction::AddTable& instr)
     {
-        std::string object_type = ObjectStore::object_type_for_table_name(get_string(instr.table));
+        std::string object_type = get_string(instr.table);
         if (object_type.size()) {
             nlohmann::json dict = {{"properties", nullptr}};
             if (instr.has_primary_key) {
                 dict["primary_key"] = get_string(instr.primary_key_field);
                 dict["properties"][get_string(instr.primary_key_field)] = {
                     {"nullable", instr.primary_key_nullable},
-                    {"type", string_for_property_type(PropertyType(instr.primary_key_type))}
+                    {"type", string_for_property_type(from_core_type(instr.primary_key_type))}
                 };
             }
             add_instruction(Adapter::InstructionType::AddType, std::move(dict),
@@ -257,16 +274,16 @@ public:
         if (instr.has_primary_key) {
             if (instr.payload.type == type_Int) {
                 identity = instr.payload.data.integer;
-                m_int_primaries[m_selected_table_name][instr.object] = instr.payload.data.integer;
+                m_int_primaries[m_selected_object_type][instr.object] = instr.payload.data.integer;
             }
             else if (instr.payload.type == type_String) {
                 std::string value = get_string(instr.payload.data.str);
                 identity = value;
-                m_string_primaries[m_selected_table_name][instr.object] = value;
+                m_string_primaries[m_selected_object_type][instr.object] = value;
             }
             else if (instr.payload.is_null()) {
                 identity = nullptr;
-                m_null_primaries[m_selected_table_name].insert(instr.object);
+                m_null_primaries[m_selected_object_type].insert(instr.object);
             }
             else {
                 REALM_TERMINATE("Non-integer/non-string primary keys not supported by adapter.");
@@ -293,9 +310,9 @@ public:
         });
 
         if (m_selected_primary) {
-            auto& int_primaries    = m_int_primaries[m_selected_table_name];
-            auto& string_primaries = m_string_primaries[m_selected_table_name];
-            auto& null_primaries   = m_null_primaries[m_selected_table_name];
+            auto& int_primaries    = m_int_primaries[m_selected_object_type];
+            auto& string_primaries = m_string_primaries[m_selected_object_type];
+            auto& null_primaries   = m_null_primaries[m_selected_object_type];
 
             // invalidate caches
             int_primaries.erase(instr.object);
@@ -379,17 +396,19 @@ public:
 
     void operator()(const Instruction::AddColumn& instr)
     {
-        std::string object_type = ObjectStore::object_type_for_table_name(m_selected_table_name);
-        if (object_type.size()) {
+        if (m_selected_object_type.size()) {
             if (instr.type == type_Link || instr.type == type_LinkList) {
-                add_column_instruction(object_type, get_string(instr.field), {
+                add_column_instruction(m_selected_object_type, get_string(instr.field), {
                     {"type", (instr.type == type_Link ? "object" : "list")},
-                    {"object_type", ObjectStore::object_type_for_table_name(get_string(instr.link_target_table))}
+                    {"object_type", get_string(instr.link_target_table)}
                 });
             }
+            else if (instr.type == type_Table) {
+                // FIXME: Arrays of primitives are not yet supported.
+            }
             else {
-                add_column_instruction(object_type, get_string(instr.field), {
-                    {"type", string_for_property_type(PropertyType(instr.type))},
+                add_column_instruction(m_selected_object_type, get_string(instr.field), {
+                    {"type", string_for_property_type(from_core_type(instr.type))},
                     {"nullable", instr.nullable}
                 });
             }
