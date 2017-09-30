@@ -358,9 +358,7 @@ def buildPerformance() {
       // MPLCONFIGDIR gives the python matplotlib library a config directory, otherwise it will try to make one on the user home dir which fails in docker
       buildEnv.inside {
         withEnv(["REALM_BENCH_DIR=${env.WORKSPACE}/test/bench/core-benchmarks", "REALM_BENCH_MACHID=docker-brix","MPLCONFIGDIR=${env.WORKSPACE}/test/bench/config"]) {
-          withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-              sh 's3cmd -c $s3cfg_config_file get s3://static.realm.io/downloads/core/core-benchmarks.zip core-benchmarks.zip'
-          }
+          rlmS3Get file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
           sh 'unzip core-benchmarks.zip -d test/bench/'
           sh 'rm core-benchmarks.zip'
 
@@ -371,9 +369,7 @@ def buildPerformance() {
             ./parse_bench_hist.py --local-html results/ core-benchmarks/
           """
           zip dir: 'test/bench', glob: 'core-benchmarks/**/*', zipFile: 'core-benchmarks.zip'
-          withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-            sh 's3cmd -c $s3cfg_config_file put core-benchmarks.zip s3://static.realm.io/downloads/core/'
-          }
+          rlmS3Put file: 'core-benchmarks.zip', path: 'downloads/core/'
           publishHTML(target: [allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'test/bench/results', reportFiles: 'report.html', reportName: 'Performance Report'])
           withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
               sh "curl -H \"Authorization: token ${env.githubToken}\" " +
@@ -555,9 +551,10 @@ def doPublishGeneric() {
             getArchive()
             dir('packaging/out') {
                 unstash 'packages-generic'
-                withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-                    sh 'find . -type f -name "*.tgz" -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
-                    sh "find . -type f -name \"*.tgz\" -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/${gitDescribeVersion}/linux \\;"
+                def files = findFiles(glob: '**/*.tgz')
+                for (file in files) {
+                    rlmS3Put file: file.path, path: 'downloads/core/'
+                    rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/linux/"
                 }
             }
 
@@ -566,20 +563,21 @@ def doPublishGeneric() {
 }
 
 def doPublishLocalArtifacts() {
-    // TODO create a Dockerfile for an image only containing s3cmd
     return {
-        node('aws') {
+        node('docker') {
             deleteDir()
-            for(def i = 0; i < publishingStashes.size(); i++) {
-                unstash name: publishingStashes[i]
-                dir('temp') {
-                    unstash name: publishingStashes[i]
-                    def path = publishingStashes[i].replaceAll('___', '/')
-                    withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-                        sh "find . -type f -name \"*\" -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/${gitDescribeVersion}/${path}/ \\;"
-                        sh 'find . -type f -name "*" -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
+            dir('temp') {
+                withAWS(credentials: 'aws-credentials', region: 'us-east-1') {
+                    for(publishingStash in publishingStashes) {
+                        unstash name: publishingStash
+                        def path = publishingStash.replaceAll('___', '/')
+                        def files = findFiles(glob: '**')
+                        for (file in files) {
+                            rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/"
+                            rlmS3Put file: file.path, path: "downloads/core/"
+                        }
+                        deleteDir()
                     }
-                    deleteDir()
                 }
             }
         }
