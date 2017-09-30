@@ -337,7 +337,7 @@ install(FILES ${PROJECT_BINARY_DIR}/src/realm/util/config.h
         COMPONENT devel)
 
 if(NOT REALM_SKIP_SHARED_LIB)
-    install(TARGETS realm-shared EXPORT realm
+    install(TARGETS realm-shared
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
             RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
 endif()
