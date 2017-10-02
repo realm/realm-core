@@ -205,6 +205,10 @@ private:
     void insert_row(size_t ndx, Key k);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
     template <class T>
+    void do_create(size_t col_ndx);
+    template <class T>
+    void do_insert_row(size_t ndx, size_t col_ndx, bool nullable);
+    template <class T>
     void do_move(size_t ndx, size_t col_ndx, Cluster* to);
     template <class T>
     void do_erase(size_t ndx, size_t col_ndx);
@@ -263,7 +267,7 @@ private:
     Obj& _set(size_t col_ndx, Head v, Tail... tail);
     void update_if_needed() const;
     template <class T>
-    void do_set_null(Array& fields, size_t col_ndx);
+    void do_set_null(size_t col_ndx);
 };
 
 class ClusterTree {

@@ -10,6 +10,7 @@ set(REALM_SOURCES
     array_string.cpp
     array_string_short.cpp
     array_string_long.cpp
+    array_timestamp.cpp
     bptree.cpp
     cluster.cpp
     column.cpp
@@ -78,6 +79,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_string.hpp
     array_string_short.hpp
     array_string_long.hpp
+    array_timestamp.hpp
     binary_data.hpp
     bptree.hpp
     column.hpp

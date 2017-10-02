@@ -22,6 +22,7 @@
 #include "realm/array_integer.hpp"
 #include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
+#include "realm/array_timestamp.hpp"
 #include "realm/column_type_traits.hpp"
 #include <iostream>
 
@@ -393,6 +394,15 @@ int64_t ClusterNodeInner::get_last_key() const
 
 /********************************* Cluster ***********************************/
 
+template <class T>
+inline void Cluster::do_create(size_t col_ndx)
+{
+    T arr(m_alloc);
+    arr.create();
+    arr.set_parent(this, col_ndx);
+    arr.update_parent();
+}
+
 void Cluster::create()
 {
     // Create array with the required size
@@ -417,17 +427,15 @@ void Cluster::create()
                 break;
             }
             case col_type_String: {
-                ArrayString arr(m_alloc);
-                arr.create();
-                arr.set_parent(this, i + 1);
-                arr.update_parent();
+                do_create<ArrayString>(i + 1);
                 break;
             }
             case col_type_Binary: {
-                ArrayBinary arr(m_alloc);
-                arr.create();
-                arr.set_parent(this, i + 1);
-                arr.update_parent();
+                do_create<ArrayBinary>(i + 1);
+                break;
+            }
+            case col_type_Timestamp: {
+                do_create<ArrayTimestamp>(i + 1);
                 break;
             }
             default:
@@ -457,6 +465,15 @@ MemRef Cluster::ensure_writeable(Key)
     return get_mem();
 }
 
+template <class T>
+inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, bool nullable)
+{
+    T arr(m_alloc);
+    arr.set_parent(this, col_ndx);
+    arr.init_from_parent();
+    arr.insert(ndx, T::default_value(nullable));
+}
+
 void Cluster::insert_row(size_t ndx, Key k)
 {
     m_keys.insert(ndx, k.value);
@@ -478,17 +495,15 @@ void Cluster::insert_row(size_t ndx, Key k)
                 break;
             }
             case col_type_String: {
-                ArrayString arr(m_alloc);
-                arr.set_parent(this, i);
-                arr.init_from_parent();
-                arr.insert(ndx, nullable ? StringData{} : StringData{""});
+                do_insert_row<ArrayString>(ndx, i, nullable);
                 break;
             }
             case col_type_Binary: {
-                ArrayBinary arr(m_alloc);
-                arr.set_parent(this, i);
-                arr.init_from_parent();
-                arr.insert(ndx, nullable ? BinaryData{} : BinaryData{"", 0});
+                do_insert_row<ArrayBinary>(ndx, i, nullable);
+                break;
+            }
+            case col_type_Timestamp: {
+                do_insert_row<ArrayTimestamp>(ndx, i, nullable);
                 break;
             }
             default:
@@ -555,6 +570,10 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 do_move<ArrayBinary>(ndx, i, new_leaf);
                 break;
             }
+            case col_type_Timestamp: {
+                do_move<ArrayTimestamp>(ndx, i, new_leaf);
+                break;
+            }
             default:
                 break;
         }
@@ -608,6 +627,15 @@ void Cluster::insert_column(size_t ndx)
             arr.create();
             for (size_t i = 0; i < sz; i++) {
                 arr.add(nullable ? BinaryData{} : BinaryData{"", 0});
+            }
+            Array::insert(ndx + 1, from_ref(arr.get_ref()));
+            break;
+        }
+        case col_type_Timestamp: {
+            ArrayTimestamp arr(m_alloc);
+            arr.create();
+            for (size_t i = 0; i < sz; i++) {
+                arr.add(nullable ? Timestamp{} : Timestamp{0, 0});
             }
             Array::insert(ndx + 1, from_ref(arr.get_ref()));
             break;
@@ -715,6 +743,10 @@ unsigned Cluster::erase(Key k)
                 do_erase<ArrayBinary>(ndx, i);
                 break;
             }
+            case col_type_Timestamp: {
+                do_erase<ArrayTimestamp>(ndx, i);
+                break;
+            }
             default:
                 break;
         }
@@ -763,6 +795,13 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_Binary: {
                     ArrayBinary arr(m_alloc);
+                    ref_type ref = Array::get_as_ref(j);
+                    arr.init_from_ref(ref);
+                    std::cout << ", " << arr.get(i);
+                    break;
+                }
+                case col_type_Timestamp: {
+                    ArrayTimestamp arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
@@ -847,6 +886,8 @@ bool ConstObj::is_null(size_t col_ndx) const
                 return do_is_null<ArrayString>(col_ndx + 1);
             case col_type_Binary:
                 return do_is_null<ArrayBinary>(col_ndx + 1);
+            case col_type_Timestamp:
+                return do_is_null<ArrayTimestamp>(col_ndx + 1);
             default:
                 break;
         }
@@ -925,15 +966,21 @@ template int64_t ConstObj::get<int64_t>(size_t col_ndx) const;
 template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(size_t col_ndx) const;
 template StringData ConstObj::get<StringData>(size_t col_ndx) const;
 template BinaryData ConstObj::get<BinaryData>(size_t col_ndx) const;
+template Timestamp ConstObj::get<Timestamp>(size_t col_ndx) const;
 
 template Obj& Obj::set<StringData>(size_t, StringData, bool);
 template Obj& Obj::set<BinaryData>(size_t, BinaryData, bool);
+template Obj& Obj::set<Timestamp>(size_t, Timestamp, bool);
 }
 
 template <class T>
-inline void Obj::do_set_null(Array& fields, size_t col_ndx)
+inline void Obj::do_set_null(size_t col_ndx)
 {
-    T values(fields.get_alloc());
+    Allocator& alloc = m_tree_top->get_alloc();
+    Array fields(alloc);
+    fields.init_from_mem(m_mem);
+
+    T values(alloc);
     values.set_parent(&fields, col_ndx);
     values.init_from_parent();
     values.set_null(m_row_ndx);
@@ -949,24 +996,24 @@ Obj& Obj::set_null(size_t col_ndx, bool is_default)
 
     update_if_needed();
 
-    Allocator& alloc = m_tree_top->get_alloc();
-    Array fields(alloc);
-    fields.init_from_mem(m_mem);
     switch (m_tree_top->get_spec().get_column_type(col_ndx)) {
         case col_type_Int:
-            do_set_null<ArrayIntNull>(fields, col_ndx + 1);
+            do_set_null<ArrayIntNull>(col_ndx + 1);
             break;
         case col_type_String:
-            do_set_null<ArrayString>(fields, col_ndx + 1);
+            do_set_null<ArrayString>(col_ndx + 1);
             break;
         case col_type_Binary:
-            do_set_null<ArrayBinary>(fields, col_ndx + 1);
+            do_set_null<ArrayBinary>(col_ndx + 1);
+            break;
+        case col_type_Timestamp:
+            do_set_null<ArrayTimestamp>(col_ndx + 1);
             break;
         default:
             break;
     }
 
-    if (Replication* repl = alloc.get_replication())
+    if (Replication* repl = m_tree_top->get_alloc().get_replication())
         repl->set_null(m_tree_top->get_owner(), col_ndx, m_row_ndx,
                        is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 

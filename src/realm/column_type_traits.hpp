@@ -26,11 +26,13 @@
 
 namespace realm {
 
+class Timestamp;
 class OldDateTime;
 class ArraySmallBlobs;
 class ArrayString;
 class ArrayStringShort;
 class ArrayBinary;
+class ArrayTimestamp;
 class ArrayInteger;
 class ArrayIntNull;
 template <class>
@@ -95,6 +97,14 @@ struct ColumnTypeTraits<double> {
     static const DataType id = type_Double;
     static const ColumnType column_id = col_type_Double;
     static const ColumnType real_column_type = col_type_Double;
+};
+
+template <>
+
+struct ColumnTypeTraits<Timestamp> {
+    using cluster_leaf_type = ArrayTimestamp;
+    static const DataType id = type_Timestamp;
+    static const ColumnType column_id = col_type_Timestamp;
 };
 
 template <>

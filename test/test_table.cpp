@@ -8755,13 +8755,16 @@ TEST(Table_object_basic)
     auto strnull_col = table.add_column(type_String, "strnull", true);
     auto bin_col = table.add_column(type_Binary, "bin");
     auto binnull_col = table.add_column(type_Binary, "binnull", true);
+    auto ts_col = table.add_column(type_Timestamp, "ts");
+    auto tsnull_col = table.add_column(type_Timestamp, "tsnull", true);
 
     char data[10];
     memset(data, 0x5a, 10);
     BinaryData bin_data(data, 10);
     BinaryData bin_zero(data, 0);
 
-    table.create_object(Key(5)).set_all(100, 7, "Hello", "World", bin_data, bin_data);
+    table.create_object(Key(5)).set_all(100, 7, "Hello", "World", bin_data, bin_data, Timestamp(123, 456),
+                                        Timestamp(789, 10));
     CHECK_EQUAL(table.size(), 1);
     CHECK_THROW(table.create_object(Key(5)), InvalidKey);
     CHECK_EQUAL(table.size(), 1);
@@ -8820,6 +8823,17 @@ TEST(Table_object_basic)
     CHECK_EQUAL(bin_data, x.get<Binary>(bin_col));
     CHECK_EQUAL(bin_data_big, y.get<Binary>(bin_col));
     CHECK(!y.is_null(bin_col));
+
+    // Timestamp
+    CHECK(!x.is_null(ts_col));
+    CHECK_EQUAL(Timestamp(0, 0), x.get<Timestamp>(ts_col));
+    CHECK(x.is_null(tsnull_col));
+
+    CHECK_EQUAL(Timestamp(123, 456), y.get<Timestamp>(ts_col));
+    CHECK(!y.is_null(tsnull_col));
+    CHECK_EQUAL(Timestamp(789, 10), y.get<Timestamp>(tsnull_col));
+    y.set_null(binnull_col);
+    CHECK(y.is_null(binnull_col));
 
     // Check that accessing a removed object will throw
     table.remove_object(Key(5));
