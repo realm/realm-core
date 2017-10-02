@@ -50,6 +50,10 @@ public:
     {
         Array::create(type_Normal);
     }
+    bool is_null(size_t) const
+    {
+        return false;
+    }
     void set(size_t ndx, bool value)
     {
         Array::set(ndx, value ? 1 : 0);

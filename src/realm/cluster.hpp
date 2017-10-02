@@ -31,8 +31,9 @@ class Cluster;
 class ClusterNodeInner;
 class ClusterTree;
 template <class>
+class ConstList;
+template <class>
 class List;
-
 
 struct Key {
     constexpr Key()
@@ -242,6 +243,8 @@ public:
     ConstObj(const ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx);
     ConstObj& operator=(const ConstObj&) = delete;
 
+    Allocator& get_alloc() const;
+
     Key get_key() const
     {
         return m_key;
@@ -252,6 +255,9 @@ public:
 
     template <typename U>
     U get(StringData col_name) const;
+
+    template <typename U>
+    ConstList<U> get_list(size_t col_ndx) const;
 
     bool is_null(size_t col_ndx) const;
 
@@ -267,8 +273,7 @@ public:
     }
 
 protected:
-    template <class>
-    friend class List;
+    friend class ConstListBase;
 
     const ClusterTree* m_tree_top;
     Key m_key;
@@ -282,7 +287,6 @@ protected:
         m_row_ndx = other.m_row_ndx;
         m_version = other.m_version;
     }
-    Allocator& get_alloc() const;
     template <class T>
     bool do_is_null(size_t col_ndx) const;
 };
@@ -308,7 +312,7 @@ public:
     List<U> get_list(size_t col_ndx);
 
 private:
-    friend class ListBase;
+    friend class ConstListBase;
     template <class>
     friend class List;
 
@@ -325,70 +329,144 @@ private:
     void set_int(size_t col_ndx, int64_t value);
 };
 
-class ListBase : public ArrayParent {
-protected:
-    ListBase(Obj& owner, size_t col_ndx);
-    virtual ~ListBase();
+class ConstListBase : public ArrayParent {
+public:
+    virtual ~ConstListBase();
+    /*
+     * Operations that makes sense without knowing the specific type
+     * can be made virtual.
+     */
+    virtual size_t size() const = 0;
+    virtual bool is_null() const = 0;
 
-    void update_child_ref(size_t, ref_type new_ref) override;
+protected:
+    const ConstObj* m_const_obj = nullptr;
+    const size_t m_col_ndx;
+
+    ConstListBase(size_t col_ndx)
+        : m_col_ndx(col_ndx)
+    {
+    }
+    virtual void init_from_parent() const = 0;
+
+    void set_obj(const ConstObj* obj)
+    {
+        m_const_obj = obj;
+    }
     ref_type get_child_ref(size_t) const noexcept override;
     std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
 
-    mutable Obj m_owner;
-    const size_t m_col_ndx;
+    void update_if_needed() const
+    {
+        if (m_const_obj->update_if_needed()) {
+            init_from_parent();
+        }
+    }
 };
 
-/**
- * Only member functions not referring to an index in the list will check if
- * the object is up-to-date. The logic is that the user must always check the
- * size before referring to a particular index, and size() will check for update.
- */
+/// This class defines the interface to ConstList, except for the constructor
+/// The ConstList class has the ConstObj member m_obj, which should not be
+/// inherited from List<T>.
 template <class T>
-class List : public ListBase {
+class ConstListIf : public ConstListBase {
 public:
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
 
-    List(Obj& owner, size_t col_ndx);
-    List(List&&) = default;
-
-    ~List() override
+    /**
+     * Only member functions not referring to an index in the list will check if
+     * the object is up-to-date. The logic is that the user must always check the
+     * size before referring to a particular index, and size() will check for update.
+     */
+    size_t size() const override
     {
+        update_if_needed();
+        return m_valid ? m_leaf->size() : 0;
+    }
+    bool is_null() const override
+    {
+        return !m_valid;
+    }
+    T get(size_t ndx) const
+    {
+        return m_leaf->get(ndx);
+    }
+    T operator[](size_t ndx) const
+    {
+        return get(ndx);
     }
 
-    ref_type get_ref() const
+protected:
+    mutable std::unique_ptr<LeafType> m_leaf;
+    mutable bool m_valid = false;
+
+    ConstListIf(size_t col_ndx, Allocator& alloc);
+
+    void init_from_parent() const override
     {
-        return m_leaf->get_ref();
+        ref_type ref = get_child_ref(0);
+        if (ref && (!m_valid || ref != m_leaf->get_ref())) {
+            m_leaf->init_from_ref(ref);
+            m_valid = true;
+        }
     }
+};
+
+template <class T>
+class ConstList : public ConstListIf<T> {
+public:
+    ConstList(const ConstObj& owner, size_t col_ndx);
+
+private:
+    ConstObj m_obj;
+    void update_child_ref(size_t, ref_type) override
+    {
+    }
+};
+/*
+ * This class defines a virtual interface to a writable list
+ */
+class ListBase {
+public:
+    virtual ~ListBase()
+    {
+    }
+    virtual void resize(size_t new_size) = 0;
+    virtual void remove(size_t from, size_t to) = 0;
+    virtual void move(size_t from, size_t to) = 0;
+    virtual void swap(size_t ndx1, size_t ndx2) = 0;
+    virtual void clear() = 0;
+};
+
+template <class T>
+class List : public ConstListIf<T>, public ListBase {
+public:
+    using ConstListIf<T>::m_leaf;
+    using ConstListIf<T>::get;
+
+    List(const Obj& owner, size_t col_ndx);
+
+    void update_child_ref(size_t, ref_type new_ref) override
+    {
+        m_obj.set(ConstListBase::m_col_ndx, from_ref(new_ref));
+    }
+
     void create()
     {
         m_leaf->create();
+        ConstListIf<T>::m_valid = true;
     }
-    void init_from_ref(ref_type ref)
-    {
-        m_leaf->init_from_ref(ref);
-    }
-    size_t size() const
-    {
-        update_if_needed();
-        return m_leaf->size();
-    }
-    void resize(size_t new_size)
+    void resize(size_t new_size) override
     {
         update_if_needed();
         size_t current_size = m_leaf->size();
         while (new_size > current_size) {
-            m_leaf->add(LeafType::default_value(false));
+            m_leaf->add(ConstList<T>::LeafType::default_value(false));
             current_size++;
         }
         if (current_size > new_size) {
             m_leaf->truncate_and_destroy_children(new_size);
         }
     }
-    T get(size_t ndx) const
-    {
-        return m_leaf->get(ndx);
-    }
-
     void add(T value)
     {
         update_if_needed();
@@ -412,13 +490,13 @@ public:
         m_leaf->erase(ndx);
         return ret;
     }
-    void remove(size_t from, size_t to)
+    void remove(size_t from, size_t to) override
     {
         while (from < to) {
             remove(--to);
         }
     }
-    void move(size_t from, size_t to)
+    void move(size_t from, size_t to) override
     {
         if (from != to) {
             T tmp = get(from);
@@ -431,33 +509,25 @@ public:
             set(to, tmp);
         }
     }
-    void swap(size_t ndx1, size_t ndx2)
+    void swap(size_t ndx1, size_t ndx2) override
     {
-        T tmp = get(ndx1);
-        set(ndx1, get(ndx2));
-        set(ndx2, tmp);
+        if (ndx1 != ndx2) {
+            T tmp = get(ndx1);
+            set(ndx1, get(ndx2));
+            set(ndx2, tmp);
+        }
     }
-    void clear()
+    void clear() override
     {
         update_if_needed();
         m_leaf->truncate_and_destroy_children(0);
     }
-    T operator[](size_t ndx) const
-    {
-        return get(ndx);
-    }
 
 private:
-    mutable std::unique_ptr<LeafType> m_leaf;
-    void update_if_needed() const
-    {
-        if (m_owner.ConstObj::update_if_needed()) {
-            m_leaf->init_from_parent();
-        }
-    }
+    Obj m_obj;
     void update_if_needed()
     {
-        if (m_owner.update_if_needed()) {
+        if (m_obj.update_if_needed()) {
             m_leaf->init_from_parent();
         }
     }
@@ -622,14 +692,6 @@ void Cluster::init_leaf(size_t col_ndx, T* leaf) const noexcept
 {
     ref_type ref = to_ref(Array::get(col_ndx + 1));
     leaf->init_from_ref(ref);
-}
-
-template <class T>
-List<T>::List(Obj& owner, size_t col_ndx)
-    : ListBase(owner, col_ndx)
-    , m_leaf(new LeafType(owner.m_tree_top->get_alloc()))
-{
-    m_leaf->set_parent(this, 0); // ndx not used, implicit in m_owner
 }
 
 template <typename U>
