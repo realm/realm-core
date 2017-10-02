@@ -21,6 +21,7 @@
 #include "realm/replication.hpp"
 #include "realm/array_integer.hpp"
 #include "realm/array_string.hpp"
+#include "realm/array_binary.hpp"
 #include "realm/column_type_traits.hpp"
 #include <iostream>
 
@@ -422,6 +423,13 @@ void Cluster::create()
                 arr.update_parent();
                 break;
             }
+            case col_type_Binary: {
+                ArrayBinary arr(m_alloc);
+                arr.create();
+                arr.set_parent(this, i + 1);
+                arr.update_parent();
+                break;
+            }
             default:
                 break;
         }
@@ -476,10 +484,35 @@ void Cluster::insert_row(size_t ndx, Key k)
                 arr.insert(ndx, nullable ? StringData{} : StringData{""});
                 break;
             }
+            case col_type_Binary: {
+                ArrayBinary arr(m_alloc);
+                arr.set_parent(this, i);
+                arr.init_from_parent();
+                arr.insert(ndx, nullable ? BinaryData{} : BinaryData{"", 0});
+                break;
+            }
             default:
                 break;
         }
     }
+}
+
+template <class T>
+inline void Cluster::do_move(size_t ndx, size_t col_ndx, Cluster* to)
+{
+    size_t end = node_size();
+    T src(m_alloc);
+    src.set_parent(this, col_ndx);
+    src.init_from_parent();
+
+    T dst(m_alloc);
+    dst.set_parent(to, col_ndx);
+    dst.init_from_parent();
+
+    for (size_t j = ndx; j < end; j++) {
+        dst.add(src.get(j));
+    }
+    src.truncate_and_destroy_children(ndx);
 }
 
 void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
@@ -515,18 +548,11 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 break;
             }
             case col_type_String: {
-                ArrayString src(m_alloc);
-                src.set_parent(this, i);
-                src.init_from_parent();
-
-                ArrayString dst(m_alloc);
-                dst.set_parent(new_leaf, i);
-                dst.init_from_parent();
-
-                for (size_t j = ndx; j < end; j++) {
-                    dst.add(src.get(j));
-                }
-                src.truncate_and_destroy_children(ndx);
+                do_move<ArrayString>(ndx, i, new_leaf);
+                break;
+            }
+            case col_type_Binary: {
+                do_move<ArrayBinary>(ndx, i, new_leaf);
                 break;
             }
             default:
@@ -574,6 +600,15 @@ void Cluster::insert_column(size_t ndx)
                 arr.add(nullable ? StringData{} : StringData{""});
             }
             // Insert the reference to the newly created array in parent
+            Array::insert(ndx + 1, from_ref(arr.get_ref()));
+            break;
+        }
+        case col_type_Binary: {
+            ArrayBinary arr(m_alloc);
+            arr.create();
+            for (size_t i = 0; i < sz; i++) {
+                arr.add(nullable ? BinaryData{} : BinaryData{"", 0});
+            }
             Array::insert(ndx + 1, from_ref(arr.get_ref()));
             break;
         }
@@ -639,6 +674,15 @@ void Cluster::get(Key k, ClusterNode::State& state) const
     }
 }
 
+template <class T>
+inline void Cluster::do_erase(size_t ndx, size_t col_ndx)
+{
+    T values(m_alloc);
+    values.set_parent(this, col_ndx);
+    values.init_from_parent();
+    values.erase(ndx);
+}
+
 unsigned Cluster::erase(Key k)
 {
     size_t ndx = m_keys.lower_bound_int(k.value);
@@ -664,10 +708,11 @@ unsigned Cluster::erase(Key k)
                 break;
             }
             case col_type_String: {
-                ArrayString values(m_alloc);
-                values.set_parent(this, i);
-                values.init_from_parent();
-                values.erase(ndx);
+                do_erase<ArrayString>(ndx, i);
+                break;
+            }
+            case col_type_Binary: {
+                do_erase<ArrayBinary>(ndx, i);
                 break;
             }
             default:
@@ -711,6 +756,13 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_String: {
                     ArrayString arr(m_alloc);
+                    ref_type ref = Array::get_as_ref(j);
+                    arr.init_from_ref(ref);
+                    std::cout << ", " << arr.get(i);
+                    break;
+                }
+                case col_type_Binary: {
+                    ArrayBinary arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
@@ -771,6 +823,15 @@ T ConstObj::get(size_t col_ndx) const
     return values.get(m_row_ndx);
 }
 
+template <class T>
+inline bool ConstObj::do_is_null(size_t col_ndx) const
+{
+    T values(m_tree_top->get_alloc());
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx));
+    values.init_from_ref(ref);
+    return values.is_null(m_row_ndx);
+}
+
 bool ConstObj::is_null(size_t col_ndx) const
 {
     if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
@@ -780,19 +841,12 @@ bool ConstObj::is_null(size_t col_ndx) const
 
     if (m_tree_top->get_spec().get_column_attr(col_ndx) & col_attr_Nullable) {
         switch (m_tree_top->get_spec().get_column_type(col_ndx)) {
-            case col_type_Int: {
-                ArrayIntNull values(m_tree_top->get_alloc());
-                ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
-                values.init_from_ref(ref);
-                return values.is_null(m_row_ndx);
-            }
-            case col_type_String: {
-                ArrayString values(m_tree_top->get_alloc());
-                ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
-                values.init_from_ref(ref);
-                return values.is_null(m_row_ndx);
-                break;
-            }
+            case col_type_Int:
+                return do_is_null<ArrayIntNull>(col_ndx + 1);
+            case col_type_String:
+                return do_is_null<ArrayString>(col_ndx + 1);
+            case col_type_Binary:
+                return do_is_null<ArrayBinary>(col_ndx + 1);
             default:
                 break;
         }
@@ -870,8 +924,10 @@ namespace realm {
 template int64_t ConstObj::get<int64_t>(size_t col_ndx) const;
 template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(size_t col_ndx) const;
 template StringData ConstObj::get<StringData>(size_t col_ndx) const;
+template BinaryData ConstObj::get<BinaryData>(size_t col_ndx) const;
 
 template Obj& Obj::set<StringData>(size_t, StringData, bool);
+template Obj& Obj::set<BinaryData>(size_t, BinaryData, bool);
 }
 
 template <class T>
@@ -902,6 +958,9 @@ Obj& Obj::set_null(size_t col_ndx, bool is_default)
             break;
         case col_type_String:
             do_set_null<ArrayString>(fields, col_ndx + 1);
+            break;
+        case col_type_Binary:
+            do_set_null<ArrayBinary>(fields, col_ndx + 1);
             break;
         default:
             break;

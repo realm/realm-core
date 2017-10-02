@@ -8753,8 +8753,15 @@ TEST(Table_object_basic)
     auto intnull_col = table.add_column(type_Int, "intnull", true);
     auto str_col = table.add_column(type_String, "str");
     auto strnull_col = table.add_column(type_String, "strnull", true);
+    auto bin_col = table.add_column(type_Binary, "bin");
+    auto binnull_col = table.add_column(type_Binary, "binnull", true);
 
-    table.create_object(Key(5)).set_all(100, 7, "Hello", "World");
+    char data[10];
+    memset(data, 0x5a, 10);
+    BinaryData bin_data(data, 10);
+    BinaryData bin_zero(data, 0);
+
+    table.create_object(Key(5)).set_all(100, 7, "Hello", "World", bin_data, bin_data);
     CHECK_EQUAL(table.size(), 1);
     CHECK_THROW(table.create_object(Key(5)), InvalidKey);
     CHECK_EQUAL(table.size(), 1);
@@ -8792,6 +8799,27 @@ TEST(Table_object_basic)
     y.set(str_col, "This is a fine day");
     CHECK_EQUAL("This is a fine day", y.get<String>(str_col));
     CHECK(!y.is_null(str_col));
+
+    // Binary
+    CHECK(!x.is_null(bin_col));
+    CHECK_EQUAL(bin_zero, x.get<Binary>(bin_col));
+    CHECK(x.is_null(binnull_col));
+
+    CHECK_EQUAL(bin_data, y.get<Binary>(bin_col));
+    CHECK(!y.is_null(binnull_col));
+    CHECK_EQUAL(bin_data, y.get<Binary>(binnull_col));
+    y.set_null(binnull_col);
+    CHECK(y.is_null(binnull_col));
+
+    // Upgrade from small to big
+    char big_data[100];
+    memset(big_data, 0xa5, 10);
+    BinaryData bin_data_big(data, 100);
+    x.set(bin_col, bin_data);
+    y.set(bin_col, bin_data_big);
+    CHECK_EQUAL(bin_data, x.get<Binary>(bin_col));
+    CHECK_EQUAL(bin_data_big, y.get<Binary>(bin_col));
+    CHECK(!y.is_null(bin_col));
 
     // Check that accessing a removed object will throw
     table.remove_object(Key(5));

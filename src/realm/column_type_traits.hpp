@@ -30,6 +30,7 @@ class OldDateTime;
 class ArraySmallBlobs;
 class ArrayString;
 class ArrayStringShort;
+class ArrayBinary;
 class ArrayInteger;
 class ArrayIntNull;
 template <class>
@@ -119,6 +120,7 @@ template <>
 struct ColumnTypeTraits<BinaryData> {
     using column_type = BinaryColumn;
     using leaf_type = ArraySmallBlobs;
+    using cluster_leaf_type = ArrayBinary;
     static const DataType id = type_Binary;
     static const ColumnType column_id = col_type_Binary;
     static const ColumnType real_column_type = col_type_Binary;

@@ -2,6 +2,7 @@ set(REALM_SOURCES
     alloc.cpp
     alloc_slab.cpp
     array.cpp
+    array_binary.cpp
     array_blob.cpp
     array_blobs_small.cpp
     array_blobs_big.cpp
@@ -68,6 +69,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array.hpp
     array_basic.hpp
     array_basic_tpl.hpp
+    array_binary.hpp
     array_blob.hpp
     array_blobs_small.hpp
     array_blobs_big.hpp

@@ -481,6 +481,13 @@ inline void Replication::set(const Table* table, size_t col_ndx, size_t ndx, Str
     set_string(table, col_ndx, ndx, value, variant);
 }
 
+template <>
+inline void Replication::set(const Table* table, size_t col_ndx, size_t ndx, BinaryData value,
+                             _impl::Instruction variant)
+{
+    set_binary(table, col_ndx, ndx, value, variant);
+}
+
 inline TrivialReplication::TrivialReplication(const std::string& database_file)
     : m_database_file(database_file)
 {

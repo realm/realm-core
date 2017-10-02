@@ -1,0 +1,88 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
+#ifndef REALM_ARRAY_BINARY_HPP
+#define REALM_ARRAY_BINARY_HPP
+
+#include <realm/array_blobs_small.hpp>
+#include <realm/array_blobs_big.hpp>
+
+namespace realm {
+
+class ArrayBinary {
+public:
+    explicit ArrayBinary(Allocator&);
+
+    static BinaryData default_value(bool nullable)
+    {
+        return nullable ? BinaryData{} : BinaryData{"", 0};
+    }
+
+    void create();
+
+    ref_type get_ref() const
+    {
+        return m_arr->get_ref();
+    }
+
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent)
+    {
+        m_arr->set_parent(parent, ndx_in_parent);
+    }
+
+    void update_parent()
+    {
+        m_arr->update_parent();
+    }
+
+    void init_from_ref(ref_type ref);
+    void init_from_parent();
+
+    size_t size() const;
+
+    void add(BinaryData value);
+    void set(size_t ndx, BinaryData value);
+    void set_null(size_t ndx)
+    {
+        set(ndx, BinaryData{});
+    }
+    void insert(size_t ndx, BinaryData value);
+    BinaryData get(size_t ndx) const;
+    bool is_null(size_t ndx) const;
+    void erase(size_t ndx);
+    void truncate_and_destroy_children(size_t ndx);
+
+private:
+    static constexpr size_t small_blob_max_size = 64;
+
+    union Storage {
+        std::aligned_storage<sizeof(ArraySmallBlobs), alignof(ArraySmallBlobs)>::type m_small_blobs;
+        std::aligned_storage<sizeof(ArrayBigBlobs), alignof(ArrayBigBlobs)>::type m_big_blobs;
+    };
+
+    bool m_is_big = false;
+
+    Allocator& m_alloc;
+    Storage m_storage;
+    Array* m_arr;
+
+    bool upgrade_leaf(size_t value_size);
+};
+}
+
+#endif /* SRC_REALM_ARRAY_BINARY_HPP_ */
