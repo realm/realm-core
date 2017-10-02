@@ -24,6 +24,10 @@
 #include <string>
 #include <fstream>
 #include <ostream>
+#include <set>
+#include <chrono>
+
+using namespace std::chrono;
 
 #include <realm.hpp>
 #include <realm/history.hpp>
@@ -8229,6 +8233,129 @@ TEST(Table_KeyRow)
     CHECK_EQUAL(i, 0);
     i = table.find_first_int(0, 456);
     CHECK_EQUAL(i, 1);
+}
+
+TEST(Table_object_basic)
+{
+    Table table;
+    table.add_column(type_Int, "int1");
+    table.add_column(type_Int, "int2");
+
+    table.create_object(Key(5)).set_all(5, 7);
+    table.create_object(Key(2));
+    Obj x = table.create_object(Key(7)).set(0, 100);
+    table.create_object(Key(8));
+    table.create_object(Key(10));
+    table.create_object(Key(6));
+
+    Obj y = table.get_object(Key(5));
+    CHECK_EQUAL(7, y.get<int64_t>(1));
+    CHECK_EQUAL(100, x.get<int64_t>(0));
+
+    table.remove_object(Key(5));
+    CHECK_THROW(y.get<int64_t>(1), InvalidKey);
+}
+
+TEST(Table_object_sequential)
+{
+    int nb_rows = 1024;
+    Table table;
+    table.add_column(type_Int, "int1");
+    table.add_column(type_Int, "int2");
+
+    auto t1 = steady_clock::now();
+
+    for (int i = 0; i < nb_rows; i++) {
+        table.create_object(Key(i)).set_all(i << 1, i << 2);
+    }
+
+    auto t2 = steady_clock::now();
+
+    for (int i = 0; i < nb_rows; i++) {
+        Obj o = table.get_object(Key(i));
+        CHECK_EQUAL(i << 1, o.get<int64_t>(0));
+        CHECK_EQUAL(i << 2, o.get<int64_t>(1));
+    }
+
+    auto t3 = steady_clock::now();
+
+    for (int i = 0; i < nb_rows; i++) {
+        table.remove_object(Key(i));
+        for (int j = i + 1; j < nb_rows; j++) {
+            Obj o = table.get_object(Key(j));
+            CHECK_EQUAL(j << 1, o.get<int64_t>(0));
+            CHECK_EQUAL(j << 2, o.get<int64_t>(1));
+        }
+    }
+
+    auto t4 = steady_clock::now();
+
+    std::cout << nb_rows << " rows" << std::endl;
+    std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+              << std::endl;
+    std::cout << "   lookup time   : " << duration_cast<nanoseconds>(t3 - t2).count() / nb_rows << " ns/key"
+              << std::endl;
+    std::cout << "   erase time    : " << duration_cast<nanoseconds>(t4 - t3).count() / nb_rows << " ns/key"
+              << std::endl;
+}
+
+TEST(Table_object_random)
+{
+    int nb_rows = 1024;
+    std::vector<int64_t> key_values;
+    {
+        std::set<int64_t> key_set;
+        for (int i = 0; i < nb_rows; i++) {
+            bool ok = false;
+            while (!ok) {
+                auto key_val = test_util::random_int<int64_t>(0, nb_rows * 10);
+                if (key_set.count(key_val) == 0) {
+                    key_values.push_back(key_val);
+                    key_set.insert(key_val);
+                    ok = true;
+                }
+            }
+        }
+    }
+
+    Table table;
+    table.add_column(type_Int, "int1");
+    table.add_column(type_Int, "int2");
+
+    auto t1 = steady_clock::now();
+
+    for (int i = 0; i < nb_rows; i++) {
+        table.create_object(Key(key_values[i])).set_all(i << 1, i << 2);
+    }
+
+    auto t2 = steady_clock::now();
+
+    for (int i = 0; i < nb_rows; i++) {
+        Obj o = table.get_object(Key(key_values[i]));
+        CHECK_EQUAL(i << 1, o.get<int64_t>(0));
+        CHECK_EQUAL(i << 2, o.get<int64_t>(1));
+    }
+
+    auto t3 = steady_clock::now();
+
+    for (int i = 0; i < nb_rows; i++) {
+        table.remove_object(Key(key_values[i]));
+        for (int j = i + 1; j < nb_rows; j++) {
+            Obj o = table.get_object(Key(key_values[j]));
+            CHECK_EQUAL(j << 1, o.get<int64_t>(0));
+            CHECK_EQUAL(j << 2, o.get<int64_t>(1));
+        }
+    }
+
+    auto t4 = steady_clock::now();
+
+    std::cout << nb_rows << " rows" << std::endl;
+    std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+              << std::endl;
+    std::cout << "   lookup time   : " << duration_cast<nanoseconds>(t3 - t2).count() / nb_rows << " ns/key"
+              << std::endl;
+    std::cout << "   erase time    : " << duration_cast<nanoseconds>(t4 - t3).count() / nb_rows << " ns/key"
+              << std::endl;
 }
 
 #endif // TEST_TABLE
