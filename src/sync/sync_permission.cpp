@@ -251,12 +251,34 @@ SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, const 
             Property{"userId",            PropertyType::String},
             Property{"metadataKey",       PropertyType::String|PropertyType::Nullable},
             Property{"metadataValue",     PropertyType::String|PropertyType::Nullable},
-            Property{"metadataNamespace", PropertyType::String|PropertyType::Nullable},
+            Property{"metadataNameSpace", PropertyType::String|PropertyType::Nullable},
             Property{"realmUrl",          PropertyType::String},
             Property{"mayRead",           PropertyType::Bool|PropertyType::Nullable},
             Property{"mayWrite",          PropertyType::Bool|PropertyType::Nullable},
             Property{"mayManage",         PropertyType::Bool|PropertyType::Nullable},
-        }}
+        }},
+        {"PermissionOffer", {
+            Property{"id",                PropertyType::String, Property::IsPrimary{true}},
+            Property{"createdAt",         PropertyType::Date},
+            Property{"updatedAt",         PropertyType::Date},
+            Property{"expiresAt",         PropertyType::Date},
+            Property{"statusCode",        PropertyType::Int|PropertyType::Nullable},
+            Property{"statusMessage",     PropertyType::String|PropertyType::Nullable},
+            Property{"token",             PropertyType::String|PropertyType::Nullable},
+            Property{"realmUrl",          PropertyType::String},
+            Property{"mayRead",           PropertyType::Bool},
+            Property{"mayWrite",          PropertyType::Bool},
+            Property{"mayManage",         PropertyType::Bool},
+        }},
+        {"PermissionOfferResponse", {
+            Property{"id",                PropertyType::String, Property::IsPrimary{true}},
+            Property{"createdAt",         PropertyType::Date},
+            Property{"updatedAt",         PropertyType::Date},
+            Property{"statusCode",        PropertyType::Int|PropertyType::Nullable},
+            Property{"statusMessage",     PropertyType::String|PropertyType::Nullable},
+            Property{"token",             PropertyType::String|PropertyType::Nullable},
+            Property{"realmUrl",          PropertyType::String},
+        }},
     };
     config.schema_version = 0;
     auto shared_realm = Realm::get_shared_realm(std::move(config));
