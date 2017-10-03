@@ -31,6 +31,8 @@ class Cluster;
 class ClusterNodeInner;
 class ClusterTree;
 template <class>
+class ConstListIf;
+template <class>
 class ConstList;
 template <class>
 class List;
@@ -364,6 +366,67 @@ protected:
     }
 };
 
+/*
+ * This class implements a forward iterator over the elements in a ConstList.
+ * It is not stable across changes, but as the list itself is constant, changes
+ * are not possible.
+ * Values are read into a member variable (m_val). This is the only way to
+ * implement operator-> and operator* returning a pointer and a reference resp.
+ * It also allows us to use the variable as a cache. There is no overhead compared
+ * to the alternative where operator* would have to return T by value.
+ */
+template <class T>
+class ListIterator {
+public:
+    typedef std::forward_iterator_tag iterator_category;
+    typedef const T value_type;
+    typedef ptrdiff_t difference_type;
+    typedef const T* pointer;
+    typedef const T& reference;
+
+    ListIterator(const ConstListIf<T>& l, size_t ndx)
+        : m_list(l)
+        , m_ndx(ndx)
+    {
+    }
+    pointer operator->()
+    {
+        if (m_dirty) {
+            m_val = m_list[m_ndx];
+            m_dirty = false;
+        }
+        return &m_val;
+    }
+    reference operator*()
+    {
+        return *operator->();
+    }
+    ListIterator& operator++()
+    {
+        m_ndx++;
+        m_dirty = true;
+        return *this;
+    }
+    ListIterator operator++(int)
+    {
+        ListIterator tmp(*this);
+        ++m_ndx;
+        m_dirty = true;
+        return tmp;
+    }
+
+    bool operator!=(const ListIterator& rhs)
+    {
+        return m_ndx != rhs.m_ndx;
+    }
+
+private:
+    T m_val;
+    const ConstListIf<T>& m_list;
+    size_t m_ndx;
+    bool m_dirty = true;
+};
+
 /// This class defines the interface to ConstList, except for the constructor
 /// The ConstList class has the ConstObj member m_obj, which should not be
 /// inherited from List<T>.
@@ -393,6 +456,14 @@ public:
     T operator[](size_t ndx) const
     {
         return get(ndx);
+    }
+    ListIterator<T> begin() const
+    {
+        return ListIterator<T>(*this, 0);
+    }
+    ListIterator<T> end() const
+    {
+        return ListIterator<T>(*this, size());
     }
 
 protected:

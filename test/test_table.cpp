@@ -8927,83 +8927,98 @@ TEST(Table_ListOfPrimitives)
     size_t timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
     Obj obj = t->create_object(Key(7));
 
-    std::vector<int64_t> integer_list = {1, 2, 3, 4};
-    obj.set_list_values(int_col, integer_list);
+    std::vector<int64_t> integer_vector = {1, 2, 3, 4};
+    obj.set_list_values(int_col, integer_vector);
 
-    std::vector<bool> bool_list = {false, false, true, false, true};
-    obj.set_list_values(bool_col, bool_list);
+    std::vector<bool> bool_vector = {false, false, true, false, true};
+    obj.set_list_values(bool_col, bool_vector);
 
-    std::vector<StringData> string_list = {"monday", "tuesday", "thursday", "friday", "saturday", "sunday"};
-    obj.set_list_values(string_col, string_list);
+    std::vector<StringData> string_vector = {"monday", "tuesday", "thursday", "friday", "saturday", "sunday"};
+    obj.set_list_values(string_col, string_vector);
 
-    std::vector<double> double_list = {898742.09382, 3.14159265358979, 2.71828182845904};
-    obj.set_list_values(double_col, double_list);
+    std::vector<double> double_vector = {898742.09382, 3.14159265358979, 2.71828182845904};
+    obj.set_list_values(double_col, double_vector);
 
     time_t seconds_since_epoc = time(nullptr);
-    std::vector<Timestamp> timestamp_list = {Timestamp(seconds_since_epoc, 0), Timestamp(seconds_since_epoc + 60, 0)};
-    obj.set_list_values(timestamp_col, timestamp_list);
+    std::vector<Timestamp> timestamp_vector = {Timestamp(seconds_since_epoc, 0),
+                                               Timestamp(seconds_since_epoc + 60, 0)};
+    obj.set_list_values(timestamp_col, timestamp_vector);
 
-    auto int_vec = obj.get_list<int64_t>(int_col);
-    std::vector<int> vec(int_vec.size());
-    CHECK_EQUAL(integer_list.size(), int_vec.size());
+    auto int_list = obj.get_list<int64_t>(int_col);
+    std::vector<int> vec(int_list.size());
+    CHECK_EQUAL(integer_vector.size(), int_list.size());
     // {1, 2, 3, 4}
-    for (unsigned i = 0; i < int_vec.size(); i++) {
-        CHECK_EQUAL(integer_list[i], int_vec[i]);
+    auto it = int_list.begin();
+    CHECK_EQUAL(*it, 1);
+    std::copy(int_list.begin(), int_list.end(), vec.begin());
+    unsigned j = 0;
+    for (auto i : int_list) {
+        CHECK_EQUAL(vec[j], i);
+        CHECK_EQUAL(integer_vector[j++], i);
     }
-    CHECK_EQUAL(3, int_vec.remove(2));
+    auto f = std::find(int_list.begin(), int_list.end(), 3);
+    CHECK_EQUAL(3, *f++);
+    CHECK_EQUAL(4, *f);
+
+    for (unsigned i = 0; i < int_list.size(); i++) {
+        CHECK_EQUAL(integer_vector[i], int_list[i]);
+    }
+
+    CHECK_EQUAL(3, int_list.remove(2));
     // {1, 2, 4}
-    CHECK_EQUAL(integer_list.size() - 1, int_vec.size());
-    CHECK_EQUAL(4, int_vec[2]);
-    int_vec.resize(6);
+    CHECK_EQUAL(integer_vector.size() - 1, int_list.size());
+    CHECK_EQUAL(4, int_list[2]);
+    int_list.resize(6);
     // {1, 2, 4, 0, 0, 0}
-    CHECK_EQUAL(int_vec[5], 0);
-    int_vec.swap(0, 1);
+    CHECK_EQUAL(int_list[5], 0);
+    int_list.swap(0, 1);
     // {2, 1, 4, 0, 0, 0}
-    CHECK_EQUAL(2, int_vec[0]);
-    CHECK_EQUAL(1, int_vec[1]);
-    int_vec.move(1, 4);
+    CHECK_EQUAL(2, int_list[0]);
+    CHECK_EQUAL(1, int_list[1]);
+    int_list.move(1, 4);
     // {2, 4, 0, 0, 1, 0}
-    CHECK_EQUAL(4, int_vec[1]);
-    CHECK_EQUAL(1, int_vec[4]);
-    int_vec.remove(1, 3);
+    CHECK_EQUAL(4, int_list[1]);
+    CHECK_EQUAL(1, int_list[4]);
+    int_list.remove(1, 3);
     // {2, 0, 1, 0}
-    CHECK_EQUAL(1, int_vec[2]);
-    int_vec.resize(2);
+    CHECK_EQUAL(1, int_list[2]);
+    int_list.resize(2);
     // {2, 0}
-    CHECK_EQUAL(2, int_vec.size());
-    CHECK_EQUAL(2, int_vec[0]);
-    CHECK_EQUAL(0, int_vec[1]);
+    CHECK_EQUAL(2, int_list.size());
+    CHECK_EQUAL(2, int_list[0]);
+    CHECK_EQUAL(0, int_list[1]);
 
-    int_vec.clear();
-    auto int_vec2 = obj.get_list<int64_t>(int_col);
-    CHECK_EQUAL(0, int_vec2.size());
+    int_list.clear();
+    auto int_list2 = obj.get_list<int64_t>(int_col);
+    CHECK_EQUAL(0, int_list2.size());
 
-    auto bool_vec = obj.get_list<bool>(bool_col);
-    CHECK_EQUAL(bool_list.size(), bool_vec.size());
-    for (unsigned i = 0; i < bool_vec.size(); i++) {
-        CHECK_EQUAL(bool_list[i], bool_vec[i]);
+    auto bool_list = obj.get_list<bool>(bool_col);
+    CHECK_EQUAL(bool_vector.size(), bool_list.size());
+    for (unsigned i = 0; i < bool_list.size(); i++) {
+        CHECK_EQUAL(bool_vector[i], bool_list[i]);
     }
 
-    auto string_vec = obj.get_list<StringData>(string_col);
-    CHECK_EQUAL(string_list.size(), string_vec.size());
-    for (unsigned i = 0; i < string_vec.size(); i++) {
-        CHECK_EQUAL(string_list[i], string_vec[i]);
+    auto string_list = obj.get_list<StringData>(string_col);
+    CHECK_EQUAL(string_list.begin()->size(), string_vector.begin()->size());
+    CHECK_EQUAL(string_vector.size(), string_list.size());
+    for (unsigned i = 0; i < string_list.size(); i++) {
+        CHECK_EQUAL(string_vector[i], string_list[i]);
     }
 
-    string_vec.insert(2, "Wednesday");
-    CHECK_EQUAL(string_list.size() + 1, string_vec.size());
-    CHECK_EQUAL(StringData("Wednesday"), string_vec.get(2));
+    string_list.insert(2, "Wednesday");
+    CHECK_EQUAL(string_vector.size() + 1, string_list.size());
+    CHECK_EQUAL(StringData("Wednesday"), string_list.get(2));
 
-    auto double_vec = obj.get_list<double>(double_col);
-    CHECK_EQUAL(double_list.size(), double_vec.size());
-    for (unsigned i = 0; i < double_vec.size(); i++) {
-        CHECK_EQUAL(double_list[i], double_vec.get(i));
+    auto double_list = obj.get_list<double>(double_col);
+    CHECK_EQUAL(double_vector.size(), double_list.size());
+    for (unsigned i = 0; i < double_list.size(); i++) {
+        CHECK_EQUAL(double_vector[i], double_list.get(i));
     }
 
-    auto timestamp_vec = obj.get_list<Timestamp>(timestamp_col);
-    CHECK_EQUAL(timestamp_list.size(), timestamp_vec.size());
-    for (unsigned i = 0; i < timestamp_vec.size(); i++) {
-        CHECK_EQUAL(timestamp_list[i], timestamp_vec.get(i));
+    auto timestamp_list = obj.get_list<Timestamp>(timestamp_col);
+    CHECK_EQUAL(timestamp_vector.size(), timestamp_list.size());
+    for (unsigned i = 0; i < timestamp_list.size(); i++) {
+        CHECK_EQUAL(timestamp_vector[i], timestamp_list.get(i));
     }
 }
 
