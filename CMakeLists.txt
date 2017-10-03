@@ -51,8 +51,10 @@ git_describe(REALM_VERSION)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-# Core APIs are always built for internal usage
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+if(ANDROID)
+    # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
+    set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+endif()
 
 # Set global warnings settings
 if(MSVC)
