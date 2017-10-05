@@ -115,9 +115,10 @@ struct SyncConfig {
     bool client_validate_ssl = true;
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<sync::Session::SSLVerifyCallback> ssl_verify_callback;
-    bool validate_sync_history = true;
     bool is_partial = false;
     util::Optional<std::string> custom_partial_sync_identifier;
+
+    bool validate_sync_history = true;
 
     // The URL that will be used when connecting to the object server.
     // This will differ from `reference_realm_url` when partial sync is being used.
