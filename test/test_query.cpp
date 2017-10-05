@@ -125,33 +125,33 @@ TEST(Query_Count)
     }
 }
 
-#ifdef LEGACY_TESTS
-
 TEST(Query_NextGenSyntaxTypedString)
 {
-    TestTable books;
+    Table books;
     books.add_column(type_String, "1");
     books.add_column(type_String, "2");
     books.add_column(type_Int, "3");
 
-    add(books, "Computer Architecture and Organization", "B. Govindarajalu", 752);
-    add(books, "Introduction to Quantum Mechanics", "David Griffiths", 480);
-    add(books, "Biophysics: Searching for Principles", "William Bialek", 640);
+    Obj obj1 = books.create_object().set_all("Computer Architecture and Organization", "B. Govindarajalu", 752);
+    Obj obj2 = books.create_object().set_all("Introduction to Quantum Mechanics", "David Griffiths", 480);
+    Obj obj3 = books.create_object().set_all("Biophysics: Searching for Principles", "William Bialek", 640);
 
     // Typed table:
     Query q = books.column<Int>(2) >= 200 && books.column<String>(1) == "David Griffiths";
-    size_t match = q.find();
-    CHECK_EQUAL(1, match);
+    auto match = q.find();
+    CHECK_EQUAL(obj2.get_key(), match);
     // You don't need to create a query object first:
     match = (books.column<Int>(2) >= 200 && books.column<String>(1) == "David Griffiths").find();
-    CHECK_EQUAL(1, match);
+    CHECK_EQUAL(obj2.get_key(), match);
 
     // You can also create column objects and use them in expressions:
     Columns<Int> pages = books.column<Int>(2);
     Columns<String> author = books.column<String>(1);
     match = (pages >= 200 && author == "David Griffiths").find();
-    CHECK_EQUAL(1, match);
+    CHECK_EQUAL(obj2.get_key(), match);
 }
+
+#ifdef LEGACY_TESTS
 
 TEST(Query_NextGenSyntax)
 {

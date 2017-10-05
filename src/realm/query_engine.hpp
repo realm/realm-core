@@ -91,7 +91,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <array>
 
 #include <realm/array_basic.hpp>
-#include <realm/array_string_short.hpp>
+#include <realm/array_string.hpp>
 #include <realm/column_binary.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/column_link.hpp>
@@ -1131,8 +1131,21 @@ public:
 
     void table_changed() override
     {
-        m_condition_column = &get_column_base(m_condition_column_idx);
         m_column_type = get_real_column_type(m_condition_column_idx);
+        m_has_search_index = m_table->has_search_index(m_condition_column_idx);
+    }
+
+    void cluster_changed() override
+    {
+        // Assigning nullptr will cause the Leaf destructor to be called. Must
+        // be done before assigning a new one. Otherwise the destructor will be
+        // called after the constructor is called and that is unfortunate if
+        // the object has the same address. (As in this case)
+        m_array_ptr = nullptr;
+        // Create new Leaf
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayString(m_table->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
     }
 
     void verify_column() const override
@@ -1154,18 +1167,15 @@ public:
 
     void clear_leaf_state()
     {
-        m_leaf.reset(nullptr);
+        m_array_ptr = nullptr;
     }
 
     StringNodeBase(const StringNodeBase& from, QueryNodeHandoverPatches* patches)
         : ParentNode(from, patches)
         , m_value(from.m_value)
-        , m_condition_column(from.m_condition_column)
         , m_column_type(from.m_column_type)
         , m_leaf_type(from.m_leaf_type)
     {
-        if (m_condition_column && patches)
-            m_condition_column_idx = m_condition_column->get_column_index();
     }
 
     virtual std::string describe() const override
@@ -1177,11 +1187,15 @@ public:
 protected:
     util::Optional<std::string> m_value;
 
-    const ColumnBase* m_condition_column = nullptr;
-    ColumnType m_column_type;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayString), alignof(ArrayString)>::type;
+    using LeafPtr = std::unique_ptr<ArrayString, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const ArrayString* m_leaf_ptr = nullptr;
 
-    // Used for linear scan through short/long-string
-    std::unique_ptr<const ArrayParent> m_leaf;
+    ColumnType m_column_type;
+    bool m_has_search_index = false;
+
     StringColumn::LeafType m_leaf_type;
     size_t m_end_s = 0;
     size_t m_leaf_start = 0;
@@ -1189,39 +1203,7 @@ protected:
 
     inline StringData get_string(size_t s)
     {
-        StringData t;
-
-        if (m_column_type == col_type_StringEnum) {
-            // enum
-            t = static_cast<const StringEnumColumn*>(m_condition_column)->get(s);
-        }
-        else {
-            // short or long
-            const StringColumn* asc = static_cast<const StringColumn*>(m_condition_column);
-            REALM_ASSERT_3(s, <, asc->size());
-            if (s >= m_end_s || s < m_leaf_start) {
-                // we exceeded current leaf's range
-                clear_leaf_state();
-                size_t ndx_in_leaf;
-                m_leaf = asc->get_leaf(s, ndx_in_leaf, m_leaf_type);
-                m_leaf_start = s - ndx_in_leaf;
-
-                if (m_leaf_type == StringColumn::leaf_type_Small)
-                    m_end_s = m_leaf_start + static_cast<const ArrayStringShort&>(*m_leaf).size();
-                else if (m_leaf_type == StringColumn::leaf_type_Medium)
-                    m_end_s = m_leaf_start + static_cast<const ArrayStringLong&>(*m_leaf).size();
-                else
-                    m_end_s = m_leaf_start + static_cast<const ArrayBigBlobs&>(*m_leaf).size();
-            }
-
-            if (m_leaf_type == StringColumn::leaf_type_Small)
-                t = static_cast<const ArrayStringShort&>(*m_leaf).get(s - m_leaf_start);
-            else if (m_leaf_type == StringColumn::leaf_type_Medium)
-                t = static_cast<const ArrayStringLong&>(*m_leaf).get(s - m_leaf_start);
-            else
-                t = static_cast<const ArrayBigBlobs&>(*m_leaf).get_string(s - m_leaf_start);
-        }
-        return t;
+        return m_leaf_ptr->get(s);
     }
 };
 
@@ -1473,11 +1455,7 @@ protected:
     virtual void _search_index_init() = 0;
     virtual size_t _find_first_local(size_t start, size_t end) = 0;
 
-    size_t m_key_ndx = not_found;
     size_t m_last_indexed;
-
-    // Used for linear scan through enum-string
-    SequentialGetter<StringEnumColumn> m_cse;
 
     // Used for index lookup
     std::unique_ptr<IntegerColumn> m_index_matches;
