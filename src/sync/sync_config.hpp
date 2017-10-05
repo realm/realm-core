@@ -112,10 +112,10 @@ struct SyncConfig {
     std::function<SyncSessionErrorHandler> error_handler;
     std::shared_ptr<ChangesetTransformer> transformer;
     util::Optional<std::array<char, 64>> realm_encryption_key;
-    bool client_validate_ssl = true;
+    bool client_validate_ssl;
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<sync::Session::SSLVerifyCallback> ssl_verify_callback;
-    bool is_partial = false;
+    bool is_partial;
     util::Optional<std::string> custom_partial_sync_identifier;
 
     bool validate_sync_history = true;
@@ -124,8 +124,6 @@ struct SyncConfig {
     // This will differ from `reference_realm_url` when partial sync is being used.
     std::string realm_url() const;
 
-#if __GNUC__ < 5
-    // GCC 4.9 does not support C++14 braced-init
     SyncConfig(std::shared_ptr<SyncUser> user, std::string reference_realm_url,
                SyncSessionStopPolicy stop_policy,
                std::function<SyncBindSessionHandler> bind_session_handler,
@@ -152,10 +150,6 @@ struct SyncConfig {
         , custom_partial_sync_identifier(std::move(custom_partial_sync_identifier))
     {
     }
-
-    SyncConfig() {}
-
-#endif
 };
 
 } // namespace realm
