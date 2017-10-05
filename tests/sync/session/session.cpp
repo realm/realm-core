@@ -143,7 +143,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         const std::string path = "/test1e";
         std::weak_ptr<SyncSession> weak_session;
         std::string on_disk_path;
-        SyncConfig config;
+        util::Optional<SyncConfig> config;
         auto user = SyncManager::shared().get_user({ "user1e", dummy_auth_url }, "not_a_real_token");
         {
             // Create the session within a nested scope, so we can control its lifetime.
@@ -163,7 +163,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
 
         // The next time we request it, it'll be created anew.
         // The call to `get_session()` should result in `SyncUser::register_session()` being called.
-        auto session = SyncManager::shared().get_session(on_disk_path, config);
+        auto session = SyncManager::shared().get_session(on_disk_path, *config);
         CHECK(session);
         session = user->session_for_on_disk_path(on_disk_path);
         CHECK(session);
