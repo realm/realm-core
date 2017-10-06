@@ -42,11 +42,9 @@ AdminRealmListener::AdminRealmListener(std::string local_root, std::string serve
     m_config.cache = false;
     m_config.path = util::File::resolve("realms.realm", local_root);
     m_config.schema_mode = SchemaMode::ReadOnlyAlternative;
-    m_config.sync_config = std::make_shared<SyncConfig>();
-    m_config.sync_config->stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
-    m_config.sync_config->user = user;
-    m_config.sync_config->reference_realm_url = server_base_url + "/__admin";
-    m_config.sync_config->bind_session_handler = std::move(bind_callback);
+    m_config.sync_config = std::make_shared<SyncConfig>(user, server_base_url + "/__admin",
+                                                        SyncSessionStopPolicy::AfterChangesUploaded,
+                                                        std::move(bind_callback));
 }
 
 void AdminRealmListener::start(std::function<void(std::vector<std::string>)> callback)
