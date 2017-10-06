@@ -840,6 +840,7 @@ template <class ColType, class TConditionFunction>
 class FloatDoubleNode : public ParentNode {
 public:
     using TConditionValue = typename ColType::value_type;
+    using LeafType = typename ColumnTypeTraits<TConditionValue>::cluster_leaf_type;
     static const bool special_null_node = false;
 
     FloatDoubleNode(TConditionValue v, size_t column_ndx)
@@ -855,9 +856,13 @@ public:
         m_dT = 1.0;
     }
 
-    void table_changed() override
+    void cluster_changed() override
     {
-        m_condition_column.init(&get_column<ColType>(m_condition_column_idx));
+        m_array_ptr = nullptr;
+        // Create new Leaf
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
     }
 
     void verify_column() const override
@@ -878,7 +883,7 @@ public:
         auto find = [&](bool nullability) {
             bool m_value_nan = nullability ? null::is_null_float(m_value) : false;
             for (size_t s = start; s < end; ++s) {
-                TConditionValue v = m_condition_column.get_next(s);
+                TConditionValue v = m_leaf_ptr->get(s);
                 REALM_ASSERT(!(null::is_null_float(v) && !nullability));
                 if (cond(v, m_value, nullability ? null::is_null_float<TConditionValue>(v) : false, m_value_nan))
                     return s;
@@ -912,12 +917,16 @@ public:
         : ParentNode(from, patches)
         , m_value(from.m_value)
     {
-        copy_getter(m_condition_column, m_condition_column_idx, from.m_condition_column, patches);
     }
 
 protected:
     TConditionValue m_value;
-    SequentialGetter<ColType> m_condition_column;
+    // Leaf cache
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
+    using LeafPtr = std::unique_ptr<LeafType, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const LeafType* m_leaf_ptr = nullptr;
 };
 
 template <class ColType, class TConditionFunction>
@@ -1564,6 +1573,13 @@ public:
         }
     }
 
+    void cluster_changed() override
+    {
+        for (auto& condition : m_conditions) {
+            condition->set_cluster(m_cluster);
+        }
+    }
+
     void verify_column() const override
     {
         for (auto& condition : m_conditions) {
@@ -1702,6 +1718,11 @@ public:
     void table_changed() override
     {
         m_condition->set_table(*m_table);
+    }
+
+    void cluster_changed() override
+    {
+        m_condition->set_cluster(m_cluster);
     }
 
     void verify_column() const override
@@ -1920,6 +1941,7 @@ public:
     size_t find_first_local(size_t start, size_t end) override;
 
     void table_changed() override;
+    void cluster_changed() override;
     void verify_column() const override;
 
     virtual std::string describe() const override;

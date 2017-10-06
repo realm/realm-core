@@ -324,7 +324,7 @@ void StringNode<EqualIns>::_search_index_init()
         REALM_ASSERT_RELEASE(false && "Case insensitive searches in StringEnum columns is not yet implemented.");
         // FindRes fr;
         InternalFindResult res;
-        /*fr = */ static_cast<const StringEnumColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
+        static_cast<const StringEnumColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
     }
     else {
         m_index_matches.reset(
@@ -499,6 +499,11 @@ ExpressionNode::ExpressionNode(std::unique_ptr<Expression> expression)
 void ExpressionNode::table_changed()
 {
     m_expression->set_base_table(m_table.get());
+}
+
+void ExpressionNode::cluster_changed()
+{
+    m_expression->set_cluster(m_cluster);
 }
 
 std::string ExpressionNode::describe() const

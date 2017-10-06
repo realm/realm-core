@@ -1323,7 +1323,7 @@ Key Query::find(size_t begin)
             size_t end = cluster->node_size();
             node->set_cluster(cluster);
             size_t res = node->find_first(0, end);
-            if (res != end) {
+            if (res != not_found) {
                 key = Key(cluster->get_key(res) + key_offset);
                 // We should just find one - we're done
                 return true;
