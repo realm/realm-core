@@ -304,26 +304,6 @@ public:
     void set_link_type(size_t col_ndx, LinkType link_type);
 
     //@{
-    /// Get the descriptor for the specified subtable column.
-    ///
-    /// This function provides access to the shared subtable
-    /// descriptor for the subtables in the specified column. The
-    /// specified column must be a column whose type is 'table'. The
-    /// consequences of specifying a column of a different type, or
-    /// specifying an index that is out of range, are undefined.
-    ///
-    /// Note that this function cannot be used with 'mixed' columns,
-    /// since subtables of that kind have independent dynamic types,
-    /// and therefore, have independent descriptors. You can only get
-    /// access to the descriptor of a subtable in a mixed column by
-    /// first getting access to the subtable itself.
-    ///
-    /// \sa is_root()
-    DescriptorRef get_subdescriptor(size_t column_ndx);
-    ConstDescriptorRef get_subdescriptor(size_t column_ndx) const;
-    //@}
-
-    //@{
     /// Returns the parent table descriptor, if any.
     ///
     /// If this descriptor is the *root descriptor*, then this
@@ -352,30 +332,6 @@ public:
     ConstTableRef get_link_target(size_t col_ndx) const noexcept;
     //@}
 
-    /// Is this a root descriptor?
-    ///
-    /// Descriptors of tables with independent dynamic type are root
-    /// descriptors. Root descriptors are never shared. Tables that
-    /// are direct members of groups have independent dynamic
-    /// types. The same is true for free-standing tables and subtables
-    /// in columns of type 'mixed'.
-    ///
-    /// When a table has a column of type 'table', the cells in that
-    /// column contain subtables. All those subtables have the same
-    /// dynamic type, and they share a single dynamic type
-    /// descriptor. Such shared descriptors are never root
-    /// descriptors.
-    ///
-    /// A type descriptor can even be shared by subtables with
-    /// different parent tables, but only if the parent tables
-    /// themselves have a shared type descriptor. For example, if a
-    /// table has a column `foo` of type 'table', and each of the
-    /// subtables in `foo` has a column `bar` of type 'table', then
-    /// all the subtables in all the `bar` columns share the same
-    /// dynamic type descriptor.
-    ///
-    /// \sa Table::has_shared_type()
-    bool is_root() const noexcept;
 
     /// Determine whether this accessor is still attached.
     ///
@@ -442,22 +398,6 @@ private:
     DescriptorRef m_parent; // Null iff detached or root descriptor.
     Spec* m_spec;           // Valid if attached. Owned iff valid and `m_parent`.
 
-    // Whenever a subtable descriptor accessor is created, it is
-    // stored in this map. This ensures that when get_subdescriptor()
-    // is called to created multiple DescriptorRef objects that
-    // overlap in time, then they will all refer to the same
-    // descriptor object.
-    //
-    // It also enables the necessary recursive detaching of descriptor
-    // objects.
-    struct subdesc_entry {
-        size_t m_column_ndx;
-        std::weak_ptr<Descriptor> m_subdesc;
-        subdesc_entry(size_t column_ndx, DescriptorRef);
-    };
-    typedef std::vector<subdesc_entry> subdesc_map;
-    mutable subdesc_map m_subdesc_map;
-
     Descriptor() noexcept;
 
     // Called by the root table if this becomes the root
@@ -499,11 +439,6 @@ private:
     // Not idempotent.
     void detach() noexcept;
 
-    // Recursively detach all subtable descriptor accessors that
-    // exist, that is, all subtable descriptor accessors that have
-    // this descriptor as ancestor.
-    void detach_subdesc_accessors() noexcept;
-
     // Record the path in terms of subtable column indexes from the
     // root descriptor to this descriptor. If this descriptor is a
     // root descriptor, the path is empty. Returns zero if the path is
@@ -512,16 +447,7 @@ private:
     // `begin_2` is the returned pointer.
     size_t* record_subdesc_path(size_t* begin, size_t* end) const noexcept;
 
-    // Returns a pointer to the accessor of the specified
-    // subdescriptor if that accessor exists, otherwise this function
-    // return null.
-    DescriptorRef get_subdesc_accessor(size_t column_ndx) noexcept;
-
     void move_column(size_t from_ndx, size_t to_ndx);
-
-    void adj_insert_column(size_t col_ndx) noexcept;
-    void adj_erase_column(size_t col_ndx) noexcept;
-    void adj_move_column(size_t col_ndx_1, size_t col_ndx_2) noexcept;
 
     friend class util::bind_ptr<Descriptor>;
     friend class util::bind_ptr<const Descriptor>;
@@ -584,7 +510,7 @@ inline size_t Descriptor::add_column_list(DataType type, StringData name)
 
     LinkTargetInfo invalid_link;
     tf::insert_column(*this, col_ndx, type, name, invalid_link, false, true); // Throws
-    adj_insert_column(col_ndx);
+
     return col_ndx;
 }
 
@@ -602,9 +528,9 @@ inline void Descriptor::insert_column(size_t col_ndx, DataType type, StringData 
 
     LinkTargetInfo invalid_link;
     tf::insert_column(*this, col_ndx, type, name, invalid_link, nullable); // Throws
-    adj_insert_column(col_ndx);
-    if (subdesc && type == type_Table)
-        *subdesc = get_subdescriptor(col_ndx);
+
+    if (subdesc)
+        *subdesc = nullptr;
 }
 
 inline size_t Descriptor::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
@@ -625,8 +551,6 @@ inline void Descriptor::insert_column_link(size_t col_ndx, DataType type, String
         throw LogicError(LogicError::column_index_out_of_range);
     if (REALM_UNLIKELY(!tf::is_link_type(ColumnType(type))))
         throw LogicError(LogicError::illegal_type);
-    if (REALM_UNLIKELY(!is_root()))
-        throw LogicError(LogicError::wrong_kind_of_descriptor);
     // Both origin and target must be group-level tables, and in the same group.
     Group* origin_group = tf::get_parent_group(*get_root_table());
     Group* target_group = tf::get_parent_group(target);
@@ -637,7 +561,6 @@ inline void Descriptor::insert_column_link(size_t col_ndx, DataType type, String
 
     LinkTargetInfo link(&target);
     tf::insert_column(*this, col_ndx, type, name, link); // Throws
-    adj_insert_column(col_ndx);
 
     tf::set_link_type(*get_root_table(), col_ndx, link_type); // Throws
 }
@@ -652,7 +575,6 @@ inline void Descriptor::remove_column(size_t col_ndx)
         throw LogicError(LogicError::column_index_out_of_range);
 
     tf::erase_column(*this, col_ndx); // Throws
-    adj_erase_column(col_ndx);
 }
 
 inline void Descriptor::rename_column(size_t col_ndx, StringData name)
@@ -672,7 +594,6 @@ inline void Descriptor::move_column(size_t from_ndx, size_t to_ndx)
     REALM_ASSERT(is_attached());
     typedef _impl::TableFriend tf;
     tf::move_column(*this, from_ndx, to_ndx); // Throws
-    adj_move_column(from_ndx, to_ndx);
 }
 
 inline void Descriptor::set_link_type(size_t col_ndx, LinkType link_type)
@@ -687,11 +608,6 @@ inline void Descriptor::set_link_type(size_t col_ndx, LinkType link_type)
         throw LogicError(LogicError::illegal_type);
 
     tf::set_link_type(*get_root_table(), col_ndx, link_type); // Throws
-}
-
-inline ConstDescriptorRef Descriptor::get_subdescriptor(size_t column_ndx) const
-{
-    return const_cast<Descriptor*>(this)->get_subdescriptor(column_ndx);
 }
 
 inline DescriptorRef Descriptor::get_parent() noexcept
@@ -717,20 +633,13 @@ inline ConstTableRef Descriptor::get_root_table() const noexcept
 inline TableRef Descriptor::get_link_target(size_t col_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(is_root());
     return get_root_table()->get_link_target(col_ndx);
 }
 
 inline ConstTableRef Descriptor::get_link_target(size_t col_ndx) const noexcept
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(is_root());
     return get_root_table()->get_link_target(col_ndx);
-}
-
-inline bool Descriptor::is_root() const noexcept
-{
-    return !m_parent;
 }
 
 inline Descriptor::Descriptor() noexcept
@@ -740,7 +649,6 @@ inline Descriptor::Descriptor() noexcept
 inline void Descriptor::attach(Table* table, DescriptorRef parent, Spec* spec) noexcept
 {
     REALM_ASSERT(!is_attached());
-    REALM_ASSERT(!table->has_shared_type());
     m_root_table.reset(table);
     m_parent = parent;
     m_spec = spec;
@@ -749,12 +657,6 @@ inline void Descriptor::attach(Table* table, DescriptorRef parent, Spec* spec) n
 inline bool Descriptor::is_attached() const noexcept
 {
     return bool(m_root_table);
-}
-
-inline Descriptor::subdesc_entry::subdesc_entry(size_t n, DescriptorRef d)
-    : m_column_ndx(n)
-    , m_subdesc(d)
-{
 }
 
 inline bool Descriptor::operator==(const Descriptor& d) const noexcept
@@ -788,11 +690,6 @@ public:
         desc.detach();
     }
 
-    static void detach_subdesc_accessors(Descriptor& desc) noexcept
-    {
-        desc.detach_subdesc_accessors();
-    }
-
     static Table& get_root_table(Descriptor& desc) noexcept
     {
         return *desc.m_root_table;
@@ -818,29 +715,9 @@ public:
         return desc.record_subdesc_path(begin, end);
     }
 
-    static DescriptorRef get_subdesc_accessor(Descriptor& desc, size_t column_ndx) noexcept
-    {
-        return desc.get_subdesc_accessor(column_ndx);
-    }
-
     static void move_column(Descriptor& desc, size_t from_ndx, size_t to_ndx)
     {
         return desc.move_column(from_ndx, to_ndx);
-    }
-
-    static void adj_insert_column(Descriptor& desc, size_t col_ndx) noexcept
-    {
-        desc.adj_insert_column(col_ndx);
-    }
-
-    static void adj_erase_column(Descriptor& desc, size_t col_ndx) noexcept
-    {
-        desc.adj_erase_column(col_ndx);
-    }
-
-    static void adj_move_column(Descriptor& desc, size_t col_ndx_1, size_t col_ndx_2) noexcept
-    {
-        desc.adj_move_column(col_ndx_1, col_ndx_2);
     }
 };
 

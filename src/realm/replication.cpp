@@ -178,7 +178,7 @@ public:
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->clear_subtable(%1, %2);", col_ndx, row_ndx); // Throws
-            m_table->clear_subtable(col_ndx, row_ndx);               // Throws
+            // m_table->clear_subtable(col_ndx, row_ndx);               // Throws
             return true;
         }
         return false;
@@ -188,7 +188,7 @@ public:
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->set_mixed(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_mixed(col_ndx, row_ndx, value);                   // Throws
+            // m_table->set_mixed(col_ndx, row_ndx, value);                   // Throws
             return true;
         }
         return false;
@@ -372,7 +372,7 @@ public:
         return true;
     }
 
-    bool select_table(size_t group_level_ndx, int levels, const size_t* path)
+    bool select_table(size_t group_level_ndx, int levels, const size_t*)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(group_level_ndx >= m_group.size())))
             return false;
@@ -380,6 +380,8 @@ public:
         m_desc.reset();
         m_link_list.reset();
         m_table = m_group.get_table(group_level_ndx); // Throws
+        REALM_ASSERT(levels == 0);
+        /*
         for (int i = 0; i < levels; ++i) {
             size_t col_ndx = path[2 * i + 0];
             size_t row_ndx = path[2 * i + 1];
@@ -402,6 +404,7 @@ public:
                     return false;
             }
         }
+        */
         return true;
     }
 
@@ -546,17 +549,17 @@ public:
         return false;
     }
 
-    bool select_descriptor(int levels, const size_t* path)
+    bool select_descriptor(int levels, const size_t*)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table->is_attached())))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(m_table->has_shared_type())))
-            return false;
         log("desc = table->get_descriptor();"); // Throws
         m_link_list.reset();
         m_desc = m_table->get_descriptor(); // Throws
+        REALM_ASSERT(levels == 0);
+        /*
         for (int i = 0; i < levels; ++i) {
             size_t col_ndx = path[i];
             if (REALM_UNLIKELY(REALM_COVER_NEVER(col_ndx >= m_desc->get_column_count())))
@@ -566,6 +569,7 @@ public:
             log("desc = desc->get_subdescriptor(%1);", col_ndx); // Throws
             m_desc = m_desc->get_subdescriptor(col_ndx);
         }
+        */
         return true;
     }
 
@@ -626,11 +630,9 @@ public:
     bool optimize_table()
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(!m_table->has_shared_type()))) {
-                log("table->optimize();"); // Throws
-                m_table->optimize();       // Throws
-                return true;
-            }
+            log("table->optimize();"); // Throws
+            m_table->optimize();       // Throws
+            return true;
         }
         return false;
     }
@@ -787,14 +789,12 @@ private:
                 return "type_DateTime";
             case type_Timestamp:
                 return "type_Timestamp";
-            case type_Table:
-                return "type_Table";
-            case type_Mixed:
-                return "type_Mixed";
             case type_Link:
                 return "type_Link";
             case type_LinkList:
                 return "type_LinkList";
+            default:
+                break;
         }
 
         return "type_Unknown"; // LCOV_EXCL_LINE

@@ -244,8 +244,6 @@ public:
     // Grouping
     Query& group();
     Query& end_group();
-    Query& subtable(size_t column);
-    Query& end_subtable();
     Query& Or();
 
     Query& and_query(const Query& q);
@@ -440,9 +438,6 @@ private:
     std::string error_code;
 
     std::vector<QueryGroup> m_groups;
-
-    // Used to access schema while building query:
-    std::vector<size_t> m_subtable_path;
 
     ConstDescriptorRef m_current_descriptor;
     TableRef m_table;

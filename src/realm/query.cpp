@@ -206,7 +206,7 @@ void Query::set_table(TableRef tr)
     if (m_table) {
         fetch_descriptor();
         ParentNode* root = root_node();
-        if (root && !m_table->is_degenerate())
+        if (root)
             root->set_table(*m_table);
     }
     else {
@@ -236,13 +236,7 @@ void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
     // not going through Table::create_from_and_consume_patch because we need to use
     // set_table() to update all table references
     if (patch.m_table) {
-        if (patch.m_table->m_is_sub_table) {
-            auto parent_table = dest_group.get_table(patch.m_table->m_table_num);
-            set_table(parent_table->get_subtable(patch.m_table->m_col_ndx, patch.m_table->m_row_ndx));
-        }
-        else {
-            set_table(dest_group.get_table(patch.m_table->m_table_num));
-        }
+        set_table(dest_group.get_table(patch.m_table->m_table_num));
     }
     REALM_ASSERT(patch.m_node_data.empty());
 }
@@ -393,9 +387,6 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Descriptor& descripto
         case type_LinkList: {
             return std::unique_ptr<ParentNode>{new SizeNode<LinkListColumn, Cond>(value, column_ndx)};
         }
-        case type_Table: {
-            return std::unique_ptr<ParentNode>{new SizeNode<SubtableColumn, Cond>(value, column_ndx)};
-        }
         default: {
             throw LogicError{LogicError::type_mismatch};
         }
@@ -406,11 +397,7 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Descriptor& descripto
 
 void Query::fetch_descriptor()
 {
-    ConstDescriptorRef desc = m_table->get_descriptor();
-    for (size_t i = 0; i < m_subtable_path.size(); ++i) {
-        desc = desc->get_subdescriptor(m_subtable_path[i]);
-    }
-    m_current_descriptor = desc;
+    m_current_descriptor = m_table->get_descriptor();
 }
 
 
@@ -873,7 +860,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
                    size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                    size_t* return_ndx) const
 {
-    if (limit == 0 || m_table->is_degenerate()) {
+    if (limit == 0) {
         if (resultcount)
             *resultcount = 0;
         return static_cast<R>(0);
@@ -1148,7 +1135,7 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
 #endif
 
-    if (limit == 0 || m_table->is_degenerate()) {
+    if (limit == 0) {
         if (resultcount)
             *resultcount = 0;
         return 0.;
@@ -1253,42 +1240,12 @@ Query& Query::Or()
     return *this;
 }
 
-Query& Query::subtable(size_t column)
-{
-    m_subtable_path.push_back(column);
-    fetch_descriptor();
-    group();
-    m_groups.back().m_subtable_column = column;
-    return *this;
-}
-
-Query& Query::end_subtable()
-{
-    auto& current_group = m_groups.back();
-    if (current_group.m_subtable_column == not_found) {
-        error_code = "Unbalanced subtable";
-        return *this;
-    }
-
-    auto subtable_node = std::unique_ptr<ParentNode>(
-        new SubtableNode(current_group.m_subtable_column, std::move(current_group.m_root_node)));
-    end_group();
-    m_subtable_path.pop_back();
-    add_node(std::move(subtable_node));
-
-    fetch_descriptor();
-    return *this;
-}
-
 // todo, add size_t end? could be useful
 Key Query::find(size_t begin)
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Find);
 #endif
-
-    if (m_table->is_degenerate())
-        return null_key;
 
     REALM_ASSERT_3(begin, <=, m_table->size());
 
@@ -1337,7 +1294,7 @@ Key Query::find(size_t begin)
 
 void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit) const
 {
-    if (limit == 0 || m_table->is_degenerate())
+    if (limit == 0)
         return;
 
     REALM_ASSERT_3(begin, <=, m_table->size());
@@ -1398,7 +1355,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
 #endif
 
-    if (limit == 0 || m_table->is_degenerate())
+    if (limit == 0)
         return 0;
 
     if (end == size_t(-1))
@@ -1448,9 +1405,6 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove()
 {
-    if (m_table->is_degenerate())
-        return 0;
-
     TableView tv = find_all();
     size_t rows = tv.size();
     tv.clear();
@@ -1643,7 +1597,7 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
     REALM_ASSERT(node);
     using State = QueryGroup::State;
 
-    if (m_table && m_subtable_path.empty() && !m_table->is_degenerate())
+    if (m_table)
         node->set_table(*m_table);
 
     auto& current_group = m_groups.back();

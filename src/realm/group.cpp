@@ -1319,7 +1319,7 @@ public:
         return true;
     }
 
-    bool select_table(size_t group_level_ndx, int levels, const size_t* path) noexcept
+    bool select_table(size_t group_level_ndx, int levels, const size_t*) noexcept
     {
         m_table.reset();
         // The list of table accessors must either be empty or correctly reflect
@@ -1327,25 +1327,11 @@ public:
         // Group::do_get_table()). An empty list means that no table accessors
         // have been created yet (all entries are null).
         REALM_ASSERT(m_group.m_table_accessors.empty() || group_level_ndx < m_group.m_table_accessors.size());
+        REALM_ASSERT(levels == 0);
         if (group_level_ndx < m_group.m_table_accessors.size()) {
-            TableRef table(m_group.m_table_accessors[group_level_ndx]);
-            if (table) {
-                const size_t* path_begin = path;
-                const size_t* path_end = path_begin + 2 * levels;
-                for (;;) {
-                    typedef _impl::TableFriend tf;
-                    tf::mark(*table);
-                    if (path_begin == path_end) {
-                        m_table = std::move(table);
-                        break;
-                    }
-                    size_t col_ndx = path_begin[0];
-                    size_t row_ndx = path_begin[1];
-                    table = tf::get_subtable_accessor(*table, col_ndx, row_ndx);
-                    if (!table)
-                        break;
-                    path_begin += 2;
-                }
+            m_table.reset(m_group.m_table_accessors[group_level_ndx]);
+            if (m_table) {
+                _impl::TableFriend::mark(*m_table);
             }
         }
         return true;
@@ -1497,27 +1483,6 @@ public:
         return true; // No-op
     }
 
-    bool set_table(size_t col_ndx, size_t row_ndx, _impl::Instruction) noexcept
-    {
-        if (m_table) {
-            typedef _impl::TableFriend tf;
-            TableRef subtab(tf::get_subtable_accessor(*m_table, col_ndx, row_ndx));
-            if (subtab) {
-                tf::mark(*subtab);
-                tf::adj_acc_clear_nonroot_table(*subtab);
-            }
-        }
-        return true;
-    }
-
-    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&, _impl::Instruction) noexcept
-    {
-        typedef _impl::TableFriend tf;
-        if (m_table)
-            tf::discard_subtable_accessor(*m_table, col_ndx, row_ndx);
-        return true;
-    }
-
     bool set_null(size_t, size_t, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
@@ -1569,7 +1534,6 @@ public:
     {
         m_desc.reset();
         if (m_table) {
-            REALM_ASSERT(!m_table->has_shared_type());
             typedef _impl::TableFriend tf;
             DescriptorRef desc = tf::get_root_table_desc_accessor(*m_table);
             int i = 0;
@@ -1578,10 +1542,13 @@ public:
                     m_desc = desc;
                     break;
                 }
+                REALM_ASSERT(levels == 0);
+                /*
                 typedef _impl::DescriptorFriend df;
                 size_t col_ndx = path[i];
                 desc = df::get_subdesc_accessor(*desc, col_ndx);
                 ++i;
+                */
             }
             m_desc_path_begin = path;
             m_desc_path_end = path + levels;
@@ -1599,9 +1566,6 @@ public:
             InsertColumnUpdater updater(col_ndx);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
-        typedef _impl::DescriptorFriend df;
-        if (m_desc)
-            df::adj_insert_column(*m_desc, col_ndx);
 
         m_schema_changed = true;
 
@@ -1631,10 +1595,6 @@ public:
                 tf::mark(*target);
             }
         }
-        if (m_desc) {
-            using df = _impl::DescriptorFriend;
-            df::adj_insert_column(*m_desc, col_ndx);
-        }
 
         m_schema_changed = true;
 
@@ -1648,9 +1608,6 @@ public:
             EraseColumnUpdater updater(col_ndx);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
-        typedef _impl::DescriptorFriend df;
-        if (m_desc)
-            df::adj_erase_column(*m_desc, col_ndx);
 
         m_schema_changed = true;
 
@@ -1678,10 +1635,6 @@ public:
             using tf = _impl::TableFriend;
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
-        if (m_desc) {
-            using df = _impl::DescriptorFriend;
-            df::adj_erase_column(*m_desc, col_ndx);
-        }
 
         m_schema_changed = true;
 
@@ -1701,9 +1654,6 @@ public:
             MoveColumnUpdater updater(col_ndx_1, col_ndx_2);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
-        typedef _impl::DescriptorFriend df;
-        if (m_desc)
-            df::adj_move_column(*m_desc, col_ndx_1, col_ndx_2);
 
         m_schema_changed = true;
 

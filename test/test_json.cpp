@@ -81,11 +81,10 @@ const bool generate_all = false;
 // All produced json is automatically checked for syntax regardless of
 // the setting of generate_all. This is done using the 'jsmn' parser.
 
-void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_subtab_sizes = false)
+void setup_multi_table(Table& table, size_t rows)
 {
     // Create table with all column types
     {
-        DescriptorRef sub1;
         table.add_column(type_Int, "int");                 //  0
         table.add_column(type_Bool, "bool");               //  1
         table.add_column(type_OldDateTime, "date");        //  2
@@ -96,10 +95,6 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
         table.add_column(type_String, "string_big_blobs"); //  7
         table.add_column(type_String, "string_enum");      //  8 - becomes StringEnumColumn
         table.add_column(type_Binary, "binary");           //  9
-        table.add_column(type_Table, "tables", &sub1);     // 10
-        table.add_column(type_Mixed, "mixed");             // 11
-        sub1->add_column(type_Int, "sub_first");
-        sub1->add_column(type_String, "sub_second");
     }
 
     table.add_empty_row(rows);
@@ -162,60 +157,6 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
     }
     for (size_t i = 0; i < rows; ++i)
         table.set_binary(9, i, BinaryData("binary", 7));
-    for (size_t i = 0; i < rows; ++i) {
-        int64_t sign = (i % 2 == 0) ? 1 : -1;
-        size_t n = sub_rows;
-        if (!fixed_subtab_sizes)
-            n += i;
-        for (size_t j = 0; j != n; ++j) {
-            TableRef subtable = table.get_subtable(10, i);
-            int64_t val = -123 + i * j * 1234 * sign;
-            subtable->insert_empty_row(j);
-            subtable->set_int(0, j, val);
-            subtable->set_string(1, j, "sub");
-        }
-    }
-    for (size_t i = 0; i < rows; ++i) {
-        int64_t sign = (i % 2 == 0) ? 1 : -1;
-        switch (i % 8) {
-            case 0:
-                table.set_mixed(11, i, false);
-                break;
-            case 1:
-                table.set_mixed(11, i, int64_t(i * i * sign));
-                break;
-            case 2:
-                table.set_mixed(11, i, "string");
-                break;
-            case 3:
-                table.set_mixed(11, i, OldDateTime(123456789));
-                break;
-            case 4:
-                table.set_mixed(11, i, BinaryData("binary", 7));
-                break;
-            case 5: {
-                // Add subtable to mixed column
-                // We can first set schema and contents when the entire
-                // row has been inserted
-                table.set_mixed(11, i, Mixed::subtable_tag());
-                TableRef subtable = table.get_subtable(11, i);
-                subtable->add_column(type_Int, "first");
-                subtable->add_column(type_String, "second");
-                for (size_t j = 0; j != 2; ++j) {
-                    subtable->insert_empty_row(j);
-                    subtable->set_int(0, j, i * i * j * sign);
-                    subtable->set_string(1, j, "mixed sub");
-                }
-                break;
-            }
-            case 6:
-                table.set_mixed(11, i, float(123.1 * i * sign));
-                break;
-            case 7:
-                table.set_mixed(11, i, double(987.65 * i * sign));
-                break;
-        }
-    }
 
     // We also want a StringEnumColumn
     table.optimize();
@@ -270,7 +211,7 @@ bool json_test(std::string json, std::string expected_file, bool generate)
 TEST(Json_NoLinks)
 {
     Table table;
-    setup_multi_table(table, 15, 2);
+    setup_multi_table(table, 15);
 
     std::stringstream ss;
     table.to_json(ss);

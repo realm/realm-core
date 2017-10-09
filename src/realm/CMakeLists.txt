@@ -19,10 +19,8 @@ set(REALM_SOURCES
     column_link.cpp
     column_link_base.cpp
     column_linklist.cpp
-    column_mixed.cpp
     column_string.cpp
     column_string_enum.cpp
-    column_table.cpp
     column_timestamp.cpp
     descriptor.cpp
     disable_sync_to_disk.cpp
@@ -95,11 +93,8 @@ set(REALM_INSTALL_GENERAL_HEADERS
     column_link.hpp
     column_linkbase.hpp
     column_linklist.hpp
-    column_mixed.hpp
-    column_mixed_tpl.hpp
     column_string.hpp
     column_string_enum.hpp
-    column_table.hpp
     column_timestamp.hpp
     column_tpl.hpp
     column_type.hpp
