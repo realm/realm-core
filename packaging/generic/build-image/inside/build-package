@@ -7,8 +7,6 @@ set -e
 # to delete them from our host.
 trap 'code=$?; chown -R --reference /inside/build-package /out/; exit $code' EXIT
 
-source /opt/rh/devtoolset-3/enable
-
 name="realm-core-${VERSION}"
 
 # If we're not releasing, append the iteration to the existing version
