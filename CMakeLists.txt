@@ -51,6 +51,10 @@ git_describe(REALM_VERSION)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+if(ANDROID)
+    # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
+    set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+endif()
 
 # Set global warnings settings
 if(MSVC)
@@ -146,14 +150,19 @@ if(NOT REALM_BUILD_LIB_ONLY AND NOT REALM_NO_TESTS)
     add_subdirectory(test)
 endif()
 
-# CPack
+# Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
+
+# Make the project importable from the build directory
 export(TARGETS realm FILE realm-config.cmake)
+
+# Make the project importable from the install directory
 install(EXPORT realm
         FILE realm-config.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
         COMPONENT devel)
 
+# CPack
 if(APPLE)
     set(CPACK_GENERATOR "TGZ")
 elseif(ANDROID)
