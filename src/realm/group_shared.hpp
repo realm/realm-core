@@ -683,6 +683,7 @@ private:
     /// finish up the process of starting a write transaction. Internal use only.
     void finish_begin_write();
 
+    void close_internal(std::unique_lock<InterprocessMutex>) noexcept;
     friend class _impl::SharedGroupFriend;
 };
 
