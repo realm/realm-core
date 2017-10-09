@@ -8,5 +8,4 @@ RUN touch /var/lib/rpm/* \
  && yum -y install \
       epel-release \
       centos-release-scl-rh \
- && yum-config-manager --enable rhel-server-rhscl-6-rpms \
  && yum clean all
