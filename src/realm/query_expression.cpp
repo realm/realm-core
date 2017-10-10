@@ -31,37 +31,42 @@ void Columns<Link>::evaluate(size_t index, ValueBase& destination)
     destination.import(v);
 }
 
-void Columns<SubTable>::evaluate_internal(size_t index, ValueBase& destination, size_t nb_elements)
+void ColumnListBase::set_cluster(const Cluster* cluster)
 {
-    REALM_ASSERT_DEBUG(dynamic_cast<Value<ConstTableRef>*>(&destination) != nullptr);
-    Value<ConstTableRef>* d = static_cast<Value<ConstTableRef>*>(&destination);
-    REALM_ASSERT(d);
+    m_array_ptr = nullptr;
+    // Create new Leaf
+    m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) Array(m_link_map.base_table()->get_alloc()));
+    cluster->init_leaf(this->m_column_ndx, m_array_ptr.get());
+    m_leaf_ptr = m_array_ptr.get();
+}
 
+void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_t nb_elements)
+{
     if (m_link_map.m_link_columns.size() > 0) {
         std::vector<size_t> links = m_link_map.get_links(index);
         auto sz = links.size();
 
         if (m_link_map.only_unary_links()) {
-            ConstTableRef val;
+            ref_type val = 0;
             if (sz == 1) {
-                val = m_column->get(links[0]);
+                val = m_leaf_ptr->get(links[0]);
             }
-            d->init(false, 1, val);
+            destination.init(false, 1, val);
         }
         else {
-            d->init(true, sz);
+            destination.init(true, sz);
             for (size_t t = 0; t < sz; t++) {
-                d->m_storage.set(t, m_column->get(links[t]));
+                destination.m_storage.set(t, m_leaf_ptr->get(links[t]));
             }
         }
     }
     else {
-        size_t rows = std::min(m_column->size() - index, nb_elements);
+        size_t rows = std::min(m_leaf_ptr->size() - index, nb_elements);
 
-        d->init(false, rows);
+        destination.init(false, rows);
 
         for (size_t t = 0; t < rows; t++) {
-            d->m_storage.set(t, m_column->get(index + t));
+            destination.m_storage.set(t, m_leaf_ptr->get(index + t));
         }
     }
 }

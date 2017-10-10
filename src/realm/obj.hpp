@@ -105,7 +105,7 @@ public:
     Obj& set_null(size_t col_ndx, bool is_default = false);
 
     template <typename U>
-    Obj& set_list_values(size_t col_ndx, std::vector<U>& values);
+    Obj& set_list_values(size_t col_ndx, const std::vector<U>& values);
 
     template <typename U>
     std::vector<U> get_list_values(size_t col_ndx);
@@ -165,7 +165,7 @@ inline Obj& Obj::set(size_t col_ndx, const char* str, bool is_default)
 }
 
 template <typename U>
-Obj& Obj::set_list_values(size_t col_ndx, std::vector<U>& values)
+Obj& Obj::set_list_values(size_t col_ndx, const std::vector<U>& values)
 {
     size_t sz = values.size();
     auto list = get_list<U>(col_ndx);

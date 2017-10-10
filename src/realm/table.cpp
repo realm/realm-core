@@ -6669,6 +6669,13 @@ Obj Table::create_object(Key key)
     return obj;
 }
 
+void Table::create_objects(size_t number, std::vector<Key>& keys)
+{
+    while (number--) {
+        keys.push_back(create_object().get_key());
+    }
+}
+
 void Table::do_remove_object(Key key, bool /* broken_reciprocal_backlinks */)
 {
     m_clusters.erase(key);
