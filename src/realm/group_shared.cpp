@@ -1288,9 +1288,6 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 // corrupt your database if something fails
 bool SharedGroup::compact()
 {
-    // FIXME: ExcetionSafety: This function must be rewritten with exception
-    // safety in mind.
-
     // Verify that the database file is attached
     if (is_attached() == false) {
         throw std::runtime_error(m_db_path + ": compact must be done on an open/attached SharedGroup");
@@ -1349,7 +1346,7 @@ bool SharedGroup::compact()
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
         m_group.m_alloc.detach();
-        
+
 #ifdef _WIN32
         util::File::copy(tmp_path, m_db_path);
 #else
@@ -1407,9 +1404,6 @@ void SharedGroup::close_internal(std::unique_lock<InterprocessMutex> lock) noexc
             is_sync_agent = repl->is_sync_agent();
 
         if (!lock.owns_lock())
-        //std::lock_guard<InterprocessMutex> lock(m_controlmutex);
-        //std::unique_lock<InterprocessMutex> lock(m_controlmutex, std::defer_lock);
-        //if (!already_locked)
             lock.lock();
 
         if (m_group.m_alloc.is_attached())
