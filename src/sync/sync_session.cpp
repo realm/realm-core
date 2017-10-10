@@ -287,6 +287,10 @@ struct sync_session_states::Active : public SyncSession::State {
         (*session.m_session.*waiter)(std::move(callback));
         return true;
     }
+
+    void handle_reconnect(std::unique_lock<std::mutex>&, SyncSession& session) const override {
+        session.m_session->cancel_reconnect_delay();
+    }
 };
 
 struct sync_session_states::Dying : public SyncSession::State {
