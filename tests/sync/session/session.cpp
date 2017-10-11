@@ -368,6 +368,7 @@ TEST_CASE("sync: error handling", "[sync]") {
         SyncError initial_error{std::error_code{code, realm::sync::protocol_error_category()}, "Something bad happened", false};
         std::time_t just_before_raw = std::time(nullptr);
         SyncSession::OnlyForTesting::handle_error(*session, std::move(initial_error));
+        REQUIRE(session->state() == SyncSession::PublicState::Inactive);
         std::time_t just_after_raw = std::time(nullptr);
         auto just_before = util::localtime(just_before_raw);
         auto just_after = util::localtime(just_after_raw);
