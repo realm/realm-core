@@ -2,7 +2,10 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix a race between SharedGroup::compact() and SharedGroup::open(). The race could
+  cause asserts indicating file corruption even if no corruption is caused. It is also
+  possible that it could cause real file corruption, though that is much less likely.
+  PR [#2892](https://github.com/realm/realm-core/pull/2892)
 
 ### Breaking changes
 

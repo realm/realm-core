@@ -1288,9 +1288,6 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 // corrupt your database if something fails
 bool SharedGroup::compact()
 {
-    // FIXME: ExcetionSafety: This function must be rewritten with exception
-    // safety in mind.
-
     // Verify that the database file is attached
     if (is_attached() == false) {
         throw std::runtime_error(m_db_path + ": compact must be done on an open/attached SharedGroup");
@@ -1303,7 +1300,7 @@ bool SharedGroup::compact()
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
     {
         SharedInfo* info = m_file_map.get_addr();
-        std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
+        std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
         if (info->num_participants > 1)
             return false;
 
@@ -1337,9 +1334,6 @@ bool SharedGroup::compact()
             }
             throw;
         }
-#ifndef _WIN32
-        util::File::move(tmp_path, m_db_path);
-#endif
         {
             SharedInfo* r_info = m_reader_map.get_addr();
             Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
@@ -1352,12 +1346,15 @@ bool SharedGroup::compact()
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
         m_group.m_alloc.detach();
-    }
-    close();
-#ifdef _WIN32
-    util::File::copy(tmp_path, m_db_path);
-#endif
 
+#ifdef _WIN32
+        util::File::copy(tmp_path, m_db_path);
+#else
+        util::File::move(tmp_path, m_db_path);
+#endif
+        close_internal(/* with lock held: */ std::move(lock));
+
+    }
     SharedGroupOptions new_options;
     new_options.durability = dura;
     new_options.encryption_key = m_key;
@@ -1380,6 +1377,11 @@ SharedGroup::~SharedGroup() noexcept
 
 void SharedGroup::close() noexcept
 {
+    close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock));
+}
+
+void SharedGroup::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
+{
     if (!is_attached())
         return;
 
@@ -1401,7 +1403,8 @@ void SharedGroup::close() noexcept
         if (Replication* repl = m_group.get_replication())
             is_sync_agent = repl->is_sync_agent();
 
-        std::lock_guard<InterprocessMutex> lock(m_controlmutex);
+        if (!lock.owns_lock())
+            lock.lock();
 
         if (m_group.m_alloc.is_attached())
             m_group.m_alloc.detach();
@@ -1429,6 +1432,7 @@ void SharedGroup::close() noexcept
             if (Replication* repl = gf::get_replication(m_group))
                 repl->terminate_session();
         }
+        lock.unlock();
     }
 #ifdef REALM_ASYNC_DAEMON
     m_room_to_write.close();
