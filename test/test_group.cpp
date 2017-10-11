@@ -424,7 +424,7 @@ TEST(Group_InsertTable)
 
 TEST(Group_InsertTableWithLinks)
 {
-    using df = _impl::DescriptorFriend;
+    using tf = _impl::TableFriend;
 
     Group group;
     TableRef a = group.add_table("a");
@@ -432,8 +432,8 @@ TEST(Group_InsertTableWithLinks)
     a->add_column(type_Int, "foo");
     b->add_column_link(type_Link, "bar", *a);
 
-    auto& a_spec = df::get_spec(*a->get_descriptor());
-    auto& b_spec = df::get_spec(*b->get_descriptor());
+    auto& a_spec = tf::get_spec(*a);
+    auto& b_spec = tf::get_spec(*b);
     CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(0), 0);
     CHECK_EQUAL(a_spec.get_opposite_link_table_ndx(1), 1);
 
@@ -811,7 +811,7 @@ TEST(Group_BasicMoveTable)
 
 TEST(Group_MoveTableWithLinks)
 {
-    using df = _impl::DescriptorFriend;
+    using tf = _impl::TableFriend;
     Group group;
     TableRef a = group.add_table("a");
     TableRef b = group.add_table("b");
@@ -823,10 +823,10 @@ TEST(Group_MoveTableWithLinks)
     c->add_column_link(type_Link, "link_to_d", *d);
     d->add_column_link(type_LinkList, "link_to_a", *a);
 
-    auto& a_spec = df::get_spec(*a->get_descriptor());
-    auto& b_spec = df::get_spec(*b->get_descriptor());
-    auto& c_spec = df::get_spec(*c->get_descriptor());
-    auto& d_spec = df::get_spec(*d->get_descriptor());
+    auto& a_spec = tf::get_spec(*a);
+    auto& b_spec = tf::get_spec(*b);
+    auto& c_spec = tf::get_spec(*c);
+    auto& d_spec = tf::get_spec(*d);
 
     // Move up:
     group.move_table(1, 3);
@@ -1602,8 +1602,8 @@ TEST(Group_CascadeNotify_Simple)
 
     // move_last_over() on the origin table with strong links lists the target
     // rows that are removed
-    origin->get_descriptor()->set_link_type(0, link_Strong);
-    origin->get_descriptor()->set_link_type(1, link_Strong);
+    origin->set_link_type(0, link_Strong);
+    origin->set_link_type(1, link_Strong);
 
     origin->set_link(0, 10, 50);
     origin->set_link(0, 11, 62);
@@ -1733,8 +1733,8 @@ TEST(Group_CascadeNotify_TableClear)
     origin->add_empty_row(10);
 
     // and cascaded deletions
-    origin->get_descriptor()->set_link_type(0, link_Strong);
-    origin->get_descriptor()->set_link_type(1, link_Strong);
+    origin->set_link_type(0, link_Strong);
+    origin->set_link_type(1, link_Strong);
     origin->set_link(0, 1, 2);
     origin->get_linklist(1, 3)->add(4);
     called = false;

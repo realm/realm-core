@@ -40,7 +40,6 @@
 #include <realm/olddatetime.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/link_view_fwd.hpp>
-#include <realm/descriptor_fwd.hpp>
 #include <realm/row.hpp>
 
 namespace realm {
@@ -377,8 +376,6 @@ public:
     Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode);
 
 private:
-    void fetch_descriptor();
-
     void add_expression_node(std::unique_ptr<Expression>);
 
     template <class ColumnType>
@@ -439,7 +436,6 @@ private:
 
     std::vector<QueryGroup> m_groups;
 
-    ConstDescriptorRef m_current_descriptor;
     TableRef m_table;
 
     // points to the base class of the restricting view. If the restricting

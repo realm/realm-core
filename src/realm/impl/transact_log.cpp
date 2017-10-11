@@ -71,51 +71,6 @@ void TransactLogConvenientEncoder::do_select_table(const Table* table)
     m_selected_table = table;
 }
 
-bool TransactLogEncoder::select_descriptor(size_t levels, const size_t* path)
-{
-    const size_t* end = path + levels;
-    int max_elems_per_chunk = 8; // FIXME: Use smaller number when compiling in debug mode
-    char* buf = reserve(1 + (1 + max_elems_per_chunk) * max_enc_bytes_per_int); // Throws
-    *buf++ = char(instr_SelectDescriptor);
-    size_t level = end - path;
-    buf = encode_int(buf, level);
-    if (path == end)
-        goto good;
-    for (;;) {
-        for (int i = 0; i < max_elems_per_chunk; ++i) {
-            buf = encode_int(buf, *path);
-            if (++path == end)
-                goto good;
-        }
-        buf = reserve(max_elems_per_chunk * max_enc_bytes_per_int); // Throws
-    }
-good:
-    advance(buf);
-    return true;
-}
-
-void TransactLogConvenientEncoder::do_select_desc(const Descriptor& desc)
-{
-    typedef _impl::DescriptorFriend df;
-    size_t* begin;
-    size_t* end;
-    select_table(&df::get_root_table(desc));
-    for (;;) {
-        begin = m_subtab_path_buf.data();
-        end = begin + m_subtab_path_buf.size();
-        begin = df::record_subdesc_path(desc, begin, end);
-        if (begin)
-            break;
-        size_t new_size = m_subtab_path_buf.size();
-        if (util::int_multiply_with_overflow_detect(new_size, 2))
-            throw std::runtime_error("Too many table type descriptor nesting levels");
-        m_subtab_path_buf.set_size(new_size); // Throws
-    }
-
-    m_encoder.select_descriptor(end - begin, begin); // Throws
-    m_selected_spec = &df::get_spec(desc);
-}
-
 bool TransactLogEncoder::select_link_list(size_t col_ndx, size_t row_ndx, size_t link_target_group_level_ndx)
 {
     append_simple_instr(instr_SelectLinkList, col_ndx, row_ndx, link_target_group_level_ndx); // Throws

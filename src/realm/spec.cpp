@@ -161,6 +161,9 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, in
 {
     REALM_ASSERT(column_ndx <= m_types.size());
 
+    if (REALM_UNLIKELY(name.size() > Table::max_column_name_length))
+        throw LogicError(LogicError::column_name_too_long);
+
     if (type != col_type_BackLink)        // backlinks do not have names
         m_names.insert(column_ndx, name); // Throws
     m_types.insert(column_ndx, type);     // Throws

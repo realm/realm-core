@@ -53,7 +53,6 @@
 
 #if REALM_METRICS
 
-#include <realm/descriptor.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>

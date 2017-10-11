@@ -31,7 +31,6 @@
 #include <realm/impl/input_stream.hpp>
 
 #include <realm/group.hpp>
-#include <realm/descriptor.hpp>
 #include <realm/link_view.hpp>
 
 namespace realm {
@@ -59,7 +58,6 @@ enum Instruction {
     instr_MergeRows = 17,  // Replace links pointing to row A with links to row B
     instr_ClearTable = 18, // Remove all rows in selected table
     instr_OptimizeTable = 19,
-    instr_SelectDescriptor = 20, // Select descriptor from currently selected root table
     instr_InsertColumn =
         21, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
     instr_InsertLinkColumn = 22,     // do, but for a link-type column
@@ -496,11 +494,11 @@ public:
     virtual void erase_group_level_table(size_t table_ndx, size_t num_tables);
     virtual void rename_group_level_table(size_t table_ndx, StringData new_name);
     virtual void move_group_level_table(size_t from_table_ndx, size_t to_table_ndx);
-    virtual void insert_column(const Descriptor&, size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
+    virtual void insert_column(const Table*, size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
                                bool nullable = false);
-    virtual void erase_column(const Descriptor&, size_t col_ndx);
-    virtual void rename_column(const Descriptor&, size_t col_ndx, StringData name);
-    virtual void move_column(const Descriptor&, size_t from, size_t to);
+    virtual void erase_column(const Table*, size_t col_ndx);
+    virtual void rename_column(const Table*, size_t col_ndx, StringData name);
+    virtual void move_column(const Table*, size_t from, size_t to);
 
     virtual void set_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value,
                          Instruction variant = instr_Set);
@@ -535,8 +533,8 @@ public:
     virtual void swap_rows(const Table*, size_t row_ndx_1, size_t row_ndx_2);
     virtual void move_row(const Table*, size_t from_ndx, size_t to_ndx);
     virtual void merge_rows(const Table*, size_t row_ndx, size_t new_row_ndx);
-    virtual void add_search_index(const Descriptor&, size_t col_ndx);
-    virtual void remove_search_index(const Descriptor&, size_t col_ndx);
+    virtual void add_search_index(const Table*, size_t col_ndx);
+    virtual void remove_search_index(const Table*, size_t col_ndx);
     virtual void set_link_type(const Table*, size_t col_ndx, LinkType);
     virtual void clear_table(const Table*, size_t prior_num_rows);
     virtual void optimize_table(const Table*);
@@ -591,13 +589,11 @@ private:
     mutable std::atomic<const LinkView*> m_selected_link_list;
 
     void unselect_all() noexcept;
-    void select_table(const Table*);        // unselects descriptor and link list
-    void select_desc(const Descriptor&);    // unselects link list
-    void select_link_list(const LinkView&); // unselects descriptor
+    void select_table(const Table*); // unselects link list
+    void select_link_list(const LinkView&);
 
     void record_subtable_path(const Table&, size_t*& out_begin, size_t*& out_end);
     void do_select_table(const Table*);
-    void do_select_desc(const Descriptor&);
     void do_select_link_list(const LinkView&);
 
     friend class TransactReverser;
@@ -989,15 +985,6 @@ inline void TransactLogConvenientEncoder::select_table(const Table* table)
     m_selected_link_list = nullptr;
 }
 
-inline void TransactLogConvenientEncoder::select_desc(const Descriptor& desc)
-{
-    typedef _impl::DescriptorFriend df;
-    if (&df::get_spec(desc) != m_selected_spec)
-        do_select_desc(desc); // Throws
-    // no race with on_link_list_destroyed since both are setting to nullptr
-    m_selected_link_list = nullptr;
-}
-
 inline void TransactLogConvenientEncoder::select_link_list(const LinkView& list)
 {
     // A race between this and a call to on_link_list_destroyed() must
@@ -1081,15 +1068,14 @@ inline bool TransactLogEncoder::insert_link_column(size_t col_ndx, DataType type
 }
 
 
-inline void TransactLogConvenientEncoder::insert_column(const Descriptor& desc, size_t col_ndx, DataType type,
+inline void TransactLogConvenientEncoder::insert_column(const Table* t, size_t col_ndx, DataType type,
                                                         StringData name, LinkTargetInfo& link, bool nullable)
 {
-    select_desc(desc); // Throws
+    select_table(t); // Throws
     if (link.is_valid()) {
         typedef _impl::TableFriend tf;
-        typedef _impl::DescriptorFriend df;
         size_t target_table_ndx = link.m_target_table->get_index_in_group();
-        const Table& origin_table = df::get_root_table(desc);
+        const Table& origin_table = *t;
         REALM_ASSERT(origin_table.is_group_level());
         const Spec& target_spec = tf::get_spec(*(link.m_target_table));
         size_t origin_table_ndx = origin_table.get_index_in_group();
@@ -1115,23 +1101,20 @@ inline bool TransactLogEncoder::erase_link_column(size_t col_ndx, size_t link_ta
     return true;
 }
 
-inline void TransactLogConvenientEncoder::erase_column(const Descriptor& desc, size_t col_ndx)
+inline void TransactLogConvenientEncoder::erase_column(const Table* t, size_t col_ndx)
 {
-    select_desc(desc); // Throws
+    select_table(t); // Throws
 
-    DataType type = desc.get_column_type(col_ndx);
+    DataType type = t->get_column_type(col_ndx);
     typedef _impl::TableFriend tf;
     if (!tf::is_link_type(ColumnType(type))) {
         m_encoder.erase_column(col_ndx); // Throws
     }
     else { // it's a link column:
-        typedef _impl::DescriptorFriend df;
-        const Table& origin_table = df::get_root_table(desc);
-        REALM_ASSERT(origin_table.is_group_level());
-        const Table& target_table = *tf::get_link_target_table_accessor(origin_table, col_ndx);
+        const Table& target_table = *tf::get_link_target_table_accessor(*t, col_ndx);
         size_t target_table_ndx = target_table.get_index_in_group();
         const Spec& target_spec = tf::get_spec(target_table);
-        size_t origin_table_ndx = origin_table.get_index_in_group();
+        size_t origin_table_ndx = t->get_index_in_group();
         size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
         m_encoder.erase_link_column(col_ndx, target_table_ndx, backlink_col_ndx); // Throws
     }
@@ -1143,9 +1126,9 @@ inline bool TransactLogEncoder::rename_column(size_t col_ndx, StringData new_nam
     return true;
 }
 
-inline void TransactLogConvenientEncoder::rename_column(const Descriptor& desc, size_t col_ndx, StringData name)
+inline void TransactLogConvenientEncoder::rename_column(const Table* t, size_t col_ndx, StringData name)
 {
-    select_desc(desc);                      // Throws
+    select_table(t);                        // Throws
     m_encoder.rename_column(col_ndx, name); // Throws
 }
 
@@ -1156,9 +1139,9 @@ inline bool TransactLogEncoder::move_column(size_t from, size_t to)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::move_column(const Descriptor& desc, size_t from, size_t to)
+inline void TransactLogConvenientEncoder::move_column(const Table* t, size_t from, size_t to)
 {
-    select_desc(desc); // Throws
+    select_table(t); // Throws
     m_encoder.move_column(from, to);
 }
 
@@ -1325,7 +1308,9 @@ inline void TransactLogConvenientEncoder::set_link(const Table* t, size_t col_nd
                                                    Instruction variant)
 {
     select_table(t); // Throws
-    size_t target_group_level_ndx = t->get_descriptor()->get_column_link_target(col_ndx);
+    typedef _impl::TableFriend tf;
+    const Spec& spec = tf::get_spec(*t);
+    size_t target_group_level_ndx = spec.get_opposite_link_table_ndx(col_ndx);
     m_encoder.set_link(col_ndx, ndx, value, target_group_level_ndx, variant); // Throws
 }
 
@@ -1358,7 +1343,9 @@ inline bool TransactLogEncoder::nullify_link(size_t col_ndx, size_t ndx, size_t 
 inline void TransactLogConvenientEncoder::nullify_link(const Table* t, size_t col_ndx, size_t ndx)
 {
     select_table(t); // Throws
-    size_t target_group_level_ndx = t->get_descriptor()->get_column_link_target(col_ndx);
+    typedef _impl::TableFriend tf;
+    const Spec& spec = tf::get_spec(*t);
+    size_t target_group_level_ndx = spec.get_opposite_link_table_ndx(col_ndx);
     m_encoder.nullify_link(col_ndx, ndx, target_group_level_ndx); // Throws
 }
 
@@ -1505,9 +1492,9 @@ inline bool TransactLogEncoder::add_search_index(size_t col_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::add_search_index(const Descriptor& desc, size_t col_ndx)
+inline void TransactLogConvenientEncoder::add_search_index(const Table* t, size_t col_ndx)
 {
-    select_desc(desc);                   // Throws
+    select_table(t);                     // Throws
     m_encoder.add_search_index(col_ndx); // Throws
 }
 
@@ -1518,9 +1505,9 @@ inline bool TransactLogEncoder::remove_search_index(size_t col_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::remove_search_index(const Descriptor& desc, size_t col_ndx)
+inline void TransactLogConvenientEncoder::remove_search_index(const Table* t, size_t col_ndx)
 {
-    select_desc(desc);                      // Throws
+    select_table(t);                        // Throws
     m_encoder.remove_search_index(col_ndx); // Throws
 }
 
@@ -2077,20 +2064,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t col_ndx_1 = read_int<size_t>();          // Throws
             size_t col_ndx_2 = read_int<size_t>();          // Throws
             if (!handler.move_column(col_ndx_1, col_ndx_2)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SelectDescriptor: {
-            int levels = read_int<int>(); // Throws
-            if (levels < 0 || levels > m_max_levels)
-                parser_error();
-            m_path.reserve(0, levels); // Throws
-            size_t* path = m_path.data();
-            for (int i = 0; i != levels; ++i) {
-                size_t col_ndx = read_int<size_t>(); // Throws
-                path[i] = col_ndx;
-            }
-            if (!handler.select_descriptor(levels, path)) // Throws
                 parser_error();
             return;
         }

@@ -3638,7 +3638,7 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
         wt.get_group().rename_table("foo", "bar");
         auto bar = wt.get_table("bar");
         bar->rename_column(0, "b");
-        _impl::TableFriend::move_column(*bar->get_descriptor(), 1, 0);
+        _impl::TableFriend::move_column(*bar, 1, 0);
         wt.get_group().move_table(1, 0);
         wt.commit();
     }

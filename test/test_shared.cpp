@@ -2482,34 +2482,34 @@ TEST(Shared_MovingEnumStringColumn)
         for (int i = 0; i < 64; ++i)
             table->set_string(0, i, "foo");
         table->optimize();
-        CHECK_EQUAL(1, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(1, table->get_num_unique_values(0));
         wt.commit();
     }
     // Insert new string enumeration column
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("foo");
-        CHECK_EQUAL(1, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(1, table->get_num_unique_values(0));
         table->insert_column(0, type_String, "");
         for (int i = 0; i < 64; ++i)
             table->set_string(0, i, i % 2 == 0 ? "a" : "b");
         table->optimize();
         wt.get_group().verify();
-        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
-        CHECK_EQUAL(1, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(2, table->get_num_unique_values(0));
+        CHECK_EQUAL(1, table->get_num_unique_values(1));
         table->set_string(1, 0, "bar0");
         table->set_string(1, 1, "bar1");
         wt.get_group().verify();
-        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
-        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(2, table->get_num_unique_values(0));
+        CHECK_EQUAL(3, table->get_num_unique_values(1));
         wt.commit();
     }
     {
         ReadTransaction rt(sg);
         rt.get_group().verify();
         ConstTableRef table = rt.get_table("foo");
-        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
-        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(2, table->get_num_unique_values(0));
+        CHECK_EQUAL(3, table->get_num_unique_values(1));
         for (int i = 0; i < 64; ++i) {
             std::string value = table->get_string(0, i);
             if (i % 2 == 0) {
@@ -2535,21 +2535,21 @@ TEST(Shared_MovingEnumStringColumn)
         WriteTransaction wt(sg);
         wt.get_group().verify();
         TableRef table = wt.get_table("foo");
-        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
-        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(2, table->get_num_unique_values(0));
+        CHECK_EQUAL(3, table->get_num_unique_values(1));
         table->remove_column(0);
         wt.get_group().verify();
-        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(3, table->get_num_unique_values(0));
         table->set_string(0, 2, "bar2");
         wt.get_group().verify();
-        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_num_unique_values(0));
         wt.commit();
     }
     {
         ReadTransaction rt(sg);
         rt.get_group().verify();
         ConstTableRef table = rt.get_table("foo");
-        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_num_unique_values(0));
         for (int i = 0; i < 64; ++i) {
             std::string value = table->get_string(0, i);
             if (i == 0) {
@@ -2592,8 +2592,8 @@ TEST(Shared_MovingSearchIndex)
         }
         table->set_string(1, 63, "bar63");
         table->optimize();
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
-        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(0, table->get_num_unique_values(0));
+        CHECK_EQUAL(2, table->get_num_unique_values(1));
         table->add_search_index(0);
         table->add_search_index(1);
         wt.get_group().verify();
@@ -2605,21 +2605,21 @@ TEST(Shared_MovingSearchIndex)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("foo");
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
-        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(0, table->get_num_unique_values(0));
+        CHECK_EQUAL(2, table->get_num_unique_values(1));
         CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
         CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
         table->insert_column(0, type_Int, "i");
         wt.get_group().verify();
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
-        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(0, table->get_num_unique_values(1));
+        CHECK_EQUAL(2, table->get_num_unique_values(2));
         CHECK_EQUAL(62, table->find_first_string(1, "foo62"));
         CHECK_EQUAL(63, table->find_first_string(2, "bar63"));
         table->set_string(1, 0, "foo_X");
         table->set_string(2, 0, "bar_X");
         wt.get_group().verify();
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
-        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(0, table->get_num_unique_values(1));
+        CHECK_EQUAL(3, table->get_num_unique_values(2));
         CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
         CHECK_EQUAL(realm::not_found, table->find_first_string(2, "bad"));
         CHECK_EQUAL(0, table->find_first_string(1, "foo_X"));
@@ -2637,8 +2637,8 @@ TEST(Shared_MovingSearchIndex)
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("foo");
         CHECK(table->has_search_index(1) && table->has_search_index(2));
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
-        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(0, table->get_num_unique_values(1));
+        CHECK_EQUAL(3, table->get_num_unique_values(2));
         CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
         CHECK_EQUAL(realm::not_found, table->find_first_string(2, "bad"));
         CHECK_EQUAL(0, table->find_first_string(1, "foo_X"));
@@ -2652,8 +2652,8 @@ TEST(Shared_MovingSearchIndex)
         table->remove_column(0);
         wt.get_group().verify();
         CHECK(table->has_search_index(0) && table->has_search_index(1));
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
-        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(0, table->get_num_unique_values(0));
+        CHECK_EQUAL(3, table->get_num_unique_values(1));
         CHECK_EQUAL(realm::not_found, table->find_first_string(0, "bad"));
         CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
         CHECK_EQUAL(0, table->find_first_string(0, "foo_X"));
@@ -2668,8 +2668,8 @@ TEST(Shared_MovingSearchIndex)
         table->set_string(1, 1, "bar_Y");
         wt.get_group().verify();
         CHECK(table->has_search_index(0) && table->has_search_index(1));
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
-        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(0, table->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_num_unique_values(1));
         CHECK_EQUAL(realm::not_found, table->find_first_string(0, "bad"));
         CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
         CHECK_EQUAL(0, table->find_first_string(0, "foo_X"));
@@ -2688,8 +2688,8 @@ TEST(Shared_MovingSearchIndex)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("foo");
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
-        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(0, table->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_num_unique_values(1));
         CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
         CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
 
@@ -2702,9 +2702,9 @@ TEST(Shared_MovingSearchIndex)
         table->remove_search_index(1);
         wt.get_group().verify();
 
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
-        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(0, table->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_num_unique_values(1));
+        CHECK_EQUAL(0, table->get_num_unique_values(2));
         CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
         CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
         CHECK_EQUAL(60, table->find_first_int(2, 60));
@@ -2721,9 +2721,9 @@ TEST(Shared_MovingSearchIndex)
         table->add_search_index(0);
         wt.get_group().verify();
 
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
-        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(0, table->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_num_unique_values(1));
+        CHECK_EQUAL(0, table->get_num_unique_values(2));
         CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
         CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
         CHECK_EQUAL(60, table->find_first_int(2, 60));
@@ -2734,9 +2734,9 @@ TEST(Shared_MovingSearchIndex)
         table->remove_search_index(0);
         wt.get_group().verify();
 
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
-        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
-        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(0, table->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_num_unique_values(1));
+        CHECK_EQUAL(0, table->get_num_unique_values(2));
         CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
         CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
         CHECK_EQUAL(60, table->find_first_int(2, 60));

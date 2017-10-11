@@ -22,7 +22,6 @@ set(REALM_SOURCES
     column_string.cpp
     column_string_enum.cpp
     column_timestamp.cpp
-    descriptor.cpp
     disable_sync_to_disk.cpp
     exceptions.cpp
     group.cpp
@@ -100,8 +99,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     column_type.hpp
     column_type_traits.hpp
     data_type.hpp
-    descriptor.hpp
-    descriptor_fwd.hpp
     disable_sync_to_disk.hpp
     exceptions.hpp
     group.hpp

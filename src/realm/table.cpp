@@ -29,7 +29,6 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/table.hpp>
-#include <realm/descriptor.hpp>
 #include <realm/alloc_slab.hpp>
 #include <realm/column.hpp>
 #include <realm/column_string.hpp>
@@ -275,23 +274,54 @@ const int_fast64_t realm::Table::min_integer;
 
 // -- Table ---------------------------------------------------------------------------------
 
-size_t Table::add_column(DataType type, StringData name, bool nullable, DescriptorRef* subdesc)
+size_t Table::add_column(DataType type, StringData name, bool nullable)
 {
-    return get_descriptor()->add_column(type, name, subdesc, nullable); // Throws
+    size_t col_ndx = get_column_count();
+    insert_column(col_ndx, type, name, nullable); // Throws
+    return col_ndx;
 }
+
 size_t Table::add_column_list(DataType type, StringData name)
 {
-    return get_descriptor()->add_column_list(type, name); // Throws
+    size_t col_ndx = get_column_count();
+
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+
+    LinkTargetInfo invalid_link;
+    do_insert_column(col_ndx, type, name, invalid_link, false, true); // Throws
+
+    return col_ndx;
 }
+
 size_t Table::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
 {
-    return get_descriptor()->add_column_link(type, name, target, link_type); // Throws
+    size_t col_ndx = get_column_count();
+    insert_column_link(col_ndx, type, name, target, link_type); // Throws
+    return col_ndx;
 }
 
 
 void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target, LinkType link_type)
 {
-    get_descriptor()->insert_column_link(col_ndx, type, name, target, link_type); // Throws
+    if (REALM_UNLIKELY(!is_attached() || !target.is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(col_ndx > get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+    if (REALM_UNLIKELY(!is_link_type(ColumnType(type))))
+        throw LogicError(LogicError::illegal_type);
+    // Both origin and target must be group-level tables, and in the same group.
+    Group* origin_group = get_parent_group();
+    Group* target_group = target.get_parent_group();
+    if (!origin_group || !target_group)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    if (origin_group != target_group)
+        throw LogicError(LogicError::group_mismatch);
+
+    LinkTargetInfo link(&target);
+    do_insert_column(col_ndx, type, name, link); // Throws
+
+    set_link_type(col_ndx, link_type); // Throws
 }
 
 
@@ -388,43 +418,63 @@ void Table::remove_backlink_broken_rows(const CascadeState& cascade_state)
 }
 
 
-void Table::insert_column(size_t col_ndx, DataType type, StringData name, bool nullable, DescriptorRef* subdesc)
+void Table::insert_column(size_t col_ndx, DataType type, StringData name, bool nullable)
 {
-    get_descriptor()->insert_column(col_ndx, type, name, subdesc, nullable); // Throws
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(col_ndx > get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+    if (REALM_UNLIKELY(is_link_type(ColumnType(type))))
+        throw LogicError(LogicError::illegal_type);
+
+    LinkTargetInfo invalid_link;
+    do_insert_column(col_ndx, type, name, invalid_link, nullable); // Throws
 }
 
 
 void Table::remove_column(size_t col_ndx)
 {
-    get_descriptor()->remove_column(col_ndx); // Throws
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(col_ndx >= get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
+    // It is possible that the column to be removed is the last column. If there
+    // are no backlink columns, then the removal of the last column is enough to
+    // effectively truncate the size (number of rows) to zero, since the number of rows
+    // is simply the number of entries in each column. Although the size of the table at
+    // this point will be zero (locally), we need to explicitly inject a clear operation
+    // so that sync can handle conflicts with adding rows. Additionally, if there
+    // are backlink columns, we need to inject a clear operation before
+    // the column removal to correctly reproduce the desired effect, namely that
+    // the table appears truncated after the removal of the last non-hidden
+    // column. The clear operation needs to be submitted to the replication
+    // handler as an individual operation, and precede the column removal
+    // operation in order to get the right behaviour in
+    // Group::advance_transact().
+    if (get_column_count() == 1)
+        clear(); // Throws
+
+    if (Replication* repl = get_repl())
+        repl->erase_column(this, col_ndx); // Throws
+
+    bump_version();
+    erase_root_column(col_ndx); // Throws
 }
 
 
 void Table::rename_column(size_t col_ndx, StringData name)
 {
-    get_descriptor()->rename_column(col_ndx, name); // Throws
-}
-
-
-DescriptorRef Table::get_descriptor()
-{
     REALM_ASSERT(is_attached());
 
-    DescriptorRef desc = m_descriptor.lock();
-    if (!desc) {
-        typedef _impl::DescriptorFriend df;
-        desc = df::create(); // Throws
-        DescriptorRef parent = nullptr;
-        df::attach(*desc, this, parent, m_spec.get());
-        m_descriptor = desc;
-    }
-    return desc;
-}
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
 
+    m_spec->rename_column(col_ndx, name); // Throws
 
-ConstDescriptorRef Table::get_descriptor() const
-{
-    return const_cast<Table*>(this)->get_descriptor(); // Throws
+    bump_version();
+
+    if (Replication* repl = get_repl())
+        repl->rename_column(this, col_ndx, name); // Throws
 }
 
 
@@ -486,54 +536,41 @@ void Table::init(Spec* shared_spec, ArrayParent* parent_column, size_t parent_ro
 }
 
 
-void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
-                             bool nullable, bool listtype)
+void Table::do_insert_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link, bool nullable,
+                             bool listtype)
 {
-    REALM_ASSERT(desc.is_attached());
-
-    if (REALM_UNLIKELY(name.size() > Descriptor::max_column_name_length))
-        throw LogicError(LogicError::column_name_too_long);
-
-    typedef _impl::DescriptorFriend df;
-    Table& root_table = df::get_root_table(desc);
-
     if (type == type_Link)
         nullable = true;
 
-    root_table.bump_version();
-    root_table.insert_root_column(col_ndx, type, name, link, nullable, listtype); // Throws
+    bump_version();
+    insert_root_column(col_ndx, type, name, link, nullable, listtype); // Throws
 
-    if (Replication* repl = root_table.get_repl())
-        repl->insert_column(desc, col_ndx, type, name, link, nullable); // Throws
+    if (Replication* repl = get_repl())
+        repl->insert_column(this, col_ndx, type, name, link, nullable); // Throws
 }
 
 
-void Table::do_insert_column_unless_exists(Descriptor& desc, size_t col_ndx, DataType type, StringData name,
-                                           LinkTargetInfo& link, bool nullable, bool* was_inserted)
+void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
+                                           bool nullable, bool* was_inserted)
 {
-    using df = _impl::DescriptorFriend;
-    using tf = _impl::TableFriend;
-
-    Spec& spec = df::get_spec(desc);
-
-    size_t existing_ndx = spec.get_column_index(name);
+    size_t existing_ndx = get_column_index(name);
     if (existing_ndx != npos) {
         col_ndx = existing_ndx;
     }
 
-    if (col_ndx < spec.get_public_column_count()) {
-        StringData existing_name = spec.get_column_name(col_ndx);
+    if (col_ndx < get_column_count()) {
+        StringData existing_name = get_column_name(col_ndx);
         if (existing_name == name) {
-            DataType existing_type = spec.get_public_column_type(col_ndx);
+            DataType existing_type = get_column_type(col_ndx);
             if (existing_type != type) {
                 throw LogicError(LogicError::type_mismatch);
             }
-            bool existing_is_nullable = (spec.get_column_attr(col_ndx) & col_attr_Nullable) != 0;
+            bool existing_is_nullable = is_nullable(col_ndx);
             if (existing_is_nullable != nullable) {
                 throw LogicError(LogicError::type_mismatch);
             }
-            if (tf::is_link_type(ColumnType(type)) &&
-                spec.get_opposite_link_table_ndx(col_ndx) != link.m_target_table->get_index_in_group()) {
+            if (is_link_type(ColumnType(type)) &&
+                m_spec->get_opposite_link_table_ndx(col_ndx) != link.m_target_table->get_index_in_group()) {
                 throw LogicError(LogicError::type_mismatch);
             }
 
@@ -544,127 +581,118 @@ void Table::do_insert_column_unless_exists(Descriptor& desc, size_t col_ndx, Dat
             return;
         }
         else {
-            REALM_ASSERT_3(spec.get_column_index(name), ==, npos);
+            REALM_ASSERT_3(get_column_index(name), ==, npos);
         }
     }
 
-    do_insert_column(desc, col_ndx, type, name, link, nullable);
+    do_insert_column(col_ndx, type, name, link, nullable);
     if (was_inserted) {
         *was_inserted = true;
     }
 }
 
 
-void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
+void Table::do_move_column(size_t col_ndx_1, size_t col_ndx_2)
 {
-    REALM_ASSERT(desc.is_attached());
+    REALM_ASSERT(is_attached());
 
-    typedef _impl::DescriptorFriend df;
-    Table& root_table = df::get_root_table(desc);
-    REALM_ASSERT_3(col_ndx, <, desc.get_column_count());
+    REALM_ASSERT_3(col_ndx_1, <, get_column_count());
+    REALM_ASSERT_3(col_ndx_2, <, get_column_count());
 
-    // It is possible that the column to be removed is the last column. If there
-    // are no backlink columns, then the removal of the last column is enough to
-    // effectively truncate the size (number of rows) to zero, since the number of rows
-    // is simply the number of entries in each column. Although the size of the table at
-    // this point will be zero (locally), we need to explicitly inject a clear operation
-    // so that sync can handle conflicts with adding rows. Additionally, if there
-    // are backlink columns, we need to inject a clear operation before
-    // the column removal to correctly reproduce the desired effect, namely that
-    // the table appears truncated after the removal of the last non-hidden
-    // column. The clear operation needs to be submitted to the replication
-    // handler as an individual operation, and precede the column removal
-    // operation in order to get the right behaviour in
-    // Group::advance_transact().
-    if (root_table.m_spec->get_public_column_count() == 1)
-        root_table.clear(); // Throws
+    if (Replication* repl = get_repl())
+        repl->move_column(this, col_ndx_1, col_ndx_2);
 
-    if (Replication* repl = root_table.get_repl())
-        repl->erase_column(desc, col_ndx); // Throws
-
-    root_table.bump_version();
-    root_table.erase_root_column(col_ndx); // Throws
+    bump_version();
+    move_root_column(col_ndx_1, col_ndx_2);
 }
 
 
-void Table::do_move_column(Descriptor& desc, size_t col_ndx_1, size_t col_ndx_2)
+void Table::add_search_index(size_t column_ndx)
 {
-    REALM_ASSERT(desc.is_attached());
-
-    using df = _impl::DescriptorFriend;
-    Table& root_table = df::get_root_table(desc);
-    REALM_ASSERT_3(col_ndx_1, <, desc.get_column_count());
-    REALM_ASSERT_3(col_ndx_2, <, desc.get_column_count());
-
-    if (Replication* repl = root_table.get_repl())
-        repl->move_column(desc, col_ndx_1, col_ndx_2);
-
-    root_table.bump_version();
-    root_table.move_root_column(col_ndx_1, col_ndx_2);
-}
-
-
-void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
-{
-    REALM_ASSERT(desc.is_attached());
-
-    typedef _impl::DescriptorFriend df;
-    Table& root_table = df::get_root_table(desc);
-    REALM_ASSERT_3(col_ndx, <, desc.get_column_count());
-
-    Spec& spec = df::get_spec(desc);
-    spec.rename_column(col_ndx, name); // Throws
-
-    root_table.bump_version();
-
-    if (Replication* repl = root_table.get_repl())
-        repl->rename_column(desc, col_ndx, name); // Throws
-}
-
-void Table::do_add_search_index(Descriptor& descr, size_t column_ndx)
-{
-    typedef _impl::DescriptorFriend df;
-    Spec& spec = df::get_spec(descr);
-
-    if (REALM_UNLIKELY(column_ndx >= spec.get_public_column_count()))
+    if (REALM_UNLIKELY(column_ndx >= get_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
 
     // Early-out of already indexed
-    if (descr.has_search_index(column_ndx))
+    if (has_search_index(column_ndx))
         return;
 
-    Table& root_table = df::get_root_table(descr);
-    int attr = spec.get_column_attr(column_ndx);
+    int attr = m_spec->get_column_attr(column_ndx);
 
-    root_table._add_search_index(column_ndx);
+    ColumnBase& col = get_column_base(column_ndx);
 
-    spec.set_column_attr(column_ndx, ColumnAttr(attr | col_attr_Indexed)); // Throws
+    if (!col.supports_search_index())
+        throw LogicError(LogicError::illegal_combination);
 
-    if (Replication* repl = root_table.get_repl())
-        repl->add_search_index(descr, column_ndx); // Throws
+    // Create the index
+    StringIndex* index = col.create_search_index(); // Throws
+    if (!index) {
+        throw LogicError(LogicError::illegal_combination);
+    }
+
+    // The index goes in the list of column refs immediate after the owning column
+    size_t index_pos = m_spec->get_column_info(column_ndx).m_column_ref_ndx + 1;
+    index->set_parent(&m_columns, index_pos);
+    m_columns.insert(index_pos, index->get_ref()); // Throws
+
+    // Mark the column as having an index
+    attr = m_spec->get_column_attr(column_ndx);
+    attr |= col_attr_Indexed;
+    m_spec->set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+
+    // Update column accessors for all columns after the one we just added an
+    // index for, as their position in `m_columns` has changed
+    refresh_column_accessors(column_ndx + 1); // Throws
+
+    m_spec->set_column_attr(column_ndx, ColumnAttr(attr | col_attr_Indexed)); // Throws
+
+    if (Replication* repl = get_repl())
+        repl->add_search_index(this, column_ndx); // Throws
 }
 
-void Table::do_remove_search_index(Descriptor& descr, size_t column_ndx)
+void Table::remove_search_index(size_t column_ndx)
 {
-    typedef _impl::DescriptorFriend df;
-    Spec& spec = df::get_spec(descr);
-
-    if (REALM_UNLIKELY(column_ndx >= spec.get_public_column_count()))
+    if (REALM_UNLIKELY(column_ndx >= get_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
 
     // Early-out of non-indexed
-    if (!descr.has_search_index(column_ndx))
+    if (!has_search_index(column_ndx))
         return;
 
-    Table& root_table = df::get_root_table(descr);
-    int attr = spec.get_column_attr(column_ndx);
+    int attr = m_spec->get_column_attr(column_ndx);
 
-    root_table._remove_search_index(column_ndx);
+    // Destroy and remove the index column
+    ColumnBase& col = get_column_base(column_ndx);
+    col.get_search_index()->destroy();
+    col.destroy_search_index();
 
-    spec.set_column_attr(column_ndx, ColumnAttr(attr & ~col_attr_Indexed)); // Throws
+    // The index is always immediately after the column in m_columns
+    size_t index_pos = m_spec->get_column_info(column_ndx).m_column_ref_ndx + 1;
+    m_columns.erase(index_pos);
 
-    if (Replication* repl = root_table.get_repl())
-        repl->remove_search_index(descr, column_ndx); // Throws
+    // Mark the column as no longer having an index
+    attr = m_spec->get_column_attr(column_ndx);
+    attr &= ~col_attr_Indexed;
+    m_spec->set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+
+    // Update column accessors for all columns after the one we just removed the
+    // index for, as their position in `m_columns` has changed
+    refresh_column_accessors(column_ndx + 1); // Throws
+
+    m_spec->set_column_attr(column_ndx, ColumnAttr(attr & ~col_attr_Indexed)); // Throws
+
+    if (Replication* repl = get_repl())
+        repl->remove_search_index(this, column_ndx); // Throws
+}
+
+size_t Table::get_num_unique_values(size_t column_ndx) const
+{
+    REALM_ASSERT(is_attached());
+    ColumnType col_type = m_spec->get_column_type(column_ndx);
+    if (col_type != col_type_StringEnum)
+        return 0;
+    ref_type ref = m_spec->get_enumkeys_ref(column_ndx);
+    StringColumn col(m_spec->get_alloc(), ref); // Throws
+    return col.size();
 }
 
 void Table::insert_root_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link_target,
@@ -818,7 +846,7 @@ void Table::do_move_root_column(size_t from_ndx, size_t to_ndx)
 }
 
 
-void Table::do_set_link_type(size_t col_ndx, LinkType link_type)
+void Table::set_link_type(size_t col_ndx, LinkType link_type)
 {
     bool weak_links = false;
     switch (link_type) {
@@ -1016,7 +1044,7 @@ void Table::discard_row_accessors() noexcept
 }
 
 
-void Table::update_accessors(const size_t* col_path_begin, const size_t* col_path_end, AccessorUpdater& updater)
+void Table::update_accessors(AccessorUpdater& updater)
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -1024,7 +1052,6 @@ void Table::update_accessors(const size_t* col_path_begin, const size_t* col_pat
 
     REALM_ASSERT(is_attached());
 
-    REALM_ASSERT(col_path_begin == col_path_end);
     updater.update(*this); // Throws
 }
 
@@ -1037,8 +1064,6 @@ void Table::detach() noexcept
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
     m_spec.detach();
-
-    discard_desc_accessor();
 
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
@@ -1064,18 +1089,6 @@ void Table::discard_child_accessors() noexcept
         if (col != nullptr) {
             col->discard_child_accessors();
         }
-    }
-}
-
-
-void Table::discard_desc_accessor() noexcept
-{
-    // Must hold a reliable reference count while detaching
-    DescriptorRef desc = m_descriptor.lock();
-    if (desc) {
-        typedef _impl::DescriptorFriend df;
-        df::detach(*desc);
-        m_descriptor.reset();
     }
 }
 
@@ -1365,75 +1378,6 @@ void Table::upgrade_olddatetime()
         static_cast<void>(col_type);
         REALM_ASSERT(col_type != col_type_OldDateTime);
     }
-}
-
-
-void Table::add_search_index(size_t col_ndx)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-
-    get_descriptor()->add_search_index(col_ndx);
-}
-
-
-void Table::remove_search_index(size_t col_ndx)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-
-    get_descriptor()->remove_search_index(col_ndx);
-}
-
-
-void Table::_add_search_index(size_t col_ndx)
-{
-    ColumnBase& col = get_column_base(col_ndx);
-
-    if (!col.supports_search_index())
-        throw LogicError(LogicError::illegal_combination);
-
-    // Create the index
-    StringIndex* index = col.create_search_index(); // Throws
-    if (!index) {
-        throw LogicError(LogicError::illegal_combination);
-    }
-
-    // The index goes in the list of column refs immediate after the owning column
-    size_t index_pos = m_spec->get_column_info(col_ndx).m_column_ref_ndx + 1;
-    index->set_parent(&m_columns, index_pos);
-    m_columns.insert(index_pos, index->get_ref()); // Throws
-
-    // Mark the column as having an index
-    int attr = m_spec->get_column_attr(col_ndx);
-    attr |= col_attr_Indexed;
-    m_spec->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
-
-    // Update column accessors for all columns after the one we just added an
-    // index for, as their position in `m_columns` has changed
-    refresh_column_accessors(col_ndx + 1); // Throws
-}
-
-
-void Table::_remove_search_index(size_t col_ndx)
-{
-    // Destroy and remove the index column
-    ColumnBase& col = get_column_base(col_ndx);
-    col.get_search_index()->destroy();
-    col.destroy_search_index();
-
-    // The index is always immediately after the column in m_columns
-    size_t index_pos = m_spec->get_column_info(col_ndx).m_column_ref_ndx + 1;
-    m_columns.erase(index_pos);
-
-    // Mark the column as no longer having an index
-    int attr = m_spec->get_column_attr(col_ndx);
-    attr &= ~col_attr_Indexed;
-    m_spec->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
-
-    // Update column accessors for all columns after the one we just removed the
-    // index for, as their position in `m_columns` has changed
-    refresh_column_accessors(col_ndx + 1); // Throws
 }
 
 

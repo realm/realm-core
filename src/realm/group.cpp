@@ -1530,41 +1530,13 @@ public:
         return true; // No-op
     }
 
-    bool select_descriptor(int levels, const size_t* path)
-    {
-        m_desc.reset();
-        if (m_table) {
-            typedef _impl::TableFriend tf;
-            DescriptorRef desc = tf::get_root_table_desc_accessor(*m_table);
-            int i = 0;
-            while (desc) {
-                if (i >= levels) {
-                    m_desc = desc;
-                    break;
-                }
-                REALM_ASSERT(levels == 0);
-                /*
-                typedef _impl::DescriptorFriend df;
-                size_t col_ndx = path[i];
-                desc = df::get_subdesc_accessor(*desc, col_ndx);
-                ++i;
-                */
-            }
-            m_desc_path_begin = path;
-            m_desc_path_end = path + levels;
-            MarkDirtyUpdater updater;
-            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
-        }
-        return true;
-    }
-
     bool insert_column(size_t col_ndx, DataType, StringData, bool nullable)
     {
         static_cast<void>(nullable);
         if (m_table) {
             typedef _impl::TableFriend tf;
             InsertColumnUpdater updater(col_ndx);
-            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+            tf::update_accessors(*m_table, updater);
         }
 
         m_schema_changed = true;
@@ -1578,7 +1550,7 @@ public:
         if (m_table) {
             InsertColumnUpdater updater(col_ndx);
             using tf = _impl::TableFriend;
-            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+            tf::update_accessors(*m_table, updater);
         }
         // Since insertion of a link column also modifies the target table by
         // adding a backlink column there, the target table accessor needs to be
@@ -1606,7 +1578,7 @@ public:
         if (m_table) {
             typedef _impl::TableFriend tf;
             EraseColumnUpdater updater(col_ndx);
-            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+            tf::update_accessors(*m_table, updater);
         }
 
         m_schema_changed = true;
@@ -1633,7 +1605,7 @@ public:
         if (m_table) {
             EraseColumnUpdater updater(col_ndx);
             using tf = _impl::TableFriend;
-            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+            tf::update_accessors(*m_table, updater);
         }
 
         m_schema_changed = true;
@@ -1652,7 +1624,7 @@ public:
         if (m_table) {
             typedef _impl::TableFriend tf;
             MoveColumnUpdater updater(col_ndx_1, col_ndx_2);
-            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+            tf::update_accessors(*m_table, updater);
         }
 
         m_schema_changed = true;
@@ -1739,9 +1711,6 @@ public:
 private:
     Group& m_group;
     TableRef m_table;
-    DescriptorRef m_desc;
-    const size_t* m_desc_path_begin;
-    const size_t* m_desc_path_end;
     bool& m_schema_changed;
 };
 
