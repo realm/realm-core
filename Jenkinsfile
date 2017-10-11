@@ -465,11 +465,11 @@ def doBuildCoverage() {
           cmake -G Ninja -D REALM_COVERAGE=ON ..
           ninja
           cd ..
-          lcov --no-external --capture --initial --directory . --output-file ${workspace}/coverage-base.info
+          lcov --no-external --capture --initial --directory ./src --output-file ${workspace}/coverage-base.info
           cd build/test
           ./realm-tests
           cd ../..
-          lcov --no-external --directory . --capture --output-file ${workspace}/coverage-test.info
+          lcov --no-external --directory ./src --capture --output-file ${workspace}/coverage-test.info
           lcov --add-tracefile ${workspace}/coverage-base.info --add-tracefile coverage-test.info --output-file ${workspace}/coverage-total.info
           lcov --remove ${workspace}/coverage-total.info '/usr/*' '${workspace}/test/*' --output-file ${workspace}/coverage-filtered.info
           rm coverage-base.info coverage-test.info coverage-total.info
