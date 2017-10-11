@@ -829,6 +829,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             File::UnmapGuard fug(m_file_map);
             SharedInfo* info_2 = m_file_map.get_addr();
             info_2->init_complete = 1;
+            m_file_map.sync();
         }
 
         // We hold the shared lock from here until we close the file!
@@ -1227,6 +1228,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                 REALM_ASSERT(!info->sync_agent_present);
                 info->sync_agent_present = 1; // Set to true
             }
+            m_file_map.sync();
 
             // Initially wait_for_change is enabled
             m_wait_for_change_enabled = true;
@@ -1236,7 +1238,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             fug_2.release(); // Do not unmap
             fug_1.release(); // Do not unmap
             fcg.release();   // Do not close
-        }
+        } // release lock on m_control mutex
         break;
     }
 
@@ -1432,6 +1434,7 @@ void SharedGroup::close_internal(std::unique_lock<InterprocessMutex> lock) noexc
             if (Replication* repl = gf::get_replication(m_group))
                 repl->terminate_session();
         }
+        m_file_map.sync();
         lock.unlock();
     }
 #ifdef REALM_ASYNC_DAEMON
