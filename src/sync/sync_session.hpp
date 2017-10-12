@@ -149,7 +149,9 @@ public:
     //
     // NOTE: This is intended for use only in very specific circumstances. Please check with the
     // object store team before using it.
+#if (REALM_VERSION_MAJOR >= 4)
     void override_server(std::string address, int port);
+#endif
 
     // An object representing the user who owns the Realm this `SyncSession` represents.
     std::shared_ptr<SyncUser> user() const
