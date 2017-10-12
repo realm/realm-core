@@ -287,6 +287,10 @@ if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE)
         set(OPENSSL_ROOT_DIR "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}")
         set(OPENSSL_INCLUDE_DIR "${OPENSSL_ROOT_DIR}/include")
         set(OPENSSL_CRYPTO_LIBRARY "${OPENSSL_ROOT_DIR}/lib/libcrypto.a")
+        install(
+            DIRECTORY ${OPENSSL_ROOT_DIR}
+            DESTINATION .
+            COMPONENT devel)
     endif()
     find_package(OpenSSL REQUIRED)
     target_include_directories(realm-objects PUBLIC ${OPENSSL_INCLUDE_DIR})
