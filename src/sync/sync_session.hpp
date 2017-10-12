@@ -143,6 +143,16 @@ public:
     // Inform the sync session that it should log out.
     void log_out();
 
+    // Override the address and port of the server that this `SyncSession` is connected to. If the
+    // session is already connected, it will disconnect and then reconnect to the specified address.
+    // If it's not already connected, future connection attempts will be to the specified address.
+    //
+    // NOTE: This is intended for use only in very specific circumstances. Please check with the
+    // object store team before using it.
+#if (REALM_VERSION_MAJOR >= 4)
+    void override_server(std::string address, int port);
+#endif
+
     // An object representing the user who owns the Realm this `SyncSession` represents.
     std::shared_ptr<SyncUser> user() const
     {
@@ -309,6 +319,14 @@ private:
         std::function<void(std::error_code)> callback;
     };
     std::vector<CompletionWaitPackage> m_completion_wait_packages;
+
+#if (REALM_VERSION_MAJOR >= 4)
+    struct ServerOverride {
+        std::string address;
+        int port;
+    };
+    util::Optional<ServerOverride> m_server_override;
+#endif
 
     // The underlying `Session` object that is owned and managed by this `SyncSession`.
     // The session is first created when the `SyncSession` is moved out of its initial `inactive` state.
