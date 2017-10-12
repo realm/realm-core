@@ -143,6 +143,12 @@ public:
     // Inform the sync session that it should log out.
     void log_out();
 
+    // Override the address and port of the server that this `SyncSession` is connected to. If the
+    // session is already connected, it will disconnect and then reconnect to the specified address.
+    // If it's not already connected, future connection attempts will be to the specified address.
+    //
+    // NOTE: This is intended for use only in very specific circumstances. Please check with the
+    // object store team before using it.
     void override_server(std::string address, int port);
 
     // An object representing the user who owns the Realm this `SyncSession` represents.
