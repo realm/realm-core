@@ -318,11 +318,13 @@ private:
     };
     std::vector<CompletionWaitPackage> m_completion_wait_packages;
 
+#if (REALM_VERSION_MAJOR >= 4)
     struct ServerOverride {
         std::string address;
         int port;
     };
     util::Optional<ServerOverride> m_server_override;
+#endif
 
     // The underlying `Session` object that is owned and managed by this `SyncSession`.
     // The session is first created when the `SyncSession` is moved out of its initial `inactive` state.

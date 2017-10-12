@@ -130,7 +130,9 @@ struct SyncSession::State {
         return false;
     }
 
+#if (REALM_VERSION_MAJOR >= 4)
     virtual void override_server(std::unique_lock<std::mutex>&, SyncSession&, std::string, int) const { }
+#endif
 
     static const State& waiting_for_access_token;
     static const State& active;
@@ -163,8 +165,10 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
             session.m_session_has_been_bound = true;
         }
 
+#if (REALM_VERSION_MAJOR >= 4)
         if (session.m_server_override)
             session.m_session->override_server(session.m_server_override->address, session.m_server_override->port);
+#endif
 
         // Register all the pending wait-for-completion blocks.
         for (auto& package : session.m_completion_wait_packages) {
@@ -234,11 +238,13 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
         return true;
     }
 
+#if (REALM_VERSION_MAJOR >= 4)
     void override_server(std::unique_lock<std::mutex>&, SyncSession& session,
                          std::string address, int port) const override
     {
         session.m_server_override = SyncSession::ServerOverride{address, port};
     }
+#endif
 };
 
 struct sync_session_states::Active : public SyncSession::State {
@@ -304,12 +310,14 @@ struct sync_session_states::Active : public SyncSession::State {
         session.m_session->cancel_reconnect_delay();
     }
 
+#if (REALM_VERSION_MAJOR >= 4)
     void override_server(std::unique_lock<std::mutex>&, SyncSession& session,
                          std::string address, int port) const override
     {
         session.m_server_override = SyncSession::ServerOverride{address, port};
         session.m_session->override_server(address, port);
     }
+#endif
 };
 
 struct sync_session_states::Dying : public SyncSession::State {
@@ -361,12 +369,14 @@ struct sync_session_states::Dying : public SyncSession::State {
         return true;
     }
 
+#if (REALM_VERSION_MAJOR >= 4)
     void override_server(std::unique_lock<std::mutex>&, SyncSession& session,
                          std::string address, int port) const override
     {
         session.m_server_override = SyncSession::ServerOverride{address, port};
         session.m_session->override_server(address, port);
     }
+#endif
 };
 
 struct sync_session_states::Inactive : public SyncSession::State {
@@ -406,11 +416,13 @@ struct sync_session_states::Inactive : public SyncSession::State {
         return true;
     }
 
+#if (REALM_VERSION_MAJOR >= 4)
     void override_server(std::unique_lock<std::mutex>&, SyncSession& session,
                          std::string address, int port) const override
     {
         session.m_server_override = SyncSession::ServerOverride{address, port};
     }
+#endif
 };
 
 struct sync_session_states::Error : public SyncSession::State {
@@ -871,11 +883,13 @@ void SyncSession::bind_with_admin_token(std::string admin_token, std::string ser
     m_state->bind_with_admin_token(lock, *this, admin_token, server_url);
 }
 
+#if (REALM_VERSION_MAJOR >= 4)
 void SyncSession::override_server(std::string address, int port)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     m_state->override_server(lock, *this, std::move(address), port);
 }
+#endif
 
 SyncSession::PublicState SyncSession::state() const
 {
