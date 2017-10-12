@@ -2,6 +2,28 @@
 
 ### Bugfixes
 
+* Lorem ipsum.
+
+### Breaking changes
+
+* Lorem ipsum.
+
+### Enhancements
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# NEXT RELEASE
+
+### Bugfixes
+
 * Fix a race between SharedGroup::compact() and SharedGroup::open(). The race could
   cause asserts indicating file corruption even if no corruption is caused. It is also
   possible that it could cause real file corruption, though that is much less likely.
