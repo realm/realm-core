@@ -24,6 +24,7 @@
 #include <mutex>
 #include <sstream>
 #include <type_traits>
+#include <random>
 
 #include <realm/util/features.h>
 #include <realm/util/errno.hpp>
@@ -796,12 +797,20 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
     // in case there is something wrong with the .lock file... the retries allows
     // us to pick a new lockfile initializer in case the first one crashes without
     // completing the initialization
-    if (retries_left < 10) {
-        int msecs = random() % (10 * (10 - retries_left));
-        millisleep(msecs);
-    }
-
+    std::default_random_engine random_gen;
     for (;;) {
+
+        // if we're retrying, we first wait a random time
+        if (retries_left < 10) {
+            if (retries_left == 9) { // we seed it from a true random source if possible
+                std::random_device r;
+                random_gen.seed(r());
+            }
+            int max_delay = (10 - retries_left) * 10;
+            int msecs = random_gen() % max_delay;
+            millisleep(msecs);
+        }
+
         m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
         File::CloseGuard fcg(m_file);
 
