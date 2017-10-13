@@ -86,7 +86,7 @@ void (*termination_notification_callback)(const char*) noexcept = nslog;
 
 void android_log(const char* message) noexcept
 {
-    __android_log_print(ANDROID_LOG_ERROR, "REALM", message);
+    __android_log_write(ANDROID_LOG_ERROR, "REALM", message);
 }
 
 void (*termination_notification_callback)(const char*) noexcept = android_log;
