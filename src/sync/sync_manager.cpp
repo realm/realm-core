@@ -73,7 +73,7 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
                 try {
                     m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
                                                                                true,
-                                                                               std::move(custom_encryption_key));
+                                                                               custom_encryption_key);
                 } catch (RealmFileException const& ex) {
                     if (reset_metadata_on_error && m_file_manager->remove_metadata_realm()) {
                         m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
