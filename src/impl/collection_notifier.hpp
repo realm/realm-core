@@ -237,6 +237,10 @@ private:
     // Iteration variable for looping over callbacks
     // remove_callback() updates this when needed
     size_t m_callback_index = -1;
+    // During callback iteration, the number of callbacks present at the
+    // beginning of iteration which have not been removed.
+    // Used to avoid calling callbacks registered during iteration.
+    size_t m_callback_count = -1;
 
     template<typename Fn>
     void for_each_callback(Fn&& fn);

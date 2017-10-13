@@ -263,15 +263,38 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE(notification_calls == 1);
     }
 
-    SECTION("notifications are delivered when a new callback is added from within a callback") {
+    SECTION("notifications are delivered on the next cycle when a new callback is added from within a callback") {
         NotificationToken token2, token3;
         bool called = false;
         token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token2 = {};
             token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
                 called = true;
             });
         });
 
+        advance_and_notify(*r);
+        REQUIRE_FALSE(called);
+        advance_and_notify(*r);
+        REQUIRE(called);
+    }
+
+    SECTION("remote changes made before adding a callback from within a callback are not reported") {
+        NotificationToken token2, token3;
+        bool called = false;
+        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token2 = {};
+            make_remote_change();
+            coordinator->on_change();
+            token3 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                called = true;
+                REQUIRE(c.empty());
+                REQUIRE(table->get_int(0, 0) == 5);
+            });
+        });
+
+        advance_and_notify(*r);
+        REQUIRE_FALSE(called);
         advance_and_notify(*r);
         REQUIRE(called);
     }

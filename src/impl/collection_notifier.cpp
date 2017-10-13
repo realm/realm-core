@@ -213,8 +213,10 @@ void CollectionNotifier::remove_callback(size_t token)
         }
 
         size_t idx = distance(begin(m_callbacks), it);
-        if (m_callback_index != npos && m_callback_index >= idx) {
-            --m_callback_index;
+        if (m_callback_index != npos) {
+            if (m_callback_index >= idx)
+                --m_callback_index;
+            --m_callback_count;
         }
 
         old = std::move(*it);
@@ -373,7 +375,8 @@ template<typename Fn>
 void CollectionNotifier::for_each_callback(Fn&& fn)
 {
     std::unique_lock<std::mutex> callback_lock(m_callback_mutex);
-    for (++m_callback_index; m_callback_index < m_callbacks.size(); ++m_callback_index) {
+    m_callback_count = m_callbacks.size();
+    for (++m_callback_index; m_callback_index < m_callback_count; ++m_callback_index) {
         fn(callback_lock, m_callbacks[m_callback_index]);
         if (!callback_lock.owns_lock())
             callback_lock.lock();
