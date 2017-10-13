@@ -1,2 +1,3 @@
-ignore:
-  - "test/**/*"  # ignore the test files
+codecov:
+  ignore:
+    - "test/**/*"  # ignore the test files
