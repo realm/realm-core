@@ -145,14 +145,11 @@ AESCryptor::AESCryptor(const uint8_t* key)
       m_dst_buffer(new char[block_size])
 {
 #if REALM_PLATFORM_APPLE
-    // Randomize IV
-    void *iv = 0;
+    // A random iv is passed to CCCryptorReset. Here, in CCCryptorCreate, iv
+    // is randomized only to make happy some security static analyzer tools
     unsigned char u_iv[kCCKeySizeAES256];
-    for (size_t i = 0; i < sizeof(iv); ++i) {
-        u_iv[i] = arc4random() % 255;
-    }
-    iv = u_iv;
-    // Encrypt
+    arc4random_buf(u_iv, kCCKeySizeAES256);
+    void *iv = u_iv;
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_encr);
     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_decr);
 #elif defined(_WIN32)
