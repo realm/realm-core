@@ -225,8 +225,9 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
     }
 
     if (!realm) {
+        bool should_initialize_notifier = !config.immutable() && config.automatic_change_notifications;
         realm = Realm::make_shared_realm(std::move(config), shared_from_this());
-        if (!config.immutable() && !m_notifier && config.automatic_change_notifications) {
+        if (!m_notifier && should_initialize_notifier) {
             try {
                 m_notifier = std::make_unique<ExternalCommitHelper>(*this);
             }
