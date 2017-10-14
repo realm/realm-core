@@ -3462,4 +3462,340 @@ NONCONCURRENT_TEST(SharedGroupOptions_tmp_dir)
     SharedGroupOptions::set_sys_tmp_dir(initial_system_dir);
 }
 
+
+namespace {
+
+void wait_for(size_t expected, std::mutex& mutex, size_t& test_value)
+{
+    while (true) {
+        sched_yield();
+        std::lock_guard<std::mutex> guard(mutex);
+        if (test_value == expected) {
+            return;
+        }
+    }
+}
+
+} // end anonymous namespace
+
+NONCONCURRENT_TEST(Shared_LockFileInitSpinsOnZeroSize)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    bool no_create = false;
+    SharedGroupOptions options;
+    options.encryption_key = crypt_key();
+    SharedGroup sg((SharedGroup::unattached_tag()));
+
+    sg.open(path, no_create, options);
+    sg.close();
+
+    CHECK(File::exists(path));
+    CHECK(File::exists(path.get_lock_path()));
+
+    std::mutex mutex;
+    size_t test_stage = 0;
+
+    Thread t;
+    auto do_async = [&]() {
+        File f(path.get_lock_path(), File::mode_Write);
+        f.lock_shared();
+        File::UnlockGuard ug(f);
+
+        CHECK(f.is_attached());
+
+        f.resize(0);
+        f.sync();
+
+        mutex.lock();
+        test_stage = 1;
+        mutex.unlock();
+
+        millisleep(100);
+        // the lock is then released and the other thread will be able to initialise properly
+    };
+    t.start(do_async);
+
+    wait_for(1, mutex, test_stage);
+
+    // we'll spin here without error until we can obtain the exclusive lock and initialise it ourselves
+    sg.open(path, no_create, options);
+    CHECK(sg.is_attached());
+    sg.close();
+
+    t.join();
+}
+
+
+NONCONCURRENT_TEST(Shared_LockFileSpinsOnInitComplete)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    bool no_create = false;
+    SharedGroupOptions options;
+    options.encryption_key = crypt_key();
+    SharedGroup sg((SharedGroup::unattached_tag()));
+
+    sg.open(path, no_create, options);
+    sg.close();
+
+    CHECK(File::exists(path));
+    CHECK(File::exists(path.get_lock_path()));
+
+    std::mutex mutex;
+    size_t test_stage = 0;
+
+    Thread t;
+    auto do_async = [&]() {
+        File f(path.get_lock_path(), File::mode_Write);
+        f.lock_shared();
+        File::UnlockGuard ug(f);
+
+        CHECK(f.is_attached());
+
+        f.resize(1); // ftruncate will write 0 to init_complete
+        f.sync();
+
+        mutex.lock();
+        test_stage = 1;
+        mutex.unlock();
+
+        millisleep(100);
+        // the lock is then released and the other thread will be able to initialise properly
+    };
+    t.start(do_async);
+
+    wait_for(1, mutex, test_stage);
+
+    // we'll spin here without error until we can obtain the exclusive lock and initialise it ourselves
+    sg.open(path, no_create, options);
+    CHECK(sg.is_attached());
+    sg.close();
+
+    t.join();
+}
+
+
+NONCONCURRENT_TEST(Shared_LockFileOfWrongSizeThrows)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    bool no_create = false;
+    SharedGroupOptions options;
+    options.encryption_key = crypt_key();
+    SharedGroup sg((SharedGroup::unattached_tag()));
+
+    sg.open(path, no_create, options);
+    sg.close();
+
+    CHECK(File::exists(path));
+    CHECK(File::exists(path.get_lock_path()));
+
+    std::mutex mutex;
+    size_t test_stage = 0;
+
+    Thread t;
+    auto do_async = [&]() {
+        File f(path.get_lock_path(), File::mode_Write);
+        f.lock_shared();
+        File::UnlockGuard ug(f);
+
+        CHECK(f.is_attached());
+
+        size_t wrong_size = 100; // < sizeof(SharedInfo)
+        f.resize(wrong_size); // ftruncate will fill with 0
+        f.seek(0);
+        char data [1] = { 1 };
+        f.write(data, 1); // init_complete = true
+        f.sync();
+        CHECK_EQUAL(f.get_size(), wrong_size);
+
+        mutex.lock();
+        test_stage = 1;
+        mutex.unlock();
+
+        wait_for(2, mutex, test_stage); // hold the lock until other thread finished an open attempt
+    };
+    t.start(do_async);
+
+    wait_for(1, mutex, test_stage);
+
+    // we expect to throw if init_complete = 1 but the file is not the expected size (< sizeof(SharedInfo))
+    // we go through 10 retry attempts before throwing
+    CHECK_THROW(sg.open(path, no_create, options), IncompatibleLockFile);
+    CHECK(!sg.is_attached());
+
+    mutex.lock();
+    test_stage = 2;
+    mutex.unlock();
+
+    t.join();
+}
+
+
+NONCONCURRENT_TEST(Shared_LockFileOfWrongVersionThrows)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    bool no_create = false;
+    SharedGroupOptions options;
+    options.encryption_key = crypt_key();
+    SharedGroup sg((SharedGroup::unattached_tag()));
+
+    sg.open(path, no_create, options);
+
+    CHECK(File::exists(path));
+    CHECK(File::exists(path.get_lock_path()));
+
+    std::mutex mutex;
+    size_t test_stage = 0;
+
+    Thread t;
+    auto do_async = [&]() {
+        CHECK(File::exists(path.get_lock_path()));
+
+        File f;
+        f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
+
+        f.lock_shared();
+        File::UnlockGuard ug(f);
+
+        CHECK(f.is_attached());
+        f.seek(6);
+        char bad_version = 0;
+        f.write(&bad_version, 1);
+        f.sync();
+
+        mutex.lock();
+        test_stage = 1;
+        mutex.unlock();
+
+        wait_for(2, mutex, test_stage); // hold the lock until other thread finished an open attempt
+    };
+    t.start(do_async);
+
+    wait_for(1, mutex, test_stage);
+    sg.close();
+
+    // we expect to throw if info->shared_info_version != g_shared_info_version
+    CHECK_THROW(sg.open(path, no_create, options), IncompatibleLockFile);
+    CHECK(!sg.is_attached());
+
+    mutex.lock();
+    test_stage = 2;
+    mutex.unlock();
+
+    t.join();
+}
+
+
+NONCONCURRENT_TEST(Shared_LockFileOfWrongMutexSizeThrows)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    bool no_create = false;
+    SharedGroupOptions options;
+    options.encryption_key = crypt_key();
+    SharedGroup sg((SharedGroup::unattached_tag()));
+
+    sg.open(path, no_create, options);
+
+    CHECK(File::exists(path));
+    CHECK(File::exists(path.get_lock_path()));
+
+    std::mutex mutex;
+    size_t test_stage = 0;
+
+    Thread t;
+    auto do_async = [&]() {
+        File f;
+        f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
+        f.lock_shared();
+        File::UnlockGuard ug(f);
+
+        CHECK(f.is_attached());
+
+        char bad_mutex_size = sizeof(InterprocessMutex::SharedPart) + 1;
+        f.seek(1);
+        f.write(&bad_mutex_size, 1);
+        f.sync();
+
+        mutex.lock();
+        test_stage = 1;
+        mutex.unlock();
+
+        wait_for(2, mutex, test_stage); // hold the lock until other thread finished an open attempt
+    };
+    t.start(do_async);
+
+    wait_for(1, mutex, test_stage);
+
+    sg.close();
+
+    // we expect to throw if the mutex size is incorrect
+    CHECK_THROW(sg.open(path, no_create, options), IncompatibleLockFile);
+    CHECK(!sg.is_attached());
+
+    mutex.lock();
+    test_stage = 2;
+    mutex.unlock();
+
+    t.join();
+}
+
+
+NONCONCURRENT_TEST(Shared_LockFileOfWrongCondvarSizeThrows)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    bool no_create = false;
+    SharedGroupOptions options;
+    options.encryption_key = crypt_key();
+    SharedGroup sg((SharedGroup::unattached_tag()));
+
+    sg.open(path, no_create, options);
+
+    CHECK(File::exists(path));
+    CHECK(File::exists(path.get_lock_path()));
+
+    std::mutex mutex;
+    size_t test_stage = 0;
+
+    Thread t;
+    auto do_async = [&]() {
+        File f;
+        f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
+        f.lock_shared();
+        File::UnlockGuard ug(f);
+
+        CHECK(f.is_attached());
+
+        char bad_condvar_size = sizeof(InterprocessCondVar::SharedPart) + 1;
+        f.seek(2);
+        f.write(&bad_condvar_size, 1);
+        f.sync();
+
+        mutex.lock();
+        test_stage = 1;
+        mutex.unlock();
+
+        wait_for(2, mutex, test_stage); // hold the lock until other thread finished an open attempt
+    };
+    t.start(do_async);
+
+    wait_for(1, mutex, test_stage);
+    sg.close();
+
+    // we expect to throw if the condvar size is incorrect
+    CHECK_THROW(sg.open(path, no_create, options), IncompatibleLockFile);
+    CHECK(!sg.is_attached());
+
+    mutex.lock();
+    test_stage = 2;
+    mutex.unlock();
+
+    t.join();
+}
+
+
 #endif // TEST_SHARED
