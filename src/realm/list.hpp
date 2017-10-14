@@ -20,6 +20,7 @@
 #define REALM_LIST_HPP
 
 #include <realm/obj.hpp>
+#include <realm/array_key.hpp>
 
 namespace realm {
 
@@ -346,7 +347,7 @@ public:
         m_leaf->truncate_and_destroy_children(0);
     }
 
-private:
+protected:
     Obj m_obj;
     void update_if_needed()
     {
@@ -354,6 +355,65 @@ private:
             m_leaf->init_from_parent();
         }
     }
+};
+
+template <>
+void List<Key>::add(Key target_key);
+template <>
+Key List<Key>::set(size_t ndx, Key target_key);
+template <>
+void List<Key>::insert(size_t ndx, Key target_key);
+template <>
+Key List<Key>::remove(size_t ndx);
+template <>
+void List<Key>::clear();
+
+
+class ConstLinkListIf : public ConstListIf<Key> {
+public:
+    // Getting links
+    ConstObj operator[](size_t link_ndx) const
+    {
+        return get(link_ndx);
+    }
+    ConstObj get(size_t link_ndx) const;
+
+protected:
+    ConstLinkListIf(size_t col_ndx, Allocator& alloc)
+        : ConstListIf<Key>(col_ndx, alloc)
+    {
+    }
+};
+
+class ConstLinkList : public ConstLinkListIf {
+public:
+    ConstLinkList(const ConstObj& obj, size_t col_ndx)
+        : ConstLinkListIf(col_ndx, obj.get_alloc())
+        , m_obj(obj)
+    {
+        this->set_obj(&m_obj);
+        this->init_from_parent();
+    }
+    void update_child_ref(size_t, ref_type) override
+    {
+    }
+
+private:
+    ConstObj m_obj;
+};
+
+class LinkList : public List<Key> {
+public:
+    LinkList(Obj& owner, size_t col_ndx)
+        : List<Key>(owner, col_ndx)
+    {
+    }
+    // Getting links
+    Obj operator[](size_t link_ndx)
+    {
+        return get(link_ndx);
+    }
+    Obj get(size_t link_ndx);
 };
 
 template <typename U>
@@ -378,6 +438,26 @@ template <typename U>
 ListPtr<U> Obj::get_list_ptr(size_t col_ndx)
 {
     return std::make_unique<List<U>>(*this, col_ndx);
+}
+
+inline ConstLinkList ConstObj::get_linklist(size_t col_ndx)
+{
+    return ConstLinkList(*this, col_ndx);
+}
+
+inline ConstLinkListPtr ConstObj::get_linklist_ptr(size_t col_ndx)
+{
+    return std::make_unique<ConstLinkList>(*this, col_ndx);
+}
+
+inline LinkList Obj::get_linklist(size_t col_ndx)
+{
+    return LinkList(*this, col_ndx);
+}
+
+inline LinkListPtr Obj::get_linklist_ptr(size_t col_ndx)
+{
+    return std::make_unique<LinkList>(*this, col_ndx);
 }
 }
 

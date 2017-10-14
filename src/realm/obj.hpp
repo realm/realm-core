@@ -21,6 +21,7 @@
 
 #include <realm/array.hpp>
 #include <realm/cluster.hpp>
+#include <realm/table_ref.hpp>
 
 namespace realm {
 
@@ -36,6 +37,11 @@ template <class>
 class List;
 template <class T>
 using ListPtr = std::unique_ptr<List<T>>;
+
+class LinkList;
+class ConstLinkList;
+using LinkListPtr = std::unique_ptr<LinkList>;
+using ConstLinkListPtr = std::unique_ptr<ConstLinkList>;
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class ConstObj {
@@ -64,6 +70,11 @@ public:
     template <typename U>
     ConstListPtr<U> get_list_ptr(size_t col_ndx) const;
 
+    ConstLinkList get_linklist(size_t col_ndx);
+    ConstLinkListPtr get_linklist_ptr(size_t col_ndx);
+
+    size_t get_link_count(size_t col_ndx) const;
+
     bool is_null(size_t col_ndx) const;
     size_t get_backlink_count(const Table& origin, size_t origin_col_ndx) const;
     Key get_backlink(const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const;
@@ -81,6 +92,8 @@ public:
 
 protected:
     friend class ConstListBase;
+    friend class ConstLinkListIf;
+    friend class LinkList;
 
     const ClusterTree* m_tree_top;
     Key m_key;
@@ -97,8 +110,9 @@ protected:
     template <class T>
     bool do_is_null(size_t col_ndx) const;
 
-private:
     size_t get_column_index(StringData col_name) const;
+    size_t get_table_index() const;
+    TableRef get_target_table(size_t col_ndx) const;
 };
 
 class Obj : public ConstObj {
@@ -123,9 +137,10 @@ public:
     template <typename U>
     ListPtr<U> get_list_ptr(size_t col_ndx);
 
+    LinkList get_linklist(size_t col_ndx);
+    LinkListPtr get_linklist_ptr(size_t col_ndx);
+
 private:
-    template <class>
-    friend class List;
     friend class Cluster;
     friend class ConstListBase;
     friend class ArrayBacklink;

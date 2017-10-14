@@ -30,6 +30,7 @@
 #include <realm/util/thread.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/link_view_fwd.hpp>
+#include <realm/list.hpp>
 #include <realm/row.hpp>
 #include <realm/spec.hpp>
 #include <realm/mixed.hpp>
@@ -60,7 +61,6 @@ struct LinkTargetInfo;
 
 struct Link {
 };
-typedef Link LinkList;
 typedef Link BackLink;
 
 

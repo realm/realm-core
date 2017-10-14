@@ -55,6 +55,16 @@ size_t ConstObj::get_column_index(StringData col_name) const
     return m_tree_top->get_spec().get_column_index(col_name);
 }
 
+size_t ConstObj::get_table_index() const
+{
+    return m_tree_top->get_owner()->get_index_in_group();
+}
+
+TableRef ConstObj::get_target_table(size_t col_ndx) const
+{
+    return _impl::TableFriend::get_opposite_link_table(*m_tree_top->get_owner(), col_ndx);
+}
+
 Obj::Obj(ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx)
     : ConstObj(tree_top, ref, key, row_ndx)
     , m_writeable(!tree_top->get_alloc().is_read_only(ref))
@@ -79,9 +89,9 @@ T ConstObj::get(size_t col_ndx) const
 {
     if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
-    ColumnAttrMask attr = m_tree_top->get_spec().get_column_attr(col_ndx);
-    REALM_ASSERT(attr.test(col_attr_List) ||
-                 (m_tree_top->get_spec().get_column_type(col_ndx) == ColumnTypeTraits<T>::column_id));
+    const Spec& spec = m_tree_top->get_spec();
+    ColumnAttrMask attr = spec.get_column_attr(col_ndx);
+    REALM_ASSERT(attr.test(col_attr_List) || (spec.get_column_type(col_ndx) == ColumnTypeTraits<T>::column_id));
 
     update_if_needed();
 
@@ -99,6 +109,11 @@ inline bool ConstObj::do_is_null(size_t col_ndx) const
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
     values.init_from_ref(ref);
     return values.is_null(m_row_ndx);
+}
+
+size_t ConstObj::get_link_count(size_t col_ndx) const
+{
+    return get_list<Key>(col_ndx).size();
 }
 
 bool ConstObj::is_null(size_t col_ndx) const
@@ -236,10 +251,9 @@ Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
     values.set_parent(&fields, col_ndx + 1);
     values.init_from_parent();
 
-    TableRef target_table = _impl::TableFriend::get_opposite_link_table(*m_tree_top->get_owner(), col_ndx);
+    TableRef target_table = get_target_table(col_ndx);
     const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-    size_t backlink_col =
-        target_table_spec.find_backlink_column(m_tree_top->get_owner()->get_index_in_group(), col_ndx);
+    size_t backlink_col = target_table_spec.find_backlink_column(get_table_index(), col_ndx);
 
     Key old_key = values.get(m_row_ndx);
 

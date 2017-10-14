@@ -26,6 +26,7 @@
 #include "realm/array_binary.hpp"
 #include "realm/array_timestamp.hpp"
 #include "realm/column_type_traits.hpp"
+#include "realm/table.hpp"
 
 using namespace realm;
 
@@ -84,6 +85,7 @@ template ConstList<double>::ConstList(const ConstObj& obj, size_t col_ndx);
 template ConstList<StringData>::ConstList(const ConstObj& obj, size_t col_ndx);
 template ConstList<BinaryData>::ConstList(const ConstObj& obj, size_t col_ndx);
 template ConstList<Timestamp>::ConstList(const ConstObj& obj, size_t col_ndx);
+template ConstList<Key>::ConstList(const ConstObj& obj, size_t col_ndx);
 
 template List<int64_t>::List(const Obj& obj, size_t col_ndx);
 template List<bool>::List(const Obj& obj, size_t col_ndx);
@@ -92,4 +94,71 @@ template List<double>::List(const Obj& obj, size_t col_ndx);
 template List<StringData>::List(const Obj& obj, size_t col_ndx);
 template List<BinaryData>::List(const Obj& obj, size_t col_ndx);
 template List<Timestamp>::List(const Obj& obj, size_t col_ndx);
+template List<Key>::List(const Obj& obj, size_t col_ndx);
+}
+
+ConstObj ConstLinkListIf::get(size_t link_ndx) const
+{
+    return m_const_obj->get_target_table(m_col_ndx)->get_object(ConstListIf<Key>::get(link_ndx));
+}
+
+Obj LinkList::get(size_t link_ndx)
+{
+    return m_obj.get_target_table(m_col_ndx)->get_object(List<Key>::get(link_ndx));
+}
+
+template <>
+void List<Key>::add(Key target_key)
+{
+    update_if_needed();
+    size_t ndx = m_leaf->size();
+    m_leaf->insert(ndx, null_key);
+    set(ndx, target_key);
+}
+
+template <>
+Key List<Key>::set(size_t ndx, Key target_key)
+{
+    TableRef target_table = m_obj.get_target_table(m_col_ndx);
+    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
+    size_t backlink_col = target_table_spec.find_backlink_column(m_obj.get_table_index(), m_col_ndx);
+
+    Key old_key = m_leaf->get(ndx);
+
+    if (old_key != realm::null_key) {
+        Obj target_obj = target_table->get_object(old_key);
+        target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
+    }
+
+    m_leaf->set(ndx, target_key);
+
+    if (target_key != realm::null_key) {
+        Obj target_obj = target_table->get_object(target_key);
+        target_obj.add_backlink(backlink_col, m_obj.get_key()); // Throws
+    }
+    return old_key;
+}
+
+template <>
+void List<Key>::insert(size_t ndx, Key target_key)
+{
+    m_leaf->insert(ndx, null_key);
+    set(ndx, target_key);
+}
+
+template <>
+Key List<Key>::remove(size_t ndx)
+{
+    Key old = set(ndx, null_key);
+    m_leaf->erase(ndx);
+    return old;
+}
+
+template <>
+void List<Key>::clear()
+{
+    size_t ndx = size();
+    while (ndx--) {
+        remove(ndx);
+    }
 }
