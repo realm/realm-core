@@ -3468,7 +3468,7 @@ namespace {
 void wait_for(size_t expected, std::mutex& mutex, size_t& test_value)
 {
     while (true) {
-        sched_yield();
+        millisleep(1);
         std::lock_guard<std::mutex> guard(mutex);
         if (test_value == expected) {
             return;
