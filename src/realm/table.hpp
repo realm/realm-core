@@ -36,7 +36,7 @@
 #include <realm/mixed.hpp>
 #include <realm/query.hpp>
 #include <realm/column.hpp>
-#include <realm/cluster.hpp>
+#include <realm/cluster_tree.hpp>
 
 namespace realm {
 
