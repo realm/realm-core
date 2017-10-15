@@ -30,8 +30,9 @@ using namespace realm::util;
 using namespace realm::test_util;
 using unit_test::TestContext;
 
+#ifdef LEGACY_TESTS
 // Tests thread safety of accessor chain manipulations related to LinkViews
-TEST(ThreadSafety_LinkViewDestruction)
+ONLY(ThreadSafety_LinkViewDestruction)
 {
     std::vector<LinkViewRef> ptrs;
     Mutex mutex;
@@ -173,5 +174,5 @@ TEST(ThreadSafety_RowDestruction)
     thread.join();
 }
 
-
+#endif
 #endif

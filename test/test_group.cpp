@@ -1463,7 +1463,7 @@ TEST(Group_StockBug)
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Group_CommitLinkListChange)
 {
     GROUP_TEST_PATH(path);
@@ -1480,7 +1480,6 @@ TEST(Group_CommitLinkListChange)
     group.verify();
 }
 
-#ifdef LEGACY_TESTS
 TEST(Group_Commit_Update_Integer_Index)
 {
     // This reproduces a bug where a commit would fail to update the Column::m_search_index pointer
@@ -1506,7 +1505,6 @@ TEST(Group_Commit_Update_Integer_Index)
     // This would fail (sometimes return not_found, sometimes crash)
     CHECK(t->find_first_int(0, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == 0);
 }
-#endif
 
 TEST(Group_CascadeNotify_Simple)
 {
@@ -1751,7 +1749,6 @@ TEST(Group_CascadeNotify_TableClear)
     CHECK(called);
 }
 
-#ifdef LEGACY_TESTS
 TEST(Group_CascadeNotify_TableViewClear)
 {
     GROUP_TEST_PATH(path);
@@ -2047,7 +2044,7 @@ TEST(Group_SharedMappingsForReadOnlyStreamingForm)
     }
 }
 
-
+#ifdef LEGACY_TESTS
 // This test embodies a current limitation of our merge algorithm. If this
 // limitation is lifted, the code for the SET_UNIQUE instruction in
 // fuzz_group.cpp should be strengthened to reflect this.
@@ -2140,5 +2137,6 @@ TEST(Group_RemoveRecursive)
     target->remove_recursive(0);
     CHECK_EQUAL(target->size(), 0);
 }
+#endif // LEGACY_TESTS
 
 #endif // TEST_GROUP

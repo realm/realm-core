@@ -202,6 +202,7 @@ private:
     std::unique_ptr<Array> m_arr;
 };
 
+#ifdef LEGACY_TESTS
 void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& rt_2)
 {
     ReadTransaction rt_1(sg_1);
@@ -209,10 +210,10 @@ void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& 
     rt_2.get_group().verify();
     CHECK(rt_1.get_group() == rt_2.get_group());
 }
-
+#endif
 } // anonymous namespace
 
-#ifdef TEST_REPLICATION_OLD
+#ifdef LEGACY_TESTS
 
 namespace {
 
@@ -3308,7 +3309,7 @@ TEST(Replication_CascadeRemove_ColumnLink)
     CHECK_EQUAL(target->size(), 0);
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Replication_LinkListSelfLinkNullification)
 {
     SHARED_GROUP_TEST_PATH(path_1);
@@ -3446,7 +3447,7 @@ TEST(Replication_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     CHECK(!target_row_0 && !target_row_1);
     CHECK_EQUAL(target->size(), 0);
 }
-
+#endif
 
 TEST(Replication_NullStrings)
 {
@@ -3497,7 +3498,7 @@ TEST(Replication_NullStrings)
     }
 }
 
-#ifdef TEST_REPLICATION_OLD
+#ifdef LEGACY_TESTS
 TEST(Replication_NullInteger)
 {
     SHARED_GROUP_TEST_PATH(path_1);
@@ -3735,7 +3736,6 @@ TEST(Replication_LinkListNullifyThroughTableView)
         CHECK_EQUAL(rt1.get_table(0)->get_linklist(0, 0)->size(), 0);
     }
 }
-#endif
 
 TEST(Replication_Substrings)
 {
@@ -3826,6 +3826,7 @@ TEST(Replication_MoveSelectedLinkView)
     // FIXME: Redo the test with all other table-level operations that move the
     // link list to a new row or column index.
 }
+#endif
 
 TEST(Replication_HistorySchemaVersionNormal)
 {

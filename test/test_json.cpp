@@ -69,6 +69,7 @@ using namespace realm::test_util;
 
 namespace {
 
+#ifdef LEGACY_TESTS
 const bool generate_all = false;
 
 // After modifying json methods in core, set above generate_all = true to
@@ -234,7 +235,6 @@ link_depth >= 0:
 A link which isn't followed (bottom of link_depth has been met, or link has already been followed with
     link_depth = -1) is printed as a simple sequence of integers of row indexes in the link column.
 */
-
 TEST(Json_LinkList1)
 {
     // Basic non-cyclic LinkList test that also tests column and table renaming
@@ -437,7 +437,7 @@ TEST(Json_LinkCycles)
     table1->to_json(ss, 2);
     CHECK(json_test(ss.str(), "expected_json_link_cycles5", generate_all));
 }
-
+#endif
 } // anonymous namespace
 
 #endif // TEST_TABLE
