@@ -158,6 +158,8 @@ public:
     virtual void dump_objects(int64_t key_offset, std::string lead) const = 0;
 
 protected:
+    friend class ArrayBacklink;
+
     const ClusterTree& m_tree_top;
     Array m_keys;
 };

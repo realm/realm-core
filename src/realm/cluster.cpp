@@ -23,6 +23,8 @@
 #include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
 #include "realm/array_timestamp.hpp"
+#include "realm/array_key.hpp"
+#include "realm/array_backlink.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/replication.hpp"
 #include <iostream>
@@ -481,6 +483,12 @@ void Cluster::create()
             case col_type_Timestamp:
                 do_create<ArrayTimestamp>(col_ndx);
                 break;
+            case col_type_Link:
+                do_create<ArrayKey>(col_ndx);
+                break;
+            case col_type_BackLink:
+                do_create<ArrayBacklink>(col_ndx);
+                break;
             default:
                 // Silently ignore unsupported types
                 // TODO: Eventually we should have an assert here
@@ -533,6 +541,12 @@ void Cluster::insert_row(size_t ndx, Key k)
     size_t nb_columns = size() - 1;
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
         int attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+
+        if (attr & col_attr_List) {
+            do_insert_row<ArrayInteger>(ndx, col_ndx, attr);
+            continue;
+        }
+
         switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
             case col_type_Int:
                 if (attr) {
@@ -559,6 +573,12 @@ void Cluster::insert_row(size_t ndx, Key k)
                 break;
             case col_type_Timestamp:
                 do_insert_row<ArrayTimestamp>(ndx, col_ndx, attr);
+                break;
+            case col_type_Link:
+                do_insert_row<ArrayKey>(ndx, col_ndx, attr);
+                break;
+            case col_type_BackLink:
+                do_insert_row<ArrayBacklink>(ndx, col_ndx, attr);
                 break;
             default:
                 REALM_ASSERT(false);
@@ -624,6 +644,12 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 break;
             case col_type_Timestamp:
                 do_move<ArrayTimestamp>(ndx, col_ndx, new_leaf);
+                break;
+            case col_type_Link:
+                do_move<ArrayKey>(ndx, col_ndx, new_leaf);
+                break;
+            case col_type_BackLink:
+                do_move<ArrayBacklink>(ndx, col_ndx, new_leaf);
                 break;
             default:
                 REALM_ASSERT(false);
@@ -697,6 +723,12 @@ void Cluster::insert_column(size_t col_ndx)
             break;
         case col_type_Timestamp:
             do_insert_column<ArrayTimestamp>(col_ndx, nullable);
+            break;
+        case col_type_Link:
+            do_insert_column<ArrayKey>(col_ndx, nullable);
+            break;
+        case col_type_BackLink:
+            do_insert_column<ArrayBacklink>(col_ndx, nullable);
             break;
         default:
             // We need to insert something in spite we don't support the type yet
@@ -781,16 +813,64 @@ inline void Cluster::do_erase(size_t ndx, size_t col_ndx)
     values.erase(ndx);
 }
 
+namespace realm {
+template <>
+inline void Cluster::do_erase<ArrayKey>(size_t ndx, size_t col_ndx)
+{
+    ArrayKey values(m_alloc);
+    values.set_parent(this, col_ndx + 1);
+    values.init_from_parent();
+
+    TableRef target_table = _impl::TableFriend::get_opposite_link_table(*m_tree_top.get_owner(), col_ndx);
+    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
+    size_t backlink_col =
+        target_table_spec.find_backlink_column(m_tree_top.get_owner()->get_index_in_group(), col_ndx);
+
+    Key old_key = values.get(ndx);
+
+    if (old_key != realm::null_key) {
+        Obj target_obj = target_table->get_object(old_key);
+        target_obj.remove_one_backlink(backlink_col, Key(get_key(ndx))); // Throws
+    }
+
+
+    values.erase(ndx);
+}
+}
+
 unsigned Cluster::erase(Key k)
 {
     size_t ndx = m_keys.lower_bound_int(k.value);
     if (ndx == m_keys.size() || m_keys.get(ndx) != k.value) {
         throw InvalidKey("Key not found");
     }
-    m_keys.erase(ndx);
-    size_t nb_columns = size() - 1;
-    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        int attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+
+    const Spec& spec = m_tree_top.get_spec();
+    size_t num_cols = spec.get_column_count();
+    size_t num_public_cols = spec.get_public_column_count();
+    // We must start with backlink columns in case the corresponding link
+    // columns are in the same table so that the link columns are not updated
+    // twice. Backlink columns will nullify the rows in connected link columns
+    // first so by the time we get to the link column in this loop, the rows to
+    // be removed have already been nullified.
+    //
+    // This phase also generates replication instructions documenting the side-
+    // effects of deleting the object (i.e. link nullifications). These instructions
+    // must come before the actual deletion of the object, but at the same time
+    // the Replication object may need a consistent view of the row (not including
+    // link columns). Therefore we first delete the row in backlink columns, then
+    // generate the instruction, and then delete the row in the remaining columns.
+    for (size_t col_ndx = num_cols - 1; col_ndx >= num_public_cols; --col_ndx) {
+        REALM_ASSERT(spec.get_column_type(col_ndx) == col_type_BackLink);
+        do_erase<ArrayBacklink>(ndx, col_ndx);
+    }
+
+    if (Replication* repl = m_alloc.get_replication()) {
+        repl->remove_object(m_tree_top.get_owner(), k);
+    }
+
+    for (size_t col_ndx = 0; col_ndx < num_public_cols; col_ndx++) {
+        int attr = spec.get_column_attr(col_ndx);
         if (attr & col_attr_List) {
             ArrayInteger values(m_alloc);
             values.set_parent(this, col_ndx + 1);
@@ -805,7 +885,7 @@ unsigned Cluster::erase(Key k)
 
             continue;
         }
-        switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
+        switch (spec.get_column_type(col_ndx)) {
             case col_type_Int:
                 if (attr & col_attr_Nullable) {
                     do_erase<ArrayIntNull>(ndx, col_ndx);
@@ -832,15 +912,16 @@ unsigned Cluster::erase(Key k)
             case col_type_Timestamp:
                 do_erase<ArrayTimestamp>(ndx, col_ndx);
                 break;
+            case col_type_Link:
+                do_erase<ArrayKey>(ndx, col_ndx);
+                break;
             default:
                 REALM_ASSERT(false);
                 break;
         }
     }
 
-    if (Replication* repl = m_alloc.get_replication()) {
-        repl->remove_object(m_tree_top.get_owner(), k);
-    }
+    m_keys.erase(ndx);
 
     return node_size();
 }
@@ -913,6 +994,16 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     std::cout << ", " << arr.get(i);
+                    break;
+                }
+                case col_type_Link: {
+                    ArrayKey arr(m_alloc);
+                    ref_type ref = Array::get_as_ref(j);
+                    arr.init_from_ref(ref);
+                    std::cout << ", " << arr.get(i);
+                    break;
+                }
+                case col_type_BackLink: {
                     break;
                 }
                 default:

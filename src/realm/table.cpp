@@ -319,7 +319,7 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
         throw LogicError(LogicError::group_mismatch);
 
     LinkTargetInfo link(&target);
-    do_insert_column(col_ndx, type, name, link); // Throws
+    do_insert_column(col_ndx, type, name, link, false, type == type_LinkList); // Throws
 
     set_link_type(col_ndx, link_type); // Throws
 }
@@ -5661,4 +5661,10 @@ Table::Iterator Table::begin()
 Table::Iterator Table::end()
 {
     return Iterator(m_clusters, size());
+}
+
+TableRef _impl::TableFriend::get_opposite_link_table(const Table& table, size_t col_ndx)
+{
+    auto target_table_ndx = table.m_spec->get_opposite_link_table_ndx(col_ndx);
+    return table.get_parent_group()->get_table(target_table_ndx);
 }

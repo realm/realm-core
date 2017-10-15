@@ -2254,6 +2254,8 @@ public:
         return *table.m_spec;
     }
 
+    static TableRef get_opposite_link_table(const Table& table, size_t col_ndx);
+
     static ColumnBase& get_column(const Table& table, size_t col_ndx)
     {
         return *table.m_cols[col_ndx];

@@ -65,6 +65,8 @@ public:
     ConstListPtr<U> get_list_ptr(size_t col_ndx) const;
 
     bool is_null(size_t col_ndx) const;
+    size_t get_backlink_count(const Table& origin, size_t origin_col_ndx) const;
+    Key get_backlink(const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const;
 
     // To be used by the query system when a single object should
     // be tested. Will allow a function to be called in the context
@@ -122,7 +124,11 @@ public:
     ListPtr<U> get_list_ptr(size_t col_ndx);
 
 private:
+    template <class>
+    friend class List;
+    friend class Cluster;
     friend class ConstListBase;
+    friend class ArrayBacklink;
     template <class>
     friend class List;
 
@@ -137,6 +143,9 @@ private:
     void do_set_null(size_t col_ndx);
 
     void set_int(size_t col_ndx, int64_t value);
+    void add_backlink(size_t backlink_col, Key origin_key);
+    void remove_one_backlink(size_t backlink_col, Key origin_key);
+    void nullify_link(size_t origin_col, Key target_key);
 };
 
 
@@ -156,6 +165,10 @@ inline Optional<double> ConstObj::get<Optional<double>>(size_t col_ndx) const
 
 template <>
 Obj& Obj::set(size_t, int64_t value, bool is_default);
+
+template <>
+Obj& Obj::set(size_t, Key value, bool is_default);
+
 
 template <>
 inline Obj& Obj::set(size_t col_ndx, int value, bool is_default)

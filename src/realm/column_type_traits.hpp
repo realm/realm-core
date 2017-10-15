@@ -26,6 +26,7 @@
 
 namespace realm {
 
+struct Key;
 class Timestamp;
 class OldDateTime;
 class ArraySmallBlobs;
@@ -37,6 +38,7 @@ class ArrayInteger;
 class ArrayIntNull;
 class ArrayBool;
 class ArrayBoolNull;
+class ArrayKey;
 template <class>
 class BasicArray;
 
@@ -72,6 +74,13 @@ struct ColumnTypeTraits<bool> : ColumnTypeTraits<int64_t> {
     using cluster_leaf_type = ArrayBool;
     static const DataType id = type_Bool;
     static const ColumnType column_id = col_type_Bool;
+};
+
+template <>
+struct ColumnTypeTraits<Key> {
+    using cluster_leaf_type = ArrayKey;
+    static const DataType id = type_Link;
+    static const ColumnType column_id = col_type_Link;
 };
 
 template <>

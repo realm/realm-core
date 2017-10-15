@@ -138,6 +138,12 @@ public:
         : ConstIterator(other.m_tree, other.m_key)
     {
     }
+    ConstIterator& operator=(ConstIterator&& other)
+    {
+        REALM_ASSERT(&m_tree == &other.m_tree);
+        m_key = other.m_key;
+        return *this;
+    }
     reference operator*() const
     {
         return *operator->();
@@ -175,6 +181,10 @@ public:
     pointer operator->() const
     {
         return const_cast<pointer>(ConstIterator::operator->());
+    }
+    Iterator& operator++()
+    {
+        return static_cast<Iterator&>(ConstIterator::operator++());
     }
 };
 
