@@ -107,6 +107,7 @@ if(APPLE)
     find_library(Foundation Foundation)
 elseif(ANDROID)
     set(ANDROID_OPENSSL_VERSION "1.0.2k")
+    set(ANDROID_OPENSSL_BUILD_NUMBER "1")
     list(APPEND PLATFORM_LIBRARIES log android)
 endif()
 
