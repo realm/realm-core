@@ -120,7 +120,7 @@ void ArrayBacklink::remove(size_t ndx, Key key)
     }
 }
 
-size_t ArrayBacklink::get_backlink_count(size_t ndx)
+size_t ArrayBacklink::get_backlink_count(size_t ndx) const
 {
     int64_t value = Array::get(ndx);
     if (value == 0) {
@@ -138,7 +138,7 @@ size_t ArrayBacklink::get_backlink_count(size_t ndx)
     return Array::get_size_from_header(mem.get_addr());
 }
 
-Key ArrayBacklink::get_backlink(size_t ndx, size_t index)
+Key ArrayBacklink::get_backlink(size_t ndx, size_t index) const
 {
     int64_t value = Array::get(ndx);
     REALM_ASSERT(value != 0);

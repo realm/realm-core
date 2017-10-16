@@ -158,9 +158,25 @@ bool ConstObj::is_null(size_t col_ndx) const
 
 size_t ConstObj::get_backlink_count(const Table& origin, size_t origin_col_ndx) const
 {
+    size_t cnt = 0;
+    size_t origin_table_ndx = origin.get_index_in_group();
+    if (origin_table_ndx != realm::npos) {
+        size_t backlink_col_ndx = m_tree_top->get_spec().find_backlink_column(origin_table_ndx, origin_col_ndx);
+        cnt = get_backlink_count(backlink_col_ndx);
+    }
+    return cnt;
+}
+
+Key ConstObj::get_backlink(const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const
+{
     size_t origin_table_ndx = origin.get_index_in_group();
     size_t backlink_col_ndx = m_tree_top->get_spec().find_backlink_column(origin_table_ndx, origin_col_ndx);
 
+    return get_backlink(backlink_col_ndx, backlink_ndx);
+}
+
+size_t ConstObj::get_backlink_count(size_t backlink_col_ndx) const
+{
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
     fields.init_from_mem(m_mem);
@@ -172,11 +188,8 @@ size_t ConstObj::get_backlink_count(const Table& origin, size_t origin_col_ndx) 
     return backlinks.get_backlink_count(m_row_ndx);
 }
 
-Key ConstObj::get_backlink(const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const
+Key ConstObj::get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) const
 {
-    size_t origin_table_ndx = origin.get_index_in_group();
-    size_t backlink_col_ndx = m_tree_top->get_spec().find_backlink_column(origin_table_ndx, origin_col_ndx);
-
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
     fields.init_from_mem(m_mem);

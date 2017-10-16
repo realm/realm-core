@@ -17,46 +17,207 @@
  **************************************************************************/
 
 #include <realm/query_expression.hpp>
+#include <realm/group.hpp>
 
 namespace realm {
 
+void LinkMap::set_base_table(const Table* table)
+{
+    if (table == base_table())
+        return;
+
+    m_tables.clear();
+    m_tables.push_back(table);
+    m_link_types.clear();
+    m_only_unary_links = true;
+
+    Group* group = _impl::TableFriend::get_parent_group(*table);
+    TableRef target_table;
+
+    for (size_t i = 0; i < m_link_column_indexes.size(); i++) {
+        size_t link_column_index = m_link_column_indexes[i];
+        // Link column can be either LinkList or single Link
+        const Table* t = m_tables.back();
+        const Spec& spec = _impl::TableFriend::get_spec(*t);
+
+        ColumnType type = t->get_real_column_type(link_column_index);
+        REALM_ASSERT(Table::is_link_type(type) || type == col_type_BackLink);
+        if (type == col_type_LinkList || type == col_type_BackLink) {
+            m_only_unary_links = false;
+        }
+
+        m_link_types.push_back(type);
+        size_t target_table_index = spec.get_opposite_link_table_ndx(link_column_index);
+        target_table = group->get_table(target_table_index);
+        m_tables.push_back(target_table.get());
+    }
+}
+
+std::string LinkMap::description() const
+{
+    std::string s;
+    for (size_t i = 0; i < m_link_column_indexes.size(); ++i) {
+        if (i < m_tables.size() && m_tables[i]) {
+            if (i == 0) {
+                s += std::string(m_tables[i]->get_name()) + metrics::value_separator;
+            }
+            if (m_link_types[i] == col_type_BackLink) {
+                s += "backlink";
+            }
+            else if (m_link_column_indexes[i] < m_tables[i]->get_column_count()) {
+                s += std::string(m_tables[i]->get_column_name(m_link_column_indexes[i]));
+            }
+            if (i != m_link_column_indexes.size() - 1) {
+                s += metrics::value_separator;
+            }
+        }
+    }
+    return s;
+}
+
+void LinkMap::map_links(size_t column, Key key, LinkMapFunction& lm)
+{
+    bool last = (column + 1 == m_link_column_indexes.size());
+    ColumnType type = m_link_types[column];
+    ConstObj obj = m_tables[column]->get_object(key);
+    if (type == col_type_Link) {
+        if (Key k = obj.get<Key>(m_link_column_indexes[column])) {
+            if (last)
+                lm.consume(k);
+            else
+                map_links(column + 1, k, lm);
+        }
+    }
+    else if (type == col_type_LinkList) {
+        auto linklist = obj.get_list<Key>(m_link_column_indexes[column]);
+        size_t sz = linklist.size();
+        for (size_t t = 0; t < sz; t++) {
+            Key k = linklist.get(t);
+            if (last) {
+                bool continue2 = lm.consume(k);
+                if (!continue2)
+                    return;
+            }
+            else
+                map_links(column + 1, k, lm);
+        }
+    }
+    else if (type == col_type_BackLink) {
+        auto backlink_column = m_link_column_indexes[column];
+        size_t sz = obj.get_backlink_count(backlink_column);
+        for (size_t t = 0; t < sz; t++) {
+            Key k = obj.get_backlink(backlink_column, t);
+            if (last) {
+                bool continue2 = lm.consume(k);
+                if (!continue2)
+                    return;
+            }
+            else
+                map_links(column + 1, k, lm);
+        }
+    }
+    else {
+        REALM_ASSERT(false);
+    }
+}
+
+void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm)
+{
+    REALM_ASSERT(m_leaf_ptr != nullptr);
+
+    bool last = (column + 1 == m_link_column_indexes.size());
+    ColumnType type = m_link_types[column];
+    if (type == col_type_Link) {
+        auto keys = reinterpret_cast<const ArrayKey*>(m_leaf_ptr);
+        if (Key k = keys->get(row)) {
+            if (last)
+                lm.consume(k);
+            else
+                map_links(column + 1, k, lm);
+        }
+    }
+    else if (type == col_type_LinkList) {
+        if (ref_type ref = m_leaf_ptr->get_as_ref(row)) {
+            ArrayKey arr(base_table()->get_alloc());
+            arr.init_from_ref(ref);
+            size_t sz = arr.size();
+            for (size_t t = 0; t < sz; t++) {
+                Key k = arr.get(t);
+                if (last) {
+                    bool continue2 = lm.consume(k);
+                    if (!continue2)
+                        return;
+                }
+                else
+                    map_links(column + 1, k, lm);
+            }
+        }
+    }
+    else if (type == col_type_BackLink) {
+        auto back_links = reinterpret_cast<const ArrayBacklink*>(m_leaf_ptr);
+        size_t sz = back_links->get_backlink_count(row);
+        for (size_t t = 0; t < sz; t++) {
+            Key k = back_links->get_backlink(row, t);
+            if (last) {
+                bool continue2 = lm.consume(k);
+                if (!continue2)
+                    return;
+            }
+            else
+                map_links(column + 1, k, lm);
+        }
+    }
+    else {
+        REALM_ASSERT(false);
+    }
+}
+
 void Columns<Link>::evaluate(size_t index, ValueBase& destination)
 {
-    std::vector<size_t> links = m_link_map.get_links(index);
-    Value<RowIndex> v = make_value_for_link<RowIndex>(m_link_map.only_unary_links(), links.size());
+    std::vector<Key> links = m_link_map.get_links(index);
+    Value<Key> v = make_value_for_link<Key>(m_link_map.only_unary_links(), links.size());
 
     for (size_t t = 0; t < links.size(); t++) {
-        v.m_storage.set(t, RowIndex(links[t]));
+        v.m_storage.set(t, links[t]);
     }
     destination.import(v);
 }
 
 void ColumnListBase::set_cluster(const Cluster* cluster)
 {
+    m_leaf_ptr = nullptr;
     m_array_ptr = nullptr;
-    // Create new Leaf
-    m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) Array(m_link_map.base_table()->get_alloc()));
-    cluster->init_leaf(this->m_column_ndx, m_array_ptr.get());
-    m_leaf_ptr = m_array_ptr.get();
+    if (m_link_map.has_links()) {
+        m_link_map.set_cluster(cluster);
+    }
+    else {
+        // Create new Leaf
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) Array(m_link_map.base_table()->get_alloc()));
+        cluster->init_leaf(this->m_column_ndx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
+    }
 }
 
 void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_t nb_elements)
 {
-    if (m_link_map.m_link_columns.size() > 0) {
-        std::vector<size_t> links = m_link_map.get_links(index);
+    if (m_link_map.has_links()) {
+        std::vector<Key> links = m_link_map.get_links(index);
         auto sz = links.size();
 
         if (m_link_map.only_unary_links()) {
             ref_type val = 0;
             if (sz == 1) {
-                val = to_ref(m_leaf_ptr->get(links[0]));
+                ConstObj obj = m_link_map.target_table()->get_object(links[0]);
+                val = to_ref(obj.get<int64_t>(m_column_ndx));
             }
             destination.init(false, 1, val);
         }
         else {
             destination.init(true, sz);
             for (size_t t = 0; t < sz; t++) {
-                destination.m_storage.set(t, to_ref(m_leaf_ptr->get(links[t])));
+                ConstObj obj = m_link_map.target_table()->get_object(links[t]);
+                ref_type val = to_ref(obj.get<int64_t>(m_column_ndx));
+                destination.m_storage.set(t, val);
             }
         }
     }

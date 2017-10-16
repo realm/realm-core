@@ -490,8 +490,7 @@ void Cluster::create()
                 do_create<ArrayBacklink>(col_ndx);
                 break;
             default:
-                // Silently ignore unsupported types
-                // TODO: Eventually we should have an assert here
+                throw LogicError(LogicError::illegal_type);
                 break;
         }
     }
@@ -731,9 +730,7 @@ void Cluster::insert_column(size_t col_ndx)
             do_insert_column<ArrayBacklink>(col_ndx, nullable);
             break;
         default:
-            // We need to insert something in spite we don't support the type yet
-            // TODO: Eventually we should have an assert here
-            Array::insert(col_ndx + 1, 0);
+            throw LogicError(LogicError::illegal_type);
             break;
     }
 }
