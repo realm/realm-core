@@ -820,10 +820,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             // We're alone in the world, and it is Ok to initialize the
             // file. Start by truncating the file to zero to ensure that
             // the following resize will generate a file filled with zeroes.
-
-
+            // 
+            // This will in particular set m_init_complete to 0.
             m_file.resize(0);
             m_file.resize(sizeof(SharedInfo));
+
             // We can crash anytime during this process. A crash prior to
             // the first resize could allow another thread which could not
             // get the exclusive lock because we hold it, and hence were
@@ -836,7 +837,9 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             
             new (info_2) SharedInfo{options.durability, openers_hist_type,
                                     openers_hist_schema_version}; // Throws
-
+            
+            // Because init_complete is an std::atomic, it's guaranteed not to be observable by others
+            // as being 1 before the entire SharedInfo header has been written.
             info_2->init_complete = 1;
         }
 
