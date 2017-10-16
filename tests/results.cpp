@@ -279,6 +279,61 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE(called);
     }
 
+    SECTION("notifications are delivered on the next cycle when a new callback is added from within a callback") {
+        auto results2 = results;
+        auto results3 = results;
+        NotificationToken token2, token3, token4;
+
+        bool called = false;
+        auto check = [&](Results& outer, Results& inner) {
+            token2 = outer.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                token2 = {};
+                token3 = inner.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                    called = true;
+                });
+            });
+
+            advance_and_notify(*r);
+            REQUIRE_FALSE(called);
+            advance_and_notify(*r);
+            REQUIRE(called);
+        };
+
+        SECTION("same Results") {
+            check(results, results);
+        }
+
+        SECTION("Results which has never had a notifier") {
+            check(results, results2);
+        }
+
+        SECTION("Results which used to have callbacks but no longer does") {
+            SECTION("notifier before active") {
+                token3 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                    token3 = {};
+                });
+                check(results3, results2);
+            }
+            SECTION("notifier after active") {
+                token3 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                    token3 = {};
+                });
+                check(results, results2);
+            }
+        }
+
+        SECTION("Results which already has callbacks") {
+            SECTION("notifier before active") {
+                token4 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { });
+                check(results3, results2);
+            }
+            SECTION("notifier after active") {
+                token4 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { });
+                check(results, results2);
+            }
+        }
+    }
+
     SECTION("remote changes made before adding a callback from within a callback are not reported") {
         NotificationToken token2, token3;
         bool called = false;
@@ -1021,10 +1076,26 @@ TEST_CASE("notifications: async error handling") {
             REQUIRE(called);
         }
 
-        SECTION("adding another callback from within an error callback") {
+        SECTION("adding another callback from within an error callback defers delivery") {
             NotificationToken token2;
             token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
                 token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+                    REQUIRE(err);
+                    REQUIRE_FALSE(called);
+                    called = true;
+                });
+            });
+            advance_and_notify(*r);
+            REQUIRE(!called);
+            advance_and_notify(*r);
+            REQUIRE(called);
+        }
+
+        SECTION("adding a callback to a different collection from within the error callback defers delivery") {
+            auto results2 = results;
+            NotificationToken token2;
+            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                token2 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
                     REQUIRE(err);
                     REQUIRE_FALSE(called);
                     called = true;
@@ -1053,7 +1124,7 @@ TEST_CASE("notifications: async error handling") {
             REQUIRE(called);
         }
 
-        SECTION("adding another callback does not send the error again") {
+        SECTION("adding another callback only sends the error to the new one") {
             bool called = false;
             auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
                 REQUIRE(err);

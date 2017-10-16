@@ -237,9 +237,10 @@ private:
     // Iteration variable for looping over callbacks
     // remove_callback() updates this when needed
     size_t m_callback_index = -1;
-    // During callback iteration, the number of callbacks present at the
-    // beginning of iteration which have not been removed.
-    // Used to avoid calling callbacks registered during iteration.
+    // The number of callbacks which were present when the notifier was packaged
+    // for delivery which are still present.
+    // Updated by packaged_for_delivery and removd_callback(), and used in
+    // for_each_callback() to avoid calling callbacks registered during delivery.
     size_t m_callback_count = -1;
 
     uint64_t m_next_token = 0;

@@ -206,8 +206,8 @@ void CollectionNotifier::remove_callback(uint64_t token)
         if (m_callback_index != npos) {
             if (m_callback_index >= idx)
                 --m_callback_index;
-            --m_callback_count;
         }
+        --m_callback_count;
 
         old = std::move(*it);
         m_callbacks.erase(it);
@@ -334,6 +334,7 @@ void CollectionNotifier::deliver_error(std::exception_ptr error)
     // Don't complain about double-unregistering callbacks
     m_error = true;
 
+    m_callback_count = m_callbacks.size();
     for_each_callback([&](auto& lock, auto& callback) {
         // acquire a local reference to the callback so that removing the
         // callback from within it can't result in a dangling pointer
@@ -360,6 +361,7 @@ bool CollectionNotifier::package_for_delivery()
     std::lock_guard<std::mutex> l(m_callback_mutex);
     for (auto& callback : m_callbacks)
         callback.changes_to_deliver = std::move(callback.accumulated_changes).finalize();
+    m_callback_count = m_callbacks.size();
     return true;
 }
 
@@ -367,7 +369,7 @@ template<typename Fn>
 void CollectionNotifier::for_each_callback(Fn&& fn)
 {
     std::unique_lock<std::mutex> callback_lock(m_callback_mutex);
-    m_callback_count = m_callbacks.size();
+    REALM_ASSERT_DEBUG(m_callback_count <= m_callbacks.size());
     for (++m_callback_index; m_callback_index < m_callback_count; ++m_callback_index) {
         fn(callback_lock, m_callbacks[m_callback_index]);
         if (!callback_lock.owns_lock())
