@@ -106,6 +106,12 @@ DWORD winfork(std::string unit_test_name)
         return GetCurrentProcessId();
 
     char filename[MAX_PATH];
+    DWORD success = GetModuleFileNameA(nullptr, filename, MAX_PATH);
+    if (success == 0 || success == MAX_PATH) {
+        DWORD err = GetLastError();
+        REALM_ASSERT_EX(false, err, MAX_PATH, filename);
+    }
+
     GetModuleFileNameA(nullptr, filename, MAX_PATH);
 
     StringBuffer environment;
@@ -2177,7 +2183,7 @@ TEST(Shared_WaitForChangeAfterOwnCommit)
 
 #endif
 
-TEST(Shared_InterprocessWaitForChange)
+NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
 {
     // We can't use SHARED_GROUP_TEST_PATH() because it will attempt to clean up the .realm file at the end,
     // and hence throw if the other processstill has the .realm file open
