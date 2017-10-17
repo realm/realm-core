@@ -223,7 +223,7 @@ TEST_IF(File_NoSpuriousTryLockFailures2, !(running_with_valgrind || running_with
             while(lock_taken + lock_not_taken < num_slaves) {
             }
 
-            CHECK_EQUAL(lock_taken, 1);
+            CHECK_EQUAL(lock_taken.load(), 1);
 
             if(owns_lock) {
                 file.unlock();
