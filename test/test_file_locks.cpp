@@ -237,9 +237,6 @@ TEST(File_NoSpuriousTryLockFailures2)
                    
             barrier_1 = 0;
 
-            if(t % 10 == 0)
-                std::cout << t << " ";
-
             // Thread barrier. After this barrier, the file is guaranteed to be unlocked regardless who owned it.
             barrier_2++;
             while(barrier_2 < num_slaves) {
