@@ -1020,6 +1020,21 @@ TEST_CASE("notifications: async error handling") {
             advance_and_notify(*r);
             REQUIRE(called);
         }
+
+        SECTION("adding another callback from within an error callback") {
+            NotificationToken token2;
+            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+                    REQUIRE(err);
+                    REQUIRE_FALSE(called);
+                    called = true;
+                });
+            });
+            advance_and_notify(*r);
+            REQUIRE(!called);
+            advance_and_notify(*r);
+            REQUIRE(called);
+        }
     }
 
     SECTION("error when opening the executor SG") {

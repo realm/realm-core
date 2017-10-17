@@ -331,18 +331,20 @@ void CollectionNotifier::after_advance()
 
 void CollectionNotifier::deliver_error(std::exception_ptr error)
 {
+    // Don't complain about double-unregistering callbacks
+    m_error = true;
+
     for_each_callback([&](auto& lock, auto& callback) {
         // acquire a local reference to the callback so that removing the
         // callback from within it can't result in a dangling pointer
-        auto cb = callback.fn;
+        auto cb = std::move(callback.fn);
+        auto token = callback.token;
         lock.unlock();
         cb.error(error);
-    });
 
-    // Remove all the callbacks as we never need to call anything ever again
-    // after delivering an error
-    m_callbacks.clear();
-    m_error = true;
+        // We never want to call the callback again after this, so just remove it
+        remove_callback(token);
+    });
 }
 
 bool CollectionNotifier::is_for_realm(Realm& realm) const noexcept
