@@ -2136,21 +2136,21 @@ inline bool Table::is_link_type(ColumnType col_type) noexcept
     return col_type == col_type_Link || col_type == col_type_LinkList;
 }
 
-inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const noexcept
+inline size_t* Table::record_subtable_path(size_t* b, size_t* e) const noexcept
 {
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     size_t index_in_parent = real_top.get_ndx_in_parent();
-    REALM_ASSERT_3(begin, <, end);
-    *begin++ = index_in_parent;
+    REALM_ASSERT_3(b, <, e);
+    *b++ = index_in_parent;
     ArrayParent* parent = real_top.get_parent();
     REALM_ASSERT(parent);
     REALM_ASSERT(dynamic_cast<Parent*>(parent));
-    return static_cast<Parent*>(parent)->record_subtable_path(begin, end);
+    return static_cast<Parent*>(parent)->record_subtable_path(b, e);
 }
 
-inline size_t* Table::Parent::record_subtable_path(size_t* begin, size_t*) noexcept
+inline size_t* Table::Parent::record_subtable_path(size_t* b, size_t*) noexcept
 {
-    return begin;
+    return b;
 }
 
 inline bool Table::is_marked() const noexcept
@@ -2527,9 +2527,9 @@ public:
         table.remove_backlink_broken_rows(rows); // Throws
     }
 
-    static size_t* record_subtable_path(const Table& table, size_t* begin, size_t* end) noexcept
+    static size_t* record_subtable_path(const Table& table, size_t* b, size_t* e) noexcept
     {
-        return table.record_subtable_path(begin, end);
+        return table.record_subtable_path(b, e);
     }
 
     static void insert_column(Descriptor& desc, size_t column_ndx, DataType type, StringData name,

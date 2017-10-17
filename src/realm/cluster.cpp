@@ -238,7 +238,8 @@ unsigned ClusterNodeInner::erase(Key key)
             size_t sibling_ndx = child_info.ndx + 1;
             Cluster l2(m_alloc, m_tree_top);
             ClusterNodeInner n2(m_alloc, m_tree_top);
-            ClusterNode* sibling_node = erase_node->is_leaf() ? (ClusterNode*)&l2 : (ClusterNode*)&n2;
+            ClusterNode* sibling_node =
+                erase_node->is_leaf() ? static_cast<ClusterNode*>(&l2) : static_cast<ClusterNode*>(&n2);
             sibling_node->set_parent(&m_children, sibling_ndx);
             sibling_node->init_from_parent();
 

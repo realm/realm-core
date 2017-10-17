@@ -1808,8 +1808,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
 
             switch (DataType(type)) {
                 case type_Int: {
-                    int_fast64_t value = read_int<int64_t>();
-                    if (!handler.set_int(col_ndx, static_cast<int64_t>(row_ndx), value, instr, prior_num_rows))
+                    int_fast64_t value = read_int<int64_t>();                             // Throws
+                    if (!handler.set_int(col_ndx, row_ndx, value, instr, prior_num_rows)) // Throws
                         parser_error();
                     return;
                 }

@@ -8287,7 +8287,7 @@ TEST(Table_object_merge_nodes)
 
     for (int i = 0; i < nb_rows; i++) {
         auto key_index = test_util::random_int<int64_t>(0, key_set.size() - 1);
-        auto it = key_set.begin() + key_index;
+        auto it = key_set.begin() + int(key_index);
 
         // table.dump_objects();
         // std::cout << "Key to remove: " << std::hex << *it << std::dec << std::endl;
