@@ -201,7 +201,7 @@ TEST(File_NoSpuriousTryLockFailures2)
     std::atomic<size_t> barrier_2 { 0 };
     std::atomic<size_t> lock_not_taken { 0 };
 
-    auto slave = [&](int ndx, std::string path) {
+    auto slave = [&](std::string path) {
         File file(path, File::mode_Write);
 
         for(size_t t = 0; t < num_rounds; t++) {
@@ -248,7 +248,7 @@ TEST(File_NoSpuriousTryLockFailures2)
     std::string str_path = path;
     ThreadWrapper slaves[100];
     for (size_t i = 0; i != num_slaves; ++i) {
-        slaves[i].start([=] { slave(i, str_path); });
+        slaves[i].start([=] { slave(str_path); });
     }
 
     for (size_t i = 0; i != num_slaves; ++i)
