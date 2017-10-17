@@ -175,7 +175,7 @@ TEST(File_NoSpuriousTryLockFailures)
 
 // Same as above, but with busy waiting to increase the chance that try_lock is called simultaneously from
 // all the threads.
-TEST(File_NoSpuriousTryLockFailures2)
+ONLY(File_NoSpuriousTryLockFailures2)
 {
     // Busy waiting is very slow in Valgrind, so don't run it there.. Seems like we have no ONLY_TEST_IF, 
 // so we're using this return instead.
@@ -184,7 +184,7 @@ TEST(File_NoSpuriousTryLockFailures2)
     }
 
 #if TEST_DURATION < 1
-    const size_t num_rounds = 20;
+    const size_t num_rounds = 2000000;
 #elif TEST_DURATION < 2
     const int num_rounds = 1000;
 #elif TEST_DURATION < 3
@@ -196,10 +196,10 @@ TEST(File_NoSpuriousTryLockFailures2)
     // More threads than cores will give OS time slice yields at random places which is good for randomness
     size_t num_slaves = 2 * std::thread::hardware_concurrency(); // The number includes HyperThread cores
 
-    std::atomic<size_t> lock_taken = 0;
-    std::atomic<size_t> barrier_1 = 0;
-    std::atomic<size_t> barrier_2 = 0;
-    std::atomic<size_t> lock_not_taken = 0;
+    std::atomic<size_t> lock_taken { 0 };
+    std::atomic<size_t> barrier_1 { 0 };
+    std::atomic<size_t> barrier_2 { 0 };
+    std::atomic<size_t> lock_not_taken { 0 };
 
     auto slave = [&](int ndx, std::string path) {
         File file(path, File::mode_Write);
@@ -236,6 +236,9 @@ TEST(File_NoSpuriousTryLockFailures2)
             }
                    
             barrier_1 = 0;
+
+            if(t % 10 == 0)
+                std::cout << t << " ";
 
             // Thread barrier. After this barrier, the file is guaranteed to be unlocked regardless who owned it.
             barrier_2++;
