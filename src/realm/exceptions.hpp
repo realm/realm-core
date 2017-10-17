@@ -92,6 +92,17 @@ public:
     /// runtime_error::what() returns the msg provided in the constructor.
 };
 
+/// Thrown when a key can not be used (either not found or already existing
+/// when trying to create a new object)
+class InvalidKey : public std::runtime_error {
+public:
+    InvalidKey(const std::string& msg)
+        : std::runtime_error(msg)
+    {
+    }
+    /// runtime_error::what() returns the msg provided in the constructor.
+};
+
 
 /// The \c LogicError exception class is intended to be thrown only when
 /// applications (or bindings) violate rules that are stated (or ought to have

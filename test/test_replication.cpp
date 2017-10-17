@@ -202,6 +202,20 @@ private:
     std::unique_ptr<Array> m_arr;
 };
 
+void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& rt_2)
+{
+    ReadTransaction rt_1(sg_1);
+    rt_1.get_group().verify();
+    rt_2.get_group().verify();
+    CHECK(rt_1.get_group() == rt_2.get_group());
+}
+
+} // anonymous namespace
+
+#ifdef TEST_REPLICATION_OLD
+
+namespace {
+
 void my_table_add_columns(TableRef t)
 {
     t->add_column(type_Int, "my_int");
@@ -222,8 +236,7 @@ void my_table_add_columns(TableRef t)
 
     sub_descr2->add_column(type_Int, "first");
 }
-
-} // anonymous namespace
+}
 
 TEST(Replication_General)
 {
@@ -311,15 +324,6 @@ TEST(Replication_General)
 }
 
 
-void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& rt_2)
-{
-    ReadTransaction rt_1(sg_1);
-    rt_1.get_group().verify();
-    rt_2.get_group().verify();
-    CHECK(rt_1.get_group() == rt_2.get_group());
-}
-
-
 TEST(Replication_Timestamp)
 {
     SHARED_GROUP_TEST_PATH(path_1);
@@ -383,7 +387,6 @@ TEST(Replication_Timestamp)
         CHECK(table->get_timestamp(0, 1).is_null());
     }
 }
-
 
 TEST(Replication_Links)
 {
@@ -3210,7 +3213,7 @@ TEST(Replication_Links)
         CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 4));
     }
 }
-
+#endif
 
 TEST(Replication_CascadeRemove_ColumnLink)
 {
@@ -3494,6 +3497,7 @@ TEST(Replication_NullStrings)
     }
 }
 
+#ifdef TEST_REPLICATION_OLD
 TEST(Replication_NullInteger)
 {
     SHARED_GROUP_TEST_PATH(path_1);
@@ -3530,7 +3534,7 @@ TEST(Replication_NullInteger)
         CHECK(table2->is_null(0, 2));
     }
 }
-
+#endif
 
 TEST(Replication_SetUnique)
 {
@@ -3574,38 +3578,6 @@ TEST(Replication_SetUnique)
         CHECK_EQUAL(table2->get_string(1, 0), "");
         CHECK(table2->is_null(2, 0));
         CHECK_EQUAL(table2->get_string(3, 0), "Hello, World!");
-    }
-}
-
-
-TEST(Replication_AddRowWithKey)
-{
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-
-    util::Logger& replay_logger = test_context.logger;
-
-    MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
-    SharedGroup sg_2(path_2);
-
-    {
-        WriteTransaction wt(sg_1);
-        TableRef table1 = wt.add_table("table");
-        table1->add_column(type_Int, "c1");
-        table1->add_search_index(0);
-        table1->add_row_with_key(0, 123);
-        table1->add_row_with_key(0, 456);
-        CHECK_EQUAL(table1->size(), 2);
-        wt.commit();
-    }
-    repl.replay_transacts(sg_2, replay_logger);
-    {
-        ReadTransaction rt(sg_2);
-        ConstTableRef table2 = rt.get_table("table");
-
-        CHECK_EQUAL(table2->find_first_int(0, 123), 0);
-        CHECK_EQUAL(table2->find_first_int(0, 456), 1);
     }
 }
 
@@ -3939,6 +3911,51 @@ TEST(Replication_HistorySchemaVersionUpgrade)
     // If this was not the case we would have triggered another upgrade
     // and the test would hang
     SharedGroup sg_2(repl);
+}
+
+TEST(Replication_CreateAndRemoveObject)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    util::Logger& replay_logger = test_context.logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("table");
+        table1->add_column(type_Int, "int1");
+        table1->create_object(Key(123)).set(0, 0);
+        table1->create_object(Key(456)).set(0, 1);
+        CHECK_EQUAL(table1->size(), 2);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table2 = rt.get_table("table");
+
+        CHECK_EQUAL(table2->get_object(Key(123)).get<int64_t>(0), 0);
+        CHECK_EQUAL(table2->get_object(Key(456)).get<int64_t>(0), 1);
+    }
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.get_table("table");
+        table1->remove_object(Key(123));
+        table1->get_object(Key(456)).set(0, 7);
+        CHECK_EQUAL(table1->size(), 1);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table2 = rt.get_table("table");
+        CHECK_THROW(table2->get_object(Key(123)), InvalidKey);
+        CHECK_EQUAL(table2->get_object(Key(456)).get<int64_t>(0), 7);
+    }
 }
 
 #endif // TEST_REPLICATION

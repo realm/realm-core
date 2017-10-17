@@ -24,6 +24,10 @@
 #include <string>
 #include <fstream>
 #include <ostream>
+#include <set>
+#include <chrono>
+
+using namespace std::chrono;
 
 #include <realm.hpp>
 #include <realm/history.hpp>
@@ -8229,6 +8233,202 @@ TEST(Table_KeyRow)
     CHECK_EQUAL(i, 0);
     i = table.find_first_int(0, 456);
     CHECK_EQUAL(i, 1);
+}
+
+TEST(Table_object_basic)
+{
+    Table table;
+    table.add_column(type_Int, "int1");
+    table.add_column(type_Int, "int2", true);
+
+    table.create_object(Key(5)).set_all(5, 7);
+    CHECK_EQUAL(table.size(), 1);
+    CHECK_THROW(table.create_object(Key(5)), InvalidKey);
+    CHECK_EQUAL(table.size(), 1);
+    table.create_object(Key(2));
+    Obj x = table.create_object(Key(7)).set(0, 100);
+    table.create_object(Key(8));
+    table.create_object(Key(10));
+    table.create_object(Key(6));
+
+    Obj y = table.get_object(Key(5));
+    CHECK(!y.is_null(1));
+    CHECK_EQUAL(y.get<util::Optional<int64_t>>(1), 7);
+    CHECK_EQUAL(x.get<int64_t>(0), 100);
+    y.set_null(1);
+    CHECK(y.is_null(1));
+
+    table.remove_object(Key(5));
+    CHECK_THROW(y.get<int64_t>(1), InvalidKey);
+
+    CHECK(table.get_object(Key(8)).is_null(1));
+
+    Key k11 = table.create_object().get_key();
+    Key k12 = table.create_object().get_key();
+    CHECK_EQUAL(k11.value, 11);
+    CHECK_EQUAL(k12.value, 12);
+}
+
+TEST(Table_object_merge_nodes)
+{
+    // This test works best for REALM_MAX_BPNODE_SIZE == 8.
+    // To be used mostly as a help when debugging new implementation
+
+    int nb_rows = REALM_MAX_BPNODE_SIZE * 8;
+    Table table;
+    std::vector<int64_t> key_set;
+    table.add_column(type_Int, "int1");
+    table.add_column(type_Int, "int2", true);
+
+    for (int i = 0; i < nb_rows; i++) {
+        table.create_object(Key(i)).set_all(i << 1, i << 2);
+        key_set.push_back(i);
+    }
+
+    for (int i = 0; i < nb_rows; i++) {
+        auto key_index = test_util::random_int<int64_t>(0, key_set.size() - 1);
+        auto it = key_set.begin() + int(key_index);
+
+        // table.dump_objects();
+        // std::cout << "Key to remove: " << std::hex << *it << std::dec << std::endl;
+
+        table.remove_object(Key(*it));
+        key_set.erase(it);
+        for (unsigned j = 0; j < key_set.size(); j++) {
+            int64_t key_val = key_set[j];
+            Obj o = table.get_object(Key(key_val));
+            CHECK_EQUAL(key_val << 1, o.get<int64_t>(0));
+            CHECK_EQUAL(key_val << 2, o.get<util::Optional<int64_t>>(1));
+        }
+    }
+}
+
+TEST(Table_object_forward_iterator)
+{
+    int nb_rows = 1024;
+    Table table;
+    table.add_column(type_Int, "int1");
+    table.add_column(type_Int, "int2", true);
+
+    for (int i = 0; i < nb_rows; i++) {
+        table.create_object(Key(i));
+    }
+
+    for (Obj o : table) {
+        int64_t key_value = o.get_key().value;
+        o.set_all(key_value << 1, key_value << 2);
+    }
+
+    // table.dump_objects();
+
+    for (Obj o : table) {
+        int64_t key_value = o.get_key().value;
+        // std::cout << "Key value: " << std::hex << key_value << std::dec << std::endl;
+        CHECK_EQUAL(key_value << 1, o.get<int64_t>(0));
+        CHECK_EQUAL(key_value << 2, o.get<util::Optional<int64_t>>(1));
+    }
+}
+
+TEST(Table_object_sequential)
+{
+    int nb_rows = 1024;
+    Table table;
+    table.add_column(type_Int, "int1");
+    table.add_column(type_Int, "int2", true);
+
+    auto t1 = steady_clock::now();
+
+    for (int i = 0; i < nb_rows; i++) {
+        table.create_object(Key(i)).set_all(i << 1, i << 2);
+    }
+
+    auto t2 = steady_clock::now();
+
+    for (int i = 0; i < nb_rows; i++) {
+        Obj o = table.get_object(Key(i));
+        CHECK_EQUAL(i << 1, o.get<int64_t>(0));
+        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(1));
+    }
+
+    auto t3 = steady_clock::now();
+
+    for (int i = 0; i < nb_rows; i++) {
+        table.remove_object(Key(i));
+        for (int j = i + 1; j < nb_rows; j++) {
+            Obj o = table.get_object(Key(j));
+            CHECK_EQUAL(j << 1, o.get<int64_t>(0));
+            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(1));
+        }
+    }
+
+    auto t4 = steady_clock::now();
+
+    std::cout << nb_rows << " rows" << std::endl;
+    std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+              << std::endl;
+    std::cout << "   lookup time   : " << duration_cast<nanoseconds>(t3 - t2).count() / nb_rows << " ns/key"
+              << std::endl;
+    std::cout << "   erase time    : " << duration_cast<nanoseconds>(t4 - t3).count() / nb_rows << " ns/key"
+              << std::endl;
+}
+
+TEST(Table_object_random)
+{
+    int nb_rows = 1024;
+    std::vector<int64_t> key_values;
+    {
+        std::set<int64_t> key_set;
+        for (int i = 0; i < nb_rows; i++) {
+            bool ok = false;
+            while (!ok) {
+                auto key_val = test_util::random_int<int64_t>(0, nb_rows * 10);
+                if (key_set.count(key_val) == 0) {
+                    key_values.push_back(key_val);
+                    key_set.insert(key_val);
+                    ok = true;
+                }
+            }
+        }
+    }
+
+    Table table;
+    table.add_column(type_Int, "int1");
+    table.add_column(type_Int, "int2", true);
+
+    auto t1 = steady_clock::now();
+
+    for (int i = 0; i < nb_rows; i++) {
+        table.create_object(Key(key_values[i])).set_all(i << 1, i << 2);
+    }
+
+    auto t2 = steady_clock::now();
+
+    for (int i = 0; i < nb_rows; i++) {
+        Obj o = table.get_object(Key(key_values[i]));
+        CHECK_EQUAL(i << 1, o.get<int64_t>(0));
+        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(1));
+    }
+
+    auto t3 = steady_clock::now();
+
+    for (int i = 0; i < nb_rows; i++) {
+        table.remove_object(Key(key_values[i]));
+        for (int j = i + 1; j < nb_rows; j++) {
+            Obj o = table.get_object(Key(key_values[j]));
+            CHECK_EQUAL(j << 1, o.get<int64_t>(0));
+            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(1));
+        }
+    }
+
+    auto t4 = steady_clock::now();
+
+    std::cout << nb_rows << " rows" << std::endl;
+    std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+              << std::endl;
+    std::cout << "   lookup time   : " << duration_cast<nanoseconds>(t3 - t2).count() / nb_rows << " ns/key"
+              << std::endl;
+    std::cout << "   erase time    : " << duration_cast<nanoseconds>(t4 - t3).count() / nb_rows << " ns/key"
+              << std::endl;
 }
 
 #endif // TEST_TABLE

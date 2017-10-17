@@ -1320,6 +1320,21 @@ public:
         return true;
     }
 
+    bool create_object(int64_t) noexcept
+    {
+        return true;
+    }
+
+    bool remove_object(int64_t) noexcept
+    {
+        typedef _impl::TableFriend tf;
+        if (m_table) {
+            // TODO: Is this needed?
+            tf::mark_opposite_link_tables(*m_table);
+        }
+        return true;
+    }
+
     bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool unordered) noexcept
     {
         typedef _impl::TableFriend tf;

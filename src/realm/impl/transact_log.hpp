@@ -80,6 +80,8 @@ enum Instruction {
     instr_LinkListClear = 37,   // Ramove all entries from a link list
     instr_LinkListSetAll = 38,  // Assign to link list entry
     instr_AddRowWithKey = 39,   // Insert a row with a given key
+    instr_CreateObject = 40,
+    instr_RemoveObject = 41,
 };
 
 class TransactLogStream {
@@ -153,6 +155,14 @@ public:
     }
 
     // Must have table selected:
+    bool create_object(int64_t)
+    {
+        return true;
+    }
+    bool remove_object(int64_t)
+    {
+        return true;
+    }
     bool insert_empty_rows(size_t, size_t, size_t, bool)
     {
         return true;
@@ -338,6 +348,8 @@ public:
     bool move_group_level_table(size_t from_table_ndx, size_t to_table_ndx);
 
     /// Must have table selected.
+    bool create_object(int64_t);
+    bool remove_object(int64_t);
     bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool unordered);
     bool add_row_with_key(size_t row_ndx, size_t prior_num_rows, size_t key_col_ndx, int64_t key);
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows, bool unordered);
@@ -484,7 +496,8 @@ public:
     virtual void rename_column(const Descriptor&, size_t col_ndx, StringData name);
     virtual void move_column(const Descriptor&, size_t from, size_t to);
 
-    virtual void set_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value, Instruction variant = instr_Set);
+    virtual void set_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value,
+                         Instruction variant = instr_Set);
     virtual void add_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value);
     virtual void set_bool(const Table*, size_t col_ndx, size_t ndx, bool value, Instruction variant = instr_Set);
     virtual void set_float(const Table*, size_t col_ndx, size_t ndx, float value, Instruction variant = instr_Set);
@@ -502,6 +515,8 @@ public:
     virtual void insert_substring(const Table*, size_t col_ndx, size_t row_ndx, size_t pos, StringData);
     virtual void erase_substring(const Table*, size_t col_ndx, size_t row_ndx, size_t pos, size_t size);
 
+    virtual void create_object(const Table*, Key);
+    virtual void remove_object(const Table*, Key);
     /// \param prior_num_rows The number of rows in the table prior to the
     /// modification.
     virtual void insert_empty_rows(const Table*, size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows);
@@ -1454,6 +1469,30 @@ inline void TransactLogConvenientEncoder::erase_substring(const Table* t, size_t
     }
 }
 
+inline bool TransactLogEncoder::create_object(int64_t key)
+{
+    append_simple_instr(instr_CreateObject, key); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::create_object(const Table* t, Key key)
+{
+    select_table(t);                    // Throws
+    m_encoder.create_object(key.value); // Throws
+}
+
+inline bool TransactLogEncoder::remove_object(int64_t key)
+{
+    append_simple_instr(instr_RemoveObject, key); // Throws
+    return true;
+}
+
+
+inline void TransactLogConvenientEncoder::remove_object(const Table* t, Key key)
+{
+    select_table(t);                    // Throws
+    m_encoder.remove_object(key.value); // Throws
+}
 inline bool TransactLogEncoder::insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
                                                   bool unordered)
 {
@@ -1879,6 +1918,18 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t pos = read_int<size_t>();                           // Throws
             size_t size = read_int<size_t>();                          // Throws
             if (!handler.erase_substring(col_ndx, row_ndx, pos, size)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_CreateObject: {
+            size_t key_value = read_int<size_t>(); // Throws
+            if (!handler.create_object(key_value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_RemoveObject: {
+            size_t key_value = read_int<size_t>(); // Throws
+            if (!handler.remove_object(key_value)) // Throws
                 parser_error();
             return;
         }
@@ -2437,6 +2488,20 @@ public:
     bool optimize_table()
     {
         return true; // No-op
+    }
+
+    bool create_object(int64_t key_value)
+    {
+        m_encoder.remove_object(key_value); // Throws
+        append_instruction();
+        return true;
+    }
+
+    bool remove_object(int64_t key_value)
+    {
+        m_encoder.create_object(key_value); // Throws
+        append_instruction();
+        return true;
     }
 
     bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool unordered)

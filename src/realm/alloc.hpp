@@ -47,8 +47,8 @@ public:
     MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept;
     MemRef(ref_type ref, Allocator& alloc) noexcept;
 
-    char* get_addr();
-    ref_type get_ref();
+    char* get_addr() const;
+    ref_type get_ref() const;
     void set_ref(ref_type ref);
     void set_addr(char* addr);
 
@@ -283,7 +283,7 @@ inline MemRef::MemRef(ref_type ref, Allocator& alloc) noexcept
 #endif
 }
 
-inline char* MemRef::get_addr()
+inline char* MemRef::get_addr() const
 {
 #if REALM_ENABLE_MEMDEBUG
     // Asserts if the ref has been freed
@@ -292,7 +292,7 @@ inline char* MemRef::get_addr()
     return m_addr;
 }
 
-inline ref_type MemRef::get_ref()
+inline ref_type MemRef::get_ref() const
 {
 #if REALM_ENABLE_MEMDEBUG
     // Asserts if the ref has been freed

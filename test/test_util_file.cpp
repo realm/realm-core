@@ -43,7 +43,6 @@ using namespace realm::util;
 // check-testcase` (or one of its friends) from the command line.
 
 // FIXME: Methods on File are not yet implemented on Windows
-#ifndef _WIN32
 
 TEST(Utils_File_dir)
 {
@@ -70,6 +69,7 @@ TEST(Utils_File_dir)
     }
     CHECK(dir_exists);
 
+#ifndef _WIN32
     bool perm_denied = false;
     try {
         make_dir("/foobar");
@@ -89,6 +89,7 @@ TEST(Utils_File_dir)
         perm_denied = true;
     }
     CHECK(perm_denied);
+#endif
 
     // Remove directory
     remove_dir(dir_name);
@@ -117,17 +118,31 @@ TEST(Utils_File_resolve)
     res = File::resolve("", "");
     CHECK_EQUAL(res, ".");
 
-    res = File::resolve("/foo/bar", "dir");
-    CHECK_EQUAL(res, "/foo/bar");
+#ifdef _WIN32
+    res = File::resolve("C:\\foo\\bar", "dir");
+    CHECK_EQUAL(res, "C:\\foo\\bar");
 
-    res = File::resolve("foo/bar", "");
-    CHECK_EQUAL(res, "foo/bar");
+    res = File::resolve("foo\\bar", "");
+    CHECK_EQUAL(res, "foo\\bar");
 
     res = File::resolve("file", "dir");
-    CHECK_EQUAL(res, "dir/file");
+    CHECK_EQUAL(res, "dir\\file");
 
-    res = File::resolve("file/", "dir");
-    CHECK_EQUAL(res, "dir/file/");
+    res = File::resolve("file\\", "dir");
+    CHECK_EQUAL(res, "dir\\file\\");
+#else
+	res = File::resolve("/foo/bar", "dir");
+	CHECK_EQUAL(res, "/foo/bar");
+
+	res = File::resolve("foo/bar", "");
+	CHECK_EQUAL(res, "foo/bar");
+
+	res = File::resolve("file", "dir");
+	CHECK_EQUAL(res, "dir/file");
+
+	res = File::resolve("file/", "dir");
+	CHECK_EQUAL(res, "dir/file/");
+#endif
 
     /* Function does not work as specified - but not used
     res = File::resolve("../baz", "/foo/bar");
@@ -135,6 +150,7 @@ TEST(Utils_File_resolve)
     */
 }
 
+#ifndef _WIN32 // An open file cannot be deleted on Windows
 TEST(Utils_File_remove_open)
 {
     std::string file_name = File::resolve("FooBar", test_util::get_test_path_prefix());
@@ -144,6 +160,7 @@ TEST(Utils_File_remove_open)
     std::remove(file_name.c_str());
     CHECK_EQUAL(f.is_removed(), true);
 }
+#endif
 
 TEST(Utils_File_RemoveDirRecursive)
 {
@@ -247,7 +264,5 @@ TEST(Utils_File_ForEach)
         CHECK_EQUAL("file_6", files[5].second);
     }
 }
-
-#endif // _WIN32
 
 #endif

@@ -9,6 +9,7 @@ set(REALM_SOURCES
     array_string.cpp
     array_string_long.cpp
     bptree.cpp
+    cluster.cpp
     column.cpp
     column_backlink.cpp
     column_binary.cpp

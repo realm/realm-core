@@ -80,59 +80,6 @@ using unit_test::TestContext;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-
-// FIXME: Move this test to test_table.cpp
-TEST(LangBindHelper_SetSubtable)
-{
-    Table t1;
-    DescriptorRef s;
-    t1.add_column(type_Table, "sub", &s);
-    s->add_column(type_Int, "i1");
-    s->add_column(type_Int, "i2");
-    s.reset();
-    t1.add_empty_row();
-
-    Table t2;
-    t2.add_column(type_Int, "i1");
-    t2.add_column(type_Int, "i2");
-    t2.insert_empty_row(0);
-    t2.set_int(0, 0, 10);
-    t2.set_int(1, 0, 120);
-    t2.insert_empty_row(1);
-    t2.set_int(0, 1, 12);
-    t2.set_int(1, 1, 100);
-
-    t1.set_subtable(0, 0, &t2);
-
-    TableRef sub = t1.get_subtable(0, 0);
-
-    CHECK_EQUAL(t2.get_column_count(), sub->get_column_count());
-    CHECK_EQUAL(t2.size(), sub->size());
-    CHECK(t2 == *sub);
-
-    Table* table_ptr = LangBindHelper::get_subtable_ptr_during_insert(&t1, 0, 0);
-    CHECK(table_ptr == sub);
-    LangBindHelper::unbind_table_ptr(table_ptr);
-}
-
-
-TEST(LangBindHelper_LinkView)
-{
-    Group group;
-    TableRef origin = group.add_table("origin");
-    TableRef target = group.add_table("target");
-    origin->add_column_link(type_LinkList, "", *target);
-    target->add_column(type_Int, "");
-    origin->add_empty_row();
-    target->add_empty_row();
-    Row row = origin->get(0);
-    const LinkViewRef& link_view = LangBindHelper::get_linklist_ptr(row, 0);
-    link_view->add(0);
-    LangBindHelper::unbind_linklist_ptr(link_view);
-    CHECK_EQUAL(1, origin->get_link_count(0, 0));
-}
-
-
 namespace {
 
 class ShortCircuitHistory : public TrivialReplication, public _impl::History {
@@ -247,6 +194,60 @@ private:
 };
 
 } // anonymous namespace
+
+#ifdef TEST_LANG_BIND_HELPER_OLD
+
+// FIXME: Move this test to test_table.cpp
+TEST(LangBindHelper_SetSubtable)
+{
+    Table t1;
+    DescriptorRef s;
+    t1.add_column(type_Table, "sub", &s);
+    s->add_column(type_Int, "i1");
+    s->add_column(type_Int, "i2");
+    s.reset();
+    t1.add_empty_row();
+
+    Table t2;
+    t2.add_column(type_Int, "i1");
+    t2.add_column(type_Int, "i2");
+    t2.insert_empty_row(0);
+    t2.set_int(0, 0, 10);
+    t2.set_int(1, 0, 120);
+    t2.insert_empty_row(1);
+    t2.set_int(0, 1, 12);
+    t2.set_int(1, 1, 100);
+
+    t1.set_subtable(0, 0, &t2);
+
+    TableRef sub = t1.get_subtable(0, 0);
+
+    CHECK_EQUAL(t2.get_column_count(), sub->get_column_count());
+    CHECK_EQUAL(t2.size(), sub->size());
+    CHECK(t2 == *sub);
+
+    Table* table_ptr = LangBindHelper::get_subtable_ptr_during_insert(&t1, 0, 0);
+    CHECK(table_ptr == sub);
+    LangBindHelper::unbind_table_ptr(table_ptr);
+}
+
+
+TEST(LangBindHelper_LinkView)
+{
+    Group group;
+    TableRef origin = group.add_table("origin");
+    TableRef target = group.add_table("target");
+    origin->add_column_link(type_LinkList, "", *target);
+    target->add_column(type_Int, "");
+    origin->add_empty_row();
+    target->add_empty_row();
+    Row row = origin->get(0);
+    const LinkViewRef& link_view = LangBindHelper::get_linklist_ptr(row, 0);
+    link_view->add(0);
+    LangBindHelper::unbind_linklist_ptr(link_view);
+    CHECK_EQUAL(1, origin->get_link_count(0, 0));
+}
+
 
 TEST(LangBindHelper_AdvanceReadTransact_Basics)
 {
@@ -13400,6 +13401,46 @@ TEST(LangBindHelper_UpdateDescriptor)
     // Try again. The Descriptor should be created again
     tv = sub->where().equal(0, 53).find_all();
     CHECK_EQUAL(tv.size(), 1);
+}
+
+#endif // TEST_LANG_BIND_HELPER_OLD
+
+TEST(LangBindHelper_RemoveObject)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_w(hist);
+    SharedGroup sg_r(hist);
+
+    ReadTransaction rt(sg_r);
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef t = group.add_table("Foo");
+        t->add_column(type_Int, "int");
+        t->create_object(Key(123)).set(0, 1);
+        t->create_object(Key(456)).set(0, 2);
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg_r);
+    const Group& g = rt.get_group();
+    auto table = g.get_table("Foo");
+    ConstObj o1 = table->get_object(Key(123));
+    ConstObj o2 = table->get_object(Key(456));
+    CHECK_EQUAL(o1.get<int64_t>(0), 1);
+    CHECK_EQUAL(o2.get<int64_t>(0), 2);
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef t = group.get_table("Foo");
+        t->remove_object(Key(123));
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg_r);
+    CHECK_THROW(o1.get<int64_t>(0), InvalidKey);
+    CHECK_EQUAL(o2.get<int64_t>(0), 2);
 }
 
 #endif

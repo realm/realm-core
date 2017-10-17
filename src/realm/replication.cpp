@@ -67,8 +67,12 @@ public:
             // preceding this. Calling the set_int_unique() here would be a
             // waste of time, because all possible side-effects have already
             // been carried out.
-            m_table->set_int(col_ndx, row_ndx, value); // Throws
-            return true;
+            try {
+                m_table->get_object(Key(int64_t(row_ndx))).set(col_ndx, value); // Throws
+                return true;
+            }
+            catch (...) {
+            }
         }
         return false;
     }
@@ -256,6 +260,30 @@ public:
         catch (LogicError&) { // LCOV_EXCL_START
             return false;
         } // LCOV_EXCL_STOP
+    }
+
+    bool create_object(int64_t key_value)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
+            return false;
+        log("table->create_object(%1);", key_value); // Throws
+        m_table->create_object(Key(key_value));      // Throws
+        return true;
+    }
+
+    bool remove_object(int64_t key_value)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
+            return false;
+        typedef _impl::TableFriend tf;
+        log("table->remove_object(%1);", key_value); // Throws
+        try {
+            tf::do_remove_object(*m_table, Key(key_value)); // Throws
+            return true;
+        }
+        catch (...) {
+            return false;
+        }
     }
 
     bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool unordered)
@@ -722,8 +750,7 @@ private:
         static_cast<void>(row_ndx);
         if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_table->get_column_count()))) {
-                if (REALM_LIKELY(REALM_COVER_ALWAYS(row_ndx < m_table->size())))
-                    return true;
+                return true;
             }
         }
         return false;

@@ -3455,4 +3455,58 @@ NONCONCURRENT_TEST(SharedGroupOptions_tmp_dir)
     SharedGroupOptions::set_sys_tmp_dir(initial_system_dir);
 }
 
+
+TEST(Shared_ConstObject)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg_w(path);
+    Group& g = sg_w.begin_write();
+
+    TableRef t = g.add_table("Foo");
+    t->add_column(type_Int, "");
+    t->create_object(Key(47)).set(0, 5);
+    sg_w.commit();
+
+    SharedGroup sg_r(path);
+    const Group& g2 = sg_r.begin_read();
+    ConstTableRef t2 = g2.get_table("Foo");
+    ConstObj obj = t2->get_object(Key(47));
+    CHECK_EQUAL(obj.get<int64_t>(0), 5);
+}
+
+TEST(Shared_ConstObjectIterator)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    Group& g = sg.begin_write();
+
+    TableRef t = g.add_table("Foo");
+    t->add_column(type_Int, "");
+    t->create_object(Key(47)).set(0, 5);
+    t->create_object(Key(99)).set(0, 8);
+    sg.commit();
+
+    SharedGroup sg2(path);
+    Group& g2 = sg2.begin_write();
+    TableRef t2 = g2.get_or_add_table("Foo");
+    auto i1 = t2->begin();
+    auto i2 = t2->begin();
+    CHECK_EQUAL(i1->get<int64_t>(0), 5);
+    CHECK_EQUAL(i2->get<int64_t>(0), 5);
+    i1->set(0, 7);
+    CHECK_EQUAL(i2->get<int64_t>(0), 7);
+    ++i1;
+    CHECK_EQUAL(i1->get<int64_t>(0), 8);
+    sg2.commit();
+
+    // Now ensure that we can create a ConstIterator
+    SharedGroup sg_r(path);
+    const Group& g3 = sg_r.begin_read();
+    ConstTableRef t3 = g3.get_table("Foo");
+    auto i3 = t3->begin();
+    CHECK_EQUAL(i3->get<int64_t>(0), 7);
+    ++i3;
+    CHECK_EQUAL(i3->get<int64_t>(0), 8);
+}
+
 #endif // TEST_SHARED

@@ -514,7 +514,6 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     // Load from allocated memory
     m_top.set_parent(parent, ndx_in_parent);
     m_top.init_from_ref(top_ref);
-    REALM_ASSERT_3(m_top.size(), ==, 2);
 
     size_t spec_ndx_in_parent = 0;
     m_spec.manage(new Spec(get_alloc()));
@@ -523,6 +522,12 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     size_t columns_ndx_in_parent = 1;
     m_columns.set_parent(&m_top, columns_ndx_in_parent);
     m_columns.init_from_parent();
+
+    if (m_top.size() > 2) {
+        size_t keys_ndx_in_parent = 2;
+        m_clusters.set_parent(&m_top, keys_ndx_in_parent);
+        m_clusters.init_from_parent();
+    }
 
     size_t num_cols = m_spec->get_column_count();
     m_cols.resize(num_cols); // Throws
@@ -979,6 +984,10 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name, L
     }
 
     refresh_link_target_accessors(col_ndx);
+
+    if (m_clusters.is_attached()) {
+        m_clusters.insert_column(col_ndx);
+    }
 }
 
 
@@ -2151,6 +2160,13 @@ ref_type Table::create_empty_table(Allocator& alloc)
         top.add(v); // Throws
         dg_2.release();
     }
+    {
+        MemRef mem = ClusterTree::create_empty_cluster(alloc); // Throws
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v(from_ref(mem.get_ref()));
+        top.add(v); // Throws
+        dg_2.release();
+    }
 
     dg.release();
     return top.get_ref();
@@ -2438,8 +2454,8 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
             state.rows.push_back(row); // Throws
         }
     }
-    sort(begin(state.rows), end(state.rows));
-    state.rows.erase(unique(begin(state.rows), end(state.rows)), end(state.rows));
+    sort(std::begin(state.rows), std::end(state.rows));
+    state.rows.erase(unique(std::begin(state.rows), std::end(state.rows)), std::end(state.rows));
 
     if (Group* g = get_parent_group())
         state.track_link_nullifications = g->has_cascade_notification_handler();
@@ -2632,6 +2648,10 @@ void Table::do_clear(bool broken_reciprocal_backlinks)
         ColumnBase& col = get_column_base(col_ndx);
         col.clear(m_size, broken_reciprocal_backlinks); // Throws
     }
+    if (m_clusters.is_attached()) {
+        m_clusters.clear();
+    }
+
     m_size = 0;
 
     discard_row_accessors();
@@ -3097,10 +3117,13 @@ size_t Table::set_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
         ndx = do_set_unique(col, ndx, value, conflict); // Throws
     }
 
+    /*
+    // TODO: reintroduce replication
     if (!conflict) {
         if (Replication* repl = get_repl())
             repl->set_int(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
     }
+    */
 
     return ndx;
 }
@@ -3188,7 +3211,7 @@ size_t Table::set_unique(size_t col_ndx, size_t row_ndx, null)
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool /* is_default */)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -3203,8 +3226,11 @@ void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
         col.set(ndx, value);
     }
 
+    /*
+    // TODO: reintroduce replication
     if (Replication* repl = get_repl())
         repl->set_int(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+    */
 }
 
 template <>
@@ -4974,6 +5000,9 @@ void Table::update_from_parent(size_t old_baseline) noexcept
             // and remember to update mappings in subtable columns
             spec_might_have_changed = true;
         }
+        if (m_top.size() > 2) {
+            m_clusters.update_from_parent(old_baseline);
+        }
     }
     else {
         refresh_spec_accessor();
@@ -6094,6 +6123,9 @@ void Table::refresh_accessor_tree()
             }
         }
         m_columns.init_from_parent();
+        if (m_top.size() > 2) {
+            m_clusters.init_from_parent();
+        }
     }
     else {
         // Subtable with shared descriptor
@@ -6247,6 +6279,10 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
     else {
         ColumnBase* first_col = m_cols[0];
         m_size = first_col->size();
+    }
+    size_t sz = m_clusters.size();
+    if (sz > m_size) {
+        m_size = sz;
     }
 }
 
@@ -6623,3 +6659,46 @@ void Table::dump_node_structure(std::ostream& out, int level) const
 }
 
 #endif // LCOV_EXCL_STOP ignore debug functions
+
+Obj Table::create_object(Key key)
+{
+    if (key == null_key) {
+        if (m_next_key_value == -1) {
+            m_next_key_value = m_clusters.get_last_key() + 1;
+        }
+        key = Key(m_next_key_value++);
+    }
+
+    Obj obj = m_clusters.insert(key);
+    bump_version();
+    m_size++;
+
+    return obj;
+}
+
+void Table::do_remove_object(Key key, bool /* broken_reciprocal_backlinks */)
+{
+    m_clusters.erase(key);
+    bump_version();
+    m_size--; // TODO: Redundant
+}
+
+Table::ConstIterator Table::begin() const
+{
+    return ConstIterator(m_clusters, 0);
+}
+
+Table::ConstIterator Table::end() const
+{
+    return ConstIterator(m_clusters, size());
+}
+
+Table::Iterator Table::begin()
+{
+    return Iterator(m_clusters, 0);
+}
+
+Table::Iterator Table::end()
+{
+    return Iterator(m_clusters, size());
+}
