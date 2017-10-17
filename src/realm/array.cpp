@@ -484,6 +484,8 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
 
 void Array::move_rotate(size_t from, size_t to, size_t num_elems)
 {
+    REALM_ASSERT_DEBUG_EX(from < m_size && to < m_size && num_elems <= m_size, from, to, num_elems, m_size);
+
     if (from == to)
         return;
 

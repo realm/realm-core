@@ -114,7 +114,7 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
         return;
 
     Table& target_table = m_origin_column->get_target_table();
-    size_t num_remaining = target_table.get_num_strong_backlinks(old_target_row_ndx);
+    size_t num_remaining = target_table.get_backlink_count(old_target_row_ndx, true);
     if (num_remaining > 0)
         return;
 
@@ -208,7 +208,7 @@ void LinkView::remove(size_t link_ndx)
         return;
 
     Table& target_table = m_origin_column->get_target_table();
-    size_t num_remaining = target_table.get_num_strong_backlinks(target_row_ndx);
+    size_t num_remaining = target_table.get_backlink_count(target_row_ndx, true);
     if (num_remaining > 0)
         return;
 
@@ -264,7 +264,7 @@ void LinkView::clear()
         size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
         m_origin_column->remove_backlink(target_row_ndx, origin_row_ndx); // Throws
         Table& target_table = m_origin_column->get_target_table();
-        size_t num_remaining = target_table.get_num_strong_backlinks(target_row_ndx);
+        size_t num_remaining = target_table.get_backlink_count(target_row_ndx, true);
         if (num_remaining > 0)
             continue;
         CascadeState::row target_row;

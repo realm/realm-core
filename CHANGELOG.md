@@ -1,3 +1,102 @@
+# 4.0.2 Release notes
+
+### Bugfixes
+
+* Fix a race between SharedGroup::compact() and SharedGroup::open(). The race could
+  cause asserts indicating file corruption even if no corruption is caused. It is also
+  possible that it could cause real file corruption, though that is much less likely.
+  PR [#2892](https://github.com/realm/realm-core/pull/2892)
+
+----------------------------------------------
+
+# 4.0.1 Release notes
+
+### Bugfixes
+
+* Fix case insensitive contains query for null strings not returning all results and
+  Fix case insensitive equals query for null strings returning nothing when null strings exist.
+  PR [#2871](https://github.com/realm/realm-core/pull/2871).
+* Added mentioning of bugfix #2853 to this file for Core 4.0.0. (see 4.0.0 below)
+  The mentioning of this fix for 4.0 was originally ommitted.
+
+----------------------------------------------
+
+# 4.0.0 Release notes
+
+### Bugfixes
+
+* Fix a bug in subtable management which caused crashes if a subtable was destroyed
+  on a different thread.
+  PR [#2855](https://github.com/realm/realm-core/pull/2855).
+* Fix corruption caused by `swap_rows()` and `move_column()` operations applied
+  to a StringEnumColumn. Currently unused by bindings.
+  PR [#2780](https://github.com/realm/realm-core/pull/2780).
+
+### Breaking changes
+
+* Add `Table::move_row()`.
+  PR [#2873](https://github.com/realm/realm-core/pull/2873).
+* Changing instruction values for `Table::move_row()` requires a version bump to 9.
+  Version 8 files in read only mode without any history can be opened without upgrading.
+  PR [#2877](https://github.com/realm/realm-core/pull/2877).
+
+### Enhancements
+
+* Add method to recursively delete an object tree
+  PR [#2752](https://github.com/realm/realm-core/pull/2752)
+  Issue [#2718](https://github.com/realm/realm-core/issues/2718)
+* Add method to safely delete or otherwise manipulate realm file
+  and management files.
+  PR [#2864](https://github.com/realm/realm-core/pull/2864)
+
+-----------
+
+### Internals
+
+* A specialised exception realm::OutOfDiskSpace is thrown instead of a generic
+  runtime exception when writing fails because the disk is full or the user exceeds
+  the allotted disk quota.
+  PR [#2861](https://github.com/realm/realm-core/pull/2861).
+
+----------------------------------------------
+
+# 3.2.1 Release notes
+
+### Bugfixes
+
+* Compact now throws an exception if writing fails for some reason
+  instead of ignoring errors and possibly causing corruption.
+  In particular, this solves file truncation causing "bad header" exceptions
+  after a compact operation on a file system that is running out of disk space.
+  PR [#2852](https://github.com/realm/realm-core/pull/2852).
+
+-----------
+
+### Internals
+
+* Moved object store's true and false query expressions down to core.
+  PR [#2857](https://github.com/realm/realm-core/pull/2857).
+
+----------------------------------------------
+
+# 3.2.0 Release notes
+
+### Enhancements
+
+* Added metrics tracking as an optional SharedGroup feature.
+  PR [#2840](https://github.com/realm/realm-core/pull/2840).
+
+-----------
+
+### Internals
+
+* Improve crash durability on windows.
+  PR [#2845](https://github.com/realm/realm-core/pull/2845).
+* Removed incorrect string column type traits, which could cause errors.
+  They were unused. PR [#2846](https://github.com/realm/realm-core/pull/2846).
+
+----------------------------------------------
+
 # 3.1.0 Release notes
 
 ### Bugfixes
@@ -89,6 +188,39 @@
 * The archives produced by the packaging process for Mac builds are now
   .tar.gz files rather than .tar.xz files, with the exception of the aggregate
   realm-core-cocoa-VERSION.tar.xz archive, which remains as a .tar.xz file.
+
+----------------------------------------------
+
+# 2.9.2 Release notes
+
+### Bugfixes
+
+* Throw a MaximumFileSizeExceeded exception during commits or allocations
+  instead of causing corruption or asserting. This would most likely be
+  seen when creating large Realm files on 32 bit OS.
+  PR [#2795](https://github.com/realm/realm-core/pull/2795).
+
+**Note: This is a hotfix release built on top of 2.9.1. The above fixes are not present in version 3.0.0.**
+
+----------------------------------------------
+
+# 2.9.1 Release notes
+
+### Bugfixes
+
+* A linker error in some configurations was addressed by adding an explicit
+  instantiation of `Table::find_first` for `BinaryData`.
+  [#2823](https://github.com/realm/realm-core/pull/2823).
+
+-----------
+
+### Internals
+
+* The archives produced by the packaging process for Mac builds are now
+  .tar.gz files rather than .tar.xz files, with the exception of the aggregate
+  realm-core-cocoa-VERSION.tar.xz archive, which remains as a .tar.xz file.
+
+**Note: This is a hotfix release built on top of 2.9.0. The above fixes are not present in version 3.0.0.**
 
 ----------------------------------------------
 

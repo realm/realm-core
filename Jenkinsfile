@@ -6,6 +6,11 @@ cocoaStashes = []
 androidStashes = []
 publishingStashes = []
 
+tokens = "${env.JOB_NAME}".tokenize('/')
+org = tokens[tokens.size()-3]
+repo = tokens[tokens.size()-2]
+branch = tokens[tokens.size()-1]
+
 jobWrapper {
   timeout(time: 5, unit: 'HOURS') {
       stage('gather-info') {
@@ -63,7 +68,8 @@ jobWrapper {
                                packageCentos6      : doBuildPackage('centos-6', 'rpm'),
                                packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
                                threadSanitizer     : doBuildInDocker('Debug', 'thread'),
-                               addressSanitizer    : doBuildInDocker('Debug', 'address')
+                               addressSanitizer    : doBuildInDocker('Debug', 'address'),
+                               coverage            : doBuildCoverage()
               ]
 
           androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
@@ -89,7 +95,6 @@ jobWrapper {
           }
 
           if (env.CHANGE_TARGET) {
-              parallelExecutors['diffCoverage'] = buildDiffCoverage()
               parallelExecutors['performance'] = buildPerformance()
           }
 
@@ -273,10 +278,14 @@ def doBuildWindows(String buildType, boolean isUWP, String platform) {
                 }
             }
             if(!isUWP) {
-                def environment = environment()
+                def environment = environment() << "TMP=${env.WORKSPACE}\\temp"
                 withEnv(environment) {
                     dir("build-dir/test/${buildType}") {
-                        bat 'realm-tests.exe --no-error-exit-code'
+                        bat '''
+                          mkdir %TMP%
+                          realm-tests.exe --no-error-exit-code
+                          rmdir /Q /S %TMP%
+                        '''
                     }
                 }
                 recordTests("Windows-${platform}-${buildType}")
@@ -327,7 +336,7 @@ def buildDiffCoverage() {
                         sh """
                            curl -H \"Authorization: token ${env.githubToken}\" \\
                                 -d '{ \"body\": \"${coverageResults}\\n\\nPlease check your coverage here: ${env.BUILD_URL}Diff_Coverage\"}' \\
-                                \"https://api.github.com/repos/realm/realm-core/issues/${env.CHANGE_ID}/comments\"
+                                \"https://api.github.com/repos/realm/${repo}/issues/${env.CHANGE_ID}/comments\"
                         """
                     }
                 }
@@ -369,7 +378,7 @@ def buildPerformance() {
           withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
               sh "curl -H \"Authorization: token ${env.githubToken}\" " +
                  "-d '{ \"body\": \"Check the performance result here: ${env.BUILD_URL}Performance_Report\"}' " +
-                 "\"https://api.github.com/repos/realm/realm-core/issues/${env.CHANGE_ID}/comments\""
+                 "\"https://api.github.com/repos/realm/${repo}/issues/${env.CHANGE_ID}/comments\""
           }
         }
       }
@@ -380,11 +389,11 @@ def buildPerformance() {
 def doBuildMacOs(String buildType) {
     def sdk = 'macosx'
     return {
-        node('macos || osx') {
+        node('osx') {
             getArchive()
 
             dir("build-macos-${buildType}") {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -420,10 +429,10 @@ def doBuildMacOs(String buildType) {
 
 def doBuildAppleDevice(String sdk, String buildType) {
     return {
-        node('macos || osx') {
+        node('osx') {
             getArchive()
 
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {
                 retry(3) {
                     timeout(time: 15, unit: 'MINUTES') {
                         runAndCollectWarnings(parser:'clang', script: """
@@ -442,6 +451,37 @@ def doBuildAppleDevice(String sdk, String buildType) {
             }
         }
     }
+}
+
+def doBuildCoverage() {
+  return {
+    node('docker') {
+      getArchive()
+      docker.build('realm-core:snapshot').inside {
+        def workspace = pwd()
+        sh """
+          mkdir build
+          cd build
+          cmake -G Ninja -D REALM_COVERAGE=ON ..
+          ninja
+          cd ..
+          lcov --no-external --capture --initial --directory . --output-file ${workspace}/coverage-base.info
+          cd build/test
+          ./realm-tests
+          cd ../..
+          lcov --no-external --directory . --capture --output-file ${workspace}/coverage-test.info
+          lcov --add-tracefile ${workspace}/coverage-base.info --add-tracefile coverage-test.info --output-file ${workspace}/coverage-total.info
+          lcov --remove ${workspace}/coverage-total.info '/usr/*' '${workspace}/test/*' --output-file ${workspace}/coverage-filtered.info
+          rm coverage-base.info coverage-test.info coverage-total.info
+        """
+        withCredentials([[$class: 'StringBinding', credentialsId: 'codecov-token-core', variable: 'CODECOV_TOKEN']]) {
+          sh '''
+            curl -s https://codecov.io/bash | bash
+          '''
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -517,7 +557,7 @@ def doPublishGeneric() {
                 unstash 'packages-generic'
                 withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
                     sh 'find . -type f -name "*.tgz" -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
-                    sh "find . -type f -name \"*.tgz\" -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/${gitDescribeVersion}/linux \\;"
+                    sh "find . -type f -name \"*.tgz\" -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/${gitDescribeVersion}/linux/ \\;"
                 }
             }
 

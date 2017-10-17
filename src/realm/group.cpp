@@ -112,7 +112,10 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     if (requested_history_type == Replication::hist_None && current_file_format_version == 7)
         return 7;
 
-    return 8;
+    if (requested_history_type == Replication::hist_None && current_file_format_version == 8)
+        return 8;
+
+    return 9;
 }
 
 
@@ -123,7 +126,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 8, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 9, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -131,7 +134,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     // SharedGroup::do_open() must ensure this. Be sure to revisit the
     // following upgrade logic when SharedGroup::do_open() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version >= 2 && current_file_format_version <= 7,
+    REALM_ASSERT_EX(current_file_format_version >= 2 && current_file_format_version <= 8,
                     current_file_format_version);
 
     // Upgrade from version prior to 5 (datetime -> timestamp)
@@ -162,6 +165,8 @@ void Group::upgrade_file_format(int target_file_format_version)
         }
     }
 
+    // Upgrading to version 9 doesn't require changing anything.
+
     // NOTE: Additional future upgrade steps go here.
 
     set_file_format_version(target_file_format_version);
@@ -177,7 +182,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
     bool file_format_ok = false;
     // In non-shared mode (Realm file opened via a Group instance) this version
     // of the core library is only able to open Realms using file format version
-    // 6, 7 or 8. These versions can be read without an upgrade.
+    // 6, 7, 8 or 9. These versions can be read without an upgrade.
     // Since a Realm file cannot be upgraded when opened in this mode
     // (we may be unable to write to the file), no earlier versions can be opened.
     // Please see Group::get_file_format_version() for information about the
@@ -189,6 +194,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
         case 6:
         case 7:
         case 8:
+        case 9:
             file_format_ok = true;
             break;
     }
@@ -315,6 +321,10 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
     }
 
     m_attached = true;
+
+#if REALM_METRICS
+    update_num_objects();
+#endif // REALM_METRICS
 }
 
 
@@ -328,6 +338,23 @@ void Group::detach() noexcept
     m_top.detach();
 
     m_attached = false;
+}
+
+void Group::update_num_objects()
+{
+#if REALM_METRICS
+    if (m_metrics) {
+        // FIXME: this is quite invasive and completely defeats the lazy loading mechanism
+        // where table accessors are only instantiated on demand, because they are all created here.
+
+        m_total_rows = 0;
+        size_t num_tables = size();
+        for (size_t i = 0; i < num_tables; ++i) {
+            ConstTableRef t = get_table(i);
+            m_total_rows += t->size();
+        }
+    }
+#endif // REALM_METRICS
 }
 
 
@@ -789,7 +816,10 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
     file.set_encryption_key(encryption_key);
     File::Streambuf streambuf(&file);
     std::ostream out(&streambuf);
+    out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
     write(out, encryption_key != 0, version_number);
+    int sync_status = streambuf.pubsync();
+    REALM_ASSERT(sync_status == 0);
 }
 
 BinaryData Group::write_to_mem() const
@@ -1298,14 +1328,15 @@ public:
         // have been created yet (all entries are null).
         REALM_ASSERT(m_group.m_table_accessors.empty() || group_level_ndx < m_group.m_table_accessors.size());
         if (group_level_ndx < m_group.m_table_accessors.size()) {
-            if (Table* table = m_group.m_table_accessors[group_level_ndx]) {
+            TableRef table(m_group.m_table_accessors[group_level_ndx]);
+            if (table) {
                 const size_t* path_begin = path;
                 const size_t* path_end = path_begin + 2 * levels;
                 for (;;) {
                     typedef _impl::TableFriend tf;
                     tf::mark(*table);
                     if (path_begin == path_end) {
-                        m_table.reset(table);
+                        m_table = std::move(table);
                         break;
                     }
                     size_t col_ndx = path_begin[0];
@@ -1397,6 +1428,14 @@ public:
         return true;
     }
 
+    bool move_row(size_t from_ndx, size_t to_ndx) noexcept
+    {
+        using tf = _impl::TableFriend;
+        if (m_table)
+            tf::adj_acc_move_row(*m_table, from_ndx, to_ndx);
+        return true;
+    }
+
     bool merge_rows(size_t row_ndx, size_t new_row_ndx) noexcept
     {
         typedef _impl::TableFriend tf;
@@ -1462,7 +1501,8 @@ public:
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
-            if (Table* subtab = tf::get_subtable_accessor(*m_table, col_ndx, row_ndx)) {
+            TableRef subtab(tf::get_subtable_accessor(*m_table, col_ndx, row_ndx));
+            if (subtab) {
                 tf::mark(*subtab);
                 tf::adj_acc_clear_nonroot_table(*subtab);
             }

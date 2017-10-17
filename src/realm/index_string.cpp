@@ -27,6 +27,7 @@
 #include <realm/index_string.hpp>
 #include <realm/column.hpp>
 #include <realm/column_string.hpp>
+#include <realm/column_string_enum.hpp>
 #include <realm/column_timestamp.hpp> // Timestamp
 
 using namespace realm;
@@ -419,6 +420,12 @@ private:
 
 void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, ColumnBase* column) const
 {
+    if (value.is_null()) {
+        // we can't use case_map on null strings because it currently returns an
+        // empty string ("") in that case which is different than a null StringData
+        return index_string_all(value, result, column);
+    }
+
     const util::Optional<std::string> upper_value = case_map(value, true);
     const util::Optional<std::string> lower_value = case_map(value, false);
     SearchList search_list(upper_value, lower_value);
@@ -1572,7 +1579,8 @@ void StringIndex::verify() const
 
 #ifdef REALM_DEBUG
 
-void StringIndex::verify_entries(const StringColumn& column) const
+template<typename T>
+void StringIndex::verify_entries(const T& column) const
 {
     Allocator& alloc = Allocator::get_default();
     ref_type results_ref = IntegerColumn::create(alloc); // Throws
@@ -1593,6 +1601,8 @@ void StringIndex::verify_entries(const StringColumn& column) const
     results.destroy(); // clean-up
 }
 
+template void StringIndex::verify_entries(const StringColumn&) const;
+template void StringIndex::verify_entries(const StringEnumColumn&) const;
 
 void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int level)
 {

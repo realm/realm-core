@@ -30,6 +30,7 @@
 #include <realm/impl/input_stream.hpp>
 #include <realm/impl/output_stream.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
+#include <realm/metrics/metrics.hpp>
 #include <realm/table.hpp>
 #include <realm/alloc_slab.hpp>
 
@@ -601,6 +602,8 @@ private:
 
     std::function<void(const CascadeNotification&)> m_notify_handler;
     std::function<void()> m_schema_change_handler;
+    std::shared_ptr<metrics::Metrics> m_metrics;
+    size_t m_total_rows;
 
     struct shared_tag {
     };
@@ -655,6 +658,10 @@ private:
     void child_accessor_destroyed(Table*) noexcept override;
 
     // Overriding method in Table::Parent
+    std::recursive_mutex* get_accessor_management_lock() noexcept override
+    { return nullptr; } // we don't need locking for group!
+
+    // Overriding method in Table::Parent
     Group* get_parent_group() noexcept override;
 
     class TableWriter;
@@ -689,6 +696,9 @@ private:
 
     Replication* get_replication() const noexcept;
     void set_replication(Replication*) noexcept;
+    std::shared_ptr<metrics::Metrics> get_metrics() const noexcept;
+    void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
+    void update_num_objects();
     class TransactAdvancer;
     void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&);
     void refresh_dirty_accessors();
@@ -752,6 +762,8 @@ private:
     ///
     ///   8 Subtables can now have search index.
     ///
+    ///   9 Replication instruction values shuffled, instr_MoveRow added.
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and SharedGroup::do_open, the file
     /// format selection logic in
@@ -789,6 +801,8 @@ private:
     friend class _impl::TransactLogParser;
     friend class Replication;
     friend class TrivialReplication;
+    friend class metrics::QueryInfo;
+    friend class metrics::Metrics;
 };
 
 
@@ -800,6 +814,7 @@ inline Group::Group(const std::string& file, const char* key, OpenMode mode)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
     , m_is_shared(false)
+    , m_total_rows(0)
 {
     init_array_parents();
 
@@ -812,6 +827,7 @@ inline Group::Group(BinaryData buffer, bool take_ownership)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
     , m_is_shared(false)
+    , m_total_rows(0)
 {
     init_array_parents();
     open(buffer, take_ownership); // Throws
@@ -824,6 +840,7 @@ inline Group::Group(unattached_tag) noexcept
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
     , m_is_shared(false)
+    , m_total_rows(0)
 {
     init_array_parents();
 }
@@ -840,6 +857,7 @@ inline Group::Group(shared_tag) noexcept
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
     , m_is_shared(true)
+    , m_total_rows(0)
 {
     init_array_parents();
 }
@@ -1144,6 +1162,16 @@ inline void Group::set_replication(Replication* repl) noexcept
     m_alloc.set_replication(repl);
 }
 
+inline std::shared_ptr<metrics::Metrics> Group::get_metrics() const noexcept
+{
+    return m_metrics;
+}
+
+inline void Group::set_metrics(std::shared_ptr<metrics::Metrics> shared) noexcept
+{
+    m_metrics = shared;
+}
+
 // The purpose of this class is to give internal access to some, but
 // not all of the non-public parts of the Group class.
 class _impl::GroupFriend {
@@ -1373,6 +1401,9 @@ struct CascadeState : Group::CascadeNotification {
     /// If false, the links field is not needed, so any work done just for that
     /// can be skipped.
     bool track_link_nullifications = false;
+
+    /// If false, weak links are followed too
+    bool only_strong_links = true;
 };
 
 inline bool Group::CascadeNotification::row::operator==(const row& r) const noexcept

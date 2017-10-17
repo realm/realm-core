@@ -34,6 +34,7 @@
 #include <realm/index_string.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/exceptions.hpp>
+#include <realm/table_ref.hpp>
 
 namespace realm {
 
@@ -276,7 +277,7 @@ public:
     /// the pointer to the subtable accessor at the specified row index if it
     /// exists, otherwise it returns null. For other column types, this function
     /// returns null.
-    virtual Table* get_subtable_accessor(size_t row_ndx) const noexcept;
+    virtual TableRef get_subtable_accessor(size_t row_ndx) const noexcept;
 
     /// Detach and remove the subtable accessor at the specified row if it
     /// exists. For column types that are unable to contain subtable, this
@@ -288,6 +289,7 @@ public:
     /// See Table::adj_acc_move_over()
     virtual void adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
     virtual void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+    virtual void adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept;
     virtual void adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
     virtual void adj_acc_clear_root_table() noexcept;
 
@@ -816,11 +818,6 @@ inline void ColumnBase::discard_child_accessors() noexcept
     do_discard_child_accessors();
 }
 
-inline Table* ColumnBase::get_subtable_accessor(size_t) const noexcept
-{
-    return 0;
-}
-
 inline void ColumnBase::discard_subtable_accessor(size_t) noexcept
 {
     // Noop
@@ -842,6 +839,11 @@ inline void ColumnBase::adj_acc_move_over(size_t, size_t) noexcept
 }
 
 inline void ColumnBase::adj_acc_swap_rows(size_t, size_t) noexcept
+{
+    // Noop
+}
+
+inline void ColumnBase::adj_acc_move_row(size_t, size_t) noexcept
 {
     // Noop
 }

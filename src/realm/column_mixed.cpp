@@ -407,8 +407,8 @@ bool MixedColumn::compare_mixed(const MixedColumn& c) const
                     return false;
                 break;
             case type_Table: {
-                ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
-                ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
+                ConstTableRef t1 = get_subtable_tableref(i);
+                ConstTableRef t2 = c.get_subtable_tableref(i);
                 if (*t1 != *t2)
                     return false;
                 break;
@@ -541,7 +541,7 @@ void MixedColumn::verify(const Table& table, size_t col_ndx) const
         int64_t v = m_data->get(i);
         if (v == 0 || v & 0x1)
             continue;
-        ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
+        ConstTableRef subtable = m_data->get_subtable_tableref(i);
         REALM_ASSERT_3(subtable->get_parent_row_index(), ==, i);
         subtable->verify();
     }
@@ -587,7 +587,7 @@ void MixedColumn::to_dot(std::ostream& out, StringData title) const
         MixedColType type = MixedColType(m_types->get(i));
         if (type != mixcol_Table)
             continue;
-        ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
+        ConstTableRef subtable = m_data->get_subtable_tableref(i);
         subtable->to_dot(out);
     }
 

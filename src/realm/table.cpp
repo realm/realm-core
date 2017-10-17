@@ -291,7 +291,7 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
 }
 
 
-size_t Table::get_backlink_count(size_t row_ndx) const noexcept
+size_t Table::get_backlink_count(size_t row_ndx, bool only_strong_links) const noexcept
 {
     size_t backlink_columns_begin = m_spec->first_backlink_column_index();
     size_t backlink_columns_end = backlink_columns_begin + m_spec->backlink_column_count();
@@ -299,6 +299,11 @@ size_t Table::get_backlink_count(size_t row_ndx) const noexcept
 
     for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
         const BacklinkColumn& backlink_col = get_column_backlink(i);
+        if (only_strong_links) {
+            const LinkColumnBase& link_col = backlink_col.get_origin_column();
+            if (link_col.get_weak_links())
+                continue;
+        }
         ref_count += backlink_col.get_backlink_count(row_ndx);
     }
 
@@ -332,22 +337,6 @@ void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_tab
     link_col.set_backlink_column(backlink_col);
     backlink_col.set_origin_table(*this);
     backlink_col.set_origin_column(link_col);
-}
-
-
-size_t Table::get_num_strong_backlinks(size_t row_ndx) const noexcept
-{
-    size_t sum = 0;
-    size_t col_ndx_begin = m_spec->get_public_column_count();
-    size_t col_ndx_end = m_cols.size();
-    for (size_t i = col_ndx_begin; i < col_ndx_end; ++i) {
-        const BacklinkColumn& backlink_col = get_column_backlink(i);
-        const LinkColumnBase& link_col = backlink_col.get_origin_column();
-        if (link_col.get_weak_links())
-            continue;
-        sum += backlink_col.get_backlink_count(row_ndx);
-    }
-    return sum;
 }
 
 
@@ -1366,7 +1355,7 @@ void Table::update_subtables(const size_t* col_path_begin, const size_t* col_pat
                 // preexisting accessors
                 if (!updater)
                     continue;
-                subtable.reset(subtables.get_subtable_ptr(row_ndx)); // Throws
+                subtable = subtables.get_subtable_tableref(row_ndx); // Throws
             }
             subtable->update_subtables(col_path_begin + 1, col_path_end, updater); // Throws
         }
@@ -1442,7 +1431,6 @@ void Table::detach() noexcept
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
-
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
     m_spec.detach();
@@ -1628,6 +1616,21 @@ void Table::destroy_column_accessors() noexcept
     m_cols.clear();
 }
 
+std::recursive_mutex* Table::get_parent_accessor_management_lock() const
+{
+    if (!is_attached())
+        return nullptr;
+    if (!m_top.is_attached()) {
+        ArrayParent* parent = m_columns.get_parent();
+        REALM_ASSERT(dynamic_cast<Parent*>(parent));
+        return static_cast<Parent*>(parent)->get_accessor_management_lock();
+    }
+    if (ArrayParent* parent = m_top.get_parent()) {
+        REALM_ASSERT(dynamic_cast<Parent*>(parent));
+        return static_cast<Parent*>(parent)->get_accessor_management_lock();
+    }
+    return nullptr;
+}
 
 Table::~Table() noexcept
 {
@@ -2377,6 +2380,33 @@ void Table::erase_row(size_t row_ndx, bool is_move_last_over)
     remove_backlink_broken_rows(state); // Throws
 }
 
+void Table::remove_recursive(size_t row_ndx)
+{
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(row_ndx, <, m_size);
+
+    size_t table_ndx = get_index_in_group();
+    // Only group-level tables can have link columns
+    REALM_ASSERT(table_ndx != realm::npos);
+
+    CascadeState::row row;
+    row.table_ndx = table_ndx;
+    row.row_ndx = row_ndx;
+    CascadeState state;
+    state.rows.push_back(row); // Throws
+    state.only_strong_links = false;
+
+    if (Group* g = get_parent_group())
+        state.track_link_nullifications = g->has_cascade_notification_handler();
+
+    cascade_break_backlinks_to(row_ndx, state); // Throws
+
+    if (Group* g = get_parent_group())
+        _impl::GroupFriend::send_cascade_notification(*g, state);
+
+    remove_backlink_broken_rows(state); // Throws
+}
+
 void Table::merge_rows(size_t row_ndx, size_t new_row_ndx)
 {
     if (REALM_UNLIKELY(!is_attached()))
@@ -2573,6 +2603,38 @@ void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 }
 
 
+void Table::do_move_row(size_t from_ndx, size_t to_ndx)
+{
+    // If to and from are next to each other we can just convert this to a swap
+    if (from_ndx == to_ndx + 1 || to_ndx == from_ndx + 1) {
+        if (from_ndx > to_ndx)
+            std::swap(from_ndx, to_ndx);
+        do_swap_rows(from_ndx, to_ndx);
+        return;
+    }
+
+    adj_row_acc_move_row(from_ndx, to_ndx);
+
+    // Adjust the row indexes to compensate for the temporary row used
+    if (from_ndx > to_ndx)
+        ++from_ndx;
+    else
+        ++to_ndx;
+
+    size_t num_cols = m_spec->get_column_count();
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        bool insert_nulls = m_spec->get_column_type(col_ndx) == col_type_Link;
+        bool broken_reciprocal_backlinks = true;
+
+        ColumnBase& col = get_column_base(col_ndx);
+        col.insert_rows(to_ndx, 1, m_size, insert_nulls);
+        col.swap_rows(from_ndx, to_ndx);
+        col.erase_rows(from_ndx, 1, m_size + 1, broken_reciprocal_backlinks);
+    }
+    bump_version();
+}
+
+
 void Table::do_merge_rows(size_t row_ndx, size_t new_row_ndx)
 {
     // This bypasses handling of cascading rows, and we have decided that this is OK, because
@@ -2688,6 +2750,21 @@ void Table::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         repl->swap_rows(this, row_ndx_1, row_ndx_2);
 }
 
+void Table::move_row(size_t from_ndx, size_t to_ndx)
+{
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(from_ndx >= m_size || to_ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+    if (from_ndx == to_ndx)
+        return;
+
+    do_move_row(from_ndx, to_ndx);
+
+    if (Replication* repl = get_repl())
+        repl->move_row(this, from_ndx, to_ndx);
+}
+
 
 void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
@@ -2721,7 +2798,7 @@ void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
 }
 
 
-Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
+TableRef Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
     // If this table is not a degenerate subtable, then `col_ndx` must be a
@@ -2735,7 +2812,7 @@ Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
         if (ColumnBase* col = m_cols[col_ndx])
             return col->get_subtable_accessor(row_ndx);
     }
-    return 0;
+    return {};
 }
 
 
@@ -2769,7 +2846,7 @@ void Table::discard_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept
 }
 
 
-Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx)
+TableRef Table::get_subtable_tableref(size_t col_ndx, size_t row_ndx)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(row_ndx, <, m_size);
@@ -2777,14 +2854,14 @@ Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx)
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_Table) {
         SubtableColumn& subtables = get_column_table(col_ndx);
-        return subtables.get_subtable_ptr(row_ndx); // Throws
+        return subtables.get_subtable_tableref(row_ndx); // Throws
     }
     if (type == col_type_Mixed) {
         MixedColumn& subtables = get_column_mixed(col_ndx);
-        return subtables.get_subtable_ptr(row_ndx); // Throws
+        return subtables.get_subtable_tableref(row_ndx); // Throws
     }
     REALM_ASSERT(false);
-    return 0;
+    return TableRef();
 }
 
 
@@ -3722,7 +3799,8 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool
     if (col.get_weak_links())
         return;
 
-    size_t num_remaining = target_table.get_num_strong_backlinks(old_target_row_ndx);
+    size_t num_remaining = target_table.get_backlink_count(old_target_row_ndx,
+                                                           /* only strong links:*/ true);
     if (num_remaining > 0)
         return;
 
@@ -5811,6 +5889,23 @@ void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
+void Table::adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    adj_row_acc_move_row(from_ndx, to_ndx);
+
+    // Adjust subtable accessors after row move
+    for (auto& col : m_cols) {
+        if (col != nullptr) {
+            col->adj_acc_move_row(from_ndx, to_ndx);
+        }
+    }
+}
+
+
 void Table::adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
@@ -5949,6 +6044,33 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
     // Adjust rows in tableviews after row swap
     for (auto& view : m_views) {
         view->adj_row_acc_swap_rows(row_ndx_1, row_ndx_2);
+    }
+}
+
+
+void Table::adj_row_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    // Adjust row accessors after move
+    LockGuard lock(m_accessor_mutex);
+    RowBase* row = m_row_accessors;
+    while (row) {
+        size_t ndx = row->m_row_ndx;
+        if (ndx == from_ndx)
+            row->m_row_ndx = to_ndx;
+        else if (ndx > from_ndx && ndx <= to_ndx)
+            row->m_row_ndx = ndx - 1;
+        else if (ndx >= to_ndx && ndx < from_ndx)
+            row->m_row_ndx = ndx + 1;
+        row = row->m_next;
+    }
+
+    // Adjust rows in tableviews after row move
+    for (auto& view : m_views) {
+        view->adj_row_acc_move_row(from_ndx, to_ndx);
     }
 }
 
