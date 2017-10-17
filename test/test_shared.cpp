@@ -3582,8 +3582,12 @@ NONCONCURRENT_TEST(Shared_LockFileSpinsOnInitComplete)
 }
 
 
-NONCONCURRENT_TEST(Shared_LockFileOfWrongSizeThrows)
+ONLY(Shared_LockFileOfWrongSizeThrows)
 {
+    // NOTE: This unit test attempts to mimic the initialization of the .lock file as it takes place inside
+    // the SharedGroup::do_open() method. NOTE: If the layout of SharedGroup::SharedInfo should change,
+    // this unit test might stop working.
+
     SHARED_GROUP_TEST_PATH(path);
 
     bool no_create = false;
@@ -3609,11 +3613,18 @@ NONCONCURRENT_TEST(Shared_LockFileOfWrongSizeThrows)
         CHECK(f.is_attached());
 
         size_t wrong_size = 100; // < sizeof(SharedInfo)
-        f.resize(wrong_size); // ftruncate will fill with 0
+        f.resize(wrong_size); // ftruncate will fill with 0, which will set the init_complete flag to 0.
         f.seek(0);
-        char data [1] = { 1 };
-        f.write(data, 1); // init_complete = true
+    
+        // On Windows, we implement a shared lock on a file by locking the first byte of the file. Since
+        // you cannot write to a locked region using WriteFile(), we use memory mapping which works fine, and
+        // which is also the same method used by the .lock file initialization in SharedGroup::do_open()
+        char* mem = static_cast<char*>(f.map(realm::util::File::access_ReadWrite, 1));      
+
+        // set init_complete flag to 1 and sync
+        mem[0] = 1;
         f.sync();
+
         CHECK_EQUAL(f.get_size(), wrong_size);
 
         mutex.lock();
