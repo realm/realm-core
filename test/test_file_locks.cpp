@@ -175,7 +175,7 @@ TEST(File_NoSpuriousTryLockFailures)
 
 // Same as above, but with busy waiting to increase the chance that try_lock is called simultaneously from
 // all the threads.
-ONLY(File_NoSpuriousTryLockFailures2)
+TEST(File_NoSpuriousTryLockFailures2)
 {
     // Busy waiting is very slow in Valgrind, so don't run it there.. Seems like we have no ONLY_TEST_IF, 
 // so we're using this return instead.
@@ -184,7 +184,7 @@ ONLY(File_NoSpuriousTryLockFailures2)
     }
 
 #if TEST_DURATION < 1
-    const size_t num_rounds = 2000000;
+    const size_t num_rounds = 20;
 #elif TEST_DURATION < 2
     const int num_rounds = 1000;
 #elif TEST_DURATION < 3
