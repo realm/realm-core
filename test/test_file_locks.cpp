@@ -23,11 +23,11 @@
 #include <map>
 #include <iostream>
 #include <functional>
+#include <thread>
 
 #include <realm/util/thread.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/features.h>
-
 #include "test.hpp"
 
 using namespace realm::util;
@@ -247,11 +247,11 @@ TEST(File_NoSpuriousTryLockFailures2)
     TEST_PATH(path);
     std::string str_path = path;
     ThreadWrapper slaves[100];
-    for (int i = 0; i != num_slaves; ++i) {
+    for (size_t i = 0; i != num_slaves; ++i) {
         slaves[i].start([=] { slave(i, str_path); });
     }
 
-    for (int i = 0; i != num_slaves; ++i)
+    for (size_t i = 0; i != num_slaves; ++i)
         CHECK(!slaves[i].join());
 }
 
