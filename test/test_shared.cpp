@@ -3582,7 +3582,7 @@ NONCONCURRENT_TEST(Shared_LockFileSpinsOnInitComplete)
 }
 
 
-ONLY(Shared_LockFileOfWrongSizeThrows)
+NONCONCURRENT_TEST(Shared_LockFileOfWrongSizeThrows)
 {
     // NOTE: This unit test attempts to mimic the initialization of the .lock file as it takes place inside
     // the SharedGroup::do_open() method. NOTE: If the layout of SharedGroup::SharedInfo should change,
