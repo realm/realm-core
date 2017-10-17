@@ -173,4 +173,86 @@ TEST(File_NoSpuriousTryLockFailures)
     CHECK_EQUAL(0, results[0]);
 }
 
+// Same as above, but with busy waiting to increase the chance that try_lock is called simultaneously from
+// all the threads.
+TEST(File_NoSpuriousTryLockFailures2)
+{
+    // Busy waiting is very slow in Valgrind, so don't run it there.. Seems like we have no ONLY_TEST_IF, 
+// so we're using this return instead.
+    if(running_with_valgrind) {
+        return;
+    }
+
+#if TEST_DURATION < 1
+    const size_t num_rounds = 20;
+#elif TEST_DURATION < 2
+    const int num_rounds = 1000;
+#elif TEST_DURATION < 3
+    const int num_rounds = 10000;
+#else
+    const int num_rounds = 100000;
+#endif
+
+    // More threads than cores will give OS time slice yields at random places which is good for randomness
+    size_t num_slaves = 2 * std::thread::hardware_concurrency(); // The number includes HyperThread cores
+
+    std::atomic<size_t> lock_taken = 0;
+    std::atomic<size_t> barrier_1 = 0;
+    std::atomic<size_t> barrier_2 = 0;
+    std::atomic<size_t> lock_not_taken = 0;
+
+    auto slave = [&](int ndx, std::string path) {
+        File file(path, File::mode_Write);
+
+        for(size_t t = 0; t < num_rounds; t++) {
+            lock_taken = 0;
+            lock_not_taken = 0;
+
+            // Thread barrier
+            barrier_1++;
+            while(barrier_1 < num_slaves) {
+            }
+       
+            // All threads race for the lock
+            bool owns_lock = file.try_lock_exclusive();
+
+            barrier_2 = 0;
+
+            if(owns_lock) {
+                lock_taken++;
+            }
+            else {
+                lock_not_taken++;
+            }
+
+            // Thread barrier
+            while(lock_taken + lock_not_taken < num_slaves) {
+            }
+
+            REALM_ASSERT(lock_taken == 1);
+
+            if(owns_lock) {
+                file.unlock();
+            }
+                   
+            barrier_1 = 0;
+
+            // Thread barrier. After this barrier, the file is guaranteed to be unlocked regardless who owned it.
+            barrier_2++;
+            while(barrier_2 < num_slaves) {
+            }
+        }
+    };
+
+    TEST_PATH(path);
+    std::string str_path = path;
+    ThreadWrapper slaves[100];
+    for (int i = 0; i != num_slaves; ++i) {
+        slaves[i].start([=] { slave(i, str_path); });
+    }
+
+    for (int i = 0; i != num_slaves; ++i)
+        CHECK(!slaves[i].join());
+}
+
 #endif // TEST_FILE_LOCKS
