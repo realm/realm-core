@@ -991,7 +991,7 @@ TEST_CASE("notifications: async error handling") {
             r->cancel_transaction();
         }
 
-        SECTION("adding another callback does not send the error again") {
+        SECTION("adding another callback sends the error to only the newly added one") {
             advance_and_notify(*r);
             REQUIRE(called);
 
@@ -1004,6 +1004,21 @@ TEST_CASE("notifications: async error handling") {
 
             advance_and_notify(*r);
             REQUIRE(called2);
+        }
+
+        SECTION("destroying a token from before the error does not remove newly added callbacks") {
+            advance_and_notify(*r);
+
+            bool called = false;
+            auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+                REQUIRE(err);
+                REQUIRE_FALSE(called);
+                called = true;
+            });
+            token = {};
+
+            advance_and_notify(*r);
+            REQUIRE(called);
         }
     }
 
