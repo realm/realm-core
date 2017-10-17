@@ -174,15 +174,9 @@ TEST(File_NoSpuriousTryLockFailures)
 }
 
 // Same as above, but with busy waiting to increase the chance that try_lock is called simultaneously from
-// all the threads.
-TEST(File_NoSpuriousTryLockFailures2)
+// all the threads. Busy waiting is very slow in Valgrind and tsan, so don't run it there.
+TEST_IF(File_NoSpuriousTryLockFailures2, !(running_with_valgrind || running_with_tsan))
 {
-    // Busy waiting is very slow in Valgrind, so don't run it there.. Seems like we have no ONLY_TEST_IF, 
-// so we're using this return instead.
-    if(running_with_valgrind) {
-        return;
-    }
-
 #if TEST_DURATION < 1
     const size_t num_rounds = 20;
 #elif TEST_DURATION < 2
@@ -212,7 +206,7 @@ TEST(File_NoSpuriousTryLockFailures2)
             barrier_1++;
             while(barrier_1 < num_slaves) {
             }
-       
+
             // All threads race for the lock
             bool owns_lock = file.try_lock_exclusive();
 
@@ -234,7 +228,7 @@ TEST(File_NoSpuriousTryLockFailures2)
             if(owns_lock) {
                 file.unlock();
             }
-                   
+
             barrier_1 = 0;
 
             // Thread barrier. After this barrier, the file is guaranteed to be unlocked regardless who owned it.
