@@ -1110,7 +1110,8 @@ TEST_TYPES(ColumnString_FindAllRanges, string_column, nullable_string_column, en
     c.destroy();
 }
 
-TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, string_column, nullable_string_column, enum_column,
+           nullable_enum_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();

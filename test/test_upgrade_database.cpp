@@ -1274,7 +1274,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-    util::to_string(REALM_MAX_BPNODE_SIZE) + "_8_to_9.realm";
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_8_to_9.realm";
     std::string validation_str = "test string";
 #if TEST_READ_UPGRADE_MODE
 

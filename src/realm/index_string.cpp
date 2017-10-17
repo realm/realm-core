@@ -1579,7 +1579,7 @@ void StringIndex::verify() const
 
 #ifdef REALM_DEBUG
 
-template<typename T>
+template <typename T>
 void StringIndex::verify_entries(const T& column) const
 {
     Allocator& alloc = Allocator::get_default();

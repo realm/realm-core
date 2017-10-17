@@ -1325,8 +1325,7 @@ bool SharedGroup::compact()
             if (!disable_sync)
                 file.sync(); // Throws
         }
-        catch (...)
-        {
+        catch (...) {
             // If writing the compact version failed in any way, delete the partially written file to clean up disk
             // space. This is so that we don't fail with 100% disk space used when compacting on a mostly full disk.
             if (File::exists(tmp_path)) {
@@ -1353,7 +1352,6 @@ bool SharedGroup::compact()
         util::File::move(tmp_path, m_db_path);
 #endif
         close_internal(/* with lock held: */ std::move(lock));
-
     }
     SharedGroupOptions new_options;
     new_options.durability = dura;
@@ -1496,12 +1494,14 @@ void SharedGroup::set_transact_stage(SharedGroup::TransactStage stage) noexcept
                 m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions);
             }
             m_metrics->start_read_transaction();
-        } else if (stage == transact_Writing) {
+        }
+        else if (stage == transact_Writing) {
             if (m_transact_stage == transact_Reading) {
                 m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions);
             }
             m_metrics->start_write_transaction();
-        } else if (stage == transact_Ready) {
+        }
+        else if (stage == transact_Ready) {
             m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions);
             m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions);
         }

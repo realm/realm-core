@@ -37,8 +37,7 @@ struct SharedGroupOptions {
     explicit SharedGroupOptions(Durability level = Durability::Full, const char* key = nullptr,
                                 bool allow_upgrade = true,
                                 std::function<void(int, int)> file_upgrade_callback = std::function<void(int, int)>(),
-                                std::string temp_directory = sys_tmp_dir,
-                                bool track_metrics = false)
+                                std::string temp_directory = sys_tmp_dir, bool track_metrics = false)
         : durability(level)
         , encryption_key(key)
         , allow_file_format_upgrade(allow_upgrade)

@@ -195,7 +195,7 @@ TEST_TYPES(StringIndex_DeleteAll, string_column, nullable_string_column, enum_co
     CHECK(ndx.is_empty());
 }
 
-TEST_TYPES(StringIndex_Delete,string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Delete, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -320,7 +320,7 @@ TEST_TYPES(StringIndex_ClearEmpty, string_column, nullable_string_column, enum_c
     CHECK(ndx.is_empty());
 }
 
-TEST_TYPES(StringIndex_Clear,string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Clear, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -653,7 +653,8 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
     col.destroy();
 }
 
-TEST_TYPES(StringIndex_FindAllNoCopyCommonPrefixStrings, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_FindAllNoCopyCommonPrefixStrings, string_column, nullable_string_column, enum_column,
+           nullable_enum_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -1201,7 +1202,7 @@ TEST_TYPES(StringIndex_Duplicate_Values, string_column, nullable_string_column, 
 
 namespace {
 
-template<class TestColumn>
+template <class TestColumn>
 void verify_single_move_last_over(TestContext& test_context, TestColumn& col, size_t index)
 {
     std::string value = col.get(col.size() - 1);
@@ -1213,7 +1214,8 @@ void verify_single_move_last_over(TestContext& test_context, TestColumn& col, si
 
 } // unnamed namespace
 
-TEST_TYPES(StringIndex_MoveLastOver_DoUpdateRef, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_MoveLastOver_DoUpdateRef, string_column, nullable_string_column, enum_column,
+           nullable_enum_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -1422,7 +1424,8 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
     col.clear(); // calls recursive function Array::destroy_deep()
 }
 
-TEST_TYPES(StringIndex_InsertLongPrefixAndQuery, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_InsertLongPrefixAndQuery, string_column, nullable_string_column, enum_column,
+           nullable_enum_column)
 {
     constexpr int half_node_size = REALM_MAX_BPNODE_SIZE / 2;
     bool nullable_column = TEST_TYPE::is_nullable();
@@ -1835,7 +1838,8 @@ TEST_TYPES(StringIndex_Insensitive_Fuzz, string_column, nullable_string_column, 
 
 // Exercise the StringIndex case insensitive search for strings with very long, common prefixes
 // to cover the special case code paths where different strings are stored in a list.
-TEST_TYPES(StringIndex_Insensitive_VeryLongStrings, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Insensitive_VeryLongStrings, string_column, nullable_string_column, enum_column,
+           nullable_enum_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();

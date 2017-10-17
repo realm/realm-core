@@ -275,8 +275,8 @@ public:
     virtual std::string describe_column(size_t col_ndx) const
     {
         if (m_table && col_ndx != npos) {
-            return std::string(m_table->get_name()) + metrics::value_separator
-                + std::string(m_table->get_column_name(col_ndx));
+            return std::string(m_table->get_name()) + metrics::value_separator +
+                   std::string(m_table->get_column_name(col_ndx));
         }
         return "";
     }
@@ -808,7 +808,8 @@ public:
 
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + describe_condition() + " " + metrics::print_value(IntegerNodeBase<ColType>::m_value);
+        return this->describe_column() + " " + describe_condition() + " " +
+               metrics::print_value(IntegerNodeBase<ColType>::m_value);
     }
 
     virtual std::string describe_condition() const override
@@ -946,7 +947,8 @@ public:
 
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + describe_condition() + " " + metrics::print_value(FloatDoubleNode::m_value);
+        return this->describe_column() + " " + describe_condition() + " " +
+               metrics::print_value(FloatDoubleNode::m_value);
     }
     virtual std::string describe_condition() const override
     {
@@ -1079,8 +1081,8 @@ public:
 
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + TConditionFunction::description() + " \""
-            + metrics::print_value(BinaryNode::m_value.data()) + "\"";
+        return this->describe_column() + " " + TConditionFunction::description() + " \"" +
+               metrics::print_value(BinaryNode::m_value.data()) + "\"";
     }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
@@ -1145,7 +1147,8 @@ public:
 
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + TConditionFunction::description() + " " + metrics::print_value(TimestampNode::m_value);
+        return this->describe_column() + " " + TConditionFunction::description() + " " +
+               metrics::print_value(TimestampNode::m_value);
     }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
@@ -1219,7 +1222,8 @@ public:
 
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + describe_condition() + " \"" + metrics::print_value(StringNodeBase::m_value) + "\"";
+        return this->describe_column() + " " + describe_condition() + " \"" +
+               metrics::print_value(StringNodeBase::m_value) + "\"";
     }
 
 protected:
@@ -1643,7 +1647,6 @@ public:
     std::string describe() const override
     {
         if (m_conditions.size() >= 2) {
-
         }
         std::string s;
         for (size_t i = 0; i < m_conditions.size(); ++i) {
@@ -2033,7 +2036,8 @@ public:
 
     virtual std::string describe() const override
     {
-        return this->describe_column(m_origin_column) + " " + describe_condition() + " " + metrics::print_value(m_target_row.get_index());
+        return this->describe_column(m_origin_column) + " " + describe_condition() + " " +
+               metrics::print_value(m_target_row.get_index());
     }
     virtual std::string describe_condition() const override
     {

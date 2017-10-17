@@ -659,7 +659,10 @@ private:
 
     // Overriding method in Table::Parent
     std::recursive_mutex* get_accessor_management_lock() noexcept override
-    { return nullptr; } // we don't need locking for group!
+    {
+        // we don't need locking for group!
+        return nullptr;
+    }
 
     // Overriding method in Table::Parent
     Group* get_parent_group() noexcept override;

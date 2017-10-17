@@ -13372,7 +13372,11 @@ TEST(LangBindHelper_IndexedStringEnumColumnSwapRows)
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
     Group& g = sg_w.begin_write();
-    try { g.insert_table(0, "t0"); } catch (const TableNameInUse&) { }
+    try {
+        g.insert_table(0, "t0");
+    }
+    catch (const TableNameInUse&) {
+    }
     g.get_table(0)->insert_column(0, DataType(2), "", true);
     g.get_table(0)->add_search_index(0);
     g.get_table(0)->optimize(true);
@@ -13394,7 +13398,11 @@ TEST(LangBindHelper_IndexedStringEnumColumnSwapRowsWithValue)
     SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
     Group& g = sg_w.begin_write();
 
-    try { g.add_table("table"); } catch (const TableNameInUse&) { }
+    try {
+        g.add_table("table");
+    }
+    catch (const TableNameInUse&) {
+    }
     g.get_table(0)->add_column(type_String, "str_col", true);
     g.get_table(0)->add_search_index(0);
     g.get_table(0)->insert_empty_row(0, 16);
@@ -13554,9 +13562,7 @@ TEST(LangBindHelper_callWithLock)
         CHECK(realm_path.compare(path) == 0);
     };
 
-    SharedGroup::CallbackWithLock callback_not_called = [this, &path](const std::string&) {
-        CHECK(false);
-    };
+    SharedGroup::CallbackWithLock callback_not_called = [this, &path](const std::string&) { CHECK(false); };
 
     // call_with_lock should run the callback if the lock file doesn't exist.
     CHECK_NOT(File::exists(path.get_lock_path()));

@@ -47,7 +47,6 @@ const std::string value_separator = ".";
 
 class QueryInfo {
 public:
-
     enum QueryType {
         type_Find,
         type_FindAll,

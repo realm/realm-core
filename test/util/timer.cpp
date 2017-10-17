@@ -52,7 +52,7 @@ uint_fast64_t Timer::get_timer_ticks() const
             FILETIME creation, exit, kernel, user;
             BOOL b = GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user);
             REALM_ASSERT_RELEASE(b);
-            return (static_cast<uint_fast64_t>(user.dwHighDateTime) << 32) + user.dwLowDateTime;      
+            return (static_cast<uint_fast64_t>(user.dwHighDateTime) << 32) + user.dwLowDateTime;
 #endif
     }
 

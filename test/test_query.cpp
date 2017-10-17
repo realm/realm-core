@@ -533,7 +533,6 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, 1);
 
 
-
     m = table2->column<String>(0).contains(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
 

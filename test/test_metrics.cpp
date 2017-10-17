@@ -229,8 +229,7 @@ void populate(SharedGroup& sg)
         person->set_bool(account_col, row, overdue);
         BinaryData bd(data);
         person->set_binary(data_col, row, bd);
-        for (auto ndx : owes_coffee_to)
-        {
+        for (auto ndx : owes_coffee_to) {
             LinkViewRef list = person->get_linklist(owes_col, row);
             list->add(ndx);
         }
@@ -894,7 +893,6 @@ TEST(Metrics_TransactionVersions)
         CHECK_EQUAL(transactions->at(3 + i).get_num_available_versions(), 2 + i);
     }
 }
-
 
 
 #endif // REALM_METRICS

@@ -294,7 +294,7 @@ inline MaximumFileSizeExceeded::MaximumFileSizeExceeded(const std::string& msg)
 }
 
 inline OutOfDiskSpace::OutOfDiskSpace(const std::string& msg)
-: std::runtime_error(msg)
+    : std::runtime_error(msg)
 {
 }
 

@@ -87,8 +87,7 @@ std::unique_ptr<MetricTimer> QueryInfo::track(const Query* query, QueryType type
 
 QueryInfo::QueryType QueryInfo::type_from_action(Action action)
 {
-    switch (action)
-    {
+    switch (action) {
         case act_ReturnFirst:
             return type_Find;
         case act_Sum:

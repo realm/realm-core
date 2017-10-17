@@ -348,9 +348,11 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
 {
     if (!r.is_attached()) {
         out << "detached row";
-    } else if (r.is_null()) {
+    }
+    else if (r.is_null()) {
         out << "null row";
-    } else {
+    }
+    else {
         out << r.m_row_index;
     }
     return out;
@@ -1204,8 +1206,8 @@ public:
     virtual std::string description() const override
     {
         if (ValueBase::m_from_link_list) {
-            return metrics::print_value(util::to_string(ValueBase::m_values)
-                                        + (ValueBase::m_values == 1 ? " value" : " values"));
+            return metrics::print_value(util::to_string(ValueBase::m_values) +
+                                        (ValueBase::m_values == 1 ? " value" : " values"));
         }
         if (m_storage.m_size > 0) {
             return metrics::print_value(m_storage[0]);
@@ -1840,7 +1842,8 @@ public:
                 }
                 if (m_link_types[i] == col_type_BackLink) {
                     s += "backlink";
-                } else if (m_link_column_indexes[i] < m_tables[i]->get_column_count()) {
+                }
+                else if (m_link_column_indexes[i] < m_tables[i]->get_column_count()) {
                     s += std::string(m_tables[i]->get_column_name(m_link_column_indexes[i]));
                 }
                 if (i != m_link_column_indexes.size() - 1) {
@@ -2056,8 +2059,8 @@ public:
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached()) {
-            return std::string(target_table->get_name()) + metrics::value_separator
-                + std::string(target_table->get_column_name(m_column_ndx));
+            return std::string(target_table->get_name()) + metrics::value_separator +
+                   std::string(target_table->get_column_name(m_column_ndx));
         }
         return "";
     }
@@ -2717,13 +2720,12 @@ public:
         const Table* table = get_base_table();
         if (table && table->is_attached()) {
             if (m_subtable_column.m_column) {
-                return std::string(table->get_name()) + metrics::value_separator
-                    + std::string(table->get_column_name(m_subtable_column.m_column_ndx));
-
+                return std::string(table->get_name()) + metrics::value_separator +
+                       std::string(table->get_column_name(m_subtable_column.m_column_ndx));
             }
             else {
-                return std::string(table->get_name()) + metrics::value_separator
-                    + std::string(table->get_column_name(m_column_ndx));
+                return std::string(table->get_name()) + metrics::value_separator +
+                       std::string(table->get_column_name(m_column_ndx));
             }
         }
         return "";
@@ -2850,8 +2852,9 @@ public:
     {
         const Table* table = get_base_table();
         if (table && table->is_attached()) {
-            return std::string(table->get_name()) + metrics::value_separator
-            + std::string(table->get_column_name(m_column_ndx)) + metrics::value_separator + Operation::description() + "()";
+            return std::string(table->get_name()) + metrics::value_separator +
+                   std::string(table->get_column_name(m_column_ndx)) + metrics::value_separator +
+                   Operation::description() + "()";
         }
         return "";
     }
@@ -3100,8 +3103,8 @@ public:
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached() && m_column_ndx != npos) {
-            return std::string(target_table->get_name()) + metrics::value_separator
-                + std::string(target_table->get_column_name(m_column_ndx));
+            return std::string(target_table->get_name()) + metrics::value_separator +
+                   std::string(target_table->get_column_name(m_column_ndx));
         }
         return "";
     }
@@ -3297,7 +3300,8 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + "(" + m_column.description() + ")" + metrics::value_separator + Operation::description() + "()";
+        return m_link_map.description() + "(" + m_column.description() + ")" + metrics::value_separator +
+               Operation::description() + "()";
     }
 
 private:
@@ -3346,8 +3350,8 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + metrics::value_separator + "(where " + m_query.get_description() + ")"
-            + metrics::value_separator + "count()";
+        return m_link_map.description() + metrics::value_separator + "(where " + m_query.get_description() + ")" +
+               metrics::value_separator + "count()";
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -3509,7 +3513,6 @@ public:
     {
         return "average";
     }
-
 };
 }
 
@@ -3748,8 +3751,8 @@ public:
 
     virtual std::string description() const override
     {
-        return metrics::print_value(m_left->description() + " " + TCond::description()
-                                    + " " + m_right->description());
+        return metrics::print_value(m_left->description() + " " + TCond::description() + " " +
+                                    m_right->description());
     }
 
     std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override

@@ -157,7 +157,9 @@ protected:
 
     // Overriding method in Table::Parent
     std::recursive_mutex* get_accessor_management_lock() noexcept override
-    { return &m_subtable_map_lock; }
+    {
+        return &m_subtable_map_lock;
+    }
 
     /// Assumes that the two tables have the same spec.
     static bool compare_subtable_rows(const Table&, const Table&);
