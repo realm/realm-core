@@ -3484,7 +3484,7 @@ void wait_for(size_t expected, std::mutex& mutex, size_t& test_value)
 
 } // end anonymous namespace
 
-NONCONCURRENT_TEST(Shared_LockFileInitSpinsOnZeroSize)
+TEST(Shared_LockFileInitSpinsOnZeroSize)
 {
     SHARED_GROUP_TEST_PATH(path);
 
@@ -3533,7 +3533,7 @@ NONCONCURRENT_TEST(Shared_LockFileInitSpinsOnZeroSize)
 }
 
 
-NONCONCURRENT_TEST(Shared_LockFileSpinsOnInitComplete)
+TEST(Shared_LockFileSpinsOnInitComplete)
 {
     SHARED_GROUP_TEST_PATH(path);
 
@@ -3582,7 +3582,7 @@ NONCONCURRENT_TEST(Shared_LockFileSpinsOnInitComplete)
 }
 
 
-NONCONCURRENT_TEST(Shared_LockFileOfWrongSizeThrows)
+TEST(Shared_LockFileOfWrongSizeThrows)
 {
     // NOTE: This unit test attempts to mimic the initialization of the .lock file as it takes place inside
     // the SharedGroup::do_open() method. NOTE: If the layout of SharedGroup::SharedInfo should change,
@@ -3650,7 +3650,7 @@ NONCONCURRENT_TEST(Shared_LockFileOfWrongSizeThrows)
 }
 
 
-NONCONCURRENT_TEST(Shared_LockFileOfWrongVersionThrows)
+TEST(Shared_LockFileOfWrongVersionThrows)
 {
     SHARED_GROUP_TEST_PATH(path);
 
@@ -3706,7 +3706,7 @@ NONCONCURRENT_TEST(Shared_LockFileOfWrongVersionThrows)
 }
 
 
-NONCONCURRENT_TEST(Shared_LockFileOfWrongMutexSizeThrows)
+TEST(Shared_LockFileOfWrongMutexSizeThrows)
 {
     SHARED_GROUP_TEST_PATH(path);
 
@@ -3761,7 +3761,7 @@ NONCONCURRENT_TEST(Shared_LockFileOfWrongMutexSizeThrows)
 }
 
 
-NONCONCURRENT_TEST(Shared_LockFileOfWrongCondvarSizeThrows)
+TEST(Shared_LockFileOfWrongCondvarSizeThrows)
 {
     SHARED_GROUP_TEST_PATH(path);
 
