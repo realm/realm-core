@@ -13612,4 +13612,33 @@ TEST(LangBindHelper_getCoreFiles)
     CHECK(core_files.size() == 0);
 }
 
+TEST(LangBindHelper_AdvanceReadCluster)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_w(hist);
+    SharedGroup sg_r(hist);
+
+    ReadTransaction rt(sg_r);
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef t = group.add_table("Foo");
+        auto int_col = t->add_column(type_Int, "int");
+        for (int64_t i = 0; i < 100; i++) {
+            t->create_object(Key(i)).set(int_col, i);
+        }
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg_r);
+    const Group& g = rt.get_group();
+    auto table = g.get_table("Foo");
+    auto int_col = table->get_column_index("int");
+    for (int64_t i = 0; i < 100; i++) {
+        ConstObj o = table->get_object(Key(i));
+        CHECK_EQUAL(o.get<int64_t>(int_col), i);
+    }
+}
+
 #endif

@@ -114,6 +114,7 @@ public:
         char* header = m_alloc.translate(ref);
         init(MemRef(header, ref, m_alloc));
     }
+
     unsigned node_size() const
     {
         return is_attached() ? unsigned(m_keys.size()) : 0;
@@ -128,6 +129,7 @@ public:
         m_keys.adjust(0, m_keys.size(), offset);
     }
 
+    virtual bool update_from_parent(size_t old_baseline) noexcept = 0;
     virtual bool is_leaf() const = 0;
     /// Number of elements in this subtree
     virtual size_t get_tree_size() const = 0;
@@ -172,6 +174,7 @@ public:
 
     void create() override;
     void init(MemRef mem) override;
+    bool update_from_parent(size_t old_baseline) noexcept override;
     bool is_writeable() const
     {
         return !Array::is_read_only();

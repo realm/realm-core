@@ -47,6 +47,7 @@ public:
 
     void create() override;
     void init(MemRef mem) override;
+    bool update_from_parent(size_t old_baseline) noexcept;
     MemRef ensure_writeable(Key k) override;
 
     bool is_leaf() const override
@@ -151,6 +152,16 @@ void ClusterNodeInner::init(MemRef mem)
     m_keys.init_from_parent();
     m_children.set_parent(this, 1);
     m_children.init_from_parent();
+}
+
+bool ClusterNodeInner::update_from_parent(size_t old_baseline) noexcept
+{
+    if (Array::update_from_parent(old_baseline)) {
+        m_keys.update_from_parent(old_baseline);
+        m_children.update_from_parent(old_baseline);
+        return true;
+    }
+    return false;
 }
 
 template <class T, class F>
@@ -414,6 +425,15 @@ void Cluster::init(MemRef mem)
 {
     Array::init_from_mem(mem);
     m_keys.init_from_ref(Array::get_as_ref(0));
+}
+
+bool Cluster::update_from_parent(size_t old_baseline) noexcept
+{
+    if (Array::update_from_parent(old_baseline)) {
+        m_keys.update_from_parent(old_baseline);
+        return true;
+    }
+    return false;
 }
 
 MemRef Cluster::ensure_writeable(Key)
