@@ -25,10 +25,10 @@
 
 struct string_column {
     using ColumnTestType = realm::StringColumn;
-    string_column(bool is_nullable = false)
+    string_column(bool nullable = false)
     {
         m_ref = realm::StringColumn::create(realm::Allocator::get_default());
-        m_col = new realm::StringColumn(realm::Allocator::get_default(), m_ref, is_nullable);
+        m_col = new realm::StringColumn(realm::Allocator::get_default(), m_ref, nullable);
     }
     virtual ~string_column()
     {
@@ -55,13 +55,13 @@ struct nullable_string_column : public string_column
 
 struct enum_column : public string_column {
     using ColumnTestType = realm::StringEnumColumn;
-    enum_column(bool is_nullable = false) : string_column(is_nullable)
+    enum_column(bool nullable = false) : string_column(nullable)
     {
         realm::ref_type ref, keys_ref;
         bool enforce = true;
         bool created = m_col->auto_enumerate(keys_ref, ref, enforce);
         REALM_ASSERT(created);
-        m_enum_col = new realm::StringEnumColumn(realm::Allocator::get_default(), ref, keys_ref, is_nullable); // Throws
+        m_enum_col = new realm::StringEnumColumn(realm::Allocator::get_default(), ref, keys_ref, nullable); // Throws
     }
     ~enum_column()
     {
