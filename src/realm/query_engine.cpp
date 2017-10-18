@@ -544,6 +544,16 @@ void ExpressionNode::table_changed()
     m_expression->set_base_table(m_table.get());
 }
 
+std::string ExpressionNode::describe() const
+{
+    if (m_expression) {
+        return m_expression->description();
+    }
+    else {
+        return "empty expression";
+    }
+}
+
 void ExpressionNode::verify_column() const
 {
     m_expression->verify_column();

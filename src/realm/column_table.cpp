@@ -30,6 +30,7 @@ using namespace realm::util;
 void SubtableColumnBase::update_from_parent(size_t old_baseline) noexcept
 {
     IntegerColumn::update_from_parent(old_baseline);
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     m_subtable_map.update_from_parent(old_baseline);
 }
 
@@ -78,17 +79,18 @@ void SubtableColumnBase::verify(const Table& table, size_t col_ndx) const
 }
 
 
-Table* SubtableColumnBase::get_subtable_ptr(size_t subtable_ndx)
+TableRef SubtableColumnBase::get_subtable_tableref(size_t subtable_ndx)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     REALM_ASSERT_3(subtable_ndx, <, size());
     if (Table* subtable = m_subtable_map.find(subtable_ndx))
-        return subtable;
+        return TableRef(subtable);
 
     typedef _impl::TableFriend tf;
     ref_type top_ref = get_as_ref(subtable_ndx);
     Allocator& alloc = get_alloc();
     SubtableColumnBase* parent = this;
-    std::unique_ptr<Table> subtable(tf::create_accessor(alloc, top_ref, parent, subtable_ndx)); // Throws
+    TableRef subtable(tf::create_accessor(alloc, top_ref, parent, subtable_ndx)); // Throws
     // FIXME: Note that if the following map insertion fails, then the
     // destructor of the newly created child will call
     // SubtableColumnBase::child_accessor_destroyed() with a pointer that is not
@@ -97,20 +99,21 @@ Table* SubtableColumnBase::get_subtable_ptr(size_t subtable_ndx)
     m_subtable_map.add(subtable_ndx, subtable.get()); // Throws
     if (was_empty && m_table)
         tf::bind_ptr(*m_table);
-    return subtable.release();
+    return subtable;
 }
 
 
-Table* SubtableColumn::get_subtable_ptr(size_t subtable_ndx)
+TableRef SubtableColumn::get_subtable_tableref(size_t subtable_ndx)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     REALM_ASSERT_3(subtable_ndx, <, size());
     if (Table* subtable = m_subtable_map.find(subtable_ndx))
-        return subtable;
+        return TableRef(subtable);
 
     typedef _impl::TableFriend tf;
     Spec* shared_subspec = get_subtable_spec();
     SubtableColumn* parent = this;
-    std::unique_ptr<Table> subtable(tf::create_accessor(shared_subspec, parent, subtable_ndx)); // Throws
+    TableRef subtable(tf::create_accessor(shared_subspec, parent, subtable_ndx)); // Throws
     // FIXME: Note that if the following map insertion fails, then the
     // destructor of the newly created child will call
     // SubtableColumnBase::child_accessor_destroyed() with a pointer that is not
@@ -119,12 +122,14 @@ Table* SubtableColumn::get_subtable_ptr(size_t subtable_ndx)
     m_subtable_map.add(subtable_ndx, subtable.get()); // Throws
     if (was_empty && m_table)
         tf::bind_ptr(*m_table);
-    return subtable.release();
+    return subtable;
 }
 
 
 void SubtableColumnBase::child_accessor_destroyed(Table* child) noexcept
 {
+    // m_subtable_map_lock must be locked by calling functions
+
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
@@ -332,6 +337,7 @@ void SubtableColumn::set(size_t row_ndx, const Table* subtable)
     set_as_ref(row_ndx, columns_ref); // Throws
 
     // Refresh the accessors, if present
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     if (Table* table = m_subtable_map.find(row_ndx)) {
         TableRef table_2;
         table_2.reset(table); // Must hold counted reference
@@ -390,8 +396,8 @@ bool SubtableColumn::compare_table(const SubtableColumn& c) const
     if (c.size() != n)
         return false;
     for (size_t i = 0; i != n; ++i) {
-        ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();   // Throws
-        ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref(); // throws
+        ConstTableRef t1 = get_subtable_tableref(i);   // Throws
+        ConstTableRef t2 = c.get_subtable_tableref(i); // throws
         if (!compare_subtable_rows(*t1, *t2))
             return false;
     }
@@ -422,7 +428,7 @@ void SubtableColumn::verify(const Table& table, size_t col_ndx) const
     for (size_t i = 0; i != n; ++i) {
         // We want to verify any cached table accessors so we do not
         // want to skip null refs here.
-        ConstTableRef subtable = get_subtable_ptr(i)->get_table_ref();
+        ConstTableRef subtable = get_subtable_tableref(i);
         REALM_ASSERT_3(tf::get_spec(*subtable).get_ndx_in_parent(), ==, subspec_ndx);
         REALM_ASSERT_3(subtable->get_parent_row_index(), ==, i);
         subtable->verify();
@@ -445,7 +451,7 @@ void SubtableColumn::to_dot(std::ostream& out, StringData title) const
     for (size_t i = 0; i != n; ++i) {
         if (get_as_ref(i) == 0)
             continue;
-        ConstTableRef subtable = get_subtable_ptr(i)->get_table_ref();
+        ConstTableRef subtable = get_subtable_tableref(i);
         subtable->to_dot(out);
     }
 }

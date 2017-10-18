@@ -244,7 +244,7 @@ void LinkListColumn::cascade_break_backlinks_to__leaf(size_t row_ndx, const Arra
         // Remove the reciprocal backlink at target_row_ndx that points to row_ndx
         m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
 
-        if (m_weak_links)
+        if (m_weak_links && state.only_strong_links)
             continue;
         if (m_target_table == state.stop_on_table)
             continue;
@@ -473,6 +473,15 @@ void LinkListColumn::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexc
 }
 
 
+void LinkListColumn::adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
+{
+    LinkColumnBase::adj_acc_move_row(from_ndx, to_ndx);
+
+    const bool fix_ndx_in_parent = false;
+    adj_move<fix_ndx_in_parent>(from_ndx, to_ndx);
+}
+
+
 void LinkListColumn::adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
 {
     prune_list_accessor_tombstones();
@@ -659,6 +668,20 @@ void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
     }
 
     validate_list_accessors();
+}
+
+
+template <bool fix_ndx_in_parent>
+void LinkListColumn::adj_move(size_t from_ndx, size_t to_ndx) noexcept
+{
+    if (from_ndx < to_ndx) {
+        adj_insert_rows<fix_ndx_in_parent>(to_ndx, 1);
+        adj_erase_rows<fix_ndx_in_parent>(from_ndx, 1);
+    }
+    else {
+        adj_erase_rows<fix_ndx_in_parent>(from_ndx, 1);
+        adj_insert_rows<fix_ndx_in_parent>(to_ndx, 1);
+    }
 }
 
 

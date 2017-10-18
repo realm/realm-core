@@ -50,6 +50,7 @@
 
 
 using namespace realm;
+using namespace realm::metrics;
 using namespace realm::util;
 using Durability = SharedGroupOptions::Durability;
 
@@ -723,12 +724,10 @@ void spawn_daemon(const std::string& file)
 
 } // anonymous namespace
 
-#if !REALM_UWP
-std::string SharedGroupOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
+#if REALM_HAVE_STD_FILESYSTEM
+std::string SharedGroupOptions::sys_tmp_dir = std::filesystem::temp_directory_path().u8string();
 #else
-// FIXME: getenv not supported on UWP. You must provide a temp path manually to the
-// SharedGroupOptions and pass it to the SharedGroup constructor.
-std::string SharedGroupOptions::sys_tmp_dir = "";
+std::string SharedGroupOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 #endif
 
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
@@ -771,6 +770,13 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
     m_key = options.encryption_key;
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     SlabAlloc& alloc = m_group.m_alloc;
+
+#if REALM_METRICS
+    if (options.enable_metrics) {
+        m_metrics = std::make_shared<Metrics>();
+        m_group.set_metrics(m_metrics);
+    }
+#endif // REALM_METRICS
 
     Replication::HistoryType openers_hist_type = Replication::hist_None;
     int openers_hist_schema_version = 0;
@@ -1013,7 +1019,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             bool file_format_ok = false;
             // In shared mode (Realm file opened via a SharedGroup instance) this
             // version of the core library is able to open Realms using file format
-            // versions from 2 to 8. Please see Group::get_file_format_version() for
+            // versions from 2 to 9. Please see Group::get_file_format_version() for
             // information about the individual file format versions.
             switch (current_file_format_version) {
                 case 0:
@@ -1026,6 +1032,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                 case 6:
                 case 7:
                 case 8:
+                case 9:
                     file_format_ok = true;
                     break;
             }
@@ -1233,7 +1240,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         break;
     }
 
-    m_transact_stage = transact_Ready;
+    set_transact_stage(transact_Ready);
 // std::cerr << "open completed" << std::endl;
 
 #ifdef REALM_ASYNC_DAEMON
@@ -1281,9 +1288,6 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 // corrupt your database if something fails
 bool SharedGroup::compact()
 {
-    // FIXME: ExcetionSafety: This function must be rewritten with exception
-    // safety in mind.
-
     // Verify that the database file is attached
     if (is_attached() == false) {
         throw std::runtime_error(m_db_path + ": compact must be done on an open/attached SharedGroup");
@@ -1296,7 +1300,7 @@ bool SharedGroup::compact()
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
     {
         SharedInfo* info = m_file_map.get_addr();
-        std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
+        std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
         if (info->num_participants > 1)
             return false;
 
@@ -1312,16 +1316,23 @@ bool SharedGroup::compact()
 
         // Compact by writing a new file holding only live data, then renaming the new file
         // so it becomes the database file, replacing the old one in the process.
-        File file;
-        file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
-        m_group.write(file, m_key, info->latest_version_number);
-        // Data needs to be flushed to the disk before renaming.
-        bool disable_sync = get_disable_sync_to_disk();
-        if (!disable_sync)
-            file.sync(); // Throws
-#ifndef _WIN32
-        util::File::move(tmp_path, m_db_path);
-#endif
+        try {
+            File file;
+            file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
+            m_group.write(file, m_key, info->latest_version_number); // Throws
+            // Data needs to be flushed to the disk before renaming.
+            bool disable_sync = get_disable_sync_to_disk();
+            if (!disable_sync)
+                file.sync(); // Throws
+        }
+        catch (...) {
+            // If writing the compact version failed in any way, delete the partially written file to clean up disk
+            // space. This is so that we don't fail with 100% disk space used when compacting on a mostly full disk.
+            if (File::exists(tmp_path)) {
+                File::remove(tmp_path);
+            }
+            throw;
+        }
         {
             SharedInfo* r_info = m_reader_map.get_addr();
             Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
@@ -1334,12 +1345,14 @@ bool SharedGroup::compact()
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
         m_group.m_alloc.detach();
-    }
-    close();
-#ifdef _WIN32
-    util::File::copy(tmp_path, m_db_path);
-#endif
 
+#ifdef _WIN32
+        util::File::copy(tmp_path, m_db_path);
+#else
+        util::File::move(tmp_path, m_db_path);
+#endif
+        close_internal(/* with lock held: */ std::move(lock));
+    }
     SharedGroupOptions new_options;
     new_options.durability = dura;
     new_options.encryption_key = m_key;
@@ -1362,6 +1375,11 @@ SharedGroup::~SharedGroup() noexcept
 
 void SharedGroup::close() noexcept
 {
+    close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock));
+}
+
+void SharedGroup::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
+{
     if (!is_attached())
         return;
 
@@ -1376,14 +1394,15 @@ void SharedGroup::close() noexcept
             break;
     }
     m_group.detach();
-    m_transact_stage = transact_Ready;
+    set_transact_stage(transact_Ready);
     SharedInfo* info = m_file_map.get_addr();
     {
         bool is_sync_agent = false;
         if (Replication* repl = m_group.get_replication())
             is_sync_agent = repl->is_sync_agent();
 
-        std::lock_guard<InterprocessMutex> lock(m_controlmutex);
+        if (!lock.owns_lock())
+            lock.lock();
 
         if (m_group.m_alloc.is_attached())
             m_group.m_alloc.detach();
@@ -1411,6 +1430,7 @@ void SharedGroup::close() noexcept
             if (Replication* repl = gf::get_replication(m_group))
                 repl->terminate_session();
         }
+        lock.unlock();
     }
 #ifdef REALM_ASYNC_DAEMON
     m_room_to_write.close();
@@ -1458,6 +1478,37 @@ void SharedGroup::enable_wait_for_change()
 {
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = true;
+}
+
+void SharedGroup::set_transact_stage(SharedGroup::TransactStage stage) noexcept
+{
+#if REALM_METRICS
+    if (m_metrics) { // null if metrics are disabled
+        size_t total_size = m_used_space + m_free_space;
+        size_t free_space = m_free_space;
+        size_t num_objects = m_group.m_total_rows;
+        size_t num_available_versions = static_cast<size_t>(get_number_of_versions());
+
+        if (stage == transact_Reading) {
+            if (m_transact_stage == transact_Writing) {
+                m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions);
+            }
+            m_metrics->start_read_transaction();
+        }
+        else if (stage == transact_Writing) {
+            if (m_transact_stage == transact_Reading) {
+                m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions);
+            }
+            m_metrics->start_write_transaction();
+        }
+        else if (stage == transact_Ready) {
+            m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions);
+            m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions);
+        }
+    }
+#endif
+
+    m_transact_stage = stage;
 }
 
 #ifdef REALM_ASYNC_DAEMON
@@ -1738,7 +1789,7 @@ const Group& SharedGroup::begin_read(VersionID version_id)
     bool writable = false;
     do_begin_read(version_id, writable); // Throws
 
-    m_transact_stage = transact_Reading;
+    set_transact_stage(transact_Reading);
     return m_group;
 }
 
@@ -1755,7 +1806,7 @@ void SharedGroup::end_read() noexcept
 
     do_end_read();
 
-    m_transact_stage = transact_Ready;
+    set_transact_stage(transact_Ready);
 }
 #ifdef _MSC_VER
 #pragma warning (default: 4297)
@@ -1787,7 +1838,7 @@ Group& SharedGroup::begin_write()
         throw;
     }
 
-    m_transact_stage = transact_Writing;
+    set_transact_stage(transact_Writing);
     return m_group;
 }
 
@@ -1817,7 +1868,7 @@ bool SharedGroup::try_begin_write(Group* &group)
         throw;
     }
 
-    m_transact_stage = transact_Writing;
+    set_transact_stage(transact_Writing);
     group = &m_group;
     return true;
 }
@@ -1848,7 +1899,7 @@ SharedGroup::version_type SharedGroup::commit()
 
     do_end_read();
     m_read_lock = lock_after_commit;
-    m_transact_stage = transact_Ready;
+    set_transact_stage(transact_Ready);
     return new_version;
 }
 
@@ -1871,7 +1922,7 @@ void SharedGroup::rollback() noexcept
     if (Replication* repl = m_group.get_replication())
         repl->abort_transact();
 
-    m_transact_stage = transact_Ready;
+    set_transact_stage(transact_Ready);
 }
 #ifdef _MSC_VER
 #pragma warning (default: 4297)
@@ -1898,6 +1949,12 @@ void SharedGroup::unpin_version(VersionID token)
     release_read_lock(read_lock);
 }
 
+#if REALM_METRICS
+std::shared_ptr<Metrics> SharedGroup::get_metrics()
+{
+    return m_metrics;
+}
+#endif // REALM_METRICS
 
 void SharedGroup::do_begin_read(VersionID version_id, bool writable)
 {
@@ -2094,7 +2151,7 @@ SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
     // Remap file if it has grown, and update refs in underlying node structure
     gf::remap_and_update_refs(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size); // Throws
 
-    m_transact_stage = transact_Reading;
+    set_transact_stage(transact_Reading);
 
     return version;
 }
@@ -2181,6 +2238,10 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     // Do the actual commit
     REALM_ASSERT(m_group.m_top.is_attached());
     REALM_ASSERT(oldest_version <= new_version);
+
+#if REALM_METRICS
+    m_group.update_num_objects();
+#endif // REALM_METRICS
     // info->readers.dump();
     GroupWriter out(m_group); // Throws
     out.set_versions(new_version, oldest_version);
@@ -2299,4 +2360,27 @@ TableRef SharedGroup::import_table_from_handover(std::unique_ptr<Handover<Table>
     }
     TableRef result = Table::create_from_and_consume_patch(handover->patch, m_group);
     return result;
+}
+
+bool SharedGroup::call_with_lock(const std::string& realm_path, CallbackWithLock callback)
+{
+    auto lockfile_path(realm_path + ".lock");
+
+    File lockfile;
+    lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
+    File::CloseGuard fcg(lockfile);
+
+    if (lockfile.try_lock_exclusive()) { // Throws
+        callback(realm_path);
+        return true;
+    }
+    return false;
+}
+
+std::vector<std::pair<std::string, bool>> SharedGroup::get_core_files(const std::string& realm_path)
+{
+    std::vector<std::pair<std::string, bool>> files;
+    files.emplace_back(std::make_pair(realm_path, false));
+    files.emplace_back(std::make_pair(realm_path + ".management", true));
+    return files;
 }

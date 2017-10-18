@@ -297,7 +297,7 @@ TEST_IF(Upgrade_Database_2_Backwards_Compatible, REALM_MAX_BPNODE_SIZE == 4 || R
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
-    CHECK_EQUAL(8, sgf::get_file_format_version(g));
+    CHECK_EQUAL(9, sgf::get_file_format_version(g));
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -438,7 +438,7 @@ TEST_IF(Upgrade_Database_2_Backwards_Compatible_WriteTransaction, REALM_MAX_BPNO
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
-    CHECK_EQUAL(8, sgf::get_file_format_version(g));
+    CHECK_EQUAL(9, sgf::get_file_format_version(g));
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -793,7 +793,7 @@ TEST_IF(Upgrade_InRealmHistory, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
         {
             SharedGroup sg(temp_path, no_create);
             using sgf = _impl::SharedGroupFriend;
-            CHECK_EQUAL(8, sgf::get_file_format_version(sg));
+            CHECK_EQUAL(9, sgf::get_file_format_version(sg));
         }
         {
             std::unique_ptr<Replication> hist = make_in_realm_history(temp_path);
@@ -1269,5 +1269,70 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
+
+
+TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_8_to_9.realm";
+    std::string validation_str = "test string";
+#if TEST_READ_UPGRADE_MODE
+
+    // Automatic upgrade from SharedGroup
+    {
+        CHECK_OR_RETURN(File::exists(path));
+        SHARED_GROUP_TEST_PATH(temp_copy);
+
+        // Make a copy of the version 9 database so that we keep the
+        // original file intact and unmodified
+        File::copy(path, temp_copy);
+
+        // Constructing this SharedGroup will trigger an upgrade
+        auto hist = make_in_realm_history(temp_copy);
+        SharedGroup sg(*hist);
+
+        ReadTransaction rt(sg);
+        CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(rt.get_group()),
+                    hist->get_history_schema_version());
+
+        ConstTableRef t = rt.get_table("table");
+        CHECK(t);
+        CHECK_EQUAL(t->size(), 1);
+        CHECK_EQUAL(t->get_int(0, 0), 123);
+        CHECK_EQUAL(t->get_string(1, 0), validation_str);
+    }
+
+    // Opening old file with Group
+    {
+        CHECK_OR_RETURN(File::exists(path));
+
+        // Opening in read-only mode, so it doesn't upgrade
+        Group g(path);
+        CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(g), 0);
+        CHECK_EQUAL(_impl::GroupFriend::get_file_format_version(g), 8);
+
+        ConstTableRef t = g.get_table("table");
+        CHECK(t);
+        CHECK_EQUAL(t->size(), 1);
+        CHECK_EQUAL(t->get_int(0, 0), 123);
+        CHECK_EQUAL(t->get_string(1, 0), validation_str);
+    }
+
+#else  // test write mode
+    // NOTE: This code must be executed from an old file-format-version 8
+    // core in order to create a file-format-version 8 test file!
+
+    Group g;
+    TableRef t = g.add_table("table");
+    size_t col = t->add_column(type_Int, "value");
+    size_t str_col = t->add_column(type_String, "str_col", true);
+    t->add_search_index(str_col);
+    size_t row = t->add_empty_row();
+    t->set_int(col, row, 123);
+    t->set_string(str_col, row, validation_str);
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+}
+
 
 #endif // TEST_GROUP

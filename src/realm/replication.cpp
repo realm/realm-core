@@ -348,6 +348,18 @@ public:
         return true;
     }
 
+    bool move_row(size_t from_ndx, size_t to_ndx)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(from_ndx >= m_table->size() || to_ndx >= m_table->size())))
+            return false;
+        log("table->move_row(%1, %2);", from_ndx, to_ndx); // Throws
+        using tf = _impl::TableFriend;
+        tf::do_move_row(*m_table, from_ndx, to_ndx); // Throws
+        return true;
+    }
+
     bool merge_rows(size_t row_ndx, size_t new_row_ndx)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))

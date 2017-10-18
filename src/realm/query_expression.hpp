@@ -133,6 +133,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/column_type_traits.hpp>
 #include <realm/impl/sequential_getter.hpp>
 #include <realm/link_view.hpp>
+#include <realm/metrics/query_info.hpp>
 #include <realm/query_operators.hpp>
 #include <realm/util/optional.hpp>
 
@@ -214,6 +215,10 @@ struct Plus {
     {
         return v1 + v2;
     }
+    static std::string description()
+    {
+        return "plus";
+    }
     typedef T type;
 };
 
@@ -222,6 +227,10 @@ struct Minus {
     T operator()(T v1, T v2) const
     {
         return v1 - v2;
+    }
+    static std::string description()
+    {
+        return "minus";
     }
     typedef T type;
 };
@@ -232,6 +241,10 @@ struct Div {
     {
         return v1 / v2;
     }
+    static std::string description()
+    {
+        return "divided by";
+    }
     typedef T type;
 };
 
@@ -240,6 +253,10 @@ struct Mul {
     T operator()(T v1, T v2) const
     {
         return v1 * v2;
+    }
+    static std::string description()
+    {
+        return "multiplied by";
     }
     typedef T type;
 };
@@ -250,6 +267,10 @@ struct Pow {
     T operator()(T v) const
     {
         return v * v;
+    }
+    static std::string description()
+    {
+        return "to the power of";
     }
     typedef T type;
 };
@@ -315,11 +336,27 @@ struct RowIndex {
     {
         return !(*this == other);
     }
+    template <class C, class T>
+    friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const RowIndex&);
 
 private:
     util::Optional<size_t> m_row_index;
 };
 
+template <class C, class T>
+inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const RowIndex& r)
+{
+    if (!r.is_attached()) {
+        out << "detached row";
+    }
+    else if (r.is_null()) {
+        out << "null row";
+    }
+    else {
+        out << r.m_row_index;
+    }
+    return out;
+}
 
 struct ValueBase {
     static const size_t default_size = 8;
@@ -356,6 +393,7 @@ public:
     virtual void set_base_table(const Table* table) = 0;
     virtual void verify_column() const = 0;
     virtual const Table* get_base_table() const = 0;
+    virtual std::string description() const = 0;
 
     virtual std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const = 0;
     virtual void apply_handover_patch(QueryNodeHandoverPatches&, Group&)
@@ -392,6 +430,7 @@ public:
     }
 
     virtual void verify_column() const = 0;
+    virtual std::string description() const = 0;
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and
@@ -1063,6 +1102,63 @@ struct OperatorOptionalAdapter {
     }
 };
 
+
+struct TrueExpression : Expression {
+    size_t find_first(size_t start, size_t end) const override
+    {
+        REALM_ASSERT(start <= end);
+        if (start != end)
+            return start;
+
+        return realm::not_found;
+    }
+    void set_base_table(const Table*) override
+    {
+    }
+    const Table* get_base_table() const override
+    {
+        return nullptr;
+    }
+    void verify_column() const override
+    {
+    }
+    std::string description() const override
+    {
+        return "TRUEPREDICATE";
+    }
+    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const override
+    {
+        return std::unique_ptr<Expression>(new TrueExpression(*this));
+    }
+};
+
+
+struct FalseExpression : Expression {
+    size_t find_first(size_t, size_t) const override
+    {
+        return realm::not_found;
+    }
+    void set_base_table(const Table*) override
+    {
+    }
+    void verify_column() const override
+    {
+    }
+    std::string description() const override
+    {
+        return "FALSEPREDICATE";
+    }
+    const Table* get_base_table() const override
+    {
+        return nullptr;
+    }
+    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const override
+    {
+        return std::unique_ptr<Expression>(new FalseExpression(*this));
+    }
+};
+
+
 // Stores N values of type T. Can also exchange data with other ValueBase of different types
 template <class T>
 class Value : public ValueBase, public Subexpr2<T> {
@@ -1105,6 +1201,18 @@ public:
 
     void verify_column() const override
     {
+    }
+
+    virtual std::string description() const override
+    {
+        if (ValueBase::m_from_link_list) {
+            return metrics::print_value(util::to_string(ValueBase::m_values) +
+                                        (ValueBase::m_values == 1 ? " value" : " values"));
+        }
+        if (m_storage.m_size > 0) {
+            return metrics::print_value(m_storage[0]);
+        }
+        return "";
     }
 
     void evaluate(size_t, ValueBase& destination) override
@@ -1724,6 +1832,28 @@ public:
         }
     }
 
+    virtual std::string description() const
+    {
+        std::string s;
+        for (size_t i = 0; i < m_link_column_indexes.size(); ++i) {
+            if (i < m_tables.size() && m_tables[i]) {
+                if (i == 0) {
+                    s += std::string(m_tables[i]->get_name()) + metrics::value_separator;
+                }
+                if (m_link_types[i] == col_type_BackLink) {
+                    s += "backlink";
+                }
+                else if (m_link_column_indexes[i] < m_tables[i]->get_column_count()) {
+                    s += std::string(m_tables[i]->get_column_name(m_link_column_indexes[i]));
+                }
+                if (i != m_link_column_indexes.size() - 1) {
+                    s += metrics::value_separator;
+                }
+            }
+        }
+        return s;
+    }
+
     std::vector<size_t> get_links(size_t index)
     {
         std::vector<size_t> res;
@@ -1922,6 +2052,19 @@ public:
         return m_link_map.m_link_columns.size() > 0;
     }
 
+    virtual std::string description() const override
+    {
+        if (links_exist()) {
+            return m_link_map.description();
+        }
+        const Table* target_table = m_link_map.target_table();
+        if (target_table && target_table->is_attached()) {
+            return std::string(target_table->get_name()) + metrics::value_separator +
+                   std::string(target_table->get_column_name(m_column_ndx));
+        }
+        return "";
+    }
+
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches = nullptr) const override
     {
         return make_subexpr<Columns<T>>(static_cast<const Columns<T>&>(*this), patches);
@@ -2111,6 +2254,11 @@ public:
         return not_found;
     }
 
+    virtual std::string description() const override
+    {
+        return m_link_map.description() + metrics::value_separator + (has_links ? "is_not_null()" : "is_null()");
+    }
+
     std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override
     {
         return std::unique_ptr<Expression>(new UnaryLinkCompare(*this, patches));
@@ -2162,6 +2310,11 @@ public:
     {
         size_t count = m_link_map.count_links(index);
         destination.import(Value<Int>(false, 1, count));
+    }
+
+    virtual std::string description() const override
+    {
+        return m_link_map.description() + metrics::value_separator + "count()";
     }
 
 private:
@@ -2218,6 +2371,14 @@ public:
         }
     }
 
+    std::string description() const override
+    {
+        if (m_expr) {
+            return m_expr->description() + metrics::value_separator + "size()";
+        }
+        return "size()";
+    }
+
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
         return std::unique_ptr<Subexpr>(new SizeOperator(*this, patches));
@@ -2272,6 +2433,14 @@ public:
             Value<RowIndex> v(RowIndex::Detached);
             destination.import(v);
         }
+    }
+
+    virtual std::string description() const override
+    {
+        if (!m_row.is_attached()) {
+            return metrics::print_value("detached object");
+        }
+        return metrics::print_value(m_row.get_index());
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -2359,6 +2528,11 @@ public:
         m_link_map.verify_columns();
     }
 
+    std::string description() const override
+    {
+        return m_link_map.description();
+    }
+
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
         return std::unique_ptr<Subexpr>(new Columns<Link>(*this, patches));
@@ -2416,6 +2590,11 @@ public:
     {
         m_link_map.verify_columns();
         m_link_map.target_table()->verify_column(m_column_ndx, m_column);
+    }
+
+    std::string description() const override
+    {
+        return m_link_map.description();
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -2536,6 +2715,22 @@ public:
         destination.import(v);
     }
 
+    virtual std::string description() const override
+    {
+        const Table* table = get_base_table();
+        if (table && table->is_attached()) {
+            if (m_subtable_column.m_column) {
+                return std::string(table->get_name()) + metrics::value_separator +
+                       std::string(table->get_column_name(m_subtable_column.m_column_ndx));
+            }
+            else {
+                return std::string(table->get_name()) + metrics::value_separator +
+                       std::string(table->get_column_name(m_column_ndx));
+            }
+        }
+        return "";
+    }
+
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
     {
         return {m_column_ndx, m_subtable_column};
@@ -2651,6 +2846,17 @@ public:
             }
         }
         destination.import(v);
+    }
+
+    virtual std::string description() const override
+    {
+        const Table* table = get_base_table();
+        if (table && table->is_attached()) {
+            return std::string(table->get_name()) + metrics::value_separator +
+                   std::string(table->get_column_name(m_column_ndx)) + metrics::value_separator +
+                   Operation::description() + "()";
+        }
+        return "";
     }
 
 private:
@@ -2890,6 +3096,19 @@ public:
         }
     }
 
+    virtual std::string description() const override
+    {
+        if (links_exist()) {
+            return m_link_map.description();
+        }
+        const Table* target_table = m_link_map.target_table();
+        if (target_table && target_table->is_attached() && m_column_ndx != npos) {
+            return std::string(target_table->get_name()) + metrics::value_separator +
+                   std::string(target_table->get_column_name(m_column_ndx));
+        }
+        return "";
+    }
+
     // Load values from Column into destination
     void evaluate(size_t index, ValueBase& destination) override
     {
@@ -2976,6 +3195,11 @@ public:
     {
         // SubColumns can only be used in an expression in conjunction with its aggregate methods.
         REALM_ASSERT(false);
+    }
+
+    virtual std::string description() const override
+    {
+        return ""; // by itself there are no conditions, see SubColumnAggregate
     }
 
     SubColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
@@ -3074,6 +3298,12 @@ public:
         }
     }
 
+    virtual std::string description() const override
+    {
+        return m_link_map.description() + "(" + m_column.description() + ")" + metrics::value_separator +
+               Operation::description() + "()";
+    }
+
 private:
     Columns<T> m_column;
     LinkMap m_link_map;
@@ -3116,6 +3346,12 @@ public:
         });
 
         destination.import(Value<Int>(false, 1, size_t(count)));
+    }
+
+    virtual std::string description() const override
+    {
+        return m_link_map.description() + metrics::value_separator + "(where " + m_query.get_description() + ")" +
+               metrics::value_separator + "count()";
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -3212,6 +3448,10 @@ public:
     {
         return std::min(a, b);
     }
+    static std::string description()
+    {
+        return "minimum";
+    }
 };
 
 template <typename T>
@@ -3224,6 +3464,10 @@ public:
     static T apply(T a, T b)
     {
         return std::max(a, b);
+    }
+    static std::string description()
+    {
+        return "maximum";
     }
 };
 
@@ -3241,6 +3485,10 @@ public:
     bool is_null() const
     {
         return false;
+    }
+    static std::string description()
+    {
+        return "sum";
     }
 };
 
@@ -3260,6 +3508,10 @@ public:
     double result() const
     {
         return Base::m_result / Base::m_count;
+    }
+    static std::string description()
+    {
+        return "average";
     }
 };
 }
@@ -3314,6 +3566,14 @@ public:
         m_left->evaluate(index, left);
         result.template fun<oper>(&left);
         destination.import(result);
+    }
+
+    virtual std::string description() const override
+    {
+        if (m_left) {
+            return m_left->description();
+        }
+        return "";
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -3399,6 +3659,19 @@ public:
         destination.import(result);
     }
 
+    virtual std::string description() const override
+    {
+        std::string s;
+        if (m_left) {
+            s += m_left->description();
+        }
+        s += oper::description();
+        if (m_right) {
+            s += m_right->description();
+        }
+        return s;
+    }
+
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
         return make_subexpr<Operator>(*this, patches);
@@ -3474,6 +3747,12 @@ public:
         }
 
         return not_found; // no match
+    }
+
+    virtual std::string description() const override
+    {
+        return metrics::print_value(m_left->description() + " " + TCond::description() + " " +
+                                    m_right->description());
     }
 
     std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override

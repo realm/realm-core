@@ -22,6 +22,7 @@
 #include <sstream>
 
 #include <realm/util/features.h>
+#include <realm/util/assert.hpp>
 
 #if defined _WIN32
 #include <windows.h>
@@ -43,12 +44,19 @@ using namespace realm::test_util;
 
 uint_fast64_t Timer::get_timer_ticks() const
 {
-// FIXME: Need to find UWP version of this
-#if !REALM_UWP
-    return GetTickCount();
-#else
-    return 0;
+    switch (m_type) {
+        case type_RealTime:
+            return GetTickCount64();
+        case type_UserTime:
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+            FILETIME creation, exit, kernel, user;
+            BOOL b = GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user);
+            REALM_ASSERT_RELEASE(b);
+            return (static_cast<uint_fast64_t>(user.dwHighDateTime) << 32) + user.dwLowDateTime;
 #endif
+    }
+
+    return 0;
 }
 
 double Timer::calc_elapsed_seconds(uint_fast64_t ticks) const

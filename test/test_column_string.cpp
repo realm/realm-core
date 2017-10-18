@@ -25,6 +25,7 @@
 #include <realm/index_string.hpp>
 
 #include "test.hpp"
+#include "test_string_types.hpp"
 
 using namespace realm;
 using namespace realm::test_util;
@@ -72,12 +73,10 @@ struct non_nullable {
 } // anonymous namespace
 
 
-TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
+TEST_TYPES(ColumnString_Basic, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
-    constexpr bool nullable = TEST_TYPE::value;
-
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn c(Allocator::get_default(), ref, nullable);
+    TEST_TYPE test_resources;
+    typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
 
     // TEST(ColumnString_MultiEmpty)
 
@@ -129,7 +128,7 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.add();
 
     // for StringColumn the default value is dependent on nullability
-    StringData default_string_value = nullable ? realm::null() : StringData("");
+    StringData default_string_value = TEST_TYPE::is_nullable() ? realm::null() : StringData("");
 
     CHECK_EQUAL(default_string_value, c.get(0));
     CHECK_EQUAL(1, c.size());
@@ -457,20 +456,13 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
 
         col.destroy();
     }
-
-
-    // TEST(ColumnString_Destroy)
-
-    c.destroy();
 }
 
 
-TEST_TYPES(ColumnString_Find1, non_nullable, nullable)
+TEST_TYPES(ColumnString_Find1, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
-    constexpr bool nullable = TEST_TYPE::value;
-
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn c(Allocator::get_default(), ref, nullable);
+    TEST_TYPE test_resources;
+    typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
 
     c.add("a");
     c.add("bc");
@@ -486,17 +478,12 @@ TEST_TYPES(ColumnString_Find1, non_nullable, nullable)
 
     size_t res3 = c.find_first("klmop");
     CHECK_EQUAL(4, res3);
-
-    // Cleanup
-    c.destroy();
 }
 
-TEST_TYPES(ColumnString_Find2, non_nullable, nullable)
+TEST_TYPES(ColumnString_Find2, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
-    constexpr bool nullable = TEST_TYPE::value;
-
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn c(Allocator::get_default(), ref, nullable);
+    TEST_TYPE test_resources;
+    typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
 
     c.add("a");
     c.add("bc");
@@ -518,15 +505,12 @@ TEST_TYPES(ColumnString_Find2, non_nullable, nullable)
 
     size_t res4 = c.find_first("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx");
     CHECK_EQUAL(5, res4);
-
-    // Cleanup
-    c.destroy();
 }
 
-TEST(ColumnString_UpperLowerBounds)
+TEST_TYPES(ColumnString_UpperLowerBounds1, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn c(Allocator::get_default(), ref);
+    TEST_TYPE test_resources;
+    typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
 
     c.add("a");
     c.add("bc");
@@ -534,24 +518,14 @@ TEST(ColumnString_UpperLowerBounds)
     c.add("ghij");
     c.add("klmop");
 
-    // Create StringEnum
-    ref_type keys;
-    ref_type values;
-    bool res = c.auto_enumerate(keys, values, true);
-    CHECK(res);
-    StringEnumColumn e(Allocator::get_default(), values, keys, false);
-
-    CHECK_EQUAL(e.lower_bound_string("baboo"), 1);
-    CHECK_EQUAL(e.upper_bound_string("baboo"), 1);
-
-    c.destroy();
-    e.destroy();
+    CHECK_EQUAL(c.lower_bound_string("baboo"), 1);
+    CHECK_EQUAL(c.upper_bound_string("baboo"), 1);
 }
 
-TEST(StringEnumColumn_UpperLowerBounds)
+TEST_TYPES(ColumnString_UpperLowerBounds2, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn c(Allocator::get_default(), ref);
+    TEST_TYPE test_resources;
+    typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
 
     c.add("a");
     c.add("bc");
@@ -568,8 +542,6 @@ TEST(StringEnumColumn_UpperLowerBounds)
     // Big size
     c.add("qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio ");
     CHECK_EQUAL(c.upper_bound_string("oops"), 6);
-
-    c.destroy();
 }
 
 TEST_TYPES(ColumnString_AutoEnumerate, non_nullable, nullable)
@@ -622,8 +594,6 @@ TEST_TYPES(ColumnString_AutoEnumerate, non_nullable, nullable)
     e.destroy();
 }
 
-
-#if !defined DISABLE_INDEX
 
 TEST_TYPES(ColumnString_AutoEnumerateIndex, non_nullable, nullable)
 {
@@ -778,7 +748,6 @@ TEST_TYPES(ColumnString_AutoEnumerateIndexReuse, non_nullable, nullable)
     e.destroy();
 }
 
-#endif // !defined DISABLE_INDEX
 
 TEST(StringEnumColumn_CloneDeep)
 {
@@ -817,22 +786,20 @@ TEST(StringEnumColumn_CloneDeep)
 
 // First test if width expansion (nulls->empty string, nulls->non-empty string, empty string->non-empty string, etc)
 // works. Then do a fuzzy test at the end.
-TEST(ColumnString_Null)
+TEST_TYPES(ColumnString_Null, nullable_string_column, nullable_enum_column)
 {
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        TEST_TYPE test_resources;
+        typename TEST_TYPE::ColumnTestType& a = test_resources.get_column();
 
         a.add("");
         size_t t = a.find_first("");
         CHECK_EQUAL(t, 0);
-
-        a.destroy();
     }
 
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        TEST_TYPE test_resources;
+        typename TEST_TYPE::ColumnTestType& a = test_resources.get_column();
 
         a.add("foo");
         a.add("");
@@ -843,16 +810,6 @@ TEST(ColumnString_Null)
         CHECK_EQUAL(a.is_null(2), true);
         CHECK(a.get(0) == "foo");
 
-        size_t keys, values;
-        bool res = a.auto_enumerate(keys, values, true);
-        CHECK(res);
-        StringEnumColumn e{Allocator::get_default(), values, keys, true};
-        CHECK_EQUAL(e.is_null(0), false);
-        CHECK_EQUAL(e.is_null(1), false);
-        CHECK_EQUAL(e.is_null(2), true);
-        CHECK(e.get(0) == "foo");
-        e.destroy();
-
         // Test set
         a.set_null(0);
         a.set_null(1);
@@ -860,14 +817,11 @@ TEST(ColumnString_Null)
         CHECK_EQUAL(a.is_null(1), true);
         CHECK_EQUAL(a.is_null(0), true);
         CHECK_EQUAL(a.is_null(2), true);
-
-
-        a.destroy();
     }
 
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        TEST_TYPE test_resources;
+        typename TEST_TYPE::ColumnTestType& a = test_resources.get_column();
 
         a.add(realm::null());
         a.add("");
@@ -889,13 +843,11 @@ TEST(ColumnString_Null)
         CHECK_EQUAL(a.is_null(3), false);
         CHECK_EQUAL(a.is_null(4), true);
         CHECK_EQUAL(a.is_null(5), false);
-
-        a.destroy();
     }
 
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        TEST_TYPE test_resources;
+        typename TEST_TYPE::ColumnTestType& a = test_resources.get_column();
 
         a.add("");
         a.add(realm::null());
@@ -912,15 +864,13 @@ TEST(ColumnString_Null)
 
         a.erase(0);
         CHECK_EQUAL(a.is_null(0), false);
-
-        a.destroy();
     }
 
     Random random(random_int<unsigned long>());
 
     for (size_t t = 0; t < 50; t++) {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        TEST_TYPE test_resources;
+        typename TEST_TYPE::ColumnTestType& a = test_resources.get_column();
 
         // vector that is kept in sync with the ArrayString so that we can compare with it
         std::vector<std::string> v;
@@ -982,7 +932,6 @@ TEST(ColumnString_Null)
                 }
             }
         }
-        a.destroy();
     }
 }
 
@@ -1004,12 +953,10 @@ TEST(ColumnString_SetNullThrowsUnlessNullable)
 }
 
 
-TEST_TYPES(ColumnString_FindAllExpand, non_nullable, nullable)
+TEST_TYPES(ColumnString_FindAllExpand, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
-    constexpr bool nullable = TEST_TYPE::value;
-
-    ref_type asc_ref = StringColumn::create(Allocator::get_default());
-    StringColumn asc(Allocator::get_default(), asc_ref, nullable);
+    TEST_TYPE test_resources;
+    typename TEST_TYPE::ColumnTestType& asc = test_resources.get_column();
 
     ref_type col_ref = IntegerColumn::create(Allocator::get_default());
     IntegerColumn c(Allocator::get_default(), col_ref);
@@ -1048,17 +995,14 @@ TEST_TYPES(ColumnString_FindAllExpand, non_nullable, nullable)
     CHECK_EQUAL(6, c.get(3));
     CHECK_EQUAL(8, c.get(4));
 
-    asc.destroy();
     c.destroy();
 }
 
 // FindAll using ranges, when expanded ArrayStringLong
-TEST_TYPES(ColumnString_FindAllRangesLong, non_nullable, nullable)
+TEST_TYPES(ColumnString_FindAllRangesLong, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
-    constexpr bool nullable = TEST_TYPE::value;
-
-    ref_type asc_ref = StringColumn::create(Allocator::get_default());
-    StringColumn asc(Allocator::get_default(), asc_ref, nullable);
+    TEST_TYPE test_resources;
+    typename TEST_TYPE::ColumnTestType& asc = test_resources.get_column();
 
     ref_type col_ref = IntegerColumn::create(Allocator::get_default());
     IntegerColumn c(Allocator::get_default(), col_ref);
@@ -1107,17 +1051,14 @@ TEST_TYPES(ColumnString_FindAllRangesLong, non_nullable, nullable)
     CHECK_EQUAL(14, c.get(6));
 
     // Clean-up
-    asc.destroy();
     c.destroy();
 }
 
 // FindAll using ranges, when not expanded (using ArrayString)
-TEST_TYPES(ColumnString_FindAllRanges, non_nullable, nullable)
+TEST_TYPES(ColumnString_FindAllRanges, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
-    constexpr bool nullable = TEST_TYPE::value;
-
-    ref_type asc_ref = StringColumn::create(Allocator::get_default());
-    StringColumn asc(Allocator::get_default(), asc_ref, nullable);
+    TEST_TYPE test_resources;
+    typename TEST_TYPE::ColumnTestType& asc = test_resources.get_column();
 
     ref_type col_ref = IntegerColumn::create(Allocator::get_default());
     IntegerColumn c(Allocator::get_default(), col_ref);
@@ -1166,17 +1107,14 @@ TEST_TYPES(ColumnString_FindAllRanges, non_nullable, nullable)
     CHECK_EQUAL(14, c.get(6));
 
     // Clean-up
-    asc.destroy();
     c.destroy();
 }
 
-TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, non_nullable, nullable)
+TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, string_column, nullable_string_column, enum_column,
+           nullable_enum_column)
 {
-    constexpr bool nullable = TEST_TYPE::value;
-
-    // Create column *without* duplicate values.
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn col(Allocator::get_default(), ref, nullable);
+    TEST_TYPE test_resources;
+    typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
 
     col.add("a");
     col.add("b");
@@ -1193,7 +1131,6 @@ TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, non_nullable, nullable)
 
     // Clean-up
     res.destroy();
-    col.destroy();
 }
 
 TEST_TYPES(ColumnString_Count, non_nullable, nullable)
@@ -1238,25 +1175,23 @@ TEST_TYPES(ColumnString_Count, non_nullable, nullable)
     e.destroy();
 }
 
-TEST(ColumnString_SetIndexInParent)
+TEST_TYPES(ColumnString_SetIndexInParent, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
-    ref_type asc_ref = StringColumn::create(Allocator::get_default());
-    StringColumn sc(Allocator::get_default(), asc_ref, true);
+    TEST_TYPE test_resources;
+    typename TEST_TYPE::ColumnTestType& sc = test_resources.get_column();
 
     StringIndex* ndx = sc.create_search_index();
     CHECK(ndx != nullptr);
     sc.set_ndx_in_parent(0);
     CHECK_EQUAL(sc.get_ndx_in_parent() + 1, ndx->get_ndx_in_parent());
-
-    sc.destroy();
 }
 
-TEST(ColumnString_SwapRows)
+TEST_TYPES(ColumnString_SwapRows, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
     // Normal case
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn c(Allocator::get_default(), ref);
+        TEST_TYPE test_resources;
+        typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
 
         c.add("a");
         c.add("b");
@@ -1272,14 +1207,12 @@ TEST(ColumnString_SwapRows)
         CHECK_EQUAL(c.get(1), "c");
         CHECK_EQUAL(c.get(2), "b");
         CHECK_EQUAL(c.size(), 4);
-
-        c.destroy();
     }
 
     // First two elements
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn c(Allocator::get_default(), ref);
+        TEST_TYPE test_resources;
+        typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
 
         c.add("a");
         c.add("b");
@@ -1290,14 +1223,12 @@ TEST(ColumnString_SwapRows)
         CHECK_EQUAL(c.get(0), "b");
         CHECK_EQUAL(c.get(1), "a");
         CHECK_EQUAL(c.size(), 3); // size should not change
-
-        c.destroy();
     }
 
     // Last two elements
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn c(Allocator::get_default(), ref);
+        TEST_TYPE test_resources;
+        typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
 
         c.add("a");
         c.add("b");
@@ -1308,14 +1239,12 @@ TEST(ColumnString_SwapRows)
         CHECK_EQUAL(c.get(1), "c");
         CHECK_EQUAL(c.get(2), "b");
         CHECK_EQUAL(c.size(), 3); // size should not change
-
-        c.destroy();
     }
 
     // Indices in wrong order
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn c(Allocator::get_default(), ref);
+        TEST_TYPE test_resources;
+        typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
 
         c.add("a");
         c.add("b");
@@ -1326,14 +1255,12 @@ TEST(ColumnString_SwapRows)
         CHECK_EQUAL(c.get(1), "c");
         CHECK_EQUAL(c.get(2), "b");
         CHECK_EQUAL(c.size(), 3); // size should not change
-
-        c.destroy();
     }
 
     // Column with duplicate values
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn c(Allocator::get_default(), ref);
+        TEST_TYPE test_resources;
+        typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
 
         c.add("a");
         c.add("a");
@@ -1343,14 +1270,12 @@ TEST(ColumnString_SwapRows)
 
         CHECK_EQUAL(c.get(0), "a");
         CHECK_EQUAL(c.get(1), "a");
-
-        c.destroy();
     }
 
     // Null values
-    {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn c(Allocator::get_default(), ref, true);
+    if (TEST_TYPE::is_nullable()) {
+        TEST_TYPE test_resources;
+        typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
 
         c.add("a");
         c.add("b");
@@ -1362,20 +1287,14 @@ TEST(ColumnString_SwapRows)
 
         CHECK(c.get(1).is_null());  // fails
         CHECK_EQUAL(c.get(2), "b"); // passes
-
-        c.destroy();
     }
 }
 
 
-#if !defined DISABLE_INDEX
-
-TEST_TYPES(ColumnString_Index, non_nullable, nullable)
+TEST_TYPES(ColumnString_Index, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
-    constexpr bool nullable = TEST_TYPE::value;
-
-    ref_type asc_ref = StringColumn::create(Allocator::get_default());
-    StringColumn asc(Allocator::get_default(), asc_ref, nullable);
+    TEST_TYPE test_resources;
+    typename TEST_TYPE::ColumnTestType& asc = test_resources.get_column();
 
     // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
@@ -1466,12 +1385,7 @@ TEST_TYPES(ColumnString_Index, non_nullable, nullable)
     size_t c2 = asc.find_first("fifteen");
     CHECK_EQUAL(not_found, c1);
     CHECK_EQUAL(not_found, c2);
-
-    // Clean-up
-    asc.destroy();
 }
-
-#endif // !defined DISABLE_INDEX
 
 
 /**

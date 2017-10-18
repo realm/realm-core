@@ -24,6 +24,7 @@
 #include <utility>
 #include <typeinfo>
 #include <memory>
+#include <mutex>
 
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
@@ -68,6 +69,9 @@ typedef Link BackLink;
 
 namespace _impl {
 class TableFriend;
+}
+namespace metrics {
+class QueryInfo;
 }
 
 class Replication;
@@ -370,6 +374,9 @@ public:
     /// vacated slot. This operation assumes that the table is unordered, and it
     /// may therfore be used on tables with link columns.
     ///
+    /// remove_recursive() will delete linked rows if the removed link was the
+    /// last one holding on to the row in question. This will be done recursively.
+    ///
     /// The removal of a row from an unordered table (move_last_over()) may
     /// cause other linked rows to be cascade-removed. The clearing of a table
     /// may also cause linked rows to be cascade-removed, but in this respect,
@@ -395,6 +402,7 @@ public:
     }
 
     void remove(size_t row_ndx);
+    void remove_recursive(size_t row_ndx);
     void remove_last();
     void remove_object(Key key)
     {
@@ -403,13 +411,13 @@ public:
     void move_last_over(size_t row_ndx);
     void clear();
     void swap_rows(size_t row_ndx_1, size_t row_ndx_2);
+    void move_row(size_t from_ndx, size_t to_ndx);
     using Iterator = ClusterTree::Iterator;
     using ConstIterator = ClusterTree::ConstIterator;
     ConstIterator begin() const;
     ConstIterator end() const;
     Iterator begin();
     Iterator end();
-
     //@}
 
     /// Replaces all links to \a row_ndx with links to \a new_row_ndx.
@@ -590,13 +598,14 @@ public:
     // 'mixed', for a value in a mixed column that is not a subtable,
     // get_subtable() returns null, get_subtable_size() returns zero,
     // and clear_subtable() replaces the value with an empty table.)
+    // Currently, subtables of subtables are not supported.
     TableRef get_subtable(size_t column_ndx, size_t row_ndx);
     ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
     size_t get_subtable_size(size_t column_ndx, size_t row_ndx) const noexcept;
     void clear_subtable(size_t column_ndx, size_t row_ndx);
 
     // Backlinks
-    size_t get_backlink_count(size_t row_ndx) const noexcept;
+    size_t get_backlink_count(size_t row_ndx, bool only_strong_links = false) const noexcept;
     size_t get_backlink_count(size_t row_ndx, const Table& origin, size_t origin_col_ndx) const noexcept;
     size_t get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const
         noexcept;
@@ -916,10 +925,10 @@ protected:
     ///
     /// The returned table pointer must **always** end up being
     /// wrapped in some instantiation of BasicTableRef<>.
-    Table* get_subtable_ptr(size_t col_ndx, size_t row_ndx);
+    TableRef get_subtable_tableref(size_t col_ndx, size_t row_ndx);
 
-    /// See non-const get_subtable_ptr().
-    const Table* get_subtable_ptr(size_t col_ndx, size_t row_ndx) const;
+    /// See non-const get_subtable_tableref().
+    ConstTableRef get_subtable_tableref(size_t col_ndx, size_t row_ndx) const;
 
     /// Compare the rows of two tables under the assumption that the two tables
     /// have the same number of columns, and the same data type at each column
@@ -1083,6 +1092,7 @@ private:
     void do_remove_object(Key key, bool broken_reciprocal_backlinks);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
+    void do_move_row(size_t from_ndx, size_t to_ndx);
     void do_merge_rows(size_t row_ndx, size_t new_row_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
@@ -1346,8 +1356,6 @@ private:
 
     void connect_opposite_link_columns(size_t link_col_ndx, Table& target_table, size_t backlink_col_ndx) noexcept;
 
-    size_t get_num_strong_backlinks(size_t row_ndx) const noexcept;
-
     //@{
 
     /// Cascading removal of strong links.
@@ -1441,7 +1449,7 @@ private:
     /// that the specified column index in a valid index into `m_cols` but does
     /// not otherwise assume more than minimal accessor consistency (see
     /// AccessorConsistencyLevels.)
-    Table* get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept;
+    TableRef get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept;
 
     /// Unless the column accessor is missing, this function returns the
     /// accessor for the target table of the specified link-type column. The
@@ -1460,6 +1468,7 @@ private:
     void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_acc_erase_row(size_t row_ndx) noexcept;
     void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+    void adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept;
     void adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
 
     /// Adjust this table accessor and its subordinates after move_last_over()
@@ -1500,6 +1509,7 @@ private:
     void adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_row_acc_erase_row(size_t row_ndx) noexcept;
     void adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+    void adj_row_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept;
     void adj_row_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
 
     /// Called by adj_acc_move_over() to adjust row accessors.
@@ -1565,7 +1575,7 @@ private:
     void refresh_link_target_accessors(size_t col_ndx_begin = 0);
 
     bool is_cross_table_link_target() const noexcept;
-
+    std::recursive_mutex* get_parent_accessor_management_lock() const;
 #ifdef REALM_DEBUG
     void to_dot_internal(std::ostream&) const;
 #endif
@@ -1573,6 +1583,7 @@ private:
     friend class SubtableNode;
     friend class _impl::TableFriend;
     friend class Query;
+    friend class metrics::QueryInfo;
     template <class>
     friend class util::bind_ptr;
     template <class>
@@ -1625,6 +1636,7 @@ protected:
 
 
     virtual size_t* record_subtable_path(size_t* begin, size_t* end) noexcept;
+    virtual std::recursive_mutex* get_accessor_management_lock() noexcept = 0;
 
     friend class Table;
 };
@@ -1696,11 +1708,21 @@ inline void Table::unbind_ptr() const noexcept
     // any changes, so it is a convenient place to do a release.
     // The release will then be observed by the acquire fence in
     // the case where delete is actually called (the count reaches 0)
-    if (m_ref_count.fetch_sub(1, std::memory_order_release) != 1)
+    if (m_ref_count.fetch_sub(1, std::memory_order_release) != 1) {
         return;
+    }
 
     std::atomic_thread_fence(std::memory_order_acquire);
-    delete this;
+
+    std::recursive_mutex* lock = get_parent_accessor_management_lock();
+    if (lock) {
+        std::lock_guard<std::recursive_mutex> lg(*lock);
+        if (m_ref_count == 0)
+            delete this;
+    }
+    else {
+        delete this;
+    }
 }
 
 inline void Table::register_view(const TableViewBase* view)
@@ -2042,9 +2064,9 @@ inline size_t Table::add_empty_row(size_t num_rows)
     return row_ndx;                      // Return index of first new row
 }
 
-inline const Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx) const
+inline ConstTableRef Table::get_subtable_tableref(size_t col_ndx, size_t row_ndx) const
 {
-    return const_cast<Table*>(this)->get_subtable_ptr(col_ndx, row_ndx); // Throws
+    return const_cast<Table*>(this)->get_subtable_tableref(col_ndx, row_ndx); // Throws
 }
 
 inline bool Table::is_null_link(size_t col_ndx, size_t row_ndx) const noexcept
@@ -2070,12 +2092,12 @@ inline void Table::nullify_link(size_t col_ndx, size_t row_ndx)
 
 inline TableRef Table::get_subtable(size_t column_ndx, size_t row_ndx)
 {
-    return TableRef(get_subtable_ptr(column_ndx, row_ndx));
+    return get_subtable_tableref(column_ndx, row_ndx);
 }
 
 inline ConstTableRef Table::get_subtable(size_t column_ndx, size_t row_ndx) const
 {
-    return ConstTableRef(get_subtable_ptr(column_ndx, row_ndx));
+    return get_subtable_tableref(column_ndx, row_ndx);
 }
 
 inline ConstTableRef Table::get_parent_table(size_t* column_ndx_out) const noexcept
@@ -2496,6 +2518,11 @@ public:
         table.do_swap_rows(row_ndx_1, row_ndx_2); // Throws
     }
 
+    static void do_move_row(Table& table, size_t from_ndx, size_t to_ndx)
+    {
+        table.do_move_row(from_ndx, to_ndx); // Throws
+    }
+
     static void do_merge_rows(Table& table, size_t row_ndx, size_t new_row_ndx)
     {
         table.do_merge_rows(row_ndx, new_row_ndx); // Throws
@@ -2512,9 +2539,9 @@ public:
         table.do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
     }
 
-    static size_t get_num_strong_backlinks(const Table& table, size_t row_ndx) noexcept
+    static size_t get_backlink_count(const Table& table, size_t row_ndx, bool only_strong_links) noexcept
     {
-        return table.get_num_strong_backlinks(row_ndx);
+        return table.get_backlink_count(row_ndx, only_strong_links);
     }
 
     static void cascade_break_backlinks_to(Table& table, size_t row_ndx, CascadeState& state)
@@ -2584,7 +2611,7 @@ public:
         table.batch_erase_rows(row_indexes, is_move_last_over); // Throws
     }
 
-    static Table* get_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx) noexcept
+    static TableRef get_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx) noexcept
     {
         return table.get_subtable_accessor(col_ndx, row_ndx);
     }
@@ -2612,6 +2639,11 @@ public:
     static void adj_acc_swap_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept
     {
         table.adj_acc_swap_rows(row_ndx_1, row_ndx_2);
+    }
+
+    static void adj_acc_move_row(Table& table, size_t from_ndx, size_t to_ndx) noexcept
+    {
+        table.adj_acc_move_row(from_ndx, to_ndx);
     }
 
     static void adj_acc_merge_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept
