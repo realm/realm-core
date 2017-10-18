@@ -27,6 +27,7 @@ void LinkMap::set_base_table(const Table* table)
         return;
 
     m_tables.clear();
+    m_link_column_names.clear();
     m_tables.push_back(table);
     m_link_types.clear();
     m_only_unary_links = true;
@@ -47,6 +48,7 @@ void LinkMap::set_base_table(const Table* table)
         }
 
         m_link_types.push_back(type);
+        m_link_column_names.emplace_back(spec.get_column_name(link_column_index));
         size_t target_table_index = spec.get_opposite_link_table_ndx(link_column_index);
         target_table = group->get_table(target_table_index);
         m_tables.push_back(target_table.get());

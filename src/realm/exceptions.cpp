@@ -34,6 +34,10 @@ const char* LogicError::what() const noexcept
             return "Table name too long";
         case column_name_too_long:
             return "Column name too long";
+        case column_name_in_use:
+            return "Column name must be unique";
+        case invalid_column_name:
+            return "Column name not found";
         case table_index_out_of_range:
             return "Table index out of range";
         case row_index_out_of_range:

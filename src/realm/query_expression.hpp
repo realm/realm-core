@@ -395,7 +395,7 @@ public:
     virtual void set_cluster(const Cluster*)
     {
     }
-    virtual void verify_column() const = 0;
+    virtual void update_column() const = 0;
     virtual const Table* get_base_table() const = 0;
     virtual std::string description() const = 0;
 
@@ -433,7 +433,7 @@ public:
     {
     }
 
-    virtual void verify_column() const = 0;
+    virtual void update_column() const = 0;
     virtual std::string description() const = 0;
 
     virtual void set_cluster(const Cluster*)
@@ -1151,7 +1151,7 @@ struct TrueExpression : Expression {
     {
         return nullptr;
     }
-    void verify_column() const override
+    void update_column() const override
     {
     }
     std::string description() const override
@@ -1173,7 +1173,7 @@ struct FalseExpression : Expression {
     void set_base_table(const Table*) override
     {
     }
-    void verify_column() const override
+    void update_column() const override
     {
     }
     std::string description() const override
@@ -1231,7 +1231,7 @@ public:
         ValueBase::m_values = values;
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
     }
 
@@ -1802,6 +1802,7 @@ public:
 
     LinkMap(LinkMap const& other)
     {
+        m_link_column_names = other.m_link_column_names;
         m_link_column_indexes = other.m_link_column_indexes;
         m_tables = other.m_tables;
         m_link_types = other.m_link_types;
@@ -1832,10 +1833,14 @@ public:
         cluster->init_leaf(m_link_column_indexes[0], m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
-    void verify_columns() const
+
+    void update_columns() const
     {
         for (size_t i = 0; i < m_link_column_indexes.size(); i++) {
-            m_tables[i]->verify_column(m_link_column_indexes[i]);
+            m_link_column_indexes[i] = m_tables[i]->get_column_index(m_link_column_names[i]);
+            if (m_link_column_indexes[i] == npos) {
+                throw LogicError(LogicError::column_does_not_exist);
+            }
         }
     }
 
@@ -1886,7 +1891,8 @@ private:
         map_links(row, mlv);
     }
 
-    std::vector<size_t> m_link_column_indexes;
+    mutable std::vector<size_t> m_link_column_indexes;
+    std::vector<std::string> m_link_column_names;
     std::vector<ColumnType> m_link_types;
     std::vector<const Table*> m_tables;
     bool m_only_unary_links = true;
@@ -1933,8 +1939,9 @@ template <class T>
 class SimpleQuerySupport : public Subexpr2<T> {
 public:
     SimpleQuerySupport(size_t column, const Table* table, std::vector<size_t> links = {})
-        : m_column_ndx(column)
-        , m_link_map(table, std::move(links))
+        : m_link_map(table, std::move(links))
+        , m_column_name(m_link_map.target_table()->get_column_name(column))
+        , m_column_ndx(column)
     {
     }
 
@@ -1952,6 +1959,7 @@ public:
     {
         if (table != get_base_table()) {
             m_link_map.set_base_table(table);
+            m_column_name = m_link_map.target_table()->get_column_name(m_column_ndx);
         }
     }
 
@@ -1970,14 +1978,14 @@ public:
         }
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        // verify links
-        m_link_map.verify_columns();
-        // verify target table
-        const Table* target_table = m_link_map.target_table();
-        if (target_table && m_column_ndx != npos) {
-            target_table->verify_column(m_column_ndx);
+        // update links
+        m_link_map.update_columns();
+        // update target column
+        m_column_ndx = m_link_map.target_table()->get_column_index(m_column_name);
+        if (m_column_ndx == realm::npos) {
+            throw LogicError(LogicError::column_does_not_exist);
         }
     }
 
@@ -2030,15 +2038,14 @@ public:
 
     SimpleQuerySupport(SimpleQuerySupport const& other, QueryNodeHandoverPatches* patches)
         : Subexpr2<T>(other)
-        , m_column_ndx(other.m_column_ndx)
         , m_link_map(other.m_link_map, patches)
+        , m_column_name(other.m_column_name)
+        , m_column_ndx(other.m_column_ndx)
     {
     }
 
     SimpleQuerySupport(SimpleQuerySupport const& other)
-        : Subexpr2<T>(other)
-        , m_column_ndx(other.m_column_ndx)
-        , m_link_map(other.m_link_map)
+        : SimpleQuerySupport(other, nullptr)
     {
     }
 
@@ -2053,9 +2060,12 @@ public:
     }
 
 private:
-    // Column index of payload column of m_table
-    mutable size_t m_column_ndx;
     LinkMap m_link_map;
+
+    // Column index of payload column of m_table
+    std::string m_column_name;
+    mutable size_t m_column_ndx;
+
     // Leaf cache
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
@@ -2194,9 +2204,9 @@ public:
         m_link_map.set_base_table(table);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_link_map.verify_columns();
+        m_link_map.update_columns();
     }
 
     // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as
@@ -2267,9 +2277,9 @@ public:
         m_link_map.set_base_table(table);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_link_map.verify_columns();
+        m_link_map.update_columns();
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2306,9 +2316,9 @@ public:
         m_expr->set_cluster(cluster);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_expr->verify_column();
+        m_expr->update_column();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
@@ -2384,7 +2394,7 @@ public:
     {
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
     }
 
@@ -2493,9 +2503,9 @@ public:
         m_link_map.set_base_table(table);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_link_map.verify_columns();
+        m_link_map.update_columns();
     }
 
     std::string description() const override
@@ -2545,20 +2555,20 @@ class Average;
 class ColumnListBase {
 public:
     ColumnListBase(size_t column_ndx, const Table* table, const std::vector<size_t>& links)
-        : m_link_map(table, links)
-        , m_column_ndx(column_ndx)
+        : m_column_ndx(column_ndx)
+        , m_link_map(table, links)
     {
     }
 
     ColumnListBase(const ColumnListBase& other, QueryNodeHandoverPatches* patches)
-        : m_link_map(other.m_link_map, patches)
+        : m_column_name(other.m_column_name)
         , m_column_ndx(other.m_column_ndx)
+        , m_link_map(other.m_link_map, patches)
     {
     }
 
     ColumnListBase(const ColumnListBase& other)
-        : m_link_map(other.m_link_map)
-        , m_column_ndx(other.m_column_ndx)
+        : ColumnListBase(other, nullptr)
     {
     }
 
@@ -2571,8 +2581,9 @@ public:
         return m_link_map.has_links();
     }
 
+    std::string m_column_name;
+    mutable size_t m_column_ndx;
     LinkMap m_link_map;
-    size_t m_column_ndx;
     // Leaf cache
     using LeafCacheStorage = typename std::aligned_storage<sizeof(Array), alignof(Array)>::type;
     using LeafPtr = std::unique_ptr<Array, PlacementDelete>;
@@ -2612,6 +2623,7 @@ public:
     void set_base_table(const Table* table) override
     {
         m_link_map.set_base_table(table);
+        m_column_name = m_link_map.target_table()->get_column_name(m_column_ndx);
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -2619,10 +2631,13 @@ public:
         ColumnListBase::set_cluster(cluster);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_link_map.verify_columns();
-        m_link_map.target_table()->verify_column(m_column_ndx);
+        m_link_map.update_columns();
+        m_column_ndx = m_link_map.target_table()->get_column_index(m_column_name);
+        if (m_column_ndx == realm::npos) {
+            throw LogicError(LogicError::column_does_not_exist);
+        }
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2781,9 +2796,9 @@ public:
         m_subtable_column.set_cluster(cluster);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_subtable_column.verify_column();
+        m_subtable_column.update_column();
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2915,6 +2930,7 @@ public:
 
     Columns(size_t column, const Table* table, std::vector<size_t> links = {})
         : m_link_map(table, std::move(links))
+        , m_column_name(m_link_map.target_table()->get_column_name(column))
         , m_column_ndx(column)
         , m_nullable(m_link_map.target_table()->is_nullable(m_column_ndx))
     {
@@ -2922,6 +2938,7 @@ public:
 
     Columns(const Columns& other, QueryNodeHandoverPatches* patches = nullptr)
         : m_link_map(other.m_link_map, patches)
+        , m_column_name(other.m_column_name)
         , m_column_ndx(other.m_column_ndx)
         , m_nullable(other.m_nullable)
     {
@@ -2931,6 +2948,7 @@ public:
     {
         if (this != &other) {
             m_link_map = other.m_link_map;
+            m_column_name = other.m_column_name;
             m_column_ndx = other.m_column_ndx;
             m_nullable = other.m_nullable;
         }
@@ -2950,6 +2968,7 @@ public:
 
         m_link_map.set_base_table(table);
         m_nullable = m_link_map.target_table()->is_nullable(m_column_ndx);
+        m_column_name = m_link_map.target_table()->get_column_name(m_column_ndx);
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -2967,14 +2986,14 @@ public:
         }
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        // verify links
-        m_link_map.verify_columns();
-        // verify target table
-        const Table* target_table = m_link_map.target_table();
-        if (target_table && m_column_ndx != npos) {
-            target_table->verify_column(m_column_ndx);
+        // update links
+        m_link_map.update_columns();
+        // update target column
+        m_column_ndx = m_link_map.target_table()->get_column_index(m_column_name);
+        if (m_column_ndx == realm::npos) {
+            throw LogicError(LogicError::column_does_not_exist);
         }
     }
 
@@ -3090,7 +3109,8 @@ private:
     const LeafType* m_leaf_ptr = nullptr;
 
     // Column index of payload column of m_table
-    size_t m_column_ndx;
+    std::string m_column_name;
+    mutable size_t m_column_ndx;
 
     // set to false by default for stand-alone Columns declaration that are not yet associated with any table
     // or oclumn. Call init() to update it or use a constructor that takes table + column index as argument.
@@ -3125,10 +3145,10 @@ public:
         m_column.set_base_table(m_link_map.target_table());
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_link_map.verify_columns();
-        m_column.verify_column();
+        m_link_map.update_columns();
+        m_column.update_column();
     }
 
     void evaluate(size_t, ValueBase&) override
@@ -3197,10 +3217,10 @@ public:
         m_column.set_base_table(m_link_map.target_table());
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_link_map.verify_columns();
-        m_column.verify_column();
+        m_link_map.update_columns();
+        m_column.update_column();
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -3271,9 +3291,9 @@ public:
         m_link_map.set_base_table(table);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_link_map.verify_columns();
+        m_link_map.update_columns();
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -3488,9 +3508,9 @@ public:
         m_left->set_base_table(table);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_left->verify_column();
+        m_left->update_column();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
@@ -3574,10 +3594,10 @@ public:
         m_right->set_cluster(cluster);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_left->verify_column();
-        m_right->verify_column();
+        m_left->update_column();
+        m_right->update_column();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
@@ -3660,10 +3680,10 @@ public:
         m_right->set_cluster(cluster);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_left->verify_column();
-        m_right->verify_column();
+        m_left->update_column();
+        m_right->update_column();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression

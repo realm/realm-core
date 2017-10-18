@@ -827,14 +827,16 @@ TEST(Table_ColumnNameTooLong)
     TableRef table = group.add_table("foo");
     const size_t buf_size = 64;
     char buf[buf_size];
-    memset(buf, 'S', buf_size);
+    memset(buf, 'A', buf_size);
     CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
     CHECK_LOGIC_ERROR(table->add_column_list(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
     CHECK_LOGIC_ERROR(table->add_column_link(type_Link, StringData(buf, buf_size), *table),
                       LogicError::column_name_too_long);
 
     table->add_column(type_Int, StringData(buf, buf_size - 1));
+    memset(buf, 'B', buf_size); // Column names must be unique
     table->add_column_list(type_Int, StringData(buf, buf_size - 1));
+    memset(buf, 'C', buf_size);
     table->add_column_link(type_Link, StringData(buf, buf_size - 1), *table);
 }
 

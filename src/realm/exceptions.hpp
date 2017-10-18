@@ -148,6 +148,8 @@ public:
         binary_too_big,
         table_name_too_long,
         column_name_too_long,
+        column_name_in_use,
+        invalid_column_name,
         table_index_out_of_range,
         row_index_out_of_range,
         column_index_out_of_range,

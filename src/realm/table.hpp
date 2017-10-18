@@ -1060,7 +1060,8 @@ private:
                                bool listtype = false);
     void do_erase_root_column(size_t col_ndx);
     void do_move_root_column(size_t from, size_t to);
-    void insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx);
+    void insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx,
+                                StringData name);
     void erase_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx);
     void update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_ndx_begin);
     void update_link_target_tables_after_column_move(size_t moved_from, size_t moved_to);

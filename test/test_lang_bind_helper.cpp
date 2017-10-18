@@ -9680,51 +9680,51 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
     CHECK(!table->has_search_index(1));
     group.verify();
 }
-
+#endif
 
 TEST(LangBindHelper_HandoverQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
-    sg.begin_read();
+    ReadTransaction rt(sg);
+    Group& group = const_cast<Group&>(rt.get_group());
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
-    SharedGroup::VersionID vid;
-    std::unique_ptr<SharedGroup::Handover<Query>> handover;
     {
-        LangBindHelper::promote_to_write(sg_w);
-        TableRef table = group_w.add_table("table2");
-        table->add_column(type_Int, "first");
+        WriteTransaction wt(sg_w);
+        Group& group_w = wt.get_group();
+        TableRef t = group_w.add_table("table2");
+        t->add_column(type_String, "first");
+        auto int_col = t->add_column(type_Int, "second");
         for (int i = 0; i < 100; ++i) {
-            table->add_empty_row();
-            table->set_int(0, i, i);
+            t->create_object().set(int_col, i);
         }
-        CHECK_EQUAL(100, table->size());
-        for (int i = 0; i < 100; ++i)
-            CHECK_EQUAL(i, table->get_int(0, i));
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-        vid = sg_w.get_version_of_current_transaction();
-        Query query(table->where());
-        handover = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
+        wt.commit();
     }
+    LangBindHelper::advance_read(sg);
+    auto table = group.get_table("table2");
+    auto int_col = table->get_column_index("second");
+    Query query = table->column<Int>(int_col) < 50;
+    size_t count = query.count();
+    CHECK_EQUAL(count, 50);
     {
-        LangBindHelper::advance_read(sg, vid);
-        sg_w.close();
-        // importing query
-        std::unique_ptr<Query> q(sg.import_from_handover(move(handover)));
-        TableView tv = q->find_all();
-        CHECK(tv.is_attached());
-        CHECK_EQUAL(100, tv.size());
-        for (int i = 0; i < 100; ++i)
-            CHECK_EQUAL(i, tv.get_int(0, i));
+        // Delete first column. This alters the index of 'second' column
+        WriteTransaction wt(sg_w);
+        Group& group_w = wt.get_group();
+        TableRef t = group_w.get_table("table2");
+        auto str_col = table->get_column_index("first");
+        t->remove_column(str_col);
+        wt.commit();
     }
+    LangBindHelper::advance_read(sg);
+    count = query.count();
+    CHECK_EQUAL(count, 50);
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
