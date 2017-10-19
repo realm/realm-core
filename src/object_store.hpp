@@ -42,7 +42,7 @@ std::string format(const char* fmt, Args&&... args);
 class ObjectStore {
 public:
     // Schema version used for uninitialized Realms
-    static const uint64_t NotVersioned;
+    static constexpr uint64_t NotVersioned = std::numeric_limits<uint64_t>::max();
 
     // Column name used for subtables which store an array
     static constexpr const char* const ArrayColumnName = "!ARRAY_VALUE";
@@ -53,7 +53,6 @@ public:
     // set the schema version without any checks
     // and the tables for the schema version and the primary key are created if they don't exist
     // NOTE: must be performed within a write transaction
-    // FIXME remove this after integrating OS's migration related logic into Realm java
     static void set_schema_version(Group& group, uint64_t version);
 
     // check if all of the changes in the list can be applied automatically, or
