@@ -230,6 +230,9 @@ public:
     template <typename U>
     U get(size_t col_ndx) const;
 
+    template <typename U>
+    U get(StringData col_name) const;
+
     bool is_null(size_t col_ndx) const;
 
 protected:
@@ -357,6 +360,8 @@ private:
         return create_root_from_mem(alloc, MemRef{alloc.translate(ref), ref, alloc});
     }
     std::unique_ptr<ClusterNode> get_node(ref_type ref) const;
+
+    size_t get_column_index(StringData col_name) const;
 };
 
 class ClusterTree::ConstIterator {
@@ -412,6 +417,12 @@ public:
         return const_cast<pointer>(ConstIterator::operator->());
     }
 };
+
+template <typename U>
+U ConstObj::get(StringData col_name) const
+{
+    return get<U>(m_tree_top->get_column_index(col_name));
+}
 
 template <>
 inline Optional<float> ConstObj::get<Optional<float>>(size_t col_ndx) const

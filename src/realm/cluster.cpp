@@ -1236,6 +1236,11 @@ std::unique_ptr<ClusterNode> ClusterTree::get_node(ref_type ref) const
     return node;
 }
 
+size_t ClusterTree::get_column_index(StringData col_name) const
+{
+    return get_spec().get_column_index(col_name);
+}
+
 const Spec& ClusterTree::get_spec() const
 {
     typedef _impl::TableFriend tf;
