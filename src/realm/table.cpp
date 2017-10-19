@@ -973,10 +973,6 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name, L
     }
 
     refresh_link_target_accessors(col_ndx);
-
-    if (m_clusters.is_attached()) {
-        m_clusters.insert_column(col_ndx);
-    }
 }
 
 
@@ -1028,6 +1024,10 @@ void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, 
     size_t ndx_in_parent = info.m_column_ref_ndx;
     ref_type col_ref = create_column(type, m_size, nullable, m_columns.get_alloc()); // Throws
     m_columns.insert(ndx_in_parent, col_ref);                                        // Throws
+
+    if (m_clusters.is_attached()) {
+        m_clusters.insert_column(ndx);
+    }
 }
 
 
@@ -1048,6 +1048,10 @@ void Table::do_erase_root_column(size_t ndx)
         ref_type index_ref = m_columns.get_as_ref(ndx_in_parent);
         Array::destroy_deep(index_ref, m_columns.get_alloc());
         m_columns.erase(ndx_in_parent);
+    }
+
+    if (m_clusters.is_attached()) {
+        m_clusters.remove_column(ndx);
     }
 }
 

@@ -8905,6 +8905,28 @@ TEST(Table_object_basic)
     CHECK_EQUAL(k12.value, 12);
 }
 
+TEST(Table_remove_column)
+{
+    Table table;
+    table.add_column(type_Int, "int1");
+    auto int2_col = table.add_column(type_Int, "int2");
+    table.add_column(type_Int, "int3");
+
+    Obj obj = table.create_object(Key(5)).set_all(100, 7, 25);
+
+    CHECK_EQUAL(obj.get<int64_t>("int1"), 100);
+    CHECK_EQUAL(obj.get<int64_t>("int2"), 7);
+    CHECK_EQUAL(obj.get<int64_t>("int3"), 25);
+
+    table.remove_column(int2_col);
+
+    CHECK_EQUAL(obj.get<int64_t>("int1"), 100);
+    CHECK_THROW(obj.get<int64_t>("int2"), LogicError);
+    CHECK_EQUAL(obj.get<int64_t>("int3"), 25);
+    table.add_column(type_Int, "int4");
+    CHECK_EQUAL(obj.get<int64_t>("int4"), 0);
+}
+
 TEST(Table_object_merge_nodes)
 {
     // This test works best for REALM_MAX_BPNODE_SIZE == 8.

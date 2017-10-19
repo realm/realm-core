@@ -62,6 +62,7 @@ public:
     int64_t get_last_key() const override;
 
     void insert_column(size_t ndx) override;
+    void remove_column(size_t ndx) override;
     ref_type insert(Key k, State& state) override;
     void get(Key k, State& state) const override;
     unsigned erase(Key k) override;
@@ -284,6 +285,16 @@ void ClusterNodeInner::insert_column(size_t ndx)
         std::shared_ptr<ClusterNode> node = m_tree_top.get_node(child_ref);
         node->set_parent(&m_children, i);
         node->insert_column(ndx);
+    }
+}
+
+void ClusterNodeInner::remove_column(size_t ndx)
+{
+    for (size_t i = 0; i < m_children.size(); i++) {
+        ref_type child_ref = m_children.get_as_ref(i);
+        std::shared_ptr<ClusterNode> node = m_tree_top.get_node(child_ref);
+        node->set_parent(&m_children, i);
+        node->remove_column(ndx);
     }
 }
 
@@ -629,6 +640,16 @@ void Cluster::insert_column(size_t col_ndx)
             Array::insert(col_ndx + 1, 0);
             break;
     }
+}
+
+void Cluster::remove_column(size_t col_ndx)
+{
+    col_ndx++;
+    ref_type ref = to_ref(Array::get(col_ndx));
+    if (ref != 0) {
+        Array::destroy_deep(ref, m_alloc);
+    }
+    Array::erase(col_ndx);
 }
 
 ref_type Cluster::insert(Key k, ClusterNode::State& state)

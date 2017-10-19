@@ -146,6 +146,8 @@ public:
 
     /// Insert a column at position 'ndx'
     virtual void insert_column(size_t ndx) = 0;
+    /// Remove a column at position 'ndx'
+    virtual void remove_column(size_t ndx) = 0;
     /// Create a new object identified by 'key' and update 'state' accordingly
     /// Return reference to new node created (if any)
     virtual ref_type insert(Key k, State& state) = 0;
@@ -195,6 +197,7 @@ public:
     }
 
     void insert_column(size_t ndx) override;
+    void remove_column(size_t ndx) override;
     ref_type insert(Key k, State& state) override;
     void get(Key k, State& state) const override;
     unsigned erase(Key k) override;
@@ -333,6 +336,10 @@ public:
     void insert_column(size_t ndx)
     {
         m_root->insert_column(ndx);
+    }
+    void remove_column(size_t ndx)
+    {
+        m_root->remove_column(ndx);
     }
     Obj insert(Key k);
     void erase(Key k);
