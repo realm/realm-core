@@ -387,35 +387,35 @@ TEST(SafeIntOps_IntCast)
 
 TEST(SafeIntOps_ShiftLeft)
 {
-    size_t uint = 1;
-    CHECK(!int_shift_left_with_overflow_detect(uint, 0));
-    CHECK_EQUAL(uint, 1);
+    size_t unsigned_int = 1;
+    CHECK(!int_shift_left_with_overflow_detect(unsigned_int, 0));
+    CHECK_EQUAL(unsigned_int, 1);
 
-    uint = 0;
-    CHECK(!int_shift_left_with_overflow_detect(uint, 1));
-    CHECK_EQUAL(uint, 0);
+    unsigned_int = 0;
+    CHECK(!int_shift_left_with_overflow_detect(unsigned_int, 1));
+    CHECK_EQUAL(unsigned_int, 0);
 
-    uint = 1;
-    CHECK(!int_shift_left_with_overflow_detect(uint, 1));
-    CHECK_EQUAL(uint, 2);
+    unsigned_int = 1;
+    CHECK(!int_shift_left_with_overflow_detect(unsigned_int, 1));
+    CHECK_EQUAL(unsigned_int, 2);
 
-    uint = 1;
-    CHECK(!int_shift_left_with_overflow_detect(uint, std::numeric_limits<size_t>::digits - 1));
-    CHECK_EQUAL(uint, size_t(1) << (std::numeric_limits<size_t>::digits - 1));
+    unsigned_int = 1;
+    CHECK(!int_shift_left_with_overflow_detect(unsigned_int, std::numeric_limits<size_t>::digits - 1));
+    CHECK_EQUAL(unsigned_int, size_t(1) << (std::numeric_limits<size_t>::digits - 1));
 
 // Shifting by 64 (or greater) is not defined behaviour.
-// With clang, the following does not overflow and gives uint == 1
-//    uint = 1;
-//    CHECK(int_shift_left_with_overflow_detect(uint, std::numeric_limits<size_t>::digits));
-//    CHECK_EQUAL(uint, 1);
+// With clang, the following does not overflow and gives unsigned_int == 1
+//    unsigned_int = 1;
+//    CHECK(int_shift_left_with_overflow_detect(unsigned_int, std::numeric_limits<size_t>::digits));
+//    CHECK_EQUAL(unsigned_int, 1);
 
-    uint = 2;
-    CHECK(int_shift_left_with_overflow_detect(uint, std::numeric_limits<size_t>::digits - 1));
-    CHECK_EQUAL(uint, 2);
+    unsigned_int = 2;
+    CHECK(int_shift_left_with_overflow_detect(unsigned_int, std::numeric_limits<size_t>::digits - 1));
+    CHECK_EQUAL(unsigned_int, 2);
 
-    uint = std::numeric_limits<size_t>::max();
-    CHECK(int_shift_left_with_overflow_detect(uint, 1));
-    CHECK_EQUAL(uint, std::numeric_limits<size_t>::max());
+    unsigned_int = std::numeric_limits<size_t>::max();
+    CHECK(int_shift_left_with_overflow_detect(unsigned_int, 1));
+    CHECK_EQUAL(unsigned_int, std::numeric_limits<size_t>::max());
 
     int signed_int = 1;
     CHECK(!int_shift_left_with_overflow_detect(signed_int, 0));
@@ -445,11 +445,11 @@ TEST(SafeIntOps_ShiftLeft)
 
 TEST(SafeIntOps_IsNegative)
 {
-    size_t uint = 0;
-    CHECK(!is_negative(uint));
+    size_t unsigned_int = 0;
+    CHECK(!is_negative(unsigned_int));
 
-    uint = size_t(-1);
-    CHECK(!is_negative(uint));
+    unsigned_int = size_t(-1);
+    CHECK(!is_negative(unsigned_int));
 
     char c = 0;
     CHECK(!is_negative(c));
