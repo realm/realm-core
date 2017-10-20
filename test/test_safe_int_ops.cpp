@@ -161,6 +161,22 @@ TEST(SafeIntOps_AddWithOverflowDetect)
         rval = -1;
         CHECK(int_add_with_overflow_detect(lval, rval));
         CHECK_EQUAL(lval, std::numeric_limits<size_t>::min());
+
+        // lval::bits < rval::bits
+        unsigned char lval2 = std::numeric_limits<unsigned char>::max();
+        int64_t rval2 = 1;
+        CHECK(int_add_with_overflow_detect(lval2, rval2));
+        CHECK_EQUAL(lval2, std::numeric_limits<unsigned char>::max());
+
+        lval2 = std::numeric_limits<unsigned char>::max() - 1;
+        rval2 = 1;
+        CHECK(!int_add_with_overflow_detect(lval2, rval2));
+        CHECK_EQUAL(lval2, std::numeric_limits<unsigned char>::max());
+
+        lval2 = 0;
+        rval2 = std::numeric_limits<unsigned char>::max() + 1;
+        CHECK(int_add_with_overflow_detect(lval2, rval2));
+        CHECK_EQUAL(lval2, 0);
     }
     {   // unsigned and unsigned
         size_t lval = std::numeric_limits<size_t>::max();
@@ -275,6 +291,22 @@ TEST(SafeIntOps_SubtractWithOverflowDetect)
         rval = -1;
         CHECK(int_subtract_with_overflow_detect(lval, rval));
         CHECK_EQUAL(lval, std::numeric_limits<size_t>::max());
+
+        // lval::bits < rval::bits
+        unsigned char lval2 = 0;
+        int64_t rval2 = 1;
+        CHECK(int_subtract_with_overflow_detect(lval2, rval2));
+        CHECK_EQUAL(lval2, 0);
+
+        lval2 = std::numeric_limits<unsigned char>::max();
+        rval2 = std::numeric_limits<unsigned char>::max();
+        CHECK(!int_subtract_with_overflow_detect(lval2, rval2));
+        CHECK_EQUAL(lval2, 0);
+
+        lval2 = std::numeric_limits<unsigned char>::max();
+        rval2 = std::numeric_limits<unsigned char>::max() + 1;
+        CHECK(int_subtract_with_overflow_detect(lval2, rval2));
+        CHECK_EQUAL(lval2, std::numeric_limits<unsigned char>::max());
     }
     {   // unsigned and unsigned
         size_t lval = std::numeric_limits<size_t>::min();
