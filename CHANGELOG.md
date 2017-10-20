@@ -5,6 +5,10 @@
 * Make calls to posix_fallocate() robust against interruption and report
   the correct error on failure.
   PR [#2905](https://github.com/realm/realm-core/pull/2905).
+* Fix an error in `int_multiply_with_overflow_detect()` which would report
+  overflow when no overflow should occur. This could cause out of memory
+  exceptions when the `TransactLogParser` reads strings or binary data > 2GB.
+  PR [#2906](https://github.com/realm/realm-core/pull/2906).
 
 ### Breaking changes
 
