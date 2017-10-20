@@ -773,6 +773,37 @@ Schema ObjectStore::schema_from_group(Group const& group) {
     return schema;
 }
 
+util::Optional<Property> ObjectStore::property_for_column_index(ConstTableRef& table, size_t column_index)
+{
+    StringData column_name = table->get_column_name(column_index);
+
+#if REALM_HAVE_SYNC_STABLE_IDS
+    // The object ID column is an implementation detail, and is omitted from the schema.
+    // FIXME: Consider filtering out all column names starting with `!`.
+    if (column_name == sync::object_id_column_name)
+        return util::none;
+#endif
+
+    if (table->get_column_type(column_index) == type_Table) {
+        auto subdesc = table->get_subdescriptor(column_index);
+        if (subdesc->get_column_count() != 1 || subdesc->get_column_name(0) != ObjectStore::ArrayColumnName)
+            return util::none;
+    }
+
+    Property property;
+    property.name = column_name;
+    property.type = ObjectSchema::from_core_type(*table->get_descriptor(), column_index);
+    property.is_indexed = table->has_search_index(column_index);
+    property.table_column = column_index;
+
+    if (property.type == PropertyType::Object) {
+        // set link type for objects and arrays
+        ConstTableRef linkTable = table->get_link_target(column_index);
+        property.object_type = ObjectStore::object_type_for_table_name(linkTable->get_name().data());
+    }
+    return property;
+}
+
 void ObjectStore::set_schema_columns(Group const& group, Schema& schema)
 {
     for (auto& object_schema : schema) {
