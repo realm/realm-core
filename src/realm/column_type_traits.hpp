@@ -45,6 +45,21 @@ class BasicArray;
 template <class T>
 struct ColumnTypeTraits;
 
+template <class T, Action action>
+struct AggregateResultType {
+    using result_type = T;
+};
+
+template <Action action>
+struct AggregateResultType<util::Optional<int64_t>, action> {
+    using result_type = int64_t;
+};
+
+template <>
+struct AggregateResultType<float, act_Sum> {
+    using result_type = double;
+};
+
 template <>
 struct ColumnTypeTraits<int64_t> {
     using column_type = Column<int64_t>;

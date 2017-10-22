@@ -1097,7 +1097,6 @@ TEST_TYPES(StringIndex_Zero_Crash2, std::true_type, std::false_type)
         }
     }
 }
-#endif
 
 TEST(StringIndex_Integer_Increasing)
 {
@@ -1201,6 +1200,7 @@ TEST_TYPES(StringIndex_Duplicate_Values, string_column, nullable_string_column, 
     CHECK(!ndx.has_duplicate_values());
     CHECK(col.size() == 0);
 }
+#endif
 
 namespace {
 

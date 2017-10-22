@@ -4303,6 +4303,8 @@ TEST(Table_HasSharedSpec)
     CHECK(table4->get_subtable(1, 0)->has_shared_type());
 }
 
+#endif // LEGACY_TESTS
+
 #if TEST_DURATION > 0
 #define TBL_SIZE REALM_MAX_BPNODE_SIZE * 10
 #else
@@ -4312,22 +4314,23 @@ TEST(Table_HasSharedSpec)
 TEST(Table_Aggregates)
 {
     TestTable table;
-    table.add_column(type_Int, "c_int");
-    table.add_column(type_Float, "c_float");
-    table.add_column(type_Double, "c_double");
+    auto int_col = table.add_column(type_Int, "c_int");
+    auto float_col = table.add_column(type_Float, "c_float");
+    auto double_col = table.add_column(type_Double, "c_double");
+    auto str_col = table.add_column(type_String, "c_string");
     int64_t i_sum = 0;
     double f_sum = 0;
     double d_sum = 0;
 
     for (int i = 0; i < TBL_SIZE; i++) {
-        add(table, 5987654, 4.0f, 3.0);
+        table.create_object().set_all(5987654, 4.0f, 3.0, "Hello");
         i_sum += 5987654;
         f_sum += 4.0f;
         d_sum += 3.0;
     }
-    add(table, 1, 1.1f, 1.2);
-    add(table, 987654321, 11.0f, 12.0);
-    add(table, 5, 4.0f, 3.0);
+    table.create_object().set_all(1, 1.1f, 1.2, "Hi");
+    table.create_object().set_all(987654321, 11.0f, 12.0, "Goodbye");
+    table.create_object().set_all(5, 4.0f, 3.0, "Hey");
     i_sum += 1 + 987654321 + 5;
     f_sum += double(1.1f) + double(11.0f) + double(4.0f);
     d_sum += 1.2 + 12.0 + 3.0;
@@ -4335,42 +4338,47 @@ TEST(Table_Aggregates)
 
     double epsilon = std::numeric_limits<double>::epsilon();
 
+    // count
+    CHECK_EQUAL(1, table.count_int(int_col, 987654321));
+    CHECK_EQUAL(1, table.count_float(float_col, 11.0f));
+    CHECK_EQUAL(1, table.count_double(double_col, 12.0));
+    CHECK_EQUAL(1, table.count_string(str_col, "Goodbye"));
     // minimum
-    CHECK_EQUAL(1, table.minimum_int(0));
-    CHECK_EQUAL(1.1f, table.minimum_float(1));
-    CHECK_EQUAL(1.2, table.minimum_double(2));
+    CHECK_EQUAL(1, table.minimum_int(int_col));
+    CHECK_EQUAL(1.1f, table.minimum_float(float_col));
+    CHECK_EQUAL(1.2, table.minimum_double(double_col));
     // maximum
-    CHECK_EQUAL(987654321, table.maximum_int(0));
-    CHECK_EQUAL(11.0f, table.maximum_float(1));
-    CHECK_EQUAL(12.0, table.maximum_double(2));
+    CHECK_EQUAL(987654321, table.maximum_int(int_col));
+    CHECK_EQUAL(11.0f, table.maximum_float(float_col));
+    CHECK_EQUAL(12.0, table.maximum_double(double_col));
     // sum
-    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.sum_int(0)), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(f_sum, table.sum_float(1), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(d_sum, table.sum_double(2), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.sum_int(int_col)), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum, table.sum_float(float_col), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum, table.sum_double(double_col), 10 * epsilon);
     // average
-    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.average_int(0), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.average_float(1), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.average_double(2), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.average_int(int_col), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.average_float(float_col), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.average_double(double_col), 10 * epsilon);
 }
-
 
 TEST(Table_Aggregates2)
 {
     TestTable table;
-    table.add_column(type_Int, "c_count");
+    auto int_col = table.add_column(type_Int, "c_count");
     int c = -420;
     int s = 0;
     while (c < -20) {
-        add(table, c);
+        table.create_object().set(int_col, c);
         s += c;
         c++;
     }
 
-    CHECK_EQUAL(-420, table.minimum_int(0));
-    CHECK_EQUAL(-21, table.maximum_int(0));
-    CHECK_EQUAL(s, table.sum_int(0));
+    CHECK_EQUAL(-420, table.minimum_int(int_col));
+    CHECK_EQUAL(-21, table.maximum_int(int_col));
+    CHECK_EQUAL(s, table.sum_int(int_col));
 }
 
+#ifdef LEGACY_TESTS
 // Test Table methods max, min, avg, sum, on both nullable and non-nullable columns
 TEST(Table_Aggregates3)
 {
@@ -4414,7 +4422,7 @@ TEST(Table_Aggregates3)
         table->set_timestamp(4, 2, Timestamp(6, 6));
 
         size_t count;
-        size_t pos;
+        Key pos;
         if (nullable) {
             // max
             pos = 123;
@@ -4571,7 +4579,6 @@ TEST(Table_EmptyMinmax)
     CHECK_EQUAL(max_index, realm::npos);
     CHECK(max_ts.is_null());
 }
-
 
 TEST(Table_LanguageBindings)
 {
