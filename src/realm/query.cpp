@@ -25,6 +25,7 @@
 #include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/table_view.hpp>
+#include <realm/table_tpl.hpp>
 
 #include <algorithm>
 
@@ -866,52 +867,44 @@ bool Query::eval_object(ConstObj& obj) const
     return true;
 }
 
-template <Action action, typename T, typename R, class ColType>
-R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_t limit, size_t* return_ndx) const,
-                   size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                   size_t* return_ndx) const
+template <Action action, typename T, typename R>
+R Query::aggregate(size_t column_ndx, size_t* resultcount, Key* return_ndx) const
 {
-    if (limit == 0) {
-        if (resultcount)
-            *resultcount = 0;
-        return static_cast<R>(0);
-    }
-
-    if (end == size_t(-1))
-        end = m_table->size();
-
-    const ColType& column = m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
+    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    using ResultType = typename AggregateResultType<T, action>::result_type;
 
     if (!has_conditions() && !m_view) {
-        // No criteria, so call aggregate METHODS directly on columns
-        // - this bypasses the query system and is faster
-        // User created query with no criteria; aggregate range
-        if (resultcount) {
-            *resultcount = limit < (end - start) ? limit : (end - start);
-        }
-        // direct aggregate on the column
-        return (column.*aggregateMethod)(start, end, limit, action == act_Sum ? resultcount : return_ndx);
+        // use table aggregate
+        return m_table->aggregate<action, T, R>(column_ndx, T{}, resultcount, return_ndx);
     }
     else {
 
         // Aggregate with criteria - goes through the nodes in the query system
         init();
-        QueryState<R> st(action, nullptr, limit);
-
-        SequentialGetter<ColType> source_column(*m_table, column_ndx);
+        QueryState<ResultType> st(action);
 
         if (!m_view) {
-            aggregate_internal(action, ColumnTypeTraits<T>::id, ColType::nullable, root_node(), &st, start, end,
-                               &source_column);
+            LeafType leaf(m_table->get_alloc());
+            auto node = root_node();
+
+            m_table->traverse_clusters(
+                [column_ndx, &leaf, &node, &st, this](const Cluster* cluster, int64_t key_offsets) {
+                    size_t e = cluster->node_size();
+                    node->set_cluster(cluster);
+                    cluster->init_leaf(column_ndx, &leaf);
+                    st.m_key_offset = key_offsets;
+                    st.m_key_values = cluster->get_key_array();
+                    aggregate_internal(action, ColumnTypeTraits<T>::id, false, node, &st, 0, e,
+                                       nullptr /* TODO: &leaf */);
+                    // Continue
+                    return false;
+                });
         }
         else {
             for (size_t t = 0; t < m_view->size(); t++) {
                 ConstObj obj = m_view->get(t);
-                if (t >= start && t < end && eval_object(obj)) {
-                    st.template match<action, false>(size_t(obj.get_key().value), 0, obj.get<T>(column_ndx));
-                    if (st.m_match_count >= limit) {
-                        break;
-                    }
+                if (eval_object(obj)) {
+                    st.template match<action, false>(obj.get_key().value, 0, obj.get<T>(column_ndx));
                 }
             }
         }
@@ -982,179 +975,126 @@ void Query::aggregate_internal(Action TAction, DataType TSourceColumn, bool null
 
 // Sum
 
-int64_t Query::sum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+int64_t Query::sum_int(size_t column_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
 #endif
 
     if (m_table->is_nullable(column_ndx)) {
-        return aggregate<act_Sum, int64_t>(&IntNullColumn::sum, column_ndx, resultcount, start, end, limit);
+        return aggregate<act_Sum, util::Optional<int64_t>, int64_t>(column_ndx);
     }
-    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, int64_t, int64_t>(column_ndx);
 }
-double Query::sum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::sum_float(size_t column_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
 #endif
 
-    return aggregate<act_Sum, float>(&FloatColumn::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, float, double>(column_ndx);
 }
-double Query::sum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::sum_double(size_t column_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
 #endif
 
-    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_ndx, resultcount, start, end, limit);
+    return aggregate<act_Sum, double, double>(column_ndx);
 }
 
 // Maximum
 
-int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                           size_t* return_ndx) const
+int64_t Query::maximum_int(size_t column_ndx, Key* return_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
 #endif
 
     if (m_table->is_nullable(column_ndx)) {
-        return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, resultcount, start, end, limit,
-                                           return_ndx);
+        return aggregate<act_Max, util::Optional<int64_t>, int64_t>(column_ndx, nullptr, return_ndx);
     }
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit,
-                                       return_ndx);
+    return aggregate<act_Max, int64_t, int64_t>(column_ndx, nullptr, return_ndx);
 }
 
-OldDateTime Query::maximum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                                       size_t* return_ndx) const
+float Query::maximum_float(size_t column_ndx, Key* return_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
 #endif
 
-    if (m_table->is_nullable(column_ndx)) {
-        return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, resultcount, start, end, limit,
-                                           return_ndx);
-    }
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit,
-                                       return_ndx);
+    return aggregate<act_Max, float, float>(column_ndx, nullptr, return_ndx);
 }
-
-float Query::maximum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                           size_t* return_ndx) const
+double Query::maximum_double(size_t column_ndx, Key* return_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
 #endif
 
-    return aggregate<act_Max, float>(&FloatColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
-}
-double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                             size_t* return_ndx) const
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
-#endif
-
-    return aggregate<act_Max, double>(&DoubleColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Max, double, double>(column_ndx, nullptr, return_ndx);
 }
 
 
 // Minimum
 
-int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                           size_t* return_ndx) const
+int64_t Query::minimum_int(size_t column_ndx, Key* return_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
 #endif
 
     if (m_table->is_nullable(column_ndx)) {
-        return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit,
-                                           return_ndx);
+        return aggregate<act_Min, util::Optional<int64_t>, int64_t>(column_ndx, nullptr, return_ndx);
     }
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit,
-                                       return_ndx);
+    return aggregate<act_Min, int64_t, int64_t>(column_ndx, nullptr, return_ndx);
 }
-float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                           size_t* return_ndx) const
+float Query::minimum_float(size_t column_ndx, Key* return_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
 #endif
 
-    return aggregate<act_Min, float>(&FloatColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Min, float, float>(column_ndx, nullptr, return_ndx);
 }
-double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                             size_t* return_ndx) const
+double Query::minimum_double(size_t column_ndx, Key* return_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
 #endif
 
-    return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Min, double, double>(column_ndx, nullptr, return_ndx);
 }
 
-OldDateTime Query::minimum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                                       size_t* return_ndx) const
+Timestamp Query::minimum_timestamp(size_t column_ndx, Key* return_ndx)
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
 #endif
 
-    if (m_table->is_nullable(column_ndx)) {
-        return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit,
-                                           return_ndx);
-    }
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit,
-                                       return_ndx);
+    return aggregate<act_Min, Timestamp, Timestamp>(column_ndx, nullptr, return_ndx);
 }
 
-Timestamp Query::minimum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start, size_t end, size_t limit)
-{
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
-#endif
-    TableView tv(*m_table, *this, start, end, limit);
-    find_all(tv, start, end, limit);
-    Timestamp ts = tv.minimum_timestamp(column_ndx, return_ndx);
-    return ts;
-}
-
-Timestamp Query::maximum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start, size_t end, size_t limit)
+Timestamp Query::maximum_timestamp(size_t column_ndx, Key* return_ndx)
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
 #endif
 
-    TableView tv(*m_table, *this, start, end, limit);
-    find_all(tv, start, end, limit);
-    Timestamp ts = tv.maximum_timestamp(column_ndx, return_ndx);
-    return ts;
+    return aggregate<act_Max, Timestamp, Timestamp>(column_ndx, nullptr, return_ndx);
 }
 
 
 // Average
 
 template <typename T, bool Nullable>
-double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::average(size_t column_ndx, size_t* resultcount) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
 #endif
-
-    if (limit == 0) {
-        if (resultcount)
-            *resultcount = 0;
-        return 0.;
-    }
-
+    using ResultType = typename AggregateResultType<T, act_Sum>::result_type;
     size_t resultcount2 = 0;
-    typedef typename ColumnTypeTraits<T>::column_type ColType;
-    typedef typename ColumnTypeTraits<T>::sum_type SumType;
-    const SumType sum1 = aggregate<act_Sum, T>(&ColType::sum, column_ndx, &resultcount2, start, end, limit);
+    auto sum1 = aggregate<act_Sum, T, ResultType>(column_ndx, &resultcount2);
     double avg1 = 0;
     if (resultcount2 != 0)
         avg1 = static_cast<double>(sum1) / resultcount2;
@@ -1163,26 +1103,26 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
     return avg1;
 }
 
-double Query::average_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::average_int(size_t column_ndx, size_t* resultcount) const
 {
     if (m_table->is_nullable(column_ndx)) {
-        return average<util::Optional<int64_t>, true>(column_ndx, resultcount, start, end, limit);
+        return average<util::Optional<int64_t>, true>(column_ndx, resultcount);
     }
-    return average<int64_t, false>(column_ndx, resultcount, start, end, limit);
+    return average<int64_t, false>(column_ndx, resultcount);
 }
-double Query::average_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::average_float(size_t column_ndx, size_t* resultcount) const
 {
     if (m_table->is_nullable(column_ndx)) {
-        return average<float, true>(column_ndx, resultcount, start, end, limit);
+        return average<float, true>(column_ndx, resultcount);
     }
-    return average<float, false>(column_ndx, resultcount, start, end, limit);
+    return average<float, false>(column_ndx, resultcount);
 }
-double Query::average_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::average_double(size_t column_ndx, size_t* resultcount) const
 {
     if (m_table->is_nullable(column_ndx)) {
-        return average<double, true>(column_ndx, resultcount, start, end, limit);
+        return average<double, true>(column_ndx, resultcount);
     }
-    return average<double, false>(column_ndx, resultcount, start, end, limit);
+    return average<double, false>(column_ndx, resultcount);
 }
 
 
@@ -1358,25 +1298,18 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 }
 
 
-size_t Query::count(size_t start, size_t end, size_t limit) const
+size_t Query::count() const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
 #endif
-
-    if (limit == 0)
-        return 0;
-
-    if (end == size_t(-1))
-        end = m_table->size();
-
     if (!has_conditions()) {
         // User created query with no criteria; count all
         if (m_view) {
-            return (limit < m_view->size() - start ? limit : m_view->size() - start);
+            return m_view->size();
         }
         else {
-            return (limit < end - start ? limit : end - start);
+            return m_table->size();
         }
     }
 
@@ -1384,16 +1317,16 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     size_t cnt = 0;
 
     if (m_view) {
-        for (size_t t = 0; t < m_view->size() && cnt < limit; t++) {
+        for (size_t t = 0; t < m_view->size(); t++) {
             ConstObj obj = m_view->get(t);
-            if (t >= start && t < end && eval_object(obj)) {
+            if (eval_object(obj)) {
                 cnt++;
             }
         }
     }
     else {
         auto node = root_node();
-        QueryState<int64_t> st(act_Count, nullptr, limit);
+        QueryState<int64_t> st(act_Count);
 
         m_table->traverse_clusters([&node, &st, this](const Cluster* cluster, int64_t key_offsets) {
             size_t e = cluster->node_size();
