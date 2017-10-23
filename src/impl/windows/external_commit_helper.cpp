@@ -17,69 +17,53 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "impl/external_commit_helper.hpp"
-
 #include "impl/realm_coordinator.hpp"
 
 #include <algorithm>
-#include <codecvt>
 
 using namespace realm;
 using namespace realm::_impl;
 
-static HANDLE CreateNotificationEvent(std::string realm_path)
-{
-    // replace backslashes because they're significant in object namespace names
+static std::wstring create_condvar_sharedmemory_name(std::string realm_path) {
     std::replace(realm_path.begin(), realm_path.end(), '\\', '/');
-
-    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-    std::wstring path(L"Local\\" + converter.from_bytes(realm_path));
-
-    HANDLE event = CreateEventEx(nullptr, path.c_str(), CREATE_EVENT_MANUAL_RESET, SYNCHRONIZE | EVENT_MODIFY_STATE);
-    if (event == nullptr) {
-        throw std::system_error(GetLastError(), std::system_category());
-    }
-
-    return event;
+    return L"Local\\Realm_ObjectStore_ExternalCommitHelper_SharedCondVar_" + std::wstring(realm_path.begin(), realm_path.end());
 }
 
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
-, m_event(CreateNotificationEvent(parent.get_path()))
-, m_close_mutex(CreateMutexEx(nullptr, nullptr, CREATE_MUTEX_INITIAL_OWNER, SYNCHRONIZE | MUTEX_MODIFY_STATE))
+, m_condvar_shared(create_condvar_sharedmemory_name(parent.get_path()).c_str())
 {
+    m_mutex.set_shared_part(InterprocessMutex::SharedPart(), parent.get_path(), "ExternalCommitHelper_ControlMutex");
+    m_commit_available.set_shared_part(m_condvar_shared.get(), parent.get_path(),
+                                       "ExternalCommitHelper_CommitCondVar",
+                                       std::filesystem::temp_directory_path().u8string());
     m_thread = std::async(std::launch::async, [this]() { listen(); });
 }
 
 ExternalCommitHelper::~ExternalCommitHelper()
 {
-    ReleaseMutex(m_close_mutex);
+    {
+        std::lock_guard<InterprocessMutex> lock(m_mutex);
+        m_keep_listening = false;
+        m_commit_available.notify_all();
+    }
     m_thread.wait();
 
-    CloseHandle(m_event);
-    CloseHandle(m_close_mutex);
+    m_commit_available.release_shared_part();
 }
 
 void ExternalCommitHelper::notify_others()
 {
-    SetEvent(m_event);
-    std::this_thread::yield();
-    ResetEvent(m_event);
+    m_commit_available.notify_all();
 }
 
 void ExternalCommitHelper::listen()
 {
-    std::array<HANDLE, 2> handles{ m_event, m_close_mutex };
-    while (true) {
-        DWORD wait_result = WaitForMultipleObjectsEx(handles.size(), handles.data(), false, INFINITE, false);
-        switch (wait_result) {
-        case WAIT_OBJECT_0: // event signaled
-            m_parent.on_change();
-            continue;
-        case WAIT_OBJECT_0 + 1: // mutex released
-            return; // exit the loop
-        case WAIT_FAILED:
-            throw std::system_error(GetLastError(), std::system_category());
+    std::lock_guard<InterprocessMutex> lock(m_mutex);
+    while (m_keep_listening) {
+        m_commit_available.wait(m_mutex, nullptr);
+        if (m_keep_listening) {
+			m_parent.on_change();
         }
     }
-    REALM_UNREACHABLE();
 }
