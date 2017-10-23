@@ -335,7 +335,7 @@ void CollectionNotifier::deliver_error(std::exception_ptr error)
     m_error = true;
 
     m_callback_count = m_callbacks.size();
-    for_each_callback([&](auto& lock, auto& callback) {
+    for_each_callback([this, &error](auto& lock, auto& callback) {
         // acquire a local reference to the callback so that removing the
         // callback from within it can't result in a dangling pointer
         auto cb = std::move(callback.fn);
@@ -344,7 +344,7 @@ void CollectionNotifier::deliver_error(std::exception_ptr error)
         cb.error(error);
 
         // We never want to call the callback again after this, so just remove it
-        remove_callback(token);
+        this->remove_callback(token);
     });
 }
 
