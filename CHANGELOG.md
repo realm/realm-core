@@ -8,6 +8,9 @@
   scenario. The hope is that it will fix some non-reproducible problems related to
   lockfile initialization.
   PR [#2902](https://github.com/realm/realm-core/pull/2902)
+* Make calls to posix_fallocate() robust against interruption and report
+  the correct error on failure.
+  PR [#2905](https://github.com/realm/realm-core/pull/2905).
 
 ### Breaking changes
 
