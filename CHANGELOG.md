@@ -2,6 +2,12 @@
 
 ### Bugfixes
 
+* Switch from using a combination of file write and mmap to using only mmap when
+  initializing the lockfile. It is unclear if this counts as a bugfix, because
+  it is unclear if there are still systems out there with problems handling that
+  scenario. The hope is that it will fix some non-reproducible problems related to
+  lockfile initialization.
+  PR [#2902](https://github.com/realm/realm-core/pull/2902)
 * Make calls to posix_fallocate() robust against interruption and report
   the correct error on failure.
   PR [#2905](https://github.com/realm/realm-core/pull/2905).
