@@ -11018,4 +11018,70 @@ TEST(Query_IntOnly)
     CHECK_EQUAL(tv.get(1).get_key(), Key(21));
 }
 
+TEST(Query_LinksTo)
+{
+    Query q;
+    Key found_key;
+    Group group;
+
+    TableRef source = group.add_table("source");
+    TableRef target = group.add_table("target");
+
+    size_t col_link = source->add_column_link(type_Link, "link", *target);
+    size_t col_linklist = source->add_column_link(type_LinkList, "linklist", *target);
+
+    std::vector<Key> target_keys;
+    target->create_objects(10, target_keys);
+
+    std::vector<Key> source_keys;
+    source->create_objects(10, source_keys);
+
+    source->get_object(source_keys[2]).set(col_link, target_keys[2]);
+    source->get_object(source_keys[5]).set(col_link, target_keys[5]);
+    source->get_object(source_keys[9]).set(col_link, target_keys[9]);
+
+    q = source->column<Link>(col_link) == target->get_object(target_keys[2]);
+    found_key = q.find();
+    CHECK_EQUAL(found_key, source_keys[2]);
+
+    q = source->column<Link>(col_link) == target->get_object(target_keys[5]);
+    found_key = q.find();
+    CHECK_EQUAL(found_key, source_keys[5]);
+
+    q = source->column<Link>(col_link) == target->get_object(target_keys[9]);
+    found_key = q.find();
+    CHECK_EQUAL(found_key, source_keys[9]);
+
+    q = source->column<Link>(col_link) == target->get_object(target_keys[0]);
+    found_key = q.find();
+    CHECK_EQUAL(found_key, null_key);
+
+    q = source->column<Link>(col_link).is_null();
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 7);
+
+    q = source->column<Link>(col_link) != null();
+    found_key = q.find();
+    CHECK_EQUAL(found_key, source_keys[2]);
+
+    auto linklist = source->get_object(source_keys[1]).get_linklist_ptr(col_linklist);
+    linklist->add(target_keys[7]);
+    linklist = source->get_object(source_keys[2]).get_linklist_ptr(col_linklist);
+    linklist->add(target_keys[0]);
+    linklist->add(target_keys[1]);
+    linklist->add(target_keys[2]);
+    linklist = source->get_object(source_keys[8]).get_linklist_ptr(col_linklist);
+    linklist->add(target_keys[0]);
+    linklist->add(target_keys[5]);
+    linklist->add(target_keys[6]);
+
+    q = source->column<Link>(col_linklist) == target->get_object(target_keys[5]);
+    found_key = q.find();
+    CHECK_EQUAL(found_key, source_keys[8]);
+
+    q = source->column<Link>(col_linklist) != target->get_object(target_keys[7]);
+    found_key = q.find();
+    CHECK_EQUAL(found_key, source_keys[2]);
+}
+
 #endif // TEST_QUERY

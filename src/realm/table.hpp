@@ -666,8 +666,8 @@ public:
     Key find_first_binary(size_t column_ndx, BinaryData value) const;
     Key find_first_null(size_t column_ndx) const;
 
-    TableView find_all_link(size_t target_row_index);
-    ConstTableView find_all_link(size_t target_row_index) const;
+    TableView find_all_link(Key target_key);
+    ConstTableView find_all_link(Key target_key) const;
     TableView find_all_int(size_t column_ndx, int64_t value);
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
     TableView find_all_bool(size_t column_ndx, bool value);

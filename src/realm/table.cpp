@@ -3461,17 +3461,16 @@ TableView Table::find_all(size_t col_ndx, T value)
     return where().equal(col_ndx, value).find_all();
 }
 
-TableView Table::find_all_link(size_t target_row_index)
+TableView Table::find_all_link(Key target_key)
 {
-    auto target_row = get_link_target(m_link_chain[0])->get(target_row_index);
-    TableView tv = where().links_to(m_link_chain[0], target_row).find_all();
+    TableView tv = where().links_to(m_link_chain[0], target_key).find_all();
     m_link_chain.clear();
     return tv;
 }
 
-ConstTableView Table::find_all_link(size_t target_row_index) const
+ConstTableView Table::find_all_link(Key target_key) const
 {
-    return const_cast<Table*>(this)->find_all_link(target_row_index);
+    return const_cast<Table*>(this)->find_all_link(target_key);
 }
 
 TableView Table::find_all_int(size_t col_ndx, int64_t value)

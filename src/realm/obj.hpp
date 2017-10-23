@@ -55,6 +55,7 @@ public:
     {
         return m_key;
     }
+    const Table* get_table() const;
 
     template <typename U>
     U get(size_t col_ndx) const;

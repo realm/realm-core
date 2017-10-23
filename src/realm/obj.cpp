@@ -50,6 +50,11 @@ Allocator& ConstObj::get_alloc() const
     return m_tree_top->get_alloc();
 }
 
+const Table* ConstObj::get_table() const
+{
+    return m_tree_top->get_owner();
+}
+
 size_t ConstObj::get_column_index(StringData col_name) const
 {
     return m_tree_top->get_spec().get_column_index(col_name);

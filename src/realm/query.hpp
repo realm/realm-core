@@ -100,7 +100,7 @@ public:
     Query& operator=(Query&&);
 
     // Find links that point to a specific target row
-    Query& links_to(size_t column_ndx, const ConstRow& target_row);
+    Query& links_to(size_t column_ndx, Key target_key);
 
     // Conditions: null
     Query& equal(size_t column_ndx, null);

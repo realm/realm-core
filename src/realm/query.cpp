@@ -612,9 +612,9 @@ Query& Query::between(size_t column_ndx, int from, int to)
     return between(column_ndx, static_cast<int64_t>(from), static_cast<int64_t>(to));
 }
 
-Query& Query::links_to(size_t origin_column, const ConstRow& target_row)
+Query& Query::links_to(size_t origin_column, Key target_key)
 {
-    add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column, target_row)));
+    add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column, target_key)));
     return *this;
 }
 

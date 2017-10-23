@@ -176,13 +176,22 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm)
 
 void Columns<Link>::evaluate(size_t index, ValueBase& destination)
 {
+    // Destination must be of Key type. It only makes sense to
+    // compare keys with keys
+    auto d = dynamic_cast<Value<Key>*>(&destination);
+    REALM_ASSERT(d != nullptr);
     std::vector<Key> links = m_link_map.get_links(index);
-    Value<Key> v = make_value_for_link<Key>(m_link_map.only_unary_links(), links.size());
 
-    for (size_t t = 0; t < links.size(); t++) {
-        v.m_storage.set(t, links[t]);
+    if (m_link_map.only_unary_links()) {
+        Key key;
+        if (!links.empty()) {
+            key = links[0];
+        }
+        d->init(false, 1, key);
     }
-    destination.import(v);
+    else {
+        d->init(true, links);
+    }
 }
 
 void ColumnListBase::set_cluster(const Cluster* cluster)

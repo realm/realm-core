@@ -1920,8 +1920,8 @@ struct LinksToNodeHandoverPatch : public QueryNodeHandoverPatch {
 
 class LinksToNode : public ParentNode {
 public:
-    LinksToNode(size_t origin_column_index, const ConstRow& target_row)
-        : m_target_row(target_row)
+    LinksToNode(size_t origin_column_index, Key target_key)
+        : m_target_key(target_key)
     {
         m_dD = 10.0;
         m_dT = 50.0;
@@ -1931,14 +1931,20 @@ public:
     void table_changed() override
     {
         m_column_type = m_table->get_column_type(m_condition_column_idx);
-        m_column = &const_cast<Table*>(m_table.get())->get_column_link_base(m_condition_column_idx);
         REALM_ASSERT(m_column_type == type_Link || m_column_type == type_LinkList);
+    }
+
+    void cluster_changed() override
+    {
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) Array(m_table->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
     }
 
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + describe_condition() + " " +
-               metrics::print_value(m_target_row.get_index());
+        return this->describe_column() + " " + describe_condition() + " " + metrics::print_value(m_target_key);
     }
     virtual std::string describe_condition() const override
     {
@@ -1947,58 +1953,44 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        REALM_ASSERT(m_column);
-        if (!m_target_row.is_attached())
-            return not_found;
-
         if (m_column_type == type_Link) {
-            LinkColumn& cl = static_cast<LinkColumn&>(*m_column);
-            return cl.find_first(m_target_row.get_index() + 1, start,
-                                 end); // LinkColumn stores link to row N as the integer N + 1
+            // LinkColumn stores key values as the integer N + 1
+            return m_array_ptr->find_first(m_target_key.value + 1, start, end);
         }
         else if (m_column_type == type_LinkList) {
-            LinkListColumn& cll = static_cast<LinkListColumn&>(*m_column);
-
+            ArrayKey arr(m_table->get_alloc());
             for (size_t i = start; i < end; i++) {
-                LinkViewRef lv = cll.get(i);
-                if (lv->find(m_target_row.get_index()) != not_found)
-                    return i;
+                ref_type ref = m_leaf_ptr->get_as_ref(i);
+                if (ref) {
+                    arr.init_from_ref(ref);
+                    if (arr.find_first(m_target_key, 0, arr.size()) != not_found)
+                        return i;
+                }
             }
         }
 
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches*) const override
     {
-        return std::unique_ptr<ParentNode>(patches ? new LinksToNode(*this, patches) : new LinksToNode(*this));
-    }
-
-    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
-    {
-        REALM_ASSERT(patches.size());
-        std::unique_ptr<QueryNodeHandoverPatch> abstract_patch = std::move(patches.back());
-        patches.pop_back();
-
-        auto patch = dynamic_cast<LinksToNodeHandoverPatch*>(abstract_patch.get());
-        REALM_ASSERT(patch);
-
-        m_target_row.apply_and_consume_patch(patch->m_target_row, group);
-
-        ParentNode::apply_handover_patch(patches, group);
+        return std::unique_ptr<ParentNode>(new LinksToNode(*this));
     }
 
 private:
-    ConstRow m_target_row;
-    LinkColumnBase* m_column = nullptr;
-    DataType m_column_type;
+    Key m_target_key;
+    DataType m_column_type = type_Link;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(Array), alignof(Array)>::type;
+    using LeafPtr = std::unique_ptr<Array, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const Array* m_leaf_ptr = nullptr;
 
-    LinksToNode(const LinksToNode& source, QueryNodeHandoverPatches* patches)
-        : ParentNode(source, patches)
+
+    LinksToNode(const LinksToNode& source)
+        : ParentNode(source, nullptr)
+        , m_target_key(source.m_target_key)
     {
-        auto patch = std::make_unique<LinksToNodeHandoverPatch>();
-        ConstRow::generate_patch(source.m_target_row, patch->m_target_row);
-        patches->push_back(std::move(patch));
     }
 };
 
