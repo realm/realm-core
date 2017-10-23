@@ -91,18 +91,12 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <array>
 
 #include <realm/array_basic.hpp>
+#include <realm/array_key.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_binary.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/array_list.hpp>
-#include <realm/column_binary.hpp>
-#include <realm/column_fwd.hpp>
-#include <realm/column_link.hpp>
-#include <realm/column_linklist.hpp>
-#include <realm/column_string.hpp>
-#include <realm/column_string_enum.hpp>
-#include <realm/column_timestamp.hpp>
-#include <realm/column_type_traits.hpp>
+#include <realm/array_backlink.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/impl/sequential_getter.hpp>
 #include <realm/link_view.hpp>
@@ -207,25 +201,25 @@ public:
 
     virtual void aggregate_local_prepare(Action TAction, DataType col_id, bool nullable);
 
-    template <Action TAction, class TSourceColumn>
-    bool column_action_specialization(QueryStateBase* st, SequentialGetterBase* source_column, size_t r)
+    template <Action TAction, class LeafType>
+    bool column_action_specialization(QueryStateBase* st, ArrayPayload* source_column, size_t r)
     {
         // TResult: type of query result
         // TSourceValue: type of aggregate source
-        using TSourceValue = typename TSourceColumn::value_type;
-        using TResult = typename ColumnTypeTraitsSum<TSourceValue, TAction>::sum_type;
+        using TSourceValue = typename LeafType::value_type;
+        using TResult = typename AggregateResultType<TSourceValue, TAction>::result_type;
 
         // Sum of float column must accumulate in double
         static_assert(!(TAction == act_Sum &&
-                        (std::is_same<TSourceColumn, float>::value && !std::is_same<TResult, double>::value)),
+                        (std::is_same<TSourceValue, float>::value && !std::is_same<TResult, double>::value)),
                       "");
 
         TSourceValue av{};
         // uses_val test because compiler cannot see that IntegerColumn::get has no side effect and result is
         // discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != nullptr) {
-            REALM_ASSERT_DEBUG(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != nullptr);
-            av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
+            REALM_ASSERT_DEBUG(dynamic_cast<LeafType*>(source_column) != nullptr);
+            av = static_cast<LeafType*>(source_column)->get(r);
         }
         REALM_ASSERT_DEBUG(dynamic_cast<QueryState<TResult>*>(st) != nullptr);
         bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, av);
@@ -233,7 +227,7 @@ public:
     }
 
     virtual size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                                   SequentialGetterBase* source_column);
+                                   ArrayPayload* source_column);
 
 
     virtual std::string validate()
@@ -342,7 +336,7 @@ public:
     size_t m_matches = 0;
 
 protected:
-    typedef bool (ParentNode::*Column_action_specialized)(QueryStateBase*, SequentialGetterBase*, size_t);
+    typedef bool (ParentNode::*Column_action_specialized)(QueryStateBase*, ArrayPayload*, size_t);
     Column_action_specialized m_column_action_specializer = nullptr;
     ConstTableRef m_table;
     const Cluster* m_cluster = nullptr;
@@ -351,18 +345,6 @@ protected:
     ColumnType get_real_column_type(size_t ndx)
     {
         return m_table->get_real_column_type(ndx);
-    }
-
-    template <class ColType>
-    void copy_getter(SequentialGetter<ColType>& dst, size_t& dst_idx, const SequentialGetter<ColType>& src,
-                     const QueryNodeHandoverPatches* patches)
-    {
-        if (src.m_column) {
-            if (patches)
-                dst_idx = src.m_column->get_column_index();
-            else
-                dst.init(src.m_column);
-        }
     }
 
 private:
@@ -378,11 +360,11 @@ private:
 
 namespace _impl {
 
-template <class ColType>
+template <class LeafType>
 struct CostHeuristic;
 
 template <>
-struct CostHeuristic<IntegerColumn> {
+struct CostHeuristic<ArrayInteger> {
     static constexpr double dD()
     {
         return 100.0;
@@ -394,7 +376,7 @@ struct CostHeuristic<IntegerColumn> {
 };
 
 template <>
-struct CostHeuristic<IntNullColumn> {
+struct CostHeuristic<ArrayIntNull> {
     static constexpr double dD()
     {
         return 100.0;
@@ -427,18 +409,18 @@ protected:
     {
     }
 
-    template <Action TAction, class ColType>
+    template <Action TAction, class LeafType>
     bool match_callback(int64_t v)
     {
-        using TSourceValue = typename ColType::value_type;
-        using QueryStateType = typename ColumnTypeTraitsSum<TSourceValue, TAction>::sum_type;
+        using TSourceValue = typename LeafType::value_type;
+        using ResultType = typename AggregateResultType<TSourceValue, TAction>::result_type;
 
         size_t i = to_size_t(v);
         m_last_local_match = i;
         m_local_matches++;
 
-        auto state = static_cast<QueryState<QueryStateType>*>(m_state);
-        auto source_column = static_cast<SequentialGetter<ColType>*>(m_source_column);
+        auto state = static_cast<QueryState<ResultType>*>(m_state);
+        auto source_column = static_cast<LeafType*>(m_source_column);
 
         // Test remaining sub conditions of this node. m_children[0] is the node that called match_callback(), so skip
         // it
@@ -452,7 +434,7 @@ protected:
         bool b;
         if (state->template uses_val<TAction>()) { // Compiler cannot see that IntegerColumn::Get has no side effect
             // and result is discarded
-            TSourceValue av = source_column->get_next(i);
+            TSourceValue av = source_column->get(i);
             b = state->template match<TAction, false>(i, 0, av);
         }
         else {
@@ -469,36 +451,31 @@ protected:
     bool m_fastmode_disabled = false;
     Action m_action;
     QueryStateBase* m_state = nullptr;
-    SequentialGetterBase* m_source_column =
-        nullptr; // Column of values used in aggregate (act_FindAll, actReturnFirst, act_Sum, etc)
+    // Column of values used in aggregate (act_FindAll, actReturnFirst, act_Sum, etc)
+    ArrayPayload* m_source_column = nullptr;
 };
 
-template <class ColType>
+template <class LeafType>
 class IntegerNodeBase : public ColumnNodeBase {
-    using ThisType = IntegerNodeBase<ColType>;
+    using ThisType = IntegerNodeBase<LeafType>;
 
 public:
-    using TConditionValue = typename ColType::value_type;
-    static const bool nullable = ColType::nullable;
+    using TConditionValue = typename LeafType::value_type;
+    // static const bool nullable = ColType::nullable;
 
     template <class TConditionFunction, Action TAction, DataType TDataType, bool Nullable>
     bool find_callback_specialization(size_t start_in_leaf, size_t end_in_leaf)
     {
-        using AggregateColumnType = typename GetColumnType<TDataType, Nullable>::type;
-        bool cont;
-        cont = this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>(
-            m_value, start_in_leaf, end_in_leaf, start_in_leaf, nullptr,
-            std::bind(std::mem_fn(&ThisType::template match_callback<TAction, AggregateColumnType>), this,
-                      std::placeholders::_1));
-        return cont;
+        using AggregateLeafType = typename GetLeafType<TDataType, Nullable>::type;
+        auto cb = std::bind(std::mem_fn(&ThisType::template match_callback<TAction, AggregateLeafType>), this,
+                            std::placeholders::_1);
+        return this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>(
+            m_value, start_in_leaf, end_in_leaf, start_in_leaf, nullptr, cb);
     }
 
 protected:
-    using LeafType = typename ColType::LeafType;
-    using LeafInfo = typename ColType::LeafInfo;
-
     size_t aggregate_local_impl(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                                SequentialGetterBase* source_column, int c)
+                                ArrayPayload* source_column, int c)
     {
         REALM_ASSERT(m_table);
         REALM_ASSERT(m_cluster);
@@ -568,17 +545,19 @@ protected:
     {
         ColumnNodeBase::init();
 
-        m_dT = _impl::CostHeuristic<ColType>::dT();
-        m_dD = _impl::CostHeuristic<ColType>::dD();
+        m_dT = _impl::CostHeuristic<LeafType>::dT();
+        m_dD = _impl::CostHeuristic<LeafType>::dD();
     }
 
-    bool should_run_in_fastmode(SequentialGetterBase* source_column) const
+    bool should_run_in_fastmode(ArrayPayload* source_leaf) const
     {
-        return (m_children.size() == 1 &&
-                (source_column == nullptr ||
-                 (!m_fastmode_disabled &&
-                  static_cast<SequentialGetter<ColType>*>(source_column)->m_column->get_column_index() ==
-                      m_condition_column_idx)));
+        if (m_children.size() > 1 || m_fastmode_disabled)
+            return false;
+        if (source_leaf == nullptr)
+            return true;
+        // Compare leafs to see if they are the same
+        auto leaf = dynamic_cast<LeafType*>(source_leaf);
+        return leaf ? leaf->get_ref() == m_leaf_ptr->get_ref() : false;
     }
 
     // Search value:
@@ -598,10 +577,10 @@ protected:
 
 
 // FIXME: Add specialization that uses index for TConditionFunction = Equal
-template <class ColType, class TConditionFunction>
-class IntegerNode : public IntegerNodeBase<ColType> {
-    using BaseType = IntegerNodeBase<ColType>;
-    using ThisType = IntegerNode<ColType, TConditionFunction>;
+template <class LeafType, class TConditionFunction>
+class IntegerNode : public IntegerNodeBase<LeafType> {
+    using BaseType = IntegerNodeBase<LeafType>;
+    using ThisType = IntegerNode<LeafType, TConditionFunction>;
 
 public:
     static const bool special_null_node = false;
@@ -624,7 +603,7 @@ public:
     }
 
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                           SequentialGetterBase* source_column) override
+                           ArrayPayload* source_column) override
     {
         constexpr int cond = TConditionFunction::condition;
         return this->aggregate_local_impl(st, start, end, local_limit, source_column, cond);
@@ -637,8 +616,7 @@ public:
 
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + describe_condition() + " " +
-               metrics::print_value(IntegerNodeBase<ColType>::m_value);
+        return this->describe_column() + " " + describe_condition() + " " + metrics::print_value(BaseType::m_value);
     }
 
     virtual std::string describe_condition() const override
@@ -648,7 +626,7 @@ public:
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new IntegerNode<ColType, TConditionFunction>(*this, patches));
+        return std::unique_ptr<ParentNode>(new ThisType(*this, patches));
     }
 
 protected:
@@ -686,6 +664,8 @@ protected:
                 return get_specialized_callback_3<TAction, type_Float>(nullable);
             case type_Double:
                 return get_specialized_callback_3<TAction, type_Double>(nullable);
+            case type_Timestamp:
+                return get_specialized_callback_3<TAction, type_Timestamp>(nullable);
             default:
                 break;
         }
@@ -717,11 +697,10 @@ protected:
 
 
 // This node is currently used for floats and doubles only
-template <class ColType, class TConditionFunction>
+template <class LeafType, class TConditionFunction>
 class FloatDoubleNode : public ParentNode {
 public:
-    using TConditionValue = typename ColType::value_type;
-    using LeafType = typename ColumnTypeTraits<TConditionValue>::cluster_leaf_type;
+    using TConditionValue = typename LeafType::value_type;
     static const bool special_null_node = false;
 
     FloatDoubleNode(TConditionValue v, size_t column_ndx)
@@ -1131,7 +1110,6 @@ public:
         : ParentNode(from, patches)
         , m_value(from.m_value)
         , m_column_type(from.m_column_type)
-        , m_leaf_type(from.m_leaf_type)
     {
     }
 
@@ -1153,7 +1131,6 @@ protected:
     ColumnType m_column_type;
     bool m_has_search_index = false;
 
-    StringColumn::LeafType m_leaf_type;
     size_t m_end_s = 0;
     size_t m_leaf_start = 0;
     size_t m_leaf_end = 0;
@@ -1764,10 +1741,10 @@ private:
 
 
 // Compare two columns with eachother row-by-row
-template <class ColType, class TConditionFunction>
+template <class LeafType, class TConditionFunction>
 class TwoColumnsNode : public ParentNode {
 public:
-    using TConditionValue = typename ColType::value_type;
+    using TConditionValue = typename LeafType::value_type;
 
     TwoColumnsNode(size_t column1, size_t column2)
     {
@@ -1856,7 +1833,7 @@ public:
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new TwoColumnsNode<ColType, TConditionFunction>(*this, patches));
+        return std::unique_ptr<ParentNode>(new TwoColumnsNode<LeafType, TConditionFunction>(*this, patches));
     }
 
     TwoColumnsNode(const TwoColumnsNode& from, QueryNodeHandoverPatches* patches)
@@ -1877,7 +1854,6 @@ private:
     mutable size_t m_condition_column_idx1;
     mutable size_t m_condition_column_idx2;
 
-    using LeafType = typename ColType::LeafType;
     using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
     using LeafPtr = std::unique_ptr<LeafType, PlacementDelete>;
 

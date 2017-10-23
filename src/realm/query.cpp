@@ -294,10 +294,10 @@ struct MakeConditionNode {
 };
 
 template <class Cond>
-struct MakeConditionNode<IntegerNode<IntegerColumn, Cond>> {
+struct MakeConditionNode<IntegerNode<ArrayInteger, Cond>> {
     static std::unique_ptr<ParentNode> make(size_t col_ndx, int64_t value)
     {
-        return std::unique_ptr<ParentNode>{new IntegerNode<IntegerColumn, Cond>(std::move(value), col_ndx)};
+        return std::unique_ptr<ParentNode>{new IntegerNode<ArrayInteger, Cond>(std::move(value), col_ndx)};
     }
 
     template <class T>
@@ -336,17 +336,17 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, size_t colum
         case type_Bool:
         case type_OldDateTime: {
             if (is_nullable) {
-                return MakeConditionNode<IntegerNode<IntNullColumn, Cond>>::make(column_ndx, value);
+                return MakeConditionNode<IntegerNode<ArrayIntNull, Cond>>::make(column_ndx, value);
             }
             else {
-                return MakeConditionNode<IntegerNode<IntegerColumn, Cond>>::make(column_ndx, value);
+                return MakeConditionNode<IntegerNode<ArrayInteger, Cond>>::make(column_ndx, value);
             }
         }
         case type_Float: {
-            return MakeConditionNode<FloatDoubleNode<FloatColumn, Cond>>::make(column_ndx, value);
+            return MakeConditionNode<FloatDoubleNode<ArrayFloat, Cond>>::make(column_ndx, value);
         }
         case type_Double: {
-            return MakeConditionNode<FloatDoubleNode<DoubleColumn, Cond>>::make(column_ndx, value);
+            return MakeConditionNode<FloatDoubleNode<ArrayDouble, Cond>>::make(column_ndx, value);
         }
         case type_String: {
             return MakeConditionNode<StringNode<Cond>>::make(column_ndx, value);
@@ -481,93 +481,93 @@ Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
 // column vs column, integer
 Query& Query::equal_int(size_t column_ndx1, size_t column_ndx2)
 {
-    return equal<IntegerColumn>(column_ndx1, column_ndx2);
+    return equal<ArrayInteger>(column_ndx1, column_ndx2);
 }
 
 Query& Query::not_equal_int(size_t column_ndx1, size_t column_ndx2)
 {
-    return not_equal<IntegerColumn>(column_ndx1, column_ndx2);
+    return not_equal<ArrayInteger>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_int(size_t column_ndx1, size_t column_ndx2)
 {
-    return less<IntegerColumn>(column_ndx1, column_ndx2);
+    return less<ArrayInteger>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_equal_int(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater_equal<IntegerColumn>(column_ndx1, column_ndx2);
+    return greater_equal<ArrayInteger>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_equal_int(size_t column_ndx1, size_t column_ndx2)
 {
-    return less_equal<IntegerColumn>(column_ndx1, column_ndx2);
+    return less_equal<ArrayInteger>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_int(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater<IntegerColumn>(column_ndx1, column_ndx2);
+    return greater<ArrayInteger>(column_ndx1, column_ndx2);
 }
 
 
 // column vs column, float
 Query& Query::not_equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return not_equal<FloatColumn>(column_ndx1, column_ndx2);
+    return not_equal<ArrayFloat>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return less<FloatColumn>(column_ndx1, column_ndx2);
+    return less<ArrayFloat>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater<FloatColumn>(column_ndx1, column_ndx2);
+    return greater<ArrayFloat>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater_equal<FloatColumn>(column_ndx1, column_ndx2);
+    return greater_equal<ArrayFloat>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return less_equal<FloatColumn>(column_ndx1, column_ndx2);
+    return less_equal<ArrayFloat>(column_ndx1, column_ndx2);
 }
 
 Query& Query::equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return equal<FloatColumn>(column_ndx1, column_ndx2);
+    return equal<ArrayFloat>(column_ndx1, column_ndx2);
 }
 
 // column vs column, double
 Query& Query::equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return equal<DoubleColumn>(column_ndx1, column_ndx2);
+    return equal<ArrayDouble>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return less_equal<DoubleColumn>(column_ndx1, column_ndx2);
+    return less_equal<ArrayDouble>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater_equal<DoubleColumn>(column_ndx1, column_ndx2);
+    return greater_equal<ArrayDouble>(column_ndx1, column_ndx2);
 }
 Query& Query::greater_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater<DoubleColumn>(column_ndx1, column_ndx2);
+    return greater<ArrayDouble>(column_ndx1, column_ndx2);
 }
 Query& Query::less_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return less<DoubleColumn>(column_ndx1, column_ndx2);
+    return less<ArrayDouble>(column_ndx1, column_ndx2);
 }
 
 Query& Query::not_equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return not_equal<DoubleColumn>(column_ndx1, column_ndx2);
+    return not_equal<ArrayDouble>(column_ndx1, column_ndx2);
 }
 
 // null vs column
@@ -896,8 +896,7 @@ R Query::aggregate(size_t column_ndx, size_t* resultcount, Key* return_ndx) cons
                     cluster->init_leaf(column_ndx, &leaf);
                     st.m_key_offset = key_offsets;
                     st.m_key_values = cluster->get_key_array();
-                    aggregate_internal(action, ColumnTypeTraits<T>::id, false, node, &st, 0, e,
-                                       nullptr /* TODO: &leaf */);
+                    aggregate_internal(action, ColumnTypeTraits<T>::id, false, node, &st, 0, e, &leaf);
                     // Continue
                     return false;
                 });
@@ -931,8 +930,7 @@ R Query::aggregate(size_t column_ndx, size_t* resultcount, Key* return_ndx) cons
 **************************************************************************************************************/
 
 void Query::aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable, ParentNode* pn,
-                               QueryStateBase* st, size_t start, size_t end,
-                               SequentialGetterBase* source_column) const
+                               QueryStateBase* st, size_t start, size_t end, ArrayPayload* source_column) const
 {
     if (end == not_found)
         end = m_table->size();

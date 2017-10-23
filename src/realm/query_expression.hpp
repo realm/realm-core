@@ -2975,7 +2975,7 @@ public:
         }
         else {
             REALM_ASSERT(m_leaf_ptr != nullptr);
-            auto leaf = reinterpret_cast<const LeafType2*>(m_leaf_ptr); // TODO change to dynamic_cast at some point
+            auto leaf = static_cast<const LeafType2*>(m_leaf_ptr);
             // Not a Link column
             size_t colsize = leaf->size();
 
@@ -2988,7 +2988,7 @@ public:
                 // If you want to modify 'default_size' then update Array::get_chunk()
                 REALM_ASSERT_3(ValueBase::default_size, ==, 8);
 
-                auto leaf_2 = reinterpret_cast<const Array*>(leaf); // TODO change to dynamic_cast at some point
+                auto leaf_2 = static_cast<const Array*>(leaf);
                 leaf_2->get_chunk(index, v.m_storage.m_first);
 
                 destination.import(v);
@@ -3051,10 +3051,10 @@ private:
 
     // Leaf cache
     using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
-    using LeafPtr = std::unique_ptr<LeafType, PlacementDelete>;
+    using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
-    const LeafType* m_leaf_ptr = nullptr;
+    const ArrayPayload* m_leaf_ptr = nullptr;
 
     // Column index of payload column of m_table
     std::string m_column_name;

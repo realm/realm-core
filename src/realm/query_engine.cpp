@@ -65,9 +65,9 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
 {
     if (TAction == act_ReturnFirst) {
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayInteger>;
     }
     else if (TAction == act_Count) {
         // For count(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being read
@@ -76,43 +76,43 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
         if (nullable)
             REALM_ASSERT(false);
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Count, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Count, ArrayInteger>;
     }
     else if (TAction == act_Sum && col_id == type_Int) {
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayInteger>;
     }
     else if (TAction == act_Sum && col_id == type_Float) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, FloatColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayFloat>;
     }
     else if (TAction == act_Sum && col_id == type_Double) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, DoubleColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayDouble>;
     }
     else if (TAction == act_Max && col_id == type_Int) {
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayInteger>;
     }
     else if (TAction == act_Max && col_id == type_Float) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, FloatColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayFloat>;
     }
     else if (TAction == act_Max && col_id == type_Double) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, DoubleColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayDouble>;
     }
     else if (TAction == act_Min && col_id == type_Int) {
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayInteger>;
     }
     else if (TAction == act_Min && col_id == type_Float) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, FloatColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayFloat>;
     }
     else if (TAction == act_Min && col_id == type_Double) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, DoubleColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayDouble>;
     }
     else if (TAction == act_FindAll) {
         // For find_all(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being read
@@ -121,16 +121,16 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
         if (nullable)
             REALM_ASSERT(false);
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, ArrayInteger>;
     }
     else if (TAction == act_CallbackIdx) {
         // Future features where for each query match, you want to perform an action that only requires knowlege
         // about the row index, and not the payload there. Examples could be find_all(), however, this code path
         // below is for new features given in a callback method and not yet supported by core.
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayInteger>;
     }
     else {
         REALM_ASSERT(false);
@@ -138,7 +138,7 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
 }
 
 size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                                   SequentialGetterBase* source_column)
+                                   ArrayPayload* source_column)
 {
     // aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
     // integer version, because find_first_local() is relatively slower here (because it's non-integers).

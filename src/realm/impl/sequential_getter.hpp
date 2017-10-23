@@ -19,6 +19,8 @@
 #ifndef REALM_IMPL_SEQUENTIAL_GETTER_HPP
 #define REALM_IMPL_SEQUENTIAL_GETTER_HPP
 
+#include <realm/table.hpp>
+
 namespace realm {
 
 class SequentialGetterBase {
