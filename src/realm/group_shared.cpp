@@ -412,7 +412,7 @@ struct alignas(8) SharedGroup::SharedInfo {
     ///
     /// CAUTION: This member must never move or change type, as that would
     /// compromize safety of the the session initiation process.
-    std::atomic<bool> init_complete; // Offset 0
+    std::atomic<uint8_t> init_complete; // Offset 0
 
     /// The size in bytes of a mutex member of SharedInfo. This allows all
     /// session participants to be in agreement. Obviously, a size match is not
@@ -580,7 +580,7 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
 #endif
     static_assert(offsetof(SharedInfo, init_complete) == 0 &&
                   ATOMIC_BOOL_LOCK_FREE==2 &&
-                  std::is_same<decltype(init_complete), std::atomic<bool>>::value &&
+                  std::is_same<decltype(init_complete), std::atomic<uint8_t>>::value &&
                   offsetof(SharedInfo, shared_info_version) == 6 &&
                   std::is_same<decltype(shared_info_version), uint16_t>::value,
                   "Forbidden change in SharedInfo layout");
