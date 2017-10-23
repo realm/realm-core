@@ -92,6 +92,8 @@ AggregateState      State of the aggregate - contains a state variable that stor
 
 #include <realm/array_basic.hpp>
 #include <realm/array_string.hpp>
+#include <realm/array_binary.hpp>
+#include <realm/array_timestamp.hpp>
 #include <realm/column_binary.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/column_link.hpp>
@@ -344,19 +346,6 @@ protected:
     ConstTableRef m_table;
     const Cluster* m_cluster = nullptr;
     std::string error_code;
-
-    const ColumnBase& get_column_base(size_t ndx)
-    {
-        return m_table->get_column_base(ndx);
-    }
-
-    template <class ColType>
-    const ColType& get_column(size_t ndx)
-    {
-        auto& col = m_table->get_column_base(ndx);
-        REALM_ASSERT_DEBUG(dynamic_cast<const ColType*>(&col));
-        return static_cast<const ColType&>(col);
-    }
 
     ColumnType get_real_column_type(size_t ndx)
     {
@@ -967,9 +956,12 @@ public:
     {
     }
 
-    void table_changed() override
+    void cluster_changed() override
     {
-        m_condition_column = &get_column<BinaryColumn>(m_condition_column_idx);
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayBinary(m_table->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
     }
 
     void init() override
@@ -983,7 +975,7 @@ public:
     {
         TConditionFunction condition;
         for (size_t s = start; s < end; ++s) {
-            BinaryData value = m_condition_column->get(s);
+            BinaryData value = m_leaf_ptr->get(s);
             if (condition(m_value.get(), value))
                 return s;
         }
@@ -1004,15 +996,16 @@ public:
     BinaryNode(const BinaryNode& from, QueryNodeHandoverPatches* patches)
         : ParentNode(from, patches)
         , m_value(from.m_value)
-        , m_condition_column(from.m_condition_column)
     {
-        if (m_condition_column && patches)
-            m_condition_column_idx = m_condition_column->get_column_index();
     }
 
 private:
     OwnedBinaryData m_value;
-    const BinaryColumn* m_condition_column;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayBinary), alignof(ArrayBinary)>::type;
+    using LeafPtr = std::unique_ptr<ArrayBinary, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const ArrayBinary* m_leaf_ptr = nullptr;
 };
 
 
@@ -1033,9 +1026,12 @@ public:
     {
     }
 
-    void table_changed() override
+    void cluster_changed() override
     {
-        m_condition_column = &get_column<TimestampColumn>(m_condition_column_idx);
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayTimestamp(m_table->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
     }
 
     void init() override
@@ -1047,8 +1043,14 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        size_t ret = m_condition_column->find<TConditionFunction>(m_value, start, end);
-        return ret;
+        TConditionFunction condition;
+        bool m_value_is_null = m_value.is_null();
+        for (size_t s = start; s < end; ++s) {
+            Timestamp value = m_leaf_ptr->get(s);
+            if (condition(value, m_value, value.is_null(), m_value_is_null))
+                return s;
+        }
+        return not_found;
     }
 
     virtual std::string describe() const override
@@ -1065,15 +1067,16 @@ public:
     TimestampNode(const TimestampNode& from, QueryNodeHandoverPatches* patches)
         : ParentNode(from, patches)
         , m_value(from.m_value)
-        , m_condition_column(from.m_condition_column)
     {
-        if (m_condition_column && patches)
-            m_condition_column_idx = m_condition_column->get_column_index();
     }
 
 private:
     Timestamp m_value;
-    const TimestampColumn* m_condition_column;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayTimestamp), alignof(ArrayTimestamp)>::type;
+    using LeafPtr = std::unique_ptr<ArrayTimestamp, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const ArrayTimestamp* m_leaf_ptr = nullptr;
 };
 
 class StringNodeBase : public ParentNode {

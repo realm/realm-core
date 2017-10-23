@@ -5950,10 +5950,11 @@ TEST(Query_FindAllLikeCaseInsensitive)
     CHECK_EQUAL(2, tv1.get_source_ndx(2));
     CHECK_EQUAL(3, tv1.get_source_ndx(3));
 }
+#endif
 
 TEST(Query_Binary)
 {
-    TestTable t;
+    Table t;
     t.add_column(type_Int, "1");
     t.add_column(type_Binary, "2");
 
@@ -5963,15 +5964,18 @@ TEST(Query_Binary)
 
     const char bin_2[4] = {6, 6, 6, 6}; // Not occuring above
 
-    add(t, 0, BinaryData(bin + 0, 16));
-    add(t, 0, BinaryData(bin + 0, 32));
-    add(t, 0, BinaryData(bin + 0, 48));
-    add(t, 0, BinaryData(bin + 0, 64));
-    add(t, 0, BinaryData(bin + 16, 48));
-    add(t, 0, BinaryData(bin + 32, 32));
-    add(t, 0, BinaryData(bin + 48, 16));
-    add(t, 0, BinaryData(bin + 24, 16)); // The "odd ball"
-    add(t, 0, BinaryData(bin + 0, 32));  // Repeat an entry
+    std::vector<Key> keys;
+    t.create_objects(9, keys);
+
+    t.get_object(keys[0]).set_all(0, BinaryData(bin + 0, 16));
+    t.get_object(keys[1]).set_all(0, BinaryData(bin + 0, 32));
+    t.get_object(keys[2]).set_all(0, BinaryData(bin + 0, 48));
+    t.get_object(keys[3]).set_all(0, BinaryData(bin + 0, 64));
+    t.get_object(keys[4]).set_all(0, BinaryData(bin + 16, 48));
+    t.get_object(keys[5]).set_all(0, BinaryData(bin + 32, 32));
+    t.get_object(keys[6]).set_all(0, BinaryData(bin + 48, 16));
+    t.get_object(keys[7]).set_all(0, BinaryData(bin + 24, 16)); // The "odd ball"
+    t.get_object(keys[8]).set_all(0, BinaryData(bin + 0, 32));  // Repeat an entry
 
     CHECK_EQUAL(0, t.where().equal(1, BinaryData(bin + 16, 16)).count());
     CHECK_EQUAL(1, t.where().equal(1, BinaryData(bin + 0, 16)).count());
@@ -6005,8 +6009,8 @@ TEST(Query_Binary)
     {
         TableView tv = t.where().equal(1, BinaryData(bin + 0, 32)).find_all();
         if (tv.size() == 2) {
-            CHECK_EQUAL(1, tv.get_source_ndx(0));
-            CHECK_EQUAL(8, tv.get_source_ndx(1));
+            CHECK_EQUAL(keys[1], tv.get_key(0));
+            CHECK_EQUAL(keys[8], tv.get_key(1));
         }
         else
             CHECK(false);
@@ -6015,17 +6019,17 @@ TEST(Query_Binary)
     {
         TableView tv = t.where().contains(1, BinaryData(bin + 24, 16)).find_all();
         if (tv.size() == 4) {
-            CHECK_EQUAL(2, tv.get_source_ndx(0));
-            CHECK_EQUAL(3, tv.get_source_ndx(1));
-            CHECK_EQUAL(4, tv.get_source_ndx(2));
-            CHECK_EQUAL(7, tv.get_source_ndx(3));
+            CHECK_EQUAL(keys[2], tv.get_key(0));
+            CHECK_EQUAL(keys[3], tv.get_key(1));
+            CHECK_EQUAL(keys[4], tv.get_key(2));
+            CHECK_EQUAL(keys[7], tv.get_key(3));
         }
         else
             CHECK(false);
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Query_Enums)
 {
     TestTable t;
@@ -9787,123 +9791,126 @@ TEST(Query_MoveDoesntDoubleDelete)
         q2 = std::move(q1);
     }
 }
+#endif // LEGACY_TESTS
 
 TEST(Query_Timestamp)
 {
-    size_t match;
+    Key match;
+    size_t cnt;
     Table table;
-    table.add_column(type_Timestamp, "first", true);
-    table.add_column(type_Timestamp, "second", true);
-    Columns<Timestamp> first = table.column<Timestamp>(0);
-    Columns<Timestamp> second = table.column<Timestamp>(1);
+    auto col_first = table.add_column(type_Timestamp, "first", true);
+    auto col_second = table.add_column(type_Timestamp, "second", true);
+    Columns<Timestamp> first = table.column<Timestamp>(col_first);
+    Columns<Timestamp> second = table.column<Timestamp>(col_second);
 
-    table.add_empty_row(6);
-    table.set_timestamp(0, 0, Timestamp(111, 222));
-    table.set_timestamp(0, 1, Timestamp(111, 333));
-    table.set_timestamp(0, 2, Timestamp(333, 444));
-    table.set_timestamp(0, 3, Timestamp{});
-    table.set_timestamp(0, 4, Timestamp(0, 0));
-    table.set_timestamp(0, 5, Timestamp(-1000, 0));
+    std::vector<Key> keys;
+    table.create_objects(6, keys);
+    table.get_object(keys[0]).set(col_first, Timestamp(111, 222));
+    table.get_object(keys[1]).set(col_first, Timestamp(111, 333));
+    table.get_object(keys[2]).set(col_first, Timestamp(333, 444)).set(col_second, Timestamp(222, 222));
+    table.get_object(keys[3]).set(col_first, Timestamp{});
+    table.get_object(keys[4]).set(col_first, Timestamp(0, 0));
+    table.get_object(keys[5]).set(col_first, Timestamp(-1000, 0));
 
-    table.set_timestamp(1, 2, Timestamp(222, 222));
 
-    CHECK(table.get_timestamp(0, 0) == Timestamp(111, 222));
+    CHECK(table.get_object(keys[0]).get<Timestamp>(col_first) == Timestamp(111, 222));
 
     match = (first == Timestamp(111, 222)).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (first != Timestamp(111, 222)).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, keys[1]);
 
     match = (first > Timestamp(111, 222)).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, keys[1]);
 
     match = (first < Timestamp(111, 333)).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (first == Timestamp(0, 0)).find();
-    CHECK_EQUAL(match, 4);
+    CHECK_EQUAL(match, keys[4]);
 
     match = (first < Timestamp(111, 333)).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (first < Timestamp(0, 0)).find();
-    CHECK_EQUAL(match, 5);
+    CHECK_EQUAL(match, keys[5]);
 
     // Note: .count(), not find()
-    match = (first < Timestamp(0, 0)).count();
-    CHECK_EQUAL(match, 1);
+    cnt = (first < Timestamp(0, 0)).count();
+    CHECK_EQUAL(cnt, 1);
 
-    match = (first != Timestamp{}).count();
-    CHECK_EQUAL(match, 5);
+    cnt = (first != Timestamp{}).count();
+    CHECK_EQUAL(cnt, 5);
 
-    match = (first != null{}).count();
-    CHECK_EQUAL(match, 5);
+    cnt = (first != null{}).count();
+    CHECK_EQUAL(cnt, 5);
 
-    match = (first != Timestamp(0, 0)).count();
-    CHECK_EQUAL(match, 5);
+    cnt = (first != Timestamp(0, 0)).count();
+    CHECK_EQUAL(cnt, 5);
 
     match = (first < Timestamp(-100, 0)).find();
-    CHECK_EQUAL(match, 5);
+    CHECK_EQUAL(match, keys[5]);
 
     // Left-hand-side being Timestamp() constant, right being column
     match = (Timestamp(111, 222) == first).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (Timestamp{} == first).find();
-    CHECK_EQUAL(match, 3);
+    CHECK_EQUAL(match, keys[3]);
 
     match = (Timestamp(111, 222) > first).find();
-    CHECK_EQUAL(match, 4);
+    CHECK_EQUAL(match, keys[4]);
 
     match = (Timestamp(111, 333) < first).find();
-    CHECK_EQUAL(match, 2);
+    CHECK_EQUAL(match, keys[2]);
 
     match = (Timestamp(111, 222) >= first).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (Timestamp(111, 111) >= first).find();
-    CHECK_EQUAL(match, 4);
+    CHECK_EQUAL(match, keys[4]);
 
     match = (Timestamp(333, 444) <= first).find();
-    CHECK_EQUAL(match, 2);
+    CHECK_EQUAL(match, keys[2]);
 
     match = (Timestamp(111, 300) <= first).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, keys[1]);
 
     match = (Timestamp(111, 222) != first).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, keys[1]);
 
     // Compare column with self
     match = (first == first).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (first != first).find();
-    CHECK_EQUAL(match, npos);
+    CHECK_EQUAL(match, null_key);
 
     match = (first > first).find();
-    CHECK_EQUAL(match, npos);
+    CHECK_EQUAL(match, null_key);
 
     match = (first < first).find();
-    CHECK_EQUAL(match, npos);
+    CHECK_EQUAL(match, null_key);
 
     match = (first >= first).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (first <= first).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     // Two different columns
     match = (first == second).find();
-    CHECK_EQUAL(match, 3); // null == null
+    CHECK_EQUAL(match, keys[3]); // null == null
 
     match = (first > second).find();
-    CHECK_EQUAL(match, 2); // Timestamp(333, 444) > Timestamp(111, 222)
+    CHECK_EQUAL(match, keys[2]); // Timestamp(333, 444) > Timestamp(111, 222)
 
     match = (first < second).find();
-    CHECK_EQUAL(match, npos); // Note that (null < null) == false
+    CHECK_EQUAL(match, null_key); // Note that (null < null) == false
 }
 
+#ifdef LEGACY_TESTS
 TEST(Query_Timestamp_Null)
 {
     // Test that querying for null on non-nullable column (with default value being non-null value) is
