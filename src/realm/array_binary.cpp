@@ -31,7 +31,7 @@ void ArrayBinary::create()
     static_cast<ArraySmallBlobs*>(m_arr)->create();
 }
 
-void ArrayBinary::init_from_ref(ref_type ref)
+void ArrayBinary::init_from_ref(ref_type ref) noexcept
 {
     char* header = m_alloc.translate(ref);
 

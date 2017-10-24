@@ -157,6 +157,13 @@ struct TreeInsertBase {
     size_t m_split_size;
 };
 
+/// Base class for all array classes holding user data
+class ArrayPayload {
+public:
+    virtual ~ArrayPayload();
+    virtual void init_from_ref(ref_type) noexcept = 0;
+};
+
 /// Provides access to individual array nodes of the database.
 ///
 /// This class serves purely as an accessor, it assumes no ownership of the

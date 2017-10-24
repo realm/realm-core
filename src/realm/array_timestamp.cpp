@@ -42,7 +42,7 @@ void ArrayTimestamp::create()
     m_nanoseconds.init_from_parent();
 }
 
-void ArrayTimestamp::init_from_ref(ref_type ref)
+void ArrayTimestamp::init_from_ref(ref_type ref) noexcept
 {
     Array::init_from_ref(ref);
     m_seconds.init_from_parent();

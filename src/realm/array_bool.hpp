@@ -28,7 +28,7 @@ namespace realm {
 /// between the two type when adding a row and when adding a column.
 /// add, insert and getting of non-nullable values are taken care of by the
 /// respective functions in Array.
-class ArrayBool : protected Array {
+class ArrayBool : public Array, public ArrayPayload {
 public:
     using value_type = bool;
 
@@ -49,6 +49,10 @@ public:
     void create()
     {
         Array::create(type_Normal);
+    }
+    void init_from_ref(ref_type ref) noexcept override
+    {
+        Array::init_from_ref(ref);
     }
     bool is_null(size_t) const
     {

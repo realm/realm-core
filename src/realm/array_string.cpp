@@ -31,7 +31,7 @@ void ArrayString::create()
     static_cast<ArrayStringShort*>(m_arr)->create();
 }
 
-void ArrayString::init_from_ref(ref_type ref)
+void ArrayString::init_from_ref(ref_type ref) noexcept
 {
     char* header = m_alloc.translate(ref);
 

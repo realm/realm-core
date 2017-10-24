@@ -129,8 +129,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm)
     bool last = (column + 1 == m_link_column_indexes.size());
     ColumnType type = m_link_types[column];
     if (type == col_type_Link) {
-        auto keys = reinterpret_cast<const ArrayKey*>(m_leaf_ptr);
-        if (Key k = keys->get(row)) {
+        if (Key k = static_cast<const ArrayKey*>(m_leaf_ptr)->get(row)) {
             if (last)
                 lm.consume(k);
             else
@@ -138,7 +137,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm)
         }
     }
     else if (type == col_type_LinkList) {
-        if (ref_type ref = m_leaf_ptr->get_as_ref(row)) {
+        if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(row)) {
             ArrayKey arr(base_table()->get_alloc());
             arr.init_from_ref(ref);
             size_t sz = arr.size();
@@ -155,7 +154,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm)
         }
     }
     else if (type == col_type_BackLink) {
-        auto back_links = reinterpret_cast<const ArrayBacklink*>(m_leaf_ptr);
+        auto back_links = static_cast<const ArrayBacklink*>(m_leaf_ptr);
         size_t sz = back_links->get_backlink_count(row);
         for (size_t t = 0; t < sz; t++) {
             Key k = back_links->get_backlink(row, t);
@@ -202,7 +201,7 @@ void ColumnListBase::set_cluster(const Cluster* cluster)
     }
     else {
         // Create new Leaf
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) Array(m_link_map.base_table()->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayList(m_link_map.base_table()->get_alloc()));
         cluster->init_leaf(this->m_column_ndx, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }

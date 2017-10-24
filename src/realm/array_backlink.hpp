@@ -22,10 +22,9 @@
 #include <realm/cluster.hpp>
 
 namespace realm {
-class ArrayBacklink : private Array {
+class ArrayBacklink : public ArrayPayload, private Array {
 public:
     using Array::Array;
-    using Array::init_from_ref;
     using Array::set_parent;
     using Array::init_from_parent;
     using Array::update_parent;
@@ -38,6 +37,10 @@ public:
         return 0;
     }
 
+    void init_from_ref(ref_type ref) noexcept override
+    {
+        Array::init_from_ref(ref);
+    }
     void create()
     {
         Array::create(type_HasRefs);

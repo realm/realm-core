@@ -475,6 +475,7 @@ void Cluster::create()
                 do_create<ArrayDouble>(col_ndx);
                 break;
             case col_type_String:
+            case col_type_StringEnum:
                 do_create<ArrayString>(col_ndx);
                 break;
             case col_type_Binary:
@@ -565,6 +566,7 @@ void Cluster::insert_row(size_t ndx, Key k)
                 do_insert_row<ArrayDouble>(ndx, col_ndx, attr);
                 break;
             case col_type_String:
+            case col_type_StringEnum:
                 do_insert_row<ArrayString>(ndx, col_ndx, attr);
                 break;
             case col_type_Binary:
@@ -636,6 +638,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 do_move<ArrayDouble>(ndx, col_ndx, new_leaf);
                 break;
             case col_type_String:
+            case col_type_StringEnum:
                 do_move<ArrayString>(ndx, col_ndx, new_leaf);
                 break;
             case col_type_Binary:
@@ -715,6 +718,7 @@ void Cluster::insert_column(size_t col_ndx)
             do_insert_column<ArrayDouble>(col_ndx, nullable);
             break;
         case col_type_String:
+        case col_type_StringEnum:
             do_insert_column<ArrayString>(col_ndx, nullable);
             break;
         case col_type_Binary:
@@ -897,6 +901,7 @@ unsigned Cluster::erase(Key key)
                 do_erase<ArrayDouble>(ndx, col_ndx);
                 break;
             case col_type_String:
+            case col_type_StringEnum:
                 do_erase<ArrayString>(ndx, col_ndx);
                 break;
             case col_type_Binary:
@@ -931,19 +936,19 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
             switch (m_tree_top.get_spec().get_column_type(j - 1)) {
                 case col_type_Int: {
                     bool nullable = m_tree_top.get_spec().get_column_attr(j - 1).test(col_attr_Nullable);
-                    Array arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);
                     if (nullable) {
-                        auto arr_int_null = reinterpret_cast<ArrayIntNull*>(&arr);
-                        arr_int_null->init_from_ref(ref);
-                        if (arr_int_null->is_null(i)) {
+                        ArrayIntNull arr_int_null(m_alloc);
+                        arr_int_null.init_from_ref(ref);
+                        if (arr_int_null.is_null(i)) {
                             std::cout << ", null";
                         }
                         else {
-                            std::cout << ", " << arr_int_null->get(i).value();
+                            std::cout << ", " << arr_int_null.get(i).value();
                         }
                     }
                     else {
+                        Array arr(m_alloc);
                         arr.init_from_ref(ref);
                         std::cout << ", " << arr.get(i);
                     }
@@ -971,6 +976,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     std::cout << ", " << arr.get(i);
                     break;
                 }
+                case col_type_StringEnum:
                 case col_type_String: {
                     ArrayString arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);

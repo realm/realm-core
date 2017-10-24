@@ -94,6 +94,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/array_string.hpp>
 #include <realm/array_binary.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/array_list.hpp>
 #include <realm/column_binary.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/column_link.hpp>
@@ -888,7 +889,7 @@ public:
         // called after the constructor is called and that is unfortunate if
         // the object has the same address. (As in this case)
         m_array_ptr = nullptr;
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) Array(m_table->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayList(m_table->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -902,7 +903,7 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         for (size_t s = start; s < end; ++s) {
-            ref_type ref = m_leaf_ptr->get_as_ref(s);
+            ref_type ref = m_leaf_ptr->get(s);
             if (ref) {
                 ListType list(m_table->get_alloc());
                 list.init_from_ref(ref);
@@ -928,11 +929,11 @@ public:
 private:
     // Leaf cache
     using ListType = typename ColumnTypeTraits<T>::cluster_leaf_type;
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(Array), alignof(Array)>::type;
-    using LeafPtr = std::unique_ptr<Array, PlacementDelete>;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayList), alignof(ArrayList)>::type;
+    using LeafPtr = std::unique_ptr<ArrayList, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
-    const Array* m_leaf_ptr = nullptr;
+    const ArrayList* m_leaf_ptr = nullptr;
 
     int64_t m_value;
 };
@@ -1937,7 +1938,12 @@ public:
     void cluster_changed() override
     {
         m_array_ptr = nullptr;
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) Array(m_table->get_alloc()));
+        if (m_column_type == type_Link) {
+            m_array_ptr = LeafPtr(new (&m_storage.m_list) ArrayKey(m_table->get_alloc()));
+        }
+        else if (m_column_type == type_LinkList) {
+            m_array_ptr = LeafPtr(new (&m_storage.m_linklist) ArrayList(m_table->get_alloc()));
+        }
         m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -1954,14 +1960,12 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         if (m_column_type == type_Link) {
-            // LinkColumn stores key values as the integer N + 1
-            return m_array_ptr->find_first(m_target_key.value + 1, start, end);
+            return static_cast<const ArrayKey*>(m_leaf_ptr)->find_first(m_target_key, start, end);
         }
         else if (m_column_type == type_LinkList) {
             ArrayKey arr(m_table->get_alloc());
             for (size_t i = start; i < end; i++) {
-                ref_type ref = m_leaf_ptr->get_as_ref(i);
-                if (ref) {
+                if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
                     arr.init_from_ref(ref);
                     if (arr.find_first(m_target_key, 0, arr.size()) != not_found)
                         return i;
@@ -1980,11 +1984,14 @@ public:
 private:
     Key m_target_key;
     DataType m_column_type = type_Link;
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(Array), alignof(Array)>::type;
-    using LeafPtr = std::unique_ptr<Array, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
+    using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
+    union Storage {
+        typename std::aligned_storage<sizeof(ArrayKey), alignof(ArrayKey)>::type m_list;
+        typename std::aligned_storage<sizeof(ArrayList), alignof(ArrayList)>::type m_linklist;
+    };
+    Storage m_storage;
     LeafPtr m_array_ptr;
-    const Array* m_leaf_ptr = nullptr;
+    const ArrayPayload* m_leaf_ptr = nullptr;
 
 
     LinksToNode(const LinksToNode& source)

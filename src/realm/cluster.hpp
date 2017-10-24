@@ -213,8 +213,11 @@ public:
     void get(Key k, State& state) const override;
     unsigned erase(Key k) override;
 
-    template <class T>
-    void init_leaf(size_t col_ndx, T* leaf) const noexcept;
+    void init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept
+    {
+        ref_type ref = to_ref(Array::get(col_ndx + 1));
+        leaf->init_from_ref(ref);
+    }
     const Array* get_key_array() const
     {
         return &m_keys;
