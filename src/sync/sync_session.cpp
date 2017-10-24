@@ -540,11 +540,16 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::reuse_of_session_ident:
             case ProtocolError::bound_in_other_session:
             case ProtocolError::bad_message_order:
+            case ProtocolError::bad_client_version:
+            case ProtocolError::illegal_realm_path:
+            case ProtocolError::no_such_realm:
+            case ProtocolError::bad_changeset:
 #if REALM_SYNC_VER_MAJOR > 1
             case ProtocolError::bad_changeset_header_syntax:
             case ProtocolError::bad_changeset_size:
             case ProtocolError::bad_changesets:
             case ProtocolError::bad_decompression:
+            case ProtocolError::partial_sync_disabled:
 #else
             case ProtocolError::malformed_http_request:
 #endif
@@ -575,24 +580,17 @@ void SyncSession::handle_error(SyncError error)
                     user_to_invalidate->invalidate();
                 break;
             }
-            case ProtocolError::illegal_realm_path:
-            case ProtocolError::no_such_realm:
-                break;
             case ProtocolError::permission_denied: {
                 next_state = NextStateAfterError::inactive;
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::no);
                 break;
             }
-            case ProtocolError::bad_client_version:
-                break;
             case ProtocolError::bad_server_file_ident:
             case ProtocolError::bad_client_file_ident:
             case ProtocolError::bad_server_version:
             case ProtocolError::diverging_histories:
                 next_state = NextStateAfterError::inactive;
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
-                break;
-            case ProtocolError::bad_changeset:
                 break;
         }
     } else if (error_code.category() == realm::sync::client_error_category()) {
