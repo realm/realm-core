@@ -896,8 +896,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
 
         // Aggregate with criteria - goes through the nodes in the query system
         init();
-        QueryState<R> st;
-        st.init(action, nullptr, limit);
+        QueryState<R> st(action, nullptr, limit);
 
         SequentialGetter<ColType> source_column(*m_table, column_ndx);
 
@@ -1332,8 +1331,7 @@ void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit)
         }
         else {
             auto node = root_node();
-            QueryState<int64_t> st;
-            st.init(act_FindAll, &ret.m_key_values, limit);
+            QueryState<int64_t> st(act_FindAll, &ret.m_key_values, limit);
 
             m_table->traverse_clusters([&node, &st, this](const Cluster* cluster, int64_t key_offsets) {
                 size_t e = cluster->node_size();
@@ -1395,8 +1393,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     }
     else {
         auto node = root_node();
-        QueryState<int64_t> st;
-        st.init(act_Count, nullptr, limit);
+        QueryState<int64_t> st(act_Count, nullptr, limit);
 
         m_table->traverse_clusters([&node, &st, this](const Cluster* cluster, int64_t key_offsets) {
             size_t e = cluster->node_size();

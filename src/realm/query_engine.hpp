@@ -1817,7 +1817,7 @@ public:
             if (std::is_same<TConditionValue, int64_t>::value) {
                 // For int64_t we've created an array intrinsics named compare_leafs which template expands bitwidths
                 // of boths arrays to make Get faster.
-                QueryState<int64_t> qs;
+                QueryState<int64_t> qs(act_ReturnFirst);
                 bool resume = m_leaf_ptr1->template compare_leafs<TConditionFunction, act_ReturnFirst>(
                     m_leaf_ptr2, start, end, 0, &qs, CallbackDummy());
 

@@ -28,6 +28,50 @@
 
 namespace realm {
 
+enum Action {
+    act_ReturnFirst,
+    act_Sum,
+    act_Max,
+    act_Min,
+    act_Count,
+    act_FindAll,
+    act_CallIdx,
+    act_CallbackIdx,
+    act_CallbackVal,
+    act_CallbackNone,
+    act_CallbackBoth,
+    act_Average
+};
+
+class Array;
+
+class QueryStateBase {
+public:
+    size_t m_match_count;
+    size_t m_limit;
+    int64_t m_minmax_index; // used only for min/max, to save index of current min/max value
+    int64_t m_key_offset;
+    const Array* m_key_values;
+    QueryStateBase(size_t limit)
+        : m_match_count(0)
+        , m_limit(limit)
+        , m_minmax_index(-1)
+        , m_key_offset(-1)
+        , m_key_values(nullptr)
+    {
+    }
+    virtual ~QueryStateBase()
+    {
+    }
+
+private:
+    virtual void dyncast();
+};
+
+template <class>
+class QueryState;
+
+
 // Array::VTable only uses the first 4 conditions (enums) in an array of function pointers
 enum { cond_Equal, cond_NotEqual, cond_Greater, cond_Less, cond_VTABLE_FINDER_COUNT, cond_None, cond_LeftNotNull };
 
