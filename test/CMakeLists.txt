@@ -7,9 +7,13 @@ endif()
 
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
-# FIXME: Add other benchmarks
 
 set(NORMAL_TESTS
+    simulation/simulation_column.cpp
+    simulation/simulation_group.cpp
+    simulation/simulation_query_result.cpp
+    simulation/simulation_shared_group.cpp
+    simulation/simulation_table.cpp
     test_all.cpp
     test_alloc.cpp
     test_array.cpp
@@ -66,7 +70,8 @@ set(NORMAL_TESTS
     test_util_stringbuffer.cpp
     test_util_to_string.cpp
     test_util_type_list.cpp
-    test_version.cpp)
+    test_version.cpp
+) # NORMAL_TESTS
 
 if (REALM_ENABLE_ENCRYPTION)
 	list(APPEND NORMAL_TESTS test_encrypted_file_mapping.cpp)
@@ -79,12 +84,20 @@ set(LARGE_TESTS
 set(REALM_TEST_HEADERS
     fuzz_group.hpp
     pthread_test.hpp
+    simulation/simulation_column.hpp
+    simulation/simulation_group.hpp
+    simulation/simulation_query_result.hpp
+    simulation/simulation_shared_group.hpp
+    simulation/simulation_table.hpp
     test.hpp
     test_all.hpp
     test_string_types.hpp
     test_table_helper.hpp
     testsettings.hpp
 ) # REALM_TEST_HEADERS
+
+list(APPEND NORMAL_TESTS ${SIMULATION_CPP_FILES})
+list(APPEND REALM_TEST_HEADERS ${SIMULATION_HPP_FILES})
 
 set(FUZZY_TESTS fuzz_group.cpp)
 

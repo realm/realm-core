@@ -26,10 +26,12 @@
 #include <fstream>
 #include <iostream>
 
+#include "simulation/simulation_group.hpp"
 #include "util/test_path.hpp"
 
 using namespace realm;
 using namespace realm::util;
+using namespace realm::simulation;
 
 // Determines whether or not to run the shared group verify function
 // after each transaction. This will find errors earlier but is expensive.
@@ -354,6 +356,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         Group& g_r = const_cast<Group&>(sg_r.begin_read());
         std::vector<TableView> table_views;
         std::vector<TableRef> subtable_refs;
+        std::vector<SimulationGroup> groups;
 
         for (;;) {
             char instr = get_next(s) % COUNT;
