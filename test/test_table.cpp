@@ -8869,8 +8869,8 @@ TEST(Table_object_basic)
 
     // Upgrade from small to big
     char big_data[100];
-    memset(big_data, 0xa5, 10);
-    BinaryData bin_data_big(data, 100);
+    memset(big_data, 0xa5, 100);
+    BinaryData bin_data_big(big_data, 100);
     x.set(bin_col, bin_data);
     y.set(bin_col, bin_data_big);
     CHECK_EQUAL(bin_data, x.get<Binary>(bin_col));

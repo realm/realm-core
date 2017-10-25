@@ -35,7 +35,7 @@ public:
 
     static T default_value(bool nullable)
     {
-        return nullable ? null::get_null_float<T>() : 0.0;
+        return nullable ? null::get_null_float<T>() : T(0.0);
     }
 
     // Disable copying, this is not allowed.

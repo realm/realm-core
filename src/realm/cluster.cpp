@@ -51,7 +51,7 @@ public:
 
     void create() override;
     void init(MemRef mem) override;
-    bool update_from_parent(size_t old_baseline) noexcept;
+    bool update_from_parent(size_t old_baseline) noexcept override;
     MemRef ensure_writeable(Key k) override;
 
     bool is_leaf() const override
