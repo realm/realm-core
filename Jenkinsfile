@@ -69,7 +69,7 @@ jobWrapper {
                                packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
                                threadSanitizer     : doBuildInDocker('Debug', 'thread'),
                                addressSanitizer    : doBuildInDocker('Debug', 'address'),
-                               addressSanitizer    : doBuildInDocker('Debug', 'memory'),
+                               memorySanitizer     : doBuildInDocker('Debug', 'memory'),
                                coverage            : doBuildCoverage()
               ]
 
