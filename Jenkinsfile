@@ -69,6 +69,7 @@ jobWrapper {
                                packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
                                threadSanitizer     : doBuildInDocker('Debug', 'thread'),
                                addressSanitizer    : doBuildInDocker('Debug', 'address'),
+                               addressSanitizer    : doBuildInDocker('Debug', 'memory'),
                                coverage            : doBuildCoverage()
               ]
 
@@ -174,6 +175,9 @@ def doBuildInDocker(String buildType, String sanitizeMode='') {
             } else if (sanitizeMode.contains('address')) {
                 environment << 'UNITTEST_THREADS=1'
                 sanitizeFlags = '-D REALM_ASAN=ON'
+            } else if (sanitizeMode.contains('memory')) {
+                environment << 'UNITTEST_THREADS=1'
+                sanitizeFlags = '-D REALM_MSAN=ON'
             }
             withEnv(environment) {
                 buildEnv.inside {
