@@ -24,7 +24,6 @@
 #include <vector>
 
 #include "simulation_group.hpp"
-#include "simulation_table.hpp"
 
 #include <realm/version_id.hpp>
 
@@ -34,19 +33,17 @@ class Group;
 
 namespace simulation {
 
-struct SimulationGroupSnapshot {
-    SimulationGroup group;
-    realm::VersionID version;
-    size_t num_writers = 0;
-};
-
 class SimulationSharedGroup {
 public:
     SimulationSharedGroup();
     ~SimulationSharedGroup() noexcept;
+    void prune_orphaned_groups();
+    std::shared_ptr<SimulationGroup> get_group(VersionID version);
+    void add_reader(std::shared_ptr<SimulationGroup> group);
+    void begin_write_on(VersionID version);
     void verify(Group* other) const;
 private:
-    std::vector<std::shared_ptr<SimulationGroupSnapshot>> groups;
+    std::vector<std::shared_ptr<SimulationGroup>> groups;
 };
 
 } // namespace simulation

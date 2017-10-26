@@ -26,7 +26,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "simulation/simulation_group.hpp"
+#include "simulation/simulation_shared_group.hpp"
 #include "util/test_path.hpp"
 
 using namespace realm;
@@ -343,6 +343,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "Group& g_r = const_cast<Group&>(sg_r.begin_read());\n";
             *log << "std::vector<TableView> table_views;\n";
             *log << "std::vector<TableRef> subtable_refs;\n";
+            *log << "std::vector<SimulationGroup> groups;\n";
 
             *log << "\n";
         }
@@ -352,11 +353,19 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
         SharedGroup sg_r(*hist_r, SharedGroupOptions(key));
         SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+
         Group& g = const_cast<Group&>(sg_w.begin_write());
         Group& g_r = const_cast<Group&>(sg_r.begin_read());
         std::vector<TableView> table_views;
         std::vector<TableRef> subtable_refs;
-        std::vector<SimulationGroup> groups;
+        SimulationSharedGroup simulation_sg;
+
+        std::shared_ptr<SimulationGroup> simulation_reader = std::make_shared<SimulationGroup>(sg_r.get_version_of_current_transaction());
+        std::shared_ptr<SimulationGroup> simulation_writer = std::make_shared<SimulationGroup>(sg_w.get_version_of_current_transaction());
+
+        simulation_sg.add_reader(simulation_reader);
+        simulation_sg.add_reader(simulation_writer);
+        simulation_sg.begin_write_on(simulation_writer);
 
         for (;;) {
             char instr = get_next(s) % COUNT;

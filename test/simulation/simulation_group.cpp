@@ -37,3 +37,18 @@ void SimulationGroup::verify(Group* other) const
     REALM_ASSERT(other);
 }
 
+void SimulationGroup::begin_write()
+{
+    ++num_writers;
+}
+
+void SimulationGroup::end_write()
+{
+    REALM_ASSERT(num_writers != 0);
+    --num_writers;
+}
+
+realm::VersionID SimulationGroup::get_version() const
+{
+    return version_id;
+}

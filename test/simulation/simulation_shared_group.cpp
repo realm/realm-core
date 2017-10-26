@@ -31,6 +31,40 @@ SimulationSharedGroup::~SimulationSharedGroup() noexcept
 {
 }
 
+void SimulationSharedGroup::prune_orphaned_groups()
+{
+    groups.erase(std::remove_if(groups.begin(), groups.end(),
+                                    [](std::shared_ptr<SimulationGroup> snapshot) {
+                                        return bool(!snapshot);
+                                    }
+                                ), groups.end());
+}
+
+std::shared_ptr<SimulationGroup> SimulationSharedGroup::get_group(VersionID version)
+{
+    prune_orphaned_groups();
+    for (size_t i = 0; i < groups.size(); ++i) {
+        std::shared_ptr<SimulationGroup> group = groups.at(i);
+        REALM_ASSERT(group);
+        if (group->get_version() == version) {
+            return group;
+        }
+    }
+    return nullptr;
+}
+
+void SimulationSharedGroup::add_reader(std::shared_ptr<SimulationGroup> group)
+{
+    groups.push_back(group);
+}
+
+void SimulationSharedGroup::begin_write_on(VersionID version)
+{
+    std::shared_ptr<SimulationGroup> group = get_group(version);
+    REALM_ASSERT(group);
+    group->begin_write();
+}
+
 void SimulationSharedGroup::verify(Group* other) const
 {
     REALM_ASSERT(other);

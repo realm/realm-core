@@ -37,8 +37,12 @@ public:
     SimulationGroup(realm::VersionID version);
     ~SimulationGroup() noexcept;
     void verify(Group* other) const;
+    void begin_write();
+    void end_write();
+    realm::VersionID get_version() const;
 private:
     realm::VersionID version_id;
+    size_t num_writers;
     std::vector<std::string> table_names;
     std::vector<SimulationTable> tables;
 };
