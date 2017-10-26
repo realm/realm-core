@@ -100,9 +100,7 @@ void GlobalNotifier::calculate()
         auto& realm = *next.realm;
         auto& sg = Realm::Internal::get_shared_group(realm);
 
-        auto config = realm.config();
-        config.cache = false;
-        auto realm2 = Realm::make_shared_realm(config);
+        auto realm2 = Realm::make_shared_realm(realm.config());
         Realm::Internal::begin_read(*realm2, sg->get_version_of_current_transaction());
         auto& sg2 = Realm::Internal::get_shared_group(*realm2);
         Group const& g = realm2->read_group();
@@ -154,12 +152,12 @@ realm::Realm::Config GlobalNotifier::get_config(std::string const& path, util::O
     }
 
     config.path = std::move(file_path);
-    config.sync_config = std::shared_ptr<SyncConfig>(
-        new SyncConfig{m_user, m_server_base_url + path.data(), SyncSessionStopPolicy::AfterChangesUploaded,
-                       m_bind_callback, nullptr, m_transformer}
-    );
+    config.sync_config.reset(new SyncConfig{m_user, m_server_base_url + path.data(),
+                                            SyncSessionStopPolicy::AfterChangesUploaded,
+                                            m_bind_callback, nullptr, m_transformer});
     config.schema_mode = SchemaMode::Additive;
     config.cache = false;
+    config.automatic_change_notifications = false;
     return config;
 }
 
@@ -253,18 +251,14 @@ SharedRealm GlobalNotifier::ChangeNotification::get_old_realm() const
     if (const_cast<VersionID&>(m_old_version) == VersionID{})
         return nullptr;
 
-    auto config = m_realm->config();
-    config.cache = false;
-    auto old_realm = Realm::get_shared_realm(std::move(config));
+    auto old_realm = Realm::get_shared_realm(m_realm->config());
     Realm::Internal::begin_read(*old_realm, m_old_version);
     return old_realm;
 }
 
 SharedRealm GlobalNotifier::ChangeNotification::get_new_realm() const
 {
-    auto config = m_realm->config();
-    config.cache = false;
-    auto new_realm = Realm::get_shared_realm(std::move(config));
+    auto new_realm = Realm::get_shared_realm(m_realm->config());
     Realm::Internal::begin_read(*new_realm, m_new_version);
     return new_realm;
 }
