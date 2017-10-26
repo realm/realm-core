@@ -10,7 +10,6 @@ RUN apt-get update && apt-get install -y \
     g++-4.9 \
     lcov \
     libprocps4-dev \
-    libpthread-stubs0-dev \
     libssl-dev \
     ninja-build \
     pandoc \

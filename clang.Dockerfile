@@ -9,7 +9,7 @@ RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup
 # No need for the apt cache in a container
 RUN echo "Acquire::http {No-Cache=True;};" > /etc/apt/apt.conf.d/no-cache
 
-# Download the GBG key to use the LLVM repo
+# Download the GPG key to use the LLVM repo
 ADD https://apt.llvm.org/llvm-snapshot.gpg.key /tmp/llvm.key
 
 # Add the key
