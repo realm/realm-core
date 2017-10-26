@@ -165,7 +165,7 @@ def doBuildInDocker(String buildType, String sanitizeMode='') {
         node('docker') {
             getArchive()
 
-            def dockerBuildArgs = sanitizeMode == '' ? '' : '-f clang.Dockerfile'
+            def dockerBuildArgs = sanitizeMode == '' ? '' : '-f clang.Dockerfile .'
             def buildEnv = docker.build('realm-core:snapshot', dockerBuildArgs)
             def environment = environment()
             def sanitizeFlags = ''
