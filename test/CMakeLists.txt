@@ -13,12 +13,12 @@ set(NORMAL_TESTS
     test_all.cpp
     test_alloc.cpp
     test_array.cpp
-    test_array_binary.cpp
+    test_array_blobs_small.cpp
     test_array_blob.cpp
     test_array_blobs_big.cpp
     test_array_float.cpp
     test_array_integer.cpp
-    test_array_string.cpp
+    test_array_string_short.cpp
     test_array_string_long.cpp
     test_basic_utils.cpp
     test_binary_data.cpp

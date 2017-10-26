@@ -20,7 +20,7 @@
 #define REALM_COLUMN_STRING_HPP
 
 #include <memory>
-#include <realm/array_string.hpp>
+#include <realm/array_string_short.hpp>
 #include <realm/array_string_long.hpp>
 #include <realm/array_blobs_big.hpp>
 #include <realm/column.hpp>
@@ -200,7 +200,7 @@ inline size_t StringColumn::size() const noexcept
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             return leaf->size();
         }
         bool is_big = m_array->get_context_flag();
@@ -315,7 +315,7 @@ inline size_t StringColumn::get_size_from_ref(ref_type root_ref, Allocator& allo
         bool long_strings = Array::get_hasrefs_from_header(root_header);
         if (!long_strings) {
             // Small strings leaf
-            return ArrayString::get_size_from_header(root_header);
+            return ArrayStringShort::get_size_from_header(root_header);
         }
         bool is_big = Array::get_context_flag_from_header(root_header);
         if (!is_big) {

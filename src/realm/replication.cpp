@@ -576,7 +576,7 @@ public:
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(table_ndx > m_group.size())))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(name.size() >= ArrayString::max_width)))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(name.size() >= ArrayStringShort::max_width)))
             return false;
         log("group->insert_table(%1, \"%2\", false);", table_ndx, name); // Throws
         typedef _impl::GroupFriend gf;
@@ -603,7 +603,7 @@ public:
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(m_group.has_table(new_name))))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(new_name.size() >= ArrayString::max_width)))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(new_name.size() >= ArrayStringShort::max_width)))
             return false;
         log("group->rename_table(%1, \"%2\");", table_ndx, new_name); // Throws
         m_group.rename_table(table_ndx, new_name);

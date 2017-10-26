@@ -34,6 +34,12 @@ public:
     {
     }
 
+    static value_type default_value(bool)
+    {
+        return 0;
+    }
+
+
     // Disable copying, this is not allowed.
     ArrayInteger& operator=(const ArrayInteger&) = delete;
     ArrayInteger(const ArrayInteger&) = delete;
@@ -82,6 +88,11 @@ public:
     explicit ArrayIntNull(Allocator&) noexcept;
     ~ArrayIntNull() noexcept override;
 
+    static value_type default_value(bool)
+    {
+        return util::none;
+    }
+
     /// Construct an array of the specified type and size, and return just the
     /// reference to the underlying memory. All elements will be initialized to
     /// the specified value.
@@ -111,6 +122,10 @@ public:
     void erase(size_t ndx);
     void erase(size_t begin, size_t end);
     void truncate(size_t size);
+    void truncate_and_destroy_children(size_t size)
+    {
+        truncate(size);
+    }
     void clear();
     void set_all_to_zero();
 

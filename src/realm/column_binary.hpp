@@ -20,7 +20,7 @@
 #define REALM_COLUMN_BINARY_HPP
 
 #include <realm/column.hpp>
-#include <realm/array_binary.hpp>
+#include <realm/array_blobs_small.hpp>
 #include <realm/array_blobs_big.hpp>
 
 namespace realm {
@@ -192,7 +192,7 @@ inline size_t BinaryColumn::size() const noexcept
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
-            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
+            ArraySmallBlobs* leaf = static_cast<ArraySmallBlobs*>(m_array.get());
             return leaf->size();
         }
         // Big blobs root leaf
@@ -214,8 +214,8 @@ inline void BinaryColumn::update_from_parent(size_t old_baseline) noexcept
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
-            REALM_ASSERT(dynamic_cast<ArrayBinary*>(m_array.get()));
-            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
+            REALM_ASSERT(dynamic_cast<ArraySmallBlobs*>(m_array.get()));
+            ArraySmallBlobs* leaf = static_cast<ArraySmallBlobs*>(m_array.get());
             leaf->update_from_parent(old_baseline);
             return;
         }
@@ -237,7 +237,7 @@ inline BinaryData BinaryColumn::get(size_t ndx) const noexcept
         BinaryData ret;
         if (!is_big) {
             // Small blobs root leaf
-            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
+            ArraySmallBlobs* leaf = static_cast<ArraySmallBlobs*>(m_array.get());
             ret = leaf->get(ndx);
         }
         else {
@@ -258,7 +258,7 @@ inline BinaryData BinaryColumn::get(size_t ndx) const noexcept
     bool is_big = Array::get_context_flag_from_header(leaf_header);
     if (!is_big) {
         // Small blobs
-        return ArrayBinary::get(leaf_header, ndx_in_leaf, alloc);
+        return ArraySmallBlobs::get(leaf_header, ndx_in_leaf, alloc);
     }
     // Big blobs
     return ArrayBigBlobs::get(leaf_header, ndx_in_leaf, alloc);
@@ -415,7 +415,7 @@ inline size_t BinaryColumn::get_size_from_ref(ref_type root_ref, Allocator& allo
         bool is_big = Array::get_context_flag_from_header(root_header);
         if (!is_big) {
             // Small blobs leaf
-            return ArrayBinary::get_size_from_header(root_header, alloc);
+            return ArraySmallBlobs::get_size_from_header(root_header, alloc);
         }
         // Big blobs leaf
         return ArrayBigBlobs::get_size_from_header(root_header);

@@ -114,6 +114,7 @@ public:
         char* header = m_alloc.translate(ref);
         init(MemRef(header, ref, m_alloc));
     }
+
     unsigned node_size() const
     {
         return is_attached() ? unsigned(m_keys.size()) : 0;
@@ -128,6 +129,7 @@ public:
         m_keys.adjust(0, m_keys.size(), offset);
     }
 
+    virtual bool update_from_parent(size_t old_baseline) noexcept = 0;
     virtual bool is_leaf() const = 0;
     /// Number of elements in this subtree
     virtual size_t get_tree_size() const = 0;
@@ -172,6 +174,7 @@ public:
 
     void create() override;
     void init(MemRef mem) override;
+    bool update_from_parent(size_t old_baseline) noexcept override;
     bool is_writeable() const
     {
         return !Array::is_read_only();
@@ -201,6 +204,16 @@ public:
 private:
     void insert_row(size_t ndx, Key k);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
+    template <class T>
+    void do_create(size_t col_ndx);
+    template <class T>
+    void do_insert_column(size_t col_ndx, bool nullable);
+    template <class T>
+    void do_insert_row(size_t ndx, size_t col_ndx, bool nullable);
+    template <class T>
+    void do_move(size_t ndx, size_t col_ndx, Cluster* to);
+    template <class T>
+    void do_erase(size_t ndx, size_t col_ndx);
 };
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
@@ -226,13 +239,14 @@ protected:
     mutable size_t m_row_ndx;
     mutable uint64_t m_version;
     bool update_if_needed() const;
-
     void update(ConstObj other) const
     {
         m_mem = other.m_mem;
         m_row_ndx = other.m_row_ndx;
         m_version = other.m_version;
     }
+    template <class T>
+    bool do_is_null(size_t col_ndx) const;
 };
 
 class Obj : public ConstObj {
@@ -254,6 +268,8 @@ private:
     template <class Head, class... Tail>
     Obj& _set(size_t col_ndx, Head v, Tail... tail);
     void update_if_needed() const;
+    template <class T>
+    void do_set_null(size_t col_ndx);
 };
 
 class ClusterTree {
@@ -398,7 +414,21 @@ public:
 };
 
 template <>
-Obj& Obj::set<int64_t>(size_t, int64_t value, bool is_default);
+inline Optional<float> ConstObj::get<Optional<float>>(size_t col_ndx) const
+{
+    float f = get<float>(col_ndx);
+    return null::is_null_float(f) ? util::none : util::make_optional(f);
+}
+
+template <>
+inline Optional<double> ConstObj::get<Optional<double>>(size_t col_ndx) const
+{
+    double f = get<double>(col_ndx);
+    return null::is_null_float(f) ? util::none : util::make_optional(f);
+}
+
+template <>
+Obj& Obj::set(size_t, int64_t value, bool is_default);
 
 template <>
 inline Obj& Obj::set(size_t col_ndx, int value, bool is_default)

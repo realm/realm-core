@@ -592,7 +592,7 @@ private:
     /// transaction.
     Array m_top;
     ArrayInteger m_tables;
-    ArrayString m_table_names;
+    ArrayStringShort m_table_names;
 
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;

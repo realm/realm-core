@@ -344,6 +344,9 @@ public:
     {
     }
 
+    template <class T>
+    void set(const Table*, size_t col_ndx, size_t ndx, T value, _impl::Instruction variant);
+
 protected:
     Replication();
 
@@ -377,7 +380,6 @@ protected:
 
     friend class _impl::TransactReverser;
 };
-
 
 class Replication::Interrupted : public std::exception {
 public:
@@ -470,6 +472,45 @@ inline void Replication::clear_interrupt() noexcept
 inline bool Replication::is_sync_agent() const noexcept
 {
     return false;
+}
+
+template <>
+inline void Replication::set(const Table* table, size_t col_ndx, size_t ndx, StringData value,
+                             _impl::Instruction variant)
+{
+    set_string(table, col_ndx, ndx, value, variant);
+}
+
+template <>
+inline void Replication::set(const Table* table, size_t col_ndx, size_t ndx, BinaryData value,
+                             _impl::Instruction variant)
+{
+    set_binary(table, col_ndx, ndx, value, variant);
+}
+
+template <>
+inline void Replication::set(const Table* table, size_t col_ndx, size_t ndx, Timestamp value,
+                             _impl::Instruction variant)
+{
+    set_timestamp(table, col_ndx, ndx, value, variant);
+}
+
+template <>
+inline void Replication::set(const Table* table, size_t col_ndx, size_t ndx, bool value, _impl::Instruction variant)
+{
+    set_bool(table, col_ndx, ndx, value, variant);
+}
+
+template <>
+inline void Replication::set(const Table* table, size_t col_ndx, size_t ndx, float value, _impl::Instruction variant)
+{
+    set_float(table, col_ndx, ndx, value, variant);
+}
+
+template <>
+inline void Replication::set(const Table* table, size_t col_ndx, size_t ndx, double value, _impl::Instruction variant)
+{
+    set_double(table, col_ndx, ndx, value, variant);
 }
 
 inline TrivialReplication::TrivialReplication(const std::string& database_file)

@@ -4,10 +4,13 @@ set(REALM_SOURCES
     array.cpp
     array_binary.cpp
     array_blob.cpp
+    array_blobs_small.cpp
     array_blobs_big.cpp
     array_integer.cpp
     array_string.cpp
+    array_string_short.cpp
     array_string_long.cpp
+    array_timestamp.cpp
     bptree.cpp
     cluster.cpp
     column.cpp
@@ -69,11 +72,15 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_basic_tpl.hpp
     array_binary.hpp
     array_blob.hpp
+    array_blobs_small.hpp
     array_blobs_big.hpp
     array_direct.hpp
     array_integer.hpp
+    array_bool.hpp
     array_string.hpp
+    array_string_short.hpp
     array_string_long.hpp
+    array_timestamp.hpp
     binary_data.hpp
     bptree.hpp
     column.hpp

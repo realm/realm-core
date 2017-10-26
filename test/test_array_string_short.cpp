@@ -19,7 +19,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_STRING
 
-#include <realm/array_string.hpp>
+#include <realm/array_string_short.hpp>
 #include <realm/column.hpp>
 
 #include "test.hpp"
@@ -60,7 +60,7 @@ using namespace realm::test_util;
 
 TEST(ArrayString_Basic)
 {
-    ArrayString c(Allocator::get_default());
+    ArrayStringShort c(Allocator::get_default());
     c.create();
 
     // TEST(ArrayString_MultiEmpty)
@@ -520,7 +520,7 @@ TEST(ArrayString_Basic)
 TEST(ArrayString_Null)
 {
     {
-        ArrayString a(Allocator::get_default(), true);
+        ArrayStringShort a(Allocator::get_default(), true);
         a.create();
 
         a.add("");
@@ -531,7 +531,7 @@ TEST(ArrayString_Null)
     }
 
     {
-        ArrayString a(Allocator::get_default(), true);
+        ArrayStringShort a(Allocator::get_default(), true);
         a.create();
 
         a.add("foo");
@@ -555,7 +555,7 @@ TEST(ArrayString_Null)
     }
 
     {
-        ArrayString a(Allocator::get_default(), true);
+        ArrayStringShort a(Allocator::get_default(), true);
         a.create();
 
         a.add(realm::null());
@@ -583,7 +583,7 @@ TEST(ArrayString_Null)
     }
 
     {
-        ArrayString a(Allocator::get_default(), true);
+        ArrayStringShort a(Allocator::get_default(), true);
         a.create();
 
         a.add("");
@@ -608,13 +608,13 @@ TEST(ArrayString_Null)
     Random random(random_int<unsigned long>());
 
     for (size_t t = 0; t < 50; t++) {
-        ArrayString a(Allocator::get_default(), true);
+        ArrayStringShort a(Allocator::get_default(), true);
         a.create();
 
-        // vector that is kept in sync with the ArrayString so that we can compare with it
+        // vector that is kept in sync with the ArrayStringShort so that we can compare with it
         std::vector<std::string> v;
 
-        // ArrayString capacity starts at 128 bytes, so we need lots of elements
+        // ArrayStringShort capacity starts at 128 bytes, so we need lots of elements
         // to test if relocation works
         for (size_t i = 0; i < 100; i++) {
             unsigned char rnd = static_cast<unsigned char>(
@@ -677,7 +677,7 @@ TEST(ArrayString_Null)
 
 TEST(ArrayString_Compare)
 {
-    ArrayString a(Allocator::get_default()), b(Allocator::get_default());
+    ArrayStringShort a(Allocator::get_default()), b(Allocator::get_default());
     a.create();
     b.create();
 
@@ -697,7 +697,7 @@ TEST(ArrayString_Compare)
 TEST(ArrayString_Null2)
 {
     {
-        ArrayString a(Allocator::get_default()), b(Allocator::get_default(), false);
+        ArrayStringShort a(Allocator::get_default()), b(Allocator::get_default(), false);
         a.create();
         b.create();
 
@@ -719,7 +719,7 @@ TEST(ArrayString_Null2)
 
     // Same as above test, but for a nullable column
     {
-        ArrayString a(Allocator::get_default()), b(Allocator::get_default(), true);
+        ArrayStringShort a(Allocator::get_default()), b(Allocator::get_default(), true);
         a.create();
         b.create();
 
@@ -738,7 +738,7 @@ TEST(ArrayString_Null2)
     }
 
     {
-        ArrayString a(Allocator::get_default()), b(Allocator::get_default(), false);
+        ArrayStringShort a(Allocator::get_default()), b(Allocator::get_default(), false);
         a.create();
         b.create();
 

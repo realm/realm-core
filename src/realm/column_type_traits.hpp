@@ -26,10 +26,17 @@
 
 namespace realm {
 
+class Timestamp;
 class OldDateTime;
+class ArraySmallBlobs;
+class ArrayString;
+class ArrayStringShort;
 class ArrayBinary;
+class ArrayTimestamp;
 class ArrayInteger;
 class ArrayIntNull;
+class ArrayBool;
+class ArrayBoolNull;
 template <class>
 class BasicArray;
 
@@ -40,6 +47,7 @@ template <>
 struct ColumnTypeTraits<int64_t> {
     using column_type = Column<int64_t>;
     using leaf_type = ArrayInteger;
+    using cluster_leaf_type = ArrayInteger;
     using sum_type = int64_t;
     using minmax_type = int64_t;
     static const DataType id = type_Int;
@@ -51,6 +59,7 @@ template <>
 struct ColumnTypeTraits<util::Optional<int64_t>> {
     using column_type = Column<util::Optional<int64_t>>;
     using leaf_type = ArrayIntNull;
+    using cluster_leaf_type = ArrayIntNull;
     using sum_type = int64_t;
     using minmax_type = int64_t;
     static const DataType id = type_Int;
@@ -60,12 +69,14 @@ struct ColumnTypeTraits<util::Optional<int64_t>> {
 
 template <>
 struct ColumnTypeTraits<bool> : ColumnTypeTraits<int64_t> {
+    using cluster_leaf_type = ArrayBool;
     static const DataType id = type_Bool;
     static const ColumnType column_id = col_type_Bool;
 };
 
 template <>
 struct ColumnTypeTraits<util::Optional<bool>> : ColumnTypeTraits<util::Optional<int64_t>> {
+    using cluster_leaf_type = ArrayBoolNull;
     static const DataType id = type_Bool;
     static const ColumnType column_id = col_type_Bool;
 };
@@ -74,6 +85,7 @@ template <>
 struct ColumnTypeTraits<float> {
     using column_type = FloatColumn;
     using leaf_type = BasicArray<float>;
+    using cluster_leaf_type = BasicArray<float>;
     using sum_type = double;
     using minmax_type = float;
     static const DataType id = type_Float;
@@ -85,11 +97,20 @@ template <>
 struct ColumnTypeTraits<double> {
     using column_type = DoubleColumn;
     using leaf_type = BasicArray<double>;
+    using cluster_leaf_type = BasicArray<double>;
     using sum_type = double;
     using minmax_type = double;
     static const DataType id = type_Double;
     static const ColumnType column_id = col_type_Double;
     static const ColumnType real_column_type = col_type_Double;
+};
+
+template <>
+
+struct ColumnTypeTraits<Timestamp> {
+    using cluster_leaf_type = ArrayTimestamp;
+    static const DataType id = type_Timestamp;
+    static const ColumnType column_id = col_type_Timestamp;
 };
 
 template <>
@@ -106,6 +127,7 @@ struct ColumnTypeTraits<util::Optional<OldDateTime>> : ColumnTypeTraits<util::Op
 
 template <>
 struct ColumnTypeTraits<StringData> {
+    using cluster_leaf_type = ArrayString;
     static const DataType id = type_String;
     static const ColumnType column_id = col_type_String;
 };
@@ -113,7 +135,8 @@ struct ColumnTypeTraits<StringData> {
 template <>
 struct ColumnTypeTraits<BinaryData> {
     using column_type = BinaryColumn;
-    using leaf_type = ArrayBinary;
+    using leaf_type = ArraySmallBlobs;
+    using cluster_leaf_type = ArrayBinary;
     static const DataType id = type_Binary;
     static const ColumnType column_id = col_type_Binary;
     static const ColumnType real_column_type = col_type_Binary;

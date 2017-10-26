@@ -8749,28 +8749,153 @@ TEST(Table_KeyRow)
 TEST(Table_object_basic)
 {
     Table table;
-    table.add_column(type_Int, "int1");
-    table.add_column(type_Int, "int2", true);
+    auto int_col = table.add_column(type_Int, "int");
+    auto intnull_col = table.add_column(type_Int, "intnull", true);
 
-    table.create_object(Key(5)).set_all(5, 7);
+    char data[10];
+    memset(data, 0x5a, 10);
+    BinaryData bin_data(data, 10);
+    BinaryData bin_zero(data, 0);
+
+    table.create_object(Key(5)).set_all(100, 7);
     CHECK_EQUAL(table.size(), 1);
     CHECK_THROW(table.create_object(Key(5)), InvalidKey);
     CHECK_EQUAL(table.size(), 1);
     table.create_object(Key(2));
-    Obj x = table.create_object(Key(7)).set(0, 100);
+    Obj x = table.create_object(Key(7));
     table.create_object(Key(8));
     table.create_object(Key(10));
     table.create_object(Key(6));
 
     Obj y = table.get_object(Key(5));
-    CHECK(!y.is_null(1));
-    CHECK_EQUAL(y.get<util::Optional<int64_t>>(1), 7);
-    CHECK_EQUAL(x.get<int64_t>(0), 100);
-    y.set_null(1);
-    CHECK(y.is_null(1));
 
+    // Int
+    CHECK(!x.is_null(int_col));
+    CHECK_EQUAL(0, x.get<int64_t>(int_col));
+    CHECK(x.is_null(intnull_col));
+
+    CHECK_EQUAL(100, y.get<int64_t>(int_col));
+    CHECK(!y.is_null(intnull_col));
+    CHECK_EQUAL(7, y.get<util::Optional<int64_t>>(intnull_col));
+    y.set_null(intnull_col);
+    CHECK(y.is_null(intnull_col));
+
+    // Boolean
+    auto bool_col = table.add_column(type_Bool, "bool");
+    auto boolnull_col = table.add_column(type_Bool, "boolnull", true);
+    y.set(bool_col, true);
+    y.set(boolnull_col, false);
+
+    CHECK(!x.is_null(bool_col));
+    CHECK_EQUAL(false, x.get<Bool>(bool_col));
+    CHECK(x.is_null(boolnull_col));
+
+    CHECK_EQUAL(true, y.get<Bool>(bool_col));
+    CHECK(!y.is_null(boolnull_col));
+    auto bool_val = y.get<util::Optional<Bool>>(boolnull_col);
+    CHECK_EQUAL(true, bool(bool_val));
+    CHECK_EQUAL(false, *bool_val);
+    y.set_null(boolnull_col);
+    CHECK(y.is_null(boolnull_col));
+
+    // Float
+    auto float_col = table.add_column(type_Float, "float");
+    auto floatnull_col = table.add_column(type_Float, "floatnull", true);
+    y.set(float_col, 2.7182818f);
+    y.set(floatnull_col, 3.1415927f);
+
+    CHECK(!x.is_null(float_col));
+    CHECK_EQUAL(0.0f, x.get<Float>(float_col));
+    CHECK(x.is_null(floatnull_col));
+
+    CHECK_EQUAL(2.7182818f, y.get<Float>(float_col));
+    CHECK(!y.is_null(floatnull_col));
+    CHECK_EQUAL(3.1415927f, y.get<util::Optional<Float>>(floatnull_col));
+    y.set_null(floatnull_col);
+    CHECK(y.is_null(floatnull_col));
+
+    // Double
+    auto double_col = table.add_column(type_Double, "double");
+    auto doublenull_col = table.add_column(type_Double, "doublenull", true);
+    y.set(double_col, 2.718281828459045);
+    y.set(doublenull_col, 3.141592653589793);
+
+    CHECK(!x.is_null(double_col));
+    CHECK_EQUAL(0.0f, x.get<Double>(double_col));
+    CHECK(x.is_null(doublenull_col));
+
+    CHECK_EQUAL(2.718281828459045, y.get<Double>(double_col));
+    CHECK(!y.is_null(doublenull_col));
+    CHECK_EQUAL(3.141592653589793, y.get<util::Optional<Double>>(doublenull_col));
+    y.set_null(doublenull_col);
+    CHECK(y.is_null(doublenull_col));
+
+    // String
+    auto str_col = table.add_column(type_String, "str");
+    auto strnull_col = table.add_column(type_String, "strnull", true);
+    y.set(str_col, "Hello");
+    y.set(strnull_col, "World");
+
+    CHECK(!x.is_null(str_col));
+    CHECK_EQUAL("", x.get<String>(str_col));
+    CHECK(x.is_null(strnull_col));
+
+    CHECK_EQUAL("Hello", y.get<String>(str_col));
+    CHECK(!y.is_null(strnull_col));
+    CHECK_EQUAL("World", y.get<String>(strnull_col));
+    y.set_null(strnull_col);
+    CHECK(y.is_null(strnull_col));
+
+    // Upgrade to medium leaf
+    y.set(str_col, "This is a fine day");
+    CHECK_EQUAL("This is a fine day", y.get<String>(str_col));
+    CHECK(!y.is_null(str_col));
+
+    // Binary
+    auto bin_col = table.add_column(type_Binary, "bin");
+    auto binnull_col = table.add_column(type_Binary, "binnull", true);
+    y.set(bin_col, bin_data);
+    y.set(binnull_col, bin_data);
+
+    CHECK(!x.is_null(bin_col));
+    CHECK_EQUAL(bin_zero, x.get<Binary>(bin_col));
+    CHECK(x.is_null(binnull_col));
+
+    CHECK_EQUAL(bin_data, y.get<Binary>(bin_col));
+    CHECK(!y.is_null(binnull_col));
+    CHECK_EQUAL(bin_data, y.get<Binary>(binnull_col));
+    y.set_null(binnull_col);
+    CHECK(y.is_null(binnull_col));
+
+    // Upgrade from small to big
+    char big_data[100];
+    memset(big_data, 0xa5, 100);
+    BinaryData bin_data_big(big_data, 100);
+    x.set(bin_col, bin_data);
+    y.set(bin_col, bin_data_big);
+    CHECK_EQUAL(bin_data, x.get<Binary>(bin_col));
+    CHECK_EQUAL(bin_data_big, y.get<Binary>(bin_col));
+    CHECK(!y.is_null(bin_col));
+
+    // Timestamp
+    auto ts_col = table.add_column(type_Timestamp, "ts");
+    auto tsnull_col = table.add_column(type_Timestamp, "tsnull", true);
+    y.set(ts_col, Timestamp(123, 456));
+    y.set(tsnull_col, Timestamp(789, 10));
+
+    CHECK(!x.is_null(ts_col));
+    CHECK_EQUAL(Timestamp(0, 0), x.get<Timestamp>(ts_col));
+    CHECK(x.is_null(tsnull_col));
+
+    CHECK_EQUAL(Timestamp(123, 456), y.get<Timestamp>(ts_col));
+    CHECK(!y.is_null(tsnull_col));
+    CHECK_EQUAL(Timestamp(789, 10), y.get<Timestamp>(tsnull_col));
+    y.set_null(binnull_col);
+    CHECK(y.is_null(binnull_col));
+
+    // Check that accessing a removed object will throw
     table.remove_object(Key(5));
-    CHECK_THROW(y.get<int64_t>(1), InvalidKey);
+    CHECK_THROW(y.get<int64_t>(intnull_col), InvalidKey);
 
     CHECK(table.get_object(Key(8)).is_null(1));
 

@@ -28,7 +28,7 @@
 #include <realm/column_string.hpp>
 #include <realm/column_string_enum.hpp>
 #include <realm/column_mixed.hpp>
-#include <realm/array_binary.hpp>
+#include <realm/array_blobs_small.hpp>
 #include <realm/array_string_long.hpp>
 
 #include "../util/timer.hpp"
