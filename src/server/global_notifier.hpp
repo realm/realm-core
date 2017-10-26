@@ -20,7 +20,6 @@
 #define REALM_OBJECT_STORE_GLOBAL_NOTIFIER_HPP
 
 #include "admin_realm.hpp"
-#include "results.hpp"
 #include "shared_realm.hpp"
 #include "sync/sync_config.hpp"
 
@@ -112,7 +111,7 @@ public:
         friend class GlobalNotifier;
     };
 
-    realm::Realm::Config get_config(std::string path, util::Optional<Schema> schema = util::none);
+    realm::Realm::Config get_config(std::string const& path, util::Optional<Schema> schema = util::none);
 
 private:
     GlobalNotifier(std::unique_ptr<Callback>, std::string local_root_dir,

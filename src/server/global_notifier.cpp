@@ -21,7 +21,6 @@
 #include "impl/realm_coordinator.hpp"
 #include "impl/transact_log_handler.hpp"
 #include "object_store.hpp"
-#include "results.hpp"
 #include "object_schema.hpp"
 #include "util/event_loop_signal.hpp"
 
@@ -31,10 +30,7 @@
 #include "sync/sync_session.hpp"
 
 #include <realm/util/file.hpp>
-#include <realm/util/uri.hpp>
-#include <realm/lang_bind_helper.hpp>
 
-#include <regex>
 #include <utility>
 #include <stdexcept>
 #include <vector>
@@ -127,11 +123,8 @@ void GlobalNotifier::calculate()
                     }
                 }
             }
-            if (changes.empty()) // && !realm.read_group().is_empty())
+            if (changes.empty())
                 continue; // nothing to notify about
-        }
-        else {
-            //LangBindHelper::advance_read(sg2, next.target_version);
         }
 
         std::lock_guard<std::mutex> l2(m_deliver_queue_mutex);
@@ -146,25 +139,21 @@ void GlobalNotifier::calculate()
     }
 }
 
-realm::Realm::Config GlobalNotifier::get_config(std::string path, util::Optional<Schema> schema) {
+realm::Realm::Config GlobalNotifier::get_config(std::string const& path, util::Optional<Schema> schema) {
     Realm::Config config;
     if (schema) {
-        config.schema = schema;
+        config.schema = std::move(schema);
         config.schema_version = 0;
     }
 
-    char *path_str = strdup(path.c_str());
-    char *tok = strtok(path_str, "/");
-    std::string file_path = m_regular_realms_dir;
-    while (tok != NULL) {
-        util::try_make_dir(file_path);\
-        file_path += "/";
-        file_path += tok;
-        tok = strtok(NULL, "/");
+    std::string file_path = m_regular_realms_dir + path + ".realm";
+    for (size_t pos = m_regular_realms_dir.size(); pos != file_path.npos; pos = file_path.find('/', pos + 1)) {
+        file_path[pos] = '\0';
+        util::try_make_dir(file_path);
+        file_path[pos] = '/';
     }
-    free(path_str);
 
-    config.path = file_path + ".realm";
+    config.path = std::move(file_path);
     config.sync_config = std::shared_ptr<SyncConfig>(
         new SyncConfig{m_user, m_server_base_url + path.data(), SyncSessionStopPolicy::AfterChangesUploaded,
                        m_bind_callback, nullptr, m_transformer}
