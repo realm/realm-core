@@ -12,7 +12,6 @@ set(NORMAL_TESTS
     simulation/simulation_column.cpp
     simulation/simulation_group.cpp
     simulation/simulation_query_result.cpp
-    simulation/simulation_shared_group.cpp
     simulation/simulation_table.cpp
     test_all.cpp
     test_alloc.cpp
@@ -87,7 +86,6 @@ set(REALM_TEST_HEADERS
     simulation/simulation_column.hpp
     simulation/simulation_group.hpp
     simulation/simulation_query_result.hpp
-    simulation/simulation_shared_group.hpp
     simulation/simulation_table.hpp
     test.hpp
     test_all.hpp
