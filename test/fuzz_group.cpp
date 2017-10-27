@@ -26,7 +26,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "simulation/simulation_shared_group.hpp"
+#include "simulation/simulation_group.hpp"
 #include "util/test_path.hpp"
 
 using namespace realm;
@@ -66,6 +66,7 @@ enum INS {
     ADD_TABLE,
     INSERT_TABLE,
     REMOVE_TABLE,
+    RENAME_TABLE,
     INSERT_ROW,
     ADD_EMPTY_ROW,
     ADD_ROW_WITH_KEY,
@@ -405,6 +406,19 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     simulation_writer->remove_table(table_ndx);
                 }
                 catch (const CrossTableLinkTarget&) {
+                }
+            }
+            else if (instr == RENAME_TABLE && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                std::string name = create_table_name(s);
+                if (log) {
+                    *log << "try { g.rename_table(" << table_ndx << ", \"" << name << "\"); } catch (const CrossTableLinkTarget&) { }\n";
+                }
+                try {
+                    g.rename_table(table_ndx, name);
+                    simulation_writer->rename_table(table_ndx, name);
+                }
+                catch (const TableNameInUse&) {
                 }
             }
             else if (instr == CLEAR_TABLE && g.size() > 0) {
