@@ -718,7 +718,7 @@ void SyncSession::create_sync_session()
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
-    m_session = std::make_unique<sync::Session>(m_client.client, m_realm_path, session_config);
+    m_session = m_client.make_session(m_realm_path, std::move(session_config));
 
     // The next time we get a token, call `bind()` instead of `refresh()`.
     m_session_has_been_bound = false;
