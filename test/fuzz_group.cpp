@@ -358,16 +358,15 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         Group& g_r = const_cast<Group&>(sg_r.begin_read());
         std::vector<TableView> table_views;
         std::vector<TableRef> subtable_refs;
-        SimulationSharedGroup simulation_sg;
 
         std::shared_ptr<SimulationGroup> simulation_reader = std::make_shared<SimulationGroup>(sg_r.get_version_of_current_transaction());
         std::shared_ptr<SimulationGroup> simulation_writer = std::make_shared<SimulationGroup>(sg_w.get_version_of_current_transaction());
-
-        simulation_sg.add_reader(simulation_reader);
-        simulation_sg.add_reader(simulation_writer);
-        simulation_sg.begin_write_on(simulation_writer);
+        std::shared_ptr<SimulationGroup> simulation_writer_previous = simulation_reader;
 
         for (;;) {
+            simulation_reader->verify(g_r);
+            simulation_writer->verify(g);
+
             char instr = get_next(s) % COUNT;
 
             if (instr == ADD_TABLE && g.size() < max_tables) {
@@ -377,6 +376,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 try {
                     g.add_table(name);
+                    simulation_writer->add_table(name);
                 }
                 catch (const TableNameInUse&) {
                 }
@@ -390,6 +390,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 try {
                     g.insert_table(table_ndx, name);
+                    simulation_writer->add_table(name, table_ndx);
                 }
                 catch (const TableNameInUse&) {
                 }
@@ -401,6 +402,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 try {
                     g.remove_table(table_ndx);
+                    simulation_writer->remove_table(table_ndx);
                 }
                 catch (const CrossTableLinkTarget&) {
                 }
@@ -420,6 +422,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "g.move_table(" << from_ndx << ", " << to_ndx << ");\n";
                     }
                     g.move_table(from_ndx, to_ndx);
+                    simulation_writer->move_table(from_ndx, to_ndx);
                 }
             }
             else if (instr == INSERT_ROW && g.size() > 0) {
@@ -952,6 +955,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 LangBindHelper::promote_to_write(sg_w);
                 REALM_DO_IF_VERIFY(log, g.verify());
+                simulation_writer->commit_version(sg_w.get_version_of_current_transaction());
+                simulation_writer_previous = simulation_writer;
+                simulation_writer = std::make_shared<SimulationGroup>(*simulation_writer_previous); // deep copy
             }
             else if (instr == ROLLBACK) {
                 if (log) {
@@ -964,6 +970,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 LangBindHelper::promote_to_write(sg_w);
                 REALM_DO_IF_VERIFY(log, g.verify());
+                simulation_writer = simulation_writer_previous;
+                simulation_writer = std::make_shared<SimulationGroup>(*simulation_writer_previous); // deep copy
             }
             else if (instr == ADVANCE) {
                 if (log) {
@@ -971,6 +979,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 LangBindHelper::advance_read(sg_r);
                 REALM_DO_IF_VERIFY(log, g_r.verify());
+                simulation_reader = simulation_writer_previous;
             }
             else if (instr == CLOSE_AND_REOPEN) {
                 bool read_group = get_next(s) % 2 == 0;
@@ -988,6 +997,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     sg_r.begin_read();
                     REALM_DO_IF_VERIFY(log, g_r.verify());
+                    simulation_reader = simulation_writer_previous;
                 }
                 else {
                     if (log) {
@@ -1003,6 +1013,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     sg_w.begin_write();
                     REALM_DO_IF_VERIFY(log, g.verify());
+                    // this is essentially a rollback since changes are not committed
+                    simulation_writer = simulation_writer_previous;
+                    simulation_writer = std::make_shared<SimulationGroup>(*simulation_writer_previous); // deep copy
                 }
             }
             else if (instr == GET_ALL_COLUMN_NAMES && g.size() > 0) {
@@ -1069,6 +1082,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 sg_r.begin_read();
                 REALM_DO_IF_VERIFY(log, g_r.verify());
+                simulation_writer->commit_version(sg_w.get_version_of_current_transaction());
+                simulation_writer_previous = simulation_writer;
+                simulation_writer = std::make_shared<SimulationGroup>(*simulation_writer_previous); // deep copy
+
+                simulation_reader = simulation_writer_previous;
             }
             else if (instr == SET_UNIQUE && g.size() > 0) {
                 std::pair<size_t, size_t> target = get_target_for_set_unique(g, s);

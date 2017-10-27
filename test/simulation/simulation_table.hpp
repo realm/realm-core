@@ -19,6 +19,7 @@
 #ifndef REALM_SIMULATION_TABLE_HPP
 #define REALM_SIMULATION_TABLE_HPP
 
+#include <string>
 #include <vector>
 
 #include "simulation_column.hpp"
@@ -29,10 +30,14 @@ namespace simulation {
 
 class SimulationTable {
 public:
-    SimulationTable();
+    SimulationTable(std::string table_name);
     ~SimulationTable() noexcept;
+
+    std::string get_name() const;
+    void set_name(std::string table_name);
 private:
     std::vector<SimulationColumn> columns;
+    std::string name;
 };
 
 } // namespace simulation

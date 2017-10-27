@@ -21,7 +21,8 @@
 using namespace realm;
 using namespace realm::simulation;
 
-SimulationTable::SimulationTable()
+SimulationTable::SimulationTable(std::string table_name)
+: name(table_name)
 {
 }
 
@@ -29,3 +30,12 @@ SimulationTable::~SimulationTable() noexcept
 {
 }
 
+std::string SimulationTable::get_name() const
+{
+    return name;
+}
+
+void SimulationTable::set_name(std::string table_name)
+{
+    name = table_name;
+}

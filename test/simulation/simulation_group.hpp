@@ -36,14 +36,17 @@ class SimulationGroup {
 public:
     SimulationGroup(realm::VersionID version);
     ~SimulationGroup() noexcept;
-    void verify(Group* other) const;
-    void begin_write();
-    void end_write();
+    void verify(const Group& other) const;
     realm::VersionID get_version() const;
+    void commit_version(realm::VersionID new_version);
+    void add_table(std::string name, size_t ndx = -1);
+    void remove_table(size_t ndx);
+    void move_table(size_t from, size_t to);
+    void rename_table(size_t ndx, std::string name);
+    std::string get_table_name(size_t ndx);
+
 private:
     realm::VersionID version_id;
-    size_t num_writers;
-    std::vector<std::string> table_names;
     std::vector<SimulationTable> tables;
 };
 
