@@ -25,7 +25,6 @@
 #include "simulation_column.hpp"
 
 namespace realm {
-
 namespace simulation {
 
 class SimulationTable {
@@ -35,9 +34,16 @@ public:
 
     std::string get_name() const;
     void set_name(std::string table_name);
+
+    void insert_column(size_t ndx, DataType type, std::string name);
+    void remove_column(size_t ndx);
+    void rename_column(size_t ndx, std::string name);
+    std::string get_column_name(size_t ndx) const;
+    
 private:
-    std::vector<SimulationColumn> columns;
-    std::string name;
+    std::vector<SimulationColumn> m_columns;
+    std::string m_name;
+    StableKey m_key;
 };
 
 } // namespace simulation

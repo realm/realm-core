@@ -19,22 +19,31 @@
 #ifndef REALM_SIMULATION_COLUMN_HPP
 #define REALM_SIMULATION_COLUMN_HPP
 
+#include <string>
 #include <vector>
 
-namespace realm {
+#include "any_type.hpp"
+#include "stable_key.hpp"
 
+namespace realm {
 namespace simulation {
 
 class SimulationColumn {
 public:
-    SimulationColumn();
+    SimulationColumn(DataType type, std::string name);
     ~SimulationColumn() noexcept;
+    void insert_value(size_t ndx, AnyType value);
+    AnyType get_value(size_t ndx) const;
+    void set_name(std::string name);
+    std::string get_name() const;
 private:
-    std::vector<int64_t> values;
+    std::vector<AnyType> m_values;
+    DataType m_type;
+    std::string m_name;
+    StableKey m_key;
 };
 
 } // namespace simulation
 } // namespace realm
 
 #endif // REALM_SIMULATION_COLUMN_HPP
-

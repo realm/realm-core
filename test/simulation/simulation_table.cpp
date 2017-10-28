@@ -22,7 +22,7 @@ using namespace realm;
 using namespace realm::simulation;
 
 SimulationTable::SimulationTable(std::string table_name)
-: name(table_name)
+: m_name(table_name)
 {
 }
 
@@ -32,10 +32,36 @@ SimulationTable::~SimulationTable() noexcept
 
 std::string SimulationTable::get_name() const
 {
-    return name;
+    return m_name;
 }
 
 void SimulationTable::set_name(std::string table_name)
 {
-    name = table_name;
+    m_name = table_name;
 }
+
+void SimulationTable::insert_column(size_t ndx, DataType type, std::string name)
+{
+    REALM_ASSERT_EX(ndx <= m_columns.size(), ndx, m_columns.size());
+    m_columns.insert(m_columns.begin() + ndx, SimulationColumn(type, name));
+}
+
+void SimulationTable::remove_column(size_t ndx)
+{
+    REALM_ASSERT_EX(ndx < m_columns.size(), ndx, m_columns.size());
+    m_columns.erase(m_columns.begin() + ndx);
+}
+
+void SimulationTable::rename_column(size_t ndx, std::string name)
+{
+    REALM_ASSERT_EX(ndx < m_columns.size(), ndx, m_columns.size());
+    m_columns[ndx].set_name(name);
+}
+
+std::string SimulationTable::get_column_name(size_t ndx) const
+{
+    REALM_ASSERT_EX(ndx < m_columns.size(), ndx, m_columns.size());
+    return m_columns[ndx].get_name();
+}
+
+

@@ -9,10 +9,12 @@ add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
 
 set(NORMAL_TESTS
+    simulation/any_type.cpp
     simulation/simulation_column.cpp
     simulation/simulation_group.cpp
     simulation/simulation_query_result.cpp
     simulation/simulation_table.cpp
+    simulation/stable_key.cpp
     test_all.cpp
     test_alloc.cpp
     test_array.cpp
@@ -83,10 +85,12 @@ set(LARGE_TESTS
 set(REALM_TEST_HEADERS
     fuzz_group.hpp
     pthread_test.hpp
+    simulation/any_type.hpp
     simulation/simulation_column.hpp
     simulation/simulation_group.hpp
     simulation/simulation_query_result.hpp
     simulation/simulation_table.hpp
+    simulation/stable_key.hpp
     test.hpp
     test_all.hpp
     test_string_types.hpp

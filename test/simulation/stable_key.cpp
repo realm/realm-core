@@ -16,40 +16,20 @@
  *
  **************************************************************************/
 
-#include "simulation_column.hpp"
+#include "stable_key.hpp"
 
 using namespace realm;
 using namespace realm::simulation;
 
-SimulationColumn::SimulationColumn(DataType type, std::string name)
-: m_type(type), m_name(name)
+// this should be protected by a mutex in a multithreaded fuzz test
+uint64_t realm::simulation::StableKey::last_assigned = 0;
+
+StableKey::StableKey()
 {
+    ++last_assigned;
+    value = last_assigned;
 }
 
-SimulationColumn::~SimulationColumn() noexcept
+StableKey::~StableKey() noexcept
 {
 }
-
-void SimulationColumn::insert_value(size_t ndx, AnyType value)
-{
-    REALM_ASSERT_EX(ndx <= m_values.size(), ndx, m_values.size());
-    m_values.insert(m_values.begin() + ndx, value);
-}
-
-AnyType SimulationColumn::get_value(size_t ndx) const
-{
-    REALM_ASSERT_EX(ndx < m_values.size(), ndx, m_values.size());
-    return m_values[ndx];
-}
-
-void SimulationColumn::set_name(std::string name)
-{
-    m_name = name;
-}
-
-std::string SimulationColumn::get_name() const
-{
-    return m_name;
-}
-
-

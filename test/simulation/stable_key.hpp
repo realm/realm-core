@@ -16,40 +16,25 @@
  *
  **************************************************************************/
 
-#include "simulation_column.hpp"
+#ifndef REALM_SIMULATION_STABLE_KEY_HPP
+#define REALM_SIMULATION_STABLE_KEY_HPP
 
-using namespace realm;
-using namespace realm::simulation;
+#include <stdint.h>
 
-SimulationColumn::SimulationColumn(DataType type, std::string name)
-: m_type(type), m_name(name)
-{
-}
+namespace realm {
+namespace simulation {
 
-SimulationColumn::~SimulationColumn() noexcept
-{
-}
+class StableKey {
+public:
+    StableKey();
+    ~StableKey() noexcept;
 
-void SimulationColumn::insert_value(size_t ndx, AnyType value)
-{
-    REALM_ASSERT_EX(ndx <= m_values.size(), ndx, m_values.size());
-    m_values.insert(m_values.begin() + ndx, value);
-}
+private:
+    uint64_t value;
+    static uint64_t last_assigned;
+};
 
-AnyType SimulationColumn::get_value(size_t ndx) const
-{
-    REALM_ASSERT_EX(ndx < m_values.size(), ndx, m_values.size());
-    return m_values[ndx];
-}
+} // namespace simulation
+} // namespace realm
 
-void SimulationColumn::set_name(std::string name)
-{
-    m_name = name;
-}
-
-std::string SimulationColumn::get_name() const
-{
-    return m_name;
-}
-
-
+#endif // REALM_SIMULATION_STABLE_KEY_HPP
