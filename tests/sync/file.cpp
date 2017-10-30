@@ -31,9 +31,9 @@ using File = realm::util::File;
 
 static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_file/";
 
-static void prepare_sync_manager_test(void) {
+static void prepare_sync_manager_test() {
     // Remove the base directory in /tmp where all test-related file status lives.
-    remove_nonempty_dir(base_path);
+    try_remove_dir_recursive(base_path);
     const std::string manager_path = base_path + "syncmanager/";
     util::make_dir(base_path);
     util::make_dir(manager_path);

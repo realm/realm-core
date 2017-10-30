@@ -33,7 +33,7 @@ bool create_dummy_realm(std::string path) {
 }
 
 void reset_test_directory(const std::string& base_path) {
-    remove_nonempty_dir(base_path);
+    try_remove_dir_recursive(base_path);
     util::make_dir(base_path);
 }
 
