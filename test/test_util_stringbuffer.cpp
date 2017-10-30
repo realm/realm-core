@@ -168,4 +168,19 @@ TEST(Utils_StringBuffer)
 }
 }
 
+
+// This test requests a string of 2.14 GB and so is disabled for normal CI runs.
+// There was a bug in int_multiply_with_overflow_detect (used in StringBuffer::reserve())
+// which would cause appending to any string longer than half of std::numeric_limits<int>::max()
+// to request buffer space for std::numeric_limits<size_t>::max() which is *much* larger.
+TEST_IF(Utils_StringBufferLargeResize, TEST_DURATION > 0)
+{
+    StringBuffer sb;
+    std::string long_str((std::numeric_limits<int>::max() / 2) + 1, 'a');
+    sb.append(long_str);
+    sb.append("hello world");
+    // with the bug, you would probably get a std::bad_alloc exception instead of failing the following check
+    CHECK_NOT_EQUAL(sb.size(), std::numeric_limits<size_t>::max());
+}
+
 #endif
