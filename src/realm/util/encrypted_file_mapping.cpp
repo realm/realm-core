@@ -145,8 +145,12 @@ AESCryptor::AESCryptor(const uint8_t* key)
       m_dst_buffer(new char[block_size])
 {
 #if REALM_PLATFORM_APPLE
-    CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
-    CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
+    // We pass 0 in form of a variable to CCCryptorCreate() instead of just passing a `0` literal as an attempt
+    // to suppress a false warning from the Security Analyzer from IBM Bluemix. FIXME: It's uncertain if this works;
+    // follow up on it. The pointer is volatile so it won't get optimized away in release mode.
+    volatile const void* iv = nullptr;
+    CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_encr);
+    CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_decr);
 #elif defined(_WIN32)
     BCRYPT_ALG_HANDLE hAesAlg = NULL;
     int ret;
