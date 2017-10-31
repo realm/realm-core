@@ -18,6 +18,7 @@
 
 #include "sync_test_utils.hpp"
 
+#include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_user.hpp"
 #include <realm/util/logger.hpp>
@@ -43,6 +44,13 @@ bool validate_user_in_vector(std::vector<std::shared_ptr<SyncUser>> vector,
     return false;
 }
 
+}
+
+TEST_CASE("sync_config: basic functionality", "[sync") {
+    SECTION("should reject URLs containing \"/__partial/\"") {
+        auto make_bad_config = [] { SyncConfig{nullptr, "realm://example.org:9080/123456/__partial/realm"}; };
+        REQUIRE_THROWS(make_bad_config());
+    }
 }
 
 TEST_CASE("sync_manager: basic properties and APIs", "[sync]") {

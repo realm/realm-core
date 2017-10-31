@@ -90,12 +90,6 @@ InMemoryTestFile::InMemoryTestFile()
 
 #if REALM_ENABLE_SYNC
 
-SyncTestFile::SyncTestFile(const SyncConfig& sync_config)
-{
-    this->sync_config = std::make_shared<SyncConfig>(sync_config);
-    schema_mode = SchemaMode::Additive;
-}
-
 SyncTestFile::SyncTestFile(SyncServer& server, 
     std::string name, 
     realm::util::Optional<realm::Schema> realm_schema, 
@@ -108,13 +102,10 @@ SyncTestFile::SyncTestFile(SyncServer& server,
     if (realm_schema)
         schema = std::move(realm_schema);
 
-    sync_config = std::make_shared<SyncConfig>(SyncConfig{
-        SyncManager::shared().get_user({ "user", url }, "not_a_real_token"),
-        url,
-        SyncSessionStopPolicy::Immediately,
-        [=](auto&, auto& config, auto session) { session->refresh_access_token(s_test_token, config.realm_url()); },
-        [](auto, auto) { abort(); }
-    });
+    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user({ "user", url }, "not_a_real_token"), url);
+    sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
+    sync_config->bind_session_handler = [=](auto&, auto& config, auto session) { session->refresh_access_token(s_test_token, config.realm_url()); };
+    sync_config->error_handler = [](auto, auto) { abort(); };
     sync_config->is_partial = is_partial;
     schema_mode = SchemaMode::Additive;
 }

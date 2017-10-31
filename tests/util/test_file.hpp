@@ -26,12 +26,15 @@
 #include <realm/util/optional.hpp>
 
 #if REALM_ENABLE_SYNC
+#include "sync/sync_config.hpp"
+
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
 
 namespace realm {
 struct SyncConfig;
 class Schema;
+enum class SyncSessionStopPolicy;
 }
 
 // {"identity":"test", "access": ["download", "upload"]}
@@ -100,7 +103,19 @@ private:
 };
 
 struct SyncTestFile : TestFile {
-    SyncTestFile(const realm::SyncConfig&);
+    template<typename BindHandler, typename ErrorHandler>
+    SyncTestFile(const realm::SyncConfig& sync_config, 
+        realm::SyncSessionStopPolicy stop_policy, 
+        BindHandler&& bind_handler, 
+        ErrorHandler&& error_handler)
+    {
+        this->sync_config = std::make_shared<realm::SyncConfig>(sync_config);
+        this->sync_config->stop_policy = stop_policy;
+        this->sync_config->bind_session_handler = std::forward<BindHandler>(bind_handler);
+        this->sync_config->error_handler = std::forward<ErrorHandler>(error_handler);
+        schema_mode = realm::SchemaMode::Additive;
+    }
+
     SyncTestFile(SyncServer& server, 
         std::string name="", 
         realm::util::Optional<realm::Schema> realm_schema=none, 

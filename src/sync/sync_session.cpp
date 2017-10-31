@@ -434,7 +434,7 @@ struct sync_session_states::Error : public SyncSession::State {
         }
         session.m_completion_wait_packages.clear();
         session.m_session = nullptr;
-        session.m_config = { nullptr, "", SyncSessionStopPolicy::Immediately, nullptr };
+        session.m_config = { nullptr, "" };
     }
 
     // Everything else is a no-op when in the error state.
