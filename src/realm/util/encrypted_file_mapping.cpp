@@ -145,9 +145,10 @@ AESCryptor::AESCryptor(const uint8_t* key)
       m_dst_buffer(new char[block_size])
 {
 #if REALM_PLATFORM_APPLE
-    // A random iv is passed to CCCryptorReset. Here, in CCCryptorCreate, iv
-    // is randomized only to make happy some security static analyzer tools
-    unsigned char u_iv[kCCKeySizeAES256];
+    // A random iv is passed to CCCryptorReset. This iv is *not used* by Realm; we set it manually prior to
+	// each call to BCryptEncrypt() and BCryptDecrypt(). We pass this random iv as an attempt to 
+	// suppress a false encryption security warning from the IBM Bluemix Security Analyzer (PR[#2911])
+	unsigned char u_iv[kCCKeySizeAES256];
     arc4random_buf(u_iv, kCCKeySizeAES256);
     void *iv = u_iv;
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_encr);
