@@ -4733,16 +4733,16 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
 }
 
 
-TableView Table::get_range_view(size_t begin, size_t end)
+TableView Table::get_range_view(size_t from, size_t to)
 {
-    REALM_ASSERT(!m_columns.is_attached() || end <= size());
+    REALM_ASSERT(!m_columns.is_attached() || to <= size());
 
-    return where().find_all(begin, end);
+    return where().find_all(from, to);
 }
 
-ConstTableView Table::get_range_view(size_t begin, size_t end) const
+ConstTableView Table::get_range_view(size_t from, size_t to) const
 {
-    return const_cast<Table*>(this)->get_range_view(begin, end);
+    return const_cast<Table*>(this)->get_range_view(from, to);
 }
 
 TableView Table::get_backlink_view(size_t row_ndx, Table* src_table, size_t src_col_ndx)

@@ -122,9 +122,9 @@ public:
     void erase(size_t ndx);
     void erase(size_t begin, size_t end);
     void truncate(size_t size);
-    void truncate_and_destroy_children(size_t size)
+    void truncate_and_destroy_children(size_t sz)
     {
-        truncate(size);
+        truncate(sz);
     }
     void clear();
     void set_all_to_zero();
