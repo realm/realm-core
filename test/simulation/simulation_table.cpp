@@ -16,6 +16,7 @@
  *
  **************************************************************************/
 
+#include "simulation_group.hpp"
 #include "simulation_table.hpp"
 
 using namespace realm;
@@ -40,10 +41,10 @@ void SimulationTable::set_name(std::string table_name)
     m_name = table_name;
 }
 
-void SimulationTable::insert_column(size_t ndx, DataType type, std::string name)
+void SimulationTable::insert_column(size_t ndx, SimulationColumn col)
 {
     REALM_ASSERT_EX(ndx <= m_columns.size(), ndx, m_columns.size());
-    m_columns.insert(m_columns.begin() + ndx, SimulationColumn(type, name));
+    m_columns.insert(m_columns.begin() + ndx, col);
 }
 
 void SimulationTable::remove_column(size_t ndx)
@@ -64,4 +65,23 @@ std::string SimulationTable::get_column_name(size_t ndx) const
     return m_columns[ndx].get_name();
 }
 
+size_t SimulationTable::get_num_columns() const
+{
+    return m_columns.size();
+}
+
+StableKey SimulationTable::get_id() const
+{
+    return m_key;
+}
+
+void SimulationTable::move_column(size_t from, size_t to)
+{
+    move_range<SimulationColumn>(from, 1, to, m_columns);
+}
+
+realm::simulation::SimulationColumn &SimulationTable::get_column(size_t ndx)
+{
+    return m_columns[ndx];
+}
 

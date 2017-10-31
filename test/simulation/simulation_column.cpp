@@ -26,6 +26,13 @@ SimulationColumn::SimulationColumn(DataType type, std::string name)
 {
 }
 
+SimulationColumn::SimulationColumn(DataType type, std::string name, StableKey linked_table)
+: m_type(type)
+, m_name(name)
+, m_linked_table(linked_table)
+{
+}
+
 SimulationColumn::~SimulationColumn() noexcept
 {
 }
@@ -52,4 +59,12 @@ std::string SimulationColumn::get_name() const
     return m_name;
 }
 
+StableKey SimulationColumn::get_id() const
+{
+    return m_key;
+}
 
+realm::DataType SimulationColumn::get_type() const
+{
+    return m_type;
+}

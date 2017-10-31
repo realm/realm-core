@@ -181,3 +181,9 @@ void AnyType::set_link(StableLink value) noexcept
     m_link = value;
 }
 
+std::vector<AnyType>& AnyType::get_subtable() noexcept
+{
+    return m_subtable;
+}
+
+

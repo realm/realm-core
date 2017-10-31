@@ -32,7 +32,7 @@ SimulationGroup::~SimulationGroup() noexcept
 {
 }
 
-void SimulationGroup::verify(const Group& other) const
+void SimulationGroup::verify(const Group& other)
 {
     REALM_ASSERT_EX(other.size() == tables.size(), other.size(), tables.size());
 
@@ -40,6 +40,19 @@ void SimulationGroup::verify(const Group& other) const
         StringData name1 = other.get_table_name(i);
         std::string name2 = tables[i].get_name();
         REALM_ASSERT(name1 == name2);
+        size_t num_cols1 = other.get_table(i)->get_column_count();
+        size_t num_cols2 = tables.at(i).get_num_columns();
+        REALM_ASSERT_EX(num_cols1 == num_cols2, num_cols1, num_cols2);
+        for (size_t col = 0; col < num_cols2; ++col) {
+            ConstTableRef t1 = other.get_table(i);
+            SimulationTable& t2 = tables[i];
+            StringData col_name1 = t1->get_column_name(col);
+            const std::string& col_name2 = t2.get_column_name(col);
+            REALM_ASSERT(col_name1 == StringData(col_name2));
+            DataType col_type1 = t1->get_column_type(col);
+            DataType col_type2 = t2.get_column(col).get_type();
+            REALM_ASSERT(col_type1 == col_type2);
+        }
     }
 }
 
@@ -66,25 +79,6 @@ void SimulationGroup::remove_table(size_t ndx)
     tables.erase(tables.begin() + ndx);
 }
 
-template <typename T>
-void move_range(size_t start, size_t length, size_t dst, std::vector<T> & v)
-{
-    typename std::vector<T>::iterator first, middle, last;
-    if (start < dst)
-    {
-        first  = v.begin() + start;
-        middle = first + length;
-        last   = v.begin() + dst + 1;
-    }
-    else
-    {
-        first  = v.begin() + dst;
-        middle = v.begin() + start;
-        last   = middle + length;
-    }
-    std::rotate(first, middle, last);
-}
-
 void SimulationGroup::move_table(size_t from, size_t to)
 {
     move_range<SimulationTable>(from, 1, to, tables);
@@ -99,3 +93,9 @@ std::string SimulationGroup::get_table_name(size_t ndx)
 {
     return tables[ndx].get_name();
 }
+
+realm::simulation::SimulationTable &SimulationGroup::get_table(size_t ndx)
+{
+    return tables[ndx];
+}
+

@@ -36,7 +36,7 @@ class SimulationGroup {
 public:
     SimulationGroup(realm::VersionID version);
     ~SimulationGroup() noexcept;
-    void verify(const Group& other) const;
+    void verify(const Group& other);
     realm::VersionID get_version() const;
     void commit_version(realm::VersionID new_version);
     void add_table(std::string name, size_t ndx = -1);
@@ -45,10 +45,32 @@ public:
     void rename_table(size_t ndx, std::string name);
     std::string get_table_name(size_t ndx);
 
+    SimulationTable& get_table(size_t ndx);
+
 private:
     realm::VersionID version_id;
     std::vector<SimulationTable> tables;
 };
+
+template <typename T>
+void move_range(size_t start, size_t length, size_t dst, std::vector<T> & v)
+{
+    typename std::vector<T>::iterator first, middle, last;
+    if (start < dst)
+    {
+        first  = v.begin() + start;
+        middle = first + length;
+        last   = v.begin() + dst + 1;
+    }
+    else
+    {
+        first  = v.begin() + dst;
+        middle = v.begin() + start;
+        last   = middle + length;
+    }
+    std::rotate(first, middle, last);
+}
+
 
 } // namespace simulation
 } // namespace realm

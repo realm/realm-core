@@ -505,7 +505,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \""
                              << name << "\", " << (nullable ? "true" : "false") << ");\n";
                     }
-                    g.get_table(table_ndx)->add_column(type, name, nullable);
+                    size_t col_ndx = g.get_table(table_ndx)->add_column(type, name, nullable);
+                    simulation_writer->get_table(table_ndx).insert_column(col_ndx, {type, name});
                 }
                 else {
                     bool subnullable = (get_next(s) % 2 == 0);
@@ -519,8 +520,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                              << "}\n";
                     }
                     DescriptorRef subdescr;
-                    g.get_table(table_ndx)->add_column(type, name, subnullable, &subdescr);
+                    size_t col_ndx = g.get_table(table_ndx)->add_column(type, name, subnullable, &subdescr);
                     subdescr->add_column(type_Int, "integers", nullptr, subnullable);
+                    simulation_writer->get_table(table_ndx).insert_column(col_ndx, {type,  name});
                 }
             }
             else if (instr == INSERT_COLUMN && g.size() > 0) {
@@ -535,6 +537,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                              << int(type) << "), \"" << name << "\", " << (nullable ? "true" : "false") << ");\n";
                     }
                     g.get_table(table_ndx)->insert_column(col_ndx, type, name, nullable);
+                    simulation_writer->get_table(table_ndx).insert_column(col_ndx, {type, name});
                 }
                 else {
                     bool subnullable = (get_next(s) % 2 == 0);
@@ -550,6 +553,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     DescriptorRef subdescr;
                     g.get_table(table_ndx)->insert_column(col_ndx, type, name, subnullable, &subdescr);
                     subdescr->add_column(type_Int, "integers", nullptr, subnullable);
+                    simulation_writer->get_table(table_ndx).insert_column(col_ndx, {type,  name});
                 }
             }
             else if (instr == REMOVE_COLUMN && g.size() > 0) {
@@ -561,6 +565,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "g.get_table(" << table_ndx << ")->remove_column(" << col_ndx << ");\n";
                     }
                     t->remove_column(col_ndx);
+                    simulation_writer->get_table(table_ndx).remove_column(col_ndx);
                 }
             }
             else if (instr == RENAME_COLUMN && g.size() > 0) {
@@ -574,6 +579,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                              << col_ndx << ", \"" << name << "\");\n";
                     }
                     t->rename_column(col_ndx, name);
+                    simulation_writer->get_table(table_ndx).rename_column(col_ndx, std::string(name));
                 }
             }
             else if (instr == MOVE_COLUMN && g.size() > 0) {
@@ -589,6 +595,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                              << ")->get_descriptor()), " << col_ndx1 << ", " << col_ndx2 << ");\n";
                     }
                     _impl::TableFriend::move_column(*(t->get_descriptor()), col_ndx1, col_ndx2);
+                    simulation_writer->get_table(table_ndx).move_column(col_ndx1, col_ndx2);
                 }
             }
             else if (instr == ADD_SEARCH_INDEX && g.size() > 0) {
@@ -653,7 +660,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_Link, \"" << name
                          << "\", *g.get_table(" << table_ndx_2 << "));\n";
                 }
-                t1->add_column_link(type_Link, name, *t2);
+                size_t col_ndx = t1->add_column_link(type_Link, name, *t2);
+                SimulationTable& linked_table = simulation_writer->get_table(table_ndx_2);
+                StableKey linked_table_id = linked_table.get_id();
+                simulation_writer->get_table(table_ndx_1).insert_column(col_ndx, {type_Link, name, linked_table_id});
             }
             else if (instr == INSERT_COLUMN_LINK && g.size() >= 1) {
                 size_t table_ndx_1 = get_next(s) % g.size();
@@ -667,6 +677,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                          << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
                 }
                 t1->insert_column_link(col_ndx, type_Link, name, *t2);
+                SimulationTable& linked_table = simulation_writer->get_table(table_ndx_2);
+                StableKey linked_table_id = linked_table.get_id();
+                simulation_writer->get_table(table_ndx_1).insert_column(col_ndx, {type_Link, name, linked_table_id});
             }
             else if (instr == ADD_COLUMN_LINK_LIST && g.size() >= 2) {
                 size_t table_ndx_1 = get_next(s) % g.size();
@@ -678,7 +691,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_LinkList, \"" << name
                          << "\", *g.get_table(" << table_ndx_2 << "));\n";
                 }
-                t1->add_column_link(type_LinkList, name, *t2);
+                size_t col_ndx = t1->add_column_link(type_LinkList, name, *t2);
+                SimulationTable& linked_table = simulation_writer->get_table(table_ndx_2);
+                StableKey linked_table_id = linked_table.get_id();
+                simulation_writer->get_table(table_ndx_1).insert_column(col_ndx, {type_LinkList, name, linked_table_id});
             }
             else if (instr == SET && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();

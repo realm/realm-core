@@ -31,16 +31,20 @@ namespace simulation {
 class SimulationColumn {
 public:
     SimulationColumn(DataType type, std::string name);
+    SimulationColumn(DataType type, std::string name, StableKey linked_table);
     ~SimulationColumn() noexcept;
     void insert_value(size_t ndx, AnyType value);
     AnyType get_value(size_t ndx) const;
     void set_name(std::string name);
     std::string get_name() const;
+    StableKey get_id() const;
+    DataType get_type() const;
 private:
     std::vector<AnyType> m_values;
     DataType m_type;
     std::string m_name;
     StableKey m_key;
+    StableKey m_linked_table;
 };
 
 } // namespace simulation

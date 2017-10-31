@@ -63,6 +63,7 @@ public:
     BinaryData get_binary() const noexcept;
     Timestamp get_timestamp() const noexcept;
     StableLink get_link() const noexcept;
+    std::vector<AnyType>& get_subtable() noexcept;
 
     void set_int(int64_t) noexcept;
     void set_bool(bool) noexcept;
@@ -86,6 +87,7 @@ private:
     StableLink m_link;
     std::string m_data;
     std::vector<StableKey> m_linklist;
+    std::vector<AnyType> m_subtable;
 };
 
 } // namespace simulation
