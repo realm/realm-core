@@ -201,10 +201,6 @@ public:
     }
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
-    virtual size_t match_local(ConstObj&)
-    {
-        return false;
-    }
 
     virtual void aggregate_local_prepare(Action TAction, DataType col_id, bool nullable);
 
@@ -466,10 +462,6 @@ public:
                 return s;
         }
         return not_found;
-    }
-    size_t match_local(ConstObj&) override
-    {
-        return false;
     }
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
@@ -759,12 +751,6 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         return this->m_leaf_ptr->template find_first<TConditionFunction>(this->m_value, start, end);
-    }
-    size_t match_local(ConstObj& obj) override
-    {
-        TConditionFunction cond;
-        return cond(obj.get<TConditionValue>(this->m_condition_column_idx), this->m_value,
-                    obj.is_null(this->m_condition_column_idx));
     }
 
     virtual std::string describe() const override

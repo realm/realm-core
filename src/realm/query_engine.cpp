@@ -53,13 +53,12 @@ size_t ParentNode::find_first(size_t start, size_t end)
 
 bool ParentNode::match(ConstObj& obj)
 {
-    size_t sz = m_children.size();
-
-    while (sz--) {
-        if (!m_children[sz]->match_local(obj))
-            return false;
-    }
-    return true;
+    auto cb = [this](const Cluster* cluster, size_t row) {
+        set_cluster(cluster);
+        size_t m = find_first(row, row + 1);
+        return m != npos;
+    };
+    return obj.evaluate(cb);
 }
 
 void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)

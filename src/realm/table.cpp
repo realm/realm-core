@@ -4153,9 +4153,10 @@ template <class T>
 Key Table::find_first(size_t col_ndx, T value) const
 {
     Key key;
-    typename ColumnTypeTraits<T>::cluster_leaf_type leaf(get_alloc());
+    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    LeafType leaf(get_alloc());
     traverse_clusters([&key, &col_ndx, &value, &leaf](const Cluster* cluster, int64_t key_offset) {
-        cluster->template init_leaf(col_ndx, &leaf);
+        cluster->init_leaf<LeafType>(col_ndx, &leaf);
         size_t row = leaf.find_first(value, 0, cluster->node_size());
         if (row != realm::npos) {
             key = Key(cluster->get_key(row) + key_offset);

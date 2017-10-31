@@ -911,7 +911,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
             for (size_t t = 0; t < m_view->size(); t++) {
                 ConstObj obj = m_view->get(t);
                 if (t >= start && t < end && eval_object(obj)) {
-                    st.template match<action, false>(obj.get_key().value, 0, obj.get<T>(column_ndx));
+                    st.template match<action, false>(size_t(obj.get_key().value), 0, obj.get<T>(column_ndx));
                     if (st.m_match_count >= limit) {
                         break;
                     }

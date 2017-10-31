@@ -251,6 +251,17 @@ public:
 
     bool is_null(size_t col_ndx) const;
 
+    // To be used by the query system when a single object should
+    // be tested. Will allow a function to be called in the context
+    // of the owning cluster.
+    template <class T>
+    bool evaluate(T func) const
+    {
+        Cluster cluster(get_alloc(), *m_tree_top);
+        cluster.init_from_mem(m_mem);
+        return func(&cluster, m_row_ndx);
+    }
+
 protected:
     const ClusterTree* m_tree_top;
     Key m_key;
@@ -264,6 +275,7 @@ protected:
         m_row_ndx = other.m_row_ndx;
         m_version = other.m_version;
     }
+    Allocator& get_alloc() const;
     template <class T>
     bool do_is_null(size_t col_ndx) const;
 };

@@ -893,6 +893,11 @@ inline bool ConstObj::update_if_needed() const
     return false;
 }
 
+Allocator& ConstObj::get_alloc() const
+{
+    return m_tree_top->get_alloc();
+}
+
 template <class T>
 T ConstObj::get(size_t col_ndx) const
 {
