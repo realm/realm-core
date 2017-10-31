@@ -51,9 +51,15 @@ size_t ParentNode::find_first(size_t start, size_t end)
     return not_found;
 }
 
-bool ParentNode::match(ConstObj&)
+bool ParentNode::match(ConstObj& obj)
 {
-    return false;
+    size_t sz = m_children.size();
+
+    while (sz--) {
+        if (!m_children[sz]->match_local(obj))
+            return false;
+    }
+    return true;
 }
 
 void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)

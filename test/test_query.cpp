@@ -10929,6 +10929,16 @@ TEST(Query_IntOnly)
     CHECK_EQUAL(tv.get(0).get_key(), Key(7));
     CHECK_EQUAL(tv.get(1).get_key(), Key(21));
 
+    auto q1 = table.where(&tv).equal(0, 2);
+    TableView tv1 = q1.find_all();
+    CHECK_EQUAL(tv1.size(), 1);
+    CHECK_EQUAL(tv1.get(0).get_key(), Key(21));
+
+    q1 = table.where(&tv).greater(0, 5);
+    tv1 = q1.find_all();
+    CHECK_EQUAL(tv1.size(), 1);
+    CHECK_EQUAL(tv1.get(0).get_key(), Key(7));
+
     q = table.column<Int>(0) == 19 && table.column<Int>(1) == 9;
     key = q.find();
     CHECK_EQUAL(key.value, 19);
