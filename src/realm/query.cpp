@@ -146,6 +146,15 @@ Query& Query::operator=(const Query& source)
 }
 
 Query::Query(Query&&) = default;
+
+Query::Query(Query&& other, TableViewBase* tv) : Query(std::move(other))
+{
+    if (tv) {
+        REALM_ASSERT(tv->m_table == m_table);
+        m_view = tv;
+    }
+}
+
 Query& Query::operator=(Query&&) = default;
 
 Query::~Query() noexcept = default;

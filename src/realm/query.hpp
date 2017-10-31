@@ -98,6 +98,7 @@ public:
     Query& operator=(const Query& source);
 
     Query(Query&&);
+    Query(Query&&, TableViewBase* tv);
     Query& operator=(Query&&);
 
     // Find links that point to a specific target row
