@@ -95,7 +95,6 @@ TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch, Con
 void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
 {
     m_table = Table::create_from_and_consume_patch(patch.m_table, group);
-    m_table->register_view(this);
     m_query.apply_patch(patch.query_patch, group);
     m_linkview_source = LinkView::create_from_and_consume_patch(patch.linkview_patch, group);
     m_descriptor_ordering = DescriptorOrdering::create_from_and_consume_patch(patch.descriptors_patch, *m_table);
@@ -613,14 +612,12 @@ void TableView::clear(RemoveMode underlying_mode)
     // Temporarily unregister this view so that it's not pointlessly updated
     // for the row removals
     using tf = _impl::TableFriend;
-    tf::unregister_view(*m_table, this);
 
     bool is_move_last_over = (underlying_mode == RemoveMode::unordered);
     tf::batch_erase_rows(*m_table, m_key_values, is_move_last_over); // Throws
 
     m_key_values.clear();
     m_num_detached_refs = 0;
-    tf::register_view(*m_table, this); // Throws
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:

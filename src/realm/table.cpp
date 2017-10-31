@@ -1454,47 +1454,6 @@ void Table::detach() noexcept
     destroy_column_accessors();
     m_cols.clear();
     // FSA: m_cols.destroy();
-    discard_views();
-}
-
-
-void Table::unregister_view(const TableViewBase* view) noexcept
-{
-    LockGuard lock(m_accessor_mutex);
-    // Fixme: O(n) may be unacceptable - if so, put and maintain
-    // iterator or index in TableViewBase.
-    for (auto& v : m_views) {
-        if (v == view) {
-            v = m_views.back();
-            m_views.pop_back();
-            break;
-        }
-    }
-}
-
-
-void Table::move_registered_view(const TableViewBase* old_addr, const TableViewBase* new_addr) noexcept
-{
-    LockGuard lock(m_accessor_mutex);
-    for (auto& view : m_views) {
-        if (view == old_addr) {
-            // casting away constness here... all operations on members
-            // of  m_views are preserving logical constness on the table views.
-            view = const_cast<TableViewBase*>(new_addr);
-            return;
-        }
-    }
-    REALM_ASSERT(false);
-}
-
-
-void Table::discard_views() noexcept
-{
-    LockGuard lock(m_accessor_mutex);
-    for (const auto& view : m_views) {
-        view->detach();
-    }
-    m_views.clear();
 }
 
 

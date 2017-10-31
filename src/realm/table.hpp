@@ -1075,11 +1075,6 @@ private:
     // always null for tables with shared descriptor.
     mutable std::weak_ptr<Descriptor> m_descriptor;
 
-    // Table view instances
-    // Access needs to be protected by m_accessor_mutex
-    typedef std::vector<TableViewBase*> views;
-    mutable views m_views;
-
     // Points to first bound row accessor, or is null if there are none.
     mutable RowBase* m_row_accessors = nullptr;
 
@@ -1269,11 +1264,6 @@ private:
 
     void bind_ptr() const noexcept;
     void unbind_ptr() const noexcept;
-
-    void register_view(const TableViewBase* view);
-    void unregister_view(const TableViewBase* view) noexcept;
-    void move_registered_view(const TableViewBase* old_addr, const TableViewBase* new_addr) noexcept;
-    void discard_views() noexcept;
 
     void register_row_accessor(RowBase*) const noexcept;
     void unregister_row_accessor(RowBase*) const noexcept;
@@ -1732,15 +1722,6 @@ inline void Table::unbind_ptr() const noexcept
     else {
         delete this;
     }
-}
-
-inline void Table::register_view(const TableViewBase* view)
-{
-    util::LockGuard lock(m_accessor_mutex);
-    // Casting away constness here - operations done on tableviews
-    // through m_views are all internal and preserving "some" kind
-    // of logical constness.
-    m_views.push_back(const_cast<TableViewBase*>(view));
 }
 
 inline bool Table::is_attached() const noexcept
@@ -2772,16 +2753,6 @@ public:
     static Replication* get_repl(Table& table) noexcept
     {
         return table.get_repl();
-    }
-
-    static void register_view(Table& table, const TableViewBase* view)
-    {
-        table.register_view(view); // Throws
-    }
-
-    static void unregister_view(Table& table, const TableViewBase* view) noexcept
-    {
-        table.unregister_view(view);
     }
 };
 

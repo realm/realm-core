@@ -984,12 +984,14 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQuery);
     BENCH(BenchmarkQueryNot);
     BENCH(BenchmarkSize);
+#ifdef LEGACY_TESTS
     BENCH(BenchmarkSort);
     BENCH(BenchmarkSortInt);
     BENCH(BenchmarkDistinctIntFewDupes);
     BENCH(BenchmarkDistinctIntManyDupes);
     BENCH(BenchmarkDistinctStringFewDupes);
     BENCH(BenchmarkDistinctStringManyDupes);
+#endif
     BENCH(BenchmarkFindAllStringFewDupes);
     BENCH(BenchmarkFindAllStringManyDupes);
     BENCH(BenchmarkFindFirstStringFewDupes);
