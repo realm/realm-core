@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 4.0.3 Release notes
 
 ### Bugfixes
 
@@ -15,20 +15,6 @@
   overflow when no overflow should occur. This could cause out of memory
   exceptions when the `TransactLogParser` reads strings or binary data > 2GB.
   PR [#2906](https://github.com/realm/realm-core/pull/2906).
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
