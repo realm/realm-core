@@ -714,11 +714,19 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
     if (int_cast_with_overflow_detect(size, size2))
         throw std::runtime_error("File size overflow");
 
-    if (::posix_fallocate(m_fd, offset, size2) == 0)
+    // posix_fallocate() does not set errno, it returns the error (if any) or zero.
+    // It is also possible for it to be interrupted by EINTR according to some man pages (ex fedora 24)
+    int status;
+    do {
+        status = ::posix_fallocate(m_fd, offset, size2);
+    } while (status == EINTR);
+
+    if (REALM_LIKELY(status == 0)) {
         return;
-    int err = errno; // Eliminate any risk of clobbering
-    std::string msg = get_errno_msg("posix_fallocate() failed: ", err);
-    if (err == ENOSPC || err == EDQUOT) {
+    }
+
+    std::string msg = get_errno_msg("posix_fallocate() failed: ", status);
+    if (status == ENOSPC || status == EDQUOT) {
         throw OutOfDiskSpace(msg);
     }
     throw std::runtime_error(msg);
