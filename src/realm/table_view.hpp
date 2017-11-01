@@ -197,33 +197,29 @@ public:
     // Aggregate functions. count_target is ignored by all <int
     // function> except Count. Hack because of bug in optional
     // arguments in clang and vs2010 (fixed in 2012)
-    template <int function, typename T, typename R, class ColType>
-    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx,
-                T count_target, size_t* return_ndx = nullptr) const;
+    template <Action action, typename T, typename R>
+    R aggregate(size_t column_ndx, T count_target, size_t* result_count = nullptr, Key* return_key = nullptr) const;
 
     int64_t sum_int(size_t column_ndx) const;
-    int64_t maximum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    int64_t minimum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    int64_t maximum_int(size_t column_ndx, Key* return_key = nullptr) const;
+    int64_t minimum_int(size_t column_ndx, Key* return_key = nullptr) const;
     double average_int(size_t column_ndx, size_t* value_count = nullptr) const;
     size_t count_int(size_t column_ndx, int64_t target) const;
 
     double sum_float(size_t column_ndx) const;
-    float maximum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    float minimum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    float maximum_float(size_t column_ndx, Key* return_key = nullptr) const;
+    float minimum_float(size_t column_ndx, Key* return_key = nullptr) const;
     double average_float(size_t column_ndx, size_t* value_count = nullptr) const;
     size_t count_float(size_t column_ndx, float target) const;
 
     double sum_double(size_t column_ndx) const;
-    double maximum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    double minimum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    double maximum_double(size_t column_ndx, Key* return_key = nullptr) const;
+    double minimum_double(size_t column_ndx, Key* return_key = nullptr) const;
     double average_double(size_t column_ndx, size_t* value_count = nullptr) const;
     size_t count_double(size_t column_ndx, double target) const;
 
-    OldDateTime maximum_olddatetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    OldDateTime minimum_olddatetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
-
-    Timestamp minimum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    Timestamp maximum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    Timestamp minimum_timestamp(size_t column_ndx, Key* return_key = nullptr) const;
+    Timestamp maximum_timestamp(size_t column_ndx, Key* return_key = nullptr) const;
     size_t count_timestamp(size_t column_ndx, Timestamp target) const;
 
     // Simple pivot aggregate method. Experimental! Please do not
@@ -388,7 +384,7 @@ private:
     void detach() const noexcept; // may have to remove const
     size_t find_first_integer(size_t column_ndx, int64_t value) const;
     template <class oper>
-    Timestamp minmax_timestamp(size_t column_ndx, size_t* return_ndx) const;
+    Timestamp minmax_timestamp(size_t column_ndx, Key* return_key) const;
 
     friend class Table;
     friend class Query;
