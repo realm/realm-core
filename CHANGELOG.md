@@ -1,25 +1,3 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* Lorem ipsum.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
-
-----------------------------------------------
-
 # 4.0.3 Release notes
 
 ### Bugfixes
