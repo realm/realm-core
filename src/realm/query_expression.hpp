@@ -135,9 +135,9 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/array_bool.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/impl/sequential_getter.hpp>
+#include <realm/list.hpp>
 #include <realm/link_view.hpp>
 #include <realm/metrics/query_info.hpp>
-#include <realm/query_operators.hpp>
 #include <realm/util/optional.hpp>
 
 #include <numeric>
@@ -897,9 +897,9 @@ struct NullableVector {
     }
 
     template <typename Type = T>
-    typename std::enable_if<realm::is_any<Type, float, double, OldDateTime, BinaryData, StringData, RowIndex,
-                                          Timestamp, ref_type, null>::value,
-                            void>::type
+    typename std::enable_if<
+        realm::is_any<Type, float, double, BinaryData, StringData, Key, Timestamp, ref_type, SizeOfList, null>::value,
+        void>::type
     set(size_t index, t_storage value)
     {
         m_first[index] = value;
@@ -1091,6 +1091,18 @@ template <>
 inline void NullableVector<ref_type>::set_null(size_t index)
 {
     m_first[index] = 0;
+}
+
+// SizeOfAny
+template <>
+inline bool NullableVector<SizeOfList>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
+template <>
+inline void NullableVector<SizeOfList>::set_null(size_t index)
+{
+    m_first[index].set_null();
 }
 
 template <typename Operator>
@@ -2106,9 +2118,9 @@ public:
         return m_column_ndx;
     }
 
-    SizeOperator<Size<T>> size()
+    SizeOperator<T> size()
     {
-        return SizeOperator<Size<T>>(this->clone(nullptr));
+        return SizeOperator<T>(this->clone(nullptr));
     }
 
 private:
@@ -2346,7 +2358,7 @@ private:
     LinkMap m_link_map;
 };
 
-template <class oper, class TExpr>
+template <class T, class TExpr>
 class SizeOperator : public Subexpr2<Int> {
 public:
     SizeOperator(std::unique_ptr<TExpr> left)
@@ -2358,6 +2370,11 @@ public:
     void set_base_table(const Table* table) override
     {
         m_expr->set_base_table(table);
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_expr->set_cluster(cluster);
     }
 
     void verify_column() const override
@@ -2391,7 +2408,7 @@ public:
                 d->m_storage.set_null(i);
             }
             else {
-                d->m_storage.set(i, oper()(*elem));
+                d->m_storage.set(i, elem->size());
             }
         }
     }
@@ -2420,7 +2437,6 @@ private:
     {
     }
 
-    typedef typename oper::type T;
     std::unique_ptr<TExpr> m_expr;
 };
 
@@ -2636,6 +2652,9 @@ public:
     Array* m_leaf_ptr = nullptr;
 };
 
+template <typename>
+class ColumnListSize;
+
 template <typename T>
 class Columns<List<T>> : public Subexpr2<T>, public ColumnListBase {
 public:
@@ -2721,6 +2740,8 @@ public:
         return "";
     }
 
+    SizeOperator<SizeOfList> size();
+
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
     {
         return {m_column_ndx, *this};
@@ -2750,6 +2771,49 @@ private:
     {
     }
 };
+
+template <typename T>
+class ColumnListSize : public Columns<List<T>> {
+public:
+    ColumnListSize(const Columns<List<T>>& other)
+        : Columns<List<T>>(other)
+    {
+    }
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        REALM_ASSERT_DEBUG(dynamic_cast<Value<SizeOfList>*>(&destination) != nullptr);
+        Value<SizeOfList>* d = static_cast<Value<SizeOfList>*>(&destination);
+
+        Allocator& alloc = this->get_base_table()->get_alloc();
+        Value<ref_type> list_refs;
+        this->get_lists(index, list_refs, 1);
+        d->init(list_refs.m_from_link_list, list_refs.m_values);
+
+        for (size_t i = 0; i < list_refs.m_values; i++) {
+            ref_type list_ref = list_refs.m_storage[i];
+            if (list_ref) {
+                typename ColumnTypeTraits<T>::cluster_leaf_type leaf(alloc);
+                leaf.init_from_ref(list_ref);
+                size_t s = leaf.size();
+                d->m_storage.set(i, SizeOfList(s));
+            }
+            else {
+                d->m_storage.set_null(i);
+            }
+        }
+    }
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    {
+        return std::unique_ptr<Subexpr>(new ColumnListSize<T>(*this));
+    }
+};
+
+template <typename T>
+SizeOperator<SizeOfList> Columns<List<T>>::size()
+{
+    std::unique_ptr<Subexpr> ptr(new ColumnListSize<T>(*this));
+    return SizeOperator<SizeOfList>(std::move(ptr));
+}
 
 template <typename T, typename Operation>
 class ListColumnAggregate : public Subexpr2<typename Operation::ResultType> {
