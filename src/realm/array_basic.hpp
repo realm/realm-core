@@ -28,6 +28,8 @@ namespace realm {
 template <class T>
 class BasicArray : public Array {
 public:
+    using value_type = T;
+
     explicit BasicArray(Allocator&) noexcept;
     ~BasicArray() noexcept override
     {

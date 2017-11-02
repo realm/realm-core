@@ -3019,11 +3019,12 @@ public:
         return m_link_map.base_table();
     }
 
-    template <class ColType2 = ColType>
+    template <class LeafType2 = LeafType>
     void evaluate_internal(size_t index, ValueBase& destination)
     {
         REALM_ASSERT(m_leaf_ptr != nullptr);
-        using U = typename ColType2::value_type;
+        using U = typename LeafType2::value_type;
+        auto leaf = reinterpret_cast<const LeafType2*>(m_leaf_ptr); // TODO change to dynamic_cast at some point
 
         if (links_exist()) {
             // LinkList with more than 0 values. Create Value with payload for all fields
@@ -3046,7 +3047,7 @@ public:
         }
         else {
             // Not a Link column
-            size_t colsize = m_leaf_ptr->size();
+            size_t colsize = leaf->size();
 
             // Now load `ValueBase::default_size` rows from from the leaf into m_storage. If it's an integer
             // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first
@@ -3057,7 +3058,7 @@ public:
                 // If you want to modify 'default_size' then update Array::get_chunk()
                 REALM_ASSERT_3(ValueBase::default_size, ==, 8);
 
-                auto leaf_2 = reinterpret_cast<const Array*>(m_leaf_ptr); // TODO change to dynamic_cast at some point
+                auto leaf_2 = reinterpret_cast<const Array*>(leaf); // TODO change to dynamic_cast at some point
                 leaf_2->get_chunk(index, v.m_storage.m_first);
 
                 destination.import(v);
@@ -3069,7 +3070,7 @@ public:
                 Value<typename util::RemoveOptional<U>::type> v(false, rows);
 
                 for (size_t t = 0; t < rows; t++)
-                    v.m_storage.set(t, m_leaf_ptr->get(index + t));
+                    v.m_storage.set(t, leaf->get(index + t));
 
                 destination.import(v);
             }
@@ -3093,10 +3094,10 @@ public:
     void evaluate(size_t index, ValueBase& destination) override
     {
         if (m_nullable && std::is_same<typename ColType::value_type, int64_t>::value) {
-            evaluate_internal<IntNullColumn>(index, destination);
+            evaluate_internal<ArrayIntNull>(index, destination);
         }
         else {
-            evaluate_internal<ColType>(index, destination);
+            evaluate_internal<LeafType>(index, destination);
         }
     }
 
