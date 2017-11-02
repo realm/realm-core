@@ -16,7 +16,8 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Add support for libfuzzer.
+  PR [#2922](https://github.com/realm/realm-core/pull/2922).
 
 ----------------------------------------------
 
