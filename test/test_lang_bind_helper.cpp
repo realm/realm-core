@@ -195,8 +195,7 @@ private:
 
 } // anonymous namespace
 
-#ifdef TEST_LANG_BIND_HELPER_OLD
-
+#ifdef LEGACY_TESTS
 // FIXME: Move this test to test_table.cpp
 TEST(LangBindHelper_SetSubtable)
 {
@@ -13515,7 +13514,7 @@ TEST(LangBindHelper_UpdateDescriptor)
     CHECK_EQUAL(tv.size(), 1);
 }
 
-#endif // TEST_LANG_BIND_HELPER_OLD
+#endif // LEGACY_TESTS
 
 TEST(LangBindHelper_RemoveObject)
 {

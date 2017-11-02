@@ -24,6 +24,7 @@
 #include <mutex>
 #include <sstream>
 #include <type_traits>
+#include <random>
 
 #include <realm/util/features.h>
 #include <realm/util/errno.hpp>
@@ -411,7 +412,7 @@ struct alignas(8) SharedGroup::SharedInfo {
     ///
     /// CAUTION: This member must never move or change type, as that would
     /// compromize safety of the the session initiation process.
-    uint8_t init_complete = 0; // Offset 0
+    std::atomic<uint8_t> init_complete; // Offset 0
 
     /// The size in bytes of a mutex member of SharedInfo. This allows all
     /// session participants to be in agreement. Obviously, a size match is not
@@ -578,7 +579,8 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 #endif
     static_assert(offsetof(SharedInfo, init_complete) == 0 &&
-                  std::is_same<decltype(init_complete), uint8_t>::value &&
+                  ATOMIC_BOOL_LOCK_FREE==2 &&
+                  std::is_same<decltype(init_complete), std::atomic<uint8_t>>::value &&
                   offsetof(SharedInfo, shared_info_version) == 6 &&
                   std::is_same<decltype(shared_info_version), uint16_t>::value,
                   "Forbidden change in SharedInfo layout");
@@ -791,7 +793,24 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
     int target_file_format_version;
     int stored_hist_schema_version = -1; // Signals undetermined
 
+    int retries_left = 10; // number of times to retry before throwing exceptions
+    // in case there is something wrong with the .lock file... the retries allows
+    // us to pick a new lockfile initializer in case the first one crashes without
+    // completing the initialization
+    std::default_random_engine random_gen;
     for (;;) {
+
+        // if we're retrying, we first wait a random time
+        if (retries_left < 10) {
+            if (retries_left == 9) { // we seed it from a true random source if possible
+                std::random_device r;
+                random_gen.seed(r());
+            }
+            int max_delay = (10 - retries_left) * 10;
+            int msecs = random_gen() % max_delay;
+            millisleep(msecs);
+        }
+
         m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
         File::CloseGuard fcg(m_file);
 
@@ -799,35 +818,28 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             File::UnlockGuard ulg(m_file);
 
             // We're alone in the world, and it is Ok to initialize the
-            // file. Start by truncating the file, to maximize the chance of a
-            // an incorrectly initialized file gets rejected by other session
-            // participants that get the shared file lock after the initiator
-            // has dies half way through the initialization. Note, however, that
-            // this can still happen if the initializing process is dies before
-            // the truncation, but after obtaining the exclusive file lock.
+            // file. Start by truncating the file to zero to ensure that
+            // the following resize will generate a file filled with zeroes.
+            // 
+            // This will in particular set m_init_complete to 0.
             m_file.resize(0);
+            m_file.resize(sizeof(SharedInfo));
 
-            // Write an initialized SharedInfo structure to the file, but with
-            // init_complete = 0. Need to fill with zeros before constructing
-            // due to the bit field members. Otherwise we would write
-            // uninitialized bits to the file.
-            alignas(SharedInfo) char buffer[sizeof (SharedInfo)] = {0};
-            new (buffer) SharedInfo{options.durability, openers_hist_type,
-                                    openers_hist_schema_version}; // Throws
-            m_file.write(buffer, sizeof buffer); // Throws
-
-            // Mark the file as completely initialized via a memory
-            // mapping. Since this is done as a separate final step (involving
-            // separate system calls) there is no chance of the individual
-            // modifications to get reordered, even in case of a crash at a
-            // random position during the initialization (except if it happens
-            // before the truncation). This could also have been done by a
-            // util::File::write(), but it is more convenient to manipulate the
-            // structure via its type.
+            // We can crash anytime during this process. A crash prior to
+            // the first resize could allow another thread which could not
+            // get the exclusive lock because we hold it, and hence were
+            // waiting for the shared lock instead, to observe and use an
+            // old lock file.
             m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo),
                            File::map_NoSync); // Throws
             File::UnmapGuard fug(m_file_map);
             SharedInfo* info_2 = m_file_map.get_addr();
+            
+            new (info_2) SharedInfo{options.durability, openers_hist_type,
+                                    openers_hist_schema_version}; // Throws
+            
+            // Because init_complete is an std::atomic, it's guaranteed not to be observable by others
+            // as being 1 before the entire SharedInfo header has been written.
             info_2->init_complete = 1;
         }
 
@@ -901,11 +913,19 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         // initializaed with a different memory layout if other concurrent
         // session participants use different versions of the core library.
         if (info_size < sizeof(SharedInfo)) {
+            if (retries_left) {
+                --retries_left;
+                continue;
+            }
             std::stringstream ss;
             ss << "Info size doesn't match, " << info_size << " " << sizeof(SharedInfo) << ".";
             throw IncompatibleLockFile(ss.str());
         }
         if (info->shared_info_version != g_shared_info_version) {
+            if (retries_left) {
+                --retries_left;
+                continue;
+            }
             std::stringstream ss;
             ss << "Shared info version doesn't match, " << info->shared_info_version << " " << g_shared_info_version
                << ".";
@@ -917,6 +937,10 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         // `size_of_mutex` and `size_of_condvar` are known to be as expected due
         // to the preceeding check in `shared_info_version`.
         if (info->size_of_mutex != sizeof info->shared_controlmutex) {
+            if (retries_left) {
+                --retries_left;
+                continue;
+            }
             std::stringstream ss;
             ss << "Mutex size doesn't match: " << info->size_of_mutex << " " << sizeof(info->shared_controlmutex)
                << ".";
@@ -924,6 +948,10 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         }
 
         if (info->size_of_condvar != sizeof info->room_to_write) {
+            if (retries_left) {
+                --retries_left;
+                continue;
+            }
             std::stringstream ss;
             ss << "Condtion var size doesn't match: " << info->size_of_condvar << " " << sizeof(info->room_to_write)
                << ".";

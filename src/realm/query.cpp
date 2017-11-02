@@ -52,8 +52,8 @@ Query::Query(Table& table, TableViewBase* tv)
 
 Query::Query(const Table& table, const LinkViewRef& lv)
     : m_table((const_cast<Table&>(table)).get_table_ref())
-    , m_view(lv.get())
-    , m_source_link_view(lv)
+//    , m_view(lv.get())        TODO
+//    , m_source_link_view(lv)  TODO
 {
 #ifdef REALM_DEBUG
     if (m_view)
@@ -221,8 +221,9 @@ void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
         m_source_table_view->apply_and_consume_patch(patch.table_view_data, dest_group);
     }
     m_source_link_view = LinkView::create_from_and_consume_patch(patch.link_view_data, dest_group);
-    if (m_source_link_view)
-        m_view = m_source_link_view.get();
+    if (m_source_link_view) {
+        // m_view = m_source_link_view.get();   TODO
+    }
     else if (m_source_table_view)
         m_view = m_source_table_view;
     else
@@ -854,17 +855,17 @@ Query& Query::like(size_t column_ndx, StringData value, bool case_sensitive)
 
 // Aggregates =================================================================================
 
-size_t Query::peek_tablerow(size_t tablerow) const
+bool Query::eval_object(ConstObj& obj) const
 {
 #ifdef REALM_DEBUG
     m_view->check_cookie();
 #endif
 
     if (has_conditions())
-        return root_node()->find_first(tablerow, tablerow + 1);
+        return root_node()->match(obj);
 
     // Query has no conditions, so all rows match, also the user given argument
-    return tablerow;
+    return true;
 }
 
 template <Action action, typename T, typename R, class ColType>
@@ -908,9 +909,9 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
         }
         else {
             for (size_t t = 0; t < m_view->size(); t++) {
-                size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
-                if (tablerow >= start && tablerow < end && peek_tablerow(tablerow) != not_found) {
-                    st.template match<action, false>(tablerow, 0, source_column.get_next(tablerow));
+                ConstObj obj = m_view->get(t);
+                if (t >= start && t < end && eval_object(obj)) {
+                    st.template match<action, false>(size_t(obj.get_key().value), 0, obj.get<T>(column_ndx));
                     if (st.m_match_count >= limit) {
                         break;
                     }
@@ -1280,14 +1281,14 @@ Query& Query::end_subtable()
 }
 
 // todo, add size_t end? could be useful
-size_t Query::find(size_t begin)
+Key Query::find(size_t begin)
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Find);
 #endif
 
     if (m_table->is_degenerate())
-        return not_found;
+        return null_key;
 
     REALM_ASSERT_3(begin, <=, m_table->size());
 
@@ -1296,29 +1297,41 @@ size_t Query::find(size_t begin)
     // User created query with no criteria; return first
     if (!has_conditions()) {
         if (m_view) {
-            for (size_t t = 0; t < m_view->size(); t++) {
-                size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
-                if (tablerow >= begin)
-                    return tablerow;
+            if (begin < m_view->size()) {
+                return Key(m_view->m_key_values.get(begin));
             }
-            return not_found;
+            return null_key;
         }
         else
-            return m_table->size() == 0 ? not_found : begin;
+            return m_table->size() == 0 ? null_key : m_table->begin()->get_key();
     }
 
     if (m_view) {
-        for (size_t t = 0; t < m_view->size(); t++) {
-            size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
-            if (tablerow >= begin && peek_tablerow(tablerow) != not_found)
-                return tablerow;
+        while (begin < m_view->size()) {
+            ConstObj obj = m_view->get(begin);
+            if (eval_object(obj)) {
+                return obj.get_key();
+            }
+            begin++;
         }
-        return not_found;
+        return null_key;
     }
     else {
-        size_t end = m_table->size();
-        size_t res = root_node()->find_first(begin, end);
-        return (res == end) ? not_found : res;
+        auto node = root_node();
+        Key key;
+        m_table->traverse_clusters([&node, &key](const Cluster* cluster, int64_t key_offset) {
+            size_t end = cluster->node_size();
+            node->set_cluster(cluster);
+            size_t res = node->find_first(0, end);
+            if (res != not_found) {
+                key = Key(cluster->get_key(res) + key_offset);
+                // We should just find one - we're done
+                return true;
+            }
+            // Continue
+            return false;
+        });
+        return key;
     }
 }
 
@@ -1336,24 +1349,33 @@ void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit)
 
     if (m_view) {
         for (size_t t = 0; t < m_view->size() && ret.size() < limit; t++) {
-            size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
-            if (tablerow >= begin && tablerow < end && peek_tablerow(tablerow) != not_found) {
-                ret.m_row_indexes.add(tablerow);
+            ConstObj obj = m_view->get(t);
+            if (t >= begin && t < end && eval_object(obj)) {
+                ret.m_key_values.add(obj.get_key().value);
             }
         }
     }
     else {
         if (!has_conditions()) {
-            IntegerColumn& refs = ret.m_row_indexes;
-            for (size_t i = begin; i < end && refs.size() < limit; ++i) {
-                refs.add(i);
+            IntegerColumn& refs = ret.m_key_values;
+            for (auto o : *m_table) {
+                refs.add(o.get_key().value);
             }
         }
         else {
+            auto node = root_node();
             QueryState<int64_t> st;
-            st.init(act_FindAll, &ret.m_row_indexes, limit);
-            aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, false, root_node(), &st, begin, end,
-                               nullptr);
+            st.init(act_FindAll, &ret.m_key_values, limit);
+
+            m_table->traverse_clusters([&node, &st, this](const Cluster* cluster, int64_t key_offsets) {
+                size_t e = cluster->node_size();
+                node->set_cluster(cluster);
+                st.m_key_offset = key_offsets;
+                st.m_key_values = cluster->get_key_array();
+                aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, false, node, &st, 0, e, nullptr);
+                // Continue
+                return false;
+            });
         }
     }
 }
@@ -1397,16 +1419,25 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 
     if (m_view) {
         for (size_t t = 0; t < m_view->size() && cnt < limit; t++) {
-            size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
-            if (tablerow >= start && tablerow < end && peek_tablerow(tablerow) != not_found) {
+            ConstObj obj = m_view->get(t);
+            if (t >= start && t < end && eval_object(obj)) {
                 cnt++;
             }
         }
     }
     else {
+        auto node = root_node();
         QueryState<int64_t> st;
         st.init(act_Count, nullptr, limit);
-        aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, false, root_node(), &st, start, end, nullptr);
+
+        m_table->traverse_clusters([&node, &st, this](const Cluster* cluster, int64_t key_offsets) {
+            size_t e = cluster->node_size();
+            node->set_cluster(cluster);
+            st.m_key_offset = key_offsets;
+            st.m_key_values = cluster->get_key_array();
+            aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, false, node, &st, 0, e, nullptr);
+            return false;
+        });
         cnt = size_t(st.m_state);
     }
 

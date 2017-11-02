@@ -45,6 +45,7 @@ set(REALM_SOURCES
     spec.cpp
     string_data.cpp
     table.cpp
+    obj_list.cpp
     table_view.cpp
     unicode.cpp
     util/basic_system_errors.cpp
@@ -130,6 +131,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     string_data.hpp
     table.hpp
     table_ref.hpp
+    obj_list.hpp
     table_view.hpp
     timestamp.hpp
     unicode.hpp
@@ -283,7 +285,7 @@ endif()
 if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE)
     if(ANDROID)
         string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
-        set(OPENSSL_FILENAME "openssl-${BUILD_TYPE}-${ANDROID_OPENSSL_VERSION}-Android-${ANDROID_ABI}")
+        set(OPENSSL_FILENAME "openssl-${BUILD_TYPE}-${ANDROID_OPENSSL_VERSION}-${ANDROID_OPENSSL_BUILD_NUMBER}-Android-${ANDROID_ABI}")
         set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${ANDROID_ABI}/${OPENSSL_FILENAME}.tar.gz")
 
         message(STATUS "Downloading OpenSSL...")
@@ -295,6 +297,10 @@ if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE)
         set(OPENSSL_ROOT_DIR "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}")
         set(OPENSSL_INCLUDE_DIR "${OPENSSL_ROOT_DIR}/include")
         set(OPENSSL_CRYPTO_LIBRARY "${OPENSSL_ROOT_DIR}/lib/libcrypto.a")
+        install(
+            DIRECTORY ${OPENSSL_ROOT_DIR}
+            DESTINATION .
+            COMPONENT devel)
     endif()
     find_package(OpenSSL REQUIRED)
     target_include_directories(realm-objects PUBLIC ${OPENSSL_INCLUDE_DIR})

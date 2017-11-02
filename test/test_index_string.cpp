@@ -973,6 +973,7 @@ TEST_TYPES(StringIndex_Null, nullable_string_column, nullable_enum_column)
     CHECK_EQUAL(r1, 1);
 }
 
+#ifdef LEGACY_TESTS
 TEST_TYPES(StringIndex_Zero_Crash, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
     bool nullable = TEST_TYPE::is_nullable();
@@ -1096,6 +1097,7 @@ TEST_TYPES(StringIndex_Zero_Crash2, std::true_type, std::false_type)
         }
     }
 }
+#endif
 
 TEST(StringIndex_Integer_Increasing)
 {
@@ -1424,6 +1426,7 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
     col.clear(); // calls recursive function Array::destroy_deep()
 }
 
+#ifdef LEGACY_TESTS
 TEST_TYPES(StringIndex_InsertLongPrefixAndQuery, string_column, nullable_string_column, enum_column,
            nullable_enum_column)
 {
@@ -1539,7 +1542,7 @@ TEST(StringIndex_Fuzzy)
                 CHECK_EQUAL(tv0.size(), tv1.size());
 
                 for (size_t v = 0; v < tv0.size(); v++) {
-                    CHECK_EQUAL(tv0.get_source_ndx(v), tv1.get_source_ndx(v));
+                    CHECK_EQUAL(tv0.get_source_key(v), tv1.get_source_key(v));
                 }
             }
 
@@ -1563,7 +1566,7 @@ TEST(StringIndex_Fuzzy)
                 CHECK_EQUAL(tv0.size(), tv1.size());
 
                 for (size_t v = 0; v < tv0.size(); v++) {
-                    CHECK_EQUAL(tv0.get_source_ndx(v), tv1.get_source_ndx(v));
+                    CHECK_EQUAL(tv0.get_source_key(v), tv1.get_source_key(v));
                 }
             }
             if (t->size() > 10)
@@ -1585,7 +1588,7 @@ TEST(StringIndex_Fuzzy)
         }
     }
 }
-
+#endif
 
 namespace {
 

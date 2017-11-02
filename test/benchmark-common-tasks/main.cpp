@@ -566,6 +566,7 @@ struct BenchmarkGetLongString : BenchmarkWithLongStrings {
     }
 };
 
+#ifdef LEGACY_TESTS
 struct BenchmarkQueryLongString : BenchmarkWithStrings {
     static constexpr const char* long_string = "This is some other long string, that takes a lot of time to find";
     bool ok;
@@ -693,6 +694,7 @@ struct BenchmarkQueryInsensitiveStringIndexed : BenchmarkQueryInsensitiveString 
         tr.commit();
     }
 };
+#endif
 
 struct BenchmarkSetLongString : BenchmarkWithLongStrings {
     const char* name() const
@@ -982,12 +984,14 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQuery);
     BENCH(BenchmarkQueryNot);
     BENCH(BenchmarkSize);
+#ifdef LEGACY_TESTS
     BENCH(BenchmarkSort);
     BENCH(BenchmarkSortInt);
     BENCH(BenchmarkDistinctIntFewDupes);
     BENCH(BenchmarkDistinctIntManyDupes);
     BENCH(BenchmarkDistinctStringFewDupes);
     BENCH(BenchmarkDistinctStringManyDupes);
+#endif
     BENCH(BenchmarkFindAllStringFewDupes);
     BENCH(BenchmarkFindAllStringManyDupes);
     BENCH(BenchmarkFindFirstStringFewDupes);
@@ -997,11 +1001,13 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkSetString);
     BENCH(BenchmarkCreateIndex);
     BENCH(BenchmarkGetLongString);
-    BENCH(BenchmarkQueryLongString);
     BENCH(BenchmarkSetLongString);
     BENCH(BenchmarkGetLinkList);
+#ifdef LEGACY_TESTS
+    BENCH(BenchmarkQueryLongString);
     BENCH(BenchmarkQueryInsensitiveString);
     BENCH(BenchmarkQueryInsensitiveStringIndexed);
+#endif
     BENCH(BenchmarkNonInitatorOpen);
 
 #undef BENCH

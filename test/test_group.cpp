@@ -915,7 +915,7 @@ TEST(Group_TableAccessorLeftBehind)
     CHECK(!subtable->is_attached());
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Group_SubtableDescriptors)
 {
     // This test originally only failed when checked with valgrind as the
@@ -950,6 +950,7 @@ TEST(Group_SubtableDescriptors)
     g.commit();
     table->get_subdescriptor(0)->remove_search_index(0);
 }
+#endif
 
 TEST(Group_UpdateSubtableDescriptorsAccessors)
 {
@@ -1234,7 +1235,7 @@ TEST(Group_Close)
     Group from_mem(buffer);
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Group_Serialize_Optimized)
 {
     // Create group with one table
@@ -1279,7 +1280,7 @@ TEST(Group_Serialize_Optimized)
     from_mem.verify();
 #endif
 }
-
+#endif
 
 TEST(Group_Serialize_All)
 {
@@ -1922,7 +1923,7 @@ TEST(Group_ToString)
     CHECK_EQUAL("     tables     rows  \n   0 test       2     \n", str.c_str());
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Group_IndexString)
 {
     Group to_mem;
@@ -1992,7 +1993,7 @@ TEST(Group_IndexString)
     CHECK_EQUAL(not_found, m7);
     CHECK_EQUAL(6, m8);
 }
-
+#endif
 
 TEST(Group_StockBug)
 {
@@ -2032,7 +2033,7 @@ TEST(Group_CommitLinkListChange)
     group.verify();
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Group_Commit_Update_Integer_Index)
 {
     // This reproduces a bug where a commit would fail to update the Column::m_search_index pointer
@@ -2058,7 +2059,7 @@ TEST(Group_Commit_Update_Integer_Index)
     // This would fail (sometimes return not_found, sometimes crash)
     CHECK(t->find_first_int(0, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == 0);
 }
-
+#endif
 
 TEST(Group_CascadeNotify_Simple)
 {
@@ -2303,7 +2304,7 @@ TEST(Group_CascadeNotify_TableClear)
     CHECK(called);
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Group_CascadeNotify_TableViewClear)
 {
     GROUP_TEST_PATH(path);
@@ -2389,7 +2390,7 @@ TEST(Group_CascadeNotify_TableViewClear)
     origin->where().find_all().clear();
     CHECK(called);
 }
-
+#endif
 
 TEST(Group_AddEmptyRowCrash)
 {

@@ -130,6 +130,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/column_link.hpp>
 #include <realm/column_linklist.hpp>
 #include <realm/column_table.hpp>
+#include <realm/array_bool.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/impl/sequential_getter.hpp>
 #include <realm/link_view.hpp>
@@ -391,6 +392,9 @@ public:
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_base_table(const Table* table) = 0;
+    virtual void set_cluster(const Cluster*)
+    {
+    }
     virtual void verify_column() const = 0;
     virtual const Table* get_base_table() const = 0;
     virtual std::string description() const = 0;
@@ -431,6 +435,10 @@ public:
 
     virtual void verify_column() const = 0;
     virtual std::string description() const = 0;
+
+    virtual void set_cluster(const Cluster*)
+    {
+    }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and
@@ -1828,7 +1836,7 @@ public:
     void verify_columns() const
     {
         for (size_t i = 0; i < m_link_column_indexes.size(); i++) {
-            m_tables[i]->verify_column(m_link_column_indexes[i], m_link_columns[i]);
+            m_tables[i]->verify_column(m_link_column_indexes[i]);
         }
     }
 
@@ -2019,7 +2027,7 @@ public:
         // verify target table
         const Table* target_table = m_link_map.target_table();
         if (target_table && m_column_ndx != npos) {
-            target_table->verify_column(m_column_ndx, m_column);
+            target_table->verify_column(m_column_ndx);
         }
     }
 
@@ -2589,7 +2597,7 @@ public:
     void verify_column() const override
     {
         m_link_map.verify_columns();
-        m_link_map.target_table()->verify_column(m_column_ndx, m_column);
+        m_link_map.target_table()->verify_column(m_column_ndx);
     }
 
     std::string description() const override
@@ -2943,6 +2951,7 @@ template <class T>
 class Columns : public Subexpr2<T> {
 public:
     using ColType = typename ColumnTypeTraits<T>::column_type;
+    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
 
     Columns(size_t column, const Table* table, std::vector<size_t> links = {})
         : m_link_map(table, std::move(links))
@@ -2956,27 +2965,12 @@ public:
         , m_column_ndx(other.m_column_ndx)
         , m_nullable(other.m_nullable)
     {
-        if (!other.m_sg)
-            return;
-
-        if (patches) {
-            m_column_ndx = other.get_column_base().get_column_index();
-        }
-        else {
-            if (m_nullable && std::is_same<typename ColType::value_type, int64_t>::value) {
-                init<IntNullColumn>(&other.get_column_base());
-            }
-            else {
-                init<ColType>(&other.get_column_base());
-            }
-        }
     }
 
     Columns& operator=(const Columns& other)
     {
         if (this != &other) {
             m_link_map = other.m_link_map;
-            m_sg.reset();
             m_column_ndx = other.m_column_ndx;
             m_nullable = other.m_nullable;
         }
@@ -2991,19 +2985,20 @@ public:
     // See comment in base class
     void set_base_table(const Table* table) override
     {
-        if (m_sg && table == get_base_table())
+        if (table == get_base_table())
             return;
 
         m_link_map.set_base_table(table);
         m_nullable = m_link_map.target_table()->is_nullable(m_column_ndx);
+    }
 
-        const ColumnBase* c = &m_link_map.target_table()->get_column_base(m_column_ndx);
-        if (m_nullable && std::is_same<typename ColType::value_type, int64_t>::value) {
-            init<IntNullColumn>(c);
-        }
-        else {
-            init<ColType>(c);
-        }
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_array_ptr = nullptr;
+        // Create new Leaf
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(get_base_table()->get_alloc()));
+        cluster->init_leaf(this->m_column_ndx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
     }
 
     void verify_column() const override
@@ -3013,18 +3008,8 @@ public:
         // verify target table
         const Table* target_table = m_link_map.target_table();
         if (target_table && m_column_ndx != npos) {
-            target_table->verify_column(m_column_ndx, &get_column_base());
+            target_table->verify_column(m_column_ndx);
         }
-    }
-
-    template <class ActualColType>
-    void init(const ColumnBase* c)
-    {
-        REALM_ASSERT_DEBUG(dynamic_cast<const ActualColType*>(c));
-        if (m_sg == nullptr) {
-            m_sg.reset(new SequentialGetter<ActualColType>());
-        }
-        static_cast<SequentialGetter<ActualColType>&>(*m_sg).init(static_cast<const ActualColType*>(c));
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
@@ -3034,19 +3019,16 @@ public:
         return m_link_map.base_table();
     }
 
-    template <class ColType2 = ColType>
+    template <class LeafType2 = LeafType>
     void evaluate_internal(size_t index, ValueBase& destination)
     {
-        REALM_ASSERT_DEBUG(m_sg.get());
-        REALM_ASSERT_DEBUG(dynamic_cast<SequentialGetter<ColType2>*>(m_sg.get()));
-
-        using U = typename ColType2::value_type;
-        auto sgc = static_cast<SequentialGetter<ColType2>*>(m_sg.get());
-        REALM_ASSERT_DEBUG(sgc->m_column);
+        REALM_ASSERT(m_leaf_ptr != nullptr);
+        using U = typename LeafType2::value_type;
+        auto leaf = reinterpret_cast<const LeafType2*>(m_leaf_ptr); // TODO change to dynamic_cast at some point
 
         if (links_exist()) {
             // LinkList with more than 0 values. Create Value with payload for all fields
-
+            /*
             std::vector<size_t> links = m_link_map.get_links(index);
             auto v = make_value_for_link<typename util::RemoveOptional<U>::type>(m_link_map.only_unary_links(),
                                                                                  links.size());
@@ -3061,24 +3043,23 @@ public:
                     v.m_storage.set(t, sgc->get_next(link_to));
             }
             destination.import(v);
+            */
         }
         else {
             // Not a Link column
-            // make sequential getter load the respective leaf to access data at column row 'index'
-            sgc->cache_next(index);
-            size_t colsize = sgc->m_column->size();
+            size_t colsize = leaf->size();
 
             // Now load `ValueBase::default_size` rows from from the leaf into m_storage. If it's an integer
             // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first
             // case of the `if` below. Otherwise, copy the values one by one in a for-loop (the `else` case).
-            if (std::is_same<U, int64_t>::value && index + ValueBase::default_size <= sgc->m_leaf_end) {
+            if (std::is_same<U, int64_t>::value && index + ValueBase::default_size <= colsize) {
                 Value<int64_t> v;
 
                 // If you want to modify 'default_size' then update Array::get_chunk()
                 REALM_ASSERT_3(ValueBase::default_size, ==, 8);
 
-                auto sgc_2 = static_cast<SequentialGetter<ColType>*>(m_sg.get());
-                sgc_2->m_leaf_ptr->get_chunk(index - sgc->m_leaf_start, v.m_storage.m_first);
+                auto leaf_2 = reinterpret_cast<const Array*>(leaf); // TODO change to dynamic_cast at some point
+                leaf_2->get_chunk(index, v.m_storage.m_first);
 
                 destination.import(v);
             }
@@ -3089,7 +3070,7 @@ public:
                 Value<typename util::RemoveOptional<U>::type> v(false, rows);
 
                 for (size_t t = 0; t < rows; t++)
-                    v.m_storage.set(t, sgc->get_next(index + t));
+                    v.m_storage.set(t, leaf->get(index + t));
 
                 destination.import(v);
             }
@@ -3113,10 +3094,10 @@ public:
     void evaluate(size_t index, ValueBase& destination) override
     {
         if (m_nullable && std::is_same<typename ColType::value_type, int64_t>::value) {
-            evaluate_internal<IntNullColumn>(index, destination);
+            evaluate_internal<ArrayIntNull>(index, destination);
         }
         else {
-            evaluate_internal<ColType>(index, destination);
+            evaluate_internal<LeafType>(index, destination);
         }
     }
 
@@ -3132,14 +3113,18 @@ public:
 
     size_t column_ndx() const noexcept
     {
-        return m_sg ? get_column_base().get_column_index() : m_column_ndx;
+        return m_column_ndx;
     }
 
 private:
     LinkMap m_link_map;
 
-    // Fast (leaf caching) value getter for payload column (column in table on which query condition is executed)
-    std::unique_ptr<SequentialGetterBase> m_sg;
+    // Leaf cache
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
+    using LeafPtr = std::unique_ptr<LeafType, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const LeafType* m_leaf_ptr = nullptr;
 
     // Column index of payload column of m_table
     size_t m_column_ndx;
@@ -3147,14 +3132,6 @@ private:
     // set to false by default for stand-alone Columns declaration that are not yet associated with any table
     // or oclumn. Call init() to update it or use a constructor that takes table + column index as argument.
     bool m_nullable = false;
-
-    const ColumnBase& get_column_base() const noexcept
-    {
-        if (m_nullable && std::is_same<int64_t, T>::value)
-            return *static_cast<SequentialGetter<IntNullColumn>&>(*m_sg).m_column;
-        else
-            return *static_cast<SequentialGetter<ColType>&>(*m_sg).m_column;
-    }
 };
 
 template <typename T, typename Operation>
@@ -3626,6 +3603,12 @@ public:
         m_right->set_base_table(table);
     }
 
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_left->set_cluster(cluster);
+        m_right->set_cluster(cluster);
+    }
+
     void verify_column() const override
     {
         m_left->verify_column();
@@ -3704,6 +3687,12 @@ public:
     {
         m_left->set_base_table(table);
         m_right->set_base_table(table);
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_left->set_cluster(cluster);
+        m_right->set_cluster(cluster);
     }
 
     void verify_column() const override

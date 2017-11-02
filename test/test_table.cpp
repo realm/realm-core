@@ -75,6 +75,31 @@ using unit_test::TestContext;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+namespace {
+
+class TestTable01 : public realm::Table {
+public:
+    TestTable01(Allocator& a)
+        : Table(a)
+    {
+        init();
+    }
+    TestTable01()
+    {
+        init();
+    }
+    void init()
+    {
+        add_column(type_Int, "first");
+        add_column(type_Int, "second");
+        add_column(type_Bool, "third");
+        add_column(type_Int, "fourth");
+    }
+};
+
+} // anonymous namespace
+
+#ifdef LEGACY_TESTS
 
 #ifdef JAVA_MANY_COLUMNS_CRASH
 
@@ -910,30 +935,6 @@ TEST(Table_Floats)
 #endif
 }
 
-namespace {
-
-class TestTable01 : public TestTable {
-public:
-    TestTable01(Allocator& a)
-        : TestTable(a)
-    {
-        init();
-    }
-    TestTable01()
-    {
-        init();
-    }
-    void init()
-    {
-        add_column(type_Int, "first");
-        add_column(type_Int, "second");
-        add_column(type_Bool, "third");
-        add_column(type_Int, "fourth");
-    }
-};
-
-} // anonymous namespace
-
 TEST(Table_2)
 {
     TestTable01 table;
@@ -949,28 +950,6 @@ TEST(Table_2)
 #endif
 }
 
-TEST(Table_3)
-{
-    TestTable01 table;
-
-    for (size_t i = 0; i < 100; ++i) {
-        add(table, 0, 10, true, Wed);
-    }
-
-    // Test column searching
-    CHECK_EQUAL(size_t(0), table.find_first_int(0, 0));
-    CHECK_EQUAL(size_t(-1), table.find_first_int(0, 1));
-    CHECK_EQUAL(size_t(0), table.find_first_int(1, 10));
-    CHECK_EQUAL(size_t(-1), table.find_first_int(1, 100));
-    CHECK_EQUAL(size_t(0), table.find_first_bool(2, true));
-    CHECK_EQUAL(size_t(-1), table.find_first_bool(2, false));
-    CHECK_EQUAL(size_t(0), table.find_first_int(3, Wed));
-    CHECK_EQUAL(size_t(-1), table.find_first_int(3, Mon));
-
-#ifdef REALM_DEBUG
-    table.verify();
-#endif
-}
 
 namespace {
 
@@ -984,27 +963,6 @@ public:
 };
 
 } // anonymous namespace
-
-TEST(Table_4)
-{
-    TestTableEnum table;
-
-    add(table, Mon, "Hello");
-    add(table, Mon, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
-
-    CHECK_EQUAL(Mon, table.get_int(0, 0));
-    CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello",
-                table.get_string(1, 1));
-
-    // Test string column searching
-    CHECK_EQUAL(size_t(1), table.find_first_string(
-                               1, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
-    CHECK_EQUAL(size_t(-1), table.find_first_string(1, "Foo"));
-
-#ifdef REALM_DEBUG
-    table.verify();
-#endif
-}
 
 namespace {
 
@@ -8745,6 +8703,7 @@ TEST(Table_KeyRow)
     i = table.find_first_int(0, 456);
     CHECK_EQUAL(i, 1);
 }
+#endif
 
 TEST(Table_object_basic)
 {
@@ -8905,6 +8864,28 @@ TEST(Table_object_basic)
     CHECK_EQUAL(k12.value, 12);
 }
 
+TEST(Table_remove_column)
+{
+    Table table;
+    table.add_column(type_Int, "int1");
+    auto int2_col = table.add_column(type_Int, "int2");
+    table.add_column(type_Int, "int3");
+
+    Obj obj = table.create_object(Key(5)).set_all(100, 7, 25);
+
+    CHECK_EQUAL(obj.get<int64_t>("int1"), 100);
+    CHECK_EQUAL(obj.get<int64_t>("int2"), 7);
+    CHECK_EQUAL(obj.get<int64_t>("int3"), 25);
+
+    table.remove_column(int2_col);
+
+    CHECK_EQUAL(obj.get<int64_t>("int1"), 100);
+    CHECK_THROW(obj.get<int64_t>("int2"), LogicError);
+    CHECK_EQUAL(obj.get<int64_t>("int3"), 25);
+    table.add_column(type_Int, "int4");
+    CHECK_EQUAL(obj.get<int64_t>("int4"), 0);
+}
+
 TEST(Table_object_merge_nodes)
 {
     // This test works best for REALM_MAX_BPNODE_SIZE == 8.
@@ -8949,6 +8930,13 @@ TEST(Table_object_forward_iterator)
     for (int i = 0; i < nb_rows; i++) {
         table.create_object(Key(i));
     }
+
+    int tree_size = 0;
+    table.traverse_clusters([&tree_size](const Cluster* cluster, int64_t) {
+        tree_size += cluster->node_size();
+        return false;
+    });
+    CHECK_EQUAL(tree_size, nb_rows);
 
     for (Obj o : table) {
         int64_t key_value = o.get_key().value;
@@ -9065,6 +9053,51 @@ TEST(Table_object_random)
               << std::endl;
     std::cout << "   erase time    : " << duration_cast<nanoseconds>(t4 - t3).count() / nb_rows << " ns/key"
               << std::endl;
+}
+
+TEST(Table_3)
+{
+    TestTable01 table;
+
+    for (int64_t i = 0; i < 100; ++i) {
+        table.create_object(Key(i)).set_all(i, 10, true, int(Wed));
+    }
+
+    // Test column searching
+    CHECK_EQUAL(Key(0), table.find_first_int(0, 0));
+    CHECK_EQUAL(Key(50), table.find_first_int(0, 50));
+    CHECK_EQUAL(null_key, table.find_first_int(0, 500));
+    CHECK_EQUAL(Key(0), table.find_first_int(1, 10));
+    CHECK_EQUAL(null_key, table.find_first_int(1, 100));
+    CHECK_EQUAL(Key(0), table.find_first_bool(2, true));
+    CHECK_EQUAL(null_key, table.find_first_bool(2, false));
+    CHECK_EQUAL(Key(0), table.find_first_int(3, Wed));
+    CHECK_EQUAL(null_key, table.find_first_int(3, Mon));
+
+#ifdef REALM_DEBUG
+    table.verify();
+#endif
+}
+
+TEST(Table_4)
+{
+    Table table;
+    table.add_column(type_String, "strings");
+
+    table.create_object(Key(5)).set(0, "Hello");
+    table.create_object(Key(7)).set(0, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
+
+    CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello",
+                table.get_object(Key(7)).get<String>(0));
+
+    // Test string column searching
+    CHECK_EQUAL(Key(7), table.find_first_string(
+                            0, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
+    CHECK_EQUAL(null_key, table.find_first_string(0, "Foo"));
+
+#ifdef REALM_DEBUG
+    table.verify();
+#endif
 }
 
 #endif // TEST_TABLE

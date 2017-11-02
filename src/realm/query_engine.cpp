@@ -51,6 +51,16 @@ size_t ParentNode::find_first(size_t start, size_t end)
     return not_found;
 }
 
+bool ParentNode::match(ConstObj& obj)
+{
+    auto cb = [this](const Cluster* cluster, size_t row) {
+        set_cluster(cluster);
+        size_t m = find_first(row, row + 1);
+        return m != npos;
+    };
+    return obj.evaluate(cb);
+}
+
 void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)
 {
     if (TAction == act_ReturnFirst) {
@@ -199,16 +209,15 @@ void StringNodeEqualBase::init()
 
     if (m_column_type == col_type_StringEnum) {
         m_dT = 1.0;
-        m_key_ndx = static_cast<const StringEnumColumn*>(m_condition_column)->get_key_ndx(m_value);
     }
-    else if (m_condition_column->has_search_index()) {
+    else if (m_has_search_index) {
         m_dT = 0.0;
     }
     else {
         m_dT = 10.0;
     }
 
-    if (m_condition_column->has_search_index()) {
+    if (m_has_search_index) {
         m_index_matches_destroy = false;
         m_last_start = size_t(-1);
 
@@ -219,17 +228,13 @@ void StringNodeEqualBase::init()
             m_index_getter.reset(new SequentialGetter<IntegerColumn>(m_index_matches.get()));
         }
     }
-    else if (m_column_type != col_type_String) {
-        REALM_ASSERT_DEBUG(dynamic_cast<const StringEnumColumn*>(m_condition_column));
-        m_cse.init(static_cast<const StringEnumColumn*>(m_condition_column));
-    }
 }
 
 size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
 {
     REALM_ASSERT(m_table);
 
-    if (m_condition_column->has_search_index()) {
+    if (m_has_search_index) {
         // Indexed string column
         if (!m_index_getter)
             return not_found; // no matches in the index
@@ -264,23 +269,6 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
         return not_found;
     }
 
-    if (m_column_type != col_type_String) {
-        // Enum string column
-        if (m_key_ndx == not_found)
-            return not_found; // not in key set
-
-        for (size_t s = start; s < end; ++s) {
-            m_cse.cache_next(s);
-            s = m_cse.m_leaf_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.local_end(end));
-            if (s == not_found)
-                s = m_cse.m_leaf_end - 1;
-            else
-                return s + m_cse.m_leaf_start;
-        }
-
-        return not_found;
-    }
-
     return _find_first_local(start, end);
 }
 
@@ -288,6 +276,8 @@ namespace realm {
 
 void StringNode<Equal>::_search_index_init()
 {
+// TODO: fix when search indexes are supported in clusters
+#if 0
     FindRes fr;
     InternalFindResult res;
 
@@ -323,52 +313,23 @@ void StringNode<Equal>::_search_index_init()
             m_index_getter.reset();
             break;
     }
+#endif
 }
 
 size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 {
-    // Normal string column, with long or short leaf
-    for (size_t s = start; s < end; ++s) {
-        const StringColumn* asc = static_cast<const StringColumn*>(m_condition_column);
-        if (s >= m_leaf_end || s < m_leaf_start) {
-            clear_leaf_state();
-            size_t ndx_in_leaf;
-            m_leaf = asc->get_leaf(s, ndx_in_leaf, m_leaf_type);
-            m_leaf_start = s - ndx_in_leaf;
-            if (m_leaf_type == StringColumn::leaf_type_Small)
-                m_leaf_end = m_leaf_start + static_cast<const ArrayStringShort&>(*m_leaf).size();
-            else if (m_leaf_type == StringColumn::leaf_type_Medium)
-                m_leaf_end = m_leaf_start + static_cast<const ArrayStringLong&>(*m_leaf).size();
-            else
-                m_leaf_end = m_leaf_start + static_cast<const ArrayBigBlobs&>(*m_leaf).size();
-            REALM_ASSERT(m_leaf);
-        }
-        size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
-
-        if (m_leaf_type == StringColumn::leaf_type_Small)
-            s = static_cast<const ArrayStringShort&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
-        else if (m_leaf_type == StringColumn::leaf_type_Medium)
-            s = static_cast<const ArrayStringLong&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
-        else
-            s = static_cast<const ArrayBigBlobs&>(*m_leaf).find_first(str_to_bin(m_value), true, s - m_leaf_start,
-                                                                      end2);
-
-        if (s == not_found)
-            s = m_leaf_end - 1;
-        else
-            return s + m_leaf_start;
-    }
-
-    return not_found;
+    return m_leaf_ptr->find_first(m_value, start, end);
 }
 
 void StringNode<EqualIns>::_search_index_init()
 {
+// TODO: fix when search indexes are supported in clusters
+#if 0
     if (m_column_type == col_type_StringEnum) {
         REALM_ASSERT_RELEASE(false && "Case insensitive searches in StringEnum columns is not yet implemented.");
         // FindRes fr;
         InternalFindResult res;
-        /*fr = */ static_cast<const StringEnumColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
+        static_cast<const StringEnumColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
     }
     else {
         m_index_matches.reset(
@@ -382,6 +343,7 @@ void StringNode<EqualIns>::_search_index_init()
     m_index_matches_destroy = true; // we own m_index_matches, so we must destroy it
     m_results_start = 0;
     m_results_end = m_index_matches->size();
+#endif
 }
 
 size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
@@ -542,6 +504,11 @@ ExpressionNode::ExpressionNode(std::unique_ptr<Expression> expression)
 void ExpressionNode::table_changed()
 {
     m_expression->set_base_table(m_table.get());
+}
+
+void ExpressionNode::cluster_changed()
+{
+    m_expression->set_cluster(m_cluster);
 }
 
 std::string ExpressionNode::describe() const

@@ -43,19 +43,19 @@ void ArrayString::init_from_ref(ref_type ref)
         // Small strings
         auto arr = new (&m_storage.m_string_short) ArrayStringShort(m_alloc, true);
         arr->init_from_mem(MemRef(header, ref, m_alloc));
-        m_type = Type::small;
+        m_type = Type::small_strings;
     }
     else {
         bool is_big = Array::get_context_flag_from_header(header);
         if (!is_big) {
             auto arr = new (&m_storage.m_string_long) ArraySmallBlobs(m_alloc);
             arr->init_from_mem(MemRef(header, ref, m_alloc));
-            m_type = Type::medium;
+            m_type = Type::medium_strings;
         }
         else {
             auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
             arr->init_from_mem(MemRef(header, ref, m_alloc));
-            m_type = Type::big;
+            m_type = Type::big_strings;
         }
     }
     m_arr->set_parent(parent, ndx_in_parent);
@@ -70,11 +70,11 @@ void ArrayString::init_from_parent()
 size_t ArrayString::size() const
 {
     switch (m_type) {
-        case Type::small:
+        case Type::small_strings:
             return static_cast<ArrayStringShort*>(m_arr)->size();
-        case Type::medium:
+        case Type::medium_strings:
             return static_cast<ArraySmallBlobs*>(m_arr)->size();
-        case Type::big:
+        case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->size();
     }
     return {};
@@ -83,13 +83,13 @@ size_t ArrayString::size() const
 void ArrayString::add(StringData value)
 {
     switch (upgrade_leaf(value.size())) {
-        case Type::small:
+        case Type::small_strings:
             static_cast<ArrayStringShort*>(m_arr)->add(value);
             break;
-        case Type::medium:
+        case Type::medium_strings:
             static_cast<ArraySmallBlobs*>(m_arr)->add_string(value);
             break;
-        case Type::big:
+        case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->add_string(value);
             break;
     }
@@ -98,13 +98,13 @@ void ArrayString::add(StringData value)
 void ArrayString::set(size_t ndx, StringData value)
 {
     switch (upgrade_leaf(value.size())) {
-        case Type::small:
+        case Type::small_strings:
             static_cast<ArrayStringShort*>(m_arr)->set(ndx, value);
             break;
-        case Type::medium:
+        case Type::medium_strings:
             static_cast<ArraySmallBlobs*>(m_arr)->set_string(ndx, value);
             break;
-        case Type::big:
+        case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->set_string(ndx, value);
             break;
     }
@@ -113,13 +113,13 @@ void ArrayString::set(size_t ndx, StringData value)
 void ArrayString::insert(size_t ndx, StringData value)
 {
     switch (upgrade_leaf(value.size())) {
-        case Type::small:
+        case Type::small_strings:
             static_cast<ArrayStringShort*>(m_arr)->insert(ndx, value);
             break;
-        case Type::medium:
+        case Type::medium_strings:
             static_cast<ArraySmallBlobs*>(m_arr)->insert_string(ndx, value);
             break;
-        case Type::big:
+        case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->insert_string(ndx, value);
             break;
     }
@@ -128,11 +128,11 @@ void ArrayString::insert(size_t ndx, StringData value)
 StringData ArrayString::get(size_t ndx) const
 {
     switch (m_type) {
-        case Type::small:
+        case Type::small_strings:
             return static_cast<ArrayStringShort*>(m_arr)->get(ndx);
-        case Type::medium:
+        case Type::medium_strings:
             return static_cast<ArraySmallBlobs*>(m_arr)->get_string(ndx);
-        case Type::big:
+        case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->get_string(ndx);
     }
     return {};
@@ -141,11 +141,11 @@ StringData ArrayString::get(size_t ndx) const
 bool ArrayString::is_null(size_t ndx) const
 {
     switch (m_type) {
-        case Type::small:
+        case Type::small_strings:
             return static_cast<ArrayStringShort*>(m_arr)->is_null(ndx);
-        case Type::medium:
+        case Type::medium_strings:
             return static_cast<ArraySmallBlobs*>(m_arr)->is_null(ndx);
-        case Type::big:
+        case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->is_null(ndx);
     }
     return {};
@@ -154,13 +154,13 @@ bool ArrayString::is_null(size_t ndx) const
 void ArrayString::erase(size_t ndx)
 {
     switch (m_type) {
-        case Type::small:
+        case Type::small_strings:
             static_cast<ArrayStringShort*>(m_arr)->erase(ndx);
             break;
-        case Type::medium:
+        case Type::medium_strings:
             static_cast<ArraySmallBlobs*>(m_arr)->erase(ndx);
             break;
-        case Type::big:
+        case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->erase(ndx);
             break;
     }
@@ -169,13 +169,13 @@ void ArrayString::erase(size_t ndx)
 void ArrayString::truncate_and_destroy_children(size_t ndx)
 {
     switch (m_type) {
-        case Type::small:
+        case Type::small_strings:
             static_cast<ArrayStringShort*>(m_arr)->truncate(ndx);
             break;
-        case Type::medium:
+        case Type::medium_strings:
             static_cast<ArraySmallBlobs*>(m_arr)->truncate(ndx);
             break;
-        case Type::big:
+        case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->truncate(ndx);
             break;
     }
@@ -183,12 +183,12 @@ void ArrayString::truncate_and_destroy_children(size_t ndx)
 
 ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
 {
-    if (m_type == Type::big)
-        return Type::big;
+    if (m_type == Type::big_strings)
+        return Type::big_strings;
 
-    if (m_type == Type::medium) {
+    if (m_type == Type::medium_strings) {
         if (value_size <= medium_string_max_size)
-            return Type::medium;
+            return Type::medium_strings;
 
         // Upgrade root leaf from medium to big strings
         auto string_long = static_cast<ArraySmallBlobs*>(m_arr);
@@ -205,13 +205,13 @@ ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
         auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
         arr->init_from_mem(big_blobs.get_mem());
 
-        m_type = Type::big;
-        return Type::big;
+        m_type = Type::big_strings;
+        return Type::big_strings;
     }
 
     // m_type == Type::small
     if (value_size <= small_string_max_size)
-        return Type::small;
+        return Type::small_strings;
 
     if (value_size <= medium_string_max_size) {
         // Upgrade root leaf from small to medium strings
@@ -229,7 +229,7 @@ ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
         auto arr = new (&m_storage.m_string_short) ArraySmallBlobs(m_alloc);
         arr->init_from_mem(string_long.get_mem());
 
-        m_type = Type::medium;
+        m_type = Type::medium_strings;
     }
     else {
         // Upgrade root leaf from small to big strings
@@ -247,7 +247,7 @@ ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
         auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
         arr->init_from_mem(big_blobs.get_mem());
 
-        m_type = Type::big;
+        m_type = Type::big_strings;
     }
 
     return m_type;

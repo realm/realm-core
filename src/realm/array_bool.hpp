@@ -77,6 +77,16 @@ public:
         }
     }
 
+    size_t find_first(util::Optional<bool> value, size_t begin = 0, size_t end = npos) const noexcept
+    {
+        if (value) {
+            return Array::find_first(*value, begin, end);
+        }
+        else {
+            return Array::find_first(null_value, begin, end);
+        }
+    }
+
 protected:
     // We can still be in two bits as small values are considered unsigned
     static constexpr int null_value = 2;

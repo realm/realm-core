@@ -34,7 +34,7 @@
 #include <pthread.h>
 #endif
 
-#include <realm/views.hpp>
+#include <realm/obj_list.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/olddatetime.hpp>
@@ -256,7 +256,7 @@ public:
 
 
     // Searching
-    size_t find(size_t begin_at_table_row = size_t(0));
+    Key find(size_t begin_at_table_row = size_t(0));
     TableView find_all(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1));
     ConstTableView find_all(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
 
@@ -349,7 +349,7 @@ private:
 
     void init() const;
     size_t find_internal(size_t start = 0, size_t end = size_t(-1)) const;
-    size_t peek_tablerow(size_t row) const;
+    bool eval_object(ConstObj& obj) const;
     void handle_pending_not();
     void set_table(TableRef tr);
 
@@ -450,7 +450,7 @@ private:
     // points to the base class of the restricting view. If the restricting
     // view is a link view, m_source_link_view is non-zero. If it is a table view,
     // m_source_table_view is non-zero.
-    RowIndexes* m_view = nullptr;
+    ObjList* m_view = nullptr;
 
     // At most one of these can be non-zero, and if so the non-zero one indicates the restricting view.
     LinkViewRef m_source_link_view;               // link views are refcounted and shared.

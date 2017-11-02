@@ -72,6 +72,7 @@ using namespace realm::util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+#ifdef LEGACY_TESTS
 
 TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
@@ -279,7 +280,6 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
-
 
 // Same as above test, just with different string lengths to get better coverage of the different String array types
 // that all have been modified by null support
@@ -1269,6 +1269,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
+#endif
 
 
 TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)

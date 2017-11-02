@@ -58,10 +58,14 @@ public:
     {
         return false;
     }
+
+    bool traverse(ClusterTree::TraverseFunction func, int64_t) const;
+
     size_t get_tree_size() const override;
     int64_t get_last_key() const override;
 
     void insert_column(size_t ndx) override;
+    void remove_column(size_t ndx) override;
     ref_type insert(Key k, State& state) override;
     void get(Key k, State& state) const override;
     unsigned erase(Key k) override;
@@ -287,6 +291,16 @@ void ClusterNodeInner::insert_column(size_t ndx)
     }
 }
 
+void ClusterNodeInner::remove_column(size_t ndx)
+{
+    for (size_t i = 0; i < m_children.size(); i++) {
+        ref_type child_ref = m_children.get_as_ref(i);
+        std::shared_ptr<ClusterNode> node = m_tree_top.get_node(child_ref);
+        node->set_parent(&m_children, i);
+        node->remove_column(ndx);
+    }
+}
+
 void ClusterNodeInner::add(ref_type ref, int64_t key_value)
 {
     m_children.add(from_ref(ref));
@@ -351,6 +365,17 @@ void ClusterNodeInner::move(size_t ndx, ClusterNode* new_node, int64_t key_adj)
 size_t ClusterNodeInner::get_tree_size() const
 {
     size_t tree_size = 0;
+    traverse(
+        [&tree_size](const Cluster* cluster, int64_t) {
+            tree_size += cluster->node_size();
+            return false;
+        },
+        0);
+    return tree_size;
+}
+
+bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction func, int64_t key_offset) const
+{
     unsigned sz = node_size();
 
     for (unsigned i = 0; i < sz; i++) {
@@ -358,18 +383,23 @@ size_t ClusterNodeInner::get_tree_size() const
         char* header = m_alloc.translate(ref);
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
         MemRef mem(header, ref, m_alloc);
+        int64_t offs = key_offset + get_key(i);
         if (child_is_leaf) {
             Cluster leaf(m_alloc, m_tree_top);
             leaf.init(mem);
-            tree_size += leaf.node_size();
+            if (func(&leaf, offs)) {
+                return true;
+            }
         }
         else {
             ClusterNodeInner node(m_alloc, m_tree_top);
             node.init(mem);
-            tree_size += node.get_tree_size();
+            if (node.traverse(func, offs)) {
+                return true;
+            }
         }
     }
-    return tree_size;
+    return false;
 }
 
 int64_t ClusterNodeInner::get_last_key() const
@@ -631,6 +661,16 @@ void Cluster::insert_column(size_t col_ndx)
     }
 }
 
+void Cluster::remove_column(size_t col_ndx)
+{
+    col_ndx++;
+    ref_type ref = to_ref(Array::get(col_ndx));
+    if (ref != 0) {
+        Array::destroy_deep(ref, m_alloc);
+    }
+    Array::erase(col_ndx);
+}
+
 ref_type Cluster::insert(Key k, ClusterNode::State& state)
 {
     int64_t current_key_value = -1;
@@ -851,6 +891,11 @@ inline bool ConstObj::update_if_needed() const
         return true;
     }
     return false;
+}
+
+Allocator& ConstObj::get_alloc() const
+{
+    return m_tree_top->get_alloc();
 }
 
 template <class T>
@@ -1210,11 +1255,22 @@ void ClusterTree::get_leaf(size_t ndx, ClusterNode::IteratorState& state) const 
 
     if (m_root->is_leaf()) {
         state.m_current_leaf.init(m_root->get_mem());
+        state.m_leaf_end_ndx = state.m_current_leaf.node_size();
     }
     else {
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
         state.m_root_index = 0;
         node->get_leaf(ndx, state);
+    }
+}
+
+bool ClusterTree::traverse(TraverseFunction func) const
+{
+    if (m_root->is_leaf()) {
+        return func(static_cast<Cluster*>(m_root.get()), 0);
+    }
+    else {
+        return static_cast<ClusterNodeInner*>(m_root.get())->traverse(func, 0);
     }
 }
 
@@ -1234,6 +1290,11 @@ std::unique_ptr<ClusterNode> ClusterTree::get_node(ref_type ref) const
     node->init(MemRef(child_header, ref, alloc));
 
     return node;
+}
+
+size_t ClusterTree::get_column_index(StringData col_name) const
+{
+    return get_spec().get_column_index(col_name);
 }
 
 const Spec& ClusterTree::get_spec() const
@@ -1261,7 +1322,7 @@ void ClusterTree::ConstIterator::load_leaf() const
     }
 }
 
-Table::ConstIterator::pointer Table::ConstIterator::operator->() const
+ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
 {
     if (m_version != m_tree.get_version_counter()) {
         load_leaf();
@@ -1274,7 +1335,7 @@ Table::ConstIterator::pointer Table::ConstIterator::operator->() const
     return new (&m_obj_cache_storage) Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_ref(), k, index);
 }
 
-Table::ConstIterator& Table::ConstIterator::operator++()
+ClusterTree::ConstIterator& Table::ConstIterator::operator++()
 {
     m_ndx++;
     if (m_ndx == m_state.m_leaf_end_ndx) {

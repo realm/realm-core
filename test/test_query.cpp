@@ -27,6 +27,7 @@
 #include <realm.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/column.hpp>
+#include <realm/array_bool.hpp>
 #include <realm/history.hpp>
 #include <realm/query_expression.hpp>
 
@@ -74,22 +75,23 @@ TEST(Query_NoConditions)
     table.add_column(type_Int, "i");
     {
         Query query(table.where());
-        CHECK_EQUAL(not_found, query.find());
+        CHECK_EQUAL(null_key, query.find());
     }
     {
         Query query = table.where();
-        CHECK_EQUAL(not_found, query.find());
+        CHECK_EQUAL(null_key, query.find());
     }
-    table.add_empty_row();
+    table.create_object(Key(5));
     {
         Query query(table.where());
-        CHECK_EQUAL(0, query.find());
+        CHECK_EQUAL(5, query.find().value);
     }
     {
         Query query = table.where();
-        CHECK_EQUAL(0, query.find());
+        CHECK_EQUAL(5, query.find().value);
     }
 }
+
 
 TEST(Query_Count)
 {
@@ -104,16 +106,15 @@ TEST(Query_Count)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int j = 0; j < 100; j++) {
         Table table;
-        table.add_column(type_Int, "i");
+        auto col_ndx = table.add_column(type_Int, "i");
 
         size_t matching = 0;
         size_t not_matching = 0;
         size_t rows = random.draw_int_mod(5 * REALM_MAX_BPNODE_SIZE); // to cross some leaf boundaries
 
         for (size_t i = 0; i < rows; ++i) {
-            table.add_empty_row();
             int64_t val = random.draw_int_mod(5);
-            table.set_int(0, i, val);
+            table.create_object().set(col_ndx, val);
             if (val == 2)
                 matching++;
             else
@@ -125,36 +126,36 @@ TEST(Query_Count)
     }
 }
 
-
 TEST(Query_NextGenSyntaxTypedString)
 {
-    TestTable books;
+    Table books;
     books.add_column(type_String, "1");
     books.add_column(type_String, "2");
     books.add_column(type_Int, "3");
 
-    add(books, "Computer Architecture and Organization", "B. Govindarajalu", 752);
-    add(books, "Introduction to Quantum Mechanics", "David Griffiths", 480);
-    add(books, "Biophysics: Searching for Principles", "William Bialek", 640);
+    Obj obj1 = books.create_object().set_all("Computer Architecture and Organization", "B. Govindarajalu", 752);
+    Obj obj2 = books.create_object().set_all("Introduction to Quantum Mechanics", "David Griffiths", 480);
+    Obj obj3 = books.create_object().set_all("Biophysics: Searching for Principles", "William Bialek", 640);
 
     // Typed table:
     Query q = books.column<Int>(2) >= 200 && books.column<String>(1) == "David Griffiths";
-    size_t match = q.find();
-    CHECK_EQUAL(1, match);
+    auto match = q.find();
+    CHECK_EQUAL(obj2.get_key(), match);
     // You don't need to create a query object first:
     match = (books.column<Int>(2) >= 200 && books.column<String>(1) == "David Griffiths").find();
-    CHECK_EQUAL(1, match);
+    CHECK_EQUAL(obj2.get_key(), match);
 
     // You can also create column objects and use them in expressions:
     Columns<Int> pages = books.column<Int>(2);
     Columns<String> author = books.column<String>(1);
     match = (pages >= 200 && author == "David Griffiths").find();
-    CHECK_EQUAL(1, match);
+    CHECK_EQUAL(obj2.get_key(), match);
 }
+
 
 TEST(Query_NextGenSyntax)
 {
-    size_t match;
+    Key match;
 
     // Setup untyped table
     Table untyped;
@@ -163,118 +164,86 @@ TEST(Query_NextGenSyntax)
     untyped.add_column(type_Double, "third");
     untyped.add_column(type_Bool, "third2");
     untyped.add_column(type_String, "fourth");
-    untyped.add_empty_row(2);
-    untyped.set_int(0, 0, 20);
-    untyped.set_float(1, 0, 19.9f);
-    untyped.set_double(2, 0, 3.0);
-    untyped.set_bool(3, 0, true);
-    untyped.set_string(4, 0, "hello");
-
-    untyped.set_int(0, 1, 20);
-    untyped.set_float(1, 1, 20.1f);
-    untyped.set_double(2, 1, 4.0);
-    untyped.set_bool(3, 1, false);
-    untyped.set_string(4, 1, "world");
-
-    TestTable typed;
-    typed.add_column(type_Int, "1");
-    typed.add_column(type_Float, "2");
-    typed.add_column(type_Double, "3");
-    typed.add_column(type_Bool, "4");
-    typed.add_column(type_String, "5");
-
-    add(typed, 20, 19.9f, 3.0, true, "hello");
-    add(typed, 20, 20.1f, 4.0, false, "world");
+    Key k0 = untyped.create_object().set_all(20, 19.9f, 3.0, true, "hello").get_key();
+    Key k1 = untyped.create_object().set_all(20, 20.1f, 4.0, false, "world").get_key();
 
     match = (untyped.column<String>(4) == "world").find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
     match = ("world" == untyped.column<String>(4)).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
     match = ("hello" != untyped.column<String>(4)).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
     match = (!("hello" == untyped.column<String>(4))).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
     match = (untyped.column<String>(4) != StringData("hello")).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
     match = (!(untyped.column<String>(4) == StringData("hello"))).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
     match = (!(!(untyped.column<String>(4) != StringData("hello")))).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
 
     // This is a demonstration of fallback to old query_engine for the specific cases where it's possible
     // because old engine is faster. This will return a ->less(...) query
     match = (untyped.column<int64_t>(0) == untyped.column<int64_t>(0)).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, k0);
 
 
     match = (untyped.column<bool>(3) == false).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
     match = (20.3 > untyped.column<double>(2) + 2).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, k0);
 
 
     match = (untyped.column<int64_t>(0) > untyped.column<int64_t>(0)).find();
-    CHECK_EQUAL(match, not_found);
-
-
-    // Small typed table test:
-    match = (typed.column<float>(1) + 100 > 120 && typed.column<int64_t>(0) > 2).find();
-    CHECK_EQUAL(match, 1);
-
-    // internal negation (rewrite of test above):
-    match = (!(!(typed.column<float>(1) + 100 > 120) || !(typed.column<int64_t>(0) > 2))).find();
-    CHECK_EQUAL(match, 1);
-
-
-    // Untyped &&
+    CHECK_EQUAL(match, realm::null_key);
 
     // Left condition makes first row non-match
     match = (untyped.column<float>(1) + 1 > 21 && untyped.column<double>(2) > 2).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
     // Right condition makes first row a non-match
     match = (untyped.column<float>(1) > 10 && untyped.column<double>(2) > 3.5).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
     // Both make first row match
     match = (untyped.column<float>(1) < 20 && untyped.column<double>(2) > 2).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, k0);
 
     // Both make first row non-match
     match = (untyped.column<float>(1) > 20 && untyped.column<double>(2) > 3.5).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
     // Left cond match 0, right match 1
     match = (untyped.column<float>(1) < 20 && untyped.column<double>(2) > 3.5).find();
-    CHECK_EQUAL(match, not_found);
+    CHECK_EQUAL(match, realm::null_key);
 
     // Left match 1, right match 0
     match = (untyped.column<float>(1) > 20 && untyped.column<double>(2) < 3.5).find();
-    CHECK_EQUAL(match, not_found);
+    CHECK_EQUAL(match, realm::null_key);
 
     // Untyped ||
 
     // Left match 0
     match = (untyped.column<float>(1) < 20 || untyped.column<double>(2) < 3.5).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, k0);
 
     // Right match 0
     match = (untyped.column<float>(1) > 20 || untyped.column<double>(2) < 3.5).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, k0);
 
     // Left match 1
 
     match = (untyped.column<float>(1) > 20 || untyped.column<double>(2) > 9.5).find();
 
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
     Query q4 = untyped.column<float>(1) + untyped.column<int64_t>(0) > 40;
 
@@ -282,7 +251,7 @@ TEST(Query_NextGenSyntax)
     Query q5 = 20 < untyped.column<float>(1);
 
     match = q4.and_query(q5).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
 
     // Untyped, direct column addressing
@@ -292,77 +261,51 @@ TEST(Query_NextGenSyntax)
 
     Query q2 = uv1 <= uc1;
     match = q2.find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, k0);
 
 
     Query q0 = uv1 <= uc1;
     match = q0.find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, k0);
 
     Query q99 = uv1 <= untyped.column<float>(1);
     match = q99.find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, k0);
 
 
     Query q8 = 1 > untyped.column<float>(1) + 5;
     match = q8.find();
-    CHECK_EQUAL(match, not_found);
+    CHECK_EQUAL(match, null_key);
 
     Query q3 = untyped.column<float>(1) + untyped.column<int64_t>(0) > 10 + untyped.column<int64_t>(0);
     match = q3.find();
 
     match = q2.find();
-    CHECK_EQUAL(match, 0);
-
-
-    // Typed, direct column addressing
-    Query q1 = typed.column<float>(1) + typed.column<Int>(0) > 40;
-    match = q1.find();
-    CHECK_EQUAL(match, 1);
-
-
-    match = (typed.column<Int>(0) + typed.column<float>(1) > 40).find();
-    CHECK_EQUAL(match, 1);
-
-
-    Query tq1 = typed.column<Int>(0) + typed.column<float>(1) >= typed.column<Int>(0) + typed.column<float>(1);
-    match = tq1.find();
-    CHECK_EQUAL(match, 0);
-
-
-    // Typed, column objects
-    Columns<int64_t> t0 = typed.column<Int>(0);
-    Columns<float> t1 = typed.column<float>(1);
-
-    match = (t0 + t1 > 40).find();
-    CHECK_EQUAL(match, 1);
-
-    match = q1.find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k0);
 
     match = (untyped.column<int64_t>(0) + untyped.column<float>(1) > 40).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 
     match = (untyped.column<int64_t>(0) + untyped.column<float>(1) < 40).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, k0);
 
     match = (untyped.column<float>(1) <= untyped.column<int64_t>(0)).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, k0);
 
     match = (untyped.column<int64_t>(0) + untyped.column<float>(1) >=
              untyped.column<int64_t>(0) + untyped.column<float>(1))
                 .find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, k0);
 
     // Untyped, column objects
     Columns<int64_t> u0 = untyped.column<int64_t>(0);
     Columns<float> u1 = untyped.column<float>(1);
 
     match = (u0 + u1 > 40).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, k1);
 }
 
-
+#ifdef LEGACY_TESTS
 /*
 This tests the new string conditions now available for the expression syntax.
 
@@ -10964,5 +10907,52 @@ TEST_TYPES(Query_Rover, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 2);
 }
 
+#endif
+
+TEST(Query_IntOnly)
+{
+    Table table;
+    table.add_column(type_Int, "i1");
+    table.add_column(type_Int, "i2");
+
+    table.create_object(Key(7)).set_all(7, 6);
+    table.create_object(Key(19)).set_all(19, 9);
+    table.create_object(Key(5)).set_all(19, 22);
+    table.create_object(Key(21)).set_all(2, 6);
+
+    auto q = table.column<Int>(1) == 6;
+    Key key = q.find();
+    CHECK_EQUAL(key, Key(7));
+
+    TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get(0).get_key(), Key(7));
+    CHECK_EQUAL(tv.get(1).get_key(), Key(21));
+
+    auto q1 = table.where(&tv).equal(0, 2);
+    TableView tv1 = q1.find_all();
+    CHECK_EQUAL(tv1.size(), 1);
+    CHECK_EQUAL(tv1.get(0).get_key(), Key(21));
+
+    q1 = table.where(&tv).greater(0, 5);
+    tv1 = q1.find_all();
+    CHECK_EQUAL(tv1.size(), 1);
+    CHECK_EQUAL(tv1.get(0).get_key(), Key(7));
+
+    q = table.column<Int>(0) == 19 && table.column<Int>(1) == 9;
+    key = q.find();
+    CHECK_EQUAL(key.value, 19);
+
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get(0).get_key(), Key(19));
+
+    // Two column expression
+    q = table.column<Int>(0) < table.column<Int>(1);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get(0).get_key(), Key(5));
+    CHECK_EQUAL(tv.get(1).get_key(), Key(21));
+}
 
 #endif // TEST_QUERY

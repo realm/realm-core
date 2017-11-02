@@ -71,6 +71,7 @@ using namespace realm::metrics;
 using namespace realm::test_util;
 using namespace realm::util;
 
+#ifdef LEGACY_TESTS
 TEST(Metrics_HasNoReportsWhenDisabled)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -895,5 +896,6 @@ TEST(Metrics_TransactionVersions)
 }
 
 
+#endif // LEGACY_TESTS
 #endif // REALM_METRICS
 #endif // TEST_METRICS

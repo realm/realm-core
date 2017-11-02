@@ -65,6 +65,7 @@ using namespace test_util;
 // Another way to debug a particular test, is to copy that test into
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
+#ifdef LEGACY_TESTS
 
 TEST(TableView_Json)
 {
@@ -3469,5 +3470,6 @@ TEST(TableView_TimestampMaxRemoveRow)
     CHECK_EQUAL(tv.size(), 9);
     CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0));
 }
+#endif
 
 #endif // TEST_TABLE_VIEW

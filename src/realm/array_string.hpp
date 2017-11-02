@@ -68,6 +68,15 @@ public:
     void erase(size_t ndx);
     void truncate_and_destroy_children(size_t ndx);
 
+    size_t find_first(StringData value, size_t begin, size_t end) const noexcept
+    {
+        for (size_t t = begin; t < end; t++) {
+            if (get(t) == value)
+                return t;
+        }
+        return not_found;
+    }
+
 private:
     static constexpr size_t small_string_max_size = 15;  // ArrayStringShort
     static constexpr size_t medium_string_max_size = 63; // ArrayStringLong
@@ -77,12 +86,12 @@ private:
         std::aligned_storage<sizeof(ArrayBigBlobs), alignof(ArrayBigBlobs)>::type m_big_blobs;
     };
     enum class Type {
-        small,
-        medium,
-        big,
+        small_strings,
+        medium_strings,
+        big_strings,
     };
 
-    Type m_type = Type::small;
+    Type m_type = Type::small_strings;
 
     Allocator& m_alloc;
     Storage m_storage;

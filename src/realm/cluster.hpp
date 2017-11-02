@@ -59,6 +59,12 @@ struct Key {
     int64_t value;
 };
 
+inline std::ostream& operator<<(std::ostream& ostr, Key key)
+{
+    ostr << key.value;
+    return ostr;
+}
+
 constexpr Key null_key;
 
 class ClusterNode : public Array {
@@ -146,6 +152,8 @@ public:
 
     /// Insert a column at position 'ndx'
     virtual void insert_column(size_t ndx) = 0;
+    /// Remove a column at position 'ndx'
+    virtual void remove_column(size_t ndx) = 0;
     /// Create a new object identified by 'key' and update 'state' accordingly
     /// Return reference to new node created (if any)
     virtual ref_type insert(Key k, State& state) = 0;
@@ -195,9 +203,17 @@ public:
     }
 
     void insert_column(size_t ndx) override;
+    void remove_column(size_t ndx) override;
     ref_type insert(Key k, State& state) override;
     void get(Key k, State& state) const override;
     unsigned erase(Key k) override;
+
+    template <class T>
+    void init_leaf(size_t col_ndx, T* leaf) const noexcept;
+    const Array* get_key_array() const
+    {
+        return &m_keys;
+    }
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
@@ -230,7 +246,21 @@ public:
     template <typename U>
     U get(size_t col_ndx) const;
 
+    template <typename U>
+    U get(StringData col_name) const;
+
     bool is_null(size_t col_ndx) const;
+
+    // To be used by the query system when a single object should
+    // be tested. Will allow a function to be called in the context
+    // of the owning cluster.
+    template <class T>
+    bool evaluate(T func) const
+    {
+        Cluster cluster(get_alloc(), *m_tree_top);
+        cluster.init_from_mem(m_mem);
+        return func(&cluster, m_row_ndx);
+    }
 
 protected:
     const ClusterTree* m_tree_top;
@@ -245,6 +275,7 @@ protected:
         m_row_ndx = other.m_row_ndx;
         m_version = other.m_version;
     }
+    Allocator& get_alloc() const;
     template <class T>
     bool do_is_null(size_t col_ndx) const;
 };
@@ -276,6 +307,7 @@ class ClusterTree {
 public:
     class ConstIterator;
     class Iterator;
+    using TraverseFunction = std::function<bool(const Cluster*, int64_t)>;
 
     ClusterTree(Table* owner, Allocator& alloc);
     static MemRef create_empty_cluster(Allocator& alloc);
@@ -291,7 +323,7 @@ public:
     {
         m_root->set_parent(parent, ndx_in_parent);
     }
-    bool is_attached()
+    bool is_attached() const
     {
         return m_root->is_attached();
     }
@@ -331,14 +363,23 @@ public:
     {
         m_root->insert_column(ndx);
     }
+    void remove_column(size_t ndx)
+    {
+        m_root->remove_column(ndx);
+    }
     Obj insert(Key k);
     void erase(Key k);
     ConstObj get(Key k) const;
     Obj get(Key k);
     void get_leaf(size_t ndx, ClusterNode::IteratorState& state) const noexcept;
+    bool traverse(TraverseFunction func) const;
     void dump_objects()
     {
         m_root->dump_objects(0, "");
+    }
+    void verify() const
+    {
+        // TODO: implement
     }
 
 private:
@@ -357,6 +398,8 @@ private:
         return create_root_from_mem(alloc, MemRef{alloc.translate(ref), ref, alloc});
     }
     std::unique_ptr<ClusterNode> get_node(ref_type ref) const;
+
+    size_t get_column_index(StringData col_name) const;
 };
 
 class ClusterTree::ConstIterator {
@@ -412,6 +455,19 @@ public:
         return const_cast<pointer>(ConstIterator::operator->());
     }
 };
+
+template <class T>
+void Cluster::init_leaf(size_t col_ndx, T* leaf) const noexcept
+{
+    ref_type ref = to_ref(Array::get(col_ndx + 1));
+    leaf->init_from_ref(ref);
+}
+
+template <typename U>
+U ConstObj::get(StringData col_name) const
+{
+    return get<U>(m_tree_top->get_column_index(col_name));
+}
 
 template <>
 inline Optional<float> ConstObj::get<Optional<float>>(size_t col_ndx) const

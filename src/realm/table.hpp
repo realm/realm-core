@@ -329,6 +329,10 @@ public:
     /// \sa Descriptor::is_root()
     bool has_shared_type() const noexcept;
 
+    bool has_clusters() const
+    {
+        return m_clusters.is_attached();
+    }
 
     template <class T>
     Columns<T> column(size_t column); // FIXME: Should this one have been declared noexcept?
@@ -399,6 +403,11 @@ public:
     void dump_objects()
     {
         return m_clusters.dump_objects();
+    }
+
+    bool traverse_clusters(ClusterTree::TraverseFunction func) const
+    {
+        return m_clusters.traverse(func);
     }
 
     void remove(size_t row_ndx);
@@ -668,18 +677,18 @@ public:
 
     // Searching
     template <class T>
-    size_t find_first(size_t column_ndx, T value) const;
+    Key find_first(size_t column_ndx, T value) const;
 
-    size_t find_first_link(size_t target_row_index) const;
-    size_t find_first_int(size_t column_ndx, int64_t value) const;
-    size_t find_first_bool(size_t column_ndx, bool value) const;
-    size_t find_first_olddatetime(size_t column_ndx, OldDateTime value) const;
-    size_t find_first_timestamp(size_t column_ndx, Timestamp value) const;
-    size_t find_first_float(size_t column_ndx, float value) const;
-    size_t find_first_double(size_t column_ndx, double value) const;
-    size_t find_first_string(size_t column_ndx, StringData value) const;
-    size_t find_first_binary(size_t column_ndx, BinaryData value) const;
-    size_t find_first_null(size_t column_ndx) const;
+    Key find_first_link(size_t target_row_index) const;
+    Key find_first_int(size_t column_ndx, int64_t value) const;
+    Key find_first_bool(size_t column_ndx, bool value) const;
+    Key find_first_olddatetime(size_t column_ndx, OldDateTime value) const;
+    Key find_first_timestamp(size_t column_ndx, Timestamp value) const;
+    Key find_first_float(size_t column_ndx, float value) const;
+    Key find_first_double(size_t column_ndx, double value) const;
+    Key find_first_string(size_t column_ndx, StringData value) const;
+    Key find_first_binary(size_t column_ndx, BinaryData value) const;
+    Key find_first_null(size_t column_ndx) const;
 
     TableView find_all_link(size_t target_row_index);
     ConstTableView find_all_link(size_t target_row_index) const;
@@ -1066,11 +1075,6 @@ private:
     // always null for tables with shared descriptor.
     mutable std::weak_ptr<Descriptor> m_descriptor;
 
-    // Table view instances
-    // Access needs to be protected by m_accessor_mutex
-    typedef std::vector<TableViewBase*> views;
-    mutable views m_views;
-
     // Points to first bound row accessor, or is null if there are none.
     mutable RowBase* m_row_accessors = nullptr;
 
@@ -1261,11 +1265,6 @@ private:
     void bind_ptr() const noexcept;
     void unbind_ptr() const noexcept;
 
-    void register_view(const TableViewBase* view);
-    void unregister_view(const TableViewBase* view) noexcept;
-    void move_registered_view(const TableViewBase* old_addr, const TableViewBase* new_addr) noexcept;
-    void discard_views() noexcept;
-
     void register_row_accessor(RowBase*) const noexcept;
     void unregister_row_accessor(RowBase*) const noexcept;
     void do_unregister_row_accessor(RowBase*) const noexcept;
@@ -1319,7 +1318,7 @@ private:
     const BacklinkColumn& get_column_backlink(size_t ndx) const noexcept;
     BacklinkColumn& get_column_backlink(size_t ndx);
 
-    void verify_column(size_t col_ndx, const ColumnBase* col) const;
+    void verify_column(size_t col_ndx) const;
 
     void instantiate_before_change();
     void validate_column_type(const ColumnBase& col, ColumnType expected_type, size_t ndx) const;
@@ -1725,15 +1724,6 @@ inline void Table::unbind_ptr() const noexcept
     }
 }
 
-inline void Table::register_view(const TableViewBase* view)
-{
-    util::LockGuard lock(m_accessor_mutex);
-    // Casting away constness here - operations done on tableviews
-    // through m_views are all internal and preserving "some" kind
-    // of logical constness.
-    m_views.push_back(const_cast<TableViewBase*>(view));
-}
-
 inline bool Table::is_attached() const noexcept
 {
     // Note that it is not possible to tie the state of attachment of a table to
@@ -1818,16 +1808,12 @@ inline bool Table::has_shared_type() const noexcept
     return !m_top.is_attached();
 }
 
-inline void Table::verify_column(size_t col_ndx, const ColumnBase* col) const
+inline void Table::verify_column(size_t col_ndx) const
 {
-    // Check if the column exists at the expected location
-    if (REALM_LIKELY(col_ndx < m_cols.size() && m_cols[col_ndx] == col))
+    // TODO Check against spec
+    if (REALM_LIKELY(col_ndx < m_cols.size()))
         return;
-    // The column might be elsewhere in the list
-    for (auto c : m_cols) {
-        if (c == col)
-            return;
-    }
+
     throw LogicError(LogicError::column_does_not_exist);
 }
 
@@ -2767,16 +2753,6 @@ public:
     static Replication* get_repl(Table& table) noexcept
     {
         return table.get_repl();
-    }
-
-    static void register_view(Table& table, const TableViewBase* view)
-    {
-        table.register_view(view); // Throws
-    }
-
-    static void unregister_view(Table& table, const TableViewBase* view) noexcept
-    {
-        table.unregister_view(view);
     }
 };
 
