@@ -8,6 +8,11 @@ set(TEST_AFL_TRANSACT_LOG
     ../fuzz_group.cpp
 ) # TEST_AFL_TRANSACT_LOG
 
+set(TEST_LIBFUZZER_SOURCES
+    libfuzzer_entry.cpp
+    ../fuzz_group.cpp
+) # TEST_LIBFUZZER_SOURCES
+
 file(GLOB AFL_RUN_SCRIPTS
      "simple_start.sh"
      "simple_stop.sh"
@@ -28,4 +33,7 @@ target_link_libraries(fuzz-transact-log ${PLATFORM_LIBRARIES} test-util realm)
 
 add_executable(fuzz-group ${TEST_AFL_SOURCES})
 target_link_libraries(fuzz-group ${PLATFORM_LIBRARIES} test-util realm)
+
+add_executable(realm-libfuzzer ${TEST_LIBFUZZER_SOURCES})
+target_link_libraries(realm-libfuzzer ${PLATFORM_LIBRARIES} test-util realm)
 
