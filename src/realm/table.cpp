@@ -489,7 +489,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     m_top.init_from_ref(top_ref);
 
     size_t spec_ndx_in_parent = 0;
-    m_spec.manage(new Spec(get_alloc()));
+    m_spec.reset(new Spec(get_alloc()));
     m_spec->set_parent(&m_top, spec_ndx_in_parent);
     m_spec->init_from_parent();
     size_t columns_ndx_in_parent = 1;
@@ -509,30 +509,6 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         // Create column accessors and initialize `m_size`
         refresh_column_accessors(); // Throws
     }
-}
-
-
-void Table::init(Spec* shared_spec, ArrayParent* parent_column, size_t parent_row_ndx)
-{
-    m_mark = false;
-
-    m_version = 0;
-
-    m_spec = shared_spec;
-    m_columns.set_parent(parent_column, parent_row_ndx);
-
-    // A degenerate subtable has no underlying columns array and no column
-    // accessors yet. They will be created on first modification.
-    ref_type columns_ref = m_columns.get_ref_from_parent();
-    if (columns_ref != 0) {
-        m_columns.init_from_ref(columns_ref);
-
-        size_t num_cols = m_spec->get_column_count();
-        m_cols.resize(num_cols); // Throws
-    }
-
-    // Create column accessors and initialize `m_size`
-    refresh_column_accessors(); // Throws
 }
 
 
@@ -1063,7 +1039,7 @@ void Table::detach() noexcept
     // underlying node structure. See AccessorConsistencyLevels.
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
-    m_spec.detach();
+    m_spec->detach();
 
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
@@ -1210,7 +1186,7 @@ Table::~Table() noexcept
 
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
-    m_spec.detach();
+    m_spec->detach();
 
     if (!m_top.is_attached()) {
         // This is a subtable with a shared spec, and its lifetime is managed by
@@ -4149,7 +4125,6 @@ public:
         // write it to the output stream
         ref_type spec_ref;
         {
-            REALM_ASSERT(m_table.m_spec.is_managed());
             MemRef mem = m_table.m_spec->m_top.clone_deep(alloc); // Throws
             Spec spec(alloc);
             spec.init(mem); // Throws
@@ -4251,9 +4226,6 @@ void Table::update_from_parent(size_t old_baseline) noexcept
         if (m_top.size() > 2) {
             m_clusters.update_from_parent(old_baseline);
         }
-    }
-    else {
-        refresh_spec_accessor();
     }
 
     if (!m_columns.is_attached())
@@ -5205,47 +5177,9 @@ void Table::refresh_accessor_tree()
             m_clusters.init_from_parent();
         }
     }
-    else {
-        // Subtable with shared descriptor
-        refresh_spec_accessor();
-
-        // If the underlying table was degenerate, then `m_cols` must still be
-        // empty.
-        REALM_ASSERT(m_columns.is_attached() || m_cols.empty());
-
-        ref_type columns_ref = m_columns.get_ref_from_parent();
-        if (columns_ref != 0) {
-            if (!m_columns.is_attached()) {
-                // The underlying table is no longer degenerate
-                size_t num_cols = m_spec->get_column_count();
-                m_cols.resize(num_cols); // Throws
-            }
-            m_columns.init_from_ref(columns_ref);
-        }
-        else if (m_columns.is_attached()) {
-            // The underlying table has become degenerate
-            m_columns.detach();
-            destroy_column_accessors();
-        }
-    }
 
     refresh_column_accessors(); // Throws
     m_mark = false;
-}
-
-void Table::refresh_spec_accessor()
-{
-    REALM_ASSERT(is_attached());
-    if (!m_top.is_attached()) {
-        // this is only relevant for subtables
-
-        ArrayParent* array_parent = m_columns.get_parent();
-        REALM_ASSERT(dynamic_cast<Parent*>(array_parent));
-        Parent* table_parent = static_cast<Parent*>(array_parent);
-
-        Spec* subspec = table_parent->get_subtable_spec();
-        m_spec = subspec;
-    }
 }
 
 void Table::refresh_column_accessors(size_t col_ndx_begin)

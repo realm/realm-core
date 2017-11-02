@@ -932,68 +932,7 @@ private:
     Array m_top;
     Array m_columns; // 2nd slot in m_top (for root tables)
 
-    // Management class for the spec object. Only if the table has an independent
-    // spec, the spec object should be deleted when the table object is deleted.
-    // If the table has a shared spec, the spec object is managed by the spec object
-    // of the containing table.
-    class SpecPtr {
-    public:
-        ~SpecPtr()
-         {
-            optionally_delete();
-         }
-        void manage(Spec* ptr)
-        {
-            optionally_delete();
-            m_p = ptr;
-            m_is_managed = true;
-        }
-        void detach()
-        {
-            if (m_is_managed) {
-                m_p->detach();
-            }
-        }
-        SpecPtr& operator=(Spec* ptr)
-        {
-            optionally_delete();
-            m_p = ptr;
-            m_is_managed = false;
-            return *this;
-        }
-        Spec* operator->() const
-        {
-            return m_p;
-        }
-        Spec* get() const
-        {
-            return m_p;
-        }
-        Spec& operator*() const
-        {
-            return *m_p;
-        }
-        operator bool() const
-        {
-            return m_p != nullptr;
-        }
-        bool is_managed() const
-        {
-            return m_is_managed;
-        }
-
-    private:
-        Spec* m_p = nullptr;
-        bool m_is_managed = false;
-
-        void optionally_delete()
-        {
-            if (m_is_managed) {
-                delete m_p;
-            }
-        }
-    };
-
+    using SpecPtr = std::unique_ptr<Spec>;
     SpecPtr m_spec; // 1st slot in m_top (for root tables)
     ClusterTree m_clusters;
     int64_t m_next_key_value = -1;
@@ -1093,7 +1032,6 @@ private:
     Table(ref_count_tag, Allocator&);
 
     void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool skip_create_column_accessors = false);
-    void init(Spec* shared_spec, ArrayParent* parent_column, size_t parent_row_ndx);
 
     void do_insert_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link_target_info,
                           bool nullable = false, bool listtype = false);
@@ -1465,8 +1403,6 @@ private:
     ///    structural correspondence with the underlying node hierarchy whose
     ///    root ref is stored in the parent (see AccessorConsistencyLevels).
     void refresh_accessor_tree();
-
-    void refresh_spec_accessor();
 
     void refresh_column_accessors(size_t col_ndx_begin = 0);
 
@@ -2238,14 +2174,6 @@ public:
         return table.release();
     }
 
-    static Table* create_accessor(Spec* shared_spec, Table::Parent* parent_column, size_t parent_row_ndx)
-    {
-        Allocator& alloc = shared_spec->get_alloc();
-        std::unique_ptr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
-        table->init(shared_spec, parent_column, parent_row_ndx);                // Throws
-        return table.release();
-    }
-
     // Intended to be used only by Group::create_table_accessor()
     static Table* create_incomplete_accessor(Allocator& alloc, ref_type top_ref, Table::Parent* parent,
                                              size_t ndx_in_parent)
@@ -2536,11 +2464,6 @@ public:
     static void refresh_accessor_tree(Table& table)
     {
         table.refresh_accessor_tree(); // Throws
-    }
-
-    static void refresh_spec_accessor(Table& table)
-    {
-        table.refresh_spec_accessor(); // Throws
     }
 
     static void set_ndx_in_parent(Table& table, size_t ndx_in_parent) noexcept
