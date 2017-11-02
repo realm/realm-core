@@ -890,5 +890,6 @@ void RealmCoordinator::process_available_async(Realm& realm)
 
 void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)
 {
+    create_sync_session();
     m_transaction_callback = std::move(fn);
 }
