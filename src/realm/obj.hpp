@@ -26,15 +26,16 @@ namespace realm {
 
 template <class>
 class ConstListIf;
+
 template <class>
 class ConstList;
+template <class T>
+using ConstListPtr = std::unique_ptr<ConstList<T>>;
+
 template <class>
 class List;
-
 template <class T>
-using ConstListRef = std::unique_ptr<ConstList<T>>;
-template <class T>
-using ListRef = std::unique_ptr<List<T>>;
+using ListPtr = std::unique_ptr<List<T>>;
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class ConstObj {
@@ -60,6 +61,8 @@ public:
 
     template <typename U>
     ConstList<U> get_list(size_t col_ndx) const;
+    template <typename U>
+    ConstListPtr<U> get_list_ptr(size_t col_ndx) const;
 
     bool is_null(size_t col_ndx) const;
 
@@ -115,6 +118,8 @@ public:
 
     template <typename U>
     List<U> get_list(size_t col_ndx);
+    template <typename U>
+    ListPtr<U> get_list_ptr(size_t col_ndx);
 
 private:
     friend class ConstListBase;

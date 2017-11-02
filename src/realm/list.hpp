@@ -320,6 +320,30 @@ private:
         }
     }
 };
+
+template <typename U>
+ConstList<U> ConstObj::get_list(size_t col_ndx) const
+{
+    return ConstList<U>(*this, col_ndx);
+}
+
+template <typename U>
+ConstListPtr<U> ConstObj::get_list_ptr(size_t col_ndx) const
+{
+    return std::make_unique<ConstList<U>>(*this, col_ndx);
+}
+
+template <typename U>
+List<U> Obj::get_list(size_t col_ndx)
+{
+    return List<U>(*this, col_ndx);
+}
+
+template <typename U>
+ListPtr<U> Obj::get_list_ptr(size_t col_ndx)
+{
+    return std::make_unique<List<U>>(*this, col_ndx);
+}
 }
 
 #endif /* REALM_LIST_HPP */
