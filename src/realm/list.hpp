@@ -168,6 +168,14 @@ protected:
     mutable bool m_valid = false;
 
     ConstListIf(size_t col_ndx, Allocator& alloc);
+    ConstListIf(const ConstListIf&) = delete;
+    ConstListIf(ConstListIf&& other)
+        : ConstListBase(std::move(other))
+        , m_leaf(std::move(other.m_leaf))
+        , m_valid(other.m_valid)
+    {
+        m_leaf->set_parent(this, 0);
+    }
 
     void init_from_parent() const override
     {
@@ -183,6 +191,12 @@ template <class T>
 class ConstList : public ConstListIf<T> {
 public:
     ConstList(const ConstObj& owner, size_t col_ndx);
+    ConstList(ConstList&& other)
+        : ConstListIf<T>(std::move(other))
+        , m_obj(std::move(other.m_obj))
+    {
+        this->set_obj(&m_obj);
+    }
 
 private:
     ConstObj m_obj;
@@ -212,6 +226,12 @@ public:
     using ConstListIf<T>::get;
 
     List(const Obj& owner, size_t col_ndx);
+    List(List&& other)
+        : ConstListIf<T>(std::move(other))
+        , m_obj(std::move(other.m_obj))
+    {
+        this->set_obj(&m_obj);
+    }
 
     void update_child_ref(size_t, ref_type new_ref) override
     {
