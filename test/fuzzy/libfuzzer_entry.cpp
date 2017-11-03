@@ -13,7 +13,7 @@
 using namespace realm;
 using namespace realm::util;
 
-// This function is the entry point for libfuzzer, there is no main
+// This function is the entry point for libfuzzer, main is auto-generated
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
     realm::test_util::RealmPathInfo test_context{"libfuzzer_test"};
     SHARED_GROUP_TEST_PATH(path);
