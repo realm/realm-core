@@ -8945,7 +8945,7 @@ TEST(Table_ListOfPrimitives)
     obj.set_list_values(timestamp_col, timestamp_vector);
 
     auto int_list = obj.get_list<int64_t>(int_col);
-    std::vector<int> vec(int_list.size());
+    std::vector<int64_t> vec(int_list.size());
     CHECK_EQUAL(integer_vector.size(), int_list.size());
     // {1, 2, 3, 4}
     auto it = int_list.begin();

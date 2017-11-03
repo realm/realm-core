@@ -76,7 +76,7 @@ public:
     typedef const T* pointer;
     typedef const T& reference;
 
-    ListIterator(const ConstListIf<T>& l, size_t ndx)
+    ListIterator(const ConstListIf<T>* l, size_t ndx)
         : m_list(l)
         , m_ndx(ndx)
     {
@@ -84,7 +84,7 @@ public:
     pointer operator->()
     {
         if (m_dirty) {
-            m_val = m_list[m_ndx];
+            m_val = m_list->get(m_ndx);
             m_dirty = false;
         }
         return &m_val;
@@ -112,9 +112,14 @@ public:
         return m_ndx != rhs.m_ndx;
     }
 
+    bool operator==(const ListIterator& rhs)
+    {
+        return m_ndx == rhs.m_ndx;
+    }
+
 private:
     T m_val;
-    const ConstListIf<T>& m_list;
+    const ConstListIf<T>* m_list;
     size_t m_ndx;
     bool m_dirty = true;
 };
@@ -151,11 +156,11 @@ public:
     }
     ListIterator<T> begin() const
     {
-        return ListIterator<T>(*this, 0);
+        return ListIterator<T>(this, 0);
     }
     ListIterator<T> end() const
     {
-        return ListIterator<T>(*this, size());
+        return ListIterator<T>(this, size());
     }
 
 protected:

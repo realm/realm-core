@@ -49,14 +49,14 @@ void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_
         if (m_link_map.only_unary_links()) {
             ref_type val = 0;
             if (sz == 1) {
-                val = m_leaf_ptr->get(links[0]);
+                val = to_ref(m_leaf_ptr->get(links[0]));
             }
             destination.init(false, 1, val);
         }
         else {
             destination.init(true, sz);
             for (size_t t = 0; t < sz; t++) {
-                destination.m_storage.set(t, m_leaf_ptr->get(links[t]));
+                destination.m_storage.set(t, to_ref(m_leaf_ptr->get(links[t])));
             }
         }
     }
@@ -66,7 +66,7 @@ void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_
         destination.init(false, rows);
 
         for (size_t t = 0; t < rows; t++) {
-            destination.m_storage.set(t, m_leaf_ptr->get(index + t));
+            destination.m_storage.set(t, to_ref(m_leaf_ptr->get(index + t)));
         }
     }
 }
