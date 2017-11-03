@@ -183,7 +183,7 @@ def doBuildInDocker(String buildType, String sanitizeMode='') {
                            cd build-dir
                            cmake -D CMAKE_BUILD_TYPE=${buildType} ${sanitizeFlags} -G Ninja ..
                         """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
+                        runAndCollectWarnings(script: "cd build-dir && ninja realm-tests")
                         sh """
                            cd build-dir/test
                            ./realm-tests
@@ -258,11 +258,14 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
 }
 
 def doBuildWindows(String buildType, boolean isUWP, String platform) {
-    def cmakeDefinitions;
+    def cmakeDefinitions
+    def target
     if (isUWP) {
-      cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 -DREALM_BUILD_LIB_ONLY=1'
+      cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0'
+      target = 'Core'
     } else {
       cmakeDefinitions = '-DCMAKE_SYSTEM_VERSION=8.1'
+      target = 'CoreTests'
     }
 
     return {
@@ -272,7 +275,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform) {
             dir('build-dir') {
                 bat "\"${tool 'cmake'}\" ${cmakeDefinitions} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} .."
                 withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
-                    runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: "\"${tool 'cmake'}\" --build . --config ${buildType}")
+                    runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: "\"${tool 'cmake'}\" --build . --config ${buildType} --target ${target}")
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
                 archiveArtifacts('*.tar.gz')
@@ -316,7 +319,7 @@ def buildDiffCoverage() {
                         cmake -D CMAKE_BUILD_TYPE=Debug \
                               -D REALM_COVERAGE=ON \
                               -G Ninja ..
-                        ninja
+                        ninja realm-tests
                         cd test
                         ./realm-tests
                         gcovr --filter=\'.*src/realm.*\' -x >gcovr.xml
@@ -465,7 +468,7 @@ def doBuildCoverage() {
           mkdir build
           cd build
           cmake -G Ninja -D REALM_COVERAGE=ON ..
-          ninja
+          ninja CoreTests
           cd ..
           lcov --no-external --capture --initial --directory . --output-file ${workspace}/coverage-base.info
           cd build/test

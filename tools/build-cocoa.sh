@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
+set -x
 
 #Set Script Name variable
 SCRIPT=$(basename "${BASH_SOURCE[0]}")
@@ -50,7 +51,7 @@ if [[ ! -z $BUILD ]]; then
     if [[ -z $MACOS_ONLY ]]; then
         for os in ios watchos tvos; do
             for bt in Release MinSizeDebug; do
-                tools/cross_compile.sh -o $os -t $bt -v $(git describe)
+                tools/cross_compile.sh -o $os -t $bt -v "$(git describe)"
             done
         done
     fi
@@ -59,7 +60,7 @@ fi
 rm -rf core
 mkdir core
 
-filename=$(find "build-macos-Release" -maxdepth 1 -type f -name "realm-core-Release-*-Darwin-devel.tar.gz")
+filename=$(find "build-macos-Release" -maxdepth 1 -type f -name "realm-core-Release-*-Darwin.tar.gz")
 tar -C core -zxvf "${filename}" include doc
 
 for bt in "${BUILD_TYPES[@]}"; do
@@ -67,10 +68,7 @@ for bt in "${BUILD_TYPES[@]}"; do
     for p in "${PLATFORMS[@]}"; do
         [[ $p = "macos" ]] && infix="macosx" || infix="${p}"
         [[ $p != "macos" && $bt = "Debug" ]] && prefix="MinSize" || prefix=""
-        filename=$(find "build-${p}-${prefix}${bt}" -maxdepth 1 -type f -name "realm-core-*-devel.tar.gz")
-        if [[ -z $filename ]]; then
-            filename=$(find "build-${p}-${prefix}${bt}" -maxdepth 1 -type f -name "realm-core-*.tar.gz")
-        fi
+        filename=$(find "build-${p}-${prefix}${bt}" -maxdepth 1 -type f -name "realm-core-*.tar.gz")
         tar -C core -zxvf "${filename}" "lib/librealm${suffix}.a"
         mv "core/lib/librealm${suffix}.a" "core/librealm-${infix}${suffix}.a"
         rm -rf core/lib

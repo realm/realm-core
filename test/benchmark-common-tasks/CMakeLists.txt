@@ -1,9 +1,12 @@
-add_executable(realm-benchmark-common-tasks main.cpp compatibility.cpp)
-target_link_libraries(realm-benchmark-common-tasks ${PLATFORM_LIBRARIES} test-util)
-add_test(RealmBenchmarkCommonTasks realm-benchmark-common-tasks)
+add_executable(BenchmarkCommonTasks EXCLUDE_FROM_ALL main.cpp compatibility.cpp)
+add_executable(realm-benchmark-common-tasks ALIAS BenchmarkCommonTasks) # TODO: Remove when scripts are updated
+set_target_properties(BenchmarkCommonTasks PROPERTIES OUTPUT_NAME realm-benchmark-common-tasks)
+target_link_libraries(BenchmarkCommonTasks ${PLATFORM_LIBRARIES} TestUtil)
+add_test(BenchmarkCommonTasks BenchmarkCommonTasks)
 
-add_executable(realm-stats stats.cpp)
-target_link_libraries(realm-stats ${PLATFORM_LIBRARIES} realm)
-file(COPY "collect_stats.py"
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+add_executable(RealmStats EXCLUDE_FROM_ALL stats.cpp)
+add_executable(realm-stats ALIAS RealmStats) # TODO: Remove when scripts are updated
+set_target_properties(RealmStats PROPERTIES OUTPUT_NAME realm-stats)
+target_link_libraries(RealmStats ${PLATFORM_LIBRARIES} Core)
+file(COPY "collect_stats.py" DESTINATION ${RealmCore_BINARY_DIR})
 

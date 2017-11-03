@@ -6,8 +6,6 @@ fix_xcode_try_compile()
 
 set_common_xcode_attributes()
 
-set(REALM_SKIP_SHARED_LIB ON)
-
 set(CMAKE_OSX_SYSROOT "iphoneos")
 
 set(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS "iphoneos iphonesimulator")

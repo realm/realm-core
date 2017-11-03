@@ -13,6 +13,7 @@ RUN touch /var/lib/rpm/* \
         devtoolset-3-gcc-c++ \
         git \
         openssl-devel \
+        procps-devel \
         unzip \
         wget \
         which \

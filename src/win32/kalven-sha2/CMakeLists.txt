@@ -1,1 +1,19 @@
-add_library(sha_win32 OBJECT sha224k.cpp sha256k.cpp sha224.hpp)
+add_library(ShaWin32 sha224k.cpp sha256k.cpp)
+add_library(Realm::ShaWin32 ALIAS ShaWin32)
+
+target_include_directories(ShaWin32
+	INTERFACE
+		$<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/win32/kalven-sha2>
+		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/win32/kalven-sha2>
+)
+
+install(
+	TARGETS ShaWin32
+	EXPORT realm
+	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+	INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(FILES sha224.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/win32/kalven-sha2)

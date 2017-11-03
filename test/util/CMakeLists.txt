@@ -1,4 +1,4 @@
-set(TEST_UTIL_SOURCES
+add_library(TestUtil EXCLUDE_FROM_ALL
     benchmark_results.cpp
     demangle.cpp
     mem.cpp
@@ -15,9 +15,10 @@ set(TEST_UTIL_SOURCES
     verified_string.cpp
     resource_limits.cpp
     jsmn.cpp
-) # TEST_UTIL_SOURCES
+)
 
-add_library(test-util ${TEST_UTIL_SOURCES})
-
-target_link_libraries(test-util realm)
+target_link_libraries(TestUtil
+    Core
+    $<$<BOOL:${LINUX}>:rt>
+)
 

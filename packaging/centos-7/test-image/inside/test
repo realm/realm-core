@@ -10,7 +10,7 @@ trap 'code=$?; chown -R --reference /inside/test /test-logs/; exit $code' EXIT
 yum -y install /out/*.rpm
 
 # include build test here to ensure that everything is properly installed
-packages=(realm realm-devel realm-utils realm-debug realm-devel-debug)
+packages=(realm-devel realm-utils realm-devel-debug)
 
 for x in "${packages[@]}"; do
     rpm -q "$x"

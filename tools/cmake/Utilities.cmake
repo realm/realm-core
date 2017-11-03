@@ -4,6 +4,10 @@ else()
     set(REALM_UTILITIES 1)
 endif()
 
+if(UNIX AND NOT APPLE AND NOT ANDROID)
+    set(LINUX ON)
+endif()
+
 macro(check_generator _generator)
     string(COMPARE EQUAL "${CMAKE_GENERATOR}" "${_generator}" _is_correct_generator)
     if(NOT _is_correct_generator)

@@ -9,7 +9,7 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 CORES=$(getconf _NPROCESSORS_ONLN)
 
 function usage {
-    echo "$Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>]"
+    echo "Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>]"
     echo ""
     echo "Arguments:"
     echo "   build_type=<Release|Debug|MinSizeDebug>"
@@ -74,7 +74,7 @@ if [ "${OS}" == "android" ]; then
           -D CPACK_SYSTEM_NAME="Android-${ARCH}" \
           ..
 
-    make -j "${CORES}" -l "${CORES}" VERBOSE=1
+    make -j "${CORES}" -l "${CORES}" CoreTests VERBOSE=1
     make package
 else
     mkdir -p "build-${OS}-${BUILD_TYPE}"
@@ -90,15 +90,16 @@ else
     cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${OS}.toolchain.cmake" \
           -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D REALM_NO_TESTS=1 \
           -D REALM_VERSION="${VERSION}" \
           -G Xcode ..
 
     xcodebuild -sdk "${SDK}os" \
                -configuration "${BUILD_TYPE}" \
+               -target Core \
                ONLY_ACTIVE_ARCH=NO
     xcodebuild -sdk "${SDK}simulator" \
                -configuration "${BUILD_TYPE}" \
+               -target Core \
                ONLY_ACTIVE_ARCH=NO
     mkdir -p "src/realm/${BUILD_TYPE}"
     lipo -create \

@@ -1,15 +1,14 @@
 add_subdirectory(util)
-
-# AFL not yet supported by Windows
-if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    add_subdirectory(fuzzy)
-endif()
-
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
 # FIXME: Add other benchmarks
 
-set(NORMAL_TESTS
+if(NOT WIN32)
+    # AFL not yet supported by Windows
+    add_subdirectory(fuzzy)
+endif()
+
+add_executable(CoreTests EXCLUDE_FROM_ALL
     test_all.cpp
     test_alloc.cpp
     test_array.cpp
@@ -31,6 +30,7 @@ set(NORMAL_TESTS
     test_descriptor.cpp
     test_destroy_guard.cpp
     test_destructor_thread_safety.cpp
+    $<$<BOOL:${REALM_ENABLE_ENCRYPTION}>:test_encrypted_file_mapping.cpp>
     test_file.cpp
     test_file_locks.cpp
     test_group.cpp
@@ -66,69 +66,49 @@ set(NORMAL_TESTS
     test_util_stringbuffer.cpp
     test_util_to_string.cpp
     test_util_type_list.cpp
-    test_version.cpp)
-
-if (REALM_ENABLE_ENCRYPTION)
-	list(APPEND NORMAL_TESTS test_encrypted_file_mapping.cpp)
-endif()
-
-set(LARGE_TESTS
+    test_version.cpp
     large_tests/test_column_large.cpp
-    large_tests/test_strings.cpp)
+    large_tests/test_strings.cpp
+    fuzz_group.cpp
+    $<$<STREQUAL:${CMAKE_GENERATOR},Xcode>:main.mm>
+    $<$<NOT:$<STREQUAL:${CMAKE_GENERATOR},Xcode>>:main.cpp>
+)
+add_executable(realm-tests ALIAS CoreTests) # TODO: Remove when scripts are migrated
 
-set(REALM_TEST_HEADERS
-    fuzz_group.hpp
-    pthread_test.hpp
-    test.hpp
-    test_all.hpp
-    test_string_types.hpp
-    test_table_helper.hpp
-    testsettings.hpp
-) # REALM_TEST_HEADERS
-
-set(FUZZY_TESTS fuzz_group.cpp)
-
-set(TESTS ${NORMAL_TESTS} ${LARGE_TESTS} ${FUZZY_TESTS})
-
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND NOT ANDROID)
+if(LINUX)
     include(Findprocps)
-    set(EXTRA_TEST_LIBS ${PROCPS_LIBRARY} rt)
-    set(EXTRA_TEST_CFLAGS ${PROCPS_INCLUDE_DIR})
 endif()
+
+target_link_libraries(CoreTests
+    TestUtil
+    $<$<BOOL:${PROCPS_FOUND}>:ProcPs>
+)
 
 # Resources required for running the tests
 file(GLOB REQUIRED_TEST_FILES
      "*.json"
      "*.realm"
-     "expect_string.txt")
-file(COPY ${REQUIRED_TEST_FILES}
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+     "expect_string.txt"
+ )
+file(COPY ${REQUIRED_TEST_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-# FIXME: Benchmarks
-
-if(CMAKE_GENERATOR STREQUAL Xcode)
-    set(MAIN_FILE main.mm)
-else()
-    set(MAIN_FILE main.cpp)
-endif()
 
 if (MSVC)
     set_source_files_properties(test_query.cpp PROPERTIES COMPILE_FLAGS /bigobj)
 endif()
 
-add_executable(realm-tests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
+set_target_properties(CoreTests PROPERTIES OUTPUT_NAME realm-tests)
 
 if(CMAKE_GENERATOR STREQUAL Xcode)
-    set_target_properties(realm-tests PROPERTIES
-                          MACOSX_BUNDLE YES
-                          RESOURCE "${REQUIRED_TEST_FILES}")
+    set_target_properties(CoreTests
+        PROPERTIES
+            MACOSX_BUNDLE YES
+            RESOURCE "${REQUIRED_TEST_FILES}"
+    )
 endif()
 
-target_link_libraries(realm-tests
-                      test-util ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
-)
+add_test(NAME CoreTests COMMAND CoreTests)
 
-target_include_directories(realm-tests PUBLIC ${EXTRA_TEST_CFLAGS})
-
-add_test(NAME RealmTests COMMAND realm-tests)
-
+# Since the tests are not included in the all target, we create some convenience targets
+add_custom_target(check COMMAND "${RealmCore_BINARY_DIR}/test/realm-tests" DEPENDS CoreTests)
+add_custom_target(universe DEPENDS CoreTests BenchmarkCommonTasks RealmStats BenchmarkCrud FuzzGroup FuzzTransactLog)

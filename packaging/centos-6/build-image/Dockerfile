@@ -7,15 +7,16 @@ FROM ci/realm-core:centos-6-base
 # Link: https://github.com/docker/docker/issues/10180
 RUN touch /var/lib/rpm/* \
     && yum -y install \
-        git \
-        wget \
-        unzip \
-        which \
         chrpath \
-        openssl-devel \
+        devtoolset-3-binutils \
         devtoolset-3-gcc \
         devtoolset-3-gcc-c++ \
-        devtoolset-3-binutils \
+        git \
+        openssl-devel \
+        procps-devel \
+        unzip \
+        wget \
+        which \
     && yum clean all
 
 # Install CMake

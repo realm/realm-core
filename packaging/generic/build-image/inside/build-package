@@ -20,21 +20,17 @@ cd /tmp/build
 rm -rf build-dir
 mkdir build-dir
 cd build-dir
-cmake -DREALM_ENABLE_ENCRYPTION=1 \
-      -DREALM_NO_TESTS=1 \
-      -DCMAKE_INSTALL_PREFIX="/dest/${name}" \
-      -DCMAKE_BUILD_TYPE=Release \
-      -GNinja ..
-ninja
-ninja install/strip
+cmake -D CMAKE_INSTALL_PREFIX="/dest/${name}" \
+      -D CMAKE_BUILD_TYPE=Release \
+      -G Ninja ..
+ninja Core RealmConfig RealmImporter Realmd
+ninja install
 
 rm -rf -- *
-cmake -DREALM_ENABLE_ENCRYPTION=1 \
-      -DREALM_NO_TESTS=1 \
-      -DCMAKE_INSTALL_PREFIX="/dest/${name}" \
+cmake -DCMAKE_INSTALL_PREFIX="/dest/${name}" \
       -DCMAKE_BUILD_TYPE=Debug \
       -GNinja ..
-ninja
+ninja Core RealmConfig RealmImporter Realmd
 ninja install
 
 cd /dest

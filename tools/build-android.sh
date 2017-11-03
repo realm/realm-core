@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
+set -x
 
 #Set Script Name variable
 SCRIPT=$(basename "${BASH_SOURCE[0]}")
@@ -39,13 +40,13 @@ fi
 rm -rf core-android
 mkdir core-android
 
-filename=$(find "build-android-armeabi-v7a-Release" -maxdepth 1 -type f -name "realm-core-Release-*-devel.tar.gz")
+filename=$(find "build-android-armeabi-v7a-Release" -maxdepth 1 -type f -name "realm-core-Release-*.tar.gz")
 tar -C core-android -zxvf "${filename}" include doc
 
 for bt in "${BUILD_TYPES[@]}"; do
     [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
     for p in "${PLATFORMS[@]}"; do
-        filename=$(find "build-android-${p}-${bt}" -maxdepth 1 -type f -name "realm-core-*-devel.tar.gz")
+        filename=$(find "build-android-${p}-${bt}" -maxdepth 1 -type f -name "realm-core-*.tar.gz")
         tar -C core-android -zxvf "${filename}" "lib/librealm${suffix}.a"
         mv "core-android/lib/librealm${suffix}.a" "core-android/librealm-android-${p}${suffix}.a"
         rm -rf core-android/lib

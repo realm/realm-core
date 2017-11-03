@@ -19,40 +19,18 @@ cd /tmp/build
 rm -rf build-dir
 mkdir build-dir
 cd build-dir
-cmake3 -DREALM_ENABLE_ENCRYPTION=1 \
-      -DREALM_NO_TESTS=1 \
-      -DCMAKE_INSTALL_PREFIX=/prod \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_MAKE_PROGRAM=ninja-build \
-      -GNinja ..
-ninja-build
-ninja-build install/strip
+cmake3 -D CMAKE_INSTALL_PREFIX=/prod \
+       -D CMAKE_BUILD_TYPE=Release \
+       -D CMAKE_MAKE_PROGRAM=ninja-build \
+       -G Ninja ..
+ninja-build Core RealmConfig RealmImporter Realmd
+ninja-build install
 
 echo "ldconfig" > /tmp/post-ldconf
 echo "echo >/dev/null" >> /tmp/post-ldconf
 
 (
 cd /out
-
-fpm \
-    -t rpm \
-    -s dir \
-    -n realm \
-    --rpm-dist el7 \
-    --license "Apache 2.0" \
-    --version "${VERSION}" \
-    --iteration "${ITERATION}" \
-    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
-    --url "https://realm.io" \
-    --category "System Environment/Libraries" \
-    --vendor "Realm" \
-    --maintainer "Realm <help@realm.io>" \
-    --after-install "/tmp/post-ldconf" \
-    --after-remove "/tmp/post-ldconf" \
-    -d "openssl" \
-    -C "/prod" \
-    lib64/librealm.so=/usr/lib64/librealm.so \
-    libexec=/usr
 
 fpm \
     -t rpm \
@@ -67,7 +45,6 @@ fpm \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    -d "realm = ${VERSION}-${ITERATION}.el7" \
     -d "openssl-devel" \
     -C "/prod" \
     /include=/usr \
@@ -87,42 +64,20 @@ fpm \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    -d "realm = ${VERSION}-${ITERATION}.el7" \
+    -d "openssl-devel" \
     -C "/prod" \
     /bin/realm-importer=/usr/bin/realm-importer
 )
 
 rm -rf -- * /prod/*
-cmake3 -DREALM_ENABLE_ENCRYPTION=1 \
-       -DREALM_NO_TESTS=1 \
-       -DCMAKE_INSTALL_PREFIX=/prod \
-       -DCMAKE_BUILD_TYPE=Debug \
-       -DCMAKE_MAKE_PROGRAM=ninja-build \
-       -GNinja ..
-ninja-build
+cmake3 -D CMAKE_INSTALL_PREFIX=/prod \
+       -D CMAKE_BUILD_TYPE=Debug \
+       -D CMAKE_MAKE_PROGRAM=ninja-build \
+       -G Ninja ..
+ninja-build Core RealmConfig RealmImporter Realmd
 ninja-build install
 
 cd /out
-
-fpm \
-    -t rpm \
-    -s dir \
-    -n realm-debug \
-    --rpm-dist el7 \
-    --license "Apache 2.0" \
-    --version "${VERSION}" \
-    --iteration "${ITERATION}" \
-    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
-    --url "https://realm.io" \
-    --category "System Environment/Libraries" \
-    --vendor "Realm" \
-    --maintainer "Realm <help@realm.io>" \
-    --after-install "/tmp/post-ldconf" \
-    --after-remove "/tmp/post-ldconf" \
-    -d "openssl" \
-    -C "/prod" \
-    lib64/librealm-dbg.so=/usr/lib64/librealm-dbg.so \
-    libexec=/usr
 
 fpm \
     -t rpm \
@@ -137,7 +92,6 @@ fpm \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    -d "realm-devel = ${VERSION}-${ITERATION}.el7" \
     -d "openssl-devel" \
     -C "/prod" \
-    lib64/librealm-dbg.so=/usr/lib64/librealm-dbg.a
+    lib64/librealm-dbg.a=/usr/lib64/librealm-dbg.a

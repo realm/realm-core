@@ -95,15 +95,9 @@ CMake [wiki page](http://www.vtk.org/Wiki/CMake_Useful_Variables#Compilers_and_T
 
 ## Testing
 
-The core library comes with a suite of unit tests. You can run it in one of the
-following ways:
+The core library comes with a suite of unit tests. You can run it with:
 
-    ctest
-
-or
-
-    cd build-dir/test
-    ./realm-tests
+    make check
 
 There are a number of environment variable that can be use the customize the
 execution. For example, here is how to run only the `Foo` test and those whose
