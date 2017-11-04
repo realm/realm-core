@@ -7294,6 +7294,46 @@ TEST(LangBindHelper_StringEnumMoveOutOfBounds)
     CHECK(t.get_string(2, 0) == enum_1);
 }
 
+// found by libfuzzer in [realm-core-4.0.3] on Fri Nov 3 13:50:09 2017
+TEST(LangBindHelper_StringEnumSparseMovement)
+{
+    Group g;
+    TableRef t = g.add_table("t1");
+
+    t->add_column_link(type_Link, "link0", *t);
+    t->add_column(type_String, "string_enum1");
+    t->add_column(type_String, "string_enum2");
+    t->add_column_link(type_Link, "link3", *t);
+    t->add_column(type_String, "string_enum4");
+    // gap for string column
+    t->add_column_link(type_Link, "link6", *t);
+    t->add_column_link(type_Link, "link7", *t);
+    // gap for string column
+    t->add_column(type_String, "string_enum9");
+    // gap for string column
+    t->add_column(type_String, "string_enum11");
+    t->add_column(type_String, "string_enum12");
+    t->add_column_link(type_Link, "link13", *t);
+
+    t->add_empty_row();
+    StringData enum1("enum 1 value");
+    StringData enum2("enum 2 value");
+    t->set_string(1, 0, enum1);
+    t->set_string(2, 0, enum2);
+
+    t->optimize(true);
+
+    // fill in gaps with regular string columns
+    t->insert_column(5, type_String, "string5");
+    t->insert_column(8, type_String, "string8");
+    t->insert_column(10, type_String, "string10");
+
+    _impl::TableFriend::move_column(*(g.get_table(0)->get_descriptor()), 1, 6);
+
+    t->verify();
+    CHECK(t->get_string(1, 0) == enum2);
+    CHECK(t->get_string(6, 0) == enum1);
+}
 
 TEST(Table_MoveSubtables)
 {

@@ -385,9 +385,11 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
 
         size_t from_enums_ndx = get_enumkeys_ndx(from_ndx);
         size_t to_enums_ndx = get_enumkeys_ndx(to_ndx);
-        if (to_enums_ndx >= m_enumkeys.size()) {
-            to_enums_ndx = m_enumkeys.size() - 1;
+        ColumnType to_type = ColumnType(m_types.get(to_ndx));
+        if (to_ndx > from_ndx && to_type != col_type_StringEnum) {
+            to_enums_ndx -= 1;
         }
+
         m_enumkeys.move_rotate(from_enums_ndx, to_enums_ndx);
     }
 

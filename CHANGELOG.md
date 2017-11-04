@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix possible corruption when moving a StringEnumColumn.
+  Currently unused by bindings.
+  PR [#2924](https://github.com/realm/realm-core/pull/2924).
 
 ### Breaking changes
 
