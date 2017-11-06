@@ -1103,44 +1103,6 @@ TEST(Table_MoveAllTypes)
 
 #ifdef LEGACY_TESTS
 
-TEST(Table_Range)
-{
-    Table table;
-    table.add_column(type_Int, "int");
-    table.add_empty_row(100);
-    for (size_t i = 0; i < 100; ++i)
-        table.set_int(0, i, i);
-    TableView tv = table.get_range_view(10, 20);
-    CHECK_EQUAL(10, tv.size());
-    for (size_t i = 0; i < tv.size(); ++i)
-        CHECK_EQUAL(int64_t(i + 10), tv.get_int(0, i));
-
-    for (size_t i = 0; i < 5; ++i)
-        table.insert_empty_row(0);
-
-    CHECK(tv.sync_if_needed());
-    for (size_t i = 0; i < tv.size(); ++i)
-        CHECK_EQUAL(int64_t(i + 5), tv.get_int(0, i));
-}
-
-TEST(Table_RangeConst)
-{
-    Group group;
-    {
-        TableRef table = group.add_table("test");
-        table->add_column(type_Int, "int");
-        table->add_empty_row(100);
-        for (int i = 0; i < 100; ++i)
-            table->set_int(0, i, i);
-    }
-    ConstTableRef ctable = group.get_table("test");
-    ConstTableView tv = ctable->get_range_view(10, 20);
-    CHECK_EQUAL(10, tv.size());
-    for (size_t i = 0; i < tv.size(); ++i)
-        CHECK_EQUAL(int64_t(i + 10), tv.get_int(0, i));
-}
-
-
 // enable to generate testfiles for to_string below
 #define GENERATE 0
 

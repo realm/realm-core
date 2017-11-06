@@ -3809,19 +3809,6 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     }
 }
 
-
-TableView Table::get_range_view(size_t from, size_t to)
-{
-    REALM_ASSERT(!m_columns.is_attached() || to <= size());
-
-    return where().find_all(from, to);
-}
-
-ConstTableView Table::get_range_view(size_t from, size_t to) const
-{
-    return const_cast<Table*>(this)->get_range_view(from, to);
-}
-
 TableView Table::get_backlink_view(size_t row_ndx, Table* src_table, size_t src_col_ndx)
 {
     REALM_ASSERT(&src_table->get_column_link_base(src_col_ndx).get_target_table() == this);

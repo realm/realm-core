@@ -697,9 +697,6 @@ public:
     TableView get_sorted_view(SortDescriptor order);
     ConstTableView get_sorted_view(SortDescriptor order) const;
 
-    TableView get_range_view(size_t begin, size_t end);
-    ConstTableView get_range_view(size_t begin, size_t end) const;
-
     TableView get_backlink_view(size_t row_ndx, Table* src_table, size_t src_col_ndx);
 
 
