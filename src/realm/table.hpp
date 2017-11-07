@@ -429,6 +429,10 @@ public:
     ConstIterator end() const;
     Iterator begin();
     Iterator end();
+    void remove_object(ConstIterator& it)
+    {
+        do_remove_object(it->get_key(), false);
+    }
     //@}
 
     /// Replaces all links to \a row_ndx with links to \a new_row_ndx.

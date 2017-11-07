@@ -90,7 +90,7 @@ public:
         return m_keys.get(0);
     }
 
-    void get_leaf(size_t ndx, ClusterNode::IteratorState& state) const noexcept;
+    bool get_leaf(Key key, ClusterNode::IteratorState& state) const noexcept;
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
@@ -126,7 +126,7 @@ void ClusterNode::IteratorState::clear()
 {
     m_current_leaf.detach();
     m_key_offset = 0;
-    m_leaf_start_ndx = 0;
+    m_current_index = size_t(-1);
 }
 
 /***************************** ClusterNodeInner ******************************/
@@ -307,36 +307,38 @@ void ClusterNodeInner::add(ref_type ref, int64_t key_value)
     m_keys.add(key_value);
 }
 
-void ClusterNodeInner::get_leaf(size_t ndx, ClusterNode::IteratorState& state) const noexcept
+// Find leaf that contains the object identified by key. If this does not exist return the
+// leaf that contains the next object
+bool ClusterNodeInner::get_leaf(Key key, ClusterNode::IteratorState& state) const noexcept
 {
-    unsigned sz = node_size();
-    for (unsigned i = 0; i < sz; i++) {
-        ref_type ref = m_children.get_as_ref(i);
-        char* header = m_alloc.translate(ref);
-        bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
-        size_t child_size;
+    size_t child_ndx = m_keys.upper_bound_int(key.value);
+    if (child_ndx > 0)
+        child_ndx--;
+
+    while (child_ndx < m_children.size()) {
+        int64_t key_offset = m_keys.get(child_ndx);
+        Key new_key = Key(key.value - key_offset);
+        state.m_key_offset += key_offset;
+
+        ref_type child_ref = m_children.get_as_ref(child_ndx);
+        char* child_header = m_alloc.translate(child_ref);
+        bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
         if (child_is_leaf) {
-            state.m_current_leaf.init(MemRef(header, ref, m_alloc));
-            child_size = state.m_current_leaf.node_size();
-            state.m_leaf_end_ndx = state.m_leaf_start_ndx + child_size;
-            if (ndx < state.m_leaf_end_ndx) {
-                state.m_key_offset += get_key(i);
-                return;
-            }
+            state.m_current_leaf.init(MemRef(child_header, child_ref, m_alloc));
+            state.m_current_index = state.m_current_leaf.lower_bound_key(new_key);
+            if (state.m_current_index < state.m_current_leaf.node_size())
+                return true;
         }
         else {
-            ClusterNodeInner inner_node(m_alloc, m_tree_top);
-            inner_node.init(MemRef(header, ref, m_alloc));
-
-            child_size = inner_node.get_tree_size();
-            if (ndx < state.m_leaf_start_ndx + child_size) {
-                state.m_key_offset += get_key(i);
-                auto node = m_tree_top.get_node(ref);
-                return inner_node.get_leaf(ndx, state);
-            }
+            ClusterNodeInner node(m_alloc, m_tree_top);
+            node.init(MemRef(child_header, child_ref, m_alloc));
+            if (node.get_leaf(new_key, state))
+                return true;
         }
-        state.m_leaf_start_ndx += child_size;
+        state.m_key_offset -= key_offset;
+        child_ndx++;
     }
+    return false;
 }
 
 void ClusterNodeInner::dump_objects(int64_t key_offset, std::string lead) const
@@ -1076,18 +1078,19 @@ void ClusterTree::erase(Key k)
     }
 }
 
-void ClusterTree::get_leaf(size_t ndx, ClusterNode::IteratorState& state) const noexcept
+bool ClusterTree::get_leaf(Key key, ClusterNode::IteratorState& state) const noexcept
 {
     state.clear();
 
     if (m_root->is_leaf()) {
-        state.m_current_leaf.init(m_root->get_mem());
-        state.m_leaf_end_ndx = state.m_current_leaf.node_size();
+        Cluster* node = static_cast<Cluster*>(m_root.get());
+        state.m_current_leaf.init(node->get_mem());
+        state.m_current_index = node->lower_bound_key(key);
+        return state.m_current_index < state.m_current_leaf.node_size();
     }
     else {
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
-        state.m_root_index = 0;
-        node->get_leaf(ndx, state);
+        return node->get_leaf(key, state);
     }
 }
 
@@ -1134,44 +1137,70 @@ ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
     : m_tree(t)
     , m_leaf(t.get_alloc(), t)
     , m_state(m_leaf)
-    , m_ndx(ndx)
+{
+    if (ndx == 0) {
+        // begin
+        m_key = load_leaf(Key(0));
+    }
+    else {
+        // end
+        m_key = null_key;
+    }
+}
+
+ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, Key key)
+    : m_tree(t)
+    , m_leaf(t.get_alloc(), t)
+    , m_state(m_leaf)
+    , m_key(key)
 {
 }
 
-void ClusterTree::ConstIterator::load_leaf() const
+Key ClusterTree::ConstIterator::load_leaf(Key key) const
 {
-    if (m_ndx < m_tree.size()) {
-        m_tree.get_leaf(m_ndx, m_state);
-        m_version = m_tree.get_version_counter();
+    m_version = m_tree.get_version_counter();
+    // 'key' may or may not exist. If it does not exist, state is updated
+    // to point to the next object in line.
+    if (m_tree.get_leaf(key, m_state)) {
+        // Get the actual key value
+        return Key(m_leaf.get_key(m_state.m_current_index) + m_state.m_key_offset);
     }
     else {
-        m_state.clear();
+        // end of table
+        return null_key;
     }
 }
 
 ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
 {
     if (m_version != m_tree.get_version_counter()) {
-        load_leaf();
+        Key k = load_leaf(m_key);
+        if (k != m_key)
+            throw std::out_of_range("Object was deleted");
     }
 
     REALM_ASSERT(m_leaf.is_attached());
-    size_t index = m_ndx - m_state.m_leaf_start_ndx;
-    Key k = Key(m_leaf.get_key(index) + m_state.m_key_offset);
 
-    return new (&m_obj_cache_storage) Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_ref(), k, index);
+    return new (&m_obj_cache_storage)
+        Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_ref(), m_key, m_state.m_current_index);
 }
 
 ClusterTree::ConstIterator& Table::ConstIterator::operator++()
 {
-    m_ndx++;
-    if (m_ndx == m_state.m_leaf_end_ndx) {
-        if (m_ndx < m_tree.size()) {
-            load_leaf();
+    if (m_version != m_tree.get_version_counter()) {
+        Key k = load_leaf(m_key);
+        if (k != m_key) {
+            // Objects was deleted. k points to the next object
+            m_key = k;
+            return *this;
         }
-        else {
-            m_state.clear();
-        }
+    }
+    m_state.m_current_index++;
+    if (m_state.m_current_index == m_leaf.node_size()) {
+        m_key = load_leaf(Key(m_key.value + 1));
+    }
+    else {
+        m_key = Key(m_leaf.get_key(m_state.m_current_index) + m_state.m_key_offset);
     }
     return *this;
 }

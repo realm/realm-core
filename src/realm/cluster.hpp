@@ -80,17 +80,6 @@ public:
     };
 
     struct IteratorState {
-        struct NodeInfo {
-            NodeInfo(std::unique_ptr<ClusterNode> n, size_t s, size_t i)
-                : node(std::move(n))
-                , size(s)
-                , index(i)
-            {
-            }
-            std::unique_ptr<ClusterNode> node;
-            size_t size;
-            size_t index;
-        };
         IteratorState(Cluster& leaf)
             : m_current_leaf(leaf)
         {
@@ -100,9 +89,7 @@ public:
 
         Cluster& m_current_leaf;
         int64_t m_key_offset = 0;
-        size_t m_leaf_start_ndx = 0;
-        size_t m_leaf_end_ndx = 0;
-        size_t m_root_index = 0;
+        size_t m_current_index = 0;
     };
 
     ClusterNode(Allocator& allocator, const ClusterTree& tree_top)
@@ -200,6 +187,10 @@ public:
     int64_t get_last_key() const override
     {
         return m_keys.size() ? get_key(m_keys.size() - 1) : 0;
+    }
+    size_t lower_bound_key(Key key)
+    {
+        return m_keys.lower_bound_int(key.value);
     }
 
     void insert_column(size_t ndx) override;
