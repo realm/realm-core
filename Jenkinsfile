@@ -118,7 +118,7 @@ def doWindowsBuild() {
       getSourceArchive()
 
       bat """
-        "${tool 'cmake'}" .
+        "${tool 'cmake'}" . -DCMAKE_SYSTEM_VERSION="8.1"
         "${tool 'cmake'}" --build . --config Release
         tests\\Release\\tests.exe
       """
