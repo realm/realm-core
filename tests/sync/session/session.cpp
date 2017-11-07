@@ -28,8 +28,8 @@
 
 #include "util/event_loop.hpp"
 #include "util/templated_test_case.hpp"
-#include "util/time.hpp"
 
+#include <realm/util/time.hpp>
 #include <realm/util/scope_exit.hpp>
 
 #include <atomic>
@@ -379,15 +379,15 @@ TEST_CASE("sync: error handling", "[sync]") {
         idx = recovery_path.find(SyncManager::shared().recovery_directory_path());
         CHECK(idx != std::string::npos);
         if (just_before.tm_year == just_after.tm_year) {
-            idx = recovery_path.find(util::put_time(just_after_raw, "%Y"));
+            idx = recovery_path.find(util::format_local_time(just_after_raw, "%Y"));
             CHECK(idx != std::string::npos);
         }
         if (just_before.tm_mon == just_after.tm_mon) {
-            idx = recovery_path.find(util::put_time(just_after_raw, "%m"));
+            idx = recovery_path.find(util::format_local_time(just_after_raw, "%m"));
             CHECK(idx != std::string::npos);
         }
         if (just_before.tm_yday == just_after.tm_yday) {
-            idx = recovery_path.find(util::put_time(just_after_raw, "%d"));
+            idx = recovery_path.find(util::format_local_time(just_after_raw, "%d"));
             CHECK(idx != std::string::npos);
         }
     }
