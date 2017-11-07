@@ -424,7 +424,7 @@ TEST(Group_InsertTable)
 
 TEST(Group_InsertTableWithLinks)
 {
-    using df = _impl::DescriptorFriend;
+    using tf = _impl::TableFriend;
 
     Group group;
     TableRef a = group.add_table("a");
@@ -432,8 +432,8 @@ TEST(Group_InsertTableWithLinks)
     a->add_column(type_Int, "foo");
     b->add_column_link(type_Link, "bar", *a);
 
-    auto& a_spec = df::get_spec(*a->get_descriptor());
-    auto& b_spec = df::get_spec(*b->get_descriptor());
+    auto& a_spec = tf::get_spec(*a);
+    auto& b_spec = tf::get_spec(*b);
     CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(0), 0);
     CHECK_EQUAL(a_spec.get_opposite_link_table_ndx(1), 1);
 
@@ -811,7 +811,7 @@ TEST(Group_BasicMoveTable)
 
 TEST(Group_MoveTableWithLinks)
 {
-    using df = _impl::DescriptorFriend;
+    using tf = _impl::TableFriend;
     Group group;
     TableRef a = group.add_table("a");
     TableRef b = group.add_table("b");
@@ -823,10 +823,10 @@ TEST(Group_MoveTableWithLinks)
     c->add_column_link(type_Link, "link_to_d", *d);
     d->add_column_link(type_LinkList, "link_to_a", *a);
 
-    auto& a_spec = df::get_spec(*a->get_descriptor());
-    auto& b_spec = df::get_spec(*b->get_descriptor());
-    auto& c_spec = df::get_spec(*c->get_descriptor());
-    auto& d_spec = df::get_spec(*d->get_descriptor());
+    auto& a_spec = tf::get_spec(*a);
+    auto& b_spec = tf::get_spec(*b);
+    auto& c_spec = tf::get_spec(*c);
+    auto& d_spec = tf::get_spec(*d);
 
     // Move up:
     group.move_table(1, 3);
@@ -898,23 +898,6 @@ TEST(Group_Equal)
 }
 
 
-TEST(Group_TableAccessorLeftBehind)
-{
-    TableRef table;
-    TableRef subtable;
-    {
-        auto group = std::make_unique<Group>();
-        table = group->add_table("test");
-        CHECK(table->is_attached());
-        table->add_column(type_Table, "sub");
-        table->add_empty_row();
-        subtable = table->get_subtable(0, 0);
-        CHECK(subtable->is_attached());
-    }
-    CHECK(!table->is_attached());
-    CHECK(!subtable->is_attached());
-}
-
 #ifdef LEGACY_TESTS
 TEST(Group_SubtableDescriptors)
 {
@@ -951,32 +934,6 @@ TEST(Group_SubtableDescriptors)
     table->get_subdescriptor(0)->remove_search_index(0);
 }
 #endif
-
-TEST(Group_UpdateSubtableDescriptorsAccessors)
-{
-    GROUP_TEST_PATH(path);
-    Group g(path, crypt_key(), Group::mode_ReadWrite);
-
-    TableRef table = g.add_table("first");
-
-    {
-        DescriptorRef subdescr;
-        table->add_column(type_Table, "sub1", true, &subdescr);
-        subdescr->add_column(type_Int, "integers", nullptr, false);
-    }
-
-    {
-        DescriptorRef subdescr;
-        table->add_column(type_Table, "sub2", true, &subdescr);
-        subdescr->add_column(type_Int, "integers", nullptr, false);
-    }
-
-    g.commit();
-
-    table->get_subdescriptor(1)->remove_search_index(0);
-    table->remove_column(0);
-    table->get_subdescriptor(0)->add_search_index(0);
-}
 
 TEST(Group_Invalid1)
 {
@@ -1293,7 +1250,6 @@ TEST(Group_Serialize_All)
     table->add_column(type_OldDateTime, "date");
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
-    table->add_column(type_Mixed, "mixed");
 
     table->insert_empty_row(0);
     table->set_int(0, 0, 12);
@@ -1301,7 +1257,6 @@ TEST(Group_Serialize_All)
     table->set_olddatetime(2, 0, 12345);
     table->set_string(3, 0, "test");
     table->set_binary(4, 0, BinaryData("binary", 7));
-    table->set_mixed(5, 0, false);
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -1310,7 +1265,7 @@ TEST(Group_Serialize_All)
     Group from_mem(buffer);
     TableRef t = from_mem.get_table("test");
 
-    CHECK_EQUAL(6, t->get_column_count());
+    CHECK_EQUAL(5, t->get_column_count());
     CHECK_EQUAL(1, t->size());
     CHECK_EQUAL(12, t->get_int(0, 0));
     CHECK_EQUAL(true, t->get_bool(1, 0));
@@ -1318,8 +1273,6 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL("test", t->get_string(3, 0));
     CHECK_EQUAL(7, t->get_binary(4, 0).size());
     CHECK_EQUAL("binary", t->get_binary(4, 0).data());
-    CHECK_EQUAL(type_Bool, t->get_mixed(5, 0).get_type());
-    CHECK_EQUAL(false, t->get_mixed(5, 0).get_bool());
 }
 
 TEST(Group_Persist)
@@ -1336,7 +1289,6 @@ TEST(Group_Persist)
     table->add_column(type_OldDateTime, "date");
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
-    table->add_column(type_Mixed, "mixed");
     table->add_column(type_Timestamp, "timestamp");
     table->insert_empty_row(0);
     table->set_int(0, 0, 12);
@@ -1344,8 +1296,7 @@ TEST(Group_Persist)
     table->set_olddatetime(2, 0, 12345);
     table->set_string(3, 0, "test");
     table->set_binary(4, 0, BinaryData("binary", 7));
-    table->set_mixed(5, 0, false);
-    table->set_timestamp(6, 0, Timestamp(111, 222));
+    table->set_timestamp(5, 0, Timestamp(111, 222));
 
     // Write changes to file
     db.commit();
@@ -1354,7 +1305,7 @@ TEST(Group_Persist)
     db.verify();
 #endif
 
-    CHECK_EQUAL(7, table->get_column_count());
+    CHECK_EQUAL(6, table->get_column_count());
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
@@ -1362,9 +1313,7 @@ TEST(Group_Persist)
     CHECK_EQUAL("test", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
-    CHECK_EQUAL(type_Bool, table->get_mixed(5, 0).get_type());
-    CHECK_EQUAL(false, table->get_mixed(5, 0).get_bool());
-    CHECK(table->get_timestamp(6, 0) == Timestamp(111, 222));
+    CHECK(table->get_timestamp(5, 0) == Timestamp(111, 222));
 
     // Change a bit
     table->set_string(3, 0, "Changed!");
@@ -1376,7 +1325,7 @@ TEST(Group_Persist)
     db.verify();
 #endif
 
-    CHECK_EQUAL(7, table->get_column_count());
+    CHECK_EQUAL(6, table->get_column_count());
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
@@ -1384,509 +1333,7 @@ TEST(Group_Persist)
     CHECK_EQUAL("Changed!", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
-    CHECK_EQUAL(type_Bool, table->get_mixed(5, 0).get_type());
-    CHECK_EQUAL(false, table->get_mixed(5, 0).get_bool());
-    CHECK(table->get_timestamp(6, 0) == Timestamp(111, 222));
-}
-
-
-TEST(Group_Subtable)
-{
-    GROUP_TEST_PATH(path_1);
-    GROUP_TEST_PATH(path_2);
-
-    int n = 1;
-
-    Group g;
-    TableRef table = g.add_table("test");
-    DescriptorRef sub;
-    table->add_column(type_Int, "foo");
-    table->add_column(type_Table, "sub", &sub);
-    table->add_column(type_Mixed, "baz");
-    sub->add_column(type_Int, "bar");
-    sub.reset();
-
-    for (int i = 0; i < n; ++i) {
-        table->add_empty_row();
-        table->set_int(0, i, 100 + i);
-        if (i % 2 == 0) {
-            TableRef st = table->get_subtable(1, i);
-            st->add_empty_row();
-            st->set_int(0, 0, 200 + i);
-        }
-        if (i % 3 == 1) {
-            table->set_mixed(2, i, Mixed::subtable_tag());
-            TableRef st = table->get_subtable(2, i);
-            st->add_column(type_Int, "banach");
-            st->add_empty_row();
-            st->set_int(0, 0, 700 + i);
-        }
-    }
-
-    CHECK_EQUAL(n, table->size());
-
-    for (int i = 0; i < n; ++i) {
-        CHECK_EQUAL(100 + i, table->get_int(0, i));
-        {
-            TableRef st = table->get_subtable(1, i);
-            CHECK_EQUAL(i % 2 == 0 ? 1 : 0, st->size());
-            if (i % 2 == 0)
-                CHECK_EQUAL(200 + i, st->get_int(0, 0));
-            if (i % 3 == 0) {
-                st->add_empty_row();
-                st->set_int(0, st->size() - 1, 300 + i);
-            }
-        }
-        CHECK_EQUAL(i % 3 == 1 ? type_Table : type_Int, table->get_mixed_type(2, i));
-        if (i % 3 == 1) {
-            TableRef st = table->get_subtable(2, i);
-            CHECK_EQUAL(1, st->size());
-            CHECK_EQUAL(700 + i, st->get_int(0, 0));
-        }
-        if (i % 8 == 3) {
-            if (i % 3 != 1)
-                table->set_mixed(2, i, Mixed::subtable_tag());
-            TableRef st = table->get_subtable(2, i);
-            if (i % 3 != 1)
-                st->add_column(type_Int, "banach");
-            st->add_empty_row();
-            st->set_int(0, st->size() - 1, 800 + i);
-        }
-    }
-
-    for (int i = 0; i < n; ++i) {
-        CHECK_EQUAL(100 + i, table->get_int(0, i));
-        {
-            TableRef st = table->get_subtable(1, i);
-            size_t expected_size = (i % 2 == 0 ? 1 : 0) + (i % 3 == 0 ? 1 : 0);
-            CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
-            if (i % 2 == 0) {
-                CHECK_EQUAL(200 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-            if (i % 3 == 0) {
-                CHECK_EQUAL(300 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-        }
-        CHECK_EQUAL(i % 3 == 1 || i % 8 == 3 ? type_Table : type_Int, table->get_mixed_type(2, i));
-        if (i % 3 == 1 || i % 8 == 3) {
-            TableRef st = table->get_subtable(2, i);
-            size_t expected_size = (i % 3 == 1 ? 1 : 0) + (i % 8 == 3 ? 1 : 0);
-            CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
-            if (i % 3 == 1) {
-                CHECK_EQUAL(700 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-            if (i % 8 == 3) {
-                CHECK_EQUAL(800 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-        }
-    }
-
-    g.write(path_1, crypt_key());
-
-    // Read back tables
-    Group g2(path_1, crypt_key());
-    TableRef table2 = g2.get_table("test");
-
-    for (int i = 0; i < n; ++i) {
-        CHECK_EQUAL(100 + i, table2->get_int(0, i));
-        {
-            TableRef st = table2->get_subtable(1, i);
-            size_t expected_size = (i % 2 == 0 ? 1 : 0) + (i % 3 == 0 ? 1 : 0);
-            CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
-            if (i % 2 == 0) {
-                CHECK_EQUAL(200 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-            if (i % 3 == 0) {
-                CHECK_EQUAL(300 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-            if (i % 5 == 0) {
-                st->add_empty_row();
-                st->set_int(0, st->size() - 1, 400 + i);
-            }
-        }
-        CHECK_EQUAL(i % 3 == 1 || i % 8 == 3 ? type_Table : type_Int, table2->get_mixed_type(2, i));
-        if (i % 3 == 1 || i % 8 == 3) {
-            TableRef st = table2->get_subtable(2, i);
-            size_t expected_size = (i % 3 == 1 ? 1 : 0) + (i % 8 == 3 ? 1 : 0);
-            CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
-            if (i % 3 == 1) {
-                CHECK_EQUAL(700 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-            if (i % 8 == 3) {
-                CHECK_EQUAL(800 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-        }
-        if (i % 7 == 4) {
-            if (i % 3 != 1 && i % 8 != 3)
-                table2->set_mixed(2, i, Mixed::subtable_tag());
-            TableRef st = table2->get_subtable(2, i);
-            if (i % 3 != 1 && i % 8 != 3)
-                st->add_column(type_Int, "banach");
-            st->add_empty_row();
-            st->set_int(0, st->size() - 1, 900 + i);
-        }
-    }
-
-    for (int i = 0; i < n; ++i) {
-        CHECK_EQUAL(100 + i, table2->get_int(0, i));
-        {
-            TableRef st = table2->get_subtable(1, i);
-            size_t expected_size = (i % 2 == 0 ? 1 : 0) + (i % 3 == 0 ? 1 : 0) + (i % 5 == 0 ? 1 : 0);
-            CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
-            if (i % 2 == 0) {
-                CHECK_EQUAL(200 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-            if (i % 3 == 0) {
-                CHECK_EQUAL(300 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-            if (i % 5 == 0) {
-                CHECK_EQUAL(400 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-        }
-        CHECK_EQUAL(i % 3 == 1 || i % 8 == 3 || i % 7 == 4 ? type_Table : type_Int, table2->get_mixed_type(2, i));
-        if (i % 3 == 1 || i % 8 == 3 || i % 7 == 4) {
-            TableRef st = table2->get_subtable(2, i);
-            size_t expected_size = (i % 3 == 1 ? 1 : 0) + (i % 8 == 3 ? 1 : 0) + (i % 7 == 4 ? 1 : 0);
-            CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
-            if (i % 3 == 1) {
-                CHECK_EQUAL(700 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-            if (i % 8 == 3) {
-                CHECK_EQUAL(800 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-            if (i % 7 == 4) {
-                CHECK_EQUAL(900 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-        }
-    }
-
-    g2.write(path_2, crypt_key());
-
-    // Read back tables
-    Group g3(path_2, crypt_key());
-    TableRef table3 = g2.get_table("test");
-
-    for (int i = 0; i < n; ++i) {
-        CHECK_EQUAL(100 + i, table3->get_int(0, i));
-        {
-            TableRef st = table3->get_subtable(1, i);
-            size_t expected_size = (i % 2 == 0 ? 1 : 0) + (i % 3 == 0 ? 1 : 0) + (i % 5 == 0 ? 1 : 0);
-            CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
-            if (i % 2 == 0) {
-                CHECK_EQUAL(200 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-            if (i % 3 == 0) {
-                CHECK_EQUAL(300 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-            if (i % 5 == 0) {
-                CHECK_EQUAL(400 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-        }
-        CHECK_EQUAL(i % 3 == 1 || i % 8 == 3 || i % 7 == 4 ? type_Table : type_Int, table3->get_mixed_type(2, i));
-        if (i % 3 == 1 || i % 8 == 3 || i % 7 == 4) {
-            TableRef st = table3->get_subtable(2, i);
-            size_t expected_size = (i % 3 == 1 ? 1 : 0) + (i % 8 == 3 ? 1 : 0) + (i % 7 == 4 ? 1 : 0);
-            CHECK_EQUAL(expected_size, st->size());
-            size_t ndx = 0;
-            if (i % 3 == 1) {
-                CHECK_EQUAL(700 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-            if (i % 8 == 3) {
-                CHECK_EQUAL(800 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-            if (i % 7 == 4) {
-                CHECK_EQUAL(900 + i, st->get_int(0, ndx));
-                ++ndx;
-            }
-        }
-    }
-}
-
-
-TEST(Group_MultiLevelSubtables)
-{
-    GROUP_TEST_PATH(path_1);
-    GROUP_TEST_PATH(path_2);
-    GROUP_TEST_PATH(path_3);
-    GROUP_TEST_PATH(path_4);
-    GROUP_TEST_PATH(path_5);
-
-    {
-        Group g;
-        TableRef table = g.add_table("test");
-        {
-            DescriptorRef sub_1, sub_2;
-            table->add_column(type_Int, "int");
-            table->add_column(type_Table, "tab", &sub_1);
-            table->add_column(type_Mixed, "mix");
-            sub_1->add_column(type_Int, "int");
-            sub_1->add_column(type_Table, "tab", &sub_2);
-            sub_2->add_column(type_Int, "int");
-        }
-        table->add_empty_row();
-        {
-            TableRef a = table->get_subtable(1, 0);
-            a->add_empty_row();
-            TableRef b = a->get_subtable(1, 0);
-            b->add_empty_row();
-        }
-        {
-            table->set_mixed(2, 0, Mixed::subtable_tag());
-            TableRef a = table->get_subtable(2, 0);
-            a->add_column(type_Int, "int");
-            a->add_column(type_Mixed, "mix");
-            a->add_empty_row();
-            a->set_mixed(1, 0, Mixed::subtable_tag());
-            TableRef b = a->get_subtable(1, 0);
-            b->add_column(type_Int, "int");
-            b->add_empty_row();
-        }
-        g.write(path_1, crypt_key());
-    }
-
-    // Non-mixed
-    {
-        Group g(path_1, crypt_key());
-        TableRef table = g.get_table("test");
-        // Get A as subtable
-        TableRef a = table->get_subtable(1, 0);
-        // Get B as subtable from A
-        TableRef b = a->get_subtable(1, 0);
-        // Modify B
-        b->set_int(0, 0, 6661012);
-        // Modify A
-        a->set_int(0, 0, 6661011);
-        // Modify top
-        table->set_int(0, 0, 6661010);
-        // Get a second ref to A (compare)
-        CHECK_EQUAL(table->get_subtable(1, 0), a);
-        CHECK_EQUAL(table->get_subtable(1, 0)->get_int(0, 0), 6661011);
-        // get a second ref to B (compare)
-        CHECK_EQUAL(a->get_subtable(1, 0), b);
-        CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0, 0), 6661012);
-        g.write(path_2, crypt_key());
-    }
-    {
-        Group g(path_2, crypt_key());
-        TableRef table = g.get_table("test");
-        // Get A as subtable
-        TableRef a = table->get_subtable(1, 0);
-        // Get B as subtable from A
-        TableRef b = a->get_subtable(1, 0);
-        // Drop reference to A
-        a = TableRef();
-        // Modify B
-        b->set_int(0, 0, 6661013);
-        // Get a third ref to A (compare)
-        a = table->get_subtable(1, 0);
-        CHECK_EQUAL(table->get_subtable(1, 0)->get_int(0, 0), 6661011);
-        // Get third ref to B and verify last mod
-        b = a->get_subtable(1, 0);
-        CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0, 0), 6661013);
-        g.write(path_3, crypt_key());
-    }
-
-    // Mixed
-    {
-        Group g(path_3, crypt_key());
-        TableRef table = g.get_table("test");
-        // Get A as subtable
-        TableRef a = table->get_subtable(2, 0);
-        // Get B as subtable from A
-        TableRef b = a->get_subtable(1, 0);
-        // Modify B
-        b->set_int(0, 0, 6661012);
-        // Modify A
-        a->set_int(0, 0, 6661011);
-        // Modify top
-        table->set_int(0, 0, 6661010);
-        // Get a second ref to A (compare)
-        CHECK_EQUAL(table->get_subtable(2, 0), a);
-        CHECK_EQUAL(table->get_subtable(2, 0)->get_int(0, 0), 6661011);
-        // get a second ref to B (compare)
-        CHECK_EQUAL(a->get_subtable(1, 0), b);
-        CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0, 0), 6661012);
-        g.write(path_4, crypt_key());
-    }
-    {
-        Group g(path_4, crypt_key());
-        TableRef table = g.get_table("test");
-        // Get A as subtable
-        TableRef a = table->get_subtable(2, 0);
-        // Get B as subtable from A
-        TableRef b = a->get_subtable(1, 0);
-        // Drop reference to A
-        a = TableRef();
-        // Modify B
-        b->set_int(0, 0, 6661013);
-        // Get a third ref to A (compare)
-        a = table->get_subtable(2, 0);
-        CHECK_EQUAL(table->get_subtable(2, 0)->get_int(0, 0), 6661011);
-        // Get third ref to B and verify last mod
-        b = a->get_subtable(1, 0);
-        CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0, 0), 6661013);
-        g.write(path_5, crypt_key());
-    }
-}
-
-
-TEST(Group_CommitSubtable)
-{
-    GROUP_TEST_PATH(path);
-    Group group(path, crypt_key(), Group::mode_ReadWrite);
-
-    TableRef table = group.add_table("test");
-    DescriptorRef sub_1;
-    table->add_column(type_Table, "subtable", &sub_1);
-    sub_1->add_column(type_Int, "int");
-    sub_1.reset();
-    table->add_empty_row();
-
-    TableRef subtable = table->get_subtable(0, 0);
-    subtable->add_empty_row();
-
-    group.commit();
-
-    table->add_empty_row();
-    group.commit();
-
-    subtable = table->get_subtable(0, 0);
-    subtable->add_empty_row();
-    group.commit();
-
-    table->add_empty_row();
-    subtable = table->get_subtable(0, 0);
-    subtable->add_empty_row();
-    group.commit();
-    group.verify();
-
-    TableRef table1 = group.add_table("other");
-    table1->add_column_link(type_LinkList, "linkList", *table);
-    group.commit();
-    group.verify();
-    table->insert_column_link(0, type_Link, "link", *table);
-    group.commit();
-    group.verify();
-}
-
-
-TEST(Group_CommitSubtableMixed)
-{
-    GROUP_TEST_PATH(path);
-    Group group(path, crypt_key(), Group::mode_ReadWrite);
-
-    TableRef table = group.add_table("test");
-    table->add_column(type_Mixed, "mixed");
-
-    table->add_empty_row();
-
-    table->clear_subtable(0, 0);
-    TableRef subtable = table->get_subtable(0, 0);
-    subtable->add_column(type_Int, "int");
-    subtable->add_empty_row();
-
-    group.commit();
-
-    table->add_empty_row();
-    group.commit();
-
-    subtable = table->get_subtable(0, 0);
-    subtable->add_empty_row();
-    group.commit();
-
-    table->add_empty_row();
-    subtable = table->get_subtable(0, 0);
-    subtable->add_empty_row();
-    group.commit();
-}
-
-
-TEST(Group_CommitDegenerateSubtable)
-{
-    GROUP_TEST_PATH(path);
-    Group group(path, crypt_key(), Group::mode_ReadWrite);
-    TableRef table = group.add_table("parent");
-    table->add_column(type_Table, "");
-    table->get_subdescriptor(0)->add_column(type_Int, "");
-    table->add_empty_row();
-    TableRef subtab = table->get_subtable(0, 0);
-    CHECK(subtab->is_degenerate());
-    group.commit();
-    CHECK(subtab->is_degenerate());
-}
-
-TEST(Group_InvalidateTables)
-{
-    TableRef table;
-    TableRef subtable1;
-    TableRef subtable2;
-    TableRef subtable3;
-    {
-        Group group;
-        table = group.add_table("foo");
-        table->add_column(type_Mixed, "first");
-        DescriptorRef descr1;
-        DescriptorRef descr2;
-        table->add_column(type_Table, "second", &descr1);
-        test_table_add_columns(descr1);
-        table->add_column(type_Table, "third", &descr2);
-        test_table_add_columns(descr2);
-        CHECK(table->is_attached());
-        table->add_empty_row();
-        table->set_mixed(0, 0, Mixed::subtable_tag());
-        CHECK(table->is_attached());
-        subtable1 = table->get_subtable(0, 0);
-        CHECK(table->is_attached());
-        CHECK(subtable1);
-        CHECK(subtable1->is_attached());
-        subtable2 = table->get_subtable(1, 0);
-        CHECK(table->is_attached());
-        CHECK(subtable1->is_attached());
-        CHECK(subtable2);
-        CHECK(subtable2->is_attached());
-        subtable3 = table->get_subtable(2, 0);
-        CHECK(table->is_attached());
-        CHECK(subtable1->is_attached());
-        CHECK(subtable2->is_attached());
-        CHECK(subtable3);
-        CHECK(subtable3->is_attached());
-        add(subtable3, "alpha", 79542, true, Wed);
-        add(subtable3, "beta", 97, false, Mon);
-        CHECK(table->is_attached());
-        CHECK(subtable1->is_attached());
-        CHECK(subtable2->is_attached());
-        CHECK(subtable3->is_attached());
-    }
-    CHECK(!table->is_attached());
-    CHECK(!subtable1->is_attached());
-    CHECK(!subtable2->is_attached());
-    CHECK(!subtable3->is_attached());
+    CHECK(table->get_timestamp(5, 0) == Timestamp(111, 222));
 }
 
 
@@ -2155,8 +1602,8 @@ TEST(Group_CascadeNotify_Simple)
 
     // move_last_over() on the origin table with strong links lists the target
     // rows that are removed
-    origin->get_descriptor()->set_link_type(0, link_Strong);
-    origin->get_descriptor()->set_link_type(1, link_Strong);
+    origin->set_link_type(0, link_Strong);
+    origin->set_link_type(1, link_Strong);
 
     origin->set_link(0, 10, 50);
     origin->set_link(0, 11, 62);
@@ -2286,8 +1733,8 @@ TEST(Group_CascadeNotify_TableClear)
     origin->add_empty_row(10);
 
     // and cascaded deletions
-    origin->get_descriptor()->set_link_type(0, link_Strong);
-    origin->get_descriptor()->set_link_type(1, link_Strong);
+    origin->set_link_type(0, link_Strong);
+    origin->set_link_type(1, link_Strong);
     origin->set_link(0, 1, 2);
     origin->get_linklist(1, 3)->add(4);
     called = false;

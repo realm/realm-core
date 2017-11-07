@@ -105,12 +105,6 @@ inline void TestTable::set(size_t, size_t, decltype(nullptr), bool)
 {
 }
 
-template <>
-inline void TestTable::set(size_t column_ndx, size_t row_ndx, realm::Mixed value, bool is_default)
-{
-    set_mixed(column_ndx, row_ndx, value, is_default);
-}
-
 /*****************************************************************************/
 
 template <class Val>

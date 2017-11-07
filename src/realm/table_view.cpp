@@ -675,10 +675,8 @@ void TableViewBase::do_sync()
     else if (m_distinct_column_source != npos) {
         m_key_values.clear();
         REALM_ASSERT(m_table->has_search_index(m_distinct_column_source));
-        if (!m_table->is_degenerate()) {
-            const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
-            col.get_search_index()->distinct(m_key_values);
-        }
+        const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
+        col.get_search_index()->distinct(m_key_values);
     }
     else if (m_linked_column) {
         m_key_values.clear();

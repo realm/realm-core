@@ -819,28 +819,26 @@ TEST(Table_1)
 #endif
 }
 
+#endif
 
 TEST(Table_ColumnNameTooLong)
 {
     Group group;
     TableRef table = group.add_table("foo");
     const size_t buf_size = 64;
-    std::unique_ptr<char[]> buf(new char[buf_size]);
-    CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf.get(), buf_size)), LogicError::column_name_too_long);
-    CHECK_LOGIC_ERROR(table->insert_column(0, type_Int, StringData(buf.get(), buf_size)),
-                      LogicError::column_name_too_long);
-    CHECK_LOGIC_ERROR(table->add_column_link(type_Link, StringData(buf.get(), buf_size), *table),
-                      LogicError::column_name_too_long);
-    CHECK_LOGIC_ERROR(table->insert_column_link(0, type_Link, StringData(buf.get(), buf_size), *table),
+    char buf[buf_size];
+    memset(buf, 'S', buf_size);
+    CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
+    CHECK_LOGIC_ERROR(table->add_column_list(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
+    CHECK_LOGIC_ERROR(table->add_column_link(type_Link, StringData(buf, buf_size), *table),
                       LogicError::column_name_too_long);
 
-    table->add_column(type_Int, StringData(buf.get(), buf_size - 1));
-    table->insert_column(0, type_Int, StringData(buf.get(), buf_size - 1));
-    table->add_column_link(type_Link, StringData(buf.get(), buf_size - 1), *table);
-    table->insert_column_link(0, type_Link, StringData(buf.get(), buf_size - 1), *table);
+    table->add_column(type_Int, StringData(buf, buf_size - 1));
+    table->add_column_list(type_Int, StringData(buf, buf_size - 1));
+    table->add_column_link(type_Link, StringData(buf, buf_size - 1), *table);
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Table_StringOrBinaryTooBig)
 {
     Table table;

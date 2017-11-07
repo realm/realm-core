@@ -1907,7 +1907,6 @@ TEST(Query_SubtableExpression)
 
     TableRef table = g.add_table("foo");
 
-    DescriptorRef subdescr;
     auto col_int_list = table->add_column_list(type_Int, "integers");
     auto col_string_list = table->add_column_list(type_String, "strings");
     auto col_string = table->add_column(type_String, "other");

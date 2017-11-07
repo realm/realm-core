@@ -31,7 +31,6 @@
 #include <realm/table_ref.hpp>
 #include <realm/link_view_fwd.hpp>
 #include <realm/row.hpp>
-#include <realm/descriptor_fwd.hpp>
 #include <realm/spec.hpp>
 #include <realm/mixed.hpp>
 #include <realm/query.hpp>
@@ -59,8 +58,6 @@ template <class>
 class SubQuery;
 struct LinkTargetInfo;
 
-struct SubTable {
-};
 struct Link {
 };
 typedef Link LinkList;
@@ -198,21 +195,11 @@ public:
     /// \sa has_shared_type()
     /// \sa get_descriptor()
 
-    size_t add_column(DataType type, StringData name, bool nullable = false, DescriptorRef* subdesc = nullptr);
-    size_t add_column_list(DataType type, StringData name);
-    void insert_column(size_t column_ndx, DataType type, StringData name, bool nullable = false,
-                       DescriptorRef* subdesc = nullptr);
+    static const size_t max_column_name_length = 63;
 
-    // Todo, these prototypes only exist for backwards compatibility. We should remove them because they are error
-    // prone (optional arguments and implicit bool to null-ptr conversion)
-    size_t add_column(DataType type, StringData name, DescriptorRef* subdesc)
-    {
-        return add_column(type, name, false, subdesc);
-    }
-    void insert_column(size_t column_ndx, DataType type, StringData name, DescriptorRef* subdesc)
-    {
-        insert_column(column_ndx, type, name, false, subdesc);
-    }
+    size_t add_column(DataType type, StringData name, bool nullable = false);
+    size_t add_column_list(DataType type, StringData name);
+    void insert_column(size_t column_ndx, DataType type, StringData name, bool nullable = false);
 
     size_t add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
     void insert_column_link(size_t column_ndx, DataType type, StringData name, Table& target,
@@ -220,6 +207,82 @@ public:
     void remove_column(size_t column_ndx);
     void rename_column(size_t column_ndx, StringData new_name);
     //@}
+
+    /// There are two kinds of links, 'weak' and 'strong'. A strong link is one
+    /// that implies ownership, i.e., that the origin row (parent) owns the
+    /// target row (child). Simply stated, this means that when the origin row
+    /// (parent) is removed, so is the target row (child). If there are multiple
+    /// strong links to a target row, the origin rows share ownership, and the
+    /// target row is removed when the last owner disappears. Weak links do not
+    /// imply ownership, and will be nullified or removed when the target row
+    /// disappears.
+    ///
+    /// To put this in precise terms; when a strong link is broken, and the
+    /// target row has no other strong links to it, the target row is removed. A
+    /// row that is implicitly removed in this way, is said to be
+    /// *cascade-removed*. When a weak link is broken, nothing is
+    /// cascade-removed.
+    ///
+    /// A link is considered broken if
+    ///
+    ///  - the link is nullified, removed, or replaced by a different link
+    ///    (Row::nullify_link(), Row::set_link(), LinkView::remove_link(),
+    ///    LinkView::set_link(), LinkView::clear()), or if
+    ///
+    ///  - the origin row is explicitly removed (Row::move_last_over(),
+    ///    Table::clear()), or if
+    ///
+    ///  - the origin row is cascade-removed, or if
+    ///
+    ///  - the origin column is removed from the table (Table::remove_column()),
+    ///    or if
+    ///
+    ///  - the origin table is removed from the group.
+    ///
+    /// Note that a link is *not* considered broken when it is replaced by a
+    /// link to the same target row. I.e., no no rows will be cascade-removed
+    /// due to such an operation.
+    ///
+    /// When a row is explicitly removed (such as by Table::move_last_over()),
+    /// all links to it are automatically removed or nullified. For single link
+    /// columns (type_Link), links to the removed row are nullified. For link
+    /// list columns (type_LinkList), links to the removed row are removed from
+    /// the list.
+    ///
+    /// When a row is cascade-removed there can no longer be any strong links to
+    /// it, but if there are any weak links, they will be removed or nullified.
+    ///
+    /// It is important to understand that this cascade-removal scheme is too
+    /// simplistic to enable detection and removal of orphaned link-cycles. In
+    /// this respect, it suffers from the same limitations as a reference
+    /// counting scheme generally does.
+    ///
+    /// It is also important to understand, that the possible presence of a link
+    /// cycle can cause a row to be cascade-removed as a consequence of being
+    /// modified. This happens, for example, if two rows, A and B, have strong
+    /// links to each other, and there are no other strong links to either of
+    /// them. In this case, if A->B is changed to A->C, then both A and B will
+    /// be cascade-removed. This can lead to obscure bugs in some applications,
+    /// such as in the following case:
+    ///
+    ///     table.set_link(col_ndx_1, row_ndx, ...);
+    ///     table.set_int(col_ndx_2, row_ndx, ...); // Oops, `row_ndx` may no longer refer to the same row
+    ///
+    /// To be safe, applications, that may encounter cycles, are advised to
+    /// adopt the following pattern:
+    ///
+    ///     Row row = table[row_ndx];
+    ///     row.set_link(col_ndx_1, ...);
+    ///     if (row)
+    ///         row.set_int(col_ndx_2, ...); // Ok, because we check whether the row has disappeared
+    ///
+    /// \param col_ndx The index of the link column (`type_Link` or
+    /// `type_LinkList`) to be modified. It is an error to specify an index that
+    /// is greater than, or equal to the number of columns, or to specify the
+    /// index of a non-link column.
+    ///
+    /// \param link_type The type of links the column should store.
+    void set_link_type(size_t col_ndx, LinkType);
 
     //@{
 
@@ -250,85 +313,11 @@ public:
 
     //@}
 
-    //@{
-    /// Get the dynamic type descriptor for this table.
-    ///
-    /// Every table has an associated descriptor that specifies its dynamic
-    /// type. For simple tables, that is, tables without subtable columns, the
-    /// dynamic type can be inspected and modified directly using member
-    /// functions such as get_column_count() and add_column(). For more complex
-    /// tables, the type is best managed through the associated descriptor
-    /// object which is returned by this function.
-    ///
-    /// \sa has_shared_type()
-    DescriptorRef get_descriptor();
-    ConstDescriptorRef get_descriptor() const;
-    //@}
-
-    //@{
-    /// Get the dynamic type descriptor for the column with the
-    /// specified index. That column must have type 'table'.
-    ///
-    /// This is merely a shorthand for calling `get_subdescriptor(column_ndx)`
-    /// on the descriptor returned by `get_descriptor()`.
-    DescriptorRef get_subdescriptor(size_t column_ndx);
-    ConstDescriptorRef get_subdescriptor(size_t column_ndx) const;
-    //@}
-
-    //@{
-    /// Get access to an arbitrarily nested dynamic type descriptor.
-    ///
-    /// The returned descriptor is the one you would get by calling
-    /// Descriptor::get_subdescriptor() once for each entry in the specified
-    /// path, starting with the descriptor returned by get_descriptor(). The
-    /// path is allowed to be empty.
-    typedef std::vector<size_t> path_vec;
-    DescriptorRef get_subdescriptor(const path_vec& path);
-    ConstDescriptorRef get_subdescriptor(const path_vec& path) const;
-    //@}
-
-    //@{
-    /// Convenience functions for manipulating nested table types.
-    ///
-    /// These functions behave as if they were called on the descriptor returned
-    /// by `get_subdescriptor(path)`. These function must be called only on
-    /// tables with independent dynamic type.
-    ///
-    /// \return The value returned by add_subcolumn(), is the index of
-    /// the added column within the descriptor referenced by the
-    /// specified path.
-    ///
-    /// \sa Descriptor::add_column()
-    /// \sa has_shared_type()
-    size_t add_subcolumn(const path_vec& path, DataType type, StringData name);
-    void insert_subcolumn(const path_vec& path, size_t column_ndx, DataType type, StringData name);
-    void remove_subcolumn(const path_vec& path, size_t column_ndx);
-    void rename_subcolumn(const path_vec& path, size_t column_ndx, StringData new_name);
-    //@}
-
-    /// Does this table share its type with other tables?
-    ///
-    /// Tables that are direct members of groups have independent
-    /// dynamic types. The same is true for free-standing tables and
-    /// subtables in coulmns of type 'mixed'. For such tables, this
-    /// function returns false.
-    ///
-    /// When a table has a column of type 'table', the cells in that
-    /// column contain subtables. All those subtables have the same
-    /// dynamic type, and they share a single type descriptor. For all
-    /// such subtables, this function returns true. See
-    /// Descriptor::is_root() for more on this.
-    ///
-    /// Please note that Table functions that modify the dynamic type
-    /// directly, such as add_column(), are only allowed to be used on
-    /// tables with non-shared type. If you need to modify a shared
-    /// type, you will have to do that through the descriptor returned
-    /// by get_descriptor(), but note that it will then affect all the
-    /// tables sharing that descriptor.
-    ///
-    /// \sa get_descriptor()
-    /// \sa Descriptor::is_root()
-    bool has_shared_type() const noexcept;
+    /// If the specified column is optimized to store only unique values, then
+    /// this function returns the number of unique values currently
+    /// stored. Otherwise it returns zero. This function is mainly intended for
+    /// debugging purposes.
+    size_t get_num_unique_values(size_t column_ndx) const;
 
     bool has_clusters() const
     {
@@ -386,7 +375,7 @@ public:
     /// cause other linked rows to be cascade-removed. The clearing of a table
     /// may also cause linked rows to be cascade-removed, but in this respect,
     /// the effect is exactly as if each row had been removed individually. See
-    /// Descriptor::set_link_type() for details.
+    /// set_link_type() for details.
 
     size_t add_empty_row(size_t num_rows = 1);
     void insert_empty_row(size_t row_ndx, size_t num_rows = 1);
@@ -466,8 +455,6 @@ public:
     double get_double(size_t column_ndx, size_t row_ndx) const noexcept;
     StringData get_string(size_t column_ndx, size_t row_ndx) const noexcept;
     BinaryData get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
-    Mixed get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
-    DataType get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
     Timestamp get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
 
     //@}
@@ -577,7 +564,6 @@ public:
     void set_string(size_t column_ndx, size_t row_ndx, StringData value, bool is_default = false);
     size_t set_string_unique(size_t column_ndx, size_t row_ndx, StringData value);
     void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value, bool is_default = false);
-    void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value, bool is_default = false);
     void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx, bool is_default = false);
     void nullify_link(size_t column_ndx, size_t row_ndx);
     void set_null(size_t column_ndx, size_t row_ndx, bool is_default = false);
@@ -594,26 +580,6 @@ public:
     void remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t substring_size = realm::npos);
 
     //@}
-
-    /// Assumes that the specified column is a subtable column (in
-    /// particular, not a mixed column) and that the specified table
-    /// has a spec that is compatible with that column, that is, the
-    /// number of columns must be the same, and corresponding columns
-    /// must have identical data types (as returned by
-    /// get_column_type()).
-    void set_subtable(size_t col_ndx, size_t row_ndx, const Table*);
-    void set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table*);
-
-
-    // Sub-tables (works on columns whose type is either 'subtable' or
-    // 'mixed', for a value in a mixed column that is not a subtable,
-    // get_subtable() returns null, get_subtable_size() returns zero,
-    // and clear_subtable() replaces the value with an empty table.)
-    // Currently, subtables of subtables are not supported.
-    TableRef get_subtable(size_t column_ndx, size_t row_ndx);
-    ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
-    size_t get_subtable_size(size_t column_ndx, size_t row_ndx) const noexcept;
-    void clear_subtable(size_t column_ndx, size_t row_ndx);
 
     // Backlinks
     size_t get_backlink_count(size_t row_ndx, bool only_strong_links = false) const noexcept;
@@ -900,13 +866,6 @@ public:
     /// See operator==().
     bool operator!=(const Table& t) const;
 
-    /// A subtable in a column of type 'table' (which shares descriptor with
-    /// other subtables in the same column) is initially in a degenerate state
-    /// where it takes up a minimal amout of space. This function returns true
-    /// if, and only if the table accessor is attached to such a subtable. This
-    /// function is mainly intended for debugging purposes.
-    bool is_degenerate() const;
-
     /// Compute the sum of the sizes in number of bytes of all the array nodes
     /// that currently make up this table. See also
     /// Group::compute_aggregate_byte_size().
@@ -931,22 +890,10 @@ public:
     static TableRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
 
 protected:
-    /// Get a pointer to the accessor of the specified subtable. The
-    /// accessor will be created if it does not already exist.
-    ///
-    /// The returned table pointer must **always** end up being
-    /// wrapped in some instantiation of BasicTableRef<>.
-    TableRef get_subtable_tableref(size_t col_ndx, size_t row_ndx);
-
-    /// See non-const get_subtable_tableref().
-    ConstTableRef get_subtable_tableref(size_t col_ndx, size_t row_ndx) const;
-
     /// Compare the rows of two tables under the assumption that the two tables
     /// have the same number of columns, and the same data type at each column
     /// index (as expressed through the DataType enum).
     bool compare_rows(const Table&) const;
-
-    void set_into_mixed(Table* parent, size_t col_ndx, size_t row_ndx) const;
 
     void check_lists_are_empty(size_t row_ndx) const;
 
@@ -1067,16 +1014,6 @@ private:
 
     mutable std::atomic<size_t> m_ref_count;
 
-    // If this table is a root table (has independent descriptor),
-    // then Table::m_descriptor refers to the accessor of its
-    // descriptor when, and only when the descriptor accessor
-    // exists. This is used to ensure that at most one descriptor
-    // accessor exists for each underlying descriptor at any given
-    // point in time. Subdescriptors are kept unique by means of a
-    // registry in the parent descriptor. Table::m_descriptor is
-    // always null for tables with shared descriptor.
-    mutable std::weak_ptr<Descriptor> m_descriptor;
-
     // Points to first bound row accessor, or is null if there are none.
     mutable RowBase* m_row_accessors = nullptr;
 
@@ -1108,9 +1045,6 @@ private:
     size_t do_set_unique_null(ColType& col, size_t ndx, bool& conflict);
     template <class ColType, class T>
     size_t do_set_unique(ColType& column, size_t row_ndx, T&& value, bool& conflict);
-
-    void _add_search_index(size_t column_ndx);
-    void _remove_search_index(size_t column_ndx);
 
     void rebuild_search_index(size_t current_file_format_version);
 
@@ -1161,17 +1095,11 @@ private:
     void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool skip_create_column_accessors = false);
     void init(Spec* shared_spec, ArrayParent* parent_column, size_t parent_row_ndx);
 
-    static void do_insert_column(Descriptor&, size_t col_ndx, DataType type, StringData name,
-                                 LinkTargetInfo& link_target_info, bool nullable = false, bool listtype = false);
-    static void do_insert_column_unless_exists(Descriptor&, size_t col_ndx, DataType type, StringData name,
-                                               LinkTargetInfo& link, bool nullable = false,
-                                               bool* was_inserted = nullptr);
-    static void do_erase_column(Descriptor&, size_t col_ndx);
-    static void do_rename_column(Descriptor&, size_t col_ndx, StringData name);
-    static void do_move_column(Descriptor&, size_t col_ndx_1, size_t col_ndx_2);
-
-    static void do_add_search_index(Descriptor&, size_t col_ndx);
-    static void do_remove_search_index(Descriptor&, size_t col_ndx);
+    void do_insert_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link_target_info,
+                          bool nullable = false, bool listtype = false);
+    void do_insert_column_unless_exists(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
+                                        bool nullable = false, bool* was_inserted = nullptr);
+    void do_move_column(size_t col_ndx_1, size_t col_ndx_2);
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
@@ -1186,21 +1114,10 @@ private:
                                bool listtype = false);
     void do_erase_root_column(size_t col_ndx);
     void do_move_root_column(size_t from, size_t to);
-    void do_set_link_type(size_t col_ndx, LinkType);
     void insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx);
     void erase_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx);
     void update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_ndx_begin);
     void update_link_target_tables_after_column_move(size_t moved_from, size_t moved_to);
-
-    struct SubtableUpdater {
-        virtual void update(const SubtableColumn&, Array& subcolumns) = 0;
-        virtual void update_accessor(Table&) = 0;
-        virtual ~SubtableUpdater()
-        {
-        }
-    };
-    static void update_subtables(Descriptor&, SubtableUpdater*);
-    void update_subtables(const size_t* col_path_begin, const size_t* col_path_end, SubtableUpdater*);
 
     struct AccessorUpdater {
         virtual void update(Table&) = 0;
@@ -1209,9 +1126,8 @@ private:
         {
         }
     };
-    void update_accessors(const size_t* col_path_begin, const size_t* col_path_end, AccessorUpdater&);
+    void update_accessors(AccessorUpdater&);
 
-    void create_degen_subtab_columns();
     ColumnBase* create_column_accessor(ColumnType, size_t col_ndx, size_t ndx_in_parent);
     void destroy_column_accessors() noexcept;
 
@@ -1262,9 +1178,6 @@ private:
 
     void discard_row_accessors() noexcept;
 
-    // Detach the type descriptor accessor if it exists.
-    void discard_desc_accessor() noexcept;
-
     void bind_ptr() const noexcept;
     void unbind_ptr() const noexcept;
 
@@ -1306,10 +1219,6 @@ private:
     const BinaryColumn& get_column_binary(size_t column_ndx) const noexcept;
     StringEnumColumn& get_column_string_enum(size_t column_ndx);
     const StringEnumColumn& get_column_string_enum(size_t column_ndx) const noexcept;
-    SubtableColumn& get_column_table(size_t column_ndx);
-    const SubtableColumn& get_column_table(size_t column_ndx) const noexcept;
-    MixedColumn& get_column_mixed(size_t column_ndx);
-    const MixedColumn& get_column_mixed(size_t column_ndx) const noexcept;
     TimestampColumn& get_column_timestamp(size_t column_ndx);
     const TimestampColumn& get_column_timestamp(size_t column_ndx) const noexcept;
     const LinkColumnBase& get_column_link_base(size_t ndx) const noexcept;
@@ -1323,7 +1232,6 @@ private:
 
     void verify_column(size_t col_ndx) const;
 
-    void instantiate_before_change();
     void validate_column_type(const ColumnBase& col, ColumnType expected_type, size_t ndx) const;
 
     static size_t get_size_from_ref(ref_type top_ref, Allocator&) noexcept;
@@ -1446,13 +1354,6 @@ private:
     // Precondition: 1 <= end - begin
     size_t* record_subtable_path(size_t* begin, size_t* end) const noexcept;
 
-    /// Check if an accessor exists for the specified subtable. If it does,
-    /// return a pointer to it, otherwise return null. This function assumes
-    /// that the specified column index in a valid index into `m_cols` but does
-    /// not otherwise assume more than minimal accessor consistency (see
-    /// AccessorConsistencyLevels.)
-    TableRef get_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept;
-
     /// Unless the column accessor is missing, this function returns the
     /// accessor for the target table of the specified link-type column. The
     /// column accessor is said to be missing if `m_cols[col_ndx]` is null, and
@@ -1464,8 +1365,6 @@ private:
     /// column is a link-type column. Beyond that, it assume nothing more than
     /// minimal accessor consistency (see AccessorConsistencyLevels.)
     Table* get_link_target_table_accessor(size_t col_ndx) noexcept;
-
-    void discard_subtable_accessor(size_t col_ndx, size_t row_ndx) noexcept;
 
     void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_acc_erase_row(size_t row_ndx) noexcept;
@@ -1805,12 +1704,6 @@ inline const Col& Table::get_column(size_t ndx) const noexcept
     return static_cast<const Col&>(col);
 }
 
-inline bool Table::has_shared_type() const noexcept
-{
-    REALM_ASSERT(is_attached());
-    return !m_top.is_attached();
-}
-
 inline void Table::verify_column(size_t col_ndx) const
 {
     // TODO Check against spec
@@ -2053,11 +1946,6 @@ inline size_t Table::add_empty_row(size_t num_rows)
     return row_ndx;                      // Return index of first new row
 }
 
-inline ConstTableRef Table::get_subtable_tableref(size_t col_ndx, size_t row_ndx) const
-{
-    return const_cast<Table*>(this)->get_subtable_tableref(col_ndx, row_ndx); // Throws
-}
-
 inline bool Table::is_null_link(size_t col_ndx, size_t row_ndx) const noexcept
 {
     return get_link(col_ndx, row_ndx) == realm::npos;
@@ -2077,16 +1965,6 @@ inline void Table::set_enum(size_t column_ndx, size_t row_ndx, E value)
 inline void Table::nullify_link(size_t col_ndx, size_t row_ndx)
 {
     set_link(col_ndx, row_ndx, realm::npos);
-}
-
-inline TableRef Table::get_subtable(size_t column_ndx, size_t row_ndx)
-{
-    return get_subtable_tableref(column_ndx, row_ndx);
-}
-
-inline ConstTableRef Table::get_subtable(size_t column_ndx, size_t row_ndx) const
-{
-    return get_subtable_tableref(column_ndx, row_ndx);
 }
 
 inline ConstTableRef Table::get_parent_table(size_t* column_ndx_out) const noexcept
@@ -2112,20 +1990,6 @@ inline bool Table::operator==(const Table& t) const
 inline bool Table::operator!=(const Table& t) const
 {
     return !(*this == t); // Throws
-}
-
-inline bool Table::is_degenerate() const
-{
-    if (!is_attached()) {
-        throw LogicError{LogicError::detached_accessor};
-    }
-
-    return !m_columns.is_attached();
-}
-
-inline void Table::set_into_mixed(Table* parent, size_t col_ndx, size_t row_ndx) const
-{
-    parent->set_mixed_subtable(col_ndx, row_ndx, this);
 }
 
 inline size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) noexcept
@@ -2186,14 +2050,8 @@ inline Replication* Table::get_repl() noexcept
 
 inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept
 {
-    if (m_top.is_attached()) {
-        // Root table (independent descriptor)
-        m_top.set_ndx_in_parent(ndx_in_parent);
-    }
-    else {
-        // Subtable with shared descriptor
-        m_columns.set_ndx_in_parent(ndx_in_parent);
-    }
+    REALM_ASSERT(m_top.is_attached());
+    m_top.set_ndx_in_parent(ndx_in_parent);
 }
 
 // Declare our explicit specializations so that the inline wrappers don't try
@@ -2325,16 +2183,6 @@ inline void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool
     set(col_ndx, ndx, value, is_default);
 }
 
-inline Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const noexcept
-{
-    return get<Mixed>(col_ndx, ndx);
-}
-
-inline void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value, bool is_default)
-{
-    set(col_ndx, ndx, value, is_default);
-}
-
 inline void Table::set_null(size_t col_ndx, size_t ndx, bool is_default)
 {
     set(col_ndx, ndx, null(), is_default);
@@ -2437,11 +2285,6 @@ public:
     static void discard_child_accessors(Table& table) noexcept
     {
         table.discard_child_accessors();
-    }
-
-    static void discard_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx) noexcept
-    {
-        table.discard_subtable_accessor(col_ndx, row_ndx);
     }
 
     static void bind_ptr(Table& table) noexcept
@@ -2547,47 +2390,30 @@ public:
     {
         return table.record_subtable_path(b, e);
     }
-
-    static void insert_column(Descriptor& desc, size_t column_ndx, DataType type, StringData name,
-                              LinkTargetInfo& link, bool nullable = false, bool listtype = false)
-    {
-        Table::do_insert_column(desc, column_ndx, type, name, link, nullable, listtype); // Throws
-    }
-
-    static void insert_column_unless_exists(Descriptor& desc, size_t column_ndx, DataType type, StringData name,
+    static void insert_column_unless_exists(Table& table, size_t column_ndx, DataType type, StringData name,
                                             LinkTargetInfo link, bool nullable = false, bool* was_inserted = nullptr)
     {
-        Table::do_insert_column_unless_exists(desc, column_ndx, type, name, link, nullable, was_inserted); // Throws
+        table.do_insert_column_unless_exists(column_ndx, type, name, link, nullable, was_inserted); // Throws
     }
 
-    static void erase_column(Descriptor& desc, size_t column_ndx)
+    static void erase_column(Table& table, size_t column_ndx)
     {
-        Table::do_erase_column(desc, column_ndx); // Throws
+        table.remove_column(column_ndx); // Throws
     }
 
-    static void rename_column(Descriptor& desc, size_t column_ndx, StringData name)
+    static void rename_column(Table& table, size_t column_ndx, StringData name)
     {
-        Table::do_rename_column(desc, column_ndx, name); // Throws
+        table.rename_column(column_ndx, name); // Throws
     }
 
-    static void add_search_index(Descriptor& desc, size_t column_ndx)
+    static void move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2)
     {
-        Table::do_add_search_index(desc, column_ndx); // Throws
-    }
-
-    static void remove_search_index(Descriptor& desc, size_t column_ndx)
-    {
-        Table::do_remove_search_index(desc, column_ndx); // Throws
-    }
-
-    static void move_column(Descriptor& desc, size_t col_ndx_1, size_t col_ndx_2)
-    {
-        Table::do_move_column(desc, col_ndx_1, col_ndx_2); // Throws
+        table.do_move_column(col_ndx_1, col_ndx_2); // Throws
     }
 
     static void set_link_type(Table& table, size_t column_ndx, LinkType link_type)
     {
-        table.do_set_link_type(column_ndx, link_type); // Throws
+        table.set_link_type(column_ndx, link_type); // Throws
     }
 
     static void erase_row(Table& table, size_t row_ndx, bool is_move_last_over)
@@ -2598,11 +2424,6 @@ public:
     static void batch_erase_rows(Table& table, const IntegerColumn& row_indexes, bool is_move_last_over)
     {
         table.batch_erase_rows(row_indexes, is_move_last_over); // Throws
-    }
-
-    static TableRef get_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx) noexcept
-    {
-        return table.get_subtable_accessor(col_ndx, row_ndx);
     }
 
     static const Table* get_link_target_table_accessor(const Table& table, size_t col_ndx) noexcept
@@ -2706,16 +2527,10 @@ public:
         table.mark_opposite_link_tables();
     }
 
-    static DescriptorRef get_root_table_desc_accessor(Table& root_table) noexcept
-    {
-        return root_table.m_descriptor.lock();
-    }
-
     typedef Table::AccessorUpdater AccessorUpdater;
-    static void update_accessors(Table& table, const size_t* col_path_begin, const size_t* col_path_end,
-                                 AccessorUpdater& updater)
+    static void update_accessors(Table& table, AccessorUpdater& updater)
     {
-        table.update_accessors(col_path_begin, col_path_end, updater); // Throws
+        table.update_accessors(updater); // Throws
     }
 
     static void refresh_accessor_tree(Table& table)

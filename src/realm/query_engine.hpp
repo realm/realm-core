@@ -96,10 +96,8 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/column_fwd.hpp>
 #include <realm/column_link.hpp>
 #include <realm/column_linklist.hpp>
-#include <realm/column_mixed.hpp>
 #include <realm/column_string.hpp>
 #include <realm/column_string_enum.hpp>
-#include <realm/column_table.hpp>
 #include <realm/column_timestamp.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/column_type_traits.hpp>
@@ -378,116 +376,6 @@ private:
     }
 };
 
-// For conditions on a subtable (encapsulated in subtable()...end_subtable()). These return the parent row as match if
-// and only if one or more subtable rows match the condition.
-class SubtableNode : public ParentNode {
-public:
-    SubtableNode(size_t column, std::unique_ptr<ParentNode> condition)
-        : m_condition(std::move(condition))
-    {
-        m_dT = 100.0;
-        m_condition_column_idx = column;
-    }
-
-    void init() override
-    {
-        ParentNode::init();
-
-        m_dD = 10.0;
-
-        // m_condition is first node in condition of subtable query.
-        if (m_condition) {
-            // Can't call init() here as usual since the subtable can be degenerate
-            // m_condition->init(table);
-            std::vector<ParentNode*> v;
-            m_condition->gather_children(v);
-        }
-    }
-
-    void table_changed() override
-    {
-        m_col_type = m_table->get_real_column_type(m_condition_column_idx);
-        REALM_ASSERT(m_col_type == col_type_Table || m_col_type == col_type_Mixed);
-        if (m_col_type == col_type_Table)
-            m_column = &m_table->get_column_table(m_condition_column_idx);
-        else // Mixed
-            m_column = &m_table->get_column_mixed(m_condition_column_idx);
-    }
-
-    void verify_column() const override
-    {
-        if (m_table)
-            m_table->verify_column(m_condition_column_idx);
-    }
-
-    std::string validate() override
-    {
-        if (error_code != "")
-            return error_code;
-        if (m_condition == nullptr)
-            return "Unbalanced subtable/end_subtable block";
-        else
-            return m_condition->validate();
-    }
-    std::string describe() const override
-    {
-        return "subtable expression";
-    }
-
-
-    size_t find_first_local(size_t start, size_t end) override
-    {
-        REALM_ASSERT(m_table);
-        REALM_ASSERT(m_condition);
-
-        for (size_t s = start; s < end; ++s) {
-            ConstTableRef subtable; // TBD: optimize this back to Table*
-            if (m_col_type == col_type_Table)
-                subtable = static_cast<const SubtableColumn*>(m_column)->get_subtable_tableref(s);
-            else {
-                subtable = static_cast<const MixedColumn*>(m_column)->get_subtable_tableref(s);
-                if (!subtable)
-                    continue;
-            }
-
-            if (subtable->is_degenerate())
-                return not_found;
-
-            m_condition->set_table(*subtable);
-            m_condition->init();
-            const size_t subsize = subtable->size();
-            const size_t sub = m_condition->find_first(0, subsize);
-
-            if (sub != not_found)
-                return s;
-        }
-        return not_found;
-    }
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
-    {
-        return std::unique_ptr<ParentNode>(new SubtableNode(*this, patches));
-    }
-
-    SubtableNode(const SubtableNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches)
-        , m_condition(from.m_condition ? from.m_condition->clone(patches) : nullptr)
-        , m_column(from.m_column)
-        , m_col_type(from.m_col_type)
-    {
-        if (m_column && patches)
-            m_condition_column_idx = m_column->get_column_index();
-    }
-
-    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
-    {
-        m_condition->apply_handover_patch(patches, group);
-        ParentNode::apply_handover_patch(patches, group);
-    }
-
-    std::unique_ptr<ParentNode> m_condition;
-    const ColumnBase* m_column = nullptr;
-    ColumnType m_col_type;
-};
 
 namespace _impl {
 

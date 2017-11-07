@@ -20,7 +20,6 @@
 
 #include <realm/array.hpp>
 #include <realm/column_fwd.hpp>
-#include <realm/descriptor.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
 #include <realm/query_engine.hpp>
@@ -91,14 +90,11 @@ Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
 void Query::create()
 {
     m_groups.emplace_back();
-    if (m_table)
-        fetch_descriptor();
 }
 
 Query::Query(const Query& source)
     : error_code(source.error_code)
     , m_groups(source.m_groups)
-    , m_current_descriptor(source.m_current_descriptor)
     , m_table(source.m_table)
 {
     if (source.m_owned_source_table_view) {
@@ -138,9 +134,6 @@ Query& Query::operator=(const Query& source)
             m_source_link_view = source.m_source_link_view;
             m_view = source.m_view;
         }
-
-        if (m_table)
-            fetch_descriptor();
     }
     return *this;
 }
@@ -204,13 +197,9 @@ void Query::set_table(TableRef tr)
     REALM_ASSERT(!m_table);
     m_table = tr;
     if (m_table) {
-        fetch_descriptor();
         ParentNode* root = root_node();
-        if (root && !m_table->is_degenerate())
+        if (root)
             root->set_table(*m_table);
-    }
-    else {
-        m_current_descriptor.reset();
     }
 }
 
@@ -236,13 +225,7 @@ void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
     // not going through Table::create_from_and_consume_patch because we need to use
     // set_table() to update all table references
     if (patch.m_table) {
-        if (patch.m_table->m_is_sub_table) {
-            auto parent_table = dest_group.get_table(patch.m_table->m_table_num);
-            set_table(parent_table->get_subtable(patch.m_table->m_col_ndx, patch.m_table->m_row_ndx));
-        }
-        else {
-            set_table(dest_group.get_table(patch.m_table->m_table_num));
-        }
+        set_table(dest_group.get_table(patch.m_table->m_table_num));
     }
     REALM_ASSERT(patch.m_node_data.empty());
 }
@@ -343,10 +326,10 @@ struct MakeConditionNode<StringNode<Cond>> {
 };
 
 template <class Cond, class T>
-std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, size_t column_ndx, T value)
+std::unique_ptr<ParentNode> make_condition_node(const Table& table, size_t column_ndx, T value)
 {
-    DataType type = descriptor.get_column_type(column_ndx);
-    bool is_nullable = descriptor.is_nullable(column_ndx);
+    DataType type = table.get_column_type(column_ndx);
+    bool is_nullable = table.is_nullable(column_ndx);
     switch (type) {
         case type_Int:
         case type_Bool:
@@ -380,9 +363,9 @@ std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, si
 }
 
 template <class Cond>
-std::unique_ptr<ParentNode> make_size_condition_node(const Descriptor& descriptor, size_t column_ndx, int64_t value)
+std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, size_t column_ndx, int64_t value)
 {
-    DataType type = descriptor.get_column_type(column_ndx);
+    DataType type = table.get_column_type(column_ndx);
     switch (type) {
         case type_String: {
             return std::unique_ptr<ParentNode>{new SizeNode<StringColumn, Cond>(value, column_ndx)};
@@ -393,9 +376,6 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Descriptor& descripto
         case type_LinkList: {
             return std::unique_ptr<ParentNode>{new SizeNode<LinkListColumn, Cond>(value, column_ndx)};
         }
-        case type_Table: {
-            return std::unique_ptr<ParentNode>{new SizeNode<SubtableColumn, Cond>(value, column_ndx)};
-        }
         default: {
             throw LogicError{LogicError::type_mismatch};
         }
@@ -404,21 +384,10 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Descriptor& descripto
 
 } // anonymous namespace
 
-void Query::fetch_descriptor()
-{
-    ConstDescriptorRef desc = m_table->get_descriptor();
-    for (size_t i = 0; i < m_subtable_path.size(); ++i) {
-        desc = desc->get_subdescriptor(m_subtable_path[i]);
-    }
-    m_current_descriptor = desc;
-}
-
-
 template <typename TConditionFunction, class T>
 Query& Query::add_condition(size_t column_ndx, T value)
 {
-    REALM_ASSERT_DEBUG(m_current_descriptor);
-    auto node = make_condition_node<TConditionFunction>(*m_current_descriptor, column_ndx, value);
+    auto node = make_condition_node<TConditionFunction>(*m_table, column_ndx, value);
     add_node(std::move(node));
     return *this;
 }
@@ -427,8 +396,7 @@ Query& Query::add_condition(size_t column_ndx, T value)
 template <typename TConditionFunction>
 Query& Query::add_size_condition(size_t column_ndx, int64_t value)
 {
-    REALM_ASSERT_DEBUG(m_current_descriptor);
-    auto node = make_size_condition_node<TConditionFunction>(*m_current_descriptor, column_ndx, value);
+    auto node = make_size_condition_node<TConditionFunction>(*m_table, column_ndx, value);
     add_node(std::move(node));
     return *this;
 }
@@ -873,7 +841,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
                    size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                    size_t* return_ndx) const
 {
-    if (limit == 0 || m_table->is_degenerate()) {
+    if (limit == 0) {
         if (resultcount)
             *resultcount = 0;
         return static_cast<R>(0);
@@ -1148,7 +1116,7 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
 #endif
 
-    if (limit == 0 || m_table->is_degenerate()) {
+    if (limit == 0) {
         if (resultcount)
             *resultcount = 0;
         return 0.;
@@ -1253,42 +1221,12 @@ Query& Query::Or()
     return *this;
 }
 
-Query& Query::subtable(size_t column)
-{
-    m_subtable_path.push_back(column);
-    fetch_descriptor();
-    group();
-    m_groups.back().m_subtable_column = column;
-    return *this;
-}
-
-Query& Query::end_subtable()
-{
-    auto& current_group = m_groups.back();
-    if (current_group.m_subtable_column == not_found) {
-        error_code = "Unbalanced subtable";
-        return *this;
-    }
-
-    auto subtable_node = std::unique_ptr<ParentNode>(
-        new SubtableNode(current_group.m_subtable_column, std::move(current_group.m_root_node)));
-    end_group();
-    m_subtable_path.pop_back();
-    add_node(std::move(subtable_node));
-
-    fetch_descriptor();
-    return *this;
-}
-
 // todo, add size_t end? could be useful
 Key Query::find(size_t begin)
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Find);
 #endif
-
-    if (m_table->is_degenerate())
-        return null_key;
 
     REALM_ASSERT_3(begin, <=, m_table->size());
 
@@ -1337,7 +1275,7 @@ Key Query::find(size_t begin)
 
 void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit) const
 {
-    if (limit == 0 || m_table->is_degenerate())
+    if (limit == 0)
         return;
 
     REALM_ASSERT_3(begin, <=, m_table->size());
@@ -1398,7 +1336,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
 #endif
 
-    if (limit == 0 || m_table->is_degenerate())
+    if (limit == 0)
         return 0;
 
     if (end == size_t(-1))
@@ -1448,9 +1386,6 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove()
 {
-    if (m_table->is_degenerate())
-        return 0;
-
     TableView tv = find_all();
     size_t rows = tv.size();
     tv.clear();
@@ -1643,7 +1578,7 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
     REALM_ASSERT(node);
     using State = QueryGroup::State;
 
-    if (m_table && m_subtable_path.empty() && !m_table->is_degenerate())
+    if (m_table)
         node->set_table(*m_table);
 
     auto& current_group = m_groups.back();

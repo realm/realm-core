@@ -31,7 +31,6 @@
 #include <realm/impl/input_stream.hpp>
 
 #include <realm/group.hpp>
-#include <realm/descriptor.hpp>
 #include <realm/link_view.hpp>
 
 namespace realm {
@@ -59,7 +58,6 @@ enum Instruction {
     instr_MergeRows = 17,  // Replace links pointing to row A with links to row B
     instr_ClearTable = 18, // Remove all rows in selected table
     instr_OptimizeTable = 19,
-    instr_SelectDescriptor = 20, // Select descriptor from currently selected root table
     instr_InsertColumn =
         21, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
     instr_InsertLinkColumn = 22,     // do, but for a link-type column
@@ -496,11 +494,11 @@ public:
     virtual void erase_group_level_table(size_t table_ndx, size_t num_tables);
     virtual void rename_group_level_table(size_t table_ndx, StringData new_name);
     virtual void move_group_level_table(size_t from_table_ndx, size_t to_table_ndx);
-    virtual void insert_column(const Descriptor&, size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
+    virtual void insert_column(const Table*, size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
                                bool nullable = false);
-    virtual void erase_column(const Descriptor&, size_t col_ndx);
-    virtual void rename_column(const Descriptor&, size_t col_ndx, StringData name);
-    virtual void move_column(const Descriptor&, size_t from, size_t to);
+    virtual void erase_column(const Table*, size_t col_ndx);
+    virtual void rename_column(const Table*, size_t col_ndx, StringData name);
+    virtual void move_column(const Table*, size_t from, size_t to);
 
     virtual void set_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value,
                          Instruction variant = instr_Set);
@@ -513,8 +511,6 @@ public:
     virtual void set_olddatetime(const Table*, size_t col_ndx, size_t ndx, OldDateTime value,
                                  Instruction variant = instr_Set);
     virtual void set_timestamp(const Table*, size_t col_ndx, size_t ndx, Timestamp value, Instruction variant = instr_Set);
-    virtual void set_table(const Table*, size_t col_ndx, size_t ndx, Instruction variant = instr_Set);
-    virtual void set_mixed(const Table*, size_t col_ndx, size_t ndx, const Mixed& value, Instruction variant = instr_Set);
     virtual void set_link(const Table*, size_t col_ndx, size_t ndx, size_t value, Instruction variant = instr_Set);
     virtual void set_null(const Table*, size_t col_ndx, size_t ndx, Instruction variant = instr_Set);
     virtual void set_link_list(const LinkView&, const IntegerColumn& values);
@@ -537,8 +533,8 @@ public:
     virtual void swap_rows(const Table*, size_t row_ndx_1, size_t row_ndx_2);
     virtual void move_row(const Table*, size_t from_ndx, size_t to_ndx);
     virtual void merge_rows(const Table*, size_t row_ndx, size_t new_row_ndx);
-    virtual void add_search_index(const Descriptor&, size_t col_ndx);
-    virtual void remove_search_index(const Descriptor&, size_t col_ndx);
+    virtual void add_search_index(const Table*, size_t col_ndx);
+    virtual void remove_search_index(const Table*, size_t col_ndx);
     virtual void set_link_type(const Table*, size_t col_ndx, LinkType);
     virtual void clear_table(const Table*, size_t prior_num_rows);
     virtual void optimize_table(const Table*);
@@ -593,13 +589,11 @@ private:
     mutable std::atomic<const LinkView*> m_selected_link_list;
 
     void unselect_all() noexcept;
-    void select_table(const Table*);        // unselects descriptor and link list
-    void select_desc(const Descriptor&);    // unselects link list
-    void select_link_list(const LinkView&); // unselects descriptor
+    void select_table(const Table*); // unselects link list
+    void select_link_list(const LinkView&);
 
     void record_subtable_path(const Table&, size_t*& out_begin, size_t*& out_end);
     void do_select_table(const Table*);
-    void do_select_desc(const Descriptor&);
     void do_select_link_list(const LinkView&);
 
     friend class TransactReverser;
@@ -660,7 +654,6 @@ private:
     StringData read_string(util::StringBuffer&);
     BinaryData read_binary(util::StringBuffer&);
     Timestamp read_timestamp();
-    void read_mixed(Mixed*);
 
     // Advance m_input_begin and m_input_end to reflect the next block of instructions
     // Returns false if no more input was available
@@ -975,59 +968,6 @@ void TransactLogEncoder::append_simple_instr(L... numbers)
     encode_list(ptr, numbers...);
 }
 
-template <class... L>
-void TransactLogEncoder::append_mixed_instr(Instruction instr, const Mixed& value, L... numbers)
-{
-    DataType type = value.get_type();
-    switch (type) {
-        case type_Int:
-            append_simple_instr(instr, numbers..., type, value.get_int()); // Throws
-            return;
-        case type_Bool:
-            append_simple_instr(instr, numbers..., type, value.get_bool()); // Throws
-            return;
-        case type_Float:
-            append_simple_instr(instr, numbers..., type, value.get_float()); // Throws
-            return;
-        case type_Double:
-            append_simple_instr(instr, numbers..., type, value.get_double()); // Throws
-            return;
-        case type_OldDateTime: {
-            auto value_2 = value.get_olddatetime().get_olddatetime();
-            append_simple_instr(instr, numbers..., type, value_2); // Throws
-            return;
-        }
-        case type_String: {
-            append_simple_instr(instr, numbers..., type, value.get_string()); // Throws
-            return;
-        }
-        case type_Binary: {
-            BinaryData value_2 = value.get_binary();
-            StringData value_3(value_2.data(), value_2.size());
-            append_simple_instr(instr, numbers..., type, value_3); // Throws
-            return;
-        }
-        case type_Timestamp: {
-            Timestamp ts = value.get_timestamp();
-            int64_t seconds = ts.get_seconds();
-            int32_t nano_seconds = ts.get_nanoseconds();
-            append_simple_instr(instr, numbers..., type, seconds, nano_seconds); // Throws
-            return;
-        }
-        case type_Table:
-            append_simple_instr(instr, numbers..., type); // Throws
-            return;
-        case type_Mixed:
-            // Mixed in mixed is not possible
-            REALM_TERMINATE("Mixed in Mixed not possible");
-        case type_Link:
-        case type_LinkList:
-            // FIXME: Need to handle new link types here.
-            REALM_TERMINATE("Link types in Mixed not supported.");
-    }
-    REALM_TERMINATE("Invalid Mixed.");
-}
-
 inline void TransactLogConvenientEncoder::unselect_all() noexcept
 {
     m_selected_table = nullptr;
@@ -1041,15 +981,6 @@ inline void TransactLogConvenientEncoder::select_table(const Table* table)
     if (table != m_selected_table)
         do_select_table(table); // Throws
     m_selected_spec = nullptr;
-    // no race with on_link_list_destroyed since both are setting to nullptr
-    m_selected_link_list = nullptr;
-}
-
-inline void TransactLogConvenientEncoder::select_desc(const Descriptor& desc)
-{
-    typedef _impl::DescriptorFriend df;
-    if (&df::get_spec(desc) != m_selected_spec)
-        do_select_desc(desc); // Throws
     // no race with on_link_list_destroyed since both are setting to nullptr
     m_selected_link_list = nullptr;
 }
@@ -1137,15 +1068,14 @@ inline bool TransactLogEncoder::insert_link_column(size_t col_ndx, DataType type
 }
 
 
-inline void TransactLogConvenientEncoder::insert_column(const Descriptor& desc, size_t col_ndx, DataType type,
+inline void TransactLogConvenientEncoder::insert_column(const Table* t, size_t col_ndx, DataType type,
                                                         StringData name, LinkTargetInfo& link, bool nullable)
 {
-    select_desc(desc); // Throws
+    select_table(t); // Throws
     if (link.is_valid()) {
         typedef _impl::TableFriend tf;
-        typedef _impl::DescriptorFriend df;
         size_t target_table_ndx = link.m_target_table->get_index_in_group();
-        const Table& origin_table = df::get_root_table(desc);
+        const Table& origin_table = *t;
         REALM_ASSERT(origin_table.is_group_level());
         const Spec& target_spec = tf::get_spec(*(link.m_target_table));
         size_t origin_table_ndx = origin_table.get_index_in_group();
@@ -1171,24 +1101,20 @@ inline bool TransactLogEncoder::erase_link_column(size_t col_ndx, size_t link_ta
     return true;
 }
 
-inline void TransactLogConvenientEncoder::erase_column(const Descriptor& desc, size_t col_ndx)
+inline void TransactLogConvenientEncoder::erase_column(const Table* t, size_t col_ndx)
 {
-    select_desc(desc); // Throws
+    select_table(t); // Throws
 
-    DataType type = desc.get_column_type(col_ndx);
+    DataType type = t->get_column_type(col_ndx);
     typedef _impl::TableFriend tf;
     if (!tf::is_link_type(ColumnType(type))) {
         m_encoder.erase_column(col_ndx); // Throws
     }
     else { // it's a link column:
-        REALM_ASSERT(desc.is_root());
-        typedef _impl::DescriptorFriend df;
-        const Table& origin_table = df::get_root_table(desc);
-        REALM_ASSERT(origin_table.is_group_level());
-        const Table& target_table = *tf::get_link_target_table_accessor(origin_table, col_ndx);
+        const Table& target_table = *tf::get_link_target_table_accessor(*t, col_ndx);
         size_t target_table_ndx = target_table.get_index_in_group();
         const Spec& target_spec = tf::get_spec(target_table);
-        size_t origin_table_ndx = origin_table.get_index_in_group();
+        size_t origin_table_ndx = t->get_index_in_group();
         size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
         m_encoder.erase_link_column(col_ndx, target_table_ndx, backlink_col_ndx); // Throws
     }
@@ -1200,9 +1126,9 @@ inline bool TransactLogEncoder::rename_column(size_t col_ndx, StringData new_nam
     return true;
 }
 
-inline void TransactLogConvenientEncoder::rename_column(const Descriptor& desc, size_t col_ndx, StringData name)
+inline void TransactLogConvenientEncoder::rename_column(const Table* t, size_t col_ndx, StringData name)
 {
-    select_desc(desc);                      // Throws
+    select_table(t);                        // Throws
     m_encoder.rename_column(col_ndx, name); // Throws
 }
 
@@ -1213,9 +1139,9 @@ inline bool TransactLogEncoder::move_column(size_t from, size_t to)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::move_column(const Descriptor& desc, size_t from, size_t to)
+inline void TransactLogConvenientEncoder::move_column(const Table* t, size_t from, size_t to)
 {
-    select_desc(desc); // Throws
+    select_table(t); // Throws
     m_encoder.move_column(from, to);
 }
 
@@ -1367,33 +1293,6 @@ inline void TransactLogConvenientEncoder::set_timestamp(const Table* t, size_t c
     m_encoder.set_timestamp(col_ndx, ndx, value, variant); // Throws
 }
 
-inline bool TransactLogEncoder::set_table(size_t col_ndx, size_t ndx, Instruction variant)
-{
-    REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
-    append_simple_instr(variant, type_Table, col_ndx, ndx); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::set_table(const Table* t, size_t col_ndx, size_t ndx, Instruction variant)
-{
-    select_table(t);                            // Throws
-    m_encoder.set_table(col_ndx, ndx, variant); // Throws
-}
-
-inline bool TransactLogEncoder::set_mixed(size_t col_ndx, size_t ndx, const Mixed& value, Instruction variant)
-{
-    REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
-    append_mixed_instr(variant, value, type_Mixed, col_ndx, ndx); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::set_mixed(const Table* t, size_t col_ndx, size_t ndx, const Mixed& value,
-                                                    Instruction variant)
-{
-    select_table(t);                                   // Throws
-    m_encoder.set_mixed(col_ndx, ndx, value, variant); // Throws
-}
-
 inline bool TransactLogEncoder::set_link(size_t col_ndx, size_t ndx, size_t value, size_t target_group_level_ndx,
                                          Instruction variant)
 {
@@ -1409,7 +1308,9 @@ inline void TransactLogConvenientEncoder::set_link(const Table* t, size_t col_nd
                                                    Instruction variant)
 {
     select_table(t); // Throws
-    size_t target_group_level_ndx = t->get_descriptor()->get_column_link_target(col_ndx);
+    typedef _impl::TableFriend tf;
+    const Spec& spec = tf::get_spec(*t);
+    size_t target_group_level_ndx = spec.get_opposite_link_table_ndx(col_ndx);
     m_encoder.set_link(col_ndx, ndx, value, target_group_level_ndx, variant); // Throws
 }
 
@@ -1442,7 +1343,9 @@ inline bool TransactLogEncoder::nullify_link(size_t col_ndx, size_t ndx, size_t 
 inline void TransactLogConvenientEncoder::nullify_link(const Table* t, size_t col_ndx, size_t ndx)
 {
     select_table(t); // Throws
-    size_t target_group_level_ndx = t->get_descriptor()->get_column_link_target(col_ndx);
+    typedef _impl::TableFriend tf;
+    const Spec& spec = tf::get_spec(*t);
+    size_t target_group_level_ndx = spec.get_opposite_link_table_ndx(col_ndx);
     m_encoder.nullify_link(col_ndx, ndx, target_group_level_ndx); // Throws
 }
 
@@ -1589,9 +1492,9 @@ inline bool TransactLogEncoder::add_search_index(size_t col_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::add_search_index(const Descriptor& desc, size_t col_ndx)
+inline void TransactLogConvenientEncoder::add_search_index(const Table* t, size_t col_ndx)
 {
-    select_desc(desc);                   // Throws
+    select_table(t);                     // Throws
     m_encoder.add_search_index(col_ndx); // Throws
 }
 
@@ -1602,9 +1505,9 @@ inline bool TransactLogEncoder::remove_search_index(size_t col_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::remove_search_index(const Descriptor& desc, size_t col_ndx)
+inline void TransactLogConvenientEncoder::remove_search_index(const Table* t, size_t col_ndx)
 {
-    select_desc(desc);                      // Throws
+    select_table(t);                        // Throws
     m_encoder.remove_search_index(col_ndx); // Throws
 }
 
@@ -1877,18 +1780,12 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                         parser_error();
                     return;
                 }
-                case type_Table: {
-                    if (!handler.set_table(col_ndx, row_ndx, instr)) // Throws
-                        parser_error();
+                case type_OldTable:
+                    parser_error();
                     return;
-                }
-                case type_Mixed: {
-                    Mixed value;
-                    read_mixed(&value);                                     // Throws
-                    if (!handler.set_mixed(col_ndx, row_ndx, value, instr)) // Throws
-                        parser_error();
+                case type_OldMixed:
+                    parser_error();
                     return;
-                }
                 case type_Link: {
                     size_t value = read_int<size_t>(); // Throws
                     // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
@@ -2123,10 +2020,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             StringData name = read_string(m_string_buffer); // Throws
             bool nullable = (Instruction(instr) == instr_InsertNullableColumn);
-            if (REALM_UNLIKELY(nullable && (type == type_Mixed))) {
-                // Nullability not supported for Mixed columns.
-                parser_error();
-            }
             if (!handler.insert_column(col_ndx, DataType(type), name, nullable)) // Throws
                 parser_error();
             return;
@@ -2171,20 +2064,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t col_ndx_1 = read_int<size_t>();          // Throws
             size_t col_ndx_2 = read_int<size_t>();          // Throws
             if (!handler.move_column(col_ndx_1, col_ndx_2)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SelectDescriptor: {
-            int levels = read_int<int>(); // Throws
-            if (levels < 0 || levels > m_max_levels)
-                parser_error();
-            m_path.reserve(0, levels); // Throws
-            size_t* path = m_path.data();
-            for (int i = 0; i != levels; ++i) {
-                size_t col_ndx = read_int<size_t>(); // Throws
-                path[i] = col_ndx;
-            }
-            if (!handler.select_descriptor(levels, path)) // Throws
                 parser_error();
             return;
         }
@@ -2358,65 +2237,6 @@ inline BinaryData TransactLogParser::read_binary(util::StringBuffer& buf)
 }
 
 
-inline void TransactLogParser::read_mixed(Mixed* mixed)
-{
-    DataType type = DataType(read_int<int>()); // Throws
-    switch (type) {
-        case type_Int: {
-            int_fast64_t value = read_int<int64_t>(); // Throws
-            mixed->set_int(value);
-            return;
-        }
-        case type_Bool: {
-            bool value = read_bool(); // Throws
-            mixed->set_bool(value);
-            return;
-        }
-        case type_Float: {
-            float value = read_float(); // Throws
-            mixed->set_float(value);
-            return;
-        }
-        case type_Double: {
-            double value = read_double(); // Throws
-            mixed->set_double(value);
-            return;
-        }
-        case type_OldDateTime: {
-            int_fast64_t value = read_int<int_fast64_t>(); // Throws
-            mixed->set_olddatetime(value);
-            return;
-        }
-        case type_Timestamp: {
-            Timestamp value = read_timestamp(); // Throws
-            mixed->set_timestamp(value);
-            return;
-        }
-        case type_String: {
-            StringData value = read_string(m_string_buffer); // Throws
-            mixed->set_string(value);
-            return;
-        }
-        case type_Binary: {
-            BinaryData value = read_binary(m_string_buffer); // Throws
-            mixed->set_binary(value);
-            return;
-        }
-        case type_Table: {
-            *mixed = Mixed::subtable_tag();
-            return;
-        }
-        case type_Mixed:
-            break;
-        case type_Link:
-        case type_LinkList:
-            // FIXME: Need to handle new link types here
-            break;
-    }
-    throw BadTransactLog();
-}
-
-
 inline bool TransactLogParser::next_input_buffer()
 {
     return m_input->next_block(m_input_begin, m_input_end);
@@ -2443,11 +2263,12 @@ inline bool TransactLogParser::is_valid_data_type(int type)
         case type_Binary:
         case type_OldDateTime:
         case type_Timestamp:
-        case type_Table:
-        case type_Mixed:
         case type_Link:
         case type_LinkList:
             return true;
+        case type_OldTable:
+        case type_OldMixed:
+            return false;
     }
     return false;
 }

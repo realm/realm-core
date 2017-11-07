@@ -122,13 +122,6 @@ public:
         set_string(c_str);
     }
 
-    struct subtable_tag {
-    };
-    Mixed(subtable_tag) noexcept
-        : m_type(type_Table)
-    {
-    }
-
     ~Mixed() noexcept
     {
     }
@@ -434,10 +427,8 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
         case type_Timestamp:
             out << Timestamp(m.m_timestamp);
             break;
-        case type_Table:
-            out << "subtable";
-            break;
-        case type_Mixed:
+        case type_OldTable:
+        case type_OldMixed:
         case type_Link:
         case type_LinkList:
             REALM_ASSERT(false);

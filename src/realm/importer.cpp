@@ -54,12 +54,8 @@ const char* DataTypeToText(DataType t)
         return "String";
     else if (t == type_Binary)
         return "Binary";
-    else if (t == type_OldDateTime)
+    else if (t == type_Timestamp)
         return "Date";
-    else if (t == type_Table)
-        return "Table";
-    else if (t == type_Mixed)
-        return "Mixed";
     else {
         REALM_ASSERT(true);
         return "";

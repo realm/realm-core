@@ -32,11 +32,6 @@ struct IndexPair {
 
 CommonDescriptor::CommonDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices)
 {
-    if (table.is_degenerate()) {
-        // We need access to the column acessors and that's not available in a
-        // degenerate table. Since sorting an empty table is a noop just return.
-        return;
-    }
     using tf = _impl::TableFriend;
     m_columns.resize(column_indices.size());
     for (size_t i = 0; i < m_columns.size(); ++i) {
@@ -74,9 +69,6 @@ SortDescriptor::SortDescriptor(Table const& table, std::vector<std::vector<size_
                     column_indices.size());
     if (m_ascending.empty())
         m_ascending.resize(column_indices.size(), true);
-    if (table.is_degenerate()) {
-        m_ascending.clear(); // keep consistency with empty m_columns
-    }
 }
 
 std::unique_ptr<CommonDescriptor> SortDescriptor::clone() const

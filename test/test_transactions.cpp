@@ -73,6 +73,7 @@ using realm::test_util::crypt_key;
 // check-testcase` (or one of its friends) from the command line.
 
 
+#ifdef LEGACY_TESTS
 
 enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi, kumi_na_moja, kumi_na_mbili, kumi_na_tatu };
 
@@ -601,6 +602,7 @@ TEST(Transactions_General)
     }
     // End of read transaction
 }
+#endif
 
 TEST(Transactions_RollbackCreateObject)
 {
