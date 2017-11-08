@@ -556,10 +556,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     size_t col_ndx1 = get_next(s) % t->get_column_count();
                     size_t col_ndx2 = get_next(s) % t->get_column_count();
                     if (log) {
-                        *log << "_impl::TableFriend::move_column(*(g.get_table(" << table_ndx
-                             << ")->get_descriptor()), " << col_ndx1 << ", " << col_ndx2 << ");\n";
+                        *log << "g.get_table(" << table_ndx << ")->move_column(" << col_ndx1 << ", "
+                             << col_ndx2 << ");\n";
                     }
-                    _impl::TableFriend::move_column(*(t->get_descriptor()), col_ndx1, col_ndx2);
+                    t->move_column(col_ndx1, col_ndx2);
                 }
             }
             else if (instr == ADD_SEARCH_INDEX && g.size() > 0) {

@@ -7095,7 +7095,7 @@ TEST(Table_MultipleLinkColumnsToSelf)
     t->insert_column_link(1, type_LinkList, "f", *t);
     t->add_empty_row();
     t->get_linklist(1, 0)->add(0);
-    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 1);
+    t->move_column(0, 1);
     g.verify();
     t->get_linklist(0, 0)->add(0);
     g.verify();
@@ -7111,7 +7111,7 @@ TEST(Table_MultipleLinkColumnsToOther)
     t->insert_column_link(1, type_LinkList, "f", *t);
     t->add_empty_row();
     t->get_linklist(1, 0)->add(0);
-    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 1);
+    t->move_column(0, 1);
     g.verify();
     t->get_linklist(0, 0)->add(0);
     g.verify();
@@ -7127,7 +7127,7 @@ TEST(Table_MultipleLinkColumnsMoveTables)
     t->insert_column_link(1, type_LinkList, "f", *t);
     t->add_empty_row();
     t->get_linklist(1, 0)->add(0);
-    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 1);
+    t->move_column(0, 1);
     g.verify();
     t->get_linklist(0, 0)->add(0);
     g.verify();
@@ -7150,13 +7150,13 @@ TEST(Table_MultipleLinkColumnsMoveTablesCrossLinks)
     t->get_linklist(1, 0)->add(0);
     g.move_table(0, 1);
     g.verify();
-    _impl::TableFriend::move_column(*t->get_descriptor(), 1, 2);
+    t->move_column(1, 2);
     g.verify();
     t->get_linklist(2, 0)->add(0);
     g.verify();
     g.move_table(1, 0);
     g.verify();
-    _impl::TableFriend::move_column(*t->get_descriptor(), 1, 0);
+    t->move_column(1, 0);
     g.verify();
 }
 
@@ -7175,15 +7175,15 @@ TEST(Table_MoveEnumColumns)
     CHECK(t.get_string(0, 0) == "hello");
     CHECK(t.get_string(1, 0) == "world");
     t.verify();
-    _impl::TableFriend::move_column(*t.get_descriptor(), 1, 0);
+    t.move_column(1, 0);
     CHECK(t.get_string(0, 0) == "world");
     CHECK(t.get_string(1, 0) == "hello");
     t.verify();
-    _impl::TableFriend::move_column(*t.get_descriptor(), 0, 1);
+    t.move_column(0, 1);
     CHECK(t.get_string(0, 0) == "hello");
     CHECK(t.get_string(1, 0) == "world");
     t.verify();
-    _impl::TableFriend::move_column(*t.get_descriptor(), 1, 1);
+    t.move_column(1, 1);
     CHECK(t.get_string(0, 0) == "hello");
     CHECK(t.get_string(1, 0) == "world");
     t.verify();
@@ -7206,27 +7206,27 @@ TEST(LangBindHelper_StringEnumMoveOutOfBounds)
     t.set_string(0, 0, enum_0);
     t.set_string(1, 0, str_1);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 1);
+    t.move_column(0, 1);
     t.verify();
     CHECK(t.get_string(0, 0) == str_1);
     CHECK(t.get_string(1, 0) == enum_0);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 1, 1);
+    t.move_column(1, 1);
     t.verify();
     CHECK(t.get_string(0, 0) == str_1);
     CHECK(t.get_string(1, 0) == enum_0);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 0);
+    t.move_column(0, 0);
     t.verify();
     CHECK(t.get_string(0, 0) == str_1);
     CHECK(t.get_string(1, 0) == enum_0);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 1, 0);
+    t.move_column(1, 0);
     t.verify();
     CHECK(t.get_string(0, 0) == enum_0);
     CHECK(t.get_string(1, 0) == str_1);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 1, 0);
+    t.move_column(1, 0);
     t.verify();
     CHECK(t.get_string(0, 0) == str_1);
     CHECK(t.get_string(1, 0) == enum_0);
@@ -7236,37 +7236,37 @@ TEST(LangBindHelper_StringEnumMoveOutOfBounds)
     t.set_string(0, 0, enum_1);
     t.set_string(2, 0, str_2);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 2, 1);
+    t.move_column(2, 1);
     t.verify();
     CHECK(t.get_string(0, 0) == enum_1);
     CHECK(t.get_string(1, 0) == str_2);
     CHECK(t.get_string(2, 0) == enum_0);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 2, 1);
+    t.move_column(2, 1);
     t.verify();
     CHECK(t.get_string(0, 0) == enum_1);
     CHECK(t.get_string(1, 0) == enum_0);
     CHECK(t.get_string(2, 0) == str_2);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 2);
+    t.move_column(0, 2);
     t.verify();
     CHECK(t.get_string(0, 0) == enum_0);
     CHECK(t.get_string(1, 0) == str_2);
     CHECK(t.get_string(2, 0) == enum_1);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 2);
+    t.move_column(0, 2);
     t.verify();
     CHECK(t.get_string(0, 0) == str_2);
     CHECK(t.get_string(1, 0) == enum_1);
     CHECK(t.get_string(2, 0) == enum_0);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 2, 0);
+    t.move_column(2, 0);
     t.verify();
     CHECK(t.get_string(0, 0) == enum_0);
     CHECK(t.get_string(1, 0) == str_2);
     CHECK(t.get_string(2, 0) == enum_1);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 2);
+    t.move_column(0, 2);
     t.verify();
     CHECK(t.get_string(0, 0) == str_2);
     CHECK(t.get_string(1, 0) == enum_1);
@@ -7275,19 +7275,19 @@ TEST(LangBindHelper_StringEnumMoveOutOfBounds)
     t.optimize(enforce);
     t.set_string(0, 0, enum_2);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 0, 2);
+    t.move_column(0, 2);
     t.verify();
     CHECK(t.get_string(0, 0) == enum_1);
     CHECK(t.get_string(1, 0) == enum_0);
     CHECK(t.get_string(2, 0) == enum_2);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 2, 0);
+    t.move_column(2, 0);
     t.verify();
     CHECK(t.get_string(0, 0) == enum_2);
     CHECK(t.get_string(1, 0) == enum_1);
     CHECK(t.get_string(2, 0) == enum_0);
 
-    _impl::TableFriend::move_column(*(t.get_descriptor()), 1, 2);
+    t.move_column(1, 2);
     t.verify();
     CHECK(t.get_string(0, 0) == enum_2);
     CHECK(t.get_string(1, 0) == enum_0);
@@ -7318,14 +7318,14 @@ TEST(Table_MoveSubtables)
         CHECK_EQUAL(sub1->get_column_name(0), "integers");
         CHECK_EQUAL(sub2->get_column_name(0), "strings");
     }
-    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 2);
+    t->move_column(0, 2);
     {
         DescriptorRef sub1 = t->get_subdescriptor(2);
         DescriptorRef sub2 = t->get_subdescriptor(1);
         CHECK_EQUAL(sub1->get_column_name(0), "integers");
         CHECK_EQUAL(sub2->get_column_name(0), "strings");
     }
-    _impl::TableFriend::move_column(*t->get_descriptor(), 2, 0);
+    t->move_column(2, 0);
     {
         DescriptorRef sub1 = t->get_subdescriptor(0);
         DescriptorRef sub2 = t->get_subdescriptor(2);

@@ -1221,11 +1221,9 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
-        DescriptorRef desc_w = table_w->get_descriptor();
-        using tf = _impl::TableFriend;
-        tf::move_column(*desc_w, 7, 2); // FIXME: Not yet publicly exposed
-        tf::move_column(*desc_w, 8, 4);
-        tf::move_column(*desc_w, 2, 7);
+        table_w->move_column(7, 2);
+        table_w->move_column(8, 4);
+        table_w->move_column(2, 7);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -1415,10 +1413,8 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
-        DescriptorRef desc_w = table_w->get_descriptor();
-        using tf = _impl::TableFriend;
-        tf::move_column(*desc_w, 2, 5); // FIXME: Not yet publicly exposed
-        tf::move_column(*desc_w, 1, 6);
+        table_w->move_column(2, 5);
+        table_w->move_column(1, 6);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -12972,7 +12968,7 @@ TEST(LangBindHelper_RollbackMoveSame)
     g.verify();
     LangBindHelper::promote_to_write(sg_w);
     g.verify();
-    _impl::TableFriend::move_column(*(g.get_table(1)->get_descriptor()), 0, 0);
+    g.get_table(1)->move_column(0, 0);
     LangBindHelper::rollback_and_continue_as_read(sg_w);
     g.verify();
 }
@@ -13001,7 +12997,7 @@ TEST(LangBindHelper_ColumnMoveUpdatesLinkedTables)
     g_r.verify();
     LangBindHelper::promote_to_write(sg_w);
 
-    _impl::TableFriend::move_column(*(t0->get_descriptor()), 0, 1);
+    t0->move_column(0, 1);
     LangBindHelper::commit_and_continue_as_read(sg_w);
     g.verify();
     LangBindHelper::advance_read(sg_r);
