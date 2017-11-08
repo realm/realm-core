@@ -10,7 +10,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Expose `Table::move_column` to the public API.
+  PR [#2925](https://github.com/realm/realm-core/pull/2925).
 
 -----------
 
