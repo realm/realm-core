@@ -1,20 +1,42 @@
 add_library(TestUtil EXCLUDE_FROM_ALL
     benchmark_results.cpp
-    demangle.cpp
-    mem.cpp
-    timer.cpp
-    random.cpp
-    quote.cpp
-    wildcard.cpp
-    unit_test.cpp
-    test_path.cpp
-    test_only.cpp
+    benchmark_results.hpp
+    check_logic_error.hpp
     crypt_key.cpp
-    misc.cpp
-    verified_integer.cpp
-    verified_string.cpp
-    resource_limits.cpp
+    crypt_key.hpp
+    demangle.cpp
+    demangle.hpp
     jsmn.cpp
+    jsmn.hpp
+    mem.cpp
+    mem.hpp
+    misc.cpp
+    misc.hpp
+    number_names.hpp
+    quote.cpp
+    quote.hpp
+    random.cpp
+    random.hpp
+    resource_limits.cpp
+    resource_limits.hpp
+    semaphore.hpp
+    super_int.hpp
+    test_only.cpp
+    test_only.hpp
+    test_path.cpp
+    test_path.hpp
+    test_types.hpp
+    thread_wrapper.hpp
+    timer.cpp
+    timer.hpp
+    unit_test.cpp
+    unit_test.hpp
+    verified_integer.cpp
+    verified_integer.hpp
+    verified_string.cpp
+    verified_string.hpp
+    wildcard.cpp
+    wildcard.hpp
 )
 
 target_link_libraries(TestUtil

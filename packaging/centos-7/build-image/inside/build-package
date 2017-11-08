@@ -23,8 +23,7 @@ cmake3 -D CMAKE_INSTALL_PREFIX=/prod \
        -D CMAKE_BUILD_TYPE=Release \
        -D CMAKE_MAKE_PROGRAM=ninja-build \
        -G Ninja ..
-ninja-build Core RealmConfig RealmImporter Realmd
-ninja-build install
+ninja-build install/strip
 
 echo "ldconfig" > /tmp/post-ldconf
 echo "echo >/dev/null" >> /tmp/post-ldconf
@@ -74,7 +73,6 @@ cmake3 -D CMAKE_INSTALL_PREFIX=/prod \
        -D CMAKE_BUILD_TYPE=Debug \
        -D CMAKE_MAKE_PROGRAM=ninja-build \
        -G Ninja ..
-ninja-build Core RealmConfig RealmImporter Realmd
 ninja-build install
 
 cd /out

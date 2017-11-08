@@ -9,7 +9,16 @@ if(NOT WIN32)
 endif()
 
 add_executable(CoreTests EXCLUDE_FROM_ALL
+    fuzz_group.cpp
+    fuzz_group.hpp
+    large_tests/test_column_large.cpp
+    large_tests/test_strings.cpp
+    $<$<NOT:$<STREQUAL:${CMAKE_GENERATOR},Xcode>>:main.cpp>
+    $<$<STREQUAL:${CMAKE_GENERATOR},Xcode>:main.mm>
+    pthread_test.hpp
+    test.hpp
     test_all.cpp
+    test_all.hpp
     test_alloc.cpp
     test_array.cpp
     test_array_binary.cpp
@@ -49,7 +58,9 @@ add_executable(CoreTests EXCLUDE_FROM_ALL
     test_self.cpp
     test_shared.cpp
     test_string_data.cpp
+    test_string_types.hpp
     test_table.cpp
+    test_table_helper.hpp
     test_table_view.cpp
     test_thread.cpp
     test_transactions.cpp
@@ -67,13 +78,8 @@ add_executable(CoreTests EXCLUDE_FROM_ALL
     test_util_to_string.cpp
     test_util_type_list.cpp
     test_version.cpp
-    large_tests/test_column_large.cpp
-    large_tests/test_strings.cpp
-    fuzz_group.cpp
-    $<$<STREQUAL:${CMAKE_GENERATOR},Xcode>:main.mm>
-    $<$<NOT:$<STREQUAL:${CMAKE_GENERATOR},Xcode>>:main.cpp>
+    testsettings.hpp
 )
-add_executable(realm-tests ALIAS CoreTests) # TODO: Remove when scripts are migrated
 
 if(LINUX)
     include(Findprocps)

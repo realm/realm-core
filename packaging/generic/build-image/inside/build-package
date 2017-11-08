@@ -23,14 +23,12 @@ cd build-dir
 cmake -D CMAKE_INSTALL_PREFIX="/dest/${name}" \
       -D CMAKE_BUILD_TYPE=Release \
       -G Ninja ..
-ninja Core RealmConfig RealmImporter Realmd
-ninja install
+ninja install/strip
 
 rm -rf -- *
 cmake -DCMAKE_INSTALL_PREFIX="/dest/${name}" \
       -DCMAKE_BUILD_TYPE=Debug \
       -GNinja ..
-ninja Core RealmConfig RealmImporter Realmd
 ninja install
 
 cd /dest

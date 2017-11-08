@@ -183,7 +183,7 @@ def doBuildInDocker(String buildType, String sanitizeMode='') {
                            cd build-dir
                            cmake -D CMAKE_BUILD_TYPE=${buildType} ${sanitizeFlags} -G Ninja ..
                         """
-                        runAndCollectWarnings(script: "cd build-dir && ninja realm-tests")
+                        runAndCollectWarnings(script: "cd build-dir && ninja CoreTests")
                         sh """
                            cd build-dir/test
                            ./realm-tests
