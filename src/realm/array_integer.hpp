@@ -54,6 +54,11 @@ public:
     static int64_t get(const char* header, size_t ndx) noexcept;
     bool compare(const ArrayInteger& a) const noexcept;
 
+    bool is_null(size_t) const
+    {
+        return false;
+    }
+
     /// Add \a diff to the element at the specified index.
     void adjust(size_t ndx, int_fast64_t diff);
 

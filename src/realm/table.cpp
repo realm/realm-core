@@ -282,7 +282,10 @@ size_t Table::add_column(DataType type, StringData name, bool nullable, Descript
     REALM_ASSERT(!has_shared_type());
     return get_descriptor()->add_column(type, name, subdesc, nullable); // Throws
 }
-
+size_t Table::add_column_list(DataType type, StringData name)
+{
+    return get_descriptor()->add_column_list(type, name); // Throws
+}
 size_t Table::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
 {
     return get_descriptor()->add_column_link(type, name, target, link_type); // Throws
@@ -653,7 +656,7 @@ private:
 
 
 void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
-                             bool nullable)
+                             bool nullable, bool listtype)
 {
     REALM_ASSERT(desc.is_attached());
 
@@ -669,7 +672,7 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type, St
 
     if (desc.is_root()) {
         root_table.bump_version();
-        root_table.insert_root_column(col_ndx, type, name, link, nullable); // Throws
+        root_table.insert_root_column(col_ndx, type, name, link, nullable, listtype); // Throws
     }
     else {
         Spec& spec = df::get_spec(desc);
@@ -939,13 +942,13 @@ void Table::do_remove_search_index(Descriptor& descr, size_t column_ndx)
 }
 
 void Table::insert_root_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link_target,
-                               bool nullable)
+                               bool nullable, bool listtype)
 {
     using tf = _impl::TableFriend;
 
     REALM_ASSERT_3(col_ndx, <=, m_spec->get_public_column_count());
 
-    do_insert_root_column(col_ndx, ColumnType(type), name, nullable); // Throws
+    do_insert_root_column(col_ndx, ColumnType(type), name, nullable, listtype); // Throws
     adj_insert_column(col_ndx);                                       // Throws
     update_link_target_tables(col_ndx, col_ndx + 1);                  // Throws
 
@@ -1020,9 +1023,14 @@ void Table::move_root_column(size_t from, size_t to)
 }
 
 
-void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, bool nullable)
+void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, bool nullable, bool listtype)
 {
-    m_spec->insert_column(ndx, type, name, nullable ? col_attr_Nullable : col_attr_None); // Throws
+    int attr = col_attr_None;
+    if (nullable)
+        attr |= col_attr_Nullable;
+    if (listtype)
+        attr |= col_attr_List;
+    m_spec->insert_column(ndx, type, name, attr); // Throws
 
     Spec::ColumnInfo info = m_spec->get_column_info(ndx);
     size_t ndx_in_parent = info.m_column_ref_ndx;
@@ -6659,6 +6667,13 @@ Obj Table::create_object(Key key)
     m_size++;
 
     return obj;
+}
+
+void Table::create_objects(size_t number, std::vector<Key>& keys)
+{
+    while (number--) {
+        keys.push_back(create_object().get_key());
+    }
 }
 
 void Table::do_remove_object(Key key, bool /* broken_reciprocal_backlinks */)

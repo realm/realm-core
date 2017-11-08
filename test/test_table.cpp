@@ -34,6 +34,9 @@ using namespace std::chrono;
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/to_string.hpp>
+#include <realm/array_bool.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_timestamp.hpp>
 
 #include "util/misc.hpp"
 
@@ -8884,6 +8887,139 @@ TEST(Table_remove_column)
     CHECK_EQUAL(obj.get<int64_t>("int3"), 25);
     table.add_column(type_Int, "int4");
     CHECK_EQUAL(obj.get<int64_t>("int4"), 0);
+}
+
+TEST(Table_list_basic)
+{
+    Table table;
+    auto list_col = table.add_column_list(type_Int, "int_list");
+
+    {
+        Obj obj = table.create_object(Key(5));
+        CHECK(obj.is_null(list_col));
+        auto list = obj.get_list<int64_t>(list_col);
+        CHECK_NOT(obj.is_null(list_col));
+        for (int i = 0; i < 100; i++) {
+            list.add(i + 1000);
+        }
+    }
+    {
+        Obj obj = table.get_object(Key(5));
+        auto list1 = obj.get_list<int64_t>(list_col);
+        CHECK_EQUAL(list1.size(), 100);
+        CHECK_EQUAL(list1.get(0), 1000);
+        CHECK_EQUAL(list1.get(99), 1099);
+        auto list2 = obj.get_list<int64_t>(list_col);
+        list2.set(50, 747);
+        CHECK_EQUAL(list1.get(50), 747);
+    }
+    table.remove_object(Key(5));
+}
+
+TEST(Table_ListOfPrimitives)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    size_t int_col = t->add_column_list(type_Int, "integers");
+    size_t bool_col = t->add_column_list(type_Bool, "booleans");
+    size_t string_col = t->add_column_list(type_String, "strings");
+    size_t double_col = t->add_column_list(type_Double, "doubles");
+    size_t timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
+    Obj obj = t->create_object(Key(7));
+
+    std::vector<int64_t> integer_vector = {1, 2, 3, 4};
+    obj.set_list_values(int_col, integer_vector);
+
+    std::vector<bool> bool_vector = {false, false, true, false, true};
+    obj.set_list_values(bool_col, bool_vector);
+
+    std::vector<StringData> string_vector = {"monday", "tuesday", "thursday", "friday", "saturday", "sunday"};
+    obj.set_list_values(string_col, string_vector);
+
+    std::vector<double> double_vector = {898742.09382, 3.14159265358979, 2.71828182845904};
+    obj.set_list_values(double_col, double_vector);
+
+    time_t seconds_since_epoc = time(nullptr);
+    std::vector<Timestamp> timestamp_vector = {Timestamp(seconds_since_epoc, 0),
+                                               Timestamp(seconds_since_epoc + 60, 0)};
+    obj.set_list_values(timestamp_col, timestamp_vector);
+
+    auto int_list = obj.get_list<int64_t>(int_col);
+    std::vector<int64_t> vec(int_list.size());
+    CHECK_EQUAL(integer_vector.size(), int_list.size());
+    // {1, 2, 3, 4}
+    auto it = int_list.begin();
+    CHECK_EQUAL(*it, 1);
+    std::copy(int_list.begin(), int_list.end(), vec.begin());
+    unsigned j = 0;
+    for (auto i : int_list) {
+        CHECK_EQUAL(vec[j], i);
+        CHECK_EQUAL(integer_vector[j++], i);
+    }
+    auto f = std::find(int_list.begin(), int_list.end(), 3);
+    CHECK_EQUAL(3, *f++);
+    CHECK_EQUAL(4, *f);
+
+    for (unsigned i = 0; i < int_list.size(); i++) {
+        CHECK_EQUAL(integer_vector[i], int_list[i]);
+    }
+
+    CHECK_EQUAL(3, int_list.remove(2));
+    // {1, 2, 4}
+    CHECK_EQUAL(integer_vector.size() - 1, int_list.size());
+    CHECK_EQUAL(4, int_list[2]);
+    int_list.resize(6);
+    // {1, 2, 4, 0, 0, 0}
+    CHECK_EQUAL(int_list[5], 0);
+    int_list.swap(0, 1);
+    // {2, 1, 4, 0, 0, 0}
+    CHECK_EQUAL(2, int_list[0]);
+    CHECK_EQUAL(1, int_list[1]);
+    int_list.move(1, 4);
+    // {2, 4, 0, 0, 1, 0}
+    CHECK_EQUAL(4, int_list[1]);
+    CHECK_EQUAL(1, int_list[4]);
+    int_list.remove(1, 3);
+    // {2, 0, 1, 0}
+    CHECK_EQUAL(1, int_list[2]);
+    int_list.resize(2);
+    // {2, 0}
+    CHECK_EQUAL(2, int_list.size());
+    CHECK_EQUAL(2, int_list[0]);
+    CHECK_EQUAL(0, int_list[1]);
+
+    int_list.clear();
+    auto int_list2 = obj.get_list<int64_t>(int_col);
+    CHECK_EQUAL(0, int_list2.size());
+
+    auto bool_list = obj.get_list<bool>(bool_col);
+    CHECK_EQUAL(bool_vector.size(), bool_list.size());
+    for (unsigned i = 0; i < bool_list.size(); i++) {
+        CHECK_EQUAL(bool_vector[i], bool_list[i]);
+    }
+
+    auto string_list = obj.get_list<StringData>(string_col);
+    CHECK_EQUAL(string_list.begin()->size(), string_vector.begin()->size());
+    CHECK_EQUAL(string_vector.size(), string_list.size());
+    for (unsigned i = 0; i < string_list.size(); i++) {
+        CHECK_EQUAL(string_vector[i], string_list[i]);
+    }
+
+    string_list.insert(2, "Wednesday");
+    CHECK_EQUAL(string_vector.size() + 1, string_list.size());
+    CHECK_EQUAL(StringData("Wednesday"), string_list.get(2));
+
+    auto double_list = obj.get_list<double>(double_col);
+    CHECK_EQUAL(double_vector.size(), double_list.size());
+    for (unsigned i = 0; i < double_list.size(); i++) {
+        CHECK_EQUAL(double_vector[i], double_list.get(i));
+    }
+
+    auto timestamp_list = obj.get_list<Timestamp>(timestamp_col);
+    CHECK_EQUAL(timestamp_vector.size(), timestamp_list.size());
+    for (unsigned i = 0; i < timestamp_list.size(); i++) {
+        CHECK_EQUAL(timestamp_vector[i], timestamp_list.get(i));
+    }
 }
 
 TEST(Table_object_merge_nodes)

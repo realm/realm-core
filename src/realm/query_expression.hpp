@@ -127,9 +127,11 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #ifndef REALM_QUERY_EXPRESSION_HPP
 #define REALM_QUERY_EXPRESSION_HPP
 
+#include <realm/array_timestamp.hpp>
+#include <realm/array_binary.hpp>
+#include <realm/array_string.hpp>
 #include <realm/column_link.hpp>
 #include <realm/column_linklist.hpp>
-#include <realm/column_table.hpp>
 #include <realm/array_bool.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/impl/sequential_getter.hpp>
@@ -896,7 +898,7 @@ struct NullableVector {
 
     template <typename Type = T>
     typename std::enable_if<realm::is_any<Type, float, double, OldDateTime, BinaryData, StringData, RowIndex,
-                                          Timestamp, ConstTableRef, null>::value,
+                                          Timestamp, ref_type, null>::value,
                             void>::type
     set(size_t index, t_storage value)
     {
@@ -1079,16 +1081,16 @@ inline void NullableVector<Timestamp>::set_null(size_t index)
     m_first[index] = Timestamp{};
 }
 
-// ConstTableRef
+// ref_type
 template <>
-inline bool NullableVector<ConstTableRef>::is_null(size_t index) const
+inline bool NullableVector<ref_type>::is_null(size_t index) const
 {
-    return !bool(m_first[index]);
+    return m_first[index] == 0;
 }
 template <>
-inline void NullableVector<ConstTableRef>::set_null(size_t index)
+inline void NullableVector<ref_type>::set_null(size_t index)
 {
-    m_first[index].reset();
+    m_first[index] = 0;
 }
 
 template <typename Operator>
@@ -1999,12 +2001,11 @@ public:
         : m_column_ndx(column)
         , m_link_map(table, std::move(links))
     {
-        m_column = &m_link_map.target_table()->get_column_base(m_column_ndx);
     }
 
     bool is_nullable() const noexcept
     {
-        return m_link_map.base_table()->is_nullable(m_column->get_column_index());
+        return m_link_map.base_table()->is_nullable(m_column_ndx);
     }
 
     const Table* get_base_table() const override
@@ -2016,8 +2017,16 @@ public:
     {
         if (table != get_base_table()) {
             m_link_map.set_base_table(table);
-            m_column = &m_link_map.target_table()->get_column_base(m_column_ndx);
         }
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_array_ptr = nullptr;
+        // Create new Leaf
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_link_map.base_table()->get_alloc()));
+        cluster->init_leaf(this->m_column_ndx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
     }
 
     void verify_column() const override
@@ -2034,9 +2043,9 @@ public:
     void evaluate(size_t index, ValueBase& destination) override
     {
         Value<T>& d = static_cast<Value<T>&>(destination);
-        size_t col = column_ndx();
 
         if (links_exist()) {
+            /*
             std::vector<size_t> links = m_link_map.get_links(index);
             Value<T> v = make_value_for_link<T>(m_link_map.only_unary_links(), links.size());
 
@@ -2045,12 +2054,12 @@ public:
                 v.m_storage.set(t, m_link_map.target_table()->template get<T>(col, link_to));
             }
             destination.import(v);
+            */
         }
         else {
             // Not a link column
-            const Table* target_table = m_link_map.target_table();
-            for (size_t t = 0; t < destination.m_values && index + t < target_table->size(); t++) {
-                d.m_storage.set(t, target_table->get<T>(col, index + t));
+            for (size_t t = 0; t < destination.m_values && index + t < m_leaf_ptr->size(); t++) {
+                d.m_storage.set(t, m_leaf_ptr->get(index + t));
             }
         }
     }
@@ -2081,18 +2090,20 @@ public:
     SimpleQuerySupport(SimpleQuerySupport const& other, QueryNodeHandoverPatches* patches)
         : Subexpr2<T>(other)
         , m_column_ndx(other.m_column_ndx)
-        , m_column(other.m_column)
         , m_link_map(other.m_link_map, patches)
     {
-        if (patches && m_column) {
-            m_column_ndx = column_ndx();
-            m_column = nullptr;
-        }
+    }
+
+    SimpleQuerySupport(SimpleQuerySupport const& other)
+        : Subexpr2<T>(other)
+        , m_column_ndx(other.m_column_ndx)
+        , m_link_map(other.m_link_map)
+    {
     }
 
     size_t column_ndx() const
     {
-        return m_column->get_column_index();
+        return m_column_ndx;
     }
 
     SizeOperator<Size<T>> size()
@@ -2103,8 +2114,14 @@ public:
 private:
     // Column index of payload column of m_table
     mutable size_t m_column_ndx;
-    const ColumnBase* m_column;
     LinkMap m_link_map;
+    // Leaf cache
+    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
+    using LeafPtr = std::unique_ptr<LeafType, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    LeafType* m_leaf_ptr = nullptr;
 };
 
 
@@ -2580,9 +2597,65 @@ template <typename T>
 class Average;
 }
 
-template <>
-class Columns<SubTable> : public Subexpr2<SubTable> {
+class ColumnListBase {
 public:
+    ColumnListBase(size_t column_ndx, const Table* table, const std::vector<size_t>& links)
+        : m_link_map(table, links)
+        , m_column_ndx(column_ndx)
+    {
+    }
+
+    ColumnListBase(const ColumnListBase& other, QueryNodeHandoverPatches* patches)
+        : m_link_map(other.m_link_map, patches)
+        , m_column_ndx(other.m_column_ndx)
+    {
+    }
+
+    ColumnListBase(const ColumnListBase& other)
+        : m_link_map(other.m_link_map)
+        , m_column_ndx(other.m_column_ndx)
+    {
+    }
+
+    void set_cluster(const Cluster* cluster);
+
+    void get_lists(size_t index, Value<ref_type>& destination, size_t nb_elements);
+
+    bool links_exist() const
+    {
+        return m_link_map.m_link_columns.size() > 0;
+    }
+
+    LinkMap m_link_map;
+    size_t m_column_ndx;
+    // Leaf cache
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(Array), alignof(Array)>::type;
+    using LeafPtr = std::unique_ptr<Array, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    Array* m_leaf_ptr = nullptr;
+};
+
+template <typename T>
+class Columns<List<T>> : public Subexpr2<T>, public ColumnListBase {
+public:
+    Columns(const Columns<List<T>>& other, QueryNodeHandoverPatches* patches)
+        : Subexpr2<T>(other)
+        , ColumnListBase(other, patches)
+    {
+    }
+
+    Columns(const Columns<List<T>>& other)
+        : Subexpr2<T>(other)
+        , ColumnListBase(other)
+    {
+    }
+
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        return make_subexpr<Columns<List<T>>>(*this, patches);
+    }
+
     const Table* get_base_table() const override
     {
         return m_link_map.base_table();
@@ -2591,7 +2664,11 @@ public:
     void set_base_table(const Table* table) override
     {
         m_link_map.set_base_table(table);
-        m_column = &m_link_map.target_table()->get_column_table(m_column_ndx);
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        ColumnListBase::set_cluster(cluster);
     }
 
     void verify_column() const override
@@ -2600,122 +2677,30 @@ public:
         m_link_map.target_table()->verify_column(m_column_ndx);
     }
 
-    std::string description() const override
-    {
-        return m_link_map.description();
-    }
-
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
-    {
-        return std::unique_ptr<Subexpr>(new Columns<SubTable>(*this, patches));
-    }
-
     void evaluate(size_t index, ValueBase& destination) override
     {
-        evaluate_internal(index, destination, ValueBase::default_size);
-    }
-
-    void evaluate_internal(size_t index, ValueBase& destination, size_t nb_elements);
-
-    template <typename T>
-    ListColumns<T> column(size_t ndx) const
-    {
-        return ListColumns<T>(ndx, Columns<SubTable>(*this, nullptr));
-    }
-
-    template <typename T>
-    ListColumns<T> list() const
-    {
-        return column<T>(0);
-    }
-
-    SizeOperator<Size<ConstTableRef>> size()
-    {
-        return SizeOperator<Size<ConstTableRef>>(this->clone(nullptr));
-    }
-
-private:
-    LinkMap m_link_map;
-    size_t m_column_ndx;
-    const SubtableColumn* m_column = nullptr;
-    friend class Table;
-    template <class T>
-    friend class ListColumnsBase;
-    template <class T, class U>
-    friend class ListColumnAggregate;
-
-    Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links = {})
-        : m_link_map(table, links)
-        , m_column_ndx(column_ndx)
-        , m_column(&m_link_map.target_table()->get_column_table(column_ndx))
-    {
-    }
-
-    Columns(const Columns<SubTable>& other, QueryNodeHandoverPatches* patches)
-        : Subexpr2<SubTable>(other)
-        , m_link_map(other.m_link_map, patches)
-        , m_column_ndx(other.m_column_ndx)
-        , m_column(other.m_column)
-    {
-        if (m_column && patches)
-            m_column_ndx = m_column->get_column_index();
-    }
-};
-
-template <typename T>
-class ListColumnsBase : public Subexpr2<T> {
-public:
-    ListColumnsBase(size_t column_ndx, Columns<SubTable> column)
-        : m_column_ndx(column_ndx)
-        , m_subtable_column(std::move(column))
-    {
-    }
-
-    ListColumnsBase(const ListColumnsBase& other, QueryNodeHandoverPatches* patches)
-        : m_column_ndx(other.m_column_ndx)
-        , m_subtable_column(other.m_subtable_column, patches)
-    {
-    }
-
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
-    {
-        return make_subexpr<ListColumns<T>>(*this, patches);
-    }
-
-    const Table* get_base_table() const override
-    {
-        return m_subtable_column.get_base_table();
-    }
-
-    void set_base_table(const Table* table) override
-    {
-        m_subtable_column.set_base_table(table);
-    }
-
-    void verify_column() const override
-    {
-        m_subtable_column.verify_column();
-    }
-
-    void evaluate(size_t index, ValueBase& destination) override
-    {
-        Value<ConstTableRef> subtables;
-        m_subtable_column.evaluate_internal(index, subtables, 1);
+        Allocator& alloc = get_base_table()->get_alloc();
+        Value<ref_type> list_refs;
+        get_lists(index, list_refs, 1);
         size_t sz = 0;
-        for (size_t i = 0; i < subtables.m_values; i++) {
-            auto val = subtables.m_storage[i];
-            if (val)
-                sz += val->size();
+        for (size_t i = 0; i < list_refs.m_values; i++) {
+            ref_type val = list_refs.m_storage[i];
+            if (val) {
+                char* header = alloc.translate(val);
+                sz += Array::get_size_from_header(header);
+            }
         }
         auto v = make_value_for_link<typename util::RemoveOptional<T>::type>(false, sz);
         size_t k = 0;
-        for (size_t i = 0; i < subtables.m_values; i++) {
-            auto table = subtables.m_storage[i];
-            if (table) {
-                size_t s = table->size();
+        for (size_t i = 0; i < list_refs.m_values; i++) {
+            ref_type list_ref = list_refs.m_storage[i];
+            if (list_ref) {
+                typename ColumnTypeTraits<T>::cluster_leaf_type leaf(alloc);
+                leaf.init_from_ref(list_ref);
+                size_t s = leaf.size();
                 for (size_t j = 0; j < s; j++) {
-                    if (!table->is_null(m_column_ndx, j)) {
-                        v.m_storage.set(k++, table->get<T>(m_column_ndx, j));
+                    if (!leaf.is_null(j)) {
+                        v.m_storage.set(k++, leaf.get(j));
                     }
                 }
             }
@@ -2725,69 +2710,43 @@ public:
 
     virtual std::string description() const override
     {
-        const Table* table = get_base_table();
-        if (table && table->is_attached()) {
-            if (m_subtable_column.m_column) {
-                return std::string(table->get_name()) + metrics::value_separator +
-                       std::string(table->get_column_name(m_subtable_column.m_column_ndx));
-            }
-            else {
-                return std::string(table->get_name()) + metrics::value_separator +
-                       std::string(table->get_column_name(m_column_ndx));
-            }
+        if (links_exist()) {
+            return m_link_map.description();
+        }
+        const Table* target_table = m_link_map.target_table();
+        if (target_table && target_table->is_attached()) {
+            return std::string(target_table->get_name()) + metrics::value_separator +
+                   std::string(target_table->get_column_name(m_column_ndx));
         }
         return "";
     }
 
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
     {
-        return {m_column_ndx, m_subtable_column};
+        return {m_column_ndx, *this};
     }
 
     ListColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
     {
-        return {m_column_ndx, m_subtable_column};
+        return {m_column_ndx, *this};
     }
 
     ListColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
     {
-        return {m_column_ndx, m_subtable_column};
+        return {m_column_ndx, *this};
     }
 
     ListColumnAggregate<T, aggregate_operations::Average<T>> average() const
     {
-        return {m_column_ndx, m_subtable_column};
+        return {m_column_ndx, *this};
     }
 
 
 private:
-    // Storing the column index here could be a potential problem if the column
-    // changes id due to insertion/deletion.
-    size_t m_column_ndx;
-    Columns<SubTable> m_subtable_column;
-};
+    friend class Table;
 
-template <class T>
-class ListColumns : public ListColumnsBase<T> {
-public:
-    using ListColumnsBase<T>::ListColumnsBase;
-};
-
-template <>
-class ListColumns<StringData> : public ListColumnsBase<StringData> {
-public:
-    ListColumns(size_t column_ndx, Columns<SubTable> column)
-        : ListColumnsBase(column_ndx, column)
-    {
-    }
-
-    ListColumns(const ListColumnsBase& other, QueryNodeHandoverPatches* patches)
-        : ListColumnsBase(other, patches)
-    {
-    }
-
-    ListColumns(ListColumns&& other)
-        : ListColumnsBase(other)
+    Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links = {})
+        : ColumnListBase(column_ndx, table, links)
     {
     }
 };
@@ -2797,7 +2756,7 @@ class ListColumnAggregate : public Subexpr2<typename Operation::ResultType> {
 public:
     using R = typename Operation::ResultType;
 
-    ListColumnAggregate(size_t column_ndx, Columns<SubTable> column)
+    ListColumnAggregate(size_t column_ndx, Columns<List<T>> column)
         : m_column_ndx(column_ndx)
         , m_subtable_column(std::move(column))
     {
@@ -2824,6 +2783,11 @@ public:
         m_subtable_column.set_base_table(table);
     }
 
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_subtable_column.set_cluster(cluster);
+    }
+
     void verify_column() const override
     {
         m_subtable_column.verify_column();
@@ -2831,19 +2795,22 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Value<ConstTableRef> subtables;
-        m_subtable_column.evaluate_internal(index, subtables, 1);
-        REALM_ASSERT_DEBUG(subtables.m_values > 0 || subtables.m_from_link_list);
-        size_t sz = subtables.m_values;
+        Allocator& alloc = get_base_table()->get_alloc();
+        Value<ref_type> list_refs;
+        m_subtable_column.get_lists(index, list_refs, 1);
+        REALM_ASSERT_DEBUG(list_refs.m_values > 0 || list_refs.m_from_link_list);
+        size_t sz = list_refs.m_values;
         // The result is an aggregate value for each table
-        auto v = make_value_for_link<R>(!subtables.m_from_link_list, sz);
+        auto v = make_value_for_link<R>(!list_refs.m_from_link_list, sz);
         for (unsigned i = 0; i < sz; i++) {
-            auto table = subtables.m_storage[i];
+            auto list_ref = list_refs.m_storage[i];
             Operation op;
-            if (table) {
-                size_t s = table->size();
+            if (list_ref) {
+                typename ColumnTypeTraits<T>::cluster_leaf_type leaf(alloc);
+                leaf.init_from_ref(list_ref);
+                size_t s = leaf.size();
                 for (unsigned j = 0; j < s; j++) {
-                    op.accumulate(table->get<T>(m_column_ndx, j));
+                    op.accumulate(leaf.get(j));
                 }
             }
             if (op.is_null()) {
@@ -2869,7 +2836,7 @@ public:
 
 private:
     size_t m_column_ndx;
-    Columns<SubTable> m_subtable_column;
+    Columns<List<T>> m_subtable_column;
 };
 
 template <class Operator>

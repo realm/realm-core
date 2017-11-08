@@ -163,6 +163,8 @@ public:
 
     size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = nullptr, bool nullable = false);
 
+    size_t add_column_list(DataType type, StringData name);
+
     void insert_column(size_t col_ndx, DataType type, StringData name, DescriptorRef* subdesc = nullptr,
                        bool nullable = false);
 
@@ -569,6 +571,20 @@ inline size_t Descriptor::add_column(DataType type, StringData name, DescriptorR
 {
     size_t col_ndx = m_spec->get_public_column_count();
     insert_column(col_ndx, type, name, subdesc, nullable); // Throws
+    return col_ndx;
+}
+
+inline size_t Descriptor::add_column_list(DataType type, StringData name)
+{
+    size_t col_ndx = m_spec->get_public_column_count();
+    typedef _impl::TableFriend tf;
+
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+
+    LinkTargetInfo invalid_link;
+    tf::insert_column(*this, col_ndx, type, name, invalid_link, false, true); // Throws
+    adj_insert_column(col_ndx);
     return col_ndx;
 }
 

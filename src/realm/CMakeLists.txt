@@ -37,6 +37,8 @@ set(REALM_SOURCES
     index_string.cpp
     lang_bind_helper.cpp
     link_view.cpp
+    list.cpp
+    obj.cpp
     query.cpp
     query_engine.cpp
     query_expression.cpp
@@ -84,6 +86,8 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_timestamp.hpp
     binary_data.hpp
     bptree.hpp
+    cluster.hpp
+    cluster_tree.hpp
     column.hpp
     column_backlink.hpp
     column_binary.hpp
@@ -117,6 +121,8 @@ set(REALM_INSTALL_GENERAL_HEADERS
     link_view_fwd.hpp
     mixed.hpp
     null.hpp
+    list.cpp
+    obj.cpp
     olddatetime.hpp
     owned_data.hpp
     query.hpp

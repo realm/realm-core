@@ -1899,6 +1899,8 @@ TEST(Query_size)
     CHECK_EQUAL(6, tv.size());
 }
 
+#endif
+
 TEST(Query_SubtableExpression)
 {
     Group g;
@@ -1906,93 +1908,88 @@ TEST(Query_SubtableExpression)
     TableRef table = g.add_table("foo");
 
     DescriptorRef subdescr;
-    table->add_column(type_Table, "integers", &subdescr);
-    subdescr->add_column(type_Int, "list");
-    table->add_column(type_Table, "strings", &subdescr);
-    subdescr->add_column(type_String, "list", nullptr, true);
-    table->add_column(type_String, "other");
+    auto col_int_list = table->add_column_list(type_Int, "integers");
+    auto col_string_list = table->add_column_list(type_String, "strings");
+    auto col_string = table->add_column(type_String, "other");
+    std::vector<Key> keys;
 
-    table->add_empty_row(4);
+    table->create_objects(4, keys);
 
-    auto set_int_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
-        size_t sz = value_list.size();
-        subtable->clear();
-        if (sz) {
-            subtable->add_empty_row(sz);
+    {
+        auto set_string_list = [](List<String> list, const std::vector<int64_t>& value_list) {
+            size_t sz = value_list.size();
+            list.clear();
             for (size_t i = 0; i < sz; i++) {
-                subtable->set_int(0, i, value_list[i]);
+                if (value_list[i] < 100) {
+                    std::string str("Str_");
+                    str += util::to_string(value_list[i]);
+                    list.add(str);
+                }
             }
-        }
-    };
-    auto set_string_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
-        size_t sz = value_list.size();
-        subtable->clear();
-        subtable->add_empty_row(sz);
-        for (size_t i = 0; i < sz; i++) {
-            if (value_list[i] < 100) {
-                std::string str("Str_");
-                str += util::to_string(value_list[i]);
-                subtable->set_string(0, i, str);
-            }
-        }
-    };
-    set_int_list(table->get_subtable(0, 0), std::vector<Int>({0, 1}));
-    set_int_list(table->get_subtable(0, 1), std::vector<Int>({2, 3, 4, 5}));
-    set_int_list(table->get_subtable(0, 2), std::vector<Int>({6, 7, 8, 9}));
-    set_int_list(table->get_subtable(0, 3), std::vector<Int>({}));
-    set_string_list(table->get_subtable(1, 0), std::vector<Int>({0, 1}));
-    set_string_list(table->get_subtable(1, 1), std::vector<Int>({2, 3, 4, 5}));
-    set_string_list(table->get_subtable(1, 2), std::vector<Int>({6, 7, 100, 8, 9}));
-    table->set_string(2, 0, StringData("foo"));
-    table->set_string(2, 1, StringData("str"));
-    table->set_string(2, 2, StringData("str_9_baa"));
+        };
+
+        set_string_list(table->get_object(keys[0]).get_list<String>(col_string_list), std::vector<Int>({0, 1}));
+        set_string_list(table->get_object(keys[1]).get_list<String>(col_string_list), std::vector<Int>({2, 3, 4, 5}));
+        set_string_list(table->get_object(keys[2]).get_list<String>(col_string_list),
+                        std::vector<Int>({6, 7, 100, 8, 9}));
+    }
+
+    table->get_object(keys[0]).set_list_values(col_int_list, std::vector<Int>({0, 1}));
+    table->get_object(keys[1]).set_list_values(col_int_list, std::vector<Int>({2, 3, 4, 5}));
+    table->get_object(keys[2]).set_list_values(col_int_list, std::vector<Int>({6, 7, 8, 9}));
+    table->get_object(keys[3]).set_list_values(col_int_list, std::vector<Int>({}));
+
+    table->get_object(keys[0]).set<String>(col_string, StringData("foo"));
+    table->get_object(keys[1]).set<String>(col_string, StringData("str"));
+    table->get_object(keys[2]).set<String>(col_string, StringData("str_9_baa"));
 
     Query q;
     TableView tv;
-    q = table->column<SubTable>(0).list<Int>() == 5;
+    q = table->column<List<Int>>(col_int_list) == 5;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_source_ndx(0), 1);
-    q = table->column<SubTable>(1).list<String>() == "Str_5";
+    CHECK_EQUAL(tv.get_key(0), keys[1]);
+    q = table->column<List<String>>(col_string_list) == "Str_5";
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_source_ndx(0), 1);
+    CHECK_EQUAL(tv.get_key(0), keys[1]);
 
-    q = table->column<SubTable>(1).list<String>().begins_with("Str");
+    q = table->column<List<String>>(col_string_list).begins_with("Str");
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 3);
-    q = table->column<SubTable>(1).list<String>().ends_with("_8");
+    q = table->column<List<String>>(col_string_list).ends_with("_8");
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_source_ndx(0), 2);
-    q = table->column<SubTable>(1).list<String>().begins_with(table->column<String>(2), false);
+    CHECK_EQUAL(tv.get_key(0), keys[2]);
+    q = table->column<List<String>>(col_string_list).begins_with(table->column<String>(2), false);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_source_ndx(0), 1);
-    q = table->column<String>(2).begins_with(table->column<SubTable>(1).list<String>(), false);
+    CHECK_EQUAL(tv.get_key(0), keys[1]);
+    q = table->column<String>(2).begins_with(table->column<List<String>>(col_string_list), false);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_source_ndx(0), 2);
+    CHECK_EQUAL(tv.get_key(0), keys[2]);
 
-    q = table->column<SubTable>(0).list<Int>().min() >= 2;
+    q = table->column<List<Int>>(col_int_list).min() >= 2;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_source_ndx(0), 1);
-    CHECK_EQUAL(tv.get_source_ndx(1), 2);
-    q = table->column<SubTable>(0).list<Int>().max() > 6;
+    CHECK_EQUAL(tv.get_key(0), keys[1]);
+    CHECK_EQUAL(tv.get_key(1), keys[2]);
+    q = table->column<List<Int>>(col_int_list).max() > 6;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_source_ndx(0), 2);
-    q = table->column<SubTable>(0).list<Int>().sum() == 14;
+    CHECK_EQUAL(tv.get_key(0), keys[2]);
+    q = table->column<List<Int>>(col_int_list).sum() == 14;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_source_ndx(0), 1);
-    q = table->column<SubTable>(0).list<Int>().average() < 4;
+    CHECK_EQUAL(tv.get_key(0), keys[1]);
+    q = table->column<List<Int>>(col_int_list).average() < 4;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_source_ndx(0), 0);
-    CHECK_EQUAL(tv.get_source_ndx(1), 1);
+    CHECK_EQUAL(tv.get_key(0), keys[0]);
+    CHECK_EQUAL(tv.get_key(1), keys[1]);
 
+#ifdef LEGACY_TESTS
     TableRef baa = g.add_table("baa");
     baa->add_column_link(type_Link, "link", *table);
     baa->add_column_link(type_LinkList, "linklist", *table);
@@ -2012,14 +2009,17 @@ TEST(Query_SubtableExpression)
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_source_ndx(0), 0);
 
-    q = baa->link(1).column<SubTable>(1).list<String>() == "Str_5";
+    q = baa->link(1).column<List<String>>(col_string_list) == "Str_5";
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
 
     q = baa->link(1).column<SubTable>(0).list<Int>().average() >= 2.0;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
+#endif
 }
+
+#ifdef LEGACY_TESTS
 
 TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
 {

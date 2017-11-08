@@ -38,7 +38,7 @@ public:
 
     bool has_strong_link_columns() noexcept;
 
-    void insert_column(size_t column_ndx, ColumnType type, StringData name, ColumnAttr attr = col_attr_None);
+    void insert_column(size_t column_ndx, ColumnType type, StringData name, int attr = col_attr_None);
     void rename_column(size_t column_ndx, StringData new_name);
     void move_column(size_t from, size_t to);
 

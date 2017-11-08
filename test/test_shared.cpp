@@ -3868,4 +3868,25 @@ TEST(Shared_ConstObjectIterator)
     CHECK_EQUAL(i3->get<int64_t>(0), 8);
 }
 
+TEST(Shared_ConstList)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg_w(path);
+    Group& g = sg_w.begin_write();
+
+    TableRef t = g.add_table("Foo");
+    auto list_col = t->add_column_list(type_Int, "int_list");
+    t->create_object(Key(47)).get_list<int64_t>(list_col).add(47);
+    sg_w.commit();
+
+    SharedGroup sg_r(path);
+    const Group& g2 = sg_r.begin_read();
+    ConstTableRef t2 = g2.get_table("Foo");
+    ConstObj obj = t2->get_object(Key(47));
+    auto list1 = obj.get_list<int64_t>(list_col);
+
+    CHECK_EQUAL(list1.get(0), 47);
+}
+
+
 #endif // TEST_SHARED

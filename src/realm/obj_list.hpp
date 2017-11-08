@@ -22,7 +22,7 @@
 #include <realm/column.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/handover_defs.hpp>
-#include <realm/cluster.hpp>
+#include <realm/obj.hpp>
 
 namespace realm {
 
