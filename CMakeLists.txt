@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.4)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake")
-
 project(RealmCore)
+
+list(APPEND CMAKE_MODULE_PATH "${RealmCore_SOURCE_DIR}/tools/cmake")
 
 # Include general CMake modules
 include(GNUInstallDirs)
