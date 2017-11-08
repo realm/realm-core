@@ -355,6 +355,14 @@ struct sync_session_states::Dying : public SyncSession::State {
         return false;
     }
 
+    void bind_with_admin_token(std::unique_lock<std::mutex>& lock, SyncSession& session,
+                               const std::string& admin_token,
+                               const std::string& server_url) const override
+    {
+        session.advance_state(lock, waiting_for_access_token);
+        session.m_state->refresh_access_token(lock, session, admin_token, server_url);
+    }
+
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         session.advance_state(lock, inactive);
