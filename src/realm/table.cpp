@@ -405,6 +405,13 @@ void Table::rename_column(size_t col_ndx, StringData name)
 }
 
 
+void Table::move_column(size_t from_ndx, size_t to_ndx)
+{
+    REALM_ASSERT(!has_shared_type());
+    get_descriptor()->move_column(from_ndx, to_ndx);
+}
+
+
 DescriptorRef Table::get_descriptor()
 {
     REALM_ASSERT(is_attached());

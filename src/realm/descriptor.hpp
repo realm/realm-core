@@ -217,6 +217,20 @@ public:
     /// \sa Table::rename_column()
     void rename_column(size_t col_ndx, StringData new_name);
 
+    /// Change the ordering of existing columns.
+    ///
+    /// This function modifies the dynamic type of all the tables that share
+    /// this descriptor. The consequences of specifying column indexes that
+    /// are out of range are undefined.
+    ///
+    /// \param from_ndx The index of an existing column which should be moved.
+    ///
+    /// \param to_ndx The index of the destination that the column should be moved to.
+    ///
+    /// \sa Table::add_column()
+    /// \sa Table::remove_column()
+    void move_column(size_t from_ndx, size_t to_ndx);
+
     /// If the descriptor is describing a subtable column, the add_search_index()
     /// and remove_search_index() will add or remove search indexes of *all*
     /// subtables of the subtable column. This may take a while if there are many
@@ -514,8 +528,6 @@ private:
     // subdescriptor if that accessor exists, otherwise this function
     // return null.
     DescriptorRef get_subdesc_accessor(size_t column_ndx) noexcept;
-
-    void move_column(size_t from_ndx, size_t to_ndx);
 
     void adj_insert_column(size_t col_ndx) noexcept;
     void adj_erase_column(size_t col_ndx) noexcept;

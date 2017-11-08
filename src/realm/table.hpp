@@ -216,6 +216,7 @@ public:
                             LinkType link_type = link_Weak);
     void remove_column(size_t column_ndx);
     void rename_column(size_t column_ndx, StringData new_name);
+    void move_column(size_t from_ndx, size_t to_ndx);
     //@}
 
     //@{
