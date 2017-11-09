@@ -1179,32 +1179,6 @@ private:
     size_t m_col_ndx;
 };
 
-
-class MoveColumnUpdater : public _impl::TableFriend::AccessorUpdater {
-public:
-    MoveColumnUpdater(size_t col_ndx_1, size_t col_ndx_2)
-        : m_col_ndx_1(col_ndx_1)
-        , m_col_ndx_2(col_ndx_2)
-    {
-    }
-
-    void update(Table& table) override
-    {
-        using tf = _impl::TableFriend;
-        tf::adj_move_column(table, m_col_ndx_1, m_col_ndx_2);
-        size_t min_ndx = std::min(m_col_ndx_1, m_col_ndx_2);
-        tf::mark_link_target_tables(table, min_ndx);
-    }
-
-    void update_parent(Table&) override
-    {
-    }
-
-private:
-    size_t m_col_ndx_1;
-    size_t m_col_ndx_2;
-};
-
 } // anonymous namespace
 
 
@@ -1677,22 +1651,6 @@ public:
     {
         m_schema_changed = true;
         return true; // No-op
-    }
-
-    bool move_column(size_t col_ndx_1, size_t col_ndx_2) noexcept
-    {
-        if (m_table) {
-            typedef _impl::TableFriend tf;
-            MoveColumnUpdater updater(col_ndx_1, col_ndx_2);
-            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
-        }
-        typedef _impl::DescriptorFriend df;
-        if (m_desc)
-            df::adj_move_column(*m_desc, col_ndx_1, col_ndx_2);
-
-        m_schema_changed = true;
-
-        return true;
     }
 
     bool add_search_index(size_t) noexcept

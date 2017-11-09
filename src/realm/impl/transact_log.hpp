@@ -67,7 +67,7 @@ enum Instruction {
     instr_EraseColumn = 24,          // Remove column from selected descriptor
     instr_EraseLinkColumn = 25,      // Remove link-type column from selected descriptor
     instr_RenameColumn = 26,         // Rename column in selected descriptor
-    instr_MoveColumn = 27,           // Move column in selected descriptor
+    instr_MoveColumn = 27,           // Move column in selected descriptor (now unsupported)
     instr_AddSearchIndex = 28,       // Add a search index to a column
     instr_RemoveSearchIndex = 29,    // Remove a search index from a column
     instr_SetLinkType = 30,          // Strong/weak
@@ -272,10 +272,6 @@ public:
     {
         return true;
     }
-    bool move_column(size_t, size_t)
-    {
-        return true;
-    }
     bool add_search_index(size_t)
     {
         return true;
@@ -376,7 +372,6 @@ public:
     bool erase_link_column(size_t col_ndx, size_t link_target_table_ndx, size_t backlink_col_ndx);
     bool erase_column(size_t col_ndx);
     bool rename_column(size_t col_ndx, StringData new_name);
-    bool move_column(size_t col_ndx_1, size_t col_ndx_2);
     bool add_search_index(size_t col_ndx);
     bool remove_search_index(size_t col_ndx);
     bool set_link_type(size_t col_ndx, LinkType);
@@ -488,7 +483,6 @@ public:
                                bool nullable = false);
     virtual void erase_column(const Descriptor&, size_t col_ndx);
     virtual void rename_column(const Descriptor&, size_t col_ndx, StringData name);
-    virtual void move_column(const Descriptor&, size_t from, size_t to);
 
     virtual void set_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value, Instruction variant = instr_Set);
     virtual void add_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value);
@@ -1189,19 +1183,6 @@ inline void TransactLogConvenientEncoder::rename_column(const Descriptor& desc, 
 {
     select_desc(desc);                      // Throws
     m_encoder.rename_column(col_ndx, name); // Throws
-}
-
-
-inline bool TransactLogEncoder::move_column(size_t from, size_t to)
-{
-    append_simple_instr(instr_MoveColumn, from, to); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::move_column(const Descriptor& desc, size_t from, size_t to)
-{
-    select_desc(desc); // Throws
-    m_encoder.move_column(from, to);
 }
 
 
@@ -2041,6 +2022,12 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_MoveColumn: {
+            // This instruction is no longer supported and not used by either
+            // bindings or sync, so if we see it here, there was a problem parsing.
+            parser_error();
+            return;
+        }
         case instr_AddSearchIndex: {
             size_t col_ndx = read_int<size_t>();    // Throws
             if (!handler.add_search_index(col_ndx)) // Throws
@@ -2113,13 +2100,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t col_ndx = read_int<size_t>();            // Throws
             StringData name = read_string(m_string_buffer); // Throws
             if (!handler.rename_column(col_ndx, name))      // Throws
-                parser_error();
-            return;
-        }
-        case instr_MoveColumn: {
-            size_t col_ndx_1 = read_int<size_t>();          // Throws
-            size_t col_ndx_2 = read_int<size_t>();          // Throws
-            if (!handler.move_column(col_ndx_1, col_ndx_2)) // Throws
                 parser_error();
             return;
         }
@@ -2677,13 +2657,6 @@ public:
     bool rename_column(size_t, StringData)
     {
         return true; // No-op
-    }
-
-    bool move_column(size_t col_ndx_1, size_t col_ndx_2)
-    {
-        m_encoder.move_column(col_ndx_2, col_ndx_1);
-        append_instruction();
-        return true;
     }
 
     bool select_link_list(size_t col_ndx, size_t row_ndx, size_t link_target_group_level_ndx)

@@ -503,21 +503,6 @@ public:
         return false;
     }
 
-    bool move_column(size_t col_ndx_1, size_t col_ndx_2)
-    {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
-            size_t column_count = m_desc->get_column_count();
-            static_cast<void>(column_count);
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx_1 < column_count && col_ndx_2 < column_count))) {
-                log("desc->move_column(%1, %2);", col_ndx_1, col_ndx_2); // Throws
-                typedef _impl::TableFriend tf;
-                tf::move_column(*m_desc, col_ndx_1, col_ndx_2); // Throws
-                return true;
-            }
-        }
-        return false;
-    }
-
     bool select_descriptor(int levels, const size_t* path)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))

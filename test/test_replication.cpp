@@ -3634,7 +3634,6 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
         wt.get_group().rename_table("foo", "bar");
         auto bar = wt.get_table("bar");
         bar->rename_column(0, "b");
-        _impl::TableFriend::move_column(*bar->get_descriptor(), 1, 0);
         wt.get_group().move_table(1, 0);
         wt.commit();
     }
@@ -3646,7 +3645,7 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
         ConstTableRef bar = rt.get_table("bar");
         CHECK(bar);
         CHECK_EQUAL(1, bar->get_index_in_group());
-        CHECK_EQUAL(1, bar->get_column_index("b"));
+        CHECK_EQUAL(0, bar->get_column_index("b"));
     }
 }
 

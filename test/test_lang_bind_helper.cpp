@@ -1216,32 +1216,6 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL("Banach", table->get_mixed(2 + 6, 0).get_string());
     CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2 + 6, 5)) &&
         CHECK_EQUAL(OldDateTime(60), table->get_mixed(2 + 6, 5).get_olddatetime());
-
-    // Move columns around
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        DescriptorRef desc_w = table_w->get_descriptor();
-        using tf = _impl::TableFriend;
-        tf::move_column(*desc_w, 7, 2); // FIXME: Not yet publicly exposed
-        tf::move_column(*desc_w, 8, 4);
-        tf::move_column(*desc_w, 2, 7);
-        wt.commit();
-    }
-    LangBindHelper::advance_read(sg);
-    group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(8, 4)) && CHECK_EQUAL(2, table->get_mixed(8, 4).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(8, 0)) && CHECK_EQUAL(20.0f, table->get_mixed(8, 0).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(8, 5)) && CHECK_EQUAL(false, table->get_mixed(8, 5).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(7, 4)) && check_subtab(table, 7, 4, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(7, 0)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(7, 0).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(7, 5)) && CHECK_EQUAL(40, table->get_mixed(7, 5).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(3, 4)) && CHECK_EQUAL(50.0, table->get_mixed(3, 4).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(3, 0)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(3, 0).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(3, 5)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(3, 5).get_olddatetime());
 }
 
 
@@ -1410,26 +1384,6 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     CHECK_NOT(table->has_search_index(6));
     CHECK_EQUAL(3, table->find_first_string(2, "738"));
     CHECK_EQUAL(13, table->find_first_int(5, 508));
-
-    // Move the indexed columns directly
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        DescriptorRef desc_w = table_w->get_descriptor();
-        using tf = _impl::TableFriend;
-        tf::move_column(*desc_w, 2, 5); // FIXME: Not yet publicly exposed
-        tf::move_column(*desc_w, 1, 6);
-        wt.commit();
-    }
-    LangBindHelper::advance_read(sg);
-    group.verify();
-    CHECK_NOT(table->has_search_index(6));
-    CHECK(table->has_search_index(4));
-    CHECK_NOT(table->has_search_index(2));
-    CHECK(table->has_search_index(3));
-    CHECK_NOT(table->has_search_index(5));
-    CHECK_EQUAL(12, table->find_first_string(4, "931"));
-    CHECK_EQUAL(4, table->find_first_int(3, 315));
 }
 
 
@@ -7728,10 +7682,6 @@ public:
     {
         return false;
     }
-    bool move_column(size_t, size_t)
-    {
-        return false;
-    }
     bool add_search_index(size_t)
     {
         return false;
@@ -12953,60 +12903,6 @@ TEST(LangBindHelper_SwapSimple)
     CHECK_EQUAL(tr->get_int(0, 7), 4);
 }
 
-
-// Found by AFL
-TEST(LangBindHelper_RollbackMoveSame)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& g = const_cast<Group&>(sg_w.begin_write());
-
-    g.add_table("t0");
-    g.add_table("t1");
-    g.get_table(1)->add_column_link(type_LinkList, "l0", *g.get_table(0));
-    g.get_table(1)->add_column(DataType(6), "m1", false);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    g.verify();
-    LangBindHelper::promote_to_write(sg_w);
-    g.verify();
-    _impl::TableFriend::move_column(*(g.get_table(1)->get_descriptor()), 0, 0);
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
-    g.verify();
-}
-
-
-TEST(LangBindHelper_ColumnMoveUpdatesLinkedTables)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& g = const_cast<Group&>(sg_w.begin_write());
-    Group& g_r = const_cast<Group&>(sg_r.begin_read());
-
-    TableRef t0 = g.add_table("t0");
-    TableRef t1 = g.add_table("t1");
-
-    t0->add_column_link(type_Link, "l0", *t1);
-    t0->add_column(type_Int, "i1");
-    t0->add_empty_row();
-
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    g.verify();
-    LangBindHelper::advance_read(sg_r);
-    g_r.verify();
-    LangBindHelper::promote_to_write(sg_w);
-
-    _impl::TableFriend::move_column(*(t0->get_descriptor()), 0, 1);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    g.verify();
-    LangBindHelper::advance_read(sg_r);
-    g_r.verify();
-}
 
 TEST(LangBindHelper_Bug2321)
 {
