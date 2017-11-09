@@ -6958,25 +6958,6 @@ TEST(Table_InsertColumnMaintainsBacklinkIndices)
     t1->set_link(0, 0, 0);
 }
 
-TEST(Table_MultipleLinkColumnsMoveTables)
-{
-    Group g;
-    TableRef t = g.add_table("A");
-    TableRef t2 = g.add_table("B");
-    t->insert_column_link(0, type_Link, "e", *t);
-    t->insert_column_link(1, type_LinkList, "f", *t);
-    t->add_empty_row();
-    t->get_linklist(1, 0)->add(0);
-    g.verify();
-    t->get_linklist(1, 0)->add(0);
-    g.verify();
-    g.move_table(0, 1);
-    g.verify();
-    g.move_table(1, 0);
-    g.verify();
-}
-
-
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;

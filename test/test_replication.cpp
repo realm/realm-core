@@ -3610,7 +3610,7 @@ TEST(Replication_AddRowWithKey)
 }
 
 
-TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColumn)
+TEST(Replication_RenameGroupLevelTable_RenameColumn)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
@@ -3634,7 +3634,6 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
         wt.get_group().rename_table("foo", "bar");
         auto bar = wt.get_table("bar");
         bar->rename_column(0, "b");
-        wt.get_group().move_table(1, 0);
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger);
@@ -3644,7 +3643,7 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
         CHECK(!foo);
         ConstTableRef bar = rt.get_table("bar");
         CHECK(bar);
-        CHECK_EQUAL(1, bar->get_index_in_group());
+        CHECK_EQUAL(0, bar->get_index_in_group());
         CHECK_EQUAL(0, bar->get_column_index("b"));
     }
 }

@@ -7658,10 +7658,6 @@ public:
     {
         return false;
     }
-    bool move_group_level_table(size_t, size_t)
-    {
-        return false;
-    }
     bool insert_column(size_t, DataType, StringData, bool)
     {
         return false;
@@ -8422,48 +8418,6 @@ TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
     table->set_int(0, 0, 0);
     group->remove_table("table");
     LangBindHelper::rollback_and_continue_as_read(sg);
-}
-
-TEST(LangBindHelper_AdvanceReadTransact_MoveSelectedTable)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
-    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
-
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_1_w = wt.add_table("table_1");
-        TableRef table_2_w = wt.add_table("table_2");
-        table_2_w->add_column(type_Int, "i");
-        table_2_w->add_empty_row();
-        wt.commit();
-    }
-
-    // Start a read transaction (to be repeatedly advanced)
-    ReadTransaction rt(sg);
-    const Group& group = rt.get_group();
-    ConstTableRef table_1 = group.get_table("table_1");
-    ConstTableRef table_2 = group.get_table("table_2");
-
-    // Try to advance after an empty write transaction
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_1_w = wt.get_or_add_table("table_1");
-        TableRef table_2_w = wt.get_or_add_table("table_2");
-        table_2_w->set_int(0, 0, 1);
-        wt.get_group().move_table(0, 1);
-        CHECK_EQUAL(1, table_2_w->get_int(0, 0));
-        CHECK_EQUAL(0, table_2_w->get_index_in_group());
-        CHECK_EQUAL(1, table_1_w->get_index_in_group());
-        table_2_w->set_int(0, 0, 2);
-        wt.commit();
-    }
-    LangBindHelper::advance_read(sg);
-    group.verify();
-    CHECK_EQUAL(2, table_2->get_int(0, 0));
-    CHECK_EQUAL(0, table_2->get_index_in_group());
-    CHECK_EQUAL(1, table_1->get_index_in_group());
 }
 
 

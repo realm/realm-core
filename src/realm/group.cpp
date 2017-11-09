@@ -690,76 +690,6 @@ void Group::rename_table(size_t table_ndx, StringData new_name, bool require_uni
 }
 
 
-void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-    REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
-    REALM_ASSERT_EX(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size(),
-                    m_table_accessors.size(), m_tables.size());
-    if (from_table_ndx >= m_tables.size())
-        throw LogicError(LogicError::table_index_out_of_range);
-    if (to_table_ndx >= m_tables.size())
-        throw LogicError(LogicError::table_index_out_of_range);
-
-    if (from_table_ndx == to_table_ndx)
-        return;
-
-    // Tables between from_table_ndx and to_table_ndx change their indices, so
-    // link columns have to be adjusted (similar to remove_table).
-
-    // Build a map of all table indices that are going to change:
-    std::map<size_t, size_t> moves; // from -> to
-    moves[from_table_ndx] = to_table_ndx;
-    if (from_table_ndx < to_table_ndx) {
-        // Move up:
-        for (size_t i = from_table_ndx + 1; i <= to_table_ndx; ++i) {
-            moves[i] = i - 1;
-        }
-    }
-    else { // from_table_ndx > to_table_ndx
-        // Move down:
-        for (size_t i = to_table_ndx; i < from_table_ndx; ++i) {
-            moves[i] = i + 1;
-        }
-    }
-
-    // Move entries in internal data structures.
-    m_tables.move_rotate(from_table_ndx, to_table_ndx);
-    m_table_names.move_rotate(from_table_ndx, to_table_ndx);
-
-    // Move accessors.
-    if (!m_table_accessors.empty()) {
-        using iter = decltype(m_table_accessors.begin());
-        iter first, new_first, last;
-        if (from_table_ndx < to_table_ndx) {
-            // Rotate left.
-            first = m_table_accessors.begin() + from_table_ndx;
-            new_first = first + 1;
-            last = m_table_accessors.begin() + to_table_ndx + 1;
-        }
-        else { // from_table_ndx > to_table_ndx
-            // Rotate right.
-            first = m_table_accessors.begin() + to_table_ndx;
-            new_first = m_table_accessors.begin() + from_table_ndx;
-            last = new_first + 1;
-        }
-        std::rotate(first, new_first, last);
-    }
-
-    update_table_indices([&](size_t old_table_ndx) {
-        auto it = moves.find(old_table_ndx);
-        if (it != moves.end()) {
-            return it->second;
-        }
-        return old_table_ndx;
-    });
-
-    if (Replication* repl = m_alloc.get_replication())
-        repl->move_group_level_table(from_table_ndx, to_table_ndx); // Throws
-}
-
-
 class Group::DefaultTableWriter : public Group::TableWriter {
 public:
     DefaultTableWriter(const Group& group)
@@ -1254,42 +1184,6 @@ public:
         // No-op since table names are properties of the group, and the group
         // accessor is always refreshed
         m_schema_changed = true;
-        return true;
-    }
-
-    bool move_group_level_table(size_t from_table_ndx, size_t to_table_ndx) noexcept
-    {
-        REALM_ASSERT(from_table_ndx != to_table_ndx);
-        if (!m_group.m_table_accessors.empty()) {
-            using iter = decltype(m_group.m_table_accessors)::iterator;
-            iter begin, end;
-            if (from_table_ndx < to_table_ndx) {
-                // Left rotation
-                begin = m_group.m_table_accessors.begin() + from_table_ndx;
-                end = m_group.m_table_accessors.begin() + to_table_ndx + 1;
-                Table* table = begin[0];
-                realm::safe_copy_n(begin + 1, to_table_ndx - from_table_ndx, begin);
-                end[-1] = table;
-            }
-            else { // from_table_ndx > to_table_ndx
-                // Right rotation
-                begin = m_group.m_table_accessors.begin() + to_table_ndx;
-                end = m_group.m_table_accessors.begin() + from_table_ndx + 1;
-                Table* table = end[-1];
-                std::copy_backward(begin, end - 1, end);
-                begin[0] = table;
-            }
-            for (iter i = begin; i != end; ++i) {
-                if (Table* table = *i) {
-                    typedef _impl::TableFriend tf;
-                    tf::mark(*table); // FIXME: Not sure this is needed
-                    tf::mark_opposite_link_tables(*table);
-                }
-            }
-        }
-
-        m_schema_changed = true;
-
         return true;
     }
 

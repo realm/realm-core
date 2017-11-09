@@ -77,7 +77,6 @@ enum INS {
     ADD_COLUMN_LINK,
     ADD_COLUMN_LINK_LIST,
     CLEAR_TABLE,
-    MOVE_TABLE,
     INSERT_COLUMN_LINK,
     ADD_SEARCH_INDEX,
     REMOVE_SEARCH_INDEX,
@@ -398,16 +397,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     *log << "g.get_table(" << table_ndx << ")->clear();\n";
                 }
                 g.get_table(table_ndx)->clear();
-            }
-            else if (instr == MOVE_TABLE && g.size() >= 2) {
-                size_t from_ndx = get_next(s) % g.size();
-                size_t to_ndx = get_next(s) % g.size();
-                if (from_ndx != to_ndx) {
-                    if (log) {
-                        *log << "g.move_table(" << from_ndx << ", " << to_ndx << ");\n";
-                    }
-                    g.move_table(from_ndx, to_ndx);
-                }
             }
             else if (instr == INSERT_ROW && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();

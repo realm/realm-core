@@ -567,19 +567,6 @@ public:
         return true;
     }
 
-    bool move_group_level_table(size_t from_table_ndx, size_t to_table_ndx) noexcept
-    {
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(from_table_ndx == to_table_ndx)))
-            return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(from_table_ndx >= m_group.size())))
-            return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(to_table_ndx >= m_group.size())))
-            return false;
-        log("group->move_table(%1, %2);", from_table_ndx, to_table_ndx); // Throws
-        m_group.move_table(from_table_ndx, to_table_ndx);
-        return true;
-    }
-
     bool optimize_table()
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
