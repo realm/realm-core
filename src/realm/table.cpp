@@ -592,7 +592,7 @@ void Table::add_search_index(size_t column_ndx)
     if (has_search_index(column_ndx))
         return;
 
-    int attr = m_spec->get_column_attr(column_ndx);
+    ColumnAttrMask attr = m_spec->get_column_attr(column_ndx);
 
     ColumnBase& col = get_column_base(column_ndx);
 
@@ -612,14 +612,14 @@ void Table::add_search_index(size_t column_ndx)
 
     // Mark the column as having an index
     attr = m_spec->get_column_attr(column_ndx);
-    attr |= col_attr_Indexed;
-    m_spec->set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+    attr.set(col_attr_Indexed);
+    m_spec->set_column_attr(column_ndx, attr); // Throws
 
     // Update column accessors for all columns after the one we just added an
     // index for, as their position in `m_columns` has changed
     refresh_column_accessors(column_ndx + 1); // Throws
 
-    m_spec->set_column_attr(column_ndx, ColumnAttr(attr | col_attr_Indexed)); // Throws
+    m_spec->set_column_attr(column_ndx, attr); // Throws
 
     if (Replication* repl = get_repl())
         repl->add_search_index(this, column_ndx); // Throws
@@ -634,7 +634,7 @@ void Table::remove_search_index(size_t column_ndx)
     if (!has_search_index(column_ndx))
         return;
 
-    int attr = m_spec->get_column_attr(column_ndx);
+    ColumnAttrMask attr = m_spec->get_column_attr(column_ndx);
 
     // Destroy and remove the index column
     ColumnBase& col = get_column_base(column_ndx);
@@ -647,14 +647,14 @@ void Table::remove_search_index(size_t column_ndx)
 
     // Mark the column as no longer having an index
     attr = m_spec->get_column_attr(column_ndx);
-    attr &= ~col_attr_Indexed;
-    m_spec->set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+    attr.reset(col_attr_Indexed);
+    m_spec->set_column_attr(column_ndx, attr); // Throws
 
     // Update column accessors for all columns after the one we just removed the
     // index for, as their position in `m_columns` has changed
     refresh_column_accessors(column_ndx + 1); // Throws
 
-    m_spec->set_column_attr(column_ndx, ColumnAttr(attr & ~col_attr_Indexed)); // Throws
+    m_spec->set_column_attr(column_ndx, attr); // Throws
 
     if (Replication* repl = get_repl())
         repl->remove_search_index(this, column_ndx); // Throws
@@ -833,11 +833,11 @@ void Table::set_link_type(size_t col_ndx, LinkType link_type)
             break;
     }
 
-    ColumnAttr attr = m_spec->get_column_attr(col_ndx);
-    ColumnAttr new_attr = attr;
-    new_attr = ColumnAttr(new_attr & ~col_attr_StrongLinks);
+    ColumnAttrMask attr = m_spec->get_column_attr(col_ndx);
+    ColumnAttrMask new_attr{attr};
+    new_attr.reset(col_attr_StrongLinks);
     if (!weak_links)
-        new_attr = ColumnAttr(new_attr | col_attr_StrongLinks);
+        new_attr.set(col_attr_StrongLinks);
     if (new_attr == attr)
         return;
     m_spec->set_column_attr(col_ndx, new_attr);
@@ -1405,7 +1405,7 @@ bool Table::is_nullable(size_t col_ndx) const
     }
 
     REALM_ASSERT_DEBUG(col_ndx < m_spec->get_column_count());
-    return (m_spec->get_column_attr(col_ndx) & col_attr_Nullable) ||
+    return m_spec->get_column_attr(col_ndx).test(col_attr_Nullable) ||
            m_spec->get_column_type(col_ndx) == col_type_Link;
 }
 
@@ -1574,7 +1574,7 @@ size_t Table::get_size_from_ref(ref_type spec_ref, ref_type columns_ref, Allocat
     ref_type first_col_ref = to_ref(Array::get(columns_header, 0));
     Spec spec(alloc);
     spec.init(spec_ref);
-    bool nullable = (spec.get_column_attr(0) & col_attr_Nullable) == col_attr_Nullable;
+    bool nullable = spec.get_column_attr(0).test(col_attr_Nullable);
     size_t size = ColumnBase::get_size_from_type_and_ref(first_col_type, first_col_ref, alloc, nullable);
     return size;
 }
@@ -4131,10 +4131,11 @@ public:
             _impl::DestroyGuard<Spec> dg(&spec);
             size_t n = spec.get_column_count();
             for (size_t i = 0; i != n; ++i) {
-                int attr = spec.get_column_attr(i);
+                ColumnAttrMask attr = spec.get_column_attr(i);
                 // Remove any index specifying attributes
-                attr &= ~(col_attr_Indexed | col_attr_Unique);
-                spec.set_column_attr(i, ColumnAttr(attr)); // Throws
+                attr.reset(col_attr_Indexed);
+                attr.reset(col_attr_Unique);
+                spec.set_column_attr(i, attr); // Throws
             }
             bool deep = true;                                         // Deep
             bool only_if_modified = false;                            // Always
@@ -5194,8 +5195,8 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
 
         // If there is no search index accessor, but the column has been
         // equipped with a search index, create the accessor now.
-        ColumnAttr attr = m_spec->get_column_attr(col_ndx);
-        bool column_has_search_index = (attr & col_attr_Indexed) != 0;
+        ColumnAttrMask attr = m_spec->get_column_attr(col_ndx);
+        bool column_has_search_index = attr.test(col_attr_Indexed);
 
         if (!column_has_search_index && col)
             col->destroy_search_index();
@@ -5248,7 +5249,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             // of the connection is postponed.
             typedef _impl::GroupFriend gf;
             if (is_link_type(col_type)) {
-                bool weak_links = (attr & col_attr_StrongLinks) == 0;
+                bool weak_links = !attr.test(col_attr_StrongLinks);
                 LinkColumnBase* link_col = static_cast<LinkColumnBase*>(col);
                 link_col->set_weak_links(weak_links);
                 Group& group = *get_parent_group();

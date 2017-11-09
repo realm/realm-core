@@ -446,9 +446,9 @@ void Cluster::create()
     m_keys.create(Array::type_Normal);
     m_keys.update_parent();
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        int attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+        ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
 
-        if (attr & col_attr_List) {
+        if (attr.test(col_attr_List)) {
             ArrayInteger arr(m_alloc);
             arr.create(type_HasRefs);
             arr.set_parent(this, col_ndx + 1);
@@ -458,7 +458,7 @@ void Cluster::create()
         }
         switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
             case col_type_Int:
-                if (attr & col_attr_Nullable) {
+                if (attr.test(col_attr_Nullable)) {
                     do_create<ArrayIntNull>(col_ndx);
                 }
                 else {
@@ -519,9 +519,9 @@ MemRef Cluster::ensure_writeable(Key)
 }
 
 template <class T>
-inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, int attr)
+inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, ColumnAttrMask attr)
 {
-    if (attr & col_attr_List) {
+    if (attr.test(col_attr_List)) {
         ArrayInteger arr(m_alloc);
         arr.set_parent(this, col_ndx + 1);
         arr.init_from_parent();
@@ -531,7 +531,7 @@ inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, int attr)
         T arr(m_alloc);
         arr.set_parent(this, col_ndx + 1);
         arr.init_from_parent();
-        arr.insert(ndx, T::default_value(attr & col_attr_Nullable));
+        arr.insert(ndx, T::default_value(attr.test(col_attr_Nullable)));
     }
 }
 
@@ -540,16 +540,16 @@ void Cluster::insert_row(size_t ndx, Key k)
     m_keys.insert(ndx, k.value);
     size_t nb_columns = size() - 1;
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        int attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+        ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
 
-        if (attr & col_attr_List) {
+        if (attr.test(col_attr_List)) {
             do_insert_row<ArrayInteger>(ndx, col_ndx, attr);
             continue;
         }
 
         switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
             case col_type_Int:
-                if (attr) {
+                if (attr.test(col_attr_Nullable)) {
                     do_insert_row<ArrayIntNull>(ndx, col_ndx, attr);
                 }
                 else {
@@ -611,16 +611,16 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
 
     size_t nb_columns = size() - 1;
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        int attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+        ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
 
-        if (attr & col_attr_List) {
+        if (attr.test(col_attr_List)) {
             do_move<ArrayInteger>(ndx, col_ndx, new_leaf);
             continue;
         }
 
         switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
             case col_type_Int:
-                if (attr & col_attr_Nullable) {
+                if (attr.test(col_attr_Nullable)) {
                     do_move<ArrayIntNull>(ndx, col_ndx, new_leaf);
                 }
                 else {
@@ -683,8 +683,8 @@ inline void Cluster::do_insert_column(size_t col_ndx, bool nullable)
 
 void Cluster::insert_column(size_t col_ndx)
 {
-    int attr = m_tree_top.get_spec().get_column_attr(col_ndx);
-    if (attr & col_attr_List) {
+    ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+    if (attr.test(col_attr_List)) {
         size_t sz = node_size();
 
         ArrayInteger arr(m_alloc);
@@ -695,7 +695,7 @@ void Cluster::insert_column(size_t col_ndx)
         Array::insert(col_ndx + 1, from_ref(arr.get_ref()));
         return;
     }
-    bool nullable = attr & col_attr_Nullable;
+    bool nullable = attr.test(col_attr_Nullable);
 
     switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
         case col_type_Int:
@@ -870,8 +870,8 @@ unsigned Cluster::erase(Key k)
     }
 
     for (size_t col_ndx = 0; col_ndx < num_public_cols; col_ndx++) {
-        int attr = spec.get_column_attr(col_ndx);
-        if (attr & col_attr_List) {
+        ColumnAttrMask attr = spec.get_column_attr(col_ndx);
+        if (attr.test(col_attr_List)) {
             ArrayInteger values(m_alloc);
             values.set_parent(this, col_ndx + 1);
             values.init_from_parent();
@@ -887,7 +887,7 @@ unsigned Cluster::erase(Key k)
         }
         switch (spec.get_column_type(col_ndx)) {
             case col_type_Int:
-                if (attr & col_attr_Nullable) {
+                if (attr.test(col_attr_Nullable)) {
                     do_erase<ArrayIntNull>(ndx, col_ndx);
                 }
                 else {
@@ -934,7 +934,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
         for (size_t j = 1; j < size(); j++) {
             switch (m_tree_top.get_spec().get_column_type(j - 1)) {
                 case col_type_Int: {
-                    bool nullable = m_tree_top.get_spec().get_column_attr(j - 1) & col_attr_Nullable;
+                    bool nullable = m_tree_top.get_spec().get_column_attr(j - 1).test(col_attr_Nullable);
                     Array arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);
                     if (nullable) {

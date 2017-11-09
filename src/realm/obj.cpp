@@ -79,8 +79,8 @@ T ConstObj::get(size_t col_ndx) const
 {
     if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
-    int attr = m_tree_top->get_spec().get_column_attr(col_ndx);
-    REALM_ASSERT((attr & col_attr_List) ||
+    ColumnAttrMask attr = m_tree_top->get_spec().get_column_attr(col_ndx);
+    REALM_ASSERT(attr.test(col_attr_List) ||
                  (m_tree_top->get_spec().get_column_type(col_ndx) == ColumnTypeTraits<T>::column_id));
 
     update_if_needed();
@@ -107,16 +107,16 @@ bool ConstObj::is_null(size_t col_ndx) const
         throw LogicError(LogicError::column_index_out_of_range);
 
     update_if_needed();
-    int attr = m_tree_top->get_spec().get_column_attr(col_ndx);
+    ColumnAttrMask attr = m_tree_top->get_spec().get_column_attr(col_ndx);
 
-    if (attr & col_attr_List) {
+    if (attr.test(col_attr_List)) {
         ArrayInteger values(m_tree_top->get_alloc());
         ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
         values.init_from_ref(ref);
         return values.get(m_row_ndx) == 0;
     }
 
-    if (attr & col_attr_Nullable) {
+    if (attr.test(col_attr_Nullable)) {
         switch (m_tree_top->get_spec().get_column_type(col_ndx)) {
             case col_type_Int:
                 return do_is_null<ArrayIntNull>(col_ndx);
@@ -204,8 +204,8 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
     Array values(alloc);
     values.set_parent(&fields, col_ndx + 1);
     values.init_from_parent();
-    int attr = m_tree_top->get_spec().get_column_attr(col_ndx);
-    if (attr & col_attr_Nullable) {
+    ColumnAttrMask attr = m_tree_top->get_spec().get_column_attr(col_ndx);
+    if (attr.test(col_attr_Nullable)) {
         reinterpret_cast<ArrayIntNull*>(&values)->set(m_row_ndx, value);
     }
     else {
@@ -332,8 +332,8 @@ void Obj::nullify_link(size_t origin_col, Key target_key)
     fields.init_from_mem(m_mem);
 
     const Spec& spec = m_tree_top->get_spec();
-    int attr = spec.get_column_attr(origin_col);
-    if (attr & col_attr_List) {
+    ColumnAttrMask attr = spec.get_column_attr(origin_col);
+    if (attr.test(col_attr_List)) {
         Array linklists(alloc);
         linklists.set_parent(&fields, origin_col + 1);
         linklists.init_from_parent();
@@ -393,7 +393,7 @@ Obj& Obj::set_null(size_t col_ndx, bool is_default)
 {
     if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
-    if (REALM_UNLIKELY((m_tree_top->get_spec().get_column_attr(col_ndx) & col_attr_Nullable)) == 0) {
+    if (REALM_UNLIKELY(!m_tree_top->get_spec().get_column_attr(col_ndx).test(col_attr_Nullable))) {
         throw LogicError(LogicError::column_not_nullable);
     }
 

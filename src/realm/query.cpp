@@ -367,9 +367,9 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, size_t 
 {
     const Spec& spec = _impl::TableFriend::get_spec(table);
     DataType type = table.get_column_type(column_ndx);
-    int64_t attr = spec.get_column_attr(column_ndx);
+    ColumnAttrMask attr = spec.get_column_attr(column_ndx);
 
-    if (attr & col_attr_List) {
+    if (attr.test(col_attr_List)) {
         switch (type) {
             case type_Int:
             case type_Bool:

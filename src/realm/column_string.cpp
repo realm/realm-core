@@ -1591,8 +1591,8 @@ void StringColumn::verify(const Table& table, size_t col_ndx) const
 
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
-    ColumnAttr attr = spec.get_column_attr(col_ndx);
-    bool column_has_search_index = (attr & col_attr_Indexed) != 0;
+    ColumnAttrMask attr = spec.get_column_attr(col_ndx);
+    bool column_has_search_index = attr.test(col_attr_Indexed);
     REALM_ASSERT_3(column_has_search_index, ==, bool(m_search_index));
     if (column_has_search_index) {
         REALM_ASSERT(m_search_index->get_ndx_in_parent() == get_root_array()->get_ndx_in_parent() + 1);
