@@ -13404,6 +13404,65 @@ TEST(LangBindHelper_IndexedStringEnumColumnSwapRowsWithValue)
 }
 
 
+TEST(LangBindHelper_SubtableAccessorUpdatesOnMoveRow)
+{
+    // Test case generated in [realm-core-4.0.3] on Wed Nov  8 14:56:49 2017.
+    // This discovers a problem updating the index_in_parent of a subtable
+    // after a move_row(from_ndx, to_ndx) where from_ndx < to_ndx
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = nullptr;
+    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(key));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+    std::vector<TableView> table_views;
+    std::vector<TableRef> subtable_refs;
+
+    try { g.add_table(""); } catch (const TableNameInUse&) { }
+    {
+        DescriptorRef subdescr;
+        g.get_table(0)->insert_column(0, type_Table, "", true, &subdescr);
+        subdescr->add_column(type_Int, "integers", nullptr, false);
+    }
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+    g.get_table(0)->add_empty_row(6);
+    {
+        TableRef sub = g.get_table(0)->get_subtable(0, 0);
+        sub->clear();
+        sub->add_empty_row(0);
+        subtable_refs.push_back(sub);
+    }
+    g.get_table(0)->rename_column(0, "numbers");
+    g.get_table(0)->move_last_over(2);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    g.get_table(0)->move_row(1, 0);
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    g.get_table(0)->move_row(0, 0);
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    g.get_table(0)->move_row(1, 0);
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    try { g.add_table("ebnriinsbpnfodqfjpojbrpfe"); } catch (const TableNameInUse&) { }
+    try { g.add_table("lsidfcmgqrsebrlirsrroe"); } catch (const TableNameInUse&) { }
+    g.get_table(0)->get_subdescriptor(0)->add_search_index(0);
+    try { g.add_table("jlfppsctimaroipinkgccfcmhbpmlbklsrqkatpgmsp"); } catch (const TableNameInUse&) { }
+    sg_r.close();
+    sg_w.commit();
+}
+
+
 TEST(LangBindHelper_NonsharedAccessToRealmWithHistory)
 {
     // Create a Realm file with a history (history_type !=

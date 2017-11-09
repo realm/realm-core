@@ -399,6 +399,7 @@ inline void SubtableColumnBase::adj_acc_swap_rows(size_t row_ndx_1, size_t row_n
 
 inline void SubtableColumnBase::adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
 {
+    std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
     const bool fix_ndx_in_parent = false;
     m_subtable_map.adj_move_row<fix_ndx_in_parent>(from_ndx, to_ndx);
 }
@@ -534,14 +535,8 @@ void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row
 template <bool fix_ndx_in_parent>
 void SubtableColumnBase::SubtableMap::adj_move_row(size_t from_ndx, size_t to_ndx) noexcept
 {
-    if (from_ndx < to_ndx) {
-        adj_insert_rows<fix_ndx_in_parent>(to_ndx, 1);
-        adj_erase_rows<fix_ndx_in_parent>(from_ndx, 1);
-    }
-    else {
-        adj_erase_rows<fix_ndx_in_parent>(from_ndx, 1);
-        adj_insert_rows<fix_ndx_in_parent>(to_ndx, 1);
-    }
+    adj_erase_rows<fix_ndx_in_parent>(from_ndx, 1);
+    adj_insert_rows<fix_ndx_in_parent>(to_ndx, 1);
 }
 
 inline void SubtableColumnBase::SubtableMap::adj_set_null(size_t row_ndx) noexcept
