@@ -9085,6 +9085,26 @@ TEST(Table_object_forward_iterator)
         CHECK_EQUAL(key_value << 1, o.get<int64_t>(0));
         CHECK_EQUAL(key_value << 2, o.get<util::Optional<int64_t>>(1));
     }
+
+    auto it = table.begin();
+    while (it != table.end()) {
+        int64_t val = it->get_key().value;
+        // Delete every 7th object
+        if ((val % 7) == 0) {
+            table.remove_object(it);
+        }
+        ++it;
+    }
+    CHECK_EQUAL(table.size(), nb_rows * 6 / 7);
+
+    auto it1 = table.begin();
+    Key key = it1->get_key();
+    ++it1;
+    int64_t val = it1->get<int64_t>(0);
+    table.remove_object(key);
+    CHECK_EQUAL(val, it1->get<int64_t>(0));
+    table.remove_object(it1);
+    CHECK_THROW_ANY(it1->get<int64_t>(0));
 }
 
 TEST(Table_object_sequential)
