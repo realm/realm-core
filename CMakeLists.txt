@@ -110,6 +110,12 @@ add_subdirectory(test)
 # Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm")
 
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(realmConfigVersion.cmake
+    VERSION ${REALM_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
 # Make the project importable from the build directory
 export(EXPORT realm NAMESPACE Realm:: FILE realmTargets.cmake)
 file(
@@ -119,7 +125,12 @@ file(
 
 # Make the project importable from the install directory
 install(EXPORT realm FILE realmTargets.cmake NAMESPACE Realm:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm)
-install(FILES tools/cmake/realmConfig.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm)
+install(
+    FILES
+        tools/cmake/realmConfig.cmake
+        "${RealmCore_BINARY_DIR}/realmConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
+)
 
 # CPack
 set(CPACK_GENERATOR "TGZ")
