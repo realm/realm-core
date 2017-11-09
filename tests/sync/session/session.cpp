@@ -27,6 +27,7 @@
 #include "schema.hpp"
 
 #include "util/event_loop.hpp"
+#include "util/templated_test_case.hpp"
 #include "util/time.hpp"
 
 #include <realm/util/scope_exit.hpp>
@@ -39,13 +40,14 @@
 using namespace realm;
 using namespace realm::util;
 
+static const std::string dummy_auth_url = "https://realm.example.org";
+
 TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
-    const std::string dummy_auth_url = "https://realm.example.org";
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
     const std::string realm_base_url = server.base_url();
 
@@ -189,7 +191,6 @@ TEST_CASE("sync: log-in", "[sync]") {
         return;
 
     SyncServer server;
-    const std::string dummy_auth_url = "https://realm.example.org";
     // Disable file-related functionality and metadata functionality for testing purposes.
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
     auto user = SyncManager::shared().get_user({ "user", dummy_auth_url }, "not_a_real_token");
@@ -228,7 +229,6 @@ TEST_CASE("sync: token refreshing", "[sync]") {
         return;
 
     SyncServer server;
-    const std::string dummy_auth_url = "https://realm.example.org";
     // Disable file-related functionality and metadata functionality for testing purposes.
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
     auto user = SyncManager::shared().get_user({ "user-token-refreshing", dummy_auth_url }, "not_a_real_token");
@@ -399,7 +399,14 @@ TEST_CASE("sync: error handling", "[sync]") {
     }
 }
 
-TEST_CASE("sync: stop policy behavior", "[sync]") {
+struct AdminTokenUser {
+    static auto user() { return SyncManager::shared().get_admin_token_user(dummy_auth_url, "not_a_real_token"); }
+};
+struct RegularUser {
+    static auto user() { return SyncManager::shared().get_user({"user-dying-state", dummy_auth_url}, "not_a_real_token"); }
+};
+
+TEMPLATE_TEST_CASE("sync: stop policy behavior", RegularUser, AdminTokenUser) {
     using ProtocolError = realm::sync::ProtocolError;
     const std::string dummy_auth_url = "https://realm.example.org";
     if (!EventLoop::has_implementation())
@@ -417,7 +424,7 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
 
     std::atomic<bool> error_handler_invoked(false);
     Realm::Config config;
-    auto user = SyncManager::shared().get_user({"user-dying-state", dummy_auth_url}, "not_a_real_token");
+    auto user = TestType::user();
 
     auto create_session = [&](SyncSessionStopPolicy stop_policy) {
         auto session = sync_session(server, user, "/test-dying-state",
