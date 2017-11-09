@@ -416,9 +416,10 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
     };
 
     std::atomic<bool> error_handler_invoked(false);
+    Realm::Config config;
+    auto user = SyncManager::shared().get_user({"user-dying-state", dummy_auth_url}, "not_a_real_token");
+
     auto create_session = [&](SyncSessionStopPolicy stop_policy) {
-        Realm::Config config;
-        auto user = SyncManager::shared().get_user({"user-dying-state", dummy_auth_url}, "not_a_real_token");
         auto session = sync_session(server, user, "/test-dying-state",
                                     [](const auto&, const auto&) { return s_test_token; },
                                     [&](auto, auto) { error_handler_invoked = true; },
@@ -459,6 +460,12 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
         SECTION("transitions to Inactive once the server is started") {
             server.start();
             EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
+        }
+
+        SECTION("transitions back to Active if the session is revived") {
+            auto session2 = SyncManager::shared().get_session(config.path, *config.sync_config);
+            REQUIRE(session->state() == SyncSession::PublicState::Active);
+            REQUIRE(session2 == session);
         }
 
         SECTION("transitions to Inactive if a fatal error occurs") {
