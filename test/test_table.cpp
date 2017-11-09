@@ -1210,36 +1210,38 @@ TEST(Table_6)
 #endif
 }
 */
-
+#endif
 
 TEST(Table_FindAllInt)
 {
-    TestTable01 table;
+    Table table;
 
-    add(table, 0, 10, true, Wed);
-    add(table, 0, 20, true, Wed);
-    add(table, 0, 10, true, Wed);
-    add(table, 0, 20, true, Wed);
-    add(table, 0, 10, true, Wed);
-    add(table, 0, 20, true, Wed);
-    add(table, 0, 10, true, Wed);
-    add(table, 0, 20, true, Wed);
-    add(table, 0, 10, true, Wed);
-    add(table, 0, 20, true, Wed);
+    auto col_int = table.add_column(type_Int, "integers");
+
+    table.create_object(Key(0)).set(col_int, 10);
+    table.create_object(Key(1)).set(col_int, 20);
+    table.create_object(Key(2)).set(col_int, 10);
+    table.create_object(Key(3)).set(col_int, 20);
+    table.create_object(Key(4)).set(col_int, 10);
+    table.create_object(Key(5)).set(col_int, 20);
+    table.create_object(Key(6)).set(col_int, 10);
+    table.create_object(Key(7)).set(col_int, 20);
+    table.create_object(Key(8)).set(col_int, 10);
+    table.create_object(Key(9)).set(col_int, 20);
 
     // Search for a value that does not exits
-    auto v0 = table.find_all_int(1, 5);
+    auto v0 = table.find_all_int(col_int, 5);
     CHECK_EQUAL(0, v0.size());
 
     // Search for a value with several matches
-    auto v = table.find_all_int(1, 20);
+    auto v = table.find_all_int(col_int, 20);
 
     CHECK_EQUAL(5, v.size());
-    CHECK_EQUAL(1, v.get_source_ndx(0));
-    CHECK_EQUAL(3, v.get_source_ndx(1));
-    CHECK_EQUAL(5, v.get_source_ndx(2));
-    CHECK_EQUAL(7, v.get_source_ndx(3));
-    CHECK_EQUAL(9, v.get_source_ndx(4));
+    CHECK_EQUAL(Key(1), v.get_key(0));
+    CHECK_EQUAL(Key(3), v.get_key(1));
+    CHECK_EQUAL(Key(5), v.get_key(2));
+    CHECK_EQUAL(Key(7), v.get_key(3));
+    CHECK_EQUAL(Key(9), v.get_key(4));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -1248,33 +1250,35 @@ TEST(Table_FindAllInt)
 
 TEST(Table_SortedInt)
 {
-    TestTable01 table;
+    Table table;
 
-    add(table, 0, 10, true, Wed); // 0: 4
-    add(table, 0, 20, true, Wed); // 1: 7
-    add(table, 0, 0, true, Wed);  // 2: 0
-    add(table, 0, 40, true, Wed); // 3: 8
-    add(table, 0, 15, true, Wed); // 4: 6
-    add(table, 0, 11, true, Wed); // 5: 5
-    add(table, 0, 6, true, Wed);  // 6: 3
-    add(table, 0, 4, true, Wed);  // 7: 2
-    add(table, 0, 99, true, Wed); // 8: 9
-    add(table, 0, 2, true, Wed);  // 9: 1
+    auto col_int = table.add_column(type_Int, "integers");
+
+    table.create_object(Key(0)).set(col_int, 10); // 0: 4
+    table.create_object(Key(1)).set(col_int, 20); // 1: 7
+    table.create_object(Key(2)).set(col_int, 0);  // 2: 0
+    table.create_object(Key(3)).set(col_int, 40); // 3: 8
+    table.create_object(Key(4)).set(col_int, 15); // 4: 6
+    table.create_object(Key(5)).set(col_int, 11); // 5: 5
+    table.create_object(Key(6)).set(col_int, 6);  // 6: 3
+    table.create_object(Key(7)).set(col_int, 4);  // 7: 2
+    table.create_object(Key(8)).set(col_int, 99); // 8: 9
+    table.create_object(Key(9)).set(col_int, 2);  // 9: 1
 
     // Search for a value that does not exits
-    auto v = table.get_sorted_view(1);
+    auto v = table.get_sorted_view(col_int);
     CHECK_EQUAL(table.size(), v.size());
 
-    CHECK_EQUAL(2, v.get_source_ndx(0));
-    CHECK_EQUAL(9, v.get_source_ndx(1));
-    CHECK_EQUAL(7, v.get_source_ndx(2));
-    CHECK_EQUAL(6, v.get_source_ndx(3));
-    CHECK_EQUAL(0, v.get_source_ndx(4));
-    CHECK_EQUAL(5, v.get_source_ndx(5));
-    CHECK_EQUAL(4, v.get_source_ndx(6));
-    CHECK_EQUAL(1, v.get_source_ndx(7));
-    CHECK_EQUAL(3, v.get_source_ndx(8));
-    CHECK_EQUAL(8, v.get_source_ndx(9));
+    CHECK_EQUAL(Key(2), v.get_key(0));
+    CHECK_EQUAL(Key(9), v.get_key(1));
+    CHECK_EQUAL(Key(7), v.get_key(2));
+    CHECK_EQUAL(Key(6), v.get_key(3));
+    CHECK_EQUAL(Key(0), v.get_key(4));
+    CHECK_EQUAL(Key(5), v.get_key(5));
+    CHECK_EQUAL(Key(4), v.get_key(6));
+    CHECK_EQUAL(Key(1), v.get_key(7));
+    CHECK_EQUAL(Key(3), v.get_key(8));
+    CHECK_EQUAL(Key(8), v.get_key(9));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -1284,33 +1288,32 @@ TEST(Table_SortedInt)
 
 TEST(Table_Sorted_Query_where)
 {
-    // Using where(tv) instead of tableview(tv)
-    TestTable01 table;
+    Table table;
 
-    add(table, 0, 10, true, Wed);  // 0: 4
-    add(table, 0, 20, false, Wed); // 1: 7
-    add(table, 0, 0, false, Wed);  // 2: 0
-    add(table, 0, 40, false, Wed); // 3: 8
-    add(table, 0, 15, false, Wed); // 4: 6
-    add(table, 0, 11, true, Wed);  // 5: 5
-    add(table, 0, 6, true, Wed);   // 6: 3
-    add(table, 0, 4, true, Wed);   // 7: 2
-    add(table, 0, 99, true, Wed);  // 8: 9
-    add(table, 0, 2, true, Wed);   // 9: 1
+    auto col_dummy = table.add_column(type_Int, "dummmy");
+    auto col_int = table.add_column(type_Int, "integers");
+    auto col_bool = table.add_column(type_Bool, "booleans");
 
-    // Count booleans
-    size_t count_original = table.where().equal(2, false).count();
-    CHECK_EQUAL(4, count_original);
+    table.create_object(Key(0)).set(col_int, 10).set(col_bool, true);  // 0: 4
+    table.create_object(Key(1)).set(col_int, 20).set(col_bool, false); // 1: 7
+    table.create_object(Key(2)).set(col_int, 0).set(col_bool, false);  // 2: 0
+    table.create_object(Key(3)).set(col_int, 40).set(col_bool, false); // 3: 8
+    table.create_object(Key(4)).set(col_int, 15).set(col_bool, false); // 4: 6
+    table.create_object(Key(5)).set(col_int, 11).set(col_bool, true);  // 5: 5
+    table.create_object(Key(6)).set(col_int, 6).set(col_bool, true);   // 6: 3
+    table.create_object(Key(7)).set(col_int, 4).set(col_bool, true);   // 7: 2
+    table.create_object(Key(8)).set(col_int, 99).set(col_bool, true);  // 8: 9
+    table.create_object(Key(9)).set(col_int, 2).set(col_bool, true);   // 9: 1
 
     // Get a view containing the complete table
-    auto v = table.find_all_int(0, 0);
+    auto v = table.find_all_int(col_dummy, 0);
     CHECK_EQUAL(table.size(), v.size());
 
     // Count booleans
-    size_t count_view = table.where(&v).equal(2, false).count();
+    size_t count_view = table.where(&v).equal(col_bool, false).count();
     CHECK_EQUAL(4, count_view);
 
-    auto v_sorted = table.get_sorted_view(1);
+    auto v_sorted = table.get_sorted_view(col_int);
     CHECK_EQUAL(table.size(), v_sorted.size());
 
 #ifdef REALM_DEBUG
@@ -1318,33 +1321,18 @@ TEST(Table_Sorted_Query_where)
 #endif
 }
 
+
 TEST(Table_Multi_Sort)
 {
     Table table;
     table.add_column(type_Int, "first");
     table.add_column(type_Int, "second");
 
-    table.add_empty_row(5);
-
-    // 1, 10
-    table.set_int(0, 0, 1);
-    table.set_int(1, 0, 10);
-
-    // 2, 10
-    table.set_int(0, 1, 2);
-    table.set_int(1, 1, 10);
-
-    // 0, 10
-    table.set_int(0, 2, 0);
-    table.set_int(1, 2, 10);
-
-    // 2, 14
-    table.set_int(0, 3, 2);
-    table.set_int(1, 3, 14);
-
-    // 1, 14
-    table.set_int(0, 4, 1);
-    table.set_int(1, 4, 14);
+    table.create_object(Key(0)).set_all(1, 10);
+    table.create_object(Key(1)).set_all(2, 10);
+    table.create_object(Key(2)).set_all(0, 10);
+    table.create_object(Key(3)).set_all(2, 14);
+    table.create_object(Key(4)).set_all(1, 14);
 
     std::vector<std::vector<size_t>> col_ndx1 = {{0}, {1}};
     std::vector<bool> asc = {true, true};
@@ -1352,24 +1340,26 @@ TEST(Table_Multi_Sort)
     // (0, 10); (1, 10); (1, 14); (2, 10); (2; 14)
     TableView v_sorted1 = table.get_sorted_view(SortDescriptor{table, col_ndx1, asc});
     CHECK_EQUAL(table.size(), v_sorted1.size());
-    CHECK_EQUAL(2, v_sorted1.get_source_ndx(0));
-    CHECK_EQUAL(0, v_sorted1.get_source_ndx(1));
-    CHECK_EQUAL(4, v_sorted1.get_source_ndx(2));
-    CHECK_EQUAL(1, v_sorted1.get_source_ndx(3));
-    CHECK_EQUAL(3, v_sorted1.get_source_ndx(4));
+    CHECK_EQUAL(Key(2), v_sorted1.get_key(0));
+    CHECK_EQUAL(Key(0), v_sorted1.get_key(1));
+    CHECK_EQUAL(Key(4), v_sorted1.get_key(2));
+    CHECK_EQUAL(Key(1), v_sorted1.get_key(3));
+    CHECK_EQUAL(Key(3), v_sorted1.get_key(4));
 
     std::vector<std::vector<size_t>> col_ndx2 = {{1}, {0}};
 
     // (0, 10); (1, 10); (2, 10); (1, 14); (2, 14)
     TableView v_sorted2 = table.get_sorted_view(SortDescriptor{table, col_ndx2, asc});
     CHECK_EQUAL(table.size(), v_sorted2.size());
-    CHECK_EQUAL(2, v_sorted2.get_source_ndx(0));
-    CHECK_EQUAL(0, v_sorted2.get_source_ndx(1));
-    CHECK_EQUAL(1, v_sorted2.get_source_ndx(2));
-    CHECK_EQUAL(4, v_sorted2.get_source_ndx(3));
-    CHECK_EQUAL(3, v_sorted2.get_source_ndx(4));
+    CHECK_EQUAL(Key(2), v_sorted2.get_key(0));
+    CHECK_EQUAL(Key(0), v_sorted2.get_key(1));
+    CHECK_EQUAL(Key(1), v_sorted2.get_key(2));
+    CHECK_EQUAL(Key(4), v_sorted2.get_key(3));
+    CHECK_EQUAL(Key(3), v_sorted2.get_key(4));
 }
 
+
+#ifdef LEGACY_TESTS
 
 TEST(Table_IndexString)
 {

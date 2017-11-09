@@ -21,8 +21,7 @@
 
 #include <realm/column.hpp>
 #include <realm/handover_defs.hpp>
-
-#include <vector>
+#include <realm/sort_descriptor.hpp>
 
 namespace realm {
 
@@ -30,102 +29,6 @@ const int64_t detached_ref = -1;
 
 class RowIndexes;
 
-// Forward declaration needed for deleted CommonDescriptor constructor
-class SortDescriptor;
-
-// CommonDescriptor encapsulates a reference to a set of columns (possibly over
-// links), which is used to indicate the criteria columns for sort and distinct.
-// Although the input is column indices, it does not rely on those indices
-// remaining stable as long as the columns continue to exist.
-class CommonDescriptor {
-public:
-    CommonDescriptor() = default;
-    // Enforce type saftey to prevent automatic conversion of derived class
-    // SortDescriptor into CommonDescriptor at compile time.
-    CommonDescriptor(const SortDescriptor&) = delete;
-    virtual ~CommonDescriptor() = default;
-
-    // Create a descriptor for the given columns on the given table.
-    // Each vector in `column_indices` represents a chain of columns, where
-    // all but the last are Link columns (n.b.: LinkList and Backlink are not
-    // supported), and the final is any column type that can be sorted on.
-    // `column_indices` must be non-empty, and each vector within it must also
-    // be non-empty.
-    CommonDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices);
-    virtual std::unique_ptr<CommonDescriptor> clone() const;
-
-    // returns whether this descriptor is valid and can be used to sort
-    bool is_valid() const noexcept
-    {
-        return !m_columns.empty();
-    }
-
-    class Sorter;
-    virtual Sorter sorter(IntegerColumn const& row_indexes) const;
-
-    // handover support
-    std::vector<std::vector<size_t>> export_column_indices() const;
-    virtual std::vector<bool> export_order() const
-    {
-        return {};
-    }
-
-protected:
-    std::vector<std::vector<const ColumnBase*>> m_columns;
-};
-
-class SortDescriptor : public CommonDescriptor {
-public:
-    // Create a sort descriptor for the given columns on the given table.
-    // See CommonDescriptor for restrictions on `column_indices`.
-    // The sort order can be specified by using `ascending` which must either be
-    // empty or have one entry for each column index chain.
-    SortDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices,
-                   std::vector<bool> ascending = {});
-    SortDescriptor() = default;
-    ~SortDescriptor() = default;
-    std::unique_ptr<CommonDescriptor> clone() const override;
-
-    void merge_with(SortDescriptor&& other);
-
-    Sorter sorter(IntegerColumn const& row_indexes) const override;
-
-    // handover support
-    std::vector<bool> export_order() const override;
-
-private:
-    std::vector<bool> m_ascending;
-};
-
-// Distinct uses the same syntax as sort except that the order is meaningless.
-typedef CommonDescriptor DistinctDescriptor;
-
-class DescriptorOrdering {
-public:
-    DescriptorOrdering() = default;
-    DescriptorOrdering(const DescriptorOrdering&);
-    DescriptorOrdering(DescriptorOrdering&&) = default;
-    DescriptorOrdering& operator=(const DescriptorOrdering&);
-    DescriptorOrdering& operator=(DescriptorOrdering&&) = default;
-
-    void append_sort(SortDescriptor sort);
-    void append_distinct(DistinctDescriptor distinct);
-    bool descriptor_is_sort(size_t index) const;
-    bool descriptor_is_distinct(size_t index) const;
-    bool is_empty() const { return m_descriptors.empty(); }
-    size_t size() const { return m_descriptors.size(); }
-    const CommonDescriptor* operator[](size_t ndx) const;
-    bool will_apply_sort() const;
-    bool will_apply_distinct() const;
-
-    // handover support
-    using HandoverPatch = std::unique_ptr<DescriptorOrderingHandoverPatch>;
-    static void generate_patch(DescriptorOrdering const&, HandoverPatch&);
-    static DescriptorOrdering create_from_and_consume_patch(HandoverPatch&, Table const&);
-
-private:
-    std::vector<std::unique_ptr<CommonDescriptor>> m_descriptors;
-};
 
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
 // supports sorting and distinct.

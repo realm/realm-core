@@ -47,6 +47,7 @@ set(REALM_SOURCES
     table.cpp
     obj_list.cpp
     table_view.cpp
+    sort_descriptor.cpp
     unicode.cpp
     util/basic_system_errors.cpp
     util/encrypted_file_mapping.cpp
@@ -131,6 +132,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     string_data.hpp
     table.hpp
     table_ref.hpp
+    sort_descriptor.hpp
     obj_list.hpp
     table_view.hpp
     timestamp.hpp
