@@ -53,7 +53,7 @@ macro(set_target_xcode_attributes _target)
     )
 endmacro()
 
-macro(get_package_file_name _PACKAGE_NAME)
+macro(get_package_file_name _PACKAGE_NAME _PACKAGE_VERSION)
     if(NOT DEFINED CMAKE_BUILD_TYPE)
         message(WARNING "In order to generate the proper package name CMAKE_BUILD_TYPE must be set also on multi-configuration generators")
     endif()
@@ -75,11 +75,12 @@ macro(get_package_file_name _PACKAGE_NAME)
             set(REALM_OS watchos)
         elseif(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS MATCHES "tvos")
             set(REALM_OS tvos)
+        else()
+            set(REALM_OS Darwin)
         endif()
     endif()
 
-    string(TOLOWER
-        "${_PACKAGE_NAME}-${REALM_VERSION}-${REALM_OS}-${CMAKE_BUILD_TYPE}"
-        "${_PACKAGE_NAME}_FILE_NAME"
+    set("${_PACKAGE_NAME}_FILE_NAME"
+        "${_PACKAGE_NAME}-${CMAKE_BUILD_TYPE}-${_PACKAGE_VERSION}-${REALM_OS}"
     )
 endmacro()

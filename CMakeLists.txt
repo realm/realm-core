@@ -133,9 +133,9 @@ install(
 )
 
 # CPack
-set(CPACK_GENERATOR "TGZ")
-set(CPACK_PACKAGE_NAME "realm-core-${CMAKE_BUILD_TYPE}")
-set(CPACK_PACKAGE_VERSION ${REALM_VERSION})
+get_package_file_name(realm-core ${REALM_VERSION})
+set(CPACK_GENERATOR TGZ)
+set(CPACK_PACKAGE_FILE_NAME ${realm-core_FILE_NAME})
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 include(CPack)
 
