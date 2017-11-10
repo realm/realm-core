@@ -13454,12 +13454,125 @@ TEST(LangBindHelper_SubtableAccessorUpdatesOnMoveRow)
     LangBindHelper::rollback_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
     g.verify();
-    try { g.add_table("ebnriinsbpnfodqfjpojbrpfe"); } catch (const TableNameInUse&) { }
-    try { g.add_table("lsidfcmgqrsebrlirsrroe"); } catch (const TableNameInUse&) { }
+    try { g.add_table("anything"); } catch (const TableNameInUse&) { }
+    try { g.add_table("another"); } catch (const TableNameInUse&) { }
     g.get_table(0)->get_subdescriptor(0)->add_search_index(0);
-    try { g.add_table("jlfppsctimaroipinkgccfcmhbpmlbklsrqkatpgmsp"); } catch (const TableNameInUse&) { }
+    try { g.add_table("third"); } catch (const TableNameInUse&) { }
     sg_r.close();
     sg_w.commit();
+}
+
+
+TEST(LangBindHelper_MoveSubtableAccessors)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = nullptr;
+    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(key));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+    std::vector<TableView> table_views;
+    std::vector<TableRef> subtable_refs;
+
+    {
+        TableRef table = g.add_table("table");
+        DescriptorRef subdescr;
+        table->insert_column(0, type_Table, "subtable", true, &subdescr);
+        size_t id_col = table->add_column(type_Int, "id");
+        subdescr->add_column(type_Int, "integers", nullptr, false);
+        table->add_empty_row(3);
+        table->set_int(id_col, 0, 0);
+        table->set_int(id_col, 1, 1);
+        table->set_int(id_col, 2, 2);
+        TableRef sub0 = table->get_subtable(0, 0);
+        sub0->add_empty_row();
+        sub0->set_int(0, 0, 0);
+        TableRef sub1 = table->get_subtable(0, 1);
+        sub1->add_empty_row();
+        sub1->set_int(0, 0, 1);
+        TableRef sub2 = table->get_subtable(0, 2);
+        sub2->add_empty_row();
+        sub2->set_int(0, 0, 2);
+
+        // add two sets of observing accessors in order
+        subtable_refs.push_back(sub0);
+        subtable_refs.push_back(sub1);
+        subtable_refs.push_back(sub2);
+
+        subtable_refs.push_back(sub0);
+        subtable_refs.push_back(sub1);
+        subtable_refs.push_back(sub2);
+    }
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+    LangBindHelper::promote_to_write(sg_w);
+
+    auto verify_group = [&](const Group& group) {
+        group.verify();
+        ConstTableRef table = group.get_table("table");
+        CHECK_EQUAL(table->get_int(1, 0), 0);
+        ConstTableRef sub0 = table->get_subtable(0, 0);
+        CHECK_EQUAL(sub0->get_int(0, 0), 0);
+        CHECK_EQUAL(table->get_int(1, 1), 1);
+        ConstTableRef sub1 = table->get_subtable(0, 1);
+        CHECK_EQUAL(sub1->get_int(0, 0), 1);
+        CHECK_EQUAL(table->get_int(1, 2), 2);
+        ConstTableRef sub2 = table->get_subtable(0, 2);
+        CHECK_EQUAL(sub2->get_int(0, 0), 2);
+        for (size_t i = 0; i < subtable_refs.size(); ++i) {
+            CHECK_EQUAL(subtable_refs[i]->get_int(0, 0), i % 3);
+        }
+    };
+
+    verify_group(g);
+    verify_group(g_r);
+    {
+        TableRef table = g.get_table("table");
+        table->move_row(0, 0);
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+        LangBindHelper::promote_to_write(sg_w);
+        verify_group(g);
+    }
+    {
+        TableRef table = g.get_table("table");
+        table->move_row(0, 1);
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+        LangBindHelper::promote_to_write(sg_w);
+        verify_group(g);
+    }
+    {
+        TableRef table = g.get_table("table");
+        table->move_row(1, 0);
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+        LangBindHelper::promote_to_write(sg_w);
+        verify_group(g);
+    }
+    {
+        TableRef table = g.get_table("table");
+        table->move_row(0, 2);
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+        LangBindHelper::promote_to_write(sg_w);
+        verify_group(g);
+    }
+    {
+        TableRef table = g.get_table("table");
+        table->move_row(2, 0);
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+        LangBindHelper::promote_to_write(sg_w);
+        verify_group(g);
+    }
+    {
+        TableRef table = g.get_table("table");
+        table->move_row(1, 1);
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+        LangBindHelper::promote_to_write(sg_w);
+        verify_group(g);
+    }
+    LangBindHelper::advance_read(sg_r);
+    verify_group(g_r);
 }
 
 

@@ -56,6 +56,12 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 void SubtableColumnBase::verify() const
 {
 #ifdef REALM_DEBUG
+    const SubtableColumn* converted = dynamic_cast<const SubtableColumn*>(this);
+    if (converted) {
+        std::lock_guard<std::recursive_mutex> lg(m_subtable_map_lock);
+        m_subtable_map.verify(*converted);
+    }
+
     if (root_is_leaf()) {
         IntegerColumn::verify();
         REALM_ASSERT(get_root_array()->has_refs());
@@ -269,6 +275,19 @@ void SubtableColumnBase::SubtableMap::refresh_accessor_tree()
         }
     }
 }
+
+void SubtableColumnBase::SubtableMap::verify(const SubtableColumn& parent)
+{
+#ifdef REALM_DEBUG
+    for (auto& entry : m_entries) {
+        ConstTableRef t = parent.get_subtable_tableref(entry.m_subtable_ndx);
+        REALM_ASSERT(_impl::TableFriend::compare_rows(*t, *entry.m_table));
+    }
+#else
+    static_cast<void>(parent);
+#endif
+}
+
 
 
 // LCOV_EXCL_START ignore debug functions

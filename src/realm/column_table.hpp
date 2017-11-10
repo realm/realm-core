@@ -114,6 +114,7 @@ protected:
                               _impl::TableFriend::AccessorUpdater&);
         void recursive_mark() noexcept;
         void refresh_accessor_tree();
+        void verify(const SubtableColumn& parent);
 
     private:
         struct SubtableEntry {
@@ -535,8 +536,33 @@ void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row
 template <bool fix_ndx_in_parent>
 void SubtableColumnBase::SubtableMap::adj_move_row(size_t from_ndx, size_t to_ndx) noexcept
 {
-    adj_erase_rows<fix_ndx_in_parent>(from_ndx, 1);
-    adj_insert_rows<fix_ndx_in_parent>(to_ndx, 1);
+    using tf = _impl::TableFriend;
+    for (auto& entry : m_entries) {
+        if (entry.m_subtable_ndx == from_ndx) {
+            entry.m_subtable_ndx = to_ndx;
+            if (fix_ndx_in_parent)
+                tf::set_ndx_in_parent(*(entry.m_table), entry.m_subtable_ndx);
+        }
+        else {
+            if (from_ndx < to_ndx) {
+                // shift the range (from, to] down one
+                if (entry.m_subtable_ndx <= to_ndx && entry.m_subtable_ndx > from_ndx) {
+                    entry.m_subtable_ndx--;
+                    if (fix_ndx_in_parent) {
+                        tf::set_ndx_in_parent(*(entry.m_table), entry.m_subtable_ndx);
+                    }
+                }
+            } else if (from_ndx > to_ndx) {
+                // shift the range (from, to] up one
+                if (entry.m_subtable_ndx >= to_ndx && entry.m_subtable_ndx < from_ndx) {
+                    entry.m_subtable_ndx++;
+                    if (fix_ndx_in_parent) {
+                        tf::set_ndx_in_parent(*(entry.m_table), entry.m_subtable_ndx);
+                    }
+                }
+            }
+        }
+    }
 }
 
 inline void SubtableColumnBase::SubtableMap::adj_set_null(size_t row_ndx) noexcept
