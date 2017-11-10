@@ -3268,6 +3268,15 @@ template <>
 void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
+
+    // FIXME: In our unit tests, OldDateTime is often passed as integer literal (such as `942`) which is caught by this
+    // method. Because we are currently rewriting the unit test suite for stable keys (nov. 2017) we don't want to
+    // update the test suite at those numerous places in this PR because it will create conflicts. Instead, remove all
+    // OldDateTime legacy test code after stable keys are merged, and remove the col_type_OldDateTime part of the 
+    // assert below.
+    REALM_ASSERT_EX(get_real_column_type(col_ndx) == col_type_Int || 
+                    get_real_column_type(col_ndx) == col_type_OldDateTime, get_real_column_type(col_ndx));
+
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
