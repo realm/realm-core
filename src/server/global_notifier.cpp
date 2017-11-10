@@ -152,9 +152,9 @@ realm::Realm::Config GlobalNotifier::get_config(std::string const& path, util::O
     }
 
     config.path = std::move(file_path);
-    config.sync_config.reset(new SyncConfig{m_user, m_server_base_url + path.data(),
-                                            SyncSessionStopPolicy::AfterChangesUploaded,
-                                            m_bind_callback, nullptr, m_transformer});
+    config.sync_config = std::make_unique<SyncConfig>(m_user, m_server_base_url + path.data());
+    config.sync_config->bind_session_handler = m_bind_callback;
+    config.sync_config->transformer = m_transformer;
     config.schema_mode = SchemaMode::Additive;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -165,10 +165,6 @@ void GlobalNotifier::register_realm(const std::string& path) {
     auto config = get_config(path);
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config);
     m_listen_entries[path] = coordinator;
-
-    auto realm = coordinator->get_realm(std::move(config));
-    if (realm->read_group().is_empty())
-        realm = nullptr;
 
     auto unowned_coordinator = coordinator.get();
 
