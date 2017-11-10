@@ -81,8 +81,6 @@ else
         tvos) SDK="appletv";;
     esac
 
-    [[ "${BUILD_TYPE}" = "Release" ]] && suffix="" || suffix="-dbg"
-
     cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${OS}.toolchain.cmake" \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D REALM_VERSION="${VERSION}" \
@@ -96,10 +94,17 @@ else
                -configuration "${BUILD_TYPE}" \
                -target Core \
                ONLY_ACTIVE_ARCH=NO
+
+    if [ "${BUILD_TYPE}" = "Release" ]; then
+      suffix=""
+    else
+      suffix="-dbg"
+    fi
+
     mkdir -p "src/realm/${BUILD_TYPE}"
     lipo -create \
          -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a"
-    cpack
+    cpack -C "${BUILD_TYPE}"
 fi
