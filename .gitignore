@@ -24,3 +24,6 @@ MinSizeRel/
 
 # Visual Studio
 /.vs
+
+# Linters
+compile_commands.json
