@@ -19,7 +19,7 @@ cd /tmp/build
 rm -rf build-dir
 mkdir build-dir
 cd build-dir
-cmake3 -D CMAKE_INSTALL_PREFIX=/prod \
+cmake -D CMAKE_INSTALL_PREFIX=/prod \
        -D CMAKE_BUILD_TYPE=Release \
        -D CMAKE_MAKE_PROGRAM=ninja-build \
        -G Ninja ..
@@ -69,7 +69,7 @@ fpm \
 )
 
 rm -rf -- * /prod/*
-cmake3 -D CMAKE_INSTALL_PREFIX=/prod \
+cmake -D CMAKE_INSTALL_PREFIX=/prod \
        -D CMAKE_BUILD_TYPE=Debug \
        -D CMAKE_MAKE_PROGRAM=ninja-build \
        -G Ninja ..
