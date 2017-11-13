@@ -166,8 +166,7 @@ TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_or_add_table("table");
-        DescriptorRef desc = table->get_descriptor();
-        desc->add_column(type_Int, "row");
+        table->add_column(type_Int, "row");
         table->insert_empty_row(0, 1);
         table->set_int(0, 0, 0);
         wt.commit();
@@ -336,8 +335,7 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_or_add_table("table");
-        DescriptorRef desc = table->get_descriptor();
-        desc->add_column(type_Int, "row");
+        table->add_column(type_Int, "row");
         wt.commit();
     }
 
@@ -419,8 +417,7 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_or_add_table("table");
-        DescriptorRef desc = table->get_descriptor();
-        desc->add_column(type_Int, "row");
+        table->add_column(type_Int, "row");
         table->insert_empty_row(0, 1);
         table->set_int(0, 0, 0);
         wt.commit();

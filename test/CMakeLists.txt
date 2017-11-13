@@ -25,10 +25,8 @@ set(NORMAL_TESTS
     test_column.cpp
     test_column_binary.cpp
     test_column_float.cpp
-    test_column_mixed.cpp
     test_column_string.cpp
     test_column_timestamp.cpp
-    test_descriptor.cpp
     test_destroy_guard.cpp
     test_destructor_thread_safety.cpp
     test_file.cpp

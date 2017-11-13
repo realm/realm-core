@@ -202,6 +202,7 @@ private:
     std::unique_ptr<Array> m_arr;
 };
 
+#ifdef LEGACY_TESTS
 void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& rt_2)
 {
     ReadTransaction rt_1(sg_1);
@@ -209,10 +210,10 @@ void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& 
     rt_2.get_group().verify();
     CHECK(rt_1.get_group() == rt_2.get_group());
 }
-
+#endif
 } // anonymous namespace
 
-#ifdef TEST_REPLICATION_OLD
+#ifdef LEGACY_TESTS
 
 namespace {
 
@@ -3308,7 +3309,7 @@ TEST(Replication_CascadeRemove_ColumnLink)
     CHECK_EQUAL(target->size(), 0);
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Replication_LinkListSelfLinkNullification)
 {
     SHARED_GROUP_TEST_PATH(path_1);
@@ -3446,7 +3447,7 @@ TEST(Replication_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     CHECK(!target_row_0 && !target_row_1);
     CHECK_EQUAL(target->size(), 0);
 }
-
+#endif
 
 TEST(Replication_NullStrings)
 {
@@ -3497,7 +3498,7 @@ TEST(Replication_NullStrings)
     }
 }
 
-#ifdef TEST_REPLICATION_OLD
+#ifdef LEGACY_TESTS
 TEST(Replication_NullInteger)
 {
     SHARED_GROUP_TEST_PATH(path_1);
@@ -3638,7 +3639,7 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
         wt.get_group().rename_table("foo", "bar");
         auto bar = wt.get_table("bar");
         bar->rename_column(0, "b");
-        _impl::TableFriend::move_column(*bar->get_descriptor(), 1, 0);
+        _impl::TableFriend::move_column(*bar, 1, 0);
         wt.get_group().move_table(1, 0);
         wt.commit();
     }
@@ -3735,7 +3736,6 @@ TEST(Replication_LinkListNullifyThroughTableView)
         CHECK_EQUAL(rt1.get_table(0)->get_linklist(0, 0)->size(), 0);
     }
 }
-#endif
 
 TEST(Replication_Substrings)
 {
@@ -3826,71 +3826,7 @@ TEST(Replication_MoveSelectedLinkView)
     // FIXME: Redo the test with all other table-level operations that move the
     // link list to a new row or column index.
 }
-
-TEST(Replication_SubtableSearchIndex)
-{
-    // 1st: Create table with two rows
-    // 2nd: Select link list via 2nd row
-    // 3rd: Delete first row by move last over (which moves the row of the selected link list)
-    // 4th: Modify the selected link list.
-    // 5th: Replay changeset on different Realm
-
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-
-    util::Logger& replay_logger = test_context.logger;
-
-    MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
-    SharedGroup sg_2(path_2);
-
-    {
-        WriteTransaction wt(sg_1);
-        DescriptorRef subdesc;
-        TableRef table = wt.add_table("first");
-        table->add_column(type_Table, "sub", &subdesc);
-        subdesc->add_column(type_String, "strings");
-        wt.commit();
-    }
-
-    repl.replay_transacts(sg_2, replay_logger);
-    {
-        ReadTransaction rt(sg_2);
-        ConstTableRef table = rt.get_table("first");
-        ConstDescriptorRef sub = table->get_subdescriptor(0);
-        CHECK(!sub->has_search_index(0));
-    }
-
-    {
-        WriteTransaction wt(sg_1);
-        TableRef table = wt.get_table("first");
-        DescriptorRef sub = table->get_subdescriptor(0);
-        sub->add_search_index(0);
-        wt.commit();
-    }
-    repl.replay_transacts(sg_2, replay_logger);
-    {
-        ReadTransaction rt(sg_2);
-        ConstTableRef table = rt.get_table("first");
-        ConstDescriptorRef sub = table->get_subdescriptor(0);
-        CHECK(sub->has_search_index(0));
-    }
-
-    {
-        WriteTransaction wt(sg_1);
-        TableRef table = wt.get_table("first");
-        DescriptorRef sub = table->get_subdescriptor(0);
-        sub->remove_search_index(0);
-        wt.commit();
-    }
-    repl.replay_transacts(sg_2, replay_logger);
-    {
-        ReadTransaction rt(sg_2);
-        ConstTableRef table = rt.get_table("first");
-        ConstDescriptorRef sub = table->get_subdescriptor(0);
-        CHECK(!sub->has_search_index(0));
-    }
-}
+#endif
 
 TEST(Replication_HistorySchemaVersionNormal)
 {

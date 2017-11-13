@@ -464,7 +464,7 @@ TEST(Links_MultiToSame)
     CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link2));
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Links_LinkList_TableOps)
 {
     Group group;
@@ -1982,4 +1982,5 @@ TEST(Links_DetachedAccessor)
     CHECK_LOGIC_ERROR(link_list->swap(0, 1), LogicError::detached_accessor);
 }
 
+#endif
 #endif // TEST_LINKS

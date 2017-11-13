@@ -28,8 +28,6 @@
 #endif
 
 #include <realm/column.hpp>
-#include <realm/column_table.hpp>
-#include <realm/column_mixed.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/table.hpp>
@@ -186,12 +184,6 @@ void col_type_deleg(Op& op, ColumnType type, bool nullable)
         case col_type_Binary:
             op.template call<BinaryColumn>();
             return;
-        case col_type_Table:
-            op.template call<SubtableColumn>();
-            return;
-        case col_type_Mixed:
-            op.template call<MixedColumn>();
-            return;
         case col_type_Float:
             op.template call<FloatColumn>();
             return;
@@ -204,6 +196,8 @@ void col_type_deleg(Op& op, ColumnType type, bool nullable)
         case col_type_BackLink:
             op.template call<BacklinkColumn>();
             return;
+        case col_type_OldTable:
+        case col_type_OldMixed:
         case col_type_Reserved4:
             break;
     }

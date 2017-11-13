@@ -51,14 +51,6 @@ public:
     /// transaction.
     void erase_column(size_t column_ndx);
 
-    //@{
-    // If a new Spec is constructed from the returned subspec
-    // reference, it is the responsibility of the application that the
-    // parent Spec object (this) is kept alive for at least as long as
-    // the new Spec object.
-    Spec* get_subtable_spec(size_t column_ndx) noexcept;
-    //@}
-
     // Column info
     size_t get_column_count() const noexcept;
     size_t get_public_column_count() const noexcept;
@@ -74,8 +66,6 @@ public:
 
     size_t get_subspec_ndx(size_t column_ndx) const noexcept;
     ref_type get_subspec_ref(size_t subspec_ndx) const noexcept;
-    Spec* get_subspec_by_ndx(size_t subspec_ndx) noexcept;
-    const Spec* get_subspec_by_ndx(size_t subspec_ndx) const noexcept;
 
     // Auto Enumerated string columns
     void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref, ArrayParent*& keys_parent, size_t& keys_ndx);
@@ -135,16 +125,6 @@ private:
     ArrayInteger m_attr;  // 3rd slot in m_top
     Array m_subspecs;     // 4th slot in m_top (optional)
     Array m_enumkeys;     // 5th slot in m_top (optional)
-    struct SubspecPtr {
-        SubspecPtr(bool is_spec_ptr = false)
-            : m_is_spec_ptr(is_spec_ptr)
-        {
-        }
-        std::unique_ptr<Spec> m_spec;
-        bool m_is_spec_ptr;
-    };
-    using SubspecPtrs = std::vector<SubspecPtr>;
-    SubspecPtrs m_subspec_ptrs;
     bool m_has_strong_link_columns;
 
     Spec(Allocator&) noexcept; // Unattached
@@ -152,8 +132,6 @@ private:
     bool init(ref_type) noexcept;
     void init(MemRef) noexcept;
     void update_has_strong_link_columns() noexcept;
-    void reset_subspec_ptrs();
-    void adj_subspec_ptrs();
 
     // Returns true in case the ref has changed.
     bool init_from_parent() noexcept;
@@ -226,19 +204,6 @@ inline Spec::Spec(Allocator& alloc) noexcept
     , m_subspecs(alloc)
     , m_enumkeys(alloc)
 {
-}
-
-inline Spec* Spec::get_subtable_spec(size_t column_ndx) noexcept
-{
-    REALM_ASSERT(column_ndx < get_column_count());
-    REALM_ASSERT(get_column_type(column_ndx) == col_type_Table);
-    size_t subspec_ndx = get_subspec_ndx(column_ndx);
-    return get_subspec_by_ndx(subspec_ndx);
-}
-
-inline const Spec* Spec::get_subspec_by_ndx(size_t subspec_ndx) const noexcept
-{
-    return const_cast<Spec*>(this)->get_subspec_by_ndx(subspec_ndx);
 }
 
 inline bool Spec::init_from_parent() noexcept

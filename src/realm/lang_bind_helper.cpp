@@ -16,7 +16,6 @@
  *
  **************************************************************************/
 
-#include <realm/column_table.hpp>
 #include <realm/lang_bind_helper.hpp>
 
 using namespace realm;
@@ -41,14 +40,12 @@ const char* LangBindHelper::get_data_type_name(DataType type) noexcept
             return "date"; // Deprecated
         case type_Timestamp:
             return "timestamp";
-        case type_Table:
-            return "table";
-        case type_Mixed:
-            return "mixed";
         case type_Link:
             return "link";
         case type_LinkList:
             return "linklist";
+        default:
+            break;
     }
 
     return "unknown";
