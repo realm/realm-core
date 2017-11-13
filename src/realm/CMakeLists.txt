@@ -185,6 +185,7 @@ set_target_properties(Core
     PROPERTIES
         OUTPUT_NAME realm
         POSITION_INDEPENDENT_CODE ON
+        $<$<BOOL:${ANDROID}>:"CXX_VISIBILITY_PRESET hidden"> # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
 )
 
 if(COMMAND set_target_xcode_attributes)
@@ -197,6 +198,8 @@ target_include_directories(Core
         $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
+
+target_compile_features(Core PUBLIC cxx_std_14)
 
 # -------
 # OpenSSL

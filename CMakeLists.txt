@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.10)
 
 project(RealmCore)
 
@@ -16,16 +16,6 @@ include(GetVersion)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
-
-# Project-wide build flags
-# TODO: Replace these with compiler features when we move to Cmake >= 3.7
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-if(ANDROID)
-    # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
-    set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-endif()
 
 # Set global compilation options (no definitions)
 if(MSVC AND NOT WINDOWS_STORE)

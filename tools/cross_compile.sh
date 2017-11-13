@@ -63,9 +63,15 @@ if [ "${OS}" == "android" ] && [ -z "${ARCH}" ]; then
 fi
 
 if [ "${OS}" == "android" ]; then
+    if [[ ${ARCH} == *"64"* ]]; then
+        ANDROID_VERSION=21
+    else
+        ANDROID_VERSION=9
+    fi
     mkdir -p "build-android-${ARCH}-${BUILD_TYPE}"
     cd "build-android-${ARCH}-${BUILD_TYPE}" || exit 1
-    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/android.toolchain.cmake \
+    cmake -D CMAKE_SYSTEM_NAME=Android \
+          -D CMAKE_SYSTEM_VERSION=${ANDROID_VERSION}
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D ANDROID_ABI="${ARCH}" \
           -D REALM_VERSION="${VERSION}" \
