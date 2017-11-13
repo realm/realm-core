@@ -213,7 +213,7 @@ if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE)
     if(ANDROID)
         string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
         set(OPENSSL_FILENAME "openssl-${BUILD_TYPE}-${ANDROID_OPENSSL_VERSION}-${ANDROID_OPENSSL_BUILD_NUMBER}-Android-${CMAKE_ANDROID_ARCH_ABI}")
-        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${ANDROID_ABI}/${OPENSSL_FILENAME}.tar.gz")
+        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/${OPENSSL_FILENAME}.tar.gz")
 
         message(STATUS "Downloading OpenSSL...")
         file(DOWNLOAD "${OPENSSL_URL}" "${RealmCore_BINARY_DIR}/${OPENSSL_FILENAME}.tar.gz")
