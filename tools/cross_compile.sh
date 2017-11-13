@@ -73,7 +73,7 @@ if [ "${OS}" == "android" ]; then
     cmake -D CMAKE_SYSTEM_NAME=Android \
           -D CMAKE_SYSTEM_VERSION=${ANDROID_VERSION} \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D ANDROID_ABI="${ARCH}" \
+          -D CMAKE_ANDROID_ARCH_ABI="${ARCH}" \
           -D REALM_VERSION="${VERSION}" \
           ..
 
