@@ -10,6 +10,7 @@ RUN yum -y install \
         ninja-build \
         openssl-devel \
         procps-devel \
+        wget \
         which \
     && yum clean all
 
