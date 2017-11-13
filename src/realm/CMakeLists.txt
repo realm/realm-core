@@ -185,8 +185,12 @@ set_target_properties(Core
     PROPERTIES
         OUTPUT_NAME realm
         POSITION_INDEPENDENT_CODE ON
-        $<$<BOOL:${ANDROID}>:"CXX_VISIBILITY_PRESET hidden"> # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
 )
+
+if(ANDROID)
+    # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
+    set_target_properties(CORE PROPERTIES CXX_VISIBILITY_PRESET hidden)
+endif()
 
 if(COMMAND set_target_xcode_attributes)
     set_target_xcode_attributes(Core)
