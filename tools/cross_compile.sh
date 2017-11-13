@@ -71,7 +71,7 @@ if [ "${OS}" == "android" ]; then
     mkdir -p "build-android-${ARCH}-${BUILD_TYPE}"
     cd "build-android-${ARCH}-${BUILD_TYPE}" || exit 1
     cmake -D CMAKE_SYSTEM_NAME=Android \
-          -D CMAKE_SYSTEM_VERSION=${ANDROID_VERSION}
+          -D CMAKE_SYSTEM_VERSION=${ANDROID_VERSION} \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D ANDROID_ABI="${ARCH}" \
           -D REALM_VERSION="${VERSION}" \
