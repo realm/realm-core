@@ -105,7 +105,6 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/link_view.hpp>
 #include <realm/metrics/query_info.hpp>
 #include <realm/query_conditions.hpp>
-#include <realm/query_operators.hpp>
 #include <realm/table.hpp>
 #include <realm/unicode.hpp>
 #include <realm/util/miscellaneous.hpp>
@@ -745,6 +744,10 @@ public:
 
     void cluster_changed() override
     {
+        // Assigning nullptr will cause the Leaf destructor to be called. Must
+        // be done before assigning a new one. Otherwise the destructor will be
+        // called after the constructor is called and that is unfortunate if
+        // the object has the same address. (As in this case)
         m_array_ptr = nullptr;
         // Create new Leaf
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
@@ -816,7 +819,7 @@ protected:
     const LeafType* m_leaf_ptr = nullptr;
 };
 
-template <class ColType, class TConditionFunction>
+template <class T, class TConditionFunction>
 class SizeNode : public ParentNode {
 public:
     SizeNode(int64_t v, size_t column)
@@ -825,9 +828,16 @@ public:
         m_condition_column_idx = column;
     }
 
-    void table_changed() override
+    void cluster_changed() override
     {
-        m_condition_column = &get_column<ColType>(m_condition_column_idx);
+        // Assigning nullptr will cause the Leaf destructor to be called. Must
+        // be done before assigning a new one. Otherwise the destructor will be
+        // called after the constructor is called and that is unfortunate if
+        // the object has the same address. (As in this case)
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
     }
 
     void verify_column() const override
@@ -844,9 +854,9 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         for (size_t s = start; s < end; ++s) {
-            TConditionValue v = m_condition_column->get(s);
+            T v = m_leaf_ptr->get(s);
             if (v) {
-                int64_t sz = m_size_operator(v);
+                int64_t sz = v.size();
                 if (TConditionFunction()(sz, m_value))
                     return s;
             }
@@ -862,18 +872,90 @@ public:
     SizeNode(const SizeNode& from, QueryNodeHandoverPatches* patches)
         : ParentNode(from, patches)
         , m_value(from.m_value)
-        , m_condition_column(from.m_condition_column)
     {
-        if (m_condition_column && patches)
-            m_condition_column_idx = m_condition_column->get_column_index();
     }
 
 private:
-    using TConditionValue = typename ColType::value_type;
+    // Leaf cache
+    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
+    using LeafPtr = std::unique_ptr<LeafType, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const LeafType* m_leaf_ptr = nullptr;
 
     int64_t m_value;
-    const ColType* m_condition_column = nullptr;
-    Size<TConditionValue> m_size_operator;
+};
+
+
+template <class T, class TConditionFunction>
+class SizeListNode : public ParentNode {
+public:
+    SizeListNode(int64_t v, size_t column)
+        : m_value(v)
+    {
+        m_condition_column_idx = column;
+    }
+
+    void cluster_changed() override
+    {
+        // Assigning nullptr will cause the Leaf destructor to be called. Must
+        // be done before assigning a new one. Otherwise the destructor will be
+        // called after the constructor is called and that is unfortunate if
+        // the object has the same address. (As in this case)
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) Array(m_table->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
+    }
+
+    void verify_column() const override
+    {
+        do_verify_column();
+    }
+
+    void init() override
+    {
+        ParentNode::init();
+        m_dD = 50.0;
+    }
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        for (size_t s = start; s < end; ++s) {
+            ref_type ref = m_leaf_ptr->get_as_ref(s);
+            if (ref) {
+                ListType list(m_table->get_alloc());
+                list.init_from_ref(ref);
+                int64_t sz = list.size();
+                if (TConditionFunction()(sz, m_value))
+                    return s;
+            }
+        }
+        return not_found;
+    }
+
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        return std::unique_ptr<ParentNode>(new SizeListNode(*this, patches));
+    }
+
+    SizeListNode(const SizeListNode& from, QueryNodeHandoverPatches* patches)
+        : ParentNode(from, patches)
+        , m_value(from.m_value)
+    {
+    }
+
+private:
+    // Leaf cache
+    using ListType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(Array), alignof(Array)>::type;
+    using LeafPtr = std::unique_ptr<Array, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const Array* m_leaf_ptr = nullptr;
+
+    int64_t m_value;
 };
 
 

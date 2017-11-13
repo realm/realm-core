@@ -1765,38 +1765,101 @@ TEST(Query_StrIndexCrash)
     }
 }
 
+#endif
+
 TEST(Query_size)
 {
     Group g;
 
     TableRef table1 = g.add_table("primary");
     TableRef table2 = g.add_table("secondary");
+
+    auto string_col = table1->add_column(type_String, "strings");
+    auto bin_col = table1->add_column(type_Binary, "binaries", true);
+    auto int_list_col = table1->add_column_list(type_Int, "intlist");
+
+    auto int_col = table2->add_column(type_Int, "integers");
+
+    auto strings = table1->column<String>(string_col);
+    auto binaries = table1->column<Binary>(bin_col);
+    auto intlist = table1->column<List<Int>>(int_list_col);
+
+    for (int64_t i = 0; i < 10; i++) {
+        table2->create_object(Key(i)).set(int_col, i);
+    }
+
+    std::string bin1(100, 'a');
+    std::string bin2(500, '5');
+    table1->create_object(Key(0)).set(string_col, "Hi").set(bin_col, BinaryData(bin1));
+    table1->create_object(Key(1)).set(string_col, "world").set(bin_col, BinaryData(bin2));
+    for (int64_t i = 2; i < 10; i++) {
+        table1->create_object(Key(i));
+    }
+
+    auto set_list = [](ListPtr<Int> list, const std::vector<int64_t>& value_list) {
+        size_t sz = value_list.size();
+        list->clear();
+        for (size_t i = 0; i < sz; i++) {
+            list->add(value_list[i]);
+        }
+    };
+    set_list(table1->get_object(Key(0)).get_list_ptr<Int>(int_list_col), std::vector<Int>({100, 200, 300, 400, 500}));
+    set_list(table1->get_object(Key(1)).get_list_ptr<Int>(int_list_col), std::vector<Int>({1, 2, 3}));
+    set_list(table1->get_object(Key(2)).get_list_ptr<Int>(int_list_col), std::vector<Int>({1, 2, 3, 4, 5}));
+    set_list(table1->get_object(Key(3)).get_list_ptr<Int>(int_list_col),
+             std::vector<Int>({1, 2, 3, 4, 5, 6, 7, 8, 9}));
+
+    Query q;
+    Query q1;
+    Key match;
+    TableView tv;
+
+    q = strings.size() == 5;
+    q1 = table1->where().size_equal(string_col, 5);
+    match = q.find();
+    CHECK_EQUAL(Key(1), match);
+    match = q1.find();
+    CHECK_EQUAL(Key(1), match);
+
+    // Check that the null values are handled correctly
+    q = binaries.size() == realm::null();
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 8);
+    CHECK_EQUAL(tv.get_key(0), Key(2));
+
+    // Here the null values should not be included in the search
+    q = binaries.size() < 500;
+    q1 = table1->where().size_less(bin_col, 500);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = q1.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    q = intlist.size() > 3;
+    q1 = table1->where().size_greater(int_list_col, 3);
+    tv = q.find_all();
+    CHECK_EQUAL(3, tv.size());
+    tv = q1.find_all();
+    CHECK_EQUAL(3, tv.size());
+    q1 = table1->where().size_between(int_list_col, 3, 7);
+    tv = q1.find_all();
+    CHECK_EQUAL(3, tv.size());
+
+    q = intlist.size() == 3;
+    match = q.find();
+    CHECK_EQUAL(Key(1), match);
+
+    q = intlist.size() > strings.size();
+    tv = q.find_all();
+    CHECK_EQUAL(3, tv.size());
+    CHECK_EQUAL(Key(0), tv.get_key(0));
+
+#ifdef LEGACY_TESTS
+    auto linklist_col = table1->add_column_link(type_LinkList, "linklist", *table2);
     TableRef table3 = g.add_table("top");
-
-    table1->add_column(type_String, "strings");
-    table1->add_column(type_Binary, "binaries", true);
-    DescriptorRef subdesc;
-    table1->add_column(type_Table, "intlist", false, &subdesc);
-    subdesc->add_column(type_Int, "list", nullptr, true);
-    table1->add_column_link(type_LinkList, "linklist", *table2);
-
-    table2->add_column(type_Int, "integers");
-
     table3->add_column_link(type_Link, "link", *table1);
     table3->add_column_link(type_LinkList, "linklist", *table1);
     table3->add_empty_row(10);
-
-    Columns<String> strings = table1->column<String>(0);
-    Columns<Binary> binaries = table1->column<Binary>(1);
-    Columns<SubTable> intlist = table1->column<SubTable>(2);
-    Columns<LinkList> linklist = table1->column<LinkList>(3);
-
-    table1->add_empty_row(10);
-    table2->add_empty_row(10);
-
-    for (size_t i = 0; i < 10; i++) {
-        table2->set_int(0, i, i);
-    }
 
     // Leave the last one null
     for (unsigned i = 0; i < 9; i++) {
@@ -1810,27 +1873,8 @@ TEST(Query_size)
         }
     }
 
-    table1->set_string(0, 0, StringData("Hi"));
-    table1->set_string(0, 1, StringData("world"));
 
-    std::string bin1(100, 'a');
-    std::string bin2(500, '5');
-    table1->set_binary(1, 0, BinaryData(bin1));
-    table1->set_binary(1, 1, BinaryData(bin2));
-
-    auto set_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
-        size_t sz = value_list.size();
-        subtable->clear();
-        subtable->add_empty_row(sz);
-        for (size_t i = 0; i < sz; i++) {
-            subtable->set_int(0, i, value_list[i]);
-        }
-    };
-    set_list(table1->get_subtable(2, 0), std::vector<Int>({100, 200, 300, 400, 500}));
-    set_list(table1->get_subtable(2, 1), std::vector<Int>({1, 2, 3}));
-    set_list(table1->get_subtable(2, 2), std::vector<Int>({1, 2, 3, 4, 5}));
-    set_list(table1->get_subtable(2, 3), std::vector<Int>({1, 2, 3, 4, 5, 6, 7, 8, 9}));
-
+    Columns<LinkList> linklist = table1->column<LinkList>(3);
     auto set_links = [](LinkViewRef lv, const std::vector<int64_t>& value_list) {
         for (auto v : value_list) {
             lv->add(size_t(v));
@@ -1838,68 +1882,21 @@ TEST(Query_size)
     };
     set_links(table1->get_linklist(3, 0), std::vector<Int>({0, 1, 2, 3, 4, 5}));
     set_links(table1->get_linklist(3, 1), std::vector<Int>({6, 7, 8, 9}));
-
-    Query q;
-    Query q1;
-    size_t match;
-    TableView tv;
-
-    q = strings.size() == 5;
-    q1 = table1->where().size_equal(0, 5);
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q1.find();
-    CHECK_EQUAL(1, match);
-
-    // Check that the null values are handled correctly
-    q = binaries.size() == realm::null();
-    tv = q.find_all();
-    CHECK_EQUAL(tv.size(), 8);
-    CHECK_EQUAL(tv.get_source_ndx(0), 2);
-
-    // Here the null values should not be included in the search
-    q = binaries.size() < 500;
-    q1 = table1->where().size_less(1, 500);
-    tv = q.find_all();
-    CHECK_EQUAL(tv.size(), 1);
-    tv = q1.find_all();
-    CHECK_EQUAL(tv.size(), 1);
-
-    q = intlist.size() > 3;
-    q1 = table1->where().size_greater(2, 3);
-    tv = q.find_all();
-    CHECK_EQUAL(3, tv.size());
-    tv = q1.find_all();
-    CHECK_EQUAL(3, tv.size());
-    q1 = table1->where().size_between(2, 3, 7);
-    tv = q1.find_all();
-    CHECK_EQUAL(3, tv.size());
-
-    q = intlist.size() == 3;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-
-    q1 = table1->where().size_not_equal(3, 6);
-    match = q1.find();
-    CHECK_EQUAL(1, match);
-
-    q = intlist.size() > strings.size();
-    tv = q.find_all();
-    CHECK_EQUAL(3, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
-
     // Single links
     q = table3->link(0).column<SubTable>(2).size() == 5;
     tv = q.find_all();
     CHECK_EQUAL(5, tv.size());
 
+    q1 = table1->where().size_not_equal(3, 6);
+    match = q1.find();
+    CHECK_EQUAL(Key(1), match);
+
     // Multiple links
     q = table3->link(1).column<SubTable>(2).size() == 3;
     tv = q.find_all();
     CHECK_EQUAL(6, tv.size());
-}
-
 #endif
+}
 
 TEST(Query_SubtableExpression)
 {
