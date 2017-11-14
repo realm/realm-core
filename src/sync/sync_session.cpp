@@ -151,7 +151,8 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
                               std::string access_token,
                               const util::Optional<std::string>& server_url) const override
     {
-        REALM_ASSERT(session.m_session);
+        session.create_sync_session();
+
         // Since the sync session was previously unbound, it's safe to do this from the
         // calling thread.
         if (!session.m_server_url) {
@@ -403,15 +404,12 @@ struct sync_session_states::Inactive : public SyncSession::State {
                                const std::string& admin_token,
                                const std::string& server_url) const override
     {
-        session.create_sync_session();
         session.advance_state(lock, waiting_for_access_token);
         session.m_state->refresh_access_token(lock, session, admin_token, server_url);
     }
 
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
-        // Revive.
-        session.create_sync_session();
         session.advance_state(lock, waiting_for_access_token);
         return true;
     }
@@ -720,7 +718,9 @@ std::function<void()> SyncSession::NotifierPackage::create_invocation(const Prog
 
 void SyncSession::create_sync_session()
 {
-    REALM_ASSERT(!m_session);
+    if (m_session)
+        return;
+
     sync::Session::Config session_config;
     session_config.changeset_cooker = m_config.transformer;
     session_config.encryption_key = m_config.realm_encryption_key;
