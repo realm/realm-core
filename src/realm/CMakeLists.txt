@@ -190,6 +190,7 @@ set_target_properties(Core
 if(ANDROID)
     # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
     set_target_properties(Core PROPERTIES CXX_VISIBILITY_PRESET hidden)
+    target_compile_options(Core PUBLIC -fsigned-char)
 endif()
 
 if(COMMAND set_target_xcode_attributes)
