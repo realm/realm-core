@@ -41,6 +41,7 @@ while getopts ":o:a:t:v:" opt; do
             BUILD_TYPE=${OPTARG}
             [ "${BUILD_TYPE}" == "Debug" ] ||
             [ "${BUILD_TYPE}" == "MinSizeDebug" ] ||
+            [ "${BUILD_TYPE}" == "MinSizeRel" ] ||
             [ "${BUILD_TYPE}" == "Release" ] || usage
             ;;
         v) VERSION=${OPTARG};;

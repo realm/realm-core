@@ -73,7 +73,7 @@ jobWrapper {
               ]
 
           androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
-          androidBuildTypes = ['Debug', 'Release']
+          androidBuildTypes = ['Debug', 'MinSizeRel']
 
           for (def i = 0; i < androidAbis.size(); i++) {
               def abi = androidAbis[i]
