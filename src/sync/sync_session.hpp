@@ -138,6 +138,15 @@ public:
     // Give the `SyncSession` an administrator token, and ask it to immediately `bind()` the session.
     void bind_with_admin_token(std::string admin_token, std::string server_url);
 
+    // Set the multiplex identifier used for this session. Sessions with different identifiers are
+    // never multiplexed into a single connection, even if they are connecting to the same host.
+    // The value of the token is otherwise treated as an opaque token.
+    //
+    // Has no effect if session multiplexing is not enabled (see SyncManager::enable_session_multiplexing())
+    // or if called after the Sync session is created. In particular, changing the multiplex identity will
+    // not make the session reconnect.
+    void set_multiplex_identifier(std::string multiplex_identity);
+
     // Inform the sync session that it should close.
     void close();
 
@@ -345,6 +354,8 @@ private:
 
     // The fully-resolved URL of this Realm, including the server and the path.
     util::Optional<std::string> m_server_url;
+
+    std::string m_multiplex_identity;
 
     class ExternalReference;
     std::weak_ptr<ExternalReference> m_external_reference;

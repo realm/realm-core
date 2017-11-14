@@ -727,6 +727,7 @@ void SyncSession::create_sync_session()
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
+    session_config.multiplex_ident = m_multiplex_identity;
     m_session = m_client.make_session(m_realm_path, std::move(session_config));
 
     // The next time we get a token, call `bind()` instead of `refresh()`.
@@ -897,6 +898,11 @@ void SyncSession::override_server(std::string address, int port)
     m_state->override_server(lock, *this, std::move(address), port);
 }
 #endif
+
+void SyncSession::set_multiplex_identifier(std::string multiplex_identity)
+{
+    m_multiplex_identity = std::move(multiplex_identity);
+}
 
 SyncSession::PublicState SyncSession::state() const
 {
