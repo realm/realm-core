@@ -263,8 +263,7 @@ def doBuildOnCentos6(String buildType) {
             image.inside {
                 try {
                     sh """
-                        source scl_source enable devtoolset-3
-                        ls -l /usr/bin/ninja
+                        source /opt/rh/devtoolset-3/enable
                         mkdir build-dir
                         cd build-dir
                         cmake -D CMAKE_BUILD_TYPE=${buildType} -G Ninja ..
