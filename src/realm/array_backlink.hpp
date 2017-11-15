@@ -30,6 +30,7 @@ public:
     using Array::init_from_parent;
     using Array::update_parent;
     using Array::get_ref;
+    using Array::erase;
     using Array::truncate_and_destroy_children;
 
     static int64_t default_value(bool)
@@ -57,7 +58,7 @@ public:
         Array::add(val);
     }
 
-    void erase(size_t ndx);
+    void nullify_fwd_links(size_t ndx);
     void add(size_t ndx, Key key);
     void remove(size_t ndx, Key key);
     size_t get_backlink_count(size_t ndx);

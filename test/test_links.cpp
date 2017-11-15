@@ -203,6 +203,26 @@ TEST(Links_Basic)
     }
 }
 
+TEST(Group_LinksToSameTable)
+{
+    Group g;
+    TableRef table = g.add_table("target");
+
+    table->add_column(type_Int, "integers", true);
+    auto link_col = table->add_column_link(type_Link, "links", *table);
+
+    // 3 rows linked together in a list
+    std::vector<Key> keys;
+    table->create_objects(3, keys);
+    table->get_object(keys[0]).set(link_col, keys[1]);
+    table->get_object(keys[1]).set(link_col, keys[2]);
+    table->remove_object(keys[0]);
+    CHECK_EQUAL(table->size(), 2);
+    CHECK_EQUAL(table->get_object(keys[1]).get_backlink_count(*table, link_col), 0);
+    table->remove_object(keys[2]);
+    CHECK_EQUAL(table->size(), 1);
+    CHECK(table->get_object(keys[1]).is_null(link_col));
+}
 
 TEST(Links_SetLinkLogicErrors)
 {
