@@ -127,5 +127,8 @@ get_package_file_name(realm-core ${REALM_VERSION})
 set(CPACK_GENERATOR TGZ)
 set(CPACK_PACKAGE_FILE_NAME ${realm-core_FILE_NAME})
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
+if(CMAKE_BUILD_TYPE STREQUAL Release)
+    set(CPACK_STRIP_FILES TRUE)
+endif()
 include(CPack)
 
