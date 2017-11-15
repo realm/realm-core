@@ -37,7 +37,7 @@ RUN cd /opt \
     && unzip ninja-linux.zip \
     && rm -f ninja-linux.zip \
     && mv ninja /usr/bin \
-    && chmod a+rx ninja
+    && chmod a+rx /usr/bin/ninja
 
 # Make sure the above SCLs are already enabled
 ENTRYPOINT ["/usr/bin/scl", "enable", "devtoolset-3", "--"]
