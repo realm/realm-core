@@ -188,9 +188,14 @@ set_target_properties(Core
 )
 
 if(ANDROID)
-    # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
+    # TODO: Core APIs should always built for internal usage, but there seem to be issues with cocoa. Enable it only for Android for now.
     set_target_properties(Core PROPERTIES CXX_VISIBILITY_PRESET hidden)
-    target_compile_options(Core PUBLIC -fsigned-char)
+    target_compile_options(Core
+        PUBLIC
+            -fsigned-char # char are unsigned by default on ARM
+            -fdata-sections # give the linker the chance for further space optimization
+            -ffunction-sections # give the linker the chance for further space optimization
+    )
 endif()
 
 if(COMMAND set_target_xcode_attributes)
