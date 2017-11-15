@@ -49,8 +49,8 @@ jobWrapper {
       }
 
       stage('check') {
-          parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
-                               checkLinuxDebug     : doBuildInDocker('Debug'),
+          parallelExecutors = [checkLinuxRelease   : doBuildInCentos6('Release'),
+                               checkLinuxDebug     : doBuildInCentos6('Debug'),
                                buildMacOsDebug     : doBuildMacOs('Debug'),
                                buildMacOsRelease   : doBuildMacOs('Release'),
                                buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
@@ -63,10 +63,6 @@ jobWrapper {
                                buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
                                buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
                                buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
-                               packageGeneric      : doBuildPackage('generic', 'tgz'),
-                               packageCentos7      : doBuildPackage('centos-7', 'rpm'),
-                               packageCentos6      : doBuildPackage('centos-6', 'rpm'),
-                               packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
                                threadSanitizer     : doBuildInDocker('Debug', 'thread'),
                                addressSanitizer    : doBuildInDocker('Debug', 'address'),
                                coverage            : doBuildCoverage()
@@ -251,6 +247,39 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+def doBuildOnCentos6(String buildType) {
+    return {
+        node('docker') {
+            getArchive()
+
+            def stashName = "Linux___{buildType}"
+            def image = docker.build('centos6:snapshot', '-f tools/docker/centos6.Dockerfile .')
+            image.inside {
+                try {
+                    sh """
+                        mkdir build-dir
+                        cd build-dir
+                        cmake -D CMAKE_BUILD_TYPE=${buildType} -G Ninja
+                        cmake --build . --target CoreTests 2>errors.log
+                        cmake --build . --target check
+                        cmake --build . --target package
+                    """
+                } finally {
+                    recordTests(stashName)
+                }
+            }
+
+            dir('build-dir') {
+                stash includes:'realm-*.tar.gz', name:stashName
+                androidStashes << stashName
+                if (gitTag) {
+                    publishingStashes << stashName
                 }
             }
         }
