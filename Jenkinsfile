@@ -258,7 +258,12 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
 }
 
 def doBuildWindows(String buildType, boolean isUWP, String platform) {
-    def cmakeDefinitions = isUWP ? '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 -DREALM_BUILD_LIB_ONLY=1' : ''
+    def cmakeDefinitions;
+    if (isUWP) {
+      cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 -DREALM_BUILD_LIB_ONLY=1'
+    } else {
+      cmakeDefinitions = '-DCMAKE_SYSTEM_VERSION=8.1'
+    }
 
     return {
         node('windows') {
@@ -370,7 +375,7 @@ def buildPerformance() {
             ./parse_bench_hist.py --local-html results/ core-benchmarks/
           """
           zip dir: 'test/bench', glob: 'core-benchmarks/**/*', zipFile: 'core-benchmarks.zip'
-          rlmS3Put file: 'core-benchmarks.zip', path: 'downloads/core/'
+          rlmS3Put file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
           publishHTML(target: [allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'test/bench/results', reportFiles: 'report.html', reportName: 'Performance Report'])
           withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
               sh "curl -H \"Authorization: token ${env.githubToken}\" " +
@@ -554,8 +559,8 @@ def doPublishGeneric() {
                 unstash 'packages-generic'
                 def files = findFiles(glob: '**/*.tgz')
                 for (file in files) {
-                    rlmS3Put file: file.path, path: 'downloads/core/'
-                    rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/linux/"
+                    rlmS3Put file: file.path, path: "downloads/core/${file.name}"
+                    rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/linux/${file.name}"
                 }
             }
 
@@ -574,8 +579,8 @@ def doPublishLocalArtifacts() {
                         def path = publishingStash.replaceAll('___', '/')
                         def files = findFiles(glob: '**')
                         for (file in files) {
-                            rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/"
-                            rlmS3Put file: file.path, path: "downloads/core/"
+                            rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}"
+                            rlmS3Put file: file.path, path: "downloads/core/${file.name}"
                         }
                         deleteDir()
                     }
