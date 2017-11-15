@@ -278,6 +278,7 @@ def doBuildOnCentos6(String buildType) {
             }
 
             dir('build-dir') {
+                archiveArtifacts('realm-*.tar.gz')
                 stash includes:'realm-*.tar.gz', name:stashName
                 androidStashes << stashName
                 if (gitTag) {
