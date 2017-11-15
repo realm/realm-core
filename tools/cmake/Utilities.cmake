@@ -59,7 +59,7 @@ macro(get_package_file_name _PACKAGE_NAME _PACKAGE_VERSION)
     endif()
 
     if(ANDROID)
-        set(REALM_OS "Android-${ANDROID_ABI}")
+        set(REALM_OS "Android-${CMAKE_ANDROID_ARCH_ABI}")
     elseif(LINUX)
         set(REALM_OS "Linux-${CMAKE_SYSTEM_PROCESSOR}")
     elseif(WIN32)
