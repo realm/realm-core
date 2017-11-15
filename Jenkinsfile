@@ -49,8 +49,8 @@ jobWrapper {
       }
 
       stage('check') {
-          parallelExecutors = [checkLinuxRelease   : doBuildInCentos6('Release'),
-                               checkLinuxDebug     : doBuildInCentos6('Debug'),
+          parallelExecutors = [checkLinuxRelease   : doBuildOnCentos6('Release'),
+                               checkLinuxDebug     : doBuildOnCentos6('Debug'),
                                buildMacOsDebug     : doBuildMacOs('Debug'),
                                buildMacOsRelease   : doBuildMacOs('Release'),
                                buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
