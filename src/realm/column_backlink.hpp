@@ -71,9 +71,6 @@ public:
 
     void bump_link_origin_table_version() noexcept override;
 
-    void cascade_break_backlinks_to(size_t, CascadeState& state) override;
-    void cascade_break_backlinks_to_all_rows(size_t, CascadeState&) override;
-
     int compare_values(size_t, size_t) const noexcept override;
 
     void verify() const override;

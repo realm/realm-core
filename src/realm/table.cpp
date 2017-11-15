@@ -376,47 +376,20 @@ void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_tab
 }
 
 
-void Table::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
-{
-    size_t num_cols = m_spec->get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx);
-        col.cascade_break_backlinks_to(row_ndx, state); // Throws
-    }
-}
-
-
-void Table::cascade_break_backlinks_to_all_rows(CascadeState& state)
-{
-    size_t num_cols = m_spec->get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx);
-        col.cascade_break_backlinks_to_all_rows(m_size, state); // Throws
-    }
-}
-
-
-void Table::remove_backlink_broken_rows(const CascadeState& cascade_state)
+void Table::remove_recursive(CascadeState& cascade_state)
 {
     Group& group = *get_parent_group();
-
-    // Rows are ordered by ascending row index, but we need to remove the rows
-    // by descending index to avoid changing the indexes of rows that are not
-    // removed yet.
-    auto rend = cascade_state.rows.rend();
-    for (auto i = cascade_state.rows.rbegin(); i != rend; ++i) {
+    // We will have to re-evaluate size() after each call to clusters.erase
+    for (size_t i = 0; i < cascade_state.rows.size(); ++i) {
+        CascadeState::row& row = cascade_state.rows[i];
         typedef _impl::GroupFriend gf;
-        bool is_move_last_over = (i->is_ordered_removal == 0);
-        Table& table = gf::get_table(group, i->table_key);
-
-        bool broken_reciprocal_backlinks = true;
-        if (is_move_last_over) {
-            table.do_move_last_over(i->row_ndx, broken_reciprocal_backlinks);
-        }
-        else {
-            table.do_remove(i->row_ndx, broken_reciprocal_backlinks);
-        }
+        Table& table = gf::get_table(group, row.table_key);
+        // This might add to the list of objects that should be deleted
+        table.m_clusters.erase(row.key, cascade_state);
+        table.m_size--; // TODO: Redundant
     }
+    if (group.has_cascade_notification_handler())
+        _impl::GroupFriend::send_cascade_notification(group, cascade_state);
 }
 
 
@@ -1804,71 +1777,17 @@ void Table::erase_row(size_t row_ndx, bool is_move_last_over)
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(row_ndx, <, m_size);
-
-    bool skip_cascade = !m_spec->has_strong_link_columns();
-
-    // FIXME: Is this really necessary? Waiting for clarification from Thomas
-    // Goyne.
-    if (Group* g = get_parent_group()) {
-        if (g->has_cascade_notification_handler())
-            skip_cascade = false;
+    bool broken_reciprocal_backlinks = false;
+    if (is_move_last_over) {
+        do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
     }
-
-    if (skip_cascade) {
-        bool broken_reciprocal_backlinks = false;
-        if (is_move_last_over) {
-            do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
-        }
-        else {
-            do_remove(row_ndx, broken_reciprocal_backlinks); // Throws
-        }
-        return;
+    else {
+        do_remove(row_ndx, broken_reciprocal_backlinks); // Throws
     }
-
-    // When the table has strong link columns, row removals may cascade.
-    auto table_key = get_key();
-
-    CascadeState::row row;
-    row.is_ordered_removal = (is_move_last_over ? 0 : 1);
-    row.table_key = table_key;
-    row.row_ndx = row_ndx;
-    CascadeState state;
-    state.rows.push_back(row); // Throws
-
-    if (Group* g = get_parent_group())
-        state.track_link_nullifications = g->has_cascade_notification_handler();
-
-    cascade_break_backlinks_to(row_ndx, state); // Throws
-
-    if (Group* g = get_parent_group())
-        _impl::GroupFriend::send_cascade_notification(*g, state);
-
-    remove_backlink_broken_rows(state); // Throws
 }
 
-void Table::remove_recursive(size_t row_ndx)
+void Table::remove_recursive(size_t)
 {
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(row_ndx, <, m_size);
-
-    auto table_key = get_key();
-
-    CascadeState::row row;
-    row.table_key = table_key;
-    row.row_ndx = row_ndx;
-    CascadeState state;
-    state.rows.push_back(row); // Throws
-    state.only_strong_links = false;
-
-    if (Group* g = get_parent_group())
-        state.track_link_nullifications = g->has_cascade_notification_handler();
-
-    cascade_break_backlinks_to(row_ndx, state); // Throws
-
-    if (Group* g = get_parent_group())
-        _impl::GroupFriend::send_cascade_notification(*g, state);
-
-    remove_backlink_broken_rows(state); // Throws
 }
 
 void Table::merge_rows(size_t row_ndx, size_t new_row_ndx)
@@ -1887,81 +1806,9 @@ void Table::merge_rows(size_t row_ndx, size_t new_row_ndx)
     do_merge_rows(row_ndx, new_row_ndx);
 }
 
-void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over)
+void Table::batch_erase_rows(const IntegerColumn&, bool)
 {
-    REALM_ASSERT(is_attached());
-
-    bool skip_cascade = !m_spec->has_strong_link_columns();
-
-    // FIXME: Is this really necessary? Waiting for clarification from Thomas
-    // Goyne.
-    if (Group* g = get_parent_group()) {
-        if (g->has_cascade_notification_handler())
-            skip_cascade = false;
-    }
-
-    if (skip_cascade) {
-        size_t num_rows = row_indexes.size();
-        std::vector<size_t> rows;
-        rows.reserve(num_rows);
-        for (size_t i = 0; i < num_rows; ++i) {
-            int64_t v = row_indexes.get(i);
-            if (v != detached_ref) {
-                size_t row_ndx = to_size_t(v);
-                rows.push_back(row_ndx);
-            }
-        }
-        sort(rows.begin(), rows.end());
-        rows.erase(unique(rows.begin(), rows.end()), rows.end());
-        // Remove in reverse order to prevent invalidation of recorded row
-        // indexes.
-        auto rend = rows.rend();
-        for (auto i = rows.rbegin(); i != rend; ++i) {
-            size_t row_ndx = *i;
-            bool broken_reciprocal_backlinks = false;
-            if (is_move_last_over) {
-                do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
-            }
-            else {
-                do_remove(row_ndx, broken_reciprocal_backlinks); // Throws
-            }
-        }
-        return;
-    }
-
-    // When the table has strong link columns, row removals may cascade.
-    auto table_key = get_key();
-
-    CascadeState state;
-    size_t num_rows = row_indexes.size();
-    state.rows.reserve(num_rows);
-    for (size_t i = 0; i < num_rows; ++i) {
-        int64_t v = row_indexes.get(i);
-        if (v != detached_ref) {
-            size_t row_ndx = to_size_t(v);
-            CascadeState::row row;
-            row.is_ordered_removal = (is_move_last_over ? 0 : 1);
-            row.table_key = table_key;
-            row.row_ndx = row_ndx;
-            state.rows.push_back(row); // Throws
-        }
-    }
-    sort(std::begin(state.rows), std::end(state.rows));
-    state.rows.erase(unique(std::begin(state.rows), std::end(state.rows)), std::end(state.rows));
-
-    if (Group* g = get_parent_group())
-        state.track_link_nullifications = g->has_cascade_notification_handler();
-
-    // Iterate over a copy of `rows` since cascading deletes mutate it
-    auto rows_copy = state.rows;
-    for (auto const& row : rows_copy) {
-        cascade_break_backlinks_to(row.row_ndx, state); // Throws
-    }
-
-    if (Group* g = get_parent_group())
-        _impl::GroupFriend::send_cascade_notification(*g, state);
-
-    remove_backlink_broken_rows(state); // Throws
+    // FIXME: Implement using keys
 }
 
 
@@ -2126,10 +1973,10 @@ void Table::clear()
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
+    bool skip_cascade = !m_spec->has_strong_link_columns();
     size_t old_size = m_size;
 
-    size_t table_ndx = get_index_in_group();
-    if (table_ndx == realm::npos) {
+    if (skip_cascade) {
         bool broken_reciprocal_backlinks = false;
         do_clear(broken_reciprocal_backlinks);
     }
@@ -2138,17 +1985,14 @@ void Table::clear()
         // discover all the rows that need to be cascade-removed.
         CascadeState state;
         state.stop_on_table = this;
+        auto table_key = get_key();
+        for (auto& obj : *this) {
+            state.rows.emplace_back(table_key, obj.get_key());
+        }
         if (Group* g = get_parent_group())
             state.track_link_nullifications = g->has_cascade_notification_handler();
-        cascade_break_backlinks_to_all_rows(state); // Throws
 
-        if (Group* g = get_parent_group())
-            _impl::GroupFriend::send_cascade_notification(*g, state);
-
-        bool broken_reciprocal_backlinks = true;
-        do_clear(broken_reciprocal_backlinks);
-
-        remove_backlink_broken_rows(state); // Throws
+        remove_recursive(state); // Throws
     }
 
     if (Replication* repl = get_repl())
@@ -3012,33 +2856,7 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool
         repl->set_link(this, col_ndx, row_ndx, target_row_ndx,
                        is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
-    size_t old_target_row_ndx = do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
-    if (old_target_row_ndx == realm::npos)
-        return;
-
-    if (col.get_weak_links())
-        return;
-
-    size_t num_remaining = target_table.get_backlink_count(old_target_row_ndx,
-                                                           /* only strong links:*/ true);
-    if (num_remaining > 0)
-        return;
-
-    CascadeState::row target_row;
-    target_row.table_key = target_table.get_key();
-    target_row.row_ndx = old_target_row_ndx;
-    CascadeState state;
-    state.rows.push_back(target_row);
-
-    if (Group* g = get_parent_group())
-        state.track_link_nullifications = g->has_cascade_notification_handler();
-
-    target_table.cascade_break_backlinks_to(old_target_row_ndx, state); // Throws
-
-    if (Group* g = get_parent_group())
-        _impl::GroupFriend::send_cascade_notification(*g, state);
-
-    remove_backlink_broken_rows(state); // Throws
+    do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
 }
 
 
@@ -5259,11 +5077,46 @@ void Table::create_objects(size_t number, std::vector<Key>& keys)
     }
 }
 
-void Table::do_remove_object(Key key, bool /* broken_reciprocal_backlinks */)
+// Called by replication with mode = none
+void Table::do_remove_object(Key key)
 {
-    m_clusters.erase(key);
-    bump_version();
-    m_size--; // TODO: Redundant
+    CascadeState state(CascadeState::Mode::none);
+    state.rows.emplace_back(m_key, key);
+    remove_recursive(state);
+}
+
+void Table::remove_object(Key key)
+{
+    REALM_ASSERT(is_attached());
+
+    Group* g = get_parent_group();
+
+    if (m_spec->has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
+        CascadeState state(CascadeState::Mode::strong);
+        state.rows.emplace_back(m_key, key);
+        remove_recursive(state);
+    }
+    else {
+        CascadeState state(CascadeState::Mode::none);
+        m_clusters.erase(key, state);
+        m_size--; // TODO: Redundant
+    }
+}
+
+void Table::remove_object_recursive(Key key)
+{
+    size_t table_ndx = get_index_in_group();
+    if (table_ndx != realm::npos) {
+        CascadeState state(CascadeState::Mode::all);
+        state.rows.emplace_back(m_key, key);
+        remove_recursive(state);
+    }
+    else {
+        // No links in freestanding table
+        CascadeState state(CascadeState::Mode::none);
+        m_clusters.erase(key, state);
+        m_size--; // TODO: Redundant
+    }
 }
 
 Table::ConstIterator Table::begin() const

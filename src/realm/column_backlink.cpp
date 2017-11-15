@@ -355,29 +355,6 @@ ref_type BacklinkColumn::get_child_ref(size_t child_ndx) const noexcept
     return IntegerColumn::get_as_ref(child_ndx);
 }
 
-void BacklinkColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
-{
-    if (state.track_link_nullifications) {
-        bool do_destroy = false;
-        for_each_link(row_ndx, do_destroy, [&](size_t origin_row_ndx) {
-            state.links.push_back({m_origin_table.get(), get_origin_column_index(), origin_row_ndx, row_ndx});
-        });
-    }
-}
-
-void BacklinkColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState& state)
-{
-    if (state.track_link_nullifications) {
-        for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
-            // IntegerColumn::clear() handles the destruction of subtrees
-            bool do_destroy = false;
-            for_each_link(row_ndx, do_destroy, [&](size_t origin_row_ndx) {
-                state.links.push_back({m_origin_table.get(), get_origin_column_index(), origin_row_ndx, row_ndx});
-            });
-        }
-    }
-}
-
 int BacklinkColumn::compare_values(size_t, size_t) const noexcept
 {
     REALM_ASSERT(false); // backlinks can only be queried over and not on directly

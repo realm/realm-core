@@ -70,7 +70,7 @@ public:
     void remove_column(size_t ndx) override;
     ref_type insert(Key k, State& state) override;
     void get(Key k, State& state) const override;
-    unsigned erase(Key k) override;
+    unsigned erase(Key k, CascadeState& state) override;
     void add(ref_type ref, int64_t key_value = 0);
 
     ref_type get_child(size_t ndx) const
@@ -242,10 +242,10 @@ void ClusterNodeInner::get(Key key, ClusterNode::State& state) const
         key, [&state](const ClusterNode* node, ChildInfo& child_info) { return node->get(child_info.key, state); });
 }
 
-unsigned ClusterNodeInner::erase(Key key)
+unsigned ClusterNodeInner::erase(Key key, CascadeState& state)
 {
-    return recurse<unsigned>(key, [this](ClusterNode* erase_node, ChildInfo& child_info) {
-        unsigned erase_node_size = erase_node->erase(child_info.key);
+    return recurse<unsigned>(key, [this, &state](ClusterNode* erase_node, ChildInfo& child_info) {
+        unsigned erase_node_size = erase_node->erase(child_info.key, state);
 
         if (erase_node_size == 0) {
             erase_node->destroy_deep();
@@ -814,20 +814,20 @@ inline void Cluster::do_erase(size_t ndx, size_t col_ndx)
     values.erase(ndx);
 }
 
-namespace realm {
-template <>
-inline void Cluster::do_erase<ArrayKey>(size_t ndx, size_t col_ndx)
+inline void Cluster::do_erase_key(size_t ndx, size_t col_ndx, CascadeState& state)
 {
     ArrayKey values(m_alloc);
     values.set_parent(this, col_ndx + 1);
     values.init_from_parent();
 
-    remove_backlinks(Key(get_key(ndx)), col_ndx, {values.get(ndx)});
+    Key key = values.get(ndx);
+    if (key != null_key) {
+        remove_backlinks(Key(get_key(ndx)), col_ndx, {key}, state);
+    }
     values.erase(ndx);
 }
-}
 
-unsigned Cluster::erase(Key key)
+unsigned Cluster::erase(Key key, CascadeState& state)
 {
     size_t ndx = m_keys.lower_bound_int(key.value);
     if (ndx == m_keys.size() || m_keys.get(ndx) != key.value) {
@@ -872,8 +872,9 @@ unsigned Cluster::erase(Key key)
                 if (col_type == col_type_LinkList) {
                     ArrayKey links(m_alloc);
                     links.init_from_ref(ref);
-
-                    remove_backlinks(key, col_ndx, links.get_all());
+                    if (links.size() > 0) {
+                        remove_backlinks(key, col_ndx, links.get_all(), state);
+                    }
                 }
                 Array::destroy_deep(ref, m_alloc);
             }
@@ -911,7 +912,7 @@ unsigned Cluster::erase(Key key)
                 do_erase<ArrayTimestamp>(ndx, col_ndx);
                 break;
             case col_type_Link:
-                do_erase<ArrayKey>(ndx, col_ndx);
+                do_erase_key(ndx, col_ndx, state);
                 break;
             case col_type_BackLink:
                 do_erase<ArrayBacklink>(ndx, col_ndx);
@@ -1017,16 +1018,29 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
     }
 }
 
-void Cluster::remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys)
+void Cluster::remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys, CascadeState& state)
 {
+    const Table* origin_table = m_tree_top.get_owner();
     TableRef target_table = _impl::TableFriend::get_opposite_link_table(*m_tree_top.get_owner(), col_ndx);
+    TableKey target_table_key = target_table->get_key();
     const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
+    const Spec& origin_table_spec = _impl::TableFriend::get_spec(*origin_table);
     size_t backlink_col = target_table_spec.find_backlink_column(m_tree_top.get_owner()->get_key(), col_ndx);
+    CascadeState::Mode mode = state.m_mode;
 
     for (auto key : keys) {
         if (key != null_key) {
             Obj target_obj = target_table->get_object(key);
             target_obj.remove_one_backlink(backlink_col, origin_key); // Throws
+
+            if (mode != CascadeState::Mode::none &&
+                (mode == CascadeState::Mode::all ||
+                 origin_table_spec.get_column_attr(col_ndx).test(col_attr_StrongLinks))) {
+                size_t num_remaining = target_obj.get_backlink_count(*origin_table, col_ndx);
+                if (num_remaining == 0) {
+                    state.rows.emplace_back(target_table_key, key);
+                }
+            }
         }
     }
 }
@@ -1178,9 +1192,10 @@ Obj ClusterTree::get(Key k)
     return Obj(this, state.ref, k, state.index);
 }
 
-void ClusterTree::erase(Key k)
+void ClusterTree::erase(Key k, CascadeState& state)
 {
-    unsigned root_size = m_root->erase(k);
+    unsigned root_size = m_root->erase(k, state);
+    bump_version();
     m_size--;
     while (!m_root->is_leaf() && root_size == 1) {
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());

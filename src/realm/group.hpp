@@ -415,41 +415,42 @@ public:
     /// LinkLists).
     struct CascadeNotification {
         struct row {
-            /// Non-zero iff the removal of this row is ordered
-            /// (Table::remove()), as opposed to ordered
-            /// (Table::move_last_over()). Implicit removals are always
-            /// unordered.
-            ///
-            /// This flag does not take part in comparisons (operator==() and
-            /// operator<()).
-            size_t is_ordered_removal : 1;
-
             /// Key identifying a group-level table.
             TableKey table_key;
 
             /// Row index which will be removed.
-            size_t row_ndx;
+            Key key;
 
-            row()
-                : is_ordered_removal(0)
+            row() = default;
+
+            row(TableKey tk, Key k)
+                : table_key(tk)
+                , key(k)
             {
             }
-
-            bool operator==(const row&) const noexcept;
-            bool operator!=(const row&) const noexcept;
-
+            bool operator==(const row& r) const noexcept
+            {
+                return table_key == r.table_key && key == r.key;
+            }
+            bool operator!=(const row& r) const noexcept
+            {
+                return !(*this == r);
+            }
             /// Trivial lexicographic order
-            bool operator<(const row&) const noexcept;
+            bool operator<(const row& r) const noexcept
+            {
+                return table_key < r.table_key || (table_key == r.table_key && key < r.key);
+            }
         };
 
         struct link {
             const Table* origin_table; ///< A group-level table.
             size_t origin_col_ndx;     ///< Link column being nullified.
-            size_t origin_row_ndx;     ///< Row in column being nullified.
+            Key origin_key;            ///< Row in column being nullified.
             /// The target row index which is being removed. Mostly relevant for
             /// LinkList (to know which entries are being removed), but also
             /// valid for Link.
-            size_t old_target_row_ndx;
+            Key old_target_key;
         };
 
         /// A sorted list of rows which will be removed by the current operation.
@@ -1363,6 +1364,12 @@ public:
 
 
 struct CascadeState : Group::CascadeNotification {
+    enum Mode { all, strong, none };
+
+    CascadeState(Mode mode = Mode::strong)
+        : m_mode(mode)
+    {
+    }
     /// If non-null, then no recursion will be performed for rows of that
     /// table. The effect is then exactly as if all the rows of that table were
     /// added to \a state.rows initially, and then removed again after the
@@ -1379,33 +1386,18 @@ struct CascadeState : Group::CascadeNotification {
     /// on its behalf. This is used by LinkView::clear() to avoid reentrance.
     ///
     /// Must never be set concurrently with stop_on_table.
-    LinkListColumn* stop_on_link_list_column = nullptr;
+    size_t stop_on_link_list_column_ndx = size_t(-1);
 
     /// Is ignored if stop_on_link_list_column is null.
-    size_t stop_on_link_list_row_ndx = 0;
+    Key stop_on_link_list_key;
 
     /// If false, the links field is not needed, so any work done just for that
     /// can be skipped.
     bool track_link_nullifications = false;
 
-    /// If false, weak links are followed too
-    bool only_strong_links = true;
+    /// Indicate which links to take action on. Either all, strong or none.
+    Mode m_mode;
 };
-
-inline bool Group::CascadeNotification::row::operator==(const row& r) const noexcept
-{
-    return table_key == r.table_key && row_ndx == r.row_ndx;
-}
-
-inline bool Group::CascadeNotification::row::operator!=(const row& r) const noexcept
-{
-    return !(*this == r);
-}
-
-inline bool Group::CascadeNotification::row::operator<(const row& r) const noexcept
-{
-    return table_key < r.table_key || (table_key == r.table_key && row_ndx < r.row_ndx);
-}
 
 } // namespace realm
 

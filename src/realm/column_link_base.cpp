@@ -32,31 +32,6 @@ void LinkColumnBase::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 }
 
 
-void LinkColumnBase::check_cascade_break_backlinks_to(TableKey target_table_key, size_t target_row_ndx,
-                                                      CascadeState& state)
-{
-    // Stop if the target row was already visited
-    CascadeState::row target_row;
-    target_row.table_key = target_table_key;
-    target_row.row_ndx = target_row_ndx;
-    auto i = std::upper_bound(state.rows.begin(), state.rows.end(), target_row);
-    bool already_seen = i != state.rows.begin() && i[-1] == target_row;
-    if (already_seen)
-        return;
-
-    // Stop if there are any remaining strong links to this row (this scheme
-    // fails to discover orphaned cycles)
-    typedef _impl::TableFriend tf;
-    size_t num_remaining = tf::get_backlink_count(*m_target_table, target_row_ndx, state.only_strong_links);
-    if (num_remaining > 0)
-        return;
-
-    // Recurse
-    state.rows.insert(i, target_row);                                       // Throws
-    tf::cascade_break_backlinks_to(*m_target_table, target_row_ndx, state); // Throws
-}
-
-
 void LinkColumnBase::verify(const Table& table, size_t col_ndx) const
 {
 #ifdef REALM_DEBUG

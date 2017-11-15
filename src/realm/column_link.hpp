@@ -64,8 +64,6 @@ public:
     void move_last_row_over(size_t, size_t, bool) override;
     void swap_rows(size_t, size_t) override;
     void clear(size_t, bool) override;
-    void cascade_break_backlinks_to(size_t, CascadeState&) override;
-    void cascade_break_backlinks_to_all_rows(size_t, CascadeState&) override;
 
     void verify(const Table&, size_t) const override;
 

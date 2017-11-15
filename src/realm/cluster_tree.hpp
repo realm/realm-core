@@ -88,7 +88,7 @@ public:
         m_root->remove_column(ndx);
     }
     Obj insert(Key k);
-    void erase(Key k);
+    void erase(Key k, CascadeState& state);
     bool is_valid(Key k) const;
     ConstObj get(Key k) const;
     Obj get(Key k);

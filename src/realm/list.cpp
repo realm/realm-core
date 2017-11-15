@@ -27,6 +27,7 @@
 #include "realm/array_timestamp.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/table.hpp"
+#include "realm/group.hpp"
 
 using namespace realm;
 
@@ -167,10 +168,53 @@ Key List<Key>::remove(size_t ndx)
 template <>
 void List<Key>::clear()
 {
-    size_t ndx = size();
-    while (ndx--) {
-        remove(ndx);
+    Table* origin_table = const_cast<Table*>(m_obj.get_table());
+    const Spec& origin_table_spec = _impl::TableFriend::get_spec(*origin_table);
+
+    /*
+        if (Replication* repl = get_repl())
+            repl->link_list_clear(*this); // Throws
+    */
+
+    if (!origin_table_spec.get_column_attr(m_col_ndx).test(col_attr_StrongLinks)) {
+        size_t ndx = size();
+        while (ndx--) {
+            remove(ndx);
+        }
+        return;
     }
+
+    TableRef target_table = m_obj.get_target_table(m_col_ndx);
+    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
+    size_t backlink_col = target_table_spec.find_backlink_column(m_obj.get_table_key(), m_col_ndx);
+
+    CascadeState state;
+    state.stop_on_link_list_column_ndx = m_col_ndx;
+    state.stop_on_link_list_key = m_obj.get_key();
+
+    typedef _impl::TableFriend tf;
+    size_t num_links = size();
+    for (size_t ndx = 0; ndx < num_links; ++ndx) {
+        Key target_key = m_leaf->get(ndx);
+        Obj target_obj = target_table->get_object(target_key);
+        target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
+        size_t num_remaining = target_obj.get_backlink_count(*origin_table, m_col_ndx);
+        if (num_remaining > 0) {
+            continue;
+        }
+
+        CascadeState::row target_row;
+        target_row.table_key = target_table->get_key();
+        target_row.key = target_key;
+        auto i = std::upper_bound(state.rows.begin(), state.rows.end(), target_row);
+        // This target row cannot already be in state.rows
+        REALM_ASSERT(i == state.rows.begin() || i[-1] != target_row);
+        state.rows.insert(i, target_row);
+    }
+
+    m_leaf->truncate_and_destroy_children(0);
+
+    tf::remove_recursive(*origin_table, state); // Throws
 }
 
 #ifdef _WIN32

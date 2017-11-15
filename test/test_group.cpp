@@ -1936,6 +1936,7 @@ TEST(Group_SetNullUniqueLimitation)
         CHECK(le.kind() == LogicError::illegal_combination);
     }
 }
+#endif // LEGACY_TESTS
 
 // This test ensures that cascading delete works by testing that
 // a linked row is deleted when the parent row is deleted, but only
@@ -1948,66 +1949,75 @@ TEST(Group_RemoveRecursive)
     Group g;
     TableRef target = g.add_table("target");
     TableRef origin = g.add_table("origin");
+    TableKey target_key = target->get_key();
 
     target->add_column(type_Int, "integers", true);
-    target->add_column_link(type_Link, "links", *target);
-    origin->add_column_link(type_Link, "links", *target);
+    auto link_col_t = target->add_column_link(type_Link, "links", *target);
+    auto link_col_o = origin->add_column_link(type_Link, "links", *target);
 
     // Delete one at a time
-    target->add_empty_row();
-    origin->add_empty_row(2);
-    origin->set_link(0, 0, 0);
-    origin->set_link(0, 1, 0);
+    Key key_target = target->create_object().get_key();
+    Key k0 = origin->create_object().set(link_col_o, key_target).get_key();
+    Key k1 = origin->create_object().set(link_col_o, key_target).get_key();
     CHECK_EQUAL(target->size(), 1);
-    origin->remove_recursive(0);
+    origin->remove_object_recursive(k0);
     // Should not have deleted child
     CHECK_EQUAL(target->size(), 1);
     // Delete last link
-    origin->remove_recursive(0);
+    origin->remove_object_recursive(k1);
     // Now it should be gone
     CHECK_EQUAL(target->size(), 0);
 
     // 3 rows linked together in a list
-    target->add_empty_row(3);
-    target->set_link(1, 0, 1);
-    target->set_link(1, 1, 2);
+    std::vector<Key> keys;
+    target->create_objects(3, keys);
+    target->get_object(keys[0]).set(link_col_t, keys[1]);
+    target->get_object(keys[1]).set(link_col_t, keys[2]);
     bool called = false;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
-        CHECK_EQUAL(3, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(0, notification.rows[0].row_ndx);
-        CHECK_EQUAL(0, notification.rows[1].table_ndx);
-        CHECK_EQUAL(1, notification.rows[1].row_ndx);
-        CHECK_EQUAL(0, notification.rows[2].table_ndx);
-        CHECK_EQUAL(2, notification.rows[2].row_ndx);
+        size_t sz = notification.rows.size();
+        CHECK_EQUAL(3, sz);
+        for (size_t i = 0; i < sz; i++) {
+            CHECK_EQUAL(target_key, notification.rows[i].table_key);
+            CHECK_EQUAL(keys[i], notification.rows[i].key);
+        }
 
         CHECK_EQUAL(0, notification.links.size());
     });
-    target->remove_recursive(0);
+    target->remove_object_recursive(keys[0]);
+    CHECK(called);
     CHECK_EQUAL(target->size(), 0);
 
     // 3 rows linked together in circle
-    target->add_empty_row(3);
-    target->set_link(1, 0, 1);
-    target->set_link(1, 1, 2);
-    target->set_link(1, 2, 0);
+    keys.clear();
+    target->create_objects(3, keys);
+    target->get_object(keys[0]).set(link_col_t, keys[1]);
+    target->get_object(keys[1]).set(link_col_t, keys[2]);
+    target->get_object(keys[2]).set(link_col_t, keys[0]);
+
     called = false;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
-        CHECK_EQUAL(3, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(0, notification.rows[0].row_ndx);
-        CHECK_EQUAL(0, notification.rows[1].table_ndx);
-        CHECK_EQUAL(1, notification.rows[1].row_ndx);
-        CHECK_EQUAL(0, notification.rows[2].table_ndx);
-        CHECK_EQUAL(2, notification.rows[2].row_ndx);
+        size_t sz = notification.rows.size();
+        CHECK_EQUAL(3, sz);
+        for (size_t i = 0; i < sz; i++) {
+            CHECK_EQUAL(target_key, notification.rows[i].table_key);
+            CHECK_EQUAL(keys[i], notification.rows[i].key);
+        }
 
         CHECK_EQUAL(0, notification.links.size());
     });
-    target->remove_recursive(0);
+    target->remove_object_recursive(keys[0]);
+    CHECK(called);
+    CHECK_EQUAL(target->size(), 0);
+
+    // Object linked to itself
+    k0 = target->create_object().get_key();
+    target->get_object(k0).set(link_col_t, k0);
+    g.set_cascade_notification_handler(nullptr);
+    target->remove_object_recursive(k0);
     CHECK_EQUAL(target->size(), 0);
 }
-#endif // LEGACY_TESTS
 
 #endif // TEST_GROUP

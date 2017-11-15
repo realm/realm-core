@@ -71,11 +71,6 @@ protected:
     TableRef m_target_table;
     BacklinkColumn* m_backlink_column = nullptr;
     bool m_weak_links = false; // True if these links are weak (not strong)
-
-    /// Call Table::cascade_break_backlinks_to() for the specified target row if
-    /// it is not already in \a state.rows, and the number of strong links to it
-    /// has dropped to zero.
-    void check_cascade_break_backlinks_to(TableKey target_table_key, size_t target_row_ndx, CascadeState& state);
 };
 
 
