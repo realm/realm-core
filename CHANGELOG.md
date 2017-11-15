@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Table::set_int() did not check if the target column was indeed type_Int. It
+  will now assert like the other set methods.
 
 ### Breaking changes
 
