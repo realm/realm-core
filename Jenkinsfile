@@ -263,6 +263,7 @@ def doBuildOnCentos6(String buildType) {
             image.inside {
                 try {
                     sh """
+                        source scl_source enable devtoolset-3
                         ls -l /usr/bin/ninja
                         mkdir build-dir
                         cd build-dir
