@@ -265,7 +265,7 @@ def doBuildOnCentos6(String buildType) {
                     sh """
                         mkdir build-dir
                         cd build-dir
-                        cmake -D CMAKE_BUILD_TYPE=${buildType} -G Ninja
+                        cmake -D CMAKE_BUILD_TYPE=${buildType} -G Ninja ..
                         cmake --build . --target CoreTests 2>errors.log
                         cmake --build . --target check
                         cmake --build . --target package
