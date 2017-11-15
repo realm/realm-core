@@ -1725,8 +1725,6 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
         bool insert_nulls = is_nullable(col_ndx);
         col.insert_rows(row_ndx, num_rows, m_size, insert_nulls); // Throws
     }
-    if (row_ndx < m_size)
-        adj_row_acc_insert_rows(row_ndx, num_rows);
     m_size += num_rows;
 
     if (Replication* repl = get_repl()) {
@@ -1976,7 +1974,6 @@ void Table::do_remove(size_t row_ndx, bool broken_reciprocal_backlinks)
         size_t prior_num_rows = m_size;
         col.erase_rows(row_ndx, 1, prior_num_rows, broken_reciprocal_backlinks); // Throws
     }
-    adj_row_acc_erase_row(row_ndx);
     --m_size;
     bump_version();
 }
@@ -2019,8 +2016,6 @@ void Table::do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks)
         col.move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
     }
 
-    size_t last_row_ndx = m_size - 1;
-    adj_row_acc_move_over(last_row_ndx, row_ndx);
     --m_size;
     bump_version();
 }
@@ -2035,7 +2030,6 @@ void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         ColumnBase& col = get_column_base(col_ndx);
         col.swap_rows(row_ndx_1, row_ndx_2);
     }
-    adj_row_acc_swap_rows(row_ndx_1, row_ndx_2);
     bump_version();
 }
 
@@ -2049,8 +2043,6 @@ void Table::do_move_row(size_t from_ndx, size_t to_ndx)
         do_swap_rows(from_ndx, to_ndx);
         return;
     }
-
-    adj_row_acc_move_row(from_ndx, to_ndx);
 
     // Adjust the row indexes to compensate for the temporary row used
     if (from_ndx > to_ndx)
@@ -2098,7 +2090,6 @@ void Table::do_merge_rows(size_t row_ndx, size_t new_row_ndx)
         col.swap_rows(row_ndx_1, row_ndx_2);
     }
 
-    adj_row_acc_merge_rows(row_ndx, new_row_ndx);
     bump_version();
 }
 
@@ -2790,7 +2781,6 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value, bool& conflict
         if (ndx == size() - 1)
             ndx = duplicate;
 
-        adj_row_acc_merge_rows(duplicate, winner);
         move_last_over(duplicate);
         // Re-check moved-last-over
         duplicate -= 1;
@@ -2800,7 +2790,6 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value, bool& conflict
     if (winner == size() - 1)
         winner = ndx;
 
-    adj_row_acc_merge_rows(ndx, winner);
     move_last_over(ndx);
 
     return winner;
@@ -4806,250 +4795,6 @@ Table* Table::Parent::get_parent_table(size_t*) noexcept
 Spec* Table::Parent::get_subtable_spec() noexcept
 {
     return nullptr;
-}
-
-void Table::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    adj_row_acc_insert_rows(row_ndx, num_rows);
-
-    // Adjust column and subtable accessors after insertion of new rows
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->adj_acc_insert_rows(row_ndx, num_rows);
-        }
-    }
-}
-
-
-void Table::adj_acc_erase_row(size_t row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    adj_row_acc_erase_row(row_ndx);
-
-    // Adjust subtable accessors after removal of a row
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->adj_acc_erase_row(row_ndx);
-        }
-    }
-}
-
-void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    adj_row_acc_swap_rows(row_ndx_1, row_ndx_2);
-
-    // Adjust subtable accessors after row swap
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->adj_acc_swap_rows(row_ndx_1, row_ndx_2);
-        }
-    }
-}
-
-
-void Table::adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    adj_row_acc_move_row(from_ndx, to_ndx);
-
-    // Adjust subtable accessors after row move
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->adj_acc_move_row(from_ndx, to_ndx);
-        }
-    }
-}
-
-
-void Table::adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    adj_row_acc_merge_rows(old_row_ndx, new_row_ndx);
-
-    // Adjust LinkViews for new rows
-    for (auto& col : m_cols) {
-        if (col) {
-            col->adj_acc_merge_rows(old_row_ndx, new_row_ndx);
-        }
-    }
-}
-
-
-void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    adj_row_acc_move_over(from_row_ndx, to_row_ndx);
-
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->adj_acc_move_over(from_row_ndx, to_row_ndx);
-        }
-    }
-}
-
-
-void Table::adj_acc_clear_root_table() noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistencyLevels.
-
-    discard_row_accessors();
-
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->adj_acc_clear_root_table();
-        }
-    }
-}
-
-
-void Table::adj_acc_clear_nonroot_table() noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistencyLevels.
-
-    discard_child_accessors();
-    destroy_column_accessors();
-    m_columns.detach();
-}
-
-
-void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    // Adjust row accessors after insertion of new rows
-    LockGuard lock(m_accessor_mutex);
-    for (RowBase* row = m_row_accessors; row; row = row->m_next) {
-        if (row->m_row_ndx >= row_ndx)
-            row->m_row_ndx += num_rows;
-    }
-}
-
-
-void Table::adj_row_acc_erase_row(size_t row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    // Adjust row accessors after removal of a row
-    LockGuard lock(m_accessor_mutex);
-    RowBase* row = m_row_accessors;
-    while (row) {
-        RowBase* next = row->m_next;
-        if (row->m_row_ndx == row_ndx) {
-            row->m_table.reset();
-            do_unregister_row_accessor(row);
-        }
-        else if (row->m_row_ndx > row_ndx) {
-            --row->m_row_ndx;
-        }
-        row = next;
-    }
-}
-
-void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    // Adjust row accessors after swap
-    LockGuard lock(m_accessor_mutex);
-    RowBase* row = m_row_accessors;
-    while (row) {
-        if (row->m_row_ndx == row_ndx_1) {
-            row->m_row_ndx = row_ndx_2;
-        }
-        else if (row->m_row_ndx == row_ndx_2) {
-            row->m_row_ndx = row_ndx_1;
-        }
-        row = row->m_next;
-    }
-}
-
-
-void Table::adj_row_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    // Adjust row accessors after move
-    LockGuard lock(m_accessor_mutex);
-    RowBase* row = m_row_accessors;
-    while (row) {
-        size_t ndx = row->m_row_ndx;
-        if (ndx == from_ndx)
-            row->m_row_ndx = to_ndx;
-        else if (ndx > from_ndx && ndx <= to_ndx)
-            row->m_row_ndx = ndx - 1;
-        else if (ndx >= to_ndx && ndx < from_ndx)
-            row->m_row_ndx = ndx + 1;
-        row = row->m_next;
-    }
-}
-
-
-void Table::adj_row_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    LockGuard lock(m_accessor_mutex);
-    RowBase* row = m_row_accessors;
-    while (row) {
-        if (row->m_row_ndx == old_row_ndx)
-            row->m_row_ndx = new_row_ndx;
-        row = row->m_next;
-    }
-}
-
-
-void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-    LockGuard lock(m_accessor_mutex);
-    RowBase* row = m_row_accessors;
-    while (row) {
-        RowBase* next = row->m_next;
-        if (row->m_row_ndx == to_row_ndx) {
-            row->m_table.reset();
-            do_unregister_row_accessor(row);
-        }
-        else if (row->m_row_ndx == from_row_ndx) {
-            row->m_row_ndx = to_row_ndx;
-        }
-        row = next;
-    }
 }
 
 

@@ -49,11 +49,6 @@ void LinkListColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size
     }
 
     LinkColumnBase::insert_rows(row_ndx, num_rows_to_insert, prior_num_rows, insert_nulls); // Throws
-
-    if (num_rows_moved > 0) {
-        const bool fix_ndx_in_parent = true;
-        adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows_to_insert);
-    }
 }
 
 
@@ -96,9 +91,6 @@ void LinkListColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
     }
 
     LinkColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, broken_reciprocal_backlinks); // Throws
-
-    const bool fix_ndx_in_parent = true;
-    adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_to_erase);
 }
 
 
@@ -135,9 +127,6 @@ void LinkListColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows, b
 
     // Do the actual delete and move
     LinkColumnBase::move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
-
-    const bool fix_ndx_in_parent = true;
-    adj_move_over<fix_ndx_in_parent>(last_row_ndx, row_ndx);
 }
 
 
@@ -178,8 +167,6 @@ void LinkListColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     }
 
     IntegerColumn::swap_rows(row_ndx_1, row_ndx_2);
-    const bool fix_ndx_in_parent = true;
-    adj_swap<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
 }
 
 
@@ -436,240 +423,6 @@ void LinkListColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 }
 
 
-void LinkListColumn::adj_acc_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
-{
-    LinkColumnBase::adj_acc_insert_rows(row_ndx, num_rows_inserted);
-
-    const bool fix_ndx_in_parent = false;
-    adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows_inserted);
-}
-
-
-void LinkListColumn::adj_acc_erase_row(size_t row_ndx) noexcept
-{
-    LinkColumnBase::adj_acc_erase_row(row_ndx);
-
-    const bool fix_ndx_in_parent = false;
-    size_t num_rows_erased = 1;
-    adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_erased);
-}
-
-
-void LinkListColumn::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
-{
-    LinkColumnBase::adj_acc_move_over(from_row_ndx, to_row_ndx);
-
-    const bool fix_ndx_in_parent = false;
-    adj_move_over<fix_ndx_in_parent>(from_row_ndx, to_row_ndx);
-}
-
-
-void LinkListColumn::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
-{
-    LinkColumnBase::adj_acc_swap_rows(row_ndx_1, row_ndx_2);
-
-    const bool fix_ndx_in_parent = false;
-    adj_swap<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
-}
-
-
-void LinkListColumn::adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
-{
-    LinkColumnBase::adj_acc_move_row(from_ndx, to_ndx);
-
-    const bool fix_ndx_in_parent = false;
-    adj_move<fix_ndx_in_parent>(from_ndx, to_ndx);
-}
-
-
-void LinkListColumn::adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
-{
-    prune_list_accessor_tombstones();
-
-    auto begin = m_list_accessors.begin(), end = m_list_accessors.end();
-    auto old_it = std::lower_bound(begin, end, list_entry{old_row_ndx, std::weak_ptr<LinkView>()});
-    if (old_it == end || old_it->m_row_ndx != old_row_ndx)
-        return;
-
-    // move the accessor to the correct position in the sorted list for the new value
-    if (old_row_ndx < new_row_ndx) {
-        auto new_it = std::lower_bound(old_it, end, list_entry{new_row_ndx, std::weak_ptr<LinkView>()});
-        std::rotate(old_it, old_it + 1, new_it);
-        old_it = new_it - 1;
-    }
-    else {
-        auto new_it = std::lower_bound(begin, old_it, list_entry{new_row_ndx, std::weak_ptr<LinkView>()});
-        std::rotate(new_it, old_it, old_it + 1);
-        old_it = new_it;
-    }
-
-    // update the accessor
-    old_it->m_row_ndx = new_row_ndx;
-    if (LinkViewRef list = old_it->m_list.lock())
-        list->set_origin_row_index(new_row_ndx);
-
-    validate_list_accessors();
-}
-
-
-template <bool fix_ndx_in_parent>
-void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
-{
-    prune_list_accessor_tombstones();
-
-    auto end = m_list_accessors.end();
-    auto it = std::lower_bound(m_list_accessors.begin(), end, list_entry{row_ndx, std::weak_ptr<LinkView>()});
-    for (; it != end; ++it) {
-        it->m_row_ndx += num_rows_inserted;
-        if (fix_ndx_in_parent) {
-            if (LinkViewRef list = it->m_list.lock())
-                list->set_origin_row_index(it->m_row_ndx);
-        }
-    }
-
-    validate_list_accessors();
-}
-
-
-template <bool fix_ndx_in_parent>
-void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept
-{
-    prune_list_accessor_tombstones();
-
-    auto end = m_list_accessors.end();
-    auto erased_begin =
-        std::lower_bound(m_list_accessors.begin(), end, list_entry{row_ndx, std::weak_ptr<LinkView>()});
-    auto erased_end =
-        std::lower_bound(erased_begin, end, list_entry{row_ndx + num_rows_erased, std::weak_ptr<LinkView>()});
-
-    for (auto it = erased_begin; it != erased_end; ++it) {
-        if (LinkViewRef list = it->m_list.lock())
-            list->detach();
-    }
-
-    for (auto it = erased_end; it != end; ++it) {
-        it->m_row_ndx -= num_rows_erased;
-        if (fix_ndx_in_parent) {
-            if (LinkViewRef list = it->m_list.lock())
-                list->set_origin_row_index(it->m_row_ndx);
-        }
-    }
-
-    m_list_accessors.erase(erased_begin, erased_end);
-
-    validate_list_accessors();
-}
-
-
-template <bool fix_ndx_in_parent>
-void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
-{
-    prune_list_accessor_tombstones();
-
-    auto begin = m_list_accessors.begin();
-    auto end = m_list_accessors.end();
-
-    bool to_is_valid = false;
-    auto to = std::lower_bound(begin, end, list_entry{to_row_ndx, std::weak_ptr<LinkView>()});
-    if (to != end && to->m_row_ndx == to_row_ndx) {
-        to_is_valid = true;
-
-        if (LinkViewRef list = to->m_list.lock()) {
-            list->detach();
-            to->m_list.reset();
-            m_list_accessors_contains_tombstones = true;
-        }
-    }
-    if (from_row_ndx == to_row_ndx) {
-        validate_list_accessors();
-        return;
-    }
-
-    auto from = std::lower_bound(begin, end, list_entry{from_row_ndx, std::weak_ptr<LinkView>()});
-    if (from != end && from->m_row_ndx == from_row_ndx) {
-        from->m_row_ndx = to_row_ndx;
-        if (fix_ndx_in_parent) {
-            if (LinkViewRef list = from->m_list.lock())
-                list->set_origin_row_index(to_row_ndx);
-        }
-
-        if (to_is_valid) {
-            to->m_row_ndx = from_row_ndx;
-            std::iter_swap(to, from);
-        }
-        else if (from < to) {
-            std::rotate(from, from + 1, to);
-        }
-        else {
-            std::rotate(to, from, from + 1);
-        }
-    }
-
-    validate_list_accessors();
-}
-
-
-template <bool fix_ndx_in_parent>
-void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
-{
-    prune_list_accessor_tombstones();
-
-    auto begin = m_list_accessors.begin();
-    auto end = m_list_accessors.end();
-
-    auto it_1 = std::lower_bound(begin, end, list_entry{row_ndx_1, std::weak_ptr<LinkView>()});
-    bool row_1_found = (it_1 != end && it_1->m_row_ndx == row_ndx_1);
-    LinkViewRef ptr_1;
-    if (row_1_found) {
-        ptr_1 = it_1->m_list.lock();
-        if (!bool(ptr_1))
-            row_1_found = false;
-    }
-    auto it_2 = std::lower_bound(begin, end, list_entry{row_ndx_2, std::weak_ptr<LinkView>()});
-    bool row_2_found = (it_2 != end && it_2->m_row_ndx == row_ndx_2);
-    LinkViewRef ptr_2;
-    if (row_2_found) {
-        ptr_2 = it_2->m_list.lock();
-        if (!bool(ptr_2))
-            row_2_found = false;
-    }
-    if (row_1_found && row_2_found) {
-        if (fix_ndx_in_parent) {
-            ptr_1->set_origin_row_index(row_ndx_2);
-            ptr_2->set_origin_row_index(row_ndx_1);
-        }
-        std::swap(it_1->m_list, it_2->m_list);
-    }
-    else if (row_1_found || row_2_found) {
-        auto single = end;
-        auto remainder = end;
-
-        if (row_1_found) {
-            it_1->m_row_ndx = row_ndx_2;
-            if (fix_ndx_in_parent)
-                ptr_1->set_origin_row_index(row_ndx_2);
-
-            single = it_1;
-            remainder = it_2;
-        }
-        else {
-            it_2->m_row_ndx = row_ndx_1;
-            if (fix_ndx_in_parent)
-                ptr_2->set_origin_row_index(row_ndx_1);
-
-            single = it_2;
-            remainder = it_1;
-        }
-
-        if (single < remainder)
-            std::rotate(single, single + 1, remainder);
-        else
-            std::rotate(remainder, single, single + 1);
-    }
-
-    validate_list_accessors();
-}
-
 
 template <bool fix_ndx_in_parent>
 void LinkListColumn::adj_move(size_t from_ndx, size_t to_ndx) noexcept
@@ -682,13 +435,6 @@ void LinkListColumn::adj_move(size_t from_ndx, size_t to_ndx) noexcept
         adj_erase_rows<fix_ndx_in_parent>(from_ndx, 1);
         adj_insert_rows<fix_ndx_in_parent>(to_ndx, 1);
     }
-}
-
-
-void LinkListColumn::adj_acc_clear_root_table() noexcept
-{
-    LinkColumnBase::adj_acc_clear_root_table();
-    discard_child_accessors();
 }
 
 

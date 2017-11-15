@@ -1308,56 +1308,6 @@ private:
     /// minimal accessor consistency (see AccessorConsistencyLevels.)
     Table* get_link_target_table_accessor(size_t col_ndx) noexcept;
 
-    void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
-    void adj_acc_erase_row(size_t row_ndx) noexcept;
-    void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
-    void adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept;
-    void adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
-
-    /// Adjust this table accessor and its subordinates after move_last_over()
-    /// (or its inverse).
-    ///
-    /// First, any row, subtable, or link list accessors registered as being at
-    /// \a to_row_ndx will be detached, as that row is assumed to have been
-    /// replaced. Next, any row, subtable, or link list accessors registered as
-    /// being at \a from_row_ndx, will be reregistered as being at \a
-    /// to_row_ndx, as the row at \a from_row_ndx is assumed to have been moved
-    /// to \a to_row_ndx.
-    ///
-    /// Crucially, if \a to_row_ndx is equal to \a from_row_ndx, then row,
-    /// subtable, or link list accessors at that row are **still detached**.
-    ///
-    /// Additionally, this function causes all link-adjacent tables to be marked
-    /// (dirty). Two tables are link-adjacent if one is the target table of a
-    /// link column of the other table. Note that this marking follows these
-    /// relations in both directions, but only to a depth of one.
-    ///
-    /// When this function is used in connection with move_last_over(), set \a
-    /// to_row_ndx to the index of the row to be removed, and set \a
-    /// from_row_ndx to the index of the last row in the table. As mentioned
-    /// earlier, this function can also be used in connection with the **inverse
-    /// of** move_last_over(), which is an operation that vacates a row by
-    /// moving its contents into a new last row of the table. In that case, set
-    /// \a to_row_ndx to one plus the index of the last row in the table, and
-    /// set \a from_row_ndx to the index of the row to be vacated.
-    ///
-    /// This function is used as part of Table::refresh_accessor_tree() to
-    /// promote the state of the accessors from Minimal Consistency into
-    /// Structural Correspondence, so it must be able to execute without
-    /// accessing the underlying array nodes.
-    void adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
-
-    void adj_acc_clear_root_table() noexcept;
-    void adj_acc_clear_nonroot_table() noexcept;
-    void adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
-    void adj_row_acc_erase_row(size_t row_ndx) noexcept;
-    void adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
-    void adj_row_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept;
-    void adj_row_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
-
-    /// Called by adj_acc_move_over() to adjust row accessors.
-    void adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
-
     void adj_insert_column(size_t col_ndx);
     void adj_erase_column(size_t col_ndx) noexcept;
     void adj_move_column(size_t col_ndx_1, size_t col_ndx_2) noexcept;
@@ -2370,45 +2320,6 @@ public:
         return table.get_link_target_table_accessor(col_ndx);
     }
 
-    static void adj_acc_insert_rows(Table& table, size_t row_ndx, size_t num_rows) noexcept
-    {
-        table.adj_acc_insert_rows(row_ndx, num_rows);
-    }
-
-    static void adj_acc_erase_row(Table& table, size_t row_ndx) noexcept
-    {
-        table.adj_acc_erase_row(row_ndx);
-    }
-
-    static void adj_acc_swap_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept
-    {
-        table.adj_acc_swap_rows(row_ndx_1, row_ndx_2);
-    }
-
-    static void adj_acc_move_row(Table& table, size_t from_ndx, size_t to_ndx) noexcept
-    {
-        table.adj_acc_move_row(from_ndx, to_ndx);
-    }
-
-    static void adj_acc_merge_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept
-    {
-        table.adj_acc_merge_rows(row_ndx_1, row_ndx_2);
-    }
-
-    static void adj_acc_move_over(Table& table, size_t from_row_ndx, size_t to_row_ndx) noexcept
-    {
-        table.adj_acc_move_over(from_row_ndx, to_row_ndx);
-    }
-
-    static void adj_acc_clear_root_table(Table& table) noexcept
-    {
-        table.adj_acc_clear_root_table();
-    }
-
-    static void adj_acc_clear_nonroot_table(Table& table) noexcept
-    {
-        table.adj_acc_clear_nonroot_table();
-    }
 
     static void adj_insert_column(Table& table, size_t col_ndx)
     {
