@@ -37,13 +37,19 @@ SimulationColumn::~SimulationColumn() noexcept
 {
 }
 
-void SimulationColumn::insert_value(size_t ndx, AnyType value)
+void SimulationColumn::insert_value(size_t ndx, AnyType value, size_t count)
 {
     REALM_ASSERT_EX(ndx <= m_values.size(), ndx, m_values.size());
-    m_values.insert(m_values.begin() + ndx, value);
+    m_values.insert(m_values.begin() + ndx, count, value);
 }
 
-AnyType SimulationColumn::get_value(size_t ndx) const
+void SimulationColumn::remove(size_t ndx)
+{
+    REALM_ASSERT_EX(ndx < m_values.size(), ndx, m_values.size());
+    m_values.erase(m_values.begin() + ndx);
+}
+
+AnyType& SimulationColumn::get_value(size_t ndx)
 {
     REALM_ASSERT_EX(ndx < m_values.size(), ndx, m_values.size());
     return m_values[ndx];
@@ -52,6 +58,16 @@ AnyType SimulationColumn::get_value(size_t ndx) const
 void SimulationColumn::set_name(std::string name)
 {
     m_name = name;
+}
+
+void SimulationColumn::move(size_t from, size_t length, size_t to)
+{
+    move_range<AnyType>(from, length, to, m_values);
+}
+
+void SimulationColumn::clear()
+{
+    m_values.clear();
 }
 
 std::string SimulationColumn::get_name() const
@@ -67,4 +83,9 @@ StableKey SimulationColumn::get_id() const
 realm::DataType SimulationColumn::get_type() const
 {
     return m_type;
+}
+
+size_t SimulationColumn::num_rows() const
+{
+    return m_values.size();
 }

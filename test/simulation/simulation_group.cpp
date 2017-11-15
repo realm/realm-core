@@ -52,6 +52,9 @@ void SimulationGroup::verify(const Group& other)
             DataType col_type1 = t1->get_column_type(col);
             DataType col_type2 = t2.get_column(col).get_type();
             REALM_ASSERT(col_type1 == col_type2);
+            size_t num_rows1 = t1->size();
+            size_t num_rows2 = t2.get_num_rows();
+            REALM_ASSERT(num_rows1 == num_rows2);
         }
     }
 }

@@ -33,12 +33,16 @@ public:
     SimulationColumn(DataType type, std::string name);
     SimulationColumn(DataType type, std::string name, StableKey linked_table);
     ~SimulationColumn() noexcept;
-    void insert_value(size_t ndx, AnyType value);
-    AnyType get_value(size_t ndx) const;
+    void insert_value(size_t ndx, AnyType value, size_t count = 1);
+    void remove(size_t ndx);
+    AnyType& get_value(size_t ndx);
     void set_name(std::string name);
     std::string get_name() const;
     StableKey get_id() const;
     DataType get_type() const;
+    size_t num_rows() const;
+    void move(size_t from, size_t length, size_t to);
+    void clear();
 private:
     std::vector<AnyType> m_values;
     DataType m_type;

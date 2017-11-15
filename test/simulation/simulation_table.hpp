@@ -35,18 +35,26 @@ public:
     std::string get_name() const;
     void set_name(std::string table_name);
 
-    void add_column(DataType type, std::string name);
     void insert_column(size_t ndx, SimulationColumn col);
     void remove_column(size_t ndx);
     void rename_column(size_t ndx, std::string name);
     void move_column(size_t from, size_t to);
     std::string get_column_name(size_t ndx) const;
     size_t get_num_columns() const;
+    size_t get_num_rows() const;
     StableKey get_id() const;
     SimulationColumn& get_column(size_t ndx);
+    StableKey get_row_id(size_t row) const;
+
+    void add_row(size_t num_rows, std::vector<AnyType> values = {});
+    void insert_row(size_t ndx, size_t num_rows, std::vector<AnyType> values = {});
+    void remove_row(size_t ndx);
+    void move_last_over(size_t ndx);
+    void clear();
 
 private:
     std::vector<SimulationColumn> m_columns;
+    std::vector<StableKey> m_ids;
     std::string m_name;
     StableKey m_key;
 };

@@ -52,26 +52,6 @@ private:
     std::vector<SimulationTable> tables;
 };
 
-template <typename T>
-void move_range(size_t start, size_t length, size_t dst, std::vector<T> & v)
-{
-    typename std::vector<T>::iterator first, middle, last;
-    if (start < dst)
-    {
-        first  = v.begin() + start;
-        middle = first + length;
-        last   = v.begin() + dst + 1;
-    }
-    else
-    {
-        first  = v.begin() + dst;
-        middle = v.begin() + start;
-        last   = middle + length;
-    }
-    std::rotate(first, middle, last);
-}
-
-
 } // namespace simulation
 } // namespace realm
 

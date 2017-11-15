@@ -33,14 +33,18 @@ namespace realm {
 namespace simulation {
 
 struct StableLink {
+    StableLink() {}
+    StableLink(StableKey to_table, StableKey to_row)
+    : table(to_table)
+    , row(to_row) {}
     StableKey table;
-    StableKey column;
     StableKey row;
 };
 
 class AnyType {
 public:
-    AnyType();
+    AnyType() noexcept;
+    AnyType(DataType type) noexcept;
     ~AnyType() noexcept;
     AnyType(bool) noexcept;
     AnyType(int64_t) noexcept;
@@ -50,10 +54,7 @@ public:
     AnyType(BinaryData) noexcept;
     AnyType(Timestamp) noexcept;
     AnyType(StableLink) noexcept;
-    DataType get_type() const noexcept
-    {
-        return m_type;
-    }
+    DataType get_type() const noexcept;
 
     int64_t get_int() const noexcept;
     bool get_bool() const noexcept;
@@ -63,9 +64,10 @@ public:
     BinaryData get_binary() const noexcept;
     Timestamp get_timestamp() const noexcept;
     StableLink get_link() const noexcept;
-    std::vector<AnyType>& get_subtable() noexcept;
+    std::vector<AnyType>& get_list() noexcept; // this is for subtable (of one column) and linklist
 
     void set_int(int64_t) noexcept;
+    void add_int(int64_t) noexcept;
     void set_bool(bool) noexcept;
     void set_float(float) noexcept;
     void set_double(double) noexcept;
@@ -75,6 +77,7 @@ public:
     void set_timestamp(Timestamp) noexcept;
     void set_link(StableLink) noexcept;
 
+    static AnyType get_default_value(DataType type);
 private:
     DataType m_type;
     union {
@@ -86,9 +89,27 @@ private:
     };
     StableLink m_link;
     std::string m_data;
-    std::vector<StableKey> m_linklist;
-    std::vector<AnyType> m_subtable;
+    std::vector<AnyType> m_list;
 };
+
+template <typename T>
+void move_range(size_t start, size_t length, size_t dst, std::vector<T> & v)
+{
+    typename std::vector<T>::iterator first, middle, last;
+    if (start < dst)
+    {
+        first  = v.begin() + start;
+        middle = first + length;
+        last   = v.begin() + dst + 1;
+    }
+    else
+    {
+        first  = v.begin() + dst;
+        middle = v.begin() + start;
+        last   = middle + length;
+    }
+    std::rotate(first, middle, last);
+}
 
 } // namespace simulation
 } // namespace realm
