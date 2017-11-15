@@ -258,7 +258,7 @@ def doBuildOnCentos6(String buildType) {
         node('docker') {
             getArchive()
 
-            def stashName = "Linux___{buildType}"
+            def stashName = "Linux___${buildType}"
             def image = docker.build('centos6:snapshot', '-f tools/docker/centos6.Dockerfile .')
             withEnv(environment()) {
                 image.inside {
