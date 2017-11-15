@@ -263,6 +263,7 @@ def doBuildOnCentos6(String buildType) {
             image.inside {
                 try {
                     sh """
+                        ls -l /usr/bin/ninja
                         mkdir build-dir
                         cd build-dir
                         cmake -D CMAKE_BUILD_TYPE=${buildType} -G Ninja ..

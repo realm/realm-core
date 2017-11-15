@@ -36,8 +36,8 @@ RUN cd /opt \
     && wget https://github.com/ninja-build/ninja/releases/download/v1.7.2/ninja-linux.zip \
     && unzip ninja-linux.zip \
     && rm -f ninja-linux.zip \
-    && chmod a+x ninja \
-    && mv ninja /usr/bin
+    && mv ninja /usr/bin \
+    && chmod a+rx ninja
 
 # Make sure the above SCLs are already enabled
 ENTRYPOINT ["/usr/bin/scl", "enable", "devtoolset-3", "--"]
