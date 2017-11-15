@@ -1,4 +1,4 @@
-FROM centos:6
+FROM jagij/gcc:6
 
 # whatever is required for building should be installed in this image; just
 # like BuildRequires: for RPM specs
@@ -11,17 +11,13 @@ RUN touch /var/lib/rpm/* \
         centos-release-scl-rh \
     && yum -y install \
         chrpath \
-        devtoolset-3-binutils \
-        devtoolset-3-gcc \
-        devtoolset-3-gcc-c++ \
         git \
         openssl-devel \
         procps-devel \
         unzip \
         wget \
         which \
-    && yum clean all \
-    && /usr/bin/scl enable devtoolset-3 true
+    && yum clean all
 
 # Install CMake
 RUN cd /opt \
@@ -38,7 +34,3 @@ RUN cd /opt \
     && rm -f ninja-linux.zip \
     && mv ninja /usr/bin \
     && chmod a+rx /usr/bin/ninja
-
-# Make sure the above SCLs are already enabled
-ENTRYPOINT ["/usr/bin/scl", "enable", "devtoolset-3", "--"]
-CMD ["/usr/bin/scl", "enable", "devtoolset-3", "--", "/bin/bash"]
