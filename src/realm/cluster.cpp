@@ -849,27 +849,28 @@ unsigned Cluster::erase(Key k)
     size_t num_cols = spec.get_column_count();
     size_t num_public_cols = spec.get_public_column_count();
     // We must start with backlink columns in case the corresponding link
-    // columns are in the same table so that the link columns are not updated
-    // twice. Backlink columns will nullify the rows in connected link columns
-    // first so by the time we get to the link column in this loop, the rows to
-    // be removed have already been nullified.
+    // columns are in the same table so that we can nullify links before
+    // erasing rows in the link columns.
     //
     // This phase also generates replication instructions documenting the side-
     // effects of deleting the object (i.e. link nullifications). These instructions
     // must come before the actual deletion of the object, but at the same time
     // the Replication object may need a consistent view of the row (not including
-    // link columns). Therefore we first delete the row in backlink columns, then
+    // link columns). Therefore we first nullify links to this object, then
     // generate the instruction, and then delete the row in the remaining columns.
     for (size_t col_ndx = num_cols - 1; col_ndx >= num_public_cols; --col_ndx) {
         REALM_ASSERT(spec.get_column_type(col_ndx) == col_type_BackLink);
-        do_erase<ArrayBacklink>(ndx, col_ndx);
+        ArrayBacklink values(m_alloc);
+        values.set_parent(this, col_ndx + 1);
+        values.init_from_parent();
+        values.nullify_fwd_links(ndx);
     }
 
     if (Replication* repl = m_alloc.get_replication()) {
         repl->remove_object(m_tree_top.get_owner(), k);
     }
 
-    for (size_t col_ndx = 0; col_ndx < num_public_cols; col_ndx++) {
+    for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
         ColumnAttrMask attr = spec.get_column_attr(col_ndx);
         if (attr.test(col_attr_List)) {
             ArrayInteger values(m_alloc);
@@ -914,6 +915,9 @@ unsigned Cluster::erase(Key k)
                 break;
             case col_type_Link:
                 do_erase<ArrayKey>(ndx, col_ndx);
+                break;
+            case col_type_BackLink:
+                do_erase<ArrayBacklink>(ndx, col_ndx);
                 break;
             default:
                 REALM_ASSERT(false);

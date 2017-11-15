@@ -22,24 +22,25 @@
 
 using namespace realm;
 
-void ArrayBacklink::erase(size_t ndx)
+void ArrayBacklink::nullify_fwd_links(size_t ndx)
 {
-    auto cluster = dynamic_cast<Cluster*>(get_parent());
-    size_t col_ndx = get_ndx_in_parent() - 1;
-    Key target_key_value = Key(cluster->get_key(ndx));
-
-    const Spec& spec = cluster->m_tree_top.get_spec();
-
-    TableRef target_table = _impl::TableFriend::get_opposite_link_table(*cluster->m_tree_top.get_owner(), col_ndx);
-    size_t origin_col = spec.get_origin_column_ndx(col_ndx);
-
-    auto clear_link = [&target_table, origin_col, target_key_value](Key origin_key) {
-        Obj obj = target_table->get_object(origin_key);
-        obj.nullify_link(origin_col, target_key_value);
-    };
-
     uint64_t value = Array::get(ndx);
     if (value != 0) {
+        auto cluster = dynamic_cast<Cluster*>(get_parent());
+        size_t col_ndx = get_ndx_in_parent() - 1;
+        Key target_key_value = Key(cluster->get_key(ndx));
+
+        const Spec& spec = cluster->m_tree_top.get_spec();
+
+        TableRef target_table =
+            _impl::TableFriend::get_opposite_link_table(*cluster->m_tree_top.get_owner(), col_ndx);
+        size_t origin_col = spec.get_origin_column_ndx(col_ndx);
+
+        auto clear_link = [&target_table, origin_col, target_key_value](Key origin_key) {
+            Obj obj = target_table->get_object(origin_key);
+            obj.nullify_link(origin_col, target_key_value);
+        };
+
         if ((value & 1) != 0) {
             clear_link(Key(value >> 1));
         }
@@ -57,7 +58,6 @@ void ArrayBacklink::erase(size_t ndx)
             backlink_list.destroy();
         }
     }
-    Array::erase(ndx);
 }
 
 void ArrayBacklink::add(size_t ndx, Key key)
