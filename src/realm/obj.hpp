@@ -61,6 +61,11 @@ public:
     }
     const Table* get_table() const;
 
+    // Check if the object is still alive
+    bool is_valid();
+    // Delete object from table. Object is invalid afterwards.
+    void remove();
+
     template <typename U>
     U get(size_t col_ndx) const;
 
@@ -178,6 +183,7 @@ private:
     void add_backlink(size_t backlink_col, Key origin_key);
     void remove_one_backlink(size_t backlink_col, Key origin_key);
     void nullify_link(size_t origin_col, Key target_key);
+    bool update_backlinks(size_t col_ndx, Key old_key, Key new_key, CascadeState& state);
 };
 
 

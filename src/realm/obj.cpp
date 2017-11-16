@@ -113,6 +113,16 @@ const Table* ConstObj::get_table() const
     return m_tree_top->get_owner();
 }
 
+bool ConstObj::is_valid()
+{
+    return get_table()->is_valid(m_key);
+}
+
+void ConstObj::remove()
+{
+    const_cast<Table*>(get_table())->remove_object(m_key);
+}
+
 size_t ConstObj::get_column_index(StringData col_name) const
 {
     return m_tree_top->get_spec().get_column_index(col_name);
@@ -393,26 +403,21 @@ Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
     values.set_parent(&fields, col_ndx + 1);
     values.init_from_parent();
 
-    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-    size_t backlink_col = target_table_spec.find_backlink_column(get_table_key(), col_ndx);
-
     Key old_key = values.get(m_row_ndx);
 
-    if (old_key != realm::null_key) {
-        Obj target_obj = target_table->get_object(old_key);
-        target_obj.remove_one_backlink(backlink_col, m_key); // Throws
-    }
+    if (target_key != old_key) {
+        CascadeState state;
+        bool recurse = update_backlinks(col_ndx, old_key, target_key, state);
 
-    values.set(m_row_ndx, target_key);
+        values.set(m_row_ndx, target_key);
 
-    if (target_key != realm::null_key) {
-        Obj target_obj = target_table->get_object(target_key);
-        target_obj.add_backlink(backlink_col, m_key); // Throws
-    }
+        if (Replication* repl = alloc.get_replication()) {
+            repl->set(m_tree_top->get_owner(), col_ndx, size_t(m_key.value), target_key,
+                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        }
 
-    if (Replication* repl = alloc.get_replication()) {
-        repl->set(m_tree_top->get_owner(), col_ndx, size_t(m_key.value), target_key,
-                  is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        if (recurse)
+            _impl::TableFriend::remove_recursive(*target_table, state);
     }
 
     bump_version();
@@ -563,6 +568,38 @@ void Obj::nullify_link(size_t origin_col, Key target_key)
         if (Replication* repl = alloc.get_replication())
             repl->set<Key>(m_tree_top->get_owner(), origin_col, m_row_ndx, Key{}, _impl::instr_Set); // Throws
     }
+}
+
+bool Obj::update_backlinks(size_t col_ndx, Key old_key, Key new_key, CascadeState& state)
+{
+    bool recurse = false;
+
+    TableRef target_table = get_target_table(col_ndx);
+    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
+    size_t backlink_col = target_table_spec.find_backlink_column(get_table_key(), col_ndx);
+
+    if (old_key != realm::null_key) {
+        const Table* origin_table = get_table();
+        const Spec& origin_table_spec = _impl::TableFriend::get_spec(*origin_table);
+
+        Obj target_obj = target_table->get_object(old_key);
+        target_obj.remove_one_backlink(backlink_col, m_key); // Throws
+
+        if (origin_table_spec.get_column_attr(col_ndx).test(col_attr_StrongLinks)) {
+            size_t num_remaining = target_obj.get_backlink_count(*origin_table, col_ndx);
+            if (num_remaining == 0) {
+                state.rows.emplace_back(target_table->get_key(), old_key);
+                recurse = true;
+            }
+        }
+    }
+
+    if (new_key != realm::null_key) {
+        Obj target_obj = target_table->get_object(new_key);
+        target_obj.add_backlink(backlink_col, m_key); // Throws
+    }
+
+    return recurse;
 }
 
 namespace realm {

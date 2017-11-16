@@ -231,6 +231,7 @@ public:
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
 private:
+    friend class Table;
     void insert_row(size_t ndx, Key k);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
     template <class T>
@@ -243,7 +244,7 @@ private:
     void do_move(size_t ndx, size_t col_ndx, Cluster* to);
     template <class T>
     void do_erase(size_t ndx, size_t col_ndx);
-    void remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys, CascadeState& state);
+    void remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys, CascadeState& state) const;
     void do_erase_key(size_t ndx, size_t col_ndx, CascadeState& state);
 };
 

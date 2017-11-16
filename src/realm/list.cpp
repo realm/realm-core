@@ -121,23 +121,18 @@ Key List<Key>::set(size_t ndx, Key target_key)
 {
     ensure_writeable();
 
-    TableRef target_table = m_obj.get_target_table(m_col_ndx);
-    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-    size_t backlink_col = target_table_spec.find_backlink_column(m_obj.get_table_key(), m_col_ndx);
-
     // get will check for ndx out of bounds
     Key old_key = get(ndx);
+    if (target_key != old_key) {
+        CascadeState state;
+        bool recurse = m_obj.update_backlinks(m_col_ndx, old_key, target_key, state);
 
-    if (old_key != realm::null_key) {
-        Obj target_obj = target_table->get_object(old_key);
-        target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
-    }
+        m_leaf->set(ndx, target_key);
 
-    m_leaf->set(ndx, target_key);
-
-    if (target_key != realm::null_key) {
-        Obj target_obj = target_table->get_object(target_key);
-        target_obj.add_backlink(backlink_col, m_obj.get_key()); // Throws
+        if (recurse) {
+            auto table = const_cast<Table*>(m_obj.get_table());
+            _impl::TableFriend::remove_recursive(*table, state); // Throws
+        }
     }
 
     m_obj.bump_version();
@@ -185,6 +180,7 @@ void List<Key>::clear()
     }
 
     TableRef target_table = m_obj.get_target_table(m_col_ndx);
+    TableKey target_table_key = target_table->get_key();
     const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
     size_t backlink_col = target_table_spec.find_backlink_column(m_obj.get_table_key(), m_col_ndx);
 
@@ -199,17 +195,9 @@ void List<Key>::clear()
         Obj target_obj = target_table->get_object(target_key);
         target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
         size_t num_remaining = target_obj.get_backlink_count(*origin_table, m_col_ndx);
-        if (num_remaining > 0) {
-            continue;
+        if (num_remaining == 0) {
+            state.rows.emplace_back(target_table_key, target_key);
         }
-
-        CascadeState::row target_row;
-        target_row.table_key = target_table->get_key();
-        target_row.key = target_key;
-        auto i = std::upper_bound(state.rows.begin(), state.rows.end(), target_row);
-        // This target row cannot already be in state.rows
-        REALM_ASSERT(i == state.rows.begin() || i[-1] != target_row);
-        state.rows.insert(i, target_row);
     }
 
     m_leaf->truncate_and_destroy_children(0);

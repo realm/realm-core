@@ -1981,18 +1981,53 @@ void Table::clear()
         do_clear(broken_reciprocal_backlinks);
     }
     else {
+        CascadeState state(CascadeState::Mode::strong);
+        Allocator& alloc = get_alloc();
         // Group-level tables may have links, so in those cases we need to
         // discover all the rows that need to be cascade-removed.
-        CascadeState state;
-        state.stop_on_table = this;
-        auto table_key = get_key();
-        for (auto& obj : *this) {
-            state.rows.emplace_back(table_key, obj.get_key());
-        }
-        if (Group* g = get_parent_group())
-            state.track_link_nullifications = g->has_cascade_notification_handler();
+        size_t num_cols = m_spec->get_column_count();
+        for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+            auto attr = m_spec->get_column_attr(col_ndx);
+            auto col_type = m_spec->get_column_type(col_ndx);
+            if (attr.test(col_attr_StrongLinks) && is_link_type(col_type)) {
 
-        remove_recursive(state); // Throws
+                // This function will add objects that should be deleted to 'state'
+                auto func = [col_ndx, col_type, &state, &alloc](const Cluster* cluster, int64_t key_offsets) {
+                    if (col_type == col_type_Link) {
+                        ArrayKey values(alloc);
+                        cluster->init_leaf(col_ndx, &values);
+                        size_t sz = values.size();
+                        for (size_t i = 0; i < sz; i++) {
+                            if (Key key = values.get(i)) {
+                                cluster->remove_backlinks(Key(cluster->get_key(i) + key_offsets), col_ndx, {key},
+                                                          state);
+                            }
+                        }
+                    }
+                    else if (col_type == col_type_LinkList) {
+                        ArrayInteger values(alloc);
+                        cluster->init_leaf(col_ndx, &values);
+                        size_t sz = values.size();
+                        for (size_t i = 0; i < sz; i++) {
+                            if (ref_type ref = values.get_as_ref(i)) {
+                                ArrayKey links(alloc);
+                                links.init_from_ref(ref);
+                                if (links.size() > 0) {
+                                    cluster->remove_backlinks(Key(cluster->get_key(i) + key_offsets), col_ndx,
+                                                              links.get_all(), state);
+                                }
+                            }
+                        }
+                    }
+                    // Continue
+                    return false;
+                };
+
+                // Go through all clusters
+                m_clusters.traverse(func);
+            }
+        }
+        remove_recursive(state);
     }
 
     if (Replication* repl = get_repl())

@@ -1973,9 +1973,9 @@ TEST(Group_RemoveRecursive)
     target->create_objects(3, keys);
     target->get_object(keys[0]).set(link_col_t, keys[1]);
     target->get_object(keys[1]).set(link_col_t, keys[2]);
-    bool called = false;
+    int called = 0;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-        called = true;
+        called++;
         size_t sz = notification.rows.size();
         CHECK_EQUAL(3, sz);
         for (size_t i = 0; i < sz; i++) {
@@ -1986,7 +1986,7 @@ TEST(Group_RemoveRecursive)
         CHECK_EQUAL(0, notification.links.size());
     });
     target->remove_object_recursive(keys[0]);
-    CHECK(called);
+    CHECK_EQUAL(called, 1);
     CHECK_EQUAL(target->size(), 0);
 
     // 3 rows linked together in circle
@@ -1996,9 +1996,9 @@ TEST(Group_RemoveRecursive)
     target->get_object(keys[1]).set(link_col_t, keys[2]);
     target->get_object(keys[2]).set(link_col_t, keys[0]);
 
-    called = false;
+    called = 0;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-        called = true;
+        called++;
         size_t sz = notification.rows.size();
         CHECK_EQUAL(3, sz);
         for (size_t i = 0; i < sz; i++) {
@@ -2009,7 +2009,7 @@ TEST(Group_RemoveRecursive)
         CHECK_EQUAL(0, notification.links.size());
     });
     target->remove_object_recursive(keys[0]);
-    CHECK(called);
+    CHECK_EQUAL(called, 1);
     CHECK_EQUAL(target->size(), 0);
 
     // Object linked to itself

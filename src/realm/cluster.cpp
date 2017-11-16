@@ -1018,7 +1018,8 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
     }
 }
 
-void Cluster::remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys, CascadeState& state)
+void Cluster::remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys,
+                               CascadeState& state) const
 {
     const Table* origin_table = m_tree_top.get_owner();
     TableRef target_table = _impl::TableFriend::get_opposite_link_table(*m_tree_top.get_owner(), col_ndx);
