@@ -9,7 +9,7 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 CORES=$(getconf _NPROCESSORS_ONLN)
 
 function usage {
-    echo "Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>]"
+    echo "Usage: ${SCRIPT} -t <build_type> -o <target_os> [-a <android_abi>]"
     echo ""
     echo "Arguments:"
     echo "   build_type=<Release|Debug|MinSizeDebug>"
@@ -44,7 +44,6 @@ while getopts ":o:a:t:v:" opt; do
             [ "${BUILD_TYPE}" == "MinSizeRel" ] ||
             [ "${BUILD_TYPE}" == "Release" ] || usage
             ;;
-        v) VERSION=${OPTARG};;
         *) usage;;
     esac
 done
@@ -75,7 +74,6 @@ if [ "${OS}" == "android" ]; then
           -D CMAKE_SYSTEM_VERSION=${ANDROID_VERSION} \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D CMAKE_ANDROID_ARCH_ABI="${ARCH}" \
-          -D REALM_VERSION="${VERSION}" \
           ..
 
     make package -j "${CORES}" -l "${CORES}" CoreTests VERBOSE=1
@@ -90,7 +88,6 @@ else
 
     cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${OS}.toolchain.cmake" \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D REALM_VERSION="${VERSION}" \
           -G Xcode ..
 
     xcodebuild -sdk "${SDK}os" \

@@ -41,9 +41,6 @@ if [[ ! -z $BUILD ]]; then
             rm -f realm-core-*-devel.tar.gz
             cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/macos.toolchain.cmake" \
                   -D CMAKE_BUILD_TYPE="${bt}" \
-                  -D REALM_VERSION="$(git describe)" \
-                  -D REALM_SKIP_SHARED_LIB=ON \
-                  -D REALM_BUILD_LIB_ONLY=ON \
                   -G Xcode ..
             cmake --build . --config "${bt}" --target package
         )
@@ -51,7 +48,7 @@ if [[ ! -z $BUILD ]]; then
     if [[ -z $MACOS_ONLY ]]; then
         for os in ios watchos tvos; do
             for bt in Release MinSizeDebug; do
-                tools/cross_compile.sh -o $os -t $bt -v "$(git describe)"
+                tools/cross_compile.sh -o $os -t $bt
             done
         done
     fi
@@ -83,7 +80,7 @@ if [[ ! -z $COPY ]]; then
     mkdir -p "${DESTINATION}"
     cp -R core "${DESTINATION}"
 else
-    v=$(git describe --tags)
+    v=$(git describe --tags --abbrev=9)
     rm -f "realm-core-cocoa-${v}.tar.xz"
     tar -cJvf "realm-core-cocoa-${v}.tar.xz" core
 fi

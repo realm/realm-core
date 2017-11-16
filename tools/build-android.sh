@@ -32,7 +32,7 @@ BUILD_TYPES=( Release Debug )
 if [[ ! -z $BUILD ]]; then
     for bt in "${BUILD_TYPES[@]}"; do
         for p in "${PLATFORMS[@]}"; do
-            tools/cross_compile.sh -o android -a "${p}" -t "${bt}" -v "$(git describe)"
+            tools/cross_compile.sh -o android -a "${p}" -t "${bt}"
         done
     done
 fi
@@ -53,6 +53,6 @@ for bt in "${BUILD_TYPES[@]}"; do
     done
 done
 
-v=$(git describe --tags)
+v=$(git describe --tags --abbrev 9)
 rm -f "realm-core-android-${v}.tar.gz"
 tar -czvf "realm-core-android-${v}.tar.gz" -C core-android .
