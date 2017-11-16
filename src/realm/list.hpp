@@ -70,8 +70,13 @@ public:
     virtual bool is_null() const = 0;
 
 protected:
+    template <class>
+    friend class ListIterator;
+
     const ConstObj* m_const_obj = nullptr;
     const size_t m_col_ndx;
+
+    mutable std::vector<size_t> m_deleted;
 
     ConstListBase(size_t col_ndx)
         : m_col_ndx(col_ndx)
@@ -92,16 +97,66 @@ protected:
             init_from_parent();
         }
     }
+    // Increase index by one. I we land on and index that is deleted, keep
+    // increasing until we get to a valid entry.
+    size_t incr(size_t ndx) const
+    {
+        ndx++;
+        if (!m_deleted.empty()) {
+            auto it = m_deleted.begin();
+            auto end = m_deleted.end();
+            while (it != end && *it < ndx) {
+                ++it;
+            }
+            // If entry is deleted, increase further
+            while (it != end && *it == ndx) {
+                ++it;
+                ++ndx;
+            }
+        }
+        return ndx;
+    }
+    // Convert from virtual to real index
+    size_t adjust(size_t ndx) const
+    {
+        if (!m_deleted.empty()) {
+            // Optimized for the case where the iterator is past that last deleted entry
+            auto it = m_deleted.rbegin();
+            auto end = m_deleted.rend();
+            while (it != end && *it >= ndx) {
+                if (*it == ndx) {
+                    throw std::out_of_range("Element was deleted");
+                }
+                ++it;
+            }
+            auto diff = end - it;
+            ndx -= diff;
+        }
+        return ndx;
+    }
+    void adj_remove(size_t ndx)
+    {
+        auto it = m_deleted.begin();
+        auto end = m_deleted.end();
+        while (it != end && *it <= ndx) {
+            ++ndx;
+            ++it;
+        }
+        m_deleted.insert(it, ndx);
+    }
 };
 
 /*
- * This class implements a forward iterator over the elements in a ConstList.
- * It is not stable across changes, but as the list itself is constant, changes
- * are not possible.
+ * This class implements a forward iterator over the elements in a List.
+ *
+ * The iterator is stable against deletions in the list. If you try to
+ * dereference an iterator that points to an element, that is deleted, the
+ * call will throw.
+ *
  * Values are read into a member variable (m_val). This is the only way to
  * implement operator-> and operator* returning a pointer and a reference resp.
- * It also allows us to use the variable as a cache. There is no overhead compared
- * to the alternative where operator* would have to return T by value.
+ * There is no overhead compared to the alternative where operator* would have
+ * to return T by value.
  */
 template <class T>
 class ListIterator {
@@ -119,10 +174,7 @@ public:
     }
     pointer operator->()
     {
-        if (m_dirty) {
-            m_val = m_list->get(m_ndx);
-            m_dirty = false;
-        }
+        m_val = m_list->get(m_list->adjust(m_ndx));
         return &m_val;
     }
     reference operator*()
@@ -131,15 +183,13 @@ public:
     }
     ListIterator& operator++()
     {
-        m_ndx++;
-        m_dirty = true;
+        m_ndx = m_list->incr(m_ndx);
         return *this;
     }
     ListIterator operator++(int)
     {
         ListIterator tmp(*this);
-        ++m_ndx;
-        m_dirty = true;
+        operator++();
         return tmp;
     }
 
@@ -154,10 +204,10 @@ public:
     }
 
 private:
+    friend class List<T>;
     T m_val;
     const ConstListIf<T>* m_list;
     size_t m_ndx;
-    bool m_dirty = true;
 };
 
 /// This class defines the interface to ConstList, except for the constructor
@@ -184,6 +234,9 @@ public:
     }
     T get(size_t ndx) const
     {
+        if (ndx >= m_leaf->size()) {
+            throw std::out_of_range("Index out of range");
+        }
         return m_leaf->get(ndx);
     }
     T operator[](size_t ndx) const
@@ -196,7 +249,7 @@ public:
     }
     ListIterator<T> end() const
     {
-        return ListIterator<T>(this, size());
+        return ListIterator<T>(this, size() + m_deleted.size());
     }
 
 protected:
@@ -306,12 +359,21 @@ public:
     }
     void insert(size_t ndx, T value)
     {
+        if (ndx > m_leaf->size()) {
+            throw std::out_of_range("Index out of range");
+        }
         m_leaf->insert(ndx, value);
+    }
+    T remove(ListIterator<T>& it)
+    {
+        return remove(ConstListBase::adjust(it.m_ndx));
     }
     T remove(size_t ndx)
     {
         T ret = m_leaf->get(ndx);
         m_leaf->erase(ndx);
+        ConstListBase::adj_remove(ndx);
+
         return ret;
     }
     void remove(size_t from, size_t to) override
