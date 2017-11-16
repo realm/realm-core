@@ -1835,9 +1835,6 @@ public:
         std::string s;
         for (size_t i = 0; i < m_link_column_indexes.size(); ++i) {
             if (i < m_tables.size() && m_tables[i]) {
-                if (i == 0) {
-                    s += std::string(m_tables[i]->get_name()) + metrics::value_separator;
-                }
                 if (m_link_types[i] == col_type_BackLink) {
                     s += "backlink";
                 } else if (m_link_column_indexes[i] < m_tables[i]->get_column_count()) {
@@ -2056,8 +2053,7 @@ public:
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached()) {
-            return std::string(target_table->get_name()) + metrics::value_separator
-                + std::string(target_table->get_column_name(m_column_ndx));
+            return std::string(target_table->get_column_name(m_column_ndx));
         }
         return "";
     }
@@ -2311,7 +2307,7 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + metrics::value_separator + "count()";
+        return m_link_map.description() + metrics::value_separator + "@count";
     }
 
 private:
@@ -2371,9 +2367,9 @@ public:
     std::string description() const override
     {
         if (m_expr) {
-            return m_expr->description() + metrics::value_separator + "size()";
+            return m_expr->description() + metrics::value_separator + "@size";
         }
-        return "size()";
+        return "@size";
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -2717,13 +2713,11 @@ public:
         const Table* table = get_base_table();
         if (table && table->is_attached()) {
             if (m_subtable_column.m_column) {
-                return std::string(table->get_name()) + metrics::value_separator
-                    + std::string(table->get_column_name(m_subtable_column.m_column_ndx));
+                return std::string(table->get_column_name(m_subtable_column.m_column_ndx));
 
             }
             else {
-                return std::string(table->get_name()) + metrics::value_separator
-                    + std::string(table->get_column_name(m_column_ndx));
+                return std::string(table->get_column_name(m_column_ndx));
             }
         }
         return "";
@@ -2850,8 +2844,7 @@ public:
     {
         const Table* table = get_base_table();
         if (table && table->is_attached()) {
-            return std::string(table->get_name()) + metrics::value_separator
-            + std::string(table->get_column_name(m_column_ndx)) + metrics::value_separator + Operation::description() + "()";
+            return std::string(table->get_column_name(m_column_ndx)) + metrics::value_separator + Operation::description() + "()";
         }
         return "";
     }
@@ -3100,8 +3093,7 @@ public:
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached() && m_column_ndx != npos) {
-            return std::string(target_table->get_name()) + metrics::value_separator
-                + std::string(target_table->get_column_name(m_column_ndx));
+            return std::string(target_table->get_column_name(m_column_ndx));
         }
         return "";
     }
@@ -3346,8 +3338,8 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + metrics::value_separator + "(where " + m_query.get_description() + ")"
-            + metrics::value_separator + "count()";
+        return m_link_map.description() + metrics::value_separator + "SUBQUERY(" + m_query.get_description() + ")"
+            + metrics::value_separator + "@count";
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override

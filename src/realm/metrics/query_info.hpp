@@ -43,6 +43,16 @@ std::string print_value(T value)
     return ss.str();
 }
 
+template <typename T>
+std::string print_value(Optional<T> value)
+{
+    if (bool(value)) {
+        return print_value(*value);
+    } else {
+        return "none";
+    }
+}
+
 const std::string value_separator = ".";
 
 class QueryInfo {

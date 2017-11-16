@@ -275,8 +275,7 @@ public:
     virtual std::string describe_column(size_t col_ndx) const
     {
         if (m_table && col_ndx != npos) {
-            return std::string(m_table->get_name()) + metrics::value_separator
-                + std::string(m_table->get_column_name(col_ndx));
+            return std::string(m_table->get_column_name(col_ndx));
         }
         return "";
     }
