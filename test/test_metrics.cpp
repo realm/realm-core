@@ -272,7 +272,7 @@ TEST(Metrics_QueryEqual)
 
     std::string person_table_name = "person";
     std::string pet_table_name = "pet";
-    std::string query_search_term = "equal";
+    std::string query_search_term = "==";
 
     Group& g = sg.begin_write();
     TableRef person = g.get_table(person_table_name);
@@ -344,7 +344,7 @@ TEST(Metrics_QueryOrAndNot)
 
     std::string person_table_name = "person";
     std::string pet_table_name = "pet";
-    std::string query_search_term = "equal";
+    std::string query_search_term = "==";
 
     Group& g = sg.begin_write();
     TableRef person = g.get_table(person_table_name);
@@ -537,20 +537,20 @@ TEST(Metrics_LinkQueries)
     CHECK_EQUAL(find_count(count_link_description, "count"), 1);
     CHECK_EQUAL(find_count(count_link_description, pet_link_col_name), 1);
     CHECK_EQUAL(find_count(count_link_description, pet_table_name), 1);
-    CHECK_EQUAL(find_count(count_link_description, "equal"), 1);
+    CHECK_EQUAL(find_count(count_link_description, "=="), 1);
 
     std::string link_subquery_description = queries->at(3).get_description();
     CHECK_EQUAL(find_count(link_subquery_description, "count"), 1);
     CHECK_EQUAL(find_count(link_subquery_description, pet_link_col_name), 1);
     CHECK_EQUAL(find_count(link_subquery_description, pet_table_name), 1);
-    CHECK_EQUAL(find_count(link_subquery_description, "equal"), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, "=="), 1);
     CHECK_EQUAL(find_count(link_subquery_description, person_table_name), 1);
     CHECK_EQUAL(find_count(link_subquery_description, column_names[0]), 1);
-    CHECK_EQUAL(find_count(link_subquery_description, "greater"), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, ">"), 1);
 }
 
 
-TEST(Metrics_LinkListQueries)
+ONLY(Metrics_LinkListQueries)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
@@ -615,7 +615,7 @@ TEST(Metrics_LinkListQueries)
     CHECK_EQUAL(find_count(count_link_description, "count"), 1);
     CHECK_EQUAL(find_count(count_link_description, column_names[ll_col_ndx]), 1);
     CHECK_EQUAL(find_count(count_link_description, person_table_name), 1);
-    CHECK_EQUAL(find_count(count_link_description, "equal"), 1);
+    CHECK_EQUAL(find_count(count_link_description, "=="), 1);
 
     std::string equal_link_description = queries->at(3).get_description();
     CHECK_EQUAL(find_count(equal_link_description, column_names[ll_col_ndx]), 1);
@@ -627,12 +627,13 @@ TEST(Metrics_LinkListQueries)
     CHECK_EQUAL(find_count(sum_link_description, column_names[ll_col_ndx]), 1);
     CHECK_EQUAL(find_count(sum_link_description, column_names[double_col_ndx]), 1);
     CHECK_EQUAL(find_count(sum_link_description, person_table_name), 2);
-    CHECK_EQUAL(find_count(sum_link_description, "equal"), 1);
+    // the query system can choose to flip the argument order and operators so that >= might be <=
+    CHECK_EQUAL(find_count(sum_link_description, "<=") + find_count(sum_link_description, ">="), 1);
 
     std::string link_subquery_description = queries->at(5).get_description();
     CHECK_EQUAL(find_count(link_subquery_description, "count"), 1);
     CHECK_EQUAL(find_count(link_subquery_description, column_names[ll_col_ndx]), 1);
-    CHECK_EQUAL(find_count(link_subquery_description, "equal"), 2);
+    CHECK_EQUAL(find_count(link_subquery_description, "=="), 2);
     CHECK_EQUAL(find_count(link_subquery_description, person_table_name), 2);
     CHECK_EQUAL(find_count(link_subquery_description, column_names[str_col_ndx]), 1);
 }
@@ -717,7 +718,7 @@ TEST(Metrics_SubQueries)
     CHECK_EQUAL(queries->size(), 4);
 
     std::string int_equal_description = queries->at(0).get_description();
-    CHECK_EQUAL(find_count(int_equal_description, "equal"), 1);
+    CHECK_EQUAL(find_count(int_equal_description, "=="), 1);
     CHECK_EQUAL(find_count(int_equal_description, int_col_name), 1);
     CHECK_EQUAL(find_count(int_equal_description, table_name), 1);
 
@@ -732,7 +733,7 @@ TEST(Metrics_SubQueries)
     CHECK_EQUAL(find_count(str_begins_description, table_name), 1);
 
     std::string str_equal_description = queries->at(3).get_description();
-    CHECK_EQUAL(find_count(str_equal_description, "equal"), 1);
+    CHECK_EQUAL(find_count(str_equal_description, "=="), 1);
     CHECK_EQUAL(find_count(str_equal_description, str_col_name), 1);
     CHECK_EQUAL(find_count(str_equal_description, table_name), 1);
 }
