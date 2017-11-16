@@ -206,7 +206,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             withEnv(environment) {
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
-                        runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                        runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType}")
                         dir(buildDir) {
                             archiveArtifacts('realm-*.tar.gz')
                         }
@@ -219,7 +219,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                 } else {
                     docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
                         buildEnv.inside("--link ${emulator.id}:emulator") {
-                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType}")
                             dir(buildDir) {
                                 archiveArtifacts('realm-*.tar.gz')
                             }
@@ -473,7 +473,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
                     timeout(time: 15, unit: 'MINUTES') {
                         runAndCollectWarnings(parser:'clang', script: """
                                 rm -rf build-*
-                                tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
+                                tools/cross_compile.sh -o ${sdk} -t ${buildType}
                             """)
                     }
                 }
