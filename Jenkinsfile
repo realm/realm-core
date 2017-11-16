@@ -480,8 +480,8 @@ def doBuildAppleDevice(String sdk, String buildType) {
             dir("build-${sdk}-${buildType}") {
                 archiveArtifacts("*.tar.gz")
             }
-            stash includes:"build-${sdk}-${buildType}/*.tar.gz", name:stashName
             def stashName = "${sdk}___${buildType}"
+            stash includes:"build-${sdk}-${buildType}/*.tar.gz", name:stashName
             cocoaStashes << stashName
             if(gitTag) {
                 publishingStashes << stashName
