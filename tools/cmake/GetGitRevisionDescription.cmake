@@ -112,6 +112,7 @@ function(git_describe _var)
     "${GIT_EXECUTABLE}"
     describe
     "--tags"
+    "--abbrev=9"
     ${hash}
     ${ARGN}
     WORKING_DIRECTORY
