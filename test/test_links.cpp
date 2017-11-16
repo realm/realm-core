@@ -562,6 +562,7 @@ TEST(Links_LinkList_Basics)
     // create table with links to table1
     TableRef origin = group.add_table("origin");
     size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
+    origin->add_column(type_Int, "integers"); // Make sure the link column is not the only column
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
     Obj obj0 = target->create_object().set_all("test1", 1, true, int64_t(Mon));
@@ -675,6 +676,22 @@ TEST(Links_LinkList_Basics)
     // remove all links
     links.clear();
     CHECK_EQUAL(0, obj3.get_link_count(col_link));
+    CHECK_EQUAL(0, obj0.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(0, obj1.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(0, obj2.get_backlink_count(*origin, col_link));
+
+    // Add links again
+    links.add(key2);
+    links.add(key1);
+    links.add(key0);
+
+    // verify that backlinks were set
+    CHECK_EQUAL(1, obj0.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(1, obj1.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(1, obj2.get_backlink_count(*origin, col_link));
+
+    origin->remove_object(key3);
+    // verify that backlinks were removed
     CHECK_EQUAL(0, obj0.get_backlink_count(*origin, col_link));
     CHECK_EQUAL(0, obj1.get_backlink_count(*origin, col_link));
     CHECK_EQUAL(0, obj2.get_backlink_count(*origin, col_link));

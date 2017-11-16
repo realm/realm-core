@@ -224,6 +224,7 @@ private:
     void do_move(size_t ndx, size_t col_ndx, Cluster* to);
     template <class T>
     void do_erase(size_t ndx, size_t col_ndx);
+    void remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys);
 };
 
 }

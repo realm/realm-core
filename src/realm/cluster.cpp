@@ -821,27 +821,15 @@ inline void Cluster::do_erase<ArrayKey>(size_t ndx, size_t col_ndx)
     values.set_parent(this, col_ndx + 1);
     values.init_from_parent();
 
-    TableRef target_table = _impl::TableFriend::get_opposite_link_table(*m_tree_top.get_owner(), col_ndx);
-    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-    size_t backlink_col =
-        target_table_spec.find_backlink_column(m_tree_top.get_owner()->get_index_in_group(), col_ndx);
-
-    Key old_key = values.get(ndx);
-
-    if (old_key != realm::null_key) {
-        Obj target_obj = target_table->get_object(old_key);
-        target_obj.remove_one_backlink(backlink_col, Key(get_key(ndx))); // Throws
-    }
-
-
+    remove_backlinks(Key(get_key(ndx)), col_ndx, {values.get(ndx)});
     values.erase(ndx);
 }
 }
 
-unsigned Cluster::erase(Key k)
+unsigned Cluster::erase(Key key)
 {
-    size_t ndx = m_keys.lower_bound_int(k.value);
-    if (ndx == m_keys.size() || m_keys.get(ndx) != k.value) {
+    size_t ndx = m_keys.lower_bound_int(key.value);
+    if (ndx == m_keys.size() || m_keys.get(ndx) != key.value) {
         throw InvalidKey("Key not found");
     }
 
@@ -867,10 +855,11 @@ unsigned Cluster::erase(Key k)
     }
 
     if (Replication* repl = m_alloc.get_replication()) {
-        repl->remove_object(m_tree_top.get_owner(), k);
+        repl->remove_object(m_tree_top.get_owner(), key);
     }
 
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
+        auto col_type = spec.get_column_type(col_ndx);
         ColumnAttrMask attr = spec.get_column_attr(col_ndx);
         if (attr.test(col_attr_List)) {
             ArrayInteger values(m_alloc);
@@ -879,6 +868,12 @@ unsigned Cluster::erase(Key k)
             ref_type ref = values.get_as_ref(ndx);
 
             if (ref) {
+                if (col_type == col_type_LinkList) {
+                    ArrayKey links(m_alloc);
+                    links.init_from_ref(ref);
+
+                    remove_backlinks(key, col_ndx, links.get_all());
+                }
                 Array::destroy_deep(ref, m_alloc);
             }
 
@@ -886,7 +881,7 @@ unsigned Cluster::erase(Key k)
 
             continue;
         }
-        switch (spec.get_column_type(col_ndx)) {
+        switch (col_type) {
             case col_type_Int:
                 if (attr.test(col_attr_Nullable)) {
                     do_erase<ArrayIntNull>(ndx, col_ndx);
@@ -1016,6 +1011,21 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
             }
         }
         std::cout << std::endl;
+    }
+}
+
+void Cluster::remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys)
+{
+    TableRef target_table = _impl::TableFriend::get_opposite_link_table(*m_tree_top.get_owner(), col_ndx);
+    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
+    size_t backlink_col =
+        target_table_spec.find_backlink_column(m_tree_top.get_owner()->get_index_in_group(), col_ndx);
+
+    for (auto key : keys) {
+        if (key != null_key) {
+            Obj target_obj = target_table->get_object(key);
+            target_obj.remove_one_backlink(backlink_col, origin_key); // Throws
+        }
     }
 }
 

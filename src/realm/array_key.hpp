@@ -62,6 +62,16 @@ public:
     {
         return Key{Array::get(ndx) - 1};
     }
+    std::vector<Key> get_all() const
+    {
+        size_t sz = size();
+        std::vector<Key> keys;
+        keys.reserve(sz);
+        for (size_t i = 0; i < sz; i++) {
+            keys.push_back(get(i));
+        }
+        return keys;
+    }
     bool is_null(size_t ndx) const
     {
         return Array::get(ndx) == 0;
