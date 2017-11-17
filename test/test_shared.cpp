@@ -3823,7 +3823,7 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
     std::string path = test_util::get_test_resource_path() + "test_shared_decrypt_" +
                         realm::util::to_string(page_size() / 1024) + "k_page.realm";
 
-#if TEST_READ_UPGRADE_MODE
+#if 0 // set to 1 to generate the .realm file
     {
         File::try_remove(path);
         SharedGroup db(path, false, SharedGroupOptions(crypt_key(true)));
