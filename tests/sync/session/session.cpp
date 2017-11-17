@@ -346,7 +346,7 @@ TEST_CASE("sync: error handling", "[sync]") {
 
     SECTION("Properly handles a client reset error") {
         int code = 0;
-        SyncError final_error;
+        util::Optional<SyncError> final_error;
         error_handler = [&](auto, SyncError error) {
             final_error = std::move(error);
         };
@@ -375,11 +375,12 @@ TEST_CASE("sync: error handling", "[sync]") {
         auto just_before = util::localtime(just_before_raw);
         auto just_after = util::localtime(just_after_raw);
         // At this point final_error should be populated.
-        CHECK(final_error.is_client_reset_requested());
+        CHECK(bool(final_error));
+        CHECK(final_error->is_client_reset_requested());
         // The original file path should be present.
-        CHECK(final_error.user_info[SyncError::c_original_file_path_key] == on_disk_path);
+        CHECK(final_error->user_info[SyncError::c_original_file_path_key] == on_disk_path);
         // The path to the recovery file should be present, and should contain all necessary components.
-        std::string recovery_path = final_error.user_info[SyncError::c_recovery_file_path_key];
+        std::string recovery_path = final_error->user_info[SyncError::c_recovery_file_path_key];
         auto idx = recovery_path.find("recovered_realm");
         CHECK(idx != std::string::npos);
         idx = recovery_path.find(SyncManager::shared().recovery_directory_path());
@@ -560,12 +561,6 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
-
-    auto session_for_realm = [](Realm& realm) {
-        auto& user = *realm.config().sync_config->user;
-        REQUIRE(user.state() != SyncUser::State::Error);
-        return user.session_for_on_disk_path(realm.config().path);
-    };
 
     // Create a synced Realm containing a class with two properties.
     {
