@@ -24,6 +24,7 @@
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/impl/transact_log.hpp>
 #include <realm/impl/input_stream.hpp>
+#include <realm/util/base64.hpp>
 
 #include <unordered_map>
 #include <unordered_set>
@@ -341,8 +342,11 @@ public:
             case type_String:
                 return add_set_instruction(instr.object, field, std::string(get_string(instr.payload.data.str)));
             case type_Binary: {
-                std::string string = get_string(instr.payload.data.str);
-                return add_set_instruction(instr.object, field, {"data", string});
+                StringData data = get_string(instr.payload.data.str);
+                auto encoded_size = util::base64_encoded_size(data.size());
+                std::vector<char> encoded_data(encoded_size + 1, '\0');
+                util::base64_encode(data.data(), data.size(), encoded_data.data(), encoded_data.size());
+                return add_set_instruction(instr.object, field, {"data64", encoded_data.data()});
             }
             case type_Timestamp: {
                 Timestamp ts = instr.payload.data.timestamp;
