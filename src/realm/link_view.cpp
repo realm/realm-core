@@ -38,7 +38,7 @@ void LinkView::do_insert(size_t link_ndx, size_t target_row_ndx)
     REALM_ASSERT_7(m_row_indexes.is_attached(), ==, false, ||, link_ndx, <=, m_row_indexes.size());
     REALM_ASSERT_3(target_row_ndx, <, m_origin_column->get_target_table().size());
     typedef _impl::TableFriend tf;
-    tf::bump_version(*m_origin_table);
+    tf::bump_content_version(*m_origin_table);
 
     size_t origin_row_ndx = get_origin_row_index();
 
@@ -74,7 +74,7 @@ size_t LinkView::do_set(size_t link_ndx, size_t target_row_ndx)
     m_origin_column->add_backlink(target_row_ndx, origin_row_ndx);        // Throws
     m_row_indexes.set(link_ndx, target_row_ndx);                          // Throws
     typedef _impl::TableFriend tf;
-    tf::bump_version(*m_origin_table);
+    tf::bump_content_version(*m_origin_table);
     return old_target_row_ndx;
 }
 
@@ -91,7 +91,7 @@ void LinkView::move(size_t from_link_ndx, size_t to_link_ndx)
         return;
 
     typedef _impl::TableFriend tf;
-    tf::bump_version(*m_origin_table);
+    tf::bump_content_version(*m_origin_table);
 
     // FIXME: Can get() return -1 now that we have detached entries? Does this move() work with it?
     size_t target_row_ndx = static_cast<size_t>(m_row_indexes.get(from_link_ndx));
@@ -116,7 +116,7 @@ void LinkView::swap(size_t link_ndx_1, size_t link_ndx_2)
         std::swap(link_ndx_1, link_ndx_2);
 
     typedef _impl::TableFriend tf;
-    tf::bump_version(*m_origin_table);
+    tf::bump_content_version(*m_origin_table);
 
     size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx_1));
     m_row_indexes.set(link_ndx_1, m_row_indexes.get(link_ndx_2));
@@ -141,7 +141,7 @@ size_t LinkView::do_remove(size_t link_ndx)
     m_origin_column->remove_backlink(target_row_ndx, origin_row_ndx); // Throws
     m_row_indexes.erase(link_ndx);                                    // Throws
     typedef _impl::TableFriend tf;
-    tf::bump_version(*m_origin_table);
+    tf::bump_content_version(*m_origin_table);
     return target_row_ndx;
 }
 
@@ -168,7 +168,7 @@ void LinkView::do_clear(bool broken_reciprocal_backlinks)
     m_origin_column->set_row_ref(origin_row_ndx, 0); // Throws
 
     typedef _impl::TableFriend tf;
-    tf::bump_version(*m_origin_table);
+    tf::bump_content_version(*m_origin_table);
 }
 
 
@@ -233,7 +233,7 @@ void LinkView::repl_unselect() noexcept
 uint_fast64_t LinkView::sync_if_needed() const
 {
     if (m_origin_table)
-        return m_origin_table->m_version;
+        return m_origin_table->get_content_version();
 
     return std::numeric_limits<uint_fast64_t>::max();
 }

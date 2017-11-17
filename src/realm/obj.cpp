@@ -42,7 +42,8 @@ ConstObj::ConstObj(const ClusterTree* tree_top, ref_type ref, Key key, size_t ro
     , m_mem(ref, tree_top->get_alloc())
     , m_row_ndx(row_ndx)
 {
-    m_version = m_tree_top->get_version_counter();
+    m_instance_version = m_tree_top->get_instance_version();
+    m_storage_version = m_tree_top->get_storage_version(m_instance_version);
 }
 
 Allocator& ConstObj::get_alloc() const
@@ -144,10 +145,13 @@ Obj::Obj(ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx)
 {
 }
 
+// FIXME: Optimization - all the work needed to bump version counters
+// and to check if it has changed must be optimized to avoid indirections
+// and to allow inline compilation of the whole code path.
 bool ConstObj::update_if_needed() const
 {
-    auto current_version = m_tree_top->get_version_counter();
-    if (current_version != m_version) {
+    auto current_version = m_tree_top->get_storage_version(m_instance_version);
+    if (current_version != m_storage_version) {
         // Get a new object from key
         ConstObj new_obj = m_tree_top->get(m_key);
         update(new_obj);
@@ -292,9 +296,10 @@ void Obj::ensure_writeable()
     }
 }
 
-void Obj::bump_version()
+void Obj::bump_content_version()
 {
-    m_version = const_cast<ClusterTree*>(m_tree_top)->bump_version();
+    Allocator& alloc = m_tree_top->get_alloc();
+    alloc.bump_content_version();
 }
 
 template <>
@@ -307,6 +312,7 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
+    alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx + 1 < fields.size());
@@ -329,8 +335,6 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
     }
 
-    bump_version();
-
     return *this;
 }
 
@@ -349,6 +353,7 @@ Obj& Obj::add_int(size_t col_ndx, int64_t value)
     };
 
     Allocator& alloc = m_tree_top->get_alloc();
+    alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx + 1 < fields.size());
@@ -377,8 +382,6 @@ Obj& Obj::add_int(size_t col_ndx, int64_t value)
         repl->add_int(m_tree_top->get_owner(), col_ndx, m_key, value); // Throws
     }
 
-    bump_version();
-
     return *this;
 }
 
@@ -396,6 +399,7 @@ Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
+    alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx + 1 < fields.size());
@@ -419,8 +423,6 @@ Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
         if (recurse)
             _impl::TableFriend::remove_recursive(*target_table, state);
     }
-
-    bump_version();
 
     return *this;
 }
@@ -480,6 +482,7 @@ Obj& Obj::set(size_t col_ndx, T value, bool is_default)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
+    alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx + 1 < fields.size());
@@ -492,8 +495,6 @@ Obj& Obj::set(size_t col_ndx, T value, bool is_default)
         repl->set<T>(m_tree_top->get_owner(), col_ndx, m_key, value,
                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
-    bump_version();
-
     return *this;
 }
 
@@ -503,6 +504,7 @@ void Obj::set_int(size_t col_ndx, int64_t value)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
+    alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx + 1 < fields.size());
@@ -510,8 +512,6 @@ void Obj::set_int(size_t col_ndx, int64_t value)
     values.set_parent(&fields, col_ndx + 1);
     values.init_from_parent();
     values.set(m_row_ndx, value);
-
-    bump_version();
 }
 
 void Obj::add_backlink(size_t backlink_col, Key origin_key)
@@ -519,6 +519,7 @@ void Obj::add_backlink(size_t backlink_col, Key origin_key)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
+    alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
 
@@ -534,6 +535,7 @@ void Obj::remove_one_backlink(size_t backlink_col, Key origin_key)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
+    alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
 
@@ -549,6 +551,7 @@ void Obj::nullify_link(size_t origin_col, Key target_key)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
+    alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
 
@@ -636,6 +639,7 @@ inline void Obj::do_set_null(size_t col_ndx)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
+    alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
 

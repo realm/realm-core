@@ -489,6 +489,7 @@ TEST(DoubleColumn_SwapRows)
     }
 }
 
+#ifdef LEGACY_TESTS
 TEST(DoubleColumn_InitOfEmptyColumn)
 {
     Table t;
@@ -579,5 +580,6 @@ TEST(ColumnBool_InitOfEmptyColumn)
     auto col_2 = t.add_column(type_Bool, "doesn't work");
     CHECK_EQUAL(false, obj.get<Bool>(col_2));
 }
+#endif
 
 #endif // TEST_COLUMN_FLOAT

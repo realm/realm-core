@@ -591,6 +591,9 @@ private:
     std::shared_ptr<metrics::Metrics> m_metrics;
     size_t m_total_rows;
 
+    static std::vector<Table*> g_table_recycler;
+    static std::mutex g_table_recycler_mutex;
+
     struct shared_tag {
     };
     Group(shared_tag) noexcept;
@@ -616,6 +619,7 @@ private:
     void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable);
 
     void create_empty_group();
+    void remove_table(size_t table_ndx, TableKey key);
 
     void reset_free_space_tracking();
 
@@ -677,6 +681,7 @@ private:
 
     void create_and_insert_table(TableKey key, StringData name);
     Table* create_table_accessor(size_t table_ndx);
+    void recycle_table_accessor(Table*);
 
     void detach_table_accessors() noexcept; // Idempotent
 

@@ -70,6 +70,10 @@ using unit_test::TestContext;
 
 namespace {
 
+#ifdef LEGACY_TESTS
+// disable to avoid warnings about not being used - enable when tests
+// needed them are enabled again
+
 // strings used by tests
 const char s1[] = "John";
 const char s2[] = "Brian";
@@ -82,12 +86,13 @@ const char s7[] = "Sam";
 // integers used by integer index tests
 const int64_t ints[] = {0x1111,     0x11112222, 0x11113333, 0x1111333, 0x111122223333ull, 0x1111222233334ull,
                         0x22223333, 0x11112227, 0x11112227, 0x78923};
-
+#endif
 using nullable = std::true_type;
 using non_nullable = std::false_type;
 
 } // anonymous namespace
 
+#ifdef LEGACY_TESTS
 TEST(StringIndex_NonIndexable)
 {
     // Create a column with string values
@@ -1426,7 +1431,6 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
     col.clear(); // calls recursive function Array::destroy_deep()
 }
 
-#ifdef LEGACY_TESTS
 TEST_TYPES(StringIndex_InsertLongPrefixAndQuery, string_column, nullable_string_column, enum_column,
            nullable_enum_column)
 {

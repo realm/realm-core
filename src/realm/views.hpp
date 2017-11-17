@@ -50,10 +50,6 @@ public:
     RowIndexes& operator=(const RowIndexes&) = delete;
     RowIndexes(const RowIndexes&) = delete;
 
-    // Return a column of the table that m_row_indexes are pointing at (which is the target table for LinkList and
-    // parent table for TableView)
-    virtual const ColumnBase& get_column_base(size_t index) const = 0;
-
     virtual size_t size() const = 0;
 
     // These two methods are overridden by TableView and LinkView.

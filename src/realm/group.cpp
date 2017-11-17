@@ -73,6 +73,10 @@ Group::Group()
 }
 
 
+std::vector<Table*> Group::g_table_recycler;
+std::mutex Group::g_table_recycler_mutex;
+
+
 std::vector<TableKey> Group::get_keys() const
 {
     std::vector<TableKey> retval;
@@ -121,7 +125,18 @@ void Group::set_size() const noexcept
 
 TableKey Group::ndx2key(size_t ndx) const
 {
-    return m_table_accessors[ndx]->get_key();
+    REALM_ASSERT(is_attached());
+    Table* accessor = m_table_accessors[ndx];
+    if (accessor)
+        return accessor->get_key(); // fast path
+
+    // slow path:
+    RefOrTagged rot = m_tables.get_as_ref_or_tagged(ndx);
+    if (rot.is_tagged())
+        throw InvalidKey("No such table");
+    ref_type ref = rot.get_as_ref();
+    REALM_ASSERT(ref);
+    return Table::get_key_direct(m_tables.get_alloc(), ref);
 }
 
 
@@ -150,6 +165,7 @@ size_t Group::key2ndx_checked(TableKey key) const
     }
     throw InvalidKey("No corresponding table");
 }
+
 
 int Group::get_file_format_version() const noexcept
 {
@@ -396,6 +412,8 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
     m_attached = true;
     set_size();
 
+    if (m_tables.is_attached())
+        m_table_accessors.resize(m_tables.size());
 #if REALM_METRICS
     update_num_objects();
 #endif // REALM_METRICS
@@ -458,11 +476,11 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writa
 
 void Group::detach_table_accessors() noexcept
 {
-    for (const auto& table_accessor : m_table_accessors) {
+    for (auto& table_accessor : m_table_accessors) {
         if (Table* t = table_accessor) {
-            typedef _impl::TableFriend tf;
-            tf::detach(*t);
-            tf::unbind_ptr(*t);
+            t->detach();
+            recycle_table_accessor(t);
+            table_accessor = nullptr;
         }
     }
 }
@@ -492,11 +510,7 @@ void Group::create_empty_group()
 
 Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher)
 {
-    REALM_ASSERT(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size());
-
-    if (m_table_accessors.empty())
-        m_table_accessors.resize(m_tables.size()); // Throws
-
+    REALM_ASSERT(m_table_accessors.size() == m_tables.size());
     // Get table accessor from cache if it exists, else create
     Table* table = m_table_accessors[table_ndx];
     if (!table)
@@ -648,10 +662,8 @@ void Group::create_and_insert_table(TableKey key, StringData name)
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     size_t prior_num_tables = m_tables.size();
     RefOrTagged rot = RefOrTagged::make_ref(ref);
-    // We may need to align accessors and tables
-    while (m_table_accessors.size() < m_tables.size()) {
-        m_table_accessors.push_back(nullptr);
-    }
+    REALM_ASSERT(m_table_accessors.size() == m_tables.size());
+
     if (table_ndx == m_tables.size()) {
         m_tables.add(rot);
         m_table_names.add(name);
@@ -671,34 +683,8 @@ void Group::create_and_insert_table(TableKey key, StringData name)
 
 Table* Group::create_table_accessor(size_t table_ndx)
 {
-    REALM_ASSERT(m_table_accessors.empty() || table_ndx < m_table_accessors.size());
-
-    if (m_table_accessors.empty())
-        m_table_accessors.resize(m_tables.size()); // Throws
-
-    // Whenever a table has a link column, the column accessor must be set up to
-    // refer to the target table accessor, so the target table accessor needs to
-    // be created too, if it does not already exist. This, of course, applies
-    // recursively, and it applies to the opposide direction of links too (from
-    // target side to origin side). This means that whenever we create a table
-    // accessor, we actually need to create the entire cluster of table
-    // accessors, that is reachable in zero or more steps along links, or
-    // backwards along links.
-    //
-    // To be able to do this, and to handle the cases where the link
-    // relathionship graph contains cycles, each table accessor need to be
-    // created in the following steps:
-    //
-    //  1) Create table accessor, but skip creation of column accessors
-    //  2) Register incomplete table accessor in group accessor
-    //  3) Mark table accessor
-    //  4) Create column accessors
-    //  5) Unmark table accessor
-    //
-    // The marking ensures that the establsihment of the connection between link
-    // and backlink column accessors is postponed until both column accessors
-    // are created. Infinite recursion due to cycles is prevented by the early
-    // registration in the group accessor of inclomplete table accessors.
+    REALM_ASSERT(m_tables.size() == m_table_accessors.size());
+    REALM_ASSERT(table_ndx < m_table_accessors.size());
 
     typedef _impl::TableFriend tf;
     RefOrTagged rot = m_tables.get_as_ref_or_tagged(table_ndx);
@@ -706,23 +692,31 @@ Table* Group::create_table_accessor(size_t table_ndx)
     if (ref == 0) {
         throw InvalidKey("No such table");
     }
-    Table* table = tf::create_incomplete_accessor(m_alloc, ref, this, table_ndx); // Throws
-
-    // The new accessor cannot be leaked, because no exceptions can be thrown
-    // before it becomes referenced from `m_column_accessors`.
-
-    // Increase reference count from 0 to 1 to make the group accessor keep
-    // the table accessor alive. This extra reference count will be revoked
-    // during destruction of the group accessor.
-    tf::bind_ptr(*table);
-
-    tf::mark(*table);
+    Table* table = 0;
+    {
+        std::lock_guard<std::mutex> lg(g_table_recycler_mutex);
+        if (!g_table_recycler.empty()) {
+            table = g_table_recycler.back();
+            g_table_recycler.pop_back();
+        }
+    }
+    if (table) {
+        table->revive(m_alloc);
+        table->init(ref, this, table_ndx);
+    }
+    else {
+        table = tf::create_accessor(m_alloc, ref, this, table_ndx); // Throws
+    }
     m_table_accessors[table_ndx] = table;
-    tf::complete_accessor(*table); // Throws
-    tf::unmark(*table);
     return table;
 }
 
+
+void Group::recycle_table_accessor(Table* to_be_recycled)
+{
+    std::lock_guard<std::mutex> lg(g_table_recycler_mutex);
+    g_table_recycler.push_back(to_be_recycled);
+}
 
 void Group::remove_table(StringData name)
 {
@@ -732,8 +726,9 @@ void Group::remove_table(StringData name)
     if (table_ndx == not_found)
         throw NoSuchTable();
     auto key = ndx2key(table_ndx);
-    remove_table(key); // Throws
+    remove_table(table_ndx, key); // Throws
 }
+
 
 void Group::remove_table(TableKey key)
 {
@@ -741,6 +736,12 @@ void Group::remove_table(TableKey key)
         throw LogicError(LogicError::detached_accessor);
 
     size_t table_ndx = key2ndx_checked(key);
+    remove_table(table_ndx, key);
+}
+
+
+void Group::remove_table(size_t table_ndx, TableKey key)
+{
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
@@ -782,9 +783,8 @@ void Group::remove_table(TableKey key)
     m_table_accessors[table_ndx] = nullptr;
     --m_num_tables;
 
-    tf::detach(*table);
-    tf::unbind_ptr(*table);
-
+    table->detach();
+    recycle_table_accessor(table.get());
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
 }
@@ -1078,12 +1078,11 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
     if (!m_tables.update_from_parent(old_baseline))
         return;
 
-    // Update all attached table accessors including those attached to
-    // subtables.
-    for (const auto& table_accessor : m_table_accessors) {
-        typedef _impl::TableFriend tf;
-        if (Table* table = table_accessor)
-            tf::update_from_parent(*table, old_baseline);
+    // Update all attached table accessors.
+    for (auto& table_accessor : m_table_accessors) {
+        if (table_accessor) {
+            table_accessor->update_from_parent(old_baseline);
+        }
     }
 }
 
@@ -1158,86 +1157,6 @@ void Group::to_string(std::ostream& out) const
 }
 
 
-void Group::mark_all_table_accessors() noexcept
-{
-    size_t num_tables = m_table_accessors.size();
-    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
-        if (Table* table = m_table_accessors[table_ndx]) {
-            typedef _impl::TableFriend tf;
-            tf::recursive_mark(*table); // Also all subtable accessors
-        }
-    }
-}
-
-
-namespace {
-
-class MarkDirtyUpdater : public _impl::TableFriend::AccessorUpdater {
-public:
-    void update(Table& table) override
-    {
-        typedef _impl::TableFriend tf;
-        tf::mark(table);
-    }
-
-    void update_parent(Table& table) override
-    {
-        typedef _impl::TableFriend tf;
-        tf::mark(table);
-    }
-
-    size_t m_col_ndx;
-    DataType m_type;
-};
-
-
-class InsertColumnUpdater : public _impl::TableFriend::AccessorUpdater {
-public:
-    InsertColumnUpdater(size_t col_ndx)
-        : m_col_ndx(col_ndx)
-    {
-    }
-
-    void update(Table& table) override
-    {
-        typedef _impl::TableFriend tf;
-        tf::adj_insert_column(table, m_col_ndx); // Throws
-        tf::mark_link_target_tables(table, m_col_ndx + 1);
-    }
-
-    void update_parent(Table&) override
-    {
-    }
-
-private:
-    size_t m_col_ndx;
-};
-
-
-class EraseColumnUpdater : public _impl::TableFriend::AccessorUpdater {
-public:
-    EraseColumnUpdater(size_t col_ndx)
-        : m_col_ndx(col_ndx)
-    {
-    }
-
-    void update(Table& table) override
-    {
-        typedef _impl::TableFriend tf;
-        tf::adj_erase_column(table, m_col_ndx);
-        tf::mark_link_target_tables(table, m_col_ndx);
-    }
-
-    void update_parent(Table&) override
-    {
-    }
-
-private:
-    size_t m_col_ndx;
-};
-
-} // anonymous namespace
-
 
 // In general, this class cannot assume more than minimal accessor consistency
 // (See AccessorConsistencyLevels., it can however assume that replication
@@ -1250,44 +1169,20 @@ private:
 // transaction log enough to skip these checks.
 class Group::TransactAdvancer {
 public:
-    TransactAdvancer(Group& group, bool& schema_changed)
-        : m_group(group)
-        , m_schema_changed(schema_changed)
+    TransactAdvancer(Group&, bool& schema_changed)
+        : m_schema_changed(schema_changed)
     {
     }
 
-    bool insert_group_level_table(TableKey table_key, size_t num_tables, StringData) noexcept
+    bool insert_group_level_table(TableKey, size_t, StringData) noexcept
     {
-        auto table_ndx = m_group.key2ndx(table_key);
-        REALM_ASSERT_3(table_ndx, <=, num_tables);
-        REALM_ASSERT(m_group.m_table_accessors.empty() || m_group.m_table_accessors.size() == num_tables);
-
-        if (!m_group.m_table_accessors.empty()) {
-            m_group.m_table_accessors[table_ndx] = nullptr;
-        }
-
         m_schema_changed = true;
 
         return true;
     }
 
-    bool erase_group_level_table(TableKey table_key, size_t num_tables) noexcept
+    bool erase_group_level_table(TableKey, size_t) noexcept
     {
-        auto table_ndx = m_group.key2ndx(table_key);
-        REALM_ASSERT_3(table_ndx, <, num_tables);
-        REALM_ASSERT(m_group.m_table_accessors.empty() || m_group.m_table_accessors.size() == num_tables);
-
-        if (!m_group.m_table_accessors.empty()) {
-            // Link target tables do not need to be considered here, since all
-            // columns will already have been removed at this point.
-            if (Table* table = m_group.m_table_accessors[table_ndx]) {
-                typedef _impl::TableFriend tf;
-                tf::detach(*table);
-                tf::unbind_ptr(*table);
-                m_group.m_table_accessors[table_ndx] = nullptr;
-            }
-        }
-
         m_schema_changed = true;
 
         return true;
@@ -1301,21 +1196,8 @@ public:
         return true;
     }
 
-    bool select_table(size_t group_level_ndx, int levels, const size_t*) noexcept
+    bool select_table(size_t, int, const size_t*) noexcept
     {
-        m_table.reset();
-        // The list of table accessors must either be empty or correctly reflect
-        // the number of tables prior to this instruction (see
-        // Group::do_get_table()). An empty list means that no table accessors
-        // have been created yet (all entries are null).
-        REALM_ASSERT(m_group.m_table_accessors.empty() || group_level_ndx < m_group.m_table_accessors.size());
-        REALM_ASSERT(levels == 0);
-        if (group_level_ndx < m_group.m_table_accessors.size()) {
-            m_table.reset(m_group.m_table_accessors[group_level_ndx]);
-            if (m_table) {
-                _impl::TableFriend::mark(*m_table);
-            }
-        }
         return true;
     }
 
@@ -1326,11 +1208,6 @@ public:
 
     bool remove_object(Key) noexcept
     {
-        typedef _impl::TableFriend tf;
-        if (m_table) {
-            // TODO: Is this needed?
-            tf::mark_opposite_link_tables(*m_table);
-        }
         return true;
     }
 
@@ -1384,30 +1261,8 @@ public:
         return true; // No-op
     }
 
-    bool set_link(size_t col_ndx, Key, Key, TableKey, _impl::Instruction) noexcept
+    bool set_link(size_t, Key, Key, TableKey, _impl::Instruction) noexcept
     {
-        // When links are changed, the link-target table is also affected and
-        // its accessor must therefore be marked dirty too. Indeed, when it
-        // exists, the link-target table accessor must be marked dirty
-        // regardless of whether an accessor exists for the origin table (i.e.,
-        // regardless of whether `m_table` is null or not.) This would seem to
-        // pose a problem, because there is no easy way to identify the
-        // link-target table when there is no accessor for the origin
-        // table. Fortunately, due to the fact that back-link column accessors
-        // refer to the origin table accessor (and vice versa), it follows that
-        // the link-target table accessor exists if, and only if the origin
-        // table accessor exists.
-        //
-        // get_link_target_table_accessor() will return null if the
-        // m_table->m_cols[col_ndx] is null, but this can happen only when the
-        // column was inserted earlier during this transaction advance, and in
-        // that case, we have already marked the target table accessor dirty.
-
-        if (m_table) {
-            using tf = _impl::TableFriend;
-            if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
-                tf::mark(*target);
-        }
         return true;
     }
 
@@ -1461,83 +1316,29 @@ public:
         return true; // No-op
     }
 
-    bool insert_column(size_t col_ndx, DataType, StringData, bool, bool)
+    bool insert_column(size_t, DataType, StringData, bool, bool)
     {
-        if (m_table) {
-            typedef _impl::TableFriend tf;
-            InsertColumnUpdater updater(col_ndx);
-            tf::update_accessors(*m_table, updater);
-        }
-
         m_schema_changed = true;
 
         return true;
     }
 
-    bool insert_link_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx,
-                            size_t backlink_column_ndx)
+    bool insert_link_column(size_t, DataType, StringData, size_t, size_t)
     {
-        if (m_table) {
-            InsertColumnUpdater updater(col_ndx);
-            using tf = _impl::TableFriend;
-            tf::update_accessors(*m_table, updater);
-        }
-        // Since insertion of a link column also modifies the target table by
-        // adding a backlink column there, the target table accessor needs to be
-        // marked dirty if it exists. Normally, the target table accesssor
-        // exists if, and only if the origin table accessor exists, but during
-        // Group::advance_transact() there will be times where this is not the
-        // case. Only after the final phase that updates all dirty accessors
-        // will this be guaranteed to be true again. See also the comments on
-        // link handling in TransactAdvancer::set_link().
-        if (link_target_table_ndx < m_group.m_table_accessors.size()) {
-            if (Table* target = m_group.m_table_accessors[link_target_table_ndx]) {
-                using tf = _impl::TableFriend;
-                tf::adj_insert_column(*target, backlink_column_ndx); // Throws
-                tf::mark(*target);
-            }
-        }
-
         m_schema_changed = true;
 
         return true;
     }
 
-    bool erase_column(size_t col_ndx)
+    bool erase_column(size_t)
     {
-        if (m_table) {
-            typedef _impl::TableFriend tf;
-            EraseColumnUpdater updater(col_ndx);
-            tf::update_accessors(*m_table, updater);
-        }
-
         m_schema_changed = true;
 
         return true;
     }
 
-    bool erase_link_column(size_t col_ndx, size_t link_target_table_ndx, size_t backlink_col_ndx)
+    bool erase_link_column(size_t, size_t, size_t)
     {
-        // For link columns we need to handle the backlink column first in case
-        // the target table is the same as the origin table (because the
-        // backlink column occurs after regular columns.)
-        //
-        // Please also see comments on special handling of link columns in
-        // TransactAdvancer::insert_link_column() and
-        // TransactAdvancer::set_link().
-        if (link_target_table_ndx < m_group.m_table_accessors.size()) {
-            if (Table* target = m_group.m_table_accessors[link_target_table_ndx]) {
-                using tf = _impl::TableFriend;
-                tf::adj_erase_column(*target, backlink_col_ndx); // Throws
-                tf::mark(*target);
-            }
-        }
-        if (m_table) {
-            EraseColumnUpdater updater(col_ndx);
-            using tf = _impl::TableFriend;
-            tf::update_accessors(*m_table, updater);
-        }
-
         m_schema_changed = true;
 
         return true;
@@ -1620,25 +1421,49 @@ public:
     }
 
 private:
-    Group& m_group;
-    TableRef m_table;
     bool& m_schema_changed;
 };
 
 void Group::refresh_dirty_accessors()
 {
-    m_top.get_alloc().bump_global_version();
+    // FIXME:
+    // must bump versions on all changed tables (the version count has to be
+    // saved with the table to avoid bumping versions on all tables).
+    // The array of Tables cannot have shrunk:
+    REALM_ASSERT(m_tables.size() >= m_table_accessors.size());
 
-    // Refresh all remaining dirty table accessors
-    size_t num_tables = m_table_accessors.size();
-    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
-        if (Table* table = m_table_accessors[table_ndx]) {
-            typedef _impl::TableFriend tf;
-            tf::set_ndx_in_parent(*table, table_ndx);
-            if (tf::is_marked(*table)) {
-                tf::refresh_accessor_tree(*table); // Throws
-                bool bump_global = false;
-                tf::bump_version(*table, bump_global);
+    // but it may have grown - and if so, we must resize the accessor array to match
+    if (m_table_accessors.size() > 0 && m_tables.size() > m_table_accessors.size()) {
+        m_table_accessors.resize(m_tables.size());
+    }
+
+    // Update all attached table accessors.
+    for (size_t i = 0; i < m_table_accessors.size(); ++i) {
+        auto& table_accessor = m_table_accessors[i];
+        if (table_accessor) {
+            // If the table has changed it's key in the file, it's a
+            // new table. This will detach the old accessor and remove it.
+            // FIXME: The detached accessor needs to be on a waiting list
+            // to allow for future references from Objs and TableRefs.
+            RefOrTagged rot = m_tables.get_as_ref_or_tagged(i);
+            bool same_table = false;
+            if (rot.is_ref()) {
+                auto ref = rot.get_as_ref();
+                TableKey new_key = Table::get_key_direct(m_alloc, ref);
+                if (new_key == table_accessor->get_key())
+                    same_table = true;
+            }
+            if (same_table) {
+                table_accessor->refresh_accessor_tree();
+                // FIXME: Move these into table::refresh_accessor_tree ??
+                table_accessor->bump_storage_version();
+                table_accessor->bump_content_version();
+            }
+            else {
+                table_accessor->detach();
+                recycle_table_accessor(table_accessor);
+                m_table_accessors[i] = nullptr;
+                delete table_accessor;
             }
         }
     }
@@ -1648,6 +1473,7 @@ void Group::refresh_dirty_accessors()
 void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in)
 {
     REALM_ASSERT(is_attached());
+    // REALM_ASSERT(false); // FIXME: accessor updates need to be handled differently
 
     // Exception safety: If this function throws, the group accessor and all of
     // its subordinate accessors are left in a state that may not be fully
@@ -1704,6 +1530,8 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
 
     m_alloc.update_reader_view(new_file_size); // Throws
 
+    // This is no longer needed in Core, but we need to compute "schema_changed",
+    // for the benefit of ObjectStore.
     bool schema_changed = false;
     _impl::TransactLogParser parser; // Throws
     TransactAdvancer advancer(*this, schema_changed);

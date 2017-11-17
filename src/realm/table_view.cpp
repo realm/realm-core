@@ -17,6 +17,10 @@
  **************************************************************************/
 
 #include <realm/table_view.hpp>
+//#include <realm/column.hpp>
+//#include <realm/column_timestamp.hpp>
+//#include <realm/column_tpl.hpp>
+
 #include <unordered_set>
 
 using namespace realm;
@@ -520,20 +524,21 @@ uint64_t TableViewBase::outside_version() const
 
     if (m_linklist_source) {
         // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
-        return m_linklist_source->is_valid() ? m_linklist_source->get_table()->m_version : max;
+        return m_linklist_source->is_valid() ? m_linklist_source->get_table()->get_content_version() : max;
     }
 
     if (m_source_column_ndx != size_t(-1)) {
         // m_linked_column is set when this TableView was created by Table::get_backlink_view().
-        return m_linked_obj.is_valid() ? m_linked_obj.get_table()->m_version : max;
+        return m_linked_obj.is_valid() ? m_linked_obj.get_table()->get_content_version() : max;
     }
 
+    // FIXME: Unimplemented for link to a column
     if (m_query.m_table) {
         // m_query.m_table is set when this TableView was created by a query.
 
         if (auto* view = dynamic_cast<LinkList*>(m_query.m_view)) {
             // This TableView depends on Query that is restricted by a LinkView (with where(&link_view))
-            return view->is_valid() ? view->get_table()->m_version : max;
+            return view->is_valid() ? view->get_table()->get_content_version() : max;
         }
 
         if (auto* view = dynamic_cast<TableView*>(m_query.m_view)) {
@@ -543,7 +548,7 @@ uint64_t TableViewBase::outside_version() const
     }
 
     // This TableView was either created by Table::get_distinct_view(), or a Query that is not restricted to a view.
-    return m_table->m_version;
+    return m_table->get_content_version();
 }
 
 bool TableViewBase::is_in_sync() const
@@ -676,6 +681,7 @@ void TableViewBase::do_sync()
                 m_key_values.add(m_linked_obj.get_backlink(backlink_col_ndx, i));
         }
     }
+    // FIXME: Unimplemented for link to a column
     else {
         REALM_ASSERT(m_query.m_table);
 

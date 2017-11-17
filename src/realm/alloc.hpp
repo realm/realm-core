@@ -26,6 +26,7 @@
 #include <realm/util/features.h>
 #include <realm/util/terminate.hpp>
 #include <realm/util/assert.hpp>
+#include <realm/exceptions.hpp>
 
 namespace realm {
 
@@ -173,47 +174,120 @@ protected:
 
     Allocator() noexcept;
 
-    // FIXME: This really doesn't belong in an allocator, but it is the best
-    // place for now, because every table has a pointer leading here. It would
-    // be more obvious to place it in Group, but that would add a runtime overhead,
-    // and access is time critical.
+    // The following counters are used to ensure accessor refresh,
+    // and allows us to report many errors related to attempts to
+    // access data which is no longer current.
     //
-    // This means that multiple threads that allocate Realm objects through the
-    // default allocator will share this variable, which is a logical design flaw
-    // that can make sync_if_needed() re-run queries even though it is not required.
-    // It must be atomic because it's shared.
-    std::atomic<uint_fast64_t> m_table_versioning_counter;
+    // * storage_versioning: monotonically increasing counter
+    //   bumped whenever the underlying storage layout is changed,
+    //   or if the owning accessor have been detached.
+    // * content_versioning: monotonically increasing counter
+    //   bumped whenever the data is changed. Used to detect
+    //   if queries are stale.
+    // * instance_versioning: monotonically increasing counter
+    //   used to detect if the allocator (and owning structure, e.g. Table)
+    //   is recycled. Mismatch on this counter will cause accesors
+    //   lower in the hierarchy to throw if access is attempted.
+    std::atomic<uint_fast64_t> m_content_versioning_counter;
 
-    /// Bump the global version counter. This method should be called when
-    /// version bumping is initiated. Then following calls to should_propagate_version()
-    /// can be used to prune the version bumping.
-    void bump_global_version() noexcept;
+    std::atomic<uint_fast64_t> m_storage_versioning_counter;
 
-    /// Determine if the "local_version" is out of sync, so that it should
-    /// be updated. In that case: also update it. Called from Table::bump_version
-    /// to control propagation of version updates on tables within the group.
-    bool should_propagate_version(uint_fast64_t& local_version) noexcept;
+    std::atomic<uint_fast64_t> m_instance_versioning_counter;
+
+    inline uint_fast64_t get_storage_version(uint64_t instance_version)
+    {
+        if (instance_version != m_instance_versioning_counter) {
+            throw LogicError(LogicError::detached_accessor);
+        }
+        return m_storage_versioning_counter.load(std::memory_order_acquire);
+    }
+
+    inline void bump_storage_version() noexcept
+    {
+        m_storage_versioning_counter.fetch_add(1, std::memory_order_acq_rel);
+    }
+
+    inline uint_fast64_t get_content_version() noexcept
+    {
+        return m_content_versioning_counter.load(std::memory_order_acquire);
+    }
+
+    inline void bump_content_version() noexcept
+    {
+        m_content_versioning_counter.fetch_add(1, std::memory_order_acq_rel);
+    }
+
+    inline uint_fast64_t get_instance_version() noexcept
+    {
+        return m_instance_versioning_counter.load(std::memory_order_acquire);
+    }
+
+    inline void bump_instance_version() noexcept
+    {
+        m_instance_versioning_counter.fetch_add(1, std::memory_order_acq_rel);
+    }
 
     friend class Table;
     friend class Group;
+    friend class WrappedAllocator;
+    friend class Obj;
 };
 
-inline void Allocator::bump_global_version() noexcept
-{
-    m_table_versioning_counter += 1;
-}
 
+class WrappedAllocator : public Allocator {
+public:
+    WrappedAllocator(Allocator& underlying_allocator)
+        : m_alloc(&underlying_allocator)
+    {
+        m_baseline = m_alloc->m_baseline;
+        m_replication = m_alloc->m_replication;
+        m_debug_watch = 0;
+    }
 
-inline bool Allocator::should_propagate_version(uint_fast64_t& local_version) noexcept
-{
-    if (local_version != m_table_versioning_counter) {
-        local_version = m_table_versioning_counter;
-        return true;
+    ~WrappedAllocator()
+    {
     }
-    else {
-        return false;
+
+    void switch_underlying_allocator(Allocator& underlying_allocator)
+    {
+        m_alloc = &underlying_allocator;
+        m_baseline = m_alloc->m_baseline;
+        m_replication = m_alloc->m_replication;
+        m_debug_watch = 0;
     }
-}
+
+private:
+    Allocator* m_alloc;
+    MemRef do_alloc(const size_t size) override
+    {
+        auto result = m_alloc->do_alloc(size);
+        bump_storage_version();
+        m_baseline = m_alloc->m_baseline;
+        return result;
+    }
+    virtual MemRef do_realloc(ref_type ref, const char* addr, size_t old_size, size_t new_size) override
+    {
+        auto result = m_alloc->do_realloc(ref, addr, old_size, new_size);
+        bump_storage_version();
+        m_baseline = m_alloc->m_baseline;
+        return result;
+    }
+
+    virtual void do_free(ref_type ref, const char* addr) noexcept override
+    {
+        return m_alloc->do_free(ref, addr);
+    }
+
+    virtual char* do_translate(ref_type ref) const noexcept override
+    {
+        return m_alloc->do_translate(ref);
+    }
+
+    virtual void verify() const override
+    {
+        m_alloc->verify();
+    }
+};
 
 
 // Implementation:
@@ -357,7 +431,9 @@ inline bool Allocator::is_read_only(ref_type ref) const noexcept
 
 inline Allocator::Allocator() noexcept
 {
-    m_table_versioning_counter = 0;
+    m_content_versioning_counter = 0;
+    m_storage_versioning_counter = 0;
+    m_instance_versioning_counter = 0;
 }
 
 inline Allocator::~Allocator() noexcept

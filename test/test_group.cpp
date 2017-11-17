@@ -100,7 +100,6 @@ void setup_table(T t)
 } // Anonymous namespace
 
 
-#ifdef LEGACY_TESTS
 TEST(Group_Unattached)
 {
     Group group((Group::unattached_tag()));
@@ -109,6 +108,7 @@ TEST(Group_Unattached)
 }
 
 
+#ifdef LEGACY_TESTS
 TEST(Group_UnattachedErrorHandling)
 {
     Group group((Group::unattached_tag()));
@@ -242,6 +242,7 @@ TEST(Group_OpenUnencryptedFileWithKey)
 }
 #endif // REALM_ENABLE_ENCRYPTION
 
+#ifdef LEGACY_TESTS
 #ifndef _WIN32
 TEST(Group_Permissions)
 {
@@ -277,7 +278,7 @@ TEST(Group_Permissions)
     }
 }
 #endif
-
+#endif
 
 TEST(Group_BadFile)
 {
@@ -561,6 +562,21 @@ TEST(Group_BasicRemoveTable)
 }
 
 
+TEST(Group_ObjUseAfterTableDetach)
+{
+    Obj obj;
+    int col;
+    {
+        Group group;
+        TableRef alpha = group.add_table("alpha");
+        col = alpha->add_column(type_Int, "first");
+        obj = alpha->create_object();
+        obj.set(col, 42);
+        CHECK_EQUAL(obj.get<int64_t>(col), 42);
+    }
+    CHECK_THROW(obj.get<int64_t>(col), realm::LogicError);
+}
+
 TEST(Group_RemoveTableWithColumns)
 {
     Group group;
@@ -604,15 +620,18 @@ TEST(Group_RemoveTableWithColumns)
     CHECK(delta->is_attached());
     CHECK(epsilon->is_attached());
 
+#ifdef LEGACY_TESTS
     // Try, but fail to remove table which is a target of link columns of other
     // tables.
     CHECK_THROW(group.remove_table("delta"), CrossTableLinkTarget);
     CHECK_EQUAL(2, group.size());
     CHECK(delta->is_attached());
     CHECK(epsilon->is_attached());
+#endif
 }
 
 
+#ifdef LEGACY_TESTS
 TEST(Group_RemoveTableMovesTableWithLinksOver)
 {
     // Create a scenario where a table is removed from the group, and the last
@@ -732,6 +751,7 @@ TEST(Group_RemoveLinkTable)
     CHECK(target->is_attached());
     group.verify();
 }
+#endif
 
 
 TEST(Group_RenameTable)
@@ -757,6 +777,7 @@ TEST(Group_RenameTable)
 }
 
 
+#ifdef LEGACY_TESTS
 TEST(Group_Equal)
 {
     Group g1, g2, g3;
@@ -778,7 +799,6 @@ TEST(Group_Equal)
 }
 
 
-#ifdef LEGACY_TESTS
 TEST(Group_SubtableDescriptors)
 {
     // This test originally only failed when checked with valgrind as the
@@ -1120,7 +1140,7 @@ TEST(Group_Serialize_Optimized)
     from_mem.verify();
 #endif
 }
-#endif
+#endif // LEGACY_TESTS
 
 TEST(Group_Serialize_All)
 {
@@ -1230,8 +1250,6 @@ TEST(Group_ToJSON)
                 str);
 }
 
-
-#ifdef LEGACY_TESTS
 TEST(Group_ToString)
 {
     Group g;
@@ -1316,7 +1334,7 @@ TEST(Group_IndexString)
     CHECK_EQUAL(not_found, m7);
     CHECK_EQUAL(6, m8);
 }
-#endif
+#endif // LEGACY_TESTS
 
 TEST(Group_StockBug)
 {
@@ -1709,7 +1727,6 @@ TEST(Group_CascadeNotify_TableViewClear)
     origin->where().find_all().clear();
     CHECK(called);
 }
-#endif
 
 
 TEST(Group_WriteEmpty)
@@ -1833,7 +1850,9 @@ TEST(Group_ToDot)
 
 #endif // REALM_TO_DOT
 #endif // REALM_DEBUG
+#endif // LEGACY_TESTS
 
+#ifdef LEGACY_TESTS
 TEST_TYPES(Group_TimestampAddAIndexAndThenInsertEmptyRows, std::true_type, std::false_type)
 {
     constexpr bool nullable = TEST_TYPE::value;
@@ -1866,6 +1885,7 @@ TEST(Group_SharedMappingsForReadOnlyStreamingForm)
         CHECK(table2 && table2->size() == 1);
     }
 }
+
 
 // This test embodies a current limitation of our merge algorithm. If this
 // limitation is lifted, the code for the SET_UNIQUE instruction in

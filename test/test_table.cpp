@@ -1026,8 +1026,10 @@ void setup_multi_table(Table& table, size_t rows, std::vector<Key>& keys)
         obj.set(bin_col, BinaryData("binary", 7));
     }
 
+#ifdef LEGACY_TESTS
     // We also want a StringEnumColumn
     table.optimize();
+#endif
 }
 
 } // anonymous namespace
@@ -1090,8 +1092,9 @@ TEST(Table_MoveAllTypes)
     Table table;
     std::vector<Key> keys;
     setup_multi_table(table, 15, keys);
+#ifdef LEGACY_TESTS
     table.add_search_index(6);
-
+#endif
     while (!table.is_empty()) {
         size_t size = keys.size();
         auto it = keys.begin() + random.draw_int_mod(size);

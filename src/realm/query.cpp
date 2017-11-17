@@ -1658,7 +1658,7 @@ util::Optional<uint_fast64_t> Query::sync_view_if_needed() const
         return m_view->sync_if_needed();
 
     if (m_table)
-        return m_table->get_version_counter();
+        return m_table->get_content_version();
 
     return util::none;
 }

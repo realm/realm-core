@@ -194,9 +194,8 @@ Key List<Key>::remove(size_t ndx)
     }
     Key old = get(ndx);
     m_leaf->erase(ndx);
-    m_obj.bump_version();
+    m_obj.bump_content_version();
     ConstListBase::adj_remove(ndx);
-    m_obj.bump_version();
 
     return old;
 }
@@ -243,7 +242,7 @@ void List<Key>::clear()
     }
 
     m_leaf->truncate_and_destroy_children(0);
-    m_obj.bump_version();
+    m_obj.bump_content_version();
 
     tf::remove_recursive(*origin_table, state); // Throws
 }
@@ -274,7 +273,7 @@ void LinkList::sort(SortDescriptor&& order)
     ordering.append_sort(std::move(order));
     update_if_needed();
     do_sort(ordering);
-    m_obj.bump_version();
+    m_obj.bump_content_version();
 }
 
 void LinkList::sort(size_t column_index, bool ascending)
@@ -300,7 +299,7 @@ void LinkList::remove_all_target_rows()
 uint_fast64_t LinkList::sync_if_needed() const
 {
     const_cast<LinkList*>(this)->update_if_needed();
-    return get_table()->get_version_counter();
+    return get_table()->get_content_version();
 }
 
 bool LinkList::is_in_sync() const

@@ -1120,16 +1120,32 @@ bool ClusterTree::update_from_parent(size_t old_baseline) noexcept
     return was_updated;
 }
 
-
-uint64_t ClusterTree::bump_version()
+// FIXME: These functions are time critical, we need more direct access
+// without going through multiple indirections.
+uint64_t ClusterTree::bump_content_version()
 {
-    m_owner->bump_version();
-    return m_owner->get_version_counter();
+    m_owner->bump_content_version();
+    return m_owner->get_content_version();
 }
 
-uint64_t ClusterTree::get_version_counter() const
+void ClusterTree::bump_storage_version()
 {
-    return m_owner->get_version_counter();
+    m_owner->bump_storage_version();
+}
+
+uint64_t ClusterTree::get_content_version() const
+{
+    return m_owner->get_content_version();
+}
+
+uint64_t ClusterTree::get_instance_version() const
+{
+    return m_owner->get_instance_version();
+}
+
+uint64_t ClusterTree::get_storage_version(uint64_t instance_version) const
+{
+    return m_owner->get_storage_version(instance_version);
 }
 
 void ClusterTree::clear()
@@ -1191,12 +1207,13 @@ Obj ClusterTree::get(Key k)
 void ClusterTree::erase(Key k, CascadeState& state)
 {
     unsigned root_size = m_root->erase(k, state);
-    bump_version();
 
     if (Replication* repl = get_alloc().get_replication()) {
         repl->remove_object(get_owner(), k);
     }
 
+    bump_content_version();
+    bump_storage_version();
     m_size--;
     while (!m_root->is_leaf() && root_size == 1) {
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
@@ -1272,6 +1289,7 @@ ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
     : m_tree(t)
     , m_leaf(t.get_alloc(), t)
     , m_state(m_leaf)
+    , m_instance_version(t.get_instance_version())
 {
     if (ndx == 0) {
         // begin
@@ -1293,7 +1311,7 @@ ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, Key key)
 
 Key ClusterTree::ConstIterator::load_leaf(Key key) const
 {
-    m_version = m_tree.get_version_counter();
+    m_storage_version = m_tree.get_storage_version(m_instance_version);
     // 'key' may or may not exist. If it does not exist, state is updated
     // to point to the next object in line.
     if (m_tree.get_leaf(key, m_state)) {
@@ -1308,7 +1326,7 @@ Key ClusterTree::ConstIterator::load_leaf(Key key) const
 
 ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
 {
-    if (m_version != m_tree.get_version_counter()) {
+    if (m_storage_version != m_tree.get_storage_version(m_instance_version)) {
         Key k = load_leaf(m_key);
         if (k != m_key)
             throw std::out_of_range("Object was deleted");
@@ -1322,7 +1340,7 @@ ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
 
 ClusterTree::ConstIterator& Table::ConstIterator::operator++()
 {
-    if (m_version != m_tree.get_version_counter()) {
+    if (m_storage_version != m_tree.get_storage_version(m_instance_version)) {
         Key k = load_leaf(m_key);
         if (k != m_key) {
             // Objects was deleted. k points to the next object

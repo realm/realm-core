@@ -94,8 +94,6 @@ public:
     /// returned.
     size_t find(size_t target_row_ndx, size_t start = 0) const noexcept;
 
-    const ColumnBase& get_column_base(size_t index)
-        const override; // FIXME: `ColumnBase` is not part of the public API, so this function must be made private.
     const Table& get_origin_table() const noexcept;
     Table& get_origin_table() noexcept;
 
@@ -267,11 +265,6 @@ inline size_t LinkView::find(size_t target_row_ndx, size_t start) const noexcept
         return not_found;
 
     return m_row_indexes.find_first(target_row_ndx, start);
-}
-
-inline const ColumnBase& LinkView::get_column_base(size_t index) const
-{
-    return get_target_table().get_column_base(index);
 }
 
 inline const Table& LinkView::get_origin_table() const noexcept

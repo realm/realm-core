@@ -68,6 +68,7 @@ TEST_TYPES(TimestampColumn_Basic, std::true_type, std::false_type)
     c.destroy();
 }
 
+#ifdef LEGACY_TESTS
 TEST(TimestampColumn_Basic_Nulls)
 {
     constexpr bool nullable = true;
@@ -435,6 +436,7 @@ TEST(TimestampColumn_LargeNegativeTimestampSearchIndexErase)
     c.destroy_search_index();
     c.destroy();
 }
+#endif
 
 namespace { // anonymous namespace
 
@@ -594,7 +596,7 @@ TEST(TimestampColumn_FindFirst)
     CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(1, 1)), 4);
     CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(-1, 0)), 5);
 }
-#endif
+
 
 TEST(TimestampColumn_AddColumnAfterRows)
 {
@@ -614,6 +616,7 @@ TEST(TimestampColumn_AddColumnAfterRows)
     CHECK(t.get_object(keys[0]).get<Timestamp>(col_2).is_null());
     CHECK(t.get_object(keys[0]).is_null(col_2));
 }
+#endif
 
 // max/min on pure null timestamps must reuturn npos like for int, float and double
 #ifdef LEGACY_TESTS
@@ -662,7 +665,6 @@ TEST(TimestampColumn_AggregateBug)
     CHECK_EQUAL(ts, Timestamp(1, 0));
 }
 #endif
-
 
 namespace {
 // Since C++11, modulo with negative operands is well-defined

@@ -177,8 +177,6 @@ public:
     const Query& get_query() const noexcept;
 
     // Column information
-    const ColumnBase& get_column_base(size_t index) const;
-
     size_t get_column_count() const noexcept;
     StringData get_column_name(size_t column_ndx) const noexcept;
     size_t get_column_index(StringData name) const;
@@ -609,7 +607,7 @@ inline size_t TableViewBase::find_by_source_ndx(Key key) const noexcept
 
 inline TableViewBase::TableViewBase(Table* parent)
     : ObjList(m_table_view_key_values, parent) // Throws
-    , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+    , m_last_seen_version(m_table ? util::make_optional(m_table->get_content_version()) : util::none)
     , m_table_view_key_values(Allocator::get_default())
 {
     m_table_view_key_values.create();
@@ -631,7 +629,7 @@ inline TableViewBase::TableViewBase(Table* src_table, size_t src_col_ndx, const 
     : ObjList(m_table_view_key_values, src_table) // Throws
     , m_source_column_ndx(src_col_ndx)
     , m_linked_obj(obj)
-    , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+    , m_last_seen_version(m_table ? util::make_optional(m_table->get_content_version()) : util::none)
     , m_table_view_key_values(Allocator::get_default())
 {
     m_table_view_key_values.create();
@@ -640,7 +638,7 @@ inline TableViewBase::TableViewBase(Table* src_table, size_t src_col_ndx, const 
 inline TableViewBase::TableViewBase(DistinctViewTag, Table* parent, size_t column_ndx)
     : ObjList(m_table_view_key_values, parent) // Throws
     , m_distinct_column_source(column_ndx)
-    , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+    , m_last_seen_version(m_table ? util::make_optional(m_table->get_content_version()) : util::none)
     , m_table_view_key_values(Allocator::get_default())
 {
     REALM_ASSERT(m_distinct_column_source != npos);
@@ -650,7 +648,7 @@ inline TableViewBase::TableViewBase(DistinctViewTag, Table* parent, size_t colum
 inline TableViewBase::TableViewBase(Table* parent, ConstLinkListPtr link_list)
     : ObjList(m_table_view_key_values, parent) // Throws
     , m_linklist_source(std::move(link_list))
-    , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+    , m_last_seen_version(m_table ? util::make_optional(m_table->get_content_version()) : util::none)
     , m_table_view_key_values(Allocator::get_default())
 {
     REALM_ASSERT(m_linklist_source);
@@ -770,11 +768,6 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     REALM_ASSERT(row_ndx < m_key_values.size())
 
 // Column information
-
-inline const ColumnBase& TableViewBase::get_column_base(size_t index) const
-{
-    return m_table->get_column_base(index);
-}
 
 inline size_t TableViewBase::get_column_count() const noexcept
 {
