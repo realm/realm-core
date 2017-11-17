@@ -110,6 +110,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     handover_defs.hpp
     history.hpp
     index_string.hpp
+    keys.hpp
     lang_bind_helper.hpp
     link_view.hpp
     link_view_fwd.hpp

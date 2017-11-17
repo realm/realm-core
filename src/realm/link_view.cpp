@@ -119,7 +119,7 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
         return;
 
     CascadeState::row target_row;
-    target_row.table_ndx = target_table.get_index_in_group();
+    target_row.table_key = target_table.get_key();
     target_row.row_ndx = old_target_row_ndx;
     CascadeState state;
     state.rows.push_back(target_row);
@@ -213,7 +213,7 @@ void LinkView::remove(size_t link_ndx)
         return;
 
     CascadeState::row target_row;
-    target_row.table_ndx = target_table.get_index_in_group();
+    target_row.table_key = target_table.get_key();
     target_row.row_ndx = target_row_ndx;
     CascadeState state;
     state.rows.push_back(target_row);
@@ -268,7 +268,7 @@ void LinkView::clear()
         if (num_remaining > 0)
             continue;
         CascadeState::row target_row;
-        target_row.table_ndx = target_table.get_index_in_group();
+        target_row.table_key = target_table.get_key();
         target_row.row_ndx = target_row_ndx;
         auto i = std::upper_bound(state.rows.begin(), state.rows.end(), target_row);
         // This target row cannot already be in state.rows

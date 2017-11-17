@@ -217,7 +217,7 @@ public:
         return false;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, size_t, _impl::Instruction)
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, TableKey, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             if (target_row_ndx == realm::npos) {
@@ -373,11 +373,14 @@ public:
 
     bool select_table(size_t group_level_ndx, int levels, const size_t*)
     {
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(group_level_ndx >= m_group.size())))
-            return false;
         log("table = group->get_table(%1);", group_level_ndx); // Throws
         m_link_list.reset();
-        m_table = m_group.get_table(group_level_ndx); // Throws
+        try {
+            m_table = m_group.get_table(TableKey(group_level_ndx)); // Throws
+        }
+        catch (...) {
+            return false;
+        }
         REALM_ASSERT(levels == 0);
         /*
         for (int i = 0; i < levels; ++i) {
@@ -482,7 +485,7 @@ public:
                     data_type_to_str(type), name, link_target_table_ndx, backlink_col_ndx); // Throws
                 using gf = _impl::GroupFriend;
                 using tf = _impl::TableFriend;
-                Table* link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
+                Table* link_target_table = &gf::get_table(m_group, TableKey(link_target_table_ndx)); // Throws
                 LinkTargetInfo link(link_target_table, backlink_col_ndx);
                 tf::insert_column_unless_exists(*m_table, col_ndx, type, name, link); // Throws
                 return true;
@@ -545,57 +548,53 @@ public:
         return false;
     }
 
-    bool insert_group_level_table(size_t table_ndx, size_t prior_num_tables, StringData name)
+    bool insert_group_level_table(TableKey table_key, size_t prior_num_tables, StringData name)
     {
-        static_cast<void>(prior_num_tables);
+
         if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_num_tables != m_group.size())))
-            return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(table_ndx > m_group.size())))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(name.size() >= ArrayStringShort::max_width)))
             return false;
-        log("group->insert_table(%1, \"%2\", false);", table_ndx, name); // Throws
+
+        log("group->insert_table(%1, \"%2\", false);", table_key.value, name); // Throws
         typedef _impl::GroupFriend gf;
         bool was_inserted;
-        gf::get_or_insert_table(m_group, table_ndx, name, &was_inserted); // Throws
-        return true;
+        // try to add table with correct key and name - but if it fails, just back out silently
+        try {
+            gf::get_or_add_table(m_group, table_key, name, &was_inserted); // Throws
+            return true;
+        }
+        catch (...) {
+        }
+        return false;
     }
 
-    bool erase_group_level_table(size_t table_ndx, size_t num_tables) noexcept
+    bool erase_group_level_table(TableKey table_key, size_t num_tables) noexcept
     {
         static_cast<void>(num_tables);
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(num_tables != m_group.size())))
-            return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(table_ndx >= m_group.size())))
-            return false;
-        log("group->remove_table(%1);", table_ndx); // Throws
-        m_group.remove_table(table_ndx);
+        log("group->remove_table(%1);", table_key.value); // Throws
+        m_group.remove_table(table_key);
         return true;
     }
 
-    bool rename_group_level_table(size_t table_ndx, StringData new_name) noexcept
+    bool rename_group_level_table(TableKey table_key, StringData new_name) noexcept
     {
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(table_ndx >= m_group.size())))
-            return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(m_group.has_table(new_name))))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(new_name.size() >= ArrayStringShort::max_width)))
             return false;
-        log("group->rename_table(%1, \"%2\");", table_ndx, new_name); // Throws
-        m_group.rename_table(table_ndx, new_name);
+        log("group->rename_table(%1, \"%2\");", table_key, new_name); // Throws
+        m_group.rename_table(table_key, new_name);
         return true;
     }
 
     bool move_group_level_table(size_t from_table_ndx, size_t to_table_ndx) noexcept
     {
+        REALM_ASSERT(false); // unsupported
         if (REALM_UNLIKELY(REALM_COVER_NEVER(from_table_ndx == to_table_ndx)))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(from_table_ndx >= m_group.size())))
-            return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(to_table_ndx >= m_group.size())))
-            return false;
         log("group->move_table(%1, %2);", from_table_ndx, to_table_ndx); // Throws
-        m_group.move_table(from_table_ndx, to_table_ndx);
+        // m_group.move_table(from_table_ndx, to_table_ndx);
         return true;
     }
 
@@ -712,9 +711,9 @@ public:
         return true;
     }
 
-    bool nullify_link(size_t col_ndx, size_t row_ndx, size_t target_group_level_ndx)
+    bool nullify_link(size_t col_ndx, size_t row_ndx, TableKey target_table_key)
     {
-        return set_link(col_ndx, row_ndx, realm::npos, target_group_level_ndx, _impl::instr_Set);
+        return set_link(col_ndx, row_ndx, realm::npos, target_table_key, _impl::instr_Set);
     }
 
     bool link_list_nullify(size_t link_ndx, size_t prior_size)

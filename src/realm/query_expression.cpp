@@ -48,9 +48,9 @@ void LinkMap::set_base_table(const Table* table)
 
         m_link_types.push_back(type);
         m_link_column_names.emplace_back(spec.get_column_name(link_column_index));
-        size_t target_table_index = spec.get_opposite_link_table_ndx(link_column_index);
-        TableRef tt = group->get_table(target_table_index);
-        m_tables.push_back(tt.get());
+        TableKey target_table_key = spec.get_opposite_link_table_key(link_column_index);
+        auto target_table = group->get_table(target_table_key);
+        m_tables.push_back(target_table.get());
     }
 }
 

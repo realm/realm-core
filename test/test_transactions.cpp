@@ -604,6 +604,8 @@ TEST(Transactions_General)
 }
 #endif
 
+#ifdef LEGACY_TESTS
+
 TEST(Transactions_RollbackCreateObject)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -612,14 +614,14 @@ TEST(Transactions_RollbackCreateObject)
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
 
-    g.insert_table(0, "t0");
-    g.get_table(0)->add_column(type_Int, "integers");
+    auto tk = g.add_table("t0")->get_key();
+    g.get_table(tk)->add_column(type_Int, "integers");
 
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
 
-    g.get_table(0)->create_object(Key(0)).set(0, 5);
-    auto o = g.get_table(0)->get_object(Key(0));
+    g.get_table(tk)->create_object(Key(0)).set(0, 5);
+    auto o = g.get_table(tk)->get_object(Key(0));
     CHECK_EQUAL(o.get<int64_t>(0), 5);
     LangBindHelper::rollback_and_continue_as_read(sg_w);
 
@@ -629,8 +631,9 @@ TEST(Transactions_RollbackCreateObject)
 
     LangBindHelper::promote_to_write(sg_w);
 
-    CHECK_EQUAL(g.get_table(0)->size(), 0);
+    CHECK_EQUAL(g.get_table(tk)->size(), 0);
 }
+
 
 // Rollback a table move operation and check accessors.
 // This case checks column accessors when a table is inserted, moved, rolled back.
@@ -644,23 +647,22 @@ TEST(Transactions_RollbackMoveTableColumns)
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
 
-    g.insert_table(0, "t0");
-    g.get_table(0)->insert_column_link(0, type_Link, "t0_link0_to_t0", *g.get_table(0));
+    auto t0k = g.add_table("t0")->get_key();
+    g.get_table(t0k)->insert_column_link(0, type_Link, "t0_link0_to_t0", *g.get_table(t0k));
 
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
 
-    g.add_table("t1");
+    g.add_table("t1")->get_key();
 
-    g.move_table(1, 0);
-    g.insert_table(0, "inserted_at_index_zero");
+    g.add_table(0, "inserted_at_the end");
     LangBindHelper::rollback_and_continue_as_read(sg_w);
 
     g.verify(); // table.cpp:5249: [realm-core-0.97.0] Assertion failed: col_ndx <= m_cols.size() [2, 0]
 
     LangBindHelper::promote_to_write(sg_w);
 
-    CHECK_EQUAL(g.get_table(0)->get_name(), StringData("t0"));
+    CHECK_EQUAL(g.get_table(t0k)->get_name(), StringData("t0"));
     CHECK_EQUAL(g.size(), 1);
 }
 
@@ -675,23 +677,21 @@ TEST(Transactions_RollbackMoveTableReferences)
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
 
-    g.insert_table(0, "t0");
-    g.get_table(0)->insert_column(0, type_Int, "t0_int0");
+    auto t0k = g.add_table(0, "t0")->get_key();
+    g.get_table(t0k)->insert_column(0, type_Int, "t0_int0");
 
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
     g.add_table("t1");
-    g.move_table(1, 0);
     LangBindHelper::rollback_and_continue_as_read(sg_w);
 
     g.verify(); // array.cpp:2111: [realm-core-0.97.0] Assertion failed: ref_in_parent == m_ref [112, 4864]
 
     LangBindHelper::promote_to_write(sg_w);
 
-    CHECK_EQUAL(g.get_table(0)->get_name(), StringData("t0"));
+    CHECK_EQUAL(g.get_table(t0k)->get_name(), StringData("t0"));
     CHECK_EQUAL(g.size(), 1);
 }
-
 
 // Check that the spec.enumkeys become detached when
 // rolling back the insertion of a string enum column
@@ -717,29 +717,29 @@ TEST(LangBindHelper_RollbackStringEnumInsert)
     };
 
     g.add_table("t0");
-    g.add_table("t1");
+    auto t1k = g.add_table("t1")->get_key();
 
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
 
-    populate_with_string_enum(g.get_table(1));
+    populate_with_string_enum(g.get_table(t1k));
 
     LangBindHelper::rollback_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
 
-    populate_with_string_enum(g.get_table(1));
+    populate_with_string_enum(g.get_table(t1k));
 
-    g.get_table(1)->set_string(0, 0, "duplicate");
+    g.get_table(t1k)->set_string(0, 0, "duplicate");
 
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::advance_read(sg_2);
 
-    CHECK_EQUAL(g2.get_table(1)->size(), 3);
-    CHECK_EQUAL(g2.get_table(1)->get_string(0, 2), "duplicate");
+    CHECK_EQUAL(g2.get_table(t1k)->size(), 3);
+    CHECK_EQUAL(g2.get_table(t1k)->get_string(0, 2), "duplicate");
 
     CHECK_EQUAL(g.size(), 2);
-    CHECK_EQUAL(g.get_table(1)->get_column_count(), 1);
-    CHECK_EQUAL(g.get_table(1)->size(), 3);
+    CHECK_EQUAL(g.get_table(t1k)->get_column_count(), 1);
+    CHECK_EQUAL(g.get_table(t1k)->size(), 3);
 }
 
 // Check that the table.spec.subspec array becomes detached
@@ -753,13 +753,13 @@ TEST(LangBindHelper_RollbackLinkInsert)
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
-    g.add_table("t0");
-    g.add_table("t1");
+    auto t0k = g.add_table("t0")->get_key();
+    auto t1k = g.add_table("t1")->get_key();
 
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
 
-    g.get_table(1)->add_column_link(type_LinkList, "t1_col0_link", *g.get_table(0));
+    g.get_table(t1k)->add_column_link(type_LinkList, "t1_col0_link", *g.get_table(t0k));
     // or
     // g.get_table(0)->add_column_link(type_Link, "t0_col0_link", *g.get_table(1));
 
@@ -767,16 +767,17 @@ TEST(LangBindHelper_RollbackLinkInsert)
     LangBindHelper::promote_to_write(sg_w);
 
     g.add_table("t2");
-    g.get_table(1)->add_column_link(type_Link, "link", *g.get_table(0));
+    g.get_table(t1k)->add_column_link(type_Link, "link", *g.get_table(t0k));
     // or
     // g.get_table(0)->add_column_link(type_Link, "link", *g.get_table(1));
 
     g.add_table("t3");
 
     CHECK_EQUAL(g.size(), 4);
-    CHECK_EQUAL(g.get_table(1)->get_column_count(), 1);
-    CHECK_EQUAL(g.get_table(1)->get_link_target(0), g.get_table(0));
+    CHECK_EQUAL(g.get_table(t1k)->get_column_count(), 1);
+    CHECK_EQUAL(g.get_table(t1k)->get_link_target(0), g.get_table(t0k));
 }
+#endif
 
 
 #endif // TEST_TRANSACTIONS

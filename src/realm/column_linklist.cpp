@@ -222,7 +222,7 @@ void LinkListColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& st
 void LinkListColumn::cascade_break_backlinks_to__leaf(size_t row_ndx, const Array& link_list_leaf,
                                                       CascadeState& state)
 {
-    size_t target_table_ndx = m_target_table->get_index_in_group();
+    auto target_table_key = m_target_table->get_key();
 
     size_t num_links = link_list_leaf.size();
     for (size_t i = 0; i < num_links; ++i) {
@@ -237,7 +237,7 @@ void LinkListColumn::cascade_break_backlinks_to__leaf(size_t row_ndx, const Arra
             continue;
 
         // Recurse on target row when appropriate
-        check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws
+        check_cascade_break_backlinks_to(target_table_key, target_row_ndx, state); // Throws
     }
 }
 
@@ -281,14 +281,14 @@ void LinkListColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
 
 void LinkListColumn::cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf, CascadeState& state)
 {
-    size_t target_table_ndx = m_target_table->get_index_in_group();
+    auto target_table_key = m_target_table->get_key();
 
     size_t num_links = link_list_leaf.size();
     for (size_t i = 0; i < num_links; ++i) {
         size_t target_row_ndx = to_size_t(link_list_leaf.get(i));
 
         // Recurse on target row when appropriate
-        check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws
+        check_cascade_break_backlinks_to(target_table_key, target_row_ndx, state); // Throws
     }
 }
 

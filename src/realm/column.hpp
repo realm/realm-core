@@ -35,6 +35,7 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/table_ref.hpp>
+#include <realm/keys.hpp>
 
 namespace realm {
 
@@ -266,8 +267,8 @@ public:
     /// Table::cascade_break_backlinks_to_all_rows() to pass the number of rows
     /// in the table as \a num_rows.
 
-    virtual void cascade_break_backlinks_to(size_t row_ndx, CascadeState&);
-    virtual void cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState&);
+    virtual void cascade_break_backlinks_to(size_t, CascadeState&);
+    virtual void cascade_break_backlinks_to_all_rows(size_t, CascadeState&);
 
     //@}
 

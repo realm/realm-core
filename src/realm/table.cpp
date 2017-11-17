@@ -348,8 +348,8 @@ size_t Table::get_backlink_count(size_t row_ndx, bool only_strong_links) const n
 
 size_t Table::get_backlink_count(size_t row_ndx, const Table& origin, size_t origin_col_ndx) const noexcept
 {
-    size_t origin_table_ndx = origin.get_index_in_group();
-    size_t backlink_col_ndx = m_spec->find_backlink_column(origin_table_ndx, origin_col_ndx);
+    auto origin_table_key = origin.get_key();
+    size_t backlink_col_ndx = m_spec->find_backlink_column(origin_table_key, origin_col_ndx);
     const BacklinkColumn& backlink_col = get_column_backlink(backlink_col_ndx);
     return backlink_col.get_backlink_count(row_ndx);
 }
@@ -358,8 +358,8 @@ size_t Table::get_backlink_count(size_t row_ndx, const Table& origin, size_t ori
 size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const
     noexcept
 {
-    size_t origin_table_ndx = origin.get_index_in_group();
-    size_t backlink_col_ndx = m_spec->find_backlink_column(origin_table_ndx, origin_col_ndx);
+    auto origin_table_key = origin.get_key();
+    size_t backlink_col_ndx = m_spec->find_backlink_column(origin_table_key, origin_col_ndx);
     const BacklinkColumn& backlink_col = get_column_backlink(backlink_col_ndx);
     return backlink_col.get_backlink(row_ndx, backlink_ndx);
 }
@@ -407,7 +407,7 @@ void Table::remove_backlink_broken_rows(const CascadeState& cascade_state)
     for (auto i = cascade_state.rows.rbegin(); i != rend; ++i) {
         typedef _impl::GroupFriend gf;
         bool is_move_last_over = (i->is_ordered_removal == 0);
-        Table& table = gf::get_table(group, i->table_ndx);
+        Table& table = gf::get_table(group, i->table_key);
 
         bool broken_reciprocal_backlinks = true;
         if (is_move_last_over) {
@@ -480,6 +480,21 @@ void Table::rename_column(size_t col_ndx, StringData name)
 }
 
 
+TableKey Table::get_key_direct(Allocator& alloc, ref_type top_ref)
+{
+    // well, not quite "direct", more like "almost direct":
+    Array table_top(alloc);
+    table_top.init_from_ref(top_ref);
+    if (table_top.size() > 3) {
+        RefOrTagged rot = table_top.get_as_ref_or_tagged(top_position_for_key);
+        return TableKey(rot.get_as_int());
+    }
+    else {
+        return TableKey();
+    }
+}
+
+
 void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bool skip_create_column_accessors)
 {
     m_mark = false;
@@ -490,20 +505,24 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     m_top.set_parent(parent, ndx_in_parent);
     m_top.init_from_ref(top_ref);
 
-    size_t spec_ndx_in_parent = 0;
     m_spec.reset(new Spec(get_alloc()));
-    m_spec->set_parent(&m_top, spec_ndx_in_parent);
+    m_spec->set_parent(&m_top, top_position_for_spec);
     m_spec->init_from_parent();
-    size_t columns_ndx_in_parent = 1;
-    m_columns.set_parent(&m_top, columns_ndx_in_parent);
+    m_columns.set_parent(&m_top, top_position_for_columns);
     m_columns.init_from_parent();
 
     if (m_top.size() > 2) {
-        size_t keys_ndx_in_parent = 2;
-        m_clusters.set_parent(&m_top, keys_ndx_in_parent);
+        m_clusters.set_parent(&m_top, top_position_for_cluster_tree);
         m_clusters.init_from_parent();
     }
-
+    if (m_top.size() > 3) {
+        RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_key);
+        REALM_ASSERT(rot.is_tagged());
+        m_key = TableKey(rot.get_as_int());
+    }
+    else {
+        m_key = TableKey();
+    }
     size_t num_cols = m_spec->get_column_count();
     m_cols.resize(num_cols); // Throws
 
@@ -548,8 +567,7 @@ void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, String
                 throw LogicError(LogicError::type_mismatch);
             }
             if (is_link_type(ColumnType(type)) &&
-                m_spec->get_opposite_link_table_ndx(col_ndx) !=
-                    link_target_info.m_target_table->get_index_in_group()) {
+                m_spec->get_opposite_link_table_key(col_ndx) != link_target_info.m_target_table->get_key()) {
                 throw LogicError(LogicError::type_mismatch);
             }
 
@@ -694,8 +712,8 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name, L
     // established by Table::refresh_column_accessors() when it is invoked for
     // the target table below.
     if (link_target.is_valid()) {
-        size_t target_table_ndx = link_target.m_target_table->get_index_in_group();
-        m_spec->set_opposite_link_table_ndx(col_ndx, target_table_ndx); // Throws
+        auto target_table_key = link_target.m_target_table->get_key();
+        m_spec->set_opposite_link_table_key(col_ndx, target_table_key); // Throws
         link_target.m_target_table->mark();
     }
 
@@ -703,7 +721,7 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name, L
 
     if (link_target.is_valid()) {
         link_target.m_target_table->unmark();
-        size_t origin_table_ndx = get_index_in_group();
+        auto origin_table_key = get_key();
         if (link_target.m_backlink_col_ndx == realm::npos) {
             const Spec& target_spec = tf::get_spec(*(link_target.m_target_table));
             link_target.m_backlink_col_ndx = target_spec.get_column_count(); // insert at back of target
@@ -718,7 +736,7 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name, L
             backlink_col_name.resize(Table::max_column_name_length - hash_length);
             backlink_col_name += util::to_string(hash).substr(0, hash_length);
         }
-        link_target.m_target_table->insert_backlink_column(origin_table_ndx, col_ndx, link_target.m_backlink_col_ndx,
+        link_target.m_target_table->insert_backlink_column(origin_table_key, col_ndx, link_target.m_backlink_col_ndx,
                                                            backlink_col_name); // Throws
     }
 
@@ -736,8 +754,8 @@ void Table::erase_root_column(size_t col_ndx)
     ColumnType col_type = m_spec->get_column_type(col_ndx);
     if (is_link_type(col_type)) {
         Table* link_target_table = get_link_target_table_accessor(col_ndx);
-        size_t origin_table_ndx = get_index_in_group();
-        link_target_table->erase_backlink_column(origin_table_ndx, col_ndx); // Throws
+        auto origin_table_key = get_key();
+        link_target_table->erase_backlink_column(origin_table_key, col_ndx); // Throws
     }
 
     do_erase_root_column(col_ndx); // Throws
@@ -863,21 +881,21 @@ void Table::set_link_type(size_t col_ndx, LinkType link_type)
 }
 
 
-void Table::insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx,
+void Table::insert_backlink_column(TableKey origin_table_key, size_t origin_col_ndx, size_t backlink_col_ndx,
                                    StringData name)
 {
     REALM_ASSERT_3(backlink_col_ndx, <=, m_cols.size());
     do_insert_root_column(backlink_col_ndx, col_type_BackLink, name);       // Throws
     adj_insert_column(backlink_col_ndx);                                    // Throws
-    m_spec->set_opposite_link_table_ndx(backlink_col_ndx, origin_table_ndx); // Throws
+    m_spec->set_opposite_link_table_key(backlink_col_ndx, origin_table_key); // Throws
     m_spec->set_backlink_origin_column(backlink_col_ndx, origin_col_ndx);    // Throws
     refresh_column_accessors(backlink_col_ndx);                             // Throws
 }
 
 
-void Table::erase_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx)
+void Table::erase_backlink_column(TableKey origin_table_key, size_t origin_col_ndx)
 {
-    size_t backlink_col_ndx = m_spec->find_backlink_column(origin_table_ndx, origin_col_ndx);
+    size_t backlink_col_ndx = m_spec->find_backlink_column(origin_table_key, origin_col_ndx);
     REALM_ASSERT_3(backlink_col_ndx, !=, realm::not_found);
     do_erase_root_column(backlink_col_ndx); // Throws
     adj_erase_column(backlink_col_ndx);
@@ -914,9 +932,9 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
         LinkColumnBase* link_col = static_cast<LinkColumnBase*>(m_cols[new_col_ndx]);
         Table* target_table = &link_col->get_target_table();
         Spec* target_spec = target_table->m_spec.get();
-        size_t origin_table_ndx = get_index_in_group();
+        auto origin_table_key = get_key();
         size_t old_col_ndx = old_col_ndx_begin + (new_col_ndx - new_col_ndx_begin);
-        size_t backlink_col_ndx = target_spec->find_backlink_column(origin_table_ndx, old_col_ndx);
+        size_t backlink_col_ndx = target_spec->find_backlink_column(origin_table_key, old_col_ndx);
         update_backlink_columns.emplace_back(target_table, backlink_col_ndx, new_col_ndx); // Throws
     }
 
@@ -937,7 +955,7 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
 
     // This function is called after the move has already been carried out.
 
-    size_t origin_table_ndx = get_index_in_group();
+    auto origin_table_key = get_key();
 
     // If multiple link columns exist to the same table, updating the backlink
     // columns one by one is risky, because we use Spec::find_backlink_column
@@ -956,7 +974,7 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
     if (is_link_type(m_spec->get_column_type(moved_to))) {
         LinkColumnBase* link_col = static_cast<LinkColumnBase*>(m_cols[moved_to]);
         Spec* target_spec = link_col->get_target_table().m_spec.get();
-        size_t backlink_col_ndx = target_spec->find_backlink_column(origin_table_ndx, moved_from);
+        size_t backlink_col_ndx = target_spec->find_backlink_column(origin_table_key, moved_from);
         update_backlink_columns.emplace_back(target_spec, backlink_col_ndx, moved_to);
     }
 
@@ -970,7 +988,7 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
             LinkColumnBase* link_col = static_cast<LinkColumnBase*>(m_cols[col_ndx]);
             Spec* target_spec = link_col->get_target_table().m_spec.get();
             size_t old_col_ndx = col_ndx + 1;
-            size_t backlink_col_ndx = target_spec->find_backlink_column(origin_table_ndx, old_col_ndx);
+            size_t backlink_col_ndx = target_spec->find_backlink_column(origin_table_key, old_col_ndx);
             update_backlink_columns.emplace_back(target_spec, backlink_col_ndx, col_ndx);
         }
     }
@@ -982,7 +1000,7 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
             LinkColumnBase* link_col = static_cast<LinkColumnBase*>(m_cols[col_ndx]);
             Spec* target_spec = link_col->get_target_table().m_spec.get();
             size_t old_col_ndx = col_ndx - 1;
-            size_t backlink_col_ndx = target_spec->find_backlink_column(origin_table_ndx, old_col_ndx);
+            size_t backlink_col_ndx = target_spec->find_backlink_column(origin_table_key, old_col_ndx);
             update_backlink_columns.emplace_back(target_spec, backlink_col_ndx, col_ndx);
         }
     }
@@ -1594,7 +1612,7 @@ size_t Table::get_size_from_ref(ref_type spec_ref, ref_type columns_ref, Allocat
 }
 
 
-ref_type Table::create_empty_table(Allocator& alloc)
+ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
 {
     Array top(alloc);
     _impl::DeepArrayDestroyGuard dg(&top);
@@ -1623,7 +1641,8 @@ ref_type Table::create_empty_table(Allocator& alloc)
         top.add(v); // Throws
         dg_2.release();
     }
-
+    RefOrTagged rot = RefOrTagged::make_tagged(key.value);
+    top.add(rot);
     dg.release();
     return top.get_ref();
 }
@@ -1807,13 +1826,11 @@ void Table::erase_row(size_t row_ndx, bool is_move_last_over)
     }
 
     // When the table has strong link columns, row removals may cascade.
-    size_t table_ndx = get_index_in_group();
-    // Only group-level tables can have link columns
-    REALM_ASSERT(table_ndx != realm::npos);
+    auto table_key = get_key();
 
     CascadeState::row row;
     row.is_ordered_removal = (is_move_last_over ? 0 : 1);
-    row.table_ndx = table_ndx;
+    row.table_key = table_key;
     row.row_ndx = row_ndx;
     CascadeState state;
     state.rows.push_back(row); // Throws
@@ -1834,12 +1851,10 @@ void Table::remove_recursive(size_t row_ndx)
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(row_ndx, <, m_size);
 
-    size_t table_ndx = get_index_in_group();
-    // Only group-level tables can have link columns
-    REALM_ASSERT(table_ndx != realm::npos);
+    auto table_key = get_key();
 
     CascadeState::row row;
-    row.table_ndx = table_ndx;
+    row.table_key = table_key;
     row.row_ndx = row_ndx;
     CascadeState state;
     state.rows.push_back(row); // Throws
@@ -1915,9 +1930,7 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
     }
 
     // When the table has strong link columns, row removals may cascade.
-    size_t table_ndx = get_index_in_group();
-    // Only group-level tables can have link columns
-    REALM_ASSERT(table_ndx != realm::npos);
+    auto table_key = get_key();
 
     CascadeState state;
     size_t num_rows = row_indexes.size();
@@ -1928,7 +1941,7 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
             size_t row_ndx = to_size_t(v);
             CascadeState::row row;
             row.is_ordered_removal = (is_move_last_over ? 0 : 1);
-            row.table_ndx = table_ndx;
+            row.table_key = table_key;
             row.row_ndx = row_ndx;
             state.rows.push_back(row); // Throws
         }
@@ -2269,6 +2282,11 @@ size_t Table::get_index_in_group() const noexcept
         return realm::npos; // Subtable with independent descriptor
     size_t index_in_parent = m_top.get_ndx_in_parent();
     return index_in_parent;
+}
+
+TableKey Table::get_key() const noexcept
+{
+    return m_key;
 }
 
 namespace realm {
@@ -3007,7 +3025,7 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool
         return;
 
     CascadeState::row target_row;
-    target_row.table_ndx = target_table.get_index_in_group();
+    target_row.table_key = target_table.get_key();
     target_row.row_ndx = old_target_row_ndx;
     CascadeState state;
     state.rows.push_back(target_row);
@@ -4799,6 +4817,7 @@ void Table::refresh_accessor_tree()
     m_mark = false;
 }
 
+
 void Table::refresh_column_accessors(size_t col_ndx_begin)
 {
     // Index of column in Table::m_columns, which is not always equal to the
@@ -4869,18 +4888,18 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                 LinkColumnBase* link_col = static_cast<LinkColumnBase*>(col);
                 link_col->set_weak_links(weak_links);
                 Group& group = *get_parent_group();
-                size_t target_table_ndx = m_spec->get_opposite_link_table_ndx(col_ndx);
-                Table& target_table = gf::get_table(group, target_table_ndx); // Throws
+                auto target_table_key = m_spec->get_opposite_link_table_key(col_ndx);
+                Table& target_table = gf::get_table(group, target_table_key); // Throws
                 if (!target_table.is_marked() && &target_table != this) {
-                    size_t origin_ndx_in_group = m_top.get_ndx_in_parent();
-                    size_t backlink_col_ndx = target_table.m_spec->find_backlink_column(origin_ndx_in_group, col_ndx);
+                    auto origin_table_key = get_key();
+                    size_t backlink_col_ndx = target_table.m_spec->find_backlink_column(origin_table_key, col_ndx);
                     connect_opposite_link_columns(col_ndx, target_table, backlink_col_ndx);
                 }
             }
             else if (col_type == col_type_BackLink) {
                 Group& group = *get_parent_group();
-                size_t origin_table_ndx = m_spec->get_opposite_link_table_ndx(col_ndx);
-                Table& origin_table = gf::get_table(group, origin_table_ndx); // Throws
+                auto origin_table_key = m_spec->get_opposite_link_table_key(col_ndx);
+                Table& origin_table = gf::get_table(group, origin_table_key); // Throws
                 if (!origin_table.is_marked() || &origin_table == this) {
                     size_t link_col_ndx = m_spec->get_origin_column_ndx(col_ndx);
                     origin_table.connect_opposite_link_columns(link_col_ndx, *this, col_ndx);
@@ -4926,19 +4945,19 @@ void Table::refresh_link_target_accessors(size_t col_ndx_begin)
     // If a table is linked to itself, backlinks will be updated correctly as part
     // of refresh_column_accessors(), so the case of free standing tables is already handled.
     if (group) {
-        size_t origin_ndx_in_group = m_top.get_ndx_in_parent();
+        auto origin_table_key = get_key();
         size_t col_ndx_end = m_spec->get_public_column_count(); // No need to check backlink columns
 
         for (size_t col_ndx = col_ndx_begin; col_ndx != col_ndx_end; ++col_ndx) {
             ColumnType col_type = m_spec->get_column_type(col_ndx);
             if (is_link_type(col_type)) {
-                size_t target_table_ndx = m_spec->get_opposite_link_table_ndx(col_ndx);
-                Table& target_table = gf::get_table(*group, target_table_ndx); // Throws
+                auto target_table_key = m_spec->get_opposite_link_table_key(col_ndx);
+                Table& target_table = gf::get_table(*group, target_table_key); // Throws
                 ColumnBase* col = m_cols[col_ndx];
                 if (col && !target_table.is_marked() && (&target_table != this)) {
                     LinkColumnBase* link_col = static_cast<LinkColumnBase*>(col);
                     BacklinkColumn& backlink_col = link_col->get_backlink_column();
-                    size_t backlink_col_ndx = target_table.m_spec->find_backlink_column(origin_ndx_in_group, col_ndx);
+                    size_t backlink_col_ndx = target_table.m_spec->find_backlink_column(origin_table_key, col_ndx);
                     backlink_col.refresh_accessor_tree(backlink_col_ndx, *target_table.m_spec);
                 }
             }
@@ -4965,7 +4984,7 @@ void Table::generate_patch(const Table* table, std::unique_ptr<HandoverPatch>& p
 {
     if (table) {
         patch.reset(new Table::HandoverPatch);
-        patch->m_table_num = table->get_index_in_group();
+        patch->m_table_key = table->get_key();
     }
     else {
         patch.reset();
@@ -4977,7 +4996,7 @@ TableRef Table::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& pa
 {
     if (patch) {
         TableRef result;
-        result = group.get_table(patch->m_table_num);
+        result = group.get_table(patch->m_table_key);
         patch.reset();
         return result;
     }
@@ -5082,22 +5101,22 @@ void Table::print() const
                 std::cout << "String     ";
                 break;
             case col_type_Link: {
-                size_t target_table_ndx = m_spec->get_opposite_link_table_ndx(i);
-                ConstTableRef target_table = get_parent_group()->get_table(target_table_ndx);
+                auto target_table_key = m_spec->get_opposite_link_table_key(i);
+                ConstTableRef target_table = get_parent_group()->get_table(target_table_key);
                 const StringData target_name = target_table->get_name();
                 std::cout << "L->" << std::setw(7) << std::string(target_name).substr(0, 7) << " ";
                 break;
             }
             case col_type_LinkList: {
-                size_t target_table_ndx = m_spec->get_opposite_link_table_ndx(i);
-                ConstTableRef target_table = get_parent_group()->get_table(target_table_ndx);
+                auto target_table_key = m_spec->get_opposite_link_table_key(i);
+                ConstTableRef target_table = get_parent_group()->get_table(target_table_key);
                 const StringData target_name = target_table->get_name();
                 std::cout << "LL->" << std::setw(6) << std::string(target_name).substr(0, 6) << " ";
                 break;
             }
             case col_type_BackLink: {
-                size_t target_table_ndx = m_spec->get_opposite_link_table_ndx(i);
-                ConstTableRef target_table = get_parent_group()->get_table(target_table_ndx);
+                auto target_table_key = m_spec->get_opposite_link_table_key(i);
+                ConstTableRef target_table = get_parent_group()->get_table(target_table_key);
                 const StringData target_name = target_table->get_name();
                 std::cout << "BL->" << std::setw(6) << std::string(target_name).substr(0, 6) << " ";
                 break;
@@ -5282,6 +5301,6 @@ Table::Iterator Table::end()
 
 TableRef _impl::TableFriend::get_opposite_link_table(const Table& table, size_t col_ndx)
 {
-    auto target_table_ndx = table.m_spec->get_opposite_link_table_ndx(col_ndx);
-    return table.get_parent_group()->get_table(target_table_ndx);
+    auto target_table_key = table.m_spec->get_opposite_link_table_key(col_ndx);
+    return table.get_parent_group()->get_table(target_table_key);
 }

@@ -22,6 +22,8 @@
 #include <memory>
 #include <vector>
 
+#include <realm/keys.hpp>
+
 namespace realm {
 
 enum class ConstSourcePayload { Copy, Stay };
@@ -31,7 +33,7 @@ struct RowBaseHandoverPatch;
 struct TableViewHandoverPatch;
 
 struct TableHandoverPatch {
-    size_t m_table_num;
+    TableKey m_table_key;
 };
 
 struct LinkViewHandoverPatch {
