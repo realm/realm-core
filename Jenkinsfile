@@ -133,12 +133,8 @@ jobWrapper {
       }
 
       if (gitTag) {
-          stage('publish-packages') {
+          stage('Publish') {
               parallel(
-                  generic: doPublishGeneric(),
-                  centos7: doPublish('centos-7', 'rpm', 'el', 7),
-                  centos6: doPublish('centos-6', 'rpm', 'el', 6),
-                  ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
                   others: doPublishLocalArtifacts()
               )
           }
@@ -198,7 +194,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
     return {
         node('docker') {
             getArchive()
-            def stashName = "android___${abi}___${buildType}"
+            def stashName = "android-${abi}___${buildType}"
             def buildDir = "build-${stashName}".replaceAll('___', '-')
             def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
             def environment = environment()
@@ -290,13 +286,16 @@ def doBuildOnCentos6(String buildType) {
 }
 
 def doBuildWindows(String buildType, boolean isUWP, String platform) {
-    def cmakeDefinitions
+    def cmakeSystemName
+    def cmakeSystemVersion
     def target
     if (isUWP) {
-      cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0'
+      cmakeSystemName = 'WindowsStore'
+      cmakeSystemVersion = '10.0'
       target = 'Core'
     } else {
-      cmakeDefinitions = '-DCMAKE_SYSTEM_VERSION=8.1'
+      cmakeSystemName = 'Windows'
+      cmakeSystemVersion = '8.1'
       target = 'CoreTests'
     }
 
@@ -305,14 +304,14 @@ def doBuildWindows(String buildType, boolean isUWP, String platform) {
             getArchive()
 
             dir('build-dir') {
-                bat "\"${tool 'cmake'}\" ${cmakeDefinitions} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} .."
+                bat "\"${tool 'cmake'}\" -D CMAKE_SYSTEM_NAME=${cmakeSystemName} -D CMAKE_SYSTEM_VERSION=${cmakeSystemVersion} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CMAKE_BUILD_TYPE=${buildType} .."
                 withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
                     runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: "\"${tool 'cmake'}\" --build . --config ${buildType} --target ${target}")
                 }
-                bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
+                bat "\"${tool 'cmake'}\" --build . --config ${buildType} --target package"
                 archiveArtifacts('*.tar.gz')
                 if (gitTag) {
-                    def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
+                    def stashName = "${cmakeSystemName}-${platform}___${buildType}"
                     stash includes:'*.tar.gz', name:stashName
                     publishingStashes << stashName
                 }
@@ -391,7 +390,7 @@ def buildPerformance() {
     // Select docker-cph-X.  We want docker, metal (brix) and only one executor
     // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
     node('docker && brix && exclusive') {
-      getSourceArchive()
+      getArchive()
 
       def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
@@ -550,75 +549,19 @@ def readGitTag() {
     return sh(returnStdout: true, script: command).trim()
 }
 
-def doBuildPackage(distribution, fileType) {
-    return {
-        node('docker') {
-            getSourceArchive()
-
-            docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
-                env.DOCKER_REGISTRY = '012067661104.dkr.ecr.eu-west-1.amazonaws.com'
-                withCredentials([[$class: 'StringBinding', credentialsId: 'packagecloud-sync-devel-master-token', variable: 'PACKAGECLOUD_MASTER_TOKEN']]) {
-                    sh "sh packaging/package.sh ${distribution}"
-                }
-            }
-
-            dir('packaging/out') {
-                archiveArtifacts artifacts: "${distribution}/*.${fileType}"
-                stash includes: "${distribution}/*.${fileType}", name: "packages-${distribution}"
-            }
-        }
-    }
-}
-
-def doPublish(distribution, fileType, distroName, distroVersion) {
-    return {
-        node {
-            getSourceArchive()
-            packaging = load './packaging/publish.groovy'
-
-            dir('packaging/out') {
-                unstash "packages-${distribution}"
-                dir(distribution) {
-                    packaging.uploadPackages('sync-devel', fileType, distroName, distroVersion, "*.${fileType}")
-                }
-            }
-        }
-    }
-}
-
-def doPublishGeneric() {
-    return {
-        node {
-            getArchive()
-            dir('packaging/out') {
-                unstash 'packages-generic'
-                def files = findFiles(glob: '**/*.tgz')
-                for (file in files) {
-                    rlmS3Put file: file.path, path: "downloads/core/${file.name}"
-                    rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/linux/${file.name}"
-                }
-            }
-
-        }
-    }
-}
-
 def doPublishLocalArtifacts() {
     return {
         node('docker') {
             deleteDir()
             dir('temp') {
-                withAWS(credentials: 'aws-credentials', region: 'us-east-1') {
-                    for(publishingStash in publishingStashes) {
-                        unstash name: publishingStash
-                        def path = publishingStash.replaceAll('___', '/')
-                        def files = findFiles(glob: '**')
-                        for (file in files) {
-                            rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}"
-                            rlmS3Put file: file.path, path: "downloads/core/${file.name}"
-                        }
-                        deleteDir()
+                for(publishingStash in publishingStashes) {
+                    unstash name: publishingStash
+                    def files = findFiles(glob: '**')
+                    for (file in files) {
+                        rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${file.name}"
+                        rlmS3Put file: file.path, path: "downloads/core/${file.name}"
                     }
+                    deleteDir()
                 }
             }
         }
