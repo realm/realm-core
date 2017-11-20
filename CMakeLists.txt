@@ -88,7 +88,7 @@ configure_file(src/realm/util/config.h.in src/realm/util/config.h)
 configure_file(src/realm/version.hpp.in src/realm/version.hpp)
 
 # Configure the RealmConfig.cmake file
-configure_file(tools/cmake/RealmConfig.cmake.in "${RealmCore_BINARY_DIR}/RealmConfig.cmake" @ONLY)
+configure_file(tools/cmake/realmConfig.cmake.in "${RealmCore_BINARY_DIR}/realmConfig.cmake" @ONLY)
 
 set(DEPRECATED_CONFIG_FILE "${RealmCore_SOURCE_DIR}/src/realm/util/config.h")
 if(EXISTS "${DEPRECATED_CONFIG_FILE}")
