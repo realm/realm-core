@@ -11,7 +11,7 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Attempted to fix a false encryption security warning from IBM Bluemix. PR [#2911]
 
 -----------
 
