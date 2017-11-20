@@ -1756,7 +1756,7 @@ inline Columns<T> Table::column(const Table& origin, size_t origin_col_ndx)
 template <class T>
 SubQuery<T> Table::column(size_t column_ndx, Query subquery)
 {
-    static_assert(std::is_same<T, LinkList>::value, "A subquery must involve a link list or backlink column");
+    static_assert(std::is_same<T, Link>::value, "A subquery must involve a link list or backlink column");
     return SubQuery<T>(column<T>(column_ndx), std::move(subquery));
 }
 

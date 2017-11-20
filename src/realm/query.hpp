@@ -340,13 +340,14 @@ public:
 
     std::string get_description() const;
 
+    bool eval_object(ConstObj& obj) const;
+
 private:
     Query(Table& table, TableViewBase* tv = nullptr);
     void create();
 
     void init() const;
     size_t find_internal(size_t start = 0, size_t end = size_t(-1)) const;
-    bool eval_object(ConstObj& obj) const;
     void handle_pending_not();
     void set_table(TableRef tr);
 

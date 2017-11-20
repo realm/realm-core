@@ -856,8 +856,10 @@ Query& Query::like(size_t column_ndx, StringData value, bool case_sensitive)
 bool Query::eval_object(ConstObj& obj) const
 {
 #ifdef REALM_DEBUG
-    m_view->check_cookie();
+    if (m_view)
+        m_view->check_cookie();
 #endif
+    init();
 
     if (has_conditions())
         return root_node()->match(obj);

@@ -2222,6 +2222,11 @@ public:
         m_link_map.set_base_table(table);
     }
 
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_link_map.set_cluster(cluster);
+    }
+
     void update_column() const override
     {
         m_link_map.update_columns();
@@ -3215,6 +3220,11 @@ public:
         m_link_map.set_base_table(table);
     }
 
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_link_map.set_cluster(cluster);
+    }
+
     void update_column() const override
     {
         m_link_map.update_columns();
@@ -3225,10 +3235,9 @@ public:
         std::vector<Key> links = m_link_map.get_links(index);
         // std::sort(links.begin(), links.end());
 
-        size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, Key) {
-            return running_count;
-            // TODO: What to be done here?
-            // return running_count + m_query.count(link, link + 1, 1);
+        size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, Key k) {
+            ConstObj obj = m_link_map.target_table()->get_object(k);
+            return running_count + m_query.eval_object(obj);
         });
 
         destination.import(Value<Int>(false, 1, size_t(count)));

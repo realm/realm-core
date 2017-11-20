@@ -9664,116 +9664,91 @@ TEST(Query_ReferDeletedLinkView)
     // call links->add() on a deleted LinkViewRef (where is_attached() == false), it will assert
     CHECK(!links->is_attached());
 }
+#endif
 
 TEST(Query_SubQueries)
 {
     Group group;
 
-    TableRef table1 = group.add_table("table1");
-    TableRef table2 = group.add_table("table2");
+    TableRef origin = group.add_table("origin");
+    TableRef target = group.add_table("target");
 
-    // add some more columns to table1 and table2
-    table1->add_column(type_Int, "col1");
-    table1->add_column(type_String, "str1");
+    // add some more columns to origin and target
+    auto col_link_o = origin->add_column_link(type_LinkList, "link", *target);
 
-    table2->add_column(type_Int, "col1");
-    table2->add_column(type_String, "str2");
+    auto col_int_t = target->add_column(type_Int, "integers");
+    auto col_string_t = target->add_column(type_String, "strings");
 
     // add some rows
-    table1->add_empty_row();
-    table1->set_int(0, 0, 100);
-    table1->set_string(1, 0, "foo");
-    table1->add_empty_row();
-    table1->set_int(0, 1, 200);
-    table1->set_string(1, 1, "!");
-    table1->add_empty_row();
-    table1->set_int(0, 2, 300);
-    table1->set_string(1, 2, "bar");
+    origin->create_object(Key(0));
+    origin->create_object(Key(1));
+    origin->create_object(Key(2));
 
-    table2->add_empty_row();
-    table2->set_int(0, 0, 400);
-    table2->set_string(1, 0, "hello");
-    table2->add_empty_row();
-    table2->set_int(0, 1, 500);
-    table2->set_string(1, 1, "world");
-    table2->add_empty_row();
-    table2->set_int(0, 2, 600);
-    table2->set_string(1, 2, "!");
-    table2->add_empty_row();
-    table2->set_int(0, 2, 600);
-    table2->set_string(1, 1, "world");
-
-
-    size_t col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
+    target->create_object(Key(0)).set_all(400, "hello");
+    target->create_object(Key(1)).set_all(500, "world");
+    target->create_object(Key(2)).set_all(600, "!");
+    target->create_object(Key(3)).set_all(600, "world");
 
     // set some links
-    LinkViewRef links1;
+    auto links0 = origin->get_object(Key(0)).get_linklist(col_link_o);
+    links0.add(Key(1));
 
-    links1 = table1->get_linklist(col_link2, 0);
-    links1->add(1);
+    auto links1 = origin->get_object(Key(1)).get_linklist(col_link_o);
+    links1.add(Key(1));
+    links1.add(Key(2));
 
-    links1 = table1->get_linklist(col_link2, 1);
-    links1->add(1);
-    links1->add(2);
-
-
-    size_t match;
+    Key match;
+    TableView tv;
     Query q;
+    Query sub_query;
 
     // The linked rows for rows 0 and 2 all match ("world", 500). Row 2 does by virtue of having no rows.
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500)
-            .count() == table1->column<LinkList>(col_link2).count();
-    match = q.find();
-    CHECK_EQUAL(0, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    sub_query = target->column<String>(col_string_t) == "world" && target->column<Int>(col_int_t) == 500;
+    q = origin->column<Link>(col_link_o, sub_query).count() == origin->column<Link>(col_link_o).count();
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(Key(0), tv.get_key(0));
+    CHECK_EQUAL(Key(2), tv.get_key(1));
 
     // No linked rows match ("world, 600).
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 600)
-            .count() >= 1;
+    sub_query = target->column<String>(col_string_t) == "world" && target->column<Int>(col_int_t) == 600;
+    q = origin->column<Link>(col_link_o, sub_query).count() >= 1;
     match = q.find();
-    CHECK_EQUAL(not_found, match);
+    CHECK_EQUAL(match, null_key);
 
     // Rows 0 and 1 both have at least one linked row that matches ("world", 500).
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500)
-            .count() >= 1;
-    match = q.find();
-    CHECK_EQUAL(0, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    sub_query = target->column<String>(col_string_t) == "world" && target->column<Int>(col_int_t) == 500;
+    q = origin->column<Link>(col_link_o, sub_query).count() >= 1;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(Key(0), tv.get_key(0));
+    CHECK_EQUAL(Key(1), tv.get_key(1));
 
     // Row 1 has at least one linked row that matches ("!", 600).
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "!" && table2->column<Int>(0) == 600)
-            .count() >= 1;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    sub_query = target->column<String>(col_string_t) == "!" && target->column<Int>(col_int_t) == 600;
+    q = origin->column<Link>(col_link_o, sub_query).count() >= 1;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(Key(1), tv.get_key(0));
 
     // Row 1 has two linked rows that contain either "world" or 600.
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600)
-            .count() == 2;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    sub_query = target->column<String>(col_string_t) == "world" || target->column<Int>(col_int_t) == 600;
+    q = origin->column<Link>(col_link_o, sub_query).count() == 2;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(Key(1), tv.get_key(0));
 
     // Rows 0 and 2 have at most one linked row that contains either "world" or 600. Row 2 does by virtue of having no
     // rows.
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600)
-            .count() <= 1;
-    match = q.find();
-    CHECK_EQUAL(0, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    sub_query = target->column<String>(col_string_t) == "world" || target->column<Int>(col_int_t) == 600;
+    q = origin->column<Link>(col_link_o, sub_query).count() <= 1;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(Key(0), tv.get_key(0));
+    CHECK_EQUAL(Key(2), tv.get_key(1));
 }
 
+#ifdef LEGACY_TESTS
 // Ensure that Query's move constructor and move assignment operator don't result in
 // a TableView owned by the query being double-deleted when the queries are destroyed.
 TEST(Query_MoveDoesntDoubleDelete)
@@ -10970,7 +10945,7 @@ TEST_TYPES(Query_Rover, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 2);
 }
 
-#endif
+#endif // LEGACY_TESTS
 
 TEST(Query_IntOnly)
 {
