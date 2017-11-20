@@ -284,15 +284,6 @@ public:
     /// function does nothing.
     virtual void discard_subtable_accessor(size_t row_ndx) noexcept;
 
-    virtual void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
-    virtual void adj_acc_erase_row(size_t row_ndx) noexcept;
-    /// See Table::adj_acc_move_over()
-    virtual void adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
-    virtual void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
-    virtual void adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept;
-    virtual void adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
-    virtual void adj_acc_clear_root_table() noexcept;
-
     enum {
         mark_Recursive = 0x01,
         mark_LinkTargets = 0x02,
@@ -823,40 +814,6 @@ inline void ColumnBase::discard_subtable_accessor(size_t) noexcept
     // Noop
 }
 
-inline void ColumnBase::adj_acc_insert_rows(size_t, size_t) noexcept
-{
-    // Noop
-}
-
-inline void ColumnBase::adj_acc_erase_row(size_t) noexcept
-{
-    // Noop
-}
-
-inline void ColumnBase::adj_acc_move_over(size_t, size_t) noexcept
-{
-    // Noop
-}
-
-inline void ColumnBase::adj_acc_swap_rows(size_t, size_t) noexcept
-{
-    // Noop
-}
-
-inline void ColumnBase::adj_acc_move_row(size_t, size_t) noexcept
-{
-    // Noop
-}
-
-inline void ColumnBase::adj_acc_merge_rows(size_t, size_t) noexcept
-{
-    // Noop
-}
-
-inline void ColumnBase::adj_acc_clear_root_table() noexcept
-{
-    // Noop
-}
 
 inline void ColumnBase::mark(int) noexcept
 {

@@ -1352,22 +1352,8 @@ public:
         return true;
     }
 
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool unordered) noexcept
+    bool insert_empty_rows(size_t, size_t, size_t, bool) noexcept
     {
-        typedef _impl::TableFriend tf;
-        if (m_table) {
-            if (unordered) {
-                // Unordered insertion of multiple rows is not yet supported (and not
-                // yet needed).
-                REALM_ASSERT_EX((num_rows_to_insert == 1) || (num_rows_to_insert == 0), num_rows_to_insert);
-                size_t from_row_ndx = row_ndx;
-                size_t to_row_ndx = prior_num_rows;
-                tf::adj_acc_move_over(*m_table, from_row_ndx, to_row_ndx);
-            }
-            else {
-                tf::adj_acc_insert_rows(*m_table, row_ndx, num_rows_to_insert);
-            }
-        }
         return true;
     }
 
@@ -1376,65 +1362,28 @@ public:
         return true;
     }
 
-    bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows, bool unordered) noexcept
+    bool erase_rows(size_t, size_t, size_t, bool) noexcept
     {
-        if (unordered) {
-            // Unordered removal of multiple rows is not yet supported (and not
-            // yet needed).
-            REALM_ASSERT_EX((num_rows_to_erase == 1) || (num_rows_to_erase == 0), num_rows_to_erase);
-            typedef _impl::TableFriend tf;
-            if (m_table) {
-                size_t prior_last_row_ndx = prior_num_rows - 1;
-                tf::adj_acc_move_over(*m_table, prior_last_row_ndx, row_ndx);
-            }
-        }
-        else {
-            typedef _impl::TableFriend tf;
-            if (m_table) {
-                // Linked tables must still be marked for accessor updates in the case
-                // where num_rows_to_erase == 0. Without doing this here it wouldn't be done
-                // at all because the contents of the for loop do not get executed.
-                if (num_rows_to_erase == 0) {
-                    tf::mark_opposite_link_tables(*m_table);
-                }
-                else {
-                    for (size_t i = 0; i < num_rows_to_erase; ++i)
-                        tf::adj_acc_erase_row(*m_table, row_ndx + num_rows_to_erase - 1 - i);
-                }
-            }
-        }
         return true;
     }
 
-    bool swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
+    bool swap_rows(size_t, size_t) noexcept
     {
-        using tf = _impl::TableFriend;
-        if (m_table)
-            tf::adj_acc_swap_rows(*m_table, row_ndx_1, row_ndx_2);
         return true;
     }
 
-    bool move_row(size_t from_ndx, size_t to_ndx) noexcept
+    bool move_row(size_t, size_t) noexcept
     {
-        using tf = _impl::TableFriend;
-        if (m_table)
-            tf::adj_acc_move_row(*m_table, from_ndx, to_ndx);
         return true;
     }
 
-    bool merge_rows(size_t row_ndx, size_t new_row_ndx) noexcept
+    bool merge_rows(size_t, size_t) noexcept
     {
-        typedef _impl::TableFriend tf;
-        if (m_table)
-            tf::adj_acc_merge_rows(*m_table, row_ndx, new_row_ndx);
         return true;
     }
 
     bool clear_table(size_t) noexcept
     {
-        typedef _impl::TableFriend tf;
-        if (m_table)
-            tf::adj_acc_clear_root_table(*m_table);
         return true;
     }
 
