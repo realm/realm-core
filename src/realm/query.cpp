@@ -391,11 +391,9 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, size_t 
             case type_Timestamp: {
                 return std::unique_ptr<ParentNode>{new SizeListNode<Timestamp, Cond>(value, column_ndx)};
             }
-            /*
-            case type_Link: {
+            case type_LinkList: {
                 return std::unique_ptr<ParentNode>{new SizeListNode<Key, Cond>(value, column_ndx)};
             }
-            */
             default: {
                 throw LogicError{LogicError::type_mismatch};
             }

@@ -88,7 +88,7 @@ void setup_multi_table(Table& table, size_t rows)
     {
         table.add_column(type_Int, "int");                 //  0
         table.add_column(type_Bool, "bool");               //  1
-        table.add_column(type_OldDateTime, "date");        //  2
+        table.add_column(type_Timestamp, "date");          //  2
         table.add_column(type_Float, "float");             //  3
         table.add_column(type_Double, "double");           //  4
         table.add_column(type_String, "string");           //  5
@@ -107,7 +107,7 @@ void setup_multi_table(Table& table, size_t rows)
     for (size_t i = 0; i < rows; ++i)
         table.set_bool(1, i, (i % 2 ? true : false));
     for (size_t i = 0; i < rows; ++i)
-        table.set_olddatetime(2, i, 12345);
+        table.set_timestamp(2, i, {12345, 0});
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i % 2 == 0) ? 1 : -1;
         table.set_float(3, i, 123.456f * sign);

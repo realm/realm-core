@@ -61,8 +61,8 @@ public:
     void nullify_fwd_links(size_t ndx);
     void add(size_t ndx, Key key);
     void remove(size_t ndx, Key key);
-    size_t get_backlink_count(size_t ndx);
-    Key get_backlink(size_t ndx, size_t index);
+    size_t get_backlink_count(size_t ndx) const;
+    Key get_backlink(size_t ndx, size_t index) const;
 };
 }
 

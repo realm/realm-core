@@ -1306,7 +1306,7 @@ private:
     /// specified column index in a valid index into `m_cols` and that the
     /// column is a link-type column. Beyond that, it assume nothing more than
     /// minimal accessor consistency (see AccessorConsistencyLevels.)
-    Table* get_link_target_table_accessor(size_t col_ndx) noexcept;
+    Table* get_link_target_table_accessor(size_t col_ndx) const noexcept;
 
     void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_acc_erase_row(size_t row_ndx) noexcept;

@@ -1247,14 +1247,14 @@ TEST(Group_Serialize_All)
 
     table->add_column(type_Int, "int");
     table->add_column(type_Bool, "bool");
-    table->add_column(type_OldDateTime, "date");
+    table->add_column(type_Timestamp, "date");
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
 
     table->insert_empty_row(0);
     table->set_int(0, 0, 12);
     table->set_bool(1, 0, true);
-    table->set_olddatetime(2, 0, 12345);
+    table->set_timestamp(2, 0, {12345, 0});
     table->set_string(3, 0, "test");
     table->set_binary(4, 0, BinaryData("binary", 7));
 
@@ -1269,7 +1269,7 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL(1, t->size());
     CHECK_EQUAL(12, t->get_int(0, 0));
     CHECK_EQUAL(true, t->get_bool(1, 0));
-    CHECK_EQUAL(12345, t->get_olddatetime(2, 0));
+    CHECK(t->get_timestamp(2, 0) == Timestamp(12345, 0));
     CHECK_EQUAL("test", t->get_string(3, 0));
     CHECK_EQUAL(7, t->get_binary(4, 0).size());
     CHECK_EQUAL("binary", t->get_binary(4, 0).data());
@@ -1286,17 +1286,15 @@ TEST(Group_Persist)
     TableRef table = db.add_table("test");
     table->add_column(type_Int, "int");
     table->add_column(type_Bool, "bool");
-    table->add_column(type_OldDateTime, "date");
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
     table->add_column(type_Timestamp, "timestamp");
     table->insert_empty_row(0);
     table->set_int(0, 0, 12);
     table->set_bool(1, 0, true);
-    table->set_olddatetime(2, 0, 12345);
-    table->set_string(3, 0, "test");
-    table->set_binary(4, 0, BinaryData("binary", 7));
-    table->set_timestamp(5, 0, Timestamp(111, 222));
+    table->set_string(2, 0, "test");
+    table->set_binary(3, 0, BinaryData("binary", 7));
+    table->set_timestamp(4, 0, Timestamp(111, 222));
 
     // Write changes to file
     db.commit();
@@ -1305,18 +1303,17 @@ TEST(Group_Persist)
     db.verify();
 #endif
 
-    CHECK_EQUAL(6, table->get_column_count());
+    CHECK_EQUAL(5, table->get_column_count());
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(12345, table->get_olddatetime(2, 0));
-    CHECK_EQUAL("test", table->get_string(3, 0));
-    CHECK_EQUAL(7, table->get_binary(4, 0).size());
-    CHECK_EQUAL("binary", table->get_binary(4, 0).data());
-    CHECK(table->get_timestamp(5, 0) == Timestamp(111, 222));
+    CHECK_EQUAL("test", table->get_string(2, 0));
+    CHECK_EQUAL(7, table->get_binary(3, 0).size());
+    CHECK_EQUAL("binary", table->get_binary(3, 0).data());
+    CHECK(table->get_timestamp(4, 0) == Timestamp(111, 222));
 
     // Change a bit
-    table->set_string(3, 0, "Changed!");
+    table->set_string(2, 0, "Changed!");
 
     // Write changes to file
     db.commit();
@@ -1325,15 +1322,14 @@ TEST(Group_Persist)
     db.verify();
 #endif
 
-    CHECK_EQUAL(6, table->get_column_count());
+    CHECK_EQUAL(5, table->get_column_count());
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(12345, table->get_olddatetime(2, 0));
-    CHECK_EQUAL("Changed!", table->get_string(3, 0));
-    CHECK_EQUAL(7, table->get_binary(4, 0).size());
-    CHECK_EQUAL("binary", table->get_binary(4, 0).data());
-    CHECK(table->get_timestamp(5, 0) == Timestamp(111, 222));
+    CHECK_EQUAL("Changed!", table->get_string(2, 0));
+    CHECK_EQUAL(7, table->get_binary(3, 0).size());
+    CHECK_EQUAL("binary", table->get_binary(3, 0).data());
+    CHECK(table->get_timestamp(4, 0) == Timestamp(111, 222));
 }
 
 

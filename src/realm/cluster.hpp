@@ -58,7 +58,18 @@ struct Key {
     {
         return value < rhs.value;
     }
+    operator bool() const
+    {
+        return value != -1;
+    }
     int64_t value;
+
+private:
+    // operator bool will enable casting to integer. Prevent this.
+    operator int64_t() const
+    {
+        return 0;
+    }
 };
 
 inline std::ostream& operator<<(std::ostream& ostr, Key key)

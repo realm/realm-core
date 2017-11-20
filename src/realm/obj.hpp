@@ -78,6 +78,8 @@ public:
     bool is_null(size_t col_ndx) const;
     size_t get_backlink_count(const Table& origin, size_t origin_col_ndx) const;
     Key get_backlink(const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const;
+    size_t get_backlink_count(size_t backlink_col_ndx) const;
+    Key get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) const;
 
     // To be used by the query system when a single object should
     // be tested. Will allow a function to be called in the context

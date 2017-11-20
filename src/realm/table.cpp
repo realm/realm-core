@@ -2195,7 +2195,7 @@ void Table::move_row(size_t from_ndx, size_t to_ndx)
 }
 
 
-Table* Table::get_link_target_table_accessor(size_t col_ndx) noexcept
+Table* Table::get_link_target_table_accessor(size_t col_ndx) const noexcept
 {
     REALM_ASSERT(is_attached());
     // So far, link columns can only exist in group-level tables, so this table
