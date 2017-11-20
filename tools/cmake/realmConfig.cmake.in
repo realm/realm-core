@@ -12,7 +12,7 @@ if(UNIX AND NOT APPLE)
         message(STATUS "Uncompressing OpenSSL...")
         execute_process(
             COMMAND ${CMAKE_COMMAND} -E tar xfz "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}.tar.gz"
-            WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}
+            WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}"
         )
 
         list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}")
