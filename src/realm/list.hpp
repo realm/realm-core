@@ -386,9 +386,9 @@ public:
     {
         if (from != to) {
             T tmp = get(from);
-            int incr = (from < to) ? 1 : -1;
+            int adj = (from < to) ? 1 : -1;
             while (from != to) {
-                size_t neighbour = from + incr;
+                size_t neighbour = from + adj;
                 set(from, get(neighbour));
                 from = neighbour;
             }
@@ -421,15 +421,18 @@ protected:
 
 template <>
 void List<Key>::add(Key target_key);
+
 template <>
 Key List<Key>::set(size_t ndx, Key target_key);
+
 template <>
 void List<Key>::insert(size_t ndx, Key target_key);
+
 template <>
 Key List<Key>::remove(size_t ndx);
+
 template <>
 void List<Key>::clear();
-
 
 class ConstLinkListIf : public ConstListIf<Key> {
 public:

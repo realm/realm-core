@@ -113,7 +113,7 @@ void List<Key>::add(Key target_key)
     update_if_needed();
     size_t ndx = m_leaf->size();
     m_leaf->insert(ndx, null_key);
-    set(ndx, target_key);
+    List<Key>::set(ndx, target_key);
 }
 
 template <>
@@ -162,3 +162,14 @@ void List<Key>::clear()
         remove(ndx);
     }
 }
+
+#ifdef _WIN32
+// For some strange reason these functions needs to be explicitly instantiated
+// on Visual Studio 2017. Otherwise the code is not generated.
+namespace realm {
+template void List<Key>::add(Key target_key);
+template void List<Key>::insert(size_t ndx, Key target_key);
+template Key List<Key>::remove(size_t ndx);
+template void List<Key>::clear();
+}
+#endif

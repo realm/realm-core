@@ -251,8 +251,12 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
 template <>
 Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
 {
-    if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
+    if (REALM_UNLIKELY(col_ndx >= m_tree_top->get_spec().get_public_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
+    TableRef target_table = get_target_table(col_ndx);
+    if (target_key != null_key && !target_table->is_valid(target_key)) {
+        throw LogicError(LogicError::target_row_index_out_of_range);
+    }
 
     update_if_needed();
 
@@ -264,7 +268,6 @@ Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
     values.set_parent(&fields, col_ndx + 1);
     values.init_from_parent();
 
-    TableRef target_table = get_target_table(col_ndx);
     const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
     size_t backlink_col = target_table_spec.find_backlink_column(get_table_index(), col_ndx);
 
@@ -283,8 +286,8 @@ Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
     }
 
     if (Replication* repl = alloc.get_replication()) {
-        repl->set_link(m_tree_top->get_owner(), col_ndx, m_key.value, target_key.value,
-                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        repl->set(m_tree_top->get_owner(), col_ndx, size_t(m_key.value), target_key,
+                  is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
     }
 
     return *this;

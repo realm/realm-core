@@ -89,6 +89,7 @@ public:
     }
     Obj insert(Key k);
     void erase(Key k);
+    bool is_valid(Key k) const;
     ConstObj get(Key k) const;
     Obj get(Key k);
     bool get_leaf(Key key, ClusterNode::IteratorState& state) const noexcept;

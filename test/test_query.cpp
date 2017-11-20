@@ -1788,7 +1788,7 @@ TEST(Query_Links)
     std::vector<Key> target2_keys;
     target2->create_objects(10, target2_keys);
 
-    for (int64_t i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
         target2->get_object(target2_keys[i]).set(int_col, i);
     }
 
@@ -1856,7 +1856,7 @@ TEST(Query_size)
     auto intlist = table1->column<List<Int>>(int_list_col);
     auto linklist = table1->column<List<Key>>(linklist_col);
 
-    for (int64_t i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
         table2->get_object(table2_keys[i]).set(int_col, i);
     }
 
@@ -1891,14 +1891,14 @@ TEST(Query_size)
     set_list(table1->get_object(table1_keys[3]).get_list_ptr<Int>(int_list_col),
              std::vector<Int>({1, 2, 3, 4, 5, 6, 7, 8, 9}));
 
-    auto set_links = [&table2_keys](LinkListPtr lv, const std::vector<int64_t>& value_list) {
+    auto set_links = [&table2_keys](LinkListPtr lv, const std::vector<int>& value_list) {
         for (auto v : value_list) {
             lv->add(table2_keys[v]);
         }
     };
     set_links(table1->get_object(table1_keys[0]).get_linklist_ptr(linklist_col),
-              std::vector<Int>({0, 1, 2, 3, 4, 5}));
-    set_links(table1->get_object(table1_keys[1]).get_linklist_ptr(linklist_col), std::vector<Int>({6, 7, 8, 9}));
+              std::vector<int>({0, 1, 2, 3, 4, 5}));
+    set_links(table1->get_object(table1_keys[1]).get_linklist_ptr(linklist_col), std::vector<int>({6, 7, 8, 9}));
 
     Query q;
     Query q1;
