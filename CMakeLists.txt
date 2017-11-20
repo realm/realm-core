@@ -87,6 +87,9 @@ configure_file(src/realm/util/config.h.in src/realm/util/config.h)
 # Configure source code to use right version number
 configure_file(src/realm/version.hpp.in src/realm/version.hpp)
 
+# Configure the RealmConfig.cmake file
+configure_file(tools/cmake/RealmConfig.cmake.in "${RealmCore_BINARY_DIR}/RealmConfig.cmake" @ONLY)
+
 set(DEPRECATED_CONFIG_FILE "${RealmCore_SOURCE_DIR}/src/realm/util/config.h")
 if(EXISTS "${DEPRECATED_CONFIG_FILE}")
     message(FATAL_ERROR "${DEPRECATED_CONFIG_FILE} exists in the source directory, and will take precedence over the generated configuration in the build directory. Please remove this file before continuing. Alternatively, you can also clean your realm-core to remove this and other stale files: git clean -xfd")
@@ -108,16 +111,12 @@ write_basic_package_version_file(realmConfigVersion.cmake
 
 # Make the project importable from the build directory
 export(EXPORT realm NAMESPACE Realm:: FILE realmTargets.cmake)
-file(
-    COPY "${RealmCore_SOURCE_DIR}/tools/cmake/realmConfig.cmake"
-    DESTINATION "${RealmCore_BINARY_DIR}"
-)
 
 # Make the project importable from the install directory
 install(EXPORT realm FILE realmTargets.cmake NAMESPACE Realm:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm)
 install(
     FILES
-        tools/cmake/realmConfig.cmake
+        "${RealmCore_BINARY_DIR}/realmConfig.cmake"
         "${RealmCore_BINARY_DIR}/realmConfigVersion.cmake"
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
 )
