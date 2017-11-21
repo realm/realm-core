@@ -4,4 +4,4 @@ if(WIN32)
   add_subdirectory(win32)
 endif()
 
-install(FILES realm.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES realm.hpp DESTINATION include)

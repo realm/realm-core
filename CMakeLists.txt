@@ -5,7 +5,6 @@ project(RealmCore)
 list(APPEND CMAKE_MODULE_PATH "${RealmCore_SOURCE_DIR}/tools/cmake")
 
 # Include general CMake modules
-include(GNUInstallDirs)
 include(CheckIncludeFiles)
 
 # Include custom CMake modules

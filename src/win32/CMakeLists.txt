@@ -7,7 +7,7 @@ target_include_directories(GetOptWin32
 		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/win32>
 )
 
-install(TARGETS GetOptWin32 EXPORT realm INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/win32)
-install(FILES getopt.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/win32)
+install(TARGETS GetOptWin32 EXPORT realm INCLUDES DESTINATION include/win32)
+install(FILES getopt.h DESTINATION include/win32)
 
 add_subdirectory(kalven-sha2)

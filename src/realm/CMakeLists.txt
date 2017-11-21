@@ -206,7 +206,7 @@ target_include_directories(Core
     PUBLIC
         $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
         $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        $<INSTALL_INTERFACE:include>
 )
 
 target_compile_features(Core PUBLIC cxx_std_14)
@@ -260,22 +260,21 @@ target_link_libraries(Core
 )
 
 install(TARGETS Core EXPORT realm
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    INCLUDES DESTINATION include
 )
 
 install(
     DIRECTORY ./
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm
+    DESTINATION include/realm
     FILES_MATCHING
     PATTERN "*.h"
     PATTERN "*.hpp"
 )
 
-install(FILES ${RealmCore_BINARY_DIR}/src/realm/version.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm)
-install(FILES ${RealmCore_BINARY_DIR}/src/realm/util/config.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util)
+install(FILES ${RealmCore_BINARY_DIR}/src/realm/version.hpp DESTINATION include/realm)
+install(FILES ${RealmCore_BINARY_DIR}/src/realm/util/config.h DESTINATION include/realm/util)
 
 if(UNIX AND NOT APPLE AND NOT ANDROID)
     add_executable(RealmConfig config_tool.cpp)
@@ -294,7 +293,7 @@ if(UNIX AND NOT APPLE AND NOT ANDROID)
     )
     target_link_libraries(RealmImporter Core)
 
-    install(TARGETS RealmConfig RealmImporter DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(TARGETS RealmConfig RealmImporter DESTINATION bin)
 
     add_executable(RealmTrawler realm_trawler.cpp)
     set_target_properties(RealmTrawler
@@ -311,5 +310,5 @@ if(UNIX AND NOT APPLE AND NOT ANDROID)
             DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
     )
     target_link_libraries(Realmd Core)
-    install(TARGETS Realmd DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+    install(TARGETS Realmd DESTINATION libexec)
 endif()
