@@ -112,12 +112,12 @@ write_basic_package_version_file(realmConfigVersion.cmake
 export(EXPORT realm NAMESPACE Realm:: FILE realmTargets.cmake)
 
 # Make the project importable from the install directory
-install(EXPORT realm FILE realmTargets.cmake NAMESPACE Realm:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm)
+install(EXPORT realm FILE realmTargets.cmake NAMESPACE Realm:: DESTINATION lib/cmake/realm)
 install(
     FILES
         "${RealmCore_BINARY_DIR}/realm-config.cmake"
         "${RealmCore_BINARY_DIR}/realmConfigVersion.cmake"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
+    DESTINATION lib/cmake/realm
 )
 
 # CPack

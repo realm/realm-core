@@ -4,7 +4,7 @@ add_library(Realm::GetOptWin32 ALIAS GetOptWin32)
 target_include_directories(GetOptWin32
 	INTERFACE
 		$<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/win32>
-		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/win32>
+		$<INSTALL_INTERFACE:include/win32>
 )
 
 install(TARGETS GetOptWin32 EXPORT realm INCLUDES DESTINATION include/win32)
