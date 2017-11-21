@@ -116,7 +116,7 @@ export(EXPORT realm NAMESPACE Realm:: FILE realmTargets.cmake)
 install(EXPORT realm FILE realmTargets.cmake NAMESPACE Realm:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm)
 install(
     FILES
-        "${RealmCore_BINARY_DIR}/realmConfig.cmake"
+        "${RealmCore_BINARY_DIR}/realm-config.cmake"
         "${RealmCore_BINARY_DIR}/realmConfigVersion.cmake"
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
 )
