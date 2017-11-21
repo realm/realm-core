@@ -232,18 +232,21 @@ TEST(Links_SetLinkLogicErrors)
     TableRef target = group.add_table("target");
     origin->add_column_link(type_Link, "a", *target);
     origin->add_column(type_Int, "b");
-    origin->add_empty_row();
-    target->add_empty_row();
+    Obj obj = origin->create_object();
+    target->create_object(Key(10));
 
-    CHECK_LOGIC_ERROR(origin->set_link(2, 0, 0), LogicError::column_index_out_of_range);
-    CHECK_LOGIC_ERROR(origin->set_link(0, 1, 0), LogicError::row_index_out_of_range);
-    CHECK_LOGIC_ERROR(origin->set_link(0, 0, 1), LogicError::target_row_index_out_of_range);
+    CHECK_LOGIC_ERROR(obj.set(2, Key(10)), LogicError::column_index_out_of_range);
+    CHECK_LOGIC_ERROR(obj.set(0, Key(5)), LogicError::target_row_index_out_of_range);
 
     // FIXME: Must also check that Logic::type_mismatch is thrown on column type mismatch, but Table::set_link() does
     // not properly check it yet.
 
+    origin->remove_object(obj.get_key());
+    CHECK_THROW(obj.set(0, Key(10)), InvalidKey);
+#ifdef LEGACY_TESTS
     group.remove_table("origin");
-    CHECK_LOGIC_ERROR(origin->set_link(0, 0, 0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(obj.set(0, Key(10)), LogicError::detached_accessor);
+#endif
 }
 
 

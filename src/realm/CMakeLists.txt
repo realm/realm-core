@@ -115,8 +115,8 @@ set(REALM_INSTALL_GENERAL_HEADERS
     link_view_fwd.hpp
     mixed.hpp
     null.hpp
-    list.cpp
-    obj.cpp
+    list.hpp
+    obj.hpp
     olddatetime.hpp
     owned_data.hpp
     query.hpp

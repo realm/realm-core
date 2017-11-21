@@ -516,7 +516,7 @@ inline void Replication::set(const Table* table, size_t col_ndx, size_t ndx, dou
 template <>
 inline void Replication::set(const Table* table, size_t col_ndx, size_t ndx, Key value, _impl::Instruction variant)
 {
-    set_link(table, col_ndx, ndx, value.value, variant);
+    set_link(table, col_ndx, ndx, size_t(value.value), variant);
 }
 
 inline TrivialReplication::TrivialReplication(const std::string& database_file)

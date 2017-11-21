@@ -1147,6 +1147,18 @@ Obj ClusterTree::insert(Key k)
     return Obj(this, state.ref, k, state.index);
 }
 
+bool ClusterTree::is_valid(Key k) const
+{
+    try {
+        ClusterNode::State state;
+        m_root->get(k, state);
+    }
+    catch (const InvalidKey&) {
+        return false;
+    }
+    return true;
+}
+
 ConstObj ClusterTree::get(Key k) const
 {
     ClusterNode::State state;
