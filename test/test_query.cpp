@@ -1765,6 +1765,67 @@ TEST(Query_StrIndexCrash)
     }
 }
 
+#endif
+
+TEST(Query_Links)
+{
+    Group g;
+
+    TableRef origin = g.add_table("origin");
+    TableRef target1 = g.add_table("target1");
+    TableRef target2 = g.add_table("target2");
+
+    auto int_col = target2->add_column(type_Int, "integers");
+    auto str_col = target1->add_column(type_String, "strings");
+    auto linklist_col = target1->add_column_link(type_LinkList, "linklist", *target2);
+    auto link_col = origin->add_column_link(type_Link, "link", *target1);
+    auto double_col = origin->add_column(type_Double, "doubles");
+
+    std::vector<Key> origin_keys;
+    origin->create_objects(10, origin_keys);
+    std::vector<Key> target1_keys;
+    target1->create_objects(10, target1_keys);
+    std::vector<Key> target2_keys;
+    target2->create_objects(10, target2_keys);
+
+    for (int i = 0; i < 10; i++) {
+        target2->get_object(target2_keys[i]).set(int_col, i);
+    }
+
+    for (unsigned i = 0; i < 10; i++) {
+        Obj obj = target1->get_object(target1_keys[i]);
+        std::string str = "Str";
+        str += util::to_string(i);
+        obj.set(str_col, StringData(str));
+        auto lv = obj.get_linklist(linklist_col);
+        for (unsigned j = 0; j < i % 5; j++) {
+            lv.add(target2_keys[j]);
+        }
+    }
+
+    for (unsigned i = 0; i < 10; i++) {
+        Obj obj = origin->get_object(origin_keys[i]);
+        obj.set(link_col, target1_keys[i]);
+        obj.set(double_col, 1.5 * i);
+    }
+
+    Query q = target1->link(linklist_col).column<Int>(int_col) == 2;
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 4);
+
+    q = origin->link(link_col).link(linklist_col).column<Int>(int_col) == 2;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 4);
+
+    q = target2->backlink(*target1, linklist_col).column<String>(str_col) == StringData("Str3");
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 3);
+
+    q = target2->backlink(*target1, linklist_col).backlink(*origin, link_col).column<double>(double_col) > 12.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 4);
+}
+
 TEST(Query_size)
 {
     Group g;
@@ -1773,135 +1834,133 @@ TEST(Query_size)
     TableRef table2 = g.add_table("secondary");
     TableRef table3 = g.add_table("top");
 
-    table1->add_column(type_String, "strings");
-    table1->add_column(type_Binary, "binaries", true);
-    DescriptorRef subdesc;
-    table1->add_column(type_Table, "intlist", false, &subdesc);
-    subdesc->add_column(type_Int, "list", nullptr, true);
-    table1->add_column_link(type_LinkList, "linklist", *table2);
+    auto string_col = table1->add_column(type_String, "strings");
+    auto bin_col = table1->add_column(type_Binary, "binaries", true);
+    auto int_list_col = table1->add_column_list(type_Int, "intlist");
+    auto linklist_col = table1->add_column_link(type_LinkList, "linklist", *table2);
 
-    table2->add_column(type_Int, "integers");
+    auto int_col = table2->add_column(type_Int, "integers");
 
-    table3->add_column_link(type_Link, "link", *table1);
-    table3->add_column_link(type_LinkList, "linklist", *table1);
-    table3->add_empty_row(10);
+    auto link_col = table3->add_column_link(type_Link, "link", *table1);
+    auto linklist_col1 = table3->add_column_link(type_LinkList, "linklist", *table1);
 
-    Columns<String> strings = table1->column<String>(0);
-    Columns<Binary> binaries = table1->column<Binary>(1);
-    Columns<SubTable> intlist = table1->column<SubTable>(2);
-    Columns<LinkList> linklist = table1->column<LinkList>(3);
+    std::vector<Key> table1_keys;
+    table1->create_objects(10, table1_keys);
+    std::vector<Key> table2_keys;
+    table2->create_objects(10, table2_keys);
+    std::vector<Key> table3_keys;
+    table3->create_objects(10, table3_keys);
 
-    table1->add_empty_row(10);
-    table2->add_empty_row(10);
+    auto strings = table1->column<String>(string_col);
+    auto binaries = table1->column<Binary>(bin_col);
+    auto intlist = table1->column<List<Int>>(int_list_col);
+    auto linklist = table1->column<List<Key>>(linklist_col);
 
-    for (size_t i = 0; i < 10; i++) {
-        table2->set_int(0, i, i);
+    for (int i = 0; i < 10; i++) {
+        table2->get_object(table2_keys[i]).set(int_col, i);
     }
 
     // Leave the last one null
     for (unsigned i = 0; i < 9; i++) {
-        table3->set_link(0, i, i % 4);
+        table3->get_object(table3_keys[i]).set(link_col, table1_keys[i % 4]);
     }
 
     for (unsigned i = 0; i < 10; i++) {
-        auto lv = table3->get_linklist(1, i);
+        auto lv = table3->get_object(table3_keys[i]).get_linklist(linklist_col1);
         for (unsigned j = 0; j < i % 5; j++) {
-            lv->add(j);
+            lv.add(table1_keys[j]);
         }
     }
 
-    table1->set_string(0, 0, StringData("Hi"));
-    table1->set_string(0, 1, StringData("world"));
-
     std::string bin1(100, 'a');
     std::string bin2(500, '5');
-    table1->set_binary(1, 0, BinaryData(bin1));
-    table1->set_binary(1, 1, BinaryData(bin2));
+    table1->get_object(table1_keys[0]).set(string_col, "Hi").set(bin_col, BinaryData(bin1));
+    table1->get_object(table1_keys[1]).set(string_col, "world").set(bin_col, BinaryData(bin2));
 
-    auto set_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
+    auto set_list = [](ListPtr<Int> list, const std::vector<int64_t>& value_list) {
         size_t sz = value_list.size();
-        subtable->clear();
-        subtable->add_empty_row(sz);
+        list->clear();
         for (size_t i = 0; i < sz; i++) {
-            subtable->set_int(0, i, value_list[i]);
+            list->add(value_list[i]);
         }
     };
-    set_list(table1->get_subtable(2, 0), std::vector<Int>({100, 200, 300, 400, 500}));
-    set_list(table1->get_subtable(2, 1), std::vector<Int>({1, 2, 3}));
-    set_list(table1->get_subtable(2, 2), std::vector<Int>({1, 2, 3, 4, 5}));
-    set_list(table1->get_subtable(2, 3), std::vector<Int>({1, 2, 3, 4, 5, 6, 7, 8, 9}));
+    set_list(table1->get_object(table1_keys[0]).get_list_ptr<Int>(int_list_col),
+             std::vector<Int>({100, 200, 300, 400, 500}));
+    set_list(table1->get_object(table1_keys[1]).get_list_ptr<Int>(int_list_col), std::vector<Int>({1, 2, 3}));
+    set_list(table1->get_object(table1_keys[2]).get_list_ptr<Int>(int_list_col), std::vector<Int>({1, 2, 3, 4, 5}));
+    set_list(table1->get_object(table1_keys[3]).get_list_ptr<Int>(int_list_col),
+             std::vector<Int>({1, 2, 3, 4, 5, 6, 7, 8, 9}));
 
-    auto set_links = [](LinkViewRef lv, const std::vector<int64_t>& value_list) {
+    auto set_links = [&table2_keys](LinkListPtr lv, const std::vector<int>& value_list) {
         for (auto v : value_list) {
-            lv->add(size_t(v));
+            lv->add(table2_keys[v]);
         }
     };
-    set_links(table1->get_linklist(3, 0), std::vector<Int>({0, 1, 2, 3, 4, 5}));
-    set_links(table1->get_linklist(3, 1), std::vector<Int>({6, 7, 8, 9}));
+    set_links(table1->get_object(table1_keys[0]).get_linklist_ptr(linklist_col),
+              std::vector<int>({0, 1, 2, 3, 4, 5}));
+    set_links(table1->get_object(table1_keys[1]).get_linklist_ptr(linklist_col), std::vector<int>({6, 7, 8, 9}));
 
     Query q;
     Query q1;
-    size_t match;
+    Key match;
     TableView tv;
 
     q = strings.size() == 5;
-    q1 = table1->where().size_equal(0, 5);
+    q1 = table1->where().size_equal(string_col, 5);
     match = q.find();
-    CHECK_EQUAL(1, match);
+    CHECK_EQUAL(table1_keys[1], match);
     match = q1.find();
-    CHECK_EQUAL(1, match);
+    CHECK_EQUAL(table1_keys[1], match);
 
     // Check that the null values are handled correctly
     q = binaries.size() == realm::null();
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 8);
-    CHECK_EQUAL(tv.get_source_ndx(0), 2);
+    CHECK_EQUAL(tv.get_key(0), table1_keys[2]);
 
     // Here the null values should not be included in the search
     q = binaries.size() < 500;
-    q1 = table1->where().size_less(1, 500);
+    q1 = table1->where().size_less(bin_col, 500);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     tv = q1.find_all();
     CHECK_EQUAL(tv.size(), 1);
 
     q = intlist.size() > 3;
-    q1 = table1->where().size_greater(2, 3);
+    q1 = table1->where().size_greater(int_list_col, 3);
     tv = q.find_all();
     CHECK_EQUAL(3, tv.size());
     tv = q1.find_all();
     CHECK_EQUAL(3, tv.size());
-    q1 = table1->where().size_between(2, 3, 7);
+    q1 = table1->where().size_between(int_list_col, 3, 7);
     tv = q1.find_all();
     CHECK_EQUAL(3, tv.size());
 
     q = intlist.size() == 3;
     match = q.find();
-    CHECK_EQUAL(1, match);
+    CHECK_EQUAL(table1_keys[1], match);
 
-    q1 = table1->where().size_not_equal(3, 6);
+    q1 = table1->where().size_not_equal(linklist_col, 6);
     match = q1.find();
-    CHECK_EQUAL(1, match);
+    CHECK_EQUAL(table1_keys[1], match);
 
     q = intlist.size() > strings.size();
     tv = q.find_all();
     CHECK_EQUAL(3, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(table1_keys[0], tv.get_key(0));
 
     // Single links
-    q = table3->link(0).column<SubTable>(2).size() == 5;
+    q = table3->link(link_col).column<List<Int>>(int_list_col).size() == 5;
     tv = q.find_all();
     CHECK_EQUAL(5, tv.size());
 
     // Multiple links
-    q = table3->link(1).column<SubTable>(2).size() == 3;
+    q = table3->link(linklist_col1).column<List<Int>>(int_list_col).size() == 3;
     tv = q.find_all();
     CHECK_EQUAL(6, tv.size());
 }
 
-#endif
-
-TEST(Query_SubtableExpression)
+TEST(Query_ListOfPrimitives)
 {
     Group g;
 
@@ -1988,34 +2047,32 @@ TEST(Query_SubtableExpression)
     CHECK_EQUAL(tv.get_key(0), keys[0]);
     CHECK_EQUAL(tv.get_key(1), keys[1]);
 
-#ifdef LEGACY_TESTS
     TableRef baa = g.add_table("baa");
-    baa->add_column_link(type_Link, "link", *table);
-    baa->add_column_link(type_LinkList, "linklist", *table);
-    baa->add_empty_row(3);
-    baa->set_link(0, 0, 1);
-    baa->set_link(0, 1, 0);
-    auto lv = baa->get_linklist(1, 0);
-    lv->add(0);
-    lv->add(1);
-    lv = baa->get_linklist(1, 1);
-    lv->add(1);
-    lv->add(2);
-    lv->add(3);
+    auto col_link = baa->add_column_link(type_Link, "link", *table);
+    auto col_linklist = baa->add_column_link(type_LinkList, "linklist", *table);
+    Obj obj0 = baa->create_object().set(col_link, keys[1]);
+    Obj obj1 = baa->create_object().set(col_link, keys[0]);
 
-    q = baa->link(0).column<SubTable>(0).list<Int>() == 5;
+    auto lv = obj0.get_linklist_ptr(col_linklist);
+    lv->add(keys[0]);
+    lv->add(keys[1]);
+    lv = obj1.get_linklist_ptr(col_linklist);
+    lv->add(keys[1]);
+    lv->add(keys[2]);
+    lv->add(keys[3]);
+
+    q = baa->link(col_link).column<List<Int>>(col_int_list) == 5;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_source_ndx(0), 0);
+    CHECK_EQUAL(tv.get_key(0), keys[0]);
 
     q = baa->link(1).column<List<String>>(col_string_list) == "Str_5";
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
 
-    q = baa->link(1).column<SubTable>(0).list<Int>().average() >= 2.0;
+    q = baa->link(1).column<List<Int>>(0).average() >= 2.0;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
-#endif
 }
 
 #ifdef LEGACY_TESTS

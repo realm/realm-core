@@ -30,6 +30,38 @@ namespace realm {
 
 class Table;
 
+class ColumnAttrMask {
+public:
+    ColumnAttrMask()
+        : m_value(0)
+    {
+    }
+    bool test(ColumnAttr prop)
+    {
+        return (m_value & prop) != 0;
+    }
+    void set(ColumnAttr prop)
+    {
+        m_value |= prop;
+    }
+    void reset(ColumnAttr prop)
+    {
+        m_value &= ~prop;
+    }
+    bool operator==(const ColumnAttrMask& other) const
+    {
+        return m_value == other.m_value;
+    }
+
+private:
+    friend class Spec;
+    int m_value;
+    ColumnAttrMask(int64_t val)
+        : m_value(int(val))
+    {
+    }
+};
+
 class Spec {
 public:
     ~Spec() noexcept;
@@ -62,7 +94,7 @@ public:
     size_t get_column_index(StringData name) const noexcept;
 
     // Column Attributes
-    ColumnAttr get_column_attr(size_t column_ndx) const noexcept;
+    ColumnAttrMask get_column_attr(size_t column_ndx) const noexcept;
 
     size_t get_subspec_ndx(size_t column_ndx) const noexcept;
     ref_type get_subspec_ref(size_t subspec_ndx) const noexcept;
@@ -148,7 +180,7 @@ private:
     void set_parent(ArrayParent*, size_t ndx_in_parent) noexcept;
 
     void set_column_type(size_t column_ndx, ColumnType type);
-    void set_column_attr(size_t column_ndx, ColumnAttr attr);
+    void set_column_attr(size_t column_ndx, ColumnAttrMask attr);
 
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
@@ -275,20 +307,20 @@ inline void Spec::set_column_type(size_t column_ndx, ColumnType type)
     update_has_strong_link_columns();
 }
 
-inline ColumnAttr Spec::get_column_attr(size_t ndx) const noexcept
+inline ColumnAttrMask Spec::get_column_attr(size_t ndx) const noexcept
 {
     REALM_ASSERT(ndx < get_column_count());
-    return ColumnAttr(m_attr.get(ndx));
+    return ColumnAttrMask(m_attr.get(ndx));
 }
 
-inline void Spec::set_column_attr(size_t column_ndx, ColumnAttr attr)
+inline void Spec::set_column_attr(size_t column_ndx, ColumnAttrMask attr)
 {
     REALM_ASSERT(column_ndx < get_column_count());
 
     // At this point we only allow one attr at a time
     // so setting it will overwrite existing. In the future
     // we will allow combinations.
-    m_attr.set(column_ndx, attr);
+    m_attr.set(column_ndx, attr.m_value);
 
     update_has_strong_link_columns();
 }

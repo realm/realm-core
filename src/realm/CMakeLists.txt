@@ -2,6 +2,7 @@ set(REALM_SOURCES
     alloc.cpp
     alloc_slab.cpp
     array.cpp
+    array_backlink.cpp
     array_binary.cpp
     array_blob.cpp
     array_blobs_small.cpp
@@ -68,6 +69,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     alloc.hpp
     alloc_slab.hpp
     array.hpp
+    array_backlink.hpp
     array_basic.hpp
     array_basic_tpl.hpp
     array_binary.hpp
@@ -113,15 +115,14 @@ set(REALM_INSTALL_GENERAL_HEADERS
     link_view_fwd.hpp
     mixed.hpp
     null.hpp
-    list.cpp
-    obj.cpp
+    list.hpp
+    obj.hpp
     olddatetime.hpp
     owned_data.hpp
     query.hpp
     query_conditions.hpp
     query_engine.hpp
     query_expression.hpp
-    query_operators.hpp
     realm_nmmintrin.h
     replication.hpp
     row.hpp

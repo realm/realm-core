@@ -365,16 +365,46 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, size_t colum
 template <class Cond>
 std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, size_t column_ndx, int64_t value)
 {
+    const Spec& spec = _impl::TableFriend::get_spec(table);
     DataType type = table.get_column_type(column_ndx);
+    ColumnAttrMask attr = spec.get_column_attr(column_ndx);
+
+    if (attr.test(col_attr_List)) {
+        switch (type) {
+            case type_Int:
+            case type_Bool:
+            case type_OldDateTime: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<int64_t, Cond>(value, column_ndx)};
+            }
+            case type_Float: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<float, Cond>(value, column_ndx)};
+            }
+            case type_Double: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<double, Cond>(value, column_ndx)};
+            }
+            case type_String: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<String, Cond>(value, column_ndx)};
+            }
+            case type_Binary: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<Binary, Cond>(value, column_ndx)};
+            }
+            case type_Timestamp: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<Timestamp, Cond>(value, column_ndx)};
+            }
+            case type_LinkList: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<Key, Cond>(value, column_ndx)};
+            }
+            default: {
+                throw LogicError{LogicError::type_mismatch};
+            }
+        }
+    }
     switch (type) {
         case type_String: {
-            return std::unique_ptr<ParentNode>{new SizeNode<StringColumn, Cond>(value, column_ndx)};
+            return std::unique_ptr<ParentNode>{new SizeNode<StringData, Cond>(value, column_ndx)};
         }
         case type_Binary: {
-            return std::unique_ptr<ParentNode>{new SizeNode<BinaryColumn, Cond>(value, column_ndx)};
-        }
-        case type_LinkList: {
-            return std::unique_ptr<ParentNode>{new SizeNode<LinkListColumn, Cond>(value, column_ndx)};
+            return std::unique_ptr<ParentNode>{new SizeNode<BinaryData, Cond>(value, column_ndx)};
         }
         default: {
             throw LogicError{LogicError::type_mismatch};

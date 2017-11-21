@@ -89,9 +89,10 @@ public:
     }
     Obj insert(Key k);
     void erase(Key k);
+    bool is_valid(Key k) const;
     ConstObj get(Key k) const;
     Obj get(Key k);
-    void get_leaf(size_t ndx, ClusterNode::IteratorState& state) const noexcept;
+    bool get_leaf(Key key, ClusterNode::IteratorState& state) const noexcept;
     bool traverse(TraverseFunction func) const;
     void dump_objects()
     {
@@ -132,10 +133,17 @@ public:
     typedef const Obj& reference;
 
     ConstIterator(const ClusterTree& t, size_t ndx);
+    ConstIterator(const ClusterTree& t, Key key);
     ConstIterator(Iterator&&);
     ConstIterator(const ConstIterator& other)
-        : ConstIterator(other.m_tree, other.m_ndx)
+        : ConstIterator(other.m_tree, other.m_key)
     {
+    }
+    ConstIterator& operator=(ConstIterator&& other)
+    {
+        REALM_ASSERT(&m_tree == &other.m_tree);
+        m_key = other.m_key;
+        return *this;
     }
     reference operator*() const
     {
@@ -145,7 +153,7 @@ public:
     ConstIterator& operator++();
     bool operator!=(const ConstIterator& rhs) const
     {
-        return m_ndx != rhs.m_ndx;
+        return m_key != rhs.m_key;
     }
 
 protected:
@@ -153,10 +161,10 @@ protected:
     mutable uint64_t m_version = uint64_t(-1);
     mutable Cluster m_leaf;
     mutable ClusterNode::IteratorState m_state;
-    mutable size_t m_ndx;
+    mutable Key m_key;
     mutable std::aligned_storage<sizeof(Obj), alignof(Obj)>::type m_obj_cache_storage;
 
-    void load_leaf() const;
+    Key load_leaf(Key key) const;
 };
 
 class ClusterTree::Iterator : public ClusterTree::ConstIterator {
@@ -174,6 +182,10 @@ public:
     pointer operator->() const
     {
         return const_cast<pointer>(ConstIterator::operator->());
+    }
+    Iterator& operator++()
+    {
+        return static_cast<Iterator&>(ConstIterator::operator++());
     }
 };
 

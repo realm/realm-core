@@ -520,7 +520,7 @@ Spec::ColumnInfo Spec::get_column_info(size_t column_ndx) const noexcept
 {
     ColumnInfo info;
     info.m_column_ref_ndx = get_column_ndx_in_parent(column_ndx);
-    info.m_has_search_index = (get_column_attr(column_ndx) & col_attr_Indexed) != 0;
+    info.m_has_search_index = get_column_attr(column_ndx).test(col_attr_Indexed);
     return info;
 }
 

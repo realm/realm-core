@@ -8914,6 +8914,40 @@ TEST(Table_list_basic)
     table.remove_object(Key(5));
 }
 
+TEST(Table_StableIteration)
+{
+    Table table;
+    auto list_col = table.add_column_list(type_Int, "int_list");
+    std::vector<int64_t> values = {1, 7, 3, 5, 5, 2, 4};
+    Obj obj = table.create_object(Key(5)).set_list_values(list_col, values);
+
+    auto list = obj.get_list<int64_t>(list_col);
+    auto x = list.begin();
+    CHECK_EQUAL(*x, 1);
+    ++x; // == 7
+    ++x; // == 3
+    CHECK_EQUAL(*x, 3);
+    auto end = list.end();
+    for (auto it = list.begin(); it != end; it++) {
+        if (*it > 3) {
+            list.remove(it);
+            // When an element is removed, the iterator should be invalid
+            CHECK_THROW_ANY(*it);
+        }
+        // This iterator should keep pointing to the same element
+        CHECK_EQUAL(*x, 3);
+    }
+    // Advancing the iterator should skip the two deleted elements
+    ++x; // == 2
+    CHECK_EQUAL(*x, 2);
+    ++x; // Past end of list
+    CHECK_THROW_ANY(*x);
+    CHECK_EQUAL(list.size(), 3);
+    CHECK_EQUAL(list[0], 1);
+    CHECK_EQUAL(list[1], 3);
+    CHECK_EQUAL(list[2], 2);
+}
+
 TEST(Table_ListOfPrimitives)
 {
     Group g;
@@ -9085,6 +9119,26 @@ TEST(Table_object_forward_iterator)
         CHECK_EQUAL(key_value << 1, o.get<int64_t>(0));
         CHECK_EQUAL(key_value << 2, o.get<util::Optional<int64_t>>(1));
     }
+
+    auto it = table.begin();
+    while (it != table.end()) {
+        int64_t val = it->get_key().value;
+        // Delete every 7th object
+        if ((val % 7) == 0) {
+            table.remove_object(it);
+        }
+        ++it;
+    }
+    CHECK_EQUAL(table.size(), nb_rows * 6 / 7);
+
+    auto it1 = table.begin();
+    Key key = it1->get_key();
+    ++it1;
+    int64_t val = it1->get<int64_t>(0);
+    table.remove_object(key);
+    CHECK_EQUAL(val, it1->get<int64_t>(0));
+    table.remove_object(it1);
+    CHECK_THROW_ANY(it1->get<int64_t>(0));
 }
 
 TEST(Table_object_sequential)

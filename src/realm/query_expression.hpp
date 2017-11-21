@@ -130,14 +130,12 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/array_timestamp.hpp>
 #include <realm/array_binary.hpp>
 #include <realm/array_string.hpp>
-#include <realm/column_link.hpp>
-#include <realm/column_linklist.hpp>
+#include <realm/array_backlink.hpp>
 #include <realm/array_bool.hpp>
 #include <realm/column_type_traits.hpp>
-#include <realm/impl/sequential_getter.hpp>
+#include <realm/list.hpp>
 #include <realm/link_view.hpp>
 #include <realm/metrics/query_info.hpp>
-#include <realm/query_operators.hpp>
 #include <realm/util/optional.hpp>
 
 #include <numeric>
@@ -897,9 +895,9 @@ struct NullableVector {
     }
 
     template <typename Type = T>
-    typename std::enable_if<realm::is_any<Type, float, double, OldDateTime, BinaryData, StringData, RowIndex,
-                                          Timestamp, ref_type, null>::value,
-                            void>::type
+    typename std::enable_if<
+        realm::is_any<Type, float, double, BinaryData, StringData, Key, Timestamp, ref_type, SizeOfList, null>::value,
+        void>::type
     set(size_t index, t_storage value)
     {
         m_first[index] = value;
@@ -1066,6 +1064,18 @@ inline void NullableVector<RowIndex>::set_null(size_t index)
     m_first[index] = RowIndex();
 }
 
+// Key
+template <>
+inline bool NullableVector<Key>::is_null(size_t index) const
+{
+    return m_first[index] == null_key;
+}
+template <>
+inline void NullableVector<Key>::set_null(size_t index)
+{
+    m_first[index] = null_key;
+}
+
 
 // Timestamp
 
@@ -1091,6 +1101,18 @@ template <>
 inline void NullableVector<ref_type>::set_null(size_t index)
 {
     m_first[index] = 0;
+}
+
+// SizeOfAny
+template <>
+inline bool NullableVector<SizeOfList>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
+template <>
+inline void NullableVector<SizeOfList>::set_null(size_t index)
+{
+    m_first[index].set_null();
 }
 
 template <typename Operator>
@@ -1707,40 +1729,39 @@ UnaryOperator<Pow<T>> power(const Subexpr2<T>& left)
 
 // Classes used for LinkMap (see below).
 struct LinkMapFunction {
-    // Your consume() method is given row index of the linked-to table as argument, and you must return whether or
+    // Your consume() method is given key within the linked-to table as argument, and you must return whether or
     // not you want the LinkMapFunction to exit (return false) or continue (return true) harvesting the link tree
-    // for the current main table row index (it will be a link tree if you have multiple type_LinkList columns
+    // for the current main table object (it will be a link tree if you have multiple type_LinkList columns
     // in a link()->link() query.
-    virtual bool consume(size_t row_index) = 0;
+    virtual bool consume(Key) = 0;
 };
 
 struct FindNullLinks : public LinkMapFunction {
-    bool consume(size_t row_index) override
+    bool consume(Key) override
     {
-        static_cast<void>(row_index);
         m_has_link = true;
-        return false; // we've found a row index, so this can't be a null-link, so exit link harvesting
+        return false; // we've found a key, so this can't be a null-link, so exit link harvesting
     }
 
     bool m_has_link = false;
 };
 
 struct MakeLinkVector : public LinkMapFunction {
-    MakeLinkVector(std::vector<size_t>& result)
+    MakeLinkVector(std::vector<Key>& result)
         : m_links(result)
     {
     }
 
-    bool consume(size_t row_index) override
+    bool consume(Key key) override
     {
-        m_links.push_back(row_index);
+        m_links.push_back(key);
         return true; // continue evaluation
     }
-    std::vector<size_t>& m_links;
+    std::vector<Key>& m_links;
 };
 
 struct CountLinks : public LinkMapFunction {
-    bool consume(size_t) override
+    bool consume(Key) override
     {
         m_link_count++;
         return true;
@@ -1759,15 +1780,15 @@ struct CountLinks : public LinkMapFunction {
 The LinkMap and LinkMapFunction classes are used for query conditions on links themselves (contrary to conditions on
 the value payload they point at).
 
-MapLink::map_links() takes a row index of the link column as argument and follows any link chain stated in the query
+MapLink::map_links() takes a row index of the link array as argument and follows any link chain stated in the query
 (through the link()->link() methods) until the final payload table is reached, and then applies LinkMapFunction on
-the linked-to row index(es).
+the linked-to key(s).
 
-If all link columns are type_Link, then LinkMapFunction is only invoked for a single row index. If one or more
-columns are type_LinkList, then it may result in multiple row indexes.
+If all link columns are type_Link, then LinkMapFunction is only invoked for a single key. If one or more
+columns are type_LinkList, then it may result in multiple keys.
 
 The reason we use this map pattern is that we can exit the link-tree-traversal as early as possible, e.g. when we've
-found the first link that points to row '5'. Other solutions could be a std::vector<size_t> harvest_all_links(), or an
+found the first link that points to key '5'. Other solutions could be a std::vector<size_t> harvest_all_links(), or an
 iterator pattern. First solution can't exit, second solution requires internal state.
 */
 class LinkMap {
@@ -1779,62 +1800,38 @@ public:
         set_base_table(table);
     }
 
-    LinkMap(LinkMap const& other, QueryNodeHandoverPatches* patches)
+    LinkMap(LinkMap const& other)
+    {
+        m_link_column_indexes = other.m_link_column_indexes;
+        m_tables = other.m_tables;
+        m_link_types = other.m_link_types;
+        m_only_unary_links = other.m_only_unary_links;
+    }
+
+    LinkMap(LinkMap const& other, QueryNodeHandoverPatches*)
         : LinkMap(other)
     {
-        if (!patches)
-            return;
-
-        m_link_column_indexes.clear();
-        const Table* table = base_table();
-        m_tables.clear();
-        for (auto column : m_link_columns) {
-            m_link_column_indexes.push_back(column->get_column_index());
-            if (table->get_real_column_type(m_link_column_indexes.back()) == col_type_BackLink)
-                table = &static_cast<const BacklinkColumn*>(column)->get_origin_table();
-            else
-                table = &static_cast<const LinkColumnBase*>(column)->get_target_table();
-        }
     }
 
-    void set_base_table(const Table* table)
+    size_t get_nb_hops() const
     {
-        if (table == base_table())
-            return;
-
-        m_tables.clear();
-        m_tables.push_back(table);
-        m_link_columns.clear();
-        m_link_types.clear();
-        m_only_unary_links = true;
-
-        for (size_t link_column_index : m_link_column_indexes) {
-            // Link column can be either LinkList or single Link
-            const Table* t = m_tables.back();
-            ColumnType type = t->get_real_column_type(link_column_index);
-            REALM_ASSERT(Table::is_link_type(type) || type == col_type_BackLink);
-            m_link_types.push_back(type);
-
-            if (type == col_type_LinkList) {
-                const LinkListColumn& cll = t->get_column_link_list(link_column_index);
-                m_link_columns.push_back(&cll);
-                m_only_unary_links = false;
-                m_tables.push_back(&cll.get_target_table());
-            }
-            else if (type == col_type_Link) {
-                const LinkColumn& cl = t->get_column_link(link_column_index);
-                m_link_columns.push_back(&cl);
-                m_tables.push_back(&cl.get_target_table());
-            }
-            else if (type == col_type_BackLink) {
-                const BacklinkColumn& bl = t->get_column_backlink(link_column_index);
-                m_link_columns.push_back(&bl);
-                m_only_unary_links = false;
-                m_tables.push_back(&bl.get_origin_table());
-            }
-        }
+        return m_link_column_indexes.size();
     }
 
+    bool has_links() const
+    {
+        return m_link_column_indexes.size() > 0;
+    }
+
+    void set_base_table(const Table* table);
+
+    void set_cluster(const Cluster* cluster)
+    {
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) Array(m_tables.back()->get_alloc()));
+        cluster->init_leaf(m_link_column_indexes[0], m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
+    }
     void verify_columns() const
     {
         for (size_t i = 0; i < m_link_column_indexes.size(); i++) {
@@ -1842,31 +1839,11 @@ public:
         }
     }
 
-    virtual std::string description() const
-    {
-        std::string s;
-        for (size_t i = 0; i < m_link_column_indexes.size(); ++i) {
-            if (i < m_tables.size() && m_tables[i]) {
-                if (i == 0) {
-                    s += std::string(m_tables[i]->get_name()) + metrics::value_separator;
-                }
-                if (m_link_types[i] == col_type_BackLink) {
-                    s += "backlink";
-                }
-                else if (m_link_column_indexes[i] < m_tables[i]->get_column_count()) {
-                    s += std::string(m_tables[i]->get_column_name(m_link_column_indexes[i]));
-                }
-                if (i != m_link_column_indexes.size() - 1) {
-                    s += metrics::value_separator;
-                }
-            }
-        }
-        return s;
-    }
+    std::string description() const;
 
-    std::vector<size_t> get_links(size_t index)
+    std::vector<Key> get_links(size_t index)
     {
-        std::vector<size_t> res;
+        std::vector<Key> res;
         get_links(index, res);
         return res;
     }
@@ -1899,59 +1876,11 @@ public:
         return m_tables.back();
     }
 
-    std::vector<const ColumnBase*> m_link_columns;
-
 private:
-    void map_links(size_t column, size_t row, LinkMapFunction& lm)
-    {
-        bool last = (column + 1 == m_link_columns.size());
-        ColumnType type = m_link_types[column];
-        if (type == col_type_Link) {
-            const LinkColumn& cl = *static_cast<const LinkColumn*>(m_link_columns[column]);
-            size_t r = to_size_t(cl.get(row));
-            if (r == 0)
-                return;
-            r--; // LinkColumn stores link to row N as N + 1
-            if (last) {
-                bool continue2 = lm.consume(r);
-                if (!continue2)
-                    return;
-            }
-            else
-                map_links(column + 1, r, lm);
-        }
-        else if (type == col_type_LinkList) {
-            const LinkListColumn& cll = *static_cast<const LinkListColumn*>(m_link_columns[column]);
-            ConstLinkViewRef lvr = cll.get(row);
-            for (size_t t = 0; t < lvr->size(); t++) {
-                size_t r = lvr->get(t).get_index();
-                if (last) {
-                    bool continue2 = lm.consume(r);
-                    if (!continue2)
-                        return;
-                }
-                else
-                    map_links(column + 1, r, lm);
-            }
-        }
-        else if (type == col_type_BackLink) {
-            const BacklinkColumn& bl = *static_cast<const BacklinkColumn*>(m_link_columns[column]);
-            size_t count = bl.get_backlink_count(row);
-            for (size_t i = 0; i < count; ++i) {
-                size_t r = bl.get_backlink(row, i);
-                if (last) {
-                    bool continue2 = lm.consume(r);
-                    if (!continue2)
-                        return;
-                }
-                else
-                    map_links(column + 1, r, lm);
-            }
-        }
-    }
+    void map_links(size_t column, Key key, LinkMapFunction& lm);
+    void map_links(size_t column, size_t row, LinkMapFunction& lm);
 
-
-    void get_links(size_t row, std::vector<size_t>& result)
+    void get_links(size_t row, std::vector<Key>& result)
     {
         MakeLinkVector mlv = MakeLinkVector(result);
         map_links(row, mlv);
@@ -1961,6 +1890,12 @@ private:
     std::vector<ColumnType> m_link_types;
     std::vector<const Table*> m_tables;
     bool m_only_unary_links = true;
+    // Leaf cache
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(Array), alignof(Array)>::type;
+    using LeafPtr = std::unique_ptr<Array, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const Array* m_leaf_ptr = nullptr;
 
     template <class>
     friend Query compare(const Subexpr2<Link>&, const ConstRow&);
@@ -2023,10 +1958,16 @@ public:
     void set_cluster(const Cluster* cluster) override
     {
         m_array_ptr = nullptr;
-        // Create new Leaf
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_link_map.base_table()->get_alloc()));
-        cluster->init_leaf(this->m_column_ndx, m_array_ptr.get());
-        m_leaf_ptr = m_array_ptr.get();
+        m_leaf_ptr = nullptr;
+        if (links_exist()) {
+            m_link_map.set_cluster(cluster);
+        }
+        else {
+            // Create new Leaf
+            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_link_map.base_table()->get_alloc()));
+            cluster->init_leaf(this->m_column_ndx, m_array_ptr.get());
+            m_leaf_ptr = m_array_ptr.get();
+        }
     }
 
     void verify_column() const override
@@ -2045,18 +1986,18 @@ public:
         Value<T>& d = static_cast<Value<T>&>(destination);
 
         if (links_exist()) {
-            /*
-            std::vector<size_t> links = m_link_map.get_links(index);
+            REALM_ASSERT(m_leaf_ptr == nullptr);
+            std::vector<Key> links = m_link_map.get_links(index);
             Value<T> v = make_value_for_link<T>(m_link_map.only_unary_links(), links.size());
 
             for (size_t t = 0; t < links.size(); t++) {
-                size_t link_to = links[t];
-                v.m_storage.set(t, m_link_map.target_table()->template get<T>(col, link_to));
+                ConstObj obj = m_link_map.target_table()->get_object(links[t]);
+                v.m_storage.set(t, obj.get<T>(m_column_ndx));
             }
             destination.import(v);
-            */
         }
         else {
+            REALM_ASSERT(m_leaf_ptr != nullptr);
             // Not a link column
             for (size_t t = 0; t < destination.m_values && index + t < m_leaf_ptr->size(); t++) {
                 d.m_storage.set(t, m_leaf_ptr->get(index + t));
@@ -2066,7 +2007,7 @@ public:
 
     bool links_exist() const
     {
-        return m_link_map.m_link_columns.size() > 0;
+        return m_link_map.has_links();
     }
 
     virtual std::string description() const override
@@ -2106,9 +2047,9 @@ public:
         return m_column_ndx;
     }
 
-    SizeOperator<Size<T>> size()
+    SizeOperator<T> size()
     {
-        return SizeOperator<Size<T>>(this->clone(nullptr));
+        return SizeOperator<T>(this->clone(nullptr));
     }
 
 private:
@@ -2346,7 +2287,7 @@ private:
     LinkMap m_link_map;
 };
 
-template <class oper, class TExpr>
+template <class T, class TExpr>
 class SizeOperator : public Subexpr2<Int> {
 public:
     SizeOperator(std::unique_ptr<TExpr> left)
@@ -2358,6 +2299,11 @@ public:
     void set_base_table(const Table* table) override
     {
         m_expr->set_base_table(table);
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_expr->set_cluster(cluster);
     }
 
     void verify_column() const override
@@ -2391,7 +2337,7 @@ public:
                 d->m_storage.set_null(i);
             }
             else {
-                d->m_storage.set(i, oper()(*elem));
+                d->m_storage.set(i, elem->size());
             }
         }
     }
@@ -2420,7 +2366,6 @@ private:
     {
     }
 
-    typedef typename oper::type T;
     std::unique_ptr<TExpr> m_expr;
 };
 
@@ -2509,7 +2454,7 @@ class Columns<Link> : public Subexpr2<Link> {
 public:
     Query is_null()
     {
-        if (m_link_map.m_link_columns.size() > 1)
+        if (m_link_map.get_nb_hops() > 1)
             throw std::runtime_error("Combining link() and is_null() is currently not supported");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return make_expression<UnaryLinkCompare<false>>(m_link_map);
@@ -2517,7 +2462,7 @@ public:
 
     Query is_not_null()
     {
-        if (m_link_map.m_link_columns.size() > 1)
+        if (m_link_map.get_nb_hops() > 1)
             throw std::runtime_error("Combining link() and is_not_null() is currently not supported");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return make_expression<UnaryLinkCompare<true>>(m_link_map);
@@ -2623,7 +2568,7 @@ public:
 
     bool links_exist() const
     {
-        return m_link_map.m_link_columns.size() > 0;
+        return m_link_map.has_links();
     }
 
     LinkMap m_link_map;
@@ -2635,6 +2580,9 @@ public:
     LeafPtr m_array_ptr;
     Array* m_leaf_ptr = nullptr;
 };
+
+template <typename>
+class ColumnListSize;
 
 template <typename T>
 class Columns<List<T>> : public Subexpr2<T>, public ColumnListBase {
@@ -2721,6 +2669,8 @@ public:
         return "";
     }
 
+    SizeOperator<SizeOfList> size();
+
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
     {
         return {m_column_ndx, *this};
@@ -2750,6 +2700,49 @@ private:
     {
     }
 };
+
+template <typename T>
+class ColumnListSize : public Columns<List<T>> {
+public:
+    ColumnListSize(const Columns<List<T>>& other)
+        : Columns<List<T>>(other)
+    {
+    }
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        REALM_ASSERT_DEBUG(dynamic_cast<Value<SizeOfList>*>(&destination) != nullptr);
+        Value<SizeOfList>* d = static_cast<Value<SizeOfList>*>(&destination);
+
+        Allocator& alloc = this->get_base_table()->get_alloc();
+        Value<ref_type> list_refs;
+        this->get_lists(index, list_refs, 1);
+        d->init(list_refs.m_from_link_list, list_refs.m_values);
+
+        for (size_t i = 0; i < list_refs.m_values; i++) {
+            ref_type list_ref = list_refs.m_storage[i];
+            if (list_ref) {
+                typename ColumnTypeTraits<T>::cluster_leaf_type leaf(alloc);
+                leaf.init_from_ref(list_ref);
+                size_t s = leaf.size();
+                d->m_storage.set(i, SizeOfList(s));
+            }
+            else {
+                d->m_storage.set_null(i);
+            }
+        }
+    }
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    {
+        return std::unique_ptr<Subexpr>(new ColumnListSize<T>(*this));
+    }
+};
+
+template <typename T>
+SizeOperator<SizeOfList> Columns<List<T>>::size()
+{
+    std::unique_ptr<Subexpr> ptr(new ColumnListSize<T>(*this));
+    return SizeOperator<SizeOfList>(std::move(ptr));
+}
 
 template <typename T, typename Operation>
 class ListColumnAggregate : public Subexpr2<typename Operation::ResultType> {
@@ -2849,7 +2842,7 @@ Query compare(const Subexpr2<Link>& left, const ConstRow& row)
         const LinkMap& link_map = column->link_map();
         REALM_ASSERT(link_map.target_table() == row.get_table() || !row.is_attached());
 #ifdef REALM_OLDQUERY_FALLBACK
-        if (link_map.m_link_columns.size() == 1) {
+        if (link_map.get_nb_hops() == 1) {
             // We can fall back to Query::links_to for != and == operations on links, but only
             // for == on link lists. This is because negating query.links_to() is equivalent to
             // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
@@ -2962,10 +2955,16 @@ public:
     void set_cluster(const Cluster* cluster) override
     {
         m_array_ptr = nullptr;
-        // Create new Leaf
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(get_base_table()->get_alloc()));
-        cluster->init_leaf(this->m_column_ndx, m_array_ptr.get());
-        m_leaf_ptr = m_array_ptr.get();
+        m_leaf_ptr = nullptr;
+        if (links_exist()) {
+            m_link_map.set_cluster(cluster);
+        }
+        else {
+            // Create new Leaf
+            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(get_base_table()->get_alloc()));
+            cluster->init_leaf(this->m_column_ndx, m_array_ptr.get());
+            m_leaf_ptr = m_array_ptr.get();
+        }
     }
 
     void verify_column() const override
@@ -2989,30 +2988,27 @@ public:
     template <class LeafType2 = LeafType>
     void evaluate_internal(size_t index, ValueBase& destination)
     {
-        REALM_ASSERT(m_leaf_ptr != nullptr);
         using U = typename LeafType2::value_type;
-        auto leaf = reinterpret_cast<const LeafType2*>(m_leaf_ptr); // TODO change to dynamic_cast at some point
 
         if (links_exist()) {
+            REALM_ASSERT(m_leaf_ptr == nullptr);
             // LinkList with more than 0 values. Create Value with payload for all fields
-            /*
-            std::vector<size_t> links = m_link_map.get_links(index);
+            std::vector<Key> links = m_link_map.get_links(index);
             auto v = make_value_for_link<typename util::RemoveOptional<U>::type>(m_link_map.only_unary_links(),
                                                                                  links.size());
 
             for (size_t t = 0; t < links.size(); t++) {
-                size_t link_to = links[t];
-                sgc->cache_next(link_to);
-
-                if (sgc->m_column->is_null(link_to))
+                ConstObj obj = m_link_map.target_table()->get_object(links[t]);
+                if (obj.is_null(m_column_ndx))
                     v.m_storage.set_null(t);
                 else
-                    v.m_storage.set(t, sgc->get_next(link_to));
+                    v.m_storage.set(t, obj.get<U>(m_column_ndx));
             }
             destination.import(v);
-            */
         }
         else {
+            REALM_ASSERT(m_leaf_ptr != nullptr);
+            auto leaf = reinterpret_cast<const LeafType2*>(m_leaf_ptr); // TODO change to dynamic_cast at some point
             // Not a Link column
             size_t colsize = leaf->size();
 
@@ -3070,7 +3066,7 @@ public:
 
     bool links_exist() const
     {
-        return m_link_map.m_link_columns.size() > 0;
+        return m_link_map.has_links();
     }
 
     bool is_nullable() const
@@ -3282,11 +3278,13 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        std::vector<size_t> links = m_link_map.get_links(index);
-        std::sort(links.begin(), links.end());
+        std::vector<Key> links = m_link_map.get_links(index);
+        // std::sort(links.begin(), links.end());
 
-        size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, size_t link) {
-            return running_count + m_query.count(link, link + 1, 1);
+        size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, Key) {
+            return running_count;
+            // TODO: What to be done here?
+            // return running_count + m_query.count(link, link + 1, 1);
         });
 
         destination.import(Value<Int>(false, 1, size_t(count)));

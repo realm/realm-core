@@ -23,6 +23,8 @@
 #include "realm/array_string.hpp"
 #include "realm/array_binary.hpp"
 #include "realm/array_timestamp.hpp"
+#include "realm/array_key.hpp"
+#include "realm/array_backlink.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/replication.hpp"
 #include <iostream>
@@ -90,7 +92,7 @@ public:
         return m_keys.get(0);
     }
 
-    void get_leaf(size_t ndx, ClusterNode::IteratorState& state) const noexcept;
+    bool get_leaf(Key key, ClusterNode::IteratorState& state) const noexcept;
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
@@ -126,7 +128,7 @@ void ClusterNode::IteratorState::clear()
 {
     m_current_leaf.detach();
     m_key_offset = 0;
-    m_leaf_start_ndx = 0;
+    m_current_index = size_t(-1);
 }
 
 /***************************** ClusterNodeInner ******************************/
@@ -307,36 +309,38 @@ void ClusterNodeInner::add(ref_type ref, int64_t key_value)
     m_keys.add(key_value);
 }
 
-void ClusterNodeInner::get_leaf(size_t ndx, ClusterNode::IteratorState& state) const noexcept
+// Find leaf that contains the object identified by key. If this does not exist return the
+// leaf that contains the next object
+bool ClusterNodeInner::get_leaf(Key key, ClusterNode::IteratorState& state) const noexcept
 {
-    unsigned sz = node_size();
-    for (unsigned i = 0; i < sz; i++) {
-        ref_type ref = m_children.get_as_ref(i);
-        char* header = m_alloc.translate(ref);
-        bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
-        size_t child_size;
+    size_t child_ndx = m_keys.upper_bound_int(key.value);
+    if (child_ndx > 0)
+        child_ndx--;
+
+    while (child_ndx < m_children.size()) {
+        int64_t key_offset = m_keys.get(child_ndx);
+        Key new_key = Key(key.value - key_offset);
+        state.m_key_offset += key_offset;
+
+        ref_type child_ref = m_children.get_as_ref(child_ndx);
+        char* child_header = m_alloc.translate(child_ref);
+        bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
         if (child_is_leaf) {
-            state.m_current_leaf.init(MemRef(header, ref, m_alloc));
-            child_size = state.m_current_leaf.node_size();
-            state.m_leaf_end_ndx = state.m_leaf_start_ndx + child_size;
-            if (ndx < state.m_leaf_end_ndx) {
-                state.m_key_offset += get_key(i);
-                return;
-            }
+            state.m_current_leaf.init(MemRef(child_header, child_ref, m_alloc));
+            state.m_current_index = state.m_current_leaf.lower_bound_key(new_key);
+            if (state.m_current_index < state.m_current_leaf.node_size())
+                return true;
         }
         else {
-            ClusterNodeInner inner_node(m_alloc, m_tree_top);
-            inner_node.init(MemRef(header, ref, m_alloc));
-
-            child_size = inner_node.get_tree_size();
-            if (ndx < state.m_leaf_start_ndx + child_size) {
-                state.m_key_offset += get_key(i);
-                auto node = m_tree_top.get_node(ref);
-                return inner_node.get_leaf(ndx, state);
-            }
+            ClusterNodeInner node(m_alloc, m_tree_top);
+            node.init(MemRef(child_header, child_ref, m_alloc));
+            if (node.get_leaf(new_key, state))
+                return true;
         }
-        state.m_leaf_start_ndx += child_size;
+        state.m_key_offset -= key_offset;
+        child_ndx++;
     }
+    return false;
 }
 
 void ClusterNodeInner::dump_objects(int64_t key_offset, std::string lead) const
@@ -442,9 +446,9 @@ void Cluster::create()
     m_keys.create(Array::type_Normal);
     m_keys.update_parent();
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        int attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+        ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
 
-        if (attr & col_attr_List) {
+        if (attr.test(col_attr_List)) {
             ArrayInteger arr(m_alloc);
             arr.create(type_HasRefs);
             arr.set_parent(this, col_ndx + 1);
@@ -454,7 +458,7 @@ void Cluster::create()
         }
         switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
             case col_type_Int:
-                if (attr & col_attr_Nullable) {
+                if (attr.test(col_attr_Nullable)) {
                     do_create<ArrayIntNull>(col_ndx);
                 }
                 else {
@@ -479,9 +483,14 @@ void Cluster::create()
             case col_type_Timestamp:
                 do_create<ArrayTimestamp>(col_ndx);
                 break;
+            case col_type_Link:
+                do_create<ArrayKey>(col_ndx);
+                break;
+            case col_type_BackLink:
+                do_create<ArrayBacklink>(col_ndx);
+                break;
             default:
-                // Silently ignore unsupported types
-                // TODO: Eventually we should have an assert here
+                throw LogicError(LogicError::illegal_type);
                 break;
         }
     }
@@ -509,9 +518,9 @@ MemRef Cluster::ensure_writeable(Key)
 }
 
 template <class T>
-inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, int attr)
+inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, ColumnAttrMask attr)
 {
-    if (attr & col_attr_List) {
+    if (attr.test(col_attr_List)) {
         ArrayInteger arr(m_alloc);
         arr.set_parent(this, col_ndx + 1);
         arr.init_from_parent();
@@ -521,7 +530,7 @@ inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, int attr)
         T arr(m_alloc);
         arr.set_parent(this, col_ndx + 1);
         arr.init_from_parent();
-        arr.insert(ndx, T::default_value(attr & col_attr_Nullable));
+        arr.insert(ndx, T::default_value(attr.test(col_attr_Nullable)));
     }
 }
 
@@ -530,10 +539,16 @@ void Cluster::insert_row(size_t ndx, Key k)
     m_keys.insert(ndx, k.value);
     size_t nb_columns = size() - 1;
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        int attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+        ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+
+        if (attr.test(col_attr_List)) {
+            do_insert_row<ArrayInteger>(ndx, col_ndx, attr);
+            continue;
+        }
+
         switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
             case col_type_Int:
-                if (attr) {
+                if (attr.test(col_attr_Nullable)) {
                     do_insert_row<ArrayIntNull>(ndx, col_ndx, attr);
                 }
                 else {
@@ -557,6 +572,12 @@ void Cluster::insert_row(size_t ndx, Key k)
                 break;
             case col_type_Timestamp:
                 do_insert_row<ArrayTimestamp>(ndx, col_ndx, attr);
+                break;
+            case col_type_Link:
+                do_insert_row<ArrayKey>(ndx, col_ndx, attr);
+                break;
+            case col_type_BackLink:
+                do_insert_row<ArrayBacklink>(ndx, col_ndx, attr);
                 break;
             default:
                 REALM_ASSERT(false);
@@ -589,16 +610,16 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
 
     size_t nb_columns = size() - 1;
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        int attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+        ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
 
-        if (attr & col_attr_List) {
+        if (attr.test(col_attr_List)) {
             do_move<ArrayInteger>(ndx, col_ndx, new_leaf);
             continue;
         }
 
         switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
             case col_type_Int:
-                if (attr & col_attr_Nullable) {
+                if (attr.test(col_attr_Nullable)) {
                     do_move<ArrayIntNull>(ndx, col_ndx, new_leaf);
                 }
                 else {
@@ -622,6 +643,12 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 break;
             case col_type_Timestamp:
                 do_move<ArrayTimestamp>(ndx, col_ndx, new_leaf);
+                break;
+            case col_type_Link:
+                do_move<ArrayKey>(ndx, col_ndx, new_leaf);
+                break;
+            case col_type_BackLink:
+                do_move<ArrayBacklink>(ndx, col_ndx, new_leaf);
                 break;
             default:
                 REALM_ASSERT(false);
@@ -655,8 +682,8 @@ inline void Cluster::do_insert_column(size_t col_ndx, bool nullable)
 
 void Cluster::insert_column(size_t col_ndx)
 {
-    int attr = m_tree_top.get_spec().get_column_attr(col_ndx);
-    if (attr & col_attr_List) {
+    ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+    if (attr.test(col_attr_List)) {
         size_t sz = node_size();
 
         ArrayInteger arr(m_alloc);
@@ -667,7 +694,7 @@ void Cluster::insert_column(size_t col_ndx)
         Array::insert(col_ndx + 1, from_ref(arr.get_ref()));
         return;
     }
-    bool nullable = attr & col_attr_Nullable;
+    bool nullable = attr.test(col_attr_Nullable);
 
     switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
         case col_type_Int:
@@ -696,10 +723,14 @@ void Cluster::insert_column(size_t col_ndx)
         case col_type_Timestamp:
             do_insert_column<ArrayTimestamp>(col_ndx, nullable);
             break;
+        case col_type_Link:
+            do_insert_column<ArrayKey>(col_ndx, nullable);
+            break;
+        case col_type_BackLink:
+            do_insert_column<ArrayBacklink>(col_ndx, nullable);
+            break;
         default:
-            // We need to insert something in spite we don't support the type yet
-            // TODO: Eventually we should have an assert here
-            Array::insert(col_ndx + 1, 0);
+            throw LogicError(LogicError::illegal_type);
             break;
     }
 }
@@ -779,23 +810,67 @@ inline void Cluster::do_erase(size_t ndx, size_t col_ndx)
     values.erase(ndx);
 }
 
-unsigned Cluster::erase(Key k)
+namespace realm {
+template <>
+inline void Cluster::do_erase<ArrayKey>(size_t ndx, size_t col_ndx)
 {
-    size_t ndx = m_keys.lower_bound_int(k.value);
-    if (ndx == m_keys.size() || m_keys.get(ndx) != k.value) {
+    ArrayKey values(m_alloc);
+    values.set_parent(this, col_ndx + 1);
+    values.init_from_parent();
+
+    remove_backlinks(Key(get_key(ndx)), col_ndx, {values.get(ndx)});
+    values.erase(ndx);
+}
+}
+
+unsigned Cluster::erase(Key key)
+{
+    size_t ndx = m_keys.lower_bound_int(key.value);
+    if (ndx == m_keys.size() || m_keys.get(ndx) != key.value) {
         throw InvalidKey("Key not found");
     }
-    m_keys.erase(ndx);
-    size_t nb_columns = size() - 1;
-    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        int attr = m_tree_top.get_spec().get_column_attr(col_ndx);
-        if (attr & col_attr_List) {
+
+    const Spec& spec = m_tree_top.get_spec();
+    size_t num_cols = spec.get_column_count();
+    size_t num_public_cols = spec.get_public_column_count();
+    // We must start with backlink columns in case the corresponding link
+    // columns are in the same table so that we can nullify links before
+    // erasing rows in the link columns.
+    //
+    // This phase also generates replication instructions documenting the side-
+    // effects of deleting the object (i.e. link nullifications). These instructions
+    // must come before the actual deletion of the object, but at the same time
+    // the Replication object may need a consistent view of the row (not including
+    // link columns). Therefore we first nullify links to this object, then
+    // generate the instruction, and then delete the row in the remaining columns.
+    for (size_t col_ndx = num_cols - 1; col_ndx >= num_public_cols; --col_ndx) {
+        REALM_ASSERT(spec.get_column_type(col_ndx) == col_type_BackLink);
+        ArrayBacklink values(m_alloc);
+        values.set_parent(this, col_ndx + 1);
+        values.init_from_parent();
+        values.nullify_fwd_links(ndx);
+    }
+
+    if (Replication* repl = m_alloc.get_replication()) {
+        repl->remove_object(m_tree_top.get_owner(), key);
+    }
+
+    for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
+        auto col_type = spec.get_column_type(col_ndx);
+        ColumnAttrMask attr = spec.get_column_attr(col_ndx);
+        if (attr.test(col_attr_List)) {
             ArrayInteger values(m_alloc);
             values.set_parent(this, col_ndx + 1);
             values.init_from_parent();
             ref_type ref = values.get_as_ref(ndx);
 
             if (ref) {
+                if (col_type == col_type_LinkList) {
+                    ArrayKey links(m_alloc);
+                    links.init_from_ref(ref);
+
+                    remove_backlinks(key, col_ndx, links.get_all());
+                }
                 Array::destroy_deep(ref, m_alloc);
             }
 
@@ -803,9 +878,9 @@ unsigned Cluster::erase(Key k)
 
             continue;
         }
-        switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
+        switch (col_type) {
             case col_type_Int:
-                if (attr & col_attr_Nullable) {
+                if (attr.test(col_attr_Nullable)) {
                     do_erase<ArrayIntNull>(ndx, col_ndx);
                 }
                 else {
@@ -830,15 +905,19 @@ unsigned Cluster::erase(Key k)
             case col_type_Timestamp:
                 do_erase<ArrayTimestamp>(ndx, col_ndx);
                 break;
+            case col_type_Link:
+                do_erase<ArrayKey>(ndx, col_ndx);
+                break;
+            case col_type_BackLink:
+                do_erase<ArrayBacklink>(ndx, col_ndx);
+                break;
             default:
                 REALM_ASSERT(false);
                 break;
         }
     }
 
-    if (Replication* repl = m_alloc.get_replication()) {
-        repl->remove_object(m_tree_top.get_owner(), k);
-    }
+    m_keys.erase(ndx);
 
     return node_size();
 }
@@ -851,7 +930,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
         for (size_t j = 1; j < size(); j++) {
             switch (m_tree_top.get_spec().get_column_type(j - 1)) {
                 case col_type_Int: {
-                    bool nullable = m_tree_top.get_spec().get_column_attr(j - 1) & col_attr_Nullable;
+                    bool nullable = m_tree_top.get_spec().get_column_attr(j - 1).test(col_attr_Nullable);
                     Array arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);
                     if (nullable) {
@@ -913,12 +992,37 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     std::cout << ", " << arr.get(i);
                     break;
                 }
+                case col_type_Link: {
+                    ArrayKey arr(m_alloc);
+                    ref_type ref = Array::get_as_ref(j);
+                    arr.init_from_ref(ref);
+                    std::cout << ", " << arr.get(i);
+                    break;
+                }
+                case col_type_BackLink: {
+                    break;
+                }
                 default:
                     std::cout << ", Error";
                     break;
             }
         }
         std::cout << std::endl;
+    }
+}
+
+void Cluster::remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys)
+{
+    TableRef target_table = _impl::TableFriend::get_opposite_link_table(*m_tree_top.get_owner(), col_ndx);
+    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
+    size_t backlink_col =
+        target_table_spec.find_backlink_column(m_tree_top.get_owner()->get_index_in_group(), col_ndx);
+
+    for (auto key : keys) {
+        if (key != null_key) {
+            Obj target_obj = target_table->get_object(key);
+            target_obj.remove_one_backlink(backlink_col, origin_key); // Throws
+        }
     }
 }
 
@@ -1043,6 +1147,18 @@ Obj ClusterTree::insert(Key k)
     return Obj(this, state.ref, k, state.index);
 }
 
+bool ClusterTree::is_valid(Key k) const
+{
+    try {
+        ClusterNode::State state;
+        m_root->get(k, state);
+    }
+    catch (const InvalidKey&) {
+        return false;
+    }
+    return true;
+}
+
 ConstObj ClusterTree::get(Key k) const
 {
     ClusterNode::State state;
@@ -1076,18 +1192,19 @@ void ClusterTree::erase(Key k)
     }
 }
 
-void ClusterTree::get_leaf(size_t ndx, ClusterNode::IteratorState& state) const noexcept
+bool ClusterTree::get_leaf(Key key, ClusterNode::IteratorState& state) const noexcept
 {
     state.clear();
 
     if (m_root->is_leaf()) {
-        state.m_current_leaf.init(m_root->get_mem());
-        state.m_leaf_end_ndx = state.m_current_leaf.node_size();
+        Cluster* node = static_cast<Cluster*>(m_root.get());
+        state.m_current_leaf.init(node->get_mem());
+        state.m_current_index = node->lower_bound_key(key);
+        return state.m_current_index < state.m_current_leaf.node_size();
     }
     else {
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
-        state.m_root_index = 0;
-        node->get_leaf(ndx, state);
+        return node->get_leaf(key, state);
     }
 }
 
@@ -1134,44 +1251,70 @@ ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
     : m_tree(t)
     , m_leaf(t.get_alloc(), t)
     , m_state(m_leaf)
-    , m_ndx(ndx)
+{
+    if (ndx == 0) {
+        // begin
+        m_key = load_leaf(Key(0));
+    }
+    else {
+        // end
+        m_key = null_key;
+    }
+}
+
+ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, Key key)
+    : m_tree(t)
+    , m_leaf(t.get_alloc(), t)
+    , m_state(m_leaf)
+    , m_key(key)
 {
 }
 
-void ClusterTree::ConstIterator::load_leaf() const
+Key ClusterTree::ConstIterator::load_leaf(Key key) const
 {
-    if (m_ndx < m_tree.size()) {
-        m_tree.get_leaf(m_ndx, m_state);
-        m_version = m_tree.get_version_counter();
+    m_version = m_tree.get_version_counter();
+    // 'key' may or may not exist. If it does not exist, state is updated
+    // to point to the next object in line.
+    if (m_tree.get_leaf(key, m_state)) {
+        // Get the actual key value
+        return Key(m_leaf.get_key(m_state.m_current_index) + m_state.m_key_offset);
     }
     else {
-        m_state.clear();
+        // end of table
+        return null_key;
     }
 }
 
 ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
 {
     if (m_version != m_tree.get_version_counter()) {
-        load_leaf();
+        Key k = load_leaf(m_key);
+        if (k != m_key)
+            throw std::out_of_range("Object was deleted");
     }
 
     REALM_ASSERT(m_leaf.is_attached());
-    size_t index = m_ndx - m_state.m_leaf_start_ndx;
-    Key k = Key(m_leaf.get_key(index) + m_state.m_key_offset);
 
-    return new (&m_obj_cache_storage) Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_ref(), k, index);
+    return new (&m_obj_cache_storage)
+        Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_ref(), m_key, m_state.m_current_index);
 }
 
 ClusterTree::ConstIterator& Table::ConstIterator::operator++()
 {
-    m_ndx++;
-    if (m_ndx == m_state.m_leaf_end_ndx) {
-        if (m_ndx < m_tree.size()) {
-            load_leaf();
+    if (m_version != m_tree.get_version_counter()) {
+        Key k = load_leaf(m_key);
+        if (k != m_key) {
+            // Objects was deleted. k points to the next object
+            m_key = k;
+            return *this;
         }
-        else {
-            m_state.clear();
-        }
+    }
+    m_state.m_current_index++;
+    if (m_state.m_current_index == m_leaf.node_size()) {
+        m_key = load_leaf(Key(m_key.value + 1));
+    }
+    else {
+        m_key = Key(m_leaf.get_key(m_state.m_current_index) + m_state.m_key_offset);
     }
     return *this;
 }

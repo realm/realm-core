@@ -30,6 +30,7 @@ class Table;
 class Cluster;
 class ClusterNodeInner;
 class ClusterTree;
+class ColumnAttrMask;
 
 struct Key {
     constexpr Key()
@@ -57,7 +58,18 @@ struct Key {
     {
         return value < rhs.value;
     }
+    operator bool() const
+    {
+        return value != -1;
+    }
     int64_t value;
+
+private:
+    // operator bool will enable casting to integer. Prevent this.
+    operator int64_t() const
+    {
+        return 0;
+    }
 };
 
 inline std::ostream& operator<<(std::ostream& ostr, Key key)
@@ -80,17 +92,6 @@ public:
     };
 
     struct IteratorState {
-        struct NodeInfo {
-            NodeInfo(std::unique_ptr<ClusterNode> n, size_t s, size_t i)
-                : node(std::move(n))
-                , size(s)
-                , index(i)
-            {
-            }
-            std::unique_ptr<ClusterNode> node;
-            size_t size;
-            size_t index;
-        };
         IteratorState(Cluster& leaf)
             : m_current_leaf(leaf)
         {
@@ -100,9 +101,7 @@ public:
 
         Cluster& m_current_leaf;
         int64_t m_key_offset = 0;
-        size_t m_leaf_start_ndx = 0;
-        size_t m_leaf_end_ndx = 0;
-        size_t m_root_index = 0;
+        size_t m_current_index = 0;
     };
 
     ClusterNode(Allocator& allocator, const ClusterTree& tree_top)
@@ -171,6 +170,8 @@ public:
     virtual void dump_objects(int64_t key_offset, std::string lead) const = 0;
 
 protected:
+    friend class ArrayBacklink;
+
     const ClusterTree& m_tree_top;
     Array m_keys;
 };
@@ -201,6 +202,10 @@ public:
     {
         return m_keys.size() ? get_key(m_keys.size() - 1) : 0;
     }
+    size_t lower_bound_key(Key key)
+    {
+        return m_keys.lower_bound_int(key.value);
+    }
 
     void insert_column(size_t ndx) override;
     void remove_column(size_t ndx) override;
@@ -225,11 +230,12 @@ private:
     template <class T>
     void do_insert_column(size_t col_ndx, bool nullable);
     template <class T>
-    void do_insert_row(size_t ndx, size_t col_ndx, int attr);
+    void do_insert_row(size_t ndx, size_t col_ndx, ColumnAttrMask attr);
     template <class T>
     void do_move(size_t ndx, size_t col_ndx, Cluster* to);
     template <class T>
     void do_erase(size_t ndx, size_t col_ndx);
+    void remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys);
 };
 
 }

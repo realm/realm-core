@@ -21,20 +21,27 @@
 
 #include <realm/array.hpp>
 #include <realm/cluster.hpp>
+#include <realm/table_ref.hpp>
 
 namespace realm {
 
 template <class>
 class ConstListIf;
+
 template <class>
 class ConstList;
+template <class T>
+using ConstListPtr = std::unique_ptr<ConstList<T>>;
+
 template <class>
 class List;
+template <class T>
+using ListPtr = std::unique_ptr<List<T>>;
 
-template <class T>
-using ConstListRef = std::unique_ptr<ConstList<T>>;
-template <class T>
-using ListRef = std::unique_ptr<List<T>>;
+class LinkList;
+class ConstLinkList;
+using LinkListPtr = std::unique_ptr<LinkList>;
+using ConstLinkListPtr = std::unique_ptr<ConstLinkList>;
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class ConstObj {
@@ -60,8 +67,19 @@ public:
 
     template <typename U>
     ConstList<U> get_list(size_t col_ndx) const;
+    template <typename U>
+    ConstListPtr<U> get_list_ptr(size_t col_ndx) const;
+
+    ConstLinkList get_linklist(size_t col_ndx);
+    ConstLinkListPtr get_linklist_ptr(size_t col_ndx);
+
+    size_t get_link_count(size_t col_ndx) const;
 
     bool is_null(size_t col_ndx) const;
+    size_t get_backlink_count(const Table& origin, size_t origin_col_ndx) const;
+    Key get_backlink(const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const;
+    size_t get_backlink_count(size_t backlink_col_ndx) const;
+    Key get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) const;
 
     // To be used by the query system when a single object should
     // be tested. Will allow a function to be called in the context
@@ -76,6 +94,8 @@ public:
 
 protected:
     friend class ConstListBase;
+    friend class ConstLinkListIf;
+    friend class LinkList;
 
     const ClusterTree* m_tree_top;
     Key m_key;
@@ -92,8 +112,9 @@ protected:
     template <class T>
     bool do_is_null(size_t col_ndx) const;
 
-private:
     size_t get_column_index(StringData col_name) const;
+    size_t get_table_index() const;
+    TableRef get_target_table(size_t col_ndx) const;
 };
 
 class Obj : public ConstObj {
@@ -115,9 +136,16 @@ public:
 
     template <typename U>
     List<U> get_list(size_t col_ndx);
+    template <typename U>
+    ListPtr<U> get_list_ptr(size_t col_ndx);
+
+    LinkList get_linklist(size_t col_ndx);
+    LinkListPtr get_linklist_ptr(size_t col_ndx);
 
 private:
+    friend class Cluster;
     friend class ConstListBase;
+    friend class ArrayBacklink;
     template <class>
     friend class List;
 
@@ -132,6 +160,9 @@ private:
     void do_set_null(size_t col_ndx);
 
     void set_int(size_t col_ndx, int64_t value);
+    void add_backlink(size_t backlink_col, Key origin_key);
+    void remove_one_backlink(size_t backlink_col, Key origin_key);
+    void nullify_link(size_t origin_col, Key target_key);
 };
 
 
@@ -151,6 +182,10 @@ inline Optional<double> ConstObj::get<Optional<double>>(size_t col_ndx) const
 
 template <>
 Obj& Obj::set(size_t, int64_t value, bool is_default);
+
+template <>
+Obj& Obj::set(size_t, Key value, bool is_default);
+
 
 template <>
 inline Obj& Obj::set(size_t col_ndx, int value, bool is_default)

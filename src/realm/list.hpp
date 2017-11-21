@@ -20,8 +20,44 @@
 #define REALM_LIST_HPP
 
 #include <realm/obj.hpp>
+#include <realm/array_key.hpp>
 
 namespace realm {
+
+// To be used in query for size. Adds nullability to size so that
+// it can be put in a NullableVector
+struct SizeOfList {
+    static constexpr size_t null_value = size_t(-1);
+
+    SizeOfList(size_t s = null_value)
+        : sz(s)
+    {
+    }
+    bool is_null()
+    {
+        return sz == null_value;
+    }
+    void set_null()
+    {
+        sz = null_value;
+    }
+    size_t size() const
+    {
+        return sz;
+    }
+    size_t sz = null_value;
+};
+
+inline std::ostream& operator<<(std::ostream& ostr, SizeOfList size_of_list)
+{
+    if (size_of_list.is_null()) {
+        ostr << "null";
+    }
+    else {
+        ostr << size_of_list.sz;
+    }
+    return ostr;
+}
 
 class ConstListBase : public ArrayParent {
 public:
@@ -34,8 +70,13 @@ public:
     virtual bool is_null() const = 0;
 
 protected:
+    template <class>
+    friend class ListIterator;
+
     const ConstObj* m_const_obj = nullptr;
     const size_t m_col_ndx;
+
+    mutable std::vector<size_t> m_deleted;
 
     ConstListBase(size_t col_ndx)
         : m_col_ndx(col_ndx)
@@ -56,16 +97,66 @@ protected:
             init_from_parent();
         }
     }
+    // Increase index by one. I we land on and index that is deleted, keep
+    // increasing until we get to a valid entry.
+    size_t incr(size_t ndx) const
+    {
+        ndx++;
+        if (!m_deleted.empty()) {
+            auto it = m_deleted.begin();
+            auto end = m_deleted.end();
+            while (it != end && *it < ndx) {
+                ++it;
+            }
+            // If entry is deleted, increase further
+            while (it != end && *it == ndx) {
+                ++it;
+                ++ndx;
+            }
+        }
+        return ndx;
+    }
+    // Convert from virtual to real index
+    size_t adjust(size_t ndx) const
+    {
+        if (!m_deleted.empty()) {
+            // Optimized for the case where the iterator is past that last deleted entry
+            auto it = m_deleted.rbegin();
+            auto end = m_deleted.rend();
+            while (it != end && *it >= ndx) {
+                if (*it == ndx) {
+                    throw std::out_of_range("Element was deleted");
+                }
+                ++it;
+            }
+            auto diff = end - it;
+            ndx -= diff;
+        }
+        return ndx;
+    }
+    void adj_remove(size_t ndx)
+    {
+        auto it = m_deleted.begin();
+        auto end = m_deleted.end();
+        while (it != end && *it <= ndx) {
+            ++ndx;
+            ++it;
+        }
+        m_deleted.insert(it, ndx);
+    }
 };
 
 /*
- * This class implements a forward iterator over the elements in a ConstList.
- * It is not stable across changes, but as the list itself is constant, changes
- * are not possible.
+ * This class implements a forward iterator over the elements in a List.
+ *
+ * The iterator is stable against deletions in the list. If you try to
+ * dereference an iterator that points to an element, that is deleted, the
+ * call will throw.
+ *
  * Values are read into a member variable (m_val). This is the only way to
  * implement operator-> and operator* returning a pointer and a reference resp.
- * It also allows us to use the variable as a cache. There is no overhead compared
- * to the alternative where operator* would have to return T by value.
+ * There is no overhead compared to the alternative where operator* would have
+ * to return T by value.
  */
 template <class T>
 class ListIterator {
@@ -83,10 +174,7 @@ public:
     }
     pointer operator->()
     {
-        if (m_dirty) {
-            m_val = m_list->get(m_ndx);
-            m_dirty = false;
-        }
+        m_val = m_list->get(m_list->adjust(m_ndx));
         return &m_val;
     }
     reference operator*()
@@ -95,15 +183,13 @@ public:
     }
     ListIterator& operator++()
     {
-        m_ndx++;
-        m_dirty = true;
+        m_ndx = m_list->incr(m_ndx);
         return *this;
     }
     ListIterator operator++(int)
     {
         ListIterator tmp(*this);
-        ++m_ndx;
-        m_dirty = true;
+        operator++();
         return tmp;
     }
 
@@ -118,10 +204,10 @@ public:
     }
 
 private:
+    friend class List<T>;
     T m_val;
     const ConstListIf<T>* m_list;
     size_t m_ndx;
-    bool m_dirty = true;
 };
 
 /// This class defines the interface to ConstList, except for the constructor
@@ -148,6 +234,9 @@ public:
     }
     T get(size_t ndx) const
     {
+        if (ndx >= m_leaf->size()) {
+            throw std::out_of_range("Index out of range");
+        }
         return m_leaf->get(ndx);
     }
     T operator[](size_t ndx) const
@@ -160,7 +249,7 @@ public:
     }
     ListIterator<T> end() const
     {
-        return ListIterator<T>(this, size());
+        return ListIterator<T>(this, size() + m_deleted.size());
     }
 
 protected:
@@ -270,12 +359,21 @@ public:
     }
     void insert(size_t ndx, T value)
     {
+        if (ndx > m_leaf->size()) {
+            throw std::out_of_range("Index out of range");
+        }
         m_leaf->insert(ndx, value);
+    }
+    T remove(ListIterator<T>& it)
+    {
+        return remove(ConstListBase::adjust(it.m_ndx));
     }
     T remove(size_t ndx)
     {
         T ret = m_leaf->get(ndx);
         m_leaf->erase(ndx);
+        ConstListBase::adj_remove(ndx);
+
         return ret;
     }
     void remove(size_t from, size_t to) override
@@ -288,9 +386,9 @@ public:
     {
         if (from != to) {
             T tmp = get(from);
-            int incr = (from < to) ? 1 : -1;
+            int adj = (from < to) ? 1 : -1;
             while (from != to) {
-                size_t neighbour = from + incr;
+                size_t neighbour = from + adj;
                 set(from, get(neighbour));
                 from = neighbour;
             }
@@ -311,7 +409,7 @@ public:
         m_leaf->truncate_and_destroy_children(0);
     }
 
-private:
+protected:
     Obj m_obj;
     void update_if_needed()
     {
@@ -320,6 +418,112 @@ private:
         }
     }
 };
+
+template <>
+void List<Key>::add(Key target_key);
+
+template <>
+Key List<Key>::set(size_t ndx, Key target_key);
+
+template <>
+void List<Key>::insert(size_t ndx, Key target_key);
+
+template <>
+Key List<Key>::remove(size_t ndx);
+
+template <>
+void List<Key>::clear();
+
+class ConstLinkListIf : public ConstListIf<Key> {
+public:
+    // Getting links
+    ConstObj operator[](size_t link_ndx) const
+    {
+        return get(link_ndx);
+    }
+    ConstObj get(size_t link_ndx) const;
+
+protected:
+    ConstLinkListIf(size_t col_ndx, Allocator& alloc)
+        : ConstListIf<Key>(col_ndx, alloc)
+    {
+    }
+};
+
+class ConstLinkList : public ConstLinkListIf {
+public:
+    ConstLinkList(const ConstObj& obj, size_t col_ndx)
+        : ConstLinkListIf(col_ndx, obj.get_alloc())
+        , m_obj(obj)
+    {
+        this->set_obj(&m_obj);
+        this->init_from_parent();
+    }
+    void update_child_ref(size_t, ref_type) override
+    {
+    }
+
+private:
+    ConstObj m_obj;
+};
+
+class LinkList : public List<Key> {
+public:
+    LinkList(Obj& owner, size_t col_ndx)
+        : List<Key>(owner, col_ndx)
+    {
+    }
+    // Getting links
+    Obj operator[](size_t link_ndx)
+    {
+        return get(link_ndx);
+    }
+    Obj get(size_t link_ndx);
+};
+
+template <typename U>
+ConstList<U> ConstObj::get_list(size_t col_ndx) const
+{
+    return ConstList<U>(*this, col_ndx);
+}
+
+template <typename U>
+ConstListPtr<U> ConstObj::get_list_ptr(size_t col_ndx) const
+{
+    return std::make_unique<ConstList<U>>(*this, col_ndx);
+}
+
+template <typename U>
+List<U> Obj::get_list(size_t col_ndx)
+{
+    return List<U>(*this, col_ndx);
+}
+
+template <typename U>
+ListPtr<U> Obj::get_list_ptr(size_t col_ndx)
+{
+    return std::make_unique<List<U>>(*this, col_ndx);
+}
+
+inline ConstLinkList ConstObj::get_linklist(size_t col_ndx)
+{
+    return ConstLinkList(*this, col_ndx);
+}
+
+inline ConstLinkListPtr ConstObj::get_linklist_ptr(size_t col_ndx)
+{
+    return std::make_unique<ConstLinkList>(*this, col_ndx);
+}
+
+inline LinkList Obj::get_linklist(size_t col_ndx)
+{
+    return LinkList(*this, col_ndx);
+}
+
+inline LinkListPtr Obj::get_linklist_ptr(size_t col_ndx)
+{
+    return std::make_unique<LinkList>(*this, col_ndx);
+}
 }
 
 #endif /* REALM_LIST_HPP */
