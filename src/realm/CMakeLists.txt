@@ -250,8 +250,8 @@ endif()
 target_link_libraries(Core
     PUBLIC
         Threads::Threads
-        $<$<CXX_COMPILER_ID:MSVC>:ShaWin32>
-        $<$<CXX_COMPILER_ID:MSVC>:GetOptWin32>
+        $<$<CXX_COMPILER_ID:MSVC>:Realm::ShaWin32>
+        $<$<CXX_COMPILER_ID:MSVC>:Realm::GetOptWin32>
         $<$<BOOL:${ANDROID}>:atomic>
         $<$<BOOL:${ANDROID}>:log>
         $<$<BOOL:${ANDROID}>:android>

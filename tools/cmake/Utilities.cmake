@@ -82,5 +82,5 @@ macro(get_package_file_name _PACKAGE_NAME _PACKAGE_VERSION)
         "${_PACKAGE_NAME}-${CMAKE_BUILD_TYPE}-${_PACKAGE_VERSION}-${REALM_OS}"
     )
     set("${_PACKAGE_NAME}_URL_PATH"
-        "${_PACKAGE_VERSION}/${REALM_OS}")
+        "${_PACKAGE_VERSION}")
 endmacro()
