@@ -68,6 +68,22 @@ public:
      */
     virtual size_t size() const = 0;
     virtual bool is_null() const = 0;
+    Key get_key() const
+    {
+        return m_const_obj->get_key();
+    }
+    bool is_valid() const
+    {
+        return m_const_obj->is_valid();
+    }
+    const Table* get_table() const
+    {
+        return m_const_obj->get_table();
+    }
+    size_t get_col_ndx() const
+    {
+        return m_col_ndx;
+    }
 
 protected:
     template <class>

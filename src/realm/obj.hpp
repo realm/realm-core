@@ -47,8 +47,13 @@ using ConstLinkListPtr = std::unique_ptr<ConstLinkList>;
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class ConstObj {
 public:
+    ConstObj()
+        : m_tree_top(nullptr)
+        , m_row_ndx(size_t(-1))
+        , m_version(-1)
+    {
+    }
     ConstObj(const ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx);
-    ConstObj& operator=(const ConstObj&) = delete;
 
     Allocator& get_alloc() const;
 
@@ -62,7 +67,7 @@ public:
     const Table* get_table() const;
 
     // Check if the object is still alive
-    bool is_valid();
+    bool is_valid() const;
     // Delete object from table. Object is invalid afterwards.
     void remove();
 
@@ -112,6 +117,7 @@ protected:
     mutable MemRef m_mem;
     mutable size_t m_row_ndx;
     mutable uint64_t m_version;
+
     bool update_if_needed() const;
     void update(ConstObj other) const
     {
@@ -131,6 +137,10 @@ protected:
 
 class Obj : public ConstObj {
 public:
+    Obj()
+        : m_writeable(false)
+    {
+    }
     Obj(ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx);
 
     template <typename U>

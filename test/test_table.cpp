@@ -8562,6 +8562,9 @@ TEST(Table_ListOfPrimitives)
     for (unsigned i = 0; i < timestamp_list.size(); i++) {
         CHECK_EQUAL(timestamp_vector[i], timestamp_list.get(i));
     }
+
+    t->remove_object(Key(7));
+    CHECK_NOT(timestamp_list.is_valid());
 }
 
 TEST(Table_object_merge_nodes)
