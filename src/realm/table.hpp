@@ -694,7 +694,7 @@ public:
     TableView get_sorted_view(SortDescriptor order);
     ConstTableView get_sorted_view(SortDescriptor order) const;
 
-    TableView get_backlink_view(size_t row_ndx, Table* src_table, size_t src_col_ndx);
+    TableView get_backlink_view(Key key, Table* src_table, size_t src_col_ndx);
 
 
     // Pivot / aggregate operation types. Experimental! Please do not document method publicly.

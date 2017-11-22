@@ -30,16 +30,17 @@ enum class ConstSourcePayload { Copy, Stay };
 enum class MutableSourcePayload { Move };
 
 struct RowBaseHandoverPatch;
+struct ObjectHandoverPatch;
 struct TableViewHandoverPatch;
 
 struct TableHandoverPatch {
     TableKey m_table_key;
 };
 
-struct LinkViewHandoverPatch {
+struct LinkListHandoverPatch {
     std::unique_ptr<TableHandoverPatch> m_table;
     size_t m_col_num;
-    size_t m_row_ndx;
+    int64_t m_key_value;
 };
 
 // Base class for handover patches for query nodes. Subclasses are declared in query_engine.hpp.
@@ -52,7 +53,7 @@ using QueryNodeHandoverPatches = std::vector<std::unique_ptr<QueryNodeHandoverPa
 struct QueryHandoverPatch {
     std::unique_ptr<TableHandoverPatch> m_table;
     std::unique_ptr<TableViewHandoverPatch> table_view_data;
-    std::unique_ptr<LinkViewHandoverPatch> link_view_data;
+    std::unique_ptr<LinkListHandoverPatch> link_list_data;
     QueryNodeHandoverPatches m_node_data;
 };
 
@@ -63,20 +64,23 @@ struct DescriptorOrderingHandoverPatch {
 
 struct TableViewHandoverPatch {
     std::unique_ptr<TableHandoverPatch> m_table;
-    std::unique_ptr<RowBaseHandoverPatch> linked_row;
+    std::unique_ptr<ObjectHandoverPatch> linked_obj;
     size_t linked_col;
     bool was_in_sync;
     QueryHandoverPatch query_patch;
-    std::unique_ptr<LinkViewHandoverPatch> linkview_patch;
+    std::unique_ptr<LinkListHandoverPatch> linklist_patch;
     std::unique_ptr<DescriptorOrderingHandoverPatch> descriptors_patch;
 };
-
 
 struct RowBaseHandoverPatch {
     std::unique_ptr<TableHandoverPatch> m_table;
     size_t row_ndx;
 };
 
+struct ObjectHandoverPatch {
+    std::unique_ptr<TableHandoverPatch> m_table;
+    int64_t key_value;
+};
 
 } // end namespace Realm
 

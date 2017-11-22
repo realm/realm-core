@@ -108,7 +108,7 @@ Query::Query(const Query& source)
         // turn `m_source_table_view` into a dangling reference.
         m_source_table_view = source.m_source_table_view;
 
-        m_source_link_view = source.m_source_link_view;
+        m_source_link_view = source.m_source_link_view ? source.m_source_link_view->clone() : LinkListPtr{};
         m_view = source.m_view;
     }
 }
@@ -124,7 +124,7 @@ Query& Query::operator=(const Query& source)
             m_source_table_view = m_owned_source_table_view.get();
             m_view = m_source_table_view;
 
-            m_source_link_view.reset();
+            m_source_link_view = nullptr;
         }
         else {
             // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
@@ -132,7 +132,7 @@ Query& Query::operator=(const Query& source)
             m_source_table_view = source.m_source_table_view;
             m_owned_source_table_view = nullptr;
 
-            m_source_link_view = source.m_source_link_view;
+            m_source_link_view = source.m_source_link_view ? source.m_source_link_view->clone() : LinkListPtr{};
             m_view = source.m_view;
         }
     }
@@ -145,8 +145,6 @@ Query& Query::operator=(Query&&) = default;
 Query::~Query() noexcept = default;
 
 Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
-    : m_table(TableRef())
-    , m_source_link_view(LinkViewRef())
 {
     Table::generate_patch(source.m_table.get(), patch.m_table);
     if (source.m_source_table_view) {
@@ -156,7 +154,7 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
     else {
         patch.table_view_data = nullptr;
     }
-    LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
+    LinkList::generate_patch(source.m_source_link_view.get(), patch.link_list_data);
 
     m_groups.reserve(source.m_groups.size());
     for (const auto& cur_group : source.m_groups) {
@@ -165,8 +163,6 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
 }
 
 Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
-    : m_table(TableRef())
-    , m_source_link_view(LinkViewRef())
 {
     Table::generate_patch(source.m_table.get(), patch.m_table);
     if (source.m_source_table_view) {
@@ -176,7 +172,7 @@ Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
     else {
         patch.table_view_data = nullptr;
     }
-    LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
+    LinkList::generate_patch(source.m_source_link_view.get(), patch.link_list_data);
 
     m_groups.reserve(source.m_groups.size());
     for (const auto& cur_group : source.m_groups) {
@@ -213,7 +209,7 @@ void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
     if (m_source_table_view) {
         m_source_table_view->apply_and_consume_patch(patch.table_view_data, dest_group);
     }
-    m_source_link_view = LinkView::create_from_and_consume_patch(patch.link_view_data, dest_group);
+    m_source_link_view = LinkList::create_from_and_consume_patch(patch.link_list_data, dest_group);
     if (m_source_link_view) {
         // m_view = m_source_link_view.get();   TODO
     }
@@ -1592,7 +1588,7 @@ Query& Query::and_query(Query&& q)
 
         if (q.m_source_link_view) {
             REALM_ASSERT(!m_source_link_view || m_source_link_view == q.m_source_link_view);
-            m_source_link_view = q.m_source_link_view;
+            m_source_link_view = std::move(q.m_source_link_view);
         }
     }
 

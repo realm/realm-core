@@ -19,8 +19,7 @@
 #ifndef REALM_TABLE_VIEW_HPP
 #define REALM_TABLE_VIEW_HPP
 
-#include <realm/column.hpp>
-#include <realm/link_view.hpp>
+#include <realm/sort_descriptor.hpp>
 #include <realm/table.hpp>
 #include <realm/util/features.h>
 #include <realm/obj_list.hpp>
@@ -296,13 +295,13 @@ protected:
 
     void do_sync();
 
-    // The link column that this view contain backlinks for.
-    const BacklinkColumn* m_linked_column = nullptr;
-    // The target row that rows in this view link to.
-    ConstRow m_linked_row;
+    // The source column index that this view contain backlinks for.
+    size_t m_source_column_ndx = npos;
+    // The target object that rows in this view link to.
+    ConstObj m_linked_obj;
 
-    // If this TableView was created from a LinkView, then this reference points to it. Otherwise it's 0
-    mutable ConstLinkViewRef m_linkview_source;
+    // If this TableView was created from a LinkList, then this reference points to it. Otherwise it's 0
+    mutable ConstLinkListPtr m_linklist_source;
 
     // m_distinct_column_source != npos if this view was created from distinct values in a column of m_table.
     size_t m_distinct_column_source = npos;
@@ -328,8 +327,8 @@ protected:
     /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent);
     TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
-    TableViewBase(Table* parent, size_t column, BasicRowExpr<const Table> row);
-    TableViewBase(Table* parent, ConstLinkViewRef link_view);
+    TableViewBase(Table* parent, size_t column, const ConstObj& obj);
+    TableViewBase(Table* parent, ConstLinkListPtr link_list);
 
     enum DistinctViewTag { DistinctView };
     TableViewBase(DistinctViewTag, Table* parent, size_t column_ndx);
@@ -496,7 +495,7 @@ public:
 private:
     TableView(Table& parent);
     TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
-    TableView(Table& parent, ConstLinkViewRef);
+    TableView(Table& parent, ConstLinkListPtr);
 
     TableView(DistinctViewTag, Table& parent, size_t column_ndx);
 
@@ -508,6 +507,7 @@ private:
     friend class Query;
     friend class TableViewBase;
     friend class LinkView;
+    friend class LinkList;
 };
 
 
@@ -598,7 +598,7 @@ inline bool TableViewBase::is_attached() const noexcept
 
 inline bool TableViewBase::is_row_attached(size_t row_ndx) const noexcept
 {
-    return m_key_values.get(row_ndx) != detached_ref;
+    return m_table->is_valid(Key(m_key_values.get(row_ndx)));
 }
 
 inline size_t TableViewBase::num_attached_rows() const noexcept
@@ -628,10 +628,10 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
 {
 }
 
-inline TableViewBase::TableViewBase(Table* parent, size_t column, BasicRowExpr<const Table> row)
-    : ObjList(parent) // Throws
-    , m_linked_column(&parent->get_column_link_base(column).get_backlink_column())
-    , m_linked_row(row)
+inline TableViewBase::TableViewBase(Table* src_table, size_t src_col_ndx, const ConstObj& obj)
+    : ObjList(src_table) // Throws
+    , m_source_column_ndx(src_col_ndx)
+    , m_linked_obj(obj)
     , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
 {
 }
@@ -644,19 +644,19 @@ inline TableViewBase::TableViewBase(DistinctViewTag, Table* parent, size_t colum
     REALM_ASSERT(m_distinct_column_source != npos);
 }
 
-inline TableViewBase::TableViewBase(Table* parent, ConstLinkViewRef link_view)
+inline TableViewBase::TableViewBase(Table* parent, ConstLinkListPtr link_list)
     : ObjList(parent) // Throws
-    , m_linkview_source(std::move(link_view))
+    , m_linklist_source(std::move(link_list))
     , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
 {
-    REALM_ASSERT(m_linkview_source);
+    REALM_ASSERT(m_linklist_source);
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv)
     : ObjList(tv)
-    , m_linked_column(tv.m_linked_column)
-    , m_linked_row(tv.m_linked_row)
-    , m_linkview_source(tv.m_linkview_source)
+    , m_source_column_ndx(tv.m_source_column_ndx)
+    , m_linked_obj(tv.m_linked_obj)
+    , m_linklist_source(tv.m_linklist_source->clone())
     , m_distinct_column_source(tv.m_distinct_column_source)
     , m_descriptor_ordering(std::move(tv.m_descriptor_ordering))
     , m_query(tv.m_query)
@@ -670,9 +670,9 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv)
 
 inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
     : ObjList(std::move(tv))
-    , m_linked_column(tv.m_linked_column)
-    , m_linked_row(tv.m_linked_row)
-    , m_linkview_source(std::move(tv.m_linkview_source))
+    , m_source_column_ndx(tv.m_source_column_ndx)
+    , m_linked_obj(tv.m_linked_obj)
+    , m_linklist_source(std::move(tv.m_linklist_source))
     , m_distinct_column_source(tv.m_distinct_column_source)
     , m_descriptor_ordering(std::move(tv.m_descriptor_ordering))
     , m_query(std::move(tv.m_query))
@@ -698,9 +698,9 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
-    m_linked_column = tv.m_linked_column;
-    m_linked_row = tv.m_linked_row;
-    m_linkview_source = std::move(tv.m_linkview_source);
+    m_source_column_ndx = tv.m_source_column_ndx;
+    m_linked_obj = tv.m_linked_obj;
+    m_linklist_source = std::move(tv.m_linklist_source);
     m_descriptor_ordering = std::move(tv.m_descriptor_ordering);
     m_distinct_column_source = tv.m_distinct_column_source;
 
@@ -725,9 +725,9 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
-    m_linked_column = tv.m_linked_column;
-    m_linked_row = tv.m_linked_row;
-    m_linkview_source = tv.m_linkview_source;
+    m_source_column_ndx = tv.m_source_column_ndx;
+    m_linked_obj = tv.m_linked_obj;
+    m_linklist_source = tv.m_linklist_source ? tv.m_linklist_source->clone() : LinkListPtr{};
     m_descriptor_ordering = tv.m_descriptor_ordering;
     m_distinct_column_source = tv.m_distinct_column_source;
 
@@ -938,8 +938,8 @@ inline TableView::TableView(Table& parent, Query& query, size_t start, size_t en
 {
 }
 
-inline TableView::TableView(Table& parent, ConstLinkViewRef link_view)
-: TableViewBase(&parent, std::move(link_view))
+inline TableView::TableView(Table& parent, ConstLinkListPtr link_list)
+    : TableViewBase(&parent, std::move(link_list))
 {
 }
 

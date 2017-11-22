@@ -406,7 +406,7 @@ private:
     ObjList* m_view = nullptr;
 
     // At most one of these can be non-zero, and if so the non-zero one indicates the restricting view.
-    LinkViewRef m_source_link_view;               // link views are refcounted and shared.
+    LinkListPtr m_source_link_view;               // link views are owned by the query.
     TableViewBase* m_source_table_view = nullptr; // table views are not refcounted, and not owned by the query.
     std::unique_ptr<TableViewBase> m_owned_source_table_view; // <--- except when indicated here
 };

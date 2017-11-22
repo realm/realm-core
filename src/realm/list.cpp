@@ -27,6 +27,7 @@
 #include "realm/array_timestamp.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/table.hpp"
+#include "realm/table_view.hpp"
 #include "realm/group.hpp"
 
 using namespace realm;
@@ -203,6 +204,62 @@ void List<Key>::clear()
     m_leaf->truncate_and_destroy_children(0);
 
     tf::remove_recursive(*origin_table, state); // Throws
+}
+
+TableView LinkList::get_sorted_view(SortDescriptor order) const
+{
+    TableRef target_table = m_obj.get_target_table(m_col_ndx);
+    TableView tv(*target_table, clone());
+    tv.do_sync();
+    tv.sort(std::move(order));
+    return tv;
+}
+
+TableView LinkList::get_sorted_view(size_t column_index, bool ascending) const
+{
+    TableRef target_table = m_obj.get_target_table(m_col_ndx);
+    TableView v = get_sorted_view(SortDescriptor(*target_table, {{column_index}}, {ascending}));
+    return v;
+}
+
+void LinkList::generate_patch(const LinkList* list, std::unique_ptr<LinkListHandoverPatch>& patch)
+{
+    if (list) {
+        if (list->is_valid()) {
+            patch.reset(new LinkListHandoverPatch);
+            Table::generate_patch(list->get_table(), patch->m_table);
+            patch->m_col_num = list->get_col_ndx();
+            patch->m_key_value = list->get_key().value;
+        }
+        else {
+            // if the LinkView has become detached, indicate it by passing
+            // a handover patch with a nullptr in m_table.
+            patch.reset(new LinkListHandoverPatch);
+            patch->m_table = nullptr;
+        }
+    }
+    else
+        patch.reset();
+}
+
+
+LinkListPtr LinkList::create_from_and_consume_patch(std::unique_ptr<LinkListHandoverPatch>& patch, Group& group)
+{
+    if (patch) {
+        if (patch->m_table) {
+            TableRef tr = Table::create_from_and_consume_patch(patch->m_table, group);
+            auto result = tr->get_object(Key(patch->m_key_value)).get_linklist_ptr(patch->m_col_num);
+            patch.reset();
+            return result;
+        }
+        else {
+            // We end up here if we're handing over a detached LinkView.
+            // This is indicated by a patch with a null m_table.
+
+            // TODO: Should we be able to create a detached LinkView
+        }
+    }
+    return {};
 }
 
 #ifdef _WIN32
