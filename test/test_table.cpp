@@ -1486,7 +1486,6 @@ TEST(Table_IndexInteger)
     CHECK_EQUAL(11, tv[5].get_index());
 }
 
-
 TEST(Table_SetIntUnique)
 {
     Table table;
@@ -1892,15 +1891,15 @@ TEST(Table_DistinctDouble)
 */
 
 
-TEST(Table_DistinctDateTime)
+TEST(Table_DistinctTimestamp)
 {
     Table table;
-    table.add_column(type_OldDateTime, "first");
+    table.add_column(type_Timestamp, "first");
     table.add_empty_row(4);
-    table.set_olddatetime(0, 0, OldDateTime(0));
-    table.set_olddatetime(0, 1, OldDateTime(1));
-    table.set_olddatetime(0, 2, OldDateTime(3));
-    table.set_olddatetime(0, 3, OldDateTime(3));
+    table.set_timestamp(0, 0, Timestamp(0, 0));
+    table.set_timestamp(0, 1, Timestamp(1, 0));
+    table.set_timestamp(0, 2, Timestamp(3, 0));
+    table.set_timestamp(0, 3, Timestamp(3, 0));
 
     table.add_search_index(0);
     CHECK(table.has_search_index(0));
@@ -1908,7 +1907,6 @@ TEST(Table_DistinctDateTime)
     TableView view = table.get_distinct_view(0);
     CHECK_EQUAL(3, view.size());
 }
-
 
 TEST(Table_DistinctFromPersistedTable)
 {
