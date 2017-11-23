@@ -22,7 +22,9 @@
 using namespace realm;
 
 TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSourcePayload mode)
-    : m_source_column_ndx(src.m_source_column_ndx)
+    : ObjList(m_table_view_key_values)
+    , m_source_column_ndx(src.m_source_column_ndx)
+    , m_table_view_key_values(Allocator::get_default())
 {
     // move the data payload, but make sure to leave the source array intact or
     // attempts to reuse it for a query rerun will crash (or assert, if lucky)
@@ -31,6 +33,9 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSo
     if (src.m_key_values.is_attached()) {
         m_key_values = std::move(src.m_key_values); // Will leave src.m_key_values detached
         src.m_key_values.create();
+    }
+    else {
+        m_key_values.create();
     }
 
     patch.was_in_sync = src.is_in_sync();
@@ -57,11 +62,16 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSo
 }
 
 TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch, ConstSourcePayload mode)
-    : m_source_column_ndx(src.m_source_column_ndx)
+    : ObjList(m_table_view_key_values)
+    , m_source_column_ndx(src.m_source_column_ndx)
     , m_query(src.m_query, patch.query_patch, mode)
+    , m_table_view_key_values(Allocator::get_default())
 {
     if (mode == ConstSourcePayload::Copy && src.m_key_values.is_attached()) {
         m_key_values = src.m_key_values;
+    }
+    else {
+        m_key_values.create();
     }
 
     if (mode == ConstSourcePayload::Stay)
@@ -676,7 +686,6 @@ void TableViewBase::do_sync()
         else
             m_key_values.create();
 
-        // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();
 

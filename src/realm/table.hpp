@@ -781,10 +781,10 @@ public:
         return Query(*this, tv);
     }
 
-    // Perform queries on a LinkView. The returned Query holds a reference to lv.
-    Query where(const LinkViewRef& lv)
+    // Perform queries on a LinkView. The returned Query holds a reference to ll.
+    Query where(const LinkListPtr& ll)
     {
-        return Query(*this, lv);
+        return Query(*this, ll);
     }
 
     Table& link(size_t link_column);

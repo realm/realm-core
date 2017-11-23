@@ -1326,95 +1326,91 @@ TEST(Link_FirstResultPastRow1000)
     TableView tv = (link_table->column<Link>(0) == data_table->get(0)).find_all();
     CHECK_EQUAL(1, tv.size());
 }
-
+#endif
 
 // Tests queries on a LinkList
 TEST(LinkList_QueryOnLinkList)
 {
     Group group;
 
-    TableRef table1 = group.add_table("table1");
-    TableRef table2 = group.add_table("table2");
+    TableRef target = group.add_table("target");
+    TableRef origin = group.add_table("origin");
 
-    // add some more columns to table1 and table2
-    table1->add_column(type_Int, "col1");
-    table1->add_column(type_String, "str1");
+    // add some more columns to target and origin
+    auto col_int = target->add_column(type_Int, "col1");
+    target->add_column(type_String, "str1");
+    auto col_link2 = origin->add_column_link(type_LinkList, "linklist", *target);
 
     // add some rows
-    table1->add_empty_row();
-    table1->set_int(0, 0, 300);
-    table1->set_string(1, 0, "delta");
+    Key key0 = target->create_object().set_all(300, "delta").get_key();
+    Key key1 = target->create_object().set_all(100, "alfa").get_key();
+    Key key2 = target->create_object().set_all(200, "beta").get_key();
+    Key key4 = target->create_object().set_all(400, "charlie").get_key();
 
-    table1->add_empty_row();
-    table1->set_int(0, 1, 100);
-    table1->set_string(1, 1, "alfa");
 
-    table1->add_empty_row();
-    table1->set_int(0, 2, 200);
-    table1->set_string(1, 2, "beta");
+    Obj obj0 = origin->create_object();
+    Obj obj1 = origin->create_object();
 
-    size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
-
-    table2->add_empty_row();
-    table2->add_empty_row();
-
-    LinkViewRef lvr;
+    LinkListPtr list_ptr;
     TableView tv;
 
-    lvr = table2->get_linklist(col_link2, 0);
-    lvr->clear();
-    lvr->add(0);
-    lvr->add(1);
-    lvr->add(2);
+    list_ptr = obj0.get_linklist_ptr(col_link2);
+    list_ptr->add(key0);
+    list_ptr->add(key1);
+    list_ptr->add(key2);
 
-    // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
+    obj1.get_linklist(col_link2).add(key4);
 
-    // q.m_table = table1
-    // q.m_view = lvr
-    Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
+    // Return all rows of target (the linked-to-table) that match the criteria and is in the LinkList
 
-    // tv.m_table == table1
+    // q.m_table = target
+    // q.m_view = list_ptr
+    Query q = target->where(list_ptr).and_query(target->column<Int>(0) > 100);
+
+    // tv.m_table == target
     tv = q.find_all(); // tv = { 0, 2 }
 
-    TableView tv2 = lvr->get_sorted_view(0);
+    TableView tv2 = list_ptr->get_sorted_view(0);
 
     CHECK_EQUAL(3, tv2.size());
-    CHECK_EQUAL(1, tv2.get_source_ndx(0));
-    CHECK_EQUAL(2, tv2.get_source_ndx(1));
-    CHECK_EQUAL(0, tv2.get_source_ndx(2));
+    CHECK_EQUAL(key1, tv2.get_key(0));
+    CHECK_EQUAL(key2, tv2.get_key(1));
+    CHECK_EQUAL(key0, tv2.get_key(2));
 
     CHECK_EQUAL(2, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
-    CHECK_EQUAL(2, tv.get_source_ndx(1));
+    CHECK_EQUAL(key0, tv.get_key(0));
+    CHECK_EQUAL(key2, tv.get_key(1));
 
     // Should of course work even if nothing has changed
     tv.sync_if_needed();
 
     // Modify the LinkList and see if sync_if_needed takes it in count
-    lvr->remove(2); // bumps version of table2 and only table2
+    list_ptr->remove(2); // bumps version of origin and only origin
     tv.sync_if_needed();
 
     CHECK_EQUAL(1, tv.size()); // fail
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(key0, tv.get_key(0));
 
     // Now test if changes in linked-to table bumps the version of the linked-from table and that
     // the query of 'tv' is re-run
-    table1->set_int(0, 2, 50); // exclude row 2 from tv because of the '> 100' condition in Query
+    target->get_object(key0).set(col_int, 50); // exclude row 0 from tv because of the '> 100' condition in Query
     tv.sync_if_needed();
-    CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.size());
 
     // See if we can keep a LinkView alive for the lifetime of a Query (used by objc lang. binding)
     Query query2;
     {
-        LinkViewRef lvr2 = table2->get_linklist(col_link2, 1);
-        query2 = table1->where(lvr2);
+        LinkListPtr list_ptr2 = obj1.get_linklist_ptr(col_link2);
+        query2 = target->where(list_ptr2);
         // lvr2 goes out of scope now but should be kept alive
     }
-    query2.find_all();
-    query2.find();
+    tv = query2.find_all();
+    CHECK_EQUAL(1, tv.size());
+    Key match = query2.find();
+    CHECK_EQUAL(key4, match);
 }
 
+#ifdef LEGACY_TESTS
 TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
 {
     Group group;

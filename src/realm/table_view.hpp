@@ -322,7 +322,12 @@ protected:
 
     size_t m_num_detached_refs = 0;
     /// Construct null view (no memory allocated).
-    TableViewBase() = default;
+    TableViewBase()
+        : ObjList(m_table_view_key_values)
+        , m_table_view_key_values(Allocator::get_default())
+    {
+    }
+
 
     /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent);
@@ -376,6 +381,7 @@ protected:
     TableViewBase(TableViewBase& source, HandoverPatch& patch, MutableSourcePayload mode);
 
 private:
+    KeyColumn m_table_view_key_values; // We should generally not use this name
     void detach() const noexcept; // may have to remove const
     size_t find_first_integer(size_t column_ndx, int64_t value) const;
     template <class oper>
@@ -602,47 +608,57 @@ inline size_t TableViewBase::find_by_source_ndx(Key key) const noexcept
 
 
 inline TableViewBase::TableViewBase(Table* parent)
-    : ObjList(parent) // Throws
+    : ObjList(m_table_view_key_values, parent) // Throws
     , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+    , m_table_view_key_values(Allocator::get_default())
 {
+    m_table_view_key_values.create();
 }
 
 inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit)
-    : ObjList(parent)
+    : ObjList(m_table_view_key_values, parent)
     , m_query(query)
     , m_start(start)
     , m_end(end)
     , m_limit(limit)
     , m_last_seen_version(outside_version())
+    , m_table_view_key_values(Allocator::get_default())
 {
+    m_table_view_key_values.create();
 }
 
 inline TableViewBase::TableViewBase(Table* src_table, size_t src_col_ndx, const ConstObj& obj)
-    : ObjList(src_table) // Throws
+    : ObjList(m_table_view_key_values, src_table) // Throws
     , m_source_column_ndx(src_col_ndx)
     , m_linked_obj(obj)
     , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+    , m_table_view_key_values(Allocator::get_default())
 {
+    m_table_view_key_values.create();
 }
 
 inline TableViewBase::TableViewBase(DistinctViewTag, Table* parent, size_t column_ndx)
-    : ObjList(parent) // Throws
+    : ObjList(m_table_view_key_values, parent) // Throws
     , m_distinct_column_source(column_ndx)
     , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+    , m_table_view_key_values(Allocator::get_default())
 {
     REALM_ASSERT(m_distinct_column_source != npos);
+    m_table_view_key_values.create();
 }
 
 inline TableViewBase::TableViewBase(Table* parent, ConstLinkListPtr link_list)
-    : ObjList(parent) // Throws
+    : ObjList(m_table_view_key_values, parent) // Throws
     , m_linklist_source(std::move(link_list))
     , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+    , m_table_view_key_values(Allocator::get_default())
 {
     REALM_ASSERT(m_linklist_source);
+    m_table_view_key_values.create();
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv)
-    : ObjList(tv)
+    : ObjList(m_table_view_key_values, tv.m_table.get())
     , m_source_column_ndx(tv.m_source_column_ndx)
     , m_linked_obj(tv.m_linked_obj)
     , m_linklist_source(tv.m_linklist_source->clone())
@@ -654,11 +670,12 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv)
     , m_limit(tv.m_limit)
     , m_last_seen_version(tv.m_last_seen_version)
     , m_num_detached_refs(tv.m_num_detached_refs)
+    , m_table_view_key_values(tv.m_table_view_key_values)
 {
 }
 
 inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
-    : ObjList(std::move(tv))
+    : ObjList(m_table_view_key_values, tv.m_table.get())
     , m_source_column_ndx(tv.m_source_column_ndx)
     , m_linked_obj(tv.m_linked_obj)
     , m_linklist_source(std::move(tv.m_linklist_source))
@@ -673,6 +690,7 @@ inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
     // version number so that we can later trigger a sync if needed.
     m_last_seen_version(tv.m_last_seen_version)
     , m_num_detached_refs(tv.m_num_detached_refs)
+    , m_table_view_key_values(std::move(tv.m_table_view_key_values))
 {
 }
 

@@ -20,6 +20,7 @@
 #define REALM_LIST_HPP
 
 #include <realm/obj.hpp>
+#include <realm/obj_list.hpp>
 #include <realm/array_key.hpp>
 
 namespace realm {
@@ -441,11 +442,13 @@ public:
 
 protected:
     Obj m_obj;
-    void update_if_needed()
+    bool update_if_needed()
     {
         if (m_obj.update_if_needed()) {
             m_leaf->init_from_parent();
+            return true;
         }
+        return false;
     }
     void ensure_writeable()
     {
@@ -510,17 +513,26 @@ private:
     ConstObj m_obj;
 };
 
-class LinkList : public List<Key> {
+class LinkList : public List<Key>, public ObjList {
 public:
     using HandoverPatch = LinkListHandoverPatch;
 
     LinkList(const Obj& owner, size_t col_ndx)
         : List<Key>(owner, col_ndx)
+        , ObjList(*this->m_leaf, &get_target_table())
     {
     }
     LinkListPtr clone() const
     {
         return std::make_unique<LinkList>(m_obj, m_col_ndx);
+    }
+    Table& get_target_table() const
+    {
+        return *m_obj.get_target_table(m_col_ndx);
+    }
+    size_t size() const override
+    {
+        return List<Key>::size();
     }
     // Getting links
     Obj operator[](size_t link_ndx)
@@ -538,6 +550,9 @@ private:
     friend class SharedGroup;
     friend class TableViewBase;
     friend class Query;
+
+    uint_fast64_t sync_if_needed() const override;
+    bool is_in_sync() const override;
 
     static void generate_patch(const LinkList* ref, std::unique_ptr<LinkListHandoverPatch>& patch);
     static LinkListPtr create_from_and_consume_patch(std::unique_ptr<LinkListHandoverPatch>& patch, Group& group);

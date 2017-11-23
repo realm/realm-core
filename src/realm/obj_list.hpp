@@ -31,11 +31,8 @@ class Table;
 
 class ObjList {
 public:
-    ObjList();
-    ObjList(const ObjList& source);
-    ObjList(ObjList&& source);
-    ObjList(Table* parent);
-    ObjList(KeyColumn&& col);
+    ObjList(KeyColumn& key_values);
+    ObjList(KeyColumn& key_values, Table* parent);
 
     virtual ~ObjList()
     {
@@ -72,10 +69,7 @@ public:
 
     // These two methods are overridden by TableView and LinkView.
     virtual uint_fast64_t sync_if_needed() const = 0;
-    virtual bool is_in_sync() const
-    {
-        return true;
-    }
+    virtual bool is_in_sync() const = 0;
     void check_cookie() const
     {
 #ifdef REALM_COOKIE_CHECK
@@ -89,7 +83,7 @@ protected:
 
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
-    KeyColumn m_key_values;
+    KeyColumn& m_key_values;
     uint64_t m_debug_cookie;
 
     void do_sort(const DescriptorOrdering&);

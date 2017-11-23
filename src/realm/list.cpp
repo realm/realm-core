@@ -106,7 +106,7 @@ ConstObj ConstLinkListIf::get(size_t link_ndx) const
 
 Obj LinkList::get(size_t link_ndx)
 {
-    return m_obj.get_target_table(m_col_ndx)->get_object(List<Key>::get(link_ndx));
+    return get_target_table().get_object(List<Key>::get(link_ndx));
 }
 
 template <>
@@ -134,9 +134,9 @@ Key List<Key>::set(size_t ndx, Key target_key)
             auto table = const_cast<Table*>(m_obj.get_table());
             _impl::TableFriend::remove_recursive(*table, state); // Throws
         }
-    }
 
-    m_obj.bump_version();
+        m_obj.bump_version();
+    }
 
     return old_key;
 }
@@ -164,6 +164,7 @@ Key List<Key>::remove(size_t ndx)
 template <>
 void List<Key>::clear()
 {
+    update_if_needed();
     Table* origin_table = const_cast<Table*>(m_obj.get_table());
     const Spec& origin_table_spec = _impl::TableFriend::get_spec(*origin_table);
 
@@ -208,8 +209,7 @@ void List<Key>::clear()
 
 TableView LinkList::get_sorted_view(SortDescriptor order) const
 {
-    TableRef target_table = m_obj.get_target_table(m_col_ndx);
-    TableView tv(*target_table, clone());
+    TableView tv(get_target_table(), clone());
     tv.do_sync();
     tv.sort(std::move(order));
     return tv;
@@ -217,8 +217,7 @@ TableView LinkList::get_sorted_view(SortDescriptor order) const
 
 TableView LinkList::get_sorted_view(size_t column_index, bool ascending) const
 {
-    TableRef target_table = m_obj.get_target_table(m_col_ndx);
-    TableView v = get_sorted_view(SortDescriptor(*target_table, {{column_index}}, {ascending}));
+    TableView v = get_sorted_view(SortDescriptor(get_target_table(), {{column_index}}, {ascending}));
     return v;
 }
 
@@ -237,6 +236,17 @@ void LinkList::remove_all_target_rows()
     }
 }
 
+uint_fast64_t LinkList::sync_if_needed() const
+{
+    const_cast<LinkList*>(this)->update_if_needed();
+    return get_table()->get_version_counter();
+}
+
+bool LinkList::is_in_sync() const
+{
+    return const_cast<LinkList*>(this)->update_if_needed();
+}
+
 void LinkList::generate_patch(const LinkList* list, std::unique_ptr<LinkListHandoverPatch>& patch)
 {
     if (list) {
@@ -244,7 +254,7 @@ void LinkList::generate_patch(const LinkList* list, std::unique_ptr<LinkListHand
             patch.reset(new LinkListHandoverPatch);
             Table::generate_patch(list->get_table(), patch->m_table);
             patch->m_col_num = list->get_col_ndx();
-            patch->m_key_value = list->get_key().value;
+            patch->m_key_value = list->ConstListBase::get_key().value;
         }
         else {
             // if the LinkView has become detached, indicate it by passing

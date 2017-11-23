@@ -107,47 +107,17 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
         m_key_values.add(null_key);
 }
 
-
-ObjList::ObjList()
-    : m_key_values(Allocator::get_default())
+ObjList::ObjList(KeyColumn& key_values)
+    : m_key_values(key_values)
 #ifdef REALM_COOKIE_CHECK
     , m_debug_cookie(cookie_expected)
 #endif
 {
-    m_key_values.create();
 }
 
-ObjList::ObjList(const ObjList& source)
-    : m_table(source.m_table)
-    , m_key_values(source.m_key_values)
-#ifdef REALM_COOKIE_CHECK
-    , m_debug_cookie(source.m_debug_cookie)
-#endif
-{
-}
-
-ObjList::ObjList(ObjList&& source)
-    : m_table(std::move(source.m_table))
-    , m_key_values(std::move(source.m_key_values))
-#ifdef REALM_COOKIE_CHECK
-    , m_debug_cookie(source.m_debug_cookie)
-#endif
-{
-}
-
-
-ObjList::ObjList(Table* parent)
+ObjList::ObjList(KeyColumn& key_values, Table* parent)
     : m_table(parent->get_table_ref())
-    , m_key_values(Allocator::get_default())
-#ifdef REALM_COOKIE_CHECK
-    , m_debug_cookie(cookie_expected)
-#endif
-{
-    m_key_values.create();
-}
-
-ObjList::ObjList(KeyColumn&& col)
-    : m_key_values(std::move(col))
+    , m_key_values(key_values)
 #ifdef REALM_COOKIE_CHECK
     , m_debug_cookie(cookie_expected)
 #endif
