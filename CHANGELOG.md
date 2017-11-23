@@ -1,22 +1,8 @@
-# NEXT RELEASE
+# 4.0.4 Release notes
 
 ### Bugfixes
 
-* Lorem ipsum.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
+* Publish the release version of Android-armeabi-v7a binary.
 
 ----------------------------------------------
 
