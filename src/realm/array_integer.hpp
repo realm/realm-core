@@ -625,7 +625,7 @@ bool ArrayIntNull::find_action_pattern(size_t index, uint64_t pattern, QueryStat
 template <class cond>
 size_t ArrayIntNull::find_first(value_type value, size_t start, size_t end) const
 {
-    QueryState<int64_t> state(act_ReturnFirst, nullptr, 1);
+    QueryState<int64_t> state(act_ReturnFirst, 1);
     if (value) {
         Array::find<cond, act_ReturnFirst>(*value, start, end, 0, &state, Array::CallbackDummy(),
                                            true /*treat as nullable array*/,

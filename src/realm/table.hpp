@@ -974,7 +974,7 @@ private:
     mutable uint_fast64_t m_version;
 
     void erase_row(size_t row_ndx, bool is_move_last_over);
-    void batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over);
+    void batch_erase_rows(const KeyColumn& keys);
     void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_remove_object(Key key);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
@@ -2228,14 +2228,14 @@ public:
         table.set_link_type(column_ndx, link_type); // Throws
     }
 
-    static void erase_row(Table& table, size_t row_ndx, bool is_move_last_over)
+    static void erase_row(Table& table, Key key)
     {
-        table.erase_row(row_ndx, is_move_last_over); // Throws
+        table.remove_object(key); // Throws
     }
 
-    static void batch_erase_rows(Table& table, const IntegerColumn& row_indexes, bool is_move_last_over)
+    static void batch_erase_rows(Table& table, const KeyColumn& keys)
     {
-        table.batch_erase_rows(row_indexes, is_move_last_over); // Throws
+        table.batch_erase_rows(keys); // Throws
     }
 
     static const Table* get_link_target_table_accessor(const Table& table, size_t col_ndx) noexcept

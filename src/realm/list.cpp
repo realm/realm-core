@@ -222,6 +222,21 @@ TableView LinkList::get_sorted_view(size_t column_index, bool ascending) const
     return v;
 }
 
+void LinkList::remove_target_row(size_t link_ndx)
+{
+    // Deleting the object will automatically remove all links
+    // to it. So we do not have to manually remove the deleted link
+    get(link_ndx).remove();
+}
+
+void LinkList::remove_all_target_rows()
+{
+    if (is_valid()) {
+        auto table = const_cast<Table*>(get_table());
+        _impl::TableFriend::batch_erase_rows(*table, *this->m_leaf);
+    }
+}
+
 void LinkList::generate_patch(const LinkList* list, std::unique_ptr<LinkListHandoverPatch>& patch)
 {
     if (list) {

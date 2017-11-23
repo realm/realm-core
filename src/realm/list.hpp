@@ -531,6 +531,8 @@ public:
 
     TableView get_sorted_view(SortDescriptor order) const;
     TableView get_sorted_view(size_t column_index, bool ascending = true) const;
+    void remove_target_row(size_t link_ndx);
+    void remove_all_target_rows();
 
 private:
     friend class SharedGroup;

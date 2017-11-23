@@ -154,6 +154,10 @@ namespace realm {
 
 class TableViewBase : public ObjList {
 public:
+    ~TableViewBase()
+    {
+        m_key_values.destroy(); // Shallow
+    }
     // - not in use / implemented yet:   ... explicit calls to sync_if_needed() must be used
     //                                       to get 'reflective' mode.
     //    enum mode { mode_Reflective, mode_Imperative };
@@ -219,10 +223,6 @@ public:
     Timestamp minimum_timestamp(size_t column_ndx, Key* return_key = nullptr) const;
     Timestamp maximum_timestamp(size_t column_ndx, Key* return_key = nullptr) const;
     size_t count_timestamp(size_t column_ndx, Timestamp target) const;
-
-    // Simple pivot aggregate method. Experimental! Please do not
-    // document method publicly.
-    void aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const;
 
     /// Search this view for the specified key. If found, the index of that row
     /// within this view is returned, otherwise `realm::not_found` is returned.
@@ -432,24 +432,13 @@ public:
     /// underlying table.
     ///
     /// When rows are removed from the underlying table, they will by necessity
-    /// also be removed from the table view.
+    /// also be removed from the table view. The order of the remaining rows in
+    /// the the table view will be maintained.
     ///
-    /// The order of the remaining rows in the the table view will be maintained
-    /// regardless of the value passed for \a underlying_mode.
-    ///
-    /// \param row_ndx The index within this table view of the row to be
-    /// removed.
-    ///
-    /// \param underlying_mode If set to RemoveMode::ordered (the default), the
-    /// rows will be removed from the underlying table in a way that maintains
-    /// the order of the remaining rows in the underlying table. If set to
-    /// RemoveMode::unordered, the order of the remaining rows in the underlying
-    /// table will not in general be maintaind, but the operation will generally
-    /// be much faster. In any case, the order of remaining rows in the table
-    /// view will not be affected.
-    void remove(size_t row_ndx, RemoveMode underlying_mode = RemoveMode::ordered);
-    void remove_last(RemoveMode underlying_mode = RemoveMode::ordered);
-    void clear(RemoveMode underlying_mode = RemoveMode::ordered);
+    /// \param row_ndx The index within this table view of the row to be removed.
+    void remove(size_t row_ndx);
+    void remove_last();
+    void clear();
     //@}
 
     // Searching (Int and String)
@@ -588,7 +577,7 @@ inline const Query& TableViewBase::get_query() const noexcept
 
 inline bool TableViewBase::is_empty() const noexcept
 {
-    return m_key_values.is_empty();
+    return m_key_values.size() == 0;
 }
 
 inline bool TableViewBase::is_attached() const noexcept
@@ -608,7 +597,7 @@ inline size_t TableViewBase::num_attached_rows() const noexcept
 
 inline size_t TableViewBase::find_by_source_ndx(Key key) const noexcept
 {
-    return m_key_values.find_first(key.value);
+    return m_key_values.find_first(key, 0, m_key_values.size());
 }
 
 
@@ -691,7 +680,7 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
 {
     m_table = std::move(tv.m_table);
 
-    m_key_values.move_assign(tv.m_key_values);
+    m_key_values = std::move(tv.m_key_values);
     m_query = std::move(tv.m_query);
     m_num_detached_refs = tv.m_num_detached_refs;
     m_last_seen_version = tv.m_last_seen_version;
@@ -712,12 +701,7 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     if (this == &tv)
         return *this;
 
-    Allocator& alloc = m_key_values.get_alloc();
-    MemRef mem = tv.m_key_values.get_root_array()->clone_deep(alloc); // Throws
-    _impl::DeepArrayRefDestroyGuard ref_guard(mem.get_ref(), alloc);
-    m_key_values.destroy();
-    m_key_values.get_root_array()->init_from_mem(mem);
-    ref_guard.release();
+    m_key_values = tv.m_key_values;
 
     m_query = tv.m_query;
     m_num_detached_refs = tv.m_num_detached_refs;
@@ -907,10 +891,10 @@ inline ConstTableView::ConstTableView(TableView&& tv)
 {
 }
 
-inline void TableView::remove_last(RemoveMode underlying_mode)
+inline void TableView::remove_last()
 {
     if (!is_empty())
-        remove(size() - 1, underlying_mode);
+        remove(size() - 1);
 }
 
 inline Table& TableView::get_parent() noexcept

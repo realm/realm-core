@@ -24,16 +24,13 @@ using namespace realm;
 TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSourcePayload mode)
     : m_source_column_ndx(src.m_source_column_ndx)
 {
-    REALM_ASSERT(&src.m_key_values.get_alloc() == &Allocator::get_default());
-
     // move the data payload, but make sure to leave the source array intact or
     // attempts to reuse it for a query rerun will crash (or assert, if lucky)
     // There really *has* to be a way where we don't need to first create an empty
     // array, and then destroy it
     if (src.m_key_values.is_attached()) {
-        m_key_values.detach();
-        m_key_values.init_from_mem(Allocator::get_default(), src.m_key_values.get_mem());
-        src.m_key_values.init_from_ref(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()));
+        m_key_values = std::move(src.m_key_values); // Will leave src.m_key_values detached
+        src.m_key_values.create();
     }
 
     patch.was_in_sync = src.is_in_sync();
@@ -63,11 +60,8 @@ TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch, Con
     : m_source_column_ndx(src.m_source_column_ndx)
     , m_query(src.m_query, patch.query_patch, mode)
 {
-    REALM_ASSERT(&src.m_key_values.get_alloc() == &Allocator::get_default());
-
     if (mode == ConstSourcePayload::Copy && src.m_key_values.is_attached()) {
-        MemRef mem = src.m_key_values.clone_deep(Allocator::get_default());
-        m_key_values.init_from_mem(Allocator::get_default(), mem);
+        m_key_values = src.m_key_values;
     }
 
     if (mode == ConstSourcePayload::Stay)
@@ -415,8 +409,8 @@ size_t TableViewBase::count_timestamp(size_t column_ndx, Timestamp target) const
     size_t count = 0;
     for (size_t t = 0; t < size(); t++) {
         try {
-            int64_t signed_row_ndx = m_key_values.get(t);
-            Obj obj = m_table->get_object(Key(signed_row_ndx));
+            Key key = m_key_values.get(t);
+            Obj obj = m_table->get_object(key);
             auto ts = obj.get<Timestamp>(column_ndx);
             realm::Equal e;
             if (e(ts, target, ts.is_null(), target.is_null())) {
@@ -428,12 +422,6 @@ size_t TableViewBase::count_timestamp(size_t column_ndx, Timestamp target) const
         }
     }
     return count;
-}
-
-// Simple pivot aggregate method. Experimental! Please do not document method publicly.
-void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const
-{
-    m_table->aggregate(group_by_column, aggr_column, op, result, &m_key_values);
 }
 
 void TableViewBase::to_json(std::ostream& out) const
@@ -569,22 +557,21 @@ uint_fast64_t TableViewBase::sync_if_needed() const
 }
 
 
-void TableView::remove(size_t row_ndx, RemoveMode underlying_mode)
+void TableView::remove(size_t row_ndx)
 {
     REALM_ASSERT(m_table);
     REALM_ASSERT(row_ndx < m_key_values.size());
 
     bool sync_to_keep = m_last_seen_version == outside_version();
 
-    size_t origin_row_ndx = size_t(m_key_values.get(row_ndx));
+    Key key = m_key_values.get(row_ndx);
 
     // Update refs
     m_key_values.erase(row_ndx);
 
     // Delete row in origin table
     using tf = _impl::TableFriend;
-    bool is_move_last_over = (underlying_mode == RemoveMode::unordered);
-    tf::erase_row(*m_table, origin_row_ndx, is_move_last_over); // Throws
+    tf::erase_row(*m_table, key); // Throws
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
@@ -597,18 +584,13 @@ void TableView::remove(size_t row_ndx, RemoveMode underlying_mode)
 }
 
 
-void TableView::clear(RemoveMode underlying_mode)
+void TableView::clear()
 {
     REALM_ASSERT(m_table);
 
     bool sync_to_keep = m_last_seen_version == outside_version();
 
-    // Temporarily unregister this view so that it's not pointlessly updated
-    // for the row removals
-    using tf = _impl::TableFriend;
-
-    bool is_move_last_over = (underlying_mode == RemoveMode::unordered);
-    tf::batch_erase_rows(*m_table, m_key_values, is_move_last_over); // Throws
+    _impl::TableFriend::batch_erase_rows(*m_table, m_key_values); // Throws
 
     m_key_values.clear();
     m_num_detached_refs = 0;
@@ -664,13 +646,13 @@ void TableViewBase::do_sync()
     if (m_linklist_source) {
         m_key_values.clear();
         std::for_each(m_linklist_source->begin(), m_linklist_source->end(),
-                      [this](Key key) { m_key_values.add(key.value); });
+                      [this](Key key) { m_key_values.add(key); });
     }
     else if (m_distinct_column_source != npos) {
         m_key_values.clear();
         REALM_ASSERT(m_table->has_search_index(m_distinct_column_source));
-        const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
-        col.get_search_index()->distinct(m_key_values);
+        // const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
+        // col.get_search_index()->distinct(m_key_values);  TODO: enable when searchindex is supported
     }
     else if (m_source_column_ndx != npos) {
         m_key_values.clear();
@@ -682,7 +664,7 @@ void TableViewBase::do_sync()
 
             size_t backlink_count = m_linked_obj.get_backlink_count(backlink_col_ndx);
             for (size_t i = 0; i < backlink_count; i++)
-                m_key_values.add(m_linked_obj.get_backlink(backlink_col_ndx, i).value);
+                m_key_values.add(m_linked_obj.get_backlink(backlink_col_ndx, i));
         }
     }
     else {
@@ -692,7 +674,7 @@ void TableViewBase::do_sync()
         if (m_key_values.is_attached())
             m_key_values.clear();
         else
-            m_key_values.init_from_ref(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()));
+            m_key_values.create();
 
         // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
         if (m_query.m_view)

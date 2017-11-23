@@ -1257,15 +1257,15 @@ void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit)
         for (size_t t = 0; t < m_view->size() && ret.size() < limit; t++) {
             ConstObj obj = m_view->get(t);
             if (t >= begin && t < end && eval_object(obj)) {
-                ret.m_key_values.add(obj.get_key().value);
+                ret.m_key_values.add(obj.get_key());
             }
         }
     }
     else {
         if (!has_conditions()) {
-            IntegerColumn& refs = ret.m_key_values;
+            KeyColumn& refs = ret.m_key_values;
             for (auto o : *m_table) {
-                refs.add(o.get_key().value);
+                refs.add(o.get_key());
             }
         }
         else {

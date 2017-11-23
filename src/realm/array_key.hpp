@@ -21,6 +21,7 @@
 
 #include <realm/array.hpp>
 #include <realm/cluster.hpp>
+#include <realm/impl/destroy_guard.hpp>
 
 namespace realm {
 
@@ -28,13 +29,58 @@ class ArrayKey : public ArrayPayload, private Array {
 public:
     using value_type = Key;
 
-    using Array::Array;
     using Array::set_parent;
+    using Array::is_attached;
     using Array::init_from_parent;
     using Array::update_parent;
     using Array::get_ref;
     using Array::size;
     using Array::erase;
+    using Array::clear;
+    using Array::destroy;
+
+    ArrayKey(Allocator& alloc)
+        : Array(alloc)
+    {
+    }
+
+    ArrayKey(const ArrayKey& other)
+        : Array(other.get_alloc())
+    {
+        *this = other;
+    }
+
+    ArrayKey(ArrayKey&& other)
+        : Array(other.get_alloc())
+    {
+        *this = std::move(other);
+    }
+
+    ArrayKey& operator=(ArrayKey&& other)
+    {
+        // Moving elements is only allowed between freestanding arrays
+        REALM_ASSERT(&other.get_alloc() == &Allocator::get_default());
+        REALM_ASSERT(&other.get_alloc() == &get_alloc());
+        destroy();
+        init_from_mem(other.get_mem());
+        other.detach();
+        return *this;
+    }
+
+    ArrayKey& operator=(const ArrayKey& other)
+    {
+        // Copying elements is only allowed between freestanding arrays
+        REALM_ASSERT(&other.get_alloc() == &Allocator::get_default());
+        REALM_ASSERT(&other.get_alloc() == &get_alloc());
+        Allocator& alloc = get_alloc();
+        MemRef mem = other.clone_deep(alloc); // Throws
+        _impl::DeepArrayRefDestroyGuard ref_guard(mem.get_ref(), alloc);
+        destroy();
+        init_from_mem(mem);
+        ref_guard.release();
+
+        return *this;
+    }
 
     static Key default_value(bool)
     {

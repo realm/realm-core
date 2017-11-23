@@ -203,32 +203,6 @@ void LinkView::sort(SortDescriptor&& order)
     do_sort(ordering);
 }
 
-void LinkView::remove_target_row(size_t link_ndx)
-{
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
-
-    size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
-    Table& target_table = get_target_table();
-
-    // Deleting the target row will automatically remove all links
-    // to it. So we do not have to manually remove the deleted link
-    target_table.move_last_over(target_row_ndx);
-}
-
-
-void LinkView::remove_all_target_rows()
-{
-    REALM_ASSERT(is_attached());
-
-    if (m_row_indexes.is_attached()) {
-        Table& target_table = get_target_table();
-        bool is_move_last_over = true;
-        target_table.batch_erase_rows(m_row_indexes, is_move_last_over);
-    }
-}
-
-
 void LinkView::do_nullify_link(size_t old_target_row_ndx)
 {
     REALM_ASSERT(m_row_indexes.is_attached());
