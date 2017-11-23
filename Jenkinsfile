@@ -229,6 +229,9 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                             }
                             stash includes:"${buildDir}/realm-*.tar.gz", name:stashName
                             androidStashes << stashName
+                            if (gitTag) {
+                                publishingStashes << stashName
+                            }
                             try {
                                 sh '''
                                    cd $(find . -type d -maxdepth 1 -name build-android*)

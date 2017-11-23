@@ -798,10 +798,11 @@ TEST(Metrics_TransactionTimings)
         }
     }
     // give a margin of 100ms for transactions
+    // this is causing sporadic CI failures so best not to assume any upper bound
     CHECK_GREATER(transactions->at(2).get_transaction_time(), 0.060);
-    CHECK_LESS(transactions->at(2).get_transaction_time(), 0.160);
+    //CHECK_LESS(transactions->at(2).get_transaction_time(), 0.160);
     CHECK_GREATER(transactions->at(3).get_transaction_time(), 0.080);
-    CHECK_LESS(transactions->at(3).get_transaction_time(), 0.180);
+    //CHECK_LESS(transactions->at(3).get_transaction_time(), 0.180);
 }
 
 
