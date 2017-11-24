@@ -157,6 +157,12 @@ private:
     template <class Head, class... Tail>
     Obj& _set(size_t col_ndx, Head v, Tail... tail);
     bool update_if_needed() const;
+    bool is_writeable() const
+    {
+        return m_writeable;
+    }
+    void ensure_writeable();
+    void bump_version();
     template <class T>
     void do_set_null(size_t col_ndx);
 

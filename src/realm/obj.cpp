@@ -213,13 +213,20 @@ bool Obj::update_if_needed() const
     if (updated) {
         m_writeable = !m_tree_top->get_alloc().is_read_only(m_mem.get_ref());
     }
+    return updated;
+}
+
+void Obj::ensure_writeable()
+{
     if (!m_writeable) {
         m_mem = const_cast<ClusterTree*>(m_tree_top)->ensure_writeable(m_key);
         m_writeable = true;
     }
-    m_version = const_cast<ClusterTree*>(m_tree_top)->bump_version();
+}
 
-    return updated;
+void Obj::bump_version()
+{
+    m_version = const_cast<ClusterTree*>(m_tree_top)->bump_version();
 }
 
 template <>
@@ -229,6 +236,7 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
         throw LogicError(LogicError::column_index_out_of_range);
 
     update_if_needed();
+    ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
@@ -250,6 +258,8 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
     }
 
+    bump_version();
+
     return *this;
 }
 
@@ -264,6 +274,7 @@ Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
     }
 
     update_if_needed();
+    ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
@@ -295,6 +306,8 @@ Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
                   is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
     }
 
+    bump_version();
+
     return *this;
 }
 
@@ -305,6 +318,7 @@ Obj& Obj::set(size_t col_ndx, T value, bool is_default)
         throw LogicError(LogicError::column_index_out_of_range);
 
     update_if_needed();
+    ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
@@ -319,11 +333,16 @@ Obj& Obj::set(size_t col_ndx, T value, bool is_default)
         repl->set<T>(m_tree_top->get_owner(), col_ndx, m_row_ndx, value,
                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
+    bump_version();
+
     return *this;
 }
 
 void Obj::set_int(size_t col_ndx, int64_t value)
 {
+    update_if_needed();
+    ensure_writeable();
+
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
     fields.init_from_mem(m_mem);
@@ -332,6 +351,8 @@ void Obj::set_int(size_t col_ndx, int64_t value)
     values.set_parent(&fields, col_ndx + 1);
     values.init_from_parent();
     values.set(m_row_ndx, value);
+
+    bump_version();
 }
 
 void Obj::add_backlink(size_t backlink_col, Key origin_key)

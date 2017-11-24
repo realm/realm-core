@@ -2070,9 +2070,13 @@ TEST(Query_ListOfPrimitives)
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
 
-    q = baa->link(1).column<List<Int>>(0).average() >= 2.0;
+    q = baa->link(1).column<List<Int>>(0).average() >= 3.0;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
+    table->get_object(keys[1]).get_list<Int>(col_int_list).set(3, -10); // {2, 3, 4, -10}
+    // Now, one less object will have average bigger than 3
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 1);
 }
 
 #ifdef LEGACY_TESTS
