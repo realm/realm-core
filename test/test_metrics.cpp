@@ -550,7 +550,7 @@ TEST(Metrics_LinkQueries)
 }
 
 
-ONLY(Metrics_LinkListQueries)
+TEST(Metrics_LinkListQueries)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));

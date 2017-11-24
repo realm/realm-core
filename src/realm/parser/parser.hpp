@@ -23,7 +23,6 @@
 #include <string>
 
 namespace realm {
-class Schema;
 
 namespace parser {
 struct Expression

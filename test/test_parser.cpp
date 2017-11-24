@@ -56,6 +56,7 @@
 #include <realm/history.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/parser/parser.hpp>
+#include <realm/parser/query_builder.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/replication.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
@@ -222,20 +223,83 @@ static std::vector<std::string> invalid_queries = {
 
 TEST(Parser_valid_queries) {
     for (auto& query : valid_queries) {
-        std::cout << "query: " << query;
+        std::cout << "query: " << query << std::endl;
         realm::parser::parse(query);
     }
 }
 
 TEST(Parser_invalid_queries) {
     for (auto& query : invalid_queries) {
-        std::cout << "query: " << query;
+        std::cout << "query: " << query << std::endl;
         CHECK_THROW_ANY(realm::parser::parse(query));
     }
 }
 
 #if REALM_METRICS
 
+struct temp_hax
+{
+    template<typename T>
+    T unbox(std::string value) {
+        return T{}; //dummy
+    }
+    bool is_null(std::string) {
+        return false;
+    }
+};
+
+ONLY(Parser_basic_serialisation)
+{
+    Group g;
+    TableRef t = g.add_table("person");
+    size_t int_col_ndx = t->add_column(type_Int, "age");
+    size_t str_col_ndx = t->add_column(type_String, "name");
+    size_t double_col_ndx = t->add_column(type_Double, "fees");
+    size_t link_col_ndx = t->add_column_link(type_Link, "buddy", *t);
+    t->add_empty_row(5);
+    std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
+    std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
+
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(int_col_ndx, i, i);
+        t->set_string(str_col_ndx, i, names[i]);
+        t->set_double(double_col_ndx, i, fees[i]);
+    }
+    t->set_link(link_col_ndx, 0, 1);
+
+    auto verify_query = [&](TableRef t, std::string query, size_t num_results) {
+        Query q = t->where();
+
+        realm::parser::Predicate p = realm::parser::parse(query);
+
+        temp_hax h;
+        std::string s;
+        realm::query_builder::ArgumentConverter<std::string, temp_hax> args(h, &s, 0);
+        realm::query_builder::apply_predicate(q, p, args, "");
+
+        //parser->parse(query, q, parser_log);
+        CHECK_EQUAL(q.count(), num_results);
+        std::string description = q.get_description();
+        std::cerr << "original: " << query << "\tdescribed: " << description << "\n";
+        Query q2 = t->where();
+
+        realm::parser::Predicate p2 = realm::parser::parse(description);
+        realm::query_builder::apply_predicate(q2, p2, args, "");
+
+        CHECK_EQUAL(q2.count(), num_results);
+    };
+
+    Query q = t->where();
+    verify_query(t, "age > 2", 2);
+    verify_query(t, "!(age >= 2)", 2);
+    verify_query(t, "3 <= age", 2);
+    verify_query(t, "age > 2 and age < 4", 1);
+    verify_query(t, "age = 1 || age == 3", 2);
+    verify_query(t, "fees != 2.22 && fees > 2.2", 3);
+    verify_query(t, "name = \"Joe\"", 1);
+    verify_query(t, "buddy.age > 0", 1);
+
+}
 
 #endif // REALM_METRICS
 

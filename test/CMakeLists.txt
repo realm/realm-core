@@ -42,6 +42,7 @@ set(NORMAL_TESTS
     test_links.cpp
     test_metrics.cpp
     test_optional.cpp
+    test_parser.cpp
     test_priority_queue.cpp
     test_query.cpp
     test_replication.cpp

@@ -27,11 +27,11 @@
 #include <realm/null.hpp>
 #include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
+#include <realm/table.hpp>
 
 namespace realm {
 class Query;
 class Realm;
-class Schema;
 class Table;
 template<typename> class BasicRowExpr;
 using RowExpr = BasicRowExpr<Table>;
@@ -44,8 +44,7 @@ namespace query_builder {
 class Arguments;
 
 void apply_predicate(Query& query, const parser::Predicate& predicate,
-                     Arguments& arguments, const Schema& schema,
-                     const std::string& objectType);
+                     Arguments& arguments, const std::string& objectType);
 
 class Arguments {
 public:

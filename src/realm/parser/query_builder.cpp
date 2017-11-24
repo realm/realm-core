@@ -18,13 +18,7 @@
 
 #include "query_builder.hpp"
 
-#include "feature_checks.hpp"
-#include "object_schema.hpp"
-#include "object_store.hpp"
 #include "parser.hpp"
-#include "schema.hpp"
-#include "util/compiler.hpp"
-#include "util/format.hpp"
 
 #include <realm.hpp>
 #include <realm/query_expression.hpp>
@@ -96,26 +90,31 @@ KeyPath key_path_from_string(const std::string &s) {
 
 struct PropertyExpression
 {
-    const Property *prop = nullptr;
     std::vector<size_t> indexes;
     std::function<Table *()> table_getter;
+    size_t col_ndx;
+    DataType col_type;
 
-    PropertyExpression(Query &query, const Schema &schema, Schema::const_iterator desc, const std::string &key_path_string)
+    PropertyExpression(Query &query, const std::string &key_path_string)
     {
         KeyPath key_path = key_path_from_string(key_path_string);
+        TableRef cur_table = query.get_table();;
         for (size_t index = 0; index < key_path.size(); index++) {
-            if (prop) {
-                precondition(prop->type == PropertyType::Object,
-                             util::format("Property '%1' is not a link in object of type '%2'", key_path[index], desc->name));
-                indexes.push_back(prop->table_column);
+            size_t cur_col_ndx = cur_table->get_column_index(key_path[index]);
+            StringData table_name = cur_table->get_name();
 
+            precondition(cur_col_ndx != realm::not_found,
+                         util::format("No property '%1' on object of type '%2'", key_path[index], table_name));
+
+            DataType cur_col_type = cur_table->get_column_type(cur_col_ndx);
+            if (index != key_path.size() - 1) {
+                precondition(cur_col_type == type_Link,
+                             util::format("Property '%1' is not a link in object of type '%2'", key_path[index], table_name));
+                indexes.push_back(cur_col_ndx);
             }
-            prop = desc->property_for_name(key_path[index]);
-            precondition(prop != nullptr,
-                         util::format("No property '%1' on object of type '%2'", key_path[index], desc->name));
-
-            if (prop->object_type.size()) {
-                desc = schema.find(prop->object_type);
+            else {
+                col_ndx = cur_col_ndx;
+                col_type = cur_col_type;
             }
         }
 
@@ -267,9 +266,9 @@ void add_link_constraint_to_query(realm::Query &query,
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
-            REALM_FALLTHROUGH;
+            //REALM_FALLTHROUGH;
         case Predicate::Operator::Equal: {
-            size_t col = prop_expr.prop->table_column;
+            size_t col = prop_expr.col_ndx;
             query.links_to(col, query.get_table()->get_link_target(col)->get(row_index));
             break;
         }
@@ -293,7 +292,7 @@ template <typename RetType, typename TableGetter>
 struct ColumnGetter {
     static Columns<RetType> convert(TableGetter&& table, const PropertyExpression& expr, Arguments&)
     {
-        return table()->template column<RetType>(expr.prop->table_column);
+        return table()->template column<RetType>(expr.col_ndx);
     }
 };
 
@@ -391,52 +390,83 @@ auto value_of_type_for_query(TableGetter&& tables, Value&& value, Arguments &arg
     return helper::convert(tables, value, args);
 }
 
+const char* data_type_to_str(DataType type)
+{
+    switch (type) {
+        case type_Int:
+            return "Int";
+        case type_Bool:
+            return "Bool";
+        case type_Float:
+            return "Float";
+        case type_Double:
+            return "Double";
+        case type_String:
+            return "String";
+        case type_Binary:
+            return "Binary";
+        case type_OldDateTime:
+            return "DateTime";
+        case type_Timestamp:
+            return "Timestamp";
+        case type_Table:
+            return "Table";
+        case type_Mixed:
+            return "Mixed";
+        case type_Link:
+            return "Link";
+        case type_LinkList:
+            return "LinkList";
+    }
+    return "type_Unknown"; // LCOV_EXCL_LINE
+}
+
 template <typename A, typename B>
 void do_add_comparison_to_query(Query &query, Predicate::Comparison cmp,
                                 const PropertyExpression &expr, A &lhs, B &rhs, Arguments &args)
 {
-    auto type = expr.prop->type;
-    switch (type & ~PropertyType::Flags) {
-        case PropertyType::Bool:
+    DataType type = expr.col_type;
+    switch (type) {
+        case type_Bool:
             add_bool_constraint_to_query(query, cmp.op, value_of_type_for_query<bool>(expr.table_getter, lhs, args),
                                                         value_of_type_for_query<bool>(expr.table_getter, rhs, args));
             break;
-        case PropertyType::Date:
+        case type_Timestamp:
             add_numeric_constraint_to_query(query, cmp.op, value_of_type_for_query<Timestamp>(expr.table_getter, lhs, args),
                                                            value_of_type_for_query<Timestamp>(expr.table_getter, rhs, args));
             break;
-        case PropertyType::Double:
+        case type_Double:
             add_numeric_constraint_to_query(query, cmp.op, value_of_type_for_query<Double>(expr.table_getter, lhs, args),
                                                            value_of_type_for_query<Double>(expr.table_getter, rhs, args));
             break;
-        case PropertyType::Float:
+        case type_Float:
             add_numeric_constraint_to_query(query, cmp.op, value_of_type_for_query<Float>(expr.table_getter, lhs, args),
                                                            value_of_type_for_query<Float>(expr.table_getter, rhs, args));
             break;
-        case PropertyType::Int:
+        case type_Int:
             add_numeric_constraint_to_query(query, cmp.op, value_of_type_for_query<Int>(expr.table_getter, lhs, args),
                                                            value_of_type_for_query<Int>(expr.table_getter, rhs, args));
             break;
-        case PropertyType::String:
+        case type_String:
             add_string_constraint_to_query(query, cmp, value_of_type_for_query<String>(expr.table_getter, lhs, args),
                                                        value_of_type_for_query<String>(expr.table_getter, rhs, args));
             break;
-        case PropertyType::Data:
+        case type_Binary:
             add_binary_constraint_to_query(query, cmp.op, value_of_type_for_query<Binary>(expr.table_getter, lhs, args),
                                                           value_of_type_for_query<Binary>(expr.table_getter, rhs, args));
             break;
-        case PropertyType::Object:
+        case type_Link:
             add_link_constraint_to_query(query, cmp.op, expr, link_argument(lhs, rhs, args));
             break;
         default:
-            throw std::logic_error(util::format("Object type '%1' not supported", expr.prop->type_string()));
+            throw std::logic_error(util::format("Object type '%1' not supported", data_type_to_str(expr.col_type)));
     }
 }
 
 template<typename T>
 void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
-    Columns<T> column = expr.table_getter()->template column<T>(expr.prop->table_column);
+    Columns<T> column = expr.table_getter()->template column<T>(expr.col_ndx);
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.and_query(column != realm::null());
@@ -453,13 +483,13 @@ template<>
 void do_add_null_comparison_to_query<Binary>(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
     precondition(expr.indexes.empty(), "KeyPath queries not supported for data comparisons.");
-    Columns<Binary> column = expr.table_getter()->template column<Binary>(expr.prop->table_column);
+    Columns<Binary> column = expr.table_getter()->template column<Binary>(expr.col_ndx);
     switch (op) {
         case Predicate::Operator::NotEqual:
-            query.not_equal(expr.prop->table_column, realm::null());
+            query.not_equal(expr.col_ndx, realm::null());
             break;
         case Predicate::Operator::Equal:
-            query.equal(expr.prop->table_column, realm::null());
+            query.equal(expr.col_ndx, realm::null());
             break;
         default:
             throw std::logic_error("Only 'equal' and 'not equal' operators supported when comparing against 'null'.");
@@ -473,9 +503,9 @@ void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op,
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
-            REALM_FALLTHROUGH;
+            //REALM_FALLTHROUGH;
         case Predicate::Operator::Equal:
-            query.and_query(query.get_table()->column<Link>(expr.prop->table_column).is_null());
+            query.and_query(query.get_table()->column<Link>(expr.col_ndx).is_null());
             break;
         default:
             throw std::logic_error("Only 'equal' and 'not equal' operators supported for object comparison.");
@@ -484,37 +514,37 @@ void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op,
 
 void do_add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, const PropertyExpression &expr)
 {
-    auto type = expr.prop->type;
-    if (is_array(type)) {
-        throw std::logic_error("Comparing Lists to 'null' is not supported");
-    }
-    switch (type & ~PropertyType::Flags) {
-        case realm::PropertyType::Bool:
+    DataType type = expr.col_type;
+//    if (is_array(type)) {
+//        throw std::logic_error("Comparing Lists to 'null' is not supported");
+//    }
+    switch (type) {
+        case realm::type_Bool:
             do_add_null_comparison_to_query<bool>(query, cmp.op, expr);
             break;
-        case realm::PropertyType::Date:
+        case realm::type_Timestamp:
             do_add_null_comparison_to_query<Timestamp>(query, cmp.op, expr);
             break;
-        case realm::PropertyType::Double:
+        case realm::type_Double:
             do_add_null_comparison_to_query<Double>(query, cmp.op, expr);
             break;
-        case realm::PropertyType::Float:
+        case realm::type_Float:
             do_add_null_comparison_to_query<Float>(query, cmp.op, expr);
             break;
-        case realm::PropertyType::Int:
+        case realm::type_Int:
             do_add_null_comparison_to_query<Int>(query, cmp.op, expr);
             break;
-        case realm::PropertyType::String:
+        case realm::type_String:
             do_add_null_comparison_to_query<String>(query, cmp.op, expr);
             break;
-        case realm::PropertyType::Data:
+        case realm::type_Binary:
             do_add_null_comparison_to_query<Binary>(query, cmp.op, expr);
             break;
-        case realm::PropertyType::Object:
+        case realm::type_Link:
             do_add_null_comparison_to_query<Link>(query, cmp.op, expr);
             break;
         default:
-            throw std::logic_error(util::format("Object type '%1' not supported", expr.prop->type_string()));
+            throw std::logic_error(util::format("Object type '%1' not supported", data_type_to_str(expr.col_type)));
     }
 }
 
@@ -528,13 +558,12 @@ bool expression_is_null(const parser::Expression &expr, Arguments &args) {
     return false;
 }
 
-void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &args, const Schema &schema, const std::string &type)
+void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &args, const std::string &type)
 {
     const Predicate::Comparison &cmpr = pred.cmpr;
     auto t0 = cmpr.expr[0].type, t1 = cmpr.expr[1].type;
-    auto object_schema = schema.find(type);
     if (t0 == parser::Expression::Type::KeyPath && t1 != parser::Expression::Type::KeyPath) {
-        PropertyExpression expr(query, schema, object_schema, cmpr.expr[0].s);
+        PropertyExpression expr(query, cmpr.expr[0].s);
         if (expression_is_null(cmpr.expr[1], args)) {
             do_add_null_comparison_to_query(query, cmpr, expr);
         }
@@ -543,7 +572,7 @@ void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &arg
         }
     }
     else if (t0 != parser::Expression::Type::KeyPath && t1 == parser::Expression::Type::KeyPath) {
-        PropertyExpression expr(query, schema, object_schema, cmpr.expr[1].s);
+        PropertyExpression expr(query, cmpr.expr[1].s);
         if (expression_is_null(cmpr.expr[0], args)) {
             do_add_null_comparison_to_query(query, cmpr, expr);
         }
@@ -556,7 +585,7 @@ void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &arg
     }
 }
 
-void update_query_with_predicate(Query &query, const Predicate &pred, Arguments &arguments, const Schema &schema, const std::string &type)
+void update_query_with_predicate(Query &query, const Predicate &pred, Arguments &arguments, const std::string &type)
 {
     if (pred.negate) {
         query.Not();
@@ -566,7 +595,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
         case Predicate::Type::And:
             query.group();
             for (auto &sub : pred.cpnd.sub_predicates) {
-                update_query_with_predicate(query, sub, arguments, schema, type);
+                update_query_with_predicate(query, sub, arguments, type);
             }
             if (!pred.cpnd.sub_predicates.size()) {
                 query.and_query(std::unique_ptr<realm::Expression>(new TrueExpression));
@@ -578,7 +607,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
             query.group();
             for (auto &sub : pred.cpnd.sub_predicates) {
                 query.Or();
-                update_query_with_predicate(query, sub, arguments, schema, type);
+                update_query_with_predicate(query, sub, arguments, type);
             }
             if (!pred.cpnd.sub_predicates.size()) {
                 query.and_query(std::unique_ptr<realm::Expression>(new FalseExpression));
@@ -587,7 +616,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
             break;
 
         case Predicate::Type::Comparison: {
-            add_comparison_to_query(query, pred, arguments, schema, type);
+            add_comparison_to_query(query, pred, arguments, type);
             break;
         }
         case Predicate::Type::True:
@@ -607,9 +636,9 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
 namespace realm {
 namespace query_builder {
 
-void apply_predicate(Query &query, const Predicate &predicate, Arguments &arguments, const Schema &schema, const std::string &objectType)
+void apply_predicate(Query &query, const Predicate &predicate, Arguments &arguments, const std::string &objectType)
 {
-    update_query_with_predicate(query, predicate, arguments, schema, objectType);
+    update_query_with_predicate(query, predicate, arguments, objectType);
 
     // Test the constructed query in core
     std::string validateMessage = query.validate();
