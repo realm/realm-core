@@ -81,8 +81,9 @@ struct gt : one< '>' > {};
 struct contains : string_token_t("contains") {};
 struct begins : string_token_t("beginswith") {};
 struct ends : string_token_t("endswith") {};
+struct like : string_token_t("like") {};
 
-struct string_oper : seq< sor< contains, begins, ends>, star< blank >, opt< case_insensitive > > {};
+struct string_oper : seq< sor< contains, begins, ends, like>, star< blank >, opt< case_insensitive > > {};
 struct symbolic_oper : sor< eq, noteq, lteq, lt, gteq, gt > {};
 
 // predicates
@@ -273,6 +274,7 @@ OPERATOR_ACTION(lt, Predicate::Operator::LessThan)
 OPERATOR_ACTION(begins, Predicate::Operator::BeginsWith)
 OPERATOR_ACTION(ends, Predicate::Operator::EndsWith)
 OPERATOR_ACTION(contains, Predicate::Operator::Contains)
+OPERATOR_ACTION(like, Predicate::Operator::Like)
 
 template<> struct action< case_insensitive >
 {

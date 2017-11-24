@@ -298,6 +298,13 @@ ONLY(Parser_basic_serialisation)
     verify_query(t, "fees != 2.22 && fees > 2.2", 3);
     verify_query(t, "name = \"Joe\"", 1);
     verify_query(t, "buddy.age > 0", 1);
+    verify_query(t, "name BEGINSWITH \"J\"", 3);
+    verify_query(t, "name ENDSWITH \"E\"", 0);
+    verify_query(t, "name ENDSWITH[c] \"E\"", 2);
+    verify_query(t, "name CONTAINS \"OE\"", 0);
+    verify_query(t, "name CONTAINS[c] \"OE\"", 2);
+    verify_query(t, "name LIKE \"b*\"", 0);
+    verify_query(t, "name LIKE[c] \"b*\"", 2);
 
 }
 

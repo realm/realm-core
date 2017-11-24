@@ -88,7 +88,7 @@ struct Contains : public HackClass {
 
     static std::string description()
     {
-        return "contains";
+        return "CONTAINS";
     }
 
     static const int condition = -1;
@@ -132,7 +132,7 @@ struct Like : public HackClass {
 
     static std::string description()
     {
-        return "like";
+        return "LIKE";
     }
 
     static const int condition = -1;
@@ -168,7 +168,7 @@ struct BeginsWith : public HackClass {
 
     static std::string description()
     {
-        return "begins with";
+        return "BEGINSWITH";
     }
 
     static const int condition = -1;
@@ -204,7 +204,7 @@ struct EndsWith : public HackClass {
 
     static std::string description()
     {
-        return "ends with";
+        return "ENDSWITH";
     }
 
     static const int condition = -1;
@@ -348,7 +348,7 @@ struct ContainsIns : public HackClass {
 
     static std::string description()
     {
-        return "contains[c]";
+        return "CONTAINS[c]";
     }
 
     static const int condition = -1;
@@ -398,7 +398,7 @@ struct LikeIns : public HackClass {
 
     static std::string description()
     {
-        return "like[c]";
+        return "LIKE[c]";
     }
 
     static const int condition = -1;
@@ -447,7 +447,7 @@ struct BeginsWithIns : public HackClass {
 
     static std::string description()
     {
-        return "begins with[c]";
+        return "BEGINSWITH[c]";
     }
 
     static const int condition = -1;
@@ -497,7 +497,7 @@ struct EndsWithIns : public HackClass {
 
     static std::string description()
     {
-        return "ends with[c]";
+        return "ENDSWITH[c]";
     }
 
     static const int condition = -1;

@@ -195,6 +195,9 @@ void add_string_constraint_to_query(Query &query,
         case Predicate::Operator::NotEqual:
             query.and_query(column.not_equal(value, case_sensitive));
             break;
+        case Predicate::Operator::Like:
+            query.and_query(column.like(value, case_sensitive));
+            break;
         default:
             throw std::logic_error("Unsupported operator for string queries.");
     }

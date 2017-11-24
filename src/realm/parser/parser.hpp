@@ -54,7 +54,8 @@ struct Predicate
         GreaterThanOrEqual,
         BeginsWith,
         EndsWith,
-        Contains
+        Contains,
+        Like
     };
 
     enum class OperatorOption
