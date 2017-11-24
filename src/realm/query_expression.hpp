@@ -2049,7 +2049,7 @@ public:
     virtual std::string description() const override
     {
         if (links_exist()) {
-            return m_link_map.description();
+            return m_link_map.description() + metrics::value_separator;
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached()) {
@@ -3088,12 +3088,14 @@ public:
 
     virtual std::string description() const override
     {
+        std::string desc = "";
         if (links_exist()) {
-            return m_link_map.description();
+            desc = m_link_map.description() + metrics::value_separator;
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached() && m_column_ndx != npos) {
-            return std::string(target_table->get_column_name(m_column_ndx));
+            desc += std::string(target_table->get_column_name(m_column_ndx));
+            return desc;
         }
         return "";
     }
