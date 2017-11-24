@@ -29,6 +29,7 @@
 #include "realm/table.hpp"
 #include "realm/table_view.hpp"
 #include "realm/group.hpp"
+#include "realm/replication.hpp"
 
 using namespace realm;
 
@@ -219,6 +220,26 @@ TableView LinkList::get_sorted_view(size_t column_index, bool ascending) const
 {
     TableView v = get_sorted_view(SortDescriptor(get_target_table(), {{column_index}}, {ascending}));
     return v;
+}
+
+void LinkList::sort(SortDescriptor&& order)
+{
+    /*  TODO: implement
+    if (Replication* repl = m_obj.get_alloc().get_replication()) {
+        // todo, write to the replication log that we're doing a sort
+        repl->set_link_list(*this, *this->m_leaf); // Throws
+    }
+    */
+    DescriptorOrdering ordering;
+    ordering.append_sort(std::move(order));
+    update_if_needed();
+    do_sort(ordering);
+    m_obj.bump_version();
+}
+
+void LinkList::sort(size_t column_index, bool ascending)
+{
+    sort(SortDescriptor(get_target_table(), {{column_index}}, {ascending}));
 }
 
 void LinkList::remove_target_row(size_t link_ndx)

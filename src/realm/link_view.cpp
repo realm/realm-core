@@ -186,23 +186,6 @@ void LinkView::do_clear(bool broken_reciprocal_backlinks)
 }
 
 
-void LinkView::sort(size_t column_index, bool ascending)
-{
-    sort(SortDescriptor(m_origin_column->get_target_table(), {{column_index}}, {ascending}));
-}
-
-
-void LinkView::sort(SortDescriptor&& order)
-{
-    if (Replication* repl = get_repl()) {
-        // todo, write to the replication log that we're doing a sort
-        repl->set_link_list(*this, m_row_indexes); // Throws
-    }
-    DescriptorOrdering ordering;
-    ordering.append_sort(std::move(order));
-    do_sort(ordering);
-}
-
 void LinkView::do_nullify_link(size_t old_target_row_ndx)
 {
     REALM_ASSERT(m_row_indexes.is_attached());

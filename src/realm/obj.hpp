@@ -175,6 +175,7 @@ private:
     friend class ConstObj;
     template <class>
     friend class List;
+    friend class LinkList;
 
     mutable bool m_writeable;
 
