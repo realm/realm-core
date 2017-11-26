@@ -187,9 +187,16 @@ set_target_properties(Core
         POSITION_INDEPENDENT_CODE ON
 )
 
+target_compile_definitions(Core
+    PUBLIC
+        $<$<CONFIG:Debug>:REALM_DEBUG=1>
+        $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
+)
+
 if(ANDROID)
     # TODO: Core APIs should always built for internal usage, but there seem to be issues with cocoa. Enable it only for Android for now.
     set_target_properties(Core PROPERTIES CXX_VISIBILITY_PRESET hidden)
+    target_compile_definitions(Core PUBLIC ANDROID)
     target_compile_options(Core
         PUBLIC
             -fsigned-char # char are unsigned by default on ARM

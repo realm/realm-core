@@ -52,12 +52,9 @@ add_compile_options(
 
 # Set global compile definitions
 set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
-    $<$<CONFIG:Debug>:REALM_DEBUG=1>
-    $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
     $<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>
     $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
     $<$<CXX_COMPILER_ID:MSVC>:WIN32_LEAN_AND_MEAN>
-    $<$<BOOL:${ANDROID}>:ANDROID>
 )
 
 set(CMAKE_DEBUG_POSTFIX "-dbg")
