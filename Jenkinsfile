@@ -69,13 +69,13 @@ jobWrapper {
               ]
 
           androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
-          androidBuildTypes = ['Debug', 'Release']
+          androidBuildTypes = ['Debug', 'MinSizeRel']
 
           for (def i = 0; i < androidAbis.size(); i++) {
               def abi = androidAbis[i]
               for (def j = 0; j < androidBuildTypes.size(); j++) {
                   def buildType = androidBuildTypes[j]
-                  parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Release')
+                  parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'MinSizeRel')
               }
           }
 
