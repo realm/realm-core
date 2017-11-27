@@ -194,11 +194,10 @@ public:
     size_t find_first_binary(size_t column_ndx, BinaryData value) const;
     size_t find_first_timestamp(size_t column_ndx, Timestamp value) const;
 
-    // Aggregate functions. count_target is ignored by all <int
-    // function> except Count. Hack because of bug in optional
-    // arguments in clang and vs2010 (fixed in 2012)
     template <Action action, typename T, typename R>
-    R aggregate(size_t column_ndx, T count_target, size_t* result_count = nullptr, Key* return_key = nullptr) const;
+    R aggregate(size_t column_ndx, size_t* result_count = nullptr, Key* return_key = nullptr) const;
+    template <typename T>
+    size_t aggregate_count(size_t column_ndx, T count_target) const;
 
     int64_t sum_int(size_t column_ndx) const;
     int64_t maximum_int(size_t column_ndx, Key* return_key = nullptr) const;

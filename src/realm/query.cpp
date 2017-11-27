@@ -906,7 +906,7 @@ R Query::aggregate(size_t column_ndx, size_t* resultcount, Key* return_ndx) cons
             for (size_t t = 0; t < m_view->size(); t++) {
                 ConstObj obj = m_view->get(t);
                 if (eval_object(obj)) {
-                    st.template match<action, false>(obj.get_key().value, 0, obj.get<T>(column_ndx));
+                    st.template match<action, false>(size_t(obj.get_key().value), 0, obj.get<T>(column_ndx));
                 }
             }
         }

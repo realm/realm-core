@@ -1205,15 +1205,23 @@ public:
             if (action == act_Max) {
                 if (value > m_state) {
                     m_state = value;
-                    REALM_ASSERT(m_key_values);
-                    m_minmax_index = m_key_values->get(index) + m_key_offset;
+                    if (m_key_values) {
+                        m_minmax_index = m_key_values->get(index) + m_key_offset;
+                    }
+                    else {
+                        m_minmax_index = int64_t(index);
+                    }
                 }
             }
             else if (action == act_Min) {
                 if (value < m_state) {
                     m_state = value;
-                    REALM_ASSERT(m_key_values);
-                    m_minmax_index = m_key_values->get(index) + m_key_offset;
+                    if (m_key_values) {
+                        m_minmax_index = m_key_values->get(index) + m_key_offset;
+                    }
+                    else {
+                        m_minmax_index = int64_t(index);
+                    }
                 }
             }
             else if (action == act_Sum)

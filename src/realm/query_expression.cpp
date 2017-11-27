@@ -33,7 +33,6 @@ void LinkMap::set_base_table(const Table* table)
     m_only_unary_links = true;
 
     Group* group = _impl::TableFriend::get_parent_group(*table);
-    TableRef target_table;
 
     for (size_t i = 0; i < m_link_column_indexes.size(); i++) {
         size_t link_column_index = m_link_column_indexes[i];
@@ -50,8 +49,8 @@ void LinkMap::set_base_table(const Table* table)
         m_link_types.push_back(type);
         m_link_column_names.emplace_back(spec.get_column_name(link_column_index));
         size_t target_table_index = spec.get_opposite_link_table_ndx(link_column_index);
-        target_table = group->get_table(target_table_index);
-        m_tables.push_back(target_table.get());
+        TableRef tt = group->get_table(target_table_index);
+        m_tables.push_back(tt.get());
     }
 }
 

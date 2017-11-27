@@ -319,8 +319,8 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
 
-    LinkTargetInfo link(&target);
-    do_insert_column(col_ndx, type, name, link, false, type == type_LinkList); // Throws
+    LinkTargetInfo link_target_info(&target);
+    do_insert_column(col_ndx, type, name, link_target_info, false, type == type_LinkList); // Throws
 
     set_link_type(col_ndx, link_type); // Throws
 }
@@ -513,22 +513,22 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 }
 
 
-void Table::do_insert_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link, bool nullable,
-                             bool listtype)
+void Table::do_insert_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link_target_info,
+                             bool nullable, bool listtype)
 {
     if (type == type_Link)
         nullable = true;
 
     bump_version();
-    insert_root_column(col_ndx, type, name, link, nullable, listtype); // Throws
+    insert_root_column(col_ndx, type, name, link_target_info, nullable, listtype); // Throws
 
     if (Replication* repl = get_repl())
-        repl->insert_column(this, col_ndx, type, name, link, nullable); // Throws
+        repl->insert_column(this, col_ndx, type, name, link_target_info, nullable); // Throws
 }
 
 
-void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
-                                           bool nullable, bool* was_inserted)
+void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, StringData name,
+                                           LinkTargetInfo& link_target_info, bool nullable, bool* was_inserted)
 {
     size_t existing_ndx = get_column_index(name);
     if (existing_ndx != npos) {
@@ -547,7 +547,8 @@ void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, String
                 throw LogicError(LogicError::type_mismatch);
             }
             if (is_link_type(ColumnType(type)) &&
-                m_spec->get_opposite_link_table_ndx(col_ndx) != link.m_target_table->get_index_in_group()) {
+                m_spec->get_opposite_link_table_ndx(col_ndx) !=
+                    link_target_info.m_target_table->get_index_in_group()) {
                 throw LogicError(LogicError::type_mismatch);
             }
 
@@ -562,7 +563,7 @@ void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, String
         }
     }
 
-    do_insert_column(col_ndx, type, name, link, nullable);
+    do_insert_column(col_ndx, type, name, link_target_info, nullable);
     if (was_inserted) {
         *was_inserted = true;
     }
@@ -3079,9 +3080,11 @@ size_t Table::count_int(size_t col_ndx, int64_t value) const
 {
     size_t count;
     if (is_nullable(col_ndx)) {
-        return aggregate<act_Count, util::Optional<int64_t>, int64_t>(col_ndx, value, &count);
+        aggregate<act_Count, util::Optional<int64_t>, int64_t>(col_ndx, value, &count);
     }
-    aggregate<act_Count, int64_t, int64_t>(col_ndx, value, &count);
+    else {
+        aggregate<act_Count, int64_t, int64_t>(col_ndx, value, &count);
+    }
     return count;
 }
 size_t Table::count_float(size_t col_ndx, float value) const
