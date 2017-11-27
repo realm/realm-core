@@ -472,6 +472,53 @@ TEST_CASE("list") {
             advance_and_notify(*r);
             REQUIRE_INDICES(change.deletions, 5);
         }
+
+        SECTION("changes are sent in initial notification after removing and then re-adding callback") {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                REQUIRE(false);
+            });
+            token = {};
+
+            auto write = [&] {
+                r2->begin_transaction();
+                r2_lv->remove(5);
+                r2->commit_transaction();
+            };
+
+            SECTION("add new callback before transaction") {
+                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                    change = c;
+                });
+
+                write();
+
+                advance_and_notify(*r);
+                REQUIRE_INDICES(change.deletions, 5);
+            }
+
+            SECTION("add new callback after transaction") {
+                write();
+
+                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                    change = c;
+                });
+
+                advance_and_notify(*r);
+                REQUIRE_INDICES(change.deletions, 5);
+            }
+
+            SECTION("add new callback after transaction and after changeset was calculated") {
+                write();
+                coordinator.on_change();
+
+                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                    change = c;
+                });
+
+                advance_and_notify(*r);
+                REQUIRE_INDICES(change.deletions, 5);
+            }
+        }
     }
 
     SECTION("sorted add_notification_block()") {

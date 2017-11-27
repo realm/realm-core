@@ -439,6 +439,14 @@ bool List::operator==(List const& rgt) const noexcept
 NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
 {
     verify_attached();
+    // Adding a new callback to a notifier which had all of its callbacks
+    // removed does not properly reinitialize the notifier. Work around this by
+    // recreating it instead.
+    // FIXME: The notifier lifecycle here is dumb (when all callbacks are removed
+    // from a notifier a zombie is left sitting around uselessly) and should be
+    // cleaned up.
+    if (m_notifier && !m_notifier->have_callbacks())
+        m_notifier.reset();
     if (!m_notifier) {
         if (get_type() == PropertyType::Object)
             m_notifier = std::static_pointer_cast<_impl::CollectionNotifier>(std::make_shared<ListNotifier>(m_link_view, m_realm));
