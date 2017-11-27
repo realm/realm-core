@@ -72,8 +72,9 @@ int64_t VerifiedInteger::sum(size_t start, size_t end)
 
     for (size_t t = start; t < end; ++t)
         running_sum += v[t];
-
+#ifdef LEGACY_TEST
     REALM_ASSERT(running_sum == u.sum(start, end));
+#endif
     return running_sum;
 }
 
@@ -91,7 +92,9 @@ int64_t VerifiedInteger::maximum(size_t start, size_t end)
         if (v[t] > max)
             max = v[t];
 
+#ifdef LEGACY_TEST
     REALM_ASSERT(max == u.maximum(start, end));
+#endif
     return max;
 }
 
@@ -109,7 +112,9 @@ int64_t VerifiedInteger::minimum(size_t start, size_t end)
         if (v[t] < min)
             min = v[t];
 
+#ifdef LEGACY_TEST
     REALM_ASSERT(min == u.minimum(start, end));
+#endif
     return min;
 }
 

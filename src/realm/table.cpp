@@ -47,6 +47,7 @@
 #include <realm/array_binary.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/table_tpl.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
@@ -3072,266 +3073,122 @@ bool Table::is_null(size_t col_ndx, size_t row_ndx) const noexcept
     return col.is_null(row_ndx);
 }
 
-
 // count ----------------------------------------------
 
 size_t Table::count_int(size_t col_ndx, int64_t value) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-    const IntegerColumn& col = get_column<IntegerColumn, col_type_Int>(col_ndx);
-    return col.count(value);
+    size_t count;
+    if (is_nullable(col_ndx)) {
+        return aggregate<act_Count, util::Optional<int64_t>, int64_t>(col_ndx, value, &count);
+    }
+    aggregate<act_Count, int64_t, int64_t>(col_ndx, value, &count);
+    return count;
 }
 size_t Table::count_float(size_t col_ndx, float value) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-    const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
-    return col.count(value);
+    size_t count;
+    aggregate<act_Count, float, float>(col_ndx, value, &count);
+    return count;
 }
 size_t Table::count_double(size_t col_ndx, double value) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-    const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    return col.count(value);
+    size_t count;
+    aggregate<act_Count, double, double>(col_ndx, value, &count);
+    return count;
 }
 size_t Table::count_string(size_t col_ndx, StringData value) const
 {
-    REALM_ASSERT(!m_columns.is_attached() || col_ndx < get_column_count());
-
-    if (!m_columns.is_attached())
-        return 0;
-
-    ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
-        const StringColumn& col = get_column_string(col_ndx);
-        return col.count(value);
-    }
-    else {
-        REALM_ASSERT_3(type, ==, col_type_StringEnum);
-        const StringEnumColumn& col = get_column_string_enum(col_ndx);
-        return col.count(value);
-    }
+    size_t count;
+    aggregate<act_Count, StringData, StringData>(col_ndx, value, &count);
+    return count;
 }
 
 // sum ----------------------------------------------
 
 int64_t Table::sum_int(size_t col_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column<IntNullColumn, col_type_Int>(col_ndx);
-        return col.sum();
+        return aggregate<act_Sum, util::Optional<int64_t>, int64_t>(col_ndx);
     }
-    else {
-        const IntegerColumn& col = get_column<IntegerColumn, col_type_Int>(col_ndx);
-        return col.sum();
-    }
+    return aggregate<act_Sum, int64_t, int64_t>(col_ndx);
 }
 double Table::sum_float(size_t col_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0.f;
-
-    const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
-    return col.sum();
+    return aggregate<act_Sum, float, double>(col_ndx);
 }
 double Table::sum_double(size_t col_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0.;
-
-    const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    return col.sum();
+    return aggregate<act_Sum, double, double>(col_ndx);
 }
 
 // average ----------------------------------------------
 
 double Table::average_int(size_t col_ndx, size_t* value_count) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column<IntNullColumn, col_type_Int>(col_ndx);
-        return col.average(0, -1, -1, value_count);
+        return average<util::Optional<int64_t>>(col_ndx, value_count);
     }
-    else {
-        const IntegerColumn& col = get_column<IntegerColumn, col_type_Int>(col_ndx);
-        return col.average(0, -1, -1, value_count);
-    }
+    return average<int64_t>(col_ndx, value_count);
 }
 double Table::average_float(size_t col_ndx, size_t* value_count) const
 {
-    if (!m_columns.is_attached())
-        return 0.f;
-
-    const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
-    return col.average(0, -1, -1, value_count);
+    return average<float>(col_ndx, value_count);
 }
 double Table::average_double(size_t col_ndx, size_t* value_count) const
 {
-    if (!m_columns.is_attached())
-        return 0.;
-
-    const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    return col.average(0, -1, -1, value_count);
+    return average<double>(col_ndx, value_count);
 }
 
 // minimum ----------------------------------------------
 
 #define USE_COLUMN_AGGREGATE 1
 
-int64_t Table::minimum_int(size_t col_ndx, size_t* return_ndx) const
+int64_t Table::minimum_int(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-#if USE_COLUMN_AGGREGATE
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column<IntNullColumn, col_type_Int>(col_ndx);
-        return col.minimum(0, npos, npos, return_ndx);
+        return aggregate<act_Min, util::Optional<int64_t>, int64_t>(col_ndx, 0, nullptr, return_ndx);
     }
-    else {
-        const IntegerColumn& col = get_column<IntegerColumn, col_type_Int>(col_ndx);
-        return col.minimum(0, npos, npos, return_ndx);
-    }
-#else
-    if (is_empty())
-        return 0;
-
-    int64_t mv = get_int(col_ndx, 0);
-    for (size_t i = 1; i < size(); ++i) {
-        int64_t v = get_int(col_ndx, i);
-        if (v < mv) {
-            mv = v;
-        }
-    }
-    return mv;
-#endif
+    return aggregate<act_Min, int64_t, int64_t>(col_ndx, 0, nullptr, return_ndx);
 }
 
-float Table::minimum_float(size_t col_ndx, size_t* return_ndx) const
+float Table::minimum_float(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0.f;
-
-    const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
-    return col.minimum(0, npos, npos, return_ndx);
+    return aggregate<act_Min, float, float>(col_ndx, 0.f, nullptr, return_ndx);
 }
 
-double Table::minimum_double(size_t col_ndx, size_t* return_ndx) const
+double Table::minimum_double(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0.;
-
-    const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    return col.minimum(0, npos, npos, return_ndx);
+    return aggregate<act_Min, double, double>(col_ndx, 0., nullptr, return_ndx);
 }
 
-OldDateTime Table::minimum_olddatetime(size_t col_ndx, size_t* return_ndx) const
+Timestamp Table::minimum_timestamp(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-    if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column<IntNullColumn, col_type_OldDateTime>(col_ndx);
-        return col.minimum(0, npos, npos, return_ndx);
-    }
-    else {
-        const IntegerColumn& col = get_column<IntegerColumn, col_type_OldDateTime>(col_ndx);
-        return col.minimum(0, npos, npos, return_ndx);
-    }
-}
-
-Timestamp Table::minimum_timestamp(size_t col_ndx, size_t* return_ndx) const
-{
-    if (!m_columns.is_attached())
-        return Timestamp{};
-
-    const TimestampColumn& col = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
-    return col.minimum(return_ndx);
+    return aggregate<act_Min, Timestamp, Timestamp>(col_ndx, Timestamp{}, nullptr, return_ndx);
 }
 
 // maximum ----------------------------------------------
 
-int64_t Table::maximum_int(size_t col_ndx, size_t* return_ndx) const
+int64_t Table::maximum_int(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-#if USE_COLUMN_AGGREGATE
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column_int_null(col_ndx);
-        return col.maximum(0, npos, npos, return_ndx);
+        return aggregate<act_Max, util::Optional<int64_t>, int64_t>(col_ndx, 0, nullptr, return_ndx);
     }
-    else {
-        const IntegerColumn& col = get_column(col_ndx);
-        return col.maximum(0, npos, npos, return_ndx);
-    }
-
-#else
-    if (is_empty())
-        return 0;
-
-    int64_t mv = get_int(col_ndx, 0);
-    for (size_t i = 1; i < size(); ++i) {
-        int64_t v = get_int(col_ndx, i);
-        if (v > mv) {
-            mv = v;
-        }
-    }
-    return mv;
-#endif
+    return aggregate<act_Max, int64_t, int64_t>(col_ndx, 0, nullptr, return_ndx);
 }
 
-float Table::maximum_float(size_t col_ndx, size_t* return_ndx) const
+float Table::maximum_float(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0.f;
-
-    const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
-    return col.maximum(0, npos, npos, return_ndx);
+    return aggregate<act_Max, float, float>(col_ndx, 0.f, nullptr, return_ndx);
 }
 
-double Table::maximum_double(size_t col_ndx, size_t* return_ndx) const
+double Table::maximum_double(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0.;
-
-    const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    return col.maximum(0, npos, npos, return_ndx);
+    return aggregate<act_Max, double, double>(col_ndx, 0., nullptr, return_ndx);
 }
 
-OldDateTime Table::maximum_olddatetime(size_t col_ndx, size_t* return_ndx) const
+Timestamp Table::maximum_timestamp(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-    if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column<IntNullColumn, col_type_OldDateTime>(col_ndx);
-        return col.maximum(0, npos, npos, return_ndx);
-    }
-    else {
-        const IntegerColumn& col = get_column<IntegerColumn, col_type_OldDateTime>(col_ndx);
-        return col.maximum(0, npos, npos, return_ndx);
-    }
-}
-
-
-Timestamp Table::maximum_timestamp(size_t col_ndx, size_t* return_ndx) const
-{
-    if (!m_columns.is_attached())
-        return Timestamp{};
-
-    const TimestampColumn& col = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
-    return col.maximum(return_ndx);
+    return aggregate<act_Max, Timestamp, Timestamp>(col_ndx, Timestamp{}, nullptr, return_ndx);
 }
 
 

@@ -1526,209 +1526,6 @@ TEST(Query_Expressions0)
     CHECK_EQUAL(match, not_found);
 }
 
-TEST(Query_LimitUntyped2)
-{
-    Table table;
-    table.add_column(type_Int, "first1");
-    table.add_column(type_Float, "second1");
-    table.add_column(type_Double, "second1");
-    table.add_column(type_Timestamp, "date");
-
-    table.add_empty_row(3);
-    table.set_int(0, 0, 10000);
-    table.set_int(0, 1, 30000);
-    table.set_int(0, 2, 40000);
-
-    table.set_float(1, 0, 10000.f);
-    table.set_float(1, 1, 30000.f);
-    table.set_float(1, 2, 40000.f);
-
-    table.set_double(2, 0, 10000.);
-    table.set_double(2, 1, 30000.);
-    table.set_double(2, 2, 40000.);
-
-    table.set_timestamp(3, 0, Timestamp(10000, 10000));
-    table.set_timestamp(3, 1, Timestamp(30000, 30000));
-    table.set_timestamp(3, 2, Timestamp(40000, 40000));
-
-    Query q = table.where();
-    int64_t sum;
-    float sumf;
-    double sumd;
-    Timestamp ts;
-
-    // sum, limited by 'limit'
-    sum = q.sum_int(0, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000, sum);
-    sum = q.sum_int(0, nullptr, 0, -1, 2);
-    CHECK_EQUAL(40000, sum);
-    sum = q.sum_int(0, nullptr, 0, -1);
-    CHECK_EQUAL(80000, sum);
-
-    sumd = q.sum_float(1, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000., sumd);
-    sumd = q.sum_float(1, nullptr, 0, -1, 2);
-    CHECK_EQUAL(40000., sumd);
-    sumd = q.sum_float(1, nullptr, 0, -1);
-    CHECK_EQUAL(80000., sumd);
-
-    sumd = q.sum_double(2, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000., sumd);
-    sumd = q.sum_double(2, nullptr, 0, -1, 2);
-    CHECK_EQUAL(40000., sumd);
-    sumd = q.sum_double(2, nullptr, 0, -1);
-    CHECK_EQUAL(80000., sumd);
-
-    // sum, limited by 'end', but still having 'limit' specified
-    sum = q.sum_int(0, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000, sum);
-    sum = q.sum_int(0, nullptr, 0, 2, 3);
-    CHECK_EQUAL(40000, sum);
-
-    sumd = q.sum_float(1, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000., sumd);
-    sumd = q.sum_float(1, nullptr, 0, 2, 3);
-    CHECK_EQUAL(40000., sumd);
-
-    sumd = q.sum_double(2, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000., sumd);
-    sumd = q.sum_double(2, nullptr, 0, 2, 3);
-    CHECK_EQUAL(40000., sumd);
-
-    size_t ndx = not_found;
-
-    // max, limited by 'limit'
-
-    // int
-    sum = q.maximum_int(0, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000, sum);
-    q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    sum = q.maximum_int(0, nullptr, 0, -1, 2);
-    CHECK_EQUAL(30000, sum);
-    q.maximum_int(0, nullptr, 0, -1, 2, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-    sum = q.maximum_int(0, nullptr, 0, -1);
-    CHECK_EQUAL(40000, sum);
-    q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
-    CHECK_EQUAL(2, ndx);
-
-    // Timestamp
-    /*
-    ts = q.maximum_timestamp(3, nullptr, 0, -1, 1);
-    CHECK_EQUAL(Timestamp(10000, 10000), ts);
-    q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    ts = q.maximum_timestamp(3, nullptr, 0, -1, 2);
-    CHECK_EQUAL(Timestamp(30000, 30000), ts);
-    q.maximum_int(0, nullptr, 0, -1, 2, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-    ts = q.maximum_timestamp(3, nullptr, 0, -1);
-    CHECK_EQUAL(Timestamp(40000, 40000), ts);
-    q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
-    CHECK_EQUAL(2, ndx);
-    */
-    // float
-    sumf = q.maximum_float(1, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000., sumf);
-    q.maximum_float(1, nullptr, 0, -1, 1, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    sumf = q.maximum_float(1, nullptr, 0, -1, 2);
-    CHECK_EQUAL(30000., sumf);
-    q.maximum_float(1, nullptr, 0, -1, 2, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-    sumf = q.maximum_float(1, nullptr, 0, -1);
-    CHECK_EQUAL(40000., sumf);
-    q.maximum_float(1, nullptr, 0, -1, -1, &ndx);
-    CHECK_EQUAL(2, ndx);
-
-    sumd = q.maximum_double(2, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000., sumd);
-    q.maximum_double(2, nullptr, 0, -1, 1, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    sumd = q.maximum_double(2, nullptr, 0, -1, 2);
-    CHECK_EQUAL(30000., sumd);
-    q.maximum_double(2, nullptr, 0, -1, 2, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-    sumd = q.maximum_double(2, nullptr, 0, -1);
-    CHECK_EQUAL(40000., sumd);
-    q.maximum_double(2, nullptr, 0, -1, -1, &ndx);
-    CHECK_EQUAL(2, ndx);
-
-    // max, limited by 'end', but still having 'limit' specified
-    sum = q.maximum_int(0, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000, sum);
-    q.maximum_int(0, nullptr, 0, 1, 3, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    sum = q.maximum_int(0, nullptr, 0, 2, 3);
-    CHECK_EQUAL(30000, sum);
-    q.maximum_int(0, nullptr, 0, 2, 3, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-    sumf = q.maximum_float(1, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000., sumf);
-    q.maximum_float(1, nullptr, 0, 1, 3, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    sumf = q.maximum_float(1, nullptr, 0, 2, 3);
-    CHECK_EQUAL(30000., sumf);
-    q.maximum_float(1, nullptr, 0, 2, 3, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-    sumd = q.maximum_double(2, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000., sumd);
-    q.maximum_double(2, nullptr, 0, 1, 3, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    sumd = q.maximum_double(2, nullptr, 0, 2, 3);
-    CHECK_EQUAL(30000., sumd);
-    q.maximum_double(2, nullptr, 0, 2, 3, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-
-    // avg
-    sumd = q.average_int(0, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000, sumd);
-    sumd = q.average_int(0, nullptr, 0, -1, 2);
-    CHECK_EQUAL((10000 + 30000) / 2, sumd);
-
-    sumd = q.average_float(1, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000., sumd);
-    sumd = q.average_float(1, nullptr, 0, -1, 2);
-    CHECK_EQUAL((10000. + 30000.) / 2., sumd);
-
-
-    // avg, limited by 'end', but still having 'limit' specified
-    sumd = q.average_int(0, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000, sumd);
-    sumd = q.average_int(0, nullptr, 0, 2, 3);
-    CHECK_EQUAL((10000 + 30000) / 2, sumd);
-
-    sumd = q.average_float(1, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000., sumd);
-    sumd = q.average_float(1, nullptr, 0, 2, 3);
-    CHECK_EQUAL((10000. + 30000.) / 2., sumd);
-
-    // count
-    size_t cnt = q.count(0, -1, 1);
-    CHECK_EQUAL(1, cnt);
-    cnt = q.count(0, -1, 2);
-    CHECK_EQUAL(2, cnt);
-
-    // count, limited by 'end', but still having 'limit' specified
-    cnt = q.count(0, 1, 3);
-    CHECK_EQUAL(1, cnt);
-}
-
 
 TEST(Query_StrIndexCrash)
 {
@@ -6390,96 +6187,83 @@ TEST(Query_TestTV_where)
     Query q4 = t.where(&v).between(0, 3, 6);
     CHECK_EQUAL(1, q4.count());
 }
+#endif
 
 TEST(Query_SumMinMaxAvg)
 {
-    TestTable t;
+    Table t;
 
-    t.add_column(type_Int, "1");
+    auto int_col = t.add_column(type_Int, "1");
     t.add_column(type_String, "2");
-    t.add_column(type_OldDateTime, "3");
+    t.add_column(type_Timestamp, "3");
     t.add_column(type_Float, "4");
     t.add_column(type_Double, "5");
 
-    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 2, "b", OldDateTime(300), 3.0f, 3.0);
-    add(t, 3, "c", OldDateTime(50), 5.0f, 5.0);
-    add(t, 0, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 0, "b", OldDateTime(3000), 30.0f, 30.0);
-    add(t, 0, "c", OldDateTime(5), 0.5f, 0.5);
+    std::vector<Key> keys;
+    t.create_objects(9, keys);
+    t.get_object(keys[0]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 2.0);
+    t.get_object(keys[1]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 1.0);
+    t.get_object(keys[2]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 1.0);
+    t.get_object(keys[3]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 1.0);
+    t.get_object(keys[4]).set_all(2, "b", Timestamp{300, 0}, 3.0f, 3.0);
+    t.get_object(keys[5]).set_all(3, "c", Timestamp{50, 0}, 5.0f, 5.0);
+    t.get_object(keys[6]).set_all(0, "a", Timestamp{100, 0}, 1.0f, 1.0);
+    t.get_object(keys[7]).set_all(0, "b", Timestamp{3000, 0}, 30.0f, 30.0);
+    t.get_object(keys[8]).set_all(0, "c", Timestamp{5, 0}, 0.5f, 0.5);
 
-    CHECK_EQUAL(9, t.where().sum_int(0));
+    CHECK_EQUAL(9, t.where().sum_int(int_col));
 
-    CHECK_EQUAL(0, t.where().minimum_int(0));
-    CHECK_EQUAL(3, t.where().maximum_int(0));
+    CHECK_EQUAL(0, t.where().minimum_int(int_col));
+    CHECK_EQUAL(3, t.where().maximum_int(int_col));
 
-    size_t resindex = not_found;
+    Key resindex;
 
-    t.where().maximum_int(0, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(5, resindex);
+    t.where().maximum_int(int_col, &resindex);
+    CHECK_EQUAL(keys[5], resindex);
 
-    t.where().minimum_int(0, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(6, resindex);
+    t.where().minimum_int(0, &resindex);
+    CHECK_EQUAL(keys[6], resindex);
 
-    t.where().maximum_float(3, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(7, resindex);
+    t.where().maximum_float(3, &resindex);
+    CHECK_EQUAL(keys[7], resindex);
 
-    t.where().minimum_float(3, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(8, resindex);
+    t.where().minimum_float(3, &resindex);
+    CHECK_EQUAL(keys[8], resindex);
 
-    t.where().maximum_double(4, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(7, resindex);
+    t.where().maximum_double(4, &resindex);
+    CHECK_EQUAL(keys[7], resindex);
 
-    t.where().minimum_double(4, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(8, resindex);
+    t.where().minimum_double(4, &resindex);
+    CHECK_EQUAL(keys[8], resindex);
 
+    t.where().maximum_timestamp(2, &resindex);
+    CHECK_EQUAL(keys[7], resindex);
+
+    t.where().minimum_timestamp(2, &resindex);
+    CHECK_EQUAL(keys[8], resindex);
+
+#ifdef LEGACY_TESTS
     // Now with condition (tests another code path in Array::minmax())
-    t.where().not_equal(0, 0).minimum_double(4, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(0, resindex);
+    t.where().not_equal(0, 0).minimum_double(4, &resindex);
+    CHECK_EQUAL(keys[0], resindex);
 
-    t.where().not_equal(0, 0).minimum_float(3, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(0, resindex);
+    t.where().not_equal(0, 0).minimum_float(3, &resindex);
+    CHECK_EQUAL(keys[0], resindex);
 
-    t.where().not_equal(0, 0).minimum_olddatetime(2, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(5, resindex);
+    t.where().not_equal(0, 0).minimum_timestamp(2, &resindex);
+    CHECK_EQUAL(keys[5], resindex);
 
-    t.where().not_equal(0, 0).maximum_olddatetime(2, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(4, resindex);
+    t.where().not_equal(0, 0).maximum_timestamp(2, &resindex);
+    CHECK_EQUAL(keys[4], resindex);
 
     CHECK_APPROXIMATELY_EQUAL(1, t.where().average_int(0), 0.001);
 
-    CHECK_EQUAL(OldDateTime(3000), t.where().maximum_olddatetime(2));
-    CHECK_EQUAL(OldDateTime(5), t.where().minimum_olddatetime(2));
-
-    size_t cnt;
-    CHECK_EQUAL(0, t.where().sum_int(0, &cnt, 0, 0));
-    CHECK_EQUAL(0, cnt);
-    CHECK_EQUAL(0, t.where().sum_int(0, &cnt, 1, 1));
-    CHECK_EQUAL(0, cnt);
-    CHECK_EQUAL(0, t.where().sum_int(0, &cnt, 2, 2));
-    CHECK_EQUAL(0, cnt);
-
-    CHECK_EQUAL(1, t.where().sum_int(0, &cnt, 0, 1));
-    CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(2, t.where().sum_int(0, &cnt, 4, 5));
-    CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(3, t.where().sum_int(0, &cnt, 5, 6));
-    CHECK_EQUAL(1, cnt);
-
-    CHECK_EQUAL(2, t.where().sum_int(0, &cnt, 0, 2));
-    CHECK_EQUAL(2, cnt);
-    CHECK_EQUAL(5, t.where().sum_int(0, &cnt, 1, 5));
-    CHECK_EQUAL(4, cnt);
-
-    CHECK_EQUAL(3, t.where().sum_int(0, &cnt, 0, 3));
-    CHECK_EQUAL(3, cnt);
-    CHECK_EQUAL(9, t.where().sum_int(0, &cnt, 0, size_t(-1)));
-    CHECK_EQUAL(9, cnt);
+    CHECK_EQUAL(t.where().maximum_timestamp(2), Timestamp(3000, 0));
+    CHECK_EQUAL(t.where().minimum_timestamp(2), Timestamp(5, 0));
+#endif
 }
 
+#ifdef LEGACY_TESTS
 TEST(Query_SumMinMaxAvg_where)
 {
     TestTable t;
@@ -6507,24 +6291,24 @@ TEST(Query_SumMinMaxAvg_where)
     CHECK_EQUAL(0, t.where(&v).minimum_int(0));
     CHECK_EQUAL(3, t.where(&v).maximum_int(0));
 
-    size_t resindex = not_found;
+    Key resindex;
 
-    t.where(&v).maximum_int(0, nullptr, 0, -1, -1, &resindex);
+    t.where(&v).maximum_int(0, &resindex);
     CHECK_EQUAL(5, resindex);
 
-    t.where(&v).minimum_int(0, nullptr, 0, -1, -1, &resindex);
+    t.where(&v).minimum_int(0, &resindex);
     CHECK_EQUAL(6, resindex);
 
-    t.where(&v).maximum_float(3, nullptr, 0, -1, -1, &resindex);
+    t.where(&v).maximum_float(3, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where(&v).minimum_float(3, nullptr, 0, -1, -1, &resindex);
+    t.where(&v).minimum_float(3, &resindex);
     CHECK_EQUAL(8, resindex);
 
-    t.where(&v).maximum_double(4, nullptr, 0, -1, -1, &resindex);
+    t.where(&v).maximum_double(4, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where(&v).minimum_double(4, nullptr, 0, -1, -1, &resindex);
+    t.where(&v).minimum_double(4, &resindex);
     CHECK_EQUAL(8, resindex);
 
     CHECK_APPROXIMATELY_EQUAL(1, t.where(&v).average_int(0), 0.001);
@@ -6619,7 +6403,6 @@ TEST(Query_Avg2)
     CHECK_EQUAL(20, t.where().equal(1, "a").average_int(0, &cnt, 0, size_t(-1)));
     CHECK_EQUAL(3, cnt);
 }
-
 
 TEST(Query_OfByOne)
 {

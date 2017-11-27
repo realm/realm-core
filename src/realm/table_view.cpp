@@ -146,32 +146,24 @@ template size_t TableViewBase::find_first(size_t, BinaryData) const;
 
 // count_target is ignored by all <int function> except Count. Hack because of bug in optional
 // arguments in clang and vs2010 (fixed in 2012)
-template <int function, typename T, typename R, class ColType>
-R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx,
-                           T count_target, size_t* return_ndx) const
+template <Action action, typename T, typename R>
+R TableViewBase::aggregate(size_t column_ndx, T count_target, size_t* result_count, Key* return_key) const
 {
-    static_cast<void>(aggregateMethod);
     check_cookie();
     size_t non_nulls = 0;
 
-    if (return_ndx)
-        *return_ndx = npos;
+    if (return_key)
+        *return_key = null_key;
+    if (result_count)
+        *result_count = 0;
 
-    using ColTypeTraits = ColumnTypeTraits<typename ColType::value_type>;
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColTypeTraits::id);
-    REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count ||
-                 function == act_Average);
+    REALM_ASSERT(action == act_Sum || action == act_Max || action == act_Min || action == act_Count ||
+                 action == act_Average);
     REALM_ASSERT(m_table);
     REALM_ASSERT(column_ndx < m_table->get_column_count());
 
     if ((m_key_values.size() - m_num_detached_refs) == 0) {
-        if (return_ndx) {
-            if (function == act_Average)
-                *return_ndx = 0;
-            else
-                *return_ndx = npos;
-        }
-        return 0;
+        return {};
     }
 
     // typedef typename ColTypeTraits::leaf_type ArrType;
@@ -180,7 +172,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
     /*
         if (m_num_detached_refs == 0 && m_key_values.size() == column->size()) {
             // direct aggregate on the column
-            if (function == act_Count)
+            if (action == act_Count)
                 return static_cast<R>(column->count(count_target));
             else
                 return (column->*aggregateMethod)(0, size_t(-1), size_t(-1), return_ndx); // end == limit == -1
@@ -201,19 +193,20 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
     size_t row_ndx;
 */
     R res = R{};
+    size_t cnt = 0;
     {
         Key key(m_key_values.get(0));
         Obj obj = m_table->get_object(key);
         auto first = obj.get<T>(column_ndx);
 
-        if (function == act_Count) {
-            res = static_cast<R>((first == count_target ? 1 : 0));
+        if (action == act_Count) {
+            cnt = (first == count_target) ? 1 : 0;
         }
         else if (!obj.is_null(column_ndx)) { // cannot just use if(v) on float/double types
             res = static_cast<R>(util::unwrap(first));
             non_nulls++;
-            if (return_ndx) {
-                *return_ndx = 0;
+            if (return_key) {
+                *return_key = key;
             }
         }
     }
@@ -239,180 +232,165 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
         Obj obj = m_table->get_object(key);
         auto v = obj.get<T>(column_ndx);
 
-        if (function == act_Count && v == count_target) {
-            res++;
+        if (action == act_Count && v == count_target) {
+            cnt++;
         }
-        else if (function != act_Count && !obj.is_null(column_ndx)) {
+        else if (action != act_Count && !obj.is_null(column_ndx)) {
             non_nulls++;
             R unpacked = static_cast<R>(util::unwrap(v));
 
-            if (function == act_Sum || function == act_Average) {
+            if (action == act_Sum || action == act_Average) {
                 res += unpacked;
             }
-            else if ((function == act_Max && unpacked > res) || non_nulls == 1) {
+            else if ((action == act_Max && unpacked > res) || non_nulls == 1) {
                 res = unpacked;
-                if (return_ndx)
-                    *return_ndx = tv_index;
+                if (return_key)
+                    *return_key = key;
             }
-            else if ((function == act_Min && unpacked < res) || non_nulls == 1) {
+            else if ((action == act_Min && unpacked < res) || non_nulls == 1) {
                 res = unpacked;
-                if (return_ndx)
-                    *return_ndx = tv_index;
+                if (return_key)
+                    *return_key = key;
             }
         }
     }
 
-    if (function == act_Average) {
-        if (return_ndx)
-            *return_ndx = non_nulls;
+    if (action == act_Average) {
+        if (result_count)
+            *result_count = non_nulls;
         return res / (non_nulls == 0 ? 1 : non_nulls);
     }
-    else {
-        return res;
+    else if (action == act_Count) {
+        return cnt;
     }
+
+    return res;
 }
 
-// Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume we have leaf
-// types
-// and also assume numeric types that support arithmetic (+, /, etc).
+// Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume
+// numeric types that support arithmetic (+, /, etc).
 template <class C>
-Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, size_t* return_ndx) const
+Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, Key* return_key) const
 {
-    C compare = C();
-    Timestamp best = Timestamp{};
-    TimestampColumn& column = m_table->get_column_timestamp(column_ndx);
-    size_t ndx = npos;
+    C compare;
+    Timestamp best_value;
+    Key best_key;
     for (size_t t = 0; t < size(); t++) {
-        int64_t signed_row_ndx = m_key_values.get(t);
+        Key key = Key(m_key_values.get(t));
 
         // skip detached references:
-        if (signed_row_ndx == detached_ref)
+        if (key == null_key)
             continue;
 
-        auto ts = column.get(static_cast<size_t>(signed_row_ndx));
+        Obj obj = m_table->get_object(key);
+        auto ts = obj.get<Timestamp>(column_ndx);
         // Because realm::Greater(non-null, null) == false, we need to pick the initial 'best' manually when we see
         // the first non-null entry
-        if ((ndx == npos && !ts.is_null()) || compare(ts, best, ts.is_null(), best.is_null())) {
-            best = ts;
-            ndx = t;
+        if ((best_key == null_key && !ts.is_null()) || compare(ts, best_value, ts.is_null(), best_value.is_null())) {
+            best_value = ts;
+            best_key = key;
         }
     }
 
-    if (return_ndx)
-        *return_ndx = ndx;
+    if (return_key)
+        *return_key = best_key;
 
-    return best;
+    return best_value;
 }
 
 // sum
 int64_t TableViewBase::sum_int(size_t column_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Sum, int64_t>(&IntNullColumn::sum, column_ndx, 0);
+        return aggregate<act_Sum, util::Optional<int64_t>, int64_t>(column_ndx, 0);
     else {
-        return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0);
+        return aggregate<act_Sum, int64_t, int64_t>(column_ndx, 0);
     }
 }
 double TableViewBase::sum_float(size_t column_ndx) const
 {
-    return aggregate<act_Sum, float>(&FloatColumn::sum, column_ndx, 0.0);
+    return aggregate<act_Sum, float, double>(column_ndx, 0.0f);
 }
 double TableViewBase::sum_double(size_t column_ndx) const
 {
-    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_ndx, 0.0);
+    return aggregate<act_Sum, double, double>(column_ndx, 0.0);
 }
 
 // Maximum
-int64_t TableViewBase::maximum_int(size_t column_ndx, size_t* return_ndx) const
+int64_t TableViewBase::maximum_int(size_t column_ndx, Key* return_key) const
 {
     if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, 0, return_ndx);
+        return aggregate<act_Max, util::Optional<int64_t>, int64_t>(column_ndx, 0, nullptr, return_key);
     else
-        return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
+        return aggregate<act_Max, int64_t, int64_t>(column_ndx, 0, nullptr, return_key);
 }
-float TableViewBase::maximum_float(size_t column_ndx, size_t* return_ndx) const
+float TableViewBase::maximum_float(size_t column_ndx, Key* return_key) const
 {
-    return aggregate<act_Max, float>(&FloatColumn::maximum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Max, float, float>(column_ndx, 0.0f, nullptr, return_key);
 }
-double TableViewBase::maximum_double(size_t column_ndx, size_t* return_ndx) const
+double TableViewBase::maximum_double(size_t column_ndx, Key* return_key) const
 {
-    return aggregate<act_Max, double>(&DoubleColumn::maximum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Max, double, double>(column_ndx, 0.0, nullptr, return_key);
 }
-OldDateTime TableViewBase::maximum_olddatetime(size_t column_ndx, size_t* return_ndx) const
+Timestamp TableViewBase::maximum_timestamp(size_t column_ndx, Key* return_key) const
 {
-    if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, 0, return_ndx);
-    else
-        return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
-}
-
-Timestamp TableViewBase::maximum_timestamp(size_t column_ndx, size_t* return_ndx) const
-{
-    return minmax_timestamp<realm::Greater>(column_ndx, return_ndx);
+    return minmax_timestamp<realm::Greater>(column_ndx, return_key);
 }
 
 
 // Minimum
-int64_t TableViewBase::minimum_int(size_t column_ndx, size_t* return_ndx) const
+int64_t TableViewBase::minimum_int(size_t column_ndx, Key* return_key) const
 {
     if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, 0, return_ndx);
+        return aggregate<act_Min, util::Optional<int64_t>, int64_t>(column_ndx, 0, nullptr, return_key);
     else
-        return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
+        return aggregate<act_Min, int64_t, int64_t>(column_ndx, 0, nullptr, return_key);
 }
-float TableViewBase::minimum_float(size_t column_ndx, size_t* return_ndx) const
+float TableViewBase::minimum_float(size_t column_ndx, Key* return_key) const
 {
-    return aggregate<act_Min, float>(&FloatColumn::minimum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Min, float, float>(column_ndx, 0.0f, nullptr, return_key);
 }
-double TableViewBase::minimum_double(size_t column_ndx, size_t* return_ndx) const
+double TableViewBase::minimum_double(size_t column_ndx, Key* return_key) const
 {
-    return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Min, double, double>(column_ndx, 0.0, nullptr, return_key);
 }
-OldDateTime TableViewBase::minimum_olddatetime(size_t column_ndx, size_t* return_ndx) const
+Timestamp TableViewBase::minimum_timestamp(size_t column_ndx, Key* return_key) const
 {
-    if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, 0, return_ndx);
-    else
-        return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
-}
-
-Timestamp TableViewBase::minimum_timestamp(size_t column_ndx, size_t* return_ndx) const
-{
-    return minmax_timestamp<realm::Less>(column_ndx, return_ndx);
+    return minmax_timestamp<realm::Less>(column_ndx, return_key);
 }
 
 // Average. The number of values used to compute the result is written to `value_count` by callee
 double TableViewBase::average_int(size_t column_ndx, size_t* value_count) const
 {
     if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Average, int64_t>(&IntNullColumn::average, column_ndx, 0, value_count);
+        return aggregate<act_Average, util::Optional<int64_t>, double>(column_ndx, 0, value_count);
     else
-        return aggregate<act_Average, int64_t>(&IntegerColumn::average, column_ndx, 0, value_count);
+        return aggregate<act_Average, int64_t, double>(column_ndx, 0, value_count);
 }
 double TableViewBase::average_float(size_t column_ndx, size_t* value_count) const
 {
-    return aggregate<act_Average, float>(&FloatColumn::average, column_ndx, 0, value_count);
+    return aggregate<act_Average, float, double>(column_ndx, 0.0f, value_count);
 }
 double TableViewBase::average_double(size_t column_ndx, size_t* value_count) const
 {
-    return aggregate<act_Average, double>(&DoubleColumn::average, column_ndx, 0, value_count);
+    return aggregate<act_Average, double, double>(column_ndx, 0.0, value_count);
 }
 
 // Count
 size_t TableViewBase::count_int(size_t column_ndx, int64_t target) const
 {
     if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Count, int64_t, size_t, IntNullColumn>(nullptr, column_ndx, target);
+        return aggregate<act_Count, util::Optional<int64_t>, int64_t>(column_ndx, target);
     else
-        return aggregate<act_Count, int64_t, size_t, IntegerColumn>(nullptr, column_ndx, target);
+        return aggregate<act_Count, int64_t, int64_t>(column_ndx, target);
 }
 size_t TableViewBase::count_float(size_t column_ndx, float target) const
 {
-    return aggregate<act_Count, float, size_t, FloatColumn>(nullptr, column_ndx, target);
+    return aggregate<act_Count, float, float>(column_ndx, target);
 }
 size_t TableViewBase::count_double(size_t column_ndx, double target) const
 {
-    return aggregate<act_Count, double, size_t, DoubleColumn>(nullptr, column_ndx, target);
+    return aggregate<act_Count, double, double>(column_ndx, target);
 }
 
 size_t TableViewBase::count_timestamp(size_t column_ndx, Timestamp target) const

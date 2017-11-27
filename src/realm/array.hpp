@@ -73,21 +73,6 @@ Searching: The main finding function is:
 
 namespace realm {
 
-enum Action {
-    act_ReturnFirst,
-    act_Sum,
-    act_Max,
-    act_Min,
-    act_Count,
-    act_FindAll,
-    act_CallIdx,
-    act_CallbackIdx,
-    act_CallbackVal,
-    act_CallbackNone,
-    act_CallbackBoth,
-    act_Average
-};
-
 template <class T>
 inline T no0(T v)
 {
@@ -110,8 +95,6 @@ const size_t not_found = npos;
 class Array;
 class StringColumn;
 class GroupWriter;
-template <class T>
-class QueryState;
 namespace _impl {
 class ArrayWriterBase;
 }
@@ -1058,24 +1041,11 @@ private:
     friend class StringColumn;
 };
 
-
 // Implementation:
-
-class QueryStateBase {
-    virtual void dyncast()
-    {
-    }
-};
-
 template <>
 class QueryState<int64_t> : public QueryStateBase {
 public:
     int64_t m_state;
-    size_t m_match_count;
-    size_t m_limit;
-    size_t m_minmax_index; // used only for min/max, to save index of current min/max value
-    int64_t m_key_offset;
-    const Array* m_key_values;
 
     template <Action action>
     bool uses_val()
@@ -1086,13 +1056,9 @@ public:
             return false;
     }
 
-    void init(Action action, IntegerColumn* akku, size_t limit)
+    QueryState(Action action, IntegerColumn* akku = nullptr, size_t limit = -1)
+        : QueryStateBase(limit)
     {
-        m_match_count = 0;
-        m_limit = limit;
-        m_minmax_index = not_found;
-        m_key_values = nullptr;
-
         if (action == act_Max)
             m_state = -0x7fffffffffffffffLL - 1LL;
         else if (action == act_Min)
@@ -1136,13 +1102,13 @@ public:
         if (action == act_Max) {
             if (value > m_state) {
                 m_state = value;
-                m_minmax_index = index;
+                m_minmax_index = m_key_values ? m_key_values->get(index) + m_key_offset : index;
             }
         }
         else if (action == act_Min) {
             if (value < m_state) {
                 m_state = value;
-                m_minmax_index = index;
+                m_minmax_index = m_key_values ? m_key_values->get(index) + m_key_offset : index;
             }
         }
         else if (action == act_Sum)
@@ -1152,13 +1118,8 @@ public:
             m_match_count = size_t(m_state);
         }
         else if (action == act_FindAll) {
-            if (m_key_values) {
-                int64_t key_value = m_key_values->get(index) + m_key_offset;
-                Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), key_value);
-            }
-            else {
-                Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
-            }
+            int64_t key_value = m_key_values ? m_key_values->get(index) + m_key_offset : index;
+            Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), key_value);
         }
         else if (action == act_ReturnFirst) {
             m_state = index;
@@ -1185,13 +1146,9 @@ public:
             m_match_count = size_t(m_state);
         }
         else if (action == act_FindAll) {
-            if (m_key_values) {
-                int64_t key_value = m_key_values->get(index) + m_key_offset;
-                Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), key_value);
-            }
-            else {
-                Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
-            }
+            REALM_ASSERT(m_key_values);
+            int64_t key_value = m_key_values->get(index) + m_key_offset;
+            Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), key_value);
         }
         else if (action == act_ReturnFirst) {
             m_match_count++;
@@ -1207,9 +1164,6 @@ template <class R>
 class QueryState : public QueryStateBase {
 public:
     R m_state;
-    size_t m_match_count;
-    size_t m_limit;
-    size_t m_minmax_index; // used only for min/max, to save index of current min/max value
 
     template <Action action>
     bool uses_val()
@@ -1217,18 +1171,17 @@ public:
         return (action == act_Max || action == act_Min || action == act_Sum || action == act_Count);
     }
 
-    void init(Action action, Array*, size_t limit)
+    QueryState(Action action, Array* = nullptr, size_t limit = -1)
+        : QueryStateBase(limit)
     {
         REALM_ASSERT((std::is_same<R, float>::value || std::is_same<R, double>::value));
-        m_match_count = 0;
-        m_limit = limit;
-        m_minmax_index = not_found;
-
         if (action == act_Max)
             m_state = -std::numeric_limits<R>::infinity();
         else if (action == act_Min)
             m_state = std::numeric_limits<R>::infinity();
         else if (action == act_Sum)
+            m_state = 0.0;
+        else if (action == act_Count)
             m_state = 0.0;
         else {
             REALM_ASSERT_DEBUG(false);
@@ -1252,13 +1205,15 @@ public:
             if (action == act_Max) {
                 if (value > m_state) {
                     m_state = value;
-                    m_minmax_index = index;
+                    REALM_ASSERT(m_key_values);
+                    m_minmax_index = m_key_values->get(index) + m_key_offset;
                 }
             }
             else if (action == act_Min) {
                 if (value < m_state) {
                     m_state = value;
-                    m_minmax_index = index;
+                    REALM_ASSERT(m_key_values);
+                    m_minmax_index = m_key_values->get(index) + m_key_offset;
                 }
             }
             else if (action == act_Sum)
@@ -3096,9 +3051,8 @@ template <class cond>
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
     REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
-    QueryState<int64_t> state;
-    state.init(act_ReturnFirst, nullptr,
-               1); // todo, would be nice to avoid this in order to speed up find_first loops
+    // todo, would be nice to avoid this in order to speed up find_first loops
+    QueryState<int64_t> state(act_ReturnFirst, nullptr, 1);
     Finder finder = m_vtable->finder[cond::condition];
     (this->*finder)(value, start, end, 0, &state);
 

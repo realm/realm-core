@@ -637,16 +637,14 @@ public:
     int64_t sum_int(size_t column_ndx) const;
     double sum_float(size_t column_ndx) const;
     double sum_double(size_t column_ndx) const;
-    int64_t maximum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    float maximum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    double maximum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    OldDateTime maximum_olddatetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    Timestamp maximum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    int64_t minimum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    float minimum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    double minimum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    OldDateTime minimum_olddatetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    Timestamp minimum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    int64_t maximum_int(size_t column_ndx, Key* return_ndx = nullptr) const;
+    float maximum_float(size_t column_ndx, Key* return_ndx = nullptr) const;
+    double maximum_double(size_t column_ndx, Key* return_ndx = nullptr) const;
+    Timestamp maximum_timestamp(size_t column_ndx, Key* return_ndx = nullptr) const;
+    int64_t minimum_int(size_t column_ndx, Key* return_ndx = nullptr) const;
+    float minimum_float(size_t column_ndx, Key* return_ndx = nullptr) const;
+    double minimum_double(size_t column_ndx, Key* return_ndx = nullptr) const;
+    Timestamp minimum_timestamp(size_t column_ndx, Key* return_ndx = nullptr) const;
     double average_int(size_t column_ndx, size_t* value_count = nullptr) const;
     double average_float(size_t column_ndx, size_t* value_count = nullptr) const;
     double average_double(size_t column_ndx, size_t* value_count = nullptr) const;
@@ -1375,6 +1373,10 @@ private:
 #ifdef REALM_DEBUG
     void to_dot_internal(std::ostream&) const;
 #endif
+    template <Action action, typename T, typename R>
+    R aggregate(size_t column_ndx, T value = {}, size_t* resultcount = nullptr, Key* return_ndx = nullptr) const;
+    template <typename T>
+    double average(size_t column_ndx, size_t* resultcount) const;
 
     friend class SubtableNode;
     friend class _impl::TableFriend;
