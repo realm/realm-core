@@ -473,25 +473,51 @@ TEST_CASE("list") {
             REQUIRE_INDICES(change.deletions, 5);
         }
 
-        // Test case to reproduce part of Java issue https://github.com/realm/realm-java/issues/5507
-        SECTION("changes are sent in initial notification after on_change called (another token has been added and removed)") {
-            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        SECTION("changes are sent in initial notification after removing and then re-adding callback") {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
                 REQUIRE(false);
             });
-            token = {}; // The problem doesn't happen without removing token.
+            token = {};
 
-            r2->begin_transaction();
-            r2_lv->remove(5);
-            r2->commit_transaction();
+            auto write = [&] {
+                r2->begin_transaction();
+                r2_lv->remove(5);
+                r2->commit_transaction();
+            };
 
-            coordinator.on_change(); // The problem doesn't happen without this line.
+            SECTION("add new callback before transaction") {
+                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                    change = c;
+                });
 
-            token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                change = c;
-            });
+                write();
 
-            advance_and_notify(*r);
-            REQUIRE_INDICES(change.deletions, 5);
+                advance_and_notify(*r);
+                REQUIRE_INDICES(change.deletions, 5);
+            }
+
+            SECTION("add new callback after transaction") {
+                write();
+
+                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                    change = c;
+                });
+
+                advance_and_notify(*r);
+                REQUIRE_INDICES(change.deletions, 5);
+            }
+
+            SECTION("add new callback after transaction and after changeset was calculated") {
+                write();
+                coordinator.on_change();
+
+                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                    change = c;
+                });
+
+                advance_and_notify(*r);
+                REQUIRE_INDICES(change.deletions, 5);
+            }
         }
     }
 
