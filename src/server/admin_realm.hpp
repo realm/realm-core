@@ -23,7 +23,6 @@
 #include "shared_realm.hpp"
 #include "sync/sync_config.hpp"
 
-#include <functional>
 #include <memory>
 
 namespace realm {
@@ -33,15 +32,20 @@ class SyncSession;
 
 class AdminRealmListener : public std::enable_shared_from_this<AdminRealmListener> {
 public:
-    AdminRealmListener(std::string local_root, std::string server_base_url, std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback);
-    void start(std::function<void(std::vector<std::string>)> register_callback);
+    AdminRealmListener(std::string local_root, std::string server_base_url,
+                       std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback);
+
+    void start();
+
+    virtual void register_realm(StringData virtual_path) = 0;
+    virtual void download_complete() = 0;
+    virtual void error(std::exception_ptr) = 0;
 
 private:
     Realm::Config m_config;
-    SharedRealm m_realm;
     Results m_results;
     NotificationToken m_notification_token;
-    std::shared_ptr<SyncSession> m_downloading_session;
+    std::shared_ptr<SyncSession> m_download_session;
 };
 
 } // namespace realm

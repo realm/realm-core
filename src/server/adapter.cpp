@@ -17,8 +17,11 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "adapter.hpp"
-#include "object_store.hpp"
+
+#include "admin_realm.hpp"
+#include "impl/realm_coordinator.hpp"
 #include "object_schema.hpp"
+#include "object_store.hpp"
 
 #include <realm/sync/changeset_cooker.hpp>
 #include <realm/sync/changeset_parser.hpp>
@@ -517,34 +520,98 @@ public:
     }
 };
 
+class Adapter::Impl : public AdminRealmListener {
+public:
+    Impl(std::function<void(std::string)> realm_changed, std::regex regex,
+         std::string local_root_dir, std::string server_base_url,
+         std::shared_ptr<SyncUser> user,
+         std::function<SyncBindSessionHandler> bind_callback);
 
-Adapter::Adapter(std::function<void(std::string)> realm_changed,
-                 std::string local_root_dir, std::string server_base_url,
-                 std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback, std::regex regex)
-: m_global_notifier(GlobalNotifier::shared_notifier(
-    std::make_unique<Adapter::Callback>(std::move(realm_changed), regex),
-                                        local_root_dir, server_base_url, user, std::move(bind_callback),
-                                        std::make_shared<ChangesetCooker>()))
+    Realm::Config get_config(StringData virtual_path, util::Optional<Schema> schema) const;
+
+    using AdminRealmListener::start;
+
+private:
+    void register_realm(StringData virtual_path) override;
+    void error(std::exception_ptr) override {} // FIXME
+    void download_complete() override {}
+
+    const std::string m_server_base_url;
+    std::shared_ptr<SyncUser> m_user;
+    std::function<SyncBindSessionHandler> m_bind_callback;
+    std::string m_regular_realms_dir;
+
+    std::function<void(std::string)> m_realm_changed;
+    std::regex m_regex;
+
+    std::vector<std::shared_ptr<_impl::RealmCoordinator>> m_realms;
+};
+
+Adapter::Impl::Impl(std::function<void(std::string)> realm_changed, std::regex regex,
+                    std::string local_root_dir, std::string server_base_url,
+                    std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback)
+: AdminRealmListener(local_root_dir, server_base_url, user, bind_callback)
+, m_server_base_url(std::move(server_base_url))
+, m_user(std::move(user))
+, m_bind_callback(std::move(bind_callback))
+, m_regular_realms_dir(util::File::resolve("realms", local_root_dir)) // Throws
+, m_realm_changed(std::move(realm_changed))
+, m_regex(std::move(regex))
 {
-    m_global_notifier->start();
+    util::try_make_dir(m_regular_realms_dir); // Throws
 }
 
-std::vector<bool> Adapter::Callback::available(const std::vector<std::string>& realms) {
-    std::vector<bool> watch;
-    for (auto& realm_name : realms) {
-        watch.push_back(std::regex_match(realm_name, m_regex));
+Realm::Config Adapter::Impl::get_config(StringData virtual_path, util::Optional<Schema> schema) const {
+    Realm::Config config;
+    if (schema) {
+        config.schema = std::move(schema);
+        config.schema_version = 0;
     }
-    return watch;
+
+    std::string file_path = m_regular_realms_dir + virtual_path.data() + ".realm";
+    for (size_t pos = m_regular_realms_dir.size(); pos != file_path.npos; pos = file_path.find('/', pos + 1)) {
+        file_path[pos] = '\0';
+        util::try_make_dir(file_path);
+        file_path[pos] = '/';
+    }
+
+    config.path = std::move(file_path);
+    config.sync_config = std::make_unique<SyncConfig>(m_user, m_server_base_url + virtual_path.data());
+    config.sync_config->bind_session_handler = m_bind_callback;
+    config.schema_mode = SchemaMode::Additive;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    return config;
 }
 
-void Adapter::Callback::realm_changed(GlobalNotifier::ChangeNotification changes) {
-    if (m_realm_changed) {
-        m_realm_changed(changes.realm_path);
-    }
+void Adapter::Impl::register_realm(StringData virtual_path) {
+    std::string path = virtual_path;
+    if (!std::regex_match(path, m_regex))
+        return;
+
+    auto config = get_config(path, util::none);
+    config.sync_config->transformer = std::make_shared<ChangesetCooker>();
+    auto coordinator = _impl::RealmCoordinator::get_coordinator(config);
+    std::weak_ptr<Impl> weak_self = std::static_pointer_cast<Impl>(shared_from_this());
+    coordinator->set_transaction_callback([path = std::move(path), weak_self = std::move(weak_self)](VersionID, VersionID) {
+        if (auto self = weak_self.lock())
+            self->m_realm_changed(path);
+    });
+    m_realms.push_back(coordinator);
+}
+
+Adapter::Adapter(std::function<void(std::string)> realm_changed, std::string local_root_dir,
+                 std::string server_base_url, std::shared_ptr<SyncUser> user,
+                 std::function<SyncBindSessionHandler> bind_callback, std::regex regex)
+: m_impl(std::make_shared<Adapter::Impl>(std::move(realm_changed), std::move(regex),
+                                         std::move(local_root_dir), std::move(server_base_url),
+                                         std::move(user), std::move(bind_callback)))
+{
+    m_impl->start();
 }
 
 util::Optional<Adapter::ChangeSet> Adapter::current(std::string realm_path) {
-    auto realm = realm::Realm::get_shared_realm(m_global_notifier->get_config(realm_path));
+    auto realm = realm::Realm::get_shared_realm(m_impl->get_config(realm_path, util::none));
 
     REALM_ASSERT(dynamic_cast<sync::ClientHistory *>(realm->history()));
     auto sync_history = static_cast<sync::ClientHistory *>(realm->history());
@@ -556,11 +623,11 @@ util::Optional<Adapter::ChangeSet> Adapter::current(std::string realm_path) {
 
     util::AppendBuffer<char> buffer;
     sync_history->get_cooked_changeset(progress.changeset_index, buffer);
-    return ChangeSet(nlohmann::json::parse(std::string(buffer.data(), buffer.size())), realm);
+    return ChangeSet{nlohmann::json::parse(buffer.data(), buffer.data() + buffer.size()), std::move(realm)};
 }
 
 void Adapter::advance(std::string realm_path) {
-    auto realm = realm::Realm::get_shared_realm(m_global_notifier->get_config(realm_path));
+    auto realm = realm::Realm::get_shared_realm(m_impl->get_config(realm_path, util::none));
     auto sync_history = static_cast<sync::ClientHistory *>(realm->history());
     auto progress = sync_history->get_cooked_progress();
     if (progress.changeset_index < sync_history->get_num_cooked_changesets()) {
@@ -570,8 +637,6 @@ void Adapter::advance(std::string realm_path) {
     realm->invalidate();
 }
 
-realm::Realm::Config Adapter::get_config(std::string path,
-                                         util::Optional<Schema> schema) {
-    auto config = m_global_notifier->get_config(path, std::move(schema));
-    return config;
+realm::Realm::Config Adapter::get_config(std::string path, util::Optional<Schema> schema) {
+    return m_impl->get_config(path, std::move(schema));
 }

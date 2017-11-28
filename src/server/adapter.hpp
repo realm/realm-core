@@ -19,11 +19,10 @@
 #ifndef REALM_SYNC_ADAPTER_HPP
 #define REALM_SYNC_ADAPTER_HPP
 
-#include "global_notifier.hpp"
-#include "property.hpp"
+#include "shared_realm.hpp"
+#include "sync/sync_config.hpp"
 
 #include <json.hpp>
-#include <set>
 #include <regex>
 
 namespace realm {
@@ -33,7 +32,8 @@ class SyncUser;
 class Adapter {
 public:
     Adapter(std::function<void(std::string)> realm_changed, std::string local_root_dir,
-            std::string server_base_url, std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback, std::regex regex);
+            std::string server_base_url, std::shared_ptr<SyncUser> user,
+            std::function<SyncBindSessionHandler> bind_callback, std::regex regex);
 
     enum class InstructionType {
         Insert,
@@ -63,9 +63,7 @@ public:
         }
     }
 
-    class ChangeSet {
-    public:
-        ChangeSet(nlohmann::json instructions, SharedRealm realm) : json(instructions), realm(realm) {}
+    struct ChangeSet {
         const nlohmann::json json;
         const SharedRealm realm;
     };
@@ -73,23 +71,13 @@ public:
     util::Optional<ChangeSet> current(std::string realm_path);
     void advance(std::string realm_path);
 
-    realm::Realm::Config get_config(std::string path, util::Optional<Schema> schema = util::none);
+    Realm::Config get_config(std::string path, util::Optional<Schema> schema = util::none);
 
-    void close() { m_global_notifier.reset(); }
+    void close() { m_impl.reset(); }
 
 private:
-    std::shared_ptr<GlobalNotifier> m_global_notifier;
-
-    class Callback : public GlobalNotifier::Callback {
-    public:
-        Callback(std::function<void(std::string)> changed, std::regex regex) : m_realm_changed(changed), m_regex(regex) {}
-        virtual std::vector<bool> available(const std::vector<std::string>& realms);
-        virtual void realm_changed(GlobalNotifier::ChangeNotification changes);
-
-    private:
-        std::function<void(std::string)> m_realm_changed;
-        std::regex m_regex;
-    };
+    class Impl;
+    std::shared_ptr<Impl> m_impl;
 };
 
 } // namespace realm

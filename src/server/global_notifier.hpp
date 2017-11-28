@@ -19,156 +19,95 @@
 #ifndef REALM_OBJECT_STORE_GLOBAL_NOTIFIER_HPP
 #define REALM_OBJECT_STORE_GLOBAL_NOTIFIER_HPP
 
-#include "admin_realm.hpp"
+#include "collection_notifier.hpp"
 #include "shared_realm.hpp"
 #include "sync/sync_config.hpp"
 
-#include <realm/version_id.hpp>
-
-#include <condition_variable>
-#include <mutex>
-#include <queue>
-#include <unordered_map>
-
 namespace realm {
-namespace util {
-    template<typename> class EventLoopSignal;
-}
-
 class SyncUser;
-class SyncSession;
 
 /// Used to listen for changes across all, or a subset of all Realms on a
 /// particular sync server.
-class GlobalNotifier : public std::enable_shared_from_this<GlobalNotifier>  {
+class GlobalNotifier {
 public:
     class Callback;
-
-    using ChangesetTransformer = sync::ClientHistory::ChangesetCooker;
-    static std::shared_ptr<GlobalNotifier> shared_notifier(std::unique_ptr<Callback> callback, std::string local_root_dir,
-                                                           std::string server_base_url, std::shared_ptr<SyncUser> user,
-                                                           std::function<SyncBindSessionHandler> bind_callback,
-                                                           std::shared_ptr<ChangesetTransformer> transformer = nullptr);
-    ~GlobalNotifier();
-
-    // Start listening. No callbacks will be called until this function is
-    // called. Must be called on the thread which notifications should be
-    // delivered on.
-    void start();
-
-    // Stop calling callbacks until resume() is called. Must be called on the
-    // notification thread.
-    void pause();
-    // Resume calling callbacks after a call to pause(). Must be called on the
-    // notification thread.
-    void resume();
-
-    // Returns true if there are any Realms with calculated changes waiting to
-    // be delivered.
-    // Thread-safe, but probably only makes sense on the notification thread.
-    bool has_pending();
-
-    // Returns the target callback
-    Callback *target() { return m_target.get(); }
-
-    class ChangeNotification {
-    public:
-        // The virtual server path of the Realm which changed.
-        std::string realm_path;
-
-        // The Realm which changed, at the version immediately before the changes
-        // made. `modifications` and `deletions` within the change sets are indices
-        // in this Realm.
-        // This will be nullptr for the initial notification of a Realm which
-        // already existed when the GlobalNotifier was created.
-        SharedRealm get_old_realm() const;
-
-        // The Realm which changed, at the first version including the changes made.
-        // `modifications_new` and `insertions` within the change sets are indices
-        // in this Realm.
-        SharedRealm get_new_realm() const;
-
-        // The actual changes made, keyed on object name.
-        // This will be empty if the Realm already existed before the
-        // GlobalNotifier was started.
-        std::unordered_map<std::string, CollectionChangeSet> const& get_changes() const noexcept { return m_changes; }
-
-        ChangeNotification(ChangeNotification&&) = default;
-        ChangeNotification& operator=(ChangeNotification&&) = default;
-        ChangeNotification(ChangeNotification const&) = delete;
-        ChangeNotification& operator=(ChangeNotification const&) = delete;
-
-    private:
-        VersionID m_old_version;
-        VersionID m_new_version;
-        SharedRealm m_realm;
-        std::unordered_map<std::string, CollectionChangeSet> m_changes;
-
-        ChangeNotification(std::string path, VersionID old_version, VersionID new_version,
-                           SharedRealm, std::unordered_map<std::string, CollectionChangeSet>);
-        ChangeNotification() = default;
-
-        friend class GlobalNotifier;
-    };
-
-    realm::Realm::Config get_config(std::string const& path, util::Optional<Schema> schema = util::none);
-
-private:
     GlobalNotifier(std::unique_ptr<Callback>, std::string local_root_dir,
                    std::string server_base_url, std::shared_ptr<SyncUser> user,
-                   std::function<SyncBindSessionHandler> bind_callback,
-                   std::shared_ptr<ChangesetTransformer> transformer);
+                   std::function<SyncBindSessionHandler> bind_callback);
+    ~GlobalNotifier();
 
-    std::shared_ptr<AdminRealmListener> m_admin;
-    const std::unique_ptr<Callback> m_target;
-    const std::string m_server_base_url;
-    std::shared_ptr<SyncUser> m_user;
-    std::function<SyncBindSessionHandler> m_bind_callback;
-    std::string m_regular_realms_dir;
+    // Returns the target callback
+    Callback& target();
 
-    std::unordered_map<std::string, std::shared_ptr<_impl::RealmCoordinator>> m_listen_entries;
-    std::unordered_map<std::string, std::string> m_realm_ids;
+    void start();
 
-    std::shared_ptr<ChangesetTransformer> m_transformer = nullptr;
+    Realm::Config get_config(std::string const& path, util::Optional<Schema> schema = util::none);
 
-    std::mutex m_work_queue_mutex;
-    std::condition_variable m_work_queue_cv;
-    struct RealmToCalculate {
-        std::string path;
-        std::shared_ptr<Realm> realm;
-        VersionID target_version;
-    };
-    std::queue<RealmToCalculate> m_work_queue;
-    std::thread m_work_thread;
-    bool m_shutdown = false;
+    class ChangeNotification;
+    util::Optional<ChangeNotification> next_changed_realm();
 
-    std::mutex m_deliver_queue_mutex;
-    std::queue<ChangeNotification> m_pending_deliveries;
+private:
+    class Impl;
+    std::shared_ptr<Impl> m_impl;
 
-    bool m_waiting = false;
+    GlobalNotifier(std::shared_ptr<Impl> impl) : m_impl(std::move(impl)) {}
+};
 
-    void register_realms(std::vector<std::string>);
-    void register_realm(const std::string& path);
+class GlobalNotifier::ChangeNotification {
+public:
+    // The virtual server path of the Realm which changed.
+    std::string realm_path;
 
-    void on_change();
-    void calculate();
+    // The Realm which changed, at the version immediately before the changes
+    // made. `modifications` and `deletions` within the change sets are indices
+    // in this Realm.
+    // This will be nullptr for the initial notification of a Realm which
+    // already existed when the GlobalNotifier was created.
+    SharedRealm get_old_realm() const;
 
-    struct SignalCallback {
-        std::weak_ptr<GlobalNotifier> notifier;
-        void (GlobalNotifier::*method)();
-        void operator()()
-        {
-            if (auto alive = notifier.lock())
-                (alive.get()->*method)();
-        }
-    };
+    // The Realm which changed, at the first version including the changes made.
+    // `modifications_new` and `insertions` within the change sets are indices
+    // in this Realm.
+    SharedRealm get_new_realm() const;
 
-    std::shared_ptr<util::EventLoopSignal<SignalCallback>> m_signal;
+    // The actual changes made, keyed on object name.
+    // This will be empty if the Realm already existed before the
+    // GlobalNotifier was started.
+    std::unordered_map<std::string, CollectionChangeSet> const& get_changes() const;
+
+    ~ChangeNotification();
+
+    ChangeNotification(ChangeNotification&&) = default;
+    ChangeNotification& operator=(ChangeNotification&&) = default;
+    ChangeNotification(ChangeNotification const&) = delete;
+    ChangeNotification& operator=(ChangeNotification const&) = delete;
+
+private:
+    ChangeNotification(std::shared_ptr<GlobalNotifier::Impl> notifier,
+                       std::string virtual_path,
+                       Realm::Config config,
+                       VersionID old_version, VersionID new_version);
+    Realm::Config m_config;
+    VersionID m_old_version;
+    VersionID m_new_version;
+    std::shared_ptr<GlobalNotifier::Impl> m_notifier;
+    mutable std::unordered_map<std::string, CollectionChangeSet> m_changes;
+    mutable bool m_have_calculated_changes = false;
+
+    ChangeNotification() = default;
+
+    friend class GlobalNotifier;
 };
 
 class GlobalNotifier::Callback {
 public:
     virtual ~Callback();
+
+    /// Called when the initial download of the admin realm is complete and observation is beginning
+    virtual void download_complete() = 0;
+
+    /// Called when any error occurs within the global notifier
+    virtual void error(std::exception_ptr) = 0;
 
     /// Called to determine whether the application wants to listen for changes
     /// to a particular Realm.
@@ -178,26 +117,15 @@ public:
     /// *virtual path*, i.e, it is not necesarily the file system path of the
     /// Realm on the server.
     ///
+    /// If this function returns false, the global notifier will not observe
+    /// the Realm.
+    ///
     /// \param name The name (virtual path) by which the server knows that
     /// Realm.
-    virtual std::vector<bool> available(const std::vector<std::string>& realms) = 0;
+    virtual bool realm_available(std::string const& virtual_path) = 0;
 
-    /// Called when a Realm  has changed due to a transaction performed on behalf
-    /// of the synchronization mechanism. This function is not called as a
-    /// result of changing the Realm locally.
-    ///
-    /// This will also be called once for each Realm which already exists locally
-    /// on disk when the notifier is started, even if there are no m_changes.
-    ///
-    /// \param new_realm The Realm which changed, with the changes applied.
-    /// `modifications_new` and `insertions` within the change sets are indices
-    /// in this Realm.
-    ///
-    /// \param changes The changes for each object type which changed. Will be
-    /// empty only if this is a notification of a pre-existing Realm. Sync
-    /// transactions which do not have any data changes do not produce a
-    /// notification at all.
-    virtual void realm_changed(GlobalNotifier::ChangeNotification changes) = 0;
+    /// Called when a new version is available in an observed Realm.
+    virtual void realm_changed(GlobalNotifier*) = 0;
 };
 
 } // namespace realm

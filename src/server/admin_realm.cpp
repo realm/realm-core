@@ -37,7 +37,9 @@
 using namespace realm;
 using namespace realm::_impl;
 
-AdminRealmListener::AdminRealmListener(std::string local_root, std::string server_base_url, std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback)
+AdminRealmListener::AdminRealmListener(std::string local_root, std::string server_base_url,
+                                       std::shared_ptr<SyncUser> user,
+                                       std::function<SyncBindSessionHandler> bind_callback)
 {
     m_config.cache = false;
     m_config.path = util::File::resolve("realms.realm", local_root);
@@ -46,54 +48,63 @@ AdminRealmListener::AdminRealmListener(std::string local_root, std::string serve
     m_config.sync_config->bind_session_handler = std::move(bind_callback);
 }
 
-void AdminRealmListener::start(std::function<void(std::vector<std::string>)> callback)
+void AdminRealmListener::start()
 {
-    m_downloading_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
+    if (m_download_session) {
+        // If we're already downloading the Realm, don't need to do anything
+        return;
+    }
+
+    if (auto realm = m_results.get_realm()) {
+        // If we've finished downloading the Realm, just re-report all the files listed in it
+        auto& table = *ObjectStore::table_for_object_type(realm->read_group(), "RealmFile");
+        size_t path_col_ndx = table.get_column_index("path");
+
+        for (size_t i = 0, size = table.size(); i < size; ++i)
+            register_realm(table.get_string(path_col_ndx, i));
+        return;
+    }
+
+    m_download_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
     std::weak_ptr<AdminRealmListener> weak_self = shared_from_this();
-    EventLoopDispatcher<void(std::error_code)> download_callback([weak_self, this, callback](std::error_code ec) {
+    EventLoopDispatcher<void(std::error_code)> download_callback([weak_self, this](std::error_code ec) {
         auto self = weak_self.lock();
         if (!self)
             return;
 
-        auto cleanup = util::make_scope_exit([&]() noexcept { m_downloading_session.reset(); });
+        auto cleanup = util::make_scope_exit([&]() noexcept { m_download_session.reset(); });
         if (ec) {
             if (ec == util::error::operation_aborted)
                 return;
-            throw std::system_error(ec);
+            error(std::make_exception_ptr(std::system_error(ec)));
+            return;
         }
+        download_complete();
 
-        m_realm = Realm::get_shared_realm(m_config);
-        m_results = Results(m_realm, *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile"));
-        m_notification_token = m_results.add_notification_callback([weak_self, this, callback](CollectionChangeSet changes, std::exception_ptr) {
+        auto realm = Realm::get_shared_realm(m_config);
+        m_results = Results(realm, *ObjectStore::table_for_object_type(realm->read_group(), "RealmFile"));
+        m_notification_token = m_results.add_notification_callback([=](CollectionChangeSet const& changes, std::exception_ptr err) {
             auto self = weak_self.lock();
             if (!self)
                 return;
+            if (err) {
+                error(err);
+                return;
+            }
 
-            auto& table = *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile");
+            auto& table = *ObjectStore::table_for_object_type(realm->read_group(), "RealmFile");
             size_t path_col_ndx = table.get_column_index("path");
-            std::vector<std::string> realms;
-
-            auto add_realm = [&](auto index) {
-                std::string realm_path = table.get_string(path_col_ndx, index);
-                realms.emplace_back(std::move(realm_path));
-            };
 
             if (changes.empty()) {
-                for (size_t i = 0, size = table.size(); i < size; ++i) {
-                    add_realm(i);
-                }
+                for (size_t i = 0, size = table.size(); i < size; ++i)
+                    register_realm(table.get_string(path_col_ndx, i));
             }
             else {
-                for (auto i : changes.insertions.as_indexes()) {
-                    add_realm(i);
-                }
-            }
-
-            if (realms.size()) {
-                callback(std::move(realms));
+                for (auto i : changes.insertions.as_indexes())
+                    register_realm(table.get_string(path_col_ndx, i));
             }
         });
     });
-    bool result = m_downloading_session->wait_for_download_completion(std::move(download_callback));
+    bool result = m_download_session->wait_for_download_completion(std::move(download_callback));
     REALM_ASSERT_RELEASE(result);
 }
