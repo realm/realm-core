@@ -182,10 +182,6 @@ public:
     {
         return true;
     }
-    bool merge_rows(size_t, size_t)
-    {
-        return true;
-    }
     bool clear_table(size_t)
     {
         return true;
@@ -358,7 +354,6 @@ public:
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows, bool unordered);
     bool swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     bool move_row(size_t from_ndx, size_t to_ndx);
-    bool merge_rows(size_t row_ndx, size_t new_row_ndx);
     bool clear_table(size_t old_table_size);
 
     bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t, Instruction = instr_Set, size_t = 0);
@@ -532,7 +527,6 @@ public:
 
     virtual void swap_rows(const Table*, size_t row_ndx_1, size_t row_ndx_2);
     virtual void move_row(const Table*, size_t from_ndx, size_t to_ndx);
-    virtual void merge_rows(const Table*, size_t row_ndx, size_t new_row_ndx);
     virtual void add_search_index(const Table*, size_t col_ndx);
     virtual void remove_search_index(const Table*, size_t col_ndx);
     virtual void set_link_type(const Table*, size_t col_ndx, LinkType);
@@ -1480,18 +1474,6 @@ inline void TransactLogConvenientEncoder::move_row(const Table* t, size_t from_n
     m_encoder.move_row(from_ndx, to_ndx);
 }
 
-inline bool TransactLogEncoder::merge_rows(size_t row_ndx, size_t new_row_ndx)
-{
-    append_simple_instr(instr_MergeRows, row_ndx, new_row_ndx); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::merge_rows(const Table* t, size_t row_ndx, size_t new_row_ndx)
-{
-    select_table(t); // Throws
-    m_encoder.merge_rows(row_ndx, new_row_ndx);
-}
-
 inline bool TransactLogEncoder::add_search_index(size_t col_ndx)
 {
     append_simple_instr(instr_AddSearchIndex, col_ndx); // Throws
@@ -1897,13 +1879,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-        case instr_MergeRows: {
-            size_t row_ndx = read_int<size_t>();           // Throws
-            size_t new_row_ndx = read_int<size_t>();       // Throws
-            if (!handler.merge_rows(row_ndx, new_row_ndx)) // Throws
-                parser_error();
+        case instr_MergeRows:
+            parser_error();
             return;
-        }
         case instr_SelectTable: {
             int levels = read_int<int>(); // Throws
             if (levels < 0 || levels > m_max_levels)
@@ -2395,19 +2373,6 @@ public:
     bool move_row(size_t from_ndx, size_t to_ndx)
     {
         m_encoder.move_row(to_ndx, from_ndx);
-        append_instruction();
-        return true;
-    }
-
-    bool merge_rows(size_t row_ndx, size_t new_row_ndx)
-    {
-        // There is no instruction we can generate here to change back.
-        // However, we do need to refresh accessors for any tables
-        // connected through backlinks, so we generate updates on each
-        // affected row by merging to itself.
-        m_encoder.merge_rows(row_ndx, row_ndx);
-        append_instruction();
-        m_encoder.merge_rows(new_row_ndx, new_row_ndx);
         append_instruction();
         return true;
     }

@@ -1711,38 +1711,6 @@ TEST(Table_SetUniqueLoserAccessorUpdates)
 }
 
 
-TEST(Table_AccessorsUpdateAfterMergeRows)
-{
-    Group g;
-    TableRef origin = g.add_table("origin");
-    TableRef target = g.add_table("target");
-
-    target->add_column(type_Int, "col");
-    target->add_empty_row(6);
-
-    origin->add_column_link(type_Link, "link_column", *target);
-    origin->add_empty_row(3);
-    origin->set_link(0, 0, 0);
-    origin->set_link(0, 1, 1);
-    origin->set_link(0, 2, 2);
-
-    Row row_0 = (*origin)[0];
-    Row row_1 = (*origin)[1];
-
-    CHECK(row_0.is_attached());
-    CHECK(row_1.is_attached());
-    CHECK_EQUAL(row_0.get_index(), 0);
-    CHECK_EQUAL(row_1.get_index(), 1);
-
-    origin->merge_rows(1, 2);
-
-    CHECK(row_0.is_attached());
-    CHECK(row_1.is_attached());
-    CHECK_EQUAL(row_0.get_index(), 0);
-    CHECK_EQUAL(row_1.get_index(), 2);
-}
-
-
 TEST(Table_Distinct)
 {
     TestTableEnum table;
@@ -7717,62 +7685,6 @@ TEST(Table_MoveRow)
 }
 
 
-TEST(Table_MergeRows_Links)
-{
-    Group g;
-
-    TableRef t0 = g.add_table("t0");
-    TableRef t1 = g.add_table("t1");
-    t0->add_column_link(type_Link, "link", *t1);
-    t1->add_column(type_Int, "int");
-    t0->add_empty_row(2);
-    t1->add_empty_row(2);
-    for (int i = 0; i < 2; ++i) {
-        t0->set_link(0, i, i);
-        t1->set_int(0, i, i);
-    }
-    t1->add_empty_row();
-
-    Row replaced_row = t1->get(0);
-    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 1);
-    t1->merge_rows(0, 2);
-    CHECK(replaced_row.is_attached());
-    CHECK_EQUAL(t0->get_link(0, 0), 2);
-    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
-}
-
-
-TEST(Table_MergeRows_LinkLists)
-{
-    Group g;
-
-    TableRef t0 = g.add_table("t0");
-    TableRef t1 = g.add_table("t1");
-    t0->add_column_link(type_LinkList, "linklist", *t1);
-    t1->add_column(type_Int, "int");
-    t0->add_empty_row(10);
-    t1->add_empty_row(10);
-    for (int i = 0; i < 10; ++i) {
-        auto links = t0->get_linklist(0, i);
-        links->add(i);
-        links->add((i + 1) % 10);
-        t1->set_int(0, i, i);
-    }
-    t1->add_empty_row();
-
-    Row replaced_row = t1->get(0);
-    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 2);
-    t1->merge_rows(0, 10);
-    CHECK(replaced_row.is_attached());
-    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
-    CHECK_EQUAL(t0->get_linklist(0, 0)->size(), 2);
-    CHECK_EQUAL(t0->get_linklist(0, 0)->get(0).get_index(), 10);
-    CHECK_EQUAL(t0->get_linklist(0, 0)->get(1).get_index(), 1);
-    CHECK_EQUAL(t0->get_linklist(0, 9)->size(), 2);
-    CHECK_EQUAL(t0->get_linklist(0, 9)->get(0).get_index(), 9);
-    CHECK_EQUAL(t0->get_linklist(0, 9)->get(1).get_index(), 10);
-}
-
 // Minimal test case causing an assertion error because
 // backlink columns are storing stale values referencing
 // their respective link column index. If a link column
@@ -7927,7 +7839,6 @@ TEST(Table_DetachedAccessor)
     CHECK_LOGIC_ERROR(table->clear(), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->add_search_index(0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->remove_search_index(0), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->merge_rows(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->swap_rows(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->move_row(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_string(1, 0, ""), LogicError::detached_accessor);

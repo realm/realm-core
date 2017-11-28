@@ -426,18 +426,6 @@ public:
     }
     //@}
 
-    /// Replaces all links to \a row_ndx with links to \a new_row_ndx.
-    ///
-    /// This operation is usually followed by Table::move_last_over()
-    /// as part of Table::set_int_unique() or Table::set_string_unique()
-    /// or Table::set_null_unique() detecting a collision.
-    ///
-    /// \sa Table::move_last_over()
-    /// \sa Table::set_int_unique()
-    /// \sa Table::set_string_unique()
-    /// \sa Table::set_null_unique()
-    void merge_rows(size_t row_ndx, size_t new_row_ndx);
-
     //@{
 
     /// Get cell values.
@@ -980,7 +968,6 @@ private:
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     void do_move_row(size_t from_ndx, size_t to_ndx);
-    void do_merge_rows(size_t row_ndx, size_t new_row_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
     template <class ColType, class T>
@@ -2170,11 +2157,6 @@ public:
     static void do_move_row(Table& table, size_t from_ndx, size_t to_ndx)
     {
         table.do_move_row(from_ndx, to_ndx); // Throws
-    }
-
-    static void do_merge_rows(Table& table, size_t row_ndx, size_t new_row_ndx)
-    {
-        table.do_merge_rows(row_ndx, new_row_ndx); // Throws
     }
 
     static void do_clear(Table& table)

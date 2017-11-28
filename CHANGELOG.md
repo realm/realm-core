@@ -8,6 +8,7 @@
 
 * Limiting parameters removed from Query aggregate functions (start, end, limit)
 * Table::get_range_view() has been removed.
+* Table::merge_rows() not supported. Not needed anymore.
 
 ### Enhancements
 

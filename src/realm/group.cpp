@@ -1397,11 +1397,6 @@ public:
         return true;
     }
 
-    bool merge_rows(size_t, size_t) noexcept
-    {
-        return true;
-    }
-
     bool clear_table(size_t) noexcept
     {
         return true;

@@ -1790,22 +1790,6 @@ void Table::remove_recursive(size_t)
 {
 }
 
-void Table::merge_rows(size_t row_ndx, size_t new_row_ndx)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-    if (REALM_UNLIKELY(row_ndx >= m_size))
-        throw LogicError(LogicError::row_index_out_of_range);
-    if (REALM_UNLIKELY(new_row_ndx >= m_size))
-        throw LogicError(LogicError::row_index_out_of_range);
-
-    if (Replication* repl = get_repl()) {
-        repl->merge_rows(this, row_ndx, new_row_ndx);
-    }
-
-    do_merge_rows(row_ndx, new_row_ndx);
-}
-
 void Table::batch_erase_rows(const KeyColumn& keys)
 {
     REALM_ASSERT(is_attached());
@@ -1947,36 +1931,6 @@ void Table::do_move_row(size_t from_ndx, size_t to_ndx)
         col.swap_rows(from_ndx, to_ndx);
         col.erase_rows(from_ndx, 1, m_size + 1, broken_reciprocal_backlinks);
     }
-    bump_version();
-}
-
-
-void Table::do_merge_rows(size_t row_ndx, size_t new_row_ndx)
-{
-    // This bypasses handling of cascading rows, and we have decided that this is OK, because
-    // MergeRows is always followed by MoveLastOver, so breaking the last strong link
-    // to a row that is being subsumed will have no observable effect, while honoring the
-    // cascading behavior would complicate the calling code somewhat (having to take
-    // into account whether or not the row was removed as a consequence of cascade, leading
-    // to bugs in case this was forgotten).
-
-
-    // Since new_row_ndx is guaranteed to be empty at this point, simply swap
-    // the rows to get the desired behavior.
-
-    size_t row_ndx_1 = row_ndx, row_ndx_2 = new_row_ndx;
-    if (row_ndx_1 > row_ndx_2)
-        std::swap(row_ndx_1, row_ndx_2);
-    size_t num_cols = m_spec->get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx);
-        if (get_column_type(col_ndx) == type_LinkList) {
-            LinkListColumn& link_list_col = static_cast<LinkListColumn&>(col);
-            REALM_ASSERT(!link_list_col.has_links(new_row_ndx));
-        }
-        col.swap_rows(row_ndx_1, row_ndx_2);
-    }
-
     bump_version();
 }
 

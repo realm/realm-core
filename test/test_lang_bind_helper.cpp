@@ -3490,56 +3490,6 @@ TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
 }
 
 
-TEST(LangBindHelper_AdvanceReadTransact_ChangeLinkTargets)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
-    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
-
-    // Start a continuous read transaction
-    ReadTransaction rt(sg);
-    const Group& group = rt.get_group();
-
-    // Add some tables and rows.
-    {
-        WriteTransaction wt(sg_w);
-        TableRef t0 = wt.add_table("t0");
-        TableRef t1 = wt.add_table("t1");
-        t0->add_column(type_Int, "i");
-        t1->add_column_link(type_Link, "l", *t0);
-        t0->add_empty_row(10);
-        t1->add_empty_row(10);
-        t1->set_link(0, 0, 0);
-        t1->set_link(0, 1, 1);
-        t1->set_link(0, 2, 0);
-        wt.commit();
-    }
-
-    LangBindHelper::advance_read(sg);
-    group.verify();
-
-    ConstRow row_int_0_replaced_by_row_2 = group.get_table(0)->get(0);
-    ConstRow row_link_0_replaced_by_row_2 = group.get_table(1)->get(0);
-    CHECK_EQUAL(row_link_0_replaced_by_row_2.get_link(0), 0);
-
-    // Replace some rows, with and without links.
-    {
-        WriteTransaction wt(sg_w);
-        TableRef t0 = wt.get_table("t0");
-        TableRef t1 = wt.get_table("t1");
-        t0->merge_rows(0, 2);
-        t1->merge_rows(0, 2);
-        wt.commit();
-    }
-
-    LangBindHelper::advance_read(sg);
-    group.verify();
-
-    CHECK(row_int_0_replaced_by_row_2.is_attached());
-    CHECK(row_link_0_replaced_by_row_2.is_attached());
-}
-
 TEST(LangBindHelper_AdvanceReadTransact_LinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -7771,10 +7721,6 @@ public:
     {
         return false;
     }
-    bool merge_rows(size_t, size_t)
-    {
-        return false;
-    }
     bool clear_table(size_t) noexcept
     {
         return false;
@@ -9527,61 +9473,6 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
 
     sg.end_read();
     sg_w.end_read();
-}
-
-
-TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
-{
-    SHARED_GROUP_TEST_PATH(path);
-
-    std::unique_ptr<Replication> hist{make_in_realm_history(path)};
-    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
-    const Group& group = sg.begin_read();
-
-    // Create some tables and rows.
-    LangBindHelper::promote_to_write(sg);
-    Group& group_w = const_cast<Group&>(group);
-    TableRef t0 = group_w.add_table("t0");
-    TableRef t1 = group_w.add_table("t1");
-    t0->add_column(type_Int, "i");
-    t1->add_column_link(type_Link, "l", *t0);
-    t1->add_column_link(type_LinkList, "ll", *t0);
-    DescriptorRef t1t;
-    t1->add_column(type_Table, "t", &t1t);
-    t1t->add_column(type_Int, "t1ti");
-    t1->add_column(type_Mixed, "m");
-    t0->add_empty_row(10);
-    t1->add_empty_row(10);
-    for (size_t i = 0; i < 10; ++i) {
-        t0->set_int(0, i, int_fast64_t(i));
-        t1->set_mixed_subtable(3, i, nullptr);
-    }
-    LangBindHelper::commit_and_continue_as_read(sg);
-    group.verify();
-
-    Row r = t0->get(0);
-    CHECK_EQUAL(r.get_int(0), 0);
-
-    // Check that row accessors are detached.
-    LangBindHelper::promote_to_write(sg);
-    t0->merge_rows(0, 9);
-    LangBindHelper::commit_and_continue_as_read(sg);
-
-    CHECK(r.is_attached());
-
-    // Check that LinkView accessors, Subtable accessors, and Subtable accessors
-    // inside of Mixed columns are detached.
-    LinkViewRef l0 = t1->get_linklist(1, 0);
-    TableRef st0 = t1->get_subtable(2, 0);
-    TableRef mt0 = t1->get_subtable(3, 0);
-    CHECK_EQUAL(l0->get_origin_row_index(), 0);
-    LangBindHelper::promote_to_write(sg);
-    t1->merge_rows(0, 9);
-    LangBindHelper::commit_and_continue_as_read(sg);
-
-    CHECK(l0->is_attached());
-    CHECK(st0->is_attached());
-    CHECK(mt0->is_attached());
 }
 
 
@@ -13250,35 +13141,6 @@ TEST(LangBindHelper_BinaryReallocOverMax)
 
     g.get_table(0)->set_binary(0, 0, dataAlloc);
     g.get_table(0)->set_binary(0, 0, dataRealloc);
-    g.verify();
-}
-
-
-TEST(LangBindHelper_RollbackMergeRowsWithBacklinks)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    const char* key = crypt_key();
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
-    Group& g = const_cast<Group&>(sg_w.begin_write());
-
-    g.add_table("table1");
-    g.get_table(0)->add_column(type_Int, "int_col");
-    g.get_table(0)->add_empty_row(2);
-
-    g.add_table("table2");
-    g.get_table(1)->add_column_link(type_Link, "link_col", *g.get_table(0));
-    g.get_table(1)->add_empty_row(1);
-    g.get_table(1)->set_link(0, 0, 1);
-
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-
-    g.verify();
-    LangBindHelper::promote_to_write(sg_w);
-    g.get_table(0)->merge_rows(0, 1);
-    g.verify();
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
-
     g.verify();
 }
 
