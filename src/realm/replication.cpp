@@ -47,18 +47,17 @@ public:
         m_logger = logger;
     }
 
-    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value, _impl::Instruction variant,
-                 size_t prior_num_rows)
+    bool set_int(size_t col_ndx, Key key, int_fast64_t value, _impl::Instruction variant, size_t prior_num_rows)
     {
         static_cast<void>(prior_num_rows);
         static_cast<void>(variant);
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, key)))) {
             if (REALM_UNLIKELY(REALM_COVER_NEVER(variant == _impl::instr_SetUnique))) {
                 if (REALM_UNLIKELY(prior_num_rows != m_table->size())) {
                     return false;
                 }
             }
-            log("table->set_int(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
+            log("table(%1)->set_int(%2, %3);", key.value, col_ndx, value); // Throws
             // Set and SetDefault are identical in this context.
             // For SetUnique, it is acceptable to call the regular version of
             // set_int(), because we presume that the side-effects of
@@ -67,7 +66,7 @@ public:
             // waste of time, because all possible side-effects have already
             // been carried out.
             try {
-                m_table->get_object(Key(int64_t(row_ndx))).set(col_ndx, value); // Throws
+                m_table->get_object(key).set(col_ndx, value); // Throws
                 return true;
             }
             catch (...) {
@@ -76,58 +75,73 @@ public:
         return false;
     }
 
-    bool add_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
+    bool add_int(size_t col_ndx, Key key, int_fast64_t value)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            log("table->add_int(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->add_int(col_ndx, row_ndx, value);                   // Throws
-            return true;
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, key)))) {
+            log("table(%1)->add_int(%2, %3);", key.value, col_ndx, value); // Throws
+            try {
+                m_table->get_object(key).add_int(col_ndx, value); // Throws
+                return true;
+            }
+            catch (...) {
+            }
         }
         return false;
     }
 
-    bool set_bool(size_t col_ndx, size_t row_ndx, bool value, _impl::Instruction)
+    bool set_bool(size_t col_ndx, Key key, bool value, _impl::Instruction)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            log("table->set_bool(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_bool(col_ndx, row_ndx, value);                   // Throws
-            return true;
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, key)))) {
+            log("table(%1)->set_bool(%2, %3);", key.value, col_ndx, value); // Throws
+            try {
+                m_table->get_object(key).set(col_ndx, value); // Throws
+                return true;
+            }
+            catch (...) {
+            }
         }
         return false;
     }
 
-    bool set_float(size_t col_ndx, size_t row_ndx, float value, _impl::Instruction)
+    bool set_float(size_t col_ndx, Key key, float value, _impl::Instruction)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            log("table->set_float(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_float(col_ndx, row_ndx, value);                   // Throws
-            return true;
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, key)))) {
+            log("table(%1)->set_float(%2, %3);", key.value, col_ndx, value); // Throws
+            try {
+                m_table->get_object(key).set(col_ndx, value); // Throws
+                return true;
+            }
+            catch (...) {
+            }
         }
         return false;
     }
 
-    bool set_double(size_t col_ndx, size_t row_ndx, double value, _impl::Instruction)
+    bool set_double(size_t col_ndx, Key key, double value, _impl::Instruction)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            log("table->set_double(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_double(col_ndx, row_ndx, value);                   // Throws
-            return true;
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, key)))) {
+            log("table(%1)->set_double(%2, %3);", key.value, col_ndx, value); // Throws
+            try {
+                m_table->get_object(key).set(col_ndx, value); // Throws
+                return true;
+            }
+            catch (...) {
+            }
         }
         return false;
     }
 
-    bool set_string(size_t col_ndx, size_t row_ndx, StringData value, _impl::Instruction variant,
-                    size_t prior_num_rows)
+    bool set_string(size_t col_ndx, Key key, StringData value, _impl::Instruction variant, size_t prior_num_rows)
     {
         static_cast<void>(prior_num_rows);
         static_cast<void>(variant);
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, key)))) {
             if (REALM_UNLIKELY(REALM_COVER_NEVER(variant == _impl::instr_SetUnique))) {
                 if (REALM_UNLIKELY(prior_num_rows != m_table->size())) {
                     return false;
                 }
             }
-            log("table->set_string(%1, %2, \"%3\");", col_ndx, row_ndx, value); // Throws
+            log("table(%1)->set_string(%2, \"%3\");", key.value, col_ndx, value); // Throws
             // Set and SetDefault are identical in this context.
             // For SetUnique, it is acceptable to call the regular version of
             // set_int(), because we presume that the side-effects of
@@ -135,75 +149,57 @@ public:
             // preceding this. Calling the set_int_unique() here would be a
             // waste of time, because all possible side-effects have already
             // been carried out.
-            m_table->set_string(col_ndx, row_ndx, value); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData value, _impl::Instruction)
-    {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            log("table->set_binary(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            if (value.size() <= ArrayBlob::max_binary_size) {
-                m_table->set_binary(col_ndx, row_ndx, value); // Throws
+            try {
+                m_table->get_object(key).set(col_ndx, value); // Throws
                 return true;
+            }
+            catch (...) {
             }
         }
         return false;
     }
 
-    bool set_olddatetime(size_t col_ndx, size_t row_ndx, OldDateTime value, _impl::Instruction)
+    bool set_binary(size_t col_ndx, Key key, BinaryData value, _impl::Instruction)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            log("table->set_olddatetime(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_olddatetime(col_ndx, row_ndx, value);                   // Throws
-            return true;
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, key)))) {
+            log("table(%1)->set_binary(%2, %3);", key.value, col_ndx, value); // Throws
+            if (value.size() <= ArrayBlob::max_binary_size) {
+                try {
+                    m_table->get_object(key).set(col_ndx, value); // Throws
+                    return true;
+                }
+                catch (...) {
+                }
+            }
         }
         return false;
     }
 
-    bool set_timestamp(size_t col_ndx, size_t row_ndx, Timestamp value, _impl::Instruction)
+    bool set_timestamp(size_t col_ndx, Key key, Timestamp value, _impl::Instruction)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            log("table->set_timestamp(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_timestamp(col_ndx, row_ndx, value);                   // Throws
-            return true;
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, key)))) {
+            log("table(%1)->set_timestamp(%2, %3);", key.value, col_ndx, value); // Throws
+            try {
+                m_table->get_object(key).set(col_ndx, value); // Throws
+                return true;
+            }
+            catch (...) {
+            }
         }
         return false;
     }
 
-    bool set_table(size_t col_ndx, size_t row_ndx, _impl::Instruction)
-    {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            log("table->clear_subtable(%1, %2);", col_ndx, row_ndx); // Throws
-            // m_table->clear_subtable(col_ndx, row_ndx);               // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed& value, _impl::Instruction)
-    {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            log("table->set_mixed(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            // m_table->set_mixed(col_ndx, row_ndx, value);                   // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool set_null(size_t col_ndx, size_t row_ndx, _impl::Instruction variant, size_t prior_num_rows)
+    bool set_null(size_t col_ndx, Key key, _impl::Instruction variant, size_t prior_num_rows)
     {
         static_cast<void>(prior_num_rows);
         static_cast<void>(variant);
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, key)))) {
             if (REALM_UNLIKELY(REALM_COVER_NEVER(variant == _impl::instr_SetUnique))) {
                 if (REALM_UNLIKELY(prior_num_rows != m_table->size())) {
                     return false;
                 }
             }
-            log("table->set_null(%1, %2);", col_ndx, row_ndx); // Throws
+            log("table(%1)->set_null(%2);", key.value, col_ndx); // Throws
             // Set and SetDefault are identical in this context.
             // For SetUnique, it is acceptable to call the regular version of
             // set_null(), because we presume that the side-effects of
@@ -211,35 +207,42 @@ public:
             // preceding this. Calling the set_null_unique() here would be a
             // waste of time, because all possible side-effects have already
             // been carried out.
-            m_table->set_null(col_ndx, row_ndx); // Throws
-            return true;
+            try {
+                m_table->get_object(key).set_null(col_ndx); // Throws
+                return true;
+            }
+            catch (...) {
+            }
         }
         return false;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, TableKey, _impl::Instruction)
+    bool set_link(size_t col_ndx, Key key, Key target_obj_key, TableKey, _impl::Instruction)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            if (target_row_ndx == realm::npos) {
-                log("table->nullify_link(%1, %2);", col_ndx, row_ndx); // Throws
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, key)))) {
+            if (target_obj_key == null_key) {
+                log("table(%1)->nullify_link(%2);", key.value, col_ndx); // Throws
             }
             else {
-                log("table->set_link(%1, %2, %3);", col_ndx, row_ndx, target_row_ndx); // Throws
+                log("table(%1)->set_link(%1, %2, %3);", key.value, col_ndx, target_obj_key.value); // Throws
             }
-            typedef _impl::TableFriend tf;
-            tf::do_set_link(*m_table, col_ndx, row_ndx, target_row_ndx); // Throws
-            return true;
+            try {
+                m_table->get_object(key).set(col_ndx, target_obj_key); // Throws
+                return true;
+            }
+            catch (...) {
+            }
         }
         return false;
     }
 
-    bool insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData value)
+    bool insert_substring(size_t col_ndx, Key key, size_t pos, StringData value)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
-        log("table->insert_substring(%1, %2, %3, %4);", col_ndx, row_ndx, pos, value); // Throws
+        log("table(%1)->insert_substring(%2, %3, %4);", key.value, col_ndx, pos, value); // Throws
         try {
-            m_table->insert_substring(col_ndx, row_ndx, pos, value); // Throws
+            // m_table->get_object(key).insert_substring(col_ndx, pos, value); TODO: implement
             return true;
         }
         catch (LogicError&) { // LCOV_EXCL_START
@@ -247,13 +250,13 @@ public:
         } // LCOV_EXCL_STOP
     }
 
-    bool erase_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t size)
+    bool erase_substring(size_t col_ndx, Key key, size_t pos, size_t size)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
-        log("table->remove_substring(%1, %2, %3, %4);", col_ndx, row_ndx, pos, size); // Throws
+        log("table(%1)->remove_substring(%2, %3, %4);", key.value, col_ndx, pos, size); // Throws
         try {
-            m_table->remove_substring(col_ndx, row_ndx, pos, size); // Throws
+            // m_table->get_object(key).remove_substring(col_ndx, pos, size); TODO: implement
             return true;
         }
         catch (LogicError&) { // LCOV_EXCL_START
@@ -261,23 +264,23 @@ public:
         } // LCOV_EXCL_STOP
     }
 
-    bool create_object(int64_t key_value)
+    bool create_object(Key key)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
-        log("table->create_object(%1);", key_value); // Throws
-        m_table->create_object(Key(key_value));      // Throws
+        log("table->create_object(%1);", key.value); // Throws
+        m_table->create_object(key);                 // Throws
         return true;
     }
 
-    bool remove_object(int64_t key_value)
+    bool remove_object(Key key)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
         typedef _impl::TableFriend tf;
-        log("table->remove_object(%1);", key_value); // Throws
+        log("table->remove_object(%1);", key.value); // Throws
         try {
-            tf::do_remove_object(*m_table, Key(key_value)); // Throws
+            tf::do_remove_object(*m_table, key); // Throws
             return true;
         }
         catch (...) {
@@ -699,9 +702,9 @@ public:
         return true;
     }
 
-    bool nullify_link(size_t col_ndx, size_t row_ndx, TableKey target_table_key)
+    bool nullify_link(size_t col_ndx, Key key, TableKey target_table_key)
     {
-        return set_link(col_ndx, row_ndx, realm::npos, target_table_key, _impl::instr_Set);
+        return set_link(col_ndx, key, realm::null_key, target_table_key, _impl::instr_Set);
     }
 
     bool link_list_nullify(size_t link_ndx, size_t prior_size)
@@ -715,13 +718,15 @@ private:
     LinkViewRef m_link_list;
     util::Logger* m_logger = nullptr;
 
-    bool check_set_cell(size_t col_ndx, size_t row_ndx) noexcept
+    bool check_set_cell(size_t col_ndx, Key key) noexcept
     {
         static_cast<void>(col_ndx);
-        static_cast<void>(row_ndx);
+        static_cast<void>(key);
         if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_table->get_column_count()))) {
-                return true;
+                if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table->is_valid(key)))) {
+                    return true;
+                }
             }
         }
         return false;

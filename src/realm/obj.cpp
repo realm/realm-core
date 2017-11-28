@@ -325,7 +325,7 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
     }
 
     if (Replication* repl = alloc.get_replication()) {
-        repl->set_int(m_tree_top->get_owner(), col_ndx, size_t(m_key.value), value,
+        repl->set_int(m_tree_top->get_owner(), col_ndx, m_key, value,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
     }
 
@@ -374,7 +374,7 @@ Obj& Obj::add_int(size_t col_ndx, int64_t value)
     }
 
     if (Replication* repl = alloc.get_replication()) {
-        repl->add_int(m_tree_top->get_owner(), col_ndx, m_row_ndx, value); // Throws
+        repl->add_int(m_tree_top->get_owner(), col_ndx, m_key, value); // Throws
     }
 
     bump_version();
@@ -412,7 +412,7 @@ Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
         values.set(m_row_ndx, target_key);
 
         if (Replication* repl = alloc.get_replication()) {
-            repl->set(m_tree_top->get_owner(), col_ndx, size_t(m_key.value), target_key,
+            repl->set(m_tree_top->get_owner(), col_ndx, m_key, target_key,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
         }
 
@@ -489,7 +489,7 @@ Obj& Obj::set(size_t col_ndx, T value, bool is_default)
     values.set(m_row_ndx, value);
 
     if (Replication* repl = alloc.get_replication())
-        repl->set<T>(m_tree_top->get_owner(), col_ndx, m_row_ndx, value,
+        repl->set<T>(m_tree_top->get_owner(), col_ndx, m_key, value,
                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     bump_version();
@@ -516,6 +516,8 @@ void Obj::set_int(size_t col_ndx, int64_t value)
 
 void Obj::add_backlink(size_t backlink_col, Key origin_key)
 {
+    ensure_writeable();
+
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
     fields.init_from_mem(m_mem);
@@ -529,6 +531,8 @@ void Obj::add_backlink(size_t backlink_col, Key origin_key)
 
 void Obj::remove_one_backlink(size_t backlink_col, Key origin_key)
 {
+    ensure_writeable();
+
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
     fields.init_from_mem(m_mem);
@@ -542,6 +546,8 @@ void Obj::remove_one_backlink(size_t backlink_col, Key origin_key)
 
 void Obj::nullify_link(size_t origin_col, Key target_key)
 {
+    ensure_writeable();
+
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
     fields.init_from_mem(m_mem);
@@ -566,7 +572,7 @@ void Obj::nullify_link(size_t origin_col, Key target_key)
         REALM_ASSERT(key == target_key);
         links.set(m_row_ndx, Key{});
         if (Replication* repl = alloc.get_replication())
-            repl->set<Key>(m_tree_top->get_owner(), origin_col, m_row_ndx, Key{}, _impl::instr_Set); // Throws
+            repl->set<Key>(m_tree_top->get_owner(), origin_col, m_key, Key{}, _impl::instr_Set); // Throws
     }
 }
 
@@ -626,6 +632,9 @@ template Obj& Obj::set<Timestamp>(size_t, Timestamp, bool);
 template <class T>
 inline void Obj::do_set_null(size_t col_ndx)
 {
+    update_if_needed();
+    ensure_writeable();
+
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
     fields.init_from_mem(m_mem);
@@ -645,6 +654,7 @@ Obj& Obj::set_null(size_t col_ndx, bool is_default)
     }
 
     update_if_needed();
+    ensure_writeable();
 
     switch (m_tree_top->get_spec().get_column_type(col_ndx)) {
         case col_type_Int:
@@ -676,7 +686,7 @@ Obj& Obj::set_null(size_t col_ndx, bool is_default)
     }
 
     if (Replication* repl = m_tree_top->get_alloc().get_replication())
-        repl->set_null(m_tree_top->get_owner(), col_ndx, m_row_ndx,
+        repl->set_null(m_tree_top->get_owner(), col_ndx, m_key,
                        is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     return *this;

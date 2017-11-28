@@ -1732,12 +1732,6 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
         col.insert_rows(row_ndx, num_rows, m_size, insert_nulls); // Throws
     }
     m_size += num_rows;
-
-    if (Replication* repl = get_repl()) {
-        size_t num_rows_to_insert = num_rows;
-        size_t prior_num_rows = m_size - num_rows;
-        repl->insert_empty_rows(this, row_ndx, num_rows_to_insert, prior_num_rows); // Throws
-    }
 }
 
 size_t Table::add_row_with_key(size_t key_col_ndx, int64_t key)
@@ -1763,11 +1757,6 @@ size_t Table::add_row_with_key(size_t key_col_ndx, int64_t key)
         }
     }
     m_size++;
-
-    if (Replication* repl = get_repl()) {
-        size_t prior_num_rows = m_size - 1;
-        repl->add_row_with_key(this, row_ndx, prior_num_rows, key_col_ndx, key); // Throws
-    }
 
     return row_ndx;
 }
@@ -1834,12 +1823,6 @@ void Table::do_remove(size_t row_ndx, bool broken_reciprocal_backlinks)
         col.erase_rows(row_ndx, 1, prior_num_rows, broken_reciprocal_backlinks); // Throws
     }
 
-    if (Replication* repl = get_repl()) {
-        size_t num_rows_to_erase = 1;
-        bool is_move_last_over = false;
-        repl->erase_rows(this, row_ndx, num_rows_to_erase, m_size, is_move_last_over); // Throws
-    }
-
     for (size_t col_ndx = num_public_cols; col_ndx > 0; --col_ndx) {
         ColumnBase& col = get_column_base(col_ndx - 1);
         size_t prior_num_rows = m_size;
@@ -1873,12 +1856,6 @@ void Table::do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks)
         ColumnBase& col = get_column_base(col_ndx - 1);
         size_t prior_num_rows = m_size;
         col.move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
-    }
-
-    if (Replication* repl = get_repl()) {
-        size_t num_rows_to_erase = 1;
-        bool is_move_last_over = true;
-        repl->erase_rows(this, row_ndx, num_rows_to_erase, m_size, is_move_last_over); // Throws
     }
 
     for (size_t col_ndx = num_public_cols; col_ndx > 0; --col_ndx) {
@@ -2038,9 +2015,6 @@ void Table::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         std::swap(row_ndx_1, row_ndx_2);
 
     do_swap_rows(row_ndx_1, row_ndx_2);
-
-    if (Replication* repl = get_repl())
-        repl->swap_rows(this, row_ndx_1, row_ndx_2);
 }
 
 void Table::move_row(size_t from_ndx, size_t to_ndx)
@@ -2053,9 +2027,6 @@ void Table::move_row(size_t from_ndx, size_t to_ndx)
         return;
 
     do_move_row(from_ndx, to_ndx);
-
-    if (Replication* repl = get_repl())
-        repl->move_row(this, from_ndx, to_ndx);
 }
 
 
@@ -2377,8 +2348,7 @@ size_t Table::set_unique(size_t col_ndx, size_t ndx, StringData value)
     }
 
     if (!conflict) {
-        if (Replication* repl = get_repl())
-            repl->set_string(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
+        // Replication
     }
 
     return ndx;
@@ -2411,8 +2381,7 @@ size_t Table::set_unique(size_t col_ndx, size_t row_ndx, null)
     row_ndx = do_set_unique_null(col, row_ndx, conflict); // Throws
 
     if (!conflict) {
-        if (Replication* repl = get_repl())
-            repl->set_null(this, col_ndx, row_ndx, _impl::instr_SetUnique); // Throws
+        // Replication
     }
 
     return row_ndx;
@@ -2433,16 +2402,10 @@ void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool /* is_defau
         auto& col = get_column(col_ndx);
         col.set(ndx, value);
     }
-
-    /*
-    // TODO: reintroduce replication
-    if (Replication* repl = get_repl())
-        repl->set_int(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
-    */
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, Timestamp value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, Timestamp value, bool)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Timestamp);
@@ -2454,18 +2417,10 @@ void Table::set(size_t col_ndx, size_t ndx, Timestamp value, bool is_default)
 
     TimestampColumn& col = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
     col.set(ndx, value);
-
-    if (Replication* repl = get_repl()) {
-        if (value.is_null())
-            repl->set_null(this, col_ndx, ndx, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
-        else
-            repl->set_timestamp(this, col_ndx, ndx, value,
-                                is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
-    }
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, bool value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, bool value, bool)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
@@ -2480,13 +2435,10 @@ void Table::set(size_t col_ndx, size_t ndx, bool value, bool is_default)
         IntegerColumn& col = get_column(col_ndx);
         col.set(ndx, value ? 1 : 0);
     }
-
-    if (Replication* repl = get_repl())
-        repl->set_bool(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, OldDateTime value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, OldDateTime value, bool)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_OldDateTime);
@@ -2501,14 +2453,10 @@ void Table::set(size_t col_ndx, size_t ndx, OldDateTime value, bool is_default)
         IntegerColumn& col = get_column(col_ndx);
         col.set(ndx, value.get_olddatetime());
     }
-
-    if (Replication* repl = get_repl())
-        repl->set_olddatetime(this, col_ndx, ndx, value,
-                              is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, float value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, float value, bool)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2516,13 +2464,10 @@ void Table::set(size_t col_ndx, size_t ndx, float value, bool is_default)
 
     FloatColumn& col = get_column_float(col_ndx);
     col.set(ndx, value);
-
-    if (Replication* repl = get_repl())
-        repl->set_float(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, double value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, double value, bool)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2530,14 +2475,10 @@ void Table::set(size_t col_ndx, size_t ndx, double value, bool is_default)
 
     DoubleColumn& col = get_column_double(col_ndx);
     col.set(ndx, value);
-
-    if (Replication* repl = get_repl())
-        repl->set_double(this, col_ndx, ndx, value,
-                         is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, StringData value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, StringData value, bool)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -2557,10 +2498,6 @@ void Table::set(size_t col_ndx, size_t ndx, StringData value, bool is_default)
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
     col.set_string(ndx, value); // Throws
-
-    if (Replication* repl = get_repl())
-        repl->set_string(this, col_ndx, ndx, value,
-                         is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 template <>
@@ -2572,7 +2509,7 @@ void Table::set(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t row_ndx, null, bool is_default)
+void Table::set(size_t col_ndx, size_t row_ndx, null, bool)
 {
     if (!is_nullable(col_ndx)) {
         throw LogicError{LogicError::column_not_nullable};
@@ -2584,9 +2521,6 @@ void Table::set(size_t col_ndx, size_t row_ndx, null, bool is_default)
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
     col.set_null(row_ndx);
-
-    if (Replication* repl = get_repl())
-        repl->set_null(this, col_ndx, row_ndx, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 template <>
@@ -2716,9 +2650,6 @@ void Table::add_int(size_t col_ndx, size_t ndx, int_fast64_t value)
         int64_t old = col.get(ndx);
         col.set(ndx, add_wrap(old, value));
     }
-
-    if (Replication* repl = get_repl())
-        repl->add_int(this, col_ndx, ndx, value); // Throws
 }
 
 void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData value)
@@ -2747,9 +2678,6 @@ void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringD
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
     col.set_string(row_ndx, copy_of_value); // Throws
-
-    if (Replication* repl = get_repl())
-        repl->insert_substring(this, col_ndx, row_ndx, pos, value); // Throws
 }
 
 
@@ -2777,14 +2705,9 @@ void Table::remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t 
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
     col.set_string(row_ndx, copy_of_value); // Throws
-
-    if (Replication* repl = get_repl()) {
-        size_t actual_size = old_value.size() - copy_of_value.size();
-        repl->erase_substring(this, col_ndx, row_ndx, pos, actual_size); // Throws
-    }
 }
 
-void Table::set_binary_big(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
+void Table::set_binary_big(size_t col_ndx, size_t ndx, BinaryData value, bool)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -2804,10 +2727,6 @@ void Table::set_binary_big(size_t col_ndx, size_t ndx, BinaryData value, bool is
     // column type mismatch.
     BinaryColumn& col = get_column_binary(col_ndx);
     col.set(ndx, value);
-
-    if (Replication* repl = get_repl())
-        repl->set_binary(this, col_ndx, ndx, value,
-                         is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 BinaryData Table::get_binary_at(size_t col_ndx, size_t ndx, size_t& pos) const noexcept
@@ -2831,7 +2750,7 @@ TableRef Table::get_link_target(size_t col_ndx) noexcept
 }
 
 
-void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool is_default)
+void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -2853,10 +2772,6 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool
     // ColumnBase::set_string()), but that works less well here. The ideal
     // solution seems to be to have a very efficient way of checking the column
     // type. Idea: Introduce `DataType ColumnBase::m_type`.
-
-    if (Replication* repl = get_repl())
-        repl->set_link(this, col_ndx, row_ndx, target_row_ndx,
-                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
 }

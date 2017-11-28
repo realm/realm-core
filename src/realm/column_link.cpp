@@ -142,9 +142,6 @@ void LinkColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 
 void LinkColumn::do_nullify_link(size_t row_ndx, size_t)
 {
-    if (Replication* repl = get_root_array()->get_alloc().get_replication()) {
-        repl->nullify_link(m_table, get_column_index(), row_ndx);
-    }
     LinkColumnBase::set(row_ndx, 0);
 }
 

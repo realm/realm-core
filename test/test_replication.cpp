@@ -213,7 +213,6 @@ void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& 
 #endif
 } // anonymous namespace
 
-#ifdef LEGACY_TESTS
 
 namespace {
 
@@ -225,17 +224,6 @@ void my_table_add_columns(TableRef t)
     t->add_column(type_Double, "my_double");
     t->add_column(type_String, "my_string");
     t->add_column(type_Binary, "my_binary");
-    t->add_column(type_OldDateTime, "my_olddatetime");
-    DescriptorRef sub_descr1;
-    t->add_column(type_Table, "my_subtable", &sub_descr1);
-    t->add_column(type_Mixed, "my_mixed");
-
-    sub_descr1->add_column(type_Int, "a");
-    DescriptorRef sub_descr2;
-    sub_descr1->add_column(type_Table, "b", &sub_descr2);
-    sub_descr1->add_column(type_Int, "c");
-
-    sub_descr2->add_column(type_Int, "first");
 }
 }
 
@@ -252,7 +240,7 @@ TEST(Replication_General)
         WriteTransaction wt(sg_1);
         TableRef table = wt.add_table("my_table");
         my_table_add_columns(table);
-        table->add_empty_row();
+        table->create_object(Key(0));
         wt.commit();
     }
     {
@@ -260,44 +248,42 @@ TEST(Replication_General)
         TableRef table = wt.get_table("my_table");
         char buf[] = {'1'};
         BinaryData bin(buf);
-        Mixed mix;
-        mix.set_int(1);
-        set(table, 0, 2, true, 2.0f, 2.0, "xx", bin, 728, nullptr, mix);
-        add(table, 3, true, 3.0f, 3.0, "xxx", bin, 729, nullptr, mix);
-        insert(table, 0, 1, true, 1.0f, 1.0, "x", bin, 727, nullptr, mix);
+        Obj obj = table->get_object(Key(0));
+        obj.set_all(2, true, 2.0f, 2.0, "xx", bin);
+        table->create_object(Key(1)).set_all(3, true, 3.0f, 3.0, "xxx", bin);
+        table->create_object(Key(2)).set_all(1, true, 1.0f, 1.0, "x", bin);
 
-        add(table, 3, true, 3.0f, 0.0, "", bin, 729, nullptr, mix); // empty string
-        add(table, 3, true, 3.0f, 1.0, "", bin, 729, nullptr, mix); // empty string
+        table->create_object(Key(3)).set_all(3, true, 3.0f, 0.0, "", bin); // empty string
+        table->create_object(Key(4)).set_all(8, true, 3.0f, 1.0, "", bin); // empty string
         wt.commit();
     }
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("my_table");
-        table->set_int(0, 0, 9);
+        auto col_id = table->get_column_index("my_int");
+        Obj obj = table->get_object(Key(0)).set(col_id, 9);
         wt.commit();
     }
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("my_table");
-        table->set_int(0, 0, 10);
+        auto col_id = table->get_column_index("my_int");
+        table->get_object(Key(0)).set(col_id, 10);
+        table->get_object(Key(3)).set(col_id, 2);
         wt.commit();
     }
-    // Test Table::move_last_over()
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("my_table");
         char buf[] = {'9'};
         BinaryData bin(buf);
-        Mixed mix;
-        mix.set_float(9.0f);
-        insert(table, 2, 8, false, 8.0f, 8.0, "y8", bin, 282, nullptr, mix);
-        insert(table, 1, 9, false, 9.0f, 9.0, "y9", bin, 292, nullptr, mix);
+        table->create_object(Key(100)).set_all(8, false, 8.0f, 8.0, "y8", bin);
         wt.commit();
     }
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("my_table");
-        table->move_last_over(1);
+        table->remove_object(Key(100));
         wt.commit();
     }
 
@@ -312,18 +298,23 @@ TEST(Replication_General)
         rt_2.get_group().verify();
         CHECK(rt_1.get_group() == rt_2.get_group());
         auto table = rt_2.get_table("my_table");
-        CHECK_EQUAL(6, table->size());
-        CHECK_EQUAL(10, table->get_int(0, 0));
-        CHECK_EQUAL(3, table->get_int(0, 1));
-        CHECK_EQUAL(2, table->get_int(0, 2));
-        CHECK_EQUAL(8, table->get_int(0, 3));
+        auto col_id = table->get_column_index("my_int");
 
-        StringData sd1 = table->get_string(4, 4);
+        CHECK_EQUAL(5, table->size());
+
+
+        CHECK_EQUAL(10, table->get_object(Key(0)).get<Int>(col_id));
+        CHECK_EQUAL(3, table->get_object(Key(1)).get<Int>(col_id));
+        CHECK_EQUAL(2, table->get_object(Key(3)).get<Int>(col_id));
+        CHECK_EQUAL(8, table->get_object(Key(4)).get<Int>(col_id));
+
+        StringData sd1 = table->get_object(Key(4)).get<String>(4);
 
         CHECK(!sd1.is_null());
     }
 }
 
+#ifdef LEGACY_TESTS
 
 TEST(Replication_Timestamp)
 {
@@ -3462,23 +3453,26 @@ TEST(Replication_NullStrings)
     {
         WriteTransaction wt(sg_1);
         TableRef table1 = wt.add_table("table");
-        table1->add_column(type_String, "c1", true);
-        table1->add_column(type_Binary, "b1", true);
-        table1->add_empty_row(3); // default value is null
+        auto col_string = table1->add_column(type_String, "c1", true);
+        auto col_binary = table1->add_column(type_Binary, "b1", true);
 
-        table1->set_string(0, 1, StringData("")); // empty string
-        table1->set_string(0, 2, realm::null());  // null
+        Obj obj0 = table1->create_object(Key(0));
+        Obj obj1 = table1->create_object(Key(1));
+        Obj obj2 = table1->create_object(Key(2));
 
-        table1->set_binary(1, 1, BinaryData("")); // empty string
-        table1->set_binary(1, 2, BinaryData());   // null
+        obj1.set(col_string, StringData("")); // empty string
+        obj2.set(col_string, StringData());   // null
 
-        CHECK(table1->get_string(0, 0).is_null());
-        CHECK(!table1->get_string(0, 1).is_null());
-        CHECK(table1->get_string(0, 2).is_null());
+        obj1.set(col_binary, BinaryData("")); // empty string
+        obj2.set(col_binary, BinaryData());   // null
 
-        CHECK(table1->get_binary(1, 0).is_null());
-        CHECK(!table1->get_binary(1, 1).is_null());
-        CHECK(table1->get_binary(1, 2).is_null());
+        CHECK(obj0.get<String>(col_string).is_null());
+        CHECK(!obj1.get<String>(col_string).is_null());
+        CHECK(obj2.get<String>(col_string).is_null());
+
+        CHECK(obj0.get<Binary>(col_binary).is_null());
+        CHECK(!obj1.get<Binary>(col_binary).is_null());
+        CHECK(obj2.get<Binary>(col_binary).is_null());
 
         wt.commit();
     }
@@ -3486,18 +3480,23 @@ TEST(Replication_NullStrings)
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
+        auto col_string = table2->get_column_index("c1");
+        auto col_binary = table2->get_column_index("b1");
 
-        CHECK(table2->get_string(0, 0).is_null());
-        CHECK(!table2->get_string(0, 1).is_null());
-        CHECK(table2->get_string(0, 2).is_null());
+        ConstObj obj0 = table2->get_object(Key(0));
+        ConstObj obj1 = table2->get_object(Key(1));
+        ConstObj obj2 = table2->get_object(Key(2));
 
-        CHECK(table2->get_binary(1, 0).is_null());
-        CHECK(!table2->get_binary(1, 1).is_null());
-        CHECK(table2->get_binary(1, 2).is_null());
+        CHECK(obj0.get<String>(col_string).is_null());
+        CHECK(!obj1.get<String>(col_string).is_null());
+        CHECK(obj2.get<String>(col_string).is_null());
+
+        CHECK(obj0.get<Binary>(col_binary).is_null());
+        CHECK(!obj1.get<Binary>(col_binary).is_null());
+        CHECK(obj2.get<Binary>(col_binary).is_null());
     }
 }
 
-#ifdef LEGACY_TESTS
 TEST(Replication_NullInteger)
 {
     SHARED_GROUP_TEST_PATH(path_1);
@@ -3512,15 +3511,18 @@ TEST(Replication_NullInteger)
     {
         WriteTransaction wt(sg_1);
         TableRef table1 = wt.add_table("table");
-        table1->add_column(type_Int, "c1", true);
-        table1->add_empty_row(3); // default value is null
+        auto col_int = table1->add_column(type_Int, "c1", true);
 
-        table1->set_int(0, 1, 0);
-        table1->set_null(0, 2);
+        Obj obj0 = table1->create_object(Key(0));
+        Obj obj1 = table1->create_object(Key(1));
+        Obj obj2 = table1->create_object(Key(2));
 
-        CHECK(table1->is_null(0, 0));
-        CHECK(!table1->is_null(0, 1));
-        CHECK(table1->is_null(0, 2));
+        obj1.set(col_int, 0);
+        obj2.set_null(col_int);
+
+        CHECK(obj0.is_null(col_int));
+        CHECK_NOT(obj1.is_null(col_int));
+        CHECK(obj2.is_null(col_int));
 
         wt.commit();
     }
@@ -3528,58 +3530,18 @@ TEST(Replication_NullInteger)
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
+        auto col_int = table2->get_column_index("c1");
 
-        CHECK(table2->is_null(0, 0));
-        CHECK(!table2->is_null(0, 1));
-        CHECK(table2->is_null(0, 2));
+        ConstObj obj0 = table2->get_object(Key(0));
+        ConstObj obj1 = table2->get_object(Key(1));
+        ConstObj obj2 = table2->get_object(Key(2));
+
+        CHECK(obj0.is_null(col_int));
+        CHECK_NOT(obj1.is_null(col_int));
+        CHECK(obj2.is_null(col_int));
     }
 }
-#endif
 
-TEST(Replication_SetUnique)
-{
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-
-    util::Logger& replay_logger = test_context.logger;
-
-    MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
-    SharedGroup sg_2(path_2);
-
-    {
-        WriteTransaction wt(sg_1);
-        TableRef table1 = wt.add_table("table");
-        table1->add_column(type_Int, "c1");
-        table1->add_column(type_String, "c2");
-        table1->add_column(type_Int, "c3", true);
-        table1->add_column(type_String, "c4", true);
-        table1->add_search_index(0);
-        table1->add_search_index(1);
-        table1->add_search_index(2);
-        table1->add_search_index(3);
-        table1->add_empty_row(2);
-        table1->set_int_unique(0, 0, 123);
-        table1->set_string_unique(1, 0, "Hello, World!");
-        // This will delete row 0! It is a bit counter intuative but this
-        // is because we expect that SetUnique is called before filling in
-        // other columns with data.
-        table1->set_null_unique(2, 0);
-        CHECK_EQUAL(table1->size(), 1);
-        table1->set_string_unique(3, 0, "Hello, World!");
-        wt.commit();
-    }
-    repl.replay_transacts(sg_2, replay_logger);
-    {
-        ReadTransaction rt(sg_2);
-        ConstTableRef table2 = rt.get_table("table");
-
-        CHECK_EQUAL(table2->get_int(0, 0), 0);
-        CHECK_EQUAL(table2->get_string(1, 0), "");
-        CHECK(table2->is_null(2, 0));
-        CHECK_EQUAL(table2->get_string(3, 0), "Hello, World!");
-    }
-}
 
 #ifdef LEGACY_TESTS
 TEST(Replication_AddRowWithKey)

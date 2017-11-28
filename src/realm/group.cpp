@@ -1357,12 +1357,12 @@ public:
         return true;
     }
 
-    bool create_object(int64_t) noexcept
+    bool create_object(Key) noexcept
     {
         return true;
     }
 
-    bool remove_object(int64_t) noexcept
+    bool remove_object(Key) noexcept
     {
         typedef _impl::TableFriend tf;
         if (m_table) {
@@ -1372,87 +1372,57 @@ public:
         return true;
     }
 
-    bool insert_empty_rows(size_t, size_t, size_t, bool) noexcept
-    {
-        return true;
-    }
-
-    bool add_row_with_key(size_t, size_t, size_t, int64_t) noexcept
-    {
-        return true;
-    }
-
-    bool erase_rows(size_t, size_t, size_t, bool) noexcept
-    {
-        return true;
-    }
-
-    bool swap_rows(size_t, size_t) noexcept
-    {
-        return true;
-    }
-
-    bool move_row(size_t, size_t) noexcept
-    {
-        return true;
-    }
-
     bool clear_table(size_t) noexcept
     {
         return true;
     }
 
-    bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) noexcept
+    bool set_int(size_t, Key, int_fast64_t, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool add_int(size_t, size_t, int_fast64_t) noexcept
+    bool add_int(size_t, Key, int_fast64_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_bool(size_t, size_t, bool, _impl::Instruction) noexcept
+    bool set_bool(size_t, Key, bool, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_float(size_t, size_t, float, _impl::Instruction) noexcept
+    bool set_float(size_t, Key, float, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_double(size_t, size_t, double, _impl::Instruction) noexcept
+    bool set_double(size_t, Key, double, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t) noexcept
+    bool set_string(size_t, Key, StringData, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_binary(size_t, size_t, BinaryData, _impl::Instruction) noexcept
+    bool set_binary(size_t, Key, BinaryData, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction) noexcept
+    bool set_timestamp(size_t, Key, Timestamp, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction) noexcept
+    bool set_null(size_t, Key, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_null(size_t, size_t, _impl::Instruction, size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_link(size_t col_ndx, size_t, size_t, TableKey, _impl::Instruction) noexcept
+    bool set_link(size_t col_ndx, Key, Key, TableKey, _impl::Instruction) noexcept
     {
         // When links are changed, the link-target table is also affected and
         // its accessor must therefore be marked dirty too. Indeed, when it
@@ -1479,12 +1449,12 @@ public:
         return true;
     }
 
-    bool insert_substring(size_t, size_t, size_t, StringData)
+    bool insert_substring(size_t, Key, size_t, StringData)
     {
         return true; // No-op
     }
 
-    bool erase_substring(size_t, size_t, size_t, size_t)
+    bool erase_substring(size_t, Key, size_t, size_t)
     {
         return true; // No-op
     }
@@ -1662,7 +1632,7 @@ public:
         return true; // No-op
     }
 
-    bool nullify_link(size_t, size_t, TableKey)
+    bool nullify_link(size_t, Key, TableKey)
     {
         return true; // No-op
     }

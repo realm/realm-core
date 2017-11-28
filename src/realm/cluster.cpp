@@ -789,10 +789,6 @@ ref_type Cluster::insert(Key k, ClusterNode::State& state)
         ret = new_leaf.get_ref();
     }
 
-    if (Replication* repl = m_alloc.get_replication()) {
-        repl->create_object(m_tree_top.get_owner(), k);
-    }
-
     return ret;
 }
 
@@ -853,10 +849,6 @@ unsigned Cluster::erase(Key key, CascadeState& state)
         values.set_parent(this, col_ndx + 1);
         values.init_from_parent();
         values.nullify_fwd_links(ndx);
-    }
-
-    if (Replication* repl = m_alloc.get_replication()) {
-        repl->remove_object(m_tree_top.get_owner(), key);
     }
 
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
@@ -1163,6 +1155,9 @@ Obj ClusterTree::insert(Key k)
 
         replace_root(std::move(new_root));
     }
+    if (Replication* repl = get_alloc().get_replication()) {
+        repl->create_object(get_owner(), k);
+    }
     m_size++;
     return Obj(this, state.ref, k, state.index);
 }
@@ -1197,6 +1192,11 @@ void ClusterTree::erase(Key k, CascadeState& state)
 {
     unsigned root_size = m_root->erase(k, state);
     bump_version();
+
+    if (Replication* repl = get_alloc().get_replication()) {
+        repl->remove_object(get_owner(), k);
+    }
+
     m_size--;
     while (!m_root->is_leaf() && root_size == 1) {
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
