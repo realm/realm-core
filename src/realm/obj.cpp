@@ -266,6 +266,54 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
     return *this;
 }
 
+Obj& Obj::add_int(size_t col_ndx, int64_t value)
+{
+    if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
+    update_if_needed();
+    ensure_writeable();
+
+    auto add_wrap = [](int64_t a, int64_t b) -> int64_t {
+        uint64_t ua = uint64_t(a);
+        uint64_t ub = uint64_t(b);
+        return int64_t(ua + ub);
+    };
+
+    Allocator& alloc = m_tree_top->get_alloc();
+    Array fields(alloc);
+    fields.init_from_mem(m_mem);
+    REALM_ASSERT(col_ndx + 1 < fields.size());
+    ColumnAttrMask attr = m_tree_top->get_spec().get_column_attr(col_ndx);
+    if (attr.test(col_attr_Nullable)) {
+        ArrayIntNull values(alloc);
+        values.set_parent(&fields, col_ndx + 1);
+        values.init_from_parent();
+        Optional<int64_t> old = values.get(m_row_ndx);
+        if (old) {
+            values.set(m_row_ndx, add_wrap(*old, value));
+        }
+        else {
+            throw LogicError{LogicError::illegal_combination};
+        }
+    }
+    else {
+        ArrayInteger values(alloc);
+        values.set_parent(&fields, col_ndx + 1);
+        values.init_from_parent();
+        int64_t old = values.get(m_row_ndx);
+        values.set(m_row_ndx, add_wrap(old, value));
+    }
+
+    if (Replication* repl = alloc.get_replication()) {
+        repl->add_int(m_tree_top->get_owner(), col_ndx, m_row_ndx, value); // Throws
+    }
+
+    bump_version();
+
+    return *this;
+}
+
 template <>
 Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
 {

@@ -127,6 +127,8 @@ public:
     Obj& set(size_t col_ndx, U value, bool is_default = false);
     Obj& set_null(size_t col_ndx, bool is_default = false);
 
+    Obj& add_int(size_t col_ndx, int64_t value);
+
     template <typename U>
     Obj& set_list_values(size_t col_ndx, const std::vector<U>& values);
 
