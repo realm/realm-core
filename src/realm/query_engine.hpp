@@ -1819,9 +1819,9 @@ public:
     virtual std::string describe() const override
     {
         if (m_condition) {
-            return "not(" + m_condition->describe_expression() + ")";
+            return "!(" + m_condition->describe_expression() + ")";
         }
-        return "not()";
+        return "!()";
     }
 
 

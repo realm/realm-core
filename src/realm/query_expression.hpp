@@ -2249,7 +2249,7 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + metrics::value_separator + (has_links ? "is_not_null()" : "is_null()");
+        return m_link_map.description() + (has_links ? " != NULL" : " == NULL");
     }
 
     std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override

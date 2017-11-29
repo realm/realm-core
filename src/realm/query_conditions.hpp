@@ -693,7 +693,7 @@ struct NotNull {
     }
     static std::string description()
     {
-        return "!= null";
+        return "!= NULL";
     }
 };
 

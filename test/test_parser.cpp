@@ -290,6 +290,8 @@ ONLY(Parser_basic_serialisation)
     };
 
     Query q = t->where();
+    verify_query(t, "buddy == NULL", 4);
+    verify_query(t, "buddy != NULL", 1);
     verify_query(t, "age > 2", 2);
     verify_query(t, "!(age >= 2)", 2);
     verify_query(t, "3 <= age", 2);
