@@ -739,7 +739,7 @@ TEST_TYPES(Column_SwapRows, IntegerColumn, IntNullColumn)
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST_TYPES(Column_Average, IntegerColumn, IntNullColumn)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
@@ -881,7 +881,7 @@ TEST_TYPES(Column_Min2, IntegerColumn, IntNullColumn)
 
     c.destroy();
 }
-
+#endif
 
 TEST(Column_IndexCrash)
 {

@@ -351,9 +351,12 @@ public:
     }
     T set(size_t ndx, T value)
     {
-        T old = m_leaf->get(ndx);
+        // get will check for ndx out of bounds
+        T old = get(ndx);
         if (old != value) {
+            ensure_writeable();
             m_leaf->set(ndx, value);
+            m_obj.bump_version();
         }
         return old;
     }
@@ -362,7 +365,9 @@ public:
         if (ndx > m_leaf->size()) {
             throw std::out_of_range("Index out of range");
         }
+        ensure_writeable();
         m_leaf->insert(ndx, value);
+        m_obj.bump_version();
     }
     T remove(ListIterator<T>& it)
     {
@@ -370,9 +375,11 @@ public:
     }
     T remove(size_t ndx)
     {
+        ensure_writeable();
         T ret = m_leaf->get(ndx);
         m_leaf->erase(ndx);
         ConstListBase::adj_remove(ndx);
+        m_obj.bump_version();
 
         return ret;
     }
@@ -406,7 +413,9 @@ public:
     void clear() override
     {
         update_if_needed();
+        ensure_writeable();
         m_leaf->truncate_and_destroy_children(0);
+        m_obj.bump_version();
     }
 
 protected:
@@ -414,6 +423,13 @@ protected:
     void update_if_needed()
     {
         if (m_obj.update_if_needed()) {
+            m_leaf->init_from_parent();
+        }
+    }
+    void ensure_writeable()
+    {
+        if (!m_obj.is_writeable()) {
+            m_obj.ensure_writeable();
             m_leaf->init_from_parent();
         }
     }

@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#ifndef SRC_REALM_ARRAY_STRING_HPP_
-#define SRC_REALM_ARRAY_STRING_HPP_
+#ifndef REALM_ARRAY_STRING_HPP
+#define REALM_ARRAY_STRING_HPP
 
 #include <realm/array_string_short.hpp>
 #include <realm/array_blobs_small.hpp>
@@ -99,6 +99,39 @@ private:
 
     Type upgrade_leaf(size_t value_size);
 };
+
+template <>
+class QueryState<StringData> : public QueryStateBase {
+public:
+    StringData m_state;
+
+    template <Action action>
+    bool uses_val()
+    {
+        return (action == act_Count);
+    }
+
+    QueryState(Action, Array* = nullptr, size_t limit = -1)
+        : QueryStateBase(limit)
+    {
+    }
+
+    template <Action action, bool pattern>
+    inline bool match(size_t, uint64_t, StringData)
+    {
+        if (pattern)
+            return false;
+
+        if (action == act_Count) {
+            ++m_match_count;
+        }
+        else {
+            REALM_ASSERT_DEBUG(false);
+        }
+
+        return (m_limit > m_match_count);
+    }
+};
 }
 
-#endif /* SRC_REALM_ARRAY_STRING_HPP_ */
+#endif /* REALM_ARRAY_STRING_HPP */

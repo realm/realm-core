@@ -521,9 +521,9 @@ std::string ExpressionNode::describe() const
     }
 }
 
-void ExpressionNode::verify_column() const
+void ExpressionNode::update_column() const
 {
-    m_expression->verify_column();
+    m_expression->update_column();
 }
 
 size_t ExpressionNode::find_first_local(size_t start, size_t end)

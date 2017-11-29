@@ -1,3 +1,33 @@
+# NEXT RELEASE
+
+### Bugfixes
+
+* Lorem ipsum.
+
+### Breaking changes
+
+* Limiting parameters removed from Query aggregate functions (start, end, limit)
+
+### Enhancements
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 4.0.4 Release notes
+
+### Bugfixes
+
+* Publish the release version of Android-armeabi-v7a binary.
+
+----------------------------------------------
+
 # 4.0.3 Release notes
 
 ### Bugfixes

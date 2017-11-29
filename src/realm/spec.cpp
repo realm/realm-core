@@ -80,19 +80,24 @@ void Spec::init(MemRef mem) noexcept
         m_enumkeys.set_parent(&m_top, 4);
     }
 
-    update_has_strong_link_columns();
+    update_internals();
 }
 
-void Spec::update_has_strong_link_columns() noexcept
+void Spec::update_internals() noexcept
 {
+    m_has_strong_link_columns = false;
+    m_num_public_columns = 0;
     size_t n = m_types.size();
     for (size_t i = 0; i < n; ++i) {
         if (ColumnAttr(m_attr.get(i)) & col_attr_StrongLinks) {
             m_has_strong_link_columns = true;
+        }
+        if (m_types.get(i) == col_type_BackLink) {
+            // Now we have no more public columns
             return;
         }
+        m_num_public_columns++;
     }
-    m_has_strong_link_columns = false;
 }
 
 bool Spec::update_from_parent(size_t old_baseline) noexcept
@@ -110,6 +115,8 @@ bool Spec::update_from_parent(size_t old_baseline) noexcept
 
     if (m_top.size() > 4)
         m_enumkeys.update_from_parent(old_baseline);
+
+    update_internals();
 
     return true;
 }
@@ -161,11 +168,20 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, in
 {
     REALM_ASSERT(column_ndx <= m_types.size());
 
-    if (REALM_UNLIKELY(name.size() > Table::max_column_name_length))
+    if (REALM_UNLIKELY(name.size() > Table::max_column_name_length)) {
         throw LogicError(LogicError::column_name_too_long);
+    }
+    if (name.size() == 0) {
+        throw LogicError(LogicError::invalid_column_name);
+    }
+    if (get_column_index(name) != npos) {
+        throw LogicError(LogicError::column_name_in_use);
+    }
 
-    if (type != col_type_BackLink)        // backlinks do not have names
-        m_names.insert(column_ndx, name); // Throws
+    if (type != col_type_BackLink) {
+        m_num_public_columns++;
+    }
+    m_names.insert(column_ndx, name);     // Throws
     m_types.insert(column_ndx, type);     // Throws
     // FIXME: So far, attributes are never reported to the replication system
     m_attr.insert(column_ndx, attr); // Throws
@@ -210,7 +226,7 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, in
         }
     }
 
-    update_has_strong_link_columns();
+    update_internals();
 }
 
 void Spec::erase_column(size_t column_ndx)
@@ -242,13 +258,14 @@ void Spec::erase_column(size_t column_ndx)
     }
 
     // Delete the actual name and type entries
-    REALM_ASSERT((column_ndx >= m_names.size()) == (type == col_type_BackLink));
-    if (type != col_type_BackLink)
-        m_names.erase(column_ndx); // Throws
+    if (type != col_type_BackLink) {
+        m_num_public_columns--;
+    }
+    m_names.erase(column_ndx);     // Throws
     m_types.erase(column_ndx);     // Throws
     m_attr.erase(column_ndx);      // Throws
 
-    update_has_strong_link_columns();
+    update_internals();
 }
 
 
@@ -468,7 +485,7 @@ size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const noexcept
 
 size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx) const noexcept
 {
-    size_t backlinks_column_start = m_names.size();
+    size_t backlinks_column_start = m_num_public_columns;
     size_t backlinks_start = get_subspec_ndx(backlinks_column_start);
     size_t count = m_subspecs.size();
 
@@ -580,7 +597,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
 
 void Spec::verify() const
 {
-    REALM_ASSERT(m_names.size() == get_public_column_count());
+    REALM_ASSERT(m_names.size() == get_column_count());
     REALM_ASSERT(m_types.size() == get_column_count());
     REALM_ASSERT(m_attr.size() == get_column_count());
 

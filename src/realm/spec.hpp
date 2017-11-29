@@ -157,13 +157,14 @@ private:
     ArrayInteger m_attr;  // 3rd slot in m_top
     Array m_subspecs;     // 4th slot in m_top (optional)
     Array m_enumkeys;     // 5th slot in m_top (optional)
+    size_t m_num_public_columns;
     bool m_has_strong_link_columns;
 
     Spec(Allocator&) noexcept; // Unattached
 
     bool init(ref_type) noexcept;
     void init(MemRef) noexcept;
-    void update_has_strong_link_columns() noexcept;
+    void update_internals() noexcept;
 
     // Returns true in case the ref has changed.
     bool init_from_parent() noexcept;
@@ -283,9 +284,7 @@ inline size_t Spec::get_column_count() const noexcept
 
 inline size_t Spec::get_public_column_count() const noexcept
 {
-    // Backlinks are the last columns, and do not have names, so getting
-    // the number of names gives us the count of user facing columns
-    return m_names.size();
+    return m_num_public_columns;
 }
 
 inline ColumnType Spec::get_column_type(size_t ndx) const noexcept
@@ -304,7 +303,7 @@ inline void Spec::set_column_type(size_t column_ndx, ColumnType type)
 
     m_types.set(column_ndx, type); // Throws
 
-    update_has_strong_link_columns();
+    update_internals();
 }
 
 inline ColumnAttrMask Spec::get_column_attr(size_t ndx) const noexcept
@@ -322,12 +321,11 @@ inline void Spec::set_column_attr(size_t column_ndx, ColumnAttrMask attr)
     // we will allow combinations.
     m_attr.set(column_ndx, attr.m_value);
 
-    update_has_strong_link_columns();
+    update_internals();
 }
 
 inline StringData Spec::get_column_name(size_t ndx) const noexcept
 {
-    REALM_ASSERT(ndx < get_column_count());
     return m_names.get(ndx);
 }
 

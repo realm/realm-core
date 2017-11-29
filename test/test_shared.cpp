@@ -2477,7 +2477,7 @@ TEST(Shared_MovingEnumStringColumn)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("foo");
-        table->add_column(type_String, "");
+        table->add_column(type_String, "foo_strings");
         table->add_empty_row(64);
         for (int i = 0; i < 64; ++i)
             table->set_string(0, i, "foo");
@@ -2490,7 +2490,7 @@ TEST(Shared_MovingEnumStringColumn)
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("foo");
         CHECK_EQUAL(1, table->get_num_unique_values(0));
-        table->insert_column(0, type_String, "");
+        table->insert_column(0, type_String, "a_or_b");
         for (int i = 0; i < 64; ++i)
             table->set_string(0, i, i % 2 == 0 ? "a" : "b");
         table->optimize();
@@ -3134,8 +3134,8 @@ NONCONCURRENT_TEST(Shared_TopSizeNotEqualNine)
     SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg.begin_write());
 
-    TableRef t = g.add_table("");
-    t->add_column(type_Double, "");
+    TableRef t = g.add_table("foo");
+    t->add_column(type_Double, "doubles");
     t->add_empty_row(241);
     sg.commit();
     REALM_ASSERT_RELEASE(sg.compact());
@@ -3549,7 +3549,7 @@ TEST(Shared_ConstObject)
     Group& g = sg_w.begin_write();
 
     TableRef t = g.add_table("Foo");
-    t->add_column(type_Int, "");
+    t->add_column(type_Int, "integers");
     t->create_object(Key(47)).set(0, 5);
     sg_w.commit();
 
@@ -3567,7 +3567,7 @@ TEST(Shared_ConstObjectIterator)
     Group& g = sg.begin_write();
 
     TableRef t = g.add_table("Foo");
-    t->add_column(type_Int, "");
+    t->add_column(type_Int, "integers");
     t->create_object(Key(47)).set(0, 5);
     t->create_object(Key(99)).set(0, 8);
     sg.commit();

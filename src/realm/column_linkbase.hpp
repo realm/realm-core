@@ -57,12 +57,6 @@ public:
     virtual void do_update_link(size_t row_ndx, size_t old_target_row_ndx, size_t new_target_row_ndx) = 0;
     virtual void do_swap_link(size_t row_ndx, size_t target_row_ndx_1, size_t target_row_ndx_2) = 0;
 
-    void adj_acc_insert_rows(size_t, size_t) noexcept override;
-    void adj_acc_erase_row(size_t) noexcept override;
-    void adj_acc_move_over(size_t, size_t) noexcept override;
-    void adj_acc_swap_rows(size_t, size_t) noexcept override;
-    void adj_acc_move_row(size_t, size_t) noexcept override;
-    void adj_acc_clear_root_table() noexcept override;
     void mark(int) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
     void bump_link_origin_table_version() noexcept override;
@@ -133,53 +127,6 @@ inline void LinkColumnBase::set_backlink_column(BacklinkColumn& column) noexcept
     m_backlink_column = &column;
 }
 
-inline void LinkColumnBase::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
-{
-    IntegerColumn::adj_acc_insert_rows(row_ndx, num_rows);
-
-    typedef _impl::TableFriend tf;
-    tf::mark(*m_target_table);
-}
-
-inline void LinkColumnBase::adj_acc_erase_row(size_t row_ndx) noexcept
-{
-    IntegerColumn::adj_acc_erase_row(row_ndx);
-
-    typedef _impl::TableFriend tf;
-    tf::mark(*m_target_table);
-}
-
-inline void LinkColumnBase::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
-{
-    IntegerColumn::adj_acc_move_over(from_row_ndx, to_row_ndx);
-
-    typedef _impl::TableFriend tf;
-    tf::mark(*m_target_table);
-}
-
-inline void LinkColumnBase::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
-{
-    IntegerColumn::adj_acc_swap_rows(row_ndx_1, row_ndx_2);
-
-    typedef _impl::TableFriend tf;
-    tf::mark(*m_target_table);
-}
-
-inline void LinkColumnBase::adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
-{
-    IntegerColumn::adj_acc_move_row(from_ndx, to_ndx);
-
-    using tf = _impl::TableFriend;
-    tf::mark(*m_target_table);
-}
-
-inline void LinkColumnBase::adj_acc_clear_root_table() noexcept
-{
-    IntegerColumn::adj_acc_clear_root_table();
-
-    typedef _impl::TableFriend tf;
-    tf::mark(*m_target_table);
-}
 
 inline void LinkColumnBase::mark(int type) noexcept
 {

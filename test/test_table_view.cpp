@@ -217,67 +217,68 @@ TEST(TableView_FloatsGetSet)
     v[0].set_double(1, 123.3219);
     CHECK_EQUAL(123.3219, v[0].get_double(1));
 }
+#endif
 
 TEST(TableView_FloatsFindAndAggregations)
 {
-    TestTable table;
-    table.add_column(type_Float, "1");
-    table.add_column(type_Double, "2");
-    table.add_column(type_Int, "3");
+    Table table;
+    auto col_float = table.add_column(type_Float, "1");
+    auto col_double = table.add_column(type_Double, "2");
+    auto col_int = table.add_column(type_Int, "3");
 
     float f_val[] = {1.2f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f};
     double d_val[] = {-1.2, 2.2, 3.2, -1.2, 2.3, 0.0};
     // v_some =       ^^^^            ^^^^
     double sum_f = 0.0;
     double sum_d = 0.0;
-    for (size_t i = 0; i < 6; ++i) {
-        add(table, f_val[i], d_val[i], 1);
+    for (int i = 0; i < 6; ++i) {
+        table.create_object(Key(i)).set_all(f_val[i], d_val[i], 1);
         sum_d += d_val[i];
         sum_f += f_val[i];
     }
 
     // Test find_all()
-    TableView v_all = table.find_all_int(2, 1);
+    TableView v_all = table.find_all_int(col_int, 1);
     CHECK_EQUAL(6, v_all.size());
 
-    TableView v_some = table.find_all_double(1, -1.2);
+    TableView v_some = table.find_all_double(col_double, -1.2);
     CHECK_EQUAL(2, v_some.size());
-    CHECK_EQUAL(0, v_some.get_source_ndx(0));
-    CHECK_EQUAL(3, v_some.get_source_ndx(1));
+    CHECK_EQUAL(Key(0), v_some.get_key(0));
+    CHECK_EQUAL(Key(3), v_some.get_key(1));
 
     // Test find_first
-    CHECK_EQUAL(0, v_all.find_first_double(1, -1.2));
-    CHECK_EQUAL(5, v_all.find_first_double(1, 0.0));
-    CHECK_EQUAL(2, v_all.find_first_double(1, 3.2));
+    CHECK_EQUAL(0, v_all.find_first_double(col_double, -1.2));
+    CHECK_EQUAL(5, v_all.find_first_double(col_double, 0.0));
+    CHECK_EQUAL(2, v_all.find_first_double(col_double, 3.2));
 
-    CHECK_EQUAL(1, v_all.find_first_float(0, 2.1f));
-    CHECK_EQUAL(5, v_all.find_first_float(0, 0.0f));
-    CHECK_EQUAL(2, v_all.find_first_float(0, 3.1f));
+    CHECK_EQUAL(1, v_all.find_first_float(col_float, 2.1f));
+    CHECK_EQUAL(5, v_all.find_first_float(col_float, 0.0f));
+    CHECK_EQUAL(2, v_all.find_first_float(col_float, 3.1f));
 
     // TODO: add for float as well
 
     double epsilon = std::numeric_limits<double>::epsilon();
 
     // Test sum
-    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.sum_double(1), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.sum_double(col_double), 10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.sum_float(0), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.sum_double(1), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.sum_double(col_double), 10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.sum_float(0), 10 * epsilon);
 
-    size_t ndx = not_found;
+    Key key;
 
     // Test max
-    CHECK_EQUAL(3.2, v_all.maximum_double(1, &ndx));
-    CHECK_EQUAL(2, ndx);
+    CHECK_EQUAL(3.2, v_all.maximum_double(col_double, &key));
+    CHECK_EQUAL(Key(2), key);
 
-    CHECK_EQUAL(-1.2, v_some.maximum_double(1, &ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(-1.2, v_some.maximum_double(col_double, &key));
+    CHECK_EQUAL(Key(0), key);
 
-    CHECK_EQUAL(3.1f, v_all.maximum_float(0, &ndx));
-    CHECK_EQUAL(2, ndx);
+    CHECK_EQUAL(3.1f, v_all.maximum_float(col_float, &key));
+    CHECK_EQUAL(Key(2), key);
 
-    CHECK_EQUAL(1.2f, v_some.maximum_float(0, &ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(1.2f, v_some.maximum_float(col_float, &key));
+    CHECK_EQUAL(Key(0), key);
 
     // Max without ret_index
     CHECK_EQUAL(3.2, v_all.maximum_double(1));
@@ -292,17 +293,17 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(-1.1f, v_some.minimum_float(0));
 
     // min with ret_ndx
-    CHECK_EQUAL(-1.2, v_all.minimum_double(1, &ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(-1.2, v_all.minimum_double(col_double, &key));
+    CHECK_EQUAL(Key(0), key);
 
-    CHECK_EQUAL(-1.2, v_some.minimum_double(1, &ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(-1.2, v_some.minimum_double(col_double, &key));
+    CHECK_EQUAL(Key(0), key);
 
-    CHECK_EQUAL(-1.1f, v_all.minimum_float(0, &ndx));
-    CHECK_EQUAL(3, ndx);
+    CHECK_EQUAL(-1.1f, v_all.minimum_float(col_float, &key));
+    CHECK_EQUAL(Key(3), key);
 
-    CHECK_EQUAL(-1.1f, v_some.minimum_float(0, &ndx));
-    CHECK_EQUAL(1, ndx);
+    CHECK_EQUAL(-1.1f, v_some.minimum_float(col_float, &key));
+    CHECK_EQUAL(Key(3), key);
 
     // Test avg
     CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.average_double(1), 10 * epsilon);
@@ -310,15 +311,16 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.average_float(0), 10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.average_float(0), 10 * epsilon);
 
-    CHECK_EQUAL(1, v_some.count_float(0, 1.2f));
-    CHECK_EQUAL(2, v_some.count_double(1, -1.2));
-    CHECK_EQUAL(2, v_some.count_int(2, 1));
+    CHECK_EQUAL(1, v_some.count_float(col_float, 1.2f));
+    CHECK_EQUAL(2, v_some.count_double(col_double, -1.2));
+    CHECK_EQUAL(2, v_some.count_int(col_int, 1));
 
-    CHECK_EQUAL(2, v_all.count_float(0, 2.1f));
-    CHECK_EQUAL(2, v_all.count_double(1, -1.2));
-    CHECK_EQUAL(6, v_all.count_int(2, 1));
+    CHECK_EQUAL(2, v_all.count_float(col_float, 2.1f));
+    CHECK_EQUAL(2, v_all.count_double(col_double, -1.2));
+    CHECK_EQUAL(6, v_all.count_int(col_int, 1));
 }
 
+#ifdef LEGACY_TESTS
 TEST(TableView_Sum)
 {
     TestTable table;

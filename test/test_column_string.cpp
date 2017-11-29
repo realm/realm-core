@@ -1133,6 +1133,7 @@ TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, string_column, nullable_s
     res.destroy();
 }
 
+#ifdef LEGACY_TESTS
 TEST_TYPES(ColumnString_Count, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
@@ -1174,6 +1175,7 @@ TEST_TYPES(ColumnString_Count, non_nullable, nullable)
     asc.destroy();
     e.destroy();
 }
+#endif
 
 TEST_TYPES(ColumnString_SetIndexInParent, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {

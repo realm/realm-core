@@ -110,7 +110,6 @@ Obj LinkList::get(size_t link_ndx)
 template <>
 void List<Key>::add(Key target_key)
 {
-    update_if_needed();
     size_t ndx = m_leaf->size();
     m_leaf->insert(ndx, null_key);
     List<Key>::set(ndx, target_key);
@@ -119,11 +118,14 @@ void List<Key>::add(Key target_key)
 template <>
 Key List<Key>::set(size_t ndx, Key target_key)
 {
+    ensure_writeable();
+
     TableRef target_table = m_obj.get_target_table(m_col_ndx);
     const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
     size_t backlink_col = target_table_spec.find_backlink_column(m_obj.get_table_index(), m_col_ndx);
 
-    Key old_key = m_leaf->get(ndx);
+    // get will check for ndx out of bounds
+    Key old_key = get(ndx);
 
     if (old_key != realm::null_key) {
         Obj target_obj = target_table->get_object(old_key);
@@ -136,12 +138,18 @@ Key List<Key>::set(size_t ndx, Key target_key)
         Obj target_obj = target_table->get_object(target_key);
         target_obj.add_backlink(backlink_col, m_obj.get_key()); // Throws
     }
+
+    m_obj.bump_version();
+
     return old_key;
 }
 
 template <>
 void List<Key>::insert(size_t ndx, Key target_key)
 {
+    if (ndx > m_leaf->size()) {
+        throw std::out_of_range("Index out of range");
+    }
     m_leaf->insert(ndx, null_key);
     set(ndx, target_key);
 }
@@ -151,6 +159,8 @@ Key List<Key>::remove(size_t ndx)
 {
     Key old = set(ndx, null_key);
     m_leaf->erase(ndx);
+    ConstListBase::adj_remove(ndx);
+
     return old;
 }
 

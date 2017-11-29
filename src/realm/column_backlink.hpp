@@ -67,13 +67,6 @@ public:
     void move_last_row_over(size_t, size_t, bool) override;
     void swap_rows(size_t, size_t) override;
     void clear(size_t, bool) override;
-    void adj_acc_insert_rows(size_t, size_t) noexcept override;
-    void adj_acc_erase_row(size_t) noexcept override;
-    void adj_acc_move_over(size_t, size_t) noexcept override;
-    void adj_acc_swap_rows(size_t, size_t) noexcept override;
-    void adj_acc_move_row(size_t, size_t) noexcept override;
-    void adj_acc_merge_rows(size_t, size_t) noexcept override;
-    void adj_acc_clear_root_table() noexcept override;
     void mark(int) noexcept override;
 
     void bump_link_origin_table_version() noexcept override;
@@ -157,61 +150,6 @@ inline void BacklinkColumn::add_row()
     IntegerColumn::add(0);
 }
 
-inline void BacklinkColumn::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
-{
-    IntegerColumn::adj_acc_insert_rows(row_ndx, num_rows);
-
-    typedef _impl::TableFriend tf;
-    tf::mark(*m_origin_table);
-}
-
-inline void BacklinkColumn::adj_acc_erase_row(size_t row_ndx) noexcept
-{
-    IntegerColumn::adj_acc_erase_row(row_ndx);
-
-    typedef _impl::TableFriend tf;
-    tf::mark(*m_origin_table);
-}
-
-inline void BacklinkColumn::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
-{
-    IntegerColumn::adj_acc_move_over(from_row_ndx, to_row_ndx);
-
-    typedef _impl::TableFriend tf;
-    tf::mark(*m_origin_table);
-}
-
-inline void BacklinkColumn::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
-{
-    Column::adj_acc_swap_rows(row_ndx_1, row_ndx_2);
-
-    using tf = _impl::TableFriend;
-    tf::mark(*m_origin_table);
-}
-
-inline void BacklinkColumn::adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
-{
-    Column::adj_acc_move_row(from_ndx, to_ndx);
-
-    using tf = _impl::TableFriend;
-    tf::mark(*m_origin_table);
-}
-
-inline void BacklinkColumn::adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
-{
-    Column::adj_acc_merge_rows(old_row_ndx, new_row_ndx);
-
-    using tf = _impl::TableFriend;
-    tf::mark(*m_origin_table);
-}
-
-inline void BacklinkColumn::adj_acc_clear_root_table() noexcept
-{
-    IntegerColumn::adj_acc_clear_root_table();
-
-    typedef _impl::TableFriend tf;
-    tf::mark(*m_origin_table);
-}
 
 inline void BacklinkColumn::mark(int type) noexcept
 {

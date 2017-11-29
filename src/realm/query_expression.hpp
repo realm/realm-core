@@ -299,66 +299,6 @@ struct Common<T1, T2, true, false, b> {
 };
 
 
-struct RowIndex {
-    enum DetachedTag {
-        Detached,
-    };
-
-    explicit RowIndex()
-        : m_row_index(npos)
-    {
-    }
-    explicit RowIndex(size_t row_index)
-        : m_row_index(row_index)
-    {
-    }
-    RowIndex(DetachedTag)
-        : m_row_index()
-    {
-    }
-
-    bool is_attached() const
-    {
-        return bool(m_row_index);
-    }
-    bool is_null() const
-    {
-        return is_attached() && *m_row_index == npos;
-    }
-
-    bool operator==(const RowIndex& other) const
-    {
-        // Row indexes that are detached are never equal to any other row index.
-        if (!is_attached() || !other.is_attached())
-            return false;
-        return m_row_index == other.m_row_index;
-    }
-    bool operator!=(const RowIndex& other) const
-    {
-        return !(*this == other);
-    }
-    template <class C, class T>
-    friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const RowIndex&);
-
-private:
-    util::Optional<size_t> m_row_index;
-};
-
-template <class C, class T>
-inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const RowIndex& r)
-{
-    if (!r.is_attached()) {
-        out << "detached row";
-    }
-    else if (r.is_null()) {
-        out << "null row";
-    }
-    else {
-        out << r.m_row_index;
-    }
-    return out;
-}
-
 struct ValueBase {
     static const size_t default_size = 8;
     virtual void export_bool(ValueBase& destination) const = 0;
@@ -369,7 +309,6 @@ struct ValueBase {
     virtual void export_double(ValueBase& destination) const = 0;
     virtual void export_StringData(ValueBase& destination) const = 0;
     virtual void export_BinaryData(ValueBase& destination) const = 0;
-    virtual void export_RowIndex(ValueBase& destination) const = 0;
     virtual void export_null(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
 
@@ -392,10 +331,8 @@ public:
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_base_table(const Table* table) = 0;
-    virtual void set_cluster(const Cluster*)
-    {
-    }
-    virtual void verify_column() const = 0;
+    virtual void set_cluster(const Cluster*) = 0;
+    virtual void update_column() const = 0;
     virtual const Table* get_base_table() const = 0;
     virtual std::string description() const = 0;
 
@@ -433,7 +370,7 @@ public:
     {
     }
 
-    virtual void verify_column() const = 0;
+    virtual void update_column() const = 0;
     virtual std::string description() const = 0;
 
     virtual void set_cluster(const Cluster*)
@@ -953,6 +890,15 @@ struct NullableVector {
         fill(values);
     }
 
+    void init(const std::vector<T>& values)
+    {
+        size_t sz = values.size();
+        init(sz);
+        for (size_t t = 0; t < sz; t++) {
+            set(t, values[t]);
+        }
+    }
+
     void dealloc()
     {
         if (m_first) {
@@ -1052,31 +998,6 @@ inline void NullableVector<BinaryData>::set_null(size_t index)
     m_first[index] = BinaryData();
 }
 
-// RowIndex
-template <>
-inline bool NullableVector<RowIndex>::is_null(size_t index) const
-{
-    return m_first[index].is_null();
-}
-template <>
-inline void NullableVector<RowIndex>::set_null(size_t index)
-{
-    m_first[index] = RowIndex();
-}
-
-// Key
-template <>
-inline bool NullableVector<Key>::is_null(size_t index) const
-{
-    return m_first[index] == null_key;
-}
-template <>
-inline void NullableVector<Key>::set_null(size_t index)
-{
-    m_first[index] = null_key;
-}
-
-
 // Timestamp
 
 template <>
@@ -1103,7 +1024,7 @@ inline void NullableVector<ref_type>::set_null(size_t index)
     m_first[index] = 0;
 }
 
-// SizeOfAny
+// SizeOfList
 template <>
 inline bool NullableVector<SizeOfList>::is_null(size_t index) const
 {
@@ -1113,6 +1034,18 @@ template <>
 inline void NullableVector<SizeOfList>::set_null(size_t index)
 {
     m_first[index].set_null();
+}
+
+// Key
+template <>
+inline bool NullableVector<Key>::is_null(size_t index) const
+{
+    return m_first[index] == null_key;
+}
+template <>
+inline void NullableVector<Key>::set_null(size_t index)
+{
+    m_first[index] = Key{};
 }
 
 template <typename Operator>
@@ -1147,11 +1080,14 @@ struct TrueExpression : Expression {
     void set_base_table(const Table*) override
     {
     }
+    void set_cluster(const Cluster*) override
+    {
+    }
     const Table* get_base_table() const override
     {
         return nullptr;
     }
-    void verify_column() const override
+    void update_column() const override
     {
     }
     std::string description() const override
@@ -1173,7 +1109,10 @@ struct FalseExpression : Expression {
     void set_base_table(const Table*) override
     {
     }
-    void verify_column() const override
+    void set_cluster(const Cluster*) override
+    {
+    }
+    void update_column() const override
     {
     }
     std::string description() const override
@@ -1231,7 +1170,14 @@ public:
         ValueBase::m_values = values;
     }
 
-    void verify_column() const override
+    void init(bool from_link_list, const std::vector<T>& values)
+    {
+        m_storage.init(values);
+        ValueBase::m_from_link_list = from_link_list;
+        ValueBase::m_values = values.size();
+    }
+
+    void update_column() const override
     {
     }
 
@@ -1366,10 +1312,6 @@ public:
     {
         export2<BinaryData>(destination);
     }
-    REALM_FORCEINLINE void export_RowIndex(ValueBase& destination) const override
-    {
-        export2<RowIndex>(destination);
-    }
     REALM_FORCEINLINE void export_null(ValueBase& destination) const override
     {
         Value<null>& d = static_cast<Value<null>&>(destination);
@@ -1395,8 +1337,6 @@ public:
             source.export_StringData(*this);
         else if (std::is_same<T, BinaryData>::value)
             source.export_BinaryData(*this);
-        else if (std::is_same<T, RowIndex>::value)
-            source.export_RowIndex(*this);
         else if (std::is_same<T, null>::value)
             source.export_null(*this);
         else
@@ -1802,6 +1742,7 @@ public:
 
     LinkMap(LinkMap const& other)
     {
+        m_link_column_names = other.m_link_column_names;
         m_link_column_indexes = other.m_link_column_indexes;
         m_tables = other.m_tables;
         m_link_types = other.m_link_types;
@@ -1832,10 +1773,14 @@ public:
         cluster->init_leaf(m_link_column_indexes[0], m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
-    void verify_columns() const
+
+    void update_columns() const
     {
         for (size_t i = 0; i < m_link_column_indexes.size(); i++) {
-            m_tables[i]->verify_column(m_link_column_indexes[i]);
+            m_link_column_indexes[i] = m_tables[i]->get_column_index(m_link_column_names[i]);
+            if (m_link_column_indexes[i] == npos) {
+                throw LogicError(LogicError::column_does_not_exist);
+            }
         }
     }
 
@@ -1886,7 +1831,8 @@ private:
         map_links(row, mlv);
     }
 
-    std::vector<size_t> m_link_column_indexes;
+    mutable std::vector<size_t> m_link_column_indexes;
+    std::vector<std::string> m_link_column_names;
     std::vector<ColumnType> m_link_types;
     std::vector<const Table*> m_tables;
     bool m_only_unary_links = true;
@@ -1898,7 +1844,7 @@ private:
     const Array* m_leaf_ptr = nullptr;
 
     template <class>
-    friend Query compare(const Subexpr2<Link>&, const ConstRow&);
+    friend Query compare(const Subexpr2<Link>&, const ConstObj&);
 };
 
 template <class T, class S, class I>
@@ -1933,8 +1879,9 @@ template <class T>
 class SimpleQuerySupport : public Subexpr2<T> {
 public:
     SimpleQuerySupport(size_t column, const Table* table, std::vector<size_t> links = {})
-        : m_column_ndx(column)
-        , m_link_map(table, std::move(links))
+        : m_link_map(table, std::move(links))
+        , m_column_name(m_link_map.target_table()->get_column_name(column))
+        , m_column_ndx(column)
     {
     }
 
@@ -1952,6 +1899,7 @@ public:
     {
         if (table != get_base_table()) {
             m_link_map.set_base_table(table);
+            m_column_name = m_link_map.target_table()->get_column_name(m_column_ndx);
         }
     }
 
@@ -1970,14 +1918,14 @@ public:
         }
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        // verify links
-        m_link_map.verify_columns();
-        // verify target table
-        const Table* target_table = m_link_map.target_table();
-        if (target_table && m_column_ndx != npos) {
-            target_table->verify_column(m_column_ndx);
+        // update links
+        m_link_map.update_columns();
+        // update target column
+        m_column_ndx = m_link_map.target_table()->get_column_index(m_column_name);
+        if (m_column_ndx == realm::npos) {
+            throw LogicError(LogicError::column_does_not_exist);
         }
     }
 
@@ -2030,15 +1978,14 @@ public:
 
     SimpleQuerySupport(SimpleQuerySupport const& other, QueryNodeHandoverPatches* patches)
         : Subexpr2<T>(other)
-        , m_column_ndx(other.m_column_ndx)
         , m_link_map(other.m_link_map, patches)
+        , m_column_name(other.m_column_name)
+        , m_column_ndx(other.m_column_ndx)
     {
     }
 
     SimpleQuerySupport(SimpleQuerySupport const& other)
-        : Subexpr2<T>(other)
-        , m_column_ndx(other.m_column_ndx)
-        , m_link_map(other.m_link_map)
+        : SimpleQuerySupport(other, nullptr)
     {
     }
 
@@ -2053,9 +2000,12 @@ public:
     }
 
 private:
-    // Column index of payload column of m_table
-    mutable size_t m_column_ndx;
     LinkMap m_link_map;
+
+    // Column index of payload column of m_table
+    std::string m_column_name;
+    mutable size_t m_column_ndx;
+
     // Leaf cache
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
@@ -2194,9 +2144,14 @@ public:
         m_link_map.set_base_table(table);
     }
 
-    void verify_column() const override
+    void set_cluster(const Cluster* cluster) override
     {
-        m_link_map.verify_columns();
+        m_link_map.set_cluster(cluster);
+    }
+
+    void update_column() const override
+    {
+        m_link_map.update_columns();
     }
 
     // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as
@@ -2267,9 +2222,14 @@ public:
         m_link_map.set_base_table(table);
     }
 
-    void verify_column() const override
+    void set_cluster(const Cluster* cluster) override
     {
-        m_link_map.verify_columns();
+        m_link_map.set_cluster(cluster);
+    }
+
+    void update_column() const override
+    {
+        m_link_map.update_columns();
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2306,9 +2266,9 @@ public:
         m_expr->set_cluster(cluster);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_expr->verify_column();
+        m_expr->update_column();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
@@ -2369,14 +2329,10 @@ private:
     std::unique_ptr<TExpr> m_expr;
 };
 
-struct ConstantRowValueHandoverPatch : public QueryNodeHandoverPatch {
-    std::unique_ptr<RowBaseHandoverPatch> row_patch;
-};
-
-class ConstantRowValue : public Subexpr2<Link> {
+class KeyValue : public Subexpr2<Link> {
 public:
-    ConstantRowValue(const ConstRow& row)
-        : m_row(row)
+    KeyValue(Key key)
+        : m_key(key)
     {
     }
 
@@ -2384,7 +2340,7 @@ public:
     {
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
     }
 
@@ -2395,54 +2351,30 @@ public:
 
     void evaluate(size_t, ValueBase& destination) override
     {
-        if (m_row.is_attached()) {
-            Value<RowIndex> v(RowIndex(m_row.get_index()));
-            destination.import(v);
-        }
-        else {
-            Value<RowIndex> v(RowIndex::Detached);
-            destination.import(v);
-        }
+        // Destination must be of Key type. It only makes sense to
+        // compare keys with keys
+        auto d = dynamic_cast<Value<Key>*>(&destination);
+        REALM_ASSERT(d != nullptr);
+        d->init(false, 1, m_key);
     }
 
     virtual std::string description() const override
     {
-        if (!m_row.is_attached()) {
-            return metrics::print_value("detached object");
-        }
-        return metrics::print_value(m_row.get_index());
+        return metrics::print_value(m_key);
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
-        return std::unique_ptr<Subexpr>(new ConstantRowValue(*this, patches));
-    }
-
-    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
-    {
-        REALM_ASSERT(patches.size());
-        std::unique_ptr<QueryNodeHandoverPatch> abstract_patch = std::move(patches.back());
-        patches.pop_back();
-
-        auto patch = dynamic_cast<ConstantRowValueHandoverPatch*>(abstract_patch.get());
-        REALM_ASSERT(patch);
-
-        m_row.apply_and_consume_patch(patch->row_patch, group);
+        return std::unique_ptr<Subexpr>(new KeyValue(*this));
     }
 
 private:
-    ConstantRowValue(const ConstantRowValue& source, QueryNodeHandoverPatches* patches)
-        : m_row(patches ? ConstRow() : source.m_row)
+    KeyValue(const KeyValue& source)
+        : m_key(source.m_key)
     {
-        if (!patches)
-            return;
-
-        std::unique_ptr<ConstantRowValueHandoverPatch> patch(new ConstantRowValueHandoverPatch);
-        ConstRow::generate_patch(source.m_row, patch->row_patch);
-        patches->emplace_back(patch.release());
     }
 
-    ConstRow m_row;
+    Key m_key;
 };
 
 template <typename T>
@@ -2488,14 +2420,21 @@ public:
     {
         return m_link_map.base_table();
     }
+
     void set_base_table(const Table* table) override
     {
         m_link_map.set_base_table(table);
     }
 
-    void verify_column() const override
+    void set_cluster(const Cluster* cluster) override
     {
-        m_link_map.verify_columns();
+        REALM_ASSERT(m_link_map.has_links());
+        m_link_map.set_cluster(cluster);
+    }
+
+    void update_column() const override
+    {
+        m_link_map.update_columns();
     }
 
     std::string description() const override
@@ -2545,20 +2484,20 @@ class Average;
 class ColumnListBase {
 public:
     ColumnListBase(size_t column_ndx, const Table* table, const std::vector<size_t>& links)
-        : m_link_map(table, links)
-        , m_column_ndx(column_ndx)
+        : m_column_ndx(column_ndx)
+        , m_link_map(table, links)
     {
     }
 
     ColumnListBase(const ColumnListBase& other, QueryNodeHandoverPatches* patches)
-        : m_link_map(other.m_link_map, patches)
+        : m_column_name(other.m_column_name)
         , m_column_ndx(other.m_column_ndx)
+        , m_link_map(other.m_link_map, patches)
     {
     }
 
     ColumnListBase(const ColumnListBase& other)
-        : m_link_map(other.m_link_map)
-        , m_column_ndx(other.m_column_ndx)
+        : ColumnListBase(other, nullptr)
     {
     }
 
@@ -2571,8 +2510,9 @@ public:
         return m_link_map.has_links();
     }
 
+    std::string m_column_name;
+    mutable size_t m_column_ndx;
     LinkMap m_link_map;
-    size_t m_column_ndx;
     // Leaf cache
     using LeafCacheStorage = typename std::aligned_storage<sizeof(Array), alignof(Array)>::type;
     using LeafPtr = std::unique_ptr<Array, PlacementDelete>;
@@ -2612,6 +2552,7 @@ public:
     void set_base_table(const Table* table) override
     {
         m_link_map.set_base_table(table);
+        m_column_name = m_link_map.target_table()->get_column_name(m_column_ndx);
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -2619,10 +2560,13 @@ public:
         ColumnListBase::set_cluster(cluster);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_link_map.verify_columns();
-        m_link_map.target_table()->verify_column(m_column_ndx);
+        m_link_map.update_columns();
+        m_column_ndx = m_link_map.target_table()->get_column_index(m_column_name);
+        if (m_column_ndx == realm::npos) {
+            throw LogicError(LogicError::column_does_not_exist);
+        }
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2781,9 +2725,9 @@ public:
         m_subtable_column.set_cluster(cluster);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_subtable_column.verify_column();
+        m_subtable_column.update_column();
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2833,14 +2777,14 @@ private:
 };
 
 template <class Operator>
-Query compare(const Subexpr2<Link>& left, const ConstRow& row)
+Query compare(const Subexpr2<Link>& left, const ConstObj& obj)
 {
     static_assert(std::is_same<Operator, Equal>::value || std::is_same<Operator, NotEqual>::value,
                   "Links can only be compared for equality.");
     const Columns<Link>* column = dynamic_cast<const Columns<Link>*>(&left);
     if (column) {
         const LinkMap& link_map = column->link_map();
-        REALM_ASSERT(link_map.target_table() == row.get_table() || !row.is_attached());
+        REALM_ASSERT(link_map.target_table() == obj.get_table());
 #ifdef REALM_OLDQUERY_FALLBACK
         if (link_map.get_nb_hops() == 1) {
             // We can fall back to Query::links_to for != and == operations on links, but only
@@ -2855,28 +2799,28 @@ Query compare(const Subexpr2<Link>& left, const ConstRow& row)
                     // Negate the following `links_to`.
                     query.Not();
                 }
-                query.links_to(link_map.m_link_column_indexes[0], row);
+                query.links_to(link_map.m_link_column_indexes[0], obj.get_key());
                 return query;
             }
         }
 #endif
     }
-    return make_expression<Compare<Operator, RowIndex>>(left.clone(), make_subexpr<ConstantRowValue>(row));
+    return make_expression<Compare<Operator, Key>>(left.clone(), make_subexpr<KeyValue>(obj.get_key()));
 }
 
-inline Query operator==(const Subexpr2<Link>& left, const ConstRow& row)
+inline Query operator==(const Subexpr2<Link>& left, const ConstObj& row)
 {
     return compare<Equal>(left, row);
 }
-inline Query operator!=(const Subexpr2<Link>& left, const ConstRow& row)
+inline Query operator!=(const Subexpr2<Link>& left, const ConstObj& row)
 {
     return compare<NotEqual>(left, row);
 }
-inline Query operator==(const ConstRow& row, const Subexpr2<Link>& right)
+inline Query operator==(const ConstObj& row, const Subexpr2<Link>& right)
 {
     return compare<Equal>(right, row);
 }
-inline Query operator!=(const ConstRow& row, const Subexpr2<Link>& right)
+inline Query operator!=(const ConstObj& row, const Subexpr2<Link>& right)
 {
     return compare<NotEqual>(right, row);
 }
@@ -2886,7 +2830,7 @@ Query compare(const Subexpr2<Link>& left, null)
 {
     static_assert(std::is_same<Operator, Equal>::value || std::is_same<Operator, NotEqual>::value,
                   "Links can only be compared for equality.");
-    return make_expression<Compare<Operator, RowIndex>>(left.clone(), make_subexpr<Value<RowIndex>>());
+    return make_expression<Compare<Operator, Key>>(left.clone(), make_subexpr<KeyValue>(Key{}));
 }
 
 inline Query operator==(const Subexpr2<Link>& left, null)
@@ -2915,6 +2859,7 @@ public:
 
     Columns(size_t column, const Table* table, std::vector<size_t> links = {})
         : m_link_map(table, std::move(links))
+        , m_column_name(m_link_map.target_table()->get_column_name(column))
         , m_column_ndx(column)
         , m_nullable(m_link_map.target_table()->is_nullable(m_column_ndx))
     {
@@ -2922,6 +2867,7 @@ public:
 
     Columns(const Columns& other, QueryNodeHandoverPatches* patches = nullptr)
         : m_link_map(other.m_link_map, patches)
+        , m_column_name(other.m_column_name)
         , m_column_ndx(other.m_column_ndx)
         , m_nullable(other.m_nullable)
     {
@@ -2931,6 +2877,7 @@ public:
     {
         if (this != &other) {
             m_link_map = other.m_link_map;
+            m_column_name = other.m_column_name;
             m_column_ndx = other.m_column_ndx;
             m_nullable = other.m_nullable;
         }
@@ -2950,6 +2897,7 @@ public:
 
         m_link_map.set_base_table(table);
         m_nullable = m_link_map.target_table()->is_nullable(m_column_ndx);
+        m_column_name = m_link_map.target_table()->get_column_name(m_column_ndx);
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -2967,14 +2915,14 @@ public:
         }
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        // verify links
-        m_link_map.verify_columns();
-        // verify target table
-        const Table* target_table = m_link_map.target_table();
-        if (target_table && m_column_ndx != npos) {
-            target_table->verify_column(m_column_ndx);
+        // update links
+        m_link_map.update_columns();
+        // update target column
+        m_column_ndx = m_link_map.target_table()->get_column_index(m_column_name);
+        if (m_column_ndx == realm::npos) {
+            throw LogicError(LogicError::column_does_not_exist);
         }
     }
 
@@ -3090,7 +3038,8 @@ private:
     const LeafType* m_leaf_ptr = nullptr;
 
     // Column index of payload column of m_table
-    size_t m_column_ndx;
+    std::string m_column_name;
+    mutable size_t m_column_ndx;
 
     // set to false by default for stand-alone Columns declaration that are not yet associated with any table
     // or oclumn. Call init() to update it or use a constructor that takes table + column index as argument.
@@ -3125,10 +3074,10 @@ public:
         m_column.set_base_table(m_link_map.target_table());
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_link_map.verify_columns();
-        m_column.verify_column();
+        m_link_map.update_columns();
+        m_column.update_column();
     }
 
     void evaluate(size_t, ValueBase&) override
@@ -3197,10 +3146,10 @@ public:
         m_column.set_base_table(m_link_map.target_table());
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_link_map.verify_columns();
-        m_column.verify_column();
+        m_link_map.update_columns();
+        m_column.update_column();
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -3271,9 +3220,14 @@ public:
         m_link_map.set_base_table(table);
     }
 
-    void verify_column() const override
+    void set_cluster(const Cluster* cluster) override
     {
-        m_link_map.verify_columns();
+        m_link_map.set_cluster(cluster);
+    }
+
+    void update_column() const override
+    {
+        m_link_map.update_columns();
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -3281,10 +3235,9 @@ public:
         std::vector<Key> links = m_link_map.get_links(index);
         // std::sort(links.begin(), links.end());
 
-        size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, Key) {
-            return running_count;
-            // TODO: What to be done here?
-            // return running_count + m_query.count(link, link + 1, 1);
+        size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, Key k) {
+            ConstObj obj = m_link_map.target_table()->get_object(k);
+            return running_count + m_query.eval_object(obj);
         });
 
         destination.import(Value<Int>(false, 1, size_t(count)));
@@ -3488,9 +3441,9 @@ public:
         m_left->set_base_table(table);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_left->verify_column();
+        m_left->update_column();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
@@ -3574,10 +3527,10 @@ public:
         m_right->set_cluster(cluster);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_left->verify_column();
-        m_right->verify_column();
+        m_left->update_column();
+        m_right->update_column();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
@@ -3660,10 +3613,10 @@ public:
         m_right->set_cluster(cluster);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_left->verify_column();
-        m_right->verify_column();
+        m_left->update_column();
+        m_right->update_column();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression

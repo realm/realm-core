@@ -27,12 +27,12 @@ void LinkMap::set_base_table(const Table* table)
         return;
 
     m_tables.clear();
+    m_link_column_names.clear();
     m_tables.push_back(table);
     m_link_types.clear();
     m_only_unary_links = true;
 
     Group* group = _impl::TableFriend::get_parent_group(*table);
-    TableRef target_table;
 
     for (size_t i = 0; i < m_link_column_indexes.size(); i++) {
         size_t link_column_index = m_link_column_indexes[i];
@@ -47,9 +47,10 @@ void LinkMap::set_base_table(const Table* table)
         }
 
         m_link_types.push_back(type);
+        m_link_column_names.emplace_back(spec.get_column_name(link_column_index));
         size_t target_table_index = spec.get_opposite_link_table_ndx(link_column_index);
-        target_table = group->get_table(target_table_index);
-        m_tables.push_back(target_table.get());
+        TableRef tt = group->get_table(target_table_index);
+        m_tables.push_back(tt.get());
     }
 }
 
@@ -174,13 +175,22 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm)
 
 void Columns<Link>::evaluate(size_t index, ValueBase& destination)
 {
+    // Destination must be of Key type. It only makes sense to
+    // compare keys with keys
+    auto d = dynamic_cast<Value<Key>*>(&destination);
+    REALM_ASSERT(d != nullptr);
     std::vector<Key> links = m_link_map.get_links(index);
-    Value<Key> v = make_value_for_link<Key>(m_link_map.only_unary_links(), links.size());
 
-    for (size_t t = 0; t < links.size(); t++) {
-        v.m_storage.set(t, links[t]);
+    if (m_link_map.only_unary_links()) {
+        Key key;
+        if (!links.empty()) {
+            key = links[0];
+        }
+        d->init(false, 1, key);
     }
-    destination.import(v);
+    else {
+        d->init(true, links);
+    }
 }
 
 void ColumnListBase::set_cluster(const Cluster* cluster)

@@ -188,6 +188,10 @@
 using namespace realm;
 using namespace realm::util;
 
+void QueryStateBase::dyncast()
+{
+}
+
 size_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
@@ -2371,8 +2375,7 @@ void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, si
     if (end == npos)
         end = m_size;
 
-    QueryState<int64_t> state;
-    state.init(act_FindAll, result, static_cast<size_t>(-1));
+    QueryState<int64_t> state(act_FindAll, result);
     REALM_TEMPEX3(find, Equal, act_FindAll, m_width, (value, begin, end, col_offset, &state, CallbackDummy()));
 
     return;

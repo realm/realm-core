@@ -117,8 +117,7 @@ R aggregate(const ColType& column, T target, size_t start, size_t end, size_t li
     if (end == npos)
         end = column.size();
 
-    QueryState<R> state;
-    state.init(action, nullptr, limit);
+    QueryState<R> state(action, nullptr, limit);
     SequentialGetter<ColType> sg{&column};
 
     bool cont = true;
@@ -132,7 +131,7 @@ R aggregate(const ColType& column, T target, size_t start, size_t end, size_t li
     }
 
     if (return_ndx)
-        *return_ndx = action == act_Sum ? state.m_match_count : state.m_minmax_index;
+        *return_ndx = action == act_Sum ? state.m_match_count : size_t(state.m_minmax_index);
 
     return state.m_state;
 }

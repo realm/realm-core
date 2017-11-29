@@ -76,7 +76,7 @@ TEST(TimestampColumn_Basic_Nulls)
     // Test that default value is null() for nullable column and non-null for non-nullable column
     Table t;
     t.add_column(type_Timestamp, "date", non_nullable);
-    t.add_column(type_Timestamp, "date", nullable);
+    t.add_column(type_Timestamp, "date_null", nullable);
 
     t.add_empty_row();
     CHECK(!t.is_null(0, 0));

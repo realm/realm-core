@@ -637,16 +637,14 @@ public:
     int64_t sum_int(size_t column_ndx) const;
     double sum_float(size_t column_ndx) const;
     double sum_double(size_t column_ndx) const;
-    int64_t maximum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    float maximum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    double maximum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    OldDateTime maximum_olddatetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    Timestamp maximum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    int64_t minimum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    float minimum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    double minimum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    OldDateTime minimum_olddatetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    Timestamp minimum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    int64_t maximum_int(size_t column_ndx, Key* return_ndx = nullptr) const;
+    float maximum_float(size_t column_ndx, Key* return_ndx = nullptr) const;
+    double maximum_double(size_t column_ndx, Key* return_ndx = nullptr) const;
+    Timestamp maximum_timestamp(size_t column_ndx, Key* return_ndx = nullptr) const;
+    int64_t minimum_int(size_t column_ndx, Key* return_ndx = nullptr) const;
+    float minimum_float(size_t column_ndx, Key* return_ndx = nullptr) const;
+    double minimum_double(size_t column_ndx, Key* return_ndx = nullptr) const;
+    Timestamp minimum_timestamp(size_t column_ndx, Key* return_ndx = nullptr) const;
     double average_int(size_t column_ndx, size_t* value_count = nullptr) const;
     double average_float(size_t column_ndx, size_t* value_count = nullptr) const;
     double average_double(size_t column_ndx, size_t* value_count = nullptr) const;
@@ -666,8 +664,8 @@ public:
     Key find_first_binary(size_t column_ndx, BinaryData value) const;
     Key find_first_null(size_t column_ndx) const;
 
-    TableView find_all_link(size_t target_row_index);
-    ConstTableView find_all_link(size_t target_row_index) const;
+    TableView find_all_link(Key target_key);
+    ConstTableView find_all_link(Key target_key) const;
     TableView find_all_int(size_t column_ndx, int64_t value);
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
     TableView find_all_bool(size_t column_ndx, bool value);
@@ -1060,7 +1058,8 @@ private:
                                bool listtype = false);
     void do_erase_root_column(size_t col_ndx);
     void do_move_root_column(size_t from, size_t to);
-    void insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx);
+    void insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx,
+                                StringData name);
     void erase_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx);
     void update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_ndx_begin);
     void update_link_target_tables_after_column_move(size_t moved_from, size_t moved_to);
@@ -1312,56 +1311,6 @@ private:
     /// minimal accessor consistency (see AccessorConsistencyLevels.)
     Table* get_link_target_table_accessor(size_t col_ndx) const noexcept;
 
-    void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
-    void adj_acc_erase_row(size_t row_ndx) noexcept;
-    void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
-    void adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept;
-    void adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
-
-    /// Adjust this table accessor and its subordinates after move_last_over()
-    /// (or its inverse).
-    ///
-    /// First, any row, subtable, or link list accessors registered as being at
-    /// \a to_row_ndx will be detached, as that row is assumed to have been
-    /// replaced. Next, any row, subtable, or link list accessors registered as
-    /// being at \a from_row_ndx, will be reregistered as being at \a
-    /// to_row_ndx, as the row at \a from_row_ndx is assumed to have been moved
-    /// to \a to_row_ndx.
-    ///
-    /// Crucially, if \a to_row_ndx is equal to \a from_row_ndx, then row,
-    /// subtable, or link list accessors at that row are **still detached**.
-    ///
-    /// Additionally, this function causes all link-adjacent tables to be marked
-    /// (dirty). Two tables are link-adjacent if one is the target table of a
-    /// link column of the other table. Note that this marking follows these
-    /// relations in both directions, but only to a depth of one.
-    ///
-    /// When this function is used in connection with move_last_over(), set \a
-    /// to_row_ndx to the index of the row to be removed, and set \a
-    /// from_row_ndx to the index of the last row in the table. As mentioned
-    /// earlier, this function can also be used in connection with the **inverse
-    /// of** move_last_over(), which is an operation that vacates a row by
-    /// moving its contents into a new last row of the table. In that case, set
-    /// \a to_row_ndx to one plus the index of the last row in the table, and
-    /// set \a from_row_ndx to the index of the row to be vacated.
-    ///
-    /// This function is used as part of Table::refresh_accessor_tree() to
-    /// promote the state of the accessors from Minimal Consistency into
-    /// Structural Correspondence, so it must be able to execute without
-    /// accessing the underlying array nodes.
-    void adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
-
-    void adj_acc_clear_root_table() noexcept;
-    void adj_acc_clear_nonroot_table() noexcept;
-    void adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
-    void adj_row_acc_erase_row(size_t row_ndx) noexcept;
-    void adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
-    void adj_row_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept;
-    void adj_row_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
-
-    /// Called by adj_acc_move_over() to adjust row accessors.
-    void adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
-
     void adj_insert_column(size_t col_ndx);
     void adj_erase_column(size_t col_ndx) noexcept;
     void adj_move_column(size_t col_ndx_1, size_t col_ndx_2) noexcept;
@@ -1424,6 +1373,10 @@ private:
 #ifdef REALM_DEBUG
     void to_dot_internal(std::ostream&) const;
 #endif
+    template <Action action, typename T, typename R>
+    R aggregate(size_t column_ndx, T value = {}, size_t* resultcount = nullptr, Key* return_ndx = nullptr) const;
+    template <typename T>
+    double average(size_t column_ndx, size_t* resultcount) const;
 
     friend class SubtableNode;
     friend class _impl::TableFriend;
@@ -1805,7 +1758,7 @@ inline Columns<T> Table::column(const Table& origin, size_t origin_col_ndx)
 template <class T>
 SubQuery<T> Table::column(size_t column_ndx, Query subquery)
 {
-    static_assert(std::is_same<T, LinkList>::value, "A subquery must involve a link list or backlink column");
+    static_assert(std::is_same<T, Link>::value, "A subquery must involve a link list or backlink column");
     return SubQuery<T>(column<T>(column_ndx), std::move(subquery));
 }
 
@@ -2374,45 +2327,6 @@ public:
         return table.get_link_target_table_accessor(col_ndx);
     }
 
-    static void adj_acc_insert_rows(Table& table, size_t row_ndx, size_t num_rows) noexcept
-    {
-        table.adj_acc_insert_rows(row_ndx, num_rows);
-    }
-
-    static void adj_acc_erase_row(Table& table, size_t row_ndx) noexcept
-    {
-        table.adj_acc_erase_row(row_ndx);
-    }
-
-    static void adj_acc_swap_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept
-    {
-        table.adj_acc_swap_rows(row_ndx_1, row_ndx_2);
-    }
-
-    static void adj_acc_move_row(Table& table, size_t from_ndx, size_t to_ndx) noexcept
-    {
-        table.adj_acc_move_row(from_ndx, to_ndx);
-    }
-
-    static void adj_acc_merge_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept
-    {
-        table.adj_acc_merge_rows(row_ndx_1, row_ndx_2);
-    }
-
-    static void adj_acc_move_over(Table& table, size_t from_row_ndx, size_t to_row_ndx) noexcept
-    {
-        table.adj_acc_move_over(from_row_ndx, to_row_ndx);
-    }
-
-    static void adj_acc_clear_root_table(Table& table) noexcept
-    {
-        table.adj_acc_clear_root_table();
-    }
-
-    static void adj_acc_clear_nonroot_table(Table& table) noexcept
-    {
-        table.adj_acc_clear_nonroot_table();
-    }
 
     static void adj_insert_column(Table& table, size_t col_ndx)
     {

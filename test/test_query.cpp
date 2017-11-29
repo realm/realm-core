@@ -1526,209 +1526,6 @@ TEST(Query_Expressions0)
     CHECK_EQUAL(match, not_found);
 }
 
-TEST(Query_LimitUntyped2)
-{
-    Table table;
-    table.add_column(type_Int, "first1");
-    table.add_column(type_Float, "second1");
-    table.add_column(type_Double, "second1");
-    table.add_column(type_Timestamp, "date");
-
-    table.add_empty_row(3);
-    table.set_int(0, 0, 10000);
-    table.set_int(0, 1, 30000);
-    table.set_int(0, 2, 40000);
-
-    table.set_float(1, 0, 10000.f);
-    table.set_float(1, 1, 30000.f);
-    table.set_float(1, 2, 40000.f);
-
-    table.set_double(2, 0, 10000.);
-    table.set_double(2, 1, 30000.);
-    table.set_double(2, 2, 40000.);
-
-    table.set_timestamp(3, 0, Timestamp(10000, 10000));
-    table.set_timestamp(3, 1, Timestamp(30000, 30000));
-    table.set_timestamp(3, 2, Timestamp(40000, 40000));
-
-    Query q = table.where();
-    int64_t sum;
-    float sumf;
-    double sumd;
-    Timestamp ts;
-
-    // sum, limited by 'limit'
-    sum = q.sum_int(0, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000, sum);
-    sum = q.sum_int(0, nullptr, 0, -1, 2);
-    CHECK_EQUAL(40000, sum);
-    sum = q.sum_int(0, nullptr, 0, -1);
-    CHECK_EQUAL(80000, sum);
-
-    sumd = q.sum_float(1, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000., sumd);
-    sumd = q.sum_float(1, nullptr, 0, -1, 2);
-    CHECK_EQUAL(40000., sumd);
-    sumd = q.sum_float(1, nullptr, 0, -1);
-    CHECK_EQUAL(80000., sumd);
-
-    sumd = q.sum_double(2, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000., sumd);
-    sumd = q.sum_double(2, nullptr, 0, -1, 2);
-    CHECK_EQUAL(40000., sumd);
-    sumd = q.sum_double(2, nullptr, 0, -1);
-    CHECK_EQUAL(80000., sumd);
-
-    // sum, limited by 'end', but still having 'limit' specified
-    sum = q.sum_int(0, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000, sum);
-    sum = q.sum_int(0, nullptr, 0, 2, 3);
-    CHECK_EQUAL(40000, sum);
-
-    sumd = q.sum_float(1, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000., sumd);
-    sumd = q.sum_float(1, nullptr, 0, 2, 3);
-    CHECK_EQUAL(40000., sumd);
-
-    sumd = q.sum_double(2, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000., sumd);
-    sumd = q.sum_double(2, nullptr, 0, 2, 3);
-    CHECK_EQUAL(40000., sumd);
-
-    size_t ndx = not_found;
-
-    // max, limited by 'limit'
-
-    // int
-    sum = q.maximum_int(0, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000, sum);
-    q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    sum = q.maximum_int(0, nullptr, 0, -1, 2);
-    CHECK_EQUAL(30000, sum);
-    q.maximum_int(0, nullptr, 0, -1, 2, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-    sum = q.maximum_int(0, nullptr, 0, -1);
-    CHECK_EQUAL(40000, sum);
-    q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
-    CHECK_EQUAL(2, ndx);
-
-    // Timestamp
-    /*
-    ts = q.maximum_timestamp(3, nullptr, 0, -1, 1);
-    CHECK_EQUAL(Timestamp(10000, 10000), ts);
-    q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    ts = q.maximum_timestamp(3, nullptr, 0, -1, 2);
-    CHECK_EQUAL(Timestamp(30000, 30000), ts);
-    q.maximum_int(0, nullptr, 0, -1, 2, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-    ts = q.maximum_timestamp(3, nullptr, 0, -1);
-    CHECK_EQUAL(Timestamp(40000, 40000), ts);
-    q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
-    CHECK_EQUAL(2, ndx);
-    */
-    // float
-    sumf = q.maximum_float(1, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000., sumf);
-    q.maximum_float(1, nullptr, 0, -1, 1, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    sumf = q.maximum_float(1, nullptr, 0, -1, 2);
-    CHECK_EQUAL(30000., sumf);
-    q.maximum_float(1, nullptr, 0, -1, 2, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-    sumf = q.maximum_float(1, nullptr, 0, -1);
-    CHECK_EQUAL(40000., sumf);
-    q.maximum_float(1, nullptr, 0, -1, -1, &ndx);
-    CHECK_EQUAL(2, ndx);
-
-    sumd = q.maximum_double(2, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000., sumd);
-    q.maximum_double(2, nullptr, 0, -1, 1, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    sumd = q.maximum_double(2, nullptr, 0, -1, 2);
-    CHECK_EQUAL(30000., sumd);
-    q.maximum_double(2, nullptr, 0, -1, 2, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-    sumd = q.maximum_double(2, nullptr, 0, -1);
-    CHECK_EQUAL(40000., sumd);
-    q.maximum_double(2, nullptr, 0, -1, -1, &ndx);
-    CHECK_EQUAL(2, ndx);
-
-    // max, limited by 'end', but still having 'limit' specified
-    sum = q.maximum_int(0, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000, sum);
-    q.maximum_int(0, nullptr, 0, 1, 3, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    sum = q.maximum_int(0, nullptr, 0, 2, 3);
-    CHECK_EQUAL(30000, sum);
-    q.maximum_int(0, nullptr, 0, 2, 3, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-    sumf = q.maximum_float(1, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000., sumf);
-    q.maximum_float(1, nullptr, 0, 1, 3, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    sumf = q.maximum_float(1, nullptr, 0, 2, 3);
-    CHECK_EQUAL(30000., sumf);
-    q.maximum_float(1, nullptr, 0, 2, 3, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-    sumd = q.maximum_double(2, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000., sumd);
-    q.maximum_double(2, nullptr, 0, 1, 3, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    sumd = q.maximum_double(2, nullptr, 0, 2, 3);
-    CHECK_EQUAL(30000., sumd);
-    q.maximum_double(2, nullptr, 0, 2, 3, &ndx);
-    CHECK_EQUAL(1, ndx);
-
-
-    // avg
-    sumd = q.average_int(0, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000, sumd);
-    sumd = q.average_int(0, nullptr, 0, -1, 2);
-    CHECK_EQUAL((10000 + 30000) / 2, sumd);
-
-    sumd = q.average_float(1, nullptr, 0, -1, 1);
-    CHECK_EQUAL(10000., sumd);
-    sumd = q.average_float(1, nullptr, 0, -1, 2);
-    CHECK_EQUAL((10000. + 30000.) / 2., sumd);
-
-
-    // avg, limited by 'end', but still having 'limit' specified
-    sumd = q.average_int(0, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000, sumd);
-    sumd = q.average_int(0, nullptr, 0, 2, 3);
-    CHECK_EQUAL((10000 + 30000) / 2, sumd);
-
-    sumd = q.average_float(1, nullptr, 0, 1, 3);
-    CHECK_EQUAL(10000., sumd);
-    sumd = q.average_float(1, nullptr, 0, 2, 3);
-    CHECK_EQUAL((10000. + 30000.) / 2., sumd);
-
-    // count
-    size_t cnt = q.count(0, -1, 1);
-    CHECK_EQUAL(1, cnt);
-    cnt = q.count(0, -1, 2);
-    CHECK_EQUAL(2, cnt);
-
-    // count, limited by 'end', but still having 'limit' specified
-    cnt = q.count(0, 1, 3);
-    CHECK_EQUAL(1, cnt);
-}
-
 
 TEST(Query_StrIndexCrash)
 {
@@ -2070,9 +1867,13 @@ TEST(Query_ListOfPrimitives)
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
 
-    q = baa->link(1).column<List<Int>>(0).average() >= 2.0;
+    q = baa->link(1).column<List<Int>>(0).average() >= 3.0;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
+    table->get_object(keys[1]).get_list<Int>(col_int_list).set(3, -10); // {2, 3, 4, -10}
+    // Now, one less object will have average bigger than 3
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 1);
 }
 
 #ifdef LEGACY_TESTS
@@ -5950,10 +5751,11 @@ TEST(Query_FindAllLikeCaseInsensitive)
     CHECK_EQUAL(2, tv1.get_source_ndx(2));
     CHECK_EQUAL(3, tv1.get_source_ndx(3));
 }
+#endif
 
 TEST(Query_Binary)
 {
-    TestTable t;
+    Table t;
     t.add_column(type_Int, "1");
     t.add_column(type_Binary, "2");
 
@@ -5963,15 +5765,18 @@ TEST(Query_Binary)
 
     const char bin_2[4] = {6, 6, 6, 6}; // Not occuring above
 
-    add(t, 0, BinaryData(bin + 0, 16));
-    add(t, 0, BinaryData(bin + 0, 32));
-    add(t, 0, BinaryData(bin + 0, 48));
-    add(t, 0, BinaryData(bin + 0, 64));
-    add(t, 0, BinaryData(bin + 16, 48));
-    add(t, 0, BinaryData(bin + 32, 32));
-    add(t, 0, BinaryData(bin + 48, 16));
-    add(t, 0, BinaryData(bin + 24, 16)); // The "odd ball"
-    add(t, 0, BinaryData(bin + 0, 32));  // Repeat an entry
+    std::vector<Key> keys;
+    t.create_objects(9, keys);
+
+    t.get_object(keys[0]).set_all(0, BinaryData(bin + 0, 16));
+    t.get_object(keys[1]).set_all(0, BinaryData(bin + 0, 32));
+    t.get_object(keys[2]).set_all(0, BinaryData(bin + 0, 48));
+    t.get_object(keys[3]).set_all(0, BinaryData(bin + 0, 64));
+    t.get_object(keys[4]).set_all(0, BinaryData(bin + 16, 48));
+    t.get_object(keys[5]).set_all(0, BinaryData(bin + 32, 32));
+    t.get_object(keys[6]).set_all(0, BinaryData(bin + 48, 16));
+    t.get_object(keys[7]).set_all(0, BinaryData(bin + 24, 16)); // The "odd ball"
+    t.get_object(keys[8]).set_all(0, BinaryData(bin + 0, 32));  // Repeat an entry
 
     CHECK_EQUAL(0, t.where().equal(1, BinaryData(bin + 16, 16)).count());
     CHECK_EQUAL(1, t.where().equal(1, BinaryData(bin + 0, 16)).count());
@@ -6005,8 +5810,8 @@ TEST(Query_Binary)
     {
         TableView tv = t.where().equal(1, BinaryData(bin + 0, 32)).find_all();
         if (tv.size() == 2) {
-            CHECK_EQUAL(1, tv.get_source_ndx(0));
-            CHECK_EQUAL(8, tv.get_source_ndx(1));
+            CHECK_EQUAL(keys[1], tv.get_key(0));
+            CHECK_EQUAL(keys[8], tv.get_key(1));
         }
         else
             CHECK(false);
@@ -6015,17 +5820,17 @@ TEST(Query_Binary)
     {
         TableView tv = t.where().contains(1, BinaryData(bin + 24, 16)).find_all();
         if (tv.size() == 4) {
-            CHECK_EQUAL(2, tv.get_source_ndx(0));
-            CHECK_EQUAL(3, tv.get_source_ndx(1));
-            CHECK_EQUAL(4, tv.get_source_ndx(2));
-            CHECK_EQUAL(7, tv.get_source_ndx(3));
+            CHECK_EQUAL(keys[2], tv.get_key(0));
+            CHECK_EQUAL(keys[3], tv.get_key(1));
+            CHECK_EQUAL(keys[4], tv.get_key(2));
+            CHECK_EQUAL(keys[7], tv.get_key(3));
         }
         else
             CHECK(false);
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Query_Enums)
 {
     TestTable t;
@@ -6382,96 +6187,83 @@ TEST(Query_TestTV_where)
     Query q4 = t.where(&v).between(0, 3, 6);
     CHECK_EQUAL(1, q4.count());
 }
+#endif
 
 TEST(Query_SumMinMaxAvg)
 {
-    TestTable t;
+    Table t;
 
-    t.add_column(type_Int, "1");
+    auto int_col = t.add_column(type_Int, "1");
     t.add_column(type_String, "2");
-    t.add_column(type_OldDateTime, "3");
+    t.add_column(type_Timestamp, "3");
     t.add_column(type_Float, "4");
     t.add_column(type_Double, "5");
 
-    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 2, "b", OldDateTime(300), 3.0f, 3.0);
-    add(t, 3, "c", OldDateTime(50), 5.0f, 5.0);
-    add(t, 0, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 0, "b", OldDateTime(3000), 30.0f, 30.0);
-    add(t, 0, "c", OldDateTime(5), 0.5f, 0.5);
+    std::vector<Key> keys;
+    t.create_objects(9, keys);
+    t.get_object(keys[0]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 2.0);
+    t.get_object(keys[1]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 1.0);
+    t.get_object(keys[2]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 1.0);
+    t.get_object(keys[3]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 1.0);
+    t.get_object(keys[4]).set_all(2, "b", Timestamp{300, 0}, 3.0f, 3.0);
+    t.get_object(keys[5]).set_all(3, "c", Timestamp{50, 0}, 5.0f, 5.0);
+    t.get_object(keys[6]).set_all(0, "a", Timestamp{100, 0}, 1.0f, 1.0);
+    t.get_object(keys[7]).set_all(0, "b", Timestamp{3000, 0}, 30.0f, 30.0);
+    t.get_object(keys[8]).set_all(0, "c", Timestamp{5, 0}, 0.5f, 0.5);
 
-    CHECK_EQUAL(9, t.where().sum_int(0));
+    CHECK_EQUAL(9, t.where().sum_int(int_col));
 
-    CHECK_EQUAL(0, t.where().minimum_int(0));
-    CHECK_EQUAL(3, t.where().maximum_int(0));
+    CHECK_EQUAL(0, t.where().minimum_int(int_col));
+    CHECK_EQUAL(3, t.where().maximum_int(int_col));
 
-    size_t resindex = not_found;
+    Key resindex;
 
-    t.where().maximum_int(0, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(5, resindex);
+    t.where().maximum_int(int_col, &resindex);
+    CHECK_EQUAL(keys[5], resindex);
 
-    t.where().minimum_int(0, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(6, resindex);
+    t.where().minimum_int(0, &resindex);
+    CHECK_EQUAL(keys[6], resindex);
 
-    t.where().maximum_float(3, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(7, resindex);
+    t.where().maximum_float(3, &resindex);
+    CHECK_EQUAL(keys[7], resindex);
 
-    t.where().minimum_float(3, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(8, resindex);
+    t.where().minimum_float(3, &resindex);
+    CHECK_EQUAL(keys[8], resindex);
 
-    t.where().maximum_double(4, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(7, resindex);
+    t.where().maximum_double(4, &resindex);
+    CHECK_EQUAL(keys[7], resindex);
 
-    t.where().minimum_double(4, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(8, resindex);
+    t.where().minimum_double(4, &resindex);
+    CHECK_EQUAL(keys[8], resindex);
 
+    t.where().maximum_timestamp(2, &resindex);
+    CHECK_EQUAL(keys[7], resindex);
+
+    t.where().minimum_timestamp(2, &resindex);
+    CHECK_EQUAL(keys[8], resindex);
+
+#ifdef LEGACY_TESTS
     // Now with condition (tests another code path in Array::minmax())
-    t.where().not_equal(0, 0).minimum_double(4, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(0, resindex);
+    t.where().not_equal(0, 0).minimum_double(4, &resindex);
+    CHECK_EQUAL(keys[0], resindex);
 
-    t.where().not_equal(0, 0).minimum_float(3, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(0, resindex);
+    t.where().not_equal(0, 0).minimum_float(3, &resindex);
+    CHECK_EQUAL(keys[0], resindex);
 
-    t.where().not_equal(0, 0).minimum_olddatetime(2, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(5, resindex);
+    t.where().not_equal(0, 0).minimum_timestamp(2, &resindex);
+    CHECK_EQUAL(keys[5], resindex);
 
-    t.where().not_equal(0, 0).maximum_olddatetime(2, nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(4, resindex);
+    t.where().not_equal(0, 0).maximum_timestamp(2, &resindex);
+    CHECK_EQUAL(keys[4], resindex);
 
     CHECK_APPROXIMATELY_EQUAL(1, t.where().average_int(0), 0.001);
 
-    CHECK_EQUAL(OldDateTime(3000), t.where().maximum_olddatetime(2));
-    CHECK_EQUAL(OldDateTime(5), t.where().minimum_olddatetime(2));
-
-    size_t cnt;
-    CHECK_EQUAL(0, t.where().sum_int(0, &cnt, 0, 0));
-    CHECK_EQUAL(0, cnt);
-    CHECK_EQUAL(0, t.where().sum_int(0, &cnt, 1, 1));
-    CHECK_EQUAL(0, cnt);
-    CHECK_EQUAL(0, t.where().sum_int(0, &cnt, 2, 2));
-    CHECK_EQUAL(0, cnt);
-
-    CHECK_EQUAL(1, t.where().sum_int(0, &cnt, 0, 1));
-    CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(2, t.where().sum_int(0, &cnt, 4, 5));
-    CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(3, t.where().sum_int(0, &cnt, 5, 6));
-    CHECK_EQUAL(1, cnt);
-
-    CHECK_EQUAL(2, t.where().sum_int(0, &cnt, 0, 2));
-    CHECK_EQUAL(2, cnt);
-    CHECK_EQUAL(5, t.where().sum_int(0, &cnt, 1, 5));
-    CHECK_EQUAL(4, cnt);
-
-    CHECK_EQUAL(3, t.where().sum_int(0, &cnt, 0, 3));
-    CHECK_EQUAL(3, cnt);
-    CHECK_EQUAL(9, t.where().sum_int(0, &cnt, 0, size_t(-1)));
-    CHECK_EQUAL(9, cnt);
+    CHECK_EQUAL(t.where().maximum_timestamp(2), Timestamp(3000, 0));
+    CHECK_EQUAL(t.where().minimum_timestamp(2), Timestamp(5, 0));
+#endif
 }
 
+#ifdef LEGACY_TESTS
 TEST(Query_SumMinMaxAvg_where)
 {
     TestTable t;
@@ -6499,24 +6291,24 @@ TEST(Query_SumMinMaxAvg_where)
     CHECK_EQUAL(0, t.where(&v).minimum_int(0));
     CHECK_EQUAL(3, t.where(&v).maximum_int(0));
 
-    size_t resindex = not_found;
+    Key resindex;
 
-    t.where(&v).maximum_int(0, nullptr, 0, -1, -1, &resindex);
+    t.where(&v).maximum_int(0, &resindex);
     CHECK_EQUAL(5, resindex);
 
-    t.where(&v).minimum_int(0, nullptr, 0, -1, -1, &resindex);
+    t.where(&v).minimum_int(0, &resindex);
     CHECK_EQUAL(6, resindex);
 
-    t.where(&v).maximum_float(3, nullptr, 0, -1, -1, &resindex);
+    t.where(&v).maximum_float(3, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where(&v).minimum_float(3, nullptr, 0, -1, -1, &resindex);
+    t.where(&v).minimum_float(3, &resindex);
     CHECK_EQUAL(8, resindex);
 
-    t.where(&v).maximum_double(4, nullptr, 0, -1, -1, &resindex);
+    t.where(&v).maximum_double(4, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where(&v).minimum_double(4, nullptr, 0, -1, -1, &resindex);
+    t.where(&v).minimum_double(4, &resindex);
     CHECK_EQUAL(8, resindex);
 
     CHECK_APPROXIMATELY_EQUAL(1, t.where(&v).average_int(0), 0.001);
@@ -6611,7 +6403,6 @@ TEST(Query_Avg2)
     CHECK_EQUAL(20, t.where().equal(1, "a").average_int(0, &cnt, 0, size_t(-1)));
     CHECK_EQUAL(3, cnt);
 }
-
 
 TEST(Query_OfByOne)
 {
@@ -9660,116 +9451,91 @@ TEST(Query_ReferDeletedLinkView)
     // call links->add() on a deleted LinkViewRef (where is_attached() == false), it will assert
     CHECK(!links->is_attached());
 }
+#endif
 
 TEST(Query_SubQueries)
 {
     Group group;
 
-    TableRef table1 = group.add_table("table1");
-    TableRef table2 = group.add_table("table2");
+    TableRef origin = group.add_table("origin");
+    TableRef target = group.add_table("target");
 
-    // add some more columns to table1 and table2
-    table1->add_column(type_Int, "col1");
-    table1->add_column(type_String, "str1");
+    // add some more columns to origin and target
+    auto col_link_o = origin->add_column_link(type_LinkList, "link", *target);
 
-    table2->add_column(type_Int, "col1");
-    table2->add_column(type_String, "str2");
+    auto col_int_t = target->add_column(type_Int, "integers");
+    auto col_string_t = target->add_column(type_String, "strings");
 
     // add some rows
-    table1->add_empty_row();
-    table1->set_int(0, 0, 100);
-    table1->set_string(1, 0, "foo");
-    table1->add_empty_row();
-    table1->set_int(0, 1, 200);
-    table1->set_string(1, 1, "!");
-    table1->add_empty_row();
-    table1->set_int(0, 2, 300);
-    table1->set_string(1, 2, "bar");
+    origin->create_object(Key(0));
+    origin->create_object(Key(1));
+    origin->create_object(Key(2));
 
-    table2->add_empty_row();
-    table2->set_int(0, 0, 400);
-    table2->set_string(1, 0, "hello");
-    table2->add_empty_row();
-    table2->set_int(0, 1, 500);
-    table2->set_string(1, 1, "world");
-    table2->add_empty_row();
-    table2->set_int(0, 2, 600);
-    table2->set_string(1, 2, "!");
-    table2->add_empty_row();
-    table2->set_int(0, 2, 600);
-    table2->set_string(1, 1, "world");
-
-
-    size_t col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
+    target->create_object(Key(0)).set_all(400, "hello");
+    target->create_object(Key(1)).set_all(500, "world");
+    target->create_object(Key(2)).set_all(600, "!");
+    target->create_object(Key(3)).set_all(600, "world");
 
     // set some links
-    LinkViewRef links1;
+    auto links0 = origin->get_object(Key(0)).get_linklist(col_link_o);
+    links0.add(Key(1));
 
-    links1 = table1->get_linklist(col_link2, 0);
-    links1->add(1);
+    auto links1 = origin->get_object(Key(1)).get_linklist(col_link_o);
+    links1.add(Key(1));
+    links1.add(Key(2));
 
-    links1 = table1->get_linklist(col_link2, 1);
-    links1->add(1);
-    links1->add(2);
-
-
-    size_t match;
+    Key match;
+    TableView tv;
     Query q;
+    Query sub_query;
 
     // The linked rows for rows 0 and 2 all match ("world", 500). Row 2 does by virtue of having no rows.
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500)
-            .count() == table1->column<LinkList>(col_link2).count();
-    match = q.find();
-    CHECK_EQUAL(0, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    sub_query = target->column<String>(col_string_t) == "world" && target->column<Int>(col_int_t) == 500;
+    q = origin->column<Link>(col_link_o, sub_query).count() == origin->column<Link>(col_link_o).count();
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(Key(0), tv.get_key(0));
+    CHECK_EQUAL(Key(2), tv.get_key(1));
 
     // No linked rows match ("world, 600).
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 600)
-            .count() >= 1;
+    sub_query = target->column<String>(col_string_t) == "world" && target->column<Int>(col_int_t) == 600;
+    q = origin->column<Link>(col_link_o, sub_query).count() >= 1;
     match = q.find();
-    CHECK_EQUAL(not_found, match);
+    CHECK_EQUAL(match, null_key);
 
     // Rows 0 and 1 both have at least one linked row that matches ("world", 500).
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500)
-            .count() >= 1;
-    match = q.find();
-    CHECK_EQUAL(0, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    sub_query = target->column<String>(col_string_t) == "world" && target->column<Int>(col_int_t) == 500;
+    q = origin->column<Link>(col_link_o, sub_query).count() >= 1;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(Key(0), tv.get_key(0));
+    CHECK_EQUAL(Key(1), tv.get_key(1));
 
     // Row 1 has at least one linked row that matches ("!", 600).
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "!" && table2->column<Int>(0) == 600)
-            .count() >= 1;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    sub_query = target->column<String>(col_string_t) == "!" && target->column<Int>(col_int_t) == 600;
+    q = origin->column<Link>(col_link_o, sub_query).count() >= 1;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(Key(1), tv.get_key(0));
 
     // Row 1 has two linked rows that contain either "world" or 600.
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600)
-            .count() == 2;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    sub_query = target->column<String>(col_string_t) == "world" || target->column<Int>(col_int_t) == 600;
+    q = origin->column<Link>(col_link_o, sub_query).count() == 2;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(Key(1), tv.get_key(0));
 
     // Rows 0 and 2 have at most one linked row that contains either "world" or 600. Row 2 does by virtue of having no
     // rows.
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600)
-            .count() <= 1;
-    match = q.find();
-    CHECK_EQUAL(0, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
+    sub_query = target->column<String>(col_string_t) == "world" || target->column<Int>(col_int_t) == 600;
+    q = origin->column<Link>(col_link_o, sub_query).count() <= 1;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(Key(0), tv.get_key(0));
+    CHECK_EQUAL(Key(2), tv.get_key(1));
 }
 
+#ifdef LEGACY_TESTS
 // Ensure that Query's move constructor and move assignment operator don't result in
 // a TableView owned by the query being double-deleted when the queries are destroyed.
 TEST(Query_MoveDoesntDoubleDelete)
@@ -9787,123 +9553,126 @@ TEST(Query_MoveDoesntDoubleDelete)
         q2 = std::move(q1);
     }
 }
+#endif // LEGACY_TESTS
 
 TEST(Query_Timestamp)
 {
-    size_t match;
+    Key match;
+    size_t cnt;
     Table table;
-    table.add_column(type_Timestamp, "first", true);
-    table.add_column(type_Timestamp, "second", true);
-    Columns<Timestamp> first = table.column<Timestamp>(0);
-    Columns<Timestamp> second = table.column<Timestamp>(1);
+    auto col_first = table.add_column(type_Timestamp, "first", true);
+    auto col_second = table.add_column(type_Timestamp, "second", true);
+    Columns<Timestamp> first = table.column<Timestamp>(col_first);
+    Columns<Timestamp> second = table.column<Timestamp>(col_second);
 
-    table.add_empty_row(6);
-    table.set_timestamp(0, 0, Timestamp(111, 222));
-    table.set_timestamp(0, 1, Timestamp(111, 333));
-    table.set_timestamp(0, 2, Timestamp(333, 444));
-    table.set_timestamp(0, 3, Timestamp{});
-    table.set_timestamp(0, 4, Timestamp(0, 0));
-    table.set_timestamp(0, 5, Timestamp(-1000, 0));
+    std::vector<Key> keys;
+    table.create_objects(6, keys);
+    table.get_object(keys[0]).set(col_first, Timestamp(111, 222));
+    table.get_object(keys[1]).set(col_first, Timestamp(111, 333));
+    table.get_object(keys[2]).set(col_first, Timestamp(333, 444)).set(col_second, Timestamp(222, 222));
+    table.get_object(keys[3]).set(col_first, Timestamp{});
+    table.get_object(keys[4]).set(col_first, Timestamp(0, 0));
+    table.get_object(keys[5]).set(col_first, Timestamp(-1000, 0));
 
-    table.set_timestamp(1, 2, Timestamp(222, 222));
 
-    CHECK(table.get_timestamp(0, 0) == Timestamp(111, 222));
+    CHECK(table.get_object(keys[0]).get<Timestamp>(col_first) == Timestamp(111, 222));
 
     match = (first == Timestamp(111, 222)).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (first != Timestamp(111, 222)).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, keys[1]);
 
     match = (first > Timestamp(111, 222)).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, keys[1]);
 
     match = (first < Timestamp(111, 333)).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (first == Timestamp(0, 0)).find();
-    CHECK_EQUAL(match, 4);
+    CHECK_EQUAL(match, keys[4]);
 
     match = (first < Timestamp(111, 333)).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (first < Timestamp(0, 0)).find();
-    CHECK_EQUAL(match, 5);
+    CHECK_EQUAL(match, keys[5]);
 
     // Note: .count(), not find()
-    match = (first < Timestamp(0, 0)).count();
-    CHECK_EQUAL(match, 1);
+    cnt = (first < Timestamp(0, 0)).count();
+    CHECK_EQUAL(cnt, 1);
 
-    match = (first != Timestamp{}).count();
-    CHECK_EQUAL(match, 5);
+    cnt = (first != Timestamp{}).count();
+    CHECK_EQUAL(cnt, 5);
 
-    match = (first != null{}).count();
-    CHECK_EQUAL(match, 5);
+    cnt = (first != null{}).count();
+    CHECK_EQUAL(cnt, 5);
 
-    match = (first != Timestamp(0, 0)).count();
-    CHECK_EQUAL(match, 5);
+    cnt = (first != Timestamp(0, 0)).count();
+    CHECK_EQUAL(cnt, 5);
 
     match = (first < Timestamp(-100, 0)).find();
-    CHECK_EQUAL(match, 5);
+    CHECK_EQUAL(match, keys[5]);
 
     // Left-hand-side being Timestamp() constant, right being column
     match = (Timestamp(111, 222) == first).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (Timestamp{} == first).find();
-    CHECK_EQUAL(match, 3);
+    CHECK_EQUAL(match, keys[3]);
 
     match = (Timestamp(111, 222) > first).find();
-    CHECK_EQUAL(match, 4);
+    CHECK_EQUAL(match, keys[4]);
 
     match = (Timestamp(111, 333) < first).find();
-    CHECK_EQUAL(match, 2);
+    CHECK_EQUAL(match, keys[2]);
 
     match = (Timestamp(111, 222) >= first).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (Timestamp(111, 111) >= first).find();
-    CHECK_EQUAL(match, 4);
+    CHECK_EQUAL(match, keys[4]);
 
     match = (Timestamp(333, 444) <= first).find();
-    CHECK_EQUAL(match, 2);
+    CHECK_EQUAL(match, keys[2]);
 
     match = (Timestamp(111, 300) <= first).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, keys[1]);
 
     match = (Timestamp(111, 222) != first).find();
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, keys[1]);
 
     // Compare column with self
     match = (first == first).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (first != first).find();
-    CHECK_EQUAL(match, npos);
+    CHECK_EQUAL(match, null_key);
 
     match = (first > first).find();
-    CHECK_EQUAL(match, npos);
+    CHECK_EQUAL(match, null_key);
 
     match = (first < first).find();
-    CHECK_EQUAL(match, npos);
+    CHECK_EQUAL(match, null_key);
 
     match = (first >= first).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     match = (first <= first).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, keys[0]);
 
     // Two different columns
     match = (first == second).find();
-    CHECK_EQUAL(match, 3); // null == null
+    CHECK_EQUAL(match, keys[3]); // null == null
 
     match = (first > second).find();
-    CHECK_EQUAL(match, 2); // Timestamp(333, 444) > Timestamp(111, 222)
+    CHECK_EQUAL(match, keys[2]); // Timestamp(333, 444) > Timestamp(111, 222)
 
     match = (first < second).find();
-    CHECK_EQUAL(match, npos); // Note that (null < null) == false
+    CHECK_EQUAL(match, null_key); // Note that (null < null) == false
 }
 
+#ifdef LEGACY_TESTS
 TEST(Query_Timestamp_Null)
 {
     // Test that querying for null on non-nullable column (with default value being non-null value) is
@@ -10963,7 +10732,7 @@ TEST_TYPES(Query_Rover, std::true_type, std::false_type)
     CHECK_EQUAL(tv.size(), 2);
 }
 
-#endif
+#endif // LEGACY_TESTS
 
 TEST(Query_IntOnly)
 {
@@ -11009,6 +10778,72 @@ TEST(Query_IntOnly)
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get(0).get_key(), Key(5));
     CHECK_EQUAL(tv.get(1).get_key(), Key(21));
+}
+
+TEST(Query_LinksTo)
+{
+    Query q;
+    Key found_key;
+    Group group;
+
+    TableRef source = group.add_table("source");
+    TableRef target = group.add_table("target");
+
+    size_t col_link = source->add_column_link(type_Link, "link", *target);
+    size_t col_linklist = source->add_column_link(type_LinkList, "linklist", *target);
+
+    std::vector<Key> target_keys;
+    target->create_objects(10, target_keys);
+
+    std::vector<Key> source_keys;
+    source->create_objects(10, source_keys);
+
+    source->get_object(source_keys[2]).set(col_link, target_keys[2]);
+    source->get_object(source_keys[5]).set(col_link, target_keys[5]);
+    source->get_object(source_keys[9]).set(col_link, target_keys[9]);
+
+    q = source->column<Link>(col_link) == target->get_object(target_keys[2]);
+    found_key = q.find();
+    CHECK_EQUAL(found_key, source_keys[2]);
+
+    q = source->column<Link>(col_link) == target->get_object(target_keys[5]);
+    found_key = q.find();
+    CHECK_EQUAL(found_key, source_keys[5]);
+
+    q = source->column<Link>(col_link) == target->get_object(target_keys[9]);
+    found_key = q.find();
+    CHECK_EQUAL(found_key, source_keys[9]);
+
+    q = source->column<Link>(col_link) == target->get_object(target_keys[0]);
+    found_key = q.find();
+    CHECK_EQUAL(found_key, null_key);
+
+    q = source->column<Link>(col_link).is_null();
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 7);
+
+    q = source->column<Link>(col_link) != null();
+    found_key = q.find();
+    CHECK_EQUAL(found_key, source_keys[2]);
+
+    auto linklist = source->get_object(source_keys[1]).get_linklist_ptr(col_linklist);
+    linklist->add(target_keys[7]);
+    linklist = source->get_object(source_keys[2]).get_linklist_ptr(col_linklist);
+    linklist->add(target_keys[0]);
+    linklist->add(target_keys[1]);
+    linklist->add(target_keys[2]);
+    linklist = source->get_object(source_keys[8]).get_linklist_ptr(col_linklist);
+    linklist->add(target_keys[0]);
+    linklist->add(target_keys[5]);
+    linklist->add(target_keys[6]);
+
+    q = source->column<Link>(col_linklist) == target->get_object(target_keys[5]);
+    found_key = q.find();
+    CHECK_EQUAL(found_key, source_keys[8]);
+
+    q = source->column<Link>(col_linklist) != target->get_object(target_keys[7]);
+    found_key = q.find();
+    CHECK_EQUAL(found_key, source_keys[2]);
 }
 
 #endif // TEST_QUERY

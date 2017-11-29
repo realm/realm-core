@@ -92,6 +92,8 @@ AggregateState      State of the aggregate - contains a state variable that stor
 
 #include <realm/array_basic.hpp>
 #include <realm/array_string.hpp>
+#include <realm/array_binary.hpp>
+#include <realm/array_timestamp.hpp>
 #include <realm/column_binary.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/column_link.hpp>
@@ -169,8 +171,8 @@ public:
 
     virtual void init()
     {
-        // Verify that the cached column accessor is still valid
-        verify_column(); // throws
+        // Update column index
+        update_column();
 
         if (m_child)
             m_child->init();
@@ -184,6 +186,9 @@ public:
             return;
 
         m_table.reset(&table);
+        if (m_condition_column_idx != npos) {
+            m_condition_column_name = m_table->get_column_name(m_condition_column_idx);
+        }
         if (m_child)
             m_child->set_table(table);
         table_changed();
@@ -247,6 +252,7 @@ public:
 
     ParentNode(const ParentNode& from, QueryNodeHandoverPatches* patches)
         : m_child(from.m_child ? from.m_child->clone(patches) : nullptr)
+        , m_condition_column_name(from.m_condition_column_name)
         , m_condition_column_idx(from.m_condition_column_idx)
         , m_dD(from.m_dD)
         , m_dT(from.m_dT)
@@ -272,7 +278,21 @@ public:
             m_child->apply_handover_patch(patches, group);
     }
 
-    virtual void verify_column() const = 0;
+    size_t get_column_index(StringData column_name) const
+    {
+        size_t column_idx = npos;
+        if (column_name.size() > 0) {
+            column_idx = m_table->get_column_index(column_name);
+            if (column_idx == realm::npos) {
+                throw LogicError(LogicError::column_does_not_exist);
+            }
+        }
+        return column_idx;
+    }
+    virtual void update_column() const
+    {
+        m_condition_column_idx = get_column_index(m_condition_column_name);
+    }
 
     virtual std::string describe_column() const
     {
@@ -310,7 +330,8 @@ public:
 
     std::unique_ptr<ParentNode> m_child;
     std::vector<ParentNode*> m_children;
-    size_t m_condition_column_idx = npos; // Column of search criteria
+    std::string m_condition_column_name;
+    mutable size_t m_condition_column_idx = npos; // Column of search criteria
 
     double m_dD;       // Average row distance between each local match at current position
     double m_dT = 0.0; // Time overhead of testing index i + 1 if we have just tested index i. > 1 for linear scans, 0
@@ -321,23 +342,10 @@ public:
 
 protected:
     typedef bool (ParentNode::*Column_action_specialized)(QueryStateBase*, SequentialGetterBase*, size_t);
-    Column_action_specialized m_column_action_specializer;
+    Column_action_specialized m_column_action_specializer = nullptr;
     ConstTableRef m_table;
     const Cluster* m_cluster = nullptr;
     std::string error_code;
-
-    const ColumnBase& get_column_base(size_t ndx)
-    {
-        return m_table->get_column_base(ndx);
-    }
-
-    template <class ColType>
-    const ColType& get_column(size_t ndx)
-    {
-        auto& col = m_table->get_column_base(ndx);
-        REALM_ASSERT_DEBUG(dynamic_cast<const ColType*>(&col));
-        return static_cast<const ColType&>(col);
-    }
 
     ColumnType get_real_column_type(size_t ndx)
     {
@@ -353,15 +361,6 @@ protected:
                 dst_idx = src.m_column->get_column_index();
             else
                 dst.init(src.m_column);
-        }
-    }
-
-    void do_verify_column(size_t col_ndx = npos) const
-    {
-        if (col_ndx == npos)
-            col_ndx = m_condition_column_idx;
-        if (m_table && col_ndx != npos) {
-            m_table->verify_column(col_ndx);
         }
     }
 
@@ -564,11 +563,6 @@ protected:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void verify_column() const override
-    {
-        do_verify_column(m_condition_column_idx);
-    }
-
     void init() override
     {
         ColumnNodeBase::init();
@@ -755,11 +749,6 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void verify_column() const override
-    {
-        do_verify_column();
-    }
-
     void init() override
     {
         ParentNode::init();
@@ -840,11 +829,6 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void verify_column() const override
-    {
-        do_verify_column();
-    }
-
     void init() override
     {
         ParentNode::init();
@@ -907,11 +891,6 @@ public:
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) Array(m_table->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
-    }
-
-    void verify_column() const override
-    {
-        do_verify_column();
     }
 
     void init() override
@@ -977,14 +956,12 @@ public:
     {
     }
 
-    void table_changed() override
+    void cluster_changed() override
     {
-        m_condition_column = &get_column<BinaryColumn>(m_condition_column_idx);
-    }
-
-    void verify_column() const override
-    {
-        do_verify_column();
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayBinary(m_table->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
     }
 
     void init() override
@@ -998,7 +975,7 @@ public:
     {
         TConditionFunction condition;
         for (size_t s = start; s < end; ++s) {
-            BinaryData value = m_condition_column->get(s);
+            BinaryData value = m_leaf_ptr->get(s);
             if (condition(m_value.get(), value))
                 return s;
         }
@@ -1019,15 +996,16 @@ public:
     BinaryNode(const BinaryNode& from, QueryNodeHandoverPatches* patches)
         : ParentNode(from, patches)
         , m_value(from.m_value)
-        , m_condition_column(from.m_condition_column)
     {
-        if (m_condition_column && patches)
-            m_condition_column_idx = m_condition_column->get_column_index();
     }
 
 private:
     OwnedBinaryData m_value;
-    const BinaryColumn* m_condition_column;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayBinary), alignof(ArrayBinary)>::type;
+    using LeafPtr = std::unique_ptr<ArrayBinary, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const ArrayBinary* m_leaf_ptr = nullptr;
 };
 
 
@@ -1048,14 +1026,12 @@ public:
     {
     }
 
-    void table_changed() override
+    void cluster_changed() override
     {
-        m_condition_column = &get_column<TimestampColumn>(m_condition_column_idx);
-    }
-
-    void verify_column() const override
-    {
-        do_verify_column();
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayTimestamp(m_table->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
     }
 
     void init() override
@@ -1067,8 +1043,14 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        size_t ret = m_condition_column->find<TConditionFunction>(m_value, start, end);
-        return ret;
+        TConditionFunction condition;
+        bool m_value_is_null = m_value.is_null();
+        for (size_t s = start; s < end; ++s) {
+            Timestamp value = m_leaf_ptr->get(s);
+            if (condition(value, m_value, value.is_null(), m_value_is_null))
+                return s;
+        }
+        return not_found;
     }
 
     virtual std::string describe() const override
@@ -1085,15 +1067,16 @@ public:
     TimestampNode(const TimestampNode& from, QueryNodeHandoverPatches* patches)
         : ParentNode(from, patches)
         , m_value(from.m_value)
-        , m_condition_column(from.m_condition_column)
     {
-        if (m_condition_column && patches)
-            m_condition_column_idx = m_condition_column->get_column_index();
     }
 
 private:
     Timestamp m_value;
-    const TimestampColumn* m_condition_column;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayTimestamp), alignof(ArrayTimestamp)>::type;
+    using LeafPtr = std::unique_ptr<ArrayTimestamp, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const ArrayTimestamp* m_leaf_ptr = nullptr;
 };
 
 class StringNodeBase : public ParentNode {
@@ -1124,11 +1107,6 @@ public:
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayString(m_table->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
-    }
-
-    void verify_column() const override
-    {
-        do_verify_column();
     }
 
     void init() override
@@ -1549,10 +1527,10 @@ public:
         }
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
         for (auto& condition : m_conditions) {
-            condition->verify_column();
+            condition->update_column();
         }
     }
     std::string describe() const override
@@ -1694,9 +1672,9 @@ public:
         m_condition->set_cluster(m_cluster);
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        m_condition->verify_column();
+        m_condition->update_column();
     }
 
     void init() override
@@ -1801,6 +1779,11 @@ public:
     {
     }
 
+    void table_changed() override
+    {
+        m_condition_column_name1 = m_table->get_column_name(m_condition_column_idx1);
+        m_condition_column_name2 = m_table->get_column_name(m_condition_column_idx2);
+    }
     void cluster_changed() override
     {
         m_array_ptr1 = nullptr;
@@ -1814,10 +1797,10 @@ public:
         m_leaf_ptr2 = m_array_ptr2.get();
     }
 
-    void verify_column() const override
+    void update_column() const override
     {
-        do_verify_column(m_condition_column_idx1);
-        do_verify_column(m_condition_column_idx2);
+        m_condition_column_idx1 = get_column_index(m_condition_column_name1);
+        m_condition_column_idx2 = get_column_index(m_condition_column_name2);
     }
 
     void init() override
@@ -1834,7 +1817,7 @@ public:
             if (std::is_same<TConditionValue, int64_t>::value) {
                 // For int64_t we've created an array intrinsics named compare_leafs which template expands bitwidths
                 // of boths arrays to make Get faster.
-                QueryState<int64_t> qs;
+                QueryState<int64_t> qs(act_ReturnFirst);
                 bool resume = m_leaf_ptr1->template compare_leafs<TConditionFunction, act_ReturnFirst>(
                     m_leaf_ptr2, start, end, 0, &qs, CallbackDummy());
 
@@ -1878,6 +1861,8 @@ public:
     TwoColumnsNode(const TwoColumnsNode& from, QueryNodeHandoverPatches* patches)
         : ParentNode(from, patches)
         , m_column_type(from.m_column_type)
+        , m_condition_column_name1(from.m_condition_column_name1)
+        , m_condition_column_name2(from.m_condition_column_name2)
         , m_condition_column_idx1(from.m_condition_column_idx1)
         , m_condition_column_idx2(from.m_condition_column_idx2)
     {
@@ -1886,8 +1871,11 @@ public:
 private:
     ColumnType m_column_type;
 
-    size_t m_condition_column_idx1 = not_found;
-    size_t m_condition_column_idx2 = not_found;
+    std::string m_condition_column_name1;
+    std::string m_condition_column_name2;
+    mutable size_t m_condition_column_idx1;
+    mutable size_t m_condition_column_idx2;
+
     using LeafType = typename ColType::LeafType;
     using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
     using LeafPtr = std::unique_ptr<LeafType, PlacementDelete>;
@@ -1911,7 +1899,7 @@ public:
 
     void table_changed() override;
     void cluster_changed() override;
-    void verify_column() const override;
+    void update_column() const override;
 
     virtual std::string describe() const override;
 
@@ -1932,94 +1920,77 @@ struct LinksToNodeHandoverPatch : public QueryNodeHandoverPatch {
 
 class LinksToNode : public ParentNode {
 public:
-    LinksToNode(size_t origin_column_index, const ConstRow& target_row)
-        : m_origin_column(origin_column_index)
-        , m_target_row(target_row)
+    LinksToNode(size_t origin_column_index, Key target_key)
+        : m_target_key(target_key)
     {
         m_dD = 10.0;
         m_dT = 50.0;
+        m_condition_column_idx = origin_column_index;
     }
 
     void table_changed() override
     {
-        m_column_type = m_table->get_column_type(m_origin_column);
-        m_column = &const_cast<Table*>(m_table.get())->get_column_link_base(m_origin_column);
+        m_column_type = m_table->get_column_type(m_condition_column_idx);
         REALM_ASSERT(m_column_type == type_Link || m_column_type == type_LinkList);
     }
 
-    void verify_column() const override
+    void cluster_changed() override
     {
-        do_verify_column(m_origin_column);
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) Array(m_table->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
     }
 
     virtual std::string describe() const override
     {
-        return this->describe_column(m_origin_column) + " " + describe_condition() + " " +
-               metrics::print_value(m_target_row.get_index());
+        return this->describe_column() + " " + describe_condition() + " " + metrics::print_value(m_target_key);
     }
     virtual std::string describe_condition() const override
     {
         return "links to";
     }
 
-
     size_t find_first_local(size_t start, size_t end) override
     {
-        REALM_ASSERT(m_column);
-        if (!m_target_row.is_attached())
-            return not_found;
-
         if (m_column_type == type_Link) {
-            LinkColumn& cl = static_cast<LinkColumn&>(*m_column);
-            return cl.find_first(m_target_row.get_index() + 1, start,
-                                 end); // LinkColumn stores link to row N as the integer N + 1
+            // LinkColumn stores key values as the integer N + 1
+            return m_array_ptr->find_first(m_target_key.value + 1, start, end);
         }
         else if (m_column_type == type_LinkList) {
-            LinkListColumn& cll = static_cast<LinkListColumn&>(*m_column);
-
+            ArrayKey arr(m_table->get_alloc());
             for (size_t i = start; i < end; i++) {
-                LinkViewRef lv = cll.get(i);
-                if (lv->find(m_target_row.get_index()) != not_found)
-                    return i;
+                ref_type ref = m_leaf_ptr->get_as_ref(i);
+                if (ref) {
+                    arr.init_from_ref(ref);
+                    if (arr.find_first(m_target_key, 0, arr.size()) != not_found)
+                        return i;
+                }
             }
         }
 
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches*) const override
     {
-        return std::unique_ptr<ParentNode>(patches ? new LinksToNode(*this, patches) : new LinksToNode(*this));
-    }
-
-    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
-    {
-        REALM_ASSERT(patches.size());
-        std::unique_ptr<QueryNodeHandoverPatch> abstract_patch = std::move(patches.back());
-        patches.pop_back();
-
-        auto patch = dynamic_cast<LinksToNodeHandoverPatch*>(abstract_patch.get());
-        REALM_ASSERT(patch);
-
-        m_origin_column = patch->m_origin_column;
-        m_target_row.apply_and_consume_patch(patch->m_target_row, group);
-
-        ParentNode::apply_handover_patch(patches, group);
+        return std::unique_ptr<ParentNode>(new LinksToNode(*this));
     }
 
 private:
-    size_t m_origin_column = npos;
-    ConstRow m_target_row;
-    LinkColumnBase* m_column = nullptr;
-    DataType m_column_type;
+    Key m_target_key;
+    DataType m_column_type = type_Link;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(Array), alignof(Array)>::type;
+    using LeafPtr = std::unique_ptr<Array, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const Array* m_leaf_ptr = nullptr;
 
-    LinksToNode(const LinksToNode& source, QueryNodeHandoverPatches* patches)
-        : ParentNode(source, patches)
+
+    LinksToNode(const LinksToNode& source)
+        : ParentNode(source, nullptr)
+        , m_target_key(source.m_target_key)
     {
-        auto patch = std::make_unique<LinksToNodeHandoverPatch>();
-        patch->m_origin_column = source.m_column->get_column_index();
-        ConstRow::generate_patch(source.m_target_row, patch->m_target_row);
-        patches->push_back(std::move(patch));
     }
 };
 

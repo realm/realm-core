@@ -47,6 +47,7 @@
 #include <realm/array_binary.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/table_tpl.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
@@ -318,8 +319,8 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
 
-    LinkTargetInfo link(&target);
-    do_insert_column(col_ndx, type, name, link, false, type == type_LinkList); // Throws
+    LinkTargetInfo link_target_info(&target);
+    do_insert_column(col_ndx, type, name, link_target_info, false, type == type_LinkList); // Throws
 
     set_link_type(col_ndx, link_type); // Throws
 }
@@ -512,22 +513,22 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 }
 
 
-void Table::do_insert_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link, bool nullable,
-                             bool listtype)
+void Table::do_insert_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link_target_info,
+                             bool nullable, bool listtype)
 {
     if (type == type_Link)
         nullable = true;
 
     bump_version();
-    insert_root_column(col_ndx, type, name, link, nullable, listtype); // Throws
+    insert_root_column(col_ndx, type, name, link_target_info, nullable, listtype); // Throws
 
     if (Replication* repl = get_repl())
-        repl->insert_column(this, col_ndx, type, name, link, nullable); // Throws
+        repl->insert_column(this, col_ndx, type, name, link_target_info, nullable); // Throws
 }
 
 
-void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
-                                           bool nullable, bool* was_inserted)
+void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, StringData name,
+                                           LinkTargetInfo& link_target_info, bool nullable, bool* was_inserted)
 {
     size_t existing_ndx = get_column_index(name);
     if (existing_ndx != npos) {
@@ -546,7 +547,8 @@ void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, String
                 throw LogicError(LogicError::type_mismatch);
             }
             if (is_link_type(ColumnType(type)) &&
-                m_spec->get_opposite_link_table_ndx(col_ndx) != link.m_target_table->get_index_in_group()) {
+                m_spec->get_opposite_link_table_ndx(col_ndx) !=
+                    link_target_info.m_target_table->get_index_in_group()) {
                 throw LogicError(LogicError::type_mismatch);
             }
 
@@ -561,7 +563,7 @@ void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, String
         }
     }
 
-    do_insert_column(col_ndx, type, name, link, nullable);
+    do_insert_column(col_ndx, type, name, link_target_info, nullable);
     if (was_inserted) {
         *was_inserted = true;
     }
@@ -705,8 +707,18 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name, L
             const Spec& target_spec = tf::get_spec(*(link_target.m_target_table));
             link_target.m_backlink_col_ndx = target_spec.get_column_count(); // insert at back of target
         }
-        link_target.m_target_table->insert_backlink_column(origin_table_ndx, col_ndx,
-                                                           link_target.m_backlink_col_ndx); // Throws
+        std::string backlink_col_name = std::string(get_name()) + "_" + std::string(name);
+        // Make sure the new name does not violate the name length limit
+        if (backlink_col_name.size() > Table::max_column_name_length) {
+            // It does - replace the last 8 characters with a hash value
+            size_t hash_length = 8;
+            std::hash<std::string> str_hash;
+            auto hash = str_hash(backlink_col_name);
+            backlink_col_name.resize(Table::max_column_name_length - hash_length);
+            backlink_col_name += util::to_string(hash).substr(0, hash_length);
+        }
+        link_target.m_target_table->insert_backlink_column(origin_table_ndx, col_ndx, link_target.m_backlink_col_ndx,
+                                                           backlink_col_name); // Throws
     }
 
     refresh_link_target_accessors(col_ndx);
@@ -850,10 +862,11 @@ void Table::set_link_type(size_t col_ndx, LinkType link_type)
 }
 
 
-void Table::insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx)
+void Table::insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx,
+                                   StringData name)
 {
     REALM_ASSERT_3(backlink_col_ndx, <=, m_cols.size());
-    do_insert_root_column(backlink_col_ndx, col_type_BackLink, "");         // Throws
+    do_insert_root_column(backlink_col_ndx, col_type_BackLink, name);       // Throws
     adj_insert_column(backlink_col_ndx);                                    // Throws
     m_spec->set_opposite_link_table_ndx(backlink_col_ndx, origin_table_ndx); // Throws
     m_spec->set_backlink_origin_column(backlink_col_ndx, origin_col_ndx);    // Throws
@@ -1725,8 +1738,6 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
         bool insert_nulls = is_nullable(col_ndx);
         col.insert_rows(row_ndx, num_rows, m_size, insert_nulls); // Throws
     }
-    if (row_ndx < m_size)
-        adj_row_acc_insert_rows(row_ndx, num_rows);
     m_size += num_rows;
 
     if (Replication* repl = get_repl()) {
@@ -1976,7 +1987,6 @@ void Table::do_remove(size_t row_ndx, bool broken_reciprocal_backlinks)
         size_t prior_num_rows = m_size;
         col.erase_rows(row_ndx, 1, prior_num_rows, broken_reciprocal_backlinks); // Throws
     }
-    adj_row_acc_erase_row(row_ndx);
     --m_size;
     bump_version();
 }
@@ -2019,8 +2029,6 @@ void Table::do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks)
         col.move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
     }
 
-    size_t last_row_ndx = m_size - 1;
-    adj_row_acc_move_over(last_row_ndx, row_ndx);
     --m_size;
     bump_version();
 }
@@ -2035,7 +2043,6 @@ void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         ColumnBase& col = get_column_base(col_ndx);
         col.swap_rows(row_ndx_1, row_ndx_2);
     }
-    adj_row_acc_swap_rows(row_ndx_1, row_ndx_2);
     bump_version();
 }
 
@@ -2049,8 +2056,6 @@ void Table::do_move_row(size_t from_ndx, size_t to_ndx)
         do_swap_rows(from_ndx, to_ndx);
         return;
     }
-
-    adj_row_acc_move_row(from_ndx, to_ndx);
 
     // Adjust the row indexes to compensate for the temporary row used
     if (from_ndx > to_ndx)
@@ -2098,7 +2103,6 @@ void Table::do_merge_rows(size_t row_ndx, size_t new_row_ndx)
         col.swap_rows(row_ndx_1, row_ndx_2);
     }
 
-    adj_row_acc_merge_rows(row_ndx, new_row_ndx);
     bump_version();
 }
 
@@ -2790,7 +2794,6 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value, bool& conflict
         if (ndx == size() - 1)
             ndx = duplicate;
 
-        adj_row_acc_merge_rows(duplicate, winner);
         move_last_over(duplicate);
         // Re-check moved-last-over
         duplicate -= 1;
@@ -2800,7 +2803,6 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value, bool& conflict
     if (winner == size() - 1)
         winner = ndx;
 
-    adj_row_acc_merge_rows(ndx, winner);
     move_last_over(ndx);
 
     return winner;
@@ -3072,266 +3074,124 @@ bool Table::is_null(size_t col_ndx, size_t row_ndx) const noexcept
     return col.is_null(row_ndx);
 }
 
-
 // count ----------------------------------------------
 
 size_t Table::count_int(size_t col_ndx, int64_t value) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-    const IntegerColumn& col = get_column<IntegerColumn, col_type_Int>(col_ndx);
-    return col.count(value);
+    size_t count;
+    if (is_nullable(col_ndx)) {
+        aggregate<act_Count, util::Optional<int64_t>, int64_t>(col_ndx, value, &count);
+    }
+    else {
+        aggregate<act_Count, int64_t, int64_t>(col_ndx, value, &count);
+    }
+    return count;
 }
 size_t Table::count_float(size_t col_ndx, float value) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-    const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
-    return col.count(value);
+    size_t count;
+    aggregate<act_Count, float, float>(col_ndx, value, &count);
+    return count;
 }
 size_t Table::count_double(size_t col_ndx, double value) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-    const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    return col.count(value);
+    size_t count;
+    aggregate<act_Count, double, double>(col_ndx, value, &count);
+    return count;
 }
 size_t Table::count_string(size_t col_ndx, StringData value) const
 {
-    REALM_ASSERT(!m_columns.is_attached() || col_ndx < get_column_count());
-
-    if (!m_columns.is_attached())
-        return 0;
-
-    ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
-        const StringColumn& col = get_column_string(col_ndx);
-        return col.count(value);
-    }
-    else {
-        REALM_ASSERT_3(type, ==, col_type_StringEnum);
-        const StringEnumColumn& col = get_column_string_enum(col_ndx);
-        return col.count(value);
-    }
+    size_t count;
+    aggregate<act_Count, StringData, StringData>(col_ndx, value, &count);
+    return count;
 }
 
 // sum ----------------------------------------------
 
 int64_t Table::sum_int(size_t col_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column<IntNullColumn, col_type_Int>(col_ndx);
-        return col.sum();
+        return aggregate<act_Sum, util::Optional<int64_t>, int64_t>(col_ndx);
     }
-    else {
-        const IntegerColumn& col = get_column<IntegerColumn, col_type_Int>(col_ndx);
-        return col.sum();
-    }
+    return aggregate<act_Sum, int64_t, int64_t>(col_ndx);
 }
 double Table::sum_float(size_t col_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0.f;
-
-    const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
-    return col.sum();
+    return aggregate<act_Sum, float, double>(col_ndx);
 }
 double Table::sum_double(size_t col_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0.;
-
-    const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    return col.sum();
+    return aggregate<act_Sum, double, double>(col_ndx);
 }
 
 // average ----------------------------------------------
 
 double Table::average_int(size_t col_ndx, size_t* value_count) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column<IntNullColumn, col_type_Int>(col_ndx);
-        return col.average(0, -1, -1, value_count);
+        return average<util::Optional<int64_t>>(col_ndx, value_count);
     }
-    else {
-        const IntegerColumn& col = get_column<IntegerColumn, col_type_Int>(col_ndx);
-        return col.average(0, -1, -1, value_count);
-    }
+    return average<int64_t>(col_ndx, value_count);
 }
 double Table::average_float(size_t col_ndx, size_t* value_count) const
 {
-    if (!m_columns.is_attached())
-        return 0.f;
-
-    const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
-    return col.average(0, -1, -1, value_count);
+    return average<float>(col_ndx, value_count);
 }
 double Table::average_double(size_t col_ndx, size_t* value_count) const
 {
-    if (!m_columns.is_attached())
-        return 0.;
-
-    const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    return col.average(0, -1, -1, value_count);
+    return average<double>(col_ndx, value_count);
 }
 
 // minimum ----------------------------------------------
 
 #define USE_COLUMN_AGGREGATE 1
 
-int64_t Table::minimum_int(size_t col_ndx, size_t* return_ndx) const
+int64_t Table::minimum_int(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-#if USE_COLUMN_AGGREGATE
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column<IntNullColumn, col_type_Int>(col_ndx);
-        return col.minimum(0, npos, npos, return_ndx);
+        return aggregate<act_Min, util::Optional<int64_t>, int64_t>(col_ndx, 0, nullptr, return_ndx);
     }
-    else {
-        const IntegerColumn& col = get_column<IntegerColumn, col_type_Int>(col_ndx);
-        return col.minimum(0, npos, npos, return_ndx);
-    }
-#else
-    if (is_empty())
-        return 0;
-
-    int64_t mv = get_int(col_ndx, 0);
-    for (size_t i = 1; i < size(); ++i) {
-        int64_t v = get_int(col_ndx, i);
-        if (v < mv) {
-            mv = v;
-        }
-    }
-    return mv;
-#endif
+    return aggregate<act_Min, int64_t, int64_t>(col_ndx, 0, nullptr, return_ndx);
 }
 
-float Table::minimum_float(size_t col_ndx, size_t* return_ndx) const
+float Table::minimum_float(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0.f;
-
-    const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
-    return col.minimum(0, npos, npos, return_ndx);
+    return aggregate<act_Min, float, float>(col_ndx, 0.f, nullptr, return_ndx);
 }
 
-double Table::minimum_double(size_t col_ndx, size_t* return_ndx) const
+double Table::minimum_double(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0.;
-
-    const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    return col.minimum(0, npos, npos, return_ndx);
+    return aggregate<act_Min, double, double>(col_ndx, 0., nullptr, return_ndx);
 }
 
-OldDateTime Table::minimum_olddatetime(size_t col_ndx, size_t* return_ndx) const
+Timestamp Table::minimum_timestamp(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-    if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column<IntNullColumn, col_type_OldDateTime>(col_ndx);
-        return col.minimum(0, npos, npos, return_ndx);
-    }
-    else {
-        const IntegerColumn& col = get_column<IntegerColumn, col_type_OldDateTime>(col_ndx);
-        return col.minimum(0, npos, npos, return_ndx);
-    }
-}
-
-Timestamp Table::minimum_timestamp(size_t col_ndx, size_t* return_ndx) const
-{
-    if (!m_columns.is_attached())
-        return Timestamp{};
-
-    const TimestampColumn& col = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
-    return col.minimum(return_ndx);
+    return aggregate<act_Min, Timestamp, Timestamp>(col_ndx, Timestamp{}, nullptr, return_ndx);
 }
 
 // maximum ----------------------------------------------
 
-int64_t Table::maximum_int(size_t col_ndx, size_t* return_ndx) const
+int64_t Table::maximum_int(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-#if USE_COLUMN_AGGREGATE
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column_int_null(col_ndx);
-        return col.maximum(0, npos, npos, return_ndx);
+        return aggregate<act_Max, util::Optional<int64_t>, int64_t>(col_ndx, 0, nullptr, return_ndx);
     }
-    else {
-        const IntegerColumn& col = get_column(col_ndx);
-        return col.maximum(0, npos, npos, return_ndx);
-    }
-
-#else
-    if (is_empty())
-        return 0;
-
-    int64_t mv = get_int(col_ndx, 0);
-    for (size_t i = 1; i < size(); ++i) {
-        int64_t v = get_int(col_ndx, i);
-        if (v > mv) {
-            mv = v;
-        }
-    }
-    return mv;
-#endif
+    return aggregate<act_Max, int64_t, int64_t>(col_ndx, 0, nullptr, return_ndx);
 }
 
-float Table::maximum_float(size_t col_ndx, size_t* return_ndx) const
+float Table::maximum_float(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0.f;
-
-    const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
-    return col.maximum(0, npos, npos, return_ndx);
+    return aggregate<act_Max, float, float>(col_ndx, 0.f, nullptr, return_ndx);
 }
 
-double Table::maximum_double(size_t col_ndx, size_t* return_ndx) const
+double Table::maximum_double(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0.;
-
-    const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    return col.maximum(0, npos, npos, return_ndx);
+    return aggregate<act_Max, double, double>(col_ndx, 0., nullptr, return_ndx);
 }
 
-OldDateTime Table::maximum_olddatetime(size_t col_ndx, size_t* return_ndx) const
+Timestamp Table::maximum_timestamp(size_t col_ndx, Key* return_ndx) const
 {
-    if (!m_columns.is_attached())
-        return 0;
-
-    if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column<IntNullColumn, col_type_OldDateTime>(col_ndx);
-        return col.maximum(0, npos, npos, return_ndx);
-    }
-    else {
-        const IntegerColumn& col = get_column<IntegerColumn, col_type_OldDateTime>(col_ndx);
-        return col.maximum(0, npos, npos, return_ndx);
-    }
-}
-
-
-Timestamp Table::maximum_timestamp(size_t col_ndx, size_t* return_ndx) const
-{
-    if (!m_columns.is_attached())
-        return Timestamp{};
-
-    const TimestampColumn& col = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
-    return col.maximum(return_ndx);
+    return aggregate<act_Max, Timestamp, Timestamp>(col_ndx, Timestamp{}, nullptr, return_ndx);
 }
 
 
@@ -3461,17 +3321,16 @@ TableView Table::find_all(size_t col_ndx, T value)
     return where().equal(col_ndx, value).find_all();
 }
 
-TableView Table::find_all_link(size_t target_row_index)
+TableView Table::find_all_link(Key target_key)
 {
-    auto target_row = get_link_target(m_link_chain[0])->get(target_row_index);
-    TableView tv = where().links_to(m_link_chain[0], target_row).find_all();
+    TableView tv = where().links_to(m_link_chain[0], target_key).find_all();
     m_link_chain.clear();
     return tv;
 }
 
-ConstTableView Table::find_all_link(size_t target_row_index) const
+ConstTableView Table::find_all_link(Key target_key) const
 {
-    return const_cast<Table*>(this)->find_all_link(target_row_index);
+    return const_cast<Table*>(this)->find_all_link(target_key);
 }
 
 TableView Table::find_all_int(size_t col_ndx, int64_t value)
@@ -4806,250 +4665,6 @@ Table* Table::Parent::get_parent_table(size_t*) noexcept
 Spec* Table::Parent::get_subtable_spec() noexcept
 {
     return nullptr;
-}
-
-void Table::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    adj_row_acc_insert_rows(row_ndx, num_rows);
-
-    // Adjust column and subtable accessors after insertion of new rows
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->adj_acc_insert_rows(row_ndx, num_rows);
-        }
-    }
-}
-
-
-void Table::adj_acc_erase_row(size_t row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    adj_row_acc_erase_row(row_ndx);
-
-    // Adjust subtable accessors after removal of a row
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->adj_acc_erase_row(row_ndx);
-        }
-    }
-}
-
-void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    adj_row_acc_swap_rows(row_ndx_1, row_ndx_2);
-
-    // Adjust subtable accessors after row swap
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->adj_acc_swap_rows(row_ndx_1, row_ndx_2);
-        }
-    }
-}
-
-
-void Table::adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    adj_row_acc_move_row(from_ndx, to_ndx);
-
-    // Adjust subtable accessors after row move
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->adj_acc_move_row(from_ndx, to_ndx);
-        }
-    }
-}
-
-
-void Table::adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    adj_row_acc_merge_rows(old_row_ndx, new_row_ndx);
-
-    // Adjust LinkViews for new rows
-    for (auto& col : m_cols) {
-        if (col) {
-            col->adj_acc_merge_rows(old_row_ndx, new_row_ndx);
-        }
-    }
-}
-
-
-void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    adj_row_acc_move_over(from_row_ndx, to_row_ndx);
-
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->adj_acc_move_over(from_row_ndx, to_row_ndx);
-        }
-    }
-}
-
-
-void Table::adj_acc_clear_root_table() noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistencyLevels.
-
-    discard_row_accessors();
-
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->adj_acc_clear_root_table();
-        }
-    }
-}
-
-
-void Table::adj_acc_clear_nonroot_table() noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistencyLevels.
-
-    discard_child_accessors();
-    destroy_column_accessors();
-    m_columns.detach();
-}
-
-
-void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    // Adjust row accessors after insertion of new rows
-    LockGuard lock(m_accessor_mutex);
-    for (RowBase* row = m_row_accessors; row; row = row->m_next) {
-        if (row->m_row_ndx >= row_ndx)
-            row->m_row_ndx += num_rows;
-    }
-}
-
-
-void Table::adj_row_acc_erase_row(size_t row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    // Adjust row accessors after removal of a row
-    LockGuard lock(m_accessor_mutex);
-    RowBase* row = m_row_accessors;
-    while (row) {
-        RowBase* next = row->m_next;
-        if (row->m_row_ndx == row_ndx) {
-            row->m_table.reset();
-            do_unregister_row_accessor(row);
-        }
-        else if (row->m_row_ndx > row_ndx) {
-            --row->m_row_ndx;
-        }
-        row = next;
-    }
-}
-
-void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    // Adjust row accessors after swap
-    LockGuard lock(m_accessor_mutex);
-    RowBase* row = m_row_accessors;
-    while (row) {
-        if (row->m_row_ndx == row_ndx_1) {
-            row->m_row_ndx = row_ndx_2;
-        }
-        else if (row->m_row_ndx == row_ndx_2) {
-            row->m_row_ndx = row_ndx_1;
-        }
-        row = row->m_next;
-    }
-}
-
-
-void Table::adj_row_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    // Adjust row accessors after move
-    LockGuard lock(m_accessor_mutex);
-    RowBase* row = m_row_accessors;
-    while (row) {
-        size_t ndx = row->m_row_ndx;
-        if (ndx == from_ndx)
-            row->m_row_ndx = to_ndx;
-        else if (ndx > from_ndx && ndx <= to_ndx)
-            row->m_row_ndx = ndx - 1;
-        else if (ndx >= to_ndx && ndx < from_ndx)
-            row->m_row_ndx = ndx + 1;
-        row = row->m_next;
-    }
-}
-
-
-void Table::adj_row_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    LockGuard lock(m_accessor_mutex);
-    RowBase* row = m_row_accessors;
-    while (row) {
-        if (row->m_row_ndx == old_row_ndx)
-            row->m_row_ndx = new_row_ndx;
-        row = row->m_next;
-    }
-}
-
-
-void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-    LockGuard lock(m_accessor_mutex);
-    RowBase* row = m_row_accessors;
-    while (row) {
-        RowBase* next = row->m_next;
-        if (row->m_row_ndx == to_row_ndx) {
-            row->m_table.reset();
-            do_unregister_row_accessor(row);
-        }
-        else if (row->m_row_ndx == from_row_ndx) {
-            row->m_row_ndx = to_row_ndx;
-        }
-        row = next;
-    }
 }
 
 

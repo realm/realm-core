@@ -730,14 +730,14 @@ TEST(Group_RemoveLinkTable)
 {
     Group group;
     TableRef table = group.add_table("table");
-    table->add_column_link(type_Link, "", *table);
+    table->add_column_link(type_Link, "link", *table);
     group.remove_table(table->get_index_in_group());
     CHECK(group.is_empty());
     CHECK(!table->is_attached());
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
-    target->add_column(type_Int, "");
-    origin->add_column_link(type_Link, "", *target);
+    target->add_column(type_Int, "int");
+    origin->add_column_link(type_Link, "link", *target);
     CHECK_THROW(group.remove_table(target->get_index_in_group()), CrossTableLinkTarget);
     group.remove_table(origin->get_index_in_group());
     CHECK_EQUAL(1, group.size());
@@ -2012,7 +2012,7 @@ TEST_TYPES(Group_TimestampAddAIndexAndThenInsertEmptyRows, std::true_type, std::
     constexpr bool nullable = TEST_TYPE::value;
     Group g;
     TableRef table = g.add_table("");
-    table->insert_column(0, type_Timestamp, "", nullable);
+    table->insert_column(0, type_Timestamp, "date", nullable);
     table->add_search_index(0);
     table->add_empty_row(5);
     CHECK_EQUAL(table->size(), 5);

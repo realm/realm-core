@@ -3214,7 +3214,7 @@ TEST(Replication_Links)
         CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 4));
     }
 }
-#endif
+
 
 TEST(Replication_CascadeRemove_ColumnLink)
 {
@@ -3309,7 +3309,6 @@ TEST(Replication_CascadeRemove_ColumnLink)
     CHECK_EQUAL(target->size(), 0);
 }
 
-#ifdef LEGACY_TESTS
 TEST(Replication_LinkListSelfLinkNullification)
 {
     SHARED_GROUP_TEST_PATH(path_1);
