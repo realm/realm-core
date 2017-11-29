@@ -278,7 +278,13 @@ protected:
     mutable std::unique_ptr<LeafType> m_leaf;
     mutable bool m_valid = false;
 
-    ConstListIf(size_t col_ndx, Allocator& alloc);
+    ConstListIf(size_t col_ndx, Allocator& alloc)
+        : ConstListBase(col_ndx)
+        , m_leaf(new LeafType(alloc))
+    {
+        m_leaf->set_parent(this, 0); // ndx not used, implicit in m_owner
+    }
+
     ConstListIf(const ConstListIf&) = delete;
     ConstListIf(ConstListIf&& other)
         : ConstListBase(std::move(other))
@@ -346,7 +352,7 @@ public:
 
     void update_child_ref(size_t, ref_type new_ref) override
     {
-        m_obj.set(ConstListBase::m_col_ndx, from_ref(new_ref));
+        m_obj.set_int(ConstListBase::m_col_ndx, from_ref(new_ref));
     }
 
     void create()
@@ -377,7 +383,7 @@ public:
         T old = get(ndx);
         if (old != value) {
             ensure_writeable();
-            m_leaf->set(ndx, value);
+            do_set(ndx, value);
             m_obj.bump_version();
         }
         return old;
@@ -414,22 +420,23 @@ public:
     void move(size_t from, size_t to) override
     {
         if (from != to) {
+            ensure_writeable();
             T tmp = get(from);
             int adj = (from < to) ? 1 : -1;
             while (from != to) {
                 size_t neighbour = from + adj;
-                set(from, get(neighbour));
+                do_set(from, get(neighbour));
                 from = neighbour;
             }
-            set(to, tmp);
+            do_set(to, tmp);
         }
     }
     void swap(size_t ndx1, size_t ndx2) override
     {
         if (ndx1 != ndx2) {
             T tmp = get(ndx1);
-            set(ndx1, get(ndx2));
-            set(ndx2, tmp);
+            do_set(ndx1, get(ndx2));
+            do_set(ndx2, tmp);
         }
     }
     void clear() override
@@ -457,6 +464,10 @@ protected:
             m_leaf->init_from_parent();
         }
     }
+    void do_set(size_t ndx, T value)
+    {
+        m_leaf->set(ndx, value);
+    }
 };
 
 template <>
@@ -464,6 +475,9 @@ void List<Key>::add(Key target_key);
 
 template <>
 Key List<Key>::set(size_t ndx, Key target_key);
+
+template <>
+void List<Key>::do_set(size_t ndx, Key target_key);
 
 template <>
 void List<Key>::insert(size_t ndx, Key target_key);

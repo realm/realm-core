@@ -34,13 +34,6 @@
 using namespace realm;
 
 /********************************* ListBase **********************************/
-template <class T>
-ConstListIf<T>::ConstListIf(size_t col_ndx, Allocator& alloc)
-    : ConstListBase(col_ndx)
-    , m_leaf(new LeafType(alloc))
-{
-    m_leaf->set_parent(this, 0); // ndx not used, implicit in m_owner
-}
 
 template <class T>
 ConstList<T>::ConstList(const ConstObj& obj, size_t col_ndx)
@@ -115,31 +108,42 @@ void List<Key>::add(Key target_key)
 {
     size_t ndx = m_leaf->size();
     m_leaf->insert(ndx, null_key);
-    List<Key>::set(ndx, target_key);
+    do_set(ndx, target_key);
+    if (Replication* repl = m_const_obj->get_alloc().get_replication())
+        repl->link_list_insert(*(static_cast<LinkList*>(this)), ndx, target_key); // Throws
+    m_obj.bump_version();
 }
 
 template <>
 Key List<Key>::set(size_t ndx, Key target_key)
 {
-    ensure_writeable();
-
     // get will check for ndx out of bounds
     Key old_key = get(ndx);
     if (target_key != old_key) {
-        CascadeState state;
-        bool recurse = m_obj.update_backlinks(m_col_ndx, old_key, target_key, state);
-
-        m_leaf->set(ndx, target_key);
-
-        if (recurse) {
-            auto table = const_cast<Table*>(m_obj.get_table());
-            _impl::TableFriend::remove_recursive(*table, state); // Throws
-        }
+        ensure_writeable();
+        do_set(ndx, target_key);
+        if (Replication* repl = m_const_obj->get_alloc().get_replication())
+            repl->link_list_set(*(static_cast<LinkList*>(this)), ndx, target_key); // Throws
 
         m_obj.bump_version();
     }
 
     return old_key;
+}
+
+template <>
+void List<Key>::do_set(size_t ndx, Key target_key)
+{
+    CascadeState state;
+    Key old_key = get(ndx);
+    bool recurse = m_obj.update_backlinks(m_col_ndx, old_key, target_key, state);
+
+    m_leaf->set(ndx, target_key);
+
+    if (recurse) {
+        auto table = const_cast<Table*>(m_obj.get_table());
+        _impl::TableFriend::remove_recursive(*table, state); // Throws
+    }
 }
 
 template <>
@@ -149,14 +153,21 @@ void List<Key>::insert(size_t ndx, Key target_key)
         throw std::out_of_range("Index out of range");
     }
     m_leaf->insert(ndx, null_key);
-    set(ndx, target_key);
+    do_set(ndx, target_key);
+    if (Replication* repl = m_const_obj->get_alloc().get_replication())
+        repl->link_list_insert(*(static_cast<LinkList*>(this)), ndx, target_key); // Throws
+    m_obj.bump_version();
 }
 
 template <>
 Key List<Key>::remove(size_t ndx)
 {
-    Key old = set(ndx, null_key);
+    Key old = get(ndx);
+    do_set(ndx, null_key);
+    if (Replication* repl = m_const_obj->get_alloc().get_replication())
+        repl->link_list_erase(*(static_cast<LinkList*>(this)), ndx); // Throws
     m_leaf->erase(ndx);
+    m_obj.bump_version();
     ConstListBase::adj_remove(ndx);
 
     return old;
@@ -169,15 +180,15 @@ void List<Key>::clear()
     Table* origin_table = const_cast<Table*>(m_obj.get_table());
     const Spec& origin_table_spec = _impl::TableFriend::get_spec(*origin_table);
 
-    /*
-        if (Replication* repl = get_repl())
-            repl->link_list_clear(*this); // Throws
-    */
+    if (Replication* repl = m_const_obj->get_alloc().get_replication())
+        repl->link_list_clear(*(static_cast<LinkList*>(this))); // Throws
 
     if (!origin_table_spec.get_column_attr(m_col_ndx).test(col_attr_StrongLinks)) {
         size_t ndx = size();
         while (ndx--) {
-            remove(ndx);
+            do_set(ndx, null_key);
+            m_leaf->erase(ndx);
+            ConstListBase::adj_remove(ndx);
         }
         return;
     }
@@ -204,6 +215,7 @@ void List<Key>::clear()
     }
 
     m_leaf->truncate_and_destroy_children(0);
+    m_obj.bump_version();
 
     tf::remove_recursive(*origin_table, state); // Throws
 }

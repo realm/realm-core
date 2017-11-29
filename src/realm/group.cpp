@@ -1591,7 +1591,7 @@ public:
         return true; // No-op
     }
 
-    bool select_link_list(size_t col_ndx, size_t, size_t) noexcept
+    bool select_link_list(size_t col_ndx, Key, size_t) noexcept
     {
         // See comments on link handling in TransactAdvancer::set_link().
         typedef _impl::TableFriend tf;
@@ -1602,12 +1602,12 @@ public:
         return true; // No-op
     }
 
-    bool link_list_set(size_t, size_t, size_t) noexcept
+    bool link_list_set(size_t, Key, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_insert(size_t, size_t, size_t) noexcept
+    bool link_list_insert(size_t, Key, size_t) noexcept
     {
         return true; // No-op
     }
@@ -1671,7 +1671,6 @@ void Group::refresh_dirty_accessors()
 void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(false); // FIXME: accessor updates need to be handled differently
 
     // Exception safety: If this function throws, the group accessor and all of
     // its subordinate accessors are left in a state that may not be fully

@@ -31,7 +31,7 @@
 #include <realm/impl/input_stream.hpp>
 
 #include <realm/group.hpp>
-#include <realm/link_view.hpp>
+#include <realm/list.hpp>
 
 namespace realm {
 namespace _impl {
@@ -132,7 +132,7 @@ public:
     {
         return true;
     }
-    bool select_link_list(size_t, size_t, size_t)
+    bool select_link_list(size_t, Key, size_t)
     {
         return true;
     }
@@ -262,11 +262,11 @@ public:
     }
 
     // Must have linklist selected:
-    bool link_list_set(size_t, size_t, size_t)
+    bool link_list_set(size_t, Key, size_t)
     {
         return true;
     }
-    bool link_list_insert(size_t, size_t, size_t)
+    bool link_list_insert(size_t, Key, size_t)
     {
         return true;
     }
@@ -308,7 +308,7 @@ public:
     // No selection needed:
     bool select_table(size_t group_level_ndx, size_t levels, const size_t* path);
     bool select_descriptor(size_t levels, const size_t* path);
-    bool select_link_list(size_t col_ndx, size_t row_ndx, size_t link_target_group_level_ndx);
+    bool select_link_list(size_t col_ndx, Key key, size_t link_target_group_level_ndx);
     bool insert_group_level_table(TableKey table_key, size_t num_tables, StringData name);
     bool erase_group_level_table(TableKey table_key, size_t num_tables);
     bool rename_group_level_table(TableKey table_key, StringData new_name);
@@ -347,9 +347,9 @@ public:
     bool set_link_type(size_t col_ndx, LinkType);
 
     // Must have linklist selected:
-    bool link_list_set(size_t link_ndx, size_t value, size_t prior_size);
+    bool link_list_set(size_t link_ndx, Key value, size_t prior_size);
     bool link_list_set_all(const IntegerColumn& values);
-    bool link_list_insert(size_t link_ndx, size_t value, size_t prior_size);
+    bool link_list_insert(size_t link_ndx, Key value, size_t prior_size);
     bool link_list_move(size_t from_link_ndx, size_t to_link_ndx);
     bool link_list_swap(size_t link1_ndx, size_t link2_ndx);
     bool link_list_erase(size_t link_ndx, size_t prior_size);
@@ -466,7 +466,7 @@ public:
                                Instruction variant = instr_Set);
     virtual void set_link(const Table*, size_t col_ndx, Key key, Key value, Instruction variant = instr_Set);
     virtual void set_null(const Table*, size_t col_ndx, Key key, Instruction variant = instr_Set);
-    virtual void set_link_list(const LinkView&, const IntegerColumn& values);
+    virtual void set_link_list(const LinkList&, const IntegerColumn& values);
     virtual void insert_substring(const Table*, size_t col_ndx, Key key, size_t pos, StringData);
     virtual void erase_substring(const Table*, size_t col_ndx, Key key, size_t pos, size_t size);
 
@@ -480,12 +480,12 @@ public:
     virtual void clear_table(const Table*, size_t prior_num_rows);
     virtual void optimize_table(const Table*);
 
-    virtual void link_list_set(const LinkView&, size_t link_ndx, size_t value);
-    virtual void link_list_insert(const LinkView&, size_t link_ndx, size_t value);
-    virtual void link_list_move(const LinkView&, size_t from_link_ndx, size_t to_link_ndx);
-    virtual void link_list_swap(const LinkView&, size_t link_ndx_1, size_t link_ndx_2);
-    virtual void link_list_erase(const LinkView&, size_t link_ndx);
-    virtual void link_list_clear(const LinkView&);
+    virtual void link_list_set(const LinkList&, size_t link_ndx, Key value);
+    virtual void link_list_insert(const LinkList&, size_t link_ndx, Key value);
+    virtual void link_list_move(const LinkList&, size_t from_link_ndx, size_t to_link_ndx);
+    virtual void link_list_swap(const LinkList&, size_t link_ndx_1, size_t link_ndx_2);
+    virtual void link_list_erase(const LinkList&, size_t link_ndx);
+    virtual void link_list_clear(const LinkList&);
 
     //@{
 
@@ -497,13 +497,12 @@ public:
     /// nullifications.
 
     virtual void nullify_link(const Table*, size_t col_ndx, Key key);
-    virtual void link_list_nullify(const LinkView&, size_t link_ndx);
+    virtual void link_list_nullify(const LinkList&, size_t link_ndx);
 
     //@}
 
     void on_table_destroyed(const Table*) noexcept;
     void on_spec_destroyed(const Spec*) noexcept;
-    void on_link_list_destroyed(const LinkView&) noexcept;
 
 protected:
     TransactLogConvenientEncoder(TransactLogStream& encoder);
@@ -519,23 +518,43 @@ protected:
     }
 
 private:
+    struct LinkListId {
+        TableKey table_key;
+        Key object_key;
+        size_t col_id = realm::npos;
+
+        LinkListId() = default;
+        LinkListId(const ConstListBase& list)
+            : table_key(list.get_table()->get_key())
+            , object_key(list.get_key())
+            , col_id(list.get_col_ndx())
+        {
+        }
+        LinkListId(TableKey t, Key k, size_t c)
+            : table_key(t)
+            , object_key(k)
+            , col_id(c)
+        {
+        }
+        bool operator!=(const LinkListId& other)
+        {
+            return object_key != other.object_key || table_key != other.table_key || col_id != other.col_id;
+        }
+    };
     TransactLogEncoder m_encoder;
     // These are mutable because they are caches.
     mutable util::Buffer<size_t> m_subtab_path_buf;
     mutable const Table* m_selected_table;
     mutable const Spec* m_selected_spec;
-    // Has to be atomic to support concurrent reset when a linklist
-    // is unselected. This can happen on a different thread. In case
-    // of races, setting of a new value must win.
-    mutable std::atomic<const LinkView*> m_selected_link_list;
+    mutable LinkListId m_selected_link_list;
 
     void unselect_all() noexcept;
     void select_table(const Table*); // unselects link list
-    void select_link_list(const LinkView&);
+    void select_link_list(const LinkList&);
 
     void record_subtable_path(const Table&, size_t*& out_begin, size_t*& out_end);
     void do_select_table(const Table*);
-    void do_select_link_list(const LinkView&);
+    void do_select_link_list(const LinkList&);
 
     friend class TransactReverser;
 };
@@ -919,8 +938,7 @@ inline void TransactLogConvenientEncoder::unselect_all() noexcept
 {
     m_selected_table = nullptr;
     m_selected_spec = nullptr;
-    // no race with on_link_list_destroyed since both are setting to nullptr
-    m_selected_link_list = nullptr;
+    m_selected_link_list = LinkListId();
 }
 
 inline void TransactLogConvenientEncoder::select_table(const Table* table)
@@ -928,20 +946,12 @@ inline void TransactLogConvenientEncoder::select_table(const Table* table)
     if (table != m_selected_table)
         do_select_table(table); // Throws
     m_selected_spec = nullptr;
-    // no race with on_link_list_destroyed since both are setting to nullptr
-    m_selected_link_list = nullptr;
+    m_selected_link_list = LinkListId();
 }
 
-inline void TransactLogConvenientEncoder::select_link_list(const LinkView& list)
+inline void TransactLogConvenientEncoder::select_link_list(const LinkList& list)
 {
-    // A race between this and a call to on_link_list_destroyed() must
-    // end up with m_selected_link_list pointing to the list argument given
-    // here. We assume that the list given to on_link_list_destroyed() can
-    // *never* be the same as the list argument given here. We resolve the
-    // race by a) always updating m_selected_link_list in do_select_link_list()
-    // and b) only atomically and conditionally updating it in
-    // on_link_list_destroyed().
-    if (&list != m_selected_link_list) {
+    if (LinkListId(list) != m_selected_link_list) {
         do_select_link_list(list); // Throws
     }
     m_selected_spec = nullptr;
@@ -1226,25 +1236,25 @@ inline void TransactLogConvenientEncoder::set_timestamp(const Table* t, size_t c
     m_encoder.set_timestamp(col_ndx, key, value, variant); // Throws
 }
 
-inline bool TransactLogEncoder::set_link(size_t col_ndx, Key key, Key value, TableKey target_table_key,
+inline bool TransactLogEncoder::set_link(size_t col_ndx, Key key, Key target_key, TableKey target_table_key,
                                          Instruction variant)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
     // Map `realm::npos` to zero, and `n` to `n+1`, where `n` is a target row
     // index.
-    int64_t value_2 = value.value + 1;
+    int64_t value_2 = target_key.value + 1;
     append_simple_instr(variant, type_Link, col_ndx, key.value, value_2, target_table_key); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_link(const Table* t, size_t col_ndx, Key key, Key value,
+inline void TransactLogConvenientEncoder::set_link(const Table* t, size_t col_ndx, Key key, Key target_key,
                                                    Instruction variant)
 {
     select_table(t); // Throws
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(*t);
     auto target_table_key = spec.get_opposite_link_table_key(col_ndx);
-    m_encoder.set_link(col_ndx, key, value, target_table_key, variant); // Throws
+    m_encoder.set_link(col_ndx, key, target_key, target_table_key, variant); // Throws
 }
 
 inline bool TransactLogEncoder::set_null(size_t col_ndx, Key key, Instruction variant, size_t prior_num_rows)
@@ -1398,16 +1408,16 @@ inline void TransactLogConvenientEncoder::optimize_table(const Table* t)
     m_encoder.optimize_table(); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_set(size_t link_ndx, size_t value, size_t prior_size)
+inline bool TransactLogEncoder::link_list_set(size_t link_ndx, Key key, size_t prior_size)
 {
-    append_simple_instr(instr_LinkListSet, link_ndx, value, prior_size); // Throws
+    append_simple_instr(instr_LinkListSet, link_ndx, key.value, prior_size); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_set(const LinkView& list, size_t link_ndx, size_t value)
+inline void TransactLogConvenientEncoder::link_list_set(const LinkList& list, size_t link_ndx, Key key)
 {
     select_link_list(list);                                // Throws
-    m_encoder.link_list_set(link_ndx, value, list.size()); // Throws
+    m_encoder.link_list_set(link_ndx, key, list.size());   // Throws
 }
 
 inline bool TransactLogEncoder::link_list_nullify(size_t link_ndx, size_t prior_size)
@@ -1416,7 +1426,7 @@ inline bool TransactLogEncoder::link_list_nullify(size_t link_ndx, size_t prior_
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list, size_t link_ndx)
+inline void TransactLogConvenientEncoder::link_list_nullify(const LinkList& list, size_t link_ndx)
 {
     select_link_list(list);                            // Throws
     size_t prior_size = list.size();                   // Instruction is emitted before the fact.
@@ -1432,23 +1442,23 @@ inline bool TransactLogEncoder::link_list_set_all(const IntegerColumn& values)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_link_list(const LinkView& list, const IntegerColumn& values)
+inline void TransactLogConvenientEncoder::set_link_list(const LinkList& list, const IntegerColumn& values)
 {
     select_link_list(list);              // Throws
     m_encoder.link_list_set_all(values); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_insert(size_t link_ndx, size_t value, size_t prior_size)
+inline bool TransactLogEncoder::link_list_insert(size_t link_ndx, Key key, size_t prior_size)
 {
-    append_simple_instr(instr_LinkListInsert, link_ndx, value, prior_size); // Throws
+    append_simple_instr(instr_LinkListInsert, link_ndx, key.value, prior_size); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_insert(const LinkView& list, size_t link_ndx, size_t value)
+inline void TransactLogConvenientEncoder::link_list_insert(const LinkList& list, size_t link_ndx, Key key)
 {
     select_link_list(list);                                  // Throws
     size_t prior_size = list.size() - 1;                     // The instruction is emitted after the fact.
-    m_encoder.link_list_insert(link_ndx, value, prior_size); // Throws
+    m_encoder.link_list_insert(link_ndx, key, prior_size);   // Throws
 }
 
 inline bool TransactLogEncoder::link_list_move(size_t from_link_ndx, size_t to_link_ndx)
@@ -1458,7 +1468,7 @@ inline bool TransactLogEncoder::link_list_move(size_t from_link_ndx, size_t to_l
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_move(const LinkView& list, size_t from_link_ndx,
+inline void TransactLogConvenientEncoder::link_list_move(const LinkList& list, size_t from_link_ndx,
                                                          size_t to_link_ndx)
 {
     select_link_list(list);                               // Throws
@@ -1471,7 +1481,7 @@ inline bool TransactLogEncoder::link_list_swap(size_t link1_ndx, size_t link2_nd
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_swap(const LinkView& list, size_t link1_ndx, size_t link2_ndx)
+inline void TransactLogConvenientEncoder::link_list_swap(const LinkList& list, size_t link1_ndx, size_t link2_ndx)
 {
     select_link_list(list);                         // Throws
     m_encoder.link_list_swap(link1_ndx, link2_ndx); // Throws
@@ -1483,7 +1493,7 @@ inline bool TransactLogEncoder::link_list_erase(size_t link_ndx, size_t prior_si
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_erase(const LinkView& list, size_t link_ndx)
+inline void TransactLogConvenientEncoder::link_list_erase(const LinkList& list, size_t link_ndx)
 {
     select_link_list(list);                          // Throws
     size_t prior_size = list.size();                 // The instruction is emitted before the fact.
@@ -1506,16 +1516,6 @@ inline void TransactLogConvenientEncoder::on_spec_destroyed(const Spec* s) noexc
 {
     if (m_selected_spec == s)
         m_selected_spec = nullptr;
-}
-
-
-inline void TransactLogConvenientEncoder::on_link_list_destroyed(const LinkView& list) noexcept
-{
-    const LinkView* lw_ptr = &list;
-    // atomically clear m_selected_link_list iff it already points to 'list':
-    // (lw_ptr will be modified if the swap fails, but we ignore that)
-    m_selected_link_list.compare_exchange_strong(lw_ptr, nullptr, std::memory_order_relaxed,
-                                                 std::memory_order_relaxed);
 }
 
 
@@ -1635,10 +1635,10 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                     return;
                 case type_Link: {
                     int64_t value = read_int<int64_t>(); // Throws
-                    // Map zero to realm::npos, and `n+1` to `n`, where `n` is a key value.
-                    Key target_key_value(value - 1);
+                    // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
+                    Key target_key = Key(value - 1);
                     TableKey target_table_key = TableKey(read_int<int64_t>());                        // Throws
-                    if (!handler.set_link(col_ndx, key, target_key_value, target_table_key, instr))   // Throws
+                    if (!handler.set_link(col_ndx, key, target_key, target_table_key, instr))         // Throws
                         parser_error();
                     return;
                 }
@@ -1730,9 +1730,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
         case instr_LinkListSet: {
             size_t link_ndx = read_int<size_t>();                    // Throws
-            size_t value = read_int<size_t>();                       // Throws
+            Key key = Key(read_int<int64_t>());                      // Throws
             size_t prior_size = read_int<size_t>();                  // Throws
-            if (!handler.link_list_set(link_ndx, value, prior_size)) // Throws
+            if (!handler.link_list_set(link_ndx, key, prior_size))   // Throws
                 parser_error();
             return;
         }
@@ -1740,17 +1740,17 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             // todo, log that it's a SetAll we're doing
             size_t size = read_int<size_t>(); // Throws
             for (size_t i = 0; i < size; i++) {
-                size_t link = read_int<size_t>();          // Throws
-                if (!handler.link_list_set(i, link, size)) // Throws
+                Key key = Key(read_int<int64_t>());       // Throws
+                if (!handler.link_list_set(i, key, size)) // Throws
                     parser_error();
             }
             return;
         }
         case instr_LinkListInsert: {
             size_t link_ndx = read_int<size_t>();                       // Throws
-            size_t value = read_int<size_t>();                          // Throws
+            Key key = Key(read_int<int64_t>());                         // Throws
             size_t prior_size = read_int<size_t>();                     // Throws
-            if (!handler.link_list_insert(link_ndx, value, prior_size)) // Throws
+            if (!handler.link_list_insert(link_ndx, key, prior_size))   // Throws
                 parser_error();
             return;
         }
@@ -1790,9 +1790,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
         case instr_SelectLinkList: {
             size_t col_ndx = read_int<size_t>();                                     // Throws
-            size_t row_ndx = read_int<size_t>();                                     // Throws
+            Key key = Key(read_int<int64_t>());                                      // Throws
             size_t target_group_level_ndx = read_int<size_t>();                      // Throws
-            if (!handler.select_link_list(col_ndx, row_ndx, target_group_level_ndx)) // Throws
+            if (!handler.select_link_list(col_ndx, key, target_group_level_ndx))     // Throws
                 parser_error();
             return;
         }
@@ -2306,22 +2306,22 @@ public:
         return true;
     }
 
-    bool select_link_list(size_t col_ndx, size_t row_ndx, size_t link_target_group_level_ndx)
+    bool select_link_list(size_t col_ndx, Key key, size_t link_target_group_level_ndx)
     {
         sync_linkview();
-        m_encoder.select_link_list(col_ndx, row_ndx, link_target_group_level_ndx);
+        m_encoder.select_link_list(col_ndx, key, link_target_group_level_ndx);
         m_pending_lv_instr = get_inst();
         return true;
     }
 
-    bool link_list_set(size_t row, size_t value, size_t prior_size)
+    bool link_list_set(size_t row, Key key, size_t prior_size)
     {
-        m_encoder.link_list_set(row, value, prior_size);
+        m_encoder.link_list_set(row, key, prior_size);
         append_instruction();
         return true;
     }
 
-    bool link_list_insert(size_t link_ndx, size_t, size_t prior_size)
+    bool link_list_insert(size_t link_ndx, Key, size_t prior_size)
     {
         m_encoder.link_list_erase(link_ndx, prior_size + 1);
         append_instruction();
@@ -2344,7 +2344,7 @@ public:
 
     bool link_list_erase(size_t link_ndx, size_t prior_size)
     {
-        m_encoder.link_list_insert(link_ndx, 0, prior_size - 1);
+        m_encoder.link_list_insert(link_ndx, null_key, prior_size - 1);
         append_instruction();
         return true;
     }
@@ -2355,7 +2355,7 @@ public:
         // in reverse, and this way it generates all back-insertions rather than
         // all front-insertions
         for (size_t i = old_list_size; i > 0; --i) {
-            m_encoder.link_list_insert(i - 1, 0, old_list_size - i);
+            m_encoder.link_list_insert(i - 1, null_key, old_list_size - i);
             append_instruction();
         }
         return true;
@@ -2373,7 +2373,7 @@ public:
 
     bool link_list_nullify(size_t link_ndx, size_t prior_size)
     {
-        m_encoder.link_list_insert(link_ndx, 0, prior_size - 1);
+        m_encoder.link_list_insert(link_ndx, null_key, prior_size - 1);
         append_instruction();
         return true;
     }

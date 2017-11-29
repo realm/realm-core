@@ -525,7 +525,7 @@ public:
         return false;
     }
 
-    bool select_link_list(size_t col_ndx, size_t row_ndx, size_t)
+    bool select_link_list(size_t col_ndx, Key key, size_t)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
@@ -537,12 +537,12 @@ public:
         static_cast<void>(type);
         if (REALM_UNLIKELY(REALM_COVER_NEVER(type != type_LinkList)))
             return false;
-        log("link_list = table->get_link_list(%1, %2);", col_ndx, row_ndx); // Throws
-        m_link_list = m_table->get_linklist(col_ndx, row_ndx); // Throws
+        log("link_list = table->get_link_list(%1, %2);", col_ndx, key.value); // Throws
+        m_link_list = m_table->get_object(key).get_linklist_ptr(col_ndx);     // Throws
         return true;
     }
 
-    bool link_list_set(size_t link_ndx, size_t value, size_t prior_size)
+    bool link_list_set(size_t link_ndx, Key value, size_t prior_size)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_link_list)))
             return false;
@@ -552,12 +552,11 @@ public:
             return false;
         static_cast<void>(prior_size);
         log("link_list->set(%1, %2);", link_ndx, value); // Throws
-        typedef _impl::LinkListFriend llf;
-        llf::do_set(*m_link_list, link_ndx, value); // Throws
+        m_link_list->set(link_ndx, value);
         return true;
     }
 
-    bool link_list_insert(size_t link_ndx, size_t value, size_t prior_size)
+    bool link_list_insert(size_t link_ndx, Key key, size_t prior_size)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_link_list)))
             return false;
@@ -566,8 +565,8 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_link_list->size())))
             return false;
         static_cast<void>(prior_size);
-        log("link_list->insert(%1, %2);", link_ndx, value); // Throws
-        m_link_list->insert(link_ndx, value);               // Throws
+        log("link_list->insert(%1, %2);", link_ndx, key.value); // Throws
+        m_link_list->insert(link_ndx, key);                     // Throws
         return true;
     }
 
@@ -613,8 +612,7 @@ public:
             return false;
         static_cast<void>(prior_size);
         log("link_list->remove(%1);", link_ndx); // Throws
-        typedef _impl::LinkListFriend llf;
-        llf::do_remove(*m_link_list, link_ndx); // Throws
+        m_link_list->remove(link_ndx);
         return true;
     }
 
@@ -623,8 +621,7 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_link_list)))
             return false;
         log("link_list->clear();"); // Throws
-        typedef _impl::LinkListFriend llf;
-        llf::do_clear(*m_link_list); // Throws
+        m_link_list->clear();
         return true;
     }
 
@@ -641,7 +638,7 @@ public:
 private:
     Group& m_group;
     TableRef m_table;
-    LinkViewRef m_link_list;
+    LinkListPtr m_link_list;
     util::Logger* m_logger = nullptr;
 
     bool check_set_cell(size_t col_ndx, Key key) noexcept

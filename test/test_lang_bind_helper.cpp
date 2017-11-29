@@ -3488,7 +3488,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
         CHECK_EQUAL(mixed_4, table->get_subtable(1, 0));
     }
 }
-
+#endif
 
 TEST(LangBindHelper_AdvanceReadTransact_LinkView)
 {
@@ -3508,17 +3508,16 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
         TableRef origin = wt.add_table("origin");
         TableRef target = wt.add_table("target");
         target->add_column(type_Int, "value");
-        origin->add_column(type_Int, "pk");
-        origin->add_column_link(type_LinkList, "list", *target);
-        origin->add_search_index(0);
+        auto col = origin->add_column_link(type_LinkList, "list", *target);
+        // origin->add_search_index(0);
+        std::vector<Key> keys;
+        target->create_objects(10, keys);
 
-        target->add_empty_row(10);
+        Obj o0 = origin->create_object(Key(0));
+        Obj o1 = origin->create_object(Key(1));
 
-        origin->add_empty_row(2);
-        origin->set_int_unique(0, 0, 1);
-        origin->set_int_unique(0, 1, 2);
-        origin->get_linklist(1, 0)->add(1);
-        origin->get_linklist(1, 1)->add(2);
+        o0.get_linklist(col).add(keys[1]);
+        o1.get_linklist(col).add(keys[2]);
         // state:
         // origin[0].ll[0] -> target[1]
         // origin[1].ll[0] -> target[2]
@@ -3529,106 +3528,17 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
 
     // Grab references to the LinkViews
     auto origin = group.get_table("origin");
-    auto lv1 = origin->get_linklist(1, 0); // lv1[0] -> target[1]
-    auto lv2 = origin->get_linklist(1, 1); // lv2[0] -> target[2]
-    CHECK_EQUAL(lv1->size(), 1);
-    CHECK_EQUAL(lv2->size(), 1);
+    auto col_link = origin->get_column_index("list");
+    ConstObj obj0 = origin->get_object(Key(0));
+    ConstObj obj1 = origin->get_object(Key(1));
 
-    // Add a new row with the same PK which will replace the old row 0
-    {
-        WriteTransaction wt(sg_w);
-        TableRef origin_ = wt.get_table("origin");
-        origin_->add_empty_row(2);
-        origin_->set_int_unique(0, 3, 100);
-        CHECK_EQUAL(origin_->size(), 4);
-
-        origin_->set_int(0, 3, 42); // for later tracking of this entry
-        CHECK_EQUAL(origin_->get_linklist(1, 0)->size(), 1);
-        origin_->set_int_unique(0, 2, 1); // deletes row 2
-        // origin[2] is set to same pk as origin[0]. Origin[2] wins so
-        // origin[0] is lost. This then causes a move last over
-        // of origin[3] into origin[0].
-        CHECK_EQUAL(origin_->size(), 3);
-        CHECK_EQUAL(origin_->get_int(0, 0), 1);
-        CHECK_EQUAL(origin_->get_int(0, 1), 2);
-        CHECK_EQUAL(origin_->get_int(0, 2), 42);
-
-        // origin[1] should be unchanged
-        CHECK_EQUAL(origin_->get_linklist(1, 1)->size(), 1);
-        // the winner should still be index 0
-        CHECK_EQUAL(origin_->get_linklist(1, 0)->size(), 1);
-
-        origin_->get_linklist(1, 0)->add(3);
-        wt.commit();
-    }
-
-    LangBindHelper::advance_read(sg);
-    group.verify();
-    // lv1 is still origin[0], which has {1, 3}
-    // lv2 is now origin[1], which has {2}
-
-    CHECK_EQUAL(origin->size(), 3);
-    CHECK_EQUAL(origin->get_int(0, 0), 1);
-    CHECK_EQUAL(origin->get_int(0, 1), 2);
-    CHECK_EQUAL(origin->get_int(0, 2), 42);
-
-    // LinkViews should still be attached and working
-    CHECK(lv1->is_attached());
-    CHECK(lv2->is_attached());
-
-    CHECK_EQUAL(lv1->size(), 2);
-    CHECK_EQUAL(lv1->get(0).get_index(), 1);
-    CHECK_EQUAL(lv1->get(1).get_index(), 3);
-
-    CHECK_EQUAL(lv2->size(), 1);
-    CHECK_EQUAL(lv2->get(0).get_index(), 2);
-
-
-    // Same thing, but on the other LV and via a write on the same SG
-    {
-        LangBindHelper::promote_to_write(sg);
-        origin->add_empty_row(2);
-        origin->set_int_unique(0, 4, 101);
-        CHECK_EQUAL(origin->size(), 5);
-        CHECK_EQUAL(origin->get_linklist(1, 0)->size(), 2);
-        CHECK_EQUAL(origin->get_linklist(1, 1)->size(), 1);
-        origin->set_int_unique(0, 3, 2); // deletes row 2, row 1 unchanged
-        // origin[3] is set to same pk as origin[1]. Origin[1] wins so
-        // origin[3] is lost. This causes a move last over
-        // of origin[4] to origin[3]
-        CHECK_EQUAL(origin->size(), 4);
-
-        // since origin[1] won, it should get the links from the loser
-        CHECK_EQUAL(origin->get_linklist(1, 0)->size(), 2);
-        CHECK_EQUAL(origin->get_linklist(1, 1)->size(), 1);
-        CHECK_EQUAL(origin->get_linklist(1, 2)->size(), 0);
-        CHECK_EQUAL(origin->get_linklist(1, 3)->size(), 0);
-
-        CHECK(lv1->is_attached());
-        CHECK(lv2->is_attached());
-        CHECK_EQUAL(lv1->size(), 2);
-        CHECK_EQUAL(lv2->size(), 1);
-
-        origin->get_linklist(1, 1)->add(4);
-
-        LangBindHelper::commit_and_continue_as_read(sg);
-    }
-    group.verify();
-    // lv1 is still origin[0], which has {1, 3}
-    // lv2 is still origin[1], which has {2, 4}
-
-    CHECK(lv1->is_attached());
-    CHECK(lv2->is_attached());
-    CHECK_EQUAL(lv1->size(), 2);
-    CHECK_EQUAL(lv1->get(0).get_index(), 1);
-    CHECK_EQUAL(lv1->get(1).get_index(), 3);
-
-    CHECK_EQUAL(lv2->size(), 2);
-    CHECK_EQUAL(lv2->get(0).get_index(), 2);
-    CHECK_EQUAL(lv2->get(1).get_index(), 4);
+    auto ll1 = obj0.get_linklist(col_link); // lv1[0] -> target[1]
+    auto ll2 = obj1.get_linklist(col_link); // lv2[0] -> target[2]
+    CHECK_EQUAL(ll1.size(), 1);
+    CHECK_EQUAL(ll2.size(), 1);
 }
 
-
+#ifdef LEGACY_TESTS
 namespace {
 
 template <typename T>

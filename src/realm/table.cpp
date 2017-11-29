@@ -555,7 +555,7 @@ void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, String
         }
     }
 
-    do_insert_column(col_ndx, type, name, link_target_info, nullable);
+    do_insert_column(col_ndx, type, name, link_target_info, nullable, type == type_LinkList);
     if (was_inserted) {
         *was_inserted = true;
     }
