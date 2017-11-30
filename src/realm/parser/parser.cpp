@@ -20,14 +20,14 @@
 
 #include <iostream>
 
-#include <pegtl.hh>
-#include <pegtl/analyze.hh>
-#include <pegtl/trace.hh>
+#include <pegtl.hpp>
+#include <pegtl/analyze.hpp>
+#include <pegtl/contrib/tracer.hpp>
 
 // String tokens can't be followed by [A-z0-9_].
-#define string_token_t(s) seq< pegtl_istring_t(s), not_at< identifier_other > >
+#define string_token_t(s) seq< TAOCPP_PEGTL_ISTRING(s), not_at< identifier_other > >
 
-using namespace pegtl;
+using namespace tao::pegtl;
 
 namespace realm {
 namespace parser {
@@ -70,13 +70,13 @@ struct argument : seq< one< '$' >, must< argument_index > > {};
 
 // expressions and operators
 struct expr : sor< dq_string, sq_string, number, argument, true_value, false_value, null_value, key_path > {};
-struct case_insensitive : pegtl_istring_t("[c]") {};
+struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
 
 struct eq : seq< sor< two< '=' >, one< '=' > >, star< blank >, opt< case_insensitive > >{};
-struct noteq : pegtl::string< '!', '=' > {};
-struct lteq : pegtl::string< '<', '=' > {};
+struct noteq : tao::pegtl::string< '!', '=' > {};
+struct lteq : tao::pegtl::string< '<', '=' > {};
 struct lt : one< '<' > {};
-struct gteq : pegtl::string< '>', '=' > {};
+struct gteq : tao::pegtl::string< '>', '=' > {};
 struct gt : one< '>' > {};
 struct contains : string_token_t("contains") {};
 struct begins : string_token_t("beginswith") {};
@@ -209,7 +209,8 @@ struct action : nothing< Rule > {};
 
 template<> struct action< and_op >
 {
-    static void apply(const input&, ParserState& state)
+    template< typename Input >
+    static void apply(const Input&, ParserState& state)
     {
         DEBUG_PRINT_TOKEN("<and>");
         state.next_type = Predicate::Type::And;
@@ -218,7 +219,8 @@ template<> struct action< and_op >
 
 template<> struct action< or_op >
 {
-    static void apply(const input&, ParserState & state)
+    template< typename Input >
+    static void apply(const Input&, ParserState & state)
     {
         DEBUG_PRINT_TOKEN("<or>");
         state.next_type = Predicate::Type::Or;
@@ -228,7 +230,8 @@ template<> struct action< or_op >
 
 #define EXPRESSION_ACTION(rule, type)                               \
 template<> struct action< rule > {                                  \
-    static void apply(const input& in, ParserState& state) {        \
+    template< typename Input >                                      \
+    static void apply(const Input& in, ParserState& state) {        \
         DEBUG_PRINT_TOKEN(in.string());                             \
         state.add_expression(Expression(type, in.string())); }};
 
@@ -243,7 +246,8 @@ EXPRESSION_ACTION(argument_index, Expression::Type::Argument)
 
 template<> struct action< true_pred >
 {
-    static void apply(const input& in, ParserState & state)
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
     {
         DEBUG_PRINT_TOKEN(in.string());
         state.current_group()->cpnd.sub_predicates.emplace_back(Predicate::Type::True);
@@ -252,7 +256,8 @@ template<> struct action< true_pred >
 
 template<> struct action< false_pred >
 {
-    static void apply(const input& in, ParserState & state)
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
     {
         DEBUG_PRINT_TOKEN(in.string());
         state.current_group()->cpnd.sub_predicates.emplace_back(Predicate::Type::False);
@@ -261,7 +266,8 @@ template<> struct action< false_pred >
 
 #define OPERATOR_ACTION(rule, oper)                                 \
 template<> struct action< rule > {                                  \
-    static void apply(const input& in, ParserState& state) {        \
+    template< typename Input >                                      \
+    static void apply(const Input& in, ParserState& state) {        \
         DEBUG_PRINT_TOKEN(in.string());                             \
         state.last_predicate()->cmpr.op = oper; }};
 
@@ -278,7 +284,8 @@ OPERATOR_ACTION(like, Predicate::Operator::Like)
 
 template<> struct action< case_insensitive >
 {
-    static void apply(const input& in, ParserState & state)
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
     {
         DEBUG_PRINT_TOKEN(in.string());
         state.last_predicate()->cmpr.option = Predicate::OperatorOption::CaseInsensitive;
@@ -287,7 +294,8 @@ template<> struct action< case_insensitive >
 
 template<> struct action< one< '(' > >
 {
-    static void apply(const input&, ParserState & state)
+    template< typename Input >
+    static void apply(const Input&, ParserState & state)
     {
         DEBUG_PRINT_TOKEN("<begin_group>");
         state.add_predicate_to_current_group(Predicate::Type::And);
@@ -297,7 +305,8 @@ template<> struct action< one< '(' > >
 
 template<> struct action< group_pred >
 {
-    static void apply(const input&, ParserState & state)
+    template< typename Input >
+    static void apply(const Input&, ParserState & state)
     {
         DEBUG_PRINT_TOKEN("<end_group>");
         state.group_stack.pop_back();
@@ -306,7 +315,8 @@ template<> struct action< group_pred >
 
 template<> struct action< not_pre >
 {
-    static void apply(const input&, ParserState & state)
+    template< typename Input >
+    static void apply(const Input&, ParserState & state)
     {
         DEBUG_PRINT_TOKEN("<not>");
         state.negate_next = true;
@@ -314,14 +324,14 @@ template<> struct action< not_pre >
 };
 
 template< typename Rule >
-struct error_message_control : pegtl::normal< Rule >
+struct error_message_control : tao::pegtl::normal< Rule >
 {
     static const std::string error_message;
 
     template< typename Input, typename ... States >
     static void raise(const Input& in, States&&...)
     {
-        throw pegtl::parse_error(error_message, in);
+        throw tao::pegtl::parse_error(error_message, in);
     }
 };
 
@@ -340,7 +350,8 @@ Predicate parse(const std::string &query)
     ParserState state;
     state.group_stack.push_back(&out_predicate);
 
-    pegtl::parse< must< pred, eof >, action, error_message_control >(query, query, state);
+    tao::pegtl::memory_input<> input(query, query);
+    tao::pegtl::parse< must< pred, eof >, action, error_message_control >(input, state);
     if (out_predicate.type == Predicate::Type::And && out_predicate.cpnd.sub_predicates.size() == 1) {
         return std::move(out_predicate.cpnd.sub_predicates.back());
     }
