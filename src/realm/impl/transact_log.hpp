@@ -81,6 +81,7 @@ enum Instruction {
     instr_AddRowWithKey = 40,   // Insert a row with a given key
     instr_CreateObject = 41,
     instr_RemoveObject = 42,
+    instr_InsertListColumn = 43, // Insert list column
 };
 
 class TransactLogStream {
@@ -228,7 +229,7 @@ public:
     {
         return true;
     }
-    bool insert_column(size_t, DataType, StringData, bool)
+    bool insert_column(size_t, DataType, StringData, bool, bool)
     {
         return true;
     }
@@ -337,7 +338,7 @@ public:
     // Must have descriptor selected:
     bool insert_link_column(size_t col_ndx, DataType, StringData name, size_t link_target_table_ndx,
                             size_t backlink_col_ndx);
-    bool insert_column(size_t col_ndx, DataType, StringData name, bool nullable = false);
+    bool insert_column(size_t col_ndx, DataType, StringData name, bool nullable = false, bool listtype = false);
     bool erase_link_column(size_t col_ndx, size_t link_target_table_ndx, size_t backlink_col_ndx);
     bool erase_column(size_t col_ndx);
     bool rename_column(size_t col_ndx, StringData new_name);
@@ -450,7 +451,7 @@ public:
     virtual void rename_group_level_table(TableKey table_key, StringData new_name);
     virtual void move_group_level_table(size_t from_table_ndx, size_t to_table_ndx);
     virtual void insert_column(const Table*, size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
-                               bool nullable = false);
+                               bool nullable = false, bool listtype = false);
     virtual void erase_column(const Table*, size_t col_ndx);
     virtual void rename_column(const Table*, size_t col_ndx, StringData name);
     virtual void move_column(const Table*, size_t from, size_t to);
@@ -1008,9 +1009,11 @@ inline void TransactLogConvenientEncoder::move_group_level_table(size_t from_tab
     m_encoder.move_group_level_table(from_table_ndx, to_table_ndx);
 }
 
-inline bool TransactLogEncoder::insert_column(size_t col_ndx, DataType type, StringData name, bool nullable)
+inline bool TransactLogEncoder::insert_column(size_t col_ndx, DataType type, StringData name, bool nullable,
+                                              bool listtype)
 {
-    Instruction instr = (nullable ? instr_InsertNullableColumn : instr_InsertColumn);
+    Instruction instr =
+        listtype ? instr_InsertListColumn : (nullable ? instr_InsertNullableColumn : instr_InsertColumn);
     append_simple_instr(instr, col_ndx, type, name); // Throws
     return true;
 }
@@ -1026,7 +1029,8 @@ inline bool TransactLogEncoder::insert_link_column(size_t col_ndx, DataType type
 
 
 inline void TransactLogConvenientEncoder::insert_column(const Table* t, size_t col_ndx, DataType type,
-                                                        StringData name, LinkTargetInfo& link, bool nullable)
+                                                        StringData name, LinkTargetInfo& link, bool nullable,
+                                                        bool listtype)
 {
     select_table(t); // Throws
     if (link.is_valid()) {
@@ -1041,7 +1045,7 @@ inline void TransactLogConvenientEncoder::insert_column(const Table* t, size_t c
         m_encoder.insert_link_column(col_ndx, type, name, target_table_ndx, backlink_col_ndx); // Throws
     }
     else {
-        m_encoder.insert_column(col_ndx, type, name, nullable); // Throws
+        m_encoder.insert_column(col_ndx, type, name, nullable, listtype); // Throws
     }
 }
 
@@ -1827,7 +1831,19 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             StringData name = read_string(m_string_buffer); // Throws
             bool nullable = (Instruction(instr) == instr_InsertNullableColumn);
-            if (!handler.insert_column(col_ndx, DataType(type), name, nullable)) // Throws
+            if (!handler.insert_column(col_ndx, DataType(type), name, nullable, false)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertListColumn: {
+            size_t col_ndx = read_int<size_t>(); // Throws
+            int type = read_int<int>();          // Throws
+            if (!is_valid_data_type(type))
+                parser_error();
+            if (REALM_UNLIKELY(type == type_Link || type == type_LinkList))
+                parser_error();
+            StringData name = read_string(m_string_buffer);                         // Throws
+            if (!handler.insert_column(col_ndx, DataType(type), name, false, true)) // Throws
                 parser_error();
             return;
         }
@@ -2280,7 +2296,7 @@ public:
         return true;
     }
 
-    bool insert_column(size_t col_idx, DataType, StringData, bool)
+    bool insert_column(size_t col_idx, DataType, StringData, bool, bool)
     {
         m_encoder.erase_column(col_idx);
         append_instruction();

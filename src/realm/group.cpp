@@ -1464,9 +1464,8 @@ public:
         return true; // No-op
     }
 
-    bool insert_column(size_t col_ndx, DataType, StringData, bool nullable)
+    bool insert_column(size_t col_ndx, DataType, StringData, bool, bool)
     {
-        static_cast<void>(nullable);
         if (m_table) {
             typedef _impl::TableFriend tf;
             InsertColumnUpdater updater(col_ndx);

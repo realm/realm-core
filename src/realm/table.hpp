@@ -967,7 +967,7 @@ private:
     void do_insert_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link_target_info,
                           bool nullable = false, bool listtype = false);
     void do_insert_column_unless_exists(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
-                                        bool nullable = false, bool* was_inserted = nullptr);
+                                        bool nullable = false, bool listtype = false, bool* was_inserted = nullptr);
     void do_move_column(size_t col_ndx_1, size_t col_ndx_2);
 
     struct InsertSubtableColumns;
@@ -2028,9 +2028,11 @@ public:
         return table.record_subtable_path(b, e);
     }
     static void insert_column_unless_exists(Table& table, size_t column_ndx, DataType type, StringData name,
-                                            LinkTargetInfo link, bool nullable = false, bool* was_inserted = nullptr)
+                                            LinkTargetInfo link, bool nullable = false, bool listtype = false,
+                                            bool* was_inserted = nullptr)
     {
-        table.do_insert_column_unless_exists(column_ndx, type, name, link, nullable, was_inserted); // Throws
+        table.do_insert_column_unless_exists(column_ndx, type, name, link, nullable, listtype,
+                                             was_inserted); // Throws
     }
 
     static void erase_column(Table& table, size_t column_ndx)

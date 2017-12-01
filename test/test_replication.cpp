@@ -521,10 +521,12 @@ TEST(Replication_Links)
         ConstObj o_2_1 = origin_2->get_object(origin_2_keys[1]);
 
         CHECK(o_1_0.is_null(o_1_ll_1));
+        CHECK(o_1_0.is_null(o_1_f_2));
         CHECK(o_1_0.is_null(o_1_l_3));
         CHECK(o_1_0.is_null(o_1_l_4));
 
         CHECK(o_1_1.is_null(o_1_ll_1));
+        CHECK(o_1_1.is_null(o_1_f_2));
         CHECK(o_1_1.is_null(o_1_l_3));
         CHECK(o_1_1.is_null(o_1_l_4));
 
@@ -810,7 +812,6 @@ TEST(Replication_Links)
         o_2_2.get_linklist(o_2_ll_3).insert(0, target_2_keys[1]); // O_2_LL_3] -> [ T_2[1] ]
         o_2_2.get_linklist(o_2_ll_3).insert(0, target_2_keys[0]); // O_2_LL_3] -> [ T_2[0], T_2[1] ]
 
-        wt.get_group().verify();
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger);

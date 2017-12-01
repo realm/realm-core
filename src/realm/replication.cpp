@@ -378,7 +378,7 @@ public:
         return false;
     }
 
-    bool insert_column(size_t col_ndx, DataType type, StringData name, bool nullable)
+    bool insert_column(size_t col_ndx, DataType type, StringData name, bool nullable, bool listtype)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx <= m_table->get_column_count()))) {
@@ -386,7 +386,8 @@ public:
                     nullable); // Throws
                 LinkTargetInfo invalid_link;
                 using tf = _impl::TableFriend;
-                tf::insert_column_unless_exists(*m_table, col_ndx, type, name, invalid_link, nullable); // Throws
+                tf::insert_column_unless_exists(*m_table, col_ndx, type, name, invalid_link, nullable,
+                                                listtype); // Throws
                 return true;
             }
         }

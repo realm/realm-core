@@ -516,12 +516,13 @@ void Table::do_insert_column(size_t col_ndx, DataType type, StringData name, Lin
     insert_root_column(col_ndx, type, name, link_target_info, nullable, listtype); // Throws
 
     if (Replication* repl = get_repl())
-        repl->insert_column(this, col_ndx, type, name, link_target_info, nullable); // Throws
+        repl->insert_column(this, col_ndx, type, name, link_target_info, nullable, listtype); // Throws
 }
 
 
 void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, StringData name,
-                                           LinkTargetInfo& link_target_info, bool nullable, bool* was_inserted)
+                                           LinkTargetInfo& link_target_info, bool nullable, bool listtype,
+                                           bool* was_inserted)
 {
     size_t existing_ndx = get_column_index(name);
     if (existing_ndx != npos) {
@@ -555,7 +556,7 @@ void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, String
         }
     }
 
-    do_insert_column(col_ndx, type, name, link_target_info, nullable, type == type_LinkList);
+    do_insert_column(col_ndx, type, name, link_target_info, nullable, listtype || type == type_LinkList);
     if (was_inserted) {
         *was_inserted = true;
     }
