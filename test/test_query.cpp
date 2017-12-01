@@ -6201,7 +6201,7 @@ TEST(Query_SumMinMaxAvg)
 
     std::vector<Key> keys;
     t.create_objects(9, keys);
-    t.get_object(keys[0]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 2.0);
+    t.get_object(keys[0]).set_all(1, "a", Timestamp{200, 0}, 1.0f, 2.0);
     t.get_object(keys[1]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 1.0);
     t.get_object(keys[2]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 1.0);
     t.get_object(keys[3]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 1.0);
@@ -6242,10 +6242,9 @@ TEST(Query_SumMinMaxAvg)
     t.where().minimum_timestamp(2, &resindex);
     CHECK_EQUAL(keys[8], resindex);
 
-#ifdef LEGACY_TESTS
     // Now with condition (tests another code path in Array::minmax())
     t.where().not_equal(0, 0).minimum_double(4, &resindex);
-    CHECK_EQUAL(keys[0], resindex);
+    CHECK_EQUAL(keys[1], resindex);
 
     t.where().not_equal(0, 0).minimum_float(3, &resindex);
     CHECK_EQUAL(keys[0], resindex);
@@ -6260,7 +6259,6 @@ TEST(Query_SumMinMaxAvg)
 
     CHECK_EQUAL(t.where().maximum_timestamp(2), Timestamp(3000, 0));
     CHECK_EQUAL(t.where().minimum_timestamp(2), Timestamp(5, 0));
-#endif
 }
 
 #ifdef LEGACY_TESTS

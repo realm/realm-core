@@ -192,6 +192,10 @@ void QueryStateBase::dyncast()
 {
 }
 
+ArrayPayload::~ArrayPayload()
+{
+}
+
 size_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan

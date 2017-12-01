@@ -167,40 +167,29 @@ struct ColumnTypeTraits<BinaryData> {
 };
 
 template <DataType, bool Nullable>
-struct GetColumnType;
+struct GetLeafType;
 template <>
-struct GetColumnType<type_Int, false> {
-    using type = IntegerColumn;
+struct GetLeafType<type_Int, false> {
+    using type = ArrayInteger;
 };
 template <>
-struct GetColumnType<type_Int, true> {
-    using type = IntNullColumn;
+struct GetLeafType<type_Int, true> {
+    using type = ArrayIntNull;
 };
 template <bool N>
-struct GetColumnType<type_Float, N> {
+struct GetLeafType<type_Float, N> {
     // FIXME: Null definition
-    using type = FloatColumn;
+    using type = BasicArray<float>;
 };
 template <bool N>
-struct GetColumnType<type_Double, N> {
+struct GetLeafType<type_Double, N> {
     // FIXME: Null definition
-    using type = DoubleColumn;
+    using type = BasicArray<double>;
 };
-
-// Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
-template <class T, Action A>
-struct ColumnTypeTraitsSum {
-    typedef T sum_type;
-};
-
-template <>
-struct ColumnTypeTraitsSum<float, act_Sum> {
-    typedef double sum_type;
-};
-
-template <Action A>
-struct ColumnTypeTraitsSum<util::Optional<int64_t>, A> {
-    using sum_type = int64_t;
+template <bool N>
+struct GetLeafType<type_Timestamp, N> {
+    // FIXME: Null definition
+    using type = ArrayTimestamp;
 };
 }
 

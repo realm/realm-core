@@ -25,9 +25,9 @@
 
 namespace realm {
 
-class ArrayInteger : public Array {
+class ArrayInteger : public Array, public ArrayPayload {
 public:
-    typedef int64_t value_type;
+    using value_type = int64_t;
 
     explicit ArrayInteger(Allocator&) noexcept;
     ~ArrayInteger() noexcept override
@@ -39,6 +39,10 @@ public:
         return 0;
     }
 
+    void init_from_ref(ref_type ref) noexcept override
+    {
+        Array::init_from_ref(ref);
+    }
 
     // Disable copying, this is not allowed.
     ArrayInteger& operator=(const ArrayInteger&) = delete;
@@ -86,7 +90,7 @@ private:
     bool minmax(size_t from, size_t to, uint64_t maxdiff, int64_t* min, int64_t* max) const;
 };
 
-class ArrayIntNull : public Array {
+class ArrayIntNull : public Array, public ArrayPayload {
 public:
     using value_type = util::Optional<int64_t>;
 
@@ -104,7 +108,7 @@ public:
     static MemRef create_array(Type, bool context_flag, size_t size, value_type value, Allocator&);
     void create(Type = type_Normal, bool context_flag = false);
 
-    void init_from_ref(ref_type) noexcept;
+    void init_from_ref(ref_type) noexcept override;
     void init_from_mem(MemRef) noexcept;
     void init_from_parent() noexcept;
 

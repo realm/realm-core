@@ -188,13 +188,6 @@ public:
         return static_cast<Iterator&>(ConstIterator::operator++());
     }
 };
-
-template <class T>
-void Cluster::init_leaf(size_t col_ndx, T* leaf) const noexcept
-{
-    ref_type ref = to_ref(Array::get(col_ndx + 1));
-    leaf->init_from_ref(ref);
-}
 }
 
 #endif /* REALM_CLUSTER_TREE_HPP */

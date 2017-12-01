@@ -131,6 +131,8 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/array_binary.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_backlink.hpp>
+#include <realm/array_list.hpp>
+#include <realm/array_key.hpp>
 #include <realm/array_bool.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/list.hpp>
@@ -1768,8 +1770,21 @@ public:
 
     void set_cluster(const Cluster* cluster)
     {
+        Allocator& alloc = m_tables.back()->get_alloc();
         m_array_ptr = nullptr;
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) Array(m_tables.back()->get_alloc()));
+        switch (m_link_types[0]) {
+            case col_type_Link:
+                m_array_ptr = LeafPtr(new (&m_storage.m_list) ArrayKey(alloc));
+                break;
+            case col_type_LinkList:
+                m_array_ptr = LeafPtr(new (&m_storage.m_linklist) ArrayList(alloc));
+                break;
+            case col_type_BackLink:
+                m_array_ptr = LeafPtr(new (&m_storage.m_backlink) ArrayBacklink(alloc));
+                break;
+            default:
+                break;
+        }
         cluster->init_leaf(m_link_column_indexes[0], m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -1837,11 +1852,15 @@ private:
     std::vector<const Table*> m_tables;
     bool m_only_unary_links = true;
     // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(Array), alignof(Array)>::type;
-    using LeafPtr = std::unique_ptr<Array, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
+    using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
+    union Storage {
+        typename std::aligned_storage<sizeof(ArrayKey), alignof(ArrayKey)>::type m_list;
+        typename std::aligned_storage<sizeof(ArrayList), alignof(ArrayList)>::type m_linklist;
+        typename std::aligned_storage<sizeof(ArrayList), alignof(ArrayList)>::type m_backlink;
+    };
+    Storage m_storage;
     LeafPtr m_array_ptr;
-    const Array* m_leaf_ptr = nullptr;
+    const ArrayPayload* m_leaf_ptr = nullptr;
 
     template <class>
     friend Query compare(const Subexpr2<Link>&, const ConstObj&);
@@ -2514,11 +2533,11 @@ public:
     mutable size_t m_column_ndx;
     LinkMap m_link_map;
     // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(Array), alignof(Array)>::type;
-    using LeafPtr = std::unique_ptr<Array, PlacementDelete>;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayList), alignof(Array)>::type;
+    using LeafPtr = std::unique_ptr<ArrayList, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
-    Array* m_leaf_ptr = nullptr;
+    ArrayList* m_leaf_ptr = nullptr;
 };
 
 template <typename>
@@ -2956,7 +2975,7 @@ public:
         }
         else {
             REALM_ASSERT(m_leaf_ptr != nullptr);
-            auto leaf = reinterpret_cast<const LeafType2*>(m_leaf_ptr); // TODO change to dynamic_cast at some point
+            auto leaf = static_cast<const LeafType2*>(m_leaf_ptr);
             // Not a Link column
             size_t colsize = leaf->size();
 
@@ -2969,7 +2988,7 @@ public:
                 // If you want to modify 'default_size' then update Array::get_chunk()
                 REALM_ASSERT_3(ValueBase::default_size, ==, 8);
 
-                auto leaf_2 = reinterpret_cast<const Array*>(leaf); // TODO change to dynamic_cast at some point
+                auto leaf_2 = static_cast<const Array*>(leaf);
                 leaf_2->get_chunk(index, v.m_storage.m_first);
 
                 destination.import(v);
@@ -3032,10 +3051,10 @@ private:
 
     // Leaf cache
     using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
-    using LeafPtr = std::unique_ptr<LeafType, PlacementDelete>;
+    using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
-    const LeafType* m_leaf_ptr = nullptr;
+    const ArrayPayload* m_leaf_ptr = nullptr;
 
     // Column index of payload column of m_table
     std::string m_column_name;

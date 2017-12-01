@@ -37,6 +37,7 @@
 #include <realm/column_link.hpp>
 #include <realm/column_linklist.hpp>
 #include <realm/column_backlink.hpp>
+#include <realm/column_timestamp.hpp>
 #include <realm/index_string.hpp>
 #include <realm/group.hpp>
 #include <realm/link_view.hpp>
@@ -3215,7 +3216,7 @@ Key Table::find_first(size_t col_ndx, T value) const
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType leaf(get_alloc());
     traverse_clusters([&key, &col_ndx, &value, &leaf](const Cluster* cluster, int64_t key_offset) {
-        cluster->init_leaf<LeafType>(col_ndx, &leaf);
+        cluster->init_leaf(col_ndx, &leaf);
         size_t row = leaf.find_first(value, 0, cluster->node_size());
         if (row != realm::npos) {
             key = Key(cluster->get_key(row) + key_offset);

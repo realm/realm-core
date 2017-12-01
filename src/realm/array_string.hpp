@@ -25,8 +25,10 @@
 
 namespace realm {
 
-class ArrayString {
+class ArrayString : public ArrayPayload {
 public:
+    using value_type = StringData;
+
     explicit ArrayString(Allocator&);
 
     static StringData default_value(bool nullable)
@@ -51,7 +53,7 @@ public:
         m_arr->update_parent();
     }
 
-    void init_from_ref(ref_type ref);
+    void init_from_ref(ref_type ref) noexcept override;
     void init_from_parent();
 
     size_t size() const;

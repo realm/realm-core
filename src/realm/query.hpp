@@ -53,7 +53,6 @@ class TableViewBase;
 class ConstTableView;
 class Array;
 class Expression;
-class SequentialGetterBase;
 class Group;
 
 namespace metrics {
@@ -374,7 +373,7 @@ private:
     R aggregate(size_t column_ndx, size_t* resultcount = nullptr, Key* return_ndx = nullptr) const;
 
     void aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable, ParentNode* pn, QueryStateBase* st,
-                            size_t start, size_t end, SequentialGetterBase* source_column) const;
+                            size_t start, size_t end, ArrayPayload* source_column) const;
 
     void find_all(TableViewBase& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
     void delete_nodes() noexcept;

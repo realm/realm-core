@@ -242,14 +242,17 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
     Array fields(alloc);
     fields.init_from_mem(m_mem);
     REALM_ASSERT(col_ndx + 1 < fields.size());
-    Array values(alloc);
-    values.set_parent(&fields, col_ndx + 1);
-    values.init_from_parent();
     ColumnAttrMask attr = m_tree_top->get_spec().get_column_attr(col_ndx);
     if (attr.test(col_attr_Nullable)) {
-        reinterpret_cast<ArrayIntNull*>(&values)->set(m_row_ndx, value);
+        ArrayIntNull values(alloc);
+        values.set_parent(&fields, col_ndx + 1);
+        values.init_from_parent();
+        values.set(m_row_ndx, value);
     }
     else {
+        ArrayInteger values(alloc);
+        values.set_parent(&fields, col_ndx + 1);
+        values.init_from_parent();
         values.set(m_row_ndx, value);
     }
 

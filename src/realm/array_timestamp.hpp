@@ -24,8 +24,10 @@
 
 namespace realm {
 
-class ArrayTimestamp : private Array {
+class ArrayTimestamp : public ArrayPayload, private Array {
 public:
+    using value_type = Timestamp;
+
     explicit ArrayTimestamp(Allocator&);
 
     using Array::set_parent;
@@ -39,7 +41,7 @@ public:
 
     void create();
 
-    void init_from_ref(ref_type ref);
+    void init_from_ref(ref_type ref) noexcept override;
     void init_from_parent();
 
     size_t size() const

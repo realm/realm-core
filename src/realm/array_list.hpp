@@ -16,17 +16,16 @@
  *
  **************************************************************************/
 
-#ifndef REALM_ARRAY_KEY_HPP
-#define REALM_ARRAY_KEY_HPP
+#ifndef REALM_ARRAY_LIST_HPP
+#define REALM_ARRAY_LIST_HPP
 
 #include <realm/array.hpp>
-#include <realm/cluster.hpp>
 
 namespace realm {
 
-class ArrayKey : public ArrayPayload, private Array {
+class ArrayList : public ArrayPayload, private Array {
 public:
-    using value_type = Key;
+    using value_type = ref_type;
 
     using Array::Array;
     using Array::set_parent;
@@ -36,9 +35,9 @@ public:
     using Array::size;
     using Array::erase;
 
-    static Key default_value(bool)
+    static ref_type default_value(bool)
     {
-        return {};
+        return 0;
     }
 
     void init_from_ref(ref_type ref) noexcept override
@@ -48,39 +47,29 @@ public:
 
     void create()
     {
-        Array::create(type_Normal);
+        Array::create(type_HasRefs);
     }
 
-    void add(Key value)
+    void add(ref_type value)
     {
-        Array::add(value.value + 1);
+        Array::add(from_ref(value));
     }
-    void set(size_t ndx, Key value)
+    void set(size_t ndx, ref_type value)
     {
-        Array::set(ndx, value.value + 1);
+        Array::set_as_ref(ndx, value);
     }
 
     void set_null(size_t ndx)
     {
         Array::set(ndx, 0);
     }
-    void insert(size_t ndx, Key value)
+    void insert(size_t ndx, ref_type value)
     {
-        Array::insert(ndx, value.value + 1);
+        Array::insert(ndx, from_ref(value));
     }
-    Key get(size_t ndx) const
+    ref_type get(size_t ndx) const
     {
-        return Key{Array::get(ndx) - 1};
-    }
-    std::vector<Key> get_all() const
-    {
-        size_t sz = size();
-        std::vector<Key> keys;
-        keys.reserve(sz);
-        for (size_t i = 0; i < sz; i++) {
-            keys.push_back(get(i));
-        }
-        return keys;
+        return Array::get_as_ref(ndx);
     }
     bool is_null(size_t ndx) const
     {
@@ -91,19 +80,11 @@ public:
         Array::truncate(ndx);
     }
 
-    size_t find_first(Key value, size_t begin, size_t end) const noexcept
+    size_t find_first(ref_type value, size_t begin, size_t end) const noexcept
     {
-        return Array::find_first(value.value + 1, begin, end);
-    }
-
-    void nullify(Key key)
-    {
-        size_t begin = find_first(key, 0, Array::size());
-        // There must be one
-        REALM_ASSERT(begin != realm::npos);
-        Array::erase(begin);
+        return Array::find_first(from_ref(value), begin, end);
     }
 };
 }
 
-#endif /* SRC_REALM_ARRAY_KEY_HPP_ */
+#endif /* REALM_ARRAY_LIST_HPP */
