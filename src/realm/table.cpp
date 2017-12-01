@@ -4187,6 +4187,13 @@ void Table::create_objects(size_t number, std::vector<Key>& keys)
     }
 }
 
+void Table::create_objects(const std::vector<Key>& keys)
+{
+    for (auto k : keys) {
+        create_object(k);
+    }
+}
+
 // Called by replication with mode = none
 void Table::do_remove_object(Key key)
 {
