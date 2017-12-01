@@ -136,6 +136,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/metrics/query_info.hpp>
 #include <realm/query_operators.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/util/serializer.hpp>
 
 #include <numeric>
 
@@ -1204,11 +1205,11 @@ public:
     virtual std::string description() const override
     {
         if (ValueBase::m_from_link_list) {
-            return metrics::print_value(util::to_string(ValueBase::m_values)
+            return util::serializer::print_value(util::to_string(ValueBase::m_values)
                                         + (ValueBase::m_values == 1 ? " value" : " values"));
         }
         if (m_storage.m_size > 0) {
-            return metrics::print_value(m_storage[0]);
+            return util::serializer::print_value(m_storage[0]);
         }
         return "";
     }
@@ -1841,7 +1842,7 @@ public:
                     s += std::string(m_tables[i]->get_column_name(m_link_column_indexes[i]));
                 }
                 if (i != m_link_column_indexes.size() - 1) {
-                    s += metrics::value_separator;
+                    s += util::serializer::value_separator;
                 }
             }
         }
@@ -2049,7 +2050,7 @@ public:
     virtual std::string description() const override
     {
         if (links_exist()) {
-            return m_link_map.description() + metrics::value_separator;
+            return m_link_map.description() + util::serializer::value_separator;
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached()) {
@@ -2307,7 +2308,7 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + metrics::value_separator + "@count";
+        return m_link_map.description() + util::serializer::value_separator + "@count";
     }
 
 private:
@@ -2367,7 +2368,7 @@ public:
     std::string description() const override
     {
         if (m_expr) {
-            return m_expr->description() + metrics::value_separator + "@size";
+            return m_expr->description() + util::serializer::value_separator + "@size";
         }
         return "@size";
     }
@@ -2431,9 +2432,9 @@ public:
     virtual std::string description() const override
     {
         if (!m_row.is_attached()) {
-            return metrics::print_value("detached object");
+            return util::serializer::print_value("detached object");
         }
-        return metrics::print_value(m_row.get_index());
+        return util::serializer::print_value(m_row.get_index());
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -2844,7 +2845,7 @@ public:
     {
         const Table* table = get_base_table();
         if (table && table->is_attached()) {
-            return std::string(table->get_column_name(m_column_ndx)) + metrics::value_separator + Operation::description() + "()";
+            return std::string(table->get_column_name(m_column_ndx)) + util::serializer::value_separator + Operation::description() + "()";
         }
         return "";
     }
@@ -3090,7 +3091,7 @@ public:
     {
         std::string desc = "";
         if (links_exist()) {
-            desc = m_link_map.description() + metrics::value_separator;
+            desc = m_link_map.description() + util::serializer::value_separator;
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached() && m_column_ndx != npos) {
@@ -3291,7 +3292,7 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + "(" + m_column.description() + ")" + metrics::value_separator + Operation::description() + "()";
+        return m_link_map.description() + "(" + m_column.description() + ")" + util::serializer::value_separator + Operation::description() + "()";
     }
 
 private:
@@ -3340,8 +3341,8 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + metrics::value_separator + "SUBQUERY(" + m_query.get_description() + ")"
-            + metrics::value_separator + "@count";
+        return m_link_map.description() + util::serializer::value_separator + "SUBQUERY(" + m_query.get_description() + ")"
+            + util::serializer::value_separator + "@count";
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -3742,7 +3743,7 @@ public:
 
     virtual std::string description() const override
     {
-        return metrics::print_value(m_left->description() + " " + TCond::description()
+        return util::serializer::print_value(m_left->description() + " " + TCond::description()
                                     + " " + m_right->description());
     }
 

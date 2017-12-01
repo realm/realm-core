@@ -53,6 +53,7 @@ set(REALM_SOURCES
     util/logger.cpp
     util/memory_stream.cpp
     util/misc_errors.cpp
+    util/serializer.cpp
     util/string_buffer.cpp
     util/terminate.cpp
     util/thread.cpp
@@ -168,6 +169,7 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/overload.hpp
     util/priority_queue.hpp
     util/safe_int_ops.hpp
+    util/serializer.hpp
     util/scope_exit.hpp
     util/shared_ptr.hpp
     util/string_buffer.hpp
