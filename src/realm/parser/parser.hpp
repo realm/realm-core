@@ -27,9 +27,11 @@ namespace realm {
 namespace parser {
 struct Expression
 {
-    enum class Type { None, Number, String, KeyPath, Argument, True, False, Null } type;
+    enum class Type { None, Number, String, KeyPath, Argument, True, False, Null, Timestamp } type;
     std::string s;
+    std::vector<std::string> time_inputs;
     Expression(Type t = Type::None, std::string s = "") : type(t), s(s) {}
+    Expression(std::vector<std::string>&& timestamp) : type(Type::Timestamp), time_inputs(timestamp) {}
 };
 
 struct Predicate

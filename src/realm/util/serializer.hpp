@@ -19,13 +19,16 @@
 #ifndef REALM_UTIL_SERIALIZER_HPP
 #define REALM_UTIL_SERIALIZER_HPP
 
-#include <realm/null.hpp>
 #include <realm/util/optional.hpp>
 
 #include <string>
 #include <sstream>
 
 namespace realm {
+
+class Timestamp;
+struct null;
+
 namespace util {
 namespace serializer {
 
@@ -42,6 +45,7 @@ const static std::string value_separator = ".";
 
 // Specializations declared here to be defined in the cpp file
 template <> std::string print_value<>(realm::null);
+template <> std::string print_value<>(realm::Timestamp);
 
 
 // General implementation for most types

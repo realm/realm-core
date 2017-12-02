@@ -23,6 +23,7 @@
 #include <realm.hpp>
 #include <realm/query_expression.hpp>
 
+#include <time.h>
 #include <sstream>
 
 using namespace realm;
@@ -41,41 +42,41 @@ T stot(std::string const& s) {
     return value;
 }
 
+Timestamp from_timestamp_values(std::vector<std::string> const& time_inputs) {
+    if (time_inputs.size() == 2) {
+        // internal format seconds, nanoseconds
+        int64_t seconds = stot<int64_t>(time_inputs[0]);
+        int32_t nanoseconds = stot<int32_t>(time_inputs[1]);
+        return Timestamp(seconds, nanoseconds);
+    }
+    else if (time_inputs.size() == 6 || time_inputs.size() == 7) {
+        // readable format YYYY-MM-DD-HH:MM:SS:NANOS nanos optional
+        tm created;
+        created.tm_year = stot<int>(time_inputs[0]) - 1;
+        created.tm_mon = stot<int>(time_inputs[1]) - 1; // 0 - 11
+        created.tm_mday = stot<int>(time_inputs[2]) - 1;
+        created.tm_hour = stot<int>(time_inputs[3]);
+        created.tm_min = stot<int>(time_inputs[4]);
+        created.tm_sec = stot<int>(time_inputs[5]);
+
+        std::time_t unix_time = timegm(&created); // UTC time
+        tm reference{};
+        std::time_t epoch = timegm(&reference);
+
+        int64_t seconds = static_cast<int64_t>(difftime(unix_time, epoch));
+        int32_t nanoseconds = 0;
+        if (time_inputs.size() == 7) {
+            nanoseconds = stot<int32_t>(time_inputs[6]);
+        }
+        return Timestamp(seconds, nanoseconds);
+    }
+    throw std::runtime_error("Unexpected timestamp format.");
+}
+
 // check a precondition and throw an exception if it is not met
 // this should be used iff the condition being false indicates a bug in the caller
 // of the function checking its preconditions
 #define precondition(condition, message) if (!REALM_LIKELY(condition)) { throw std::logic_error(message); }
-
-// realm-core comes with TrueExpression and FalseExpression as of version 3.2.1
-#if REALM_VERSION_MAJOR < 3
-struct TrueExpression : realm::Expression {
-    size_t find_first(size_t start, size_t end) const override
-    {
-        if (start != end)
-            return start;
-
-        return realm::not_found;
-    }
-    void set_base_table(const Table*) override {}
-    const Table* get_base_table() const override { return nullptr; }
-    void verify_column() const override {}
-    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const override
-    {
-        return std::unique_ptr<Expression>(new TrueExpression(*this));
-    }
-};
-
-struct FalseExpression : realm::Expression {
-    size_t find_first(size_t, size_t) const override { return realm::not_found; }
-    void set_base_table(const Table*) override {}
-    void verify_column() const override {}
-    const Table* get_base_table() const override { return nullptr; }
-    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const override
-    {
-        return std::unique_ptr<Expression>(new FalseExpression(*this));
-    }
-};
-#endif
 
 using KeyPath = std::vector<std::string>;
 KeyPath key_path_from_string(const std::string &s) {
@@ -302,14 +303,20 @@ struct ColumnGetter {
 template <typename RequestedType, typename TableGetter>
 struct ValueGetter;
 
+
+
 template <typename TableGetter>
 struct ValueGetter<Timestamp, TableGetter> {
     static Timestamp convert(TableGetter&&, const parser::Expression & value, Arguments &args)
     {
-        if (value.type != parser::Expression::Type::Argument) {
-            throw std::logic_error("You must pass in a date argument to compare");
+        if (value.type == parser::Expression::Type::Argument) {
+            return args.timestamp_for_argument(stot<int>(value.s));
+        } else if (value.type == parser::Expression::Type::Timestamp) {
+            return from_timestamp_values(value.time_inputs);
+        } else if (value.type == parser::Expression::Type::Null) {
+            return Timestamp(realm::null());
         }
-        return args.timestamp_for_argument(stot<int>(value.s));
+        throw std::logic_error("Attempting to compare Timestamp property to a non-Timestamp value");
     }
 };
 

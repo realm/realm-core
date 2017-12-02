@@ -18,6 +18,9 @@
 
 #include <realm/util/serializer.hpp>
 
+#include <realm/null.hpp>
+#include <realm/timestamp.hpp>
+
 namespace realm {
 namespace util {
 namespace serializer {
@@ -28,7 +31,14 @@ std::string print_value<>(realm::null)
     return "NULL";
 }
 
+template <>
+std::string print_value<>(realm::Timestamp t)
+{
+    std::stringstream ss;
+    ss << "T" << t.get_seconds() << ":" << t.get_nanoseconds();
+    return ss.str();
+}
+
 } // namespace serializer
 } // namespace util
 } // namespace realm
-

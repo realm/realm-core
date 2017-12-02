@@ -240,7 +240,7 @@ TEST(Parser_invalid_queries) {
 struct temp_hax
 {
     template<typename T>
-    T unbox(std::string value) {
+    T unbox(std::string) {
         return T{}; //dummy
     }
     bool is_null(std::string) {
@@ -256,6 +256,7 @@ ONLY(Parser_basic_serialisation)
     size_t str_col_ndx = t->add_column(type_String, "name");
     size_t double_col_ndx = t->add_column(type_Double, "fees");
     size_t link_col_ndx = t->add_column_link(type_Link, "buddy", *t);
+    size_t time_col_ndx = t->add_column(type_Timestamp, "time", true);
     t->add_empty_row(5);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
@@ -265,6 +266,11 @@ ONLY(Parser_basic_serialisation)
         t->set_string(str_col_ndx, i, names[i]);
         t->set_double(double_col_ndx, i, fees[i]);
     }
+    t->set_timestamp(time_col_ndx, 0, Timestamp(realm::null()));
+    t->set_timestamp(time_col_ndx, 1, Timestamp(1512130073, 0)); // 12/02/2017 @ 12:47am (UTC)
+    t->set_timestamp(time_col_ndx, 2, Timestamp(1512130073, 505)); // with nanoseconds
+    t->set_timestamp(time_col_ndx, 3, Timestamp(1, 2));
+    t->set_timestamp(time_col_ndx, 4, Timestamp(0, 0));
     t->set_link(link_col_ndx, 0, 1);
 
     auto verify_query = [&](TableRef t, std::string query, size_t num_results) {
@@ -277,7 +283,6 @@ ONLY(Parser_basic_serialisation)
         realm::query_builder::ArgumentConverter<std::string, temp_hax> args(h, &s, 0);
         realm::query_builder::apply_predicate(q, p, args, "");
 
-        //parser->parse(query, q, parser_log);
         CHECK_EQUAL(q.count(), num_results);
         std::string description = q.get_description();
         std::cerr << "original: " << query << "\tdescribed: " << description << "\n";
@@ -290,6 +295,14 @@ ONLY(Parser_basic_serialisation)
     };
 
     Query q = t->where();
+    //verify_query(t, "buddy.age > $0", 0);
+    verify_query(t, "time == NULL", 1);
+    verify_query(t, "time != NULL", 4);
+    verify_query(t, "time > T0:0", 3);
+    verify_query(t, "time == T1:2", 1);
+    //verify_query(t, "time > T2017-12-1 12:07:53", 1);
+    //verify_query(t, "time == T2017-12-01 12:07:53:505", 1);
+
     verify_query(t, "buddy == NULL", 4);
     verify_query(t, "buddy != NULL", 1);
     verify_query(t, "age > 2", 2);

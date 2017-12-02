@@ -57,6 +57,19 @@ struct int_num : plus< digit > {};
 
 struct number : seq< minus, sor< float_num, hex_num, int_num > > {};
 
+template<typename> struct on_fail : success {};
+template<typename T> struct failable : sor<T,seq<on_fail<T>,failure>> {};
+
+struct timestamp_number : disable< number > {};
+// Tseconds:nanoseconds
+struct internal_timestamp : seq< one< 'T' >, timestamp_number, one< ':' >, timestamp_number > {};
+// T2017-09-28 23:12:60:288833
+// TYYYY-MM-DD-HH:MM:SS:NANOS nanos optional
+struct readable_timestamp : seq< one< 'T' >, timestamp_number, one< '-' >, timestamp_number, one< '-' >,
+    timestamp_number, star< blank >, timestamp_number, one< ':' >, timestamp_number, one< ':' >,
+    timestamp_number, opt< seq< one< ':' >, timestamp_number > > > {};
+struct timestamp : sor< failable< internal_timestamp >, failable< readable_timestamp > > {};
+
 struct true_value : string_token_t("true") {};
 struct false_value : string_token_t("false") {};
 struct null_value : string_token_t("null") {};
@@ -69,7 +82,7 @@ struct argument_index : plus< digit > {};
 struct argument : seq< one< '$' >, must< argument_index > > {};
 
 // expressions and operators
-struct expr : sor< dq_string, sq_string, number, argument, true_value, false_value, null_value, key_path > {};
+struct expr : sor< dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, key_path > {};
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
 
 struct eq : seq< sor< two< '=' >, one< '=' > >, star< blank >, opt< case_insensitive > >{};
@@ -110,6 +123,7 @@ struct pred : seq< and_pred, star< or_ext > > {};
 struct ParserState
 {
     std::vector<Predicate *> group_stack;
+    std::vector<std::string> timestamp_input_buffer;
 
     Predicate *current_group()
     {
@@ -153,6 +167,11 @@ struct ParserState
             add_predicate_to_current_group(Predicate::Type::Comparison);
             last_predicate()->cmpr.expr[0] = std::move(exp);
         }
+    }
+
+    void add_timestamp_from_buffer()
+    {
+        add_expression(Expression(std::move(timestamp_input_buffer))); // moving contents clears buffer
     }
 
     void apply_or()
@@ -232,7 +251,7 @@ template<> struct action< or_op >
 template<> struct action< rule > {                                  \
     template< typename Input >                                      \
     static void apply(const Input& in, ParserState& state) {        \
-        DEBUG_PRINT_TOKEN(in.string());                             \
+    DEBUG_PRINT_TOKEN(in.string() + #rule);                             \
         state.add_expression(Expression(type, in.string())); }};
 
 EXPRESSION_ACTION(dq_string_content, Expression::Type::String)
@@ -243,6 +262,49 @@ EXPRESSION_ACTION(true_value, Expression::Type::True)
 EXPRESSION_ACTION(false_value, Expression::Type::False)
 EXPRESSION_ACTION(null_value, Expression::Type::Null)
 EXPRESSION_ACTION(argument_index, Expression::Type::Argument)
+
+
+template<> struct action< timestamp >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string());
+        state.add_timestamp_from_buffer();
+    }
+};
+
+template<> struct action< on_fail< internal_timestamp > >
+{
+    template< typename Input >
+    static void apply(const Input&, ParserState & state)
+    {
+        state.timestamp_input_buffer.clear();
+    }
+};
+
+template<> struct action< on_fail< readable_timestamp > >
+{
+    template< typename Input >
+    static void apply(const Input&, ParserState & state)
+    {
+        state.timestamp_input_buffer.clear();
+    }
+};
+
+template<> struct action< timestamp_number >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string());
+        std::cout << std::endl;
+        state.timestamp_input_buffer.push_back(in.string());
+        for (std::string s : state.timestamp_input_buffer) {
+            std::cout << s << ", ";
+        }
+    }
+};
 
 template<> struct action< true_pred >
 {
