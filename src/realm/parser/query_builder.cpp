@@ -42,12 +42,22 @@ T stot(std::string const& s) {
     return value;
 }
 
+Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds) {
+    const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
+    const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
+    if (both_non_negative || both_non_positive) {
+        return Timestamp(seconds, nanoseconds);
+    }
+    throw std::runtime_error("Invalid timestamp format");
+}
+
 Timestamp from_timestamp_values(std::vector<std::string> const& time_inputs) {
+
     if (time_inputs.size() == 2) {
         // internal format seconds, nanoseconds
         int64_t seconds = stot<int64_t>(time_inputs[0]);
         int32_t nanoseconds = stot<int32_t>(time_inputs[1]);
-        return Timestamp(seconds, nanoseconds);
+        return get_timestamp_if_valid(seconds, nanoseconds);
     }
     else if (time_inputs.size() == 6 || time_inputs.size() == 7) {
         // readable format YYYY-MM-DD-HH:MM:SS:NANOS nanos optional
@@ -61,12 +71,12 @@ Timestamp from_timestamp_values(std::vector<std::string> const& time_inputs) {
 
         std::time_t unix_time = timegm(&created); // UTC time
 
-        int64_t seconds = static_cast<int64_t>(unix_time);
+        int64_t seconds = int64_t(static_cast<int32_t>(unix_time)); // unix_time comes as a int32_t
         int32_t nanoseconds = 0;
         if (time_inputs.size() == 7) {
             nanoseconds = stot<int32_t>(time_inputs[6]);
         }
-        return Timestamp(seconds, nanoseconds);
+        return get_timestamp_if_valid(seconds, nanoseconds);
     }
     throw std::runtime_error("Unexpected timestamp format.");
 }

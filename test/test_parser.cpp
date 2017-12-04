@@ -235,8 +235,6 @@ TEST(Parser_invalid_queries) {
     }
 }
 
-#if REALM_METRICS
-
 struct temp_hax
 {
     template<typename T>
@@ -247,6 +245,29 @@ struct temp_hax
         return false;
     }
 };
+
+
+void verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, size_t num_results) {
+    Query q = t->where();
+
+    realm::parser::Predicate p = realm::parser::parse(query_string);
+
+    temp_hax h;
+    std::string s;
+    realm::query_builder::ArgumentConverter<std::string, temp_hax> args(h, &s, 0);
+    realm::query_builder::apply_predicate(q, p, args, "");
+
+    CHECK_EQUAL(q.count(), num_results);
+    std::string description = q.get_description();
+    std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    Query q2 = t->where();
+
+    realm::parser::Predicate p2 = realm::parser::parse(description);
+    realm::query_builder::apply_predicate(q2, p2, args, "");
+
+    CHECK_EQUAL(q2.count(), num_results);
+};
+
 
 ONLY(Parser_basic_serialisation)
 {
@@ -267,62 +288,114 @@ ONLY(Parser_basic_serialisation)
         t->set_double(double_col_ndx, i, fees[i]);
     }
     t->set_timestamp(time_col_ndx, 0, Timestamp(realm::null()));
-    t->set_timestamp(time_col_ndx, 1, Timestamp(1512130073, 0)); // 12/02/2017 @ 12:47am (UTC)
+    t->set_timestamp(time_col_ndx, 1, Timestamp(1512130073, 0)); // 2017/12/02 @ 12:47am (UTC)
     t->set_timestamp(time_col_ndx, 2, Timestamp(1512130073, 505)); // with nanoseconds
     t->set_timestamp(time_col_ndx, 3, Timestamp(1, 2));
     t->set_timestamp(time_col_ndx, 4, Timestamp(0, 0));
     t->set_link(link_col_ndx, 0, 1);
 
-    auto verify_query = [&](TableRef t, std::string query, size_t num_results) {
-        Query q = t->where();
-
-        realm::parser::Predicate p = realm::parser::parse(query);
-
-        temp_hax h;
-        std::string s;
-        realm::query_builder::ArgumentConverter<std::string, temp_hax> args(h, &s, 0);
-        realm::query_builder::apply_predicate(q, p, args, "");
-
-        CHECK_EQUAL(q.count(), num_results);
-        std::string description = q.get_description();
-        std::cerr << "original: " << query << "\tdescribed: " << description << "\n";
-        Query q2 = t->where();
-
-        realm::parser::Predicate p2 = realm::parser::parse(description);
-        realm::query_builder::apply_predicate(q2, p2, args, "");
-
-        CHECK_EQUAL(q2.count(), num_results);
-    };
-
     Query q = t->where();
     //verify_query(t, "buddy.age > $0", 0);
-    verify_query(t, "time == NULL", 1);
-    verify_query(t, "time != NULL", 4);
-    verify_query(t, "time > T0:0", 3);
-    verify_query(t, "time == T1:2", 1);
-    verify_query(t, "time > T2017-12-1@12:07:53", 1);
-    verify_query(t, "time == T2017-12-01@12:07:53:505", 1);
+    verify_query(test_context, t, "time == NULL", 1);
+    verify_query(test_context, t, "time != NULL", 4);
+    verify_query(test_context, t, "time > T0:0", 3);
+    verify_query(test_context, t, "time == T1:2", 1);
+    verify_query(test_context, t, "time > T2017-12-1@12:07:53", 1);
+    verify_query(test_context, t, "time == T2017-12-01@12:07:53:505", 1);
 
-    verify_query(t, "buddy == NULL", 4);
-    verify_query(t, "buddy != NULL", 1);
-    verify_query(t, "age > 2", 2);
-    verify_query(t, "!(age >= 2)", 2);
-    verify_query(t, "3 <= age", 2);
-    verify_query(t, "age > 2 and age < 4", 1);
-    verify_query(t, "age = 1 || age == 3", 2);
-    verify_query(t, "fees != 2.22 && fees > 2.2", 3);
-    verify_query(t, "name = \"Joe\"", 1);
-    verify_query(t, "buddy.age > 0", 1);
-    verify_query(t, "name BEGINSWITH \"J\"", 3);
-    verify_query(t, "name ENDSWITH \"E\"", 0);
-    verify_query(t, "name ENDSWITH[c] \"E\"", 2);
-    verify_query(t, "name CONTAINS \"OE\"", 0);
-    verify_query(t, "name CONTAINS[c] \"OE\"", 2);
-    verify_query(t, "name LIKE \"b*\"", 0);
-    verify_query(t, "name LIKE[c] \"b*\"", 2);
+    verify_query(test_context, t, "buddy == NULL", 4);
+    verify_query(test_context, t, "buddy != NULL", 1);
+    verify_query(test_context, t, "age > 2", 2);
+    verify_query(test_context, t, "!(age >= 2)", 2);
+    verify_query(test_context, t, "3 <= age", 2);
+    verify_query(test_context, t, "age > 2 and age < 4", 1);
+    verify_query(test_context, t, "age = 1 || age == 3", 2);
+    verify_query(test_context, t, "fees != 2.22 && fees > 2.2", 3);
+    verify_query(test_context, t, "name = \"Joe\"", 1);
+    verify_query(test_context, t, "buddy.age > 0", 1);
+    verify_query(test_context, t, "name BEGINSWITH \"J\"", 3);
+    verify_query(test_context, t, "name ENDSWITH \"E\"", 0);
+    verify_query(test_context, t, "name ENDSWITH[c] \"E\"", 2);
+    verify_query(test_context, t, "name CONTAINS \"OE\"", 0);
+    verify_query(test_context, t, "name CONTAINS[c] \"OE\"", 2);
+    verify_query(test_context, t, "name LIKE \"b*\"", 0);
+    verify_query(test_context, t, "name LIKE[c] \"b*\"", 2);
 
 }
 
-#endif // REALM_METRICS
+TEST(Parser_Timestamps)
+{
+    Group g;
+    TableRef t = g.add_table("person");
+    size_t birthday_col_ndx = t->add_column(type_Timestamp, "birthday");           // disallow null
+    size_t internal_col_ndx = t->add_column(type_Timestamp, "T399", true);         // allow null
+    size_t readable_col_ndx = t->add_column(type_Timestamp, "T2017-12-04", true);  // allow null
+    size_t link_col_ndx = t->add_column_link(type_Link, "linked", *t);
+    t->add_empty_row(5);
+
+    t->set_timestamp(birthday_col_ndx, 0, Timestamp(-1, -1)); // before epoch by 1 second and one nanosecond
+    t->set_timestamp(birthday_col_ndx, 1, Timestamp(0, -1)); // before epoch by one nanosecond
+
+    t->set_timestamp(internal_col_ndx, 0, Timestamp(realm::null()));
+    t->set_timestamp(internal_col_ndx, 1, Timestamp(1512130073, 0)); // 2017/12/02 @ 12:47am (UTC)
+    t->set_timestamp(internal_col_ndx, 2, Timestamp(1512130073, 505)); // with nanoseconds
+    t->set_timestamp(internal_col_ndx, 3, Timestamp(1, 2));
+    t->set_timestamp(internal_col_ndx, 4, Timestamp(0, 0));
+
+    t->set_timestamp(readable_col_ndx, 0, Timestamp(1512130073, 0));
+    t->set_timestamp(readable_col_ndx, 1, Timestamp(1512130073, 505));
+
+    t->set_link(link_col_ndx, 0, 1);
+    t->set_link(link_col_ndx, 2, 0);
+
+
+    Query q = t->where();
+    verify_query(test_context, t, "T399 == NULL", 1);
+    verify_query(test_context, t, "T399 != NULL", 4);
+    verify_query(test_context, t, "linked.T399 == NULL", 4); // null links count as a match for null here
+    verify_query(test_context, t, "linked != NULL && linked.T399 == NULL", 1);
+    verify_query(test_context, t, "linked.T399 != NULL", 1);
+    verify_query(test_context, t, "linked != NULL && linked.T399 != NULL", 1);
+    verify_query(test_context, t, "T399 == T399:0", 0);
+    verify_query(test_context, t, "linked.T399 == T399:0", 0);
+    verify_query(test_context, t, "T399 == T2017-12-04@0:0:0", 0);
+
+    verify_query(test_context, t, "T2017-12-04 == NULL", 3);
+    verify_query(test_context, t, "T2017-12-04 != NULL", 2);
+    verify_query(test_context, t, "linked.T2017-12-04 == NULL", 3); // null links count as a match for null here
+    verify_query(test_context, t, "linked != NULL && linked.T2017-12-04 == NULL", 0);
+    verify_query(test_context, t, "linked.T2017-12-04 != NULL", 2);
+    verify_query(test_context, t, "linked != NULL && linked.T2017-12-04 != NULL", 2);
+    verify_query(test_context, t, "T2017-12-04 == T399:0", 0);
+    verify_query(test_context, t, "linked.T2017-12-04 == T399:0", 0);
+    verify_query(test_context, t, "T2017-12-04 == T2017-12-04@0:0:0", 0);
+
+    verify_query(test_context, t, "birthday == NULL", 0);
+    verify_query(test_context, t, "birthday != NULL", 5);
+    verify_query(test_context, t, "birthday == T0:0", 3);
+    verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:0", 3); // epoch is default non-null Timestamp
+    verify_query(test_context, t, "birthday == T1969-12-31@23:59:59:-1", 1);
+    verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:-1", 1);
+
+    // invalid timestamps, if these were constructed core would assert
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T-1:1", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:-1", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1969-12-31@23:59:59:1", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:1:-1", 0));
+
+    // Invalid predicate
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T:1", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T399", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:0:", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:0:0", 0));
+}
 
 #endif // TEST_PARSER

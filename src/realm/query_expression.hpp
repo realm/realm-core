@@ -2049,14 +2049,15 @@ public:
 
     virtual std::string description() const override
     {
+        std::string desc;
         if (links_exist()) {
-            return m_link_map.description() + util::serializer::value_separator;
+            desc = m_link_map.description() + util::serializer::value_separator;
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached()) {
-            return std::string(target_table->get_column_name(m_column_ndx));
+            desc += std::string(target_table->get_column_name(m_column_ndx));
         }
-        return "";
+        return desc;
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches = nullptr) const override
