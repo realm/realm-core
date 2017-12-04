@@ -1459,6 +1459,11 @@ public:
         return true; // No-op
     }
 
+    bool list_set_int(size_t, int64_t)
+    {
+        return true;
+    }
+
     bool optimize_table() noexcept
     {
         return true; // No-op
@@ -1590,43 +1595,37 @@ public:
         return true; // No-op
     }
 
-    bool select_link_list(size_t col_ndx, Key, size_t) noexcept
-    {
-        // See comments on link handling in TransactAdvancer::set_link().
-        typedef _impl::TableFriend tf;
-        if (m_table) {
-            if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
-                tf::mark(*target);
-        }
-        return true; // No-op
-    }
-
-    bool link_list_set(size_t, Key, size_t) noexcept
+    bool select_list(size_t, Key) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_insert(size_t, Key, size_t) noexcept
+    bool list_set_link(size_t, Key) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_move(size_t, size_t) noexcept
+    bool list_insert_null(size_t, size_t)
+    {
+        return true;
+    }
+
+    bool list_move(size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_swap(size_t, size_t) noexcept
+    bool list_swap(size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_erase(size_t, size_t) noexcept
+    bool list_erase(size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_clear(size_t) noexcept
+    bool list_clear(size_t) noexcept
     {
         return true; // No-op
     }

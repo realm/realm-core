@@ -264,6 +264,18 @@ public:
         } // LCOV_EXCL_STOP
     }
 
+    bool list_set_int(size_t list_ndx, int64_t value)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+            return false;
+        log("list->set_int(%1, %2);", list_ndx, value); // Throws
+        REALM_ASSERT_DEBUG(dynamic_cast<List<Int>*>(m_list.get()));
+        static_cast<List<Int>*>(m_list.get())->set(list_ndx, value);
+        return true;
+    }
+
     bool create_object(Key key)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
@@ -291,7 +303,7 @@ public:
     bool select_table(size_t group_level_ndx, int levels, const size_t*)
     {
         log("table = group->get_table(%1);", group_level_ndx); // Throws
-        m_link_list.reset();
+        m_list.reset();
         try {
             m_table = m_group.get_table(TableKey(group_level_ndx)); // Throws
         }
@@ -526,7 +538,21 @@ public:
         return false;
     }
 
-    bool select_link_list(size_t col_ndx, Key key, size_t)
+    bool select_list(size_t col_ndx, Key key)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table->is_attached())))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(col_ndx >= m_table->get_column_count())))
+            return false;
+        DataType type = m_table->get_column_type(col_ndx);
+        log("list = table->get_list(%1, %2);", col_ndx, key.value);        // Throws
+        m_list = m_table->get_object(key).get_listbase_ptr(col_ndx, type); // Throws
+        return true;
+    }
+
+    bool select_link_list(size_t col_ndx, Key key)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
@@ -539,90 +565,88 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(type != type_LinkList)))
             return false;
         log("link_list = table->get_link_list(%1, %2);", col_ndx, key.value); // Throws
-        m_link_list = m_table->get_object(key).get_linklist_ptr(col_ndx);     // Throws
+        m_list = m_table->get_object(key).get_linklist_ptr(col_ndx);          // Throws
         return true;
     }
 
-    bool link_list_set(size_t link_ndx, Key value, size_t prior_size)
+    bool list_set_link(size_t link_ndx, Key value)
     {
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_link_list)))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(link_ndx >= m_link_list->size())))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(link_ndx >= m_list->size())))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_link_list->size())))
-            return false;
-        static_cast<void>(prior_size);
         log("link_list->set(%1, %2);", link_ndx, value); // Throws
-        m_link_list->set(link_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<LinkList*>(m_list.get()));
+        static_cast<LinkList*>(m_list.get())->set(link_ndx, value);
         return true;
     }
 
-    bool link_list_insert(size_t link_ndx, Key key, size_t prior_size)
+    bool list_insert_null(size_t list_ndx, size_t prior_size)
     {
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_link_list)))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(link_ndx > m_link_list->size())))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_link_list->size())))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_list->size())))
             return false;
         static_cast<void>(prior_size);
-        log("link_list->insert(%1, %2);", link_ndx, key.value); // Throws
-        m_link_list->insert(link_ndx, key);                     // Throws
+        log("list_insert_null->insert(%1, %2);", list_ndx); // Throws
+        m_list->insert_null(list_ndx);                      // Throws
         return true;
     }
 
-    bool link_list_move(size_t from_link_ndx, size_t to_link_ndx)
+    bool list_move(size_t from_link_ndx, size_t to_link_ndx)
     {
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_link_list)))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(from_link_ndx == to_link_ndx)))
             return false;
-        size_t num_links = m_link_list->size();
+        size_t num_links = m_list->size();
         static_cast<void>(num_links);
         if (REALM_UNLIKELY(REALM_COVER_NEVER(from_link_ndx >= num_links)))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(to_link_ndx >= num_links)))
             return false;
         log("link_list->move(%1, %2);", from_link_ndx, to_link_ndx); // Throws
-        m_link_list->move(from_link_ndx, to_link_ndx);               // Throws
+        m_list->move(from_link_ndx, to_link_ndx);                    // Throws
         return true;
     }
 
-    bool link_list_swap(size_t link_ndx_1, size_t link_ndx_2)
+    bool list_swap(size_t link_ndx_1, size_t link_ndx_2)
     {
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_link_list)))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
-        size_t num_links = m_link_list->size();
+        size_t num_links = m_list->size();
         static_cast<void>(num_links);
         if (REALM_UNLIKELY(REALM_COVER_NEVER(link_ndx_1 >= num_links)))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(link_ndx_2 >= num_links)))
             return false;
         log("link_list->swap(%1, %2);", link_ndx_1, link_ndx_2); // Throws
-        m_link_list->swap(link_ndx_1, link_ndx_2);               // Throws
+        m_list->swap(link_ndx_1, link_ndx_2);                    // Throws
         return true;
     }
 
-    bool link_list_erase(size_t link_ndx, size_t prior_size)
+    bool list_erase(size_t link_ndx, size_t prior_size)
     {
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_link_list)))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(link_ndx >= m_link_list->size())))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(link_ndx >= m_list->size())))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_link_list->size())))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_list->size())))
             return false;
         static_cast<void>(prior_size);
         log("link_list->remove(%1);", link_ndx); // Throws
-        m_link_list->remove(link_ndx);
+        m_list->remove(link_ndx, link_ndx + 1);
         return true;
     }
 
-    bool link_list_clear(size_t)
+    bool list_clear(size_t)
     {
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_link_list)))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
         log("link_list->clear();"); // Throws
-        m_link_list->clear();
+        m_list->clear();
         return true;
     }
 
@@ -633,13 +657,13 @@ public:
 
     bool link_list_nullify(size_t link_ndx, size_t prior_size)
     {
-        return link_list_erase(link_ndx, prior_size);
+        return list_erase(link_ndx, prior_size);
     }
 
 private:
     Group& m_group;
     TableRef m_table;
-    LinkListPtr m_link_list;
+    ListBasePtr m_list;
     util::Logger* m_logger = nullptr;
 
     bool check_set_cell(size_t col_ndx, Key key) noexcept

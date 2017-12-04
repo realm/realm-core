@@ -69,14 +69,14 @@ enum Instruction {
     instr_AddSearchIndex = 28,       // Add a search index to a column
     instr_RemoveSearchIndex = 29,    // Remove a search index from a column
     instr_SetLinkType = 30,          // Strong/weak
-    instr_SelectLinkList = 31,
-    instr_LinkListSet = 32,     // Assign to link list entry
-    instr_LinkListInsert = 33,  // Insert entry into link list
-    instr_LinkListMove = 34,    // Move an entry within a link list
-    instr_LinkListSwap = 35,    // Swap two entries within a link list
-    instr_LinkListErase = 36,   // Remove an entry from a link list
+    instr_SelectList = 31,
+    instr_ListSet = 32,         // Assign to list entry
+    instr_ListInsertNull = 33,  // Insert null entry into list, will always be followed by set
+    instr_ListMove = 34,        // Move an entry within a link list
+    instr_ListSwap = 35,        // Swap two entries within a list
+    instr_ListErase = 36,       // Remove an entry from a list
     instr_LinkListNullify = 37, // Remove an entry from a link list due to linked row being erased
-    instr_LinkListClear = 38,   // Ramove all entries from a link list
+    instr_ListClear = 38,       // Ramove all entries from a list
     instr_LinkListSetAll = 39,  // Assign to link list entry
     instr_AddRowWithKey = 40,   // Insert a row with a given key
     instr_CreateObject = 41,
@@ -133,7 +133,11 @@ public:
     {
         return true;
     }
-    bool select_link_list(size_t, Key, size_t)
+    bool select_list(size_t, Key)
+    {
+        return true;
+    }
+    bool select_link_list(size_t, Key)
     {
         return true;
     }
@@ -219,6 +223,10 @@ public:
     {
         return true;
     }
+    bool list_set_int(size_t, int64_t)
+    {
+        return true;
+    }
     bool optimize_table()
     {
         return true;
@@ -263,23 +271,23 @@ public:
     }
 
     // Must have linklist selected:
-    bool link_list_set(size_t, Key, size_t)
+    bool list_insert_null(size_t, size_t)
     {
         return true;
     }
-    bool link_list_insert(size_t, Key, size_t)
+    bool list_set_link(size_t, Key)
     {
         return true;
     }
-    bool link_list_move(size_t, size_t)
+    bool list_move(size_t, size_t)
     {
         return true;
     }
-    bool link_list_swap(size_t, size_t)
+    bool list_swap(size_t, size_t)
     {
         return true;
     }
-    bool link_list_erase(size_t, size_t)
+    bool list_erase(size_t, size_t)
     {
         return true;
     }
@@ -287,7 +295,7 @@ public:
     {
         return true;
     }
-    bool link_list_clear(size_t)
+    bool list_clear(size_t)
     {
         return true;
     }
@@ -309,7 +317,8 @@ public:
     // No selection needed:
     bool select_table(size_t group_level_ndx, size_t levels, const size_t* path);
     bool select_descriptor(size_t levels, const size_t* path);
-    bool select_link_list(size_t col_ndx, Key key, size_t link_target_group_level_ndx);
+    bool select_list(size_t col_ndx, Key key);
+    bool select_link_list(size_t col_ndx, Key key);
     bool insert_group_level_table(TableKey table_key, size_t num_tables, StringData name);
     bool erase_group_level_table(TableKey table_key, size_t num_tables);
     bool rename_group_level_table(TableKey table_key, StringData new_name);
@@ -333,6 +342,9 @@ public:
     bool nullify_link(size_t col_ndx, Key key, TableKey target_table_key);
     bool insert_substring(size_t col_ndx, Key key, size_t pos, StringData);
     bool erase_substring(size_t col_ndx, Key key, size_t pos, size_t size);
+
+    bool list_set_int(size_t list_ndx, int64_t value);
+
     bool optimize_table();
 
     // Must have descriptor selected:
@@ -348,14 +360,14 @@ public:
     bool set_link_type(size_t col_ndx, LinkType);
 
     // Must have linklist selected:
-    bool link_list_set(size_t link_ndx, Key value, size_t prior_size);
+    bool list_insert_null(size_t ndx, size_t prior_size);
+    bool list_set_link(size_t link_ndx, Key value);
     bool link_list_set_all(const IntegerColumn& values);
-    bool link_list_insert(size_t link_ndx, Key value, size_t prior_size);
-    bool link_list_move(size_t from_link_ndx, size_t to_link_ndx);
-    bool link_list_swap(size_t link1_ndx, size_t link2_ndx);
-    bool link_list_erase(size_t link_ndx, size_t prior_size);
+    bool list_move(size_t from_link_ndx, size_t to_link_ndx);
+    bool list_swap(size_t link1_ndx, size_t link2_ndx);
+    bool list_erase(size_t list_ndx, size_t prior_size);
     bool link_list_nullify(size_t link_ndx, size_t prior_size);
-    bool link_list_clear(size_t old_list_size);
+    bool list_clear(size_t old_list_size);
 
     /// End of methods expected by parser.
 
@@ -471,6 +483,8 @@ public:
     virtual void insert_substring(const Table*, size_t col_ndx, Key key, size_t pos, StringData);
     virtual void erase_substring(const Table*, size_t col_ndx, Key key, size_t pos, size_t size);
 
+    virtual void list_set_int(const List<Int>& list, size_t list_ndx, int64_t value);
+
     virtual void create_object(const Table*, Key);
     virtual void remove_object(const Table*, Key);
     /// \param prior_num_rows The number of rows in the table prior to the
@@ -481,12 +495,12 @@ public:
     virtual void clear_table(const Table*, size_t prior_num_rows);
     virtual void optimize_table(const Table*);
 
-    virtual void link_list_set(const LinkList&, size_t link_ndx, Key value);
-    virtual void link_list_insert(const LinkList&, size_t link_ndx, Key value);
-    virtual void link_list_move(const LinkList&, size_t from_link_ndx, size_t to_link_ndx);
-    virtual void link_list_swap(const LinkList&, size_t link_ndx_1, size_t link_ndx_2);
-    virtual void link_list_erase(const LinkList&, size_t link_ndx);
-    virtual void link_list_clear(const LinkList&);
+    virtual void list_insert_null(const ConstListBase&, size_t ndx);
+    virtual void list_set_link(const List<Key>&, size_t link_ndx, Key value);
+    virtual void list_move(const ConstListBase&, size_t from_link_ndx, size_t to_link_ndx);
+    virtual void list_swap(const ConstListBase&, size_t link_ndx_1, size_t link_ndx_2);
+    virtual void list_erase(const ConstListBase&, size_t link_ndx);
+    virtual void list_clear(const ConstListBase&);
 
     //@{
 
@@ -547,15 +561,15 @@ private:
     mutable util::Buffer<size_t> m_subtab_path_buf;
     mutable const Table* m_selected_table;
     mutable const Spec* m_selected_spec;
-    mutable LinkListId m_selected_link_list;
+    mutable LinkListId m_selected_list;
 
     void unselect_all() noexcept;
     void select_table(const Table*); // unselects link list
-    void select_link_list(const LinkList&);
+    void select_list(const ConstListBase&);
 
     void record_subtable_path(const Table&, size_t*& out_begin, size_t*& out_end);
     void do_select_table(const Table*);
-    void do_select_link_list(const LinkList&);
+    void do_select_list(const ConstListBase&);
 
     friend class TransactReverser;
 };
@@ -939,7 +953,7 @@ inline void TransactLogConvenientEncoder::unselect_all() noexcept
 {
     m_selected_table = nullptr;
     m_selected_spec = nullptr;
-    m_selected_link_list = LinkListId();
+    m_selected_list = LinkListId();
 }
 
 inline void TransactLogConvenientEncoder::select_table(const Table* table)
@@ -947,17 +961,16 @@ inline void TransactLogConvenientEncoder::select_table(const Table* table)
     if (table != m_selected_table)
         do_select_table(table); // Throws
     m_selected_spec = nullptr;
-    m_selected_link_list = LinkListId();
+    m_selected_list = LinkListId();
 }
 
-inline void TransactLogConvenientEncoder::select_link_list(const LinkList& list)
+inline void TransactLogConvenientEncoder::select_list(const ConstListBase& list)
 {
-    if (LinkListId(list) != m_selected_link_list) {
-        do_select_link_list(list); // Throws
+    if (LinkListId(list) != m_selected_list) {
+        do_select_list(list); // Throws
     }
     m_selected_spec = nullptr;
 }
-
 
 inline bool TransactLogEncoder::insert_group_level_table(TableKey table_key, size_t prior_num_tables, StringData name)
 {
@@ -1325,6 +1338,19 @@ inline void TransactLogConvenientEncoder::erase_substring(const Table* t, size_t
     }
 }
 
+inline bool TransactLogEncoder::list_set_int(size_t list_ndx, int64_t value)
+{
+    append_simple_instr(instr_ListSet, type_Int, list_ndx, value); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_set_int(const List<Int>& list, size_t list_ndx, int64_t value)
+{
+    select_list(list);                       // Throws
+    m_encoder.list_set_int(list_ndx, value); // Throws
+}
+
+
 inline bool TransactLogEncoder::create_object(Key key)
 {
     append_simple_instr(instr_CreateObject, key.value); // Throws
@@ -1412,16 +1438,28 @@ inline void TransactLogConvenientEncoder::optimize_table(const Table* t)
     m_encoder.optimize_table(); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_set(size_t link_ndx, Key key, size_t prior_size)
+inline bool TransactLogEncoder::list_insert_null(size_t list_ndx, size_t prior_size)
 {
-    append_simple_instr(instr_LinkListSet, link_ndx, key.value, prior_size); // Throws
+    append_simple_instr(instr_ListInsertNull, list_ndx, prior_size); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_set(const LinkList& list, size_t link_ndx, Key key)
+inline void TransactLogConvenientEncoder::list_insert_null(const ConstListBase& list, size_t list_ndx)
 {
-    select_link_list(list);                                // Throws
-    m_encoder.link_list_set(link_ndx, key, list.size());   // Throws
+    select_list(list);                                 // Throws
+    m_encoder.list_insert_null(list_ndx, list.size()); // Throws
+}
+
+inline bool TransactLogEncoder::list_set_link(size_t link_ndx, Key key)
+{
+    append_simple_instr(instr_ListSet, type_Link, link_ndx, key.value); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_set_link(const List<Key>& list, size_t link_ndx, Key key)
+{
+    select_list(list);                      // Throws
+    m_encoder.list_set_link(link_ndx, key); // Throws
 }
 
 inline bool TransactLogEncoder::link_list_nullify(size_t link_ndx, size_t prior_size)
@@ -1432,7 +1470,7 @@ inline bool TransactLogEncoder::link_list_nullify(size_t link_ndx, size_t prior_
 
 inline void TransactLogConvenientEncoder::link_list_nullify(const LinkList& list, size_t link_ndx)
 {
-    select_link_list(list);                            // Throws
+    select_list(list);                                 // Throws
     size_t prior_size = list.size();                   // Instruction is emitted before the fact.
     m_encoder.link_list_nullify(link_ndx, prior_size); // Throws
 }
@@ -1448,65 +1486,52 @@ inline bool TransactLogEncoder::link_list_set_all(const IntegerColumn& values)
 
 inline void TransactLogConvenientEncoder::set_link_list(const LinkList& list, const IntegerColumn& values)
 {
-    select_link_list(list);              // Throws
+    select_list(list);                   // Throws
     m_encoder.link_list_set_all(values); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_insert(size_t link_ndx, Key key, size_t prior_size)
-{
-    append_simple_instr(instr_LinkListInsert, link_ndx, key.value, prior_size); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::link_list_insert(const LinkList& list, size_t link_ndx, Key key)
-{
-    select_link_list(list);                                  // Throws
-    size_t prior_size = list.size() - 1;                     // The instruction is emitted after the fact.
-    m_encoder.link_list_insert(link_ndx, key, prior_size);   // Throws
-}
-
-inline bool TransactLogEncoder::link_list_move(size_t from_link_ndx, size_t to_link_ndx)
+inline bool TransactLogEncoder::list_move(size_t from_link_ndx, size_t to_link_ndx)
 {
     REALM_ASSERT(from_link_ndx != to_link_ndx);
-    append_simple_instr(instr_LinkListMove, from_link_ndx, to_link_ndx); // Throws
+    append_simple_instr(instr_ListMove, from_link_ndx, to_link_ndx); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_move(const LinkList& list, size_t from_link_ndx,
-                                                         size_t to_link_ndx)
+inline void TransactLogConvenientEncoder::list_move(const ConstListBase& list, size_t from_link_ndx,
+                                                    size_t to_link_ndx)
 {
-    select_link_list(list);                               // Throws
-    m_encoder.link_list_move(from_link_ndx, to_link_ndx); // Throws
+    select_list(list);                               // Throws
+    m_encoder.list_move(from_link_ndx, to_link_ndx); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_swap(size_t link1_ndx, size_t link2_ndx)
+inline bool TransactLogEncoder::list_swap(size_t link1_ndx, size_t link2_ndx)
 {
-    append_simple_instr(instr_LinkListSwap, link1_ndx, link2_ndx); // Throws
+    append_simple_instr(instr_ListSwap, link1_ndx, link2_ndx); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_swap(const LinkList& list, size_t link1_ndx, size_t link2_ndx)
+inline void TransactLogConvenientEncoder::list_swap(const ConstListBase& list, size_t link1_ndx, size_t link2_ndx)
 {
-    select_link_list(list);                         // Throws
-    m_encoder.link_list_swap(link1_ndx, link2_ndx); // Throws
+    select_list(list);                         // Throws
+    m_encoder.list_swap(link1_ndx, link2_ndx); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_erase(size_t link_ndx, size_t prior_size)
+inline bool TransactLogEncoder::list_erase(size_t list_ndx, size_t prior_size)
 {
-    append_simple_instr(instr_LinkListErase, link_ndx, prior_size); // Throws
+    append_simple_instr(instr_ListErase, list_ndx, prior_size); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_erase(const LinkList& list, size_t link_ndx)
+inline void TransactLogConvenientEncoder::list_erase(const ConstListBase& list, size_t link_ndx)
 {
-    select_link_list(list);                          // Throws
+    select_list(list);                               // Throws
     size_t prior_size = list.size();                 // The instruction is emitted before the fact.
-    m_encoder.link_list_erase(link_ndx, prior_size); // Throws
+    m_encoder.list_erase(link_ndx, prior_size);      // Throws
 }
 
-inline bool TransactLogEncoder::link_list_clear(size_t old_list_size)
+inline bool TransactLogEncoder::list_clear(size_t old_list_size)
 {
-    append_simple_instr(instr_LinkListClear, old_list_size); // Throws
+    append_simple_instr(instr_ListClear, old_list_size); // Throws
     return true;
 }
 
@@ -1655,6 +1680,28 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             parser_error();
             return;
         }
+        case instr_ListSet: {
+            int type = read_int<int>(); // Throws
+            size_t list_ndx = read_int<size_t>();
+            switch (DataType(type)) {
+                case type_Int: {
+                    int_fast64_t value = read_int<int64_t>();   // Throws
+                    if (!handler.list_set_int(list_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Link: {
+                    Key key = Key(read_int<int64_t>());        // Throws
+                    if (!handler.list_set_link(list_ndx, key)) // Throws
+                        parser_error();
+                    return;
+                }
+                default:
+                    parser_error();
+                    break;
+            }
+            return;
+        }
         case instr_AddInteger: {
             size_t col_ndx = read_int<size_t>();           // Throws
             Key key(read_int<int64_t>());                  // Throws
@@ -1732,11 +1779,10 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-        case instr_LinkListSet: {
-            size_t link_ndx = read_int<size_t>();                    // Throws
-            Key key = Key(read_int<int64_t>());                      // Throws
+        case instr_ListInsertNull: {
+            size_t list_ndx = read_int<size_t>();                    // Throws
             size_t prior_size = read_int<size_t>();                  // Throws
-            if (!handler.link_list_set(link_ndx, key, prior_size))   // Throws
+            if (!handler.list_insert_null(list_ndx, prior_size))     // Throws
                 parser_error();
             return;
         }
@@ -1745,37 +1791,29 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t size = read_int<size_t>(); // Throws
             for (size_t i = 0; i < size; i++) {
                 Key key = Key(read_int<int64_t>());       // Throws
-                if (!handler.link_list_set(i, key, size)) // Throws
+                if (!handler.list_set_link(i, key))       // Throws
                     parser_error();
             }
             return;
         }
-        case instr_LinkListInsert: {
-            size_t link_ndx = read_int<size_t>();                       // Throws
-            Key key = Key(read_int<int64_t>());                         // Throws
-            size_t prior_size = read_int<size_t>();                     // Throws
-            if (!handler.link_list_insert(link_ndx, key, prior_size))   // Throws
-                parser_error();
-            return;
-        }
-        case instr_LinkListMove: {
+        case instr_ListMove: {
             size_t from_link_ndx = read_int<size_t>();               // Throws
             size_t to_link_ndx = read_int<size_t>();                 // Throws
-            if (!handler.link_list_move(from_link_ndx, to_link_ndx)) // Throws
+            if (!handler.list_move(from_link_ndx, to_link_ndx))      // Throws
                 parser_error();
             return;
         }
-        case instr_LinkListSwap: {
+        case instr_ListSwap: {
             size_t link1_ndx = read_int<size_t>();             // Throws
             size_t link2_ndx = read_int<size_t>();             // Throws
-            if (!handler.link_list_swap(link1_ndx, link2_ndx)) // Throws
+            if (!handler.list_swap(link1_ndx, link2_ndx))      // Throws
                 parser_error();
             return;
         }
-        case instr_LinkListErase: {
+        case instr_ListErase: {
             size_t link_ndx = read_int<size_t>();               // Throws
             size_t prior_size = read_int<size_t>();             // Throws
-            if (!handler.link_list_erase(link_ndx, prior_size)) // Throws
+            if (!handler.list_erase(link_ndx, prior_size))      // Throws
                 parser_error();
             return;
         }
@@ -1786,17 +1824,16 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-        case instr_LinkListClear: {
+        case instr_ListClear: {
             size_t old_list_size = read_int<size_t>();   // Throws
-            if (!handler.link_list_clear(old_list_size)) // Throws
+            if (!handler.list_clear(old_list_size))      // Throws
                 parser_error();
             return;
         }
-        case instr_SelectLinkList: {
+        case instr_SelectList: {
             size_t col_ndx = read_int<size_t>();                                     // Throws
             Key key = Key(read_int<int64_t>());                                      // Throws
-            size_t target_group_level_ndx = read_int<size_t>();                      // Throws
-            if (!handler.select_link_list(col_ndx, key, target_group_level_ndx))     // Throws
+            if (!handler.select_list(col_ndx, key))                                  // Throws
                 parser_error();
             return;
         }
@@ -2255,6 +2292,12 @@ public:
         return true; // No-op
     }
 
+    bool list_set_int(size_t ndx, int64_t value)
+    {
+        m_encoder.list_set_int(ndx, value);
+        append_instruction();
+        return true;
+    }
 
     bool clear_table(size_t old_size)
     {
@@ -2322,56 +2365,55 @@ public:
         return true;
     }
 
-    bool select_link_list(size_t col_ndx, Key key, size_t link_target_group_level_ndx)
+    bool select_list(size_t col_ndx, Key key)
     {
-        sync_linkview();
-        m_encoder.select_link_list(col_ndx, key, link_target_group_level_ndx);
-        m_pending_lv_instr = get_inst();
-        return true;
-    }
-
-    bool link_list_set(size_t row, Key key, size_t prior_size)
-    {
-        m_encoder.link_list_set(row, key, prior_size);
+        m_encoder.select_list(col_ndx, key);
         append_instruction();
         return true;
     }
 
-    bool link_list_insert(size_t link_ndx, Key, size_t prior_size)
+    bool list_set_link(size_t list_ndx, Key key)
     {
-        m_encoder.link_list_erase(link_ndx, prior_size + 1);
+        m_encoder.list_set_link(list_ndx, key);
         append_instruction();
         return true;
     }
 
-    bool link_list_move(size_t from_link_ndx, size_t to_link_ndx)
+    bool list_insert_null(size_t ndx, size_t prior_size)
     {
-        m_encoder.link_list_move(from_link_ndx, to_link_ndx);
+        m_encoder.list_erase(ndx, prior_size + 1);
         append_instruction();
         return true;
     }
 
-    bool link_list_swap(size_t link1_ndx, size_t link2_ndx)
+    bool list_move(size_t from_link_ndx, size_t to_link_ndx)
     {
-        m_encoder.link_list_swap(link1_ndx, link2_ndx);
+        m_encoder.list_move(from_link_ndx, to_link_ndx);
         append_instruction();
         return true;
     }
 
-    bool link_list_erase(size_t link_ndx, size_t prior_size)
+    bool list_swap(size_t link1_ndx, size_t link2_ndx)
     {
-        m_encoder.link_list_insert(link_ndx, null_key, prior_size - 1);
+        m_encoder.list_swap(link1_ndx, link2_ndx);
         append_instruction();
         return true;
     }
 
-    bool link_list_clear(size_t old_list_size)
+    bool list_erase(size_t list_ndx, size_t prior_size)
+    {
+        m_encoder.list_insert_null(list_ndx, prior_size - 1);
+        append_instruction();
+        return true;
+    }
+
+    bool list_clear(size_t old_list_size)
     {
         // Append in reverse order because the reversed log is itself applied
         // in reverse, and this way it generates all back-insertions rather than
         // all front-insertions
         for (size_t i = old_list_size; i > 0; --i) {
-            m_encoder.link_list_insert(i - 1, null_key, old_list_size - i);
+            m_encoder.list_insert_null(i - 1, old_list_size - i);
             append_instruction();
         }
         return true;
@@ -2389,7 +2431,7 @@ public:
 
     bool link_list_nullify(size_t link_ndx, size_t prior_size)
     {
-        m_encoder.link_list_insert(link_ndx, null_key, prior_size - 1);
+        m_encoder.list_insert_null(link_ndx, prior_size - 1);
         append_instruction();
         return true;
     }

@@ -40,6 +40,7 @@ template <class T>
 using ListPtr = std::unique_ptr<List<T>>;
 template <class T>
 using ConstListPtr = std::unique_ptr<const List<T>>;
+using ListBasePtr = std::unique_ptr<ListBase>;
 
 class LinkList;
 class ConstLinkList;
@@ -167,6 +168,8 @@ public:
 
     LinkList get_linklist(size_t col_ndx);
     LinkListPtr get_linklist_ptr(size_t col_ndx);
+
+    ListBasePtr get_listbase_ptr(size_t col_ndx, DataType type);
 
 private:
     friend class Cluster;

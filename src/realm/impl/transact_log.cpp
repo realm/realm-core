@@ -70,34 +70,27 @@ void TransactLogConvenientEncoder::do_select_table(const Table* table)
     m_selected_table = table;
 }
 
-bool TransactLogEncoder::select_link_list(size_t col_ndx, Key key, size_t link_target_group_level_ndx)
+bool TransactLogEncoder::select_list(size_t col_ndx, Key key)
 {
-    append_simple_instr(instr_SelectLinkList, col_ndx, key.value, link_target_group_level_ndx); // Throws
+    append_simple_instr(instr_SelectList, col_ndx, key.value); // Throws
     return true;
 }
 
 
-void TransactLogConvenientEncoder::do_select_link_list(const LinkList& list)
+void TransactLogConvenientEncoder::do_select_list(const ConstListBase& list)
 {
     select_table(list.get_table());
     size_t col_ndx = list.get_col_ndx();
     Key key = list.ConstListBase::get_key();
 
-    size_t* link_target_path_begin;
-    size_t* link_target_path_end;
-    record_subtable_path(list.get_target_table(), link_target_path_begin, link_target_path_end);
-    size_t link_target_levels = (link_target_path_end - link_target_path_begin) / 2;
-    static_cast<void>(link_target_levels);
-    REALM_ASSERT_3(link_target_levels, ==, 0);
-
-    m_encoder.select_link_list(col_ndx, key, link_target_path_begin[0]); // Throws
-    m_selected_link_list = LinkListId(list.get_table()->get_key(), key, col_ndx);
+    m_encoder.select_list(col_ndx, key); // Throws
+    m_selected_list = LinkListId(list.get_table()->get_key(), key, col_ndx);
 }
 
-void TransactLogConvenientEncoder::link_list_clear(const LinkList& list)
+void TransactLogConvenientEncoder::list_clear(const ConstListBase& list)
 {
-    select_link_list(list);                 // Throws
-    m_encoder.link_list_clear(list.size()); // Throws
+    select_list(list);                 // Throws
+    m_encoder.list_clear(list.size()); // Throws
 }
 
 REALM_NORETURN
