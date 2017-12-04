@@ -57,18 +57,16 @@ struct int_num : plus< digit > {};
 
 struct number : seq< minus, sor< float_num, hex_num, int_num > > {};
 
-template<typename> struct on_fail : success {};
-template<typename T> struct failable : sor<T,seq<on_fail<T>,failure>> {};
-
 struct timestamp_number : disable< number > {};
+struct first_timestamp_number : disable< timestamp_number > {};
 // Tseconds:nanoseconds
-struct internal_timestamp : seq< one< 'T' >, timestamp_number, one< ':' >, timestamp_number > {};
-// T2017-09-28 23:12:60:288833
-// TYYYY-MM-DD-HH:MM:SS:NANOS nanos optional
-struct readable_timestamp : seq< one< 'T' >, timestamp_number, one< '-' >, timestamp_number, one< '-' >,
-    timestamp_number, star< blank >, timestamp_number, one< ':' >, timestamp_number, one< ':' >,
+struct internal_timestamp : seq< one< 'T' >, first_timestamp_number, one< ':' >, timestamp_number > {};
+// T2017-09-28@23:12:60:288833
+// TYYYY-MM-DD@HH:MM:SS:NANOS nanos optional
+struct readable_timestamp : seq< one< 'T' >, first_timestamp_number, one< '-' >, timestamp_number, one< '-' >,
+    timestamp_number, one< '@' >, timestamp_number, one< ':' >, timestamp_number, one< ':' >,
     timestamp_number, opt< seq< one< ':' >, timestamp_number > > > {};
-struct timestamp : sor< failable< internal_timestamp >, failable< readable_timestamp > > {};
+struct timestamp : sor< internal_timestamp, readable_timestamp > {};
 
 struct true_value : string_token_t("true") {};
 struct false_value : string_token_t("false") {};
@@ -274,21 +272,16 @@ template<> struct action< timestamp >
     }
 };
 
-template<> struct action< on_fail< internal_timestamp > >
+template<> struct action< first_timestamp_number >
 {
     template< typename Input >
-    static void apply(const Input&, ParserState & state)
+    static void apply(const Input& in, ParserState & state)
     {
+        DEBUG_PRINT_TOKEN(in.string());
+        // the grammer might attempt to match a timestamp and get part way and fail,
+        // so everytime we start again we need to clear the buffer.
         state.timestamp_input_buffer.clear();
-    }
-};
-
-template<> struct action< on_fail< readable_timestamp > >
-{
-    template< typename Input >
-    static void apply(const Input&, ParserState & state)
-    {
-        state.timestamp_input_buffer.clear();
+        state.timestamp_input_buffer.push_back(in.string());
     }
 };
 
@@ -298,11 +291,7 @@ template<> struct action< timestamp_number >
     static void apply(const Input& in, ParserState & state)
     {
         DEBUG_PRINT_TOKEN(in.string());
-        std::cout << std::endl;
         state.timestamp_input_buffer.push_back(in.string());
-        for (std::string s : state.timestamp_input_buffer) {
-            std::cout << s << ", ";
-        }
     }
 };
 

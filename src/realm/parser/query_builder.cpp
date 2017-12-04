@@ -52,18 +52,16 @@ Timestamp from_timestamp_values(std::vector<std::string> const& time_inputs) {
     else if (time_inputs.size() == 6 || time_inputs.size() == 7) {
         // readable format YYYY-MM-DD-HH:MM:SS:NANOS nanos optional
         tm created;
-        created.tm_year = stot<int>(time_inputs[0]) - 1;
-        created.tm_mon = stot<int>(time_inputs[1]) - 1; // 0 - 11
-        created.tm_mday = stot<int>(time_inputs[2]) - 1;
+        created.tm_year = stot<int>(time_inputs[0]) - 1900; // epoch offset (see man mktime)
+        created.tm_mon = stot<int>(time_inputs[1]) - 1; // converts from 1-12 to 0-11
+        created.tm_mday = stot<int>(time_inputs[2]);
         created.tm_hour = stot<int>(time_inputs[3]);
         created.tm_min = stot<int>(time_inputs[4]);
         created.tm_sec = stot<int>(time_inputs[5]);
 
         std::time_t unix_time = timegm(&created); // UTC time
-        tm reference{};
-        std::time_t epoch = timegm(&reference);
 
-        int64_t seconds = static_cast<int64_t>(difftime(unix_time, epoch));
+        int64_t seconds = static_cast<int64_t>(unix_time);
         int32_t nanoseconds = 0;
         if (time_inputs.size() == 7) {
             nanoseconds = stot<int32_t>(time_inputs[6]);

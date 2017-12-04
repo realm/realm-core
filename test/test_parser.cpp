@@ -300,8 +300,8 @@ ONLY(Parser_basic_serialisation)
     verify_query(t, "time != NULL", 4);
     verify_query(t, "time > T0:0", 3);
     verify_query(t, "time == T1:2", 1);
-    //verify_query(t, "time > T2017-12-1 12:07:53", 1);
-    //verify_query(t, "time == T2017-12-01 12:07:53:505", 1);
+    verify_query(t, "time > T2017-12-1@12:07:53", 1);
+    verify_query(t, "time == T2017-12-01@12:07:53:505", 1);
 
     verify_query(t, "buddy == NULL", 4);
     verify_query(t, "buddy != NULL", 1);
