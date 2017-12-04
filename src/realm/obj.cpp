@@ -60,9 +60,9 @@ size_t ConstObj::get_column_index(StringData col_name) const
     return m_tree_top->get_spec().get_column_index(col_name);
 }
 
-size_t ConstObj::get_table_index() const
+TableKey ConstObj::get_table_key() const
 {
-    return m_tree_top->get_owner()->get_index_in_group();
+    return m_tree_top->get_owner()->get_key();
 }
 
 TableRef ConstObj::get_target_table(size_t col_ndx) const
@@ -164,9 +164,9 @@ bool ConstObj::is_null(size_t col_ndx) const
 size_t ConstObj::get_backlink_count(const Table& origin, size_t origin_col_ndx) const
 {
     size_t cnt = 0;
-    size_t origin_table_ndx = origin.get_index_in_group();
-    if (origin_table_ndx != realm::npos) {
-        size_t backlink_col_ndx = m_tree_top->get_spec().find_backlink_column(origin_table_ndx, origin_col_ndx);
+    TableKey origin_table_key = origin.get_key();
+    if (origin_table_key != TableKey()) {
+        size_t backlink_col_ndx = m_tree_top->get_spec().find_backlink_column(origin_table_key, origin_col_ndx);
         cnt = get_backlink_count(backlink_col_ndx);
     }
     return cnt;
@@ -174,8 +174,8 @@ size_t ConstObj::get_backlink_count(const Table& origin, size_t origin_col_ndx) 
 
 Key ConstObj::get_backlink(const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const
 {
-    size_t origin_table_ndx = origin.get_index_in_group();
-    size_t backlink_col_ndx = m_tree_top->get_spec().find_backlink_column(origin_table_ndx, origin_col_ndx);
+    TableKey origin_key = origin.get_key();
+    size_t backlink_col_ndx = m_tree_top->get_spec().find_backlink_column(origin_key, origin_col_ndx);
 
     return get_backlink(backlink_col_ndx, backlink_ndx);
 }
@@ -288,7 +288,7 @@ Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
     values.init_from_parent();
 
     const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-    size_t backlink_col = target_table_spec.find_backlink_column(get_table_index(), col_ndx);
+    size_t backlink_col = target_table_spec.find_backlink_column(get_table_key(), col_ndx);
 
     Key old_key = values.get(m_row_ndx);
 

@@ -100,6 +100,7 @@ void setup_table(T t)
 } // Anonymous namespace
 
 
+#ifdef LEGACY_TESTS
 TEST(Group_Unattached)
 {
     Group group((Group::unattached_tag()));
@@ -113,21 +114,17 @@ TEST(Group_UnattachedErrorHandling)
     Group group((Group::unattached_tag()));
 
     CHECK_EQUAL(false, group.is_empty());
-    CHECK_EQUAL(0, group.size());
     CHECK_EQUAL(0, group.find_table("foo"));
     CHECK_LOGIC_ERROR(group.get_table(0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.get_table("foo"), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.add_table("foo", false), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.insert_table(0, "foo", false), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.get_table(0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.get_table("foo"), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.add_table("foo", false), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.insert_table(0, "foo", false), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.remove_table("foo"), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.remove_table(0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.rename_table("foo", "bar", false), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.rename_table(0, "bar", false), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.move_table(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.commit(), LogicError::detached_accessor);
 
     {
@@ -140,9 +137,7 @@ TEST(Group_UnattachedErrorHandling)
     {
         bool f = false;
         CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f), LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(group.get_or_insert_table(0, "foo", &f), LogicError::detached_accessor);
         CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f), LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(group.get_or_insert_table(0, "foo", &f), LogicError::detached_accessor);
     }
     {
         std::ostringstream out;
@@ -151,6 +146,7 @@ TEST(Group_UnattachedErrorHandling)
         CHECK_LOGIC_ERROR(group.to_json(out, link_depth, &renames), LogicError::detached_accessor);
     }
 }
+#endif
 
 
 TEST(Group_OpenFile)
@@ -409,20 +405,18 @@ TEST(Group_AddTable)
 }
 
 
-TEST(Group_InsertTable)
+TEST(Group_AddTable2)
 {
     Group group;
     TableRef a = group.add_table("a");
-    TableRef b = group.insert_table(0, "b");
+    TableRef b = group.add_table("b");
     CHECK_EQUAL(2, group.size());
-    CHECK_THROW(group.insert_table(2, "b"), TableNameInUse);
+    CHECK_THROW(group.add_table("b"), TableNameInUse);
     CHECK_EQUAL(2, group.size());
-    CHECK_EQUAL(a->get_index_in_group(), 1);
-    CHECK_EQUAL(b->get_index_in_group(), 0);
 }
 
 
-TEST(Group_InsertTableWithLinks)
+TEST(Group_AddTableWithLinks)
 {
     using tf = _impl::TableFriend;
 
@@ -434,13 +428,15 @@ TEST(Group_InsertTableWithLinks)
 
     auto& a_spec = tf::get_spec(*a);
     auto& b_spec = tf::get_spec(*b);
-    CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(0), 0);
-    CHECK_EQUAL(a_spec.get_opposite_link_table_ndx(1), 1);
+    auto a_key = a->get_key();
+    auto b_key = b->get_key();
+    CHECK_EQUAL(b_spec.get_opposite_link_table_key(0), a_key);
+    CHECK_EQUAL(a_spec.get_opposite_link_table_key(1), b_key);
 
-    group.insert_table(0, "c");
+    group.add_table("c");
 
-    CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(0), 1);
-    CHECK_EQUAL(a_spec.get_opposite_link_table_ndx(1), 2);
+    CHECK_EQUAL(b_spec.get_opposite_link_table_key(0), a_key);
+    CHECK_EQUAL(a_spec.get_opposite_link_table_key(1), b_key);
 }
 
 
@@ -454,29 +450,19 @@ TEST(Group_TableNameTooLong)
 }
 
 
-TEST(Group_TableIndex)
+TEST(Group_TableKey)
 {
     Group group;
     TableRef moja = group.add_table("moja");
     TableRef mbili = group.add_table("mbili");
     TableRef tatu = group.add_table("tatu");
     CHECK_EQUAL(3, group.size());
-    std::vector<size_t> indexes;
-    indexes.push_back(moja->get_index_in_group());
-    indexes.push_back(mbili->get_index_in_group());
-    indexes.push_back(tatu->get_index_in_group());
-    sort(indexes.begin(), indexes.end());
-    CHECK_EQUAL(0, indexes[0]);
-    CHECK_EQUAL(1, indexes[1]);
-    CHECK_EQUAL(2, indexes[2]);
-    CHECK_EQUAL(moja, group.get_table(moja->get_index_in_group()));
-    CHECK_EQUAL(mbili, group.get_table(mbili->get_index_in_group()));
-    CHECK_EQUAL(tatu, group.get_table(tatu->get_index_in_group()));
-    CHECK_EQUAL("moja", group.get_table_name(moja->get_index_in_group()));
-    CHECK_EQUAL("mbili", group.get_table_name(mbili->get_index_in_group()));
-    CHECK_EQUAL("tatu", group.get_table_name(tatu->get_index_in_group()));
-    CHECK_LOGIC_ERROR(group.get_table(4), LogicError::table_index_out_of_range);
-    CHECK_LOGIC_ERROR(group.get_table_name(4), LogicError::table_index_out_of_range);
+    CHECK_EQUAL(moja, group.get_table(moja->get_key()));
+    CHECK_EQUAL(mbili, group.get_table(mbili->get_key()));
+    CHECK_EQUAL(tatu, group.get_table(tatu->get_key()));
+    CHECK_EQUAL("moja", group.get_table_name(moja->get_key()));
+    CHECK_EQUAL("mbili", group.get_table_name(mbili->get_key()));
+    CHECK_EQUAL("tatu", group.get_table_name(tatu->get_key()));
 }
 
 
@@ -528,17 +514,14 @@ TEST(Group_GetOrAddTable)
 }
 
 
-TEST(Group_GetOrInsertTable)
+TEST(Group_GetOrAddTable2)
 {
     Group group;
     bool was_inserted;
-    group.get_or_insert_table(0, "foo", &was_inserted);
+    group.get_or_add_table("foo", &was_inserted);
     CHECK_EQUAL(1, group.size());
     CHECK(was_inserted);
-    group.get_or_insert_table(0, "foo", &was_inserted);
-    CHECK_EQUAL(1, group.size());
-    CHECK_NOT(was_inserted);
-    group.get_or_insert_table(1, "foo", &was_inserted);
+    group.get_or_add_table("foo", &was_inserted);
     CHECK_EQUAL(1, group.size());
     CHECK_NOT(was_inserted);
 }
@@ -552,31 +535,30 @@ TEST(Group_BasicRemoveTable)
     TableRef gamma = group.add_table("gamma");
     TableRef delta = group.add_table("delta");
     CHECK_EQUAL(4, group.size());
-    group.remove_table(gamma->get_index_in_group()); // By index
+    group.remove_table(gamma->get_key()); // By key
     CHECK_EQUAL(3, group.size());
     CHECK(alpha->is_attached());
     CHECK(beta->is_attached());
     CHECK_NOT(gamma->is_attached());
     CHECK(delta->is_attached());
-    CHECK_EQUAL("alpha", group.get_table_name(alpha->get_index_in_group()));
-    CHECK_EQUAL("beta", group.get_table_name(beta->get_index_in_group()));
-    CHECK_EQUAL("delta", group.get_table_name(delta->get_index_in_group()));
-    group.remove_table(alpha->get_index_in_group()); // By index
+    CHECK_EQUAL("alpha", group.get_table_name(alpha->get_key()));
+    CHECK_EQUAL("beta", group.get_table_name(beta->get_key()));
+    CHECK_EQUAL("delta", group.get_table_name(delta->get_key()));
+    group.remove_table(alpha->get_key()); // By key
     CHECK_EQUAL(2, group.size());
     CHECK_NOT(alpha->is_attached());
     CHECK(beta->is_attached());
     CHECK_NOT(gamma->is_attached());
     CHECK(delta->is_attached());
-    CHECK_EQUAL("beta", group.get_table_name(beta->get_index_in_group()));
-    CHECK_EQUAL("delta", group.get_table_name(delta->get_index_in_group()));
+    CHECK_EQUAL("beta", group.get_table_name(beta->get_key()));
+    CHECK_EQUAL("delta", group.get_table_name(delta->get_key()));
     group.remove_table("delta"); // By name
     CHECK_EQUAL(1, group.size());
     CHECK_NOT(alpha->is_attached());
     CHECK(beta->is_attached());
     CHECK_NOT(gamma->is_attached());
     CHECK_NOT(delta->is_attached());
-    CHECK_EQUAL("beta", group.get_table_name(beta->get_index_in_group()));
-    CHECK_LOGIC_ERROR(group.remove_table(1), LogicError::table_index_out_of_range);
+    CHECK_EQUAL("beta", group.get_table_name(beta->get_key()));
     CHECK_THROW(group.remove_table("epsilon"), NoSuchTable);
     group.verify();
 }
@@ -641,14 +623,10 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     // link and backlink columns.
 
     Group group;
-    group.add_table("alpha");
-    group.add_table("beta");
-    group.add_table("gamma");
-    group.add_table("delta");
-    TableRef first = group.get_table(0);
-    TableRef second = group.get_table(1);
-    TableRef third = group.get_table(2);
-    TableRef fourth = group.get_table(3);
+    TableRef first = group.add_table("alpha");
+    TableRef second = group.add_table("beta");
+    TableRef third = group.add_table("gamma");
+    TableRef fourth = group.add_table("delta");
 
     first->add_column_link(type_Link, "one", *third);
     third->add_column_link(type_Link, "two", *fourth);
@@ -671,7 +649,7 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
 
     group.verify();
 
-    group.remove_table(1); // Second
+    group.remove_table(second->get_key()); // Second
 
     group.verify();
 
@@ -731,15 +709,15 @@ TEST(Group_RemoveLinkTable)
     Group group;
     TableRef table = group.add_table("table");
     table->add_column_link(type_Link, "link", *table);
-    group.remove_table(table->get_index_in_group());
+    group.remove_table(table->get_key());
     CHECK(group.is_empty());
     CHECK(!table->is_attached());
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
     target->add_column(type_Int, "int");
     origin->add_column_link(type_Link, "link", *target);
-    CHECK_THROW(group.remove_table(target->get_index_in_group()), CrossTableLinkTarget);
-    group.remove_table(origin->get_index_in_group());
+    CHECK_THROW(group.remove_table(target->get_key()), CrossTableLinkTarget);
+    group.remove_table(origin->get_key());
     CHECK_EQUAL(1, group.size());
     CHECK(!origin->is_attached());
     CHECK(target->is_attached());
@@ -753,13 +731,12 @@ TEST(Group_RenameTable)
     TableRef alpha = group.add_table("alpha");
     TableRef beta = group.add_table("beta");
     TableRef gamma = group.add_table("gamma");
-    group.rename_table(beta->get_index_in_group(), "delta");
+    group.rename_table(beta->get_key(), "delta");
     CHECK_EQUAL("delta", beta->get_name());
     group.rename_table("delta", "epsilon");
     CHECK_EQUAL("alpha", alpha->get_name());
     CHECK_EQUAL("epsilon", beta->get_name());
     CHECK_EQUAL("gamma", gamma->get_name());
-    CHECK_LOGIC_ERROR(group.rename_table(3, "zeta"), LogicError::table_index_out_of_range);
     CHECK_THROW(group.rename_table("eta", "theta"), NoSuchTable);
     CHECK_THROW(group.rename_table("epsilon", "alpha"), TableNameInUse);
     bool require_unique_name = false;
@@ -771,110 +748,6 @@ TEST(Group_RenameTable)
 }
 
 
-TEST(Group_BasicMoveTable)
-{
-    Group group;
-    TableRef alpha = group.add_table("alpha");
-    TableRef beta = group.add_table("beta");
-    TableRef gamma = group.add_table("gamma");
-    TableRef delta = group.add_table("delta");
-    CHECK_EQUAL(4, group.size());
-
-    // Move up:
-    group.move_table(1, 3);
-    CHECK_EQUAL(4, group.size());
-    CHECK(alpha->is_attached());
-    CHECK(beta->is_attached());
-    CHECK(gamma->is_attached());
-    CHECK(delta->is_attached());
-    CHECK_EQUAL(0, alpha->get_index_in_group());
-    CHECK_EQUAL(3, beta->get_index_in_group());
-    CHECK_EQUAL(1, gamma->get_index_in_group());
-    CHECK_EQUAL(2, delta->get_index_in_group());
-
-    group.verify();
-
-    // Move down:
-    group.move_table(2, 0);
-    CHECK_EQUAL(4, group.size());
-    CHECK(alpha->is_attached());
-    CHECK(beta->is_attached());
-    CHECK(gamma->is_attached());
-    CHECK(delta->is_attached());
-    CHECK_EQUAL(1, alpha->get_index_in_group());
-    CHECK_EQUAL(3, beta->get_index_in_group());
-    CHECK_EQUAL(2, gamma->get_index_in_group());
-    CHECK_EQUAL(0, delta->get_index_in_group());
-
-    group.verify();
-}
-
-TEST(Group_MoveTableWithLinks)
-{
-    using tf = _impl::TableFriend;
-    Group group;
-    TableRef a = group.add_table("a");
-    TableRef b = group.add_table("b");
-    TableRef c = group.add_table("c");
-    TableRef d = group.add_table("d");
-    CHECK_EQUAL(4, group.size());
-    a->add_column_link(type_Link, "link_to_b", *b);
-    b->add_column_link(type_LinkList, "link_to_c", *c);
-    c->add_column_link(type_Link, "link_to_d", *d);
-    d->add_column_link(type_LinkList, "link_to_a", *a);
-
-    auto& a_spec = tf::get_spec(*a);
-    auto& b_spec = tf::get_spec(*b);
-    auto& c_spec = tf::get_spec(*c);
-    auto& d_spec = tf::get_spec(*d);
-
-    // Move up:
-    group.move_table(1, 3);
-    CHECK(a->is_attached());
-    CHECK(b->is_attached());
-    CHECK(c->is_attached());
-    CHECK(d->is_attached());
-    CHECK_EQUAL(a->get_link_target(0), b);
-    CHECK_EQUAL(b->get_link_target(0), c);
-    CHECK_EQUAL(c->get_link_target(0), d);
-    CHECK_EQUAL(d->get_link_target(0), a);
-    // Check backlink columns
-    CHECK_EQUAL(a_spec.get_opposite_link_table_ndx(1), d->get_index_in_group());
-    CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(1), a->get_index_in_group());
-    CHECK_EQUAL(c_spec.get_opposite_link_table_ndx(1), b->get_index_in_group());
-    CHECK_EQUAL(d_spec.get_opposite_link_table_ndx(1), c->get_index_in_group());
-
-    // Move down:
-    group.move_table(2, 0);
-    CHECK(a->is_attached());
-    CHECK(b->is_attached());
-    CHECK(c->is_attached());
-    CHECK(d->is_attached());
-    CHECK_EQUAL(a->get_link_target(0), b);
-    CHECK_EQUAL(b->get_link_target(0), c);
-    CHECK_EQUAL(c->get_link_target(0), d);
-    CHECK_EQUAL(d->get_link_target(0), a);
-    // Check backlink columns
-    CHECK_EQUAL(a_spec.get_opposite_link_table_ndx(1), d->get_index_in_group());
-    CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(1), a->get_index_in_group());
-    CHECK_EQUAL(c_spec.get_opposite_link_table_ndx(1), b->get_index_in_group());
-    CHECK_EQUAL(d_spec.get_opposite_link_table_ndx(1), c->get_index_in_group());
-}
-
-
-TEST(Group_MoveTableImmediatelyAfterOpen)
-{
-    Group g1;
-    TableRef a = g1.add_table("a");
-    TableRef b = g1.add_table("b");
-    CHECK_EQUAL(2, g1.size());
-
-    Group g2(g1.write_to_mem());
-    g2.move_table(0, 1);
-    CHECK_EQUAL(2, g2.size());
-    CHECK_EQUAL("b", g2.get_table_name(0));
-    CHECK_EQUAL("a", g2.get_table_name(1));
-}
 
 
 TEST(Group_Equal)
@@ -1351,6 +1224,7 @@ TEST(Group_ToJSON)
 }
 
 
+#ifdef LEGACY_TESTS
 TEST(Group_ToString)
 {
     Group g;
@@ -1366,7 +1240,7 @@ TEST(Group_ToString)
     CHECK_EQUAL("     tables     rows  \n   0 test       2     \n", str.c_str());
 }
 
-#ifdef LEGACY_TESTS
+
 TEST(Group_IndexString)
 {
     Group to_mem;
@@ -1870,6 +1744,7 @@ TEST_IF(Group_AddEmptyRowCrash_2, REALM_MAX_BPNODE_SIZE == 4)
 }
 
 
+#ifdef LEGACY_TESTS
 TEST_IF(Group_AddEmptyRowCrash_3, REALM_MAX_BPNODE_SIZE == 4)
 {
     // Set REALM_MAX_BPNODE_SIZE = 4 for it to crash
@@ -1883,7 +1758,7 @@ TEST_IF(Group_AddEmptyRowCrash_3, REALM_MAX_BPNODE_SIZE == 4)
     // Triggers "alloc.hpp:213: Assertion failed: v % 8 == 0"
     g.verify();
 }
-
+#endif
 
 TEST(Group_WriteEmpty)
 {

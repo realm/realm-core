@@ -70,8 +70,8 @@ public:
     /// construction of a smart-pointer object (TableRef). The table accessor
     /// pointer is bound by the callee before it is returned (bind_table_ptr()).
 
-    static Table* get_table(Group&, size_t index_in_group);
-    static const Table* get_table(const Group&, size_t index_in_group);
+    static Table* get_table(Group&, TableKey key);
+    static const Table* get_table(const Group&, TableKey key);
 
     static Table* get_table(Group&, StringData name);
     static const Table* get_table(const Group&, StringData name);
@@ -201,18 +201,18 @@ inline Table* LangBindHelper::copy_table(const Table& table)
 }
 
 
-inline Table* LangBindHelper::get_table(Group& group, size_t index_in_group)
+inline Table* LangBindHelper::get_table(Group& group, TableKey key)
 {
     typedef _impl::GroupFriend gf;
-    Table* table = &gf::get_table(group, index_in_group); // Throws
+    Table* table = &gf::get_table(group, key); // Throws
     table->bind_ptr();
     return table;
 }
 
-inline const Table* LangBindHelper::get_table(const Group& group, size_t index_in_group)
+inline const Table* LangBindHelper::get_table(const Group& group, TableKey key)
 {
     typedef _impl::GroupFriend gf;
-    const Table* table = &gf::get_table(group, index_in_group); // Throws
+    const Table* table = &gf::get_table(group, key); // Throws
     table->bind_ptr();
     return table;
 }

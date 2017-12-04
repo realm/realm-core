@@ -1021,8 +1021,7 @@ void Cluster::remove_backlinks(Key origin_key, size_t col_ndx, const std::vector
 {
     TableRef target_table = _impl::TableFriend::get_opposite_link_table(*m_tree_top.get_owner(), col_ndx);
     const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-    size_t backlink_col =
-        target_table_spec.find_backlink_column(m_tree_top.get_owner()->get_index_in_group(), col_ndx);
+    size_t backlink_col = target_table_spec.find_backlink_column(m_tree_top.get_owner()->get_key(), col_ndx);
 
     for (auto key : keys) {
         if (key != null_key) {

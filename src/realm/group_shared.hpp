@@ -712,9 +712,9 @@ public:
         return get_group().has_table(name);
     }
 
-    ConstTableRef get_table(size_t table_ndx) const
+    ConstTableRef get_table(TableKey key) const
     {
-        return get_group().get_table(table_ndx); // Throws
+        return get_group().get_table(key); // Throws
     }
 
     ConstTableRef get_table(StringData name) const
@@ -751,9 +751,9 @@ public:
         return get_group().has_table(name);
     }
 
-    TableRef get_table(size_t table_ndx) const
+    TableRef get_table(TableKey key) const
     {
-        return get_group().get_table(table_ndx); // Throws
+        return get_group().get_table(key); // Throws
     }
 
     TableRef get_table(StringData name) const

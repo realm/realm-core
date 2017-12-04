@@ -22,6 +22,7 @@
 #include <realm/array.hpp>
 #include <realm/cluster.hpp>
 #include <realm/table_ref.hpp>
+#include <realm/keys.hpp>
 
 namespace realm {
 
@@ -114,7 +115,7 @@ protected:
     bool do_is_null(size_t col_ndx) const;
 
     size_t get_column_index(StringData col_name) const;
-    size_t get_table_index() const;
+    TableKey get_table_key() const;
     TableRef get_target_table(size_t col_ndx) const;
 };
 

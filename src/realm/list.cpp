@@ -122,7 +122,7 @@ Key List<Key>::set(size_t ndx, Key target_key)
 
     TableRef target_table = m_obj.get_target_table(m_col_ndx);
     const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-    size_t backlink_col = target_table_spec.find_backlink_column(m_obj.get_table_index(), m_col_ndx);
+    size_t backlink_col = target_table_spec.find_backlink_column(m_obj.get_table_key(), m_col_ndx);
 
     // get will check for ndx out of bounds
     Key old_key = get(ndx);

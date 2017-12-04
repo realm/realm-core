@@ -25,6 +25,7 @@
 #include <realm/array_integer.hpp>
 #include <realm/data_type.hpp>
 #include <realm/column_type.hpp>
+#include <realm/keys.hpp>
 
 namespace realm {
 
@@ -106,8 +107,8 @@ public:
                               size_t* keys_ndx = nullptr) noexcept;
 
     // Links
-    size_t get_opposite_link_table_ndx(size_t column_ndx) const noexcept;
-    void set_opposite_link_table_ndx(size_t column_ndx, size_t table_ndx);
+    TableKey get_opposite_link_table_key(size_t column_ndx) const noexcept;
+    void set_opposite_link_table_key(size_t column_ndx, TableKey key);
 
     // Backlinks
     bool has_backlinks() const noexcept;
@@ -115,7 +116,7 @@ public:
     size_t backlink_column_count() const noexcept;
     void set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col_ndx);
     size_t get_origin_column_ndx(size_t backlink_col_ndx) const noexcept;
-    size_t find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx) const noexcept;
+    size_t find_backlink_column(TableKey origin_table_key, size_t origin_col_ndx) const noexcept;
 
     /// Get position in `Table::m_columns` of the specified column. It may be
     /// different from the specified logical column index due to the presence of

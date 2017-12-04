@@ -37,6 +37,7 @@
 #include <realm/query.hpp>
 #include <realm/column.hpp>
 #include <realm/cluster_tree.hpp>
+#include <realm/keys.hpp>
 
 namespace realm {
 
@@ -627,6 +628,9 @@ public:
     /// If this table is a group-level table, then this function returns the
     /// index of this table within the group. Otherwise it returns realm::npos.
     size_t get_index_in_group() const noexcept;
+    TableKey get_key() const noexcept;
+    // Get the key of this table directly, without needing a Table accessor.
+    static TableKey get_key_direct(Allocator& alloc, ref_type top_ref);
 
     // Aggregate functions
     size_t count_int(size_t column_ndx, int64_t value) const;
@@ -942,6 +946,7 @@ private:
     SpecPtr m_spec; // 1st slot in m_top (for root tables)
     ClusterTree m_clusters;
     int64_t m_next_key_value = -1;
+    TableKey m_key;
 
     // Is guaranteed to be empty for a detached accessor. Otherwise it is empty
     // when the table accessor is attached to a degenerate subtable (unattached
@@ -1058,9 +1063,9 @@ private:
                                bool listtype = false);
     void do_erase_root_column(size_t col_ndx);
     void do_move_root_column(size_t from, size_t to);
-    void insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx,
+    void insert_backlink_column(TableKey origin_table_key, size_t origin_col_ndx, size_t backlink_col_ndx,
                                 StringData name);
-    void erase_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx);
+    void erase_backlink_column(TableKey origin_table_key, size_t origin_col_ndx);
     void update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_ndx_begin);
     void update_link_target_tables_after_column_move(size_t moved_from, size_t moved_to);
 
@@ -1187,7 +1192,7 @@ private:
 
     /// Create an empty table with independent spec and return just
     /// the reference to the underlying memory.
-    static ref_type create_empty_table(Allocator&);
+    static ref_type create_empty_table(Allocator&, TableKey = TableKey());
 
     /// Create a column of the specified type, fill it with the
     /// specified number of default values, and return just the
@@ -1377,6 +1382,11 @@ private:
     R aggregate(size_t column_ndx, T value = {}, size_t* resultcount = nullptr, Key* return_ndx = nullptr) const;
     template <typename T>
     double average(size_t column_ndx, size_t* resultcount) const;
+
+    static constexpr int top_position_for_spec = 0;
+    static constexpr int top_position_for_columns = 1;
+    static constexpr int top_position_for_cluster_tree = 2;
+    static constexpr int top_position_for_key = 3;
 
     friend class SubtableNode;
     friend class _impl::TableFriend;
@@ -1744,9 +1754,9 @@ inline Columns<T> Table::column(const Table& origin, size_t origin_col_ndx)
 {
     static_assert(std::is_same<T, BackLink>::value, "");
 
-    size_t origin_table_ndx = origin.get_index_in_group();
+    auto origin_table_key = origin.get_key();
     const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    size_t backlink_col_ndx = current_target_table.m_spec->find_backlink_column(origin_table_ndx, origin_col_ndx);
+    size_t backlink_col_ndx = current_target_table.m_spec->find_backlink_column(origin_table_key, origin_col_ndx);
 
     std::vector<size_t> link_chain = std::move(m_link_chain);
     m_link_chain.clear();
@@ -1778,9 +1788,9 @@ inline Table& Table::link(size_t link_column)
 
 inline Table& Table::backlink(const Table& origin, size_t origin_col_ndx)
 {
-    size_t origin_table_ndx = origin.get_index_in_group();
+    auto origin_table_key = origin.get_key();
     const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    size_t backlink_col_ndx = current_target_table.m_spec->find_backlink_column(origin_table_ndx, origin_col_ndx);
+    size_t backlink_col_ndx = current_target_table.m_spec->find_backlink_column(origin_table_key, origin_col_ndx);
     return link(backlink_col_ndx);
 }
 
@@ -2113,9 +2123,9 @@ class _impl::TableFriend {
 public:
     typedef Table::UnbindGuard UnbindGuard;
 
-    static ref_type create_empty_table(Allocator& alloc)
+    static ref_type create_empty_table(Allocator& alloc, TableKey key = TableKey())
     {
-        return Table::create_empty_table(alloc); // Throws
+        return Table::create_empty_table(alloc, key); // Throws
     }
 
     static ref_type clone(const Table& table, Allocator& alloc)

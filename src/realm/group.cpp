@@ -73,6 +73,84 @@ Group::Group()
 }
 
 
+std::vector<TableKey> Group::get_keys() const
+{
+    std::vector<TableKey> retval;
+    if (is_attached() && m_table_names.is_attached()) {
+        size_t max_index = m_tables.size();
+        REALM_ASSERT(max_index < (1 << 16));
+        for (size_t j = 0; j < max_index; ++j) {
+            RefOrTagged rot = m_tables.get_as_ref_or_tagged(j);
+            if (rot.is_ref()) {
+                if (j < m_table_accessors.size() && m_table_accessors[j]) {
+                    retval.push_back(m_table_accessors[j]->get_key());
+                }
+                else {
+                    TableKey key = Table::get_key_direct(m_tables.get_alloc(), rot.get_as_ref());
+                    retval.push_back(key);
+                }
+            }
+        }
+    }
+    return retval;
+}
+
+
+size_t Group::size() const noexcept
+{
+    return m_num_tables;
+}
+
+
+void Group::set_size() const noexcept
+{
+    int retval = 0;
+    if (is_attached() && m_table_names.is_attached()) {
+        size_t max_index = m_tables.size();
+        REALM_ASSERT(max_index < (1 << 16));
+        for (size_t j = 0; j < max_index; ++j) {
+            RefOrTagged rot = m_tables.get_as_ref_or_tagged(j);
+            if (rot.is_ref() && rot.get_as_ref()) {
+                ++retval;
+            }
+        }
+    }
+    m_num_tables = retval;
+}
+
+
+TableKey Group::ndx2key(size_t ndx) const
+{
+    return m_table_accessors[ndx]->get_key();
+}
+
+
+size_t Group::key2ndx(TableKey key) const
+{
+    size_t idx = key.value & 0xFFFF;
+    return idx;
+}
+
+
+size_t Group::key2ndx_checked(TableKey key) const
+{
+    // FIXME: This is a temporary hack we should revisit.
+    // The notion of a const group as it is now, is not really
+    // useful. It is linked to a distinction between a read
+    // and a write transaction. This distinction is likely to
+    // be moved from compile time to run time.
+    Allocator* alloc = const_cast<SlabAlloc*>(&m_alloc);
+    size_t idx = key2ndx(key);
+    if (m_tables.is_attached() && idx < m_tables.size()) {
+        RefOrTagged rot = m_tables.get_as_ref_or_tagged(idx);
+        if (rot.is_ref() && rot.get_as_ref() && (Table::get_key_direct(*alloc, rot.get_as_ref()) == key)) {
+
+            return idx;
+        }
+    }
+    throw InvalidKey("No corresponding table");
+}
+
 int Group::get_file_format_version() const noexcept
 {
     return m_file_format_version;
@@ -139,16 +217,18 @@ void Group::upgrade_file_format(int target_file_format_version)
 
     // Upgrade from version prior to 5 (datetime -> timestamp)
     if (current_file_format_version < 5) {
-        for (size_t t = 0; t < m_tables.size(); t++) {
-            TableRef table = get_table(t);
+        auto keys = get_keys();
+        for (auto key : keys) {
+            TableRef table = get_table(key);
             table->upgrade_olddatetime();
         }
     }
 
     // Upgrade from version prior to 6 (StringIndex format changed last time)
     if (current_file_format_version < 6) {
-        for (size_t t = 0; t < m_tables.size(); t++) {
-            TableRef table = get_table(t);
+        auto keys = get_keys();
+        for (auto key : keys) {
+            TableRef table = get_table(key);
             table->rebuild_search_index(current_file_format_version);
         }
     }
@@ -319,8 +399,8 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
     else if (create_group_when_missing) {
         create_empty_group(); // Throws
     }
-
     m_attached = true;
+    set_size();
 
 #if REALM_METRICS
     update_num_objects();
@@ -348,9 +428,9 @@ void Group::update_num_objects()
         // where table accessors are only instantiated on demand, because they are all created here.
 
         m_total_rows = 0;
-        size_t num_tables = size();
-        for (size_t i = 0; i < num_tables; ++i) {
-            ConstTableRef t = get_table(i);
+        auto keys = get_keys();
+        for (auto key : keys) {
+            ConstTableRef t = get_table(key);
             m_total_rows += t->size();
         }
     }
@@ -406,7 +486,7 @@ void Group::create_empty_group()
     }
     {
         m_tables.create(Array::type_HasRefs); // Throws
-        _impl::DestroyGuard<ArrayInteger> dg(&m_tables);
+        _impl::DestroyGuard<Array> dg(&m_tables);
         m_top.add(m_tables.get_ref()); // Throws
         dg.release();
     }
@@ -419,9 +499,6 @@ void Group::create_empty_group()
 Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher)
 {
     REALM_ASSERT(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size());
-
-    if (table_ndx >= m_tables.size())
-        throw LogicError(LogicError::table_index_out_of_range);
 
     if (m_table_accessors.empty())
         m_table_accessors.resize(m_tables.size()); // Throws
@@ -454,88 +531,147 @@ Table* Group::do_get_table(StringData name, DescMatcher desc_matcher)
 }
 
 
-Table* Group::do_insert_table(size_t table_ndx, StringData name, DescSetter desc_setter, bool require_unique_name)
+Table* Group::do_get_table(TableKey key, DescMatcher desc_matcher)
 {
-    if (require_unique_name && has_table(name))
-        throw TableNameInUse();
-    return do_insert_table(table_ndx, name, desc_setter); // Throws
+    if (!m_table_names.is_attached())
+        return 0;
+    size_t table_ndx = key2ndx(key);
+    if (table_ndx >= m_tables.size())
+        return 0;
+
+    Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    if (table->get_key() != key) {
+        throw InvalidKey("no such key");
+    }
+    return table;
 }
 
 
-Table* Group::do_insert_table(size_t table_ndx, StringData name, DescSetter desc_setter)
+Table* Group::do_add_table(StringData name, DescSetter desc_setter, bool require_unique_name)
 {
-    if (table_ndx > m_tables.size())
-        throw LogicError(LogicError::table_index_out_of_range);
-    create_and_insert_table(table_ndx, name);        // Throws
-    Table* table = do_get_table(table_ndx, nullptr); // Throws
+    // get new key and index
+    if (!m_table_names.is_attached())
+        return 0;
+    if (require_unique_name) {
+        size_t table_ndx = m_table_names.find_first(name);
+        if (table_ndx != not_found)
+            throw TableNameInUse();
+    }
+    // find first empty spot:
+    // FIXME: Optimize with rowing ptr or free list of some sort
+    size_t j;
+    RefOrTagged rot = RefOrTagged::make_tagged(0);
+    for (j = 0; j < m_tables.size(); ++j) {
+        rot = m_tables.get_as_ref_or_tagged(j);
+        if (!rot.is_ref())
+            break;
+    }
+    bool gen_null_tag = (j == m_tables.size()); // new tags start at zero
+    uint64_t tag = gen_null_tag ? 0 : rot.get_as_int();
+    TableKey key = TableKey((tag << 16) | j);
+    create_and_insert_table(key, name);
+    Table* table = create_table_accessor(j);
     if (desc_setter)
-        (*desc_setter)(*table); // Throws
+        (*desc_setter)(*table);
     return table;
 }
 
-Table* Group::do_get_or_insert_table(size_t table_ndx, StringData name, DescMatcher desc_matcher,
-                                     DescSetter desc_setter, bool* was_added)
+
+Table* Group::do_add_table(TableKey key, StringData name, DescSetter desc_setter, bool require_unique_name)
 {
-    Table* table;
-    size_t existing_table_ndx = m_table_names.find_first(name);
-    if (existing_table_ndx == not_found) {
-        table = do_insert_table(table_ndx, name, desc_setter); // Throws
-        if (was_added)
-            *was_added = true;
+    if (!m_table_names.is_attached())
+        return 0;
+    auto ndx = key2ndx(key);
+    if (m_tables.is_attached() && m_tables.size() > ndx) {
+        auto rot = m_tables.get_as_ref_or_tagged(ndx);
+        // validate that no such table is already there
+        if (rot.is_ref())
+            throw InvalidKey("Key already in use");
+        REALM_ASSERT(m_table_accessors[ndx] == nullptr);
     }
-    else {
-        table = do_get_table(existing_table_ndx, desc_matcher); // Throws
-        if (was_added)
-            *was_added = false;
+    // validate name if required
+    if (require_unique_name) {
+        size_t table_ndx = m_table_names.find_first(name);
+        if (table_ndx != not_found)
+            throw TableNameInUse();
     }
+    create_and_insert_table(key, name);
+    Table* table = create_table_accessor(ndx);
+    if (desc_setter)
+        (*desc_setter)(*table);
     return table;
 }
-
 
 Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher, DescSetter desc_setter, bool* was_added)
 {
     REALM_ASSERT(m_table_names.is_attached());
-    Table* table;
-    size_t table_ndx = m_table_names.find_first(name);
-    if (table_ndx == not_found) {
-        table = do_insert_table(m_tables.size(), name, desc_setter); // Throws
+    auto table = do_get_table(name, desc_matcher);
+    if (table) {
+        if (was_added)
+            *was_added = false;
+        return table;
     }
     else {
-        table = do_get_table(table_ndx, desc_matcher); // Throws
+        table = do_add_table(name, desc_setter, false);
+        if (was_added)
+            *was_added = true;
+        return table;
     }
-    if (was_added)
-        *was_added = (table_ndx == not_found);
-    return table;
 }
 
 
-void Group::create_and_insert_table(size_t table_ndx, StringData name)
+Table* Group::do_get_or_add_table(TableKey key, StringData name, DescMatcher desc_matcher, DescSetter desc_setter,
+                                  bool* was_added)
+{
+    REALM_ASSERT(m_table_names.is_attached());
+    auto table = do_get_table(key, desc_matcher);
+    if (table) {
+        if (m_table_names.get(key2ndx(key)) != name) {
+            throw InvalidKey("Key and name does not match");
+        }
+        if (was_added)
+            *was_added = false;
+        return table;
+    }
+    else {
+        table = do_add_table(key, name, desc_setter, false);
+        if (was_added)
+            *was_added = true;
+        return table;
+    }
+}
+
+
+void Group::create_and_insert_table(TableKey key, StringData name)
 {
     if (REALM_UNLIKELY(name.size() > max_table_name_length))
         throw LogicError(LogicError::table_name_too_long);
 
     using namespace _impl;
     typedef TableFriend tf;
-    ref_type ref = tf::create_empty_table(m_alloc); // Throws
+    size_t table_ndx = key2ndx(key);
+    ref_type ref = tf::create_empty_table(m_alloc, key); // Throws
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     size_t prior_num_tables = m_tables.size();
-    m_tables.insert(table_ndx, ref);       // Throws
-    m_table_names.insert(table_ndx, name); // Throws
-
-    // Need slot for table accessor
-    if (!m_table_accessors.empty()) {
-        m_table_accessors.insert(m_table_accessors.begin() + table_ndx, nullptr); // Throws
+    RefOrTagged rot = RefOrTagged::make_ref(ref);
+    // We may need to align accessors and tables
+    while (m_table_accessors.size() < m_tables.size()) {
+        m_table_accessors.push_back(nullptr);
+    }
+    if (table_ndx == m_tables.size()) {
+        m_tables.add(rot);
+        m_table_names.add(name);
+        // Need new slot for table accessor
+        m_table_accessors.push_back(nullptr);
+    }
+    else {
+        m_tables.set(table_ndx, rot);       // Throws
+        m_table_names.set(table_ndx, name); // Throws
     }
 
-    update_table_indices([&](size_t old_table_ndx) {
-        if (old_table_ndx >= table_ndx) {
-            return old_table_ndx + 1;
-        }
-        return old_table_ndx;
-    }); // Throws
-
     if (Replication* repl = m_alloc.get_replication())
-        repl->insert_group_level_table(table_ndx, prior_num_tables, name); // Throws
+        repl->insert_group_level_table(key, prior_num_tables, name); // Throws
+    ++m_num_tables;
 }
 
 
@@ -571,7 +707,11 @@ Table* Group::create_table_accessor(size_t table_ndx)
     // registration in the group accessor of inclomplete table accessors.
 
     typedef _impl::TableFriend tf;
-    ref_type ref = m_tables.get_as_ref(table_ndx);
+    RefOrTagged rot = m_tables.get_as_ref_or_tagged(table_ndx);
+    ref_type ref = rot.get_as_ref();
+    if (ref == 0) {
+        throw InvalidKey("No such table");
+    }
     Table* table = tf::create_incomplete_accessor(m_alloc, ref, this, table_ndx); // Throws
 
     // The new accessor cannot be leaked, because no exceptions can be thrown
@@ -597,18 +737,20 @@ void Group::remove_table(StringData name)
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found)
         throw NoSuchTable();
-    remove_table(table_ndx); // Throws
+    auto key = ndx2key(table_ndx);
+    remove_table(key); // Throws
 }
 
-
-void Group::remove_table(size_t table_ndx)
+void Group::remove_table(TableKey key)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
+
+    size_t table_ndx = key2ndx_checked(key);
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
-    TableRef table = get_table(table_ndx);
+    TableRef table = get_table(key);
 
     // In principle we could remove a table even if it is the target of link
     // columns of other tables, however, to do that, we would have to
@@ -632,32 +774,22 @@ void Group::remove_table(size_t table_ndx)
 
     size_t prior_num_tables = m_tables.size();
     if (Replication* repl = m_alloc.get_replication())
-        repl->erase_group_level_table(table_ndx, prior_num_tables); // Throws
+        repl->erase_group_level_table(key, prior_num_tables); // Throws
 
     int64_t ref_64 = m_tables.get(table_ndx);
     REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));
     ref_type ref = ref_type(ref_64);
 
-    // Remove table and move all successive tables
-    m_tables.erase(table_ndx);      // Throws
-    m_table_names.erase(table_ndx); // Throws
-    m_table_accessors.erase(m_table_accessors.begin() + table_ndx);
+    // Replace entry in m_tables with next tag to use:
+    RefOrTagged rot = RefOrTagged::make_tagged(1 + (key.value >> 16));
+    // Remove table
+    m_tables.set(table_ndx, rot);     // Throws
+    m_table_names.set(table_ndx, {}); // Throws
+    m_table_accessors[table_ndx] = nullptr;
+    --m_num_tables;
 
     tf::detach(*table);
     tf::unbind_ptr(*table);
-
-    // Unless the removed table is the last, update all indices of tables after
-    // the removed table.
-    bool last_table_removed = table_ndx == m_tables.size();
-    if (!last_table_removed) {
-        update_table_indices([&](size_t old_table_ndx) {
-            REALM_ASSERT(old_table_ndx != table_ndx); // We should not see links to the removed table
-            if (old_table_ndx > table_ndx) {
-                return old_table_ndx - 1;
-            }
-            return old_table_ndx;
-        }); // Throws
-    }
 
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
@@ -671,92 +803,21 @@ void Group::rename_table(StringData name, StringData new_name, bool require_uniq
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found)
         throw NoSuchTable();
-    rename_table(table_ndx, new_name, require_unique_name); // Throws
+    rename_table(ndx2key(table_ndx), new_name, require_unique_name); // Throws
 }
 
 
-void Group::rename_table(size_t table_ndx, StringData new_name, bool require_unique_name)
+void Group::rename_table(TableKey key, StringData new_name, bool require_unique_name)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
-    if (table_ndx >= m_tables.size())
-        throw LogicError(LogicError::table_index_out_of_range);
     if (require_unique_name && has_table(new_name))
         throw TableNameInUse();
+    size_t table_ndx = key2ndx_checked(key);
     m_table_names.set(table_ndx, new_name);
     if (Replication* repl = m_alloc.get_replication())
-        repl->rename_group_level_table(table_ndx, new_name); // Throws
-}
-
-
-void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-    REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
-    REALM_ASSERT_EX(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size(),
-                    m_table_accessors.size(), m_tables.size());
-    if (from_table_ndx >= m_tables.size())
-        throw LogicError(LogicError::table_index_out_of_range);
-    if (to_table_ndx >= m_tables.size())
-        throw LogicError(LogicError::table_index_out_of_range);
-
-    if (from_table_ndx == to_table_ndx)
-        return;
-
-    // Tables between from_table_ndx and to_table_ndx change their indices, so
-    // link columns have to be adjusted (similar to remove_table).
-
-    // Build a map of all table indices that are going to change:
-    std::map<size_t, size_t> moves; // from -> to
-    moves[from_table_ndx] = to_table_ndx;
-    if (from_table_ndx < to_table_ndx) {
-        // Move up:
-        for (size_t i = from_table_ndx + 1; i <= to_table_ndx; ++i) {
-            moves[i] = i - 1;
-        }
-    }
-    else { // from_table_ndx > to_table_ndx
-        // Move down:
-        for (size_t i = to_table_ndx; i < from_table_ndx; ++i) {
-            moves[i] = i + 1;
-        }
-    }
-
-    // Move entries in internal data structures.
-    m_tables.move_rotate(from_table_ndx, to_table_ndx);
-    m_table_names.move_rotate(from_table_ndx, to_table_ndx);
-
-    // Move accessors.
-    if (!m_table_accessors.empty()) {
-        using iter = decltype(m_table_accessors.begin());
-        iter first, new_first, last;
-        if (from_table_ndx < to_table_ndx) {
-            // Rotate left.
-            first = m_table_accessors.begin() + from_table_ndx;
-            new_first = first + 1;
-            last = m_table_accessors.begin() + to_table_ndx + 1;
-        }
-        else { // from_table_ndx > to_table_ndx
-            // Rotate right.
-            first = m_table_accessors.begin() + to_table_ndx;
-            new_first = m_table_accessors.begin() + from_table_ndx;
-            last = new_first + 1;
-        }
-        std::rotate(first, new_first, last);
-    }
-
-    update_table_indices([&](size_t old_table_ndx) {
-        auto it = moves.find(old_table_ndx);
-        if (it != moves.end()) {
-            return it->second;
-        }
-        return old_table_ndx;
-    });
-
-    if (Replication* repl = m_alloc.get_replication())
-        repl->move_group_level_table(from_table_ndx, to_table_ndx); // Throws
+        repl->rename_group_level_table(key, new_name); // Throws
 }
 
 
@@ -1032,20 +1093,21 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
     }
 }
 
-
 bool Group::operator==(const Group& g) const
 {
-    size_t n = size();
-    if (n != g.size())
+    auto keys_this = get_keys();
+    auto keys_g = g.get_keys();
+    size_t n = keys_this.size();
+    if (n != keys_g.size())
         return false;
     for (size_t i = 0; i < n; ++i) {
-        const StringData& table_name_1 = get_table_name(i);   // Throws
-        const StringData& table_name_2 = g.get_table_name(i); // Throws
+        const StringData& table_name_1 = get_table_name(keys_this[i]);
+        const StringData& table_name_2 = g.get_table_name(keys_g[i]);
         if (table_name_1 != table_name_2)
             return false;
 
-        ConstTableRef table_1 = get_table(i);   // Throws
-        ConstTableRef table_2 = g.get_table(i); // Throws
+        ConstTableRef table_1 = get_table(keys_this[i]);
+        ConstTableRef table_2 = g.get_table(keys_g[i]);
         if (*table_1 != *table_2)
             return false;
     }
@@ -1066,12 +1128,13 @@ size_t Group::compute_aggregated_byte_size() const noexcept
 void Group::to_string(std::ostream& out) const
 {
     // Calculate widths
-    size_t index_width = 4;
+    size_t index_width = 16;
     size_t name_width = 10;
     size_t rows_width = 6;
-    size_t count = size();
-    for (size_t i = 0; i < count; ++i) {
-        StringData name = get_table_name(i);
+
+    auto keys = get_keys();
+    for (auto key : keys) {
+        StringData name = get_table_name(key);
         if (name_width < name.size())
             name_width = name.size();
 
@@ -1089,12 +1152,12 @@ void Group::to_string(std::ostream& out) const
     out << std::setw(int(rows_width)) << std::left << "rows" << std::endl;
 
     // Print tables
-    for (size_t i = 0; i < count; ++i) {
-        StringData name = get_table_name(i);
+    for (auto key : keys) {
+        StringData name = get_table_name(key);
         ConstTableRef table = get_table(name);
         size_t row_count = table->size();
 
-        out << std::setw(int(index_width)) << std::right << i << " ";
+        out << std::setw(int(index_width)) << std::right << key.value << " ";
         out << std::setw(int(name_width)) << std::left << std::string(name) << " ";
         out << std::setw(int(rows_width)) << std::left << row_count << std::endl;
     }
@@ -1225,20 +1288,14 @@ public:
     {
     }
 
-    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) noexcept
+    bool insert_group_level_table(TableKey table_key, size_t num_tables, StringData) noexcept
     {
+        auto table_ndx = m_group.key2ndx(table_key);
         REALM_ASSERT_3(table_ndx, <=, num_tables);
         REALM_ASSERT(m_group.m_table_accessors.empty() || m_group.m_table_accessors.size() == num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
-            m_group.m_table_accessors.insert(m_group.m_table_accessors.begin() + table_ndx, nullptr);
-            for (size_t i = table_ndx + 1; i < m_group.m_table_accessors.size(); ++i) {
-                if (Table* moved_table = m_group.m_table_accessors[i]) {
-                    typedef _impl::TableFriend tf;
-                    tf::mark(*moved_table);
-                    tf::mark_opposite_link_tables(*moved_table);
-                }
-            }
+            m_group.m_table_accessors[table_ndx] = nullptr;
         }
 
         m_schema_changed = true;
@@ -1246,8 +1303,9 @@ public:
         return true;
     }
 
-    bool erase_group_level_table(size_t table_ndx, size_t num_tables) noexcept
+    bool erase_group_level_table(TableKey table_key, size_t num_tables) noexcept
     {
+        auto table_ndx = m_group.key2ndx(table_key);
         REALM_ASSERT_3(table_ndx, <, num_tables);
         REALM_ASSERT(m_group.m_table_accessors.empty() || m_group.m_table_accessors.size() == num_tables);
 
@@ -1258,15 +1316,7 @@ public:
                 typedef _impl::TableFriend tf;
                 tf::detach(*table);
                 tf::unbind_ptr(*table);
-            }
-
-            m_group.m_table_accessors.erase(m_group.m_table_accessors.begin() + table_ndx);
-            for (size_t i = table_ndx; i < m_group.m_table_accessors.size(); ++i) {
-                if (Table* moved_table = m_group.m_table_accessors[i]) {
-                    typedef _impl::TableFriend tf;
-                    tf::mark(*moved_table);
-                    tf::mark_opposite_link_tables(*moved_table);
-                }
+                m_group.m_table_accessors[table_ndx] = nullptr;
             }
         }
 
@@ -1275,7 +1325,7 @@ public:
         return true;
     }
 
-    bool rename_group_level_table(size_t, StringData) noexcept
+    bool rename_group_level_table(TableKey, StringData) noexcept
     {
         // No-op since table names are properties of the group, and the group
         // accessor is always refreshed
@@ -1283,39 +1333,9 @@ public:
         return true;
     }
 
-    bool move_group_level_table(size_t from_table_ndx, size_t to_table_ndx) noexcept
+    bool move_group_level_table(size_t, size_t) noexcept
     {
-        REALM_ASSERT(from_table_ndx != to_table_ndx);
-        if (!m_group.m_table_accessors.empty()) {
-            using iter = decltype(m_group.m_table_accessors)::iterator;
-            iter begin, end;
-            if (from_table_ndx < to_table_ndx) {
-                // Left rotation
-                begin = m_group.m_table_accessors.begin() + from_table_ndx;
-                end = m_group.m_table_accessors.begin() + to_table_ndx + 1;
-                Table* table = begin[0];
-                realm::safe_copy_n(begin + 1, to_table_ndx - from_table_ndx, begin);
-                end[-1] = table;
-            }
-            else { // from_table_ndx > to_table_ndx
-                // Right rotation
-                begin = m_group.m_table_accessors.begin() + to_table_ndx;
-                end = m_group.m_table_accessors.begin() + from_table_ndx + 1;
-                Table* table = end[-1];
-                std::copy_backward(begin, end - 1, end);
-                begin[0] = table;
-            }
-            for (iter i = begin; i != end; ++i) {
-                if (Table* table = *i) {
-                    typedef _impl::TableFriend tf;
-                    tf::mark(*table); // FIXME: Not sure this is needed
-                    tf::mark_opposite_link_tables(*table);
-                }
-            }
-        }
-
-        m_schema_changed = true;
-
+        REALM_ASSERT(false); // unsupported
         return true;
     }
 
@@ -1437,7 +1457,7 @@ public:
         return true; // No-op
     }
 
-    bool set_link(size_t col_ndx, size_t, size_t, size_t, _impl::Instruction) noexcept
+    bool set_link(size_t col_ndx, size_t, size_t, TableKey, _impl::Instruction) noexcept
     {
         // When links are changed, the link-target table is also affected and
         // its accessor must therefore be marked dirty too. Indeed, when it
@@ -1647,7 +1667,7 @@ public:
         return true; // No-op
     }
 
-    bool nullify_link(size_t, size_t, size_t)
+    bool nullify_link(size_t, size_t, TableKey)
     {
         return true; // No-op
     }
@@ -1683,57 +1703,10 @@ void Group::refresh_dirty_accessors()
 }
 
 
-template <class F>
-void Group::update_table_indices(F&& map_function)
-{
-    using tf = _impl::TableFriend;
-
-    // Update any link columns.
-    for (size_t i = 0; i < m_tables.size(); ++i) {
-        Array table_top{m_alloc};
-        Spec dummy_spec{m_alloc};
-        Spec* spec = &dummy_spec;
-
-        // Ensure that we use spec objects in potential table accessors
-        Table* table = m_table_accessors.empty() ? nullptr : m_table_accessors[i];
-        if (table) {
-            spec = &tf::get_spec(*table);
-            table->set_ndx_in_parent(i);
-        }
-        else {
-            table_top.set_parent(&m_tables, i);
-            table_top.init_from_parent();
-            dummy_spec.set_parent(&table_top, 0); // Spec has index 0 in table top
-            dummy_spec.init_from_parent();
-        }
-
-        size_t num_cols = spec->get_column_count();
-        bool spec_changed = false;
-        for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
-            ColumnType type = spec->get_column_type(col_ndx);
-            if (tf::is_link_type(type) || type == col_type_BackLink) {
-                size_t table_ndx = spec->get_opposite_link_table_ndx(col_ndx);
-                size_t new_table_ndx = map_function(table_ndx);
-                if (new_table_ndx != table_ndx) {
-                    spec->set_opposite_link_table_ndx(col_ndx, new_table_ndx); // Throws
-                    spec_changed = true;
-                }
-            }
-        }
-
-        if (spec_changed && table) {
-            tf::mark(*table);
-        }
-    }
-
-    // Update accessors.
-    refresh_dirty_accessors(); // Throws
-}
-
-
 void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in)
 {
     REALM_ASSERT(is_attached());
+    REALM_ASSERT(false); // FIXME: accessor updates need to be handled differently
 
     // Exception safety: If this function throws, the group accessor and all of
     // its subordinate accessors are left in a state that may not be fully
@@ -1954,10 +1927,10 @@ void Group::verify() const
 
     // Verify tables
     {
-        size_t n = m_tables.size();
-        for (size_t i = 0; i != n; ++i) {
-            ConstTableRef table = get_table(i);
-            REALM_ASSERT_3(table->get_index_in_group(), ==, i);
+        auto keys = get_keys();
+        for (auto key : keys) {
+            ConstTableRef table = get_table(key);
+            REALM_ASSERT_3(table->get_key().value, ==, key.value);
             table->verify();
         }
     }
@@ -2139,9 +2112,10 @@ void Group::to_dot(std::ostream& out) const
     m_tables.to_dot(out, "tables");
 
     // Tables
-    for (size_t i = 0; i < m_tables.size(); ++i) {
-        ConstTableRef table = get_table(i);
-        StringData name = get_table_name(i);
+    auto keys = get_keys();
+    for (auto key : keys) {
+        ConstTableRef table = get_table(key);
+        StringData name = get_table_name(key);
         table->to_dot(out, name);
     }
 

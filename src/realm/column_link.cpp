@@ -157,8 +157,8 @@ void LinkColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
         return;
 
     // Recurse on target row when appropriate
-    size_t target_table_ndx = m_target_table->get_index_in_group();
-    check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws
+    auto target_table_key = m_target_table->get_key();
+    check_cascade_break_backlinks_to(target_table_key, target_row_ndx, state); // Throws
 }
 
 
@@ -172,7 +172,7 @@ void LinkColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeSta
     if (m_target_table == state.stop_on_table)
         return;
 
-    size_t target_table_ndx = m_target_table->get_index_in_group();
+    auto target_table_key = m_target_table->get_key();
     for (size_t i = 0; i < num_rows; ++i) {
         int_fast64_t value = LinkColumnBase::get(i);
         bool value_is_null = value == 0;
@@ -180,7 +180,7 @@ void LinkColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeSta
             continue;
 
         size_t target_row_ndx = to_size_t(value - 1);
-        check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws
+        check_cascade_break_backlinks_to(target_table_key, target_row_ndx, state); // Throws
     }
 }
 

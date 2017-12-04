@@ -426,10 +426,10 @@ void BacklinkColumn::verify(const Table& table, size_t col_ndx) const
     REALM_ASSERT(&m_origin_column->get_backlink_column() == this);
 
     // Check that m_origin_table is the table specified by the spec
-    size_t origin_table_ndx = m_origin_table->get_index_in_group();
+    auto origin_table_key = m_origin_table->get_key();
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
-    REALM_ASSERT_3(origin_table_ndx, ==, spec.get_opposite_link_table_ndx(col_ndx));
+    REALM_ASSERT_3(origin_table_key.value, ==, spec.get_opposite_link_table_key(col_ndx).value);
 #else
     static_cast<void>(table);
     static_cast<void>(col_ndx);

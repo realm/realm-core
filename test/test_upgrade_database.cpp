@@ -1269,7 +1269,6 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
-#endif
 
 
 TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
@@ -1334,6 +1333,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
+#endif
 
 
 #endif // TEST_GROUP

@@ -716,17 +716,21 @@ TEST(Shared_try_begin_write)
         // Verify that the thread transaction commit succeeded.
         ReadTransaction rt(sg);
         const Group& gr = rt.get_group();
-        ConstTableRef t = gr.get_table(0);
+        auto keys = gr.get_keys();
+        ConstTableRef t = gr.get_table(keys[0]);
         CHECK(t->get_name() == StringData("table"));
         CHECK(t->get_column_name(0) == StringData("string_col"));
         CHECK(t->size() == 1000);
+        CHECK(keys.size() == 1);
+        CHECK(gr.size() == 1);
     }
 
     // Now try to start a transaction without any contenders.
     success = sg.try_begin_write(g);
     CHECK(success);
     CHECK(g != nullptr);
-
+    CHECK(g->size() == 1);
+    g->verify();
     {
         // make sure we still get a useful error message when trying to
         // obtain two write locks on the same thread
@@ -734,7 +738,8 @@ TEST(Shared_try_begin_write)
     }
 
     // Add some data and finish the transaction.
-    g->add_table(StringData("table 2"));
+    auto t2k = g->add_table(StringData("table 2"))->get_key();
+    CHECK(g->size() == 2);
     sg.commit();
 
     {
@@ -742,7 +747,7 @@ TEST(Shared_try_begin_write)
         ReadTransaction rt(sg);
         const Group& gr = rt.get_group();
         CHECK(gr.size() == 2);
-        CHECK(gr.get_table(1)->get_name() == StringData("table 2"));
+        CHECK(gr.get_table(t2k)->get_name() == StringData("table 2"));
     }
 }
 
@@ -3033,7 +3038,8 @@ TEST_IF(Shared_encrypted_pin_and_write, false)
             }
             WriteTransaction wt(sg);
             Group& g = wt.get_group();
-            TableRef table = g.get_table(0);
+            auto keys = g.get_keys();
+            TableRef table = g.get_table(keys[0]);
             for (size_t row = 0; row < num_rows; ++row) {
                 StringData c(rows[row]);
                 table->set_string(0, row, c);
@@ -3157,9 +3163,9 @@ TEST(Shared_Bptree_insert_failure)
     SharedGroup sg_w(path, false, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
 
-    g.add_table("");
-    g.get_table(0)->add_column(type_Double, "dgrpn", true);
-    g.get_table(0)->add_empty_row(246);
+    auto tk = g.add_table("")->get_key();
+    g.get_table(tk)->add_column(type_Double, "dgrpn", true);
+    g.get_table(tk)->add_empty_row(246);
     sg_w.commit();
     REALM_ASSERT_RELEASE(sg_w.compact());
 #if 0
@@ -3168,11 +3174,11 @@ TEST(Shared_Bptree_insert_failure)
         // but without failing:
         SharedGroup sg2(path, false, SharedGroupOptions(crypt_key()));
         Group& g2 = const_cast<Group&>(sg2.begin_write());
-        g2.get_table(0)->add_empty_row(396);
+        g2.get_table(tk)->add_empty_row(396);
     }
 #endif
     sg_w.begin_write();
-    g.get_table(0)->add_empty_row(396);
+    g.get_table(tk)->add_empty_row(396);
 }
 
 NONCONCURRENT_TEST(SharedGroupOptions_tmp_dir)
