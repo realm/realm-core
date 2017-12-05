@@ -6,6 +6,10 @@ fix_xcode_try_compile()
 
 set_common_xcode_attributes()
 
+set(CMAKE_DEBUG_POSTFIX "-ios-dbg")
+set(CMAKE_MINSIZEDEBUG_POSTFIX "-ios-dbg")
+set(CMAKE_RELEASE_POSTFIX "-ios")
+
 set(CMAKE_OSX_SYSROOT "iphoneos")
 
 set(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS "iphoneos iphonesimulator")
