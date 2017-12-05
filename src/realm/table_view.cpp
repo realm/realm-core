@@ -580,8 +580,7 @@ void TableView::remove(size_t row_ndx)
     m_key_values.erase(row_ndx);
 
     // Delete row in origin table
-    using tf = _impl::TableFriend;
-    tf::erase_row(*m_table, key); // Throws
+    m_table->remove_object(key);
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:

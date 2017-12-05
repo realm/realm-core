@@ -267,7 +267,7 @@ TEST(Table_DeleteCrash)
     table->remove_object(k1);
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Table_OptimizeCrash)
 {
     // This will crash at the .add() method
@@ -281,7 +281,7 @@ TEST(Table_OptimizeCrash)
     ttt.set_int(0, 0, 1);
     ttt.set_string(1, 0, "AA");
 }
-
+#endif
 
 TEST(Table_DateTimeMinMax)
 {

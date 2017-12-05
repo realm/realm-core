@@ -162,26 +162,6 @@ public:
     {
         return true;
     }
-    bool insert_empty_rows(size_t, size_t, size_t, bool)
-    {
-        return true;
-    }
-    bool add_row_with_key(size_t, size_t, size_t, int64_t)
-    {
-        return true;
-    }
-    bool erase_rows(size_t, size_t, size_t, bool)
-    {
-        return true;
-    }
-    bool swap_rows(size_t, size_t)
-    {
-        return true;
-    }
-    bool move_row(size_t, size_t)
-    {
-        return true;
-    }
     bool clear_table(size_t)
     {
         return true;
@@ -2259,9 +2239,13 @@ public:
         return true; // No-op
     }
 
-    bool clear_table(size_t)
+
+    bool clear_table(size_t old_size)
     {
-        // No instruction to reverse this
+        while (old_size--) {
+            m_encoder.create_object(null_key);
+            append_instruction();
+        }
         return true;
     }
 

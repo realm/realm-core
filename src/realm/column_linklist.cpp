@@ -283,18 +283,6 @@ ref_type LinkListColumn::get_child_ref(size_t child_ndx) const noexcept
 }
 
 
-void LinkListColumn::to_json_row(size_t row_ndx, std::ostream& out) const
-{
-    LinkViewRef links1 = const_cast<LinkListColumn*>(this)->get(row_ndx);
-    for (size_t t = 0; t < links1->size(); t++) {
-        if (t > 0)
-            out << ", ";
-        size_t target = links1->get(t).get_index();
-        out << target;
-    }
-}
-
-
 void LinkListColumn::discard_child_accessors() noexcept
 {
     validate_list_accessors();
@@ -411,7 +399,7 @@ void LinkListColumn::verify() const
 
 void LinkListColumn::verify(const Table& table, size_t col_ndx) const
 {
-#ifdef REALM_DEBUG
+#if 0
     LinkColumnBase::verify(table, col_ndx);
 
     std::vector<BacklinkColumn::VerifyPair> pairs;

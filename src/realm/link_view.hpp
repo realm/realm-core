@@ -54,12 +54,6 @@ public:
     bool operator==(const LinkView&) const noexcept;
     bool operator!=(const LinkView&) const noexcept;
 
-    // Getting links
-    Table::ConstRowExpr operator[](size_t link_ndx) const noexcept;
-    Table::RowExpr operator[](size_t link_ndx) noexcept;
-    Table::ConstRowExpr get(size_t link_ndx) const noexcept;
-    Table::RowExpr get(size_t link_ndx) noexcept;
-
     // Modifiers
     void add(size_t target_row_ndx);
     void insert(size_t link_ndx, size_t target_row_ndx);
@@ -254,32 +248,6 @@ inline bool LinkView::operator==(const LinkView& link_list) const noexcept
 inline bool LinkView::operator!=(const LinkView& link_list) const noexcept
 {
     return !(*this == link_list);
-}
-
-inline Table::ConstRowExpr LinkView::get(size_t link_ndx) const noexcept
-{
-    return const_cast<LinkView*>(this)->get(link_ndx);
-}
-
-inline Table::RowExpr LinkView::get(size_t link_ndx) noexcept
-{
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT(m_row_indexes.is_attached());
-    REALM_ASSERT_3(link_ndx, <, m_row_indexes.size());
-
-    Table& target_table = m_origin_column->get_target_table();
-    size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
-    return target_table[target_row_ndx];
-}
-
-inline Table::ConstRowExpr LinkView::operator[](size_t link_ndx) const noexcept
-{
-    return get(link_ndx);
-}
-
-inline Table::RowExpr LinkView::operator[](size_t link_ndx) noexcept
-{
-    return get(link_ndx);
 }
 
 inline void LinkView::add(size_t target_row_ndx)
