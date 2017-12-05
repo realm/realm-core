@@ -1464,6 +1464,36 @@ public:
         return true;
     }
 
+    bool list_set_bool(size_t, bool)
+    {
+        return true;
+    }
+
+    bool list_set_float(size_t, float)
+    {
+        return true;
+    }
+
+    bool list_set_double(size_t, double)
+    {
+        return true;
+    }
+
+    bool list_set_string(size_t, StringData)
+    {
+        return true;
+    }
+
+    bool list_set_binary(size_t, BinaryData)
+    {
+        return true;
+    }
+
+    bool list_set_timestamp(size_t, Timestamp)
+    {
+        return true;
+    }
+
     bool optimize_table() noexcept
     {
         return true; // No-op

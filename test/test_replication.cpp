@@ -994,6 +994,176 @@ TEST(Replication_Links)
     }
 }
 
+
+TEST(Replication_ListOfPrimitives)
+{
+    /*
+     * In order to get full coverage of the list code we just need to
+     * check that the set and clear operation on all types work. All the
+     * other operations are tested in the test above.
+     */
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    util::Logger& replay_logger = test_context.logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    // Create table
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.add_table("table");
+        table->add_column_list(type_Int, "integers");
+        table->add_column_list(type_Bool, "booleans");
+        table->add_column_list(type_Float, "floats");
+        table->add_column_list(type_Double, "doubles");
+        table->add_column_list(type_String, "strings");
+        table->add_column_list(type_Binary, "binaries");
+        table->add_column_list(type_Timestamp, "dates");
+        table->create_object(Key(0));
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        check(test_context, sg_1, rt);
+
+        ConstTableRef table = rt.get_table("table");
+        CHECK(table->is_attached());
+        CHECK_EQUAL(1, table->size());
+
+        auto col_int = table->get_column_index("integers");
+        auto col_boo = table->get_column_index("booleans");
+        auto col_flo = table->get_column_index("floats");
+        auto col_dou = table->get_column_index("doubles");
+        auto col_str = table->get_column_index("strings");
+        auto col_bin = table->get_column_index("binaries");
+        auto col_tim = table->get_column_index("dates");
+
+        ConstObj obj = table->get_object(Key(0));
+
+        CHECK(obj.is_null(col_int));
+        CHECK(obj.is_null(col_boo));
+        CHECK(obj.is_null(col_flo));
+        CHECK(obj.is_null(col_dou));
+        CHECK(obj.is_null(col_str));
+        CHECK(obj.is_null(col_bin));
+        CHECK(obj.is_null(col_tim));
+    }
+    // Add valuest to lists
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("table");
+        auto col_int = table->get_column_index("integers");
+        auto col_boo = table->get_column_index("booleans");
+        auto col_flo = table->get_column_index("floats");
+        auto col_dou = table->get_column_index("doubles");
+        auto col_str = table->get_column_index("strings");
+        auto col_bin = table->get_column_index("binaries");
+        auto col_tim = table->get_column_index("dates");
+
+        char buf[10];
+        memset(buf, 'A', sizeof(buf));
+        Obj obj = table->get_object(Key(0));
+        obj.get_list<Int>(col_int).add(100);
+        obj.get_list<Bool>(col_boo).add(true);
+        obj.get_list<Float>(col_flo).add(100.f);
+        obj.get_list<Double>(col_dou).add(100.);
+        obj.get_list<String>(col_str).add(StringData("Hello"));
+        obj.get_list<Binary>(col_bin).add(BinaryData(buf, sizeof(buf)));
+        obj.get_list<Timestamp>(col_tim).add(Timestamp(100, 0));
+
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        check(test_context, sg_1, rt);
+
+        ConstTableRef table = rt.get_table("table");
+        CHECK(table->is_attached());
+        CHECK_EQUAL(1, table->size());
+
+        auto col_int = table->get_column_index("integers");
+        auto col_boo = table->get_column_index("booleans");
+        auto col_flo = table->get_column_index("floats");
+        auto col_dou = table->get_column_index("doubles");
+        auto col_str = table->get_column_index("strings");
+        auto col_bin = table->get_column_index("binaries");
+        auto col_tim = table->get_column_index("dates");
+
+        ConstObj obj = table->get_object(Key(0));
+
+        char buf[10];
+        memset(buf, 'A', sizeof(buf));
+        BinaryData bin(buf, sizeof(buf));
+        CHECK_EQUAL(obj.get_list<Int>(col_int)[0], 100);
+        CHECK_EQUAL(obj.get_list<Bool>(col_boo)[0], true);
+        CHECK_EQUAL(obj.get_list<Float>(col_flo)[0], 100.f);
+        CHECK_EQUAL(obj.get_list<Double>(col_dou)[0], 100.);
+        CHECK_EQUAL(obj.get_list<String>(col_str)[0], "Hello");
+        CHECK_EQUAL(obj.get_list<Binary>(col_bin)[0], bin);
+        CHECK_EQUAL(obj.get_list<Timestamp>(col_tim)[0], Timestamp(100, 0));
+    }
+    // Clear/erase lists
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("table");
+        auto col_int = table->get_column_index("integers");
+        auto col_boo = table->get_column_index("booleans");
+        auto col_flo = table->get_column_index("floats");
+        auto col_dou = table->get_column_index("doubles");
+        auto col_str = table->get_column_index("strings");
+        auto col_bin = table->get_column_index("binaries");
+        auto col_tim = table->get_column_index("dates");
+
+        char buf[10];
+        memset(buf, 'A', sizeof(buf));
+        Obj obj = table->get_object(Key(0));
+        obj.get_list<Int>(col_int).clear();
+        obj.get_list<Bool>(col_boo).clear();
+        obj.get_list<Float>(col_flo).clear();
+        obj.get_list<Double>(col_dou).remove(0);
+        obj.get_list<String>(col_str).remove(0);
+        obj.get_list<Binary>(col_bin).remove(0);
+        obj.get_list<Timestamp>(col_tim).remove(0);
+
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        check(test_context, sg_1, rt);
+
+        ConstTableRef table = rt.get_table("table");
+        CHECK(table->is_attached());
+        CHECK_EQUAL(1, table->size());
+
+        auto col_int = table->get_column_index("integers");
+        auto col_boo = table->get_column_index("booleans");
+        auto col_flo = table->get_column_index("floats");
+        auto col_dou = table->get_column_index("doubles");
+        auto col_str = table->get_column_index("strings");
+        auto col_bin = table->get_column_index("binaries");
+        auto col_tim = table->get_column_index("dates");
+
+        ConstObj obj = table->get_object(Key(0));
+
+        char buf[10];
+        memset(buf, 'A', sizeof(buf));
+        BinaryData bin(buf, sizeof(buf));
+        CHECK_EQUAL(obj.get_list<Int>(col_int).size(), 0);
+        CHECK_EQUAL(obj.get_list<Bool>(col_boo).size(), 0);
+        CHECK_EQUAL(obj.get_list<Float>(col_flo).size(), 0);
+        CHECK_EQUAL(obj.get_list<Double>(col_dou).size(), 0);
+        CHECK_EQUAL(obj.get_list<String>(col_str).size(), 0);
+        CHECK_EQUAL(obj.get_list<Binary>(col_bin).size(), 0);
+        CHECK_EQUAL(obj.get_list<Timestamp>(col_tim).size(), 0);
+    }
+}
+
 #ifdef LEGACY_TESTS
 TEST(Replication_CascadeRemove_ColumnLink)
 {

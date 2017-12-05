@@ -227,6 +227,31 @@ public:
     {
         return true;
     }
+    bool list_set_bool(size_t, bool)
+    {
+        return true;
+    }
+    bool list_set_float(size_t, float)
+    {
+        return true;
+    }
+    bool list_set_double(size_t, double)
+    {
+        return true;
+    }
+    bool list_set_string(size_t, StringData)
+    {
+        return true;
+    }
+    bool list_set_binary(size_t, BinaryData)
+    {
+        return true;
+    }
+    bool list_set_timestamp(size_t, Timestamp)
+    {
+        return true;
+    }
+
     bool optimize_table()
     {
         return true;
@@ -344,6 +369,12 @@ public:
     bool erase_substring(size_t col_ndx, Key key, size_t pos, size_t size);
 
     bool list_set_int(size_t list_ndx, int64_t value);
+    bool list_set_bool(size_t list_ndx, bool value);
+    bool list_set_float(size_t list_ndx, float value);
+    bool list_set_double(size_t list_ndx, double value);
+    bool list_set_string(size_t list_ndx, StringData value);
+    bool list_set_binary(size_t list_ndx, BinaryData value);
+    bool list_set_timestamp(size_t list_ndx, Timestamp value);
 
     bool optimize_table();
 
@@ -484,6 +515,12 @@ public:
     virtual void erase_substring(const Table*, size_t col_ndx, Key key, size_t pos, size_t size);
 
     virtual void list_set_int(const List<Int>& list, size_t list_ndx, int64_t value);
+    virtual void list_set_bool(const List<Bool>& list, size_t list_ndx, bool value);
+    virtual void list_set_float(const List<Float>& list, size_t list_ndx, float value);
+    virtual void list_set_double(const List<Double>& list, size_t list_ndx, double value);
+    virtual void list_set_string(const List<String>& list, size_t list_ndx, StringData value);
+    virtual void list_set_binary(const List<Binary>& list, size_t list_ndx, BinaryData value);
+    virtual void list_set_timestamp(const List<Timestamp>& list, size_t list_ndx, Timestamp value);
 
     virtual void create_object(const Table*, Key);
     virtual void remove_object(const Table*, Key);
@@ -1350,6 +1387,80 @@ inline void TransactLogConvenientEncoder::list_set_int(const List<Int>& list, si
     m_encoder.list_set_int(list_ndx, value); // Throws
 }
 
+inline bool TransactLogEncoder::list_set_bool(size_t list_ndx, bool value)
+{
+    append_simple_instr(instr_ListSet, type_Bool, list_ndx, value); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_set_bool(const List<Bool>& list, size_t list_ndx, bool value)
+{
+    select_list(list);                        // Throws
+    m_encoder.list_set_bool(list_ndx, value); // Throws
+}
+
+inline bool TransactLogEncoder::list_set_float(size_t list_ndx, float value)
+{
+    append_simple_instr(instr_ListSet, type_Float, list_ndx, value); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_set_float(const List<Float>& list, size_t list_ndx, float value)
+{
+    select_list(list);                         // Throws
+    m_encoder.list_set_float(list_ndx, value); // Throws
+}
+
+inline bool TransactLogEncoder::list_set_double(size_t list_ndx, double value)
+{
+    append_simple_instr(instr_ListSet, type_Double, list_ndx, value); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_set_double(const List<Double>& list, size_t list_ndx, double value)
+{
+    select_list(list);                          // Throws
+    m_encoder.list_set_double(list_ndx, value); // Throws
+}
+
+inline bool TransactLogEncoder::list_set_string(size_t list_ndx, StringData value)
+{
+    append_simple_instr(instr_ListSet, type_String, list_ndx, value); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_set_string(const List<String>& list, size_t list_ndx, StringData value)
+{
+    select_list(list);                          // Throws
+    m_encoder.list_set_string(list_ndx, value); // Throws
+}
+
+inline bool TransactLogEncoder::list_set_binary(size_t list_ndx, BinaryData value)
+{
+    StringData value_2(value.data(), value.size());
+    append_simple_instr(instr_ListSet, type_Binary, list_ndx, value_2); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_set_binary(const List<Binary>& list, size_t list_ndx, BinaryData value)
+{
+    select_list(list);                          // Throws
+    m_encoder.list_set_binary(list_ndx, value); // Throws
+}
+
+inline bool TransactLogEncoder::list_set_timestamp(size_t list_ndx, Timestamp value)
+{
+    append_simple_instr(instr_ListSet, type_Timestamp, list_ndx, value.get_seconds(),
+                        value.get_nanoseconds()); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_set_timestamp(const List<Timestamp>& list, size_t list_ndx,
+                                                             Timestamp value)
+{
+    select_list(list);                             // Throws
+    m_encoder.list_set_timestamp(list_ndx, value); // Throws
+}
 
 inline bool TransactLogEncoder::create_object(Key key)
 {
@@ -1687,6 +1798,44 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 case type_Int: {
                     int_fast64_t value = read_int<int64_t>();   // Throws
                     if (!handler.list_set_int(list_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Bool: {
+                    bool value = read_bool();                    // Throws
+                    if (!handler.list_set_bool(list_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Float: {
+                    float value = read_float();                   // Throws
+                    if (!handler.list_set_float(list_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Double: {
+                    double value = read_double();                  // Throws
+                    if (!handler.list_set_double(list_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_String: {
+                    StringData value = read_string(m_string_buffer); // Throws
+                    if (!handler.list_set_string(list_ndx, value))   // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Binary: {
+                    BinaryData value = read_binary(m_string_buffer); // Throws
+                    if (!handler.list_set_binary(list_ndx, value))   // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Timestamp: {
+                    int64_t seconds = read_int<int64_t>();     // Throws
+                    int32_t nanoseconds = read_int<int32_t>(); // Throws
+                    Timestamp value = Timestamp(seconds, nanoseconds);
+                    if (!handler.list_set_timestamp(list_ndx, value)) // Throws
                         parser_error();
                     return;
                 }
@@ -2295,6 +2444,48 @@ public:
     bool list_set_int(size_t ndx, int64_t value)
     {
         m_encoder.list_set_int(ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool list_set_bool(size_t ndx, bool value)
+    {
+        m_encoder.list_set_bool(ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool list_set_float(size_t ndx, float value)
+    {
+        m_encoder.list_set_float(ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool list_set_double(size_t ndx, double value)
+    {
+        m_encoder.list_set_double(ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool list_set_string(size_t ndx, StringData value)
+    {
+        m_encoder.list_set_string(ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool list_set_binary(size_t ndx, BinaryData value)
+    {
+        m_encoder.list_set_binary(ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool list_set_timestamp(size_t ndx, Timestamp value)
+    {
+        m_encoder.list_set_timestamp(ndx, value);
         append_instruction();
         return true;
     }

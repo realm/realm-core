@@ -358,33 +358,39 @@ void List<Int>::set_repl(Replication* repl, size_t ndx, int64_t value)
 }
 
 template <>
-void List<Bool>::set_repl(Replication*, size_t, bool)
+void List<Bool>::set_repl(Replication* repl, size_t ndx, bool value)
 {
+    repl->list_set_bool(*this, ndx, value);
 }
 
 template <>
-void List<Float>::set_repl(Replication*, size_t, float)
+void List<Float>::set_repl(Replication* repl, size_t ndx, float value)
 {
+    repl->list_set_float(*this, ndx, value);
 }
 
 template <>
-void List<Double>::set_repl(Replication*, size_t, double)
+void List<Double>::set_repl(Replication* repl, size_t ndx, double value)
 {
+    repl->list_set_double(*this, ndx, value);
 }
 
 template <>
-void List<String>::set_repl(Replication*, size_t, StringData)
+void List<String>::set_repl(Replication* repl, size_t ndx, StringData value)
 {
+    repl->list_set_string(*this, ndx, value);
 }
 
 template <>
-void List<Binary>::set_repl(Replication*, size_t, BinaryData)
+void List<Binary>::set_repl(Replication* repl, size_t ndx, BinaryData value)
 {
+    repl->list_set_binary(*this, ndx, value);
 }
 
 template <>
-void List<Timestamp>::set_repl(Replication*, size_t, Timestamp)
+void List<Timestamp>::set_repl(Replication* repl, size_t ndx, Timestamp value)
 {
+    repl->list_set_timestamp(*this, ndx, value);
 }
 
 template <>
