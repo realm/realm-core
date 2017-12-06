@@ -3293,7 +3293,7 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + "(" + m_column.description() + ")" + util::serializer::value_separator + Operation::description() + "()";
+        return m_link_map.description() + util::serializer::value_separator + Operation::description() + util::serializer::value_separator + m_column.description();
     }
 
 private:
@@ -3442,7 +3442,7 @@ public:
     }
     static std::string description()
     {
-        return "minimum";
+        return "@min";
     }
 };
 
@@ -3459,7 +3459,7 @@ public:
     }
     static std::string description()
     {
-        return "maximum";
+        return "@max";
     }
 };
 
@@ -3480,7 +3480,7 @@ public:
     }
     static std::string description()
     {
-        return "sum";
+        return "@sum";
     }
 };
 
@@ -3503,7 +3503,7 @@ public:
     }
     static std::string description()
     {
-        return "average";
+        return "@avg";
     }
 
 };

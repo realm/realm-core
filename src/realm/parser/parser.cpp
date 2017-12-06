@@ -72,15 +72,32 @@ struct true_value : string_token_t("true") {};
 struct false_value : string_token_t("false") {};
 struct null_value : string_token_t("null") {};
 
+// following operators must allow proceeding string characters
+struct min : TAOCPP_PEGTL_ISTRING(".@min.") {};
+struct max : TAOCPP_PEGTL_ISTRING(".@max.") {};
+struct sum : TAOCPP_PEGTL_ISTRING(".@sum.") {};
+struct avg : TAOCPP_PEGTL_ISTRING(".@avg.") {};
+// these operators are normal strings (no proceeding string characters)
+struct count : string_token_t(".@count") {};
+struct size : string_token_t(".@size") {};
+
+struct single_collection_operators : sor< count, size > {};
+struct key_collection_operators : sor< min, max, sum, avg > {};
+
 // key paths
 struct key_path : list< seq< sor< alpha, one< '_' > >, star< sor< alnum, one< '_', '-' > > > >, one< '.' > > {};
+
+struct key_path_prefix : disable< key_path > {};
+struct key_path_suffix : disable< key_path > {};
+struct collection_operator_match : sor< seq< key_path_prefix, key_collection_operators, key_path_suffix >,
+                                   seq< key_path_prefix, single_collection_operators > > {};
 
 // argument
 struct argument_index : plus< digit > {};
 struct argument : seq< one< '$' >, must< argument_index > > {};
 
 // expressions and operators
-struct expr : sor< dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, key_path > {};
+struct expr : sor< dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, collection_operator_match, key_path > {};
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
 
 struct eq : seq< sor< two< '=' >, one< '=' > >, star< blank >, opt< case_insensitive > >{};
@@ -122,6 +139,8 @@ struct ParserState
 {
     std::vector<Predicate *> group_stack;
     std::vector<std::string> timestamp_input_buffer;
+    std::string collection_key_path_prefix, collection_key_path_suffix;
+    Expression::KeyPathOp pending_op;
 
     Predicate *current_group()
     {
@@ -154,16 +173,27 @@ struct ParserState
 
     bool negate_next = false;
     Predicate::Type next_type = Predicate::Type::And;
+    Expression* last_expression = nullptr;
+
+    void add_collection_aggregate_expression()
+    {
+        add_expression(Expression(collection_key_path_prefix, pending_op, collection_key_path_suffix));
+        collection_key_path_prefix = "";
+        collection_key_path_suffix = "";
+        pending_op = Expression::KeyPathOp::None;
+    }
 
     void add_expression(Expression && exp)
     {
         Predicate *current = last_predicate();
         if (current->type == Predicate::Type::Comparison && current->cmpr.expr[1].type == parser::Expression::Type::None) {
             current->cmpr.expr[1] = std::move(exp);
+            last_expression = &(current->cmpr.expr[1]);
         }
         else {
             add_predicate_to_current_group(Predicate::Type::Comparison);
             last_predicate()->cmpr.expr[0] = std::move(exp);
+            last_expression = &(last_predicate()->cmpr.expr[0]);
         }
     }
 
@@ -261,7 +291,6 @@ EXPRESSION_ACTION(false_value, Expression::Type::False)
 EXPRESSION_ACTION(null_value, Expression::Type::Null)
 EXPRESSION_ACTION(argument_index, Expression::Type::Argument)
 
-
 template<> struct action< timestamp >
 {
     template< typename Input >
@@ -292,6 +321,45 @@ template<> struct action< timestamp_number >
     {
         DEBUG_PRINT_TOKEN(in.string());
         state.timestamp_input_buffer.push_back(in.string());
+    }
+};
+
+#define COLLECTION_OPERATION_ACTION(rule, type)                     \
+template<> struct action< rule > {                                  \
+template< typename Input >                                          \
+    static void apply(const Input& in, ParserState& state) {        \
+        DEBUG_PRINT_TOKEN(in.string());                             \
+        state.pending_op = type; }};
+
+
+COLLECTION_OPERATION_ACTION(min, Expression::KeyPathOp::Min)
+COLLECTION_OPERATION_ACTION(max, Expression::KeyPathOp::Max)
+COLLECTION_OPERATION_ACTION(sum, Expression::KeyPathOp::Sum)
+COLLECTION_OPERATION_ACTION(avg, Expression::KeyPathOp::Avg)
+COLLECTION_OPERATION_ACTION(count, Expression::KeyPathOp::Count)
+COLLECTION_OPERATION_ACTION(size, Expression::KeyPathOp::Size)
+
+template<> struct action< key_path_prefix > {
+    template< typename Input >
+    static void apply(const Input& in, ParserState& state) {
+        DEBUG_PRINT_TOKEN(in.string());
+        state.collection_key_path_prefix = in.string();
+    }
+};
+
+template<> struct action< key_path_suffix > {
+    template< typename Input >
+    static void apply(const Input& in, ParserState& state) {
+        DEBUG_PRINT_TOKEN(in.string());
+        state.collection_key_path_suffix = in.string();
+    }
+};
+
+template<> struct action< collection_operator_match > {
+    template< typename Input >
+    static void apply(const Input& in, ParserState& state) {
+        DEBUG_PRINT_TOKEN(in.string());
+        state.add_collection_aggregate_expression();
     }
 };
 

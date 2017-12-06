@@ -65,6 +65,7 @@
 #include <chrono>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 using namespace realm;
@@ -269,7 +270,7 @@ void verify_query(test_util::unit_test::TestContext& test_context, TableRef t, s
 };
 
 
-ONLY(Parser_basic_serialisation)
+TEST(Parser_basic_serialisation)
 {
     Group g;
     TableRef t = g.add_table("person");
@@ -295,7 +296,8 @@ ONLY(Parser_basic_serialisation)
     t->set_link(link_col_ndx, 0, 1);
 
     Query q = t->where();
-    //verify_query(t, "buddy.age > $0", 0);
+    verify_query(test_context, t, "buddy.age.@max > 1", 1);
+
     verify_query(test_context, t, "time == NULL", 1);
     verify_query(test_context, t, "time != NULL", 4);
     verify_query(test_context, t, "time > T0:0", 3);
@@ -321,6 +323,7 @@ ONLY(Parser_basic_serialisation)
     verify_query(test_context, t, "name LIKE \"b*\"", 0);
     verify_query(test_context, t, "name LIKE[c] \"b*\"", 2);
 
+    CHECK_THROW_ANY(verify_query(test_context, t, "buddy.age > $0", 0)); // no external parameters provided
 }
 
 TEST(Parser_Timestamps)
@@ -347,7 +350,6 @@ TEST(Parser_Timestamps)
 
     t->set_link(link_col_ndx, 0, 1);
     t->set_link(link_col_ndx, 2, 0);
-
 
     Query q = t->where();
     verify_query(test_context, t, "T399 == NULL", 1);
@@ -396,6 +398,88 @@ TEST(Parser_Timestamps)
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:0:", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:0:0", 0));
+}
+
+ONLY(Parser_collection_aggregates)
+{
+    Group g;
+    TableRef people = g.add_table("person");
+    TableRef courses = g.add_table("courses");
+    size_t title_col_ndx = courses->add_column(type_String, "title");
+    size_t credits_col_ndx = courses->add_column(type_Double, "credits");
+    size_t hours_col_ndx = courses->add_column(type_Int, "hours_required");
+    size_t fail_col_ndx = courses->add_column(type_Float, "failure_percentage");
+    size_t int_col_ndx = people->add_column(type_Int, "age");
+    size_t str_col_ndx = people->add_column(type_String, "name");
+    size_t courses_col_ndx = people->add_column_link(type_LinkList, "courses_taken", *courses);
+    using info_t = std::pair<std::string, size_t>;
+    std::vector<info_t> person_info
+        = {{"Billy", 18}, {"Bob", 17}, {"Joe", 19}, {"Jane", 20}, {"Joel", 18}};
+    for (info_t i : person_info) {
+        size_t row_ndx = people->add_empty_row();
+        people->set_string(str_col_ndx, row_ndx, i.first);
+        people->set_int(int_col_ndx, row_ndx, i.second);
+    }
+    using course_info_t = std::tuple<std::string, double, size_t, float>;
+    std::vector<course_info_t> course_info
+        = {{"Math", 5.0, 42, 0.36f}, {"Comp Sci", 4.5, 45, 0.25f}, {"Chemistry", 4.0, 41, 0.40f},
+            {"English", 3.5, 40, 0.07f}, {"Physics", 4.5, 42, 0.42f}};
+    for (course_info_t course : course_info) {
+        size_t row_ndx = courses->add_empty_row();
+        courses->set_string(title_col_ndx, row_ndx, std::get<0>(course));
+        courses->set_double(credits_col_ndx, row_ndx, std::get<1>(course));
+        courses->set_int(hours_col_ndx, row_ndx, std::get<2>(course));
+        courses->set_float(fail_col_ndx, row_ndx, std::get<3>(course));
+    }
+    LinkViewRef billy_courses = people->get_linklist(courses_col_ndx, 0);
+    billy_courses->add(0);
+    billy_courses->add(1);
+    billy_courses->add(4);
+    LinkViewRef bob_courses = people->get_linklist(courses_col_ndx, 1);
+    bob_courses->add(0);
+    bob_courses->add(1);
+    bob_courses->add(1);
+    LinkViewRef joe_courses = people->get_linklist(courses_col_ndx, 2);
+    joe_courses->add(3);
+    LinkViewRef jane_courses = people->get_linklist(courses_col_ndx, 3);
+    jane_courses->add(2);
+    jane_courses->add(4);
+
+    Query q = people->where();
+    // int
+    verify_query(test_context, people, "courses_taken.@min.hours_required <= 41", 2);
+    verify_query(test_context, people, "courses_taken.@max.hours_required >= 45", 2);
+    verify_query(test_context, people, "courses_taken.@sum.hours_required <= 100", 3);
+    verify_query(test_context, people, "courses_taken.@avg.hours_required > 41", 3);
+
+    // double
+    verify_query(test_context, people, "courses_taken.@min.credits == 4.5", 2);
+    verify_query(test_context, people, "courses_taken.@max.credits == 5.0", 2);
+    verify_query(test_context, people, "courses_taken.@sum.credits > 8.6", 2);
+    verify_query(test_context, people, "courses_taken.@avg.credits > 4.0", 3);
+
+    // float
+    verify_query(test_context, people, "courses_taken.@min.failure_percentage < 0.10", 1);
+    verify_query(test_context, people, "courses_taken.@max.failure_percentage > 0.40", 2);
+    verify_query(test_context, people, "courses_taken.@sum.failure_percentage > 0.5", 3);
+    verify_query(test_context, people, "courses_taken.@avg.failure_percentage > 0.40", 1);
+
+    // string
+    CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@min.title <= 41", 2));
+    CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@max.title <= 41", 2));
+    CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@sum.title <= 41", 2));
+    CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@avg.title <= 41", 2));
+
+    // min, max, sum, avg require a target property on the linked table
+    CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@min <= 41", 2));
+    CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@max <= 41", 2));
+    CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@sum <= 41", 2));
+    CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@avg <= 41", 2));
+
+    // aggregate operations on a non-linklist column must throw
+    CHECK_THROW_ANY(verify_query(test_context, people, "name.@min.hours_required <= 41", 2));
+
+
 }
 
 #endif // TEST_PARSER
