@@ -894,10 +894,10 @@ public:
     static TableRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
 
 protected:
-    /// Compare the rows of two tables under the assumption that the two tables
+    /// Compare the objects of two tables under the assumption that the two tables
     /// have the same number of columns, and the same data type at each column
     /// index (as expressed through the DataType enum).
-    bool compare_rows(const Table&) const;
+    bool compare_objects(const Table&) const;
 
     void check_lists_are_empty(size_t row_ndx) const;
 
@@ -1808,7 +1808,7 @@ inline bool Table::is_group_level() const noexcept
 
 inline bool Table::operator==(const Table& t) const
 {
-    return *m_spec == *t.m_spec && compare_rows(t); // Throws
+    return *m_spec == *t.m_spec && compare_objects(t); // Throws
 }
 
 inline bool Table::operator!=(const Table& t) const
@@ -2113,9 +2113,9 @@ public:
         table.unbind_ptr();
     }
 
-    static bool compare_rows(const Table& a, const Table& b)
+    static bool compare_objects(const Table& a, const Table& b)
     {
-        return a.compare_rows(b); // Throws
+        return a.compare_objects(b); // Throws
     }
 
     static size_t get_size_from_ref(ref_type ref, Allocator& alloc) noexcept

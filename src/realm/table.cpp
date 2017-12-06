@@ -4372,126 +4372,26 @@ size_t Table::compute_aggregated_byte_size() const noexcept
 }
 
 
-bool Table::compare_rows(const Table& t) const
+bool Table::compare_objects(const Table& t) const
 {
-    // Table accessors attached to degenerate subtables have no column
-    // accesssors, so the general comparison scheme is impossible in that case.
-    if (m_size == 0)
-        return t.m_size == 0;
-
-    // FIXME: The current column comparison implementation is very
-    // inefficient, we should use sequential tree accessors when they
-    // become available.
-
-    size_t n = get_column_count();
-    REALM_ASSERT_3(t.get_column_count(), ==, n);
-    for (size_t i = 0; i != n; ++i) {
-        ColumnType type = get_real_column_type(i);
-        bool nullable = is_nullable(i);
-        REALM_ASSERT((type == col_type_String || type == col_type_StringEnum || type == t.get_real_column_type(i)) &&
-                     nullable == t.is_nullable(i));
-
-        switch (type) {
-            case col_type_Int:
-            case col_type_Bool:
-            case col_type_OldDateTime: {
-                if (nullable) {
-                    const IntNullColumn& c1 = get_column_int_null(i);
-                    const IntNullColumn& c2 = t.get_column_int_null(i);
-                    if (!c1.compare(c2)) {
-                        return false;
-                    }
-                }
-                else {
-                    const IntegerColumn& c1 = get_column(i);
-                    const IntegerColumn& c2 = t.get_column(i);
-                    if (!c1.compare(c2))
-                        return false;
-                }
-                continue;
-            }
-            case col_type_Timestamp: {
-                const TimestampColumn& c1 = get_column_timestamp(i);
-                const TimestampColumn& c2 = t.get_column_timestamp(i);
-                if (!c1.compare(c2))
-                    return false;
-                continue;
-            }
-            case col_type_Float: {
-                const FloatColumn& c1 = get_column_float(i);
-                const FloatColumn& c2 = t.get_column_float(i);
-                if (!c1.compare(c2))
-                    return false;
-                continue;
-            }
-            case col_type_Double: {
-                const DoubleColumn& c1 = get_column_double(i);
-                const DoubleColumn& c2 = t.get_column_double(i);
-                if (!c1.compare(c2))
-                    return false;
-                continue;
-            }
-            case col_type_String: {
-                const StringColumn& c1 = get_column_string(i);
-                ColumnType type2 = t.get_real_column_type(i);
-                if (type2 == col_type_String) {
-                    const StringColumn& c2 = t.get_column_string(i);
-                    if (!c1.compare_string(c2))
-                        return false;
-                }
-                else {
-                    REALM_ASSERT_3(type2, ==, col_type_StringEnum);
-                    const StringEnumColumn& c2 = t.get_column_string_enum(i);
-                    if (!c2.compare_string(c1))
-                        return false;
-                }
-                continue;
-            }
-            case col_type_StringEnum: {
-                const StringEnumColumn& c1 = get_column_string_enum(i);
-                ColumnType type2 = t.get_real_column_type(i);
-                if (type2 == col_type_StringEnum) {
-                    const StringEnumColumn& c2 = t.get_column_string_enum(i);
-                    if (!c1.compare_string(c2))
-                        return false;
-                }
-                else {
-                    REALM_ASSERT_3(type2, ==, col_type_String);
-                    const StringColumn& c2 = t.get_column_string(i);
-                    if (!c1.compare_string(c2))
-                        return false;
-                }
-                continue;
-            }
-            case col_type_Binary: {
-                const BinaryColumn& c1 = get_column_binary(i);
-                const BinaryColumn& c2 = t.get_column_binary(i);
-                if (!c1.compare_binary(c2))
-                    return false;
-                continue;
-            }
-            case col_type_Link: {
-                const LinkColumn& c1 = get_column_link(i);
-                const LinkColumn& c2 = t.get_column_link(i);
-                if (!c1.compare(c2))
-                    return false;
-                continue;
-            }
-            case col_type_LinkList: {
-                const LinkListColumn& c1 = get_column_link_list(i);
-                const LinkListColumn& c2 = t.get_column_link_list(i);
-                if (!c1.compare_link_list(c2))
-                    return false;
-                continue;
-            }
-            case col_type_BackLink:
-            case col_type_OldTable:
-            case col_type_OldMixed:
-            case col_type_Reserved4:
-                break;
-        }
-        REALM_ASSERT(false);
+    if (size() != t.size()) {
+        return false;
     }
+
+    auto it1 = begin();
+    auto it2 = t.begin();
+    auto e = end();
+
+    while (it1 != e) {
+        if (*it1 == *it2) {
+            ++it1;
+            ++it2;
+        }
+        else {
+            return false;
+        }
+    }
+
     return true;
 }
 
