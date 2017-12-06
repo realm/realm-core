@@ -58,6 +58,10 @@ struct Key {
     {
         return value < rhs.value;
     }
+    bool operator>(const Key& rhs) const
+    {
+        return value > rhs.value;
+    }
     operator bool() const
     {
         return value != -1;

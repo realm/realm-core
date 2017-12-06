@@ -52,6 +52,9 @@ public:
 
     Allocator& get_alloc() const;
 
+    int cmp(const ConstObj& other, size_t col_ndx) const;
+    bool operator==(const ConstObj& other) const;
+
     Key get_key() const
     {
         return m_key;
@@ -117,6 +120,8 @@ protected:
     size_t get_column_index(StringData col_name) const;
     TableKey get_table_key() const;
     TableRef get_target_table(size_t col_ndx) const;
+    template <class T>
+    int cmp(const ConstObj& other, size_t col_ndx) const;
 };
 
 class Obj : public ConstObj {

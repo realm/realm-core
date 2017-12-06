@@ -50,6 +50,64 @@ Allocator& ConstObj::get_alloc() const
     return m_tree_top->get_alloc();
 }
 
+template <class T>
+inline int ConstObj::cmp(const ConstObj& other, size_t col_ndx) const
+{
+    T val1 = get<T>(col_ndx);
+    T val2 = other.get<T>(col_ndx);
+    if (val1 < val2) {
+        return 1;
+    }
+    else if (val1 > val2) {
+        return -1;
+    }
+    return 0;
+}
+
+int ConstObj::cmp(const ConstObj& other, size_t col_ndx) const
+{
+    const Spec& spec = m_tree_top->get_spec();
+    ColumnAttrMask attr = spec.get_column_attr(col_ndx);
+    REALM_ASSERT(!attr.test(col_attr_List)); // TODO: implement comparison of lists
+
+    switch (spec.get_public_column_type(col_ndx)) {
+        case type_Int:
+            return cmp<Int>(other, col_ndx);
+        case type_Bool:
+            return cmp<Bool>(other, col_ndx);
+        case type_Float:
+            return cmp<Float>(other, col_ndx);
+        case type_Double:
+            return cmp<Double>(other, col_ndx);
+        case type_String:
+            return cmp<String>(other, col_ndx);
+        case type_Binary:
+            return cmp<Binary>(other, col_ndx);
+        case type_Timestamp:
+            return cmp<Timestamp>(other, col_ndx);
+        case type_Link:
+            return cmp<Key>(other, col_ndx);
+        case type_OldDateTime:
+        case type_OldTable:
+        case type_OldMixed:
+        case type_LinkList:
+            REALM_ASSERT(false);
+            break;
+    }
+    return 0;
+}
+
+bool ConstObj::operator==(const ConstObj& other) const
+{
+    size_t col_cnt = m_tree_top->get_spec().get_public_column_count();
+    while (col_cnt--) {
+        if (cmp(other, col_cnt) != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 const Table* ConstObj::get_table() const
 {
     return m_tree_top->get_owner();
