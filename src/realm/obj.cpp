@@ -362,11 +362,56 @@ Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
     return *this;
 }
 
+namespace {
+template <class T>
+inline bool value_is_null(const T& val)
+{
+    return val.is_null();
+}
+template <>
+inline bool value_is_null(const bool&)
+{
+    return false;
+}
+template <>
+inline bool value_is_null(const float& val)
+{
+    return null::is_null_float(val);
+}
+template <>
+inline bool value_is_null(const double& val)
+{
+    return null::is_null_float(val);
+}
+
+template <class T>
+inline void check_range(const T&)
+{
+}
+template <>
+inline void check_range(const StringData& val)
+{
+    if (REALM_UNLIKELY(val.size() > Table::max_string_size))
+        throw LogicError(LogicError::string_too_big);
+}
+template <>
+inline void check_range(const BinaryData& val)
+{
+    if (REALM_UNLIKELY(val.size() > ArrayBlob::max_binary_size))
+        throw LogicError(LogicError::binary_too_big);
+}
+}
+
 template <class T>
 Obj& Obj::set(size_t col_ndx, T value, bool is_default)
 {
-    if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
+    const Spec& spec = m_tree_top->get_spec();
+    REALM_ASSERT(spec.get_column_type(col_ndx) == ColumnTypeTraits<T>::column_id);
+    if (REALM_UNLIKELY(col_ndx > spec.get_public_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
+    if (value_is_null(value) && !spec.get_column_attr(col_ndx).test(col_attr_Nullable))
+        throw LogicError(LogicError::column_not_nullable);
+    check_range(value);
 
     update_if_needed();
     ensure_writeable();
