@@ -224,14 +224,14 @@ static std::vector<std::string> invalid_queries = {
 
 TEST(Parser_valid_queries) {
     for (auto& query : valid_queries) {
-        std::cout << "query: " << query << std::endl;
+        //std::cout << "query: " << query << std::endl;
         realm::parser::parse(query);
     }
 }
 
 TEST(Parser_invalid_queries) {
     for (auto& query : invalid_queries) {
-        std::cout << "query: " << query << std::endl;
+        //std::cout << "query: " << query << std::endl;
         CHECK_THROW_ANY(realm::parser::parse(query));
     }
 }
@@ -260,7 +260,7 @@ void verify_query(test_util::unit_test::TestContext& test_context, TableRef t, s
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
-    std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
     realm::parser::Predicate p2 = realm::parser::parse(description);
@@ -296,7 +296,6 @@ TEST(Parser_basic_serialisation)
     t->set_link(link_col_ndx, 0, 1);
 
     Query q = t->where();
-    verify_query(test_context, t, "buddy.age.@max > 1", 1);
 
     verify_query(test_context, t, "time == NULL", 1);
     verify_query(test_context, t, "time != NULL", 4);
