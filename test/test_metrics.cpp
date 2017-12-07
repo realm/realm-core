@@ -315,19 +315,16 @@ TEST(Metrics_QueryEqual)
 
     for (size_t i = 0; i < 7; ++i) {
         std::string description = queries->at(i).get_description();
-        CHECK_EQUAL(find_count(description, person_table_name), 1);
         CHECK_EQUAL(find_count(description, column_names[i]), 1);
         CHECK_EQUAL(find_count(description, query_search_term), 1);
     }
     {
         std::string description = queries->at(7).get_description();
-        CHECK_EQUAL(find_count(description, person_table_name), 1);
         CHECK_EQUAL(find_count(description, column_names[7]), 1);
         CHECK_EQUAL(find_count(description, "links to"), 1);
     }
     {
         std::string description = queries->at(8).get_description();
-        CHECK_EQUAL(find_count(description, pet_table_name), 1);
         CHECK_EQUAL(find_count(description, "owner"), 1);
         CHECK_EQUAL(find_count(description, "links to"), 1);
     }
@@ -345,6 +342,7 @@ TEST(Metrics_QueryOrAndNot)
     std::string person_table_name = "person";
     std::string pet_table_name = "pet";
     std::string query_search_term = "==";
+    std::string not_text = "!";
 
     Group& g = sg.begin_write();
     TableRef person = g.get_table(person_table_name);
@@ -404,69 +402,62 @@ TEST(Metrics_QueryOrAndNot)
     CHECK_EQUAL(find_count(and_description, " and "), 1);
     CHECK_EQUAL(find_count(and_description, column_names[0]), 1);
     CHECK_EQUAL(find_count(and_description, column_names[1]), 1);
-    CHECK_EQUAL(find_count(and_description, person_table_name), 2);
     CHECK_EQUAL(find_count(and_description, query_search_term), 2);
 
     std::string or_description = queries->at(1).get_description();
     CHECK_EQUAL(find_count(or_description, " or "), 1);
     CHECK_EQUAL(find_count(or_description, column_names[0]), 1);
     CHECK_EQUAL(find_count(or_description, column_names[1]), 1);
-    CHECK_EQUAL(find_count(or_description, person_table_name), 2);
     CHECK_EQUAL(find_count(or_description, query_search_term), 2);
 
     std::string not_description = queries->at(2).get_description();
-    CHECK_EQUAL(find_count(not_description, "not"), 1);
+    CHECK_EQUAL(find_count(not_description, not_text), 1);
     CHECK_EQUAL(find_count(not_description, column_names[0]), 1);
-    CHECK_EQUAL(find_count(not_description, person_table_name), 1);
     CHECK_EQUAL(find_count(not_description, query_search_term), 1);
 
     std::string or_and_description = queries->at(3).get_description();
     CHECK_EQUAL(find_count(or_and_description, and_description), 1);
     CHECK_EQUAL(find_count(or_and_description, " or "), 1);
     CHECK_EQUAL(find_count(or_and_description, column_names[2]), 1);
-    CHECK_EQUAL(find_count(or_and_description, person_table_name), 3);
 
     std::string and_or_description = queries->at(4).get_description();
     CHECK_EQUAL(find_count(and_or_description, and_description), 1);
     CHECK_EQUAL(find_count(and_or_description, " or "), 1);
     CHECK_EQUAL(find_count(and_or_description, column_names[2]), 1);
-    CHECK_EQUAL(find_count(and_or_description, person_table_name), 3);
 
     std::string or_nested_description = queries->at(5).get_description();
     CHECK_EQUAL(find_count(or_nested_description, or_description), 1);
     CHECK_EQUAL(find_count(or_nested_description, " or "), 2);
     CHECK_EQUAL(find_count(or_nested_description, column_names[2]), 1);
-    CHECK_EQUAL(find_count(or_nested_description, person_table_name), 3);
 
     std::string and_nested_description = queries->at(6).get_description();
     CHECK_EQUAL(find_count(and_nested_description, and_description), 1);
     CHECK_EQUAL(find_count(and_nested_description, " and "), 2);
     CHECK_EQUAL(find_count(and_nested_description, column_names[2]), 1);
-    CHECK_EQUAL(find_count(and_nested_description, person_table_name), 3);
 
     std::string not_simple_and_description = queries->at(7).get_description();
     CHECK_EQUAL(find_count(not_simple_and_description, and_description), 1);
-    CHECK_EQUAL(find_count(not_simple_and_description, "not"), 1);
+    CHECK_EQUAL(find_count(not_simple_and_description, not_text), 1);
 
     std::string not_simple_or_description = queries->at(8).get_description();
     CHECK_EQUAL(find_count(not_simple_or_description, or_description), 1);
-    CHECK_EQUAL(find_count(not_simple_or_description, "not"), 1);
+    CHECK_EQUAL(find_count(not_simple_or_description, not_text), 1);
 
     std::string not_or_and_description = queries->at(9).get_description();
     CHECK_EQUAL(find_count(not_or_and_description, or_and_description), 1);
-    CHECK_EQUAL(find_count(not_or_and_description, "not"), 1);
+    CHECK_EQUAL(find_count(not_or_and_description, not_text), 1);
 
     std::string not_and_or_description = queries->at(10).get_description();
     CHECK_EQUAL(find_count(not_and_or_description, and_or_description), 1);
-    CHECK_EQUAL(find_count(not_and_or_description, "not"), 1);
+    CHECK_EQUAL(find_count(not_and_or_description, not_text), 1);
 
     std::string not_or_nested_description = queries->at(11).get_description();
     CHECK_EQUAL(find_count(not_or_nested_description, or_nested_description), 1);
-    CHECK_EQUAL(find_count(not_or_nested_description, "not"), 1);
+    CHECK_EQUAL(find_count(not_or_nested_description, not_text), 1);
 
     std::string not_and_nested_description = queries->at(12).get_description();
     CHECK_EQUAL(find_count(not_and_nested_description, and_nested_description), 1);
-    CHECK_EQUAL(find_count(not_and_nested_description, "not"), 1);
+    CHECK_EQUAL(find_count(not_and_nested_description, not_text), 1);
 
     std::string and_true_description = queries->at(13).get_description();
     CHECK_EQUAL(find_count(and_true_description, "and"), 1);
@@ -524,27 +515,23 @@ TEST(Metrics_LinkQueries)
     CHECK_EQUAL(queries->size(), 10);
 
     std::string null_links_description = queries->at(0).get_description();
-    CHECK_EQUAL(find_count(null_links_description, "is_null"), 1);
+    CHECK_EQUAL(find_count(null_links_description, "NULL"), 1);
     CHECK_EQUAL(find_count(null_links_description, pet_link_col_name), 1);
-    CHECK_EQUAL(find_count(null_links_description, pet_table_name), 1);
 
     std::string not_null_links_description = queries->at(1).get_description();
-    CHECK_EQUAL(find_count(not_null_links_description, "is_not_null"), 1);
+    CHECK_EQUAL(find_count(not_null_links_description, "NULL"), 1);
+    CHECK_EQUAL(find_count(not_null_links_description, "!"), 1);
     CHECK_EQUAL(find_count(not_null_links_description, pet_link_col_name), 1);
-    CHECK_EQUAL(find_count(not_null_links_description, pet_table_name), 1);
 
     std::string count_link_description = queries->at(2).get_description();
-    CHECK_EQUAL(find_count(count_link_description, "count"), 1);
+    CHECK_EQUAL(find_count(count_link_description, "@count"), 1);
     CHECK_EQUAL(find_count(count_link_description, pet_link_col_name), 1);
-    CHECK_EQUAL(find_count(count_link_description, pet_table_name), 1);
     CHECK_EQUAL(find_count(count_link_description, "=="), 1);
 
     std::string link_subquery_description = queries->at(3).get_description();
-    CHECK_EQUAL(find_count(link_subquery_description, "count"), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, "@count"), 1);
     CHECK_EQUAL(find_count(link_subquery_description, pet_link_col_name), 1);
-    CHECK_EQUAL(find_count(link_subquery_description, pet_table_name), 1);
     CHECK_EQUAL(find_count(link_subquery_description, "=="), 1);
-    CHECK_EQUAL(find_count(link_subquery_description, person_table_name), 1);
     CHECK_EQUAL(find_count(link_subquery_description, column_names[0]), 1);
     CHECK_EQUAL(find_count(link_subquery_description, ">"), 1);
 }
@@ -602,39 +589,34 @@ TEST(Metrics_LinkListQueries)
     CHECK_EQUAL(queries->size(), 6 + num_total_links);
 
     std::string null_links_description = queries->at(0).get_description();
-    CHECK_EQUAL(find_count(null_links_description, "is_null"), 1);
+    CHECK_EQUAL(find_count(null_links_description, "NULL"), 1);
     CHECK_EQUAL(find_count(null_links_description, column_names[ll_col_ndx]), 1);
-    CHECK_EQUAL(find_count(null_links_description, person_table_name), 1);
 
     std::string not_null_links_description = queries->at(1).get_description();
-    CHECK_EQUAL(find_count(not_null_links_description, "is_not_null"), 1);
+    CHECK_EQUAL(find_count(not_null_links_description, "NULL"), 1);
+    CHECK_EQUAL(find_count(not_null_links_description, "!"), 1);
     CHECK_EQUAL(find_count(not_null_links_description, column_names[ll_col_ndx]), 1);
-    CHECK_EQUAL(find_count(not_null_links_description, person_table_name), 1);
 
     std::string count_link_description = queries->at(2).get_description();
-    CHECK_EQUAL(find_count(count_link_description, "count"), 1);
+    CHECK_EQUAL(find_count(count_link_description, "@count"), 1);
     CHECK_EQUAL(find_count(count_link_description, column_names[ll_col_ndx]), 1);
-    CHECK_EQUAL(find_count(count_link_description, person_table_name), 1);
     CHECK_EQUAL(find_count(count_link_description, "=="), 1);
 
     std::string equal_link_description = queries->at(3).get_description();
     CHECK_EQUAL(find_count(equal_link_description, column_names[ll_col_ndx]), 1);
-    CHECK_EQUAL(find_count(equal_link_description, person_table_name), 1);
     CHECK_EQUAL(find_count(equal_link_description, "links to"), 1);
 
     std::string sum_link_description = queries->at(4).get_description();
-    CHECK_EQUAL(find_count(sum_link_description, "sum"), 1);
+    CHECK_EQUAL(find_count(sum_link_description, "@sum"), 1);
     CHECK_EQUAL(find_count(sum_link_description, column_names[ll_col_ndx]), 1);
     CHECK_EQUAL(find_count(sum_link_description, column_names[double_col_ndx]), 1);
-    CHECK_EQUAL(find_count(sum_link_description, person_table_name), 2);
     // the query system can choose to flip the argument order and operators so that >= might be <=
     CHECK_EQUAL(find_count(sum_link_description, "<=") + find_count(sum_link_description, ">="), 1);
 
     std::string link_subquery_description = queries->at(5).get_description();
-    CHECK_EQUAL(find_count(link_subquery_description, "count"), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, "@count"), 1);
     CHECK_EQUAL(find_count(link_subquery_description, column_names[ll_col_ndx]), 1);
     CHECK_EQUAL(find_count(link_subquery_description, "=="), 2);
-    CHECK_EQUAL(find_count(link_subquery_description, person_table_name), 2);
     CHECK_EQUAL(find_count(link_subquery_description, column_names[str_col_ndx]), 1);
 }
 
@@ -720,22 +702,18 @@ TEST(Metrics_SubQueries)
     std::string int_equal_description = queries->at(0).get_description();
     CHECK_EQUAL(find_count(int_equal_description, "=="), 1);
     CHECK_EQUAL(find_count(int_equal_description, int_col_name), 1);
-    CHECK_EQUAL(find_count(int_equal_description, table_name), 1);
 
     std::string int_max_description = queries->at(1).get_description();
-    CHECK_EQUAL(find_count(int_max_description, "max"), 1);
+    CHECK_EQUAL(find_count(int_max_description, "@max"), 1);
     CHECK_EQUAL(find_count(int_max_description, int_col_name), 1);
-    CHECK_EQUAL(find_count(int_max_description, table_name), 1);
 
     std::string str_begins_description = queries->at(2).get_description();
-    CHECK_EQUAL(find_count(str_begins_description, "begins"), 1);
+    CHECK_EQUAL(find_count(str_begins_description, "BEGINSWITH"), 1);
     CHECK_EQUAL(find_count(str_begins_description, str_col_name), 1);
-    CHECK_EQUAL(find_count(str_begins_description, table_name), 1);
 
     std::string str_equal_description = queries->at(3).get_description();
     CHECK_EQUAL(find_count(str_equal_description, "=="), 1);
     CHECK_EQUAL(find_count(str_equal_description, str_col_name), 1);
-    CHECK_EQUAL(find_count(str_equal_description, table_name), 1);
 }
 
 
