@@ -34,14 +34,12 @@ namespace {
 
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
+#ifdef LEGACY_TESTS
 void test_table_add_row(TableRef t, std::string first, int second, bool third, Days forth)
 {
-    size_t ndx = t->add_empty_row(1);
-    t->set_string(0, ndx, first);
-    t->set_int(1, ndx, second);
-    t->set_bool(2, ndx, third);
-    t->set_int(3, ndx, forth);
+    t->create_object().set_all(first.c_str(), second, third, int(forth));
 }
+#endif
 
 template <class T>
 void test_table_add_columns(T t)
@@ -67,39 +65,28 @@ TEST(Links_Columns)
     table2->add_column_link(type_Link, "link", *table1);
 
     // add some more columns to table1 and table2
-    table1->add_column(type_String, "col1");
-    table2->add_column(type_String, "col1");
+    auto col_1 = table1->add_column(type_String, "col1");
+    table2->add_column(type_String, "col2");
 
+    std::vector<Key> table_1_keys;
+    std::vector<Key> table_2_keys;
     // add some rows
-    table1->add_empty_row();
-    table1->set_string(0, 0, "string1");
-    table1->add_empty_row();
-    table2->add_empty_row();
-    table2->add_empty_row();
+    table1->create_objects(2, table_1_keys);
+    table2->create_objects(2, table_2_keys);
 
-    size_t col_link2 = table1->add_column_link(type_Link, "link", *table2);
+    table1->get_object(table_1_keys[0]).set<String>(col_1, "string1");
+    auto col_link2 = table1->add_column_link(type_Link, "link", *table2);
 
     // set some links
-    table1->set_link(col_link2, 0, 1);
-    CHECK_EQUAL(1, table2->get_backlink_count(1, *table1, col_link2));
-    CHECK_EQUAL(0, table2->get_backlink(1, *table1, col_link2, 0));
-
-    // insert new column at specific location (moving link column)
-    table1->insert_column(0, type_Int, "first");
-    size_t new_link_col_ndx = col_link2 + 1;
-    CHECK_EQUAL(1, table2->get_backlink_count(1, *table1, new_link_col_ndx));
-    CHECK_EQUAL(0, table2->get_backlink(1, *table1, new_link_col_ndx, 0));
-
-    // add one more column (moving link column)
-    table1->insert_column(1, type_Int, "second");
-    size_t new_link_col_ndx2 = new_link_col_ndx + 1;
-    CHECK_EQUAL(1, table2->get_backlink_count(1, *table1, new_link_col_ndx2));
-    CHECK_EQUAL(0, table2->get_backlink(1, *table1, new_link_col_ndx2, 0));
+    table1->get_object(table_1_keys[0]).set(col_link2, table_2_keys[1]);
+    CHECK_EQUAL(1, table2->get_object(table_2_keys[1]).get_backlink_count(*table1, col_link2));
+    CHECK_EQUAL(table_1_keys[0], table2->get_object(table_2_keys[1]).get_backlink(*table1, col_link2, 0));
 
     // remove a column (moving link column back)
-    table1->remove_column(0);
-    CHECK_EQUAL(1, table2->get_backlink_count(1, *table1, new_link_col_ndx));
-    CHECK_EQUAL(0, table2->get_backlink(1, *table1, new_link_col_ndx, 0));
+    col_link2 -= 1; // TODO: When we have stable col ids, this should be removed
+    table1->remove_column(col_1);
+    CHECK_EQUAL(1, table2->get_object(table_2_keys[1]).get_backlink_count(*table1, col_link2));
+    CHECK_EQUAL(table_1_keys[0], table2->get_object(table_2_keys[1]).get_backlink(*table1, col_link2, 0));
 }
 
 
@@ -333,6 +320,7 @@ TEST(Links_Deletes)
 }
 
 
+#ifdef LEGACY_TESTS
 TEST(Links_Inserts)
 {
     Group group;
@@ -509,6 +497,7 @@ TEST(Links_MultiToSame)
     CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link1));
     CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link2));
 }
+#endif
 
 TEST(Links_LinkList_TableOps)
 {

@@ -3814,7 +3814,7 @@ TEST(Table_HasSharedSpec)
 
 TEST(Table_Aggregates)
 {
-    TestTable table;
+    Table table;
     auto int_col = table.add_column(type_Int, "c_int");
     auto float_col = table.add_column(type_Float, "c_float");
     auto double_col = table.add_column(type_Double, "c_double");
@@ -3864,7 +3864,7 @@ TEST(Table_Aggregates)
 
 TEST(Table_Aggregates2)
 {
-    TestTable table;
+    Table table;
     auto int_col = table.add_column(type_Int, "c_count");
     int c = -420;
     int s = 0;

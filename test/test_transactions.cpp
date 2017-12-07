@@ -695,6 +695,7 @@ TEST(Transactions_RollbackMoveTableReferences)
 
 // Check that the spec.enumkeys become detached when
 // rolling back the insertion of a string enum column
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_RollbackStringEnumInsert)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -741,6 +742,7 @@ TEST(LangBindHelper_RollbackStringEnumInsert)
     CHECK_EQUAL(g.get_table(t1k)->get_column_count(), 1);
     CHECK_EQUAL(g.get_table(t1k)->size(), 3);
 }
+#endif
 
 // Check that the table.spec.subspec array becomes detached
 // after rolling back the insertion of a subspec type

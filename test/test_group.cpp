@@ -91,10 +91,10 @@ void test_table_add_columns(T t)
 template <class T>
 void setup_table(T t)
 {
-    add(t, "a", 1, true, Wed);
-    add(t, "b", 15, true, Wed);
-    add(t, "ccc", 10, true, Wed);
-    add(t, "dddd", 20, true, Wed);
+    t->create_object().set_all("a", 1, true, int(Wed));
+    t->create_object().set_all("b", 15, true, int(Wed));
+    t->create_object().set_all("ccc", 10, true, int(Wed));
+    t->create_object().set_all("dddd", 20, true, int(Wed));
 }
 
 } // Anonymous namespace
@@ -227,11 +227,10 @@ TEST(Group_OpenUnencryptedFileWithKey)
         // read the footer would use the first non-zero field of the header as
         // the IV
         TableRef table = group.get_or_add_table("table");
-        table->add_column(type_String, "str");
+        auto col = table->add_column(type_String, "str");
         std::string data(page_size() - 100, '\1');
-        table->add_empty_row(2);
-        table->set_string(0, 0, data);
-        table->set_string(0, 1, data);
+        table->create_object().set<String>(col, data);
+        table->create_object().set<String>(col, data);
 
         group.commit();
     }
@@ -258,9 +257,7 @@ TEST(Group_Permissions)
         t1->add_column(type_String, "s");
         t1->add_column(type_Int, "i");
         for (size_t i = 0; i < 4; ++i) {
-            t1->insert_empty_row(i);
-            t1->set_string(0, i, "a");
-            t1->set_int(1, i, 3);
+            t1->create_object().set_all("a", 3);
         }
         group1.write(path, crypt_key());
     }
@@ -628,24 +625,32 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     TableRef third = group.add_table("gamma");
     TableRef fourth = group.add_table("delta");
 
-    first->add_column_link(type_Link, "one", *third);
-    third->add_column_link(type_Link, "two", *fourth);
-    third->add_column_link(type_Link, "three", *third);
-    fourth->add_column_link(type_Link, "four", *first);
-    fourth->add_column_link(type_Link, "five", *third);
-    first->add_empty_row(2);
-    third->add_empty_row(2);
-    fourth->add_empty_row(2);
-    first->set_link(0, 0, 0);  // first[0].one   = third[0]
-    first->set_link(0, 1, 1);  // first[1].one   = third[1]
-    third->set_link(0, 0, 1);  // third[0].two   = fourth[1]
-    third->set_link(0, 1, 0);  // third[1].two   = fourth[0]
-    third->set_link(1, 0, 1);  // third[0].three = third[1]
-    third->set_link(1, 1, 1);  // third[1].three = third[1]
-    fourth->set_link(0, 0, 0); // fourth[0].four = first[0]
-    fourth->set_link(0, 1, 0); // fourth[1].four = first[0]
-    fourth->set_link(1, 0, 0); // fourth[0].five = third[0]
-    fourth->set_link(1, 1, 1); // fourth[1].five = third[1]
+    auto one = first->add_column_link(type_Link, "one", *third);
+
+    auto two = third->add_column_link(type_Link, "two", *fourth);
+    auto three = third->add_column_link(type_Link, "three", *third);
+
+    auto four = fourth->add_column_link(type_Link, "four", *first);
+    auto five = fourth->add_column_link(type_Link, "five", *third);
+
+    std::vector<Key> first_keys;
+    std::vector<Key> third_keys;
+    std::vector<Key> fourth_keys;
+    first->create_objects(2, first_keys);
+    third->create_objects(2, third_keys);
+    fourth->create_object();
+    fourth->create_object();
+    fourth->create_objects(2, fourth_keys);
+    first->get_object(first_keys[0]).set(one, third_keys[0]);    // first[0].one   = third[0]
+    first->get_object(first_keys[1]).set(one, third_keys[1]);    // first[1].one   = third[1]
+    third->get_object(third_keys[0]).set(two, fourth_keys[1]);   // third[0].two   = fourth[1]
+    third->get_object(third_keys[1]).set(two, fourth_keys[0]);   // third[1].two   = fourth[0]
+    third->get_object(third_keys[0]).set(three, third_keys[1]);  // third[0].three = third[1]
+    third->get_object(third_keys[1]).set(three, third_keys[1]);  // third[1].three = third[1]
+    fourth->get_object(fourth_keys[0]).set(four, first_keys[0]); // fourth[0].four = first[0]
+    fourth->get_object(fourth_keys[1]).set(four, first_keys[0]); // fourth[1].four = first[0]
+    fourth->get_object(fourth_keys[0]).set(five, third_keys[0]); // fourth[0].five = third[0]
+    fourth->get_object(fourth_keys[1]).set(five, third_keys[1]); // fourth[1].five = third[1]
 
     group.verify();
 
@@ -672,35 +677,39 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     CHECK_EQUAL(first, fourth->get_link_target(0));
     CHECK_EQUAL(third, fourth->get_link_target(1));
 
-    third->set_link(0, 0, 0);  // third[0].two   = fourth[0]
-    fourth->set_link(0, 1, 1); // fourth[1].four = first[1]
-    first->set_link(0, 0, 1);  // first[0].one   = third[1]
+    third->get_object(third_keys[0]).set(two, fourth_keys[0]);   // third[0].two   = fourth[0]
+    fourth->get_object(fourth_keys[1]).set(four, first_keys[1]); // fourth[1].four = first[1]
+    first->get_object(first_keys[0]).set(one, third_keys[1]);    // first[0].one   = third[1]
 
     group.verify();
 
     CHECK_EQUAL(2, first->size());
-    CHECK_EQUAL(1, first->get_link(0, 0));
-    CHECK_EQUAL(1, first->get_link(0, 1));
-    CHECK_EQUAL(1, first->get_backlink_count(0, *fourth, 0));
-    CHECK_EQUAL(1, first->get_backlink_count(1, *fourth, 0));
+    CHECK_EQUAL(third_keys[1], first->get_object(first_keys[0]).get<Key>(one));
+    CHECK_EQUAL(third_keys[1], first->get_object(first_keys[1]).get<Key>(one));
+    CHECK_EQUAL(1, first->get_object(first_keys[0]).get_backlink_count(*fourth, one));
+    CHECK_EQUAL(1, first->get_object(first_keys[1]).get_backlink_count(*fourth, one));
+
     CHECK_EQUAL(2, third->size());
-    CHECK_EQUAL(0, third->get_link(0, 0));
-    CHECK_EQUAL(0, third->get_link(0, 1));
-    CHECK_EQUAL(1, third->get_link(1, 0));
-    CHECK_EQUAL(1, third->get_link(1, 1));
-    CHECK_EQUAL(0, third->get_backlink_count(0, *first, 0));
-    CHECK_EQUAL(2, third->get_backlink_count(1, *first, 0));
-    CHECK_EQUAL(0, third->get_backlink_count(0, *third, 1));
-    CHECK_EQUAL(2, third->get_backlink_count(1, *third, 1));
-    CHECK_EQUAL(1, third->get_backlink_count(0, *fourth, 1));
-    CHECK_EQUAL(1, third->get_backlink_count(1, *fourth, 1));
-    CHECK_EQUAL(2, fourth->size());
-    CHECK_EQUAL(0, fourth->get_link(0, 0));
-    CHECK_EQUAL(1, fourth->get_link(0, 1));
-    CHECK_EQUAL(0, fourth->get_link(1, 0));
-    CHECK_EQUAL(1, fourth->get_link(1, 1));
-    CHECK_EQUAL(2, fourth->get_backlink_count(0, *third, 0));
-    CHECK_EQUAL(0, fourth->get_backlink_count(1, *third, 0));
+    CHECK_EQUAL(fourth_keys[0], third->get_object(third_keys[0]).get<Key>(two));
+    CHECK_EQUAL(fourth_keys[0], third->get_object(third_keys[1]).get<Key>(two));
+    CHECK_EQUAL(third_keys[1], third->get_object(third_keys[0]).get<Key>(three));
+    CHECK_EQUAL(third_keys[1], third->get_object(third_keys[1]).get<Key>(three));
+
+    CHECK_EQUAL(0, third->get_object(third_keys[0]).get_backlink_count(*first, one));
+    CHECK_EQUAL(2, third->get_object(third_keys[1]).get_backlink_count(*first, one));
+    CHECK_EQUAL(0, third->get_object(third_keys[0]).get_backlink_count(*third, three));
+    CHECK_EQUAL(2, third->get_object(third_keys[1]).get_backlink_count(*third, three));
+    CHECK_EQUAL(1, third->get_object(third_keys[0]).get_backlink_count(*fourth, five));
+    CHECK_EQUAL(1, third->get_object(third_keys[1]).get_backlink_count(*fourth, five));
+
+    CHECK_EQUAL(4, fourth->size());
+    CHECK_EQUAL(first_keys[0], fourth->get_object(fourth_keys[0]).get<Key>(four));
+    CHECK_EQUAL(first_keys[1], fourth->get_object(fourth_keys[1]).get<Key>(four));
+    CHECK_EQUAL(third_keys[0], fourth->get_object(fourth_keys[0]).get<Key>(five));
+    CHECK_EQUAL(third_keys[1], fourth->get_object(fourth_keys[1]).get<Key>(five));
+
+    CHECK_EQUAL(2, fourth->get_object(fourth_keys[0]).get_backlink_count(*third, two));
+    CHECK_EQUAL(0, fourth->get_object(fourth_keys[1]).get_backlink_count(*third, two));
 }
 
 
@@ -762,12 +771,12 @@ TEST(Group_Equal)
     test_table_add_columns(t2);
     setup_table(t2);
     CHECK(g1 == g2);
-    add(t2, "hey", 2, false, Thu);
-    CHECK(g1 != g2);
+    t2->create_object().set_all("hey", 2, false, int(Thu));
+    CHECK(g1 != g2); // table size differ
     auto t3 = g3.add_table("TABLE3");
     test_table_add_columns(t3);
     setup_table(t3);
-    CHECK(g1 != g3);
+    CHECK(g1 != g3); // table names differ
 }
 
 
@@ -865,12 +874,13 @@ TEST(Group_Serialize0)
         CHECK_EQUAL(0, t->size());
 
         // Modify table
-        add(t, "Test", 1, true, Wed);
+        Obj obj = t->create_object();
+        obj.set_all("Test", 1, true, int(Wed));
 
-        CHECK_EQUAL("Test", t->get_string(0, 0));
-        CHECK_EQUAL(1, t->get_int(1, 0));
-        CHECK_EQUAL(true, t->get_bool(2, 0));
-        CHECK_EQUAL(Wed, t->get_int(3, 0));
+        CHECK_EQUAL("Test", obj.get<String>(0));
+        CHECK_EQUAL(1, obj.get<Int>(1));
+        CHECK_EQUAL(true, obj.get<Bool>(2));
+        CHECK_EQUAL(Wed, obj.get<Int>(3));
     }
     {
         // Load the group and let it clean up without loading
@@ -888,16 +898,16 @@ TEST(Group_Serialize1)
         Group to_disk;
         auto table = to_disk.add_table("test");
         test_table_add_columns(table);
-        add(table, "", 1, true, Wed);
-        add(table, "", 15, true, Wed);
-        add(table, "", 10, true, Wed);
-        add(table, "", 20, true, Wed);
-        add(table, "", 11, true, Wed);
-        add(table, "", 45, true, Wed);
-        add(table, "", 10, true, Wed);
-        add(table, "", 0, true, Wed);
-        add(table, "", 30, true, Wed);
-        add(table, "", 9, true, Wed);
+        table->create_object(Key(0)).set_all("", 1, true, int(Wed));
+        table->create_object(Key(1)).set_all("", 15, true, int(Wed));
+        table->create_object(Key(2)).set_all("", 10, true, int(Wed));
+        table->create_object(Key(3)).set_all("", 20, true, int(Wed));
+        table->create_object(Key(4)).set_all("", 11, true, int(Wed));
+        table->create_object(Key(6)).set_all("", 45, true, int(Wed));
+        table->create_object(Key(7)).set_all("", 10, true, int(Wed));
+        table->create_object(Key(8)).set_all("", 0, true, int(Wed));
+        table->create_object(Key(9)).set_all("", 30, true, int(Wed));
+        table->create_object(Key(10)).set_all("", 9, true, int(Wed));
 
 #ifdef REALM_DEBUG
         to_disk.verify();
@@ -917,13 +927,13 @@ TEST(Group_Serialize1)
         CHECK(*table == *t);
 
         // Modify both tables
-        table->set_string(0, 0, "test");
-        t->set_string(0, 0, "test");
+        table->get_object(Key(0)).set(0, "test");
+        t->get_object(Key(0)).set(0, "test");
 
-        insert(table, 5, "hello", 100, false, Mon);
-        insert(t, 5, "hello", 100, false, Mon);
-        table->remove(1);
-        t->remove(1);
+        table->create_object(Key(5)).set_all("hello", 100, false, int(Mon));
+        t->create_object(Key(5)).set_all("hello", 100, false, int(Mon));
+        table->remove_object(Key(1));
+        t->remove_object(Key(1));
 
         // Verify that both changed correctly
         CHECK(*table == *t);
@@ -948,14 +958,14 @@ TEST(Group_Serialize2)
     Group to_disk;
     TableRef table1 = to_disk.add_table("test1");
     test_table_add_columns(table1);
-    add(table1, "", 1, true, Wed);
-    add(table1, "", 15, true, Wed);
-    add(table1, "", 10, true, Wed);
+    table1->create_object().set_all("", 1, true, int(Wed));
+    table1->create_object().set_all("", 15, true, int(Wed));
+    table1->create_object().set_all("", 10, true, int(Wed));
 
     TableRef table2 = to_disk.add_table("test2");
     test_table_add_columns(table2);
-    add(table2, "hey", 0, true, Tue);
-    add(table2, "hello", 3232, false, Sun);
+    table2->create_object().set_all("hey", 0, true, int(Tue));
+    table2->create_object().set_all("hello", 3232, false, int(Sun));
 
 #ifdef REALM_DEBUG
     to_disk.verify();
@@ -988,8 +998,10 @@ TEST(Group_Serialize3)
     Group to_disk;
     TableRef table = to_disk.add_table("test");
     test_table_add_columns(table);
-    add(table, "1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1", 1, true, Wed);
-    add(table, "2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
+    table->create_object().set_all("1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1", 1,
+                                   true, int(Wed));
+    table->create_object().set_all("2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15,
+                                   true, int(Wed));
 
 #ifdef REALM_DEBUG
     to_disk.verify();
@@ -1017,16 +1029,16 @@ TEST(Group_Serialize_Mem)
     Group to_mem;
     TableRef table = to_mem.add_table("test");
     test_table_add_columns(table);
-    add(table, "", 1, true, Wed);
-    add(table, "", 15, true, Wed);
-    add(table, "", 10, true, Wed);
-    add(table, "", 20, true, Wed);
-    add(table, "", 11, true, Wed);
-    add(table, "", 45, true, Wed);
-    add(table, "", 10, true, Wed);
-    add(table, "", 0, true, Wed);
-    add(table, "", 30, true, Wed);
-    add(table, "", 9, true, Wed);
+    table->create_object().set_all("", 1, true, int(Wed));
+    table->create_object().set_all("", 15, true, int(Wed));
+    table->create_object().set_all("", 10, true, int(Wed));
+    table->create_object().set_all("", 20, true, int(Wed));
+    table->create_object().set_all("", 11, true, int(Wed));
+    table->create_object().set_all("", 45, true, int(Wed));
+    table->create_object().set_all("", 10, true, int(Wed));
+    table->create_object().set_all("", 0, true, int(Wed));
+    table->create_object().set_all("", 30, true, int(Wed));
+    table->create_object().set_all("", 9, true, int(Wed));
 
 #ifdef REALM_DEBUG
     to_mem.verify();
@@ -1056,8 +1068,8 @@ TEST(Group_Close)
     Group to_mem;
     TableRef table = to_mem.add_table("test");
     test_table_add_columns(table);
-    add(table, "", 1, true, Wed);
-    add(table, "", 2, true, Wed);
+    table->create_object().set_all("", 1, true, int(Wed));
+    table->create_object().set_all("", 2, true, int(Wed));
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -1076,7 +1088,7 @@ TEST(Group_Serialize_Optimized)
     for (size_t i = 0; i < 5; ++i) {
         add(table, "abd", 1, true, Mon);
         add(table, "eftg", 2, true, Tue);
-        add(table, "hijkl", 5, true, Wed);
+        add(table, "hijkl", 5, true, int(Wed));
         add(table, "mnopqr", 8, true, Thu);
         add(table, "stuvxyz", 9, true, Fri);
     }
@@ -1124,12 +1136,7 @@ TEST(Group_Serialize_All)
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
 
-    table->insert_empty_row(0);
-    table->set_int(0, 0, 12);
-    table->set_bool(1, 0, true);
-    table->set_timestamp(2, 0, {12345, 0});
-    table->set_string(3, 0, "test");
-    table->set_binary(4, 0, BinaryData("binary", 7));
+    table->create_object(Key(0)).set_all(12, true, Timestamp{12345, 0}, "test", BinaryData("binary", 7));
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -1140,12 +1147,13 @@ TEST(Group_Serialize_All)
 
     CHECK_EQUAL(5, t->get_column_count());
     CHECK_EQUAL(1, t->size());
-    CHECK_EQUAL(12, t->get_int(0, 0));
-    CHECK_EQUAL(true, t->get_bool(1, 0));
-    CHECK(t->get_timestamp(2, 0) == Timestamp(12345, 0));
-    CHECK_EQUAL("test", t->get_string(3, 0));
-    CHECK_EQUAL(7, t->get_binary(4, 0).size());
-    CHECK_EQUAL("binary", t->get_binary(4, 0).data());
+    Obj obj = t->get_object(Key(0));
+    CHECK_EQUAL(12, obj.get<Int>(0));
+    CHECK_EQUAL(true, obj.get<Bool>(1));
+    CHECK(obj.get<Timestamp>(2) == Timestamp(12345, 0));
+    CHECK_EQUAL("test", obj.get<String>(3));
+    CHECK_EQUAL(7, obj.get<Binary>(4).size());
+    CHECK_EQUAL("binary", obj.get<Binary>(4).data());
 }
 
 TEST(Group_Persist)
@@ -1162,12 +1170,7 @@ TEST(Group_Persist)
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
     table->add_column(type_Timestamp, "timestamp");
-    table->insert_empty_row(0);
-    table->set_int(0, 0, 12);
-    table->set_bool(1, 0, true);
-    table->set_string(2, 0, "test");
-    table->set_binary(3, 0, BinaryData("binary", 7));
-    table->set_timestamp(4, 0, Timestamp(111, 222));
+    table->create_object(Key(0)).set_all(12, true, "test", BinaryData("binary", 7), Timestamp{111, 222});
 
     // Write changes to file
     db.commit();
@@ -1176,44 +1179,50 @@ TEST(Group_Persist)
     db.verify();
 #endif
 
-    CHECK_EQUAL(5, table->get_column_count());
-    CHECK_EQUAL(1, table->size());
-    CHECK_EQUAL(12, table->get_int(0, 0));
-    CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL("test", table->get_string(2, 0));
-    CHECK_EQUAL(7, table->get_binary(3, 0).size());
-    CHECK_EQUAL("binary", table->get_binary(3, 0).data());
-    CHECK(table->get_timestamp(4, 0) == Timestamp(111, 222));
+    {
+        CHECK_EQUAL(5, table->get_column_count());
+        CHECK_EQUAL(1, table->size());
+        Obj obj = table->get_object(Key(0));
+        CHECK_EQUAL(12, obj.get<Int>(0));
+        CHECK_EQUAL(true, obj.get<Bool>(1));
+        CHECK_EQUAL("test", obj.get<String>(2));
+        CHECK_EQUAL(7, obj.get<Binary>(3).size());
+        CHECK_EQUAL("binary", obj.get<Binary>(3).data());
+        CHECK(obj.get<Timestamp>(4) == Timestamp(111, 222));
 
-    // Change a bit
-    table->set_string(2, 0, "Changed!");
+        // Change a bit
+        obj.set(2, "Changed!");
 
-    // Write changes to file
-    db.commit();
+        // Write changes to file
+        db.commit();
+    }
 
 #ifdef REALM_DEBUG
     db.verify();
 #endif
 
-    CHECK_EQUAL(5, table->get_column_count());
-    CHECK_EQUAL(1, table->size());
-    CHECK_EQUAL(12, table->get_int(0, 0));
-    CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL("Changed!", table->get_string(2, 0));
-    CHECK_EQUAL(7, table->get_binary(3, 0).size());
-    CHECK_EQUAL("binary", table->get_binary(3, 0).data());
-    CHECK(table->get_timestamp(4, 0) == Timestamp(111, 222));
+    {
+        CHECK_EQUAL(5, table->get_column_count());
+        CHECK_EQUAL(1, table->size());
+        Obj obj = table->get_object(Key(0));
+        CHECK_EQUAL(12, obj.get<Int>(0));
+        CHECK_EQUAL(true, obj.get<Bool>(1));
+        CHECK_EQUAL("Changed!", obj.get<String>(2));
+        CHECK_EQUAL(7, obj.get<Binary>(3).size());
+        CHECK_EQUAL("binary", obj.get<Binary>(3).data());
+        CHECK(obj.get<Timestamp>(4) == Timestamp(111, 222));
+    }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Group_ToJSON)
 {
     Group g;
     TableRef table = g.add_table("test");
     test_table_add_columns(table);
 
-    add(table, "jeff", 1, true, Wed);
-    add(table, "jim", 1, true, Wed);
+    add(table, "jeff", 1, true, int(Wed));
+    add(table, "jim", 1, true, int(Wed));
     std::ostringstream out;
     g.to_json(out);
     std::string str = out.str();
@@ -1231,8 +1240,8 @@ TEST(Group_ToString)
     TableRef table = g.add_table("test");
     test_table_add_columns(table);
 
-    add(table, "jeff", 1, true, Wed);
-    add(table, "jim", 1, true, Wed);
+    add(table, "jeff", 1, true, int(Wed));
+    add(table, "jim", 1, true, int(Wed));
     std::ostringstream out;
     g.to_string(out);
     std::string str = out.str();
@@ -1240,21 +1249,20 @@ TEST(Group_ToString)
     CHECK_EQUAL("     tables     rows  \n   0 test       2     \n", str.c_str());
 }
 
-
 TEST(Group_IndexString)
 {
     Group to_mem;
     TableRef table = to_mem.add_table("test");
     test_table_add_columns(table);
 
-    add(table, "jeff", 1, true, Wed);
-    add(table, "jim", 1, true, Wed);
-    add(table, "jennifer", 1, true, Wed);
-    add(table, "john", 1, true, Wed);
-    add(table, "jimmy", 1, true, Wed);
-    add(table, "jimbo", 1, true, Wed);
-    add(table, "johnny", 1, true, Wed);
-    add(table, "jennifer", 1, true, Wed); // duplicate
+    add(table, "jeff", 1, true, int(Wed));
+    add(table, "jim", 1, true, int(Wed));
+    add(table, "jennifer", 1, true, int(Wed));
+    add(table, "john", 1, true, int(Wed));
+    add(table, "jimmy", 1, true, int(Wed));
+    add(table, "jimbo", 1, true, int(Wed));
+    add(table, "johnny", 1, true, int(Wed));
+    add(table, "jennifer", 1, true, int(Wed)); // duplicate
 
     table->add_search_index(0);
     CHECK(table->has_search_index(0));
@@ -1322,12 +1330,11 @@ TEST(Group_StockBug)
     Group group(path, crypt_key(), Group::mode_ReadWrite);
 
     TableRef table = group.add_table("stocks");
-    table->add_column(type_String, "ticker");
+    auto col = table->add_column(type_String, "ticker");
 
     for (size_t i = 0; i < 100; ++i) {
         table->verify();
-        table->insert_empty_row(i);
-        table->set_string(0, i, "123456789012345678901234567890123456789");
+        table->create_object().set(col, "123456789012345678901234567890123456789");
         table->verify();
         group.commit();
     }
@@ -1706,59 +1713,6 @@ TEST(Group_CascadeNotify_TableViewClear)
 }
 #endif
 
-TEST(Group_AddEmptyRowCrash)
-{
-    // Exposes former bug in ColumnBase::build().
-
-    size_t a = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE;
-    size_t b = REALM_MAX_BPNODE_SIZE;
-
-    Group group;
-    TableRef table = group.add_table("table");
-    table->add_column(type_Int, "i1");
-    table->add_empty_row(a);
-
-    table->add_empty_row(1); // Introduces 3rd level of B+-tree
-
-    table->add_column(type_Int, "i2"); // Calls ColumnBase::create() with size = a+1
-
-    table->add_empty_row(b - 1);
-
-    // array.cpp:2008: [realm-core-0.95.4] Assertion failed: insert_ndx - 1 == REALM_MAX_BPNODE_SIZE [b+1, b]
-    table->add_empty_row(1);
-}
-
-
-TEST_IF(Group_AddEmptyRowCrash_2, REALM_MAX_BPNODE_SIZE == 4)
-{
-    // Set REALM_MAX_BPNODE_SIZE = 4 for it to crash
-    Group group;
-    TableRef table = group.add_table("table");
-    table->add_column(type_Int, "A");
-    table->add_empty_row(147);
-    table->add_column(type_Int, "B");
-    table->add_empty_row(110);
-
-    // column.hpp:1267: [realm-core-0.95.5] Assertion failed: prior_num_rows == size()
-    table->add_empty_row();
-}
-
-
-#ifdef LEGACY_TESTS
-TEST_IF(Group_AddEmptyRowCrash_3, REALM_MAX_BPNODE_SIZE == 4)
-{
-    // Set REALM_MAX_BPNODE_SIZE = 4 for it to crash
-    Group g;
-    g.insert_table(0, "A");
-    g.add_table("B");
-    g.get_table(0)->add_column_link(type_LinkList, "link", *g.get_table(1));
-    g.get_table(1)->insert_empty_row(0, 17);
-    g.get_table(1)->insert_empty_row(17, 1);
-
-    // Triggers "alloc.hpp:213: Assertion failed: v % 8 == 0"
-    g.verify();
-}
-#endif
 
 TEST(Group_WriteEmpty)
 {
@@ -1915,7 +1869,6 @@ TEST(Group_SharedMappingsForReadOnlyStreamingForm)
     }
 }
 
-#ifdef LEGACY_TESTS
 // This test embodies a current limitation of our merge algorithm. If this
 // limitation is lifted, the code for the SET_UNIQUE instruction in
 // fuzz_group.cpp should be strengthened to reflect this.
