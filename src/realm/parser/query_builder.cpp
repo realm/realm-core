@@ -770,7 +770,7 @@ bool expression_is_null(const parser::Expression &expr, Arguments &args) {
     return false;
 }
 
-void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &args, const std::string &type)
+void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &args)
 {
     const Predicate::Comparison &cmpr = pred.cmpr;
     auto t0 = cmpr.expr[0].type, t1 = cmpr.expr[1].type;
@@ -805,7 +805,7 @@ void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &arg
     }
 }
 
-void update_query_with_predicate(Query &query, const Predicate &pred, Arguments &arguments, const std::string &type)
+void update_query_with_predicate(Query &query, const Predicate &pred, Arguments &arguments)
 {
     if (pred.negate) {
         query.Not();
@@ -815,7 +815,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
         case Predicate::Type::And:
             query.group();
             for (auto &sub : pred.cpnd.sub_predicates) {
-                update_query_with_predicate(query, sub, arguments, type);
+                update_query_with_predicate(query, sub, arguments);
             }
             if (!pred.cpnd.sub_predicates.size()) {
                 query.and_query(std::unique_ptr<realm::Expression>(new TrueExpression));
@@ -827,7 +827,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
             query.group();
             for (auto &sub : pred.cpnd.sub_predicates) {
                 query.Or();
-                update_query_with_predicate(query, sub, arguments, type);
+                update_query_with_predicate(query, sub, arguments);
             }
             if (!pred.cpnd.sub_predicates.size()) {
                 query.and_query(std::unique_ptr<realm::Expression>(new FalseExpression));
@@ -836,7 +836,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
             break;
 
         case Predicate::Type::Comparison: {
-            add_comparison_to_query(query, pred, arguments, type);
+            add_comparison_to_query(query, pred, arguments);
             break;
         }
         case Predicate::Type::True:
@@ -856,9 +856,9 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
 namespace realm {
 namespace query_builder {
 
-void apply_predicate(Query &query, const Predicate &predicate, Arguments &arguments, const std::string &objectType)
+void apply_predicate(Query &query, const Predicate &predicate, Arguments &arguments)
 {
-    update_query_with_predicate(query, predicate, arguments, objectType);
+    update_query_with_predicate(query, predicate, arguments);
 
     // Test the constructed query in core
     std::string validateMessage = query.validate();
@@ -882,7 +882,7 @@ void apply_predicate(Query &query, const Predicate &predicate)
     std::string empty_string;
     realm::query_builder::ArgumentConverter<std::string, EmptyArgContext> args(ctx, &empty_string, 0);
 
-    apply_predicate(query, predicate, args, empty_string);
+    apply_predicate(query, predicate, args);
 }
 }
 }
