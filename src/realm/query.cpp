@@ -207,6 +207,9 @@ void Query::set_table(TableRef tr)
 
 void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
 {
+    // Handover is to be done differently
+    REALM_ASSERT(false);
+
     if (m_source_table_view) {
         m_source_table_view->apply_and_consume_patch(patch.table_view_data, dest_group);
     }
@@ -226,7 +229,7 @@ void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
     // not going through Table::create_from_and_consume_patch because we need to use
     // set_table() to update all table references
     if (patch.m_table) {
-        set_table(dest_group.get_table(patch.m_table->m_table_num));
+        set_table(dest_group.get_table(patch.m_table->m_table_key));
     }
     REALM_ASSERT(patch.m_node_data.empty());
 }

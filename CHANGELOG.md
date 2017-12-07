@@ -7,6 +7,7 @@
 ### Breaking changes
 
 * Limiting parameters removed from Query aggregate functions (start, end, limit)
+* Table::get_range_view() has been removed.
 
 ### Enhancements
 

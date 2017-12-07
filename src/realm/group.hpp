@@ -237,43 +237,37 @@ public:
     /// group is zero.
     bool is_empty() const noexcept;
 
-    /// Returns the number of tables in this group.
     size_t size() const noexcept;
+
+    /// Returns the keys for all tables in this group.
+    std::vector<TableKey> get_keys() const;
 
     /// \defgroup group_table_access Table Accessors
     ///
     /// has_table() returns true if, and only if this group contains a table
     /// with the specified name.
     ///
-    /// find_table() returns the index of the first table in this group with the
+    /// find_table() returns the key of the first table in this group with the
     /// specified name, or `realm::not_found` if this group does not contain a
     /// table with the specified name.
     ///
-    /// get_table_name() returns the name of table at the specified index.
+    /// get_table_name() returns the name of table with the specified key.
     ///
-    /// The versions of get_table(), that accepts a \a name argument, return the
-    /// first table with the specified name, or null if no such table exists.
+    /// The versions of get_table(), that accepts a \a name argument, return a
+    /// table with the specified name, or null if no such table exists.
     ///
     /// add_table() adds a table with the specified name to this group. It
     /// throws TableNameInUse if \a require_unique_name is true and \a name
     /// clashes with the name of an existing table. If \a require_unique_name is
     /// false, it is possible to add more than one table with the same
-    /// name. Whenever a table is added, the order of the preexisting tables may
-    /// change arbitrarily, and the new table may not end up as the last one
-    /// either. But know that you can always call Table::get_index_in_group() on
-    /// the returned table accessor to find out at which index it ends up.
+    /// name. Whenever a table is added the key assigned to it is returned.
     ///
     /// get_or_add_table() checks if a table exists in this group with the specified
     /// name. If it doesn't exist, a table is created.
     ///
-    /// get_or_insert_table() works slightly differently from get_or_add_table(),
-    /// in that it considers the position of the requested table as part of that
-    /// table's identifying "key", in addition to the name.
-    ///
     /// remove_table() removes the specified table from this group. A table can
     /// be removed only when it is not the target of a link column of a
-    /// different table. Whenever a table is removed, the order of the remaining
-    /// tables may change arbitrarily.
+    /// different table.
     ///
     /// rename_table() changes the name of a preexisting table. If \a
     /// require_unique_name is false, it becomes possible to have more than one
@@ -287,7 +281,7 @@ public:
     /// the dynamic type (descriptor) to match the statically specified custom
     /// table type.
     ///
-    /// \param index Index of table in this group.
+    /// \param key Key of table in this group.
     ///
     /// \param name Name of table. All strings are valid table names as long as
     /// they are valid UTF-8 encodings and the number of bytes does not exceed
@@ -329,38 +323,29 @@ public:
     static const size_t max_table_name_length = 63;
 
     bool has_table(StringData name) const noexcept;
-    size_t find_table(StringData name) const noexcept;
-    StringData get_table_name(size_t table_ndx) const;
+    TableKey find_table(StringData name) const noexcept;
+    StringData get_table_name(TableKey key) const;
 
-    TableRef get_table(size_t index);
-    ConstTableRef get_table(size_t index) const;
+    TableRef get_table(TableKey key);
+    ConstTableRef get_table(TableKey key) const;
+
+    // Catch some implicit conversions
+    TableRef get_table(int) = delete;
+    ConstTableRef get_table(int) const = delete;
 
     TableRef get_table(StringData name);
     ConstTableRef get_table(StringData name) const;
 
     TableRef add_table(StringData name, bool require_unique_name = true);
-    TableRef insert_table(size_t index, StringData name, bool require_unique_name = true);
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
-    TableRef get_or_insert_table(size_t index, StringData name, bool* was_added = nullptr);
 
-    void remove_table(size_t index);
+    void remove_table(TableKey key);
     void remove_table(StringData name);
 
-    void rename_table(size_t index, StringData new_name, bool require_unique_name = true);
+    void rename_table(TableKey key, StringData new_name, bool require_unique_name = true);
     void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
 
     //@}
-
-    /// Move the table at \a from_index such that it ends up at \a
-    /// to_index. Other tables are shifted as necessary in such a way that their
-    /// order is preserved.
-    ///
-    /// Note that \a to_index is the desired final index of the moved table,
-    /// therefore, `move_table(1,1)` is a no-op, while `move_table(1,2)` moves
-    /// the table at index 1 by one position, such that it ends up at index 2. A
-    /// side-effect of that, is that the table, that was originally at index 2,
-    /// is moved to index 1.
-    void move_table(size_t from_index, size_t to_index);
 
     // Serialization
 
@@ -430,41 +415,42 @@ public:
     /// LinkLists).
     struct CascadeNotification {
         struct row {
-            /// Non-zero iff the removal of this row is ordered
-            /// (Table::remove()), as opposed to ordered
-            /// (Table::move_last_over()). Implicit removals are always
-            /// unordered.
-            ///
-            /// This flag does not take part in comparisons (operator==() and
-            /// operator<()).
-            size_t is_ordered_removal : 1;
-
-            /// Index within group of a group-level table.
-            size_t table_ndx : std::numeric_limits<size_t>::digits - 1;
+            /// Key identifying a group-level table.
+            TableKey table_key;
 
             /// Row index which will be removed.
-            size_t row_ndx;
+            Key key;
 
-            row()
-                : is_ordered_removal(0)
+            row() = default;
+
+            row(TableKey tk, Key k)
+                : table_key(tk)
+                , key(k)
             {
             }
-
-            bool operator==(const row&) const noexcept;
-            bool operator!=(const row&) const noexcept;
-
+            bool operator==(const row& r) const noexcept
+            {
+                return table_key == r.table_key && key == r.key;
+            }
+            bool operator!=(const row& r) const noexcept
+            {
+                return !(*this == r);
+            }
             /// Trivial lexicographic order
-            bool operator<(const row&) const noexcept;
+            bool operator<(const row& r) const noexcept
+            {
+                return table_key < r.table_key || (table_key == r.table_key && key < r.key);
+            }
         };
 
         struct link {
             const Table* origin_table; ///< A group-level table.
             size_t origin_col_ndx;     ///< Link column being nullified.
-            size_t origin_row_ndx;     ///< Row in column being nullified.
+            Key origin_key;            ///< Row in column being nullified.
             /// The target row index which is being removed. Mostly relevant for
             /// LinkList (to know which entries are being removed), but also
             /// valid for Link.
-            size_t old_target_row_ndx;
+            Key old_target_key;
         };
 
         /// A sorted list of rows which will be removed by the current operation.
@@ -591,12 +577,12 @@ private:
     /// detached state during read transactions that precede the first write
     /// transaction.
     Array m_top;
-    ArrayInteger m_tables;
+    Array m_tables;
     ArrayStringShort m_table_names;
 
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
-
+    mutable int m_num_tables = 0;
     bool m_attached = false;
     const bool m_is_shared;
 
@@ -676,17 +662,20 @@ private:
     typedef void (*DescSetter)(Table&);
     typedef bool (*DescMatcher)(const Spec&);
 
-    Table* do_get_table(size_t table_ndx, DescMatcher desc_matcher);
-    const Table* do_get_table(size_t table_ndx, DescMatcher desc_matcher) const;
+    Table* do_get_table(size_t ndx, DescMatcher desc_matcher);
+    Table* do_get_table(TableKey key, DescMatcher desc_matcher);
+    const Table* do_get_table(size_t ndx, DescMatcher desc_matcher) const;
     Table* do_get_table(StringData name, DescMatcher desc_matcher);
     const Table* do_get_table(StringData name, DescMatcher desc_matcher) const;
-    Table* do_insert_table(size_t, StringData name, DescSetter desc_setter, bool require_unique_name);
-    Table* do_insert_table(size_t, StringData name, DescSetter desc_setter);
-    Table* do_get_or_add_table(StringData name, DescMatcher desc_matcher, DescSetter setter, bool* was_added);
-    Table* do_get_or_insert_table(size_t, StringData name, DescMatcher desc_matcher, DescSetter desc_setter,
-                                  bool* was_added);
+    Table* do_add_table(StringData name, DescSetter desc_setter, bool require_unique_name);
+    Table* do_add_table(TableKey key, StringData name, DescSetter desc_setter, bool require_unique_name);
 
-    void create_and_insert_table(size_t new_table_ndx, StringData name);
+    Table* do_get_or_add_table(StringData name, DescMatcher desc_matcher, DescSetter setter, bool* was_added);
+    TableRef get_or_add_table(TableKey key, StringData name, bool* was_added = nullptr);
+    Table* do_get_or_add_table(TableKey key, StringData name, DescMatcher desc_matcher, DescSetter setter,
+                               bool* was_added);
+
+    void create_and_insert_table(TableKey key, StringData name);
     Table* create_table_accessor(size_t table_ndx);
 
     void detach_table_accessors() noexcept; // Idempotent
@@ -796,6 +785,12 @@ private:
     void set_history_parent(Array& history_root) noexcept;
     void prepare_history_parent(Array& history_root, int history_type, int history_schema_version);
 
+    size_t find_table_index(StringData name) const noexcept;
+    TableKey ndx2key(size_t ndx) const;
+    size_t key2ndx(TableKey key) const;
+    size_t key2ndx_checked(TableKey key) const;
+    void set_size() const noexcept;
+
     friend class Table;
     friend class GroupWriter;
     friend class SharedGroup;
@@ -874,57 +869,53 @@ inline bool Group::is_empty() const noexcept
 {
     if (!is_attached())
         return false;
-    if (m_table_names.is_attached())
-        return m_table_names.is_empty();
-    return true;
+    return size() == 0;
 }
 
-inline size_t Group::size() const noexcept
+inline StringData Group::get_table_name(TableKey key) const
 {
-    if (!is_attached())
-        return 0;
-    if (m_table_names.is_attached())
-        return m_table_names.size();
-    return 0;
-}
-
-inline StringData Group::get_table_name(size_t table_ndx) const
-{
-    if (table_ndx >= size())
-        throw LogicError(LogicError::table_index_out_of_range);
+    size_t table_ndx = key2ndx_checked(key);
     return m_table_names.get(table_ndx);
 }
 
 inline bool Group::has_table(StringData name) const noexcept
 {
-    size_t ndx = find_table(name);
+    size_t ndx = find_table_index(name);
     return ndx != not_found;
 }
 
-inline size_t Group::find_table(StringData name) const noexcept
+inline size_t Group::find_table_index(StringData name) const noexcept
 {
-    if (!is_attached())
-        return 0;
     if (m_table_names.is_attached())
         return m_table_names.find_first(name);
     return not_found;
 }
 
-inline TableRef Group::get_table(size_t table_ndx)
+inline TableKey Group::find_table(StringData name) const noexcept
+{
+    if (!is_attached())
+        return TableKey();
+    size_t ndx = find_table_index(name);
+    return ndx2key(ndx);
+}
+
+inline TableRef Group::get_table(TableKey key)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = nullptr;                   // Do not check descriptor
-    Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    auto ndx = key2ndx_checked(key);
+    Table* table = do_get_table(ndx, desc_matcher); // Throws
     return TableRef(table);
 }
 
-inline ConstTableRef Group::get_table(size_t table_ndx) const
+inline ConstTableRef Group::get_table(TableKey key) const
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = nullptr;                         // Do not check descriptor
-    const Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    auto ndx = key2ndx_checked(key);
+    const Table* table = do_get_table(ndx, desc_matcher); // Throws
     return ConstTableRef(table);
 }
 
@@ -946,27 +937,12 @@ inline ConstTableRef Group::get_table(StringData name) const
     return ConstTableRef(table);
 }
 
-inline TableRef Group::insert_table(size_t table_ndx, StringData name, bool require_unique_name)
-{
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    DescSetter desc_setter = nullptr;                                                  // Do not add any columns
-    Table* table = do_insert_table(table_ndx, name, desc_setter, require_unique_name); // Throws
-    return TableRef(table);
-}
-
 inline TableRef Group::add_table(StringData name, bool require_unique_name)
 {
-    return insert_table(size(), name, require_unique_name);
-}
-
-inline TableRef Group::get_or_insert_table(size_t table_ndx, StringData name, bool* was_added)
-{
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    DescMatcher desc_matcher = nullptr; // Do not check descriptor
-    DescSetter desc_setter = nullptr;   // Do not add any columns
-    Table* table = do_get_or_insert_table(table_ndx, name, desc_matcher, desc_setter, was_added); // Throws
+    DescSetter desc_setter = nullptr;                                    // Do not add any columns
+    Table* table = do_add_table(name, desc_setter, require_unique_name); // Throws
     return TableRef(table);
 }
 
@@ -977,6 +953,16 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
     DescMatcher desc_matcher = nullptr;                                             // Do not check descriptor
     DescSetter desc_setter = nullptr;                                               // Do not add any columns
     Table* table = do_get_or_add_table(name, desc_matcher, desc_setter, was_added); // Throws
+    return TableRef(table);
+}
+
+inline TableRef Group::get_or_add_table(TableKey key, StringData name, bool* was_added)
+{
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+    DescMatcher desc_matcher = nullptr;                                             // Do not check descriptor
+    DescSetter desc_setter = nullptr;                                               // Do not add any columns
+    Table* table = do_get_or_add_table(key, name, desc_matcher, desc_setter, was_added); // Throws
     return TableRef(table);
 }
 
@@ -991,13 +977,15 @@ void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string
 
     out << "{";
 
-    for (size_t i = 0; i < m_tables.size(); ++i) {
-        StringData name = m_table_names.get(i);
+    auto keys = get_keys();
+    for (size_t i = 0; i < keys.size(); ++i) {
+        auto key = keys[i];
+        StringData name = get_table_name(key);
         std::map<std::string, std::string>& m = *renames;
         if (m[name] != "")
             name = m[name];
 
-        ConstTableRef table = get_table(i);
+        ConstTableRef table = get_table(key);
 
         if (i)
             out << ",";
@@ -1140,9 +1128,9 @@ public:
     }
 };
 
-inline const Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher) const
+inline const Table* Group::do_get_table(size_t ndx, DescMatcher desc_matcher) const
 {
-    return const_cast<Group*>(this)->do_get_table(table_ndx, desc_matcher); // Throws
+    return const_cast<Group*>(this)->do_get_table(ndx, desc_matcher); // Throws
 }
 
 inline const Table* Group::do_get_table(StringData name, DescMatcher desc_matcher) const
@@ -1194,17 +1182,19 @@ public:
         return group.m_top.get_ref();
     }
 
-    static Table& get_table(Group& group, size_t ndx_in_group)
+    static Table& get_table(Group& group, TableKey key)
     {
         Group::DescMatcher desc_matcher = 0;                           // Do not check descriptor
-        Table* table = group.do_get_table(ndx_in_group, desc_matcher); // Throws
+        auto ndx = group.key2ndx(key);
+        Table* table = group.do_get_table(ndx, desc_matcher); // Throws
         return *table;
     }
 
-    static const Table& get_table(const Group& group, size_t ndx_in_group)
+    static const Table& get_table(const Group& group, TableKey key)
     {
         Group::DescMatcher desc_matcher = 0;                                 // Do not check descriptor
-        const Table* table = group.do_get_table(ndx_in_group, desc_matcher); // Throws
+        auto ndx = group.key2ndx(key);
+        const Table* table = group.do_get_table(ndx, desc_matcher); // Throws
         return *table;
     }
 
@@ -1222,22 +1212,9 @@ public:
         return table;
     }
 
-    static Table& insert_table(Group& group, size_t table_ndx, StringData name, bool require_unique_name)
-    {
-        Group::DescSetter desc_setter = nullptr; // Do not add any columns
-        return *group.do_insert_table(table_ndx, name, desc_setter, require_unique_name);
-    }
-
     static Table& add_table(Group& group, StringData name, bool require_unique_name)
     {
-        return insert_table(group, group.size(), name, require_unique_name);
-    }
-
-    static Table& get_or_insert_table(Group& group, size_t table_ndx, StringData name, bool* was_inserted)
-    {
-        Group::DescMatcher desc_matcher = nullptr; // Do not check descriptor
-        Group::DescSetter desc_setter = nullptr;   // Do not add any columns
-        return *group.do_get_or_insert_table(table_ndx, name, desc_matcher, desc_setter, was_inserted);
+        return *group.add_table(name, require_unique_name);
     }
 
     static Table& get_or_add_table(Group& group, StringData name, bool* was_inserted)
@@ -1245,6 +1222,13 @@ public:
         Group::DescMatcher desc_matcher = nullptr; // Do not check descriptor
         Group::DescSetter desc_setter = nullptr;   // Do not add any columns
         return *group.do_get_or_add_table(name, desc_matcher, desc_setter, was_inserted);
+    }
+
+    static Table& get_or_add_table(Group& group, TableKey key, StringData name, bool* was_inserted)
+    {
+        Group::DescMatcher desc_matcher = nullptr; // Do not check descriptor
+        Group::DescSetter desc_setter = nullptr;   // Do not add any columns
+        return *group.do_get_or_add_table(key, name, desc_matcher, desc_setter, was_inserted);
     }
 
     static void send_cascade_notification(const Group& group, const Group::CascadeNotification& notification)
@@ -1380,6 +1364,12 @@ public:
 
 
 struct CascadeState : Group::CascadeNotification {
+    enum Mode { all, strong, none };
+
+    CascadeState(Mode mode = Mode::strong)
+        : m_mode(mode)
+    {
+    }
     /// If non-null, then no recursion will be performed for rows of that
     /// table. The effect is then exactly as if all the rows of that table were
     /// added to \a state.rows initially, and then removed again after the
@@ -1396,33 +1386,18 @@ struct CascadeState : Group::CascadeNotification {
     /// on its behalf. This is used by LinkView::clear() to avoid reentrance.
     ///
     /// Must never be set concurrently with stop_on_table.
-    LinkListColumn* stop_on_link_list_column = nullptr;
+    size_t stop_on_link_list_column_ndx = size_t(-1);
 
     /// Is ignored if stop_on_link_list_column is null.
-    size_t stop_on_link_list_row_ndx = 0;
+    Key stop_on_link_list_key;
 
     /// If false, the links field is not needed, so any work done just for that
     /// can be skipped.
     bool track_link_nullifications = false;
 
-    /// If false, weak links are followed too
-    bool only_strong_links = true;
+    /// Indicate which links to take action on. Either all, strong or none.
+    Mode m_mode;
 };
-
-inline bool Group::CascadeNotification::row::operator==(const row& r) const noexcept
-{
-    return table_ndx == r.table_ndx && row_ndx == r.row_ndx;
-}
-
-inline bool Group::CascadeNotification::row::operator!=(const row& r) const noexcept
-{
-    return !(*this == r);
-}
-
-inline bool Group::CascadeNotification::row::operator<(const row& r) const noexcept
-{
-    return table_ndx < r.table_ndx || (table_ndx == r.table_ndx && row_ndx < r.row_ndx);
-}
 
 } // namespace realm
 

@@ -52,9 +52,10 @@ public:
         return m_key_values.size();
     }
 
-    int64_t get_source_key(size_t ndx) const
+    // Get key for object this view is "looking" at.
+    Key get_key(size_t ndx) const
     {
-        return m_key_values.get(ndx);
+        return Key(m_key_values.get(ndx));
     }
 
     ConstObj get(size_t row_ndx) const noexcept;
@@ -94,10 +95,7 @@ protected:
     IntegerColumn m_key_values;
     uint64_t m_debug_cookie;
 
-    void do_sort(const DescriptorOrdering&)
-    {
-        // TODO
-    }
+    void do_sort(const DescriptorOrdering&);
 
 private:
     void allocate_key_values();

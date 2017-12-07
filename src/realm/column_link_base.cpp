@@ -32,31 +32,6 @@ void LinkColumnBase::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 }
 
 
-void LinkColumnBase::check_cascade_break_backlinks_to(size_t target_table_ndx, size_t target_row_ndx,
-                                                      CascadeState& state)
-{
-    // Stop if the target row was already visited
-    CascadeState::row target_row;
-    target_row.table_ndx = target_table_ndx;
-    target_row.row_ndx = target_row_ndx;
-    auto i = std::upper_bound(state.rows.begin(), state.rows.end(), target_row);
-    bool already_seen = i != state.rows.begin() && i[-1] == target_row;
-    if (already_seen)
-        return;
-
-    // Stop if there are any remaining strong links to this row (this scheme
-    // fails to discover orphaned cycles)
-    typedef _impl::TableFriend tf;
-    size_t num_remaining = tf::get_backlink_count(*m_target_table, target_row_ndx, state.only_strong_links);
-    if (num_remaining > 0)
-        return;
-
-    // Recurse
-    state.rows.insert(i, target_row);                                       // Throws
-    tf::cascade_break_backlinks_to(*m_target_table, target_row_ndx, state); // Throws
-}
-
-
 void LinkColumnBase::verify(const Table& table, size_t col_ndx) const
 {
 #ifdef REALM_DEBUG
@@ -67,14 +42,14 @@ void LinkColumnBase::verify(const Table& table, size_t col_ndx) const
     REALM_ASSERT(&m_backlink_column->get_origin_column() == this);
 
     // Check that m_target_table is the table specified by the spec
-    size_t target_table_ndx = m_target_table->get_index_in_group();
+    auto target_table_key = m_target_table->get_key();
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
-    REALM_ASSERT(target_table_ndx == spec.get_opposite_link_table_ndx(col_ndx));
+    REALM_ASSERT(target_table_key == spec.get_opposite_link_table_key(col_ndx));
 
     // Check that m_backlink_column is the column specified by the target table spec
     const Spec& target_spec = tf::get_spec(*m_target_table);
-    size_t backlink_col_ndx = target_spec.find_backlink_column(table.get_index_in_group(), col_ndx);
+    size_t backlink_col_ndx = target_spec.find_backlink_column(table.get_key(), col_ndx);
     REALM_ASSERT(m_backlink_column == &tf::get_column(*m_target_table, backlink_col_ndx));
 #else
     static_cast<void>(table);

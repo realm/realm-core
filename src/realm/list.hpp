@@ -475,6 +475,12 @@ public:
         this->set_obj(&m_obj);
         this->init_from_parent();
     }
+    ConstLinkList(ConstLinkList&& other)
+        : ConstLinkListIf(std::move(other))
+        , m_obj(std::move(other.m_obj))
+    {
+        this->set_obj(&m_obj);
+    }
     void update_child_ref(size_t, ref_type) override
     {
     }

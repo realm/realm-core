@@ -1415,7 +1415,7 @@ TEST(Links_RandomizedOperations)
         }
     }
 }
-
+#endif
 
 TEST(Links_CascadeRemove_ColumnLink)
 {
@@ -1423,170 +1423,155 @@ TEST(Links_CascadeRemove_ColumnLink)
         Group group;
         TableRef origin = group.add_table("origin");
         TableRef target = group.add_table("target");
-        Row origin_row_0, origin_row_1, origin_row_2;
-        Row target_row_0, target_row_1, target_row_2;
+        std::vector<Key> origin_keys;
+        std::vector<Key> target_keys;
+        size_t col_link;
         Fixture()
         {
-            origin->add_column_link(type_Link, "o_1", *target, link_Strong);
+            col_link = origin->add_column_link(type_Link, "o_1", *target, link_Strong);
             target->add_column(type_Int, "t_1");
-            origin->add_empty_row(3);
-            target->add_empty_row(3);
-            origin_row_0 = origin->get(0);
-            origin_row_1 = origin->get(1);
-            origin_row_2 = origin->get(2);
-            target_row_0 = target->get(0);
-            target_row_1 = target->get(1);
-            target_row_2 = target->get(2);
-            origin_row_0.set_link(0, 0); // origin[0].o_1 -> target[0]
-            origin_row_1.set_link(0, 1); // origin[1].o_1 -> target[1]
-            origin_row_2.set_link(0, 2); // origin[2].o_1 -> target[2]
+            origin->create_objects(3, origin_keys);
+            target->create_objects(3, target_keys);
+            origin->get_object(origin_keys[0]).set(col_link, target_keys[0]); // origin[0].o_1 -> target[0]
+            origin->get_object(origin_keys[1]).set(col_link, target_keys[1]); // origin[1].o_1 -> target[1]
+            origin->get_object(origin_keys[2]).set(col_link, target_keys[2]); // origin[2].o_1 -> target[2]
+        }
+        Obj get_origin_obj(int i)
+        {
+            return origin->get_object(origin_keys[i]);
+        }
+        Obj get_target_obj(int i)
+        {
+            return target->get_object(origin_keys[i]);
         }
     };
 
     // Break link by nullifying
     {
         Fixture f;
-        f.origin_row_0.nullify_link(0); // origin[0].o_1 -> realm::null()
-        // Cascade: target->move_last_over(0)
-        CHECK(!f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(1, f.origin_row_1.get_link(0));
-        CHECK_EQUAL(0, f.origin_row_2.get_link(0));
+        f.get_origin_obj(0).set(f.col_link, null_key); // origin[0].o_1 -> realm::null()
+        // Cascade: target->remove_object(key[0])
+        CHECK(!f.target->is_valid(f.target_keys[0]));
+        CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
     }
     {
         Fixture f;
-        f.origin_row_1.nullify_link(0); // origin[1].o_1 -> realm::null()
-        // Cascade: target->move_last_over(1)
-        CHECK(f.target_row_0 && !f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(0, f.origin_row_0.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_2.get_link(0));
+        f.get_origin_obj(1).set(f.col_link, null_key); // origin[1].o_1 -> realm::null()
+        // Cascade: target->remove_object(key[1])
+        CHECK(!f.target->is_valid(f.target_keys[1]));
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
     }
     {
         Fixture f;
-        f.origin_row_2.nullify_link(0); // origin[2].o_1 -> realm::null()
-        // Cascade: target->move_last_over(2)
-        CHECK(f.target_row_0 && f.target_row_1 && !f.target_row_2);
-        CHECK_EQUAL(0, f.origin_row_0.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_1.get_link(0));
+        f.get_origin_obj(2).set(f.col_link, null_key); // origin[0].o_1 -> realm::null()
+        // Cascade: target->remove_object(key[2])
+        CHECK(!f.target->is_valid(f.target_keys[2]));
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
     }
 
     // Break link by reassign
     {
         Fixture f;
-        f.origin_row_0.set_link(0, 2); // origin[0].o_1 -> target[2]
-        // Cascade: target->move_last_over(0)
-        CHECK(!f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(0, f.origin_row_0.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_1.get_link(0));
-        CHECK_EQUAL(0, f.origin_row_2.get_link(0));
+        f.get_origin_obj(0).set(f.col_link, f.target_keys[2]); // origin[0].o_1 -> target[2]
+        // Cascade: target->remove_object(key[0])
+        CHECK(!f.target->is_valid(f.target_keys[0]));
+        CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(0).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
     }
     {
         Fixture f;
-        f.origin_row_1.set_link(0, 0); // origin[1].o_1 -> target[0]
-        // Cascade: target->move_last_over(1)
-        CHECK(f.target_row_0 && !f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(0, f.origin_row_0.get_link(0));
-        CHECK_EQUAL(0, f.origin_row_1.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_2.get_link(0));
+        f.get_origin_obj(1).set(f.col_link, f.target_keys[0]); // origin[0].o_1 -> target[0]
+        // Cascade: target->remove_object(key[1])
+        CHECK(!f.target->is_valid(f.target_keys[1]));
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(1).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
     }
     {
         Fixture f;
-        f.origin_row_2.set_link(0, 1); // origin[2].o_1 -> target[1]
-        // Cascade: target->move_last_over(2)
-        CHECK(f.target_row_0 && f.target_row_1 && !f.target_row_2);
-        CHECK_EQUAL(0, f.origin_row_0.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_1.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_2.get_link(0));
+        f.get_origin_obj(2).set(f.col_link, f.target_keys[1]); // origin[2].o_1 -> target[1]
+        // Cascade: target->remove_object(key[2])
+        CHECK(!f.target->is_valid(f.target_keys[2]));
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(2).get<Key>(f.col_link));
     }
 
     // Avoid breaking link by reassigning self
     {
         Fixture f;
-        f.origin_row_0.set_link(0, 0); // No effective change!
-        CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(0, f.origin_row_0.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_1.get_link(0));
-        CHECK_EQUAL(2, f.origin_row_2.get_link(0));
+        f.get_origin_obj(0).set(f.col_link, f.target_keys[0]); // No effective change!
+        // Cascade: target->remove_object(key[2])
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
+              f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
     }
     {
         Fixture f;
-        f.origin_row_1.set_link(0, 1); // No effective change!
-        CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(0, f.origin_row_0.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_1.get_link(0));
-        CHECK_EQUAL(2, f.origin_row_2.get_link(0));
+        f.get_origin_obj(1).set(f.col_link, f.target_keys[1]); // No effective change!
+        // Cascade: target->remove_object(key[2])
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
+              f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
     }
     {
         Fixture f;
-        f.origin_row_2.set_link(0, 2); // No effective change!
-        CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(0, f.origin_row_0.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_1.get_link(0));
-        CHECK_EQUAL(2, f.origin_row_2.get_link(0));
-    }
-
-    // Break link by explicit ordered row removal
-    {
-        Fixture f;
-        f.origin_row_0.remove(); // Cascade: target->move_last_over(0)
-        CHECK(!f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(1, f.origin_row_1.get_link(0));
-        CHECK_EQUAL(0, f.origin_row_2.get_link(0));
-        CHECK_EQUAL(0, f.origin_row_1.get_index());
-        CHECK_EQUAL(1, f.origin_row_2.get_index());
-    }
-    {
-        Fixture f;
-        f.origin_row_1.remove(); // Cascade: target->move_last_over(1)
-        CHECK(f.target_row_0 && !f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(0, f.origin_row_0.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_2.get_link(0));
-        CHECK_EQUAL(0, f.origin_row_0.get_index());
-        CHECK_EQUAL(1, f.origin_row_2.get_index());
-    }
-    {
-        Fixture f;
-        f.origin_row_2.remove(); // Cascade: target->move_last_over(2)
-        CHECK(f.target_row_0 && f.target_row_1 && !f.target_row_2);
-        CHECK_EQUAL(0, f.origin_row_0.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_1.get_link(0));
-        CHECK_EQUAL(0, f.origin_row_0.get_index());
-        CHECK_EQUAL(1, f.origin_row_1.get_index());
+        f.get_origin_obj(2).set(f.col_link, f.target_keys[2]); // No effective change!
+        // Cascade: target->remove_object(key[2])
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
+              f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
     }
 
-    // Break link by explicit unordered row removal
+    // Break link by explicit object removal
     {
         Fixture f;
-        f.origin_row_0.move_last_over(); // Cascade: target->move_last_over(0)
-        CHECK(!f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(1, f.origin_row_1.get_link(0));
-        CHECK_EQUAL(0, f.origin_row_2.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_1.get_index());
-        CHECK_EQUAL(0, f.origin_row_2.get_index());
+        f.get_origin_obj(0).remove(); // Cascade: target->remove_object(key[0])
+        CHECK(!f.target->is_valid(f.target_keys[0]));
+        CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
     }
     {
         Fixture f;
-        f.origin_row_1.move_last_over(); // Cascade: target->move_last_over(1)
-        CHECK(f.target_row_0 && !f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(0, f.origin_row_0.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_2.get_link(0));
-        CHECK_EQUAL(0, f.origin_row_0.get_index());
-        CHECK_EQUAL(1, f.origin_row_2.get_index());
+        f.get_origin_obj(1).remove(); // Cascade: target->remove_object(key[1])
+        CHECK(!f.target->is_valid(f.target_keys[1]));
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
     }
     {
         Fixture f;
-        f.origin_row_2.move_last_over(); // Cascade: target->move_last_over(2)
-        CHECK(f.target_row_0 && f.target_row_1 && !f.target_row_2);
-        CHECK_EQUAL(0, f.origin_row_0.get_link(0));
-        CHECK_EQUAL(1, f.origin_row_1.get_link(0));
-        CHECK_EQUAL(0, f.origin_row_0.get_index());
-        CHECK_EQUAL(1, f.origin_row_1.get_index());
+        f.get_origin_obj(2).remove(); // Cascade: target->remove_object(key[2])
+        CHECK(!f.target->is_valid(f.target_keys[2]));
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
     }
 
     // Break link by clearing table
     {
         Fixture f;
         f.origin->clear();
-        CHECK(!f.target_row_0 && !f.target_row_1 && !f.target_row_2);
+        CHECK(!f.target->is_valid(f.target_keys[0]));
+        CHECK(!f.target->is_valid(f.target_keys[1]));
+        CHECK(!f.target->is_valid(f.target_keys[2]));
     }
 }
 
@@ -1597,208 +1582,136 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         Group group;
         TableRef origin = group.add_table("origin");
         TableRef target = group.add_table("target");
-        Row origin_row_0, origin_row_1, origin_row_2;
-        Row target_row_0, target_row_1, target_row_2;
-        LinkViewRef link_list_0, link_list_1, link_list_2;
+        std::vector<Key> origin_keys;
+        std::vector<Key> target_keys;
+        std::vector<LinkListPtr> linklists;
+        size_t col_link;
         Fixture()
         {
-            origin->add_column_link(type_LinkList, "o_1", *target, link_Strong);
+            col_link = origin->add_column_link(type_LinkList, "o_1", *target, link_Strong);
             target->add_column(type_Int, "t_1");
-            origin->add_empty_row(3);
-            target->add_empty_row(3);
-            origin_row_0 = origin->get(0);
-            origin_row_1 = origin->get(1);
-            origin_row_2 = origin->get(2);
-            target_row_0 = target->get(0);
-            target_row_1 = target->get(1);
-            target_row_2 = target->get(2);
-            link_list_0 = origin_row_0.get_linklist(0);
-            link_list_1 = origin_row_1.get_linklist(0);
-            link_list_2 = origin_row_2.get_linklist(0);
-            link_list_0->add(1); // origin[0].o_1 -> [ target[1] ]
-            link_list_1->add(0);
-            link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
-            link_list_2->add(2);
-            link_list_2->add(1);
-            link_list_2->add(2); // origin[1].o_1 -> [ target[2], target[1], target[2] ]
+            origin->create_objects(3, origin_keys);
+            target->create_objects(3, target_keys);
+            linklists.emplace_back(origin->get_object(origin_keys[0]).get_linklist_ptr(col_link));
+            linklists.emplace_back(origin->get_object(origin_keys[1]).get_linklist_ptr(col_link));
+            linklists.emplace_back(origin->get_object(origin_keys[2]).get_linklist_ptr(col_link));
+            linklists[0]->add(target_keys[1]); // origin[0].o_1 -> [ target[1] ]
+            linklists[1]->add(target_keys[0]);
+            linklists[1]->add(target_keys[1]); // origin[1].o_1 -> [ target[0], target[1] ]
+            linklists[2]->add(target_keys[2]);
+            linklists[2]->add(target_keys[1]);
+            linklists[2]->add(target_keys[2]); // origin[1].o_1 -> [ target[2], target[1], target[2] ]
+        }
+        Obj get_origin_obj(int i)
+        {
+            return origin->get_object(origin_keys[i]);
+        }
+        Obj get_target_obj(int i)
+        {
+            return target->get_object(origin_keys[i]);
         }
     };
 
     // Break links by clearing list
     {
         Fixture f;
-        f.link_list_0->clear(); // Cascade: Nothing
-        CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
-        CHECK_EQUAL(2, f.link_list_2->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
-        CHECK_EQUAL(2, f.link_list_2->get(2).get_index());
+        f.linklists[0]->clear(); // Cascade: Nothing
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
+              f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(f.target_keys[0], f.linklists[1]->get(0).get_key());
+        CHECK_EQUAL(f.target_keys[1], f.linklists[1]->get(1).get_key());
+        CHECK_EQUAL(f.target_keys[2], f.linklists[2]->get(0).get_key());
+        CHECK_EQUAL(f.target_keys[1], f.linklists[2]->get(1).get_key());
+        CHECK_EQUAL(f.target_keys[2], f.linklists[2]->get(2).get_key());
+        CHECK_EQUAL(3, f.target->size());
         f.group.verify();
     }
     {
         Fixture f;
-        f.link_list_1->clear(); // Cascade: target->move_last_over(0)
-        CHECK(!f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(1, f.link_list_0->get(0).get_index());
-        CHECK_EQUAL(0, f.link_list_2->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
-        CHECK_EQUAL(0, f.link_list_2->get(2).get_index());
+        f.linklists[1]->clear(); // Cascade: target->remove_object(0)
+        CHECK(!f.target->is_valid(f.target_keys[0]));
+        CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(2, f.target->size());
         f.group.verify();
     }
     {
         Fixture f;
-        f.link_list_2->clear(); // Cascade: target->move_last_over(2)
-        CHECK(f.target_row_0 && f.target_row_1 && !f.target_row_2);
-        CHECK_EQUAL(1, f.link_list_0->get(0).get_index());
-        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
+        f.linklists[2]->clear(); // Cascade: target->remove_object(2)
+        CHECK(!f.target->is_valid(f.target_keys[2]));
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]));
+        CHECK_EQUAL(2, f.target->size());
         f.group.verify();
     }
 
     // Break links by removal from list
     {
         Fixture f;
-        f.link_list_0->remove(0); // Cascade: Nothing
-        CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
-        CHECK_EQUAL(2, f.link_list_2->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
-        CHECK_EQUAL(2, f.link_list_2->get(2).get_index());
+        f.linklists[0]->remove(0); // Cascade: Nothing
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
+              f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(3, f.target->size());
         f.group.verify();
     }
     {
         Fixture f;
-        f.link_list_1->remove(0); // Cascade: target->move_last_over(0)
-        CHECK(!f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(1, f.link_list_0->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(0, f.link_list_2->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
-        CHECK_EQUAL(0, f.link_list_2->get(2).get_index());
+        f.linklists[1]->remove(0); // Cascade: target->remove_object(0)
+        CHECK(!f.target->is_valid(f.target_keys[0]));
+        CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(2, f.target->size());
         f.group.verify();
     }
 
     // Break links by reassign
     {
         Fixture f;
-        f.link_list_0->set(0, 0); // Cascade: Nothing
-        CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(0, f.link_list_0->get(0).get_index());
-        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
-        CHECK_EQUAL(2, f.link_list_2->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
-        CHECK_EQUAL(2, f.link_list_2->get(2).get_index());
+        f.linklists[0]->set(0, f.target_keys[0]); // Cascade: Nothing
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
+              f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(3, f.target->size());
         f.group.verify();
     }
     {
         Fixture f;
-        f.link_list_1->set(0, 1); // Cascade: target->move_last_over(0)
-        CHECK(!f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(1, f.link_list_0->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
-        CHECK_EQUAL(0, f.link_list_2->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
-        CHECK_EQUAL(0, f.link_list_2->get(2).get_index());
+        f.linklists[1]->set(0, f.target_keys[1]); // Cascade: target->remove_object(0)
+        CHECK(!f.target->is_valid(f.target_keys[0]));
+        CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(2, f.target->size());
         f.group.verify();
     }
 
     // Avoid breaking links by reassigning self
     {
         Fixture f;
-        f.link_list_1->set(0, 0);
-        CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_EQUAL(1, f.link_list_0->get(0).get_index());
-        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
-        CHECK_EQUAL(2, f.link_list_2->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
-        CHECK_EQUAL(2, f.link_list_2->get(2).get_index());
+        f.linklists[1]->set(0, f.target_keys[0]); // Cascade: Nothing
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
+              f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(3, f.target->size());
         f.group.verify();
     }
 
     // Break links by explicit ordered row removal
     {
         Fixture f;
-        f.origin_row_0.remove(); // Cascade: Nothing
-        CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_NOT(f.link_list_0->is_attached());
-        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
-        CHECK_EQUAL(2, f.link_list_2->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
-        CHECK_EQUAL(2, f.link_list_2->get(2).get_index());
-        CHECK_EQUAL(0, f.origin_row_1.get_index());
-        CHECK_EQUAL(1, f.origin_row_2.get_index());
+        f.get_origin_obj(0).remove(); // Cascade: Nothing
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
+              f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(3, f.target->size());
         f.group.verify();
     }
     {
         Fixture f;
-        f.origin_row_1.remove(); // Cascade: target->move_last_over(0)
-        CHECK(!f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_NOT(f.link_list_1->is_attached());
-        CHECK_EQUAL(1, f.link_list_0->get(0).get_index());
-        CHECK_EQUAL(0, f.link_list_2->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
-        CHECK_EQUAL(0, f.link_list_2->get(2).get_index());
-        CHECK_EQUAL(0, f.origin_row_0.get_index());
-        CHECK_EQUAL(1, f.origin_row_2.get_index());
+        f.get_origin_obj(1).remove(); // Cascade: target->remove_object(0)
+        CHECK(!f.target->is_valid(f.target_keys[0]));
+        CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(2, f.target->size());
         f.group.verify();
     }
     {
         Fixture f;
-        f.origin_row_2.remove(); // Cascade: target->move_last_over(2)
-        CHECK(f.target_row_0 && f.target_row_1 && !f.target_row_2);
-        CHECK_NOT(f.link_list_2->is_attached());
-        CHECK_EQUAL(1, f.link_list_0->get(0).get_index());
-        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
-        CHECK_EQUAL(0, f.origin_row_0.get_index());
-        CHECK_EQUAL(1, f.origin_row_1.get_index());
-        f.group.verify();
-    }
-
-    // Break links by explicit unordered row removal
-    {
-        Fixture f;
-        f.origin_row_0.move_last_over(); // Cascade: Nothing
-        CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_NOT(f.link_list_0->is_attached());
-        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
-        CHECK_EQUAL(2, f.link_list_2->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
-        CHECK_EQUAL(2, f.link_list_2->get(2).get_index());
-        CHECK_EQUAL(1, f.origin_row_1.get_index());
-        CHECK_EQUAL(0, f.origin_row_2.get_index());
-        f.group.verify();
-    }
-    {
-        Fixture f;
-        f.origin_row_1.move_last_over(); // Cascade: target->move_last_over(0)
-        CHECK(!f.target_row_0 && f.target_row_1 && f.target_row_2);
-        CHECK_NOT(f.link_list_1->is_attached());
-        CHECK_EQUAL(1, f.link_list_0->get(0).get_index());
-        CHECK_EQUAL(0, f.link_list_2->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_2->get(1).get_index());
-        CHECK_EQUAL(0, f.link_list_2->get(2).get_index());
-        CHECK_EQUAL(0, f.origin_row_0.get_index());
-        CHECK_EQUAL(1, f.origin_row_2.get_index());
-        f.group.verify();
-    }
-    {
-        Fixture f;
-        f.origin_row_2.move_last_over(); // Cascade: target->move_last_over(2)
-        CHECK(f.target_row_0 && f.target_row_1 && !f.target_row_2);
-        CHECK_NOT(f.link_list_2->is_attached());
-        CHECK_EQUAL(1, f.link_list_0->get(0).get_index());
-        CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
-        CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
-        CHECK_EQUAL(0, f.origin_row_0.get_index());
-        CHECK_EQUAL(1, f.origin_row_1.get_index());
+        f.get_origin_obj(2).remove(); // Cascade: target->remove_object(2)
+        CHECK(!f.target->is_valid(f.target_keys[2]));
+        CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]));
+        CHECK_EQUAL(2, f.target->size());
         f.group.verify();
     }
 
@@ -1806,7 +1719,10 @@ TEST(Links_CascadeRemove_ColumnLinkList)
     {
         Fixture f;
         f.origin->clear();
-        CHECK(!f.target_row_0 && !f.target_row_1 && !f.target_row_2);
+        CHECK(!f.target->is_valid(f.target_keys[0]));
+        CHECK(!f.target->is_valid(f.target_keys[1]));
+        CHECK(!f.target->is_valid(f.target_keys[2]));
+        CHECK_EQUAL(0, f.target->size());
         f.group.verify();
     }
 }
@@ -1821,7 +1737,7 @@ TEST(Links_CascadeRemove_Cycles)
 {
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Links_OrderedRowRemoval)
 {
     {
@@ -1932,7 +1848,7 @@ TEST(Links_LinkList_Swap)
         Group group;
         TableRef origin = group.add_table("origin");
         TableRef target = group.add_table("target");
-        LinkViewRef link_list_1, link_list_2;
+        LinkViewRef llinklists[1] link_list_2;
         Fixture()
         {
             origin->add_column_link(type_LinkList, "", *target);

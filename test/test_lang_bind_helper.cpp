@@ -9680,7 +9680,7 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
     CHECK(!table->has_search_index(1));
     group.verify();
 }
-#endif
+
 
 TEST(LangBindHelper_HandoverQuery)
 {
@@ -9724,7 +9724,7 @@ TEST(LangBindHelper_HandoverQuery)
     CHECK_EQUAL(count, 50);
 }
 
-#ifdef LEGACY_TESTS
+
 TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -13513,7 +13513,6 @@ TEST(LangBindHelper_UpdateDescriptor)
     CHECK_EQUAL(tv.size(), 1);
 }
 
-#endif // LEGACY_TESTS
 
 TEST(LangBindHelper_RemoveObject)
 {
@@ -13552,6 +13551,8 @@ TEST(LangBindHelper_RemoveObject)
     CHECK_THROW(o1.get<int64_t>(0), InvalidKey);
     CHECK_EQUAL(o2.get<int64_t>(0), 2);
 }
+#endif // LEGACY_TESTS
+
 
 TEST(LangBindHelper_callWithLock)
 {
@@ -13610,6 +13611,8 @@ TEST(LangBindHelper_getCoreFiles)
     CHECK(core_files.size() == 0);
 }
 
+
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_AdvanceReadCluster)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -13638,5 +13641,6 @@ TEST(LangBindHelper_AdvanceReadCluster)
         CHECK_EQUAL(o.get<int64_t>(int_col), i);
     }
 }
+#endif
 
 #endif

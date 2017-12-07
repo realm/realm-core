@@ -355,29 +355,6 @@ ref_type BacklinkColumn::get_child_ref(size_t child_ndx) const noexcept
     return IntegerColumn::get_as_ref(child_ndx);
 }
 
-void BacklinkColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
-{
-    if (state.track_link_nullifications) {
-        bool do_destroy = false;
-        for_each_link(row_ndx, do_destroy, [&](size_t origin_row_ndx) {
-            state.links.push_back({m_origin_table.get(), get_origin_column_index(), origin_row_ndx, row_ndx});
-        });
-    }
-}
-
-void BacklinkColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState& state)
-{
-    if (state.track_link_nullifications) {
-        for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
-            // IntegerColumn::clear() handles the destruction of subtrees
-            bool do_destroy = false;
-            for_each_link(row_ndx, do_destroy, [&](size_t origin_row_ndx) {
-                state.links.push_back({m_origin_table.get(), get_origin_column_index(), origin_row_ndx, row_ndx});
-            });
-        }
-    }
-}
-
 int BacklinkColumn::compare_values(size_t, size_t) const noexcept
 {
     REALM_ASSERT(false); // backlinks can only be queried over and not on directly
@@ -426,10 +403,10 @@ void BacklinkColumn::verify(const Table& table, size_t col_ndx) const
     REALM_ASSERT(&m_origin_column->get_backlink_column() == this);
 
     // Check that m_origin_table is the table specified by the spec
-    size_t origin_table_ndx = m_origin_table->get_index_in_group();
+    auto origin_table_key = m_origin_table->get_key();
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
-    REALM_ASSERT_3(origin_table_ndx, ==, spec.get_opposite_link_table_ndx(col_ndx));
+    REALM_ASSERT_3(origin_table_key.value, ==, spec.get_opposite_link_table_key(col_ndx).value);
 #else
     static_cast<void>(table);
     static_cast<void>(col_ndx);

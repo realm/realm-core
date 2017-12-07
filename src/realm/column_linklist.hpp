@@ -72,8 +72,6 @@ public:
     void move_last_row_over(size_t, size_t, bool) override;
     void swap_rows(size_t, size_t) override;
     void clear(size_t, bool) override;
-    void cascade_break_backlinks_to(size_t, CascadeState&) override;
-    void cascade_break_backlinks_to_all_rows(size_t, CascadeState&) override;
     void update_from_parent(size_t) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
@@ -118,12 +116,6 @@ private:
     // ArrayParent overrides
     void update_child_ref(size_t child_ndx, ref_type new_ref) override;
     ref_type get_child_ref(size_t child_ndx) const noexcept override;
-
-    // These helpers are needed because of the way the B+-tree of links is
-    // traversed in cascade_break_backlinks_to() and
-    // cascade_break_backlinks_to_all_rows().
-    void cascade_break_backlinks_to__leaf(size_t row_ndx, const Array& link_list_leaf, CascadeState&);
-    void cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf, CascadeState&);
 
     void discard_child_accessors() noexcept;
 

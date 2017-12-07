@@ -31,6 +31,7 @@ class Cluster;
 class ClusterNodeInner;
 class ClusterTree;
 class ColumnAttrMask;
+struct CascadeState;
 
 struct Key {
     constexpr Key()
@@ -57,6 +58,10 @@ struct Key {
     bool operator<(const Key& rhs) const
     {
         return value < rhs.value;
+    }
+    bool operator>(const Key& rhs) const
+    {
+        return value > rhs.value;
     }
     operator bool() const
     {
@@ -160,7 +165,7 @@ public:
     virtual void get(Key key, State& state) const = 0;
 
     /// Erase element identified by 'key'
-    virtual unsigned erase(Key key) = 0;
+    virtual unsigned erase(Key key, CascadeState& state) = 0;
 
     /// Move elements from position 'ndx' to 'new_node'. The new node is supposed
     /// to be a sibling positioned right after this one. All key values must
@@ -211,7 +216,7 @@ public:
     void remove_column(size_t ndx) override;
     ref_type insert(Key k, State& state) override;
     void get(Key k, State& state) const override;
-    unsigned erase(Key k) override;
+    unsigned erase(Key k, CascadeState& state) override;
 
     void init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept
     {
@@ -226,6 +231,7 @@ public:
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
 private:
+    friend class Table;
     void insert_row(size_t ndx, Key k);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
     template <class T>
@@ -238,7 +244,8 @@ private:
     void do_move(size_t ndx, size_t col_ndx, Cluster* to);
     template <class T>
     void do_erase(size_t ndx, size_t col_ndx);
-    void remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys);
+    void remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys, CascadeState& state) const;
+    void do_erase_key(size_t ndx, size_t col_ndx, CascadeState& state);
 };
 
 }

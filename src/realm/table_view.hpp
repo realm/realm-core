@@ -225,9 +225,6 @@ public:
     // document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const;
 
-    // Get key for object this view is "looking" at.
-    Key get_key(size_t row_ndx) const noexcept;
-
     /// Search this view for the specified key. If found, the index of that row
     /// within this view is returned, otherwise `realm::not_found` is returned.
     size_t find_by_source_ndx(Key key) const noexcept;
@@ -607,11 +604,6 @@ inline bool TableViewBase::is_row_attached(size_t row_ndx) const noexcept
 inline size_t TableViewBase::num_attached_rows() const noexcept
 {
     return m_key_values.size() - m_num_detached_refs;
-}
-
-inline Key TableViewBase::get_key(size_t row_ndx) const noexcept
-{
-    return Key(m_key_values.get(row_ndx));
 }
 
 inline size_t TableViewBase::find_by_source_ndx(Key key) const noexcept

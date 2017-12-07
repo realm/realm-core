@@ -37,6 +37,7 @@
 #include <realm/query.hpp>
 #include <realm/column.hpp>
 #include <realm/cluster_tree.hpp>
+#include <realm/keys.hpp>
 
 namespace realm {
 
@@ -72,7 +73,6 @@ class QueryInfo;
 }
 
 class Replication;
-
 
 /// FIXME: Table assignment (from any group to any group) could be made aliasing
 /// safe as follows: Start by cloning source table into target allocator. On
@@ -408,10 +408,8 @@ public:
     void remove(size_t row_ndx);
     void remove_recursive(size_t row_ndx);
     void remove_last();
-    void remove_object(Key key)
-    {
-        do_remove_object(key, false);
-    }
+    void remove_object(Key key);
+    void remove_object_recursive(Key key);
     void move_last_over(size_t row_ndx);
     void clear();
     void swap_rows(size_t row_ndx_1, size_t row_ndx_2);
@@ -424,7 +422,7 @@ public:
     Iterator end();
     void remove_object(ConstIterator& it)
     {
-        do_remove_object(it->get_key(), false);
+        remove_object(it->get_key());
     }
     //@}
 
@@ -627,6 +625,9 @@ public:
     /// If this table is a group-level table, then this function returns the
     /// index of this table within the group. Otherwise it returns realm::npos.
     size_t get_index_in_group() const noexcept;
+    TableKey get_key() const noexcept;
+    // Get the key of this table directly, without needing a Table accessor.
+    static TableKey get_key_direct(Allocator& alloc, ref_type top_ref);
 
     // Aggregate functions
     size_t count_int(size_t column_ndx, int64_t value) const;
@@ -692,9 +693,6 @@ public:
 
     TableView get_sorted_view(SortDescriptor order);
     ConstTableView get_sorted_view(SortDescriptor order) const;
-
-    TableView get_range_view(size_t begin, size_t end);
-    ConstTableView get_range_view(size_t begin, size_t end) const;
 
     TableView get_backlink_view(size_t row_ndx, Table* src_table, size_t src_col_ndx);
 
@@ -942,6 +940,7 @@ private:
     SpecPtr m_spec; // 1st slot in m_top (for root tables)
     ClusterTree m_clusters;
     int64_t m_next_key_value = -1;
+    TableKey m_key;
 
     // Is guaranteed to be empty for a detached accessor. Otherwise it is empty
     // when the table accessor is attached to a degenerate subtable (unattached
@@ -977,7 +976,7 @@ private:
     void erase_row(size_t row_ndx, bool is_move_last_over);
     void batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over);
     void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
-    void do_remove_object(Key key, bool broken_reciprocal_backlinks);
+    void do_remove_object(Key key);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     void do_move_row(size_t from_ndx, size_t to_ndx);
@@ -1058,9 +1057,9 @@ private:
                                bool listtype = false);
     void do_erase_root_column(size_t col_ndx);
     void do_move_root_column(size_t from, size_t to);
-    void insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx,
+    void insert_backlink_column(TableKey origin_table_key, size_t origin_col_ndx, size_t backlink_col_ndx,
                                 StringData name);
-    void erase_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx);
+    void erase_backlink_column(TableKey origin_table_key, size_t origin_col_ndx);
     void update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_ndx_begin);
     void update_link_target_tables_after_column_move(size_t moved_from, size_t moved_to);
 
@@ -1187,7 +1186,7 @@ private:
 
     /// Create an empty table with independent spec and return just
     /// the reference to the underlying memory.
-    static ref_type create_empty_table(Allocator&);
+    static ref_type create_empty_table(Allocator&, TableKey = TableKey());
 
     /// Create a column of the specified type, fill it with the
     /// specified number of default values, and return just the
@@ -1211,84 +1210,7 @@ private:
 
     void connect_opposite_link_columns(size_t link_col_ndx, Table& target_table, size_t backlink_col_ndx) noexcept;
 
-    //@{
-
-    /// Cascading removal of strong links.
-    ///
-    /// cascade_break_backlinks_to() removes all backlinks pointing to the row
-    /// at \a row_ndx. Additionally, if this causes the number of **strong**
-    /// backlinks originating from a particular opposite row (target row of
-    /// corresponding forward link) to drop to zero, and that row is not already
-    /// in \a state.rows, then that row is added to \a state.rows, and
-    /// cascade_break_backlinks_to() is called recursively for it. This
-    /// operation is the first half of the cascading row removal operation. The
-    /// second half is performed by passing the resulting contents of \a
-    /// state.rows to remove_backlink_broken_rows().
-    ///
-    /// Operations that trigger cascading row removal due to explicit removal of
-    /// one or more rows (the *initiating rows*), should add those rows to \a
-    /// rows initially, and then call cascade_break_backlinks_to() once for each
-    /// of them in turn. This is opposed to carrying out the explicit row
-    /// removals independently, which is also possible, but does require that
-    /// any initiating rows, that end up in \a state.rows due to link cycles,
-    /// are removed before passing \a state.rows to
-    /// remove_backlink_broken_rows(). In the case of clear(), where all rows of
-    /// a table are explicitly removed, it is better to use
-    /// cascade_break_backlinks_to_all_rows(), and then carry out the table
-    /// clearing as an independent step. For operations that trigger cascading
-    /// row removal for other reasons than explicit row removal, \a state.rows
-    /// must be empty initially, but cascade_break_backlinks_to() must still be
-    /// called for each of the initiating rows.
-    ///
-    /// When the last non-recursive invocation of cascade_break_backlinks_to()
-    /// returns, all forward links originating from a row in \a state.rows have
-    /// had their reciprocal backlinks removed, so remove_backlink_broken_rows()
-    /// does not perform reciprocal backlink removal at all. Additionally, all
-    /// remaining backlinks originating from rows in \a state.rows are
-    /// guaranteed to point to rows that are **not** in \a state.rows. This is
-    /// true because any backlink that was pointing to a row in \a state.rows
-    /// has been removed by one of the invocations of
-    /// cascade_break_backlinks_to(). The set of forward links, that correspond
-    /// to these remaining backlinks, is precisely the set of forward links that
-    /// need to be removed/nullified by remove_backlink_broken_rows(), which it
-    /// does by way of reciprocal forward link removal. Note also, that while
-    /// all the rows in \a state.rows can have remaining **weak** backlinks
-    /// originating from them, only the initiating rows in \a state.rows can
-    /// have remaining **strong** backlinks originating from them. This is true
-    /// because a non-initiating row is added to \a state.rows only when the
-    /// last backlink originating from it is lost.
-    ///
-    /// Each row removal is replicated individually (as opposed to one
-    /// replication instruction for the entire cascading operation). This is
-    /// done because it provides an easy way for Group::advance_transact() to
-    /// know which tables are affected by the cascade. Note that this has
-    /// several important consequences: First of all, the replication log
-    /// receiver must execute the row removal instructions in a non-cascading
-    /// fashion, meaning that there will be an asymmetry between the two sides
-    /// in how the effect of the cascade is brought about. While this is fine
-    /// for simple 1-to-1 replication, it may end up interfering badly with
-    /// *transaction merging*, when that feature is introduced. Imagine for
-    /// example that the cascade initiating operation gets canceled during
-    /// conflict resolution, but some, or all of the induced row removals get to
-    /// stay. That would break causal consistency. It is important, however, for
-    /// transaction merging that the cascaded row removals are explicitly
-    /// mentioned in the replication log, such that they can be used to adjust
-    /// row indexes during the *operational transform*.
-    ///
-    /// cascade_break_backlinks_to_all_rows() has the same affect as calling
-    /// cascade_break_backlinks_to() once for each row in the table. When
-    /// calling this function, \a state.stop_on_table must be set to the origin
-    /// table (origin table of corresponding forward links), and \a
-    /// state.stop_on_link_list_column must be null.
-    ///
-    /// It is immaterial which table remove_backlink_broken_rows() is called on,
-    /// as long it that table is in the same group as the removed rows.
-
-    void cascade_break_backlinks_to(size_t row_ndx, CascadeState& state);
-    void cascade_break_backlinks_to_all_rows(CascadeState& state);
-    void remove_backlink_broken_rows(const CascadeState&);
-
-    //@}
+    void remove_recursive(CascadeState&);
 
     /// Used by query. Follows chain of link columns and returns final target table
     const Table* get_link_chain_target(const std::vector<size_t>& link_chain) const;
@@ -1377,6 +1299,11 @@ private:
     R aggregate(size_t column_ndx, T value = {}, size_t* resultcount = nullptr, Key* return_ndx = nullptr) const;
     template <typename T>
     double average(size_t column_ndx, size_t* resultcount) const;
+
+    static constexpr int top_position_for_spec = 0;
+    static constexpr int top_position_for_columns = 1;
+    static constexpr int top_position_for_cluster_tree = 2;
+    static constexpr int top_position_for_key = 3;
 
     friend class SubtableNode;
     friend class _impl::TableFriend;
@@ -1744,9 +1671,9 @@ inline Columns<T> Table::column(const Table& origin, size_t origin_col_ndx)
 {
     static_assert(std::is_same<T, BackLink>::value, "");
 
-    size_t origin_table_ndx = origin.get_index_in_group();
+    auto origin_table_key = origin.get_key();
     const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    size_t backlink_col_ndx = current_target_table.m_spec->find_backlink_column(origin_table_ndx, origin_col_ndx);
+    size_t backlink_col_ndx = current_target_table.m_spec->find_backlink_column(origin_table_key, origin_col_ndx);
 
     std::vector<size_t> link_chain = std::move(m_link_chain);
     m_link_chain.clear();
@@ -1778,9 +1705,9 @@ inline Table& Table::link(size_t link_column)
 
 inline Table& Table::backlink(const Table& origin, size_t origin_col_ndx)
 {
-    size_t origin_table_ndx = origin.get_index_in_group();
+    auto origin_table_key = origin.get_key();
     const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    size_t backlink_col_ndx = current_target_table.m_spec->find_backlink_column(origin_table_ndx, origin_col_ndx);
+    size_t backlink_col_ndx = current_target_table.m_spec->find_backlink_column(origin_table_key, origin_col_ndx);
     return link(backlink_col_ndx);
 }
 
@@ -2113,9 +2040,9 @@ class _impl::TableFriend {
 public:
     typedef Table::UnbindGuard UnbindGuard;
 
-    static ref_type create_empty_table(Allocator& alloc)
+    static ref_type create_empty_table(Allocator& alloc, TableKey key = TableKey())
     {
-        return Table::create_empty_table(alloc); // Throws
+        return Table::create_empty_table(alloc, key); // Throws
     }
 
     static ref_type clone(const Table& table, Allocator& alloc)
@@ -2226,8 +2153,7 @@ public:
 
     static void do_remove_object(Table& table, Key key)
     {
-        bool broken_reciprocal_backlinks = false;
-        table.do_remove_object(key, broken_reciprocal_backlinks); // Throws
+        table.do_remove_object(key); // Throws
     }
 
     static void do_move_last_over(Table& table, size_t row_ndx)
@@ -2267,14 +2193,9 @@ public:
         return table.get_backlink_count(row_ndx, only_strong_links);
     }
 
-    static void cascade_break_backlinks_to(Table& table, size_t row_ndx, CascadeState& state)
+    static void remove_recursive(Table& table, CascadeState& rows)
     {
-        table.cascade_break_backlinks_to(row_ndx, state); // Throws
-    }
-
-    static void remove_backlink_broken_rows(Table& table, const CascadeState& rows)
-    {
-        table.remove_backlink_broken_rows(rows); // Throws
+        table.remove_recursive(rows); // Throws
     }
 
     static size_t* record_subtable_path(const Table& table, size_t* b, size_t* e) noexcept

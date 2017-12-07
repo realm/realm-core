@@ -136,15 +136,15 @@ public:
     {
         return true;
     }
-    bool insert_group_level_table(size_t, size_t, StringData)
+    bool insert_group_level_table(TableKey, size_t, StringData)
     {
         return true;
     }
-    bool erase_group_level_table(size_t, size_t)
+    bool erase_group_level_table(TableKey, size_t)
     {
         return true;
     }
-    bool rename_group_level_table(size_t, StringData)
+    bool rename_group_level_table(TableKey, StringData)
     {
         return true;
     }
@@ -234,7 +234,7 @@ public:
     {
         return true;
     }
-    bool set_link(size_t, size_t, size_t, size_t, Instruction)
+    bool set_link(size_t, size_t, size_t, TableKey, Instruction)
     {
         return true;
     }
@@ -242,7 +242,7 @@ public:
     {
         return true;
     }
-    bool nullify_link(size_t, size_t, size_t)
+    bool nullify_link(size_t, size_t, TableKey)
     {
         return true;
     }
@@ -345,9 +345,9 @@ public:
     bool select_table(size_t group_level_ndx, size_t levels, const size_t* path);
     bool select_descriptor(size_t levels, const size_t* path);
     bool select_link_list(size_t col_ndx, size_t row_ndx, size_t link_target_group_level_ndx);
-    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData name);
-    bool erase_group_level_table(size_t table_ndx, size_t num_tables);
-    bool rename_group_level_table(size_t table_ndx, StringData new_name);
+    bool insert_group_level_table(TableKey table_key, size_t num_tables, StringData name);
+    bool erase_group_level_table(TableKey table_key, size_t num_tables);
+    bool rename_group_level_table(TableKey table_key, StringData new_name);
     bool move_group_level_table(size_t from_table_ndx, size_t to_table_ndx);
 
     /// Must have table selected.
@@ -372,9 +372,9 @@ public:
     bool set_timestamp(size_t col_ndx, size_t row_ndx, Timestamp, Instruction = instr_Set);
     bool set_table(size_t col_ndx, size_t row_ndx, Instruction = instr_Set);
     bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&, Instruction = instr_Set);
-    bool set_link(size_t col_ndx, size_t row_ndx, size_t, size_t target_group_level_ndx, Instruction = instr_Set);
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t, TableKey target_table_key, Instruction = instr_Set);
     bool set_null(size_t col_ndx, size_t row_ndx, Instruction = instr_Set, size_t = 0);
-    bool nullify_link(size_t col_ndx, size_t row_ndx, size_t target_group_level_ndx);
+    bool nullify_link(size_t col_ndx, size_t row_ndx, TableKey target_table_key);
     bool insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData);
     bool erase_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t size);
     bool optimize_table();
@@ -490,9 +490,9 @@ private:
 
 class TransactLogConvenientEncoder {
 public:
-    virtual void insert_group_level_table(size_t table_ndx, size_t num_tables, StringData name);
-    virtual void erase_group_level_table(size_t table_ndx, size_t num_tables);
-    virtual void rename_group_level_table(size_t table_ndx, StringData new_name);
+    virtual void insert_group_level_table(TableKey table_key, size_t num_tables, StringData name);
+    virtual void erase_group_level_table(TableKey table_key, size_t num_tables);
+    virtual void rename_group_level_table(TableKey table_key, StringData new_name);
     virtual void move_group_level_table(size_t from_table_ndx, size_t to_table_ndx);
     virtual void insert_column(const Table*, size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
                                bool nullable = false);
@@ -830,6 +830,12 @@ inline char* TransactLogEncoder::encode<char>(char* ptr, char value)
 }
 
 template <>
+inline char* TransactLogEncoder::encode<TableKey>(char* ptr, TableKey key)
+{
+    return encode<int64_t>(ptr, key.value);
+}
+
+template <>
 inline char* TransactLogEncoder::encode<Instruction>(char* ptr, Instruction inst)
 {
     return encode<char>(ptr, inst);
@@ -1001,41 +1007,41 @@ inline void TransactLogConvenientEncoder::select_link_list(const LinkView& list)
 }
 
 
-inline bool TransactLogEncoder::insert_group_level_table(size_t table_ndx, size_t prior_num_tables, StringData name)
+inline bool TransactLogEncoder::insert_group_level_table(TableKey table_key, size_t prior_num_tables, StringData name)
 {
-    append_simple_instr(instr_InsertGroupLevelTable, table_ndx, prior_num_tables, name); // Throws
+    append_simple_instr(instr_InsertGroupLevelTable, table_key, prior_num_tables, name); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::insert_group_level_table(size_t table_ndx, size_t prior_num_tables,
+inline void TransactLogConvenientEncoder::insert_group_level_table(TableKey table_key, size_t prior_num_tables,
                                                                    StringData name)
 {
     unselect_all();
-    m_encoder.insert_group_level_table(table_ndx, prior_num_tables, name); // Throws
+    m_encoder.insert_group_level_table(table_key, prior_num_tables, name); // Throws
 }
 
-inline bool TransactLogEncoder::erase_group_level_table(size_t table_ndx, size_t prior_num_tables)
+inline bool TransactLogEncoder::erase_group_level_table(TableKey table_key, size_t prior_num_tables)
 {
-    append_simple_instr(instr_EraseGroupLevelTable, table_ndx, prior_num_tables); // Throws
+    append_simple_instr(instr_EraseGroupLevelTable, table_key, prior_num_tables); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::erase_group_level_table(size_t table_ndx, size_t prior_num_tables)
+inline void TransactLogConvenientEncoder::erase_group_level_table(TableKey table_key, size_t prior_num_tables)
 {
     unselect_all();
-    m_encoder.erase_group_level_table(table_ndx, prior_num_tables); // Throws
+    m_encoder.erase_group_level_table(table_key, prior_num_tables); // Throws
 }
 
-inline bool TransactLogEncoder::rename_group_level_table(size_t table_ndx, StringData new_name)
+inline bool TransactLogEncoder::rename_group_level_table(TableKey table_key, StringData new_name)
 {
-    append_simple_instr(instr_RenameGroupLevelTable, table_ndx, new_name); // Throws
+    append_simple_instr(instr_RenameGroupLevelTable, table_key, new_name); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::rename_group_level_table(size_t table_ndx, StringData new_name)
+inline void TransactLogConvenientEncoder::rename_group_level_table(TableKey table_key, StringData new_name)
 {
     unselect_all();
-    m_encoder.rename_group_level_table(table_ndx, new_name); // Throws
+    m_encoder.rename_group_level_table(table_key, new_name); // Throws
 }
 
 inline bool TransactLogEncoder::move_group_level_table(size_t from_table_ndx, size_t to_table_ndx)
@@ -1078,8 +1084,8 @@ inline void TransactLogConvenientEncoder::insert_column(const Table* t, size_t c
         const Table& origin_table = *t;
         REALM_ASSERT(origin_table.is_group_level());
         const Spec& target_spec = tf::get_spec(*(link.m_target_table));
-        size_t origin_table_ndx = origin_table.get_index_in_group();
-        size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
+        auto origin_table_key = origin_table.get_key();
+        size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_key, col_ndx);
         REALM_ASSERT_3(backlink_col_ndx, ==, link.m_backlink_col_ndx);
         m_encoder.insert_link_column(col_ndx, type, name, target_table_ndx, backlink_col_ndx); // Throws
     }
@@ -1114,8 +1120,8 @@ inline void TransactLogConvenientEncoder::erase_column(const Table* t, size_t co
         const Table& target_table = *tf::get_link_target_table_accessor(*t, col_ndx);
         size_t target_table_ndx = target_table.get_index_in_group();
         const Spec& target_spec = tf::get_spec(target_table);
-        size_t origin_table_ndx = t->get_index_in_group();
-        size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
+        auto origin_table_key = t->get_key();
+        size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_key, col_ndx);
         m_encoder.erase_link_column(col_ndx, target_table_ndx, backlink_col_ndx); // Throws
     }
 }
@@ -1293,14 +1299,14 @@ inline void TransactLogConvenientEncoder::set_timestamp(const Table* t, size_t c
     m_encoder.set_timestamp(col_ndx, ndx, value, variant); // Throws
 }
 
-inline bool TransactLogEncoder::set_link(size_t col_ndx, size_t ndx, size_t value, size_t target_group_level_ndx,
+inline bool TransactLogEncoder::set_link(size_t col_ndx, size_t ndx, size_t value, TableKey target_table_key,
                                          Instruction variant)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
     // Map `realm::npos` to zero, and `n` to `n+1`, where `n` is a target row
     // index.
     size_t value_2 = size_t(1) + value;
-    append_simple_instr(variant, type_Link, col_ndx, ndx, value_2, target_group_level_ndx); // Throws
+    append_simple_instr(variant, type_Link, col_ndx, ndx, value_2, target_table_key); // Throws
     return true;
 }
 
@@ -1310,8 +1316,8 @@ inline void TransactLogConvenientEncoder::set_link(const Table* t, size_t col_nd
     select_table(t); // Throws
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(*t);
-    size_t target_group_level_ndx = spec.get_opposite_link_table_ndx(col_ndx);
-    m_encoder.set_link(col_ndx, ndx, value, target_group_level_ndx, variant); // Throws
+    auto target_table_key = spec.get_opposite_link_table_key(col_ndx);
+    m_encoder.set_link(col_ndx, ndx, value, target_table_key, variant); // Throws
 }
 
 inline bool TransactLogEncoder::set_null(size_t col_ndx, size_t ndx, Instruction variant, size_t prior_num_rows)
@@ -1334,9 +1340,9 @@ inline void TransactLogConvenientEncoder::set_null(const Table* t, size_t col_nd
     m_encoder.set_null(col_ndx, row_ndx, variant, prior_num_rows); // Throws
 }
 
-inline bool TransactLogEncoder::nullify_link(size_t col_ndx, size_t ndx, size_t target_group_level_ndx)
+inline bool TransactLogEncoder::nullify_link(size_t col_ndx, size_t ndx, TableKey target_table_key)
 {
-    append_simple_instr(instr_NullifyLink, col_ndx, ndx, target_group_level_ndx); // Throws
+    append_simple_instr(instr_NullifyLink, col_ndx, ndx, target_table_key); // Throws
     return true;
 }
 
@@ -1345,8 +1351,8 @@ inline void TransactLogConvenientEncoder::nullify_link(const Table* t, size_t co
     select_table(t); // Throws
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(*t);
-    size_t target_group_level_ndx = spec.get_opposite_link_table_ndx(col_ndx);
-    m_encoder.nullify_link(col_ndx, ndx, target_group_level_ndx); // Throws
+    auto target_table_key = spec.get_opposite_link_table_key(col_ndx);
+    m_encoder.nullify_link(col_ndx, ndx, target_table_key); // Throws
 }
 
 inline bool TransactLogEncoder::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData value)
@@ -1790,8 +1796,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                     size_t value = read_int<size_t>(); // Throws
                     // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
                     size_t target_row_ndx = size_t(value - 1);
-                    size_t target_group_level_ndx = read_int<size_t>();                                     // Throws
-                    if (!handler.set_link(col_ndx, row_ndx, target_row_ndx, target_group_level_ndx, instr)) // Throws
+                    TableKey target_table_key = TableKey(read_int<int64_t>());                        // Throws
+                    if (!handler.set_link(col_ndx, row_ndx, target_row_ndx, target_table_key, instr)) // Throws
                         parser_error();
                     return;
                 }
@@ -1813,10 +1819,10 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_NullifyLink: {
-            size_t col_ndx = read_int<size_t>();                                 // Throws
-            size_t row_ndx = read_int<size_t>();                                 // Throws
-            size_t target_group_level_ndx = read_int<size_t>();                  // Throws
-            if (!handler.nullify_link(col_ndx, row_ndx, target_group_level_ndx)) // Throws
+            size_t col_ndx = read_int<size_t>();                           // Throws
+            size_t row_ndx = read_int<size_t>();                           // Throws
+            TableKey target_table_key = TableKey(read_int<size_t>());      // Throws
+            if (!handler.nullify_link(col_ndx, row_ndx, target_table_key)) // Throws
                 parser_error();
             return;
         }
@@ -2068,24 +2074,24 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_InsertGroupLevelTable: {
-            size_t table_ndx = read_int<size_t>();                              // Throws
+            TableKey table_key = TableKey(read_int<size_t>());                  // Throws
             size_t num_tables = read_int<size_t>();                             // Throws
             StringData name = read_string(m_string_buffer);                     // Throws
-            if (!handler.insert_group_level_table(table_ndx, num_tables, name)) // Throws
+            if (!handler.insert_group_level_table(table_key, num_tables, name)) // Throws
                 parser_error();
             return;
         }
         case instr_EraseGroupLevelTable: {
-            size_t table_ndx = read_int<size_t>();                             // Throws
+            TableKey table_key = TableKey(read_int<size_t>());                 // Throws
             size_t prior_num_tables = read_int<size_t>();                      // Throws
-            if (!handler.erase_group_level_table(table_ndx, prior_num_tables)) // Throws
+            if (!handler.erase_group_level_table(table_key, prior_num_tables)) // Throws
                 parser_error();
             return;
         }
         case instr_RenameGroupLevelTable: {
-            size_t table_ndx = read_int<size_t>();                      // Throws
+            TableKey table_key = TableKey(read_int<size_t>());          // Throws
             StringData new_name = read_string(m_string_buffer);         // Throws
-            if (!handler.rename_group_level_table(table_ndx, new_name)) // Throws
+            if (!handler.rename_group_level_table(table_key, new_name)) // Throws
                 parser_error();
             return;
         }
@@ -2303,23 +2309,23 @@ public:
         return true;
     }
 
-    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData)
+    bool insert_group_level_table(TableKey table_key, size_t num_tables, StringData)
     {
         sync_table();
-        m_encoder.erase_group_level_table(table_ndx, num_tables + 1);
+        m_encoder.erase_group_level_table(table_key, num_tables + 1);
         append_instruction();
         return true;
     }
 
-    bool erase_group_level_table(size_t table_ndx, size_t num_tables)
+    bool erase_group_level_table(TableKey table_key, size_t num_tables)
     {
         sync_table();
-        m_encoder.insert_group_level_table(table_ndx, num_tables - 1, "");
+        m_encoder.insert_group_level_table(table_key, num_tables - 1, "");
         append_instruction();
         return true;
     }
 
-    bool rename_group_level_table(size_t, StringData)
+    bool rename_group_level_table(TableKey, StringData)
     {
         sync_table();
         return true;
@@ -2490,9 +2496,9 @@ public:
         return true;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, size_t value, size_t target_group_level_ndx, Instruction variant)
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t value, TableKey target_table_key, Instruction variant)
     {
-        m_encoder.set_link(col_ndx, row_ndx, value, target_group_level_ndx, variant);
+        m_encoder.set_link(col_ndx, row_ndx, value, target_table_key, variant);
         append_instruction();
         return true;
     }
@@ -2627,13 +2633,13 @@ public:
         return true;
     }
 
-    bool nullify_link(size_t col_ndx, size_t row_ndx, size_t target_group_level_ndx)
+    bool nullify_link(size_t col_ndx, size_t row_ndx, TableKey target_table_key)
     {
         size_t value = 0;
         // FIXME: Is zero this right value to pass here, or should
         // TransactReverser::nullify_link() also have taken a
         // `target_group_level_ndx` argument.
-        m_encoder.set_link(col_ndx, row_ndx, value, target_group_level_ndx);
+        m_encoder.set_link(col_ndx, row_ndx, value, target_table_key);
         append_instruction();
         return true;
     }

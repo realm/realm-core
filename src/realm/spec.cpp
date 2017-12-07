@@ -422,13 +422,13 @@ ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent, si
 }
 
 
-size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const noexcept
+TableKey Spec::get_opposite_link_table_key(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx < get_column_count());
     REALM_ASSERT(get_column_type(column_ndx) == col_type_Link || get_column_type(column_ndx) == col_type_LinkList ||
                  get_column_type(column_ndx) == col_type_BackLink);
 
-    // Group-level index of opposite table is stored as tagged int in the
+    // Key of opposite table is stored as tagged int in the
     // subspecs array
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
     int64_t tagged_value = m_subspecs.get(subspec_ndx);
@@ -437,18 +437,18 @@ size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const noexcept
     uint64_t table_ref = uint64_t(tagged_value) >> 1;
 
     REALM_ASSERT(!util::int_cast_has_overflow<size_t>(table_ref));
-    return size_t(table_ref);
+    return TableKey(table_ref);
 }
 
 
-void Spec::set_opposite_link_table_ndx(size_t column_ndx, size_t table_ndx)
+void Spec::set_opposite_link_table_key(size_t column_ndx, TableKey table_key)
 {
     REALM_ASSERT(column_ndx < get_column_count());
     REALM_ASSERT(get_column_type(column_ndx) == col_type_Link || get_column_type(column_ndx) == col_type_LinkList ||
                  get_column_type(column_ndx) == col_type_BackLink);
 
-    // position of target table is stored as tagged int
-    size_t tagged_ndx = (table_ndx << 1) + 1;
+    // key from target table is stored as tagged int
+    int64_t tagged_ndx = (table_key.value << 1) + 1;
 
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
     m_subspecs.set(subspec_ndx, tagged_ndx); // Throws
@@ -483,13 +483,13 @@ size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const noexcept
 }
 
 
-size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx) const noexcept
+size_t Spec::find_backlink_column(TableKey origin_table_key, size_t origin_col_ndx) const noexcept
 {
     size_t backlinks_column_start = m_num_public_columns;
     size_t backlinks_start = get_subspec_ndx(backlinks_column_start);
     size_t count = m_subspecs.size();
 
-    int64_t tagged_table_ndx = (origin_table_ndx << 1) + 1;
+    int64_t tagged_table_ndx = (origin_table_key.value << 1) + 1;
     int64_t tagged_column_ndx = (origin_col_ndx << 1) + 1;
 
     for (size_t i = backlinks_start; i < count; i += 2) {
@@ -565,9 +565,9 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_Link:
             case col_type_LinkList: {
                 // In addition to name and attributes, the link target table must also be compared
-                const size_t lhs_table_ndx = get_opposite_link_table_ndx(col_ndx);
-                const size_t rhs_table_ndx = spec.get_opposite_link_table_ndx(col_ndx);
-                if (lhs_table_ndx != rhs_table_ndx)
+                auto lhs_table_key = get_opposite_link_table_key(col_ndx);
+                auto rhs_table_key = spec.get_opposite_link_table_key(col_ndx);
+                if (lhs_table_key != rhs_table_key)
                     return false;
                 break;
             }

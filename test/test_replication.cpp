@@ -3612,7 +3612,7 @@ TEST(Replication_AddRowWithKey)
         CHECK_EQUAL(table2->find_first_int(0, 456), 1);
     }
 }
-#endif
+
 
 TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColumn)
 {
@@ -3639,7 +3639,6 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
         auto bar = wt.get_table("bar");
         bar->rename_column(0, "b");
         _impl::TableFriend::move_column(*bar, 1, 0);
-        wt.get_group().move_table(1, 0);
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger);
@@ -3653,6 +3652,7 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
         CHECK_EQUAL(1, bar->get_column_index("b"));
     }
 }
+#endif
 
 
 TEST(Replication_MergeRows)

@@ -1260,8 +1260,7 @@ inline ref_type RefOrTagged::get_as_ref() const noexcept
 
 inline uint_fast64_t RefOrTagged::get_as_int() const noexcept
 {
-    // The bitwise AND is there in case uint_fast64_t is wider than 64 bits.
-    return (uint_fast64_t(m_value) & 0xFFFFFFFFFFFFFFFFULL) >> 1;
+    return (m_value >> 1);
 }
 
 inline RefOrTagged RefOrTagged::make_ref(ref_type ref) noexcept
