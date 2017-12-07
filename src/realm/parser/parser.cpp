@@ -369,7 +369,7 @@ template<> struct action< true_pred >
     static void apply(const Input& in, ParserState & state)
     {
         DEBUG_PRINT_TOKEN(in.string());
-        state.current_group()->cpnd.sub_predicates.emplace_back(Predicate::Type::True);
+        state.add_predicate_to_current_group(Predicate::Type::True);
     }
 };
 
@@ -379,7 +379,7 @@ template<> struct action< false_pred >
     static void apply(const Input& in, ParserState & state)
     {
         DEBUG_PRINT_TOKEN(in.string());
-        state.current_group()->cpnd.sub_predicates.emplace_back(Predicate::Type::False);
+        state.add_predicate_to_current_group(Predicate::Type::False);
     }
 };
 

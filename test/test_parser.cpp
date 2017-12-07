@@ -303,7 +303,6 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "time == T1:2", 1);
     verify_query(test_context, t, "time > T2017-12-1@12:07:53", 1);
     verify_query(test_context, t, "time == T2017-12-01@12:07:53:505", 1);
-
     verify_query(test_context, t, "buddy == NULL", 4);
     verify_query(test_context, t, "buddy != NULL", 1);
     verify_query(test_context, t, "age > 2", 2);
@@ -321,6 +320,14 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "name CONTAINS[c] \"OE\"", 2);
     verify_query(test_context, t, "name LIKE \"b*\"", 0);
     verify_query(test_context, t, "name LIKE[c] \"b*\"", 2);
+    verify_query(test_context, t, "TRUEPREDICATE", 5);
+    verify_query(test_context, t, "FALSEPREDICATE", 0);
+    verify_query(test_context, t, "age > 2 and TRUEPREDICATE", 2);
+    verify_query(test_context, t, "age > 2 && FALSEPREDICATE", 0);
+    verify_query(test_context, t, "age > 2 or TRUEPREDICATE", 5);
+    verify_query(test_context, t, "age > 2 || FALSEPREDICATE", 2);
+    verify_query(test_context, t, "age > 2 AND !FALSEPREDICATE", 2);
+    verify_query(test_context, t, "age > 2 AND !TRUEPREDICATE", 0);
 
     CHECK_THROW_ANY(verify_query(test_context, t, "buddy.age > $0", 0)); // no external parameters provided
 }
