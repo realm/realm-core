@@ -236,27 +236,11 @@ TEST(Parser_invalid_queries) {
     }
 }
 
-struct temp_hax
-{
-    template<typename T>
-    T unbox(std::string) {
-        return T{}; //dummy
-    }
-    bool is_null(std::string) {
-        return false;
-    }
-};
-
-
 void verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, size_t num_results) {
     Query q = t->where();
 
     realm::parser::Predicate p = realm::parser::parse(query_string);
-
-    temp_hax h;
-    std::string s;
-    realm::query_builder::ArgumentConverter<std::string, temp_hax> args(h, &s, 0);
-    realm::query_builder::apply_predicate(q, p, args, "");
+    realm::query_builder::apply_predicate(q, p);
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
@@ -264,7 +248,7 @@ void verify_query(test_util::unit_test::TestContext& test_context, TableRef t, s
     Query q2 = t->where();
 
     realm::parser::Predicate p2 = realm::parser::parse(description);
-    realm::query_builder::apply_predicate(q2, p2, args, "");
+    realm::query_builder::apply_predicate(q2, p2);
 
     CHECK_EQUAL(q2.count(), num_results);
 };

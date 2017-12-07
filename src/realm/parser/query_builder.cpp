@@ -865,5 +865,24 @@ void apply_predicate(Query &query, const Predicate &predicate, Arguments &argume
     precondition(validateMessage.empty(), validateMessage.c_str());
 }
 
+struct EmptyArgContext
+{
+    template<typename T>
+    T unbox(std::string) {
+        return T{}; //dummy
+    }
+    bool is_null(std::string) {
+        return false;
+    }
+};
+
+void apply_predicate(Query &query, const Predicate &predicate)
+{
+    EmptyArgContext ctx;
+    std::string empty_string;
+    realm::query_builder::ArgumentConverter<std::string, EmptyArgContext> args(ctx, &empty_string, 0);
+
+    apply_predicate(query, predicate, args, empty_string);
+}
 }
 }

@@ -46,6 +46,8 @@ class Arguments;
 void apply_predicate(Query& query, const parser::Predicate& predicate,
                      Arguments& arguments, const std::string& objectType);
 
+void apply_predicate(Query& query, const parser::Predicate& predicate); // zero out of string args version
+
 class Arguments {
 public:
     virtual bool bool_for_argument(size_t argument_index) = 0;
