@@ -418,6 +418,7 @@ TEST(Parser_collection_aggregates)
     size_t int_col_ndx = people->add_column(type_Int, "age");
     size_t str_col_ndx = people->add_column(type_String, "name");
     size_t courses_col_ndx = people->add_column_link(type_LinkList, "courses_taken", *courses);
+    size_t binary_col_ndx = people->add_column(type_Binary, "hash");
     using info_t = std::pair<std::string, size_t>;
     std::vector<info_t> person_info
         = {{"Billy", 18}, {"Bob", 17}, {"Joe", 19}, {"Jane", 20}, {"Joel", 18}};
@@ -425,6 +426,9 @@ TEST(Parser_collection_aggregates)
         size_t row_ndx = people->add_empty_row();
         people->set_string(str_col_ndx, row_ndx, i.first);
         people->set_int(int_col_ndx, row_ndx, i.second);
+        std::string hash(row_ndx, 'a'); // a repeated i times
+        BinaryData payload(hash);
+        people->set_binary(binary_col_ndx, row_ndx, payload);
     }
     using course_info_t = std::tuple<std::string, double, size_t, float>;
     std::vector<course_info_t> course_info
@@ -471,9 +475,18 @@ TEST(Parser_collection_aggregates)
     verify_query(test_context, people, "courses_taken.@sum.failure_percentage > 0.5", 3);
     verify_query(test_context, people, "courses_taken.@avg.failure_percentage > 0.40", 1);
 
-    // count / size
+    // count
     verify_query(test_context, people, "courses_taken.@count > 2", 2);
-    verify_query(test_context, people, "courses_taken.@size == 0", 1);
+    verify_query(test_context, people, "courses_taken.@count == 0", 1);
+
+    // size of strings
+    verify_query(test_context, people, "name.@size == 0", 0);
+    verify_query(test_context, people, "name.@size > 3", 3);
+    // size of binary data
+    verify_query(test_context, people, "hash.@size == 0", 1);
+    verify_query(test_context, people, "hash.@size > 2", 2);
+
+
 
     // string
     CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@min.title <= 41", 2));
@@ -493,6 +506,12 @@ TEST(Parser_collection_aggregates)
     // size and count do not allow paths on the destination object
     CHECK_THROW_ANY(verify_query(test_context, people, "name.@count.hours_required <= 2", 0));
     CHECK_THROW_ANY(verify_query(test_context, people, "name.@size.hours_required <= 2", 0));
+
+    // size is only allowed on certain types
+    CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@size <= 2", 0));
+    CHECK_THROW_ANY(verify_query(test_context, people, "age.@size <= 2", 0));
+    CHECK_THROW_ANY(verify_query(test_context, courses, "credits.@size == 2", 0));
+    CHECK_THROW_ANY(verify_query(test_context, courses, "failure_percentage.@size <= 2", 0));
 }
 
 #endif // TEST_PARSER

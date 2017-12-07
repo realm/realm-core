@@ -172,12 +172,18 @@ struct CollectionOperatorExpression
     {
         table_getter = pe.table_getter;
 
-        if (pe.table_getter()->get_column_type(pe.col_ndx) != type_LinkList) {
-            throw std::runtime_error(std::string("Column aggregates must operate on a List"));
+        const bool requires_expression_link = op != parser::Expression::KeyPathOp::Size;
+        if (requires_expression_link) {
+            if (pe.col_type != type_LinkList) {
+                throw std::runtime_error(std::string("Column aggregates must operate on a List"));
+            }
+            TableRef post_table = pe.table_getter()->get_link_target(pe.col_ndx);
+            if (!post_table) {
+                throw std::runtime_error(util::format("Internal error: could not reach destination table through '%1'", suffix_path));
+            }
         }
-        TableRef post_table = pe.table_getter()->get_link_target(pe.col_ndx);
-        if (!post_table) {
-            throw std::runtime_error(util::format("Internal error: could not reach destination table through '%1'", suffix_path));
+        else {
+            post_link_col_type = pe.col_type;
         }
 
         const bool requires_suffix_path = !(op == parser::Expression::KeyPathOp::Size
@@ -422,6 +428,15 @@ struct CollectionOperatorGetter<RetType, TableGetter, LinkCount >{
     }
 };
 
+template <typename RetType, typename TableGetter>
+struct CollectionOperatorGetter<RetType, TableGetter, SizeOperator<Size<RetType> > >{
+    static SizeOperator<Size<RetType> > convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
+    {
+        return table()->template column<RetType>(expr.pe.col_ndx).size();
+    }
+};
+
+
 
 template <typename RequestedType, typename TableGetter>
 struct ValueGetter;
@@ -523,11 +538,11 @@ auto value_of_type_for_query(TableGetter&& tables, Value&& value, Arguments &arg
     return helper::convert(tables, value, args);
 }
 
-template <typename RetType, typename OpType, typename Value, typename TableGetter>
+template <typename RetType, typename OpType, typename ValueType, typename Value, typename TableGetter>
 auto value_of_agg_type_for_query(TableGetter&& tables, Value&& value, Arguments &args)
 {
     const bool is_collection_operator = std::is_same<CollectionOperatorExpression, typename std::remove_reference<Value>::type>::value;
-    using helper = std::conditional_t<is_collection_operator, CollectionOperatorGetter<RetType, TableGetter, OpType>, ValueGetter<RetType, TableGetter> >;
+    using helper = std::conditional_t<is_collection_operator, CollectionOperatorGetter<RetType, TableGetter, OpType>, ValueGetter<ValueType, TableGetter> >;
     return helper::convert(tables, value, args);
 }
 
@@ -569,13 +584,14 @@ void do_add_collection_op_comparison_to_query(Query &query, Predicate::Compariso
     DataType type = expr.post_link_col_type;
     using OpType = parser::Expression::KeyPathOp;
 
-#define ENABLE_SUPPORT_OF(TYPE, OP) \
+#define ENABLE_SUPPORT_WITH_VALUE(TYPE, OP, VALUE_T) \
     if (type == type_##TYPE) { \
         add_numeric_constraint_to_query(query, cmp.op,  \
-            value_of_agg_type_for_query< realm::TYPE , OP >(expr.table_getter, lhs, args), \
-            value_of_agg_type_for_query< realm::TYPE , OP >(expr.table_getter, rhs, args)); \
+            value_of_agg_type_for_query< realm::TYPE, OP, VALUE_T >(expr.table_getter, lhs, args), \
+            value_of_agg_type_for_query< realm::TYPE, OP, VALUE_T >(expr.table_getter, rhs, args)); \
         return; \
     }
+#define ENABLE_SUPPORT_OF(TYPE, OP) ENABLE_SUPPORT_WITH_VALUE(TYPE, OP, TYPE)
 
     switch (expr.op) {
         case OpType::Min:
@@ -600,14 +616,14 @@ void do_add_collection_op_comparison_to_query(Query &query, Predicate::Compariso
             break;
         case OpType::Count:
             add_numeric_constraint_to_query(query, cmp.op,
-                value_of_agg_type_for_query<Int, LinkCount>(expr.table_getter, lhs, args),
-                value_of_agg_type_for_query<Int, LinkCount>(expr.table_getter, rhs, args));
+                value_of_agg_type_for_query<Int, LinkCount, Int>(expr.table_getter, lhs, args),
+                value_of_agg_type_for_query<Int, LinkCount, Int>(expr.table_getter, rhs, args));
             return;
         case OpType::Size:
-            add_numeric_constraint_to_query(query, cmp.op,
-                value_of_agg_type_for_query<Int, LinkCount>(expr.table_getter, lhs, args),
-                value_of_agg_type_for_query<Int, LinkCount>(expr.table_getter, rhs, args));
-            return;
+            ENABLE_SUPPORT_WITH_VALUE(String, SizeOperator<Size<StringData> >, Int)
+            ENABLE_SUPPORT_WITH_VALUE(Binary, SizeOperator<Size<BinaryData> >, Int)
+            // FIXME: Subtable support ?
+            break;
         case OpType::None:
             break;
     }
