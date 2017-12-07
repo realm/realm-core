@@ -81,9 +81,6 @@ public:
 
     //@}
 
-    static const LinkViewRef& get_linklist_ptr(Row&, size_t col_ndx);
-    static void unbind_linklist_ptr(const LinkViewRef&);
-
     using VersionID = SharedGroup::VersionID;
 
     /// \defgroup lang_bind_helper_transactions Continuous Transactions
@@ -247,11 +244,6 @@ inline void LangBindHelper::unbind_table_ptr(const Table* t) noexcept
 inline void LangBindHelper::bind_table_ptr(const Table* t) noexcept
 {
     t->bind_ptr();
-}
-
-inline void LangBindHelper::unbind_linklist_ptr(const LinkViewRef& link_view)
-{
-    delete (&link_view);
 }
 
 inline void LangBindHelper::advance_read(SharedGroup& sg, VersionID version)

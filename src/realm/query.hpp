@@ -40,7 +40,6 @@
 #include <realm/timestamp.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/link_view_fwd.hpp>
-#include <realm/row.hpp>
 
 namespace realm {
 

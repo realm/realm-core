@@ -836,22 +836,11 @@ private:
     /// any, and it does not discard column accessors either.
     void discard_child_accessors() noexcept;
 
-    void discard_row_accessors() noexcept;
-
     void bind_ptr() const noexcept
     {
     }
-    void unbind_ptr() const noexcept
-    {
-    }
 
-    void register_row_accessor(RowBase*) const noexcept
-    {
-    }
-    void unregister_row_accessor(RowBase*) const noexcept
-    {
-    }
-    void do_unregister_row_accessor(RowBase*) const noexcept
+    void unbind_ptr() const noexcept
     {
     }
 
@@ -1459,11 +1448,6 @@ public:
     static void detach(Table& table) noexcept
     {
         table.detach();
-    }
-
-    static void discard_row_accessors(Table& table) noexcept
-    {
-        table.discard_row_accessors();
     }
 
     static void discard_child_accessors(Table& table) noexcept
