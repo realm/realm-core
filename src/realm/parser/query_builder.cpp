@@ -168,16 +168,10 @@ struct CollectionOperatorExpression
     CollectionOperatorExpression(PropertyExpression exp, parser::Expression::KeyPathOp o, std::string suffix_path)
     : pe(exp)
     , op(o)
+    , post_link_col_ndx(realm::not_found)
     {
         table_getter = pe.table_getter;
 
-        KeyPath suffix_key_path = key_path_from_string(suffix_path);
-        if (suffix_path.size() == 0 || suffix_key_path.size() == 0) {
-            throw std::runtime_error(std::string("A property must be provided at the destination object to perform operation ") + collection_operator_to_str(o));
-        }
-        if (suffix_key_path.size() > 1) {
-            throw std::runtime_error(std::string("Collection aggregate operations are only supported for direct properties at this time: ") + suffix_path);
-        }
         if (pe.table_getter()->get_column_type(pe.col_ndx) != type_LinkList) {
             throw std::runtime_error(std::string("Column aggregates must operate on a List"));
         }
@@ -185,11 +179,29 @@ struct CollectionOperatorExpression
         if (!post_table) {
             throw std::runtime_error(util::format("Internal error: could not reach destination table through '%1'", suffix_path));
         }
-        post_link_col_ndx = pe.table_getter()->get_link_target(pe.col_ndx)->get_column_index(suffix_key_path[0]);
-        if (post_link_col_ndx == realm::not_found) {
-            throw std::runtime_error(std::string("Destination column not found: ") + suffix_key_path[0]);
+
+        const bool requires_suffix_path = !(op == parser::Expression::KeyPathOp::Size
+                                            || op == parser::Expression::KeyPathOp::Count);
+
+        if (requires_suffix_path) {
+            KeyPath suffix_key_path = key_path_from_string(suffix_path);
+            if (suffix_path.size() == 0 || suffix_key_path.size() == 0) {
+                throw std::runtime_error(std::string("A property must be provided at the destination object to perform operation ") + collection_operator_to_str(op));
+            }
+            if (suffix_key_path.size() > 1) {
+                throw std::runtime_error(std::string("Collection aggregate operations are only supported for direct properties at this time: ") + suffix_path);
+            }
+            post_link_col_ndx = pe.table_getter()->get_link_target(pe.col_ndx)->get_column_index(suffix_key_path[0]);
+            if (post_link_col_ndx == realm::not_found) {
+                throw std::runtime_error(std::string("Destination column not found: ") + suffix_key_path[0]);
+            }
+            post_link_col_type = pe.table_getter()->get_link_target(pe.col_ndx)->get_column_type(post_link_col_ndx);
         }
-        post_link_col_type = pe.table_getter()->get_link_target(pe.col_ndx)->get_column_type(post_link_col_ndx);
+        else {
+            if (!suffix_path.empty()) {
+                throw std::runtime_error(util::format("An extraneous property on the destination object '%1' was found for aggregate operation %2", suffix_path, collection_operator_to_str(op)));
+            }
+        }
     }
 };
 
@@ -363,7 +375,6 @@ struct ColumnGetter {
     }
 };
 
-//SubColumnAggregate<T, aggregate_operations::Minimum<T>>
 template <typename RetType, typename TableGetter, class AggOpType>
 struct CollectionOperatorGetter {
     static SubColumnAggregate<RetType, AggOpType > convert(TableGetter&&, const CollectionOperatorExpression&, Arguments&) {
@@ -403,6 +414,13 @@ struct CollectionOperatorGetter<RetType, TableGetter, aggregate_operations::Aver
     }
 };
 
+template <typename RetType, typename TableGetter>
+struct CollectionOperatorGetter<RetType, TableGetter, LinkCount >{
+    static LinkCount convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
+    {
+        return table()->template column<Link>(expr.pe.col_ndx).count();
+    }
+};
 
 
 template <typename RequestedType, typename TableGetter>
@@ -581,9 +599,15 @@ void do_add_collection_op_comparison_to_query(Query &query, Predicate::Compariso
             ENABLE_SUPPORT_OF(Int, aggregate_operations::Sum<Int>)
             break;
         case OpType::Count:
-            break;
+            add_numeric_constraint_to_query(query, cmp.op,
+                value_of_agg_type_for_query<Int, LinkCount>(expr.table_getter, lhs, args),
+                value_of_agg_type_for_query<Int, LinkCount>(expr.table_getter, rhs, args));
+            return;
         case OpType::Size:
-            break;
+            add_numeric_constraint_to_query(query, cmp.op,
+                value_of_agg_type_for_query<Int, LinkCount>(expr.table_getter, lhs, args),
+                value_of_agg_type_for_query<Int, LinkCount>(expr.table_getter, rhs, args));
+            return;
         case OpType::None:
             break;
     }

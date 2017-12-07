@@ -400,7 +400,7 @@ TEST(Parser_Timestamps)
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:0:0", 0));
 }
 
-ONLY(Parser_collection_aggregates)
+TEST(Parser_collection_aggregates)
 {
     Group g;
     TableRef people = g.add_table("person");
@@ -446,6 +446,7 @@ ONLY(Parser_collection_aggregates)
     jane_courses->add(4);
 
     Query q = people->where();
+
     // int
     verify_query(test_context, people, "courses_taken.@min.hours_required <= 41", 2);
     verify_query(test_context, people, "courses_taken.@max.hours_required >= 45", 2);
@@ -464,6 +465,10 @@ ONLY(Parser_collection_aggregates)
     verify_query(test_context, people, "courses_taken.@sum.failure_percentage > 0.5", 3);
     verify_query(test_context, people, "courses_taken.@avg.failure_percentage > 0.40", 1);
 
+    // count / size
+    verify_query(test_context, people, "courses_taken.@count > 2", 2);
+    verify_query(test_context, people, "courses_taken.@size == 0", 1);
+
     // string
     CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@min.title <= 41", 2));
     CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@max.title <= 41", 2));
@@ -479,7 +484,9 @@ ONLY(Parser_collection_aggregates)
     // aggregate operations on a non-linklist column must throw
     CHECK_THROW_ANY(verify_query(test_context, people, "name.@min.hours_required <= 41", 2));
 
-
+    // size and count do not allow paths on the destination object
+    CHECK_THROW_ANY(verify_query(test_context, people, "name.@count.hours_required <= 2", 0));
+    CHECK_THROW_ANY(verify_query(test_context, people, "name.@size.hours_required <= 2", 0));
 }
 
 #endif // TEST_PARSER
