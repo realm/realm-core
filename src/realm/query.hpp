@@ -37,7 +37,7 @@
 #include <realm/obj_list.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/olddatetime.hpp>
+#include <realm/timestamp.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/link_view_fwd.hpp>
 #include <realm/row.hpp>
@@ -185,36 +185,6 @@ public:
 
     // Conditions: bool
     Query& equal(size_t column_ndx, bool value);
-
-    // Conditions: date
-    Query& equal_olddatetime(size_t column_ndx, OldDateTime value)
-    {
-        return equal(column_ndx, int64_t(value.get_olddatetime()));
-    }
-    Query& not_equal_olddatetime(size_t column_ndx, OldDateTime value)
-    {
-        return not_equal(column_ndx, int64_t(value.get_olddatetime()));
-    }
-    Query& greater_olddatetime(size_t column_ndx, OldDateTime value)
-    {
-        return greater(column_ndx, int64_t(value.get_olddatetime()));
-    }
-    Query& greater_equal_olddatetime(size_t column_ndx, OldDateTime value)
-    {
-        return greater_equal(column_ndx, int64_t(value.get_olddatetime()));
-    }
-    Query& less_olddatetime(size_t column_ndx, OldDateTime value)
-    {
-        return less(column_ndx, int64_t(value.get_olddatetime()));
-    }
-    Query& less_equal_olddatetime(size_t column_ndx, OldDateTime value)
-    {
-        return less_equal(column_ndx, int64_t(value.get_olddatetime()));
-    }
-    Query& between_olddatetime(size_t column_ndx, OldDateTime from, OldDateTime to)
-    {
-        return between(column_ndx, int64_t(from.get_olddatetime()), int64_t(to.get_olddatetime()));
-    }
 
     // Conditions: strings
     Query& equal(size_t column_ndx, StringData value, bool case_sensitive = true);

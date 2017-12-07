@@ -474,7 +474,6 @@ public:
     Key find_first_link(size_t target_row_index) const;
     Key find_first_int(size_t column_ndx, int64_t value) const;
     Key find_first_bool(size_t column_ndx, bool value) const;
-    Key find_first_olddatetime(size_t column_ndx, OldDateTime value) const;
     Key find_first_timestamp(size_t column_ndx, Timestamp value) const;
     Key find_first_float(size_t column_ndx, float value) const;
     Key find_first_double(size_t column_ndx, double value) const;
@@ -488,8 +487,6 @@ public:
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
     TableView find_all_bool(size_t column_ndx, bool value);
     ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-    TableView find_all_olddatetime(size_t column_ndx, OldDateTime value);
-    ConstTableView find_all_olddatetime(size_t column_ndx, OldDateTime value) const;
     TableView find_all_float(size_t column_ndx, float value);
     ConstTableView find_all_float(size_t column_ndx, float value) const;
     TableView find_all_double(size_t column_ndx, double value);
@@ -501,7 +498,7 @@ public:
     TableView find_all_null(size_t column_ndx);
     ConstTableView find_all_null(size_t column_ndx) const;
 
-    /// The following column types are supported: String, Integer, OldDateTime, Bool
+    /// The following column types are supported: String, Integer, Bool
     TableView get_distinct_view(size_t column_ndx);
     ConstTableView get_distinct_view(size_t column_ndx) const;
 
@@ -1252,8 +1249,6 @@ inline Columns<T> Table::column(size_t column_ndx)
     if (std::is_same<T, int64_t>::value && ct != type_Int)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, bool>::value && ct != type_Bool)
-        throw(LogicError::type_mismatch);
-    else if (std::is_same<T, realm::OldDateTime>::value && ct != type_OldDateTime)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, float>::value && ct != type_Float)
         throw(LogicError::type_mismatch);

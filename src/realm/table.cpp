@@ -1266,16 +1266,6 @@ ConstTableView Table::find_all_double(size_t col_ndx, double value) const
     return const_cast<Table*>(this)->find_all<double>(col_ndx, value);
 }
 
-TableView Table::find_all_olddatetime(size_t col_ndx, OldDateTime value)
-{
-    return find_all<int64_t>(col_ndx, int64_t(value.get_olddatetime()));
-}
-
-ConstTableView Table::find_all_olddatetime(size_t col_ndx, OldDateTime value) const
-{
-    return const_cast<Table*>(this)->find_all<int64_t>(col_ndx, int64_t(value.get_olddatetime()));
-}
-
 TableView Table::find_all_string(size_t col_ndx, StringData value)
 {
     return where().equal(col_ndx, value).find_all();

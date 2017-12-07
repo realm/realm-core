@@ -121,7 +121,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     null.hpp
     list.hpp
     obj.hpp
-    olddatetime.hpp
     owned_data.hpp
     query.hpp
     query_conditions.hpp

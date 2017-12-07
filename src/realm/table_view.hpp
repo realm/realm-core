@@ -188,7 +188,6 @@ public:
 
     size_t find_first_int(size_t column_ndx, int64_t value) const;
     size_t find_first_bool(size_t column_ndx, bool value) const;
-    size_t find_first_olddatetime(size_t column_ndx, OldDateTime value) const;
     size_t find_first_float(size_t column_ndx, float value) const;
     size_t find_first_double(size_t column_ndx, double value) const;
     size_t find_first_string(size_t column_ndx, StringData value) const;
@@ -450,8 +449,6 @@ public:
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
     TableView find_all_bool(size_t column_ndx, bool value);
     ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-    TableView find_all_olddatetime(size_t column_ndx, OldDateTime value);
-    ConstTableView find_all_olddatetime(size_t column_ndx, OldDateTime value) const;
     TableView find_all_float(size_t column_ndx, float value);
     ConstTableView find_all_float(size_t column_ndx, float value) const;
     TableView find_all_double(size_t column_ndx, double value);
@@ -531,7 +528,6 @@ public:
     // Searching (Int and String)
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
     ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-    ConstTableView find_all_olddatetime(size_t column_ndx, OldDateTime value) const;
     ConstTableView find_all_float(size_t column_ndx, float value) const;
     ConstTableView find_all_double(size_t column_ndx, double value) const;
     ConstTableView find_all_string(size_t column_ndx, StringData value) const;
@@ -746,8 +742,7 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     REALM_ASSERT_COLUMN(column_ndx);                                                                                 \
     REALM_DIAG_PUSH();                                                                                               \
     REALM_DIAG_IGNORE_TAUTOLOGICAL_COMPARE();                                                                        \
-    REALM_ASSERT(m_table->get_column_type(column_ndx) == column_type ||                                              \
-                 (m_table->get_column_type(column_ndx) == type_OldDateTime && column_type == type_Int));             \
+    REALM_ASSERT(m_table->get_column_type(column_ndx) == column_type);                                               \
     REALM_DIAG_POP()
 
 #define REALM_ASSERT_INDEX(column_ndx, row_ndx)                                                                      \
@@ -822,12 +817,6 @@ inline size_t TableViewBase::find_first_bool(size_t column_ndx, bool value) cons
 {
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Bool);
     return find_first_integer(column_ndx, value ? 1 : 0);
-}
-
-inline size_t TableViewBase::find_first_olddatetime(size_t column_ndx, OldDateTime value) const
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_OldDateTime);
-    return find_first_integer(column_ndx, int64_t(value.get_olddatetime()));
 }
 
 inline size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
@@ -1041,13 +1030,6 @@ inline TableView TableView::find_all_bool(size_t column_ndx, bool value)
     return find_all_integer(column_ndx, value ? 1 : 0);
 }
 
-inline TableView TableView::find_all_olddatetime(size_t column_ndx, OldDateTime value)
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_OldDateTime);
-    return find_all_integer(column_ndx, int64_t(value.get_olddatetime()));
-}
-
-
 inline ConstTableView TableView::find_all_int(size_t column_ndx, int64_t value) const
 {
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Int);
@@ -1060,13 +1042,6 @@ inline ConstTableView TableView::find_all_bool(size_t column_ndx, bool value) co
     return find_all_integer(column_ndx, value ? 1 : 0);
 }
 
-inline ConstTableView TableView::find_all_olddatetime(size_t column_ndx, OldDateTime value) const
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_OldDateTime);
-    return find_all_integer(column_ndx, int64_t(value.get_olddatetime()));
-}
-
-
 inline ConstTableView ConstTableView::find_all_int(size_t column_ndx, int64_t value) const
 {
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Int);
@@ -1078,13 +1053,6 @@ inline ConstTableView ConstTableView::find_all_bool(size_t column_ndx, bool valu
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Bool);
     return find_all_integer(column_ndx, value ? 1 : 0);
 }
-
-inline ConstTableView ConstTableView::find_all_olddatetime(size_t column_ndx, OldDateTime value) const
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_OldDateTime);
-    return find_all_integer(column_ndx, int64_t(value.get_olddatetime()));
-}
-
 
 // Rows
 

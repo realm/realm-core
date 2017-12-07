@@ -26,7 +26,6 @@
 
 #include <realm/binary_data.hpp>
 #include <realm/data_type.hpp>
-#include <realm/olddatetime.hpp>
 #include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/util/assert.hpp>
@@ -108,7 +107,6 @@ public:
     Mixed(double) noexcept;
     Mixed(StringData) noexcept;
     Mixed(BinaryData) noexcept;
-    Mixed(OldDateTime) noexcept;
     Mixed(Timestamp) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
@@ -137,7 +135,6 @@ public:
     double get_double() const noexcept;
     StringData get_string() const noexcept;
     BinaryData get_binary() const noexcept;
-    OldDateTime get_olddatetime() const noexcept;
     Timestamp get_timestamp() const noexcept;
 
     void set_int(int64_t) noexcept;
@@ -147,7 +144,6 @@ public:
     void set_string(StringData) noexcept;
     void set_binary(BinaryData) noexcept;
     void set_binary(const char* data, size_t size) noexcept;
-    void set_olddatetime(OldDateTime) noexcept;
     void set_timestamp(Timestamp) noexcept;
 
     template <class Ch, class Tr>
@@ -224,12 +220,6 @@ bool operator!=(Wrap<Mixed>, BinaryData) noexcept;
 bool operator==(BinaryData, Wrap<Mixed>) noexcept;
 bool operator!=(BinaryData, Wrap<Mixed>) noexcept;
 
-// Compare mixed with date
-bool operator==(Wrap<Mixed>, OldDateTime) noexcept;
-bool operator!=(Wrap<Mixed>, OldDateTime) noexcept;
-bool operator==(OldDateTime, Wrap<Mixed>) noexcept;
-bool operator!=(OldDateTime, Wrap<Mixed>) noexcept;
-
 // Compare mixed with Timestamp
 bool operator==(Wrap<Mixed>, Timestamp) noexcept;
 bool operator!=(Wrap<Mixed>, Timestamp) noexcept;
@@ -282,12 +272,6 @@ inline Mixed::Mixed(BinaryData v) noexcept
     m_size = v.size();
 }
 
-inline Mixed::Mixed(OldDateTime v) noexcept
-{
-    m_type = type_OldDateTime;
-    m_date = v.get_olddatetime();
-}
-
 inline Mixed::Mixed(Timestamp v) noexcept
 {
     m_type = type_Timestamp;
@@ -328,12 +312,6 @@ inline BinaryData Mixed::get_binary() const noexcept
 {
     REALM_ASSERT(m_type == type_Binary);
     return BinaryData(m_data, m_size);
-}
-
-inline OldDateTime Mixed::get_olddatetime() const noexcept
-{
-    REALM_ASSERT(m_type == type_OldDateTime);
-    return m_date;
 }
 
 inline Timestamp Mixed::get_timestamp() const noexcept
@@ -385,12 +363,6 @@ inline void Mixed::set_binary(const char* data, size_t size) noexcept
     m_size = size;
 }
 
-inline void Mixed::set_olddatetime(OldDateTime v) noexcept
-{
-    m_type = type_OldDateTime;
-    m_date = v.get_olddatetime();
-}
-
 inline void Mixed::set_timestamp(Timestamp v) noexcept
 {
     m_type = type_Timestamp;
@@ -421,12 +393,10 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
         case type_Binary:
             out << BinaryData(m.m_data, m.m_size);
             break;
-        case type_OldDateTime:
-            out << OldDateTime(m.m_date);
-            break;
         case type_Timestamp:
             out << Timestamp(m.m_timestamp);
             break;
+        case type_OldDateTime:
         case type_OldTable:
         case type_OldMixed:
         case type_Link:
@@ -620,28 +590,6 @@ inline bool operator!=(BinaryData a, Wrap<Mixed> b) noexcept
     return type_Binary != Mixed(b).get_type() || a != Mixed(b).get_binary();
 }
 
-
-// Compare mixed with date
-
-inline bool operator==(Wrap<Mixed> a, OldDateTime b) noexcept
-{
-    return Mixed(a).get_type() == type_OldDateTime && OldDateTime(Mixed(a).get_olddatetime()) == b;
-}
-
-inline bool operator!=(Wrap<Mixed> a, OldDateTime b) noexcept
-{
-    return Mixed(a).get_type() != type_OldDateTime || OldDateTime(Mixed(a).get_olddatetime()) != b;
-}
-
-inline bool operator==(OldDateTime a, Wrap<Mixed> b) noexcept
-{
-    return type_OldDateTime == Mixed(b).get_type() && a == OldDateTime(Mixed(b).get_olddatetime());
-}
-
-inline bool operator!=(OldDateTime a, Wrap<Mixed> b) noexcept
-{
-    return type_OldDateTime != Mixed(b).get_type() || a != OldDateTime(Mixed(b).get_olddatetime());
-}
 
 // Compare mixed with Timestamp
 
