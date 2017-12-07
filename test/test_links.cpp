@@ -39,7 +39,7 @@ void test_table_add_row(TableRef t, std::string first, int second, bool third, D
 {
     t->create_object().set_all(first.c_str(), second, third, int(forth));
 }
-#endif
+#endif // LEGACY_TESTS
 
 template <class T>
 void test_table_add_columns(T t)
@@ -288,7 +288,7 @@ TEST(Links_Deletes)
     for (auto o : *table2) {
         CHECK(o.is_null(col_link));
     }
-#ifdef LEGACY_TESTS
+
     // add target rows again with links
     table1->create_object().set_all("test1", 1, true, int64_t(Mon));
     table1->create_object().set_all("test2", 2, false, int64_t(Tue));
@@ -307,10 +307,8 @@ TEST(Links_Deletes)
     }
 
     // add links again
-    it = table1->begin();
-    for (auto o : *table2) {
-        o.set(col_link, it->get_key());
-        ++it;
+    for (auto o : *table1) {
+        table2->create_object().set(col_link, o.get_key());
     }
 
     // clear target table and make sure links are nullified
@@ -318,7 +316,6 @@ TEST(Links_Deletes)
     for (auto o : *table2) {
         CHECK(o.is_null(col_link));
     }
-#endif
 }
 
 
@@ -537,9 +534,7 @@ TEST(Links_LinkList_TableOps)
     origin->create_object();
     origin->create_object();
     origin->create_object();
-#ifdef LEGACY_TESTS
     origin->clear();
-#endif
 }
 
 

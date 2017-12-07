@@ -133,6 +133,7 @@ private:
     std::unique_ptr<ClusterNode> get_node(ref_type ref) const;
 
     size_t get_column_index(StringData col_name) const;
+    void remove_links();
 };
 
 class ClusterTree::ConstIterator {
