@@ -448,7 +448,7 @@ void Spec::set_opposite_link_table_key(size_t column_ndx, TableKey table_key)
                  get_column_type(column_ndx) == col_type_BackLink);
 
     // key from target table is stored as tagged int
-    size_t tagged_ndx = (table_key.value << 1) + 1;
+    int64_t tagged_ndx = (table_key.value << 1) + 1;
 
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
     m_subspecs.set(subspec_ndx, tagged_ndx); // Throws
