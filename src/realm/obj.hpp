@@ -26,23 +26,25 @@
 
 namespace realm {
 
+class ListBase;
+
 template <class>
 class ConstListIf;
 
 template <class>
 class ConstList;
-template <class T>
-using ConstListPtr = std::unique_ptr<ConstList<T>>;
 
 template <class>
 class List;
 template <class T>
 using ListPtr = std::unique_ptr<List<T>>;
+template <class T>
+using ConstListPtr = std::unique_ptr<const List<T>>;
 
 class LinkList;
 class ConstLinkList;
 using LinkListPtr = std::unique_ptr<LinkList>;
-using ConstLinkListPtr = std::unique_ptr<ConstLinkList>;
+using ConstLinkListPtr = std::unique_ptr<const LinkList>;
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class ConstObj {

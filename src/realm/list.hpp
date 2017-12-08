@@ -528,7 +528,8 @@ ConstList<U> ConstObj::get_list(size_t col_ndx) const
 template <typename U>
 ConstListPtr<U> ConstObj::get_list_ptr(size_t col_ndx) const
 {
-    return std::make_unique<ConstList<U>>(*this, col_ndx);
+    Obj obj(*this);
+    return std::const_pointer_cast<const List<U>>(obj.get_list_ptr<U>(col_ndx));
 }
 
 template <typename U>
@@ -543,6 +544,12 @@ ListPtr<U> Obj::get_list_ptr(size_t col_ndx)
     return std::make_unique<List<U>>(*this, col_ndx);
 }
 
+template <>
+inline ListPtr<Key> Obj::get_list_ptr(size_t col_ndx)
+{
+    return get_linklist_ptr(col_ndx);
+}
+
 inline ConstLinkList ConstObj::get_linklist(size_t col_ndx)
 {
     return ConstLinkList(*this, col_ndx);
@@ -550,7 +557,8 @@ inline ConstLinkList ConstObj::get_linklist(size_t col_ndx)
 
 inline ConstLinkListPtr ConstObj::get_linklist_ptr(size_t col_ndx)
 {
-    return std::make_unique<ConstLinkList>(*this, col_ndx);
+    Obj obj(*this);
+    return obj.get_linklist_ptr(col_ndx);
 }
 
 inline LinkList Obj::get_linklist(size_t col_ndx)
