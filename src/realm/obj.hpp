@@ -170,11 +170,17 @@ private:
     friend class Cluster;
     friend class ConstListBase;
     friend class ArrayBacklink;
+    friend class ConstObj;
     template <class>
     friend class List;
 
     mutable bool m_writeable;
 
+    Obj(const ConstObj& other)
+        : ConstObj(other)
+        , m_writeable(false)
+    {
+    }
     template <class Val>
     Obj& _set(size_t col_ndx, Val v);
     template <class Head, class... Tail>
