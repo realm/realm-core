@@ -251,7 +251,7 @@ void verify_query(test_util::unit_test::TestContext& test_context, TableRef t, s
     realm::query_builder::apply_predicate(q2, p2);
 
     CHECK_EQUAL(q2.count(), num_results);
-};
+}
 
 
 TEST(Parser_basic_serialisation)
@@ -414,11 +414,11 @@ TEST(Parser_collection_aggregates)
         BinaryData payload(hash);
         people->set_binary(binary_col_ndx, row_ndx, payload);
     }
-    using course_info_t = std::tuple<std::string, double, size_t, float>;
-    std::vector<course_info_t> course_info
-        = {{"Math", 5.0, 42, 0.36f}, {"Comp Sci", 4.5, 45, 0.25f}, {"Chemistry", 4.0, 41, 0.40f},
-            {"English", 3.5, 40, 0.07f}, {"Physics", 4.5, 42, 0.42f}};
-    for (course_info_t course : course_info) {
+    using cinfo = std::tuple<std::string, double, size_t, float>;
+    std::vector<cinfo> course_info
+            = { cinfo{"Math", 5.0, 42, 0.36f}, cinfo{"Comp Sci", 4.5, 45, 0.25f}, cinfo{"Chemistry", 4.0, 41, 0.40f},
+            cinfo{"English", 3.5, 40, 0.07f}, cinfo{"Physics", 4.5, 42, 0.42f} };
+    for (cinfo course : course_info) {
         size_t row_ndx = courses->add_empty_row();
         courses->set_string(title_col_ndx, row_ndx, std::get<0>(course));
         courses->set_double(credits_col_ndx, row_ndx, std::get<1>(course));

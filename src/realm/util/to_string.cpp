@@ -19,6 +19,7 @@
 #include <realm/util/to_string.hpp>
 #include <realm/util/assert.hpp>
 
+#include <cstring>
 #include <iomanip>
 #include <locale>
 #include <sstream>
