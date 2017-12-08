@@ -201,26 +201,3 @@ void Descriptor::adj_erase_column(size_t col_ndx) noexcept
     if (erase != end)
         m_subdesc_map.erase(erase);
 }
-
-void Descriptor::adj_move_column(size_t from, size_t to) noexcept
-{
-    for (auto& subdesc : m_subdesc_map) {
-        if (subdesc.m_column_ndx == from) {
-            subdesc.m_column_ndx = to;
-        }
-        else {
-            if (from < to) {
-                // Moving up:
-                if (subdesc.m_column_ndx > from && subdesc.m_column_ndx <= to) {
-                    --subdesc.m_column_ndx;
-                }
-            }
-            else if (from > to) {
-                // Moving down:
-                if (subdesc.m_column_ndx < from && subdesc.m_column_ndx >= to) {
-                    ++subdesc.m_column_ndx;
-                }
-            }
-        }
-    }
-}
