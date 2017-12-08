@@ -41,10 +41,6 @@
 #endif
 #endif
 
-#if REALM_ANDROID
-#include <time64.h> // timegm64
-#endif
-
 namespace {
 
 #ifdef REALM_COMPILER_SSE
@@ -341,8 +337,9 @@ int64_t platform_timegm(tm time)
 #ifdef _WIN32
 	return static_cast<int64_t>(_mkgmtime64(&time));
 #elif REALM_ANDROID
-	time_t unix_time = timegm64(&time);
-	return static_cast<int64_t>(unix_time);
+    // Android-9 as well as others don't have timegm support
+    time_t t = mktime(&time);
+    return int64_t(static_cast<int32_t>(t + localtime(&t)->tm_gmtoff));
 #else
 	time_t unix_time = timegm(&time);
 	return int64_t(static_cast<int32_t>(unix_time)); // unix_time comes as a int32_t
