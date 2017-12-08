@@ -32,7 +32,7 @@ struct Expression
     std::string s;
     std::vector<std::string> time_inputs;
     std::string op_suffix;
-    Expression(Type t = Type::None, std::string s = "") : type(t), collection_op(KeyPathOp::None), s(s) {}
+    Expression(Type t = Type::None, std::string input = "") : type(t), collection_op(KeyPathOp::None), s(input) {}
     Expression(std::vector<std::string>&& timestamp) : type(Type::Timestamp), collection_op(KeyPathOp::None), time_inputs(timestamp) {}
     Expression(std::string prefix, KeyPathOp op, std::string suffix) : type(Type::KeyPath), collection_op(op), s(prefix), op_suffix(suffix) {}
 };

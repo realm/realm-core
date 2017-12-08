@@ -156,6 +156,7 @@ const char* collection_operator_to_str(parser::Expression::KeyPathOp op)
         case parser::Expression::KeyPathOp::Count:
             return "Count";
     }
+    return "";
 }
 
 struct CollectionOperatorExpression
