@@ -95,9 +95,10 @@ void AdminRealmListener::start()
             auto& table = *ObjectStore::table_for_object_type(realm->read_group(), "RealmFile");
             size_t path_col_ndx = table.get_column_index("path");
 
-            if (changes.empty()) {
+            if (!m_initial_sent || changes.empty()) {
                 for (size_t i = 0, size = table.size(); i < size; ++i)
                     register_realm(table.get_string(path_col_ndx, i));
+                m_initial_sent = true;
             }
             else {
                 for (auto i : changes.insertions.as_indexes())

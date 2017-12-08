@@ -46,6 +46,7 @@ private:
     Results m_results;
     NotificationToken m_notification_token;
     std::shared_ptr<SyncSession> m_download_session;
+    bool m_initial_sent = false;
 };
 
 } // namespace realm
