@@ -172,8 +172,10 @@ struct CollectionOperatorExpression
     {
         table_getter = pe.table_getter;
 
-        const bool requires_expression_link = op != parser::Expression::KeyPathOp::Size;
-        if (requires_expression_link) {
+        const bool requires_suffix_path = !(op == parser::Expression::KeyPathOp::Size
+                                            || op == parser::Expression::KeyPathOp::Count);
+
+        if (requires_suffix_path) {
             if (pe.col_type != type_LinkList) {
                 throw std::runtime_error(std::string("Column aggregates must operate on a List"));
             }
@@ -181,15 +183,7 @@ struct CollectionOperatorExpression
             if (!post_table) {
                 throw std::runtime_error(util::format("Internal error: could not reach destination table through '%1'", suffix_path));
             }
-        }
-        else {
-            post_link_col_type = pe.col_type;
-        }
 
-        const bool requires_suffix_path = !(op == parser::Expression::KeyPathOp::Size
-                                            || op == parser::Expression::KeyPathOp::Count);
-
-        if (requires_suffix_path) {
             KeyPath suffix_key_path = key_path_from_string(suffix_path);
             if (suffix_path.size() == 0 || suffix_key_path.size() == 0) {
                 throw std::runtime_error(std::string("A property must be provided at the destination object to perform operation ") + collection_operator_to_str(op));
@@ -203,7 +197,9 @@ struct CollectionOperatorExpression
             }
             post_link_col_type = pe.table_getter()->get_link_target(pe.col_ndx)->get_column_type(post_link_col_ndx);
         }
-        else {
+        else {  // !requires_suffix_path
+            post_link_col_type = pe.col_type;
+
             if (!suffix_path.empty()) {
                 throw std::runtime_error(util::format("An extraneous property on the destination object '%1' was found for aggregate operation %2", suffix_path, collection_operator_to_str(op)));
             }
@@ -614,12 +610,9 @@ void do_add_collection_op_comparison_to_query(Query &query, Predicate::Compariso
             ENABLE_SUPPORT_OF(Float, aggregate_operations::Sum<Float>)
             ENABLE_SUPPORT_OF(Int, aggregate_operations::Sum<Int>)
             break;
-        case OpType::Count:
-            add_numeric_constraint_to_query(query, cmp.op,
-                value_of_agg_type_for_query<Int, LinkCount, Int>(expr.table_getter, lhs, args),
-                value_of_agg_type_for_query<Int, LinkCount, Int>(expr.table_getter, rhs, args));
-            return;
+        case OpType::Count:  // count and size mean the same thing for users
         case OpType::Size:
+            ENABLE_SUPPORT_WITH_VALUE(LinkList, LinkCount, Int)
             ENABLE_SUPPORT_WITH_VALUE(String, SizeOperator<Size<StringData> >, Int)
             ENABLE_SUPPORT_WITH_VALUE(Binary, SizeOperator<Size<BinaryData> >, Int)
             // FIXME: Subtable support ?
