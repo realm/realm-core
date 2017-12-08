@@ -608,7 +608,9 @@ def getSourceArchive() {
           $class           : 'GitSCM',
           branches         : scm.branches,
           gitTool          : 'native git',
-          extensions       : scm.extensions + [[$class: 'CleanCheckout'], [$class: 'CloneOption', depth: 0, noTags: false, reference: '', shallow: false]],
+          extensions       : scm.extensions + [[$class: 'CleanCheckout'], [$class: 'CloneOption', depth: 0, noTags: false, reference: '', shallow: false],
+                                               [$class: 'SubmoduleOption', disableSubmodules: false, parentCredentials: false, recursiveSubmodules: true,
+                                                         reference: '', trackingSubmodules: false]],
           userRemoteConfigs: scm.userRemoteConfigs
         ]
     )
