@@ -41,6 +41,9 @@
 #endif
 #endif
 
+#if REALM_ANDROID
+#include <time64.h> // timegm64
+#endif
 
 namespace {
 
@@ -332,6 +335,20 @@ int gettimeofday(struct timeval * tp, struct timezone * tzp)
     return 0;
 }
 #endif
+
+int64_t platform_timegm(tm time)
+{
+#ifdef _WIN32
+	return static_cast<int64_t>(_mkgmtime64(&time));
+#elif REALM_ANDROID
+	time_t unix_time = timegm64(&time);
+	return static_cast<int64_t>(unix_time);
+#else
+	time_t unix_time = timegm(&time);
+	return int64_t(static_cast<int32_t>(unix_time)); // unix_time comes as a int32_t
+#endif
+}
+
 
 } // namespace realm
 

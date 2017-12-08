@@ -23,6 +23,7 @@
 #include <realm.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/column_type.hpp>
+#include <realm/utilities.hpp>
 
 #include <time.h>
 #include <sstream>
@@ -70,9 +71,7 @@ Timestamp from_timestamp_values(std::vector<std::string> const& time_inputs) {
         created.tm_min = stot<int>(time_inputs[4]);
         created.tm_sec = stot<int>(time_inputs[5]);
 
-        std::time_t unix_time = timegm(&created); // UTC time
-
-        int64_t seconds = int64_t(static_cast<int32_t>(unix_time)); // unix_time comes as a int32_t
+        int64_t seconds = platform_timegm(created); // UTC time
         int32_t nanoseconds = 0;
         if (time_inputs.size() == 7) {
             nanoseconds = stot<int32_t>(time_inputs[6]);
