@@ -147,6 +147,7 @@ set(REALM_INSTALL_IMPL_HEADERS
 )
 
 set(REALM_INSTALL_UTIL_HEADERS
+    util/any.hpp
     util/assert.hpp
     util/basic_system_errors.hpp
     util/bind_ptr.hpp

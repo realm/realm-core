@@ -59,6 +59,7 @@
 #include <realm/parser/query_builder.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/replication.hpp>
+#include <realm/util/any.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/to_string.hpp>
 
@@ -388,6 +389,51 @@ TEST(Parser_Timestamps)
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:0:", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:0:0", 0));
+}
+
+void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, const util::Any* arg_list, size_t num_args, size_t num_results) {
+
+    query_builder::AnyContext ctx;
+    std::string empty_string;
+    realm::query_builder::ArgumentConverter<util::Any, query_builder::AnyContext> args(ctx, arg_list, num_args);
+
+    Query q = t->where();
+
+    realm::parser::Predicate p = realm::parser::parse(query_string);
+    realm::query_builder::apply_predicate(q, p, args);
+
+    CHECK_EQUAL(q.count(), num_results);
+    std::string description = q.get_description();
+    //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    Query q2 = t->where();
+
+    realm::parser::Predicate p2 = realm::parser::parse(description);
+    realm::query_builder::apply_predicate(q2, p2);
+
+    CHECK_EQUAL(q2.count(), num_results);
+}
+
+TEST(Parser_substitution)
+{
+    Group g;
+    TableRef t = g.add_table("person");
+    size_t int_col_ndx = t->add_column(type_Int, "age");
+    size_t str_col_ndx = t->add_column(type_String, "name");
+    size_t double_col_ndx = t->add_column(type_Double, "fees");
+    t->add_empty_row(5);
+    std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
+    std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
+
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(int_col_ndx, i, i);
+        t->set_string(str_col_ndx, i, names[i]);
+        t->set_double(double_col_ndx, i, fees[i]);
+    }
+
+    util::Any args [] = { Int(2), Double(2.22) };
+    size_t num_args = 2;
+    verify_query_sub(test_context, t, "age > $0", args, num_args, 2);
+    verify_query_sub(test_context, t, "age > $0 || fees == $1", args, num_args, 3);
 }
 
 TEST(Parser_collection_aggregates)

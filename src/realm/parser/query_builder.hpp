@@ -28,6 +28,7 @@
 #include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/table.hpp>
+#include <realm/util/any.hpp>
 
 namespace realm {
 class Query;
@@ -43,10 +44,21 @@ namespace parser {
 namespace query_builder {
 class Arguments;
 
-void apply_predicate(Query& query, const parser::Predicate& predicate,
-                     Arguments& arguments, const std::string& objectType);
+void apply_predicate(Query& query, const parser::Predicate& predicate, Arguments& arguments);
 
 void apply_predicate(Query& query, const parser::Predicate& predicate); // zero out of string args version
+
+
+struct AnyContext
+{
+    template<typename T>
+    T unbox(const util::Any& wrapper) {
+        return util::any_cast<T>(wrapper);
+    }
+    bool is_null(const util::Any& wrapper) {
+        return !wrapper.has_value();
+    }
+};
 
 class Arguments {
 public:
