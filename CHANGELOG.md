@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix possible corruption or crashes when a `move_row` operates on a subtable.
+  PR [#2927](https://github.com/realm/realm-core/pull/2926).
 
 ### Breaking changes
 
