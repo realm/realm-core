@@ -2,6 +2,8 @@
 
 ### Bugfixes
 
+* Fix possible corruption or crashes when a `move_row` operates on a subtable.
+  PR [#2927](https://github.com/realm/realm-core/pull/2926).
 * Table::set_int() did not check if the target column was indeed type_Int. It
   will now assert like the other set methods.
 
