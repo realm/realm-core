@@ -66,7 +66,7 @@ if [ "${OS}" == "android" ]; then
     if [[ ${ARCH} == *"64"* ]]; then
         ANDROID_VERSION=21
     else
-        ANDROID_VERSION=9
+        ANDROID_VERSION=14
     fi
     mkdir -p "build-android-${ARCH}-${BUILD_TYPE}"
     cd "build-android-${ARCH}-${BUILD_TYPE}" || exit 1

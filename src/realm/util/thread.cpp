@@ -39,7 +39,7 @@
 // Support was added to glibc 2.12, so we disable for earlier versions
 // of glibs
 #ifdef REALM_HAVE_PTHREAD_PROCESS_SHARED
-#if !defined _WIN32 // 'robust' not supported by our windows pthreads port
+#if !defined _WIN32 && !(REALM_ANDROID)// 'robust' not supported by our windows pthreads port
 #if _POSIX_THREADS >= 200809L
 #ifdef __GNU_LIBRARY__
 #if __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 12
