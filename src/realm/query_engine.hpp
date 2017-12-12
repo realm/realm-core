@@ -1079,8 +1079,8 @@ public:
 
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + TConditionFunction::description() + " \""
-            + util::serializer::print_value(BinaryNode::m_value.data()) + "\"";
+        return this->describe_column() + " " + TConditionFunction::description() + " "
+            + util::serializer::print_value(BinaryNode::m_value.get());
     }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
@@ -1219,7 +1219,11 @@ public:
 
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + describe_condition() + " \"" + util::serializer::print_value(StringNodeBase::m_value) + "\"";
+        StringData sd;
+        if (bool(StringNodeBase::m_value)) {
+            sd = StringData(StringNodeBase::m_value.value());
+        }
+        return this->describe_column() + " " + describe_condition() + " " + util::serializer::print_value(sd);
     }
 
 protected:
@@ -1653,6 +1657,9 @@ public:
                     s += " or ";
                 }
             }
+        }
+        if (m_conditions.size() > 1) {
+            s = "(" + s + ")";
         }
         return s;
     }

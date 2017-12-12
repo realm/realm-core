@@ -18,17 +18,57 @@
 
 #include <realm/util/serializer.hpp>
 
+#include <realm/binary_data.hpp>
 #include <realm/null.hpp>
+#include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
+
+#include <cctype>
 
 namespace realm {
 namespace util {
 namespace serializer {
 
 template <>
+std::string print_value<>(BinaryData data)
+{
+    if (data.is_null()) {
+        return "NULL";
+    }
+    return print_value<StringData>(StringData(data.data(), data.size()));
+}
+
+template <>
+std::string print_value<>(bool b)
+{
+    if (b) {
+        return "true";
+    }
+    return "false";
+}
+
+template <>
 std::string print_value<>(realm::null)
 {
     return "NULL";
+}
+
+template <>
+std::string print_value<>(StringData data)
+{
+    if (data.is_null()) {
+        return "NULL";
+    }
+    std::string out;
+    const char* start = data.data();
+    const size_t len = data.size();
+    out.reserve(len + 2);
+    out += '"';
+    for (const char* i = start; i != start + len; ++i) {
+        out += *i;
+    }
+    out += '"';
+    return out;
 }
 
 template <>

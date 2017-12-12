@@ -462,6 +462,17 @@ struct ValueGetter<bool, TableGetter> {
             return args.bool_for_argument(stot<int>(value.s));
         }
         if (value.type != parser::Expression::Type::True && value.type != parser::Expression::Type::False) {
+            if (value.type == parser::Expression::Type::Number) {
+                // As a special exception we can handle 0 and 1.
+                // Our bool values are actually stored as integers {0, 1}
+                int64_t number_value = stot<int64_t>(value.s);
+                if (number_value == 0) {
+                    return false;
+                }
+                else if (number_value == 1) {
+                    return true;
+                }
+            }
             throw std::logic_error("Attempting to compare bool property to a non-bool value");
         }
         return value.type == parser::Expression::Type::True;
@@ -521,6 +532,9 @@ struct ValueGetter<Binary, TableGetter> {
     {
         if (value.type == parser::Expression::Type::Argument) {
             return args.binary_for_argument(stot<int>(value.s));
+        }
+        if (value.type == parser::Expression::Type::String) {
+            return BinaryData(value.s);
         }
         throw std::logic_error("Binary properties must be compared against a binary argument.");
     }

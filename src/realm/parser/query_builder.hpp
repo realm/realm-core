@@ -56,7 +56,13 @@ struct AnyContext
         return util::any_cast<T>(wrapper);
     }
     bool is_null(const util::Any& wrapper) {
-        return !wrapper.has_value();
+        if (!wrapper.has_value()) {
+            return true;
+        }
+        if (wrapper.type() == typeid(realm::null)) {
+            return true;
+        }
+        return false;
     }
 };
 

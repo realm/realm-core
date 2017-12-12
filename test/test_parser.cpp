@@ -296,6 +296,7 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "age > 2 and age < 4", 1);
     verify_query(test_context, t, "age = 1 || age == 3", 2);
     verify_query(test_context, t, "fees != 2.22 && fees > 2.2", 3);
+    verify_query(test_context, t, "(age > 1 || fees >= 2.25) && age == 4", 1);
     verify_query(test_context, t, "name = \"Joe\"", 1);
     verify_query(test_context, t, "buddy.age > 0", 1);
     verify_query(test_context, t, "name BEGINSWITH \"J\"", 3);
@@ -420,6 +421,12 @@ TEST(Parser_substitution)
     size_t int_col_ndx = t->add_column(type_Int, "age");
     size_t str_col_ndx = t->add_column(type_String, "name");
     size_t double_col_ndx = t->add_column(type_Double, "fees");
+    size_t bool_col_ndx = t->add_column(type_Bool, "paid", true);
+    size_t time_col_ndx = t->add_column(type_Timestamp, "time", true);
+    size_t binary_col_ndx = t->add_column(type_Binary, "binary", true);
+    size_t float_col_ndx = t->add_column(type_Float, "floats", true);
+    size_t link_col_ndx = t->add_column_link(type_Link, "links", *t);
+    size_t list_col_ndx = t->add_column_link(type_LinkList, "list", *t);
     t->add_empty_row(5);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
@@ -429,11 +436,127 @@ TEST(Parser_substitution)
         t->set_string(str_col_ndx, i, names[i]);
         t->set_double(double_col_ndx, i, fees[i]);
     }
+    t->set_bool(bool_col_ndx, 0, true);
+    t->set_bool(bool_col_ndx, 1, false);
+    t->set_timestamp(time_col_ndx, 1, Timestamp(1512130073, 505)); // 2017/12/02 @ 12:47am (UTC) + 505 nanoseconds
+    BinaryData bd0("oe");
+    BinaryData bd1("eo");
+    t->set_binary(binary_col_ndx, 0, bd0);
+    t->set_binary(binary_col_ndx, 1, bd1);
+    t->set_float(float_col_ndx, 0, 2.33);
+    t->set_float(float_col_ndx, 1, 2.22);
+    t->set_link(link_col_ndx, 0, 1);
+    t->set_link(link_col_ndx, 1, 0);
+    LinkViewRef list_0 = t->get_linklist(list_col_ndx, 0);
+    list_0->add(0);
+    list_0->add(1);
+    list_0->add(2);
+    LinkViewRef list_1 = t->get_linklist(list_col_ndx, 1);
+    list_1->add(0);
 
-    util::Any args [] = { Int(2), Double(2.22) };
-    size_t num_args = 2;
+    util::Any args [] = { Int(2), Double(2.22), String("oe"), realm::null{}, Bool(true),
+                            Timestamp(1512130073, 505), bd0, Float(2.33), Int(1), Int(3), Int(4) };
+    size_t num_args = 11;
     verify_query_sub(test_context, t, "age > $0", args, num_args, 2);
     verify_query_sub(test_context, t, "age > $0 || fees == $1", args, num_args, 3);
+    verify_query_sub(test_context, t, "name CONTAINS[c] $2", args, num_args, 2);
+    verify_query_sub(test_context, t, "paid == $3", args, num_args, 3);
+    verify_query_sub(test_context, t, "paid == $4", args, num_args, 1);
+    verify_query_sub(test_context, t, "time == $5", args, num_args, 1);
+    verify_query_sub(test_context, t, "time == $3", args, num_args, 4);
+    //verify_query_sub(test_context, t, "binary == $6", args, num_args, 1);  //FIXME: binary serialisation
+    verify_query_sub(test_context, t, "binary == $3", args, num_args, 3);
+    verify_query_sub(test_context, t, "floats == $7", args, num_args, 1);
+    verify_query_sub(test_context, t, "floats == $3", args, num_args, 3);
+    verify_query_sub(test_context, t, "links == $3", args, num_args, 3);
+
+    // substitutions through collection aggregates is a different code path
+    verify_query_sub(test_context, t, "list.@min.age < $0", args, num_args, 2);
+    verify_query_sub(test_context, t, "list.@max.age >= $0", args, num_args, 1);
+    verify_query_sub(test_context, t, "list.@sum.age >= $0", args, num_args, 1);
+    verify_query_sub(test_context, t, "list.@avg.age < $0", args, num_args, 2);
+    verify_query_sub(test_context, t, "list.@count > $0", args, num_args, 1);
+    verify_query_sub(test_context, t, "list.@size > $0", args, num_args, 1);
+    verify_query_sub(test_context, t, "name.@count > $0", args, num_args, 5);
+    verify_query_sub(test_context, t, "name.@size > $0", args, num_args, 5);
+    verify_query_sub(test_context, t, "binary.@count > $0", args, num_args, 2);
+    verify_query_sub(test_context, t, "binary.@size > $0", args, num_args, 2);
+
+    // reusing properties, mixing order
+    verify_query_sub(test_context, t, "(age > $0 || fees == $1) && age == $0", args, num_args, 1);
+
+    // negative index
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $-1", args, num_args, 0));
+    // missing index
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $", args, num_args, 0));
+    // non-numerical index
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $age", args, num_args, 0));
+    // leading zero index
+    verify_query_sub(test_context, t, "name CONTAINS[c] $002", args, num_args, 2);
+    // double digit index
+    verify_query_sub(test_context, t, "age == $10", args, num_args, 1);
+
+    // referencing a parameter outside of the list size throws
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $0", args, /*num_args*/ 0, 0));
+
+    // invalid types
+    // int
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $1", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $2", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $3", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $4", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $5", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $6", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $7", args, num_args, 0));
+    // double
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $0", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $2", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $3", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $4", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $5", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $6", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $7", args, num_args, 0));
+    // float
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $0", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $1", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $2", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $3", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $4", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $5", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $6", args, num_args, 0));
+    // string
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $0", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $1", args, num_args, 0));
+                    verify_query_sub(test_context, t, "name == $3", args, num_args, 0);
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $4", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $5", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $6", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $7", args, num_args, 0));
+    // bool
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $0", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $1", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $2", args, num_args, 0));
+                    verify_query_sub(test_context, t, "paid == $3", args, num_args, 3);
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $5", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $6", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $7", args, num_args, 0));
+    // timestamp
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $0", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $1", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $2", args, num_args, 0));
+                    verify_query_sub(test_context, t, "time == $3", args, num_args, 4);
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $4", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $6", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $7", args, num_args, 0));
+    // binary
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $0", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $1", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $2", args, num_args, 0));
+                    verify_query_sub(test_context, t, "binary == $3", args, num_args, 3);
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $4", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $5", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $7", args, num_args, 0));
+
 }
 
 TEST(Parser_collection_aggregates)
