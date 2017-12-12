@@ -126,17 +126,6 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
         EventLoop::main().run_until([&] { return error_count > 0; });
         REQUIRE(handler_called == true);
     }
-
-    SECTION("properly rejects any callbacks when session is errored") {
-        auto user = SyncManager::shared().get_user({ "user-async-wait-download-5", dummy_auth_url }, "not_a_real_token");
-        std::atomic<int> error_count(0);
-        auto session = sync_session(server, user, "/test",
-                                    [](const auto&, const auto&) { return "this is not a valid access token"; },
-                                    [&](auto, auto) { ++error_count; });
-
-        EventLoop::main().run_until([&] { return error_count > 0; });
-        REQUIRE(!session->wait_for_download_completion([](auto) { }));
-    }
 }
 
 TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
@@ -237,16 +226,5 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
         SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
         EventLoop::main().run_until([&] { return error_count > 0; });
         REQUIRE(handler_called == true);
-    }
-
-    SECTION("properly rejects any callbacks when session is errored") {
-        auto user = SyncManager::shared().get_user({ "user-async-wait-upload-5", dummy_auth_url }, "not_a_real_token");
-        std::atomic<int> error_count(0);
-        auto session = sync_session(server, user, "/test",
-                                    [](const auto&, const auto&) { return "this is not a valid access token"; },
-                                    [&](auto, auto) { ++error_count; });
-
-        EventLoop::main().run_until([&] { return error_count > 0; });
-        REQUIRE(!session->wait_for_upload_completion([](auto) { }));
     }
 }

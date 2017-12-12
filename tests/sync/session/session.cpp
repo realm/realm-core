@@ -204,10 +204,11 @@ TEST_CASE("sync: log-in", "[sync]") {
         std::atomic<bool> download_did_complete(false);
         session->wait_for_download_completion([&](auto) { download_did_complete = true; });
         EventLoop::main().run_until([&] { return download_did_complete.load() || error_count > 0; });
-        CHECK(!session->is_in_error_state());
         CHECK(error_count == 0);
     }
 
+    // FIXME: What should we do if we get an invalid access token? Presumably we want to retry at some point.
+    // What should drive that?
     SECTION("Session is invalid after invalid token") {
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
@@ -215,7 +216,6 @@ TEST_CASE("sync: log-in", "[sync]") {
                                     [&](auto, auto) { ++error_count; });
 
         EventLoop::main().run_until([&] { return error_count > 0; });
-        CHECK(session->is_in_error_state());
     }
 
     // TODO: write a test that logs out a Realm with multiple sessions, then logs it back in?
@@ -239,7 +239,6 @@ TEST_CASE("sync: token refreshing", "[sync]") {
                                     [](auto, auto) { },
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-        REQUIRE(!session->is_in_error_state());
 
         REQUIRE(session->state() == PublicState::Active);
         session->refresh_access_token(s_test_token, none);
@@ -258,7 +257,6 @@ TEST_CASE("sync: token refreshing", "[sync]") {
                                     },
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-        REQUIRE(!session->is_in_error_state());
         bind_function_called = false;
 
         // Simulate the "token expired" error, which should cause the object store
@@ -310,16 +308,6 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
         session->close();
         REQUIRE(sessions_are_inactive(*session));
     }
-
-    SECTION("Behaves properly when called on session in the 'error' state") {
-        auto session = sync_session(server, user, "/test-close-for-error",
-                                    [&](const auto&, const auto&) { return "NOT A VALID TOKEN"; },
-                                    [](auto, auto) { },
-                                    SyncSessionStopPolicy::AfterChangesUploaded);
-        EventLoop::main().run_until([&] { return session->state() == PublicState::Error; });
-        session->close();
-        REQUIRE(session->state() == PublicState::Error);
-    }
 }
 
 TEST_CASE("sync: error handling", "[sync]") {
@@ -342,7 +330,12 @@ TEST_CASE("sync: error handling", "[sync]") {
                                 &on_disk_path);
     // Make sure the sessions are bound.
     EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-    REQUIRE(!session->is_in_error_state());
+
+    SECTION("Doesn't treat unknown system errors as being fatal") {
+        std::error_code code = std::error_code{EBADF, std::generic_category()};
+        SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", false});
+        CHECK(!sessions_are_inactive(*session));
+    }
 
     SECTION("Properly handles a client reset error") {
         int code = 0;

@@ -59,7 +59,6 @@ TEST_CASE("progress notification", "[sync]") {
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         wait_for_session_to_activate(*session);
 
-        REQUIRE(!session->is_in_error_state());
         std::atomic<bool> callback_was_called(false);
 
         SECTION("for upload notifications, with no data transfer ongoing") {
@@ -96,7 +95,6 @@ TEST_CASE("progress notification", "[sync]") {
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         wait_for_session_to_activate(*session);
 
-        REQUIRE(!session->is_in_error_state());
         std::atomic<bool> callback_was_called(false);
         std::atomic<uint64_t> transferred(0);
         std::atomic<uint64_t> transferrable(0);
@@ -264,7 +262,6 @@ TEST_CASE("progress notification", "[sync]") {
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         wait_for_session_to_activate(*session);
 
-        REQUIRE(!session->is_in_error_state());
         std::atomic<bool> callback_was_called(false);
         std::atomic<uint64_t> transferred(0);
         std::atomic<uint64_t> transferrable(0);
