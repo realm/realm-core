@@ -443,8 +443,8 @@ TEST(Parser_substitution)
     BinaryData bd1("eo");
     t->set_binary(binary_col_ndx, 0, bd0);
     t->set_binary(binary_col_ndx, 1, bd1);
-    t->set_float(float_col_ndx, 0, 2.33);
-    t->set_float(float_col_ndx, 1, 2.22);
+    t->set_float(float_col_ndx, 0, 2.33f);
+    t->set_float(float_col_ndx, 1, 2.22f);
     t->set_link(link_col_ndx, 0, 1);
     t->set_link(link_col_ndx, 1, 0);
     LinkViewRef list_0 = t->get_linklist(list_col_ndx, 0);
