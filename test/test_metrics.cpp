@@ -316,7 +316,7 @@ TEST(Metrics_QueryEqual)
     for (size_t i = 0; i < 7; ++i) {
         std::string description = queries->at(i).get_description();
         CHECK_EQUAL(find_count(description, column_names[i]), 1);
-        CHECK_EQUAL(find_count(description, query_search_term), 1);
+        CHECK_GREATER_EQUAL(find_count(description, query_search_term), 1);
     }
     {
         std::string description = queries->at(7).get_description();

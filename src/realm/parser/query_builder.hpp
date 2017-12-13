@@ -29,6 +29,7 @@
 #include <realm/timestamp.hpp>
 #include <realm/table.hpp>
 #include <realm/util/any.hpp>
+#include <realm/util/string_buffer.hpp>
 
 namespace realm {
 class Query;
@@ -77,6 +78,7 @@ public:
     virtual Timestamp timestamp_for_argument(size_t argument_index) = 0;
     virtual size_t object_index_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
+    util::StringBuffer buffer_space; // dynamic conversion space with lifetime tied to this
 };
 
 template<typename ValueType, typename ContextType>

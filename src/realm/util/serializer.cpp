@@ -22,6 +22,8 @@
 #include <realm/null.hpp>
 #include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
+#include <realm/util/base64.hpp>
+#include <realm/util/string_buffer.hpp>
 
 #include <cctype>
 
@@ -53,6 +55,16 @@ std::string print_value<>(realm::null)
     return "NULL";
 }
 
+bool contains_invalids(StringData data) {
+    const static std::string whitelist = " {|}~:;<=>?@!#$%&()*+,-./[]^_`";
+    for (size_t i = 0; i < data.size(); ++i) {
+        if (!std::isalnum(data.data()[i]) && whitelist.find(data.data()[i]) == std::string::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
 template <>
 std::string print_value<>(StringData data)
 {
@@ -62,12 +74,20 @@ std::string print_value<>(StringData data)
     std::string out;
     const char* start = data.data();
     const size_t len = data.size();
-    out.reserve(len + 2);
-    out += '"';
-    for (const char* i = start; i != start + len; ++i) {
-        out += *i;
+
+    if (contains_invalids(data)) {
+        util::StringBuffer encode_buffer;
+        encode_buffer.resize(util::base64_encoded_size(len));
+        util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
+        out = "B64\"" + encode_buffer.str() + "\"";
+    } else {
+        out.reserve(len + 2);
+        out += '"';
+        for (const char* i = start; i != start + len; ++i) {
+            out += *i;
+        }
+        out += '"';
     }
-    out += '"';
     return out;
 }
 

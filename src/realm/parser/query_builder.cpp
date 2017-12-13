@@ -24,6 +24,7 @@
 #include <realm/query_expression.hpp>
 #include <realm/column_type.hpp>
 #include <realm/utilities.hpp>
+#include <realm/util/base64.hpp>
 
 #include <time.h>
 #include <sstream>
@@ -79,6 +80,29 @@ Timestamp from_timestamp_values(std::vector<std::string> const& time_inputs) {
         return get_timestamp_if_valid(seconds, nanoseconds);
     }
     throw std::runtime_error("Unexpected timestamp format.");
+}
+
+StringData from_base64(const std::string& input, util::StringBuffer& decode_buffer)
+{
+    // expects wrapper tokens B64"..."
+    if (input.size() < 5
+        || !(input[0] == 'B' || input[0] == 'b')
+        || input[1] != '6' || input[2] != '4'
+        || input[3] != '"' || input[input.size() - 1] != '"') {
+        throw std::runtime_error("Unexpected base64 format");
+    }
+    const size_t encoded_size = input.size() - 5;
+    size_t buffer_size = util::base64_decoded_size(encoded_size);
+    decode_buffer.resize(buffer_size);
+    StringData window(input.data() + 4, encoded_size);
+    util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
+    if (!decoded_size) {
+        throw std::runtime_error("Invalid base64 value");
+    }
+    REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
+    decode_buffer.resize(*decoded_size); // truncate
+    StringData output_window(decode_buffer.data(), decode_buffer.size());
+    return output_window;
 }
 
 // check a precondition and throw an exception if it is not met
@@ -519,10 +543,14 @@ struct ValueGetter<String, TableGetter> {
         if (value.type == parser::Expression::Type::Argument) {
             return args.string_for_argument(stot<int>(value.s));
         }
-        if (value.type != parser::Expression::Type::String) {
-            throw std::logic_error("Attempting to compare String property to a non-String value");
+        else if (value.type == parser::Expression::Type::String) {
+            return value.s;
         }
-        return value.s;
+        else if (value.type == parser::Expression::Type::Base64) {
+            // the return value points to data in the lifetime of args
+            return from_base64(value.s, args.buffer_space);
+        }
+        throw std::logic_error("Attempting to compare String property to a non-String value");
     }
 };
 
@@ -533,8 +561,13 @@ struct ValueGetter<Binary, TableGetter> {
         if (value.type == parser::Expression::Type::Argument) {
             return args.binary_for_argument(stot<int>(value.s));
         }
-        if (value.type == parser::Expression::Type::String) {
+        else if (value.type == parser::Expression::Type::String) {
             return BinaryData(value.s);
+        }
+        else if (value.type == parser::Expression::Type::Base64) {
+            StringData converted = from_base64(value.s, args.buffer_space);
+            // returning a pointer to data in the lifetime of args
+            return BinaryData(converted.data(), converted.size());
         }
         throw std::logic_error("Binary properties must be compared against a binary argument.");
     }

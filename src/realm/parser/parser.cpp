@@ -44,6 +44,11 @@ struct dq_string : seq< one< '"' >, must< dq_string_content >, any > {};
 struct sq_string_content : until< at< one< '\'' > >, must< chars > > {};
 struct sq_string : seq< one< '\'' >, must< sq_string_content >, any > {};
 
+// base64 encoded data
+struct b64_allowed : sor< disable< alnum >, one< '/' >, one< '+' >, one< '=' > > {};
+struct b64_content : until< at< one< '"' > >, must< b64_allowed > > {};
+struct base64 : seq< TAOCPP_PEGTL_ISTRING("B64\""), must< b64_content >, any > {};
+
 // numbers
 struct minus : opt< one< '-' > > {};
 struct dot : one< '.' > {};
@@ -97,7 +102,7 @@ struct argument_index : plus< digit > {};
 struct argument : seq< one< '$' >, must< argument_index > > {};
 
 // expressions and operators
-struct expr : sor< dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, collection_operator_match, key_path > {};
+struct expr : sor< dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, base64, collection_operator_match, key_path > {};
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
 
 struct eq : seq< sor< two< '=' >, one< '=' > >, star< blank >, opt< case_insensitive > >{};
@@ -290,6 +295,7 @@ EXPRESSION_ACTION(true_value, Expression::Type::True)
 EXPRESSION_ACTION(false_value, Expression::Type::False)
 EXPRESSION_ACTION(null_value, Expression::Type::Null)
 EXPRESSION_ACTION(argument_index, Expression::Type::Argument)
+EXPRESSION_ACTION(base64, Expression::Type::Base64)
 
 template<> struct action< timestamp >
 {

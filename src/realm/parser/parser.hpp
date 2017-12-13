@@ -27,7 +27,7 @@ namespace realm {
 namespace parser {
 struct Expression
 {
-    enum class Type { None, Number, String, KeyPath, Argument, True, False, Null, Timestamp } type;
+    enum class Type { None, Number, String, KeyPath, Argument, True, False, Null, Timestamp, Base64 } type;
     enum class KeyPathOp { None, Min, Max, Avg, Sum, Count, Size } collection_op;
     std::string s;
     std::vector<std::string> time_inputs;

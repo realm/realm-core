@@ -464,7 +464,7 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "paid == $4", args, num_args, 1);
     verify_query_sub(test_context, t, "time == $5", args, num_args, 1);
     verify_query_sub(test_context, t, "time == $3", args, num_args, 4);
-    //verify_query_sub(test_context, t, "binary == $6", args, num_args, 1);  //FIXME: binary serialisation
+    verify_query_sub(test_context, t, "binary == $6", args, num_args, 1);
     verify_query_sub(test_context, t, "binary == $3", args, num_args, 3);
     verify_query_sub(test_context, t, "floats == $7", args, num_args, 1);
     verify_query_sub(test_context, t, "floats == $3", args, num_args, 3);
@@ -556,7 +556,149 @@ TEST(Parser_substitution)
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $4", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $7", args, num_args, 0));
+}
 
+TEST(Parser_string_binary_encoding)
+{
+    Group g;
+    TableRef t = g.add_table("person");
+    size_t str_col_ndx = t->add_column(type_String, "string_col", true);
+    size_t bin_col_ndx = t->add_column(type_Binary, "binary_col", true);
+
+    std::vector<std::string> test_strings = {
+        // Credit of the following list to https://github.com/minimaxir/big-list-of-naughty-strings (MIT)
+        "undefined",
+        "undef",
+        "null",
+        "NULL",
+        "(null)",
+        "nil",
+        "NIL",
+        "true",
+        "false",
+        "True",
+        "False",
+        "TRUE",
+        "FALSE",
+        "None",
+        "hasOwnProperty",
+        "\\",
+        "\\\\",
+        "1.00",
+        "$1.00",
+        "1/2",
+        "1E2",
+        "1E02",
+        "1E+02",
+        "-1",
+        "-1.00",
+        "-$1.00",
+        "-1/2",
+        "-1E2",
+        "-1E02",
+        "-1E+02",
+        "1/0",
+        "0/0",
+        "-2147483648/-1",
+        "-9223372036854775808/-1",
+        "-0",
+        "-0.0",
+        "+0",
+        "+0.0",
+        "0.00",
+        "0..0",
+        "0.0.0",
+        "0,00",
+        "0,,0",
+        "0,0,0",
+        "0.0/0",
+        "1.0/0.0",
+        "0.0/0.0",
+        "1,0/0,0",
+        "0,0/0,0",
+        "--1",
+        "-.",
+        "-,",
+        "999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+        "NaN",
+        "Infinity",
+        "-Infinity",
+        "INF",
+        "1#INF",
+        "-1#IND",
+        "1#QNAN",
+        "1#SNAN",
+        "1#IND",
+        "0x0",
+        "0xffffffff",
+        "0xffffffffffffffff",
+        "0xabad1dea",
+        "123456789012345678901234567890123456789",
+        "1,000.00",
+        "1 000.00",
+        "1'000.00",
+        "1,000,000.00",
+        "1 000 000.00",
+        "1'000'000.00",
+        "1.000,00",
+        "1 000,00",
+        "1'000,00",
+        "1.000.000,00",
+        "1 000 000,00",
+        "1'000'000,00",
+        "01000",
+        "08",
+        "09",
+        "2.2250738585072011e-308",
+        ",./;'[]\\-=",
+        "<>?:\"{}|_+",
+        "!@#$%^&*()`~",
+        "''",
+        "\"\"",
+        "'\"'",
+        "\"''''\"'\"",
+        "\"'\"'\"''''\"",
+        "<foo val=“bar” />",
+        "<foo val=`bar' />"
+    };
+
+    t->add_empty_row(); // nulls
+    // add a single char of each value
+    for (size_t i = 0; i < 255; ++i) {
+        unsigned char c = static_cast<unsigned char>(i);
+        test_strings.push_back(std::string(c, 1));
+    }
+    // a single string of 100 nulls
+    test_strings.push_back(std::string(100, '\0'));
+
+    for (const std::string& buff : test_strings) {
+        StringData sd(buff);
+        BinaryData bd(buff);
+        size_t row_ndx = t->add_empty_row();
+        t->set_string(str_col_ndx, row_ndx, sd);
+        t->set_binary(bin_col_ndx, row_ndx, bd);
+    }
+
+    for (const std::string& buff : test_strings) {
+        size_t num_results = 1;
+        Query qstr = t->where().equal(str_col_ndx, StringData(buff), true);
+        Query qbin = t->where().equal(bin_col_ndx, BinaryData(buff));
+        CHECK_EQUAL(qstr.count(), num_results);
+        CHECK_EQUAL(qbin.count(), num_results);
+        std::string string_description = qstr.get_description();
+        std::string binary_description = qbin.get_description();
+        //std::cerr << "original: " << buff << "\tdescribed: " << string_description << "\n";
+
+        Query qstr2 = t->where();
+        realm::parser::Predicate pstr2 = realm::parser::parse(string_description);
+        realm::query_builder::apply_predicate(qstr2, pstr2);
+        CHECK_EQUAL(qstr2.count(), num_results);
+
+        Query qbin2 = t->where();
+        realm::parser::Predicate pbin2 = realm::parser::parse(binary_description);
+        realm::query_builder::apply_predicate(qbin2, pbin2);
+        CHECK_EQUAL(qbin2.count(), num_results);
+    }
 }
 
 TEST(Parser_collection_aggregates)
