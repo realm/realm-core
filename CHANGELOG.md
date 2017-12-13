@@ -13,7 +13,9 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Utilities gain `Any` from object store and base64 encoding from sync.
+* Initial support for query serialisation.
+  PR [#2947](https://github.com/realm/realm-core/pull/2947).
 
 -----------
 
