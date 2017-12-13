@@ -57,6 +57,7 @@ set(NORMAL_TESTS
     test_transactions_lasse.cpp
     test_upgrade_database.cpp
     test_utf8.cpp
+    test_util_any.cpp
     test_util_base64.cpp
     test_util_error.cpp
     test_util_file.cpp
