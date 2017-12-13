@@ -286,8 +286,8 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "time != NULL", 4);
     verify_query(test_context, t, "time > T0:0", 3);
     verify_query(test_context, t, "time == T1:2", 1);
-    verify_query(test_context, t, "time > T2017-12-1@12:07:53", 1);
-    verify_query(test_context, t, "time == T2017-12-01@12:07:53:505", 1);
+    verify_query(test_context, t, "time > 2017-12-1@12:07:53", 1);
+    verify_query(test_context, t, "time == 2017-12-01@12:07:53:505", 1);
     verify_query(test_context, t, "buddy == NULL", 4);
     verify_query(test_context, t, "buddy != NULL", 1);
     verify_query(test_context, t, "age > 2", 2);
@@ -448,7 +448,7 @@ TEST(Parser_Timestamps)
     verify_query(test_context, t, "linked != NULL && linked.T399 != NULL", 1);
     verify_query(test_context, t, "T399 == T399:0", 0);
     verify_query(test_context, t, "linked.T399 == T399:0", 0);
-    verify_query(test_context, t, "T399 == T2017-12-04@0:0:0", 0);
+    verify_query(test_context, t, "T399 == 2017-12-04@0:0:0", 0);
 
     verify_query(test_context, t, "T2017-12-04 == NULL", 3);
     verify_query(test_context, t, "T2017-12-04 != NULL", 2);
@@ -458,34 +458,34 @@ TEST(Parser_Timestamps)
     verify_query(test_context, t, "linked != NULL && linked.T2017-12-04 != NULL", 2);
     verify_query(test_context, t, "T2017-12-04 == T399:0", 0);
     verify_query(test_context, t, "linked.T2017-12-04 == T399:0", 0);
-    verify_query(test_context, t, "T2017-12-04 == T2017-12-04@0:0:0", 0);
+    verify_query(test_context, t, "T2017-12-04 == 2017-12-04@0:0:0", 0);
 
     verify_query(test_context, t, "birthday == NULL", 0);
     verify_query(test_context, t, "birthday != NULL", 5);
     verify_query(test_context, t, "birthday == T0:0", 3);
-    verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:0", 3); // epoch is default non-null Timestamp
-    verify_query(test_context, t, "birthday == T1969-12-31@23:59:59:-1", 1);
-    verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:-1", 1);
+    verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:0", 3); // epoch is default non-null Timestamp
+    verify_query(test_context, t, "birthday == 1969-12-31@23:59:59:-1", 1);
+    verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:-1", 1);
 
     // invalid timestamps, if these were constructed core would assert
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T-1:1", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:-1", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1969-12-31@23:59:59:1", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:1:-1", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1969-12-31@23:59:59:1", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:1:-1", 0));
 
     // Invalid predicate
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T:1", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T399", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:0:", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1970-1-1@0:0:0:0:0", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:0:", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:0:0", 0));
 }
 
 void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, const util::Any* arg_list, size_t num_args, size_t num_results) {

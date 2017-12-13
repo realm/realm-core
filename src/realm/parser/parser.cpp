@@ -67,8 +67,8 @@ struct first_timestamp_number : disable< timestamp_number > {};
 // Tseconds:nanoseconds
 struct internal_timestamp : seq< one< 'T' >, first_timestamp_number, one< ':' >, timestamp_number > {};
 // T2017-09-28@23:12:60:288833
-// TYYYY-MM-DD@HH:MM:SS:NANOS nanos optional
-struct readable_timestamp : seq< one< 'T' >, first_timestamp_number, one< '-' >, timestamp_number, one< '-' >,
+// YYYY-MM-DD@HH:MM:SS:NANOS nanos optional
+struct readable_timestamp : seq< first_timestamp_number, one< '-' >, timestamp_number, one< '-' >,
     timestamp_number, one< '@' >, timestamp_number, one< ':' >, timestamp_number, one< ':' >,
     timestamp_number, opt< seq< one< ':' >, timestamp_number > > > {};
 struct timestamp : sor< internal_timestamp, readable_timestamp > {};
