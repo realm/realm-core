@@ -45,6 +45,7 @@ set(REALM_SOURCES
     table.cpp
     table_view.cpp
     unicode.cpp
+    util/base64.cpp
     util/basic_system_errors.cpp
     util/encrypted_file_mapping.cpp
     util/file.cpp
@@ -149,6 +150,7 @@ set(REALM_INSTALL_IMPL_HEADERS
 set(REALM_INSTALL_UTIL_HEADERS
     util/any.hpp
     util/assert.hpp
+    util/base64.hpp
     util/basic_system_errors.hpp
     util/bind_ptr.hpp
     util/buffer.hpp
