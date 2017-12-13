@@ -318,6 +318,102 @@ TEST(Parser_basic_serialisation)
     CHECK_THROW_ANY(verify_query(test_context, t, "buddy.age > $0", 0)); // no external parameters provided
 }
 
+TEST(Parser_LinksToSameTable)
+{
+    Group g;
+    TableRef t = g.add_table("person");
+    size_t age_col_ndx = t->add_column(type_Int, "age");
+    size_t name_col_ndx = t->add_column(type_String, "name");
+    size_t link_col_ndx = t->add_column_link(type_Link, "buddy", *t);
+    std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
+    t->add_empty_row(5);
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(age_col_ndx, i, i);
+        t->set_string(name_col_ndx, i, names[i]);
+        t->set_link(link_col_ndx, i, (i + 1) % t->size());
+    }
+    t->nullify_link(link_col_ndx, 4);
+
+    verify_query(test_context, t, "age > 0", 4);
+    verify_query(test_context, t, "buddy.age > 0", 4);
+    verify_query(test_context, t, "buddy.buddy.age > 0", 3);
+    verify_query(test_context, t, "buddy.buddy.buddy.age > 0", 2);
+    verify_query(test_context, t, "buddy.buddy.buddy.buddy.age > 0", 1);
+    verify_query(test_context, t, "buddy.buddy.buddy.buddy.buddy.age > 0", 0);
+
+    verify_query(test_context, t, "name contains \"oe\"", 2);
+    verify_query(test_context, t, "buddy.name contains \"oe\"", 2);
+    verify_query(test_context, t, "buddy.buddy.name contains \"oe\"", 2);
+    verify_query(test_context, t, "buddy.buddy.buddy.name contains \"oe\"", 1);
+    verify_query(test_context, t, "buddy.buddy.buddy.buddy.name contains \"oe\"", 1);
+    verify_query(test_context, t, "buddy.buddy.buddy.buddy.buddy.name contains \"oe\"", 0);
+}
+
+TEST(Parser_LinksToDifferentTable)
+{
+    Group g;
+
+    TableRef discounts = g.add_table("discounts");
+    size_t discount_off_col = discounts->add_column(type_Double, "reduced_by");
+    size_t discount_active_col = discounts->add_column(type_Bool, "active");
+
+    using discount_t = std::pair<double, bool>;
+    std::vector<discount_t> discount_info = {{3.0, false}, {2.5, true}, {0.50, true}, {1.50, true}};
+    for (discount_t i : discount_info) {
+        size_t row_ndx = discounts->add_empty_row();
+        discounts->set_double(discount_off_col, row_ndx, i.first);
+        discounts->set_bool(discount_active_col, row_ndx, i.second);
+    }
+
+    TableRef items = g.add_table("items");
+    size_t item_name_col = items->add_column(type_String, "name");
+    size_t item_price_col = items->add_column(type_Double, "price");
+    size_t item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    for (item_t i : item_info) {
+        size_t row_ndx = items->add_empty_row();
+        items->set_string(item_name_col, row_ndx, i.first);
+        items->set_double(item_price_col, row_ndx, i.second);
+    }
+    items->set_link(item_discount_col, 0, 2); // milk -0.50
+    items->set_link(item_discount_col, 2, 1); // pizza -2.5
+    items->set_link(item_discount_col, 3, 0); // cereal -3.0 inactive
+
+    TableRef t = g.add_table("person");
+    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
+    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
+    t->add_empty_row(3);
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(id_col_ndx, i, i);
+    }
+
+    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
+    list_0->add(0);
+    list_0->add(1);
+    list_0->add(2);
+    list_0->add(3);
+
+    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1->add(0);
+    }
+
+    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
+    list_2->add(2);
+    list_2->add(2);
+    list_2->add(3);
+
+    verify_query(test_context, t, "items.@count > 2", 3); // how many people bought more than two items?
+    verify_query(test_context, t, "items.price > 3.0", 3); // how many people buy items over $3.0?
+    verify_query(test_context, t, "items.name ==[c] 'milk'", 2); // how many people buy milk?
+    verify_query(test_context, t, "items.discount.active == true", 3); // how many people bought items with an active sale?
+    verify_query(test_context, t, "items.discount.reduced_by > 2.0", 2); // how many people bought an item marked down by more than $2.0?
+    verify_query(test_context, t, "items.@sum.price > 50", 1); // how many people would spend more than $50 without sales applied?
+    verify_query(test_context, t, "items.@avg.price > 7", 1); // how manay people like to buy items more expensive on average than $7?
+}
+
+
 TEST(Parser_Timestamps)
 {
     Group g;

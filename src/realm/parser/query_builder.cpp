@@ -140,9 +140,10 @@ struct PropertyExpression
 
             DataType cur_col_type = cur_table->get_column_type(cur_col_ndx);
             if (index != key_path.size() - 1) {
-                precondition(cur_col_type == type_Link,
+                precondition(cur_col_type == type_Link || cur_col_type == type_LinkList,
                              util::format("Property '%1' is not a link in object of type '%2'", key_path[index], object_type));
                 indexes.push_back(cur_col_ndx);
+                cur_table = cur_table->get_link_target(cur_col_ndx);
             }
             else {
                 col_ndx = cur_col_ndx;
@@ -316,8 +317,20 @@ void add_string_constraint_to_query(realm::Query &query,
         case Predicate::Operator::NotEqual:
             query.and_query(column.not_equal(value, case_sensitive));
             break;
+        case Predicate::Operator::BeginsWith:
+            query.and_query(column.begins_with(value, case_sensitive));
+            break;
+        case Predicate::Operator::EndsWith:
+            query.and_query(column.ends_with(value, case_sensitive));
+            break;
+        case Predicate::Operator::Contains:
+            query.and_query(column.contains(value, case_sensitive));
+            break;
+        case Predicate::Operator::Like:
+            query.and_query(column.like(value, case_sensitive));
+            break;
         default:
-            throw std::logic_error("Substring comparison not supported for keypath substrings.");
+            throw std::logic_error("Unsupported operator for keypath substring queries.");
     }
 }
 
