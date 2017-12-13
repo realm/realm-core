@@ -113,9 +113,9 @@ const Table* ConstObj::get_table() const
     return m_tree_top->get_owner();
 }
 
-bool ConstObj::is_valid()
+bool ConstObj::is_valid() const
 {
-    return get_table()->is_valid(m_key);
+    return m_key && get_table()->is_valid(m_key);
 }
 
 void ConstObj::remove()

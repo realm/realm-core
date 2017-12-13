@@ -294,43 +294,44 @@ TEST(Table_DateTimeMinMax)
     // then non-null first. For each case we then try both a substitution of best candidate, then non-substitution. 4
     // permutations in total.
 
-    Obj obj0 = table->create_object();
-    Obj obj1 = table->create_object();
-    Obj obj2 = table->create_object();
+    std::vector<Obj> objs(3);
+    objs[0] = table->create_object();
+    objs[1] = table->create_object();
+    objs[2] = table->create_object();
 
-    obj0.set_null(col);
-    obj1.set(col, Timestamp{0, 0});
-    obj2.set(col, Timestamp{2, 2});
+    objs[0].set_null(col);
+    objs[1].set(col, Timestamp{0, 0});
+    objs[2].set(col, Timestamp{2, 2});
 
     CHECK_EQUAL(table->maximum_timestamp(col), Timestamp(2, 2));
     CHECK_EQUAL(table->minimum_timestamp(col), Timestamp(0, 0));
 
-    obj0.set(col, Timestamp{0, 0});
-    obj1.set_null(col);
-    obj2.set(col, Timestamp{2, 2});
+    objs[0].set(col, Timestamp{0, 0});
+    objs[1].set_null(col);
+    objs[2].set(col, Timestamp{2, 2});
 
     Key idx; // tableview entry that points at the max/min value
 
     CHECK_EQUAL(table->maximum_timestamp(col, &idx), Timestamp(2, 2));
-    CHECK_EQUAL(idx, obj2.get_key());
+    CHECK_EQUAL(idx, objs[2].get_key());
     CHECK_EQUAL(table->minimum_timestamp(col, &idx), Timestamp(0, 0));
-    CHECK_EQUAL(idx, obj0.get_key());
+    CHECK_EQUAL(idx, objs[0].get_key());
 
-    obj0.set_null(col);
-    obj1.set(col, Timestamp{2, 2});
-    obj2.set(col, Timestamp{0, 0});
+    objs[0].set_null(col);
+    objs[1].set(col, Timestamp{2, 2});
+    objs[2].set(col, Timestamp{0, 0});
 
     CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
     CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
 
-    obj0.set(col, Timestamp{2, 2});
-    obj1.set_null(col);
-    obj2.set(col, Timestamp{0, 0});
+    objs[0].set(col, Timestamp{2, 2});
+    objs[1].set_null(col);
+    objs[2].set(col, Timestamp{0, 0});
 
     CHECK_EQUAL(table->maximum_timestamp(0, &idx), Timestamp(2, 2));
-    CHECK_EQUAL(idx, obj0.get_key());
+    CHECK_EQUAL(idx, objs[0].get_key());
     CHECK_EQUAL(table->minimum_timestamp(0, &idx), Timestamp(0, 0));
-    CHECK_EQUAL(idx, obj2.get_key());
+    CHECK_EQUAL(idx, objs[2].get_key());
 }
 
 
@@ -8562,6 +8563,9 @@ TEST(Table_ListOfPrimitives)
     for (unsigned i = 0; i < timestamp_list.size(); i++) {
         CHECK_EQUAL(timestamp_vector[i], timestamp_list.get(i));
     }
+
+    t->remove_object(Key(7));
+    CHECK_NOT(timestamp_list.is_valid());
 }
 
 TEST(Table_object_merge_nodes)

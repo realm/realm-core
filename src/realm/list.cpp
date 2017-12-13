@@ -27,7 +27,9 @@
 #include "realm/array_timestamp.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/table.hpp"
+#include "realm/table_view.hpp"
 #include "realm/group.hpp"
+#include "realm/replication.hpp"
 
 using namespace realm;
 
@@ -105,7 +107,7 @@ ConstObj ConstLinkListIf::get(size_t link_ndx) const
 
 Obj LinkList::get(size_t link_ndx)
 {
-    return m_obj.get_target_table(m_col_ndx)->get_object(List<Key>::get(link_ndx));
+    return get_target_table().get_object(List<Key>::get(link_ndx));
 }
 
 template <>
@@ -133,9 +135,9 @@ Key List<Key>::set(size_t ndx, Key target_key)
             auto table = const_cast<Table*>(m_obj.get_table());
             _impl::TableFriend::remove_recursive(*table, state); // Throws
         }
-    }
 
-    m_obj.bump_version();
+        m_obj.bump_version();
+    }
 
     return old_key;
 }
@@ -163,6 +165,7 @@ Key List<Key>::remove(size_t ndx)
 template <>
 void List<Key>::clear()
 {
+    update_if_needed();
     Table* origin_table = const_cast<Table*>(m_obj.get_table());
     const Spec& origin_table_spec = _impl::TableFriend::get_spec(*origin_table);
 
@@ -203,6 +206,106 @@ void List<Key>::clear()
     m_leaf->truncate_and_destroy_children(0);
 
     tf::remove_recursive(*origin_table, state); // Throws
+}
+
+TableView LinkList::get_sorted_view(SortDescriptor order) const
+{
+    TableView tv(get_target_table(), clone());
+    tv.do_sync();
+    tv.sort(std::move(order));
+    return tv;
+}
+
+TableView LinkList::get_sorted_view(size_t column_index, bool ascending) const
+{
+    TableView v = get_sorted_view(SortDescriptor(get_target_table(), {{column_index}}, {ascending}));
+    return v;
+}
+
+void LinkList::sort(SortDescriptor&& order)
+{
+    /*  TODO: implement
+    if (Replication* repl = m_obj.get_alloc().get_replication()) {
+        // todo, write to the replication log that we're doing a sort
+        repl->set_link_list(*this, *this->m_leaf); // Throws
+    }
+    */
+    DescriptorOrdering ordering;
+    ordering.append_sort(std::move(order));
+    update_if_needed();
+    do_sort(ordering);
+    m_obj.bump_version();
+}
+
+void LinkList::sort(size_t column_index, bool ascending)
+{
+    sort(SortDescriptor(get_target_table(), {{column_index}}, {ascending}));
+}
+
+void LinkList::remove_target_row(size_t link_ndx)
+{
+    // Deleting the object will automatically remove all links
+    // to it. So we do not have to manually remove the deleted link
+    get(link_ndx).remove();
+}
+
+void LinkList::remove_all_target_rows()
+{
+    if (is_valid()) {
+        auto table = const_cast<Table*>(get_table());
+        _impl::TableFriend::batch_erase_rows(*table, *this->m_leaf);
+    }
+}
+
+uint_fast64_t LinkList::sync_if_needed() const
+{
+    const_cast<LinkList*>(this)->update_if_needed();
+    return get_table()->get_version_counter();
+}
+
+bool LinkList::is_in_sync() const
+{
+    return const_cast<LinkList*>(this)->update_if_needed();
+}
+
+void LinkList::generate_patch(const LinkList* list, std::unique_ptr<LinkListHandoverPatch>& patch)
+{
+    if (list) {
+        if (list->is_valid()) {
+            patch.reset(new LinkListHandoverPatch);
+            Table::generate_patch(list->get_table(), patch->m_table);
+            patch->m_col_num = list->get_col_ndx();
+            patch->m_key_value = list->ConstListBase::get_key().value;
+        }
+        else {
+            // if the LinkView has become detached, indicate it by passing
+            // a handover patch with a nullptr in m_table.
+            patch.reset(new LinkListHandoverPatch);
+            patch->m_table = nullptr;
+        }
+    }
+    else
+        patch.reset();
+}
+
+
+LinkListPtr LinkList::create_from_and_consume_patch(std::unique_ptr<LinkListHandoverPatch>& patch, Group& group)
+{
+    if (patch) {
+        if (patch->m_table) {
+            TableRef tr = Table::create_from_and_consume_patch(patch->m_table, group);
+            auto result = tr->get_object(Key(patch->m_key_value)).get_linklist_ptr(patch->m_col_num);
+            patch.reset();
+            return result;
+        }
+        else {
+            // We end up here if we're handing over a detached LinkView.
+            // This is indicated by a patch with a null m_table.
+
+            // TODO: Should we be able to create a detached LinkView
+        }
+    }
+    return {};
 }
 
 #ifdef _WIN32

@@ -25,49 +25,6 @@
 
 using namespace realm;
 
-void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<HandoverPatch>& patch)
-{
-    if (bool(ref)) {
-        if (ref->is_attached()) {
-            patch.reset(new HandoverPatch);
-            Table::generate_patch(ref->m_origin_table.get(), patch->m_table);
-            patch->m_col_num = ref->m_origin_column->get_column_index();
-            patch->m_row_ndx = ref->get_origin_row_index();
-        }
-        else {
-            // if the LinkView has become detached, indicate it by passing
-            // a handover patch with a nullptr in m_table.
-            patch.reset(new HandoverPatch);
-            patch->m_table = nullptr;
-        }
-    }
-    else
-        patch.reset();
-}
-
-
-LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
-{
-    if (patch) {
-        if (patch->m_table) {
-            TableRef tr = Table::create_from_and_consume_patch(patch->m_table, group);
-            LinkViewRef result = tr->get_linklist(patch->m_col_num, patch->m_row_ndx);
-            patch.reset();
-            return result;
-        }
-        else {
-            // We end up here if we're handing over a detached LinkView.
-            // This is indicated by a patch with a null m_table.
-            LinkViewRef result = LinkView::create_detached();
-            patch.reset();
-            return result;
-        }
-    }
-    else
-        return LinkViewRef();
-}
-
-
 void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
 {
     do_insert(link_ndx, target_row_ndx);
@@ -226,64 +183,6 @@ void LinkView::do_clear(bool broken_reciprocal_backlinks)
 
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
-}
-
-
-void LinkView::sort(size_t column_index, bool ascending)
-{
-    sort(SortDescriptor(m_origin_column->get_target_table(), {{column_index}}, {ascending}));
-}
-
-
-void LinkView::sort(SortDescriptor&& order)
-{
-    if (Replication* repl = get_repl()) {
-        // todo, write to the replication log that we're doing a sort
-        repl->set_link_list(*this, m_row_indexes); // Throws
-    }
-    DescriptorOrdering ordering;
-    ordering.append_sort(std::move(order));
-    do_sort(ordering);
-}
-
-TableView LinkView::get_sorted_view(SortDescriptor order) const
-{
-    TableView tv(m_origin_column->get_target_table(), shared_from_this());
-    tv.do_sync();
-    tv.sort(std::move(order));
-    return tv;
-}
-
-TableView LinkView::get_sorted_view(size_t column_index, bool ascending) const
-{
-    TableView v = get_sorted_view(SortDescriptor(m_origin_column->get_target_table(), {{column_index}}, {ascending}));
-    return v;
-}
-
-
-void LinkView::remove_target_row(size_t link_ndx)
-{
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
-
-    size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
-    Table& target_table = get_target_table();
-
-    // Deleting the target row will automatically remove all links
-    // to it. So we do not have to manually remove the deleted link
-    target_table.move_last_over(target_row_ndx);
-}
-
-
-void LinkView::remove_all_target_rows()
-{
-    REALM_ASSERT(is_attached());
-
-    if (m_row_indexes.is_attached()) {
-        Table& target_table = get_target_table();
-        bool is_move_last_over = true;
-        target_table.batch_erase_rows(m_row_indexes, is_move_last_over);
-    }
 }
 
 

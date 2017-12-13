@@ -67,7 +67,7 @@ public:
     class Sorter {
     public:
         Sorter(std::vector<std::vector<ColumnId>> const& columns, std::vector<bool> const& ascending,
-               IntegerColumn const& row_indexes);
+               KeyColumn const& row_indexes);
         Sorter()
         {
         }
@@ -96,7 +96,7 @@ public:
         };
         std::vector<SortColumn> m_columns;
     };
-    virtual Sorter sorter(IntegerColumn const& row_indexes) const;
+    virtual Sorter sorter(KeyColumn const& row_indexes) const;
 
     // handover support
     std::vector<std::vector<size_t>> export_column_indices() const;
@@ -123,7 +123,7 @@ public:
 
     void merge_with(SortDescriptor&& other);
 
-    Sorter sorter(IntegerColumn const& row_indexes) const override;
+    Sorter sorter(KeyColumn const& row_indexes) const override;
 
     // handover support
     std::vector<bool> export_order() const override;

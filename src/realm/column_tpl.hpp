@@ -117,7 +117,7 @@ R aggregate(const ColType& column, T target, size_t start, size_t end, size_t li
     if (end == npos)
         end = column.size();
 
-    QueryState<R> state(action, nullptr, limit);
+    QueryState<R> state(action, limit);
     SequentialGetter<ColType> sg{&column};
 
     bool cont = true;

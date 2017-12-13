@@ -41,6 +41,7 @@
 #include <realm/column_string.hpp>
 #include <realm/index_string.hpp>
 #include <realm/array_integer.hpp>
+#include <realm/array_key.hpp>
 
 
 // Header format (8 bytes):
@@ -564,6 +565,11 @@ void Array::move_rotate(size_t from, size_t to, size_t num_elems)
 void Array::add_to_column(IntegerColumn* column, int64_t value)
 {
     column->add(value);
+}
+
+void Array::add_to_column(KeyColumn* column, int64_t value)
+{
+    column->add(Key(value));
 }
 
 void Array::set(size_t ndx, int64_t value)

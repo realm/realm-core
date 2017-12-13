@@ -1806,9 +1806,22 @@ void Table::merge_rows(size_t row_ndx, size_t new_row_ndx)
     do_merge_rows(row_ndx, new_row_ndx);
 }
 
-void Table::batch_erase_rows(const IntegerColumn&, bool)
+void Table::batch_erase_rows(const KeyColumn& keys)
 {
-    // FIXME: Implement using keys
+    REALM_ASSERT(is_attached());
+    size_t num_objs = keys.size();
+    std::vector<Key> vec;
+    vec.reserve(num_objs);
+    for (size_t i = 0; i < num_objs; ++i) {
+        Key key = keys.get(i);
+        if (key != null_key) {
+            vec.push_back(key);
+        }
+    }
+    sort(vec.begin(), vec.end());
+    vec.erase(unique(vec.begin(), vec.end()), vec.end());
+
+    std::for_each(vec.begin(), vec.end(), [this](Key k) { remove_object(k); });
 }
 
 
@@ -3662,10 +3675,10 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     }
 }
 
-TableView Table::get_backlink_view(size_t row_ndx, Table* src_table, size_t src_col_ndx)
+TableView Table::get_backlink_view(Key key, Table* src_table, size_t src_col_ndx)
 {
     REALM_ASSERT(&src_table->get_column_link_base(src_col_ndx).get_target_table() == this);
-    TableView tv(src_table, src_col_ndx, get(row_ndx));
+    TableView tv(src_table, src_col_ndx, get_object(key));
     tv.do_sync();
     return tv;
 }

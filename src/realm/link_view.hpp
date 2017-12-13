@@ -124,10 +124,6 @@ private:
     TableRef m_origin_table;
     LinkListColumn* m_origin_column;
 
-    using HandoverPatch = LinkViewHandoverPatch;
-    static void generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<HandoverPatch>& patch);
-    static LinkViewRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
-
     void detach();
     void set_origin_row_index(size_t row_ndx) noexcept;
 

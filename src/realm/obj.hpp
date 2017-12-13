@@ -26,29 +26,36 @@
 
 namespace realm {
 
+class ListBase;
+
 template <class>
 class ConstListIf;
 
 template <class>
 class ConstList;
-template <class T>
-using ConstListPtr = std::unique_ptr<ConstList<T>>;
 
 template <class>
 class List;
 template <class T>
 using ListPtr = std::unique_ptr<List<T>>;
+template <class T>
+using ConstListPtr = std::unique_ptr<const List<T>>;
 
 class LinkList;
 class ConstLinkList;
 using LinkListPtr = std::unique_ptr<LinkList>;
-using ConstLinkListPtr = std::unique_ptr<ConstLinkList>;
+using ConstLinkListPtr = std::unique_ptr<const LinkList>;
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class ConstObj {
 public:
+    ConstObj()
+        : m_tree_top(nullptr)
+        , m_row_ndx(size_t(-1))
+        , m_version(-1)
+    {
+    }
     ConstObj(const ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx);
-    ConstObj& operator=(const ConstObj&) = delete;
 
     Allocator& get_alloc() const;
 
@@ -62,7 +69,7 @@ public:
     const Table* get_table() const;
 
     // Check if the object is still alive
-    bool is_valid();
+    bool is_valid() const;
     // Delete object from table. Object is invalid afterwards.
     void remove();
 
@@ -112,6 +119,7 @@ protected:
     mutable MemRef m_mem;
     mutable size_t m_row_ndx;
     mutable uint64_t m_version;
+
     bool update_if_needed() const;
     void update(ConstObj other) const
     {
@@ -131,6 +139,10 @@ protected:
 
 class Obj : public ConstObj {
 public:
+    Obj()
+        : m_writeable(false)
+    {
+    }
     Obj(ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx);
 
     template <typename U>
@@ -160,11 +172,18 @@ private:
     friend class Cluster;
     friend class ConstListBase;
     friend class ArrayBacklink;
+    friend class ConstObj;
     template <class>
     friend class List;
+    friend class LinkList;
 
     mutable bool m_writeable;
 
+    Obj(const ConstObj& other)
+        : ConstObj(other)
+        , m_writeable(false)
+    {
+    }
     template <class Val>
     Obj& _set(size_t col_ndx, Val v);
     template <class Head, class... Tail>

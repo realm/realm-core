@@ -19,8 +19,7 @@
 #ifndef REALM_TABLE_VIEW_HPP
 #define REALM_TABLE_VIEW_HPP
 
-#include <realm/column.hpp>
-#include <realm/link_view.hpp>
+#include <realm/sort_descriptor.hpp>
 #include <realm/table.hpp>
 #include <realm/util/features.h>
 #include <realm/obj_list.hpp>
@@ -155,6 +154,10 @@ namespace realm {
 
 class TableViewBase : public ObjList {
 public:
+    ~TableViewBase()
+    {
+        m_key_values.destroy(); // Shallow
+    }
     // - not in use / implemented yet:   ... explicit calls to sync_if_needed() must be used
     //                                       to get 'reflective' mode.
     //    enum mode { mode_Reflective, mode_Imperative };
@@ -220,10 +223,6 @@ public:
     Timestamp minimum_timestamp(size_t column_ndx, Key* return_key = nullptr) const;
     Timestamp maximum_timestamp(size_t column_ndx, Key* return_key = nullptr) const;
     size_t count_timestamp(size_t column_ndx, Timestamp target) const;
-
-    // Simple pivot aggregate method. Experimental! Please do not
-    // document method publicly.
-    void aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const;
 
     /// Search this view for the specified key. If found, the index of that row
     /// within this view is returned, otherwise `realm::not_found` is returned.
@@ -296,13 +295,13 @@ protected:
 
     void do_sync();
 
-    // The link column that this view contain backlinks for.
-    const BacklinkColumn* m_linked_column = nullptr;
-    // The target row that rows in this view link to.
-    ConstRow m_linked_row;
+    // The source column index that this view contain backlinks for.
+    size_t m_source_column_ndx = npos;
+    // The target object that rows in this view link to.
+    ConstObj m_linked_obj;
 
-    // If this TableView was created from a LinkView, then this reference points to it. Otherwise it's 0
-    mutable ConstLinkViewRef m_linkview_source;
+    // If this TableView was created from a LinkList, then this reference points to it. Otherwise it's 0
+    mutable ConstLinkListPtr m_linklist_source;
 
     // m_distinct_column_source != npos if this view was created from distinct values in a column of m_table.
     size_t m_distinct_column_source = npos;
@@ -323,13 +322,18 @@ protected:
 
     size_t m_num_detached_refs = 0;
     /// Construct null view (no memory allocated).
-    TableViewBase() = default;
+    TableViewBase()
+        : ObjList(m_table_view_key_values)
+        , m_table_view_key_values(Allocator::get_default())
+    {
+    }
+
 
     /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent);
     TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
-    TableViewBase(Table* parent, size_t column, BasicRowExpr<const Table> row);
-    TableViewBase(Table* parent, ConstLinkViewRef link_view);
+    TableViewBase(Table* parent, size_t column, const ConstObj& obj);
+    TableViewBase(Table* parent, ConstLinkListPtr link_list);
 
     enum DistinctViewTag { DistinctView };
     TableViewBase(DistinctViewTag, Table* parent, size_t column_ndx);
@@ -377,6 +381,7 @@ protected:
     TableViewBase(TableViewBase& source, HandoverPatch& patch, MutableSourcePayload mode);
 
 private:
+    KeyColumn m_table_view_key_values; // We should generally not use this name
     void detach() const noexcept; // may have to remove const
     size_t find_first_integer(size_t column_ndx, int64_t value) const;
     template <class oper>
@@ -433,24 +438,13 @@ public:
     /// underlying table.
     ///
     /// When rows are removed from the underlying table, they will by necessity
-    /// also be removed from the table view.
+    /// also be removed from the table view. The order of the remaining rows in
+    /// the the table view will be maintained.
     ///
-    /// The order of the remaining rows in the the table view will be maintained
-    /// regardless of the value passed for \a underlying_mode.
-    ///
-    /// \param row_ndx The index within this table view of the row to be
-    /// removed.
-    ///
-    /// \param underlying_mode If set to RemoveMode::ordered (the default), the
-    /// rows will be removed from the underlying table in a way that maintains
-    /// the order of the remaining rows in the underlying table. If set to
-    /// RemoveMode::unordered, the order of the remaining rows in the underlying
-    /// table will not in general be maintaind, but the operation will generally
-    /// be much faster. In any case, the order of remaining rows in the table
-    /// view will not be affected.
-    void remove(size_t row_ndx, RemoveMode underlying_mode = RemoveMode::ordered);
-    void remove_last(RemoveMode underlying_mode = RemoveMode::ordered);
-    void clear(RemoveMode underlying_mode = RemoveMode::ordered);
+    /// \param row_ndx The index within this table view of the row to be removed.
+    void remove(size_t row_ndx);
+    void remove_last();
+    void clear();
     //@}
 
     // Searching (Int and String)
@@ -496,7 +490,7 @@ public:
 private:
     TableView(Table& parent);
     TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
-    TableView(Table& parent, ConstLinkViewRef);
+    TableView(Table& parent, ConstLinkListPtr);
 
     TableView(DistinctViewTag, Table& parent, size_t column_ndx);
 
@@ -508,6 +502,7 @@ private:
     friend class Query;
     friend class TableViewBase;
     friend class LinkView;
+    friend class LinkList;
 };
 
 
@@ -588,7 +583,7 @@ inline const Query& TableViewBase::get_query() const noexcept
 
 inline bool TableViewBase::is_empty() const noexcept
 {
-    return m_key_values.is_empty();
+    return m_key_values.size() == 0;
 }
 
 inline bool TableViewBase::is_attached() const noexcept
@@ -598,7 +593,7 @@ inline bool TableViewBase::is_attached() const noexcept
 
 inline bool TableViewBase::is_row_attached(size_t row_ndx) const noexcept
 {
-    return m_key_values.get(row_ndx) != detached_ref;
+    return m_table->is_valid(Key(m_key_values.get(row_ndx)));
 }
 
 inline size_t TableViewBase::num_attached_rows() const noexcept
@@ -608,55 +603,65 @@ inline size_t TableViewBase::num_attached_rows() const noexcept
 
 inline size_t TableViewBase::find_by_source_ndx(Key key) const noexcept
 {
-    return m_key_values.find_first(key.value);
+    return m_key_values.find_first(key, 0, m_key_values.size());
 }
 
 
 inline TableViewBase::TableViewBase(Table* parent)
-    : ObjList(parent) // Throws
+    : ObjList(m_table_view_key_values, parent) // Throws
     , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+    , m_table_view_key_values(Allocator::get_default())
 {
+    m_table_view_key_values.create();
 }
 
 inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit)
-    : ObjList(parent)
+    : ObjList(m_table_view_key_values, parent)
     , m_query(query)
     , m_start(start)
     , m_end(end)
     , m_limit(limit)
     , m_last_seen_version(outside_version())
+    , m_table_view_key_values(Allocator::get_default())
 {
+    m_table_view_key_values.create();
 }
 
-inline TableViewBase::TableViewBase(Table* parent, size_t column, BasicRowExpr<const Table> row)
-    : ObjList(parent) // Throws
-    , m_linked_column(&parent->get_column_link_base(column).get_backlink_column())
-    , m_linked_row(row)
+inline TableViewBase::TableViewBase(Table* src_table, size_t src_col_ndx, const ConstObj& obj)
+    : ObjList(m_table_view_key_values, src_table) // Throws
+    , m_source_column_ndx(src_col_ndx)
+    , m_linked_obj(obj)
     , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+    , m_table_view_key_values(Allocator::get_default())
 {
+    m_table_view_key_values.create();
 }
 
 inline TableViewBase::TableViewBase(DistinctViewTag, Table* parent, size_t column_ndx)
-    : ObjList(parent) // Throws
+    : ObjList(m_table_view_key_values, parent) // Throws
     , m_distinct_column_source(column_ndx)
     , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+    , m_table_view_key_values(Allocator::get_default())
 {
     REALM_ASSERT(m_distinct_column_source != npos);
+    m_table_view_key_values.create();
 }
 
-inline TableViewBase::TableViewBase(Table* parent, ConstLinkViewRef link_view)
-    : ObjList(parent) // Throws
-    , m_linkview_source(std::move(link_view))
+inline TableViewBase::TableViewBase(Table* parent, ConstLinkListPtr link_list)
+    : ObjList(m_table_view_key_values, parent) // Throws
+    , m_linklist_source(std::move(link_list))
     , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+    , m_table_view_key_values(Allocator::get_default())
 {
-    REALM_ASSERT(m_linkview_source);
+    REALM_ASSERT(m_linklist_source);
+    m_table_view_key_values.create();
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv)
-    : ObjList(tv)
-    , m_linked_column(tv.m_linked_column)
-    , m_linked_row(tv.m_linked_row)
-    , m_linkview_source(tv.m_linkview_source)
+    : ObjList(m_table_view_key_values, tv.m_table.get())
+    , m_source_column_ndx(tv.m_source_column_ndx)
+    , m_linked_obj(tv.m_linked_obj)
+    , m_linklist_source(tv.m_linklist_source->clone())
     , m_distinct_column_source(tv.m_distinct_column_source)
     , m_descriptor_ordering(std::move(tv.m_descriptor_ordering))
     , m_query(tv.m_query)
@@ -665,14 +670,15 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv)
     , m_limit(tv.m_limit)
     , m_last_seen_version(tv.m_last_seen_version)
     , m_num_detached_refs(tv.m_num_detached_refs)
+    , m_table_view_key_values(tv.m_table_view_key_values)
 {
 }
 
 inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
-    : ObjList(std::move(tv))
-    , m_linked_column(tv.m_linked_column)
-    , m_linked_row(tv.m_linked_row)
-    , m_linkview_source(std::move(tv.m_linkview_source))
+    : ObjList(m_table_view_key_values, tv.m_table.get())
+    , m_source_column_ndx(tv.m_source_column_ndx)
+    , m_linked_obj(tv.m_linked_obj)
+    , m_linklist_source(std::move(tv.m_linklist_source))
     , m_distinct_column_source(tv.m_distinct_column_source)
     , m_descriptor_ordering(std::move(tv.m_descriptor_ordering))
     , m_query(std::move(tv.m_query))
@@ -684,6 +690,7 @@ inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
     // version number so that we can later trigger a sync if needed.
     m_last_seen_version(tv.m_last_seen_version)
     , m_num_detached_refs(tv.m_num_detached_refs)
+    , m_table_view_key_values(std::move(tv.m_table_view_key_values))
 {
 }
 
@@ -691,16 +698,16 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
 {
     m_table = std::move(tv.m_table);
 
-    m_key_values.move_assign(tv.m_key_values);
+    m_key_values = std::move(tv.m_key_values);
     m_query = std::move(tv.m_query);
     m_num_detached_refs = tv.m_num_detached_refs;
     m_last_seen_version = tv.m_last_seen_version;
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
-    m_linked_column = tv.m_linked_column;
-    m_linked_row = tv.m_linked_row;
-    m_linkview_source = std::move(tv.m_linkview_source);
+    m_source_column_ndx = tv.m_source_column_ndx;
+    m_linked_obj = tv.m_linked_obj;
+    m_linklist_source = std::move(tv.m_linklist_source);
     m_descriptor_ordering = std::move(tv.m_descriptor_ordering);
     m_distinct_column_source = tv.m_distinct_column_source;
 
@@ -712,12 +719,7 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     if (this == &tv)
         return *this;
 
-    Allocator& alloc = m_key_values.get_alloc();
-    MemRef mem = tv.m_key_values.get_root_array()->clone_deep(alloc); // Throws
-    _impl::DeepArrayRefDestroyGuard ref_guard(mem.get_ref(), alloc);
-    m_key_values.destroy();
-    m_key_values.get_root_array()->init_from_mem(mem);
-    ref_guard.release();
+    m_key_values = tv.m_key_values;
 
     m_query = tv.m_query;
     m_num_detached_refs = tv.m_num_detached_refs;
@@ -725,9 +727,9 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
-    m_linked_column = tv.m_linked_column;
-    m_linked_row = tv.m_linked_row;
-    m_linkview_source = tv.m_linkview_source;
+    m_source_column_ndx = tv.m_source_column_ndx;
+    m_linked_obj = tv.m_linked_obj;
+    m_linklist_source = tv.m_linklist_source ? tv.m_linklist_source->clone() : LinkListPtr{};
     m_descriptor_ordering = tv.m_descriptor_ordering;
     m_distinct_column_source = tv.m_distinct_column_source;
 
@@ -907,10 +909,10 @@ inline ConstTableView::ConstTableView(TableView&& tv)
 {
 }
 
-inline void TableView::remove_last(RemoveMode underlying_mode)
+inline void TableView::remove_last()
 {
     if (!is_empty())
-        remove(size() - 1, underlying_mode);
+        remove(size() - 1);
 }
 
 inline Table& TableView::get_parent() noexcept
@@ -938,8 +940,8 @@ inline TableView::TableView(Table& parent, Query& query, size_t start, size_t en
 {
 }
 
-inline TableView::TableView(Table& parent, ConstLinkViewRef link_view)
-: TableViewBase(&parent, std::move(link_view))
+inline TableView::TableView(Table& parent, ConstLinkListPtr link_list)
+    : TableViewBase(&parent, std::move(link_list))
 {
 }
 

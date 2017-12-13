@@ -20,9 +20,15 @@
 #define REALM_LIST_HPP
 
 #include <realm/obj.hpp>
+#include <realm/obj_list.hpp>
 #include <realm/array_key.hpp>
 
 namespace realm {
+
+class TableView;
+class SortDescriptor;
+class Group;
+struct LinkListHandoverPatch;
 
 // To be used in query for size. Adds nullability to size so that
 // it can be put in a NullableVector
@@ -68,6 +74,22 @@ public:
      */
     virtual size_t size() const = 0;
     virtual bool is_null() const = 0;
+    Key get_key() const
+    {
+        return m_const_obj->get_key();
+    }
+    bool is_valid() const
+    {
+        return m_const_obj->is_valid();
+    }
+    const Table* get_table() const
+    {
+        return m_const_obj->get_table();
+    }
+    size_t get_col_ndx() const
+    {
+        return m_col_ndx;
+    }
 
 protected:
     template <class>
@@ -420,11 +442,13 @@ public:
 
 protected:
     Obj m_obj;
-    void update_if_needed()
+    bool update_if_needed()
     {
         if (m_obj.update_if_needed()) {
             m_leaf->init_from_parent();
+            return true;
         }
+        return false;
     }
     void ensure_writeable()
     {
@@ -489,11 +513,26 @@ private:
     ConstObj m_obj;
 };
 
-class LinkList : public List<Key> {
+class LinkList : public List<Key>, public ObjList {
 public:
-    LinkList(Obj& owner, size_t col_ndx)
+    using HandoverPatch = LinkListHandoverPatch;
+
+    LinkList(const Obj& owner, size_t col_ndx)
         : List<Key>(owner, col_ndx)
+        , ObjList(*this->m_leaf, &get_target_table())
     {
+    }
+    LinkListPtr clone() const
+    {
+        return std::make_unique<LinkList>(m_obj, m_col_ndx);
+    }
+    Table& get_target_table() const
+    {
+        return *m_obj.get_target_table(m_col_ndx);
+    }
+    size_t size() const override
+    {
+        return List<Key>::size();
     }
     // Getting links
     Obj operator[](size_t link_ndx)
@@ -501,6 +540,24 @@ public:
         return get(link_ndx);
     }
     Obj get(size_t link_ndx);
+
+    TableView get_sorted_view(SortDescriptor order) const;
+    TableView get_sorted_view(size_t column_index, bool ascending = true) const;
+    void sort(SortDescriptor&& order);
+    void sort(size_t column, bool ascending = true);
+    void remove_target_row(size_t link_ndx);
+    void remove_all_target_rows();
+
+private:
+    friend class SharedGroup;
+    friend class TableViewBase;
+    friend class Query;
+
+    uint_fast64_t sync_if_needed() const override;
+    bool is_in_sync() const override;
+
+    static void generate_patch(const LinkList* ref, std::unique_ptr<LinkListHandoverPatch>& patch);
+    static LinkListPtr create_from_and_consume_patch(std::unique_ptr<LinkListHandoverPatch>& patch, Group& group);
 };
 
 template <typename U>
@@ -512,7 +569,8 @@ ConstList<U> ConstObj::get_list(size_t col_ndx) const
 template <typename U>
 ConstListPtr<U> ConstObj::get_list_ptr(size_t col_ndx) const
 {
-    return std::make_unique<ConstList<U>>(*this, col_ndx);
+    Obj obj(*this);
+    return std::const_pointer_cast<const List<U>>(obj.get_list_ptr<U>(col_ndx));
 }
 
 template <typename U>
@@ -527,6 +585,12 @@ ListPtr<U> Obj::get_list_ptr(size_t col_ndx)
     return std::make_unique<List<U>>(*this, col_ndx);
 }
 
+template <>
+inline ListPtr<Key> Obj::get_list_ptr(size_t col_ndx)
+{
+    return get_linklist_ptr(col_ndx);
+}
+
 inline ConstLinkList ConstObj::get_linklist(size_t col_ndx)
 {
     return ConstLinkList(*this, col_ndx);
@@ -534,7 +598,8 @@ inline ConstLinkList ConstObj::get_linklist(size_t col_ndx)
 
 inline ConstLinkListPtr ConstObj::get_linklist_ptr(size_t col_ndx)
 {
-    return std::make_unique<ConstLinkList>(*this, col_ndx);
+    Obj obj(*this);
+    return obj.get_linklist_ptr(col_ndx);
 }
 
 inline LinkList Obj::get_linklist(size_t col_ndx)

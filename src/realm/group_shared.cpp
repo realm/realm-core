@@ -2343,28 +2343,27 @@ void SharedGroup::reserve(size_t size)
 }
 
 
-std::unique_ptr<SharedGroup::Handover<LinkView>>
-SharedGroup::export_linkview_for_handover(const LinkViewRef& accessor)
+std::unique_ptr<SharedGroup::Handover<LinkList>>
+SharedGroup::export_linkview_for_handover(const LinkListPtr& accessor)
 {
     if (m_transact_stage != transact_Reading) {
         throw LogicError(LogicError::wrong_transact_state);
     }
-    std::unique_ptr<Handover<LinkView>> result(new Handover<LinkView>());
-    LinkView::generate_patch(accessor, result->patch);
+    std::unique_ptr<Handover<LinkList>> result(new Handover<LinkList>());
+    LinkList::generate_patch(accessor.get(), result->patch);
     result->clone = 0; // not used for LinkView - maybe specialize Handover<LinkView> ?
     result->version = get_version_of_current_transaction();
     return result;
 }
 
 
-LinkViewRef SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<LinkView>> handover)
+LinkListPtr SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<LinkList>> handover)
 {
     if (handover->version != get_version_of_current_transaction()) {
         throw BadVersion();
     }
     // move data
-    LinkViewRef result = LinkView::create_from_and_consume_patch(handover->patch, m_group);
-    return result;
+    return LinkList::create_from_and_consume_patch(handover->patch, m_group);
 }
 
 

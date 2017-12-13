@@ -50,16 +50,29 @@ Query::Query(Table& table, TableViewBase* tv)
     create();
 }
 
-Query::Query(const Table& table, const LinkViewRef& lv)
+Query::Query(const Table& table, const LinkListPtr& list)
     : m_table((const_cast<Table&>(table)).get_table_ref())
-//    , m_view(lv.get())        TODO
-//    , m_source_link_view(lv)  TODO
+    , m_source_link_list(list->clone())
 {
+    m_view = m_source_link_list.get();
 #ifdef REALM_DEBUG
     if (m_view)
         m_view->check_cookie();
 #endif
-    REALM_ASSERT_DEBUG(&lv->get_target_table() == m_table);
+    REALM_ASSERT_DEBUG(&list->get_target_table() == m_table);
+    create();
+}
+
+Query::Query(const Table& table, LinkListPtr&& ll)
+    : m_table((const_cast<Table&>(table)).get_table_ref())
+    , m_source_link_list(std::move(ll))
+{
+    m_view = m_source_link_list.get();
+#ifdef REALM_DEBUG
+    if (m_view)
+        m_view->check_cookie();
+#endif
+    REALM_ASSERT_DEBUG(&ll->get_target_table() == m_table);
     create();
 }
 
@@ -101,15 +114,18 @@ Query::Query(const Query& source)
     if (source.m_owned_source_table_view) {
         m_owned_source_table_view = source.m_owned_source_table_view->clone();
         m_source_table_view = m_owned_source_table_view.get();
-        m_view = m_source_table_view;
     }
     else {
         // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
         // turn `m_source_table_view` into a dangling reference.
         m_source_table_view = source.m_source_table_view;
-
-        m_source_link_view = source.m_source_link_view;
-        m_view = source.m_view;
+        m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone() : LinkListPtr{};
+    }
+    if (m_source_table_view) {
+        m_view = m_source_table_view;
+    }
+    else {
+        m_view = m_source_link_list.get();
     }
 }
 
@@ -122,9 +138,8 @@ Query& Query::operator=(const Query& source)
         if (source.m_owned_source_table_view) {
             m_owned_source_table_view = source.m_owned_source_table_view->clone();
             m_source_table_view = m_owned_source_table_view.get();
-            m_view = m_source_table_view;
 
-            m_source_link_view.reset();
+            m_source_link_list = nullptr;
         }
         else {
             // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
@@ -132,8 +147,13 @@ Query& Query::operator=(const Query& source)
             m_source_table_view = source.m_source_table_view;
             m_owned_source_table_view = nullptr;
 
-            m_source_link_view = source.m_source_link_view;
-            m_view = source.m_view;
+            m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone() : LinkListPtr{};
+        }
+        if (m_source_table_view) {
+            m_view = m_source_table_view;
+        }
+        else {
+            m_view = m_source_link_list.get();
         }
     }
     return *this;
@@ -145,8 +165,6 @@ Query& Query::operator=(Query&&) = default;
 Query::~Query() noexcept = default;
 
 Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
-    : m_table(TableRef())
-    , m_source_link_view(LinkViewRef())
 {
     Table::generate_patch(source.m_table.get(), patch.m_table);
     if (source.m_source_table_view) {
@@ -156,7 +174,7 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
     else {
         patch.table_view_data = nullptr;
     }
-    LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
+    LinkList::generate_patch(source.m_source_link_list.get(), patch.link_list_data);
 
     m_groups.reserve(source.m_groups.size());
     for (const auto& cur_group : source.m_groups) {
@@ -165,8 +183,6 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
 }
 
 Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
-    : m_table(TableRef())
-    , m_source_link_view(LinkViewRef())
 {
     Table::generate_patch(source.m_table.get(), patch.m_table);
     if (source.m_source_table_view) {
@@ -176,7 +192,7 @@ Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
     else {
         patch.table_view_data = nullptr;
     }
-    LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
+    LinkList::generate_patch(source.m_source_link_list.get(), patch.link_list_data);
 
     m_groups.reserve(source.m_groups.size());
     for (const auto& cur_group : source.m_groups) {
@@ -213,9 +229,9 @@ void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
     if (m_source_table_view) {
         m_source_table_view->apply_and_consume_patch(patch.table_view_data, dest_group);
     }
-    m_source_link_view = LinkView::create_from_and_consume_patch(patch.link_view_data, dest_group);
-    if (m_source_link_view) {
-        // m_view = m_source_link_view.get();   TODO
+    m_source_link_list = LinkList::create_from_and_consume_patch(patch.link_list_data, dest_group);
+    if (m_source_link_list) {
+        m_view = m_source_link_list.get();
     }
     else if (m_source_table_view)
         m_view = m_source_table_view;
@@ -1261,15 +1277,15 @@ void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit)
         for (size_t t = 0; t < m_view->size() && ret.size() < limit; t++) {
             ConstObj obj = m_view->get(t);
             if (t >= begin && t < end && eval_object(obj)) {
-                ret.m_key_values.add(obj.get_key().value);
+                ret.m_key_values.add(obj.get_key());
             }
         }
     }
     else {
         if (!has_conditions()) {
-            IntegerColumn& refs = ret.m_key_values;
+            KeyColumn& refs = ret.m_key_values;
             for (auto o : *m_table) {
-                refs.add(o.get_key().value);
+                refs.add(o.get_key());
             }
         }
         else {
@@ -1590,9 +1606,9 @@ Query& Query::and_query(Query&& q)
     if (q.root_node()) {
         add_node(std::move(q.m_groups[0].m_root_node));
 
-        if (q.m_source_link_view) {
-            REALM_ASSERT(!m_source_link_view || m_source_link_view == q.m_source_link_view);
-            m_source_link_view = q.m_source_link_view;
+        if (q.m_source_link_list) {
+            REALM_ASSERT(!m_source_link_list || m_source_link_list == q.m_source_link_list);
+            m_source_link_list = std::move(q.m_source_link_list);
         }
     }
 

@@ -17,29 +17,25 @@
  **************************************************************************/
 
 #include <realm/table_view.hpp>
-
-#include <realm/column.hpp>
-#include <realm/column_timestamp.hpp>
-#include <realm/column_tpl.hpp>
-#include <realm/impl/sequential_getter.hpp>
-
 #include <unordered_set>
 
 using namespace realm;
 
 TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSourcePayload mode)
-    : m_linked_column(src.m_linked_column)
+    : ObjList(m_table_view_key_values)
+    , m_source_column_ndx(src.m_source_column_ndx)
+    , m_table_view_key_values(Allocator::get_default())
 {
-    REALM_ASSERT(&src.m_key_values.get_alloc() == &Allocator::get_default());
-
     // move the data payload, but make sure to leave the source array intact or
     // attempts to reuse it for a query rerun will crash (or assert, if lucky)
     // There really *has* to be a way where we don't need to first create an empty
     // array, and then destroy it
     if (src.m_key_values.is_attached()) {
-        m_key_values.detach();
-        m_key_values.init_from_mem(Allocator::get_default(), src.m_key_values.get_mem());
-        src.m_key_values.init_from_ref(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()));
+        m_key_values = std::move(src.m_key_values); // Will leave src.m_key_values detached
+        src.m_key_values.create();
+    }
+    else {
+        m_key_values.create();
     }
 
     patch.was_in_sync = src.is_in_sync();
@@ -48,12 +44,14 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSo
     m_query = Query(src.m_query, patch.query_patch, mode);
 
     Table::generate_patch(src.m_table.get(), patch.m_table);
-    LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
+    LinkList::generate_patch(src.m_linklist_source.get(), patch.linklist_patch);
     DescriptorOrdering::generate_patch(src.m_descriptor_ordering, patch.descriptors_patch);
 
-    if (src.m_linked_column) {
-        ConstRow::generate_patch(src.m_linked_row, patch.linked_row);
-        patch.linked_col = src.m_linked_column->get_origin_column_index();
+    if (src.m_source_column_ndx != npos) {
+        patch.linked_obj.reset(new ObjectHandoverPatch);
+        Table::generate_patch(src.m_linked_obj.get_table(), patch.m_table);
+        patch.linked_obj->key_value = src.m_linked_obj.get_key().value;
+        patch.linked_col = src.m_source_column_ndx;
     }
 
     src.m_last_seen_version = util::none; // bring source out-of-sync, now that it has lost its data
@@ -64,14 +62,16 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSo
 }
 
 TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch, ConstSourcePayload mode)
-    : m_linked_column(src.m_linked_column)
+    : ObjList(m_table_view_key_values)
+    , m_source_column_ndx(src.m_source_column_ndx)
     , m_query(src.m_query, patch.query_patch, mode)
+    , m_table_view_key_values(Allocator::get_default())
 {
-    REALM_ASSERT(&src.m_key_values.get_alloc() == &Allocator::get_default());
-
     if (mode == ConstSourcePayload::Copy && src.m_key_values.is_attached()) {
-        MemRef mem = src.m_key_values.clone_deep(Allocator::get_default());
-        m_key_values.init_from_mem(Allocator::get_default(), mem);
+        m_key_values = src.m_key_values;
+    }
+    else {
+        m_key_values.create();
     }
 
     if (mode == ConstSourcePayload::Stay)
@@ -79,11 +79,13 @@ TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch, Con
     else
         patch.was_in_sync = src.is_in_sync();
     Table::generate_patch(src.m_table.get(), patch.m_table);
-    if (src.m_linked_column) {
-        ConstRow::generate_patch(src.m_linked_row, patch.linked_row);
-        patch.linked_col = src.m_linked_column->get_origin_column_index();
+    if (src.m_source_column_ndx != npos) {
+        patch.linked_obj.reset(new ObjectHandoverPatch);
+        Table::generate_patch(src.m_linked_obj.get_table(), patch.m_table);
+        patch.linked_obj->key_value = src.m_linked_obj.get_key().value;
+        patch.linked_col = src.m_source_column_ndx;
     }
-    LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
+    LinkList::generate_patch(src.m_linklist_source.get(), patch.linklist_patch);
     DescriptorOrdering::generate_patch(src.m_descriptor_ordering, patch.descriptors_patch);
 
     m_last_seen_version = 0;
@@ -96,12 +98,13 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
 {
     m_table = Table::create_from_and_consume_patch(patch.m_table, group);
     m_query.apply_patch(patch.query_patch, group);
-    m_linkview_source = LinkView::create_from_and_consume_patch(patch.linkview_patch, group);
+    m_linklist_source = LinkList::create_from_and_consume_patch(patch.linklist_patch, group);
     m_descriptor_ordering = DescriptorOrdering::create_from_and_consume_patch(patch.descriptors_patch, *m_table);
 
-    if (patch.linked_row) {
-        m_linked_column = &m_table->get_column_link_base(patch.linked_col).get_backlink_column();
-        m_linked_row.apply_and_consume_patch(patch.linked_row, group);
+    if (patch.linked_obj) {
+        TableRef table = Table::create_from_and_consume_patch(patch.m_table, group);
+        m_linked_obj = table->get_object(Key(patch.linked_obj->key_value));
+        m_source_column_ndx = patch.linked_col;
     }
 
     if (patch.was_in_sync)
@@ -126,7 +129,7 @@ size_t TableViewBase::find_first(size_t column_ndx, T value) const
         }
     }
 
-    return size_t(-1);
+    return npos;
 }
 
 template size_t TableViewBase::find_first(size_t, int64_t) const;
@@ -413,29 +416,22 @@ size_t TableViewBase::count_double(size_t column_ndx, double target) const
 
 size_t TableViewBase::count_timestamp(size_t column_ndx, Timestamp target) const
 {
-    TimestampColumn& column = m_table->get_column_timestamp(column_ndx);
     size_t count = 0;
     for (size_t t = 0; t < size(); t++) {
-        int64_t signed_row_ndx = m_key_values.get(t);
-
-        // skip detached references:
-        if (signed_row_ndx == detached_ref)
-            continue;
-
-        auto ts = column.get(static_cast<size_t>(signed_row_ndx));
-
-        realm::Equal e;
-        if (e(ts, target, ts.is_null(), target.is_null())) {
-            count++;
+        try {
+            Key key = m_key_values.get(t);
+            Obj obj = m_table->get_object(key);
+            auto ts = obj.get<Timestamp>(column_ndx);
+            realm::Equal e;
+            if (e(ts, target, ts.is_null(), target.is_null())) {
+                count++;
+            }
+        }
+        catch (const InvalidKey&) {
+            // Just skip objects that might have been deleted
         }
     }
     return count;
-}
-
-// Simple pivot aggregate method. Experimental! Please do not document method publicly.
-void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const
-{
-    m_table->aggregate(group_by_column, aggr_column, op, result, &m_key_values);
 }
 
 void TableViewBase::to_json(std::ostream& out) const
@@ -522,22 +518,22 @@ uint64_t TableViewBase::outside_version() const
     // its version number. Return the biggest possible value to trigger a refresh later.
     const uint64_t max = std::numeric_limits<uint64_t>::max();
 
-    if (m_linkview_source) {
+    if (m_linklist_source) {
         // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
-        return m_linkview_source->is_attached() ? m_linkview_source->get_origin_table().m_version : max;
+        return m_linklist_source->is_valid() ? m_linklist_source->get_table()->m_version : max;
     }
 
-    if (m_linked_column) {
+    if (m_source_column_ndx != size_t(-1)) {
         // m_linked_column is set when this TableView was created by Table::get_backlink_view().
-        return m_linked_row ? m_linked_row.get_table()->m_version : max;
+        return m_linked_obj.is_valid() ? m_linked_obj.get_table()->m_version : max;
     }
 
     if (m_query.m_table) {
         // m_query.m_table is set when this TableView was created by a query.
 
-        if (auto* view = dynamic_cast<LinkView*>(m_query.m_view)) {
+        if (auto* view = dynamic_cast<LinkList*>(m_query.m_view)) {
             // This TableView depends on Query that is restricted by a LinkView (with where(&link_view))
-            return view->is_attached() ? view->get_origin_table().m_version : max;
+            return view->is_valid() ? view->get_table()->m_version : max;
         }
 
         if (auto* view = dynamic_cast<TableView*>(m_query.m_view)) {
@@ -571,22 +567,21 @@ uint_fast64_t TableViewBase::sync_if_needed() const
 }
 
 
-void TableView::remove(size_t row_ndx, RemoveMode underlying_mode)
+void TableView::remove(size_t row_ndx)
 {
     REALM_ASSERT(m_table);
     REALM_ASSERT(row_ndx < m_key_values.size());
 
     bool sync_to_keep = m_last_seen_version == outside_version();
 
-    size_t origin_row_ndx = size_t(m_key_values.get(row_ndx));
+    Key key = m_key_values.get(row_ndx);
 
     // Update refs
     m_key_values.erase(row_ndx);
 
     // Delete row in origin table
     using tf = _impl::TableFriend;
-    bool is_move_last_over = (underlying_mode == RemoveMode::unordered);
-    tf::erase_row(*m_table, origin_row_ndx, is_move_last_over); // Throws
+    tf::erase_row(*m_table, key); // Throws
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
@@ -599,18 +594,13 @@ void TableView::remove(size_t row_ndx, RemoveMode underlying_mode)
 }
 
 
-void TableView::clear(RemoveMode underlying_mode)
+void TableView::clear()
 {
     REALM_ASSERT(m_table);
 
     bool sync_to_keep = m_last_seen_version == outside_version();
 
-    // Temporarily unregister this view so that it's not pointlessly updated
-    // for the row removals
-    using tf = _impl::TableFriend;
-
-    bool is_move_last_over = (underlying_mode == RemoveMode::unordered);
-    tf::batch_erase_rows(*m_table, m_key_values, is_move_last_over); // Throws
+    _impl::TableFriend::batch_erase_rows(*m_table, m_key_values); // Throws
 
     m_key_values.clear();
     m_num_detached_refs = 0;
@@ -663,24 +653,28 @@ void TableViewBase::do_sync()
     // - Table::get_backlink_view()
     // Here we sync with the respective source.
 
-    if (m_linkview_source) {
+    if (m_linklist_source) {
         m_key_values.clear();
-        for (size_t t = 0; t < m_linkview_source->size(); t++)
-            m_key_values.add(m_linkview_source->get(t).get_index());
+        std::for_each(m_linklist_source->begin(), m_linklist_source->end(),
+                      [this](Key key) { m_key_values.add(key); });
     }
     else if (m_distinct_column_source != npos) {
         m_key_values.clear();
         REALM_ASSERT(m_table->has_search_index(m_distinct_column_source));
-        const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
-        col.get_search_index()->distinct(m_key_values);
+        // const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
+        // col.get_search_index()->distinct(m_key_values);  TODO: enable when searchindex is supported
     }
-    else if (m_linked_column) {
+    else if (m_source_column_ndx != npos) {
         m_key_values.clear();
-        if (m_linked_row.is_attached()) {
-            size_t linked_row_ndx = m_linked_row.get_index();
-            size_t backlink_count = m_linked_column->get_backlink_count(linked_row_ndx);
+        if (m_linked_obj.is_valid()) {
+            TableKey origin_table_key = m_table->get_key();
+            const Table* target_table = m_linked_obj.get_table();
+            const Spec& spec = _impl::TableFriend::get_spec(*target_table);
+            size_t backlink_col_ndx = spec.find_backlink_column(origin_table_key, m_source_column_ndx);
+
+            size_t backlink_count = m_linked_obj.get_backlink_count(backlink_col_ndx);
             for (size_t i = 0; i < backlink_count; i++)
-                m_key_values.add(m_linked_column->get_backlink(linked_row_ndx, i));
+                m_key_values.add(m_linked_obj.get_backlink(backlink_col_ndx, i));
         }
     }
     else {
@@ -690,9 +684,8 @@ void TableViewBase::do_sync()
         if (m_key_values.is_attached())
             m_key_values.clear();
         else
-            m_key_values.init_from_ref(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()));
+            m_key_values.create();
 
-        // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();
 
@@ -710,13 +703,13 @@ bool TableViewBase::is_in_table_order() const
     if (!m_table) {
         return false;
     }
-    else if (m_linkview_source) {
+    else if (m_linklist_source) {
         return false;
     }
     else if (m_distinct_column_source != npos) {
         return !m_descriptor_ordering.will_apply_sort();
     }
-    else if (m_linked_column) {
+    else if (m_source_column_ndx != npos) {
         return false;
     }
     else {

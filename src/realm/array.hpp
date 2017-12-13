@@ -98,6 +98,8 @@ class GroupWriter;
 namespace _impl {
 class ArrayWriterBase;
 }
+class ArrayKey;
+using KeyColumn = ArrayKey;
 
 
 struct MemStats {
@@ -335,6 +337,7 @@ public:
     Type get_type() const noexcept;
 
     static void add_to_column(IntegerColumn* column, int64_t value);
+    static void add_to_column(KeyColumn* column, int64_t value);
 
     void insert(size_t ndx, int_fast64_t value);
     void add(int_fast64_t value);
@@ -1063,26 +1066,18 @@ public:
             return false;
     }
 
-    QueryState(Action action, IntegerColumn* akku = nullptr, size_t limit = -1)
-        : QueryStateBase(limit)
+    QueryState(Action action, size_t limit = -1)
+        : QueryState(action, int64_t(0), limit)
     {
-        if (action == act_Max)
-            m_state = -0x7fffffffffffffffLL - 1LL;
-        else if (action == act_Min)
-            m_state = 0x7fffffffffffffffLL;
-        else if (action == act_ReturnFirst)
-            m_state = not_found;
-        else if (action == act_Sum)
-            m_state = 0;
-        else if (action == act_Count)
-            m_state = 0;
-        else if (action == act_FindAll)
-            m_state = reinterpret_cast<int64_t>(akku);
-        else if (action == act_CallbackIdx) {
-        }
-        else {
-            REALM_ASSERT_DEBUG(false);
-        }
+    }
+
+    QueryState(Action action, KeyColumn* akku, size_t limit = -1)
+        : QueryState(action, reinterpret_cast<int64_t>(akku), limit)
+    {
+    }
+    QueryState(Action action, IntegerColumn* akku, size_t limit = -1)
+        : QueryState(action, reinterpret_cast<int64_t>(akku), limit)
+    {
     }
 
     template <Action action, bool pattern>
@@ -1125,8 +1120,13 @@ public:
             m_match_count = size_t(m_state);
         }
         else if (action == act_FindAll) {
-            int64_t key_value = m_key_values ? m_key_values->get(index) + m_key_offset : index;
-            Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), key_value);
+            if (m_key_values) {
+                int64_t key_value = m_key_values->get(index) + m_key_offset;
+                Array::add_to_column(reinterpret_cast<KeyColumn*>(m_state), key_value);
+            }
+            else {
+                Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
+            }
         }
         else if (action == act_ReturnFirst) {
             m_state = index;
@@ -1153,9 +1153,13 @@ public:
             m_match_count = size_t(m_state);
         }
         else if (action == act_FindAll) {
-            REALM_ASSERT(m_key_values);
-            int64_t key_value = m_key_values->get(index) + m_key_offset;
-            Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), key_value);
+            if (m_key_values) {
+                int64_t key_value = m_key_values->get(index) + m_key_offset;
+                Array::add_to_column(reinterpret_cast<KeyColumn*>(m_state), key_value);
+            }
+            else {
+                Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
+            }
         }
         else if (action == act_ReturnFirst) {
             m_match_count++;
@@ -1163,6 +1167,29 @@ public:
             return false;
         }
         return m_limit > m_match_count;
+    }
+
+private:
+    QueryState(Action action, int64_t akku, size_t limit)
+        : QueryStateBase(limit)
+    {
+        if (action == act_Max)
+            m_state = std::numeric_limits<int64_t>::min();
+        else if (action == act_Min)
+            m_state = std::numeric_limits<int64_t>::max();
+        else if (action == act_ReturnFirst)
+            m_state = not_found;
+        else if (action == act_Sum)
+            m_state = 0;
+        else if (action == act_Count)
+            m_state = 0;
+        else if (action == act_FindAll)
+            m_state = akku;
+        else if (action == act_CallbackIdx) {
+        }
+        else {
+            REALM_ASSERT_DEBUG(false);
+        }
     }
 };
 
@@ -3066,7 +3093,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
     REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
     // todo, would be nice to avoid this in order to speed up find_first loops
-    QueryState<int64_t> state(act_ReturnFirst, nullptr, 1);
+    QueryState<int64_t> state(act_ReturnFirst, 1);
     Finder finder = m_vtable->finder[cond::condition];
     (this->*finder)(value, start, end, 0, &state);
 

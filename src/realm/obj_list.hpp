@@ -19,7 +19,7 @@
 #ifndef REALM_OBJ_LIST_HPP
 #define REALM_OBJ_LIST_HPP
 
-#include <realm/column.hpp>
+#include <realm/array_key.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/obj.hpp>
@@ -31,17 +31,11 @@ class Table;
 
 class ObjList {
 public:
-    ObjList();
-    ObjList(const ObjList& source);
-    ObjList(ObjList&& source);
-    ObjList(Table* parent);
-    ObjList(IntegerColumn&& col);
-    ObjList(const ObjList& source, ConstSourcePayload mode);
-    ObjList(ObjList& source, MutableSourcePayload mode);
+    ObjList(KeyColumn& key_values);
+    ObjList(KeyColumn& key_values, Table* parent);
 
     virtual ~ObjList()
     {
-        m_key_values.destroy(); // Shallow
 #ifdef REALM_COOKIE_CHECK
         m_debug_cookie = 0x7765697633333333; // 0x77656976 = 'view'; 0x33333333 = '3333' = destructed
 #endif
@@ -75,10 +69,7 @@ public:
 
     // These two methods are overridden by TableView and LinkView.
     virtual uint_fast64_t sync_if_needed() const = 0;
-    virtual bool is_in_sync() const
-    {
-        return true;
-    }
+    virtual bool is_in_sync() const = 0;
     void check_cookie() const
     {
 #ifdef REALM_COOKIE_CHECK
@@ -92,13 +83,10 @@ protected:
 
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
-    IntegerColumn m_key_values;
+    KeyColumn& m_key_values;
     uint64_t m_debug_cookie;
 
     void do_sort(const DescriptorOrdering&);
-
-private:
-    void allocate_key_values();
 };
 }
 

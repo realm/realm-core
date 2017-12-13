@@ -78,7 +78,7 @@ void SortDescriptor::merge_with(SortDescriptor&& other)
 
 
 CommonDescriptor::Sorter::Sorter(std::vector<std::vector<ColumnId>> const& columns,
-                                 std::vector<bool> const& ascending, IntegerColumn const& key_values)
+                                 std::vector<bool> const& ascending, KeyColumn const& key_values)
 {
     REALM_ASSERT(!columns.empty());
     REALM_ASSERT_EX(columns.size() == ascending.size(), columns.size(), ascending.size());
@@ -132,7 +132,7 @@ std::vector<bool> SortDescriptor::export_order() const
     return m_ascending;
 }
 
-CommonDescriptor::Sorter CommonDescriptor::sorter(IntegerColumn const& row_indexes) const
+CommonDescriptor::Sorter CommonDescriptor::sorter(KeyColumn const& row_indexes) const
 {
     REALM_ASSERT(!m_column_ids.empty());
     std::vector<bool> ascending(m_column_ids.size(), true);
@@ -140,7 +140,7 @@ CommonDescriptor::Sorter CommonDescriptor::sorter(IntegerColumn const& row_index
 }
 
 
-SortDescriptor::Sorter SortDescriptor::sorter(IntegerColumn const& row_indexes) const
+SortDescriptor::Sorter SortDescriptor::sorter(KeyColumn const& row_indexes) const
 {
     REALM_ASSERT(!m_column_ids.empty());
     return Sorter(m_column_ids, m_ascending, row_indexes);
