@@ -50,7 +50,6 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 ///    * ACTIVE: when the binding successfully refreshes the token
 ///    * INACTIVE: if asked to log out, or if asked to close and the stop policy
 ///                is Immediate.
-///    * ERROR: if a fatal error occurs
 ///
 /// ACTIVE: the session is connected to the Realm Object Server and is actively
 /// transferring data.
@@ -61,7 +60,6 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 ///    * INACTIVE: if asked to log out, or if asked to close and the stop policy
 ///                is Immediate.
 ///    * DYING: if asked to close and the stop policy is AfterChangesUploaded
-///    * ERROR: if a fatal error occurs
 ///
 /// DYING: the session is performing clean-up work in preparation to be destroyed.
 /// From: ACTIVE
@@ -70,7 +68,6 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 ///                revived, or if explicitly asked to log out before the
 ///                clean-up work begins
 ///    * ACTIVE: if the session is revived
-///    * ERROR: if a fatal error occurs
 ///
 /// INACTIVE: the user owning this session has logged out, the `sync::Session`
 /// owned by this session is destroyed, and the session is quiescent.
@@ -79,13 +76,6 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 /// From: initial, WAITING_FOR_ACCESS_TOKEN, ACTIVE, DYING
 /// To:
 ///    * WAITING_FOR_ACCESS_TOKEN: if the session is revived
-///    * ERROR: if a fatal error occurs
-///
-/// ERROR: a non-recoverable error has occurred, and this session is semantically
-/// invalid. The binding must create a new session with a different configuration.
-/// From: WAITING_FOR_ACCESS_TOKEN, ACTIVE, DYING, INACTIVE
-/// To:
-///    * (none, this is a terminal state)
 ///
 struct SyncSession::State {
     virtual ~State() { }
@@ -138,7 +128,6 @@ struct SyncSession::State {
     static const State& active;
     static const State& dying;
     static const State& inactive;
-    static const State& error;
 };
 
 struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
@@ -322,8 +311,14 @@ struct sync_session_states::Active : public SyncSession::State {
 };
 
 struct sync_session_states::Dying : public SyncSession::State {
-    void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
+    void enter_state(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
+        // If we have no session, we cannot possibly upload anything.
+        if (!session.m_session) {
+            session.advance_state(lock, inactive);
+            return;
+        }
+
         size_t current_death_count = ++session.m_death_count;
         std::weak_ptr<SyncSession> weak_session = session.shared_from_this();
         session.m_session->async_wait_for_upload_completion([weak_session, current_death_count](std::error_code) {
@@ -431,27 +426,11 @@ struct sync_session_states::Inactive : public SyncSession::State {
 #endif
 };
 
-struct sync_session_states::Error : public SyncSession::State {
-    void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
-    {
-        // Inform any queued-up completion handlers that they were cancelled.
-        for (auto& package : session.m_completion_wait_packages) {
-            package.callback(util::error::operation_aborted);
-        }
-        session.m_completion_wait_packages.clear();
-        session.m_session = nullptr;
-        session.m_config = { nullptr, "" };
-    }
-
-    // Everything else is a no-op when in the error state.
-};
-
 
 const SyncSession::State& SyncSession::State::waiting_for_access_token = WaitingForAccessToken();
 const SyncSession::State& SyncSession::State::active = Active();
 const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
-const SyncSession::State& SyncSession::State::error = Error();
 
 SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config)
 : m_state(&State::inactive)
@@ -580,7 +559,7 @@ void SyncSession::handle_error(SyncError error)
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
                     user_to_invalidate = user();
-                    advance_state(lock, State::error);
+                    cancel_pending_waits();
                 }
                 if (user_to_invalidate)
                     user_to_invalidate->invalidate();
@@ -633,7 +612,6 @@ void SyncSession::handle_error(SyncError error)
     } else {
         // Unrecognized error code.
         error.is_unrecognized_by_client = true;
-        next_state = NextStateAfterError::error;
     }
     switch (next_state) {
         case NextStateAfterError::none:
@@ -645,13 +623,22 @@ void SyncSession::handle_error(SyncError error)
         }
         case NextStateAfterError::error: {
             std::unique_lock<std::mutex> lock(m_state_mutex);
-            advance_state(lock, State::error);
+            cancel_pending_waits();
             break;
         }
     }
     if (m_error_handler) {
         m_error_handler(shared_from_this(), std::move(error));
     }
+}
+
+void SyncSession::cancel_pending_waits()
+{
+    // Inform any queued-up completion handlers that they were cancelled.
+    for (auto& package : m_completion_wait_packages) {
+        package.callback(util::error::operation_aborted);
+    }
+    m_completion_wait_packages.clear();
 }
 
 void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable,
@@ -915,8 +902,6 @@ SyncSession::PublicState SyncSession::state() const
         return PublicState::Dying;
     } else if (m_state == &State::inactive) {
         return PublicState::Inactive;
-    } else if (m_state == &State::error) {
-        return PublicState::Error;
     }
     REALM_UNREACHABLE();
 }

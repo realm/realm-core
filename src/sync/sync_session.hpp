@@ -42,7 +42,6 @@ struct WaitingForAccessToken;
 struct Active;
 struct Dying;
 struct Inactive;
-struct Error;
 }
 }
 
@@ -60,13 +59,14 @@ public:
         Active,
         Dying,
         Inactive,
+
+        // FIXME: This state no longer exists. This should be removed.
         Error,
     };
     PublicState state() const;
 
-    bool is_in_error_state() const {
-        return state() == PublicState::Error;
-    }
+    // FIXME: The error state no longer exists. This should be removed.
+    bool is_in_error_state() const { return false; }
 
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
     std::string const& path() const { return m_realm_path; }
@@ -242,7 +242,6 @@ private:
     friend struct _impl::sync_session_states::Active;
     friend struct _impl::sync_session_states::Dying;
     friend struct _impl::sync_session_states::Inactive;
-    friend struct _impl::sync_session_states::Error;
 
     friend class realm::SyncManager;
     // Called by SyncManager {
@@ -260,6 +259,7 @@ private:
     SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig);
 
     void handle_error(SyncError);
+    void cancel_pending_waits();
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup);
     static std::string get_recovery_file_path();
