@@ -401,7 +401,7 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     Query q = t->where();
 
     realm::parser::Predicate p = realm::parser::parse(query_string);
-    realm::query_builder::apply_predicate(q, p, args);
+    realm::query_builder::apply_predicate(q, p, args, "Person");
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
