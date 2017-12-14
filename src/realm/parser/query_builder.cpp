@@ -347,18 +347,8 @@ void add_string_constraint_to_query(realm::Query &query,
         case Predicate::Operator::NotEqual:
             query.and_query(column.not_equal(value, case_sensitive));
             break;
-        case Predicate::Operator::BeginsWith:
-            query.and_query(column.begins_with(value, case_sensitive));
-            break;
-        case Predicate::Operator::EndsWith:
-            query.and_query(column.ends_with(value, case_sensitive));
-            break;
-        case Predicate::Operator::Contains:
-            query.and_query(column.contains(value, case_sensitive));
-            break;
-        case Predicate::Operator::Like:
-            query.and_query(column.like(value, case_sensitive));
-            break;
+            // operators CONTAINS, BEGINSWITH, ENDSWITH, LIKE are not supported in this direction
+            // These queries are not the same: "'asdf' CONTAINS string_property" vs "string_property CONTAINS 'asdf'"
         default:
             throw std::logic_error("Unsupported operator for keypath substring queries.");
     }
