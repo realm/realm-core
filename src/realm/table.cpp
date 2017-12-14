@@ -2993,6 +2993,17 @@ BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
 }
 
 template <>
+BinaryIterator Table::get(size_t col_ndx, size_t ndx) const noexcept
+{
+    REALM_ASSERT_3(col_ndx, <, m_columns.size());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Binary);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    const BinaryColumn& col = get_column<BinaryColumn, col_type_Binary>(col_ndx);
+    return BinaryIterator{&col, ndx};
+}
+
+template <>
 Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());

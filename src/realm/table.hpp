@@ -36,6 +36,7 @@
 #include <realm/mixed.hpp>
 #include <realm/query.hpp>
 #include <realm/column.hpp>
+#include <realm/column_binary.hpp>
 
 namespace realm {
 
@@ -427,6 +428,7 @@ public:
     double get_double(size_t column_ndx, size_t row_ndx) const noexcept;
     StringData get_string(size_t column_ndx, size_t row_ndx) const noexcept;
     BinaryData get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
+    BinaryIterator get_binary_iterator(size_t column_ndx, size_t row_ndx) const noexcept;
     Mixed get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
     Timestamp get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
@@ -2181,6 +2183,7 @@ template<> OldDateTime Table::get<OldDateTime>(size_t, size_t) const noexcept;
 template<> Timestamp Table::get<Timestamp>(size_t, size_t) const noexcept;
 template<> StringData Table::get<StringData>(size_t, size_t) const noexcept;
 template<> BinaryData Table::get<BinaryData>(size_t, size_t) const noexcept;
+template<> BinaryIterator Table::get<BinaryIterator>(size_t, size_t) const noexcept;
 template<> Mixed Table::get<Mixed>(size_t, size_t) const noexcept;
 
 template<> void Table::set<int64_t>(size_t, size_t, int64_t, bool);
@@ -2290,6 +2293,11 @@ inline size_t Table::set_string_unique(size_t col_ndx, size_t ndx, StringData va
 inline BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const noexcept
 {
     return get<BinaryData>(col_ndx, ndx);
+}
+
+inline BinaryIterator Table::get_binary_iterator(size_t col_ndx, size_t ndx) const noexcept
+{
+    return get<BinaryIterator>(col_ndx, ndx);
 }
 
 inline void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
