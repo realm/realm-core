@@ -402,7 +402,7 @@ void add_link_constraint_to_query(realm::Query &query,
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
-            //REALM_FALLTHROUGH;
+            REALM_FALLTHROUGH;
         case Predicate::Operator::Equal: {
             size_t col = prop_expr.col_ndx;
             query.links_to(col, query.get_table()->get_link_target(col)->get(row_index));
@@ -785,7 +785,7 @@ void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op,
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
-            //REALM_FALLTHROUGH;
+            REALM_FALLTHROUGH;
         case Predicate::Operator::Equal:
             query.and_query(query.get_table()->column<Link>(expr.col_ndx).is_null());
             break;
