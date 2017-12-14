@@ -45,7 +45,7 @@ namespace parser {
 namespace query_builder {
 class Arguments;
 
-void apply_predicate(Query& query, const parser::Predicate& predicate, Arguments& arguments, const std::string& object_type);
+void apply_predicate(Query& query, const parser::Predicate& predicate, Arguments& arguments);
 
 void apply_predicate(Query& query, const parser::Predicate& predicate); // zero out of string args version
 

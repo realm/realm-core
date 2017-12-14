@@ -258,7 +258,8 @@ void verify_query(test_util::unit_test::TestContext& test_context, TableRef t, s
 TEST(Parser_basic_serialisation)
 {
     Group g;
-    TableRef t = g.add_table("person");
+    std::string table_name = "person";
+    TableRef t = g.add_table(table_name);
     size_t int_col_ndx = t->add_column(type_Int, "age");
     size_t str_col_ndx = t->add_column(type_String, "name");
     size_t double_col_ndx = t->add_column(type_Double, "fees");
@@ -316,12 +317,17 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "age > 2 AND !TRUEPREDICATE", 0);
 
     CHECK_THROW_ANY(verify_query(test_context, t, "buddy.age > $0", 0)); // no external parameters provided
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "missing_property > 2", 0), message);
+    CHECK(message.find(table_name) != std::string::npos); // no prefix modification for names without "class_"
+    CHECK(message.find("missing_property") != std::string::npos);
 }
 
 TEST(Parser_LinksToSameTable)
 {
     Group g;
-    TableRef t = g.add_table("person");
+    TableRef t = g.add_table("class_Person");
     size_t age_col_ndx = t->add_column(type_Int, "age");
     size_t name_col_ndx = t->add_column(type_String, "name");
     size_t link_col_ndx = t->add_column_link(type_Link, "buddy", *t);
@@ -347,13 +353,18 @@ TEST(Parser_LinksToSameTable)
     verify_query(test_context, t, "buddy.buddy.buddy.name contains \"oe\"", 1);
     verify_query(test_context, t, "buddy.buddy.buddy.buddy.name contains \"oe\"", 1);
     verify_query(test_context, t, "buddy.buddy.buddy.buddy.buddy.name contains \"oe\"", 0);
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "buddy.buddy.missing_property > 2", 0), message);
+    CHECK(message.find("Person") != std::string::npos); // without the "class_" prefix
+    CHECK(message.find("missing_property") != std::string::npos);
 }
 
 TEST(Parser_LinksToDifferentTable)
 {
     Group g;
 
-    TableRef discounts = g.add_table("discounts");
+    TableRef discounts = g.add_table("class_Discounts");
     size_t discount_off_col = discounts->add_column(type_Double, "reduced_by");
     size_t discount_active_col = discounts->add_column(type_Bool, "active");
 
@@ -365,7 +376,7 @@ TEST(Parser_LinksToDifferentTable)
         discounts->set_bool(discount_active_col, row_ndx, i.second);
     }
 
-    TableRef items = g.add_table("items");
+    TableRef items = g.add_table("class_Items");
     size_t item_name_col = items->add_column(type_String, "name");
     size_t item_price_col = items->add_column(type_Double, "price");
     size_t item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
@@ -380,7 +391,7 @@ TEST(Parser_LinksToDifferentTable)
     items->set_link(item_discount_col, 2, 1); // pizza -2.5
     items->set_link(item_discount_col, 3, 0); // cereal -3.0 inactive
 
-    TableRef t = g.add_table("person");
+    TableRef t = g.add_table("class_Person");
     size_t id_col_ndx = t->add_column(type_Int, "customer_id");
     size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
     t->add_empty_row(3);
@@ -411,6 +422,25 @@ TEST(Parser_LinksToDifferentTable)
     verify_query(test_context, t, "items.discount.reduced_by > 2.0", 2); // how many people bought an item marked down by more than $2.0?
     verify_query(test_context, t, "items.@sum.price > 50", 1); // how many people would spend more than $50 without sales applied?
     verify_query(test_context, t, "items.@avg.price > 7", 1); // how manay people like to buy items more expensive on average than $7?
+
+    std::string message;
+    // missing property
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "missing_property > 2", 0), message);
+    CHECK(message.find("Person") != std::string::npos); // without the "class_" prefix
+    CHECK(message.find("missing_property") != std::string::npos);
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.absent_property > 2", 0), message);
+    CHECK(message.find("Items") != std::string::npos); // without the "class_" prefix
+    CHECK(message.find("absent_property") != std::string::npos);
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.discount.nonexistent_property > 2", 0), message);
+    CHECK(message.find("Discounts") != std::string::npos); // without the "class_" prefix
+    CHECK(message.find("nonexistent_property") != std::string::npos);
+    // property is not a link
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "customer_id.property > 2", 0), message);
+    CHECK(message.find("Person") != std::string::npos); // without the "class_" prefix
+    CHECK(message.find("customer_id") != std::string::npos); // is not a link
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price.property > 2", 0), message);
+    CHECK(message.find("Items") != std::string::npos); // without the "class_" prefix
+    CHECK(message.find("price") != std::string::npos); // is not a link
 }
 
 
@@ -497,7 +527,7 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     Query q = t->where();
 
     realm::parser::Predicate p = realm::parser::parse(query_string);
-    realm::query_builder::apply_predicate(q, p, args, "Person");
+    realm::query_builder::apply_predicate(q, p, args);
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
@@ -800,8 +830,8 @@ TEST(Parser_string_binary_encoding)
 TEST(Parser_collection_aggregates)
 {
     Group g;
-    TableRef people = g.add_table("person");
-    TableRef courses = g.add_table("courses");
+    TableRef people = g.add_table("class_Person");
+    TableRef courses = g.add_table("class_Course");
     size_t title_col_ndx = courses->add_column(type_String, "title");
     size_t credits_col_ndx = courses->add_column(type_Double, "credits");
     size_t hours_col_ndx = courses->add_column(type_Int, "hours_required");
@@ -885,6 +915,8 @@ TEST(Parser_collection_aggregates)
     verify_query(test_context, people, "hash.@count > 2", 2);
     verify_query(test_context, people, "hash.@size > 2", 2);
 
+    std::string message;
+
     // string
     CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@min.title <= 41", 2));
     CHECK_THROW_ANY(verify_query(test_context, people, "courses_taken.@max.title <= 41", 2));
@@ -902,6 +934,9 @@ TEST(Parser_collection_aggregates)
     CHECK_THROW_ANY(verify_query(test_context, people, "name.@max.hours_required <= 41", 2));
     CHECK_THROW_ANY(verify_query(test_context, people, "name.@sum.hours_required <= 41", 2));
     CHECK_THROW_ANY(verify_query(test_context, people, "name.@avg.hours_required <= 41", 2));
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, people, "name.@min.hours_required <= 41", 2), message);
+    CHECK(message.find("list") != std::string::npos);
+    CHECK(message.find("name") != std::string::npos);
 
     // size and count do not allow paths on the destination object
     CHECK_THROW_ANY(verify_query(test_context, people, "name.@count.hours_required <= 2", 0));

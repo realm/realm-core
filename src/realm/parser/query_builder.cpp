@@ -121,6 +121,17 @@ KeyPath key_path_from_string(const std::string &s) {
     return key_path;
 }
 
+StringData get_printable_table_name(const Table& table)
+{
+    StringData name = table.get_name();
+    // the "class_" prefix is an implementation detail of the object store that shouldn't be exposed to users
+    static const std::string prefix = "class_";
+    if (name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
+        name = StringData(name.data() + prefix.size(), name.size() - prefix.size());
+    }
+    return name;
+}
+
 struct PropertyExpression
 {
     std::vector<size_t> indexes;
@@ -128,20 +139,22 @@ struct PropertyExpression
     size_t col_ndx;
     DataType col_type;
 
-    PropertyExpression(Query &query, const std::string &key_path_string, const std::string& object_type)
+    PropertyExpression(Query &query, const std::string &key_path_string)
     {
         KeyPath key_path = key_path_from_string(key_path_string);
         TableRef cur_table = query.get_table();;
         for (size_t index = 0; index < key_path.size(); index++) {
             size_t cur_col_ndx = cur_table->get_column_index(key_path[index]);
 
+            StringData object_name = get_printable_table_name(*cur_table);
+
             precondition(cur_col_ndx != realm::not_found,
-                         util::format("No property '%1' on object of type '%2'", key_path[index], object_type));
+                         util::format("No property '%1' on object of type '%2'", key_path[index], object_name));
 
             DataType cur_col_type = cur_table->get_column_type(cur_col_ndx);
             if (index != key_path.size() - 1) {
                 precondition(cur_col_type == type_Link || cur_col_type == type_LinkList,
-                             util::format("Property '%1' is not a link in object of type '%2'", key_path[index], object_type));
+                             util::format("Property '%1' is not a link in object of type '%2'", key_path[index], object_name));
                 indexes.push_back(cur_col_ndx);
                 cur_table = cur_table->get_link_target(cur_col_ndx);
             }
@@ -165,19 +178,19 @@ const char* collection_operator_to_str(parser::Expression::KeyPathOp op)
 {
     switch (op) {
         case parser::Expression::KeyPathOp::None:
-            return "None";
+            return "NONE";
         case parser::Expression::KeyPathOp::Min:
-            return "Min";
+            return "@min";
         case parser::Expression::KeyPathOp::Max:
-            return "Max";
+            return "@max";
         case parser::Expression::KeyPathOp::Sum:
-            return "Sum";
+            return "@sum";
         case parser::Expression::KeyPathOp::Avg:
-            return "Avg";
+            return "@avg";
         case parser::Expression::KeyPathOp::Size:
-            return "Size";
+            return "@size";
         case parser::Expression::KeyPathOp::Count:
-            return "Count";
+            return "@count";
     }
     return "";
 }
@@ -200,33 +213,39 @@ struct CollectionOperatorExpression
                                             || op == parser::Expression::KeyPathOp::Count);
 
         if (requires_suffix_path) {
-            if (pe.col_type != type_LinkList) {
-                throw std::runtime_error(std::string("Property aggregates must operate on a List"));
-            }
-            TableRef post_table = pe.table_getter()->get_link_target(pe.col_ndx);
-            if (!post_table) {
-                throw std::runtime_error(util::format("Internal error: could not reach destination object through property '%1'", suffix_path));
-            }
+            Table* pre_link_table = pe.table_getter();
+            REALM_ASSERT(pre_link_table);
+            StringData list_property_name = pre_link_table->get_column_name(pe.col_ndx);
+            precondition(pe.col_type == type_LinkList,
+                         util::format("The '%1' operation must be used on a list property, but '%2' is not a list",
+                                      collection_operator_to_str(op), list_property_name));
+
+            TableRef post_link_table = pe.table_getter()->get_link_target(pe.col_ndx);
+            REALM_ASSERT(post_link_table);
+            StringData printable_post_link_table_name = get_printable_table_name(*post_link_table);
 
             KeyPath suffix_key_path = key_path_from_string(suffix_path);
-            if (suffix_path.size() == 0 || suffix_key_path.size() == 0) {
-                throw std::runtime_error(util::format("A property must be provided at the destination object to perform operation '%1'", collection_operator_to_str(op)));
-            }
-            if (suffix_key_path.size() > 1) {
-                throw std::runtime_error(std::string("Collection aggregate operations are only supported for direct properties at this time: ") + suffix_path);
-            }
+            precondition(suffix_path.size() > 0 && suffix_key_path.size() > 0,
+                         util::format("A property from object '%1' must be provided to perform operation '%2'",
+                                      printable_post_link_table_name, collection_operator_to_str(op)));
+
+            precondition(suffix_key_path.size() == 1,
+                         util::format("Unable to use '%1' because collection aggreate operations are only supported "
+                                      "for direct properties at this time", suffix_path));
+
             post_link_col_ndx = pe.table_getter()->get_link_target(pe.col_ndx)->get_column_index(suffix_key_path[0]);
-            if (post_link_col_ndx == realm::not_found) {
-                throw std::runtime_error(util::format("Destination property '%1' not found", suffix_key_path[0]));
-            }
+
+            precondition(post_link_col_ndx != realm::not_found,
+                         util::format("No property '%1' on object of type '%2'",
+                                      suffix_path, printable_post_link_table_name));
             post_link_col_type = pe.table_getter()->get_link_target(pe.col_ndx)->get_column_type(post_link_col_ndx);
         }
         else {  // !requires_suffix_path
             post_link_col_type = pe.col_type;
 
-            if (!suffix_path.empty()) {
-                throw std::runtime_error(util::format("An extraneous property on the destination object '%1' was found for aggregate operation %2", suffix_path, collection_operator_to_str(op)));
-            }
+            precondition(suffix_path.empty(),
+                         util::format("An extraneous property '%1' was found for operation '%2'",
+                                      suffix_path, collection_operator_to_str(op)));
         }
     }
 };
@@ -822,12 +841,12 @@ bool expression_is_null(const parser::Expression &expr, Arguments &args) {
     return false;
 }
 
-void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &args, const std::string& object_type)
+void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &args)
 {
     const Predicate::Comparison &cmpr = pred.cmpr;
     auto t0 = cmpr.expr[0].type, t1 = cmpr.expr[1].type;
     if (t0 == parser::Expression::Type::KeyPath && t1 != parser::Expression::Type::KeyPath) {
-        PropertyExpression expr(query, cmpr.expr[0].s, object_type);
+        PropertyExpression expr(query, cmpr.expr[0].s);
         if (cmpr.expr[0].collection_op != parser::Expression::KeyPathOp::None) {
             CollectionOperatorExpression wrapper(expr, cmpr.expr[0].collection_op, cmpr.expr[0].op_suffix);
             do_add_collection_op_comparison_to_query(query, cmpr, wrapper, wrapper, cmpr.expr[1], args);
@@ -840,7 +859,7 @@ void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &arg
         }
     }
     else if (t0 != parser::Expression::Type::KeyPath && t1 == parser::Expression::Type::KeyPath) {
-        PropertyExpression expr(query, cmpr.expr[1].s, object_type);
+        PropertyExpression expr(query, cmpr.expr[1].s);
         if (cmpr.expr[1].collection_op != parser::Expression::KeyPathOp::None) {
             CollectionOperatorExpression wrapper(expr, cmpr.expr[1].collection_op, cmpr.expr[1].op_suffix);
             do_add_collection_op_comparison_to_query(query, cmpr, wrapper, cmpr.expr[0], wrapper, args);
@@ -857,7 +876,7 @@ void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &arg
     }
 }
 
-void update_query_with_predicate(Query &query, const Predicate &pred, Arguments &arguments, const std::string& object_type)
+void update_query_with_predicate(Query &query, const Predicate &pred, Arguments &arguments)
 {
     if (pred.negate) {
         query.Not();
@@ -867,7 +886,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
         case Predicate::Type::And:
             query.group();
             for (auto &sub : pred.cpnd.sub_predicates) {
-                update_query_with_predicate(query, sub, arguments, object_type);
+                update_query_with_predicate(query, sub, arguments);
             }
             if (!pred.cpnd.sub_predicates.size()) {
                 query.and_query(std::unique_ptr<realm::Expression>(new TrueExpression));
@@ -879,7 +898,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
             query.group();
             for (auto &sub : pred.cpnd.sub_predicates) {
                 query.Or();
-                update_query_with_predicate(query, sub, arguments, object_type);
+                update_query_with_predicate(query, sub, arguments);
             }
             if (!pred.cpnd.sub_predicates.size()) {
                 query.and_query(std::unique_ptr<realm::Expression>(new FalseExpression));
@@ -888,7 +907,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
             break;
 
         case Predicate::Type::Comparison: {
-            add_comparison_to_query(query, pred, arguments, object_type);
+            add_comparison_to_query(query, pred, arguments);
             break;
         }
         case Predicate::Type::True:
@@ -908,9 +927,9 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
 namespace realm {
 namespace query_builder {
 
-void apply_predicate(Query &query, const Predicate &predicate, Arguments &arguments, const std::string& object_type)
+void apply_predicate(Query &query, const Predicate &predicate, Arguments &arguments)
 {
-    update_query_with_predicate(query, predicate, arguments, object_type);
+    update_query_with_predicate(query, predicate, arguments);
 
     // Test the constructed query in core
     std::string validateMessage = query.validate();
@@ -932,10 +951,9 @@ void apply_predicate(Query &query, const Predicate &predicate)
 {
     EmptyArgContext ctx;
     std::string empty_string;
-    std::string object_type = "";
     realm::query_builder::ArgumentConverter<std::string, EmptyArgContext> args(ctx, &empty_string, 0);
 
-    apply_predicate(query, predicate, args, object_type);
+    apply_predicate(query, predicate, args);
 }
 }
 }
