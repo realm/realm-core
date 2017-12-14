@@ -484,9 +484,9 @@ Predicate parse(const std::string &query)
     return out_predicate;
 }
 
-void analyze_grammar()
+size_t analyze_grammar()
 {
-    analyze<pred>();
+    return analyze<pred>();
 }
 
 }}

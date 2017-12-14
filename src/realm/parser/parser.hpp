@@ -91,8 +91,9 @@ struct Predicate
 
 Predicate parse(const std::string &query);
 
-void analyze_grammar();
-bool test_grammar();
+// run the analysis tool to check for cycles in the grammar
+// returns the number of problems found and prints some info to std::cout
+size_t analyze_grammar();
 }
 }
 

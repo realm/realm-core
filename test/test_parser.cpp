@@ -242,6 +242,11 @@ TEST(Parser_invalid_queries) {
     }
 }
 
+TEST(Parser_grammar_analysis)
+{
+    CHECK(realm::parser::analyze_grammar() == 0);
+}
+
 void verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, size_t num_results) {
     Query q = t->where();
 
