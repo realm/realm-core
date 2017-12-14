@@ -494,14 +494,20 @@ TEST(Parser_Timestamps)
     verify_query(test_context, t, "birthday != NULL", 5);
     verify_query(test_context, t, "birthday == T0:0", 3);
     verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:0", 3); // epoch is default non-null Timestamp
-    verify_query(test_context, t, "birthday == 1969-12-31@23:59:59:-1", 1);
-    verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:-1", 1);
+    verify_query(test_context, t, "birthday == 1969-12-31@23:59:59:1", 1); // just before epoch
+    verify_query(test_context, t, "birthday > 1905-12-31@23:59:59", 5);
+    verify_query(test_context, t, "birthday > 1905-12-31@23:59:59:2020", 5);
 
-    // invalid timestamps, if these were constructed core would assert
+    // dates pre 1900 are not supported by functions like timegm
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday > 1800-12-31@23:59:59", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday > 1800-12-31@23:59:59:2020", 4));
+
+    // negative nanoseconds are not allowed
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T-1:1", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:-1", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1969-12-31@23:59:59:1", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:1:-1", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1969-12-31@23:59:59:-1", 1));
+    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:-1", 1));
 
     // Invalid predicate
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:", 0));

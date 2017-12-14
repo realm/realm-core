@@ -64,7 +64,7 @@ Timestamp from_timestamp_values(std::vector<std::string> const& time_inputs) {
     }
     else if (time_inputs.size() == 6 || time_inputs.size() == 7) {
         // readable format YYYY-MM-DD-HH:MM:SS:NANOS nanos optional
-        tm created;
+        tm created{};
         created.tm_year = stot<int>(time_inputs[0]) - 1900; // epoch offset (see man mktime)
         created.tm_mon = stot<int>(time_inputs[1]) - 1; // converts from 1-12 to 0-11
         created.tm_mday = stot<int>(time_inputs[2]);
@@ -72,10 +72,21 @@ Timestamp from_timestamp_values(std::vector<std::string> const& time_inputs) {
         created.tm_min = stot<int>(time_inputs[4]);
         created.tm_sec = stot<int>(time_inputs[5]);
 
+        if (created.tm_year < 0) {
+            // platform timegm functions do not throw errors, they return -1 which is also a valid time
+            throw std::logic_error("Conversion of dates before 1900 is not supported.");
+        }
+
         int64_t seconds = platform_timegm(created); // UTC time
         int32_t nanoseconds = 0;
         if (time_inputs.size() == 7) {
             nanoseconds = stot<int32_t>(time_inputs[6]);
+            if (nanoseconds < 0) {
+                throw std::logic_error("The nanoseconds of a Timestamp cannot be negative.");
+            }
+            if (seconds < 0) { // seconds determines the sign of the nanoseconds part
+                nanoseconds *= -1;
+            }
         }
         return get_timestamp_if_valid(seconds, nanoseconds);
     }
