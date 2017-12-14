@@ -111,6 +111,8 @@ static std::vector<std::string> valid_queries = {
     "0 =[c] 0",
     "0!=0",
     "0 != 0",
+    "0 <> 0",
+    "0<>0",
     "0==0",
     "0 == 0",
     "0==[c]0",
@@ -119,10 +121,14 @@ static std::vector<std::string> valid_queries = {
     "0 > 0",
     "0>=0",
     "0 >= 0",
+    "0 => 0",
+    "0=>0",
     "0<0",
     "0 < 0",
     "0<=0",
     "0 <= 0",
+    "0 =< 0",
+    "0<=0",
     "0 contains 0",
     "a CONTAINS[c] b",
     "a contains [c] b",
@@ -193,7 +199,6 @@ static std::vector<std::string> invalid_queries = {
 
     // operators
     "0===>0",
-    "0 <> 0",
     "0 contains1",
     "a contains_something",
     "endswith 0",
@@ -291,9 +296,12 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "time == 2017-12-01@12:07:53:505", 1);
     verify_query(test_context, t, "buddy == NULL", 4);
     verify_query(test_context, t, "buddy != NULL", 1);
+    verify_query(test_context, t, "buddy <> NULL", 1);
     verify_query(test_context, t, "age > 2", 2);
     verify_query(test_context, t, "!(age >= 2)", 2);
+    verify_query(test_context, t, "!(age => 2)", 2);
     verify_query(test_context, t, "3 <= age", 2);
+    verify_query(test_context, t, "3 =< age", 2);
     verify_query(test_context, t, "age > 2 and age < 4", 1);
     verify_query(test_context, t, "age = 1 || age == 3", 2);
     verify_query(test_context, t, "fees != 2.22 && fees > 2.2", 3);

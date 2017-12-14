@@ -106,10 +106,10 @@ struct expr : sor< dq_string, sq_string, timestamp, number, argument, true_value
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
 
 struct eq : seq< sor< two< '=' >, one< '=' > >, star< blank >, opt< case_insensitive > >{};
-struct noteq : tao::pegtl::string< '!', '=' > {};
-struct lteq : tao::pegtl::string< '<', '=' > {};
+struct noteq : sor< tao::pegtl::string< '!', '=' >, tao::pegtl::string< '<', '>' > > {};
+struct lteq : sor< tao::pegtl::string< '<', '=' >, tao::pegtl::string< '=', '<' > > {};
 struct lt : one< '<' > {};
-struct gteq : tao::pegtl::string< '>', '=' > {};
+struct gteq : sor< tao::pegtl::string< '>', '=' >, tao::pegtl::string< '=', '>' > > {};
 struct gt : one< '>' > {};
 struct contains : string_token_t("contains") {};
 struct begins : string_token_t("beginswith") {};
@@ -117,7 +117,8 @@ struct ends : string_token_t("endswith") {};
 struct like : string_token_t("like") {};
 
 struct string_oper : seq< sor< contains, begins, ends, like>, star< blank >, opt< case_insensitive > > {};
-struct symbolic_oper : sor< eq, noteq, lteq, lt, gteq, gt > {};
+// "=" is equality and since other operators can start with "=" we must check equal last
+struct symbolic_oper : sor< noteq, lteq, lt, gteq, gt, eq > {};
 
 // predicates
 struct comparison_pred : seq< expr, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
