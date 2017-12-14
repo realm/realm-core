@@ -2,12 +2,17 @@
 
 ### Bugfixes
 
+* Fix possible corruption or crashes when a `move_row` operates on a subtable.
+  PR [#2927](https://github.com/realm/realm-core/pull/2926).
 * Table::set_int() did not check if the target column was indeed type_Int. It
   will now assert like the other set methods.
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Remove support for the (unused) instructions for moving columns and moving tables.
+  This is not a file format breaking change as the instructions are still recognised,
+  but now a parser error is thrown if either one is seen in the transaction logs.
+  PR [#2926](https://github.com/realm/realm-core/pull/2926).
 
 ### Enhancements
 

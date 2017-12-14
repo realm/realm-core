@@ -127,7 +127,6 @@ TEST(Group_UnattachedErrorHandling)
     CHECK_LOGIC_ERROR(group.remove_table(0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.rename_table("foo", "bar", false), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.rename_table(0, "bar", false), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.move_table(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.commit(), LogicError::detached_accessor);
 
     {
@@ -768,112 +767,6 @@ TEST(Group_RenameTable)
     CHECK_EQUAL("alpha", beta->get_name());
     CHECK_EQUAL("gamma", gamma->get_name());
     group.verify();
-}
-
-
-TEST(Group_BasicMoveTable)
-{
-    Group group;
-    TableRef alpha = group.add_table("alpha");
-    TableRef beta = group.add_table("beta");
-    TableRef gamma = group.add_table("gamma");
-    TableRef delta = group.add_table("delta");
-    CHECK_EQUAL(4, group.size());
-
-    // Move up:
-    group.move_table(1, 3);
-    CHECK_EQUAL(4, group.size());
-    CHECK(alpha->is_attached());
-    CHECK(beta->is_attached());
-    CHECK(gamma->is_attached());
-    CHECK(delta->is_attached());
-    CHECK_EQUAL(0, alpha->get_index_in_group());
-    CHECK_EQUAL(3, beta->get_index_in_group());
-    CHECK_EQUAL(1, gamma->get_index_in_group());
-    CHECK_EQUAL(2, delta->get_index_in_group());
-
-    group.verify();
-
-    // Move down:
-    group.move_table(2, 0);
-    CHECK_EQUAL(4, group.size());
-    CHECK(alpha->is_attached());
-    CHECK(beta->is_attached());
-    CHECK(gamma->is_attached());
-    CHECK(delta->is_attached());
-    CHECK_EQUAL(1, alpha->get_index_in_group());
-    CHECK_EQUAL(3, beta->get_index_in_group());
-    CHECK_EQUAL(2, gamma->get_index_in_group());
-    CHECK_EQUAL(0, delta->get_index_in_group());
-
-    group.verify();
-}
-
-TEST(Group_MoveTableWithLinks)
-{
-    using df = _impl::DescriptorFriend;
-    Group group;
-    TableRef a = group.add_table("a");
-    TableRef b = group.add_table("b");
-    TableRef c = group.add_table("c");
-    TableRef d = group.add_table("d");
-    CHECK_EQUAL(4, group.size());
-    a->add_column_link(type_Link, "link_to_b", *b);
-    b->add_column_link(type_LinkList, "link_to_c", *c);
-    c->add_column_link(type_Link, "link_to_d", *d);
-    d->add_column_link(type_LinkList, "link_to_a", *a);
-
-    auto& a_spec = df::get_spec(*a->get_descriptor());
-    auto& b_spec = df::get_spec(*b->get_descriptor());
-    auto& c_spec = df::get_spec(*c->get_descriptor());
-    auto& d_spec = df::get_spec(*d->get_descriptor());
-
-    // Move up:
-    group.move_table(1, 3);
-    CHECK(a->is_attached());
-    CHECK(b->is_attached());
-    CHECK(c->is_attached());
-    CHECK(d->is_attached());
-    CHECK_EQUAL(a->get_link_target(0), b);
-    CHECK_EQUAL(b->get_link_target(0), c);
-    CHECK_EQUAL(c->get_link_target(0), d);
-    CHECK_EQUAL(d->get_link_target(0), a);
-    // Check backlink columns
-    CHECK_EQUAL(a_spec.get_opposite_link_table_ndx(1), d->get_index_in_group());
-    CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(1), a->get_index_in_group());
-    CHECK_EQUAL(c_spec.get_opposite_link_table_ndx(1), b->get_index_in_group());
-    CHECK_EQUAL(d_spec.get_opposite_link_table_ndx(1), c->get_index_in_group());
-
-    // Move down:
-    group.move_table(2, 0);
-    CHECK(a->is_attached());
-    CHECK(b->is_attached());
-    CHECK(c->is_attached());
-    CHECK(d->is_attached());
-    CHECK_EQUAL(a->get_link_target(0), b);
-    CHECK_EQUAL(b->get_link_target(0), c);
-    CHECK_EQUAL(c->get_link_target(0), d);
-    CHECK_EQUAL(d->get_link_target(0), a);
-    // Check backlink columns
-    CHECK_EQUAL(a_spec.get_opposite_link_table_ndx(1), d->get_index_in_group());
-    CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(1), a->get_index_in_group());
-    CHECK_EQUAL(c_spec.get_opposite_link_table_ndx(1), b->get_index_in_group());
-    CHECK_EQUAL(d_spec.get_opposite_link_table_ndx(1), c->get_index_in_group());
-}
-
-
-TEST(Group_MoveTableImmediatelyAfterOpen)
-{
-    Group g1;
-    TableRef a = g1.add_table("a");
-    TableRef b = g1.add_table("b");
-    CHECK_EQUAL(2, g1.size());
-
-    Group g2(g1.write_to_mem());
-    g2.move_table(0, 1);
-    CHECK_EQUAL(2, g2.size());
-    CHECK_EQUAL("b", g2.get_table_name(0));
-    CHECK_EQUAL("a", g2.get_table_name(1));
 }
 
 

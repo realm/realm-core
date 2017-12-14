@@ -218,7 +218,6 @@ public:
     void remove_column(size_t column_ndx);
     void rename_column(size_t column_ndx, StringData new_name);
     //@}
-
     //@{
 
     /// has_search_index() returns true if, and only if a search index has been
@@ -1134,7 +1133,6 @@ private:
                                                bool* was_inserted = nullptr);
     static void do_erase_column(Descriptor&, size_t col_ndx);
     static void do_rename_column(Descriptor&, size_t col_ndx, StringData name);
-    static void do_move_column(Descriptor&, size_t col_ndx_1, size_t col_ndx_2);
 
     static void do_add_search_index(Descriptor&, size_t col_ndx);
     static void do_remove_search_index(Descriptor&, size_t col_ndx);
@@ -1142,15 +1140,12 @@ private:
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
-    struct MoveSubtableColumns;
 
     void insert_root_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link_target,
                             bool nullable = false);
     void erase_root_column(size_t col_ndx);
-    void move_root_column(size_t from, size_t to);
     void do_insert_root_column(size_t col_ndx, ColumnType, StringData name, bool nullable = false);
     void do_erase_root_column(size_t col_ndx);
-    void do_move_root_column(size_t from, size_t to);
     void do_set_link_type(size_t col_ndx, LinkType);
     void insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx);
     void erase_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx);
@@ -1489,7 +1484,6 @@ private:
 
     void adj_insert_column(size_t col_ndx);
     void adj_erase_column(size_t col_ndx) noexcept;
-    void adj_move_column(size_t col_ndx_1, size_t col_ndx_2) noexcept;
 
     bool is_marked() const noexcept;
     void mark() noexcept;
@@ -2560,11 +2554,6 @@ public:
         Table::do_remove_search_index(desc, column_ndx); // Throws
     }
 
-    static void move_column(Descriptor& desc, size_t col_ndx_1, size_t col_ndx_2)
-    {
-        Table::do_move_column(desc, col_ndx_1, col_ndx_2); // Throws
-    }
-
     static void set_link_type(Table& table, size_t column_ndx, LinkType link_type)
     {
         table.do_set_link_type(column_ndx, link_type); // Throws
@@ -2649,11 +2638,6 @@ public:
     static void adj_erase_column(Table& table, size_t col_ndx) noexcept
     {
         table.adj_erase_column(col_ndx);
-    }
-
-    static void adj_move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2) noexcept
-    {
-        table.adj_move_column(col_ndx_1, col_ndx_2);
     }
 
     static bool is_marked(const Table& table) noexcept
