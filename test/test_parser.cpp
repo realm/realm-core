@@ -494,9 +494,12 @@ TEST(Parser_Timestamps)
     verify_query(test_context, t, "birthday != NULL", 5);
     verify_query(test_context, t, "birthday == T0:0", 3);
     verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:0", 3); // epoch is default non-null Timestamp
+
+#ifndef _WIN32 // windows native functions do not support pre epoch conversions, other platforms stop at ~1901
     verify_query(test_context, t, "birthday == 1969-12-31@23:59:59:1", 1); // just before epoch
     verify_query(test_context, t, "birthday > 1905-12-31@23:59:59", 5);
     verify_query(test_context, t, "birthday > 1905-12-31@23:59:59:2020", 5);
+#endif
 
     // dates pre 1900 are not supported by functions like timegm
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday > 1800-12-31@23:59:59", 0));
