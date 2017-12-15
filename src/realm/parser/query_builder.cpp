@@ -798,10 +798,9 @@ void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op,
 void do_add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, const PropertyExpression &expr)
 {
     DataType type = expr.col_type;
-// FIXME: uncomment this and test it for LinkList and backlink column types
-//    if (is_array(type)) {
-//        throw std::logic_error("Comparing Lists to 'null' is not supported");
-//    }
+    if (type == type_LinkList) { // when backlinks are supported, this should check those as well
+        throw std::logic_error("Comparing Lists to 'null' is not supported");
+    }
     switch (type) {
         case realm::type_Bool:
             do_add_null_comparison_to_query<bool>(query, cmp.op, expr);

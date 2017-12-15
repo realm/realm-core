@@ -459,6 +459,9 @@ TEST(Parser_LinksToDifferentTable)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price.property > 2", 0), message);
     CHECK(message.find("Items") != std::string::npos); // without the "class_" prefix
     CHECK(message.find("price") != std::string::npos); // is not a link
+    // Null cannot be compared to lists
+    CHECK_THROW_ANY(verify_query(test_context, t, "items == NULL", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items != NULL", 0));
 }
 
 
