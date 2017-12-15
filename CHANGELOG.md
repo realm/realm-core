@@ -15,6 +15,20 @@
 
 * Utilities gain `Any` from object store and base64 encoding from sync.
 * Initial support for query serialisation.
+* The query parser from the object store was moved to core.
+  It also gained the following enhancements:
+    - Support @min, @max, @sum, @avg for types: int, double, float
+    - Support @count, @size interchangeably for types list, string, binary
+    - Support operator "LIKE" on strings
+    - Support operators: =>, =<, <>, which are synonymns for >=, <=, and != respectively
+    - Boolean types can now check against “0” or “1” in addition to false and true
+    - Fixed "not" and "or" not being applied to TRUEPREDICATE or FALSEPREDICATE
+    - Add support for comparing binary and string types using a (internal) base64 format: B64”…”
+    - Add support for Timestamps
+      - Internal format “Tseconds:nanoseconds”
+      - Readable format “YYYY-MM-DD@HH:MM:SS:NANOSECONDS”
+        - The nanoseconds part can be optionally omitted
+        - Conversion works for UTC from dates between ~1970-3000 on windows and ~1901-2038 on other platforms
   PR [#2947](https://github.com/realm/realm-core/pull/2947).
 
 -----------
