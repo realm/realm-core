@@ -128,7 +128,7 @@ if(CMAKE_GENERATOR STREQUAL Xcode)
 endif()
 
 target_link_libraries(realm-tests
-                      test-util ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
+                      test-util realm-parser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
 )
 
 target_include_directories(realm-tests PUBLIC ${EXTRA_TEST_CFLAGS})

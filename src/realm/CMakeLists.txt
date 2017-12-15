@@ -33,8 +33,6 @@ set(REALM_SOURCES
     index_string.cpp
     lang_bind_helper.cpp
     link_view.cpp
-    parser/parser.cpp
-    parser/query_builder.cpp
     query.cpp
     query_engine.cpp
     query_expression.cpp
@@ -114,8 +112,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     null.hpp
     olddatetime.hpp
     owned_data.hpp
-    parser/parser.hpp
-    parser/query_builder.hpp
     query.hpp
     query_conditions.hpp
     query_engine.hpp
@@ -135,6 +131,16 @@ set(REALM_INSTALL_GENERAL_HEADERS
     version_id.hpp
     views.hpp
 ) # REALM_INSTALL_GENERAL_HEADERS
+
+set(REALM_PARSER_SOURCES
+    parser/parser.cpp
+    parser/query_builder.cpp
+) # REALM_PARSER_SOURCES
+
+set(REALM_PARSER_HEADERS
+    parser/parser.hpp
+    parser/query_builder.hpp
+) # REALM_PARSER_HEADERS
 
 set(REALM_INSTALL_IMPL_HEADERS
     impl/array_writer.hpp
@@ -253,7 +259,6 @@ if(CMAKE_GENERATOR STREQUAL Xcode)
     )
 endif()
 
-target_include_directories(realm-objects PUBLIC ${PEGTL_INCLUDE_DIR})
 
 add_library(realm STATIC ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
 
@@ -364,6 +369,30 @@ if(ANDROID)
     install(DIRECTORY ${OPENSSL_INCLUDE_DIR}/openssl
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
             COMPONENT devel)
+endif()
+
+add_library(realm-parser STATIC ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS})
+add_dependencies(realm-parser realm)
+target_include_directories(realm-parser PUBLIC ${PEGTL_INCLUDE_DIR})
+install(FILES ${REALM_PARSER_HEADERS}
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/parser
+        COMPONENT devel)
+install(TARGETS realm-parser EXPORT realm-parser
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
+if(NOT REALM_SKIP_SHARED_LIB)
+    add_library(realm-parser-shared SHARED ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS})
+    add_dependencies(realm-parser-shared realm-shared)
+    target_link_libraries(realm-parser-shared PRIVATE realm-shared)
+    target_include_directories(realm-parser-shared PUBLIC ${PEGTL_INCLUDE_DIR})
+    target_include_directories(realm-parser-shared INTERFACE
+                               $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src> $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src>
+                               $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    set_target_properties(realm-parser-shared PROPERTIES
+                          LIBRARY_OUTPUT_NAME realm-parser
+    )
+    install(TARGETS realm-parser-shared
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
+            RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
 endif()
 
 if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT REALM_BUILD_LIB_ONLY)
