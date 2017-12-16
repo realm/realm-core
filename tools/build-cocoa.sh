@@ -73,12 +73,16 @@ for bt in "${BUILD_TYPES[@]}"; do
         fi
         tar -C core -zxvf "${filename}" "lib/librealm${suffix}.a"
         mv "core/lib/librealm${suffix}.a" "core/librealm-${infix}${suffix}.a"
+        tar -C core -zxvf "${filename}" "lib/librealm-parser${suffix}.a"
+        mv "core/lib/librealm-parser${suffix}.a" "core/librealm-parser-${infix}${suffix}.a"
         rm -rf core/lib
     done
 done
 
 ln -s librealm-macosx.a core/librealm.a
 ln -s librealm-macosx-dbg.a core/librealm-dbg.a
+ln -s librealm-parser-macosx.a core/librealm-parser.a
+ln -s librealm-parser-macosx-dbg.a core/librealm-parser-dbg.a
 
 if [[ ! -z $COPY ]]; then
     rm -rf "${DESTINATION}/core"
