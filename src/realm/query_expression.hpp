@@ -3744,8 +3744,21 @@ public:
 
     virtual std::string description() const override
     {
+        if (std::is_same<TCond, BeginsWith>::value
+            || std::is_same<TCond, BeginsWithIns>::value
+            || std::is_same<TCond, EndsWith>::value
+            || std::is_same<TCond, EndsWithIns>::value
+            || std::is_same<TCond, Contains>::value
+            || std::is_same<TCond, ContainsIns>::value
+            || std::is_same<TCond, Like>::value
+            || std::is_same<TCond, LikeIns>::value) {
+            // these string conditions have the arguments reversed but the order is important
+            // operations ==, and != can be reversed because the produce the same results both ways
+            return util::serializer::print_value(m_right->description() + " " + TCond::description()
+                                                 + " " + m_left->description());
+        }
         return util::serializer::print_value(m_left->description() + " " + TCond::description()
-                                    + " " + m_right->description());
+                                             + " " + m_right->description());
     }
 
     std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override

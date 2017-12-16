@@ -111,8 +111,12 @@ static std::vector<std::string> valid_queries = {
     "0 =[c] 0",
     "0!=0",
     "0 != 0",
+    "0 !=[c] 0",
+    "0!=[c]0",
     "0 <> 0",
     "0<>0",
+    "0 <>[c] 0",
+    "0<>[c]0",
     "0==0",
     "0 == 0",
     "0==[c]0",
@@ -360,18 +364,6 @@ TEST(Parser_LinksToSameTable)
     verify_query(test_context, t, "buddy.buddy.buddy.buddy.age > 0", 1);
     verify_query(test_context, t, "buddy.buddy.buddy.buddy.buddy.age > 0", 0);
 
-    verify_query(test_context, t, "name contains \"oe\"", 2);
-
-    // FIXME: the serialisation code switches the argument order of string operations
-    // this produces invalid queries because aside from ==, != string operations are not reversable
-    // this appears to be a problem with core internals?
-//    verify_query(test_context, t, "buddy.name contains \"oe\"", 2);
-//    verify_query(test_context, t, "buddy.buddy.name contains \"oe\"", 2);
-//    verify_query(test_context, t, "buddy.buddy.buddy.name contains \"oe\"", 1);
-//    verify_query(test_context, t, "buddy.buddy.buddy.buddy.name contains \"oe\"", 1);
-//    verify_query(test_context, t, "buddy.buddy.buddy.buddy.buddy.name contains \"oe\"", 0);
-
-
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "buddy.buddy.missing_property > 2", 0), message);
     CHECK(message.find("Person") != std::string::npos); // without the "class_" prefix
@@ -462,6 +454,52 @@ TEST(Parser_LinksToDifferentTable)
     // Null cannot be compared to lists
     CHECK_THROW_ANY(verify_query(test_context, t, "items == NULL", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "items != NULL", 0));
+}
+
+
+TEST(Parser_StringOperations)
+{
+    Group g;
+    TableRef t = g.add_table("person");
+    size_t name_col_ndx = t->add_column(type_String, "name");
+    size_t link_col_ndx = t->add_column_link(type_Link, "father", *t);
+    std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jake", "Joel"};
+    t->add_empty_row(5);
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_string(name_col_ndx, i, names[i]);
+        t->set_link(link_col_ndx, i, (i + 1) % t->size());
+    }
+    t->nullify_link(link_col_ndx, 4);
+
+    verify_query(test_context, t, "name == 'Bob'", 1);
+    verify_query(test_context, t, "father.name == 'Bob'", 1);
+    verify_query(test_context, t, "name ==[c] 'Bob'", 1);
+    verify_query(test_context, t, "father.name ==[c] 'Bob'", 1);
+
+    verify_query(test_context, t, "name != 'Bob'", 4);
+    verify_query(test_context, t, "father.name != 'Bob'", 4);
+    verify_query(test_context, t, "name !=[c] 'bOB'", 4);
+    verify_query(test_context, t, "father.name !=[c] 'bOB'", 4);
+
+    verify_query(test_context, t, "name contains \"oe\"", 2);
+    verify_query(test_context, t, "father.name contains \"oe\"", 2);
+    verify_query(test_context, t, "name contains[c] \"OE\"", 2);
+    verify_query(test_context, t, "father.name contains[c] \"OE\"", 2);
+
+    verify_query(test_context, t, "name beginswith \"J\"", 3);
+    verify_query(test_context, t, "father.name beginswith \"J\"", 3);
+    verify_query(test_context, t, "name beginswith[c] \"j\"", 3);
+    verify_query(test_context, t, "father.name beginswith[c] \"j\"", 3);
+
+    verify_query(test_context, t, "name endswith \"e\"", 2);
+    verify_query(test_context, t, "father.name endswith \"e\"", 2);
+    verify_query(test_context, t, "name endswith[c] \"E\"", 2);
+    verify_query(test_context, t, "father.name endswith[c] \"E\"", 2);
+
+    verify_query(test_context, t, "name like \"?o?\"", 2);
+    verify_query(test_context, t, "father.name like \"?o?\"", 2);
+    verify_query(test_context, t, "name like[c] \"?O?\"", 2);
+    verify_query(test_context, t, "father.name like[c] \"?O?\"", 2);
 }
 
 

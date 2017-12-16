@@ -106,7 +106,7 @@ struct expr : sor< dq_string, sq_string, timestamp, number, argument, true_value
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
 
 struct eq : seq< sor< two< '=' >, one< '=' > >, star< blank >, opt< case_insensitive > >{};
-struct noteq : sor< tao::pegtl::string< '!', '=' >, tao::pegtl::string< '<', '>' > > {};
+struct noteq : seq< sor< tao::pegtl::string< '!', '=' >, tao::pegtl::string< '<', '>' > >, star< blank >, opt< case_insensitive > > {};
 struct lteq : sor< tao::pegtl::string< '<', '=' >, tao::pegtl::string< '=', '<' > > {};
 struct lt : one< '<' > {};
 struct gteq : sor< tao::pegtl::string< '>', '=' >, tao::pegtl::string< '=', '>' > > {};
