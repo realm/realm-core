@@ -6987,11 +6987,11 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     group.verify();
 
     CHECK_EQUAL(4, group.size());
-    CHECK_NOT(alpha->is_attached());
-    CHECK(beta->is_attached());
-    CHECK(gamma->is_attached());
-    CHECK(delta->is_attached());
-    CHECK(epsilon->is_attached());
+    CHECK_NOT(alpha);
+    CHECK(beta);
+    CHECK(gamma);
+    CHECK(delta);
+    CHECK(epsilon);
 
     // Remove table with link column, and table is not a link target.
     {
@@ -7003,10 +7003,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     group.verify();
 
     CHECK_EQUAL(3, group.size());
-    CHECK_NOT(beta->is_attached());
-    CHECK(gamma->is_attached());
-    CHECK(delta->is_attached());
-    CHECK(epsilon->is_attached());
+    CHECK_NOT(beta);
+    CHECK(gamma);
+    CHECK(delta);
+    CHECK(epsilon);
 
     // Remove table with self-link column, and table is not a target of link
     // columns of other tables.
@@ -7019,9 +7019,9 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     group.verify();
 
     CHECK_EQUAL(2, group.size());
-    CHECK_NOT(gamma->is_attached());
-    CHECK(delta->is_attached());
-    CHECK(epsilon->is_attached());
+    CHECK_NOT(gamma);
+    CHECK(delta);
+    CHECK(epsilon);
 
 #ifdef LEGACY_TESTS
     // Try, but fail to remove table which is a target of link columns of other
@@ -7035,8 +7035,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     group.verify();
 
     CHECK_EQUAL(2, group.size());
-    CHECK(delta->is_attached());
-    CHECK(epsilon->is_attached());
+    CHECK(delta);
+    CHECK(epsilon);
 #endif
 }
 
@@ -8632,7 +8632,10 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     CHECK_EQUAL(1, l.size());
     target->clear();
 #ifdef LEGACY_TESTS
-    // Fails due to some problem with refreshing link list size.
+    // ^ Fails CHECK due to some problem with refreshing link list size.
+    // it seems to not follow backlinks and remove forward links
+
+    // target->remove_object(t.get_key()); // <-- fails with double free
     CHECK_EQUAL(0, l.size());
 #endif
 

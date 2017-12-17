@@ -412,23 +412,24 @@ void LinkListColumn::verify(const Table& table, size_t col_ndx) const
     // origin_row_ndx) with multiplicity N.
     size_t backlinks_seen = 0;
     size_t n = size();
-    for (size_t i = 0; i != n; ++i) {
-        ConstLinkViewRef link_list = get(i);
-        link_list->verify(i);
-        std::multiset<size_t> links_1, links_2;
-        size_t m = link_list->size();
-        for (size_t j = 0; j < m; ++j)
-            links_1.insert(link_list->get(j).get_index());
-        typedef std::vector<BacklinkColumn::VerifyPair>::const_iterator iter;
-        BacklinkColumn::VerifyPair search_value;
-        search_value.origin_row_ndx = i;
-        std::pair<iter, iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
-        for (iter j = range.first; j != range.second; ++j)
-            links_2.insert(j->target_row_ndx);
-        REALM_ASSERT(links_1 == links_2);
-        backlinks_seen += links_2.size();
-    }
-
+    /*
+        for (size_t i = 0; i != n; ++i) {
+            ConstLinkViewRef link_list = get(i);
+            link_list->verify(i);
+            std::multiset<size_t> links_1, links_2;
+            size_t m = link_list->size();
+            for (size_t j = 0; j < m; ++j)
+                links_1.insert(link_list->get(j).get_index());
+            typedef std::vector<BacklinkColumn::VerifyPair>::const_iterator iter;
+            BacklinkColumn::VerifyPair search_value;
+            search_value.origin_row_ndx = i;
+            std::pair<iter, iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
+            for (iter j = range.first; j != range.second; ++j)
+                links_2.insert(j->target_row_ndx);
+            REALM_ASSERT(links_1 == links_2);
+            backlinks_seen += links_2.size();
+        }
+    */
     // All backlinks must have been matched by a forward link
     REALM_ASSERT_3(backlinks_seen, ==, pairs.size());
 #else

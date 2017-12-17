@@ -1809,12 +1809,12 @@ public:
         return m_only_unary_links;
     }
 
-    const Table* base_table() const
+    ConstTableRef base_table() const
     {
-        return m_tables.empty() ? nullptr : m_tables[0];
+        return m_tables.empty() ? ConstTableRef() : m_tables[0];
     }
 
-    const Table* target_table() const
+    ConstTableRef target_table() const
     {
         REALM_ASSERT(!m_tables.empty());
         return m_tables.back();
@@ -1833,7 +1833,7 @@ private:
     mutable std::vector<size_t> m_link_column_indexes;
     std::vector<std::string> m_link_column_names;
     std::vector<ColumnType> m_link_types;
-    std::vector<const Table*> m_tables;
+    std::vector<ConstTableRef> m_tables;
     bool m_only_unary_links = true;
     // Leaf cache
     using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
@@ -1967,8 +1967,8 @@ public:
         if (links_exist()) {
             desc = m_link_map.description() + util::serializer::value_separator;
         }
-        const Table* target_table = m_link_map.target_table();
-        if (target_table && target_table->is_attached()) {
+        auto target_table = m_link_map.target_table();
+        if (target_table) {
             desc += std::string(target_table->get_column_name(m_column_ndx));
         }
         return desc;
@@ -2608,8 +2608,8 @@ public:
         if (links_exist()) {
             return m_link_map.description();
         }
-        const Table* target_table = m_link_map.target_table();
-        if (target_table && target_table->is_attached()) {
+        auto target_table = m_link_map.target_table();
+        if (target_table) {
             return std::string(target_table->get_column_name(m_column_ndx));
         }
         return "";
@@ -2697,13 +2697,13 @@ public:
 
     ListColumnAggregate(size_t column_ndx, Columns<List<T>> column)
         : m_column_ndx(column_ndx)
-        , m_subtable_column(std::move(column))
+        , m_list(std::move(column))
     {
     }
 
     ListColumnAggregate(const ListColumnAggregate& other, QueryNodeHandoverPatches* patches)
         : m_column_ndx(other.m_column_ndx)
-        , m_subtable_column(other.m_subtable_column, patches)
+        , m_list(other.m_list, patches)
     {
     }
 
@@ -2714,29 +2714,29 @@ public:
 
     const Table* get_base_table() const override
     {
-        return m_subtable_column.get_base_table();
+        return m_list.get_base_table();
     }
 
     void set_base_table(const Table* table) override
     {
-        m_subtable_column.set_base_table(table);
+        m_list.set_base_table(table);
     }
 
     void set_cluster(const Cluster* cluster) override
     {
-        m_subtable_column.set_cluster(cluster);
+        m_list.set_cluster(cluster);
     }
 
     void update_column() const override
     {
-        m_subtable_column.update_column();
+        m_list.update_column();
     }
 
     void evaluate(size_t index, ValueBase& destination) override
     {
         Allocator& alloc = get_base_table()->get_alloc();
         Value<ref_type> list_refs;
-        m_subtable_column.get_lists(index, list_refs, 1);
+        m_list.get_lists(index, list_refs, 1);
         REALM_ASSERT_DEBUG(list_refs.m_values > 0 || list_refs.m_from_link_list);
         size_t sz = list_refs.m_values;
         // The result is an aggregate value for each table
@@ -2764,8 +2764,8 @@ public:
 
     virtual std::string description() const override
     {
-        const Table* table = get_base_table();
-        if (table && table->is_attached()) {
+        auto table = get_base_table();
+        if (table) {
             return std::string(table->get_column_name(m_column_ndx)) + util::serializer::value_separator +
                    Operation::description() + "()";
         }
@@ -2774,7 +2774,7 @@ public:
 
 private:
     size_t m_column_ndx;
-    Columns<List<T>> m_subtable_column;
+    Columns<List<T>> m_list;
 };
 
 template <class Operator>
@@ -2785,7 +2785,7 @@ Query compare(const Subexpr2<Link>& left, const ConstObj& obj)
     const Columns<Link>* column = dynamic_cast<const Columns<Link>*>(&left);
     if (column) {
         const LinkMap& link_map = column->link_map();
-        REALM_ASSERT(link_map.target_table() == obj.get_table());
+        REALM_ASSERT(link_map.target_table() == ConstTableRef(obj.get_table()));
 #ifdef REALM_OLDQUERY_FALLBACK
         if (link_map.get_nb_hops() == 1) {
             // We can fall back to Query::links_to for != and == operations on links, but only
@@ -2995,8 +2995,8 @@ public:
         if (links_exist()) {
             desc = m_link_map.description() + util::serializer::value_separator;
         }
-        const Table* target_table = m_link_map.target_table();
-        if (target_table && target_table->is_attached() && m_column_ndx != npos) {
+        auto target_table = m_link_map.target_table();
+        if (target_table && m_column_ndx != npos) {
             desc += std::string(target_table->get_column_name(m_column_ndx));
             return desc;
         }

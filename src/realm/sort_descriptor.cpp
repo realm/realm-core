@@ -36,7 +36,7 @@ CommonDescriptor::CommonDescriptor(Table const& table, std::vector<std::vector<s
             column_ids.push_back(ColumnId{cur_table, index});
             DataType col_type = cur_table->get_column_type(index);
             if (col_type == type_Link || col_type == type_LinkList) {
-                cur_table = cur_table->get_link_target(index).get();
+                cur_table = cur_table->get_link_target(index);
             }
             else if (column_ids.size() != indices.size()) {
                 // Only last column in link chain is allowed to be non-link

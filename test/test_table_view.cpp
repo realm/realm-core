@@ -2244,7 +2244,7 @@ TEST(TableView_IsInTableOrder)
     CHECK_EQUAL(false, tv.is_in_table_order());
 
     // Backlinks are not guaranteed to be in table order.
-    tv = target->get_backlink_view(Key(7), source.get(), col_link);
+    tv = target->get_backlink_view(Key(7), source, col_link);
     CHECK_EQUAL(false, tv.is_in_table_order());
 
     // Views derived from a LinkView are not guaranteed to be in table order.

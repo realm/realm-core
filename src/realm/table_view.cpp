@@ -47,7 +47,7 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSo
     // as exporting m_query will bring src out of sync.
     m_query = Query(src.m_query, patch.query_patch, mode);
 
-    Table::generate_patch(src.m_table.get(), patch.m_table);
+    Table::generate_patch(src.m_table, patch.m_table);
     LinkList::generate_patch(src.m_linklist_source.get(), patch.linklist_patch);
     DescriptorOrdering::generate_patch(src.m_descriptor_ordering, patch.descriptors_patch);
 
@@ -82,7 +82,7 @@ TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch, Con
         patch.was_in_sync = false;
     else
         patch.was_in_sync = src.is_in_sync();
-    Table::generate_patch(src.m_table.get(), patch.m_table);
+    Table::generate_patch(src.m_table, patch.m_table);
     if (src.m_source_column_ndx != npos) {
         patch.linked_obj.reset(new ObjectHandoverPatch);
         Table::generate_patch(src.m_linked_obj.get_table(), patch.m_table);

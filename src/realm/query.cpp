@@ -166,7 +166,7 @@ Query::~Query() noexcept = default;
 
 Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
 {
-    Table::generate_patch(source.m_table.get(), patch.m_table);
+    Table::generate_patch(source.m_table, patch.m_table);
     if (source.m_source_table_view) {
         m_owned_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
         m_source_table_view = m_owned_source_table_view.get();
@@ -184,7 +184,7 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
 
 Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
 {
-    Table::generate_patch(source.m_table.get(), patch.m_table);
+    Table::generate_patch(source.m_table, patch.m_table);
     if (source.m_source_table_view) {
         m_owned_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
         m_source_table_view = m_owned_source_table_view.get();

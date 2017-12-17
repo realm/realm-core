@@ -2373,7 +2373,7 @@ std::unique_ptr<SharedGroup::Handover<Table>> SharedGroup::export_table_for_hand
         throw LogicError(LogicError::wrong_transact_state);
     }
     std::unique_ptr<Handover<Table>> result(new Handover<Table>());
-    Table::generate_patch(accessor.get(), result->patch);
+    Table::generate_patch(accessor, result->patch);
     result->clone = 0;
     result->version = get_version_of_current_transaction();
     return result;

@@ -652,7 +652,7 @@ inline TableViewBase::TableViewBase(Table* parent, ConstLinkListPtr link_list)
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv)
-    : ObjList(m_table_view_key_values, tv.m_table.get())
+    : ObjList(m_table_view_key_values, tv.m_table)
     , m_source_column_ndx(tv.m_source_column_ndx)
     , m_linked_obj(tv.m_linked_obj)
     , m_linklist_source(tv.m_linklist_source->clone())
@@ -669,7 +669,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv)
 }
 
 inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
-    : ObjList(m_table_view_key_values, tv.m_table.get())
+    : ObjList(m_table_view_key_values, tv.m_table)
     , m_source_column_ndx(tv.m_source_column_ndx)
     , m_linked_obj(tv.m_linked_obj)
     , m_linklist_source(std::move(tv.m_linklist_source))

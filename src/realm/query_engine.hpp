@@ -180,7 +180,7 @@ public:
         if (&table == m_table)
             return;
 
-        m_table.reset(&table);
+        m_table = ConstTableRef(&table);
         if (m_condition_column_idx != npos) {
             m_condition_column_name = m_table->get_column_name(m_condition_column_idx);
         }
@@ -337,7 +337,7 @@ public:
 protected:
     typedef bool (ParentNode::*Column_action_specialized)(QueryStateBase*, ArrayPayload*, size_t);
     Column_action_specialized m_column_action_specializer = nullptr;
-    ConstTableRef m_table;
+    ConstTableRef m_table = ConstTableRef();
     const Cluster* m_cluster = nullptr;
     std::string error_code;
 

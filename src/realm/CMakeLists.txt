@@ -44,6 +44,7 @@ set(REALM_SOURCES
     spec.cpp
     string_data.cpp
     table.cpp
+    table_ref.cpp
     obj_list.cpp
     table_view.cpp
     sort_descriptor.cpp

@@ -64,7 +64,7 @@ std::unique_ptr<MetricTimer> QueryInfo::track(const Query* query, QueryType type
 {
     REALM_ASSERT_DEBUG(query);
 
-    if (!bool(query->m_table) || !query->m_table->is_attached()) {
+    if (!bool(query->m_table)) {
         return nullptr;
     }
 

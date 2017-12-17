@@ -72,16 +72,6 @@ class QueryInfo;
 
 class Replication;
 
-/// FIXME: Table assignment (from any group to any group) could be made aliasing
-/// safe as follows: Start by cloning source table into target allocator. On
-/// success, assign, and then deallocate any previous structure at the target.
-///
-/// FIXME: It might be desirable to have a 'table move' feature between two
-/// places inside the same group (say from a subtable or a mixed column to group
-/// level). This could be done in a very efficient manner.
-///
-/// FIXME: When compiling in debug mode, all public non-static table functions
-/// should REALM_ASSERT(is_attached()).
 class Table {
 public:
     /// Construct a new freestanding top-level table with static
@@ -141,15 +131,6 @@ public:
     /// further access is disallowed. This way they will be able to reliably
     /// intercept any attempt at accessing such a failed group.
     ///
-    /// FIXME: The C++ documentation must state that if any modifying operation
-    /// on a group (incl. tables, subtables, and specs) or on a free standing
-    /// table (incl. subtables and specs) fails, then any further access to that
-    /// group (except ~Group()) or freestanding table (except ~Table()) has
-    /// undefined behaviour and is considered an error on behalf of the
-    /// application. Note that even Table::is_attached() is disallowed in this
-    /// case.
-    bool is_attached() const noexcept;
-
     /// Get the name of this table, if it has one. Only group-level tables have
     /// names. For a table of any other kind, this function returns the empty
     /// string.
@@ -814,9 +795,7 @@ private:
     //
     // This function puts this table accessor into the detached
     // state. This detaches it from the underlying structure of array
-    // nodes. It also recursively detaches accessors for subtables,
-    // and the type descriptor accessor. When this function returns,
-    // is_attached() will return false.
+    // nodes. All TableRefs for this table instance becomes detached.
     //
     // This function may be called for a table accessor that is
     // already in the detached state (idempotency).
@@ -833,16 +812,6 @@ private:
     /// accessors. This function does not discard the descriptor accessor, if
     /// any, and it does not discard column accessors either.
     void discard_child_accessors() noexcept;
-
-    void bind_ptr() const noexcept
-    {
-    }
-
-    void unbind_ptr() const noexcept
-    {
-    }
-
-    class UnbindGuard;
 
     ColumnType get_real_column_type(size_t column_ndx) const noexcept;
 
@@ -1008,8 +977,6 @@ private:
     friend class Query;
     friend class metrics::QueryInfo;
     template <class>
-    friend class util::bind_ptr;
-    template <class>
     friend class SimpleQuerySupport;
     friend class LangBindHelper;
     friend class TableViewBase;
@@ -1096,14 +1063,9 @@ inline void Table::bump_content_version() const noexcept
 }
 
 
-inline bool Table::is_attached() const noexcept
-{
-    return m_top.is_attached();
-}
 
 inline StringData Table::get_name() const noexcept
 {
-    REALM_ASSERT(is_attached());
     const Array& real_top = m_top;
     ArrayParent* parent = real_top.get_parent();
     if (!parent)
@@ -1115,7 +1077,6 @@ inline StringData Table::get_name() const noexcept
 
 inline size_t Table::get_column_count() const noexcept
 {
-    REALM_ASSERT(is_attached());
     return m_spec->get_public_column_count();
 }
 
@@ -1127,7 +1088,6 @@ inline StringData Table::get_column_name(size_t ndx) const noexcept
 
 inline size_t Table::get_column_index(StringData name) const noexcept
 {
-    REALM_ASSERT(is_attached());
     return m_spec->get_column_index(name);
 }
 
@@ -1142,46 +1102,6 @@ inline DataType Table::get_column_type(size_t ndx) const noexcept
     REALM_ASSERT_3(ndx, <, m_spec->get_column_count());
     return m_spec->get_public_column_type(ndx);
 }
-
-
-class Table::UnbindGuard {
-public:
-    UnbindGuard(Table* table) noexcept
-        : m_table(table)
-    {
-    }
-
-    ~UnbindGuard() noexcept
-    {
-        if (m_table)
-            m_table->unbind_ptr();
-    }
-
-    Table& operator*() const noexcept
-    {
-        return *m_table;
-    }
-
-    Table* operator->() const noexcept
-    {
-        return m_table;
-    }
-
-    Table* get() const noexcept
-    {
-        return m_table;
-    }
-
-    Table* release() noexcept
-    {
-        Table* table = m_table;
-        m_table = nullptr;
-        return table;
-    }
-
-private:
-    Table* m_table;
-};
 
 
 inline Table::Table(Allocator& alloc)
@@ -1403,8 +1323,6 @@ struct LinkTargetInfo {
 // not all of the non-public parts of the Table class.
 class _impl::TableFriend {
 public:
-    typedef Table::UnbindGuard UnbindGuard;
-
     static ref_type create_empty_table(Allocator& alloc, TableKey key = TableKey())
     {
         return Table::create_empty_table(alloc, key); // Throws
@@ -1451,16 +1369,6 @@ public:
     static void discard_child_accessors(Table& table) noexcept
     {
         table.discard_child_accessors();
-    }
-
-    static void bind_ptr(Table& table) noexcept
-    {
-        table.bind_ptr();
-    }
-
-    static void unbind_ptr(Table& table) noexcept
-    {
-        table.unbind_ptr();
     }
 
     static bool compare_objects(const Table& a, const Table& b)

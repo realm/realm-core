@@ -451,7 +451,7 @@ ExpressionNode::ExpressionNode(std::unique_ptr<Expression> expression)
 
 void ExpressionNode::table_changed()
 {
-    m_expression->set_base_table(m_table.get());
+    m_expression->set_base_table(m_table);
 }
 
 void ExpressionNode::cluster_changed()

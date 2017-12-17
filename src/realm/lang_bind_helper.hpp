@@ -190,7 +190,6 @@ inline Table* LangBindHelper::get_table(Group& group, TableKey key)
 {
     typedef _impl::GroupFriend gf;
     Table* table = &gf::get_table(group, key); // Throws
-    table->bind_ptr();
     return table;
 }
 
@@ -198,7 +197,6 @@ inline const Table* LangBindHelper::get_table(const Group& group, TableKey key)
 {
     typedef _impl::GroupFriend gf;
     const Table* table = &gf::get_table(group, key); // Throws
-    table->bind_ptr();
     return table;
 }
 
@@ -206,8 +204,6 @@ inline Table* LangBindHelper::get_table(Group& group, StringData name)
 {
     typedef _impl::GroupFriend gf;
     Table* table = gf::get_table(group, name); // Throws
-    if (table)
-        table->bind_ptr();
     return table;
 }
 
@@ -215,8 +211,6 @@ inline const Table* LangBindHelper::get_table(const Group& group, StringData nam
 {
     typedef _impl::GroupFriend gf;
     const Table* table = gf::get_table(group, name); // Throws
-    if (table)
-        table->bind_ptr();
     return table;
 }
 
@@ -224,7 +218,6 @@ inline Table* LangBindHelper::add_table(Group& group, StringData name, bool requ
 {
     typedef _impl::GroupFriend gf;
     Table* table = &gf::add_table(group, name, require_unique_name); // Throws
-    table->bind_ptr();
     return table;
 }
 
@@ -232,18 +225,15 @@ inline Table* LangBindHelper::get_or_add_table(Group& group, StringData name, bo
 {
     typedef _impl::GroupFriend gf;
     Table* table = &gf::get_or_add_table(group, name, was_added); // Throws
-    table->bind_ptr();
     return table;
 }
 
-inline void LangBindHelper::unbind_table_ptr(const Table* t) noexcept
+inline void LangBindHelper::unbind_table_ptr(const Table*) noexcept
 {
-    t->unbind_ptr();
 }
 
-inline void LangBindHelper::bind_table_ptr(const Table* t) noexcept
+inline void LangBindHelper::bind_table_ptr(const Table*) noexcept
 {
-    t->bind_ptr();
 }
 
 inline void LangBindHelper::advance_read(SharedGroup& sg, VersionID version)

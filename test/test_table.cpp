@@ -355,31 +355,31 @@ TEST(Table_MinMaxSingleNullRow)
     {
         table->maximum_timestamp(date_col, &key); // max on table
         CHECK(key == null_key);
-        table.get()->where().find_all().maximum_timestamp(date_col, &key); // max on tableview
+        table->where().find_all().maximum_timestamp(date_col, &key); // max on tableview
         CHECK(key == null_key);
-        table.get()->where().maximum_timestamp(date_col, &key); // max on query
+        table->where().maximum_timestamp(date_col, &key); // max on query
         CHECK(key == null_key);
 
         table->maximum_int(int_col, &key); // max on table
         CHECK(key == null_key);
-        table.get()->where().find_all().maximum_int(int_col, &key); // max on tableview
+        table->where().find_all().maximum_int(int_col, &key); // max on tableview
         CHECK(key == null_key);
-        table.get()->where().maximum_int(int_col, &key); // max on query
+        table->where().maximum_int(int_col, &key); // max on query
         CHECK(key == null_key);
 
         table->maximum_float(float_col, &key); // max on table
         CHECK(key == null_key);
-        table.get()->where().find_all().maximum_float(float_col, &key); // max on tableview
+        table->where().find_all().maximum_float(float_col, &key); // max on tableview
         CHECK(key == null_key);
-        table.get()->where().maximum_float(float_col, &key); // max on query
+        table->where().maximum_float(float_col, &key); // max on query
         CHECK(key == null_key);
 
         table->create_object();
 
         CHECK(table->maximum_timestamp(date_col).is_null());               // max on table
-        table.get()->where().find_all().maximum_timestamp(date_col, &key); // max on tableview
+        table->where().find_all().maximum_timestamp(date_col, &key);       // max on tableview
         CHECK(key == null_key);
-        table.get()->where().maximum_timestamp(date_col, &key); // max on query
+        table->where().maximum_timestamp(date_col, &key); // max on query
         CHECK(key == null_key);
     }
 
@@ -387,31 +387,31 @@ TEST(Table_MinMaxSingleNullRow)
     {
         table->minimum_timestamp(date_col, &key); // max on table
         CHECK(key == null_key);
-        table.get()->where().find_all().minimum_timestamp(date_col, &key); // max on tableview
+        table->where().find_all().minimum_timestamp(date_col, &key); // max on tableview
         CHECK(key == null_key);
-        table.get()->where().minimum_timestamp(date_col, &key); // max on query
+        table->where().minimum_timestamp(date_col, &key); // max on query
         CHECK(key == null_key);
 
         table->minimum_int(int_col, &key); // max on table
         CHECK(key == null_key);
-        table.get()->where().find_all().minimum_int(int_col, &key); // max on tableview
+        table->where().find_all().minimum_int(int_col, &key); // max on tableview
         CHECK(key == null_key);
-        table.get()->where().minimum_int(int_col, &key); // max on query
+        table->where().minimum_int(int_col, &key); // max on query
         CHECK(key == null_key);
 
         table->minimum_float(float_col, &key); // max on table
         CHECK(key == null_key);
-        table.get()->where().find_all().minimum_float(float_col, &key); // max on tableview
+        table->where().find_all().minimum_float(float_col, &key); // max on tableview
         CHECK(key == null_key);
-        table.get()->where().minimum_float(float_col, &key); // max on query
+        table->where().minimum_float(float_col, &key); // max on query
         CHECK(key == null_key);
 
         table->create_object();
 
         CHECK(table->minimum_timestamp(date_col).is_null());               // max on table
-        table.get()->where().find_all().minimum_timestamp(date_col, &key); // max on tableview
+        table->where().find_all().minimum_timestamp(date_col, &key);       // max on tableview
         CHECK(key == null_key);
-        table.get()->where().minimum_timestamp(date_col, &key); // max on query
+        table->where().minimum_timestamp(date_col, &key); // max on query
         CHECK(key == null_key);
     }
 }
@@ -561,38 +561,38 @@ TEST(Table_AggregateFuzz)
         {
             // Table::max
             key = 123;
-            f = table.get()->maximum_float(2, &key);
+            f = table->maximum_float(2, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(largest_pos).get<float>(float_col));
 
             key = 123;
-            i = table.get()->maximum_int(1, &key);
+            i = table->maximum_int(1, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
 
             key = 123;
-            ts = table.get()->maximum_timestamp(0, &key);
+            ts = table->maximum_timestamp(0, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(largest_pos).get<Timestamp>(date_col));
 
             // Table::min
             key = 123;
-            f = table.get()->minimum_float(2, &key);
+            f = table->minimum_float(2, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(smallest_pos).get<float>(float_col));
 
             key = 123;
-            i = table.get()->minimum_int(1, &key);
+            i = table->minimum_int(1, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
 
             key = 123;
-            ts = table.get()->minimum_timestamp(0, &key);
+            ts = table->minimum_timestamp(0, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(smallest_pos).get<Timestamp>(date_col));
@@ -604,22 +604,22 @@ TEST(Table_AggregateFuzz)
             cnt = 123;
 
             // Table::avg
-            d = table.get()->average_float(2, &cnt);
+            d = table->average_float(2, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
                 CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
 
             cnt = 123;
-            d = table.get()->average_int(1, &cnt);
+            d = table->average_int(1, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
                 CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
 
             // Table::sum
-            d = table.get()->sum_float(2);
+            d = table->sum_float(2);
             CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
 
-            i = table.get()->sum_int(1);
+            i = table->sum_int(1);
             CHECK_EQUAL(i, sum);
         }
 
@@ -627,38 +627,38 @@ TEST(Table_AggregateFuzz)
         {
             // TableView::max
             key = 123;
-            f = table.get()->where().find_all().maximum_float(2, &key);
+            f = table->where().find_all().maximum_float(2, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(largest_pos).get<float>(float_col));
 
             key = 123;
-            i = table.get()->where().find_all().maximum_int(1, &key);
+            i = table->where().find_all().maximum_int(1, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
 
             key = 123;
-            ts = table.get()->where().find_all().maximum_timestamp(0, &key);
+            ts = table->where().find_all().maximum_timestamp(0, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(largest_pos).get<Timestamp>(date_col));
 
             // TableView::min
             key = 123;
-            f = table.get()->where().find_all().minimum_float(2, &key);
+            f = table->where().find_all().minimum_float(2, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(smallest_pos).get<float>(float_col));
 
             key = 123;
-            i = table.get()->where().find_all().minimum_int(1, &key);
+            i = table->where().find_all().minimum_int(1, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
 
             key = 123;
-            ts = table.get()->where().find_all().minimum_timestamp(0, &key);
+            ts = table->where().find_all().minimum_timestamp(0, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(smallest_pos).get<Timestamp>(date_col));
@@ -670,22 +670,22 @@ TEST(Table_AggregateFuzz)
             key = 123;
 
             // TableView::avg
-            d = table.get()->where().find_all().average_float(2, &cnt);
+            d = table->where().find_all().average_float(2, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
                 CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
 
             cnt = 123;
-            d = table.get()->where().find_all().average_int(1, &cnt);
+            d = table->where().find_all().average_int(1, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
                 CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
 
             // TableView::sum
-            d = table.get()->where().find_all().sum_float(2);
+            d = table->where().find_all().sum_float(2);
             CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
 
-            i = table.get()->where().find_all().sum_int(1);
+            i = table->where().find_all().sum_int(1);
             CHECK_EQUAL(i, sum);
 
         }
@@ -694,40 +694,40 @@ TEST(Table_AggregateFuzz)
         {
             // TableView::max
             key = 123;
-            f = table.get()->where().maximum_float(2, &key);
+            f = table->where().maximum_float(2, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(largest_pos).get<float>(float_col));
 
             key = 123;
-            i = table.get()->where().maximum_int(1, &key);
+            i = table->where().maximum_int(1, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
 
             key = 123;
             // Note: Method arguments different from metholds on other column types
-            ts = table.get()->where().maximum_timestamp(0, &key);
+            ts = table->where().maximum_timestamp(0, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(largest_pos).get<Timestamp>(date_col));
 
             // TableView::min
             key = 123;
-            f = table.get()->where().minimum_float(2, &key);
+            f = table->where().minimum_float(2, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(smallest_pos).get<float>(float_col));
 
             key = 123;
-            i = table.get()->where().minimum_int(1, &key);
+            i = table->where().minimum_int(1, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
 
             key = 123;
             // Note: Method arguments different from metholds on other column types
-            ts = table.get()->where().minimum_timestamp(0, &key);
+            ts = table->where().minimum_timestamp(0, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(smallest_pos).get<Timestamp>(date_col));
@@ -739,22 +739,22 @@ TEST(Table_AggregateFuzz)
             cnt = 123;
 
             // TableView::avg
-            d = table.get()->where().average_float(2, &cnt);
+            d = table->where().average_float(2, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
                 CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
 
             cnt = 123;
-            d = table.get()->where().average_int(1, &cnt);
+            d = table->where().average_int(1, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
                 CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
 
             // TableView::sum
-            d = table.get()->where().sum_float(2);
+            d = table->where().sum_float(2);
             CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
 
-            i = table.get()->where().sum_int(1);
+            i = table->where().sum_int(1);
             CHECK_EQUAL(i, sum);
         }
     }
@@ -2363,9 +2363,9 @@ TEST(Table_SubtableIndex)
 
         size_t match;
 
-        match = subtable.get()->where().equal(0, 43).find();
+        match = subtable->where().equal(0, 43).find();
         CHECK_EQUAL(match, 1);
-        match = subtable.get()->where().equal(1, "testsub2").find();
+        match = subtable->where().equal(1, "testsub2").find();
         CHECK_EQUAL(match, 1);
 
         // group.verify();
@@ -2373,12 +2373,12 @@ TEST(Table_SubtableIndex)
 
         subtable = table->get_subtable(1, 1);
 
-        match = subtable.get()->where().equal(0, 77).find();
+        match = subtable->where().equal(0, 77).find();
         CHECK_EQUAL(match, 1);
 
         // Query column that follows indexed column to test if refresh_column_accessors()
         // has worked
-        match = subtable.get()->where().equal(1, "testsub4").find();
+        match = subtable->where().equal(1, "testsub4").find();
         CHECK_EQUAL(match, 1);
 
         sub_1->remove_search_index(1);
@@ -2386,24 +2386,24 @@ TEST(Table_SubtableIndex)
 
         // Query column that follows indexed column to test if refresh_column_accessors()
         // has worked
-        match = subtable.get()->where().equal(1, "testsub4").find();
+        match = subtable->where().equal(1, "testsub4").find();
         CHECK_EQUAL(match, 1);
 
 
-        match = subtable.get()->where().equal(0, 77).find();
+        match = subtable->where().equal(0, 77).find();
         CHECK_EQUAL(match, 1);
 
         // Tests non-degenerate construction of index
         sub_1->add_search_index(1);
 
-        match = subtable.get()->where().equal(0, 77).find();
+        match = subtable->where().equal(0, 77).find();
         CHECK_EQUAL(match, 1);
-        match = subtable.get()->where().equal(1, "testsub4").find();
+        match = subtable->where().equal(1, "testsub4").find();
         CHECK_EQUAL(match, 1);
 
         // Add more data and see if that works
         subtable.get()->add_empty_row();
-        match = subtable.get()->where().equal(0, 0).find();
+        match = subtable->where().equal(0, 0).find();
         CHECK_EQUAL(match, 2);
 
         group.write(path);
@@ -2420,16 +2420,16 @@ TEST(Table_SubtableIndex)
 
         size_t match;
 
-        match = subtable.get()->where().equal(0, 43).find();
+        match = subtable->where().equal(0, 43).find();
         CHECK_EQUAL(match, 1);
-        match = subtable.get()->where().equal(1, "testsub2").find();
+        match = subtable->where().equal(1, "testsub2").find();
         CHECK_EQUAL(match, 1);
 
         subtable = table->get_subtable(1, 1);
 
-        match = subtable.get()->where().equal(0, 77).find();
+        match = subtable->where().equal(0, 77).find();
         CHECK_EQUAL(match, 1);
-        match = subtable.get()->where().equal(1, "testsub4").find();
+        match = subtable->where().equal(1, "testsub4").find();
         CHECK_EQUAL(match, 1);
 
         DescriptorRef subsub;

@@ -287,9 +287,6 @@ size_t Table::add_column_list(DataType type, StringData name)
 {
     size_t col_ndx = get_column_count();
 
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-
     LinkTargetInfo invalid_link;
     do_insert_column(col_ndx, type, name, invalid_link, false, true); // Throws
 
@@ -306,8 +303,6 @@ size_t Table::add_column_link(DataType type, StringData name, Table& target, Lin
 
 void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target, LinkType link_type)
 {
-    if (REALM_UNLIKELY(!is_attached() || !target.is_attached()))
-        throw LogicError(LogicError::detached_accessor);
     if (REALM_UNLIKELY(col_ndx > get_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
     if (REALM_UNLIKELY(!is_link_type(ColumnType(type))))
@@ -344,8 +339,6 @@ void Table::remove_recursive(CascadeState& cascade_state)
 
 void Table::insert_column(size_t col_ndx, DataType type, StringData name, bool nullable)
 {
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
     if (REALM_UNLIKELY(col_ndx > get_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
     if (REALM_UNLIKELY(is_link_type(ColumnType(type))))
@@ -358,8 +351,6 @@ void Table::insert_column(size_t col_ndx, DataType type, StringData name, bool n
 
 void Table::remove_column(size_t col_ndx)
 {
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
     if (REALM_UNLIKELY(col_ndx >= get_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
 
@@ -390,8 +381,6 @@ void Table::remove_column(size_t col_ndx)
 
 void Table::rename_column(size_t col_ndx, StringData name)
 {
-    REALM_ASSERT(is_attached());
-
     REALM_ASSERT_3(col_ndx, <, get_column_count());
 
     m_spec->rename_column(col_ndx, name); // Throws
@@ -561,7 +550,6 @@ void Table::remove_search_index(size_t column_ndx)
 
 size_t Table::get_num_unique_values(size_t column_ndx) const
 {
-    REALM_ASSERT(is_attached());
     ColumnType col_type = m_spec->get_column_type(column_ndx);
     if (col_type != col_type_StringEnum)
         return 0;
@@ -639,9 +627,7 @@ void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, 
         m_index_accessors.insert(m_index_accessors.begin() + ndx, nullptr);
     }
 
-    if (m_clusters.is_attached()) {
-        m_clusters.insert_column(ndx);
-    }
+    m_clusters.insert_column(ndx);
 }
 
 
@@ -658,9 +644,7 @@ void Table::do_erase_root_column(size_t ndx)
         m_index_accessors.erase(m_index_accessors.begin() + ndx);
     }
 
-    if (m_clusters.is_attached()) {
-        m_clusters.remove_column(ndx);
-    }
+    m_clusters.remove_column(ndx);
 }
 
 
@@ -713,8 +697,6 @@ void Table::update_accessors(AccessorUpdater& updater)
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-    REALM_ASSERT(is_attached());
-
     updater.update(*this); // Throws
 }
 
@@ -724,6 +706,7 @@ void Table::detach() noexcept
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
     m_alloc.bump_instance_version();
+    m_next_key_value = -1; // trigger recomputation on next use
     m_spec->detach();
     m_top.detach();
 }
@@ -735,7 +718,7 @@ Table::~Table() noexcept
     if (m_top.get_parent() == nullptr) {
         m_top.destroy_deep();
     }
-    if (is_attached())
+    if (m_top.is_attached())
         detach();
 }
 
@@ -762,10 +745,6 @@ void Table::rebuild_search_index(size_t)
 
 bool Table::is_nullable(size_t col_ndx) const
 {
-    if (!is_attached()) {
-        throw LogicError{LogicError::detached_accessor};
-    }
-
     REALM_ASSERT_DEBUG(col_ndx < m_spec->get_column_count());
     return m_spec->get_column_attr(col_ndx).test(col_attr_Nullable) ||
            m_spec->get_column_type(col_ndx) == col_type_Link;
@@ -818,7 +797,6 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
 
 void Table::batch_erase_rows(const KeyColumn& keys)
 {
-    REALM_ASSERT(is_attached());
     size_t num_objs = keys.size();
     std::vector<Key> vec;
     vec.reserve(num_objs);
@@ -837,9 +815,6 @@ void Table::batch_erase_rows(const KeyColumn& keys)
 
 void Table::clear()
 {
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-
     bool skip_cascade = !m_spec->has_strong_link_columns();
     size_t old_size = size();
 
@@ -912,7 +887,6 @@ void Table::do_clear(bool /* broken_reciprocal_backlinks */)
 
 const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const noexcept
 {
-    REALM_ASSERT_DEBUG(is_attached());
     const Array& real_top = m_top;
     if (ArrayParent* array_parent = real_top.get_parent()) {
         REALM_ASSERT_DEBUG(dynamic_cast<Parent*>(array_parent));
@@ -925,7 +899,6 @@ const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const noexcept
 
 size_t Table::get_parent_row_index() const noexcept
 {
-    REALM_ASSERT(is_attached());
     const Array& real_top = m_top;
     Parent* parent = static_cast<Parent*>(real_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
     if (!parent)
@@ -939,7 +912,6 @@ size_t Table::get_parent_row_index() const noexcept
 
 Group* Table::get_parent_group() const noexcept
 {
-    REALM_ASSERT(is_attached());
     if (!m_top.is_attached())
         return 0;                                              // Subtable with shared descriptor
     Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
@@ -954,7 +926,6 @@ Group* Table::get_parent_group() const noexcept
 
 size_t Table::get_index_in_group() const noexcept
 {
-    REALM_ASSERT(is_attached());
     if (!m_top.is_attached())
         return realm::npos;                                    // Subtable with shared descriptor
     Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
@@ -1352,7 +1323,7 @@ const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain)
         ColumnType type = table->get_real_column_type(link_chain[t]);
         if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
             auto key = table->m_spec->get_opposite_link_table_key(link_chain[t]);
-            table = table->get_parent_group()->get_table(key).get();
+            table = table->get_parent_group()->get_table(key);
         }
         else {
             // Only last column in link chain is allowed to be non-link
@@ -1377,8 +1348,6 @@ void Table::optimize(bool)
 
 void Table::update_from_parent(size_t old_baseline) noexcept
 {
-    REALM_ASSERT(is_attached());
-
     // There is no top for sub-tables sharing spec
     if (m_top.is_attached()) {
         if (!m_top.update_from_parent(old_baseline))
@@ -1728,7 +1697,7 @@ void Table::to_string_row(Key key, std::ostream& out, const std::vector<size_t>&
 
 size_t Table::compute_aggregated_byte_size() const noexcept
 {
-    if (!is_attached())
+    if (!m_top.is_attached())
         return 0;
     const Array& real_top = (m_top);
     MemStats stats_2;
@@ -1797,8 +1766,6 @@ Spec* Table::Parent::get_subtable_spec() noexcept
 
 void Table::refresh_accessor_tree()
 {
-    REALM_ASSERT(is_attached());
-
     if (m_top.is_attached()) {
         // Root table (free-standing table, group-level table, or subtable with
         // independent descriptor)
@@ -1852,8 +1819,6 @@ TableRef Table::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& pa
 void Table::verify() const
 {
 #ifdef REALM_DEBUG
-    REALM_ASSERT(is_attached());
-
     if (m_top.is_attached())
         m_top.verify();
     m_spec->verify();
@@ -2102,8 +2067,6 @@ void Table::do_remove_object(Key key)
 
 void Table::remove_object(Key key)
 {
-    REALM_ASSERT(is_attached());
-
     Group* g = get_parent_group();
 
     if (m_spec->has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
