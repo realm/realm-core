@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.0.0 Release notes
 
 ### Bugfixes
 
@@ -34,12 +34,6 @@
         - The nanoseconds part can be optionally omitted
         - Conversion works for UTC from dates between ~1970-3000 on windows and ~1901-2038 on other platforms
   PR [#2947](https://github.com/realm/realm-core/pull/2947).
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
