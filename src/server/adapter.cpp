@@ -37,6 +37,7 @@ using namespace realm;
 using ObjectID = realm::sync::ObjectID;
 using Instruction = realm::sync::Instruction;
 
+namespace {
 static PropertyType from_core_type(DataType type)
 {
     switch (type) {
@@ -520,6 +521,8 @@ public:
     }
 };
 
+} // anonymous namespace
+
 class Adapter::Impl : public AdminRealmListener {
 public:
     Impl(std::function<void(std::string)> realm_changed, std::regex regex,
@@ -539,12 +542,14 @@ private:
     const std::string m_server_base_url;
     std::shared_ptr<SyncUser> m_user;
     std::function<SyncBindSessionHandler> m_bind_callback;
+    std::shared_ptr<ChangesetCooker> m_transformer;
     std::string m_regular_realms_dir;
 
     std::function<void(std::string)> m_realm_changed;
     std::regex m_regex;
 
     std::vector<std::shared_ptr<_impl::RealmCoordinator>> m_realms;
+
 };
 
 Adapter::Impl::Impl(std::function<void(std::string)> realm_changed, std::regex regex,
@@ -554,6 +559,7 @@ Adapter::Impl::Impl(std::function<void(std::string)> realm_changed, std::regex r
 , m_server_base_url(std::move(server_base_url))
 , m_user(std::move(user))
 , m_bind_callback(std::move(bind_callback))
+, m_transformer(std::make_shared<ChangesetCooker>())
 , m_regular_realms_dir(util::File::resolve("realms", local_root_dir)) // Throws
 , m_realm_changed(std::move(realm_changed))
 , m_regex(std::move(regex))
@@ -578,6 +584,7 @@ Realm::Config Adapter::Impl::get_config(StringData virtual_path, util::Optional<
     config.path = std::move(file_path);
     config.sync_config = std::make_unique<SyncConfig>(m_user, m_server_base_url + virtual_path.data());
     config.sync_config->bind_session_handler = m_bind_callback;
+    config.sync_config->transformer = m_transformer;
     config.schema_mode = SchemaMode::Additive;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -589,9 +596,7 @@ void Adapter::Impl::register_realm(StringData virtual_path) {
     if (!std::regex_match(path, m_regex))
         return;
 
-    auto config = get_config(path, util::none);
-    config.sync_config->transformer = std::make_shared<ChangesetCooker>();
-    auto coordinator = _impl::RealmCoordinator::get_coordinator(config);
+    auto coordinator = _impl::RealmCoordinator::get_coordinator(get_config(path, util::none));
     std::weak_ptr<Impl> weak_self = std::static_pointer_cast<Impl>(shared_from_this());
     coordinator->set_transaction_callback([path = std::move(path), weak_self = std::move(weak_self)](VersionID, VersionID) {
         if (auto self = weak_self.lock())
