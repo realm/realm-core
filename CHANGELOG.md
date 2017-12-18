@@ -2,7 +2,10 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix possible corruption or crashes when a `move_row` operates on a subtable.
+  PR [#2927](https://github.com/realm/realm-core/pull/2926).
+* Table::set_int() did not check if the target column was indeed type_Int. It
+  will now assert like the other set methods.
 
 ### Breaking changes
 
@@ -13,6 +16,7 @@
 
 ### Enhancements
 
+* Attempted to fix a false encryption security warning from IBM Bluemix. PR [#2911]
 * Utilities gain `Any` from object store and base64 encoding from sync.
 * Initial support for query serialisation.
 * The query parser from the object store was moved to core.
