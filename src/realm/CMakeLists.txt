@@ -377,7 +377,7 @@ target_include_directories(realm-parser PUBLIC ${PEGTL_INCLUDE_DIR})
 install(FILES ${REALM_PARSER_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/parser
         COMPONENT devel)
-install(TARGETS realm-parser EXPORT realm-parser
+install(TARGETS realm-parser EXPORT realm
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
 if(NOT REALM_SKIP_SHARED_LIB)
     add_library(realm-parser-shared SHARED ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS})
