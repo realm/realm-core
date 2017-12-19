@@ -1,22 +1,8 @@
-# NEXT RELEASE
+# 5.0.1 Release notes
 
 ### Bugfixes
 
-* Lorem ipsum.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
 * Add a CMake import target for the `realm-parser` library.
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
