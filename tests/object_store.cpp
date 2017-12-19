@@ -67,7 +67,7 @@ TEST_CASE("ObjectStore:: property_for_column_index()") {
         for (size_t col = 0; col < count; col++) {
             auto property = ObjectStore::property_for_column_index(table, col);
             if (!property) {
-#if REALM_HAVE_SYNC_STABLE_IDS
+#if REALM_ENABLE_SYNC
                 REQUIRE(table->get_column_name(col) == sync::object_id_column_name);
 #else
                 FAIL();
