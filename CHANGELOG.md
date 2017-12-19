@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Add a CMake import target for the `realm-parser` library.
 
 -----------
 
