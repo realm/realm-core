@@ -372,18 +372,18 @@ if(ANDROID)
 endif()
 
 add_library(realm-parser STATIC ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS})
-add_dependencies(realm-parser realm)
-target_include_directories(realm-parser PUBLIC ${PEGTL_INCLUDE_DIR})
+target_link_libraries(realm-parser PUBLIC realm)
+target_include_directories(realm-parser PRIVATE ${PEGTL_INCLUDE_DIR})
 install(FILES ${REALM_PARSER_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/parser
         COMPONENT devel)
-install(TARGETS realm-parser EXPORT realm-parser
+install(TARGETS realm-parser EXPORT realm
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
 if(NOT REALM_SKIP_SHARED_LIB)
     add_library(realm-parser-shared SHARED ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS})
     add_dependencies(realm-parser-shared realm-shared)
     target_link_libraries(realm-parser-shared PRIVATE realm-shared)
-    target_include_directories(realm-parser-shared PUBLIC ${PEGTL_INCLUDE_DIR})
+    target_include_directories(realm-parser-shared PRIVATE ${PEGTL_INCLUDE_DIR})
     target_include_directories(realm-parser-shared INTERFACE
                                $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src> $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src>
                                $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
