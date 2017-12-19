@@ -30,9 +30,7 @@
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 
-#if REALM_HAVE_SYNC_STABLE_IDS
 #include <realm/sync/object.hpp>
-#endif
 
 using namespace realm;
 

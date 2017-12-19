@@ -20,7 +20,6 @@
 #define REALM_RESULTS_HPP
 
 #include "collection_notifications.hpp"
-#include "descriptor_ordering.hpp"
 #include "impl/collection_notifier.hpp"
 #include "property.hpp"
 

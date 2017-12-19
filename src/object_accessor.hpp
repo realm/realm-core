@@ -34,9 +34,7 @@
 #include <realm/util/assert.hpp>
 #include <realm/table_view.hpp>
 
-#if REALM_HAVE_SYNC_STABLE_IDS
 #include <realm/sync/object.hpp>
-#endif // REALM_HAVE_SYNC_STABLE_IDS
 
 #include <string>
 
@@ -209,24 +207,11 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         if (row_index == realm::not_found) {
             created = true;
             if (primary_prop->type == PropertyType::Int) {
-#if REALM_HAVE_SYNC_STABLE_IDS
                 row_index = sync::create_object_with_primary_key(realm->read_group(), *table, ctx.template unbox<util::Optional<int64_t>>(*primary_value));
-#else
-                row_index = table->add_empty_row();
-                if (ctx.is_null(*primary_value))
-                    table->set_null_unique(primary_prop->table_column, row_index);
-                else
-                    table->set_unique(primary_prop->table_column, row_index, ctx.template unbox<int64_t>(*primary_value));
-#endif // REALM_HAVE_SYNC_STABLE_IDS
             }
             else if (primary_prop->type == PropertyType::String) {
                 auto value = ctx.template unbox<StringData>(*primary_value);
-#if REALM_HAVE_SYNC_STABLE_IDS
                 row_index = sync::create_object_with_primary_key(realm->read_group(), *table, value);
-#else
-                row_index = table->add_empty_row();
-                table->set_unique(primary_prop->table_column, row_index, value);
-#endif // REALM_HAVE_SYNC_STABLE_IDS
             }
             else {
                 REALM_TERMINATE("Unsupported primary key type.");
@@ -248,11 +233,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         }
     }
     else {
-#if REALM_HAVE_SYNC_STABLE_IDS
         row_index = sync::create_object(realm->read_group(), *table);
-#else
-        row_index = table->add_empty_row();
-#endif // REALM_HAVE_SYNC_STABLE_IDS
         created = true;
     }
 

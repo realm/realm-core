@@ -18,7 +18,6 @@
 
 #include "feature_checks.hpp"
 
-#if REALM_HAVE_SYNC_STABLE_IDS
 
 #include "sync_test_utils.hpp"
 
@@ -263,4 +262,3 @@ TEST_CASE("Partial sync error checking", "[sync]") {
                                                   [&](Results, std::exception_ptr) { }));
     }
 }
-#endif // REALM_HAVE_SYNC_STABLE_IDS
