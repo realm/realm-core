@@ -92,6 +92,6 @@
 
 // Temporarily disable async testing until use of sleep() in the async tests have
 // been replaced with a better solution.
-#define DISABLE_ASYNC
+// #define DISABLE_ASYNC
 
 #endif
