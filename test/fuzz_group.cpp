@@ -145,12 +145,12 @@ int32_t get_int32(State& s)
     return v;
 }
 
-std::string create_string(State& s, unsigned char length)
+std::string create_string(State& s, size_t length)
 {
-    char buf[256] = {0};
+    std::string buf(length, '\0');
     for (size_t i = 0; i < length; i++)
         buf[i] = get_next(s);
-    return std::string{buf, static_cast<size_t>(length)};
+    return buf;
 }
 
 std::pair<int64_t, int32_t> get_timestamp_values(State& s) {
