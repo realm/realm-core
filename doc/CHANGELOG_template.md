@@ -2,21 +2,21 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* None.
 
 ### Breaking changes
 
-* Lorem ipsum.
+* None.
 
 ### Enhancements
 
-* Lorem ipsum.
+* None.
 
 -----------
 
 ### Internals
 
-* Lorem ipsum.
+* None.
 
 ----------------------------------------------
 
