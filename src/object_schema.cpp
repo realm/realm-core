@@ -30,8 +30,6 @@
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 
-#include <realm/sync/object.hpp>
-
 using namespace realm;
 
 ObjectSchema::ObjectSchema() = default;

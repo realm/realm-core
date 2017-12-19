@@ -30,7 +30,9 @@
 #include <realm/table_view.hpp>
 #include <realm/util/assert.hpp>
 
+#if REALM_ENABLE_SYNC
 #include <realm/sync/object.hpp>
+#endif // REALM_ENABLE_SYNC
 
 #include <string.h>
 
@@ -144,6 +146,7 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
     auto name = ObjectStore::table_name_for_object_type(object_schema.name);
 
     TableRef table;
+#if REALM_ENABLE_SYNC
     if (auto* pk_property = object_schema.primary_key_property()) {
         table = sync::create_table_with_primary_key(group, name, to_core_type(pk_property->type),
                                                     pk_property->name, is_nullable(pk_property->type));
@@ -151,6 +154,9 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
     else {
         table = sync::create_table(group, name);
     }
+#else
+    table = group.get_or_add_table(name);
+#endif // REALM_ENABLE_SYNC
 
     ObjectStore::set_primary_key_for_object(group, object_schema.name, object_schema.primary_key);
 
@@ -163,9 +169,11 @@ void add_initial_columns(Group& group, ObjectSchema const& object_schema)
     TableRef table = group.get_table(name);
 
     for (auto const& prop : object_schema.persisted_properties) {
+#if REALM_ENABLE_SYNC
         // The sync::create_table* functions create the PK column for us.
         if (prop.is_primary)
             continue;
+#endif // REALM_ENABLE_SYNC
         add_column(group, *table, prop);
     }
 }
@@ -271,6 +279,7 @@ void ObjectStore::set_primary_key_for_object(Group& group, StringData object_typ
 
     size_t row = table->find_first_string(c_primaryKeyObjectClassColumnIndex, object_type);
 
+#if REALM_ENABLE_SYNC
     // sync::create_table* functions should have already updated the pk table.
     if (sync::has_object_ids(group)) {
         if (primary_key.size() == 0)
@@ -281,6 +290,7 @@ void ObjectStore::set_primary_key_for_object(Group& group, StringData object_typ
         }
         return;
     }
+#endif // REALM_ENABLE_SYNC
 
     if (row == not_found && primary_key.size()) {
         row = table->add_empty_row();
@@ -761,10 +771,12 @@ util::Optional<Property> ObjectStore::property_for_column_index(ConstTableRef& t
 {
     StringData column_name = table->get_column_name(column_index);
 
+#if REALM_ENABLE_SYNC
     // The object ID column is an implementation detail, and is omitted from the schema.
     // FIXME: Consider filtering out all column names starting with `!`.
     if (column_name == sync::object_id_column_name)
         return util::none;
+#endif
 
     if (table->get_column_type(column_index) == type_Table) {
         auto subdesc = table->get_subdescriptor(column_index);
