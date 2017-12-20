@@ -158,6 +158,7 @@ GroupWriter::GroupWriter(Group& group)
     , m_free_lengths(m_alloc)
     , m_free_versions(m_alloc)
     , m_current_version(0)
+    , m_alloc_position(0)
 {
     m_map_windows.reserve(num_map_windows);
 
@@ -652,28 +653,22 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
     // chunks we are likely to find them faster by skipping the first half of
     // the list.
     size_t end = m_free_lengths.size();
-    if (size < 1024) {
-        chunk = search_free_space_in_part_of_freelist(size, 0, end, found);
-        if (found)
-            return chunk;
-    }
-    else {
-        chunk = search_free_space_in_part_of_freelist(size, end / 2, end, found);
-        if (found)
-            return chunk;
-        chunk = search_free_space_in_part_of_freelist(size, 0, end / 2, found);
-        if (found)
-            return chunk;
-    }
+    if (m_alloc_position >= end)
+        m_alloc_position = 0;
 
-    // No free space, so we have to extend the file.
-    do {
+    chunk = search_free_space_in_part_of_freelist(size, m_alloc_position, end, found);
+    if (!found) {
+        chunk = search_free_space_in_part_of_freelist(size, 0, m_alloc_position, found);
+    }
+    while (!found) {
+        // No free space, so we have to extend the file.
         extend_free_space(size);
         // extending the file will add a new entry at the end of the freelist,
         // so search that particular entry
         end = m_free_lengths.size();
         chunk = search_free_space_in_part_of_freelist(size, end - 1, end, found);
-    } while (!found);
+    }
+    m_alloc_position = chunk.first;
     return chunk;
 }
 
