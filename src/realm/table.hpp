@@ -1082,10 +1082,10 @@ private:
     // Upgrades OldDateTime columns to Timestamp columns
     void upgrade_olddatetime();
 
-    // indicate that the current global state version has been "observed". Until this
-    // happens, bumping of the globalt version counter can be bypassed, as any query
+    // Indicate that the current global state version has been "observed". Until this
+    // happens, bumping of the global version counter can be bypassed, as any query
     // checking for a version change will see the older version change anyways.
-    // Also returns the table-local version
+    // Also returns the table-local version.
     uint64_t observe_version() const noexcept;
 
     /// Update the version of this table and all tables which have links to it.
