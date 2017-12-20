@@ -648,10 +648,6 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
     typedef std::pair<size_t, size_t> Chunk;
     Chunk chunk;
     bool found;
-    // Since we do a first-fit search for small chunks, the top pieces are
-    // likely to get smaller and smaller. So when we are looking for bigger
-    // chunks we are likely to find them faster by skipping the first half of
-    // the list.
     size_t end = m_free_lengths.size();
     if (m_alloc_position >= end)
         m_alloc_position = 0;
