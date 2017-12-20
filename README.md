@@ -6,7 +6,6 @@ The object store consists of the following components:
 - `object_store`/`schema`/`object_schema`/`property` - contains the structures and logic used to setup and modify Realm files and their schema.
 - `shared_realm` - wraps the `object_store` APIs to provide transactions, notifications, Realm caching, migrations, and other higher level functionality.
 - `object_accessor`/`results`/`list` - accessor classes, object creation/update pipeline, and helpers for creating platform specific property getters and setters.
-- `parser`/`query_builder` - cross platform query parser and query builder - requires an `object_accessor` specialization for argument support.
 
 Each Realm product may use only a subset of the provided components depending on its needs.
 

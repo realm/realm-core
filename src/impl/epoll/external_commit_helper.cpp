@@ -18,7 +18,6 @@
 
 #include "impl/external_commit_helper.hpp"
 #include "impl/realm_coordinator.hpp"
-#include "util/format.hpp"
 
 #include <realm/util/assert.hpp>
 #include <realm/group_shared_options.hpp>

@@ -23,7 +23,6 @@
 #include "property.hpp"
 #include "schema.hpp"
 
-#include "util/format.hpp"
 
 #include <realm/data_type.hpp>
 #include <realm/descriptor.hpp>

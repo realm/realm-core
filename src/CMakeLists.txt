@@ -20,9 +20,6 @@ set(SOURCES
     impl/results_notifier.cpp
     impl/transact_log_handler.cpp
     impl/weak_realm_notifier.cpp
-    parser/parser.cpp
-    parser/query_builder.cpp
-    util/format.cpp
     util/uuid.cpp)
 
 set(HEADERS
@@ -60,20 +57,14 @@ set(HEADERS
     impl/transact_log_handler.hpp
     impl/weak_realm_notifier.hpp
 
-    parser/parser.hpp
-    parser/query_builder.hpp
-
     util/android/event_loop_signal.hpp
     util/apple/event_loop_signal.hpp
     util/generic/event_loop_signal.hpp
     util/uv/event_loop_signal.hpp
 
     util/aligned_union.hpp
-    util/any.hpp
     util/atomic_shared_ptr.hpp
-    util/compiler.hpp
     util/event_loop_signal.hpp
-    util/format.hpp
     util/tagged_bool.hpp
     util/time.hpp
     util/uuid.hpp)

@@ -30,7 +30,6 @@
 #include "schema.hpp"
 
 #include "impl/realm_coordinator.hpp"
-#include "util/format.hpp"
 
 #include <realm/group.hpp>
 

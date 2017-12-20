@@ -284,22 +284,6 @@ TEST_CASE("Transaction log parsing: schema change validation") {
         REQUIRE_NOTHROW(r->refresh());
     }
 
-    SECTION("moving columns is allowed") {
-        WriteTransaction wt(sg);
-        TableRef table = wt.get_table("class_table");
-        _impl::TableFriend::move_column(*table->get_descriptor(), 0, 1);
-        wt.commit();
-
-        REQUIRE_NOTHROW(r->refresh());
-    }
-
-    SECTION("moving tables is allowed") {
-        WriteTransaction wt(sg);
-        wt.get_group().move_table(2, 0);
-        wt.commit();
-        REQUIRE_NOTHROW(r->refresh());
-    }
-
     SECTION("removing a column is not allowed") {
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("class_table");
@@ -390,42 +374,6 @@ TEST_CASE("Transaction log parsing: schema change reporting") {
         REQUIRE(info.table_indices[4] == 6);
     }
 
-    SECTION("moving tables") {
-        auto info = track_changes([&] {
-            group.move_table(1, 4);
-        });
-        REQUIRE(info.table_indices.size() == 10);
-        REQUIRE(info.table_indices[0] == 0);
-        REQUIRE(info.table_indices[1] == 4);
-        REQUIRE(info.table_indices[2] == 1);
-        REQUIRE(info.table_indices[3] == 2);
-        REQUIRE(info.table_indices[4] == 3);
-        REQUIRE(info.table_indices[5] == 5);
-
-        info = track_changes([&] {
-            group.move_table(4, 1);
-        });
-        REQUIRE(info.table_indices.size() == 10);
-        REQUIRE(info.table_indices[0] == 0);
-        REQUIRE(info.table_indices[1] == 2);
-        REQUIRE(info.table_indices[2] == 3);
-        REQUIRE(info.table_indices[3] == 4);
-        REQUIRE(info.table_indices[4] == 1);
-        REQUIRE(info.table_indices[5] == 5);
-
-        info = track_changes([&] {
-            group.move_table(0, 1);
-            group.move_table(1, 2);
-            group.move_table(2, 3);
-        });
-        REQUIRE(info.table_indices.size() == 10);
-        REQUIRE(info.table_indices[0] == 3);
-        REQUIRE(info.table_indices[1] == 0);
-        REQUIRE(info.table_indices[2] == 1);
-        REQUIRE(info.table_indices[3] == 2);
-        REQUIRE(info.table_indices[4] == 4);
-    }
-
     SECTION("inserting columns") {
         auto info = track_changes([&] {
             group.get_table(2)->insert_column(1, type_Int, "1");
@@ -446,29 +394,6 @@ TEST_CASE("Transaction log parsing: schema change reporting") {
             group.get_table(2)->insert_column(0, type_Int, "1");
         });
         REQUIRE(info.column_indices[2] == (std::vector<size_t>{npos, 0, 1, npos, 2}));
-    }
-
-    SECTION("moving columns") {
-        auto info = track_changes([&] {
-            _impl::TableFriend::move_column(*group.get_table(2)->get_descriptor(), 1, 3);
-        });
-        REQUIRE(info.column_indices.size() == 3);
-        REQUIRE(info.column_indices[0].empty());
-        REQUIRE(info.column_indices[1].empty());
-        REQUIRE(info.column_indices[2] == (std::vector<size_t>{0, 2, 3, 1, 4}));
-
-        info = track_changes([&] {
-            _impl::TableFriend::move_column(*group.get_table(2)->get_descriptor(), 3, 1);
-        });
-        REQUIRE(info.column_indices.size() == 3);
-        REQUIRE(info.column_indices[2] == (std::vector<size_t>{0, 3, 1, 2, 4}));
-
-        info = track_changes([&] {
-            _impl::TableFriend::move_column(*group.get_table(2)->get_descriptor(), 3, 0);
-            _impl::TableFriend::move_column(*group.get_table(2)->get_descriptor(), 0, 3);
-        });
-        REQUIRE(info.column_indices.size() == 3);
-        REQUIRE(info.column_indices[2] == (std::vector<size_t>{0, 1, 2, 3, 4}));
     }
 }
 
@@ -584,18 +509,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             });
             REQUIRE(info.tables.size() == 4);
             REQUIRE_INDICES(info.tables[3].insertions, 10, 11);
-        }
-
-        SECTION("reordering tables does not distrupt change tracking") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.add_empty_row();
-                r->read_group().move_table(2, 0);
-                table.add_empty_row();
-                r->read_group().move_table(0, 1);
-                table.add_empty_row();
-            });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE_INDICES(info.tables[1].insertions, 10, 11, 12);
         }
 
         SECTION("swap_rows() reports a pair of moves") {
@@ -1280,17 +1193,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_INDICES(changes.insertions, 10, 11);
         }
 
-        SECTION("reordering tables does not distrupt change tracking") {
-            VALIDATE_CHANGES(changes) {
-                lv->add(0);
-                r->read_group().move_table(2, 0);
-                lv->add(0);
-                r->read_group().move_table(0, 3);
-                lv->add(0);
-            }
-            REQUIRE_INDICES(changes.insertions, 10, 11, 12);
-        }
-
         SECTION("inserting new columns does not distrupt change tracking") {
             VALIDATE_CHANGES(changes) {
                 lv->add(0);
@@ -1298,21 +1200,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 lv->add(0);
             }
             REQUIRE_INDICES(changes.insertions, 10, 11);
-        }
-
-        SECTION("reordering columns does not distrupt change tracking") {
-            VALIDATE_CHANGES(changes) {
-                origin->insert_column(1, type_Int, "new column 1");
-                origin->insert_column(2, type_Int, "new column 2");
-                origin->insert_column(3, type_Int, "new column 3");
-
-                lv->add(0);
-                _impl::TableFriend::move_column(*origin->get_descriptor(), 0, 3);
-                lv->add(0);
-                _impl::TableFriend::move_column(*origin->get_descriptor(), 3, 1);
-                lv->add(0);
-            }
-            REQUIRE_INDICES(changes.insertions, 10, 11, 12);
         }
 
         SECTION("schema changes in subtable column on origin") {
@@ -1756,72 +1643,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_FALSE(changes.modified(0, 1));
             REQUIRE_FALSE(changes.modified(0, 2));
             REQUIRE(changes.modified(0, 3));
-        }
-
-        SECTION("move modified columns") {
-            Row r = target->get(0);
-            auto changes = observe({r}, [&] {
-                r.set_int(0, 5);
-                _impl::TableFriend::move_column(*target->get_descriptor(), 0, 2);
-                r.set_int(1, 5);
-            });
-            REQUIRE_FALSE(changes.modified(0, 0));
-            REQUIRE(changes.modified(0, 1));
-            REQUIRE(changes.modified(0, 2));
-
-            REQUIRE(changes.initial_column_index(0, 0) == 1);
-            REQUIRE(changes.initial_column_index(0, 1) == 2);
-            REQUIRE(changes.initial_column_index(0, 2) == 0);
-
-            changes = observe({r}, [&] {
-                r.set_int(2, 5);
-                _impl::TableFriend::move_column(*target->get_descriptor(), 2, 0);
-                r.set_int(2, 5);
-            });
-            REQUIRE(changes.modified(0, 0));
-            REQUIRE_FALSE(changes.modified(0, 1));
-            REQUIRE(changes.modified(0, 2));
-
-            REQUIRE(changes.initial_column_index(0, 0) == 2);
-            REQUIRE(changes.initial_column_index(0, 1) == 0);
-            REQUIRE(changes.initial_column_index(0, 2) == 1);
-        }
-
-        SECTION("moving an observed table does not break tracking") {
-            // move via move()
-            Row r = target->get(0);
-            auto changes = observe({r}, [&] {
-                r.set_int(0, 5);
-                realm->read_group().move_table(r.get_table()->get_index_in_group(), 0);
-                r.set_int(1, 5);
-            });
-            REQUIRE(changes.modified(0, 0));
-            REQUIRE(changes.modified(0, 1));
-
-            // move via insertion()
-            changes = observe({r}, [&] {
-                r.set_int(0, 5);
-                realm->read_group().insert_table(0, "new table");
-                r.set_int(1, 5);
-            });
-            REQUIRE(changes.modified(0, 0));
-            REQUIRE(changes.modified(0, 1));
-
-            // move by shifting around surrounding tables
-            changes = observe({r}, [&] {
-                r.set_int(0, 5);
-                realm->read_group().move_table(0, realm->read_group().size() - 1);
-                r.set_int(1, 5);
-            });
-            REQUIRE(changes.modified(0, 0));
-            REQUIRE(changes.modified(0, 1));
-            changes = observe({r}, [&] {
-                r.set_int(0, 5);
-                realm->read_group().move_table(realm->read_group().size() - 1, 0);
-                r.set_int(1, 5);
-            });
-            REQUIRE(changes.modified(0, 0));
-            REQUIRE(changes.modified(0, 1));
         }
 
         SECTION("modifying a subtable in an observed table does not produce a notification") {

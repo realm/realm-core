@@ -1599,21 +1599,6 @@ TEST_CASE("migration: Additive") {
         REQUIRE(realm->schema().find("object")->persisted_properties[1].table_column == 2);
     }
 
-    SECTION("rearrange columns at beginning from different SG") {
-        auto realm2 = Realm::get_shared_realm(config);
-        auto& group = realm2->read_group();
-        realm2->begin_transaction();
-        auto table = ObjectStore::table_for_object_type(group, "object");
-        // There currently isn't actually any way to produce a column move from the public API
-        _impl::TableFriend::move_column(*table->get_descriptor(), 1, 0);
-        realm2->commit_transaction();
-
-        REQUIRE_NOTHROW(realm->refresh());
-        REQUIRE(realm->schema() == schema);
-        REQUIRE(realm->schema().find("object")->persisted_properties[0].table_column == 1);
-        REQUIRE(realm->schema().find("object")->persisted_properties[1].table_column == 0);
-    }
-
     SECTION("opening new Realms uses the correct schema after an external change") {
         auto realm2 = Realm::get_shared_realm(config);
         auto& group = realm2->read_group();

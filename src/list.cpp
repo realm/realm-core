@@ -26,7 +26,6 @@
 #include "results.hpp"
 #include "schema.hpp"
 #include "shared_realm.hpp"
-#include "util/format.hpp"
 
 #include <realm/link_view.hpp>
 

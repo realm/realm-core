@@ -19,7 +19,6 @@
 #include "catch.hpp"
 
 #include "util/event_loop.hpp"
-#include "util/format.hpp"
 #include "util/index_helpers.hpp"
 #include "util/templated_test_case.hpp"
 #include "util/test_file.hpp"
@@ -1176,7 +1175,7 @@ TEST_CASE("notifications: sync") {
         {
             auto write_realm = Realm::get_shared_realm(config);
             write_realm->begin_transaction();
-            write_realm->read_group().get_table("class_object")->add_empty_row();
+            sync::create_object(write_realm->read_group(), *write_realm->read_group().get_table("class_object"));
             write_realm->commit_transaction();
         }
 
@@ -1801,17 +1800,6 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(change.insertions, 0, 5);
         }
 
-        SECTION("move observed table") {
-            write([&] {
-                size_t row = table->add_empty_row();
-                table->set_int(0, row, 5);
-                r->read_group().move_table(table->get_index_in_group(), 0);
-                table->insert_empty_row(0);
-                table->set_int(0, 0, 5);
-            });
-            REQUIRE_INDICES(change.insertions, 0, 5);
-        }
-
         auto linked_table = table->get_link_target(1);
         SECTION("insert new column before link column") {
             write([&] {
@@ -1822,28 +1810,10 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(change.modifications, 0, 1);
         }
 
-        SECTION("move link column") {
-            write([&] {
-                linked_table->set_int(0, 1, 5);
-                _impl::TableFriend::move_column(*table->get_descriptor(), 1, 0);
-                linked_table->set_int(0, 2, 5);
-            });
-            REQUIRE_INDICES(change.modifications, 0, 1);
-        }
-
         SECTION("insert table before link target") {
             write([&] {
                 linked_table->set_int(0, 1, 5);
                 r->read_group().insert_table(0, "new table");
-                linked_table->set_int(0, 2, 5);
-            });
-            REQUIRE_INDICES(change.modifications, 0, 1);
-        }
-
-        SECTION("move link target") {
-            write([&] {
-                linked_table->set_int(0, 1, 5);
-                r->read_group().move_table(linked_table->get_index_in_group(), 0);
                 linked_table->set_int(0, 2, 5);
             });
             REQUIRE_INDICES(change.modifications, 0, 1);

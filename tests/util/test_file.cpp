@@ -19,7 +19,6 @@
 #include "util/test_file.hpp"
 
 #include "impl/realm_coordinator.hpp"
-#include "util/format.hpp"
 
 #if REALM_ENABLE_SYNC
 #include "sync/sync_config.hpp"

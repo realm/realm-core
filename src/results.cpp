@@ -23,8 +23,6 @@
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "schema.hpp"
-#include "util/compiler.hpp"
-#include "util/format.hpp"
 
 #include <stdexcept>
 

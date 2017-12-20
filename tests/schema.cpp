@@ -22,7 +22,6 @@
 #include "object_store.hpp"
 #include "property.hpp"
 #include "schema.hpp"
-#include "util/format.hpp"
 
 #include <realm/descriptor.hpp>
 #include <realm/group.hpp>

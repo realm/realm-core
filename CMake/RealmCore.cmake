@@ -174,10 +174,12 @@ function(download_realm_core core_version)
 
         set(core_library_debug "${core_directory_debug}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}realm-dbg${CMAKE_STATIC_LIBRARY_SUFFIX}")
         set(core_library_release "${core_directory_release}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}realm${CMAKE_STATIC_LIBRARY_SUFFIX}")
-        set(core_libraries ${core_library_debug} ${core_library_release})
+        set(core_parser_library_debug "${core_directory_debug}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}realm-parser-dbg${CMAKE_STATIC_LIBRARY_SUFFIX}")
+        set(core_parser_library_release "${core_directory_release}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}realm-parser${CMAKE_STATIC_LIBRARY_SUFFIX}")
+        set(core_libraries ${core_library_debug} ${core_library_release} ${core_parser_library_debug} ${core_parser_library_release})
 
-        download_realm_tarball(${url_debug} ${core_directory_debug} ${core_library_debug})
-        download_realm_tarball(${url_release} ${core_directory_release} ${core_library_release})
+        download_realm_tarball(${url_debug} ${core_directory_debug} ${core_library_debug} ${core_parser_library_debug})
+        download_realm_tarball(${url_release} ${core_directory_release} ${core_library_release} ${core_parser_library_release})
     else()
         if(APPLE)
             set(basename "realm-core-cocoa")
@@ -196,7 +198,9 @@ function(download_realm_core core_version)
 
         set(core_library_debug ${core_directory}/${library_directory}/${CMAKE_STATIC_LIBRARY_PREFIX}realm${platform}-dbg${CMAKE_STATIC_LIBRARY_SUFFIX})
         set(core_library_release ${core_directory}/${library_directory}/${CMAKE_STATIC_LIBRARY_PREFIX}realm${platform}${CMAKE_STATIC_LIBRARY_SUFFIX})
-        set(core_libraries ${core_library_debug} ${core_library_release})
+        set(core_parser_library_debug ${core_directory}/${library_directory}/${CMAKE_STATIC_LIBRARY_PREFIX}realm-parser${platform}-dbg${CMAKE_STATIC_LIBRARY_SUFFIX})
+        set(core_parser_library_release ${core_directory}/${library_directory}/${CMAKE_STATIC_LIBRARY_PREFIX}realm-parser${platform}${CMAKE_STATIC_LIBRARY_SUFFIX})
+        set(core_libraries ${core_library_debug} ${core_library_release} ${core_parser_library_debug} ${core_parser_library_release})
 
         download_realm_tarball(${url} ${core_directory} "${core_libraries}")
         download_android_openssl()
@@ -217,6 +221,13 @@ function(download_realm_core core_version)
     # configure time, when they'd otherwise not be created until we download and extract core.
     file(MAKE_DIRECTORY ${core_directory}/include)
     set_property(TARGET realm PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${core_directory}/include)
+
+    add_library(realm-parser STATIC IMPORTED)
+    add_dependencies(realm-parser realm-core)
+    set_property(TARGET realm-parser PROPERTY IMPORTED_LOCATION_DEBUG ${core_parser_library_debug})
+    set_property(TARGET realm-parser PROPERTY IMPORTED_LOCATION_COVERAGE ${core_parser_library_debug})
+    set_property(TARGET realm-parser PROPERTY IMPORTED_LOCATION_RELEASE ${core_parser_library_release})
+    set_property(TARGET realm-parser PROPERTY IMPORTED_LOCATION ${core_parser_library_release})
 endfunction()
 
 macro(build_realm_core)
@@ -249,10 +260,13 @@ macro(build_realm_core)
     set(core_release_binary_dir "${SOURCE_DIR}/build.release")
     set(core_library_debug "${core_debug_binary_dir}/src/realm/${CMAKE_STATIC_LIBRARY_PREFIX}realm-dbg${CMAKE_STATIC_LIBRARY_SUFFIX}")
     set(core_library_release "${core_release_binary_dir}/src/realm/${CMAKE_STATIC_LIBRARY_PREFIX}realm${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    set(core_parser_library_debug "${core_debug_binary_dir}/src/realm/${CMAKE_STATIC_LIBRARY_PREFIX}realm-parser-dbg${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    set(core_parser_library_release "${core_release_binary_dir}/src/realm/${CMAKE_STATIC_LIBRARY_PREFIX}realm-parser${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
     ExternalProject_Add_Step(realm-core ensure-libraries
         DEPENDEES build
         BYPRODUCTS ${core_library_debug} ${core_library_release}
+                   ${core_parser_library_debug} ${core_parser_library_release}
         )
 
     set(core_generated_headers_dir_debug "${core_debug_binary_dir}/src")
@@ -276,6 +290,13 @@ macro(build_realm_core)
         $<$<CONFIG:Debug>:${core_generated_headers_dir_debug}>
         $<$<NOT:$<CONFIG:Debug>>:${core_generated_headers_dir_release}>
     )
+
+    add_library(realm-parser STATIC IMPORTED)
+    add_dependencies(realm realm-core)
+    set_property(TARGET realm-parser PROPERTY IMPORTED_LOCATION_DEBUG ${core_parser_library_debug})
+    set_property(TARGET realm-parser PROPERTY IMPORTED_LOCATION_COVERAGE ${core_parser_library_debug})
+    set_property(TARGET realm-parser PROPERTY IMPORTED_LOCATION_RELEASE ${core_parser_library_release})
+    set_property(TARGET realm-parser PROPERTY IMPORTED_LOCATION ${core_parser_library_release})
 endmacro()
 
 function(clone_and_build_realm_core branch)

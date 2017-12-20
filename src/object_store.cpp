@@ -22,7 +22,6 @@
 #include "object_schema.hpp"
 #include "schema.hpp"
 #include "shared_realm.hpp"
-#include "util/format.hpp"
 
 #include <realm/descriptor.hpp>
 #include <realm/group.hpp>

@@ -18,7 +18,6 @@
 
 #include "catch.hpp"
 
-#include "util/any.hpp"
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
@@ -33,6 +32,7 @@
 #include "impl/object_accessor_impl.hpp"
 
 #include <realm/group_shared.hpp>
+#include <realm/util/any.hpp>
 
 #include <cstdint>
 
