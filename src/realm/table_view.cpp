@@ -472,7 +472,7 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
     while (count) {
         Key key = get_key(count);
         if (key != realm::null_key) {
-            m_table->to_string_row(size_t(key.value), out, widths); // FIXME
+            m_table->to_string_row(key, out, widths); // FIXME
             --count;
         }
         ++i;
@@ -497,7 +497,7 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
     // Print row contents
     Key key = get_key(row_ndx);
     REALM_ASSERT(key != realm::null_key);
-    m_table->to_string_row(size_t(key.value), out, widths); // FIXME
+    m_table->to_string_row(key, out, widths); // FIXME
 }
 
 

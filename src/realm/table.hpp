@@ -391,109 +391,9 @@ public:
     }
     //@}
 
-    //@{
-
-    /// Get cell values.
-    /// Will assert if the requested type does not match the column type.
-    ///
-    /// When fetching from a nullable column and the value is null, a default
-    /// value will be returned, except for object like types (StringData,
-    /// BinaryData, Timestamp) which have support for storing nulls. In that
-    /// case, call the `is_null()` method on the returned object to check
-    /// whether the stored value was null. If nullability matters and returning
-    /// a default value is unacceptable, check Table::is_null() before getting a
-    /// cell value.
-    ///
-    /// \sa Table::is_nullable(size_t col_ndx)
-    /// \sa Table::is_null(size_t col_ndx, size_t row_ndx)
-    /// \sa StringData::is_null()
-    int64_t get_int(size_t column_ndx, size_t row_ndx) const noexcept;
-    bool get_bool(size_t column_ndx, size_t row_ndx) const noexcept;
-    OldDateTime get_olddatetime(size_t column_ndx, size_t row_ndx) const noexcept;
-    float get_float(size_t column_ndx, size_t row_ndx) const noexcept;
-    double get_double(size_t column_ndx, size_t row_ndx) const noexcept;
-    StringData get_string(size_t column_ndx, size_t row_ndx) const noexcept;
-    BinaryData get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
-    Timestamp get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
-
-    //@}
-
-    /// Return data from position 'pos' and onwards. If the blob is distributed
-    /// across multiple arrays, you will only get data from one array. 'pos'
-    /// will be updated to be an index to next available data. It will be 0
-    /// if no more data.
-    BinaryData get_binary_at(size_t col_ndx, size_t ndx, size_t& pos) const noexcept;
-
-    template <class T>
-    T get(size_t c, size_t r) const noexcept;
-
-    size_t get_link(size_t column_ndx, size_t row_ndx) const noexcept;
-    bool is_null_link(size_t column_ndx, size_t row_ndx) const noexcept;
-    LinkViewRef get_linklist(size_t column_ndx, size_t row_ndx);
-    ConstLinkViewRef get_linklist(size_t column_ndx, size_t row_ndx) const;
-    size_t get_link_count(size_t column_ndx, size_t row_ndx) const noexcept;
-    bool linklist_is_empty(size_t column_ndx, size_t row_ndx) const noexcept;
-    bool is_null(size_t column_ndx, size_t row_ndx) const noexcept;
 
     TableRef get_link_target(size_t column_ndx) noexcept;
     ConstTableRef get_link_target(size_t column_ndx) const noexcept;
-
-    //@{
-
-    /// Set cell values.
-    ///
-    /// It is an error to specify a column index, row index, or string position
-    /// that is out of range.
-    ///
-    /// The number of bytes in a string value must not exceed `max_string_size`,
-    /// and the number of bytes in a binary data value must not exceed
-    /// `max_binary_size`. String must also contain valid UTF-8 encodings. These
-    /// requirements also apply when modifying a string with insert_substring()
-    /// and remove_substring(), and for strings in a mixed columnt. Passing, or
-    /// producing an oversized string or binary data value will cause an
-    /// exception to be thrown.
-    ///
-    /// The "unique" variants (set_int_unique(), set_string_unique(), set_null_unique())
-    /// are intended to be used in the implementation of primary key support. They
-    /// check if the given column already contains one or more values that are
-    /// equal to \a value, and if there are conflicts, it calls
-    /// Table::merge_rows() for the row_ndx to be replaced by the
-    /// existing row, followed by a Table::move_last_over() of row_ndx. The
-    /// return value is always a row index of a row that contains \a value in
-    /// the specified column, possibly different from \a row_ndx if a conflict
-    /// occurred.  Users intending to implement primary keys must therefore
-    /// manually check for duplicates if they want to raise an error instead.
-    ///
-    /// NOTE:  It is an error to call either function after adding elements to a
-    /// linklist in the object. In general, calling set_int_unique() or
-    /// set_string_unique() or set_null_unique() should be the first thing that
-    /// happens after creating a row. These limitations are imposed by limitations
-    /// in the Realm Object Server and may be relaxed in the future. A violation of
-    /// these rules results in a LogicError being thrown.
-    ///
-    /// add_int() adds a 64-bit signed integer to the current value of the
-    /// cell.  If the addition would cause signed integer overflow or
-    /// underflow, the addition "wraps around" with semantics similar to
-    /// unsigned integer arithmetic, such that Table::max_integer + 1 ==
-    /// Table::min_integer and Table::min_integer - 1 == Table::max_integer.
-    /// Note that the wrapping is platform-independent (all platforms wrap in
-    /// the same way regardless of integer representation). If the existing
-    /// value in the cell is null, a LogicError exception is thrown.
-    ///
-    /// insert_substring() inserts the specified string into the currently
-    /// stored string at the specified position. The position must be less than
-    /// or equal to the size of the currently stored string.
-    ///
-    /// remove_substring() removes the specified byte range from the currently
-    /// stored string. The beginning of the range (\a pos) must be less than or
-    /// equal to the size of the currently stored string. If the specified range
-    /// extends beyond the end of the currently stored string, it will be
-    /// silently clamped.
-    ///
-    /// String level modifications performed via insert_substring() and
-    /// remove_substring() are mergable and subject to operational
-    /// transformation. That is, the effect of two causally unrelated
-    /// modifications will in general both be retained during synchronization.
 
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
@@ -504,47 +404,6 @@ public:
     // not guaranteed by the standard.
     static constexpr int_fast64_t max_integer = std::numeric_limits<int64_t>::max();
     static constexpr int_fast64_t min_integer = std::numeric_limits<int64_t>::min();
-
-    template <class T>
-    void set(size_t c, size_t r, T value, bool is_default = false);
-
-    template <class T>
-    size_t set_unique(size_t c, size_t r, T value);
-
-    void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value, bool is_default = false);
-    size_t set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
-    void set_bool(size_t column_ndx, size_t row_ndx, bool value, bool is_default = false);
-    void set_olddatetime(size_t column_ndx, size_t row_ndx, OldDateTime value, bool is_default = false);
-    void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value, bool is_default = false);
-    template <class E>
-    void set_enum(size_t column_ndx, size_t row_ndx, E value);
-    void set_float(size_t column_ndx, size_t row_ndx, float value, bool is_default = false);
-    void set_double(size_t column_ndx, size_t row_ndx, double value, bool is_default = false);
-    void set_string(size_t column_ndx, size_t row_ndx, StringData value, bool is_default = false);
-    size_t set_string_unique(size_t column_ndx, size_t row_ndx, StringData value);
-    void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value, bool is_default = false);
-    void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx, bool is_default = false);
-    void nullify_link(size_t column_ndx, size_t row_ndx);
-    void set_null(size_t column_ndx, size_t row_ndx, bool is_default = false);
-
-    // Sync needs to store blobs bigger than 16 M. This function can be used for that. Data should be read
-    // out again using the get_binary_at() function. Should not be used for user data as normal get_binary()
-    // will just return null if the data is bigger than the limit.
-    void set_binary_big(size_t column_ndx, size_t row_ndx, BinaryData value, bool is_default = false);
-
-    void add_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
-
-    void insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData);
-    void remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t substring_size = realm::npos);
-
-    //@}
-
-    // Backlinks
-    size_t get_backlink_count(size_t row_ndx, bool only_strong_links = false) const noexcept;
-    size_t get_backlink_count(size_t row_ndx, const Table& origin, size_t origin_col_ndx) const noexcept;
-    size_t get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const
-        noexcept;
-
 
     //@{
 
@@ -774,7 +633,7 @@ public:
     void to_json(std::ostream& out, size_t link_depth = 0,
                  std::map<std::string, std::string>* renames = nullptr) const;
     void to_string(std::ostream& out, size_t limit = 500) const;
-    void row_to_string(size_t row_ndx, std::ostream& out) const;
+    void row_to_string(Key key, std::ostream& out) const;
 
     // Get a reference to this table
     TableRef get_table_ref()
@@ -918,9 +777,6 @@ private:
 
     void rebuild_search_index(size_t current_file_format_version);
 
-    // Upgrades OldDateTime columns to Timestamp columns
-    void upgrade_olddatetime();
-
     /// Update the version of this table and all tables which have links to it.
     /// This causes all views referring to those tables to go out of sync, so that
     /// calls to sync_if_needed() will bring the view up to date by reexecuting the
@@ -1006,7 +862,7 @@ private:
 
     // Support function for conversions
     void to_string_header(std::ostream& out, std::vector<size_t>& widths) const;
-    void to_string_row(size_t row_ndx, std::ostream& out, const std::vector<size_t>& widths) const;
+    void to_string_row(Key key, std::ostream& out, const std::vector<size_t>& widths) const;
 
     // recursive methods called by to_json, to follow links
     void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
@@ -1622,25 +1478,9 @@ inline size_t Table::size() const noexcept
 }
 
 
-inline bool Table::is_null_link(size_t col_ndx, size_t row_ndx) const noexcept
-{
-    return get_link(col_ndx, row_ndx) == realm::npos;
-}
-
 inline ConstTableRef Table::get_link_target(size_t col_ndx) const noexcept
 {
     return const_cast<Table*>(this)->get_link_target(col_ndx);
-}
-
-template <class E>
-inline void Table::set_enum(size_t column_ndx, size_t row_ndx, E value)
-{
-    set_int(column_ndx, row_ndx, value);
-}
-
-inline void Table::nullify_link(size_t col_ndx, size_t row_ndx)
-{
-    set_link(col_ndx, row_ndx, realm::npos);
 }
 
 inline ConstTableRef Table::get_parent_table(size_t* column_ndx_out) const noexcept
@@ -1728,140 +1568,6 @@ inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept
 {
     REALM_ASSERT(m_top.is_attached());
     m_top.set_ndx_in_parent(ndx_in_parent);
-}
-
-// Declare our explicit specializations so that the inline wrappers don't try
-// to instantiate them
-template<> int64_t Table::get<int64_t>(size_t, size_t) const noexcept;
-template<> util::Optional<int64_t> Table::get<util::Optional<int64_t>>(size_t, size_t) const noexcept;
-template<> bool Table::get<bool>(size_t, size_t) const noexcept;
-template<> Optional<bool> Table::get<Optional<bool>>(size_t, size_t) const noexcept;
-template<> float Table::get<float>(size_t, size_t) const noexcept;
-template<> util::Optional<float> Table::get<util::Optional<float>>(size_t, size_t) const noexcept;
-template<> double Table::get<double>(size_t, size_t) const noexcept;
-template<> util::Optional<double> Table::get<util::Optional<double>>(size_t, size_t) const noexcept;
-template<> OldDateTime Table::get<OldDateTime>(size_t, size_t) const noexcept;
-template<> Timestamp Table::get<Timestamp>(size_t, size_t) const noexcept;
-template<> StringData Table::get<StringData>(size_t, size_t) const noexcept;
-template<> BinaryData Table::get<BinaryData>(size_t, size_t) const noexcept;
-template<> Mixed Table::get<Mixed>(size_t, size_t) const noexcept;
-
-template<> void Table::set<int64_t>(size_t, size_t, int64_t, bool);
-template<> void Table::set<bool>(size_t, size_t, bool, bool);
-template<> void Table::set<float>(size_t, size_t, float, bool);
-template<> void Table::set<double>(size_t, size_t, double, bool);
-template<> void Table::set<OldDateTime>(size_t, size_t, OldDateTime, bool);
-template<> void Table::set<Timestamp>(size_t, size_t, Timestamp, bool);
-template<> void Table::set<StringData>(size_t, size_t, StringData, bool);
-template<> void Table::set<BinaryData>(size_t, size_t, BinaryData, bool);
-template<> void Table::set<Mixed>(size_t, size_t, Mixed, bool);
-template<> void Table::set<null>(size_t, size_t, null, bool);
-
-template<> size_t Table::set_unique<int64_t>(size_t, size_t, int64_t);
-template<> size_t Table::set_unique<StringData>(size_t, size_t, StringData);
-template<> size_t Table::set_unique<null>(size_t, size_t, null);
-
-inline int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
-{
-    if (is_nullable(col_ndx))
-        return get<util::Optional<int64_t>>(col_ndx, ndx).value_or(0);
-    else
-        return get<int64_t>(col_ndx, ndx);
-}
-
-inline size_t Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
-{
-    return set_unique(col_ndx, ndx, value);
-}
-
-inline void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
-{
-    return set(col_ndx, ndx, value, is_default);
-}
-
-inline Timestamp Table::get_timestamp(size_t col_ndx, size_t ndx) const noexcept
-{
-    return get<Timestamp>(col_ndx, ndx);
-}
-
-inline void Table::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value, bool is_default)
-{
-    return set(col_ndx, ndx, value, is_default);
-}
-
-inline bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
-{
-    if (is_nullable(col_ndx))
-        return get<util::Optional<bool>>(col_ndx, ndx).value_or(false);
-    else
-        return get<bool>(col_ndx, ndx);
-}
-
-inline void Table::set_bool(size_t col_ndx, size_t ndx, bool value, bool is_default)
-{
-    return set(col_ndx, ndx, value, is_default);
-}
-
-inline OldDateTime Table::get_olddatetime(size_t col_ndx, size_t ndx) const noexcept
-{
-    return get<OldDateTime>(col_ndx, ndx);
-}
-
-inline void Table::set_olddatetime(size_t col_ndx, size_t ndx, OldDateTime value, bool is_default)
-{
-    return set(col_ndx, ndx, value, is_default);
-}
-
-inline float Table::get_float(size_t col_ndx, size_t ndx) const noexcept
-{
-    float f = get<float>(col_ndx, ndx);
-    return null::is_null_float(f) ? 0.0f : f;
-}
-
-inline void Table::set_float(size_t col_ndx, size_t ndx, float value, bool is_default)
-{
-    return set(col_ndx, ndx, value, is_default);
-}
-
-inline double Table::get_double(size_t col_ndx, size_t ndx) const noexcept
-{
-    double d = get<double>(col_ndx, ndx);
-    return null::is_null_float(d) ? 0.0 : d;
-}
-
-inline void Table::set_double(size_t col_ndx, size_t ndx, double value, bool is_default)
-{
-    return set(col_ndx, ndx, value, is_default);
-}
-
-inline StringData Table::get_string(size_t col_ndx, size_t ndx) const noexcept
-{
-    return get<StringData>(col_ndx, ndx);
-}
-
-inline void Table::set_string(size_t col_ndx, size_t ndx, StringData value, bool is_default)
-{
-    return set(col_ndx, ndx, value, is_default);
-}
-
-inline size_t Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
-{
-    return set_unique(col_ndx, ndx, value);
-}
-
-inline BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const noexcept
-{
-    return get<BinaryData>(col_ndx, ndx);
-}
-
-inline void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
-{
-    set(col_ndx, ndx, value, is_default);
-}
-
-inline void Table::set_null(size_t col_ndx, size_t ndx, bool is_default)
-{
-    set(col_ndx, ndx, null(), is_default);
 }
 
 
@@ -2006,11 +1712,6 @@ public:
     static void do_set_link(Table& table, size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     {
         table.do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
-    }
-
-    static size_t get_backlink_count(const Table& table, size_t row_ndx, bool only_strong_links) noexcept
-    {
-        return table.get_backlink_count(row_ndx, only_strong_links);
     }
 
     static void remove_recursive(Table& table, CascadeState& rows)

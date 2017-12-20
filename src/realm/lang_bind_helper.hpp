@@ -261,12 +261,6 @@ inline void LangBindHelper::bind_table_ptr(const Table* t) noexcept
     t->bind_ptr();
 }
 
-inline const LinkViewRef& LangBindHelper::get_linklist_ptr(Row& row, size_t col_ndx)
-{
-    LinkViewRef* link_view = new LinkViewRef(row.get_linklist(col_ndx));
-    return *link_view;
-}
-
 inline void LangBindHelper::unbind_linklist_ptr(const LinkViewRef& link_view)
 {
     delete (&link_view);

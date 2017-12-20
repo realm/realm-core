@@ -326,45 +326,6 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
     set_link_type(col_ndx, link_type); // Throws
 }
 
-
-size_t Table::get_backlink_count(size_t row_ndx, bool only_strong_links) const noexcept
-{
-    size_t backlink_columns_begin = m_spec->first_backlink_column_index();
-    size_t backlink_columns_end = backlink_columns_begin + m_spec->backlink_column_count();
-    size_t ref_count = 0;
-
-    for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
-        const BacklinkColumn& backlink_col = get_column_backlink(i);
-        if (only_strong_links) {
-            const LinkColumnBase& link_col = backlink_col.get_origin_column();
-            if (link_col.get_weak_links())
-                continue;
-        }
-        ref_count += backlink_col.get_backlink_count(row_ndx);
-    }
-
-    return ref_count;
-}
-
-size_t Table::get_backlink_count(size_t row_ndx, const Table& origin, size_t origin_col_ndx) const noexcept
-{
-    auto origin_table_key = origin.get_key();
-    size_t backlink_col_ndx = m_spec->find_backlink_column(origin_table_key, origin_col_ndx);
-    const BacklinkColumn& backlink_col = get_column_backlink(backlink_col_ndx);
-    return backlink_col.get_backlink_count(row_ndx);
-}
-
-
-size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const
-    noexcept
-{
-    auto origin_table_key = origin.get_key();
-    size_t backlink_col_ndx = m_spec->find_backlink_column(origin_table_key, origin_col_ndx);
-    const BacklinkColumn& backlink_col = get_column_backlink(backlink_col_ndx);
-    return backlink_col.get_backlink(row_ndx, backlink_ndx);
-}
-
-
 void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_table, size_t backlink_col_ndx) noexcept
 {
     LinkColumnBase& link_col = get_column_link_base(link_col_ndx);
@@ -1258,54 +1219,6 @@ void Table::rebuild_search_index(size_t current_file_format_version)
 }
 
 
-void Table::upgrade_olddatetime()
-{
-    const size_t old_column_count = get_column_count();
-
-    for (size_t col = 0; col < get_column_count(); col++) {
-        ColumnType col_type = get_real_column_type(col);
-
-        if (col_type == col_type_OldDateTime) {
-            bool nullable = is_nullable(col);
-            StringData name = get_column_name(col);
-
-            // Insert new Timestamp column at same position as old column
-            const size_t old_col = col + 1;
-            const size_t new_col = col;
-            insert_column(new_col, type_Timestamp, name, nullable);
-
-            // Copy payload to new column
-            for (size_t row = 0; row < size(); row++) {
-                if (is_null(old_col, row)) {
-                    set_null(new_col, row);
-                }
-                else {
-                    OldDateTime dt = get_olddatetime(old_col, row);
-                    Timestamp ts = Timestamp(dt.get_olddatetime(), 0);
-                    set_timestamp(new_col, row, ts);
-                }
-            }
-
-            // If old OldDateTime column had search index, then create one for the new Timestamp column too
-            if (has_search_index(old_col)) {
-                add_search_index(new_col);
-            }
-
-            // Remove old column
-            remove_column(old_col);
-        }
-    }
-
-    REALM_ASSERT_3(old_column_count, ==, get_column_count());
-    static_cast<void>(old_column_count);
-    for (size_t col = 0; col < get_column_count(); col++) {
-        ColumnType col_type = get_real_column_type(col);
-        static_cast<void>(col_type);
-        REALM_ASSERT(col_type != col_type_OldDateTime);
-    }
-}
-
-
 // FIXME:
 //
 // Note the two versions of get_column_base(). The difference between
@@ -1745,20 +1658,13 @@ void Table::clear()
 
 // Replication instruction 'clear-table' calls this function
 // directly with broken_reciprocal_backlinks=false.
-void Table::do_clear(bool broken_reciprocal_backlinks)
+void Table::do_clear(bool /* broken_reciprocal_backlinks */)
 {
-    size_t num_cols = m_spec->get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx);
-        col.clear(m_size, broken_reciprocal_backlinks); // Throws
-    }
     if (m_clusters.is_attached()) {
         m_clusters.clear();
     }
 
     m_size = 0;
-
-    discard_row_accessors();
 
     bump_version();
 }
@@ -1839,455 +1745,6 @@ TableKey Table::get_key() const noexcept
     return m_key;
 }
 
-namespace realm {
-
-template <>
-bool Table::get(size_t col_ndx, size_t ndx) const noexcept
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    const IntegerColumn& col = get_column(col_ndx);
-    return col.get(ndx) != 0;
-}
-
-template <>
-util::Optional<bool> Table::get(size_t col_ndx, size_t ndx) const noexcept
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    const IntNullColumn& col = get_column_int_null(col_ndx);
-    auto value = col.get(ndx);
-    return value ? util::some<bool>(*value != 0) : util::none;
-}
-
-template <>
-int64_t Table::get(size_t col_ndx, size_t ndx) const noexcept
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Int);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    const IntegerColumn& col = get_column<IntegerColumn, col_type_Int>(col_ndx);
-    return col.get(ndx);
-}
-
-template <>
-util::Optional<int64_t> Table::get(size_t col_ndx, size_t ndx) const noexcept
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Int);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    const IntNullColumn& col = get_column<IntNullColumn, col_type_Int>(col_ndx);
-    return col.get(ndx);
-}
-
-template <>
-OldDateTime Table::get(size_t col_ndx, size_t ndx) const noexcept
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_OldDateTime);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column<IntNullColumn, col_type_Int>(col_ndx);
-        return col.get(ndx).value_or(0);
-    }
-    else {
-        const IntegerColumn& col = get_column<IntegerColumn, col_type_Int>(col_ndx);
-        return col.get(ndx);
-    }
-}
-
-template <>
-float Table::get(size_t col_ndx, size_t ndx) const noexcept
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Float);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
-    return col.get(ndx);
-}
-
-template <>
-util::Optional<float> Table::get(size_t col_ndx, size_t ndx) const noexcept
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Float);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
-    float f = col.get(ndx);
-    return null::is_null_float(f) ? util::none : util::make_optional(f);
-}
-
-template <>
-double Table::get(size_t col_ndx, size_t ndx) const noexcept
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Double);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    return col.get(ndx);
-}
-
-template <>
-util::Optional<double> Table::get(size_t col_ndx, size_t ndx) const noexcept
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Double);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
-    double d = col.get(ndx);
-    return null::is_null_float(d) ? util::none : util::make_optional(d);
-}
-
-template <>
-StringData Table::get(size_t col_ndx, size_t ndx) const noexcept
-{
-    REALM_ASSERT_3(col_ndx, <, m_columns.size());
-    REALM_ASSERT_7(get_real_column_type(col_ndx), ==, col_type_String, ||, get_real_column_type(col_ndx), ==,
-                   col_type_StringEnum);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    StringData sd;
-    ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
-        const StringColumn& col = get_column<StringColumn, col_type_String>(col_ndx);
-        sd = col.get(ndx);
-    }
-    else {
-        REALM_ASSERT(type == col_type_StringEnum);
-        const StringEnumColumn& col = get_column<StringEnumColumn, col_type_StringEnum>(col_ndx);
-        sd = col.get(ndx);
-    }
-    REALM_ASSERT_DEBUG(!(!is_nullable(col_ndx) && sd.is_null()));
-    return sd;
-}
-
-template <>
-BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
-{
-    REALM_ASSERT_3(col_ndx, <, m_columns.size());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Binary);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    const BinaryColumn& col = get_column<BinaryColumn, col_type_Binary>(col_ndx);
-    return col.get(ndx);
-}
-
-template <>
-Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
-{
-    REALM_ASSERT_3(col_ndx, <, m_columns.size());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Timestamp);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    const TimestampColumn& col = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
-    return col.get(ndx);
-}
-
-template <>
-void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool /* is_default */)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <, m_size);
-    bump_version();
-
-    if (is_nullable(col_ndx)) {
-        auto& col = get_column_int_null(col_ndx);
-        col.set(ndx, value);
-    }
-    else {
-        auto& col = get_column(col_ndx);
-        col.set(ndx, value);
-    }
-}
-
-template <>
-void Table::set(size_t col_ndx, size_t ndx, Timestamp value, bool)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Timestamp);
-    REALM_ASSERT_3(ndx, <, m_size);
-    bump_version();
-
-    if (!is_nullable(col_ndx) && value.is_null())
-        throw LogicError(LogicError::column_not_nullable);
-
-    TimestampColumn& col = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
-    col.set(ndx, value);
-}
-
-template <>
-void Table::set(size_t col_ndx, size_t ndx, bool value, bool)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
-    REALM_ASSERT_3(ndx, <, m_size);
-    bump_version();
-
-    if (is_nullable(col_ndx)) {
-        IntNullColumn& col = get_column_int_null(col_ndx);
-        col.set(ndx, value ? 1 : 0);
-    }
-    else {
-        IntegerColumn& col = get_column(col_ndx);
-        col.set(ndx, value ? 1 : 0);
-    }
-}
-
-template <>
-void Table::set(size_t col_ndx, size_t ndx, OldDateTime value, bool)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_OldDateTime);
-    REALM_ASSERT_3(ndx, <, m_size);
-    bump_version();
-
-    if (is_nullable(col_ndx)) {
-        IntNullColumn& col = get_column_int_null(col_ndx);
-        col.set(ndx, value.get_olddatetime());
-    }
-    else {
-        IntegerColumn& col = get_column(col_ndx);
-        col.set(ndx, value.get_olddatetime());
-    }
-}
-
-template <>
-void Table::set(size_t col_ndx, size_t ndx, float value, bool)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <, m_size);
-    bump_version();
-
-    FloatColumn& col = get_column_float(col_ndx);
-    col.set(ndx, value);
-}
-
-template <>
-void Table::set(size_t col_ndx, size_t ndx, double value, bool)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <, m_size);
-    bump_version();
-
-    DoubleColumn& col = get_column_double(col_ndx);
-    col.set(ndx, value);
-}
-
-template <>
-void Table::set(size_t col_ndx, size_t ndx, StringData value, bool)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-    if (REALM_UNLIKELY(ndx >= m_size))
-        throw LogicError(LogicError::row_index_out_of_range);
-    // For a degenerate subtable, `m_cols.size()` is zero, even when it has
-    // columns, however, the previous row index check guarantees that `m_size >
-    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
-    // cannot be degenerate if we got this far.
-    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
-        throw LogicError(LogicError::column_index_out_of_range);
-    if (!is_nullable(col_ndx) && value.is_null())
-        throw LogicError(LogicError::column_not_nullable);
-    if (REALM_UNLIKELY(value.size() > max_string_size))
-        throw LogicError(LogicError::string_too_big);
-
-    bump_version();
-    ColumnBase& col = get_column_base(col_ndx);
-    col.set_string(ndx, value); // Throws
-}
-
-template <>
-void Table::set(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
-{
-    if (REALM_UNLIKELY(value.size() > ArrayBlob::max_binary_size))
-        throw LogicError(LogicError::binary_too_big);
-    set_binary_big(col_ndx, ndx, value, is_default);
-}
-
-template <>
-void Table::set(size_t col_ndx, size_t row_ndx, null, bool)
-{
-    if (!is_nullable(col_ndx)) {
-        throw LogicError{LogicError::column_not_nullable};
-    }
-    REALM_ASSERT(!is_link_type(m_spec->get_column_type(col_ndx))); // Use nullify_link().
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(row_ndx, <, m_size);
-
-    bump_version();
-    ColumnBase& col = get_column_base(col_ndx);
-    col.set_null(row_ndx);
-}
-
-template <>
-void Table::set(size_t col_ndx, size_t row_ndx, util::Optional<bool> value, bool is_default)
-{
-    if (value)
-        set(col_ndx, row_ndx, *value, is_default);
-    else
-        set(col_ndx, row_ndx, null(), is_default);
-}
-
-template <>
-void Table::set(size_t col_ndx, size_t row_ndx, util::Optional<int64_t> value, bool is_default)
-{
-    if (value)
-        set(col_ndx, row_ndx, *value, is_default);
-    else
-        set(col_ndx, row_ndx, null(), is_default);
-}
-
-template <>
-void Table::set(size_t col_ndx, size_t row_ndx, util::Optional<float> value, bool is_default)
-{
-    if (value)
-        set(col_ndx, row_ndx, *value, is_default);
-    else
-        set(col_ndx, row_ndx, null(), is_default);
-}
-
-template <>
-void Table::set(size_t col_ndx, size_t row_ndx, util::Optional<double> value, bool is_default)
-{
-    if (value)
-        set(col_ndx, row_ndx, *value, is_default);
-    else
-        set(col_ndx, row_ndx, null(), is_default);
-}
-
-} // namespace realm;
-
-
-void Table::add_int(size_t col_ndx, size_t ndx, int_fast64_t value)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <, m_size);
-    bump_version();
-
-    auto add_wrap = [](int64_t a, int64_t b) -> int64_t {
-        uint64_t ua = uint64_t(a);
-        uint64_t ub = uint64_t(b);
-        return int64_t(ua + ub);
-    };
-
-    if (is_nullable(col_ndx)) {
-        auto& col = get_column_int_null(col_ndx);
-        Optional<int64_t> old = col.get(ndx);
-        if (old) {
-            col.set(ndx, add_wrap(*old, value));
-        }
-        else {
-            throw LogicError{LogicError::illegal_combination};
-        }
-    }
-    else {
-        auto& col = get_column(col_ndx);
-        int64_t old = col.get(ndx);
-        col.set(ndx, add_wrap(old, value));
-    }
-}
-
-void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData value)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-    if (REALM_UNLIKELY(row_ndx >= m_size))
-        throw LogicError(LogicError::row_index_out_of_range);
-    // For a degenerate subtable, `m_cols.size()` is zero, even when it has
-    // columns, however, the previous row index check guarantees that `m_size >
-    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
-    // cannot be degenerate if we got this far.
-    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
-        throw LogicError(LogicError::column_index_out_of_range);
-
-    // FIXME: Loophole: Assertion violation in Table::get_string() on column type mismatch.
-    StringData old_value = get_string(col_ndx, row_ndx);
-    if (REALM_UNLIKELY(pos > old_value.size()))
-        throw LogicError(LogicError::string_position_out_of_range);
-    if (REALM_UNLIKELY(value.size() > max_string_size - old_value.size()))
-        throw LogicError(LogicError::string_too_big);
-
-    std::string copy_of_value = old_value;                 // Throws
-    copy_of_value.insert(pos, value.data(), value.size()); // Throws
-
-    bump_version();
-    ColumnBase& col = get_column_base(col_ndx);
-    col.set_string(row_ndx, copy_of_value); // Throws
-}
-
-
-void Table::remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t substring_size)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-    if (REALM_UNLIKELY(row_ndx >= m_size))
-        throw LogicError(LogicError::row_index_out_of_range);
-    // For a degenerate subtable, `m_cols.size()` is zero, even when it has
-    // columns, however, the previous row index check guarantees that `m_size >
-    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
-    // cannot be degenerate if we got this far.
-    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
-        throw LogicError(LogicError::column_index_out_of_range);
-
-    // FIXME: Loophole: Assertion violation in Table::get_string() on column type mismatch.
-    StringData old_value = get_string(col_ndx, row_ndx);
-    if (REALM_UNLIKELY(pos > old_value.size()))
-        throw LogicError(LogicError::string_position_out_of_range);
-
-    std::string copy_of_value = old_value;    // Throws
-    copy_of_value.erase(pos, substring_size); // Throws
-
-    bump_version();
-    ColumnBase& col = get_column_base(col_ndx);
-    col.set_string(row_ndx, copy_of_value); // Throws
-}
-
-void Table::set_binary_big(size_t col_ndx, size_t ndx, BinaryData value, bool)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-    if (REALM_UNLIKELY(ndx >= m_size))
-        throw LogicError(LogicError::row_index_out_of_range);
-    // For a degenerate subtable, `m_cols.size()` is zero, even when it has
-    // columns, however, the previous row index check guarantees that `m_size >
-    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
-    // cannot be degenerate if we got this far.
-    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
-        throw LogicError(LogicError::column_index_out_of_range);
-    if (!is_nullable(col_ndx) && value.is_null())
-        throw LogicError(LogicError::column_not_nullable);
-    bump_version();
-
-    // FIXME: Loophole: Assertion violation in Table::get_column_binary() on
-    // column type mismatch.
-    BinaryColumn& col = get_column_binary(col_ndx);
-    col.set(ndx, value);
-}
-
-BinaryData Table::get_binary_at(size_t col_ndx, size_t ndx, size_t& pos) const noexcept
-{
-    return get_column<BinaryColumn, col_type_Binary>(col_ndx).get_at(ndx, pos);
-}
-
-
-size_t Table::get_link(size_t col_ndx, size_t row_ndx) const noexcept
-{
-    REALM_ASSERT_3(row_ndx, <, m_size);
-    const LinkColumn& col = get_column_link(col_ndx);
-    return col.get_link(row_ndx);
-}
-
 
 TableRef Table::get_link_target(size_t col_ndx) noexcept
 {
@@ -2295,84 +1752,6 @@ TableRef Table::get_link_target(size_t col_ndx) noexcept
     return col.get_target_table().get_table_ref();
 }
 
-
-void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-    if (REALM_UNLIKELY(row_ndx >= m_size))
-        throw LogicError(LogicError::row_index_out_of_range);
-    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
-    // column, however, the previous row index check guarantees that `m_size >
-    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
-    // cannot be degenerate if we got this far.
-    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
-        throw LogicError(LogicError::column_index_out_of_range);
-    LinkColumn& col = get_column_link(col_ndx);
-    Table& target_table = col.get_target_table();
-    if (REALM_UNLIKELY(target_row_ndx != realm::npos && target_row_ndx >= target_table.size()))
-        throw LogicError(LogicError::target_row_index_out_of_range);
-
-    // FIXME: There is still no proper check for column type mismatch. One
-    // solution would be to go in the direction of set_string() (using
-    // ColumnBase::set_string()), but that works less well here. The ideal
-    // solution seems to be to have a very efficient way of checking the column
-    // type. Idea: Introduce `DataType ColumnBase::m_type`.
-
-    do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
-}
-
-
-// Replication instruction 'set_link' calls this function directly.
-size_t Table::do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
-{
-    REALM_ASSERT_3(row_ndx, <, m_size);
-    LinkColumn& col = get_column_link(col_ndx);
-    size_t old_target_row_ndx = col.set_link(row_ndx, target_row_ndx);
-    bump_version();
-    return old_target_row_ndx;
-}
-
-
-ConstLinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx) const
-{
-    REALM_ASSERT_3(row_ndx, <, m_size);
-    const LinkListColumn& col = get_column_link_list(col_ndx);
-    return col.get(row_ndx);
-}
-
-
-LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
-{
-    REALM_ASSERT_3(row_ndx, <, m_size);
-    LinkListColumn& col = get_column_link_list(col_ndx);
-    return col.get(row_ndx);
-}
-
-
-bool Table::linklist_is_empty(size_t col_ndx, size_t row_ndx) const noexcept
-{
-    REALM_ASSERT_3(row_ndx, <, m_size);
-    const LinkListColumn& col = get_column_link_list(col_ndx);
-    return !col.has_links(row_ndx);
-}
-
-
-size_t Table::get_link_count(size_t col_ndx, size_t row_ndx) const noexcept
-{
-    REALM_ASSERT_3(row_ndx, <, m_size);
-    const LinkListColumn& col = get_column_link_list(col_ndx);
-    return col.get_link_count(row_ndx);
-}
-
-
-bool Table::is_null(size_t col_ndx, size_t row_ndx) const noexcept
-{
-    if (!is_nullable(col_ndx))
-        return false;
-    auto& col = get_column_base(col_ndx);
-    return col.is_null(row_ndx);
-}
 
 // count ----------------------------------------------
 
@@ -3091,27 +2470,12 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
     to_json_row(row_ndx, out, link_depth, *renames, followed);
 }
 
-
+/*
 namespace {
 
 inline void out_olddatetime(std::ostream& out, OldDateTime value)
 {
     time_t rawtime = time_t(value.get_olddatetime());
-    struct tm* t = gmtime(&rawtime);
-    if (t) {
-        // We need a buffer for formatting dates (and binary to hex). Max
-        // size is 20 bytes (incl zero byte) "YYYY-MM-DD HH:MM:SS"\0
-        char buffer[30];
-        size_t res = strftime(buffer, 30, "%Y-%m-%d %H:%M:%S", t);
-        if (res)
-            out << buffer;
-    }
-}
-
-inline void out_timestamp(std::ostream& out, Timestamp value)
-{
-    // FIXME: Do we want to output the full precision to json?
-    time_t rawtime = time_t(value.get_seconds());
     struct tm* t = gmtime(&rawtime);
     if (t) {
         // We need a buffer for formatting dates (and binary to hex). Max
@@ -3142,6 +2506,7 @@ void out_floats(std::ostream& out, T value)
 }
 
 } // anonymous namespace
+*/
 
 void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
 {
@@ -3176,33 +2541,28 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
         DataType type = get_column_type(i);
         switch (type) {
             case type_Int:
-                out << get_int(i, row_ndx);
+                // out << get_int(i, row_ndx);
                 break;
             case type_Bool:
-                out << (get_bool(i, row_ndx) ? "true" : "false");
+                // out << (get_bool(i, row_ndx) ? "true" : "false");
                 break;
             case type_Float:
-                out_floats<float>(out, get_float(i, row_ndx));
+                // out_floats<float>(out, get_float(i, row_ndx));
                 break;
             case type_Double:
-                out_floats<double>(out, get_double(i, row_ndx));
+                // out_floats<double>(out, get_double(i, row_ndx));
                 break;
             case type_String:
-                out << "\"" << get_string(i, row_ndx) << "\"";
-                break;
-            case type_OldDateTime:
-                out << "\"";
-                out_olddatetime(out, get_olddatetime(i, row_ndx));
-                out << "\"";
+                // out << "\"" << get_string(i, row_ndx) << "\"";
                 break;
             case type_Binary:
                 out << "\"";
-                out_binary(out, get_binary(i, row_ndx));
+                // out_binary(out, get_binary(i, row_ndx));
                 out << "\"";
                 break;
             case type_Timestamp:
                 out << "\"";
-                out_timestamp(out, get_timestamp(i, row_ndx));
+                // out_timestamp(out, get_timestamp(i, row_ndx));
                 out << "\"";
                 break;
             case type_Link: {
@@ -3259,6 +2619,7 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
 
                 break;
             }
+            case type_OldDateTime:
             case type_OldTable:
             case type_OldMixed:
                 break;
@@ -3295,8 +2656,8 @@ void Table::to_string(std::ostream& out, size_t limit) const
     size_t out_count = (limit == size_t(-1)) ? row_count : (row_count < limit) ? row_count : limit;
 
     // Print rows
-    for (size_t i = 0; i < out_count; ++i) {
-        to_string_row(i, out, widths);
+    for (auto obj : *this) {
+        to_string_row(obj.get_key(), out, widths);
     }
 
     if (out_count < row_count) {
@@ -3305,16 +2666,14 @@ void Table::to_string(std::ostream& out, size_t limit) const
     }
 }
 
-void Table::row_to_string(size_t row_ndx, std::ostream& out) const
+void Table::row_to_string(Key key, std::ostream& out) const
 {
-    REALM_ASSERT_3(row_ndx, <, size());
-
     // Print header (will also calculate widths)
     std::vector<size_t> widths;
     to_string_header(out, widths);
 
     // Print row contents
-    to_string_row(row_ndx, out, widths);
+    to_string_row(key, out, widths);
 }
 
 void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) const
@@ -3354,18 +2713,20 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                 width = 14;
                 break;
             case type_Binary:
-                for (size_t row = 0; row < row_count; ++row) {
-                    size_t len = chars_in_int(get_binary(col, row).size()) + 2;
-                    width = std::max(width, len);
-                }
+                // FIXME
+                // for (size_t row = 0; row < row_count; ++row) {
+                //     size_t len = chars_in_int(get_binary(col, row).size()) + 2;
+                //     width = std::max(width, len);
+                // }
                 width += 6; // space for " bytes"
                 break;
             case type_String: {
                 // Find max length of the strings
-                for (size_t row = 0; row < row_count; ++row) {
-                    size_t len = get_string(col, row).size();
-                    width = std::max(width, len);
-                }
+                // FIXME
+                // for (size_t row = 0; row < row_count; ++row) {
+                //     size_t len = get_string(col, row).size();
+                //     width = std::max(width, len);
+                // }
                 if (width > 20)
                     width = 23; // cut strings longer than 20 chars
                 break;
@@ -3403,23 +2764,39 @@ inline void out_string(std::ostream& out, const std::string text, const size_t m
     out.unsetf(std::ostream::adjustfield);
 }
 
+inline void out_timestamp(std::ostream& out, Timestamp value)
+{
+    // FIXME: Do we want to output the full precision to json?
+    time_t rawtime = time_t(value.get_seconds());
+    struct tm* t = gmtime(&rawtime);
+    if (t) {
+        // We need a buffer for formatting dates (and binary to hex). Max
+        // size is 20 bytes (incl zero byte) "YYYY-MM-DD HH:MM:SS"\0
+        char buffer[30];
+        size_t res = strftime(buffer, 30, "%Y-%m-%d %H:%M:%S", t);
+        if (res)
+            out << buffer;
+    }
+}
+
 } // anonymous namespace
 
 
-void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<size_t>& widths) const
+void Table::to_string_row(Key key, std::ostream& out, const std::vector<size_t>& widths) const
 {
     size_t column_count = get_column_count();
     size_t row_ndx_width = widths[0];
 
     out << std::scientific; // for float/double
     out.width(row_ndx_width);
-    out << row_ndx << ":";
+    out << key.value << ":";
 
+    ConstObj obj = get_object(key);
     for (size_t col = 0; col < column_count; ++col) {
         out << "  "; // spacing
         out.width(widths[col + 1]);
 
-        if (is_nullable(col) && is_null(col, row_ndx)) {
+        if (is_nullable(col) && obj.is_null(col)) {
             out << "(null)";
             continue;
         }
@@ -3427,33 +2804,30 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
         DataType type = get_column_type(col);
         switch (type) {
             case type_Bool:
-                out << (get_bool(col, row_ndx) ? "true" : "false");
+                out << (obj.get<bool>(col) ? "true" : "false");
                 break;
             case type_Int:
-                out << get_int(col, row_ndx);
+                out << obj.get<Int>(col);
                 break;
             case type_Float:
-                out << get_float(col, row_ndx);
+                out << obj.get<float>(col);
                 break;
             case type_Double:
-                out << get_double(col, row_ndx);
+                out << obj.get<double>(col);
                 break;
             case type_String:
-                out_string(out, get_string(col, row_ndx), 20);
-                break;
-            case type_OldDateTime:
-                out_olddatetime(out, get_olddatetime(col, row_ndx));
+                out_string(out, obj.get<String>(col), 20);
                 break;
             case type_Timestamp:
-                out_timestamp(out, get_timestamp(col, row_ndx));
+                out_timestamp(out, obj.get<Timestamp>(col));
                 break;
             case type_Binary:
                 out.width(widths[col + 1] - 6); // adjust for " bytes" text
-                out << get_binary(col, row_ndx).size() << " bytes";
+                out << obj.get<Binary>(col).size() << " bytes";
                 break;
             case type_Link:
                 // FIXME: print linked row
-                out << get_link(col, row_ndx);
+                out << obj.get<Key>(col);
                 break;
             case type_LinkList:
                 // FIXME: print number of links in list
@@ -3968,71 +3342,68 @@ void Table::print() const
     std::cout << "\n";
 
     // Columns
-    for (size_t i = 0; i < m_size; ++i) {
-        std::cout << std::setw(4) << i;
+    for (auto obj : *this) {
+        std::cout << std::setw(4) << obj.get_key().value;
+
         for (size_t n = 0; n < column_count; ++n) {
             ColumnType type = get_real_column_type(n);
-            if (is_nullable(n) && is_null(n, i)) {
+            if (is_nullable(n) && obj.is_null(n)) {
                 std::cout << std::setw(10) << "null"
                           << " ";
                 continue;
             }
             switch (type) {
                 case col_type_Int: {
-                    size_t value = to_size_t(get_int(n, i));
-                    std::cout << std::setw(10) << value << " ";
+                    // FIXME size_t value = to_size_t(get_int(n, i));
+                    // std::cout << std::setw(10) << value << " ";
                     break;
                 }
                 case col_type_Float: {
-                    float value = get_float(n, i);
-                    std::cout << std::setw(10) << value << " ";
+                    // FIXME float value = get_float(n, i);
+                    // std::cout << std::setw(10) << value << " ";
                     break;
                 }
                 case col_type_Double: {
-                    double value = get_double(n, i);
-                    std::cout << std::setw(10) << value << " ";
+                    // FIXME double value = get_double(n, i);
+                    // std::cout << std::setw(10) << value << " ";
                     break;
                 }
                 case col_type_Bool: {
-                    bool value = get_bool(n, i);
-                    std::cout << std::setw(10) << (value ? "true" : "false") << " ";
+                    // FIXME bool value = get_bool(n, i);
+                    // std::cout << std::setw(10) << (value ? "true" : "false") << " ";
                     break;
                 }
+                case col_type_StringEnum:
                 case col_type_String: {
-                    std::string value = get_string(n, i);
+                    std::string value = obj.get<String>(n);
                     std::cout << std::setw(10) << value << " ";
-                    break;
-                }
-                case col_type_StringEnum: {
-                    const StringEnumColumn& col = get_column_string_enum(n);
-                    std::cout << std::setw(10) << col.get(i) << " ";
                     break;
                 }
                 case col_type_Link: {
-                    size_t value = get_link(n, i);
-                    std::cout << std::setw(10) << value << " ";
+                    // FIXME size_t value = get_link(n, i);
+                    // std::cout << std::setw(10) << value << " ";
                     break;
                 }
                 case col_type_Binary: {
-                    BinaryData value = get_binary(n, i);
-                    std::cout << "size:" << std::setw(5) << value.size() << " ";
+                    // FIXME BinaryData value = get_binary(n, i);
+                    // std::cout << "size:" << std::setw(5) << value.size() << " ";
                     break;
                 }
                 case col_type_Timestamp: {
-                    Timestamp value = get_timestamp(n, i);
-                    std::cout << std::setw(5) << value.get_seconds() << std::setw(5) << value.get_nanoseconds()
-                              << " ";
+                    // FIXME Timestamp value = get_timestamp(n, i);
+                    // std::cout << std::setw(5) << value.get_seconds() << std::setw(5) << value.get_nanoseconds()
+                    //           << " ";
                     break;
                 }
                 case col_type_LinkList: {
-                    size_t value = get_link_count(n, i);
-                    std::cout << "count:" << std::setw(4) << value << " ";
+                    // FIXME size_t value = get_link_count(n, i);
+                    // std::cout << "count:" << std::setw(4) << value << " ";
                     break;
                 }
                 case col_type_BackLink: {
-                    const BacklinkColumn& col = get_column_backlink(n);
-                    size_t value = col.get_backlink_count(i);
-                    std::cout << "count:" << std::setw(4) << value << " ";
+                    // FIXME const BacklinkColumn& col = get_column_backlink(n);
+                    // size_t value = col.get_backlink_count(i);
+                    // std::cout << "count:" << std::setw(4) << value << " ";
                     break;
                 }
 

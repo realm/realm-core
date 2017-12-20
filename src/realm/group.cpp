@@ -215,14 +215,8 @@ void Group::upgrade_file_format(int target_file_format_version)
     REALM_ASSERT_EX(current_file_format_version >= 2 && current_file_format_version <= 8,
                     current_file_format_version);
 
-    // Upgrade from version prior to 5 (datetime -> timestamp)
-    if (current_file_format_version < 5) {
-        auto keys = get_keys();
-        for (auto key : keys) {
-            TableRef table = get_table(key);
-            table->upgrade_olddatetime();
-        }
-    }
+    // Upgrade from version prior to 5 not supported
+    REALM_ASSERT(current_file_format_version >= 5);
 
     // Upgrade from version prior to 6 (StringIndex format changed last time)
     if (current_file_format_version < 6) {
