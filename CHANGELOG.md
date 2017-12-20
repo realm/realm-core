@@ -10,7 +10,9 @@
 
 ### Enhancements
 
-* None.
+* Change the allocation scheme to (hopefully) perform better in scenarios
+  with high fragmentation.
+  PR [#2963](https://github.com/realm/realm-core/pull/2963)
 
 -----------
 
