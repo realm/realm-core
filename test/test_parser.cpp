@@ -251,7 +251,7 @@ TEST(Parser_grammar_analysis)
     CHECK(realm::parser::analyze_grammar() == 0);
 }
 
-void verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, size_t num_results) {
+Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, size_t num_results) {
     Query q = t->where();
 
     realm::parser::Predicate p = realm::parser::parse(query_string);
@@ -266,6 +266,7 @@ void verify_query(test_util::unit_test::TestContext& test_context, TableRef t, s
     realm::query_builder::apply_predicate(q2, p2);
 
     CHECK_EQUAL(q2.count(), num_results);
+    return q2;
 }
 
 
@@ -624,6 +625,37 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, people, "fav_item.data != NULL", 5);
     verify_query(test_context, people, "fav_item.nullable_data == NULL", 2);
     verify_query(test_context, people, "fav_item.nullable_data != NULL", 3);
+}
+
+TEST(Parser_OverColumnIndexChanges)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    size_t first_col_ndx = table->add_column(type_Int, "to_remove");
+    size_t int_col_ndx = table->add_column(type_Int, "ints");
+    size_t double_col_ndx = table->add_column(type_Double, "doubles");
+    size_t string_col_ndx = table->add_column(type_String, "strings");
+    table->add_empty_row(3);
+    for (size_t i = 0; i < table->size(); ++i) {
+        table->set_int(int_col_ndx, i, i);
+        table->set_double(double_col_ndx, i, double(i));
+        std::string str(i, 'a');
+        table->set_string(string_col_ndx, i, StringData(str));
+    }
+
+    std::string ints_before = verify_query(test_context, table, "ints >= 1", 2).get_description();
+    std::string doubles_before = verify_query(test_context, table, "doubles >= 1", 2).get_description();
+    std::string strings_before = verify_query(test_context, table, "strings.@count >= 1", 2).get_description();
+
+    table->remove_column(first_col_ndx);
+
+    std::string ints_after = verify_query(test_context, table, "ints >= 1", 2).get_description();
+    std::string doubles_after = verify_query(test_context, table, "doubles >= 1", 2).get_description();
+    std::string strings_after = verify_query(test_context, table, "strings.@count >= 1", 2).get_description();
+
+    CHECK_EQUAL(ints_before, ints_after);
+    CHECK_EQUAL(doubles_before, doubles_after);
+    CHECK_EQUAL(strings_before, strings_after);
 }
 
 

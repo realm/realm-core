@@ -412,6 +412,13 @@ public:
         else
             return m_condition->validate();
     }
+
+    virtual std::string describe_column() const override
+    {
+        REALM_ASSERT(m_column != nullptr);
+        return ParentNode::describe_column(m_column->get_column_index());
+    }
+
     std::string describe() const override
     {
         return "subtable expression";
@@ -675,6 +682,12 @@ protected:
     void verify_column() const override
     {
         do_verify_column(m_condition_column);
+    }
+
+    virtual std::string describe_column() const override
+    {
+        REALM_ASSERT(m_condition_column != nullptr);
+        return ParentNode::describe_column(m_condition_column->get_column_index());
     }
 
     void init() override
@@ -944,9 +957,15 @@ public:
             return find(false);
     }
 
+    virtual std::string describe_column() const override
+    {
+        REALM_ASSERT(m_condition_column.m_column != nullptr);
+        return ParentNode::describe_column(m_condition_column.m_column->get_column_index());
+    }
+
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + describe_condition() + " " + util::serializer::print_value(FloatDoubleNode::m_value);
+        return describe_column() + " " + describe_condition() + " " + util::serializer::print_value(FloatDoubleNode::m_value);
     }
     virtual std::string describe_condition() const override
     {
@@ -1077,9 +1096,15 @@ public:
         return not_found;
     }
 
+    virtual std::string describe_column() const override
+    {
+        REALM_ASSERT(m_condition_column != nullptr);
+        return ParentNode::describe_column(m_condition_column->get_column_index());
+    }
+
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + TConditionFunction::description() + " "
+        return describe_column() + " " + TConditionFunction::description() + " "
             + util::serializer::print_value(BinaryNode::m_value.get());
     }
 
@@ -1143,9 +1168,15 @@ public:
         return ret;
     }
 
+    virtual std::string describe_column() const override
+    {
+        REALM_ASSERT(m_condition_column != nullptr);
+        return ParentNode::describe_column(m_condition_column->get_column_index());
+    }
+
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + TConditionFunction::description() + " " + util::serializer::print_value(TimestampNode::m_value);
+        return describe_column() + " " + TConditionFunction::description() + " " + util::serializer::print_value(TimestampNode::m_value);
     }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
@@ -1215,6 +1246,12 @@ public:
     {
         if (m_condition_column && patches)
             m_condition_column_idx = m_condition_column->get_column_index();
+    }
+
+    virtual std::string describe_column() const override
+    {
+        REALM_ASSERT(m_condition_column != nullptr);
+        return ParentNode::describe_column(m_condition_column->get_column_index());
     }
 
     virtual std::string describe() const override
@@ -2038,9 +2075,15 @@ public:
         do_verify_column(m_column, m_origin_column);
     }
 
+    virtual std::string describe_column() const override
+    {
+        REALM_ASSERT(m_column != nullptr);
+        return ParentNode::describe_column(m_column->get_column_index());
+    }
+
     virtual std::string describe() const override
     {
-        return this->describe_column(m_origin_column) + " " + describe_condition() + " " + util::serializer::print_value(m_target_row.get_index());
+        return describe_column() + " " + describe_condition() + " " + util::serializer::print_value(m_target_row.get_index());
     }
     virtual std::string describe_condition() const override
     {
