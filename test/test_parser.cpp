@@ -586,6 +586,47 @@ TEST(Parser_Timestamps)
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:0:0", 0));
 }
 
+
+TEST(Parser_NullableBinaries)
+{
+    Group g;
+    TableRef items = g.add_table("item");
+    TableRef people = g.add_table("person");
+    size_t binary_col_ndx = items->add_column(type_Binary, "data");
+    size_t nullable_binary_col_ndx = items->add_column(type_Binary, "nullable_data", true);
+    items->add_empty_row(5);
+    BinaryData bd0("knife");
+    items->set_binary(binary_col_ndx, 0, bd0);
+    items->set_binary(nullable_binary_col_ndx, 0, bd0);
+    BinaryData bd1("plate");
+    items->set_binary(binary_col_ndx, 1, bd1);
+    items->set_binary(nullable_binary_col_ndx, 1, bd1);
+    BinaryData bd2("fork");
+    items->set_binary(binary_col_ndx, 2, bd2);
+    items->set_binary(nullable_binary_col_ndx, 2, bd2);
+
+    size_t fav_item_col_ndx = people->add_column_link(type_Link, "fav_item", *items);
+    people->add_empty_row(5);
+    people->set_link(fav_item_col_ndx, 0, 0);
+    people->set_link(fav_item_col_ndx, 1, 1);
+    people->set_link(fav_item_col_ndx, 2, 2);
+    people->set_link(fav_item_col_ndx, 3, 3);
+    people->set_link(fav_item_col_ndx, 4, 4);
+
+    // direct checks
+    verify_query(test_context, items, "data == NULL", 0);
+    verify_query(test_context, items, "data != NULL", 5);
+    verify_query(test_context, items, "nullable_data == NULL", 2);
+    verify_query(test_context, items, "nullable_data != NULL", 3);
+
+    // check across links
+    verify_query(test_context, people, "fav_item.data == NULL", 0);
+    verify_query(test_context, people, "fav_item.data != NULL", 5);
+    verify_query(test_context, people, "fav_item.nullable_data == NULL", 2);
+    verify_query(test_context, people, "fav_item.nullable_data != NULL", 3);
+}
+
+
 void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, const util::Any* arg_list, size_t num_args, size_t num_results) {
 
     query_builder::AnyContext ctx;

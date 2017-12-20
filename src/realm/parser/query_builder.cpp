@@ -385,10 +385,10 @@ void add_binary_constraint_to_query(realm::Query &query,
                                     Columns<Binary> &&column) {
     switch (op) {
         case Predicate::Operator::Equal:
-            query.equal(column.column_ndx(), BinaryData(value));
+            query.and_query(column == value);
             break;
         case Predicate::Operator::NotEqual:
-            query.not_equal(column.column_ndx(), BinaryData(value));
+            query.and_query(column != value);
             break;
         default:
             throw std::logic_error("Substring comparison not supported for keypath substrings.");
@@ -765,14 +765,14 @@ void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const
 template<>
 void do_add_null_comparison_to_query<Binary>(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
-    precondition(expr.indexes.empty(), "KeyPath queries not supported for data comparisons.");
     Columns<Binary> column = expr.table_getter()->template column<Binary>(expr.col_ndx);
+    BinaryData null_binary;
     switch (op) {
         case Predicate::Operator::NotEqual:
-            query.not_equal(expr.col_ndx, realm::null());
+            query.and_query(column != null_binary);
             break;
         case Predicate::Operator::Equal:
-            query.equal(expr.col_ndx, realm::null());
+            query.and_query(column == null_binary);
             break;
         default:
             throw std::logic_error("Only 'equal' and 'not equal' operators supported when comparing against 'null'.");
