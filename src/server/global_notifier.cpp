@@ -36,6 +36,8 @@
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
 
+#include <json.hpp>
+
 #include <condition_variable>
 #include <mutex>
 #include <queue>
@@ -46,6 +48,18 @@
 
 using namespace realm;
 using namespace realm::_impl;
+
+namespace realm {
+void to_json(nlohmann::json& j, VersionID v)
+{
+    j = {{"version", v.version}, {"index", v.index}};
+}
+void from_json(nlohmann::json const& j, VersionID& v)
+{
+    v.version = j["version"];
+    v.index = j["index"];
+}
+}
 
 class GlobalNotifier::Impl : public AdminRealmListener {
 public:
@@ -239,6 +253,30 @@ GlobalNotifier::ChangeNotification::~ChangeNotification()
     if (m_notifier)
         m_notifier->release_version(realm_path, m_old_version, m_new_version);
 
+}
+
+std::string GlobalNotifier::ChangeNotification::serialize() const
+{
+    nlohmann::json ret;
+    ret["virtual_path"] = realm_path;
+    ret["path"] = m_config.path;
+    ret["old_version"] = m_old_version;
+    ret["new_version"] = m_new_version;
+    return ret.dump();
+}
+
+GlobalNotifier::ChangeNotification::ChangeNotification(std::string const& serialized)
+{
+    auto parsed = nlohmann::json::parse(serialized);
+    realm_path = parsed["virtual_path"];
+    m_old_version = parsed["old_version"];
+    m_new_version = parsed["new_version"];
+
+    m_config.path = parsed["path"];
+    m_config.force_sync_history = true;
+    m_config.schema_mode = SchemaMode::Additive;
+    m_config.cache = false;
+    m_config.automatic_change_notifications = false;
 }
 
 SharedRealm GlobalNotifier::ChangeNotification::get_old_realm() const

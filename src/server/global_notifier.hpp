@@ -77,6 +77,9 @@ public:
 
     ~ChangeNotification();
 
+    std::string serialize() const;
+    ChangeNotification(std::string const&);
+
     ChangeNotification(ChangeNotification&&) = default;
     ChangeNotification& operator=(ChangeNotification&&) = default;
     ChangeNotification(ChangeNotification const&) = delete;
