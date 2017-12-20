@@ -556,7 +556,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_INDICES(info.tables[2].modifications, 10);
         }
 
-#if REALM_VERSION_MAJOR > 2
         SECTION("adding a new row with primary key set is not reported as a modification") {
             auto info = track_changes({false, false, true}, [&] {
                 table.add_row_with_key(0, 10);
@@ -565,7 +564,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_INDICES(info.tables[2].insertions, 10);
             REQUIRE(info.tables[2].modifications.empty());
         }
-#endif
 
         SECTION("move_last_over() does not shift rows other than the last one") {
             auto info = track_changes({false, false, true}, [&] {
@@ -2127,7 +2125,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 
         // ----------------------------------------------------------------------
 
-#if REALM_VERSION_MAJOR > 2
 
         SECTION("int array: add()") {
             auto changes = observe({r}, [&] {
@@ -2161,7 +2158,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.array_change(0, 3) == (ArrayChange{Kind::Set, {0, 2}}));
         }
 
-#if REALM_VERSION_MAJOR > 3
         SECTION("int array: move()") {
             auto changes = observe({r}, [&] {
                 tr->move_row(8, 2);
@@ -2172,7 +2168,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             });
             REQUIRE(changes.array_change(0, 3) == (ArrayChange{Kind::Set, {2, 3, 6, 7, 8}}));
         }
-#endif
 
         SECTION("int array: emulated move()") {
             auto changes = observe({r}, [&] {
@@ -2356,7 +2351,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             });
             REQUIRE(changes.array_change(0, 3) == (ArrayChange{Kind::SetAll, {}}));
         }
-#endif // REALM_VERSION_MAJOR > 2
     }
 }
 
