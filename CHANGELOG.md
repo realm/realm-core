@@ -13,6 +13,10 @@
 * Change the allocation scheme to (hopefully) perform better in scenarios
   with high fragmentation.
   PR [#2963](https://github.com/realm/realm-core/pull/2963)
+* Avoid excessive bumping of counters in the version management machinery that is
+  responsible for supporting live queries. We now prune version bumping earlier if
+  when we have sequences of changes without queries in between.
+  PR [#2962](https://github.com/realm/realm-core/pull/2962)
 
 -----------
 

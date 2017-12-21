@@ -1082,6 +1082,12 @@ private:
     // Upgrades OldDateTime columns to Timestamp columns
     void upgrade_olddatetime();
 
+    // Indicate that the current global state version has been "observed". Until this
+    // happens, bumping of the global version counter can be bypassed, as any query
+    // checking for a version change will see the older version change anyways.
+    // Also returns the table-local version.
+    uint64_t observe_version() const noexcept;
+
     /// Update the version of this table and all tables which have links to it.
     /// This causes all views referring to those tables to go out of sync, so that
     /// calls to sync_if_needed() will bring the view up to date by reexecuting the
@@ -1612,6 +1618,12 @@ protected:
 
 inline uint_fast64_t Table::get_version_counter() const noexcept
 {
+    return observe_version();
+}
+
+inline uint64_t Table::observe_version() const noexcept
+{
+    m_top.get_alloc().observe_version();
     return m_version;
 }
 
