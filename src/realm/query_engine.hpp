@@ -1939,6 +1939,24 @@ public:
         do_verify_column(m_getter2.m_column, m_condition_column_idx2);
     }
 
+    virtual std::string describe_column() const override
+    {
+        REALM_ASSERT(m_condition_column != nullptr);
+        return ParentNode::describe_column(m_condition_column->get_column_index());
+    }
+
+    virtual std::string describe() const override
+    {
+        REALM_ASSERT(m_getter1.m_column != nullptr && m_getter2.m_column != nullptr);
+        return ParentNode::describe_column(m_getter1.m_column->get_column_index()) + " " + describe_condition() + " "
+             + ParentNode::describe_column(m_getter2.m_column->get_column_index());
+    }
+
+    virtual std::string describe_condition() const override
+    {
+        return TConditionFunction::description();
+    }
+
     void init() override
     {
         ParentNode::init();
