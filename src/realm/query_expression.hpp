@@ -218,7 +218,7 @@ struct Plus {
     }
     static std::string description()
     {
-        return "plus";
+        return "+";
     }
     typedef T type;
 };
@@ -231,7 +231,7 @@ struct Minus {
     }
     static std::string description()
     {
-        return "minus";
+        return "-";
     }
     typedef T type;
 };
@@ -244,7 +244,7 @@ struct Div {
     }
     static std::string description()
     {
-        return "divided by";
+        return "/";
     }
     typedef T type;
 };
@@ -257,7 +257,7 @@ struct Mul {
     }
     static std::string description()
     {
-        return "multiplied by";
+        return "*";
     }
     typedef T type;
 };
@@ -271,7 +271,7 @@ struct Pow {
     }
     static std::string description()
     {
-        return "to the power of";
+        return "^";
     }
     typedef T type;
 };
@@ -3658,7 +3658,7 @@ public:
         if (m_left) {
             s += m_left->description();
         }
-        s += oper::description();
+        s += (" " + oper::description() + " ");
         if (m_right) {
             s += m_right->description();
         }
