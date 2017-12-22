@@ -1,12 +1,4 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* None.
-
-### Breaking changes
-
-* None.
+# 5.1.0 Release notes
 
 ### Enhancements
 
@@ -17,12 +9,6 @@
   responsible for supporting live queries. We now prune version bumping earlier if
   when we have sequences of changes without queries in between.
   PR [#2962](https://github.com/realm/realm-core/pull/2962)
-
------------
-
-### Internals
-
-* None.
 
 ----------------------------------------------
 
