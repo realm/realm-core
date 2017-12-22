@@ -371,14 +371,14 @@ if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NO
     add_executable(realm-config config_tool.cpp)
     set_target_properties(realm-config PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
 
-    add_executable(realm-importer importer_tool.cpp importer.cpp importer.hpp)
-    set_target_properties(realm-importer PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
-    target_link_libraries(realm-importer realm)
+    # FIXME add_executable(realm-importer importer_tool.cpp importer.cpp importer.hpp)
+    # set_target_properties(realm-importer PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
+    # target_link_libraries(realm-importer realm)
 
     add_executable(realm-trawler realm_trawler.cpp)
     set_target_properties(realm-trawler PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
 
-    install(TARGETS realm-config realm-importer
+    install(TARGETS realm-config # realm-importer
             COMPONENT runtime
             DESTINATION ${CMAKE_INSTALL_BINDIR})
 
