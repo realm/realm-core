@@ -1960,8 +1960,7 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
             g.remove_table("data");
             TableRef table = g.add_table("data");
             table->add_column(type_Int, "ints");
-            table->add_empty_row();
-            table->set_int(0, 0, 0);
+            table->create_object().set(0, 0);
         }
         sg->commit();
         sg->wait_for_change();
@@ -1976,7 +1975,7 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
         Group& g = sg->begin_write();
         if (g.size() == 1) {
             TableRef table = g.get_table("data");
-            int64_t v = table->get_int(0, 0);
+            int64_t v = table->begin()->get<int64_t>(0);
 
             if (i == 0 && v == 0)
                 first = true;
