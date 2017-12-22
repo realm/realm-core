@@ -1215,32 +1215,6 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL("Banach", table->get_mixed(2 + 6, 0).get_string());
     CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2 + 6, 5)) &&
         CHECK_EQUAL(OldDateTime(60), table->get_mixed(2 + 6, 5).get_olddatetime());
-
-    // Move columns around
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        DescriptorRef desc_w = table_w->get_descriptor();
-        using tf = _impl::TableFriend;
-        tf::move_column(*desc_w, 7, 2); // FIXME: Not yet publicly exposed
-        tf::move_column(*desc_w, 8, 4);
-        tf::move_column(*desc_w, 2, 7);
-        wt.commit();
-    }
-    LangBindHelper::advance_read(sg);
-    group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(8, 4)) && CHECK_EQUAL(2, table->get_mixed(8, 4).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(8, 0)) && CHECK_EQUAL(20.0f, table->get_mixed(8, 0).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(8, 5)) && CHECK_EQUAL(false, table->get_mixed(8, 5).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(7, 4)) && check_subtab(table, 7, 4, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(7, 0)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(7, 0).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(7, 5)) && CHECK_EQUAL(40, table->get_mixed(7, 5).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(3, 4)) && CHECK_EQUAL(50.0, table->get_mixed(3, 4).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(3, 0)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(3, 0).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(3, 5)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(3, 5).get_olddatetime());
 }
 
 
@@ -1409,26 +1383,6 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     CHECK_NOT(table->has_search_index(6));
     CHECK_EQUAL(3, table->find_first_string(2, "738"));
     CHECK_EQUAL(13, table->find_first_int(5, 508));
-
-    // Move the indexed columns directly
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        DescriptorRef desc_w = table_w->get_descriptor();
-        using tf = _impl::TableFriend;
-        tf::move_column(*desc_w, 2, 5); // FIXME: Not yet publicly exposed
-        tf::move_column(*desc_w, 1, 6);
-        wt.commit();
-    }
-    LangBindHelper::advance_read(sg);
-    group.verify();
-    CHECK_NOT(table->has_search_index(6));
-    CHECK(table->has_search_index(4));
-    CHECK_NOT(table->has_search_index(2));
-    CHECK(table->has_search_index(3));
-    CHECK_NOT(table->has_search_index(5));
-    CHECK_EQUAL(12, table->find_first_string(4, "931"));
-    CHECK_EQUAL(4, table->find_first_int(3, 315));
 }
 
 
@@ -7563,10 +7517,6 @@ public:
     {
         return false;
     }
-    bool move_group_level_table(size_t, size_t)
-    {
-        return false;
-    }
     bool insert_column(size_t, DataType, StringData, bool)
     {
         return false;
@@ -7584,10 +7534,6 @@ public:
         return false;
     }
     bool rename_column(size_t, StringData)
-    {
-        return false;
-    }
-    bool move_column(size_t, size_t)
     {
         return false;
     }
@@ -8327,48 +8273,6 @@ TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
     table->set_int(0, 0, 0);
     group->remove_table("table");
     LangBindHelper::rollback_and_continue_as_read(sg);
-}
-
-TEST(LangBindHelper_AdvanceReadTransact_MoveSelectedTable)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
-    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
-
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_1_w = wt.add_table("table_1");
-        TableRef table_2_w = wt.add_table("table_2");
-        table_2_w->add_column(type_Int, "i");
-        table_2_w->add_empty_row();
-        wt.commit();
-    }
-
-    // Start a read transaction (to be repeatedly advanced)
-    ReadTransaction rt(sg);
-    const Group& group = rt.get_group();
-    ConstTableRef table_1 = group.get_table("table_1");
-    ConstTableRef table_2 = group.get_table("table_2");
-
-    // Try to advance after an empty write transaction
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_1_w = wt.get_or_add_table("table_1");
-        TableRef table_2_w = wt.get_or_add_table("table_2");
-        table_2_w->set_int(0, 0, 1);
-        wt.get_group().move_table(0, 1);
-        CHECK_EQUAL(1, table_2_w->get_int(0, 0));
-        CHECK_EQUAL(0, table_2_w->get_index_in_group());
-        CHECK_EQUAL(1, table_1_w->get_index_in_group());
-        table_2_w->set_int(0, 0, 2);
-        wt.commit();
-    }
-    LangBindHelper::advance_read(sg);
-    group.verify();
-    CHECK_EQUAL(2, table_2->get_int(0, 0));
-    CHECK_EQUAL(0, table_2->get_index_in_group());
-    CHECK_EQUAL(1, table_1->get_index_in_group());
 }
 
 
@@ -12754,60 +12658,6 @@ TEST(LangBindHelper_SwapSimple)
 }
 
 
-// Found by AFL
-TEST(LangBindHelper_RollbackMoveSame)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& g = const_cast<Group&>(sg_w.begin_write());
-
-    g.add_table("t0");
-    g.add_table("t1");
-    g.get_table(1)->add_column_link(type_LinkList, "l0", *g.get_table(0));
-    g.get_table(1)->add_column(DataType(6), "m1", false);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    g.verify();
-    LangBindHelper::promote_to_write(sg_w);
-    g.verify();
-    _impl::TableFriend::move_column(*(g.get_table(1)->get_descriptor()), 0, 0);
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
-    g.verify();
-}
-
-
-TEST(LangBindHelper_ColumnMoveUpdatesLinkedTables)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& g = const_cast<Group&>(sg_w.begin_write());
-    Group& g_r = const_cast<Group&>(sg_r.begin_read());
-
-    TableRef t0 = g.add_table("t0");
-    TableRef t1 = g.add_table("t1");
-
-    t0->add_column_link(type_Link, "l0", *t1);
-    t0->add_column(type_Int, "i1");
-    t0->add_empty_row();
-
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    g.verify();
-    LangBindHelper::advance_read(sg_r);
-    g_r.verify();
-    LangBindHelper::promote_to_write(sg_w);
-
-    _impl::TableFriend::move_column(*(t0->get_descriptor()), 0, 1);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    g.verify();
-    LangBindHelper::advance_read(sg_r);
-    g_r.verify();
-}
-
 TEST(LangBindHelper_Bug2321)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -13180,6 +13030,178 @@ TEST(LangBindHelper_IndexedStringEnumColumnSwapRowsWithValue)
     g.get_table(0)->set_string(0, 2, "some string payload");
     g.get_table(0)->swap_rows(2, 6);
     g.verify();
+}
+
+
+TEST(LangBindHelper_SubtableAccessorUpdatesOnMoveRow)
+{
+    // Test case generated in [realm-core-4.0.3] on Wed Nov  8 14:56:49 2017.
+    // This discovers a problem updating the index_in_parent of a subtable
+    // after a move_row(from_ndx, to_ndx) where from_ndx < to_ndx
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = nullptr;
+    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(key));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+    std::vector<TableView> table_views;
+    std::vector<TableRef> subtable_refs;
+
+    try { g.add_table(""); } catch (const TableNameInUse&) { }
+    {
+        DescriptorRef subdescr;
+        g.get_table(0)->insert_column(0, type_Table, "", true, &subdescr);
+        subdescr->add_column(type_Int, "integers", nullptr, false);
+    }
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+    g.get_table(0)->add_empty_row(6);
+    {
+        TableRef sub = g.get_table(0)->get_subtable(0, 0);
+        sub->clear();
+        sub->add_empty_row(0);
+        subtable_refs.push_back(sub);
+    }
+    g.get_table(0)->rename_column(0, "numbers");
+    g.get_table(0)->move_last_over(2);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    g.get_table(0)->move_row(1, 0);
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    g.get_table(0)->move_row(0, 0);
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    g.get_table(0)->move_row(1, 0);
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    try { g.add_table("anything"); } catch (const TableNameInUse&) { }
+    try { g.add_table("another"); } catch (const TableNameInUse&) { }
+    g.get_table(0)->get_subdescriptor(0)->add_search_index(0);
+    try { g.add_table("third"); } catch (const TableNameInUse&) { }
+    sg_r.close();
+    sg_w.commit();
+}
+
+
+TEST(LangBindHelper_MoveSubtableAccessors)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = nullptr;
+    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(key));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+    std::vector<TableView> table_views;
+    std::vector<TableRef> subtable_refs;
+
+    {
+        TableRef table = g.add_table("table");
+        DescriptorRef subdescr;
+        table->insert_column(0, type_Table, "subtable", true, &subdescr);
+        size_t id_col = table->add_column(type_Int, "id");
+        subdescr->add_column(type_Int, "integers", nullptr, false);
+        table->add_empty_row(3);
+        table->set_int(id_col, 0, 0);
+        table->set_int(id_col, 1, 1);
+        table->set_int(id_col, 2, 2);
+        TableRef sub0 = table->get_subtable(0, 0);
+        sub0->add_empty_row();
+        sub0->set_int(0, 0, 0);
+        TableRef sub1 = table->get_subtable(0, 1);
+        sub1->add_empty_row();
+        sub1->set_int(0, 0, 1);
+        TableRef sub2 = table->get_subtable(0, 2);
+        sub2->add_empty_row();
+        sub2->set_int(0, 0, 2);
+
+        // add two sets of observing accessors in order
+        subtable_refs.push_back(sub0);
+        subtable_refs.push_back(sub1);
+        subtable_refs.push_back(sub2);
+
+        subtable_refs.push_back(sub0);
+        subtable_refs.push_back(sub1);
+        subtable_refs.push_back(sub2);
+    }
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+    LangBindHelper::promote_to_write(sg_w);
+
+    auto verify_group = [&](const Group& group) {
+        group.verify();
+        ConstTableRef table = group.get_table("table");
+        CHECK_EQUAL(table->get_int(1, 0), 0);
+        ConstTableRef sub0 = table->get_subtable(0, 0);
+        CHECK_EQUAL(sub0->get_int(0, 0), 0);
+        CHECK_EQUAL(table->get_int(1, 1), 1);
+        ConstTableRef sub1 = table->get_subtable(0, 1);
+        CHECK_EQUAL(sub1->get_int(0, 0), 1);
+        CHECK_EQUAL(table->get_int(1, 2), 2);
+        ConstTableRef sub2 = table->get_subtable(0, 2);
+        CHECK_EQUAL(sub2->get_int(0, 0), 2);
+        for (size_t i = 0; i < subtable_refs.size(); ++i) {
+            CHECK_EQUAL(subtable_refs[i]->get_int(0, 0), i % 3);
+        }
+    };
+
+    verify_group(g);
+    verify_group(g_r);
+    {
+        TableRef table = g.get_table("table");
+        table->move_row(0, 0);
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+        LangBindHelper::promote_to_write(sg_w);
+        verify_group(g);
+    }
+    {
+        TableRef table = g.get_table("table");
+        table->move_row(0, 1);
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+        LangBindHelper::promote_to_write(sg_w);
+        verify_group(g);
+    }
+    {
+        TableRef table = g.get_table("table");
+        table->move_row(1, 0);
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+        LangBindHelper::promote_to_write(sg_w);
+        verify_group(g);
+    }
+    {
+        TableRef table = g.get_table("table");
+        table->move_row(0, 2);
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+        LangBindHelper::promote_to_write(sg_w);
+        verify_group(g);
+    }
+    {
+        TableRef table = g.get_table("table");
+        table->move_row(2, 0);
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+        LangBindHelper::promote_to_write(sg_w);
+        verify_group(g);
+    }
+    {
+        TableRef table = g.get_table("table");
+        table->move_row(1, 1);
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+        LangBindHelper::promote_to_write(sg_w);
+        verify_group(g);
+    }
+    LangBindHelper::advance_read(sg_r);
+    verify_group(g_r);
 }
 
 

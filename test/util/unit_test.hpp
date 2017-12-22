@@ -134,6 +134,18 @@
         }                                                                                                            \
     } while (false)
 
+#define CHECK_THROW_ANY_GET_MESSAGE(expr, message)                                                                   \
+    do {                                                                                                             \
+        try {                                                                                                        \
+            (expr);                                                                                                  \
+            test_context.throw_any_failed(__FILE__, __LINE__, #expr);                                                \
+        }                                                                                                            \
+        catch (std::exception& e) {                                                                                  \
+            test_context.check_succeeded();                                                                          \
+            message = e.what();                                                                                      \
+        }                                                                                                            \
+    } while (false)
+
 #if REALM_VALGRIND
 static const bool running_with_valgrind = true;
 #else

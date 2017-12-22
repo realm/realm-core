@@ -87,6 +87,12 @@ enum INS {
     GET_ALL_COLUMN_NAMES,
     CREATE_TABLE_VIEW,
     COMPACT,
+<<<<<<< HEAD
+=======
+    SWAP_ROWS,
+    MOVE_ROWS,
+    SET_UNIQUE,
+>>>>>>> v5.0.1
     IS_NULL,
     OPTIMIZE_TABLE,
 
@@ -368,7 +374,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 g.get_table(table_ndx)->clear();
                 keys[table_ndx].clear();
             }
+<<<<<<< HEAD
             else if (instr == CREATE_OBJECT && g.size() > 0) {
+=======
+            else if (instr == INSERT_ROW && g.size() > 0) {
+>>>>>>> v5.0.1
                 size_t table_ndx = get_next(s) % g.size();
                 if (g.get_table(table_ndx)->get_column_count() == 0) {
                     continue; // do not insert rows if there are no columns

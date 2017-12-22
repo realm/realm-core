@@ -49,8 +49,8 @@ void LinkMap::set_base_table(const Table* table)
         m_link_types.push_back(type);
         m_link_column_names.emplace_back(spec.get_column_name(link_column_index));
         TableKey target_table_key = spec.get_opposite_link_table_key(link_column_index);
-        auto target_table = group->get_table(target_table_key);
-        m_tables.push_back(target_table.get());
+        auto target_table_ref = group->get_table(target_table_key);
+        m_tables.push_back(target_table_ref.get());
     }
 }
 
@@ -59,9 +59,6 @@ std::string LinkMap::description() const
     std::string s;
     for (size_t i = 0; i < m_link_column_indexes.size(); ++i) {
         if (i < m_tables.size() && m_tables[i]) {
-            if (i == 0) {
-                s += std::string(m_tables[i]->get_name()) + metrics::value_separator;
-            }
             if (m_link_types[i] == col_type_BackLink) {
                 s += "backlink";
             }
@@ -69,7 +66,7 @@ std::string LinkMap::description() const
                 s += std::string(m_tables[i]->get_column_name(m_link_column_indexes[i]));
             }
             if (i != m_link_column_indexes.size() - 1) {
-                s += metrics::value_separator;
+                s += util::serializer::value_separator;
             }
         }
     }

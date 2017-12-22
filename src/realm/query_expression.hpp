@@ -139,6 +139,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/link_view.hpp>
 #include <realm/metrics/query_info.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/util/serializer.hpp>
 
 #include <numeric>
 
@@ -1186,11 +1187,11 @@ public:
     virtual std::string description() const override
     {
         if (ValueBase::m_from_link_list) {
-            return metrics::print_value(util::to_string(ValueBase::m_values) +
-                                        (ValueBase::m_values == 1 ? " value" : " values"));
+            return util::serializer::print_value(util::to_string(ValueBase::m_values) +
+                                                 (ValueBase::m_values == 1 ? " value" : " values"));
         }
         if (m_storage.m_size > 0) {
-            return metrics::print_value(m_storage[0]);
+            return util::serializer::print_value(m_storage[0]);
         }
         return "";
     }
@@ -1979,15 +1980,15 @@ public:
 
     virtual std::string description() const override
     {
+        std::string desc;
         if (links_exist()) {
-            return m_link_map.description();
+            desc = m_link_map.description() + util::serializer::value_separator;
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached()) {
-            return std::string(target_table->get_name()) + metrics::value_separator +
-                   std::string(target_table->get_column_name(m_column_ndx));
+            desc += std::string(target_table->get_column_name(m_column_ndx));
         }
-        return "";
+        return desc;
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches = nullptr) const override
@@ -2196,7 +2197,7 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + metrics::value_separator + (has_links ? "is_not_null()" : "is_null()");
+        return m_link_map.description() + (has_links ? " != NULL" : " == NULL");
     }
 
     std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override
@@ -2259,7 +2260,7 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + metrics::value_separator + "count()";
+        return m_link_map.description() + util::serializer::value_separator + "@count";
     }
 
 private:
@@ -2324,9 +2325,9 @@ public:
     std::string description() const override
     {
         if (m_expr) {
-            return m_expr->description() + metrics::value_separator + "size()";
+            return m_expr->description() + util::serializer::value_separator + "@size";
         }
-        return "size()";
+        return "@size";
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -2379,7 +2380,7 @@ public:
 
     virtual std::string description() const override
     {
-        return metrics::print_value(m_key);
+        return util::serializer::print_value(m_key);
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
@@ -2626,8 +2627,7 @@ public:
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached()) {
-            return std::string(target_table->get_name()) + metrics::value_separator +
-                   std::string(target_table->get_column_name(m_column_ndx));
+            return std::string(target_table->get_column_name(m_column_ndx));
         }
         return "";
     }
@@ -2783,8 +2783,7 @@ public:
     {
         const Table* table = get_base_table();
         if (table && table->is_attached()) {
-            return std::string(table->get_name()) + metrics::value_separator +
-                   std::string(table->get_column_name(m_column_ndx)) + metrics::value_separator +
+            return std::string(table->get_column_name(m_column_ndx)) + util::serializer::value_separator +
                    Operation::description() + "()";
         }
         return "";
@@ -3009,13 +3008,14 @@ public:
 
     virtual std::string description() const override
     {
+        std::string desc = "";
         if (links_exist()) {
-            return m_link_map.description();
+            desc = m_link_map.description() + util::serializer::value_separator;
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached() && m_column_ndx != npos) {
-            return std::string(target_table->get_name()) + metrics::value_separator +
-                   std::string(target_table->get_column_name(m_column_ndx));
+            desc += std::string(target_table->get_column_name(m_column_ndx));
+            return desc;
         }
         return "";
     }
@@ -3173,8 +3173,9 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        std::vector<size_t> links = m_link_map.get_links(index);
-        std::sort(links.begin(), links.end());
+        std::vector<Key> keys = m_link_map.get_links(index);
+        std::vector<size_t> links;
+        std::sort(keys.begin(), keys.end());
 
         Operation op;
         for (size_t link_index = 0; link_index < links.size();) {
@@ -3208,8 +3209,8 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + "(" + m_column.description() + ")" + metrics::value_separator +
-               Operation::description() + "()";
+        return m_link_map.description() + util::serializer::value_separator + Operation::description() +
+               util::serializer::value_separator + m_column.description();
     }
 
 private:
@@ -3264,8 +3265,8 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + metrics::value_separator + "(where " + m_query.get_description() + ")" +
-               metrics::value_separator + "count()";
+        return m_link_map.description() + util::serializer::value_separator + "SUBQUERY(" +
+               m_query.get_description() + ")" + util::serializer::value_separator + "@count";
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -3364,7 +3365,7 @@ public:
     }
     static std::string description()
     {
-        return "minimum";
+        return "@min";
     }
 };
 
@@ -3381,7 +3382,7 @@ public:
     }
     static std::string description()
     {
-        return "maximum";
+        return "@max";
     }
 };
 
@@ -3402,7 +3403,7 @@ public:
     }
     static std::string description()
     {
-        return "sum";
+        return "@sum";
     }
 };
 
@@ -3425,7 +3426,7 @@ public:
     }
     static std::string description()
     {
-        return "average";
+        return "@avg";
     }
 };
 }
@@ -3677,8 +3678,17 @@ public:
 
     virtual std::string description() const override
     {
-        return metrics::print_value(m_left->description() + " " + TCond::description() + " " +
-                                    m_right->description());
+        if (std::is_same<TCond, BeginsWith>::value || std::is_same<TCond, BeginsWithIns>::value ||
+            std::is_same<TCond, EndsWith>::value || std::is_same<TCond, EndsWithIns>::value ||
+            std::is_same<TCond, Contains>::value || std::is_same<TCond, ContainsIns>::value ||
+            std::is_same<TCond, Like>::value || std::is_same<TCond, LikeIns>::value) {
+            // these string conditions have the arguments reversed but the order is important
+            // operations ==, and != can be reversed because the produce the same results both ways
+            return util::serializer::print_value(m_right->description() + " " + TCond::description() + " " +
+                                                 m_left->description());
+        }
+        return util::serializer::print_value(m_left->description() + " " + TCond::description() + " " +
+                                             m_right->description());
     }
 
     std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override

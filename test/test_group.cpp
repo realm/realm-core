@@ -757,8 +757,6 @@ TEST(Group_RenameTable)
 }
 
 
-
-
 TEST(Group_Equal)
 {
     Group g1, g2, g3;

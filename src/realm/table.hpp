@@ -968,21 +968,17 @@ private:
                           bool nullable = false, bool listtype = false);
     void do_insert_column_unless_exists(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
                                         bool nullable = false, bool listtype = false, bool* was_inserted = nullptr);
-    void do_move_column(size_t col_ndx_1, size_t col_ndx_2);
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
-    struct MoveSubtableColumns;
 
     void insert_root_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link_target,
                             bool nullable = false, bool linktype = false);
     void erase_root_column(size_t col_ndx);
-    void move_root_column(size_t from, size_t to);
     void do_insert_root_column(size_t col_ndx, ColumnType, StringData name, bool nullable = false,
                                bool listtype = false);
     void do_erase_root_column(size_t col_ndx);
-    void do_move_root_column(size_t from, size_t to);
     void insert_backlink_column(TableKey origin_table_key, size_t origin_col_ndx, size_t backlink_col_ndx,
                                 StringData name);
     void erase_backlink_column(TableKey origin_table_key, size_t origin_col_ndx);
@@ -1158,7 +1154,6 @@ private:
 
     void adj_insert_column(size_t col_ndx);
     void adj_erase_column(size_t col_ndx) noexcept;
-    void adj_move_column(size_t col_ndx_1, size_t col_ndx_2) noexcept;
 
     bool is_marked() const noexcept;
     void mark() noexcept;
@@ -2045,11 +2040,6 @@ public:
         table.rename_column(column_ndx, name); // Throws
     }
 
-    static void move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2)
-    {
-        table.do_move_column(col_ndx_1, col_ndx_2); // Throws
-    }
-
     static void set_link_type(Table& table, size_t column_ndx, LinkType link_type)
     {
         table.set_link_type(column_ndx, link_type); // Throws
@@ -2085,11 +2075,6 @@ public:
     static void adj_erase_column(Table& table, size_t col_ndx) noexcept
     {
         table.adj_erase_column(col_ndx);
-    }
-
-    static void adj_move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2) noexcept
-    {
-        table.adj_move_column(col_ndx_1, col_ndx_2);
     }
 
     static bool is_marked(const Table& table) noexcept

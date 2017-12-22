@@ -563,21 +563,6 @@ void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, String
 }
 
 
-void Table::do_move_column(size_t col_ndx_1, size_t col_ndx_2)
-{
-    REALM_ASSERT(is_attached());
-
-    REALM_ASSERT_3(col_ndx_1, <, get_column_count());
-    REALM_ASSERT_3(col_ndx_2, <, get_column_count());
-
-    if (Replication* repl = get_repl())
-        repl->move_column(this, col_ndx_1, col_ndx_2);
-
-    bump_version();
-    move_root_column(col_ndx_1, col_ndx_2);
-}
-
-
 void Table::add_search_index(size_t column_ndx)
 {
     if (REALM_UNLIKELY(column_ndx >= get_column_count()))
@@ -740,24 +725,6 @@ void Table::erase_root_column(size_t col_ndx)
 }
 
 
-void Table::move_root_column(size_t from, size_t to)
-{
-    REALM_ASSERT_3(from, <, m_spec->get_public_column_count());
-    REALM_ASSERT_3(to, <, m_spec->get_public_column_count());
-
-    if (from == to)
-        return;
-
-    do_move_root_column(from, to);
-    adj_move_column(from, to);
-    update_link_target_tables_after_column_move(from, to);
-
-    size_t min_ndx = std::min(from, to);
-    refresh_column_accessors(min_ndx);
-    refresh_link_target_accessors(min_ndx);
-}
-
-
 void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, bool nullable, bool listtype)
 {
     int attr = col_attr_None;
@@ -799,30 +766,6 @@ void Table::do_erase_root_column(size_t ndx)
 
     if (m_clusters.is_attached()) {
         m_clusters.remove_column(ndx);
-    }
-}
-
-
-void Table::do_move_root_column(size_t from_ndx, size_t to_ndx)
-{
-    Spec::ColumnInfo from_info = m_spec->get_column_info(from_ndx);
-    Spec::ColumnInfo to_info = m_spec->get_column_info(to_ndx);
-    m_spec->move_column(from_ndx, to_ndx);
-
-    size_t from = from_info.m_column_ref_ndx;
-    size_t to = to_info.m_column_ref_ndx;
-
-    size_t from_width = from_info.m_has_search_index ? 2 : 1;
-    if (to_ndx > from_ndx) {
-        to = to - from_width + 1;
-    }
-    m_columns.move_rotate(from, to, from_width);
-
-    // When moving upwards, we need to check if the displaced column
-    // has a search index, and if it does, move it down where it belongs.
-    if (to_ndx > from_ndx && to_info.m_has_search_index) {
-        // Move the search index down where it belongs (next to its owner).
-        m_columns.move_rotate(to + from_width, to);
     }
 }
 
@@ -3634,34 +3577,6 @@ void Table::adj_erase_column(size_t col_ndx) noexcept
         m_cols.erase(m_cols.begin() + col_ndx);
     }
 }
-
-void Table::adj_move_column(size_t from, size_t to) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    REALM_ASSERT(is_attached());
-    bool not_degenerate = m_columns.is_attached();
-    if (not_degenerate) {
-        REALM_ASSERT_3(from, <, m_cols.size());
-        REALM_ASSERT_3(to, <, m_cols.size());
-        using iter = decltype(m_cols.begin());
-        iter first, new_first, last;
-        if (from < to) {
-            first = m_cols.begin() + from;
-            new_first = first + 1;
-            last = m_cols.begin() + to + 1;
-        }
-        else {
-            first = m_cols.begin() + to;
-            new_first = m_cols.begin() + from;
-            last = new_first + 1;
-        }
-        std::rotate(first, new_first, last);
-    }
-}
-
 
 void Table::recursive_mark() noexcept
 {

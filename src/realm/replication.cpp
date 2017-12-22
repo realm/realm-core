@@ -539,21 +539,6 @@ public:
         return false;
     }
 
-    bool move_column(size_t col_ndx_1, size_t col_ndx_2)
-    {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
-            size_t column_count = m_table->get_column_count();
-            static_cast<void>(column_count);
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx_1 < column_count && col_ndx_2 < column_count))) {
-                log("desc->move_column(%1, %2);", col_ndx_1, col_ndx_2); // Throws
-                typedef _impl::TableFriend tf;
-                tf::move_column(*m_table, col_ndx_1, col_ndx_2); // Throws
-                return true;
-            }
-        }
-        return false;
-    }
-
     bool insert_group_level_table(TableKey table_key, size_t prior_num_tables, StringData name)
     {
 
@@ -591,16 +576,6 @@ public:
             return false;
         log("group->rename_table(%1, \"%2\");", table_key, new_name); // Throws
         m_group.rename_table(table_key, new_name);
-        return true;
-    }
-
-    bool move_group_level_table(size_t from_table_ndx, size_t to_table_ndx) noexcept
-    {
-        REALM_ASSERT(false); // unsupported
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(from_table_ndx == to_table_ndx)))
-            return false;
-        log("group->move_table(%1, %2);", from_table_ndx, to_table_ndx); // Throws
-        // m_group.move_table(from_table_ndx, to_table_ndx);
         return true;
     }
 
