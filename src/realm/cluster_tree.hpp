@@ -77,6 +77,14 @@ public:
     {
         return m_root->ensure_writeable(k);
     }
+    Array& get_fields_accessor(Array& fallback, MemRef mem) const
+    {
+        if (m_root->is_leaf()) {
+            return *m_root;
+        }
+        fallback.init_from_mem(mem);
+        return fallback;
+    }
     uint64_t bump_version();
     uint64_t get_version_counter() const;
     void insert_column(size_t ndx)

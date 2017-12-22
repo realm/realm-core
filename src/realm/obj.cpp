@@ -307,8 +307,8 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
-    Array fields(alloc);
-    fields.init_from_mem(m_mem);
+    Array fallback(alloc);
+    Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx + 1 < fields.size());
     ColumnAttrMask attr = m_tree_top->get_spec().get_column_attr(col_ndx);
     if (attr.test(col_attr_Nullable)) {
@@ -349,8 +349,8 @@ Obj& Obj::add_int(size_t col_ndx, int64_t value)
     };
 
     Allocator& alloc = m_tree_top->get_alloc();
-    Array fields(alloc);
-    fields.init_from_mem(m_mem);
+    Array fallback(alloc);
+    Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx + 1 < fields.size());
     ColumnAttrMask attr = m_tree_top->get_spec().get_column_attr(col_ndx);
     if (attr.test(col_attr_Nullable)) {
@@ -396,8 +396,8 @@ Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
-    Array fields(alloc);
-    fields.init_from_mem(m_mem);
+    Array fallback(alloc);
+    Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx + 1 < fields.size());
     ArrayKey values(alloc);
     values.set_parent(&fields, col_ndx + 1);
@@ -480,8 +480,8 @@ Obj& Obj::set(size_t col_ndx, T value, bool is_default)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
-    Array fields(alloc);
-    fields.init_from_mem(m_mem);
+    Array fallback(alloc);
+    Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx + 1 < fields.size());
     typename ColumnTypeTraits<T>::cluster_leaf_type values(alloc);
     values.set_parent(&fields, col_ndx + 1);
@@ -503,8 +503,8 @@ void Obj::set_int(size_t col_ndx, int64_t value)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
-    Array fields(alloc);
-    fields.init_from_mem(m_mem);
+    Array fallback(alloc);
+    Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx + 1 < fields.size());
     Array values(alloc);
     values.set_parent(&fields, col_ndx + 1);
@@ -519,8 +519,8 @@ void Obj::add_backlink(size_t backlink_col, Key origin_key)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
-    Array fields(alloc);
-    fields.init_from_mem(m_mem);
+    Array fallback(alloc);
+    Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
 
     ArrayBacklink backlinks(alloc);
     backlinks.set_parent(&fields, backlink_col + 1);
@@ -534,8 +534,8 @@ void Obj::remove_one_backlink(size_t backlink_col, Key origin_key)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
-    Array fields(alloc);
-    fields.init_from_mem(m_mem);
+    Array fallback(alloc);
+    Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
 
     ArrayBacklink backlinks(alloc);
     backlinks.set_parent(&fields, backlink_col + 1);
@@ -549,8 +549,8 @@ void Obj::nullify_link(size_t origin_col, Key target_key)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
-    Array fields(alloc);
-    fields.init_from_mem(m_mem);
+    Array fallback(alloc);
+    Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
 
     const Spec& spec = m_tree_top->get_spec();
     ColumnAttrMask attr = spec.get_column_attr(origin_col);
@@ -636,8 +636,8 @@ inline void Obj::do_set_null(size_t col_ndx)
     ensure_writeable();
 
     Allocator& alloc = m_tree_top->get_alloc();
-    Array fields(alloc);
-    fields.init_from_mem(m_mem);
+    Array fallback(alloc);
+    Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
 
     T values(alloc);
     values.set_parent(&fields, col_ndx + 1);
