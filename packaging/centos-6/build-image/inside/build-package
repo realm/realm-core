@@ -51,6 +51,7 @@ fpm \
     -d "openssl" \
     -C "/prod" \
     lib64/librealm.so=/usr/lib64/librealm.so \
+    lib64/librealm-parser.so=/usr/lib64/librealm-parser.so \
     libexec=/usr
 
 fpm \
@@ -71,24 +72,25 @@ fpm \
     -C "/prod" \
     /include=/usr \
     /lib64/librealm.a=/usr/lib64/librealm.a \
+    /lib64/librealm-parser.a=/usr/lib64/librealm-parser.a \
     /bin/realm-config=/usr/bin/realm-config
 
-fpm \
-    -t rpm \
-    -s dir \
-    -n realm-utils \
-    --rpm-dist el6 \
-    --license "Apache 2.0" \
-    --version "${VERSION}" \
-    --iteration "${ITERATION}" \
-    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
-    --url "https://realm.io" \
-    --category "System Environment/Libraries" \
-    --vendor "Realm" \
-    --maintainer "Realm <help@realm.io>" \
-    -d "realm = ${VERSION}-${ITERATION}.el6" \
-    -C "/prod" \
-    /bin/realm-importer=/usr/bin/realm-importer
+#fpm \
+#    -t rpm \
+#    -s dir \
+#    -n realm-utils \
+#    --rpm-dist el6 \
+#    --license "Apache 2.0" \
+#    --version "${VERSION}" \
+#    --iteration "${ITERATION}" \
+#    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
+#    --url "https://realm.io" \
+#    --category "System Environment/Libraries" \
+#    --vendor "Realm" \
+#    --maintainer "Realm <help@realm.io>" \
+#    -d "realm = ${VERSION}-${ITERATION}.el6" \
+#    -C "/prod" \
+#    /bin/realm-importer=/usr/bin/realm-importer
 )
 
 
@@ -121,6 +123,7 @@ fpm \
     -d "openssl" \
     -C "/prod" \
     lib64/librealm-dbg.so=/usr/lib64/librealm-dbg.so \
+    lib64/librealm-parser-dbg.so=/usr/lib64/librealm-parser-dbg.so \
     libexec=/usr
 
 fpm \
@@ -139,4 +142,5 @@ fpm \
     -d "realm-devel = ${VERSION}-${ITERATION}.el6" \
     -d "openssl-devel" \
     -C "/prod" \
-    lib64/librealm-dbg.so=/usr/lib64/librealm-dbg.a
+    lib64/librealm-dbg.so=/usr/lib64/librealm-dbg.a \
+    lib64/librealm-parser-dbg.so=/usr/lib64/librealm-parser-dbg.a

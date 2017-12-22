@@ -79,7 +79,7 @@ private:
 
 inline std::ostream& operator<<(std::ostream& ostr, Key key)
 {
-    ostr << key.value;
+    ostr << "Key(" << key.value << ")";
     return ostr;
 }
 

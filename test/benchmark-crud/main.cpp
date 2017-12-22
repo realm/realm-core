@@ -34,36 +34,36 @@ using namespace realm::test_util;
 
 namespace {
 
-inline int_fast64_t read(TableRef table, const std::vector<size_t>& order)
+inline int_fast64_t read(TableRef table, const std::vector<Key>& order)
 {
     int_fast64_t dummy = 0;
     size_t n = order.size();
     for (size_t i = 0; i != n; ++i)
-        dummy += table->get_int(0, order[i]);
+        dummy += table->get_object(order[i]).get<Int>(0);
     return dummy;
 }
 
-inline void write(TableRef table, const std::vector<size_t>& order)
+inline void write(TableRef table, const std::vector<Key>& order)
 {
     size_t n = order.size();
     for (size_t i = 0; i != n; ++i)
-        table->set_int(0, order[i], 125);
+        table->get_object(order[i]).set(0, 125);
 }
 
-inline void insert(TableRef table, const std::vector<size_t>& order)
+inline void insert(TableRef table, const std::vector<Key>& order)
 {
     size_t n = order.size();
     for (size_t i = 0; i != n; ++i) {
-        table->insert_empty_row(order[i]);
-        table->set_int(0, order[i], 127);
+        table->create_object(order[i]).set(0, 127);
     }
 }
 
-inline void erase(TableRef table, const std::vector<size_t>& order)
+inline void erase(TableRef table, const std::vector<Key>& order)
 {
     size_t n = order.size();
-    for (size_t i = 0; i != n; ++i)
-        table->remove(order[i]);
+    for (size_t i = 0; i != n; ++i) {
+        table->remove_object(order[i]);
+    }
 }
 
 } // anonymous namepsace
@@ -76,17 +76,17 @@ int main()
     std::cout << "Number of tables: " << num_tables << "\n";
     std::cout << "Elements per table: " << target_size << "\n";
 
-    std::vector<size_t> rising_order;
-    std::vector<size_t> falling_order;
-    std::vector<size_t> random_order;
-    std::vector<size_t> random_insert_order;
-    std::vector<size_t> random_erase_order;
+    std::vector<Key> rising_order;
+    std::vector<Key> falling_order;
+    std::vector<Key> random_order;
+    std::vector<Key> random_insert_order;
+    std::vector<Key> random_erase_order;
     for (size_t i = 0; i != target_size; ++i) {
-        rising_order.push_back(i);
-        falling_order.push_back(target_size - 1 - i);
-        random_order.push_back(i);
-        random_insert_order.push_back(rand() % (i + 1));
-        random_erase_order.push_back(rand() % (target_size - i));
+        rising_order.emplace_back(i);
+        falling_order.emplace_back(target_size - 1 - i);
+        random_order.emplace_back(i);
+        random_insert_order.emplace_back(rand() % (i + 1));
+        random_erase_order.emplace_back(rand() % (target_size - i));
     }
     Random random;
     random.shuffle(random_order.begin(), random_order.end());

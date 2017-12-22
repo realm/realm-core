@@ -1242,32 +1242,6 @@ private:
     size_t m_col_ndx;
 };
 
-
-class MoveColumnUpdater : public _impl::TableFriend::AccessorUpdater {
-public:
-    MoveColumnUpdater(size_t col_ndx_1, size_t col_ndx_2)
-        : m_col_ndx_1(col_ndx_1)
-        , m_col_ndx_2(col_ndx_2)
-    {
-    }
-
-    void update(Table& table) override
-    {
-        using tf = _impl::TableFriend;
-        tf::adj_move_column(table, m_col_ndx_1, m_col_ndx_2);
-        size_t min_ndx = std::min(m_col_ndx_1, m_col_ndx_2);
-        tf::mark_link_target_tables(table, min_ndx);
-    }
-
-    void update_parent(Table&) override
-    {
-    }
-
-private:
-    size_t m_col_ndx_1;
-    size_t m_col_ndx_2;
-};
-
 } // anonymous namespace
 
 
@@ -1333,12 +1307,6 @@ public:
         return true;
     }
 
-    bool move_group_level_table(size_t, size_t) noexcept
-    {
-        REALM_ASSERT(false); // unsupported
-        return true;
-    }
-
     bool select_table(size_t group_level_ndx, int levels, const size_t*) noexcept
     {
         m_table.reset();
@@ -1357,12 +1325,12 @@ public:
         return true;
     }
 
-    bool create_object(int64_t) noexcept
+    bool create_object(Key) noexcept
     {
         return true;
     }
 
-    bool remove_object(int64_t) noexcept
+    bool remove_object(Key) noexcept
     {
         typedef _impl::TableFriend tf;
         if (m_table) {
@@ -1372,92 +1340,57 @@ public:
         return true;
     }
 
-    bool insert_empty_rows(size_t, size_t, size_t, bool) noexcept
-    {
-        return true;
-    }
-
-    bool add_row_with_key(size_t, size_t, size_t, int64_t) noexcept
-    {
-        return true;
-    }
-
-    bool erase_rows(size_t, size_t, size_t, bool) noexcept
-    {
-        return true;
-    }
-
-    bool swap_rows(size_t, size_t) noexcept
-    {
-        return true;
-    }
-
-    bool move_row(size_t, size_t) noexcept
-    {
-        return true;
-    }
-
-    bool merge_rows(size_t, size_t) noexcept
-    {
-        return true;
-    }
-
     bool clear_table(size_t) noexcept
     {
         return true;
     }
 
-    bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) noexcept
+    bool set_int(size_t, Key, int_fast64_t, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool add_int(size_t, size_t, int_fast64_t) noexcept
+    bool add_int(size_t, Key, int_fast64_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_bool(size_t, size_t, bool, _impl::Instruction) noexcept
+    bool set_bool(size_t, Key, bool, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_float(size_t, size_t, float, _impl::Instruction) noexcept
+    bool set_float(size_t, Key, float, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_double(size_t, size_t, double, _impl::Instruction) noexcept
+    bool set_double(size_t, Key, double, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t) noexcept
+    bool set_string(size_t, Key, StringData, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_binary(size_t, size_t, BinaryData, _impl::Instruction) noexcept
+    bool set_binary(size_t, Key, BinaryData, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction) noexcept
+    bool set_timestamp(size_t, Key, Timestamp, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction) noexcept
+    bool set_null(size_t, Key, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_null(size_t, size_t, _impl::Instruction, size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_link(size_t col_ndx, size_t, size_t, TableKey, _impl::Instruction) noexcept
+    bool set_link(size_t col_ndx, Key, Key, TableKey, _impl::Instruction) noexcept
     {
         // When links are changed, the link-target table is also affected and
         // its accessor must therefore be marked dirty too. Indeed, when it
@@ -1484,14 +1417,49 @@ public:
         return true;
     }
 
-    bool insert_substring(size_t, size_t, size_t, StringData)
+    bool insert_substring(size_t, Key, size_t, StringData)
     {
         return true; // No-op
     }
 
-    bool erase_substring(size_t, size_t, size_t, size_t)
+    bool erase_substring(size_t, Key, size_t, size_t)
     {
         return true; // No-op
+    }
+
+    bool list_set_int(size_t, int64_t)
+    {
+        return true;
+    }
+
+    bool list_set_bool(size_t, bool)
+    {
+        return true;
+    }
+
+    bool list_set_float(size_t, float)
+    {
+        return true;
+    }
+
+    bool list_set_double(size_t, double)
+    {
+        return true;
+    }
+
+    bool list_set_string(size_t, StringData)
+    {
+        return true;
+    }
+
+    bool list_set_binary(size_t, BinaryData)
+    {
+        return true;
+    }
+
+    bool list_set_timestamp(size_t, Timestamp)
+    {
+        return true;
     }
 
     bool optimize_table() noexcept
@@ -1499,9 +1467,8 @@ public:
         return true; // No-op
     }
 
-    bool insert_column(size_t col_ndx, DataType, StringData, bool nullable)
+    bool insert_column(size_t col_ndx, DataType, StringData, bool, bool)
     {
-        static_cast<void>(nullable);
         if (m_table) {
             typedef _impl::TableFriend tf;
             InsertColumnUpdater updater(col_ndx);
@@ -1588,19 +1555,6 @@ public:
         return true; // No-op
     }
 
-    bool move_column(size_t col_ndx_1, size_t col_ndx_2) noexcept
-    {
-        if (m_table) {
-            typedef _impl::TableFriend tf;
-            MoveColumnUpdater updater(col_ndx_1, col_ndx_2);
-            tf::update_accessors(*m_table, updater);
-        }
-
-        m_schema_changed = true;
-
-        return true;
-    }
-
     bool add_search_index(size_t) noexcept
     {
         return true; // No-op
@@ -1626,48 +1580,42 @@ public:
         return true; // No-op
     }
 
-    bool select_link_list(size_t col_ndx, size_t, size_t) noexcept
-    {
-        // See comments on link handling in TransactAdvancer::set_link().
-        typedef _impl::TableFriend tf;
-        if (m_table) {
-            if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
-                tf::mark(*target);
-        }
-        return true; // No-op
-    }
-
-    bool link_list_set(size_t, size_t, size_t) noexcept
+    bool select_list(size_t, Key) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_insert(size_t, size_t, size_t) noexcept
+    bool list_set_link(size_t, Key) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_move(size_t, size_t) noexcept
+    bool list_insert_null(size_t, size_t)
+    {
+        return true;
+    }
+
+    bool list_move(size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_swap(size_t, size_t) noexcept
+    bool list_swap(size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_erase(size_t, size_t) noexcept
+    bool list_erase(size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_clear(size_t) noexcept
+    bool list_clear(size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool nullify_link(size_t, size_t, TableKey)
+    bool nullify_link(size_t, Key, TableKey)
     {
         return true; // No-op
     }
@@ -1706,7 +1654,6 @@ void Group::refresh_dirty_accessors()
 void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT(false); // FIXME: accessor updates need to be handled differently
 
     // Exception safety: If this function throws, the group accessor and all of
     // its subordinate accessors are left in a state that may not be fully

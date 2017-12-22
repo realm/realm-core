@@ -39,8 +39,8 @@ public:
     using Array::clear;
     using Array::destroy;
 
-    ArrayKey(Allocator& alloc)
-        : Array(alloc)
+    ArrayKey(Allocator& allocator)
+        : Array(allocator)
     {
     }
 
@@ -72,9 +72,9 @@ public:
         // Copying elements is only allowed between freestanding arrays
         REALM_ASSERT(&other.get_alloc() == &Allocator::get_default());
         REALM_ASSERT(&other.get_alloc() == &get_alloc());
-        Allocator& alloc = get_alloc();
-        MemRef mem = other.clone_deep(alloc); // Throws
-        _impl::DeepArrayRefDestroyGuard ref_guard(mem.get_ref(), alloc);
+        Allocator& allocator = get_alloc();
+        MemRef mem = other.clone_deep(allocator); // Throws
+        _impl::DeepArrayRefDestroyGuard ref_guard(mem.get_ref(), allocator);
         destroy();
         init_from_mem(mem);
         ref_guard.release();

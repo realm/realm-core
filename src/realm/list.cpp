@@ -33,14 +33,44 @@
 
 using namespace realm;
 
-/********************************* ListBase **********************************/
-template <class T>
-ConstListIf<T>::ConstListIf(size_t col_ndx, Allocator& alloc)
-    : ConstListBase(col_ndx)
-    , m_leaf(new LeafType(alloc))
+ListBasePtr Obj::get_listbase_ptr(size_t col_ndx, DataType type)
 {
-    m_leaf->set_parent(this, 0); // ndx not used, implicit in m_owner
+    switch (type) {
+        case type_Int: {
+            return std::make_unique<List<Int>>(*this, col_ndx);
+        }
+        case type_Bool: {
+            return std::make_unique<List<Bool>>(*this, col_ndx);
+        }
+        case type_Float: {
+            return std::make_unique<List<Float>>(*this, col_ndx);
+        }
+        case type_Double: {
+            return std::make_unique<List<Double>>(*this, col_ndx);
+        }
+        case type_String: {
+            return std::make_unique<List<String>>(*this, col_ndx);
+        }
+        case type_Binary: {
+            return std::make_unique<List<Binary>>(*this, col_ndx);
+        }
+        case type_Timestamp: {
+            return std::make_unique<List<Timestamp>>(*this, col_ndx);
+        }
+        case type_LinkList:
+            return get_linklist_ptr(col_ndx);
+        case type_Link:
+        case type_OldDateTime:
+        case type_OldTable:
+        case type_OldMixed:
+            REALM_ASSERT(false);
+            break;
+    }
+    return {};
 }
+
+
+/********************************* ListBase **********************************/
 
 template <class T>
 ConstList<T>::ConstList(const ConstObj& obj, size_t col_ndx)
@@ -64,6 +94,31 @@ std::pair<ref_type, size_t> ConstListBase::get_to_dot_parent(size_t) const
 {
     // TODO
     return {};
+}
+
+void ConstListBase::insert_null_repl(Replication* repl, size_t ndx) const
+{
+    repl->list_insert_null(*this, ndx);
+}
+
+void ConstListBase::erase_repl(Replication* repl, size_t ndx) const
+{
+    repl->list_erase(*this, ndx);
+}
+
+void ConstListBase::move_repl(Replication* repl, size_t from, size_t to) const
+{
+    repl->list_move(*this, from, to);
+}
+
+void ConstListBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
+{
+    repl->list_swap(*this, ndx1, ndx2);
+}
+
+void ConstListBase::clear_repl(Replication* repl) const
+{
+    repl->list_clear(*this);
 }
 
 template <class T>
@@ -105,59 +160,43 @@ ConstObj ConstLinkListIf::get(size_t link_ndx) const
     return m_const_obj->get_target_table(m_col_ndx)->get_object(ConstListIf<Key>::get(link_ndx));
 }
 
+/********************************* LinkList **********************************/
+
 Obj LinkList::get(size_t link_ndx)
 {
     return get_target_table().get_object(List<Key>::get(link_ndx));
 }
 
-template <>
-void List<Key>::add(Key target_key)
-{
-    size_t ndx = m_leaf->size();
-    m_leaf->insert(ndx, null_key);
-    List<Key>::set(ndx, target_key);
-}
+/********************************* List<Key> *********************************/
 
 template <>
-Key List<Key>::set(size_t ndx, Key target_key)
+void List<Key>::do_set(size_t ndx, Key target_key)
 {
-    ensure_writeable();
-
-    // get will check for ndx out of bounds
+    CascadeState state;
     Key old_key = get(ndx);
-    if (target_key != old_key) {
-        CascadeState state;
-        bool recurse = m_obj.update_backlinks(m_col_ndx, old_key, target_key, state);
+    bool recurse = m_obj.update_backlinks(m_col_ndx, old_key, target_key, state);
 
-        m_leaf->set(ndx, target_key);
+    m_leaf->set(ndx, target_key);
 
-        if (recurse) {
-            auto table = const_cast<Table*>(m_obj.get_table());
-            _impl::TableFriend::remove_recursive(*table, state); // Throws
-        }
-
-        m_obj.bump_version();
+    if (recurse) {
+        auto table = const_cast<Table*>(m_obj.get_table());
+        _impl::TableFriend::remove_recursive(*table, state); // Throws
     }
-
-    return old_key;
-}
-
-template <>
-void List<Key>::insert(size_t ndx, Key target_key)
-{
-    if (ndx > m_leaf->size()) {
-        throw std::out_of_range("Index out of range");
-    }
-    m_leaf->insert(ndx, null_key);
-    set(ndx, target_key);
 }
 
 template <>
 Key List<Key>::remove(size_t ndx)
 {
-    Key old = set(ndx, null_key);
+    ensure_writeable();
+    do_set(ndx, null_key);
+    if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+        ConstListBase::erase_repl(repl, ndx);
+    }
+    Key old = get(ndx);
     m_leaf->erase(ndx);
+    m_obj.bump_version();
     ConstListBase::adj_remove(ndx);
+    m_obj.bump_version();
 
     return old;
 }
@@ -169,15 +208,15 @@ void List<Key>::clear()
     Table* origin_table = const_cast<Table*>(m_obj.get_table());
     const Spec& origin_table_spec = _impl::TableFriend::get_spec(*origin_table);
 
-    /*
-        if (Replication* repl = get_repl())
-            repl->link_list_clear(*this); // Throws
-    */
+    if (Replication* repl = m_const_obj->get_alloc().get_replication())
+        repl->list_clear(*this); // Throws
 
     if (!origin_table_spec.get_column_attr(m_col_ndx).test(col_attr_StrongLinks)) {
         size_t ndx = size();
         while (ndx--) {
-            remove(ndx);
+            do_set(ndx, null_key);
+            m_leaf->erase(ndx);
+            ConstListBase::adj_remove(ndx);
         }
         return;
     }
@@ -204,6 +243,7 @@ void List<Key>::clear()
     }
 
     m_leaf->truncate_and_destroy_children(0);
+    m_obj.bump_version();
 
     tf::remove_recursive(*origin_table, state); // Throws
 }
@@ -306,6 +346,58 @@ LinkListPtr LinkList::create_from_and_consume_patch(std::unique_ptr<LinkListHand
         }
     }
     return {};
+}
+
+/***************************** List<T>::set_repl *****************************/
+
+namespace realm {
+template <>
+void List<Int>::set_repl(Replication* repl, size_t ndx, int64_t value)
+{
+    repl->list_set_int(*this, ndx, value);
+}
+
+template <>
+void List<Bool>::set_repl(Replication* repl, size_t ndx, bool value)
+{
+    repl->list_set_bool(*this, ndx, value);
+}
+
+template <>
+void List<Float>::set_repl(Replication* repl, size_t ndx, float value)
+{
+    repl->list_set_float(*this, ndx, value);
+}
+
+template <>
+void List<Double>::set_repl(Replication* repl, size_t ndx, double value)
+{
+    repl->list_set_double(*this, ndx, value);
+}
+
+template <>
+void List<String>::set_repl(Replication* repl, size_t ndx, StringData value)
+{
+    repl->list_set_string(*this, ndx, value);
+}
+
+template <>
+void List<Binary>::set_repl(Replication* repl, size_t ndx, BinaryData value)
+{
+    repl->list_set_binary(*this, ndx, value);
+}
+
+template <>
+void List<Timestamp>::set_repl(Replication* repl, size_t ndx, Timestamp value)
+{
+    repl->list_set_timestamp(*this, ndx, value);
+}
+
+template <>
+void List<Key>::set_repl(Replication* repl, size_t ndx, Key key)
+{
+    repl->list_set_link(*this, ndx, key);
+}
 }
 
 #ifdef _WIN32

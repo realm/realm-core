@@ -39,6 +39,8 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
+#ifdef LEGACY_TESTS
+
 namespace {
 #define BASE_SIZE 3600
 
@@ -1013,10 +1015,11 @@ int benchmark_common_tasks_main()
 #undef BENCH
     return 0;
 }
+#endif
 
 #if !REALM_IOS
 int main(int, const char**)
 {
-    return benchmark_common_tasks_main();
+    // return benchmark_common_tasks_main();
 }
 #endif

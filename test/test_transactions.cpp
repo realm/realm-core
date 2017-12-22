@@ -635,6 +635,7 @@ TEST(Transactions_RollbackCreateObject)
 }
 
 
+<<<<<<< HEAD
 // Rollback a table move operation and check accessors.
 // This case checks column accessors when a table is inserted, moved, rolled back.
 // In this case it is easy to see (by just looking at the assert message) that the
@@ -693,8 +694,11 @@ TEST(Transactions_RollbackMoveTableReferences)
     CHECK_EQUAL(g.size(), 1);
 }
 
+=======
+>>>>>>> v5.0.1
 // Check that the spec.enumkeys become detached when
 // rolling back the insertion of a string enum column
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_RollbackStringEnumInsert)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -741,6 +745,7 @@ TEST(LangBindHelper_RollbackStringEnumInsert)
     CHECK_EQUAL(g.get_table(t1k)->get_column_count(), 1);
     CHECK_EQUAL(g.get_table(t1k)->size(), 3);
 }
+#endif
 
 // Check that the table.spec.subspec array becomes detached
 // after rolling back the insertion of a subspec type

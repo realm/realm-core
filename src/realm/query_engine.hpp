@@ -105,6 +105,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/table.hpp>
 #include <realm/unicode.hpp>
 #include <realm/util/miscellaneous.hpp>
+#include <realm/util/serializer.hpp>
 #include <realm/util/shared_ptr.hpp>
 #include <realm/utilities.hpp>
 
@@ -297,8 +298,7 @@ public:
     virtual std::string describe_column(size_t col_ndx) const
     {
         if (m_table && col_ndx != npos) {
-            return std::string(m_table->get_name()) + metrics::value_separator +
-                   std::string(m_table->get_column_name(col_ndx));
+            return std::string(m_table->get_column_name(col_ndx));
         }
         return "";
     }
@@ -616,7 +616,8 @@ public:
 
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + describe_condition() + " " + metrics::print_value(BaseType::m_value);
+        return this->describe_column() + " " + describe_condition() + " " +
+               util::serializer::print_value(IntegerNodeBase<LeafType>::m_value);
     }
 
     virtual std::string describe_condition() const override
@@ -760,7 +761,7 @@ public:
     virtual std::string describe() const override
     {
         return this->describe_column() + " " + describe_condition() + " " +
-               metrics::print_value(FloatDoubleNode::m_value);
+               util::serializer::print_value(FloatDoubleNode::m_value);
     }
     virtual std::string describe_condition() const override
     {
@@ -964,8 +965,8 @@ public:
 
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + TConditionFunction::description() + " \"" +
-               metrics::print_value(BinaryNode::m_value.data()) + "\"";
+        return this->describe_column() + " " + TConditionFunction::description() + " " +
+               util::serializer::print_value(BinaryNode::m_value.get());
     }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
@@ -1036,7 +1037,7 @@ public:
     virtual std::string describe() const override
     {
         return this->describe_column() + " " + TConditionFunction::description() + " " +
-               metrics::print_value(TimestampNode::m_value);
+               util::serializer::print_value(TimestampNode::m_value);
     }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
@@ -1115,8 +1116,11 @@ public:
 
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + describe_condition() + " \"" +
-               metrics::print_value(StringNodeBase::m_value) + "\"";
+        StringData sd;
+        if (bool(StringNodeBase::m_value)) {
+            sd = StringData(StringNodeBase::m_value.value());
+        }
+        return this->describe_column() + " " + describe_condition() + " " + util::serializer::print_value(sd);
     }
 
 protected:
@@ -1209,17 +1213,18 @@ template <>
 class StringNode<Contains> : public StringNodeBase {
 public:
     StringNode(StringData v, size_t column)
-    : StringNodeBase(v, column), m_charmap()
+        : StringNodeBase(v, column)
+        , m_charmap()
     {
         if (v.size() == 0)
             return;
 
         // Build a dictionary of char-to-last distances in the search string
         // (zero indicates that the char is not in needle)
-        size_t last_char_pos = v.size()-1;
+        size_t last_char_pos = v.size() - 1;
         for (size_t i = 0; i < last_char_pos; ++i) {
             // we never jump longer increments than 255 chars, even if needle is longer (to fit in one byte)
-            uint8_t jump = last_char_pos-i < 255 ? static_cast<uint8_t>(last_char_pos-i) : 255;
+            uint8_t jump = last_char_pos - i < 255 ? static_cast<uint8_t>(last_char_pos - i) : 255;
 
             unsigned char c = v[i];
             m_charmap[c] = jump;
@@ -1261,8 +1266,8 @@ public:
     }
 
     StringNode(const StringNode& from, QueryNodeHandoverPatches* patches)
-    : StringNodeBase(from, patches)
-    , m_charmap(from.m_charmap)
+        : StringNodeBase(from, patches)
+        , m_charmap(from.m_charmap)
     {
     }
 
@@ -1275,7 +1280,8 @@ template <>
 class StringNode<ContainsIns> : public StringNodeBase {
 public:
     StringNode(StringData v, size_t column)
-    : StringNodeBase(v, column), m_charmap()
+        : StringNodeBase(v, column)
+        , m_charmap()
     {
         auto upper = case_map(v, true);
         auto lower = case_map(v, false);
@@ -1292,17 +1298,16 @@ public:
 
         // Build a dictionary of char-to-last distances in the search string
         // (zero indicates that the char is not in needle)
-        size_t last_char_pos = m_ucase.size()-1;
+        size_t last_char_pos = m_ucase.size() - 1;
         for (size_t i = 0; i < last_char_pos; ++i) {
             // we never jump longer increments than 255 chars, even if needle is longer (to fit in one byte)
-            uint8_t jump = last_char_pos-i < 255 ? static_cast<uint8_t>(last_char_pos-i) : 255;
+            uint8_t jump = last_char_pos - i < 255 ? static_cast<uint8_t>(last_char_pos - i) : 255;
 
             unsigned char uc = m_ucase[i];
             unsigned char lc = m_lcase[i];
             m_charmap[uc] = jump;
             m_charmap[lc] = jump;
         }
-
     }
 
     void init() override
@@ -1343,10 +1348,10 @@ public:
     }
 
     StringNode(const StringNode& from, QueryNodeHandoverPatches* patches)
-    : StringNodeBase(from, patches)
-    , m_charmap(from.m_charmap)
-    , m_ucase(from.m_ucase)
-    , m_lcase(from.m_lcase)
+        : StringNodeBase(from, patches)
+        , m_charmap(from.m_charmap)
+        , m_ucase(from.m_ucase)
+        , m_lcase(from.m_lcase)
     {
     }
 
@@ -1524,6 +1529,9 @@ public:
                 }
             }
         }
+        if (m_conditions.size() > 1) {
+            s = "(" + s + ")";
+        }
         return s;
     }
 
@@ -1695,9 +1703,9 @@ public:
     virtual std::string describe() const override
     {
         if (m_condition) {
-            return "not(" + m_condition->describe_expression() + ")";
+            return "!(" + m_condition->describe_expression() + ")";
         }
-        return "not()";
+        return "!()";
     }
 
 
@@ -1926,8 +1934,10 @@ public:
 
     virtual std::string describe() const override
     {
-        return this->describe_column() + " " + describe_condition() + " " + metrics::print_value(m_target_key);
+        return this->describe_column() + " " + describe_condition() + " " +
+               util::serializer::print_value(m_target_key.value);
     }
+
     virtual std::string describe_condition() const override
     {
         return "links to";

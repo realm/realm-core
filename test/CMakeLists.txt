@@ -40,6 +40,7 @@ set(NORMAL_TESTS
     test_links.cpp
     test_metrics.cpp
     test_optional.cpp
+    test_parser.cpp
     test_priority_queue.cpp
     test_query.cpp
     test_replication.cpp
@@ -54,6 +55,8 @@ set(NORMAL_TESTS
     test_transactions_lasse.cpp
     test_upgrade_database.cpp
     test_utf8.cpp
+    test_util_any.cpp
+    test_util_base64.cpp
     test_util_error.cpp
     test_util_file.cpp
     test_util_inspect.cpp
@@ -123,7 +126,7 @@ if(CMAKE_GENERATOR STREQUAL Xcode)
 endif()
 
 target_link_libraries(realm-tests
-                      test-util ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
+                      test-util realm-parser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
 )
 
 target_include_directories(realm-tests PUBLIC ${EXTRA_TEST_CFLAGS})

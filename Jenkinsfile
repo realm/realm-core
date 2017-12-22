@@ -63,10 +63,10 @@ jobWrapper {
                                buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
                                buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
                                buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
-                               packageGeneric      : doBuildPackage('generic', 'tgz'),
-                               packageCentos7      : doBuildPackage('centos-7', 'rpm'),
-                               packageCentos6      : doBuildPackage('centos-6', 'rpm'),
-                               packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
+                               // FIXME packageGeneric      : doBuildPackage('generic', 'tgz'),
+                               // FIXME packageCentos7      : doBuildPackage('centos-7', 'rpm'),
+                               // FIXME packageCentos6      : doBuildPackage('centos-6', 'rpm'),
+                               // FIXME packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
                                threadSanitizer     : doBuildInDocker('Debug', 'thread'),
                                addressSanitizer    : doBuildInDocker('Debug', 'address'),
                                coverage            : doBuildCoverage()
@@ -93,11 +93,11 @@ jobWrapper {
                   parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
               }
           }
-
+/* FIXME
           if (env.CHANGE_TARGET) {
               parallelExecutors['performance'] = buildPerformance()
           }
-
+*/
           parallel parallelExecutors
       }
 
@@ -608,7 +608,9 @@ def getSourceArchive() {
           $class           : 'GitSCM',
           branches         : scm.branches,
           gitTool          : 'native git',
-          extensions       : scm.extensions + [[$class: 'CleanCheckout'], [$class: 'CloneOption', depth: 0, noTags: false, reference: '', shallow: false]],
+          extensions       : scm.extensions + [[$class: 'CleanCheckout'], [$class: 'CloneOption', depth: 0, noTags: false, reference: '', shallow: false],
+                                               [$class: 'SubmoduleOption', disableSubmodules: false, parentCredentials: false, recursiveSubmodules: true,
+                                                         reference: '', trackingSubmodules: false]],
           userRemoteConfigs: scm.userRemoteConfigs
         ]
     )

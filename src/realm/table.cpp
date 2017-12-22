@@ -516,12 +516,13 @@ void Table::do_insert_column(size_t col_ndx, DataType type, StringData name, Lin
     insert_root_column(col_ndx, type, name, link_target_info, nullable, listtype); // Throws
 
     if (Replication* repl = get_repl())
-        repl->insert_column(this, col_ndx, type, name, link_target_info, nullable); // Throws
+        repl->insert_column(this, col_ndx, type, name, link_target_info, nullable, listtype); // Throws
 }
 
 
 void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, StringData name,
-                                           LinkTargetInfo& link_target_info, bool nullable, bool* was_inserted)
+                                           LinkTargetInfo& link_target_info, bool nullable, bool listtype,
+                                           bool* was_inserted)
 {
     size_t existing_ndx = get_column_index(name);
     if (existing_ndx != npos) {
@@ -555,25 +556,10 @@ void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, String
         }
     }
 
-    do_insert_column(col_ndx, type, name, link_target_info, nullable);
+    do_insert_column(col_ndx, type, name, link_target_info, nullable, listtype || type == type_LinkList);
     if (was_inserted) {
         *was_inserted = true;
     }
-}
-
-
-void Table::do_move_column(size_t col_ndx_1, size_t col_ndx_2)
-{
-    REALM_ASSERT(is_attached());
-
-    REALM_ASSERT_3(col_ndx_1, <, get_column_count());
-    REALM_ASSERT_3(col_ndx_2, <, get_column_count());
-
-    if (Replication* repl = get_repl())
-        repl->move_column(this, col_ndx_1, col_ndx_2);
-
-    bump_version();
-    move_root_column(col_ndx_1, col_ndx_2);
 }
 
 
@@ -739,24 +725,6 @@ void Table::erase_root_column(size_t col_ndx)
 }
 
 
-void Table::move_root_column(size_t from, size_t to)
-{
-    REALM_ASSERT_3(from, <, m_spec->get_public_column_count());
-    REALM_ASSERT_3(to, <, m_spec->get_public_column_count());
-
-    if (from == to)
-        return;
-
-    do_move_root_column(from, to);
-    adj_move_column(from, to);
-    update_link_target_tables_after_column_move(from, to);
-
-    size_t min_ndx = std::min(from, to);
-    refresh_column_accessors(min_ndx);
-    refresh_link_target_accessors(min_ndx);
-}
-
-
 void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, bool nullable, bool listtype)
 {
     int attr = col_attr_None;
@@ -798,30 +766,6 @@ void Table::do_erase_root_column(size_t ndx)
 
     if (m_clusters.is_attached()) {
         m_clusters.remove_column(ndx);
-    }
-}
-
-
-void Table::do_move_root_column(size_t from_ndx, size_t to_ndx)
-{
-    Spec::ColumnInfo from_info = m_spec->get_column_info(from_ndx);
-    Spec::ColumnInfo to_info = m_spec->get_column_info(to_ndx);
-    m_spec->move_column(from_ndx, to_ndx);
-
-    size_t from = from_info.m_column_ref_ndx;
-    size_t to = to_info.m_column_ref_ndx;
-
-    size_t from_width = from_info.m_has_search_index ? 2 : 1;
-    if (to_ndx > from_ndx) {
-        to = to - from_width + 1;
-    }
-    m_columns.move_rotate(from, to, from_width);
-
-    // When moving upwards, we need to check if the displaced column
-    // has a search index, and if it does, move it down where it belongs.
-    if (to_ndx > from_ndx && to_info.m_has_search_index) {
-        // Move the search index down where it belongs (next to its owner).
-        m_columns.move_rotate(to + from_width, to);
     }
 }
 
@@ -1713,99 +1657,6 @@ ref_type Table::clone(Allocator& alloc) const
 }
 
 
-void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
-{
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_DEBUG(row_ndx <= m_size);
-    REALM_ASSERT_DEBUG(num_rows <= std::numeric_limits<size_t>::max() - row_ndx);
-
-    size_t num_cols = m_spec->get_column_count();
-    if (REALM_UNLIKELY(num_cols == 0)) {
-        throw LogicError(LogicError::table_has_no_columns);
-    }
-
-    bump_version();
-
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx);
-        bool insert_nulls = is_nullable(col_ndx);
-        col.insert_rows(row_ndx, num_rows, m_size, insert_nulls); // Throws
-    }
-    m_size += num_rows;
-
-    if (Replication* repl = get_repl()) {
-        size_t num_rows_to_insert = num_rows;
-        size_t prior_num_rows = m_size - num_rows;
-        repl->insert_empty_rows(this, row_ndx, num_rows_to_insert, prior_num_rows); // Throws
-    }
-}
-
-size_t Table::add_row_with_key(size_t key_col_ndx, int64_t key)
-{
-    size_t num_cols = m_spec->get_column_count();
-    size_t row_ndx = m_size;
-
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(key_col_ndx, <, num_cols);
-    REALM_ASSERT(!is_nullable(key_col_ndx));
-
-    bump_version();
-
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        if (col_ndx == key_col_ndx) {
-            IntegerColumn& col = get_column(key_col_ndx);
-            col.insert(row_ndx, key, 1);
-        }
-        else {
-            ColumnBase& col = get_column_base(col_ndx);
-            bool insert_nulls = is_nullable(col_ndx);
-            col.insert_rows(row_ndx, 1, m_size, insert_nulls); // Throws
-        }
-    }
-    m_size++;
-
-    if (Replication* repl = get_repl()) {
-        size_t prior_num_rows = m_size - 1;
-        repl->add_row_with_key(this, row_ndx, prior_num_rows, key_col_ndx, key); // Throws
-    }
-
-    return row_ndx;
-}
-
-
-void Table::erase_row(size_t row_ndx, bool is_move_last_over)
-{
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(row_ndx, <, m_size);
-    bool broken_reciprocal_backlinks = false;
-    if (is_move_last_over) {
-        do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
-    }
-    else {
-        do_remove(row_ndx, broken_reciprocal_backlinks); // Throws
-    }
-}
-
-void Table::remove_recursive(size_t)
-{
-}
-
-void Table::merge_rows(size_t row_ndx, size_t new_row_ndx)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-    if (REALM_UNLIKELY(row_ndx >= m_size))
-        throw LogicError(LogicError::row_index_out_of_range);
-    if (REALM_UNLIKELY(new_row_ndx >= m_size))
-        throw LogicError(LogicError::row_index_out_of_range);
-
-    if (Replication* repl = get_repl()) {
-        repl->merge_rows(this, row_ndx, new_row_ndx);
-    }
-
-    do_merge_rows(row_ndx, new_row_ndx);
-}
-
 void Table::batch_erase_rows(const KeyColumn& keys)
 {
     REALM_ASSERT(is_attached());
@@ -1822,162 +1673,6 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     vec.erase(unique(vec.begin(), vec.end()), vec.end());
 
     std::for_each(vec.begin(), vec.end(), [this](Key k) { remove_object(k); });
-}
-
-
-// Replication instruction 'erase-row(unordered=false)' calls this function
-// directly with broken_reciprocal_backlinks=false.
-void Table::do_remove(size_t row_ndx, bool broken_reciprocal_backlinks)
-{
-    size_t num_cols = m_spec->get_column_count();
-    size_t num_public_cols = m_spec->get_public_column_count();
-
-    // We must start with backlink columns in case the corresponding link
-    // columns are in the same table so that the link columns are not updated
-    // twice. Backlink columns will nullify the rows in connected link columns
-    // first so by the time we get to the link column in this loop, the rows to
-    // be removed have already been nullified.
-    //
-    // This phase also generates replication instructions documenting the side-
-    // effects of deleting the object (i.e. link nullifications). These instructions
-    // must come before the actual deletion of the object, but at the same time
-    // the Replication object may need a consistent view of the row (not including
-    // link columns). Therefore we first delete the row in backlink columns, then
-    // generate the instruction, and then delete the row in the remaining columns.
-    for (size_t col_ndx = num_cols; col_ndx > num_public_cols; --col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx - 1);
-        size_t prior_num_rows = m_size;
-        col.erase_rows(row_ndx, 1, prior_num_rows, broken_reciprocal_backlinks); // Throws
-    }
-
-    if (Replication* repl = get_repl()) {
-        size_t num_rows_to_erase = 1;
-        bool is_move_last_over = false;
-        repl->erase_rows(this, row_ndx, num_rows_to_erase, m_size, is_move_last_over); // Throws
-    }
-
-    for (size_t col_ndx = num_public_cols; col_ndx > 0; --col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx - 1);
-        size_t prior_num_rows = m_size;
-        col.erase_rows(row_ndx, 1, prior_num_rows, broken_reciprocal_backlinks); // Throws
-    }
-    --m_size;
-    bump_version();
-}
-
-
-// Replication instruction 'erase-row(unordered=true)' calls this function
-// directly with broken_reciprocal_backlinks=false.
-void Table::do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks)
-{
-    size_t num_cols = m_spec->get_column_count();
-    size_t num_public_cols = m_spec->get_public_column_count();
-
-    // We must start with backlink columns in case the corresponding link
-    // columns are in the same table so that the link columns are not updated
-    // twice. Backlink columns will nullify the rows in connected link columns
-    // first so by the time we get to the link column in this loop, the rows to
-    // be removed have already been nullified.
-    //
-    // This phase also generates replication instructions documenting the side-
-    // effects of deleting the object (i.e. link nullifications). These instructions
-    // must come before the actual deletion of the object, but at the same time
-    // the Replication object may need a consistent view of the row (not including
-    // link columns). Therefore we first delete the row in backlink columns, then
-    // generate the instruction, and then delete the row in the remaining columns.
-    for (size_t col_ndx = num_cols; col_ndx > num_public_cols; --col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx - 1);
-        size_t prior_num_rows = m_size;
-        col.move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
-    }
-
-    if (Replication* repl = get_repl()) {
-        size_t num_rows_to_erase = 1;
-        bool is_move_last_over = true;
-        repl->erase_rows(this, row_ndx, num_rows_to_erase, m_size, is_move_last_over); // Throws
-    }
-
-    for (size_t col_ndx = num_public_cols; col_ndx > 0; --col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx - 1);
-        size_t prior_num_rows = m_size;
-        col.move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
-    }
-
-    --m_size;
-    bump_version();
-}
-
-
-void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
-{
-    REALM_ASSERT(row_ndx_1 < row_ndx_2);
-
-    size_t num_cols = m_spec->get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx);
-        col.swap_rows(row_ndx_1, row_ndx_2);
-    }
-    bump_version();
-}
-
-
-void Table::do_move_row(size_t from_ndx, size_t to_ndx)
-{
-    // If to and from are next to each other we can just convert this to a swap
-    if (from_ndx == to_ndx + 1 || to_ndx == from_ndx + 1) {
-        if (from_ndx > to_ndx)
-            std::swap(from_ndx, to_ndx);
-        do_swap_rows(from_ndx, to_ndx);
-        return;
-    }
-
-    // Adjust the row indexes to compensate for the temporary row used
-    if (from_ndx > to_ndx)
-        ++from_ndx;
-    else
-        ++to_ndx;
-
-    size_t num_cols = m_spec->get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        bool insert_nulls = m_spec->get_column_type(col_ndx) == col_type_Link;
-        bool broken_reciprocal_backlinks = true;
-
-        ColumnBase& col = get_column_base(col_ndx);
-        col.insert_rows(to_ndx, 1, m_size, insert_nulls);
-        col.swap_rows(from_ndx, to_ndx);
-        col.erase_rows(from_ndx, 1, m_size + 1, broken_reciprocal_backlinks);
-    }
-    bump_version();
-}
-
-
-void Table::do_merge_rows(size_t row_ndx, size_t new_row_ndx)
-{
-    // This bypasses handling of cascading rows, and we have decided that this is OK, because
-    // MergeRows is always followed by MoveLastOver, so breaking the last strong link
-    // to a row that is being subsumed will have no observable effect, while honoring the
-    // cascading behavior would complicate the calling code somewhat (having to take
-    // into account whether or not the row was removed as a consequence of cascade, leading
-    // to bugs in case this was forgotten).
-
-
-    // Since new_row_ndx is guaranteed to be empty at this point, simply swap
-    // the rows to get the desired behavior.
-
-    size_t row_ndx_1 = row_ndx, row_ndx_2 = new_row_ndx;
-    if (row_ndx_1 > row_ndx_2)
-        std::swap(row_ndx_1, row_ndx_2);
-    size_t num_cols = m_spec->get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx);
-        if (get_column_type(col_ndx) == type_LinkList) {
-            LinkListColumn& link_list_col = static_cast<LinkListColumn&>(col);
-            REALM_ASSERT(!link_list_col.has_links(new_row_ndx));
-        }
-        col.swap_rows(row_ndx_1, row_ndx_2);
-    }
-
-    bump_version();
 }
 
 
@@ -2067,43 +1762,6 @@ void Table::do_clear(bool broken_reciprocal_backlinks)
 
     bump_version();
 }
-
-void Table::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-    if (REALM_UNLIKELY(row_ndx_1 >= m_size || row_ndx_2 >= m_size))
-        throw LogicError(LogicError::row_index_out_of_range);
-
-    // Internally, core requires that the first row index is strictly less than
-    // the second one. The changeset merge mechanism is written to take
-    // advantage of it, and it requires it.
-    if (row_ndx_1 == row_ndx_2)
-        return;
-    if (row_ndx_1 > row_ndx_2)
-        std::swap(row_ndx_1, row_ndx_2);
-
-    do_swap_rows(row_ndx_1, row_ndx_2);
-
-    if (Replication* repl = get_repl())
-        repl->swap_rows(this, row_ndx_1, row_ndx_2);
-}
-
-void Table::move_row(size_t from_ndx, size_t to_ndx)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-    if (REALM_UNLIKELY(from_ndx >= m_size || to_ndx >= m_size))
-        throw LogicError(LogicError::row_index_out_of_range);
-    if (from_ndx == to_ndx)
-        return;
-
-    do_move_row(from_ndx, to_ndx);
-
-    if (Replication* repl = get_repl())
-        repl->move_row(this, from_ndx, to_ndx);
-}
-
 
 Table* Table::get_link_target_table_accessor(size_t col_ndx) const noexcept
 {
@@ -2337,134 +1995,6 @@ Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 }
 
 template <>
-Table::RowExpr Table::get(size_t col_ndx, size_t row_ndx) const noexcept
-{
-    REALM_ASSERT_3(row_ndx, <, m_size);
-    const LinkColumn& col = get_column_link(col_ndx);
-    return RowExpr(&col.get_target_table(), col.get_link(row_ndx));
-}
-
-template <>
-size_t Table::set_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    if (!has_search_index(col_ndx)) {
-        throw LogicError{LogicError::no_search_index};
-    }
-
-    // FIXME: See the definition of check_lists_are_empty() for an explanation
-    // of why this is needed.
-    check_lists_are_empty(ndx); // Throws
-
-    bump_version();
-
-    bool conflict = false;
-
-    if (is_nullable(col_ndx)) {
-        auto& col = get_column_int_null(col_ndx);
-        ndx = do_set_unique(col, ndx, value, conflict); // Throws
-    }
-    else {
-        auto& col = get_column(col_ndx);
-        ndx = do_set_unique(col, ndx, value, conflict); // Throws
-    }
-
-    /*
-    // TODO: reintroduce replication
-    if (!conflict) {
-        if (Replication* repl = get_repl())
-            repl->set_int(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
-    }
-    */
-
-    return ndx;
-}
-
-template <>
-size_t Table::set_unique(size_t col_ndx, size_t ndx, StringData value)
-{
-    if (REALM_UNLIKELY(value.size() > max_string_size))
-        throw LogicError(LogicError::string_too_big);
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-    if (REALM_UNLIKELY(ndx >= m_size))
-        throw LogicError(LogicError::row_index_out_of_range);
-    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
-    // column, however, the previous row index check guarantees that `m_size >
-    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
-    // cannot be degenerate if we got this far.
-
-    if (!is_nullable(col_ndx) && value.is_null())
-        throw LogicError(LogicError::column_not_nullable);
-
-    if (!has_search_index(col_ndx))
-        throw LogicError(LogicError::no_search_index);
-
-    // FIXME: See the definition of check_lists_are_empty() for an explanation
-    // of why this is needed
-    check_lists_are_empty(ndx); // Throws
-
-    bump_version();
-
-    ColumnType actual_type = get_real_column_type(col_ndx);
-    REALM_ASSERT(actual_type == ColumnType::col_type_String || actual_type == ColumnType::col_type_StringEnum);
-
-    bool conflict = false;
-    // FIXME: String and StringEnum columns should have a common base class
-    if (actual_type == ColumnType::col_type_String) {
-        StringColumn& col = get_column_string(col_ndx);
-        ndx = do_set_unique(col, ndx, value, conflict); // Throws
-    }
-    else {
-        StringEnumColumn& col = get_column_string_enum(col_ndx);
-        ndx = do_set_unique(col, ndx, value, conflict); // Throws
-    }
-
-    if (!conflict) {
-        if (Replication* repl = get_repl())
-            repl->set_string(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
-    }
-
-    return ndx;
-}
-
-template <>
-size_t Table::set_unique(size_t col_ndx, size_t row_ndx, null)
-{
-    if (!is_nullable(col_ndx)) {
-        throw LogicError{LogicError::column_not_nullable};
-    }
-    REALM_ASSERT(!is_link_type(m_spec->get_column_type(col_ndx))); // Use nullify_link().
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(row_ndx, <, m_size);
-
-    if (!has_search_index(col_ndx)) {
-        throw LogicError{LogicError::no_search_index};
-    }
-
-    // FIXME: See the definition of check_lists_are_empty() for an explanation
-    // of why this is needed.
-    check_lists_are_empty(row_ndx); // Throws
-
-    bump_version();
-
-    bool conflict = false;
-
-    // Only valid for int columns; use `set_string_unique` to set null strings
-    auto& col = get_column_int_null(col_ndx);
-    row_ndx = do_set_unique_null(col, row_ndx, conflict); // Throws
-
-    if (!conflict) {
-        if (Replication* repl = get_repl())
-            repl->set_null(this, col_ndx, row_ndx, _impl::instr_SetUnique); // Throws
-    }
-
-    return row_ndx;
-}
-
-template <>
 void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool /* is_default */)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2479,16 +2009,10 @@ void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool /* is_defau
         auto& col = get_column(col_ndx);
         col.set(ndx, value);
     }
-
-    /*
-    // TODO: reintroduce replication
-    if (Replication* repl = get_repl())
-        repl->set_int(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
-    */
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, Timestamp value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, Timestamp value, bool)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Timestamp);
@@ -2500,18 +2024,10 @@ void Table::set(size_t col_ndx, size_t ndx, Timestamp value, bool is_default)
 
     TimestampColumn& col = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
     col.set(ndx, value);
-
-    if (Replication* repl = get_repl()) {
-        if (value.is_null())
-            repl->set_null(this, col_ndx, ndx, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
-        else
-            repl->set_timestamp(this, col_ndx, ndx, value,
-                                is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
-    }
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, bool value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, bool value, bool)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
@@ -2526,13 +2042,10 @@ void Table::set(size_t col_ndx, size_t ndx, bool value, bool is_default)
         IntegerColumn& col = get_column(col_ndx);
         col.set(ndx, value ? 1 : 0);
     }
-
-    if (Replication* repl = get_repl())
-        repl->set_bool(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, OldDateTime value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, OldDateTime value, bool)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_OldDateTime);
@@ -2547,14 +2060,10 @@ void Table::set(size_t col_ndx, size_t ndx, OldDateTime value, bool is_default)
         IntegerColumn& col = get_column(col_ndx);
         col.set(ndx, value.get_olddatetime());
     }
-
-    if (Replication* repl = get_repl())
-        repl->set_olddatetime(this, col_ndx, ndx, value,
-                              is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, float value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, float value, bool)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2562,13 +2071,10 @@ void Table::set(size_t col_ndx, size_t ndx, float value, bool is_default)
 
     FloatColumn& col = get_column_float(col_ndx);
     col.set(ndx, value);
-
-    if (Replication* repl = get_repl())
-        repl->set_float(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, double value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, double value, bool)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2576,14 +2082,10 @@ void Table::set(size_t col_ndx, size_t ndx, double value, bool is_default)
 
     DoubleColumn& col = get_column_double(col_ndx);
     col.set(ndx, value);
-
-    if (Replication* repl = get_repl())
-        repl->set_double(this, col_ndx, ndx, value,
-                         is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t ndx, StringData value, bool is_default)
+void Table::set(size_t col_ndx, size_t ndx, StringData value, bool)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -2603,10 +2105,6 @@ void Table::set(size_t col_ndx, size_t ndx, StringData value, bool is_default)
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
     col.set_string(ndx, value); // Throws
-
-    if (Replication* repl = get_repl())
-        repl->set_string(this, col_ndx, ndx, value,
-                         is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 template <>
@@ -2618,7 +2116,7 @@ void Table::set(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
 }
 
 template <>
-void Table::set(size_t col_ndx, size_t row_ndx, null, bool is_default)
+void Table::set(size_t col_ndx, size_t row_ndx, null, bool)
 {
     if (!is_nullable(col_ndx)) {
         throw LogicError{LogicError::column_not_nullable};
@@ -2630,9 +2128,6 @@ void Table::set(size_t col_ndx, size_t row_ndx, null, bool is_default)
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
     col.set_null(row_ndx);
-
-    if (Replication* repl = get_repl())
-        repl->set_null(this, col_ndx, row_ndx, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 template <>
@@ -2674,67 +2169,6 @@ void Table::set(size_t col_ndx, size_t row_ndx, util::Optional<double> value, bo
 } // namespace realm;
 
 
-template <class ColType, class T>
-size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value, bool& conflict)
-{
-    size_t winner = size_t(-1);
-
-    while (true) {
-        winner = col.find_first(value, winner + 1);
-        if (winner == ndx)
-            continue;
-        if (winner == not_found)
-            return ndx;
-        else
-            break;
-    }
-
-    conflict = true;
-
-    REALM_ASSERT(winner != not_found);
-    REALM_ASSERT(winner != ndx);
-
-    // Delete additional duplicates.
-    size_t duplicate = winner;
-    while (true) {
-        duplicate = col.find_first(value, duplicate + 1);
-        if (duplicate == ndx)
-            continue;
-        if (duplicate == not_found)
-            break;
-        if (ndx == size() - 1)
-            ndx = duplicate;
-
-        move_last_over(duplicate);
-        // Re-check moved-last-over
-        duplicate -= 1;
-    }
-
-    // Delete candidate.
-    if (winner == size() - 1)
-        winner = ndx;
-
-    move_last_over(ndx);
-
-    return winner;
-}
-
-template <class ColType>
-size_t Table::do_set_unique_null(ColType& col, size_t ndx, bool& conflict)
-{
-    ndx = do_find_unique(col, ndx, null{}, conflict);
-    col.set_null(ndx);
-    return ndx;
-}
-
-template <class ColType, class T>
-size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value, bool& conflict)
-{
-    ndx = do_find_unique(col, ndx, value, conflict);
-    col.set(ndx, value);
-    return ndx;
-}
-
 void Table::add_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2762,9 +2196,6 @@ void Table::add_int(size_t col_ndx, size_t ndx, int_fast64_t value)
         int64_t old = col.get(ndx);
         col.set(ndx, add_wrap(old, value));
     }
-
-    if (Replication* repl = get_repl())
-        repl->add_int(this, col_ndx, ndx, value); // Throws
 }
 
 void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData value)
@@ -2793,9 +2224,6 @@ void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringD
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
     col.set_string(row_ndx, copy_of_value); // Throws
-
-    if (Replication* repl = get_repl())
-        repl->insert_substring(this, col_ndx, row_ndx, pos, value); // Throws
 }
 
 
@@ -2823,14 +2251,9 @@ void Table::remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t 
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
     col.set_string(row_ndx, copy_of_value); // Throws
-
-    if (Replication* repl = get_repl()) {
-        size_t actual_size = old_value.size() - copy_of_value.size();
-        repl->erase_substring(this, col_ndx, row_ndx, pos, actual_size); // Throws
-    }
 }
 
-void Table::set_binary_big(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
+void Table::set_binary_big(size_t col_ndx, size_t ndx, BinaryData value, bool)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -2850,10 +2273,6 @@ void Table::set_binary_big(size_t col_ndx, size_t ndx, BinaryData value, bool is
     // column type mismatch.
     BinaryColumn& col = get_column_binary(col_ndx);
     col.set(ndx, value);
-
-    if (Replication* repl = get_repl())
-        repl->set_binary(this, col_ndx, ndx, value,
-                         is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 BinaryData Table::get_binary_at(size_t col_ndx, size_t ndx, size_t& pos) const noexcept
@@ -2877,7 +2296,7 @@ TableRef Table::get_link_target(size_t col_ndx) noexcept
 }
 
 
-void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool is_default)
+void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -2899,10 +2318,6 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool
     // ColumnBase::set_string()), but that works less well here. The ideal
     // solution seems to be to have a very efficient way of checking the column
     // type. Idea: Introduce `DataType ColumnBase::m_type`.
-
-    if (Replication* repl = get_repl())
-        repl->set_link(this, col_ndx, row_ndx, target_row_ndx,
-                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
 }
@@ -3366,315 +2781,6 @@ const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain)
     return table;
 }
 
-
-namespace {
-
-struct AggrState {
-    AggrState(const Table& target_table)
-        : table(target_table)
-        , cache(table.get_alloc())
-        , added_row(false)
-    {
-    }
-
-    const Table& table;
-    const StringIndex* dst_index;
-    size_t group_by_column;
-
-    const StringEnumColumn* enums;
-    std::vector<size_t> keys;
-    const ArrayInteger* block = nullptr;
-    ArrayInteger cache;
-    size_t offset;
-    size_t block_end;
-
-    bool added_row;
-};
-
-typedef size_t (*get_group_fnc)(size_t, AggrState&, Table&);
-
-size_t get_group_ndx(size_t i, AggrState& state, Table& result)
-{
-    StringData str = state.table.get_string(state.group_by_column, i);
-    size_t ndx = state.dst_index->find_first(str);
-    if (ndx == not_found) {
-        ndx = result.add_empty_row();
-        result.set_string(0, ndx, str);
-        state.added_row = true;
-    }
-    return ndx;
-}
-
-size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
-{
-    // We iterate entire blocks at a time by keeping current leaf cached
-    if (i >= state.block_end) {
-        size_t ndx_in_leaf;
-        IntegerColumn::LeafInfo leaf{&state.block, &state.cache};
-        state.enums->IntegerColumn::get_leaf(i, ndx_in_leaf, leaf);
-        state.offset = i - ndx_in_leaf;
-        state.block_end = state.offset + state.block->size();
-    }
-
-    // Since we know the exact number of distinct keys,
-    // we can use that to avoid index lookups
-    int64_t key = state.block->get(i - state.offset);
-    size_t ndx = state.keys[to_size_t(key)];
-
-    // Stored position is offset by one, so zero can indicate
-    // that no entry have been added yet.
-    if (ndx == 0) {
-        ndx = result.add_empty_row();
-        result.set_string(0, ndx, state.enums->get(i));
-        state.keys[to_size_t(key)] = ndx + 1;
-        state.added_row = true;
-    }
-    else
-        --ndx;
-    return ndx;
-}
-
-} // namespace
-
-// Simple pivot aggregate method. Experimental! Please do not document method publicly.
-void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result,
-                      const IntegerColumn* viewrefs) const
-{
-    REALM_ASSERT(result.is_empty() && result.get_column_count() == 0);
-    REALM_ASSERT_3(group_by_column, <, m_columns.size());
-    REALM_ASSERT_3(aggr_column, <, m_columns.size());
-
-    REALM_ASSERT_3(get_column_type(group_by_column), ==, type_String);
-    REALM_ASSERT(op == aggr_count || get_column_type(aggr_column) == type_Int);
-
-    // Add columns to result table
-    result.add_column(type_String, get_column_name(group_by_column));
-
-    if (op == aggr_count)
-        result.add_column(type_Int, "COUNT()");
-    else
-        result.add_column(type_Int, get_column_name(aggr_column));
-
-    // Cache columms
-    const IntegerColumn& src_column = get_column(aggr_column);
-    IntegerColumn& dst_column = result.get_column(1);
-
-    AggrState state(*this);
-    get_group_fnc get_group_ndx_fnc = nullptr;
-
-    // When doing grouped aggregates, the column to group on is likely
-    // to be auto-enumerated (without a lot of duplicates grouping does not
-    // make much sense). So we can use this knowledge to optimize the process.
-    ColumnType key_type = get_real_column_type(group_by_column);
-    if (key_type == col_type_StringEnum) {
-        const StringEnumColumn& enums = get_column_string_enum(group_by_column);
-        size_t key_count = enums.get_keys().size();
-
-        state.enums = &enums;
-        state.keys.assign(key_count, 0);
-
-        size_t ndx_in_leaf;
-        IntegerColumn::LeafInfo leaf{&state.block, &state.cache};
-        enums.IntegerColumn::get_leaf(0, ndx_in_leaf, leaf);
-        state.offset = 0 - ndx_in_leaf;
-        state.block_end = state.offset + state.block->size();
-        get_group_ndx_fnc = &get_group_ndx_blocked;
-    }
-    else {
-        // If the group_by column is not auto-enumerated, we have to do
-        // (more expensive) direct lookups.
-        result.add_search_index(0);
-        const StringIndex& dst_index = *result.get_column_string(0).get_search_index();
-
-        state.dst_index = &dst_index;
-        state.group_by_column = group_by_column;
-        get_group_ndx_fnc = &get_group_ndx;
-    }
-
-    if (viewrefs) {
-        // Aggregating over a view
-        const size_t count = viewrefs->size();
-
-        switch (op) {
-            case aggr_count:
-                for (size_t r = 0; r < count; ++r) {
-                    size_t i = static_cast<size_t>(viewrefs->get(r));
-                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
-
-                    // Count
-                    dst_column.adjust(ndx, 1);
-                }
-                break;
-            case aggr_sum:
-                for (size_t r = 0; r < count; ++r) {
-                    size_t i = static_cast<size_t>(viewrefs->get(r));
-                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
-
-                    // Sum
-                    int64_t value = src_column.get(i);
-                    dst_column.adjust(ndx, value);
-                }
-                break;
-            case aggr_avg: {
-                // Add temporary column for counts
-                result.add_column(type_Int, "count");
-                IntegerColumn& cnt_column = result.get_column(2);
-
-                for (size_t r = 0; r < count; ++r) {
-                    size_t i = static_cast<size_t>(viewrefs->get(r));
-                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
-
-                    // SUM
-                    int64_t value = src_column.get(i);
-                    dst_column.adjust(ndx, value);
-
-                    // Increment count
-                    cnt_column.adjust(ndx, 1);
-                }
-
-                // Calculate averages
-                result.add_column(type_Double, "average");
-                DoubleColumn& mean_column = result.get_column_double(3);
-                const size_t res_count = result.size();
-                for (size_t i = 0; i < res_count; ++i) {
-                    int64_t sum = dst_column.get(i);
-                    int64_t item_count = cnt_column.get(i);
-                    double res = double(sum) / double(item_count);
-                    mean_column.set(i, res);
-                }
-
-                // Remove temp columns
-                result.remove_column(1); // sums
-                result.remove_column(1); // counts
-                break;
-            }
-            case aggr_min:
-                for (size_t r = 0; r < count; ++r) {
-                    size_t i = static_cast<size_t>(viewrefs->get(r));
-
-                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
-                    int64_t value = src_column.get(i);
-                    if (state.added_row) {
-                        // Set the real value, to overwrite the default value
-                        dst_column.set(ndx, value);
-                        state.added_row = false;
-                    }
-                    else {
-                        int64_t current = dst_column.get(ndx);
-                        if (value < current)
-                            dst_column.set(ndx, value);
-                    }
-                }
-                break;
-            case aggr_max:
-                for (size_t r = 0; r < count; ++r) {
-                    size_t i = static_cast<size_t>(static_cast<size_t>(viewrefs->get(r)));
-
-                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
-                    int64_t value = src_column.get(i);
-                    if (state.added_row) {
-                        // Set the real value, to overwrite the default value
-                        dst_column.set(ndx, value);
-                        state.added_row = false;
-                    }
-                    else {
-                        int64_t current = dst_column.get(ndx);
-                        if (value > current)
-                            dst_column.set(ndx, value);
-                    }
-                }
-                break;
-        }
-    }
-    else {
-        const size_t count = size();
-
-        switch (op) {
-            case aggr_count:
-                for (size_t i = 0; i < count; ++i) {
-                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
-
-                    // Count
-                    dst_column.adjust(ndx, 1);
-                }
-                break;
-            case aggr_sum:
-                for (size_t i = 0; i < count; ++i) {
-                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
-
-                    // Sum
-                    int64_t value = src_column.get(i);
-                    dst_column.adjust(ndx, value);
-                }
-                break;
-            case aggr_avg: {
-                // Add temporary column for counts
-                result.add_column(type_Int, "count");
-                IntegerColumn& cnt_column = result.get_column(2);
-
-                for (size_t i = 0; i < count; ++i) {
-                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
-
-                    // SUM
-                    int64_t value = src_column.get(i);
-                    dst_column.adjust(ndx, value);
-
-                    // Increment count
-                    cnt_column.adjust(ndx, 1);
-                }
-
-                // Calculate averages
-                result.add_column(type_Double, "average");
-                DoubleColumn& mean_column = result.get_column_double(3);
-                const size_t res_count = result.size();
-                for (size_t i = 0; i < res_count; ++i) {
-                    int64_t sum = dst_column.get(i);
-                    int64_t item_count = cnt_column.get(i);
-                    double res = double(sum) / double(item_count);
-                    mean_column.set(i, res);
-                }
-
-                // Remove temp columns
-                result.remove_column(1); // sums
-                result.remove_column(1); // counts
-                break;
-            }
-            case aggr_min:
-                for (size_t i = 0; i < count; ++i) {
-                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
-                    int64_t value = src_column.get(i);
-                    if (state.added_row) {
-                        // Set the real value, to overwrite the default value
-                        dst_column.set(ndx, value);
-                        state.added_row = false;
-                    }
-                    else {
-                        int64_t current = dst_column.get(ndx);
-                        if (value < current)
-                            dst_column.set(ndx, value);
-                    }
-                }
-                break;
-            case aggr_max:
-                for (size_t i = 0; i < count; ++i) {
-                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
-                    int64_t value = src_column.get(i);
-                    if (state.added_row) {
-                        // Set the real value, to overwrite the default value
-                        dst_column.set(ndx, value);
-                        state.added_row = false;
-                    }
-                    else {
-                        int64_t current = dst_column.get(ndx);
-                        if (value > current)
-                            dst_column.set(ndx, value);
-                    }
-                }
-                break;
-        }
-    }
-}
-
 TableView Table::get_backlink_view(Key key, Table* src_table, size_t src_col_ndx)
 {
     REALM_ASSERT(&src_table->get_column_link_base(src_col_ndx).get_target_table() == this);
@@ -4128,14 +3234,14 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
             case type_LinkList: {
                 LinkColumnBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
                 LinkListColumn& cll = static_cast<LinkListColumn&>(clb);
-                Table& table = cll.get_target_table();
+                // Table& table = cll.get_target_table();
                 LinkViewRef lv = cll.get(row_ndx);
 
                 ref_type lnk = clb.get_ref();
                 if ((link_depth == 0) ||
                     (link_depth == not_found && std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
                     out << "{\"table\": \"" << cll.get_target_table().get_name() << "\", \"rows\": [";
-                    cll.to_json_row(row_ndx, out);
+                    // FIXME cll.to_json_row(row_ndx, out);
                     out << "]}";
                     break;
                 }
@@ -4145,8 +3251,8 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
                         if (link_ndx > 0)
                             out << ", ";
                         followed.push_back(lnk);
-                        size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                        table.to_json_row(lv->get(link_ndx).get_index(), out, new_depth, renames, followed);
+                        // size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                        // FIXME table.to_json_row(lv->get(link_ndx).get_index(), out, new_depth, renames, followed);
                     }
                     out << "]";
                 }
@@ -4372,126 +3478,26 @@ size_t Table::compute_aggregated_byte_size() const noexcept
 }
 
 
-bool Table::compare_rows(const Table& t) const
+bool Table::compare_objects(const Table& t) const
 {
-    // Table accessors attached to degenerate subtables have no column
-    // accesssors, so the general comparison scheme is impossible in that case.
-    if (m_size == 0)
-        return t.m_size == 0;
-
-    // FIXME: The current column comparison implementation is very
-    // inefficient, we should use sequential tree accessors when they
-    // become available.
-
-    size_t n = get_column_count();
-    REALM_ASSERT_3(t.get_column_count(), ==, n);
-    for (size_t i = 0; i != n; ++i) {
-        ColumnType type = get_real_column_type(i);
-        bool nullable = is_nullable(i);
-        REALM_ASSERT((type == col_type_String || type == col_type_StringEnum || type == t.get_real_column_type(i)) &&
-                     nullable == t.is_nullable(i));
-
-        switch (type) {
-            case col_type_Int:
-            case col_type_Bool:
-            case col_type_OldDateTime: {
-                if (nullable) {
-                    const IntNullColumn& c1 = get_column_int_null(i);
-                    const IntNullColumn& c2 = t.get_column_int_null(i);
-                    if (!c1.compare(c2)) {
-                        return false;
-                    }
-                }
-                else {
-                    const IntegerColumn& c1 = get_column(i);
-                    const IntegerColumn& c2 = t.get_column(i);
-                    if (!c1.compare(c2))
-                        return false;
-                }
-                continue;
-            }
-            case col_type_Timestamp: {
-                const TimestampColumn& c1 = get_column_timestamp(i);
-                const TimestampColumn& c2 = t.get_column_timestamp(i);
-                if (!c1.compare(c2))
-                    return false;
-                continue;
-            }
-            case col_type_Float: {
-                const FloatColumn& c1 = get_column_float(i);
-                const FloatColumn& c2 = t.get_column_float(i);
-                if (!c1.compare(c2))
-                    return false;
-                continue;
-            }
-            case col_type_Double: {
-                const DoubleColumn& c1 = get_column_double(i);
-                const DoubleColumn& c2 = t.get_column_double(i);
-                if (!c1.compare(c2))
-                    return false;
-                continue;
-            }
-            case col_type_String: {
-                const StringColumn& c1 = get_column_string(i);
-                ColumnType type2 = t.get_real_column_type(i);
-                if (type2 == col_type_String) {
-                    const StringColumn& c2 = t.get_column_string(i);
-                    if (!c1.compare_string(c2))
-                        return false;
-                }
-                else {
-                    REALM_ASSERT_3(type2, ==, col_type_StringEnum);
-                    const StringEnumColumn& c2 = t.get_column_string_enum(i);
-                    if (!c2.compare_string(c1))
-                        return false;
-                }
-                continue;
-            }
-            case col_type_StringEnum: {
-                const StringEnumColumn& c1 = get_column_string_enum(i);
-                ColumnType type2 = t.get_real_column_type(i);
-                if (type2 == col_type_StringEnum) {
-                    const StringEnumColumn& c2 = t.get_column_string_enum(i);
-                    if (!c1.compare_string(c2))
-                        return false;
-                }
-                else {
-                    REALM_ASSERT_3(type2, ==, col_type_String);
-                    const StringColumn& c2 = t.get_column_string(i);
-                    if (!c1.compare_string(c2))
-                        return false;
-                }
-                continue;
-            }
-            case col_type_Binary: {
-                const BinaryColumn& c1 = get_column_binary(i);
-                const BinaryColumn& c2 = t.get_column_binary(i);
-                if (!c1.compare_binary(c2))
-                    return false;
-                continue;
-            }
-            case col_type_Link: {
-                const LinkColumn& c1 = get_column_link(i);
-                const LinkColumn& c2 = t.get_column_link(i);
-                if (!c1.compare(c2))
-                    return false;
-                continue;
-            }
-            case col_type_LinkList: {
-                const LinkListColumn& c1 = get_column_link_list(i);
-                const LinkListColumn& c2 = t.get_column_link_list(i);
-                if (!c1.compare_link_list(c2))
-                    return false;
-                continue;
-            }
-            case col_type_BackLink:
-            case col_type_OldTable:
-            case col_type_OldMixed:
-            case col_type_Reserved4:
-                break;
-        }
-        REALM_ASSERT(false);
+    if (size() != t.size()) {
+        return false;
     }
+
+    auto it1 = begin();
+    auto it2 = t.begin();
+    auto e = end();
+
+    while (it1 != e) {
+        if (*it1 == *it2) {
+            ++it1;
+            ++it2;
+        }
+        else {
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -4571,34 +3577,6 @@ void Table::adj_erase_column(size_t col_ndx) noexcept
         m_cols.erase(m_cols.begin() + col_ndx);
     }
 }
-
-void Table::adj_move_column(size_t from, size_t to) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    REALM_ASSERT(is_attached());
-    bool not_degenerate = m_columns.is_attached();
-    if (not_degenerate) {
-        REALM_ASSERT_3(from, <, m_cols.size());
-        REALM_ASSERT_3(to, <, m_cols.size());
-        using iter = decltype(m_cols.begin());
-        iter first, new_first, last;
-        if (from < to) {
-            first = m_cols.begin() + from;
-            new_first = first + 1;
-            last = m_cols.begin() + to + 1;
-        }
-        else {
-            first = m_cols.begin() + to;
-            new_first = m_cols.begin() + from;
-            last = new_first + 1;
-        }
-        std::rotate(first, new_first, last);
-    }
-}
-
 
 void Table::recursive_mark() noexcept
 {
@@ -5122,6 +4100,13 @@ void Table::create_objects(size_t number, std::vector<Key>& keys)
 {
     while (number--) {
         keys.push_back(create_object().get_key());
+    }
+}
+
+void Table::create_objects(const std::vector<Key>& keys)
+{
+    for (auto k : keys) {
+        create_object(k);
     }
 }
 

@@ -34,6 +34,7 @@ using namespace realm;
 using namespace realm::test_util;
 using unit_test::TestContext;
 
+#ifdef LEGACY_TESTS
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -166,9 +167,8 @@ TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_or_add_table("table");
-        table->add_column(type_Int, "row");
-        table->insert_empty_row(0, 1);
-        table->set_int(0, 0, 0);
+        auto col = table->add_column(type_Int, "row");
+        table->create_object().set(col, 0);
         wt.commit();
     }
 
@@ -272,7 +272,6 @@ private:
 };
 
 } // anonymous namespace
-
 
 TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
 {
@@ -440,5 +439,6 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
         CHECK(!reader_has_thrown);
     }
 }
+#endif
 
 #endif // TEST_TRANSACTIONS_LASSE

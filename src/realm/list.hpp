@@ -22,6 +22,10 @@
 #include <realm/obj.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/array_key.hpp>
+#include <realm/array_bool.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_binary.hpp>
+#include <realm/array_timestamp.hpp>
 
 namespace realm {
 
@@ -166,6 +170,11 @@ protected:
         }
         m_deleted.insert(it, ndx);
     }
+    void insert_null_repl(Replication* repl, size_t ndx) const;
+    void erase_repl(Replication* repl, size_t ndx) const;
+    void move_repl(Replication* repl, size_t from, size_t to) const;
+    void swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const;
+    void clear_repl(Replication* repl) const;
 };
 
 /*
@@ -278,7 +287,13 @@ protected:
     mutable std::unique_ptr<LeafType> m_leaf;
     mutable bool m_valid = false;
 
-    ConstListIf(size_t col_ndx, Allocator& alloc);
+    ConstListIf(size_t col_ndx, Allocator& alloc)
+        : ConstListBase(col_ndx)
+        , m_leaf(new LeafType(alloc))
+    {
+        m_leaf->set_parent(this, 0); // ndx not used, implicit in m_owner
+    }
+
     ConstListIf(const ConstListIf&) = delete;
     ConstListIf(ConstListIf&& other)
         : ConstListBase(std::move(other))
@@ -323,6 +338,8 @@ public:
     virtual ~ListBase()
     {
     }
+    virtual size_t size() const = 0;
+    virtual void insert_null(size_t ndx) = 0;
     virtual void resize(size_t new_size) = 0;
     virtual void remove(size_t from, size_t to) = 0;
     virtual void move(size_t from, size_t to) = 0;
@@ -346,7 +363,7 @@ public:
 
     void update_child_ref(size_t, ref_type new_ref) override
     {
-        m_obj.set(ConstListBase::m_col_ndx, from_ref(new_ref));
+        m_obj.set_int(ConstListBase::m_col_ndx, from_ref(new_ref));
     }
 
     void create()
@@ -354,22 +371,33 @@ public:
         m_leaf->create();
         ConstListIf<T>::m_valid = true;
     }
+    size_t size() const override
+    {
+        return ConstListIf<T>::size();
+    }
+    void insert_null(size_t ndx) override
+    {
+        if (ndx > m_leaf->size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        ensure_writeable();
+        if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+            ConstListBase::insert_null_repl(repl, ndx);
+        }
+        m_leaf->insert(ndx, ConstListIf<T>::LeafType::default_value(false));
+    }
     void resize(size_t new_size) override
     {
         update_if_needed();
         size_t current_size = m_leaf->size();
         while (new_size > current_size) {
-            m_leaf->add(ConstList<T>::LeafType::default_value(false));
-            current_size++;
+            insert_null(current_size++);
         }
-        if (current_size > new_size) {
-            m_leaf->truncate_and_destroy_children(new_size);
-        }
+        remove(new_size, current_size);
     }
     void add(T value)
     {
-        update_if_needed();
-        m_leaf->insert(m_leaf->size(), value);
+        insert(m_leaf->size(), value);
     }
     T set(size_t ndx, T value)
     {
@@ -377,19 +405,18 @@ public:
         T old = get(ndx);
         if (old != value) {
             ensure_writeable();
-            m_leaf->set(ndx, value);
+            do_set(ndx, value);
             m_obj.bump_version();
+            if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+                set_repl(repl, ndx, value);
+            }
         }
         return old;
     }
     void insert(size_t ndx, T value)
     {
-        if (ndx > m_leaf->size()) {
-            throw std::out_of_range("Index out of range");
-        }
-        ensure_writeable();
-        m_leaf->insert(ndx, value);
-        m_obj.bump_version();
+        insert_null(ndx);
+        set(ndx, value);
     }
     T remove(ListIterator<T>& it)
     {
@@ -398,12 +425,15 @@ public:
     T remove(size_t ndx)
     {
         ensure_writeable();
-        T ret = m_leaf->get(ndx);
+        if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+            ConstListBase::erase_repl(repl, ndx);
+        }
+        T old = get(ndx);
         m_leaf->erase(ndx);
         ConstListBase::adj_remove(ndx);
         m_obj.bump_version();
 
-        return ret;
+        return old;
     }
     void remove(size_t from, size_t to) override
     {
@@ -414,28 +444,38 @@ public:
     void move(size_t from, size_t to) override
     {
         if (from != to) {
+            ensure_writeable();
+            if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+                ConstListBase::move_repl(repl, from, to);
+            }
             T tmp = get(from);
             int adj = (from < to) ? 1 : -1;
             while (from != to) {
                 size_t neighbour = from + adj;
-                set(from, get(neighbour));
+                do_set(from, get(neighbour));
                 from = neighbour;
             }
-            set(to, tmp);
+            do_set(to, tmp);
         }
     }
     void swap(size_t ndx1, size_t ndx2) override
     {
         if (ndx1 != ndx2) {
+            if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+                ConstListBase::swap_repl(repl, ndx1, ndx2);
+            }
             T tmp = get(ndx1);
-            set(ndx1, get(ndx2));
-            set(ndx2, tmp);
+            do_set(ndx1, get(ndx2));
+            do_set(ndx2, tmp);
         }
     }
     void clear() override
     {
         update_if_needed();
         ensure_writeable();
+        if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+            ConstListBase::clear_repl(repl);
+        }
         m_leaf->truncate_and_destroy_children(0);
         m_obj.bump_version();
     }
@@ -457,16 +497,15 @@ protected:
             m_leaf->init_from_parent();
         }
     }
+    void do_set(size_t ndx, T value)
+    {
+        m_leaf->set(ndx, value);
+    }
+    void set_repl(Replication* repl, size_t ndx, T value);
 };
 
 template <>
-void List<Key>::add(Key target_key);
-
-template <>
-Key List<Key>::set(size_t ndx, Key target_key);
-
-template <>
-void List<Key>::insert(size_t ndx, Key target_key);
+void List<Key>::do_set(size_t ndx, Key target_key);
 
 template <>
 Key List<Key>::remove(size_t ndx);

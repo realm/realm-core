@@ -492,15 +492,13 @@ TEST(DoubleColumn_SwapRows)
 TEST(DoubleColumn_InitOfEmptyColumn)
 {
     Table t;
-    t.add_column(type_Double, "works");
-    t.add_column(type_Double, "works also");
-    t.add_empty_row();
-    t.set_double(0, 0, 1.1);
-    t.set_double(1, 0, 2.2);
-    t.remove_column(1);
-    t.add_empty_row();
+    auto col_0 = t.add_column(type_Double, "works");
+    auto col_1 = t.add_column(type_Double, "works also");
+    t.create_object().set_all(1.1, 2.2);
+    t.remove_column(col_1);
+    Obj obj = t.create_object();
     t.add_column(type_Double, "doesn't work");
-    CHECK_EQUAL(0.0, t.get_double(1, 0));
+    CHECK_EQUAL(0.0, obj.get<Double>(col_0));
 }
 
 // Test for a bug where default values of newly added float/double columns did not obey their nullability
@@ -509,16 +507,16 @@ TEST_TYPES(DoubleFloatColumn_InitOfEmptyColumnNullable, std::true_type, std::fal
     constexpr bool nullable_toggle = TEST_TYPE::value;
     Table t;
     t.add_column(type_Int, "unused");
-    t.add_empty_row();
-    t.add_column(type_Double, "d", nullable_toggle);
-    t.add_column(type_Float, "f", nullable_toggle);
-    CHECK(t.is_null(1, 0) == nullable_toggle);
-    CHECK(t.is_null(2, 0) == nullable_toggle);
+    Obj obj = t.create_object();
+    auto col_0 = t.add_column(type_Double, "d", nullable_toggle);
+    auto col_1 = t.add_column(type_Float, "f", nullable_toggle);
+    CHECK(obj.is_null(col_0) == nullable_toggle);
+    CHECK(obj.is_null(col_1) == nullable_toggle);
     if (nullable_toggle) {
-        t.set_null(1, 0);
-        t.set_null(2, 0);
-        CHECK(t.is_null(1, 0));
-        CHECK(t.is_null(2, 0));
+        obj.set_null(col_0);
+        obj.set_null(col_1);
+        CHECK(obj.is_null(col_0));
+        CHECK(obj.is_null(col_1));
     }
 }
 
@@ -526,70 +524,60 @@ TEST(FloatColumn_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_Float, "works");
-    t.add_column(type_Float, "works also");
-    t.add_empty_row();
-    t.set_float(0, 0, 1.1f);
-    t.set_float(1, 0, 2.2f);
-    t.remove_column(1);
-    t.add_empty_row();
-    t.add_column(type_Float, "doesn't work");
-    CHECK_EQUAL(0.0, t.get_float(1, 0));
+    auto col_1 = t.add_column(type_Float, "works also");
+    t.create_object().set_all(1.1f, 2.2f);
+    t.remove_column(col_1);
+    Obj obj = t.create_object();
+    auto col_2 = t.add_column(type_Float, "doesn't work");
+    CHECK_EQUAL(0.0, obj.get<Float>(col_2));
 }
 
 TEST(ColumnInt_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_Int, "works");
-    t.add_column(type_Int, "works also");
-    t.add_empty_row();
-    t.set_int(0, 0, 1);
-    t.set_int(1, 0, 2);
-    t.remove_column(1);
-    t.add_empty_row();
-    t.add_column(type_Int, "doesn't work");
-    CHECK_EQUAL(0, t.get_int(1, 0));
+    auto col_1 = t.add_column(type_Int, "works also");
+    t.create_object().set_all(1, 2);
+    t.remove_column(col_1);
+    Obj obj = t.create_object();
+    auto col_2 = t.add_column(type_Int, "doesn't work");
+    CHECK_EQUAL(0, obj.get<Int>(col_2));
 }
 
 TEST(ColumnString_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_String, "works");
-    t.add_column(type_String, "works also", false);
-    t.add_empty_row();
-    t.set_string(0, 0, "yellow");
-    t.set_string(1, 0, "very bright");
-    t.remove_column(1);
-    t.add_empty_row();
-    t.add_column(type_String, "doesn't work");
-    CHECK_EQUAL("", t.get_string(1, 0));
+    auto col_1 = t.add_column(type_String, "works also", false);
+    t.create_object().set_all("yellow", "very bright");
+    t.remove_column(col_1);
+    Obj obj = t.create_object();
+    auto col_2 = t.add_column(type_String, "doesn't work");
+    CHECK_EQUAL("", obj.get<String>(col_2));
 }
 
 TEST(ColumnBinary_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_Binary, "works");
-    t.add_column(type_Binary, "works also");
-    t.add_empty_row();
-    t.set_binary(0, 0, BinaryData("yellow"));
-    t.set_binary(1, 0, BinaryData("very bright"));
-    t.remove_column(1);
-    t.add_empty_row();
-    t.add_column(type_Binary, "doesn't work");
-    CHECK_NOT_EQUAL(BinaryData(), t.get_binary(1, 0));
+    auto col_1 = t.add_column(type_Binary, "works also");
+    t.create_object().set_all(BinaryData("yellow"), BinaryData("very bright"));
+    t.remove_column(col_1);
+    Obj obj = t.create_object();
+    auto col_2 = t.add_column(type_Binary, "doesn't work");
+    CHECK_NOT_EQUAL(BinaryData(), obj.get<Binary>(col_2));
 }
 
 TEST(ColumnBool_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_Bool, "works");
-    t.add_column(type_Bool, "works also");
-    t.add_empty_row();
-    t.set_bool(0, 0, true);
-    t.set_bool(1, 0, true);
-    t.remove_column(1);
-    t.add_empty_row();
-    t.add_column(type_Bool, "doesn't work");
-    CHECK_EQUAL(false, t.get_bool(1, 0));
+    auto col_1 = t.add_column(type_Bool, "works also");
+    t.create_object().set_all(true, true);
+    t.remove_column(col_1);
+    Obj obj = t.create_object();
+    auto col_2 = t.add_column(type_Bool, "doesn't work");
+    CHECK_EQUAL(false, obj.get<Bool>(col_2));
 }
 
 #endif // TEST_COLUMN_FLOAT
