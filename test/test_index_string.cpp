@@ -68,6 +68,7 @@ using unit_test::TestContext;
 // check-testcase` (or one of its friends) from the command line.
 
 
+#ifdef LEGACY_TESTS
 namespace {
 
 #ifdef LEGACY_TESTS
@@ -1926,6 +1927,6 @@ TEST_TYPES(StringIndex_Rover, string_column, nullable_string_column, enum_column
 
     results.destroy();
 }
-
+#endif // LEGACY_TESTS
 
 #endif // TEST_INDEX_STRING

@@ -594,7 +594,7 @@ TEST_TYPES(ColumnString_AutoEnumerate, non_nullable, nullable)
     e.destroy();
 }
 
-
+#ifdef LEGACY_TESTS
 TEST_TYPES(ColumnString_AutoEnumerateIndex, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
@@ -747,7 +747,7 @@ TEST_TYPES(ColumnString_AutoEnumerateIndexReuse, non_nullable, nullable)
     c.destroy();
     e.destroy();
 }
-
+#endif // LEGACY_TESTS
 
 TEST(StringEnumColumn_CloneDeep)
 {
@@ -1110,6 +1110,7 @@ TEST_TYPES(ColumnString_FindAllRanges, string_column, nullable_string_column, en
     c.destroy();
 }
 
+#ifdef LEGACY_TESTS
 TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, string_column, nullable_string_column, enum_column,
            nullable_enum_column)
 {
@@ -1133,7 +1134,6 @@ TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, string_column, nullable_s
     res.destroy();
 }
 
-#ifdef LEGACY_TESTS
 TEST_TYPES(ColumnString_Count, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
@@ -1175,7 +1175,6 @@ TEST_TYPES(ColumnString_Count, non_nullable, nullable)
     asc.destroy();
     e.destroy();
 }
-#endif
 
 TEST_TYPES(ColumnString_SetIndexInParent, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
@@ -1187,6 +1186,7 @@ TEST_TYPES(ColumnString_SetIndexInParent, string_column, nullable_string_column,
     sc.set_ndx_in_parent(0);
     CHECK_EQUAL(sc.get_ndx_in_parent() + 1, ndx->get_ndx_in_parent());
 }
+#endif
 
 TEST_TYPES(ColumnString_SwapRows, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
@@ -1292,7 +1292,7 @@ TEST_TYPES(ColumnString_SwapRows, string_column, nullable_string_column, enum_co
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST_TYPES(ColumnString_Index, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
     TEST_TYPE test_resources;
@@ -1317,6 +1317,7 @@ TEST_TYPES(ColumnString_Index, string_column, nullable_string_column, enum_colum
     asc.add("15");
     asc.add("HEJSA"); // 16
 
+#ifdef LEGACY_TESTS
     const StringIndex& ndx = *asc.create_search_index();
     CHECK(asc.has_search_index());
 #ifdef REALM_DEBUG
@@ -1324,7 +1325,7 @@ TEST_TYPES(ColumnString_Index, string_column, nullable_string_column, enum_colum
 #else
     static_cast<void>(ndx);
 #endif
-
+#endif // LEGACY_TESTS
     size_t count0 = asc.count("HEJ");
     size_t count1 = asc.count("HEJSA");
     size_t count2 = asc.count("1");
@@ -1388,7 +1389,7 @@ TEST_TYPES(ColumnString_Index, string_column, nullable_string_column, enum_colum
     CHECK_EQUAL(not_found, c1);
     CHECK_EQUAL(not_found, c2);
 }
-
+#endif
 
 /**
  * This test ensures that StringColumn::EraseLeafElem is called. It is called when you
