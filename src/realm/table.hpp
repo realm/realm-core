@@ -463,6 +463,14 @@ public:
     double average_double(size_t column_ndx, size_t* value_count = nullptr) const;
 
     // Searching
+    StringIndex* get_search_index(size_t column_ndx) const noexcept
+    {
+        if (!has_search_index(column_ndx)) {
+            throw(std::runtime_error(""));
+        }
+        return m_index_accessors[column_ndx];
+    }
+
     template <class T>
     Key find_first(size_t column_ndx, T value) const;
 
@@ -710,10 +718,12 @@ private:
     Array m_top;
 
     using SpecPtr = std::unique_ptr<Spec>;
-    SpecPtr m_spec; // 1st slot in m_top (for root tables)
-    ClusterTree m_clusters;
+    SpecPtr m_spec;         // 1st slot in m_top
+    ClusterTree m_clusters; // 3rd slot in m_top
     int64_t m_next_key_value = -1;
-    TableKey m_key;
+    TableKey m_key;     // 4th slot in m_top
+    Array m_index_refs; // 5th slot in m_top
+    std::vector<StringIndex*> m_index_accessors;
 
     // Used for queries: Items are added with link() method during buildup of query
     mutable std::vector<size_t> m_link_chain;
@@ -1010,6 +1020,7 @@ private:
     static constexpr int top_position_for_columns = 1;
     static constexpr int top_position_for_cluster_tree = 2;
     static constexpr int top_position_for_key = 3;
+    static constexpr int top_position_for_search_indexes = 4;
 
     friend class SubtableNode;
     friend class _impl::TableFriend;
@@ -1196,6 +1207,7 @@ inline Table::Table(Allocator& alloc)
     : m_alloc(alloc)
     , m_top(m_alloc)
     , m_clusters(this, m_alloc)
+    , m_index_refs(m_alloc)
 {
     ref_type ref = create_empty_table(alloc); // Throws
     Parent* parent = nullptr;
@@ -1207,6 +1219,7 @@ inline Table::Table(ref_count_tag, Allocator& alloc)
     : m_alloc(alloc)
     , m_top(m_alloc)
     , m_clusters(this, m_alloc)
+    , m_index_refs(m_alloc)
 {
 }
 

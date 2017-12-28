@@ -462,30 +462,6 @@ DataType Spec::get_public_column_type(size_t ndx) const noexcept
 }
 
 
-size_t Spec::get_column_ndx_in_parent(size_t column_ndx) const
-{
-    // If there are indexed columns, the indexes also takes
-    // up space in the list of columns refs (m_columns in table)
-    // so we need to be able to get the adjusted position
-
-    size_t offset = 0;
-    for (size_t i = 0; i < column_ndx; ++i) {
-        if ((m_attr.get(i) & col_attr_Indexed) != 0)
-            ++offset;
-    }
-    return column_ndx + offset;
-}
-
-
-Spec::ColumnInfo Spec::get_column_info(size_t column_ndx) const noexcept
-{
-    ColumnInfo info;
-    info.m_column_ref_ndx = get_column_ndx_in_parent(column_ndx);
-    info.m_has_search_index = get_column_attr(column_ndx).test(col_attr_Indexed);
-    return info;
-}
-
-
 bool Spec::operator==(const Spec& spec) const noexcept
 {
     if (!m_attr.compare(spec.m_attr))

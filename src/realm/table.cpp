@@ -435,6 +435,11 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         m_clusters.set_parent(&m_top, top_position_for_cluster_tree);
         m_clusters.init_from_parent();
     }
+    if (m_top.size() > top_position_for_search_indexes) {
+        m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
+        m_index_refs.init_from_parent();
+        m_index_accessors.resize(m_index_refs.size());
+    }
 
     RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_key);
     REALM_ASSERT(rot.is_tagged());
@@ -510,8 +515,10 @@ void Table::add_search_index(size_t column_ndx)
 
     ColumnAttrMask attr = m_spec->get_column_attr(column_ndx);
 
-    // The index goes in the list of column refs immediate after the owning column
-    REALM_ASSERT(false); // FIXME: unimplemented
+    // m_index_accessors always has the same number of pointers as the number of columns. Columns without search
+    // index have 0-entries.
+    REALM_ASSERT(m_index_accessors.size() == get_column_count());
+    REALM_ASSERT(m_index_accessors[column_ndx] == nullptr);
 
     // Mark the column as having an index
     attr = m_spec->get_column_attr(column_ndx);
@@ -536,15 +543,13 @@ void Table::remove_search_index(size_t column_ndx)
     ColumnAttrMask attr = m_spec->get_column_attr(column_ndx);
 
     // Destroy and remove the index column
+    m_index_accessors[column_ndx] = nullptr;
 
-    // The index is always immediately after the column in m_columns
-    REALM_ASSERT(false); // FIXME: Unimplemented
+    m_index_refs.set(column_ndx, 0);
 
     // Mark the column as no longer having an index
     attr = m_spec->get_column_attr(column_ndx);
     attr.reset(col_attr_Indexed);
-    m_spec->set_column_attr(column_ndx, attr); // Throws
-
     m_spec->set_column_attr(column_ndx, attr); // Throws
 
     if (Replication* repl = get_repl())
@@ -624,6 +629,13 @@ void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, 
         attr |= col_attr_List;
     m_spec->insert_column(ndx, type, name, attr); // Throws
 
+    // Backlink columns don't have search index
+    if (type != col_type_BackLink) {
+        // Column has no search index
+        m_index_refs.insert(ndx, 0);
+        m_index_accessors.insert(m_index_accessors.begin() + ndx, nullptr);
+    }
+
     if (m_clusters.is_attached()) {
         m_clusters.insert_column(ndx);
     }
@@ -632,11 +644,16 @@ void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, 
 
 void Table::do_erase_root_column(size_t ndx)
 {
+    bool search_index = has_search_index(ndx);
     m_spec->erase_column(ndx); // Throws
 
-    // If the column had a search index we have to remove and destroy that as
-    // well
-    // FIXME: Unimplemented
+    // If the column had a source index we have to remove and destroy that as well
+    if (search_index) {
+        ref_type index_ref = m_index_refs.get_as_ref(ndx);
+        Array::destroy_deep(index_ref, m_index_refs.get_alloc());
+        m_index_refs.erase(ndx);
+        m_index_accessors.erase(m_index_accessors.begin() + ndx);
+    }
 
     if (m_clusters.is_attached()) {
         m_clusters.remove_column(ndx);
@@ -719,13 +736,10 @@ Table::~Table() noexcept
 }
 
 
-bool Table::has_search_index(size_t) const noexcept
+bool Table::has_search_index(size_t col_ndx) const noexcept
 {
-    // Check column of `this` which is a root table
-    // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
-
-    // FIXME: Unimplemented - so just return false, so that it isn't used.
-    return false;
+    ColumnAttrMask attr = m_spec->get_column_attr(col_ndx);
+    return attr.test(col_attr_Indexed);
 }
 
 
@@ -778,6 +792,14 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     }
     RefOrTagged rot = RefOrTagged::make_tagged(key.value);
     top.add(rot);
+    {
+        bool context_flag = false;
+        MemRef mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v(from_ref(mem.get_ref()));
+        top.add(v); // Throws
+        dg_2.release();
+    }
     dg.release();
     return top.get_ref();
 }
@@ -1363,8 +1385,17 @@ void Table::update_from_parent(size_t old_baseline) noexcept
             return;
 
         m_spec->update_from_parent(old_baseline);
-        if (m_top.size() > 2) {
+        if (m_top.size() > top_position_for_cluster_tree) {
             m_clusters.update_from_parent(old_baseline);
+        }
+        if (m_top.size() > top_position_for_search_indexes) {
+            if (m_index_refs.update_from_parent(old_baseline)) {
+                for (auto index : m_index_accessors) {
+                    if (index != nullptr) {
+                        index->update_from_parent(old_baseline);
+                    }
+                }
+            }
         }
     }
     m_alloc.bump_storage_version();
