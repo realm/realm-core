@@ -195,11 +195,10 @@ public:
     template <class T>
     void set(Key key, util::Optional<T> new_value);
 
-    template <class T>
     void erase(Key key);
 
     template <class T>
-    size_t find_first(T value) const;
+    Key find_first(T value) const;
     template <class T>
     void find_all(std::vector<Key>& result, T value, bool case_insensitive = false) const;
     template <class T>
@@ -393,6 +392,7 @@ struct GetIndexData<float> {
     static StringData get_index_data(float, StringConversionBuffer&)
     {
         REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
+        return {};
     }
 };
 
@@ -401,6 +401,16 @@ struct GetIndexData<double> {
     static StringData get_index_data(double, StringConversionBuffer&)
     {
         REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
+        return {};
+    }
+};
+
+template <>
+struct GetIndexData<BinaryData> {
+    static StringData get_index_data(BinaryData, StringConversionBuffer&)
+    {
+        REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
+        return {};
     }
 };
 
@@ -530,8 +540,7 @@ void StringIndex::set(Key key, T new_value)
     if (REALM_LIKELY(new_value2 != old_value)) {
         // We must erase this row first because erase uses find_first which
         // might find the duplicate if we insert before erasing.
-        bool is_last = true;        // To avoid updating refs
-        erase<T>(key, is_last);     // Throws
+        erase(key); // Throws
 
         size_t offset = 0;                               // First key from beginning of string
         insert_with_offset(key, new_value2, offset);     // Throws
@@ -550,29 +559,7 @@ void StringIndex::set(Key key, util::Optional<T> new_value)
 }
 
 template <class T>
-void StringIndex::erase(Key key)
-{
-    StringConversionBuffer buffer;
-    StringData value = get(key, buffer);
-
-    do_delete(key, value, 0);
-
-    // Collapse top nodes with single item
-    while (m_array->is_inner_bptree_node()) {
-        REALM_ASSERT(m_array->size() > 1); // node cannot be empty
-        if (m_array->size() > 2)
-            break;
-
-        ref_type ref = m_array->get_as_ref(1);
-        m_array->set(1, 1); // avoid destruction of the extracted ref
-        m_array->destroy_deep();
-        m_array->init_from_ref(ref);
-        m_array->update_parent();
-    }
-}
-
-template <class T>
-size_t StringIndex::find_first(T value) const
+Key StringIndex::find_first(T value) const
 {
     // Use direct access method
     StringConversionBuffer buffer;

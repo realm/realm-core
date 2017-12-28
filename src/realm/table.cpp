@@ -525,6 +525,10 @@ void Table::populate_search_index(size_t column_ndx)
             StringData value = o.get<StringData>(column_ndx);
             index->insert(key, value); // Throws
         }
+        else if (type == type_Timestamp) {
+            Timestamp value = o.get<Timestamp>(column_ndx);
+            index->insert(key, value); // Throws
+        }
         else {
             REALM_ASSERT_RELEASE(false && "Data type does not support search index");
         }
@@ -778,8 +782,14 @@ Table::~Table() noexcept
     if (m_top.get_parent() == nullptr) {
         m_top.destroy_deep();
     }
+
     if (m_top.is_attached())
         detach();
+
+    for (auto& index : m_index_accessors) {
+        delete index;
+    }
+    m_index_accessors.clear();
 }
 
 
@@ -1131,6 +1141,15 @@ Timestamp Table::maximum_timestamp(size_t col_ndx, Key* return_ndx) const
 template <class T>
 Key Table::find_first(size_t col_ndx, T value) const
 {
+    REALM_ASSERT(col_ndx < get_column_count());
+
+    if (has_search_index(col_ndx)) {
+        REALM_ASSERT(col_ndx < m_index_accessors.size());
+        auto index = m_index_accessors[col_ndx];
+        REALM_ASSERT(index);
+        return index->find_first(value);
+    }
+
     Key key;
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType leaf(get_alloc());

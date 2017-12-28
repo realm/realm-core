@@ -71,12 +71,12 @@ StringData ClusterColumn::get_index_data(Key key, StringConversionBuffer& buffer
     }
     else if (type == type_Bool) {
         if (is_nullable()) {
-            GetIndexData<bool> stringifier;
-            return stringifier.get_index_data(obj.get<bool>(m_column_ndx), buffer);
-        }
-        else {
             GetIndexData<Optional<bool>> stringifier;
             return stringifier.get_index_data(obj.get<Optional<bool>>(m_column_ndx), buffer);
+        }
+        else {
+            GetIndexData<bool> stringifier;
+            return stringifier.get_index_data(obj.get<bool>(m_column_ndx), buffer);
         }
     }
     else if (type == type_String) {
@@ -87,10 +87,9 @@ StringData ClusterColumn::get_index_data(Key key, StringConversionBuffer& buffer
         GetIndexData<Timestamp> stringifier;
         return stringifier.get_index_data(obj.get<Timestamp>(m_column_ndx), buffer);
     }
-    else {
-        // It should not be possible to reach this line through public Core API
-        REALM_ASSERT_RELEASE(false);
-    }
+    // It should not be possible to reach this line through public Core API
+    REALM_ASSERT_RELEASE(false);
+    return {};
 }
 
 namespace realm {
@@ -119,7 +118,7 @@ int64_t IndexArray::from_list<index_FindFirst>(StringData value, InternalFindRes
     IntegerColumn::const_iterator it_end = key_values.cend();
     IntegerColumn::const_iterator lower = std::lower_bound(key_values.cbegin(), it_end, value, slc);
     if (lower == it_end)
-        return not_found;
+        return null_key.value;
 
     int64_t first_key_value = *lower;
 
@@ -127,7 +126,7 @@ int64_t IndexArray::from_list<index_FindFirst>(StringData value, InternalFindRes
     StringConversionBuffer buffer;
     StringData str = column.get_index_data(Key(first_key_value), buffer);
     if (str != value)
-        return not_found;
+        return null_key.value;
 
     return first_key_value;
 }
@@ -1312,6 +1311,26 @@ void StringIndex::do_delete(Key obj_key, StringData value, size_t offset)
     }
 }
 
+void StringIndex::erase(Key key)
+{
+    StringConversionBuffer buffer;
+    StringData value = get(key, buffer);
+
+    do_delete(key, value, 0);
+
+    // Collapse top nodes with single item
+    while (m_array->is_inner_bptree_node()) {
+        REALM_ASSERT(m_array->size() > 1); // node cannot be empty
+        if (m_array->size() > 2)
+            break;
+
+        ref_type ref = m_array->get_as_ref(1);
+        m_array->set(1, 1); // avoid destruction of the extracted ref
+        m_array->destroy_deep();
+        m_array->init_from_ref(ref);
+        m_array->update_parent();
+    }
+}
 
 namespace {
 

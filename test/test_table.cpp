@@ -8331,4 +8331,152 @@ TEST(Table_4)
 #endif
 }
 
+// Very basic sanity check of search index when you add, remove and set objects
+TEST(Table_search_index_basics)
+{
+    Table table;
+
+    size_t c1 = table.add_column(type_Int, "a");
+    size_t c2 = table.add_column(type_Int, "b", true);
+    size_t c3 = table.add_column(type_String, "c");
+    size_t c4 = table.add_column(type_String, "d", true);
+    size_t c5 = table.add_column(type_Bool, "e");
+    size_t c6 = table.add_column(type_Bool, "f", true);
+    size_t c7 = table.add_column(type_Timestamp, "g");
+    size_t c8 = table.add_column(type_Timestamp, "h", true);
+
+    Obj o0 = table.create_object();
+    Obj o1 = table.create_object();
+    Obj o2 = table.create_object();
+    Obj o3 = table.create_object();
+
+    o0.set_all(100, 100, "100", "100", false, false, Timestamp(100, 100), Timestamp(100, 100));
+    o1.set_all(200, 200, "200", "200", true, true, Timestamp(200, 200), Timestamp(200, 200));
+    o2.set_all(200, 200, "200", "200", true, true, Timestamp(200, 200), Timestamp(200, 200));
+    CHECK(o3.is_null(c2));
+    CHECK(o3.is_null(c4));
+    CHECK(o3.is_null(c6));
+    CHECK(o3.is_null(c8));
+
+    table.add_search_index(c1);
+    table.add_search_index(c2);
+    table.add_search_index(c3);
+    table.add_search_index(c4);
+    table.add_search_index(c5);
+    table.add_search_index(c6);
+    table.add_search_index(c7);
+    table.add_search_index(c8);
+
+    // Non-nullable integers
+    CHECK_EQUAL(table.find_first_int(0, 100), o0.get_key());
+    CHECK_EQUAL(table.find_first_int(0, 200), o1.get_key());
+    // Uninitialized non-nullable integers equal 0
+    CHECK_EQUAL(table.find_first_int(0, 0), o3.get_key());
+
+    // Nullable integers
+    CHECK_EQUAL(table.find_first_int(1, 100), o0.get_key());
+    CHECK_EQUAL(table.find_first_int(1, 200), o1.get_key());
+    // FIXME: Waiting for fix outside scope of search index PR
+    // CHECK_EQUAL(table.find_first_null(1), o3.get_key());
+
+    // Non-nullable strings
+    CHECK_EQUAL(table.find_first_string(2, "100"), o0.get_key());
+    CHECK_EQUAL(table.find_first_string(2, "200"), o1.get_key());
+    // Uninitialized non-nullable strings equal ""
+    CHECK_EQUAL(table.find_first_string(2, ""), o3.get_key());
+
+    // Nullable strings
+    CHECK_EQUAL(table.find_first_string(3, "100"), o0.get_key());
+    CHECK_EQUAL(table.find_first_string(3, "200"), o1.get_key());
+    // FIXME: Waiting for fix outside scope of search index PR
+    // CHECK_EQUAL(table.find_first_null(3), o3.get_key());
+
+    // Non-nullable bools
+    CHECK_EQUAL(table.find_first_bool(4, false), o0.get_key());
+    CHECK_EQUAL(table.find_first_bool(4, true), o1.get_key());
+
+    // Nullable bools
+    CHECK_EQUAL(table.find_first_bool(5, false), o0.get_key());
+    CHECK_EQUAL(table.find_first_bool(5, true), o1.get_key());
+    // FIXME: Waiting for fix outside scope of search index PR
+    // CHECK_EQUAL(table.find_first_null(5), o3.get_key());
+
+    // Non-nullable Timestamp
+    CHECK_EQUAL(table.find_first_timestamp(6, Timestamp(100, 100)), o0.get_key());
+    CHECK_EQUAL(table.find_first_timestamp(6, Timestamp(200, 200)), o1.get_key());
+
+    // Nullable Timestamp
+    CHECK_EQUAL(table.find_first_timestamp(7, Timestamp(100, 100)), o0.get_key());
+    CHECK_EQUAL(table.find_first_timestamp(7, Timestamp(200, 200)), o1.get_key());
+    // FIXME: Waiting for fix outside scope of search index PR
+    // CHECK_EQUAL(table.find_first_null(7), o3.get_key());
+
+    // Remove object and see if things still work
+    // *******************************************************************************
+    table.remove_object(o0.get_key());
+
+    // Integers
+    CHECK_EQUAL(table.find_first_int(0, 100), null_key);
+    CHECK_EQUAL(table.find_first_int(0, 200), o1.get_key());
+    // Uninitialized non-nullable integers equal 0
+    CHECK_EQUAL(table.find_first_int(0, 0), o3.get_key());
+
+    CHECK_EQUAL(table.find_first_int(1, 200), o1.get_key());
+    // FIXME: Waiting for fix outside scope of search index PR
+    // CHECK_EQUAL(table.find_first_null(1), o3.get_key());
+
+    // Non-nullable strings
+    CHECK_EQUAL(table.find_first_string(2, "100"), null_key);
+    CHECK_EQUAL(table.find_first_string(2, "200"), o1.get_key());
+    // Uninitialized non-nullable strings equal ""
+    CHECK_EQUAL(table.find_first_string(2, ""), o3.get_key());
+
+    // Nullable strings
+    CHECK_EQUAL(table.find_first_string(3, "100"), null_key);
+    CHECK_EQUAL(table.find_first_string(3, "200"), o1.get_key());
+    // FIXME: Waiting for fix outside scope of search index PR
+    // CHECK_EQUAL(table.find_first_null(3), o3.get_key());
+
+    // Non-nullable bools
+    // default value for non-nullable bool is false, so o3 is a match
+    CHECK_EQUAL(table.find_first_bool(4, false), o3.get_key());
+    CHECK_EQUAL(table.find_first_bool(4, true), o1.get_key());
+
+    // Nullable bools
+    CHECK_EQUAL(table.find_first_bool(5, false), null_key);
+    CHECK_EQUAL(table.find_first_bool(5, true), o1.get_key());
+
+    // Call "set" and see if things still work
+    // *******************************************************************************
+    o1.set_all(500, 500, "500", "500");
+    o2.set_all(600, 600, "600", "600");
+
+    CHECK_EQUAL(table.find_first_int(0, 500), o1.get_key());
+    CHECK_EQUAL(table.find_first_int(0, 600), o2.get_key());
+    // Uninitialized non-nullable integers equal 0
+    CHECK_EQUAL(table.find_first_int(0, 0), o3.get_key());
+    CHECK_EQUAL(table.find_first_int(1, 500), o1.get_key());
+    // FIXME: Waiting for fix outside scope of search index PR
+    // CHECK_EQUAL(table.find_first_null(1), o3.get_key());
+
+    // Non-nullable strings
+    CHECK_EQUAL(table.find_first_string(2, "500"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(2, "600"), o2.get_key());
+    // Uninitialized non-nullable strings equal ""
+    CHECK_EQUAL(table.find_first_string(2, ""), o3.get_key());
+
+    // Nullable strings
+    CHECK_EQUAL(table.find_first_string(3, "500"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(3, "600"), o2.get_key());
+    // FIXME: Waiting for fix outside scope of search index PR
+    // CHECK_EQUAL(table.find_first_null(3), o3.get_key());
+
+    // Remove four of the indexes through remove_search_index() call. Let other four remain to see
+    // if they leak memory when Table goes out of scope (needs leak detector)
+    table.remove_search_index(c1);
+    table.remove_search_index(c2);
+    table.remove_search_index(c3);
+    table.remove_search_index(c4);
+}
+
 #endif // TEST_TABLE
