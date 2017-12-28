@@ -514,6 +514,11 @@ void Table::add_search_index(size_t column_ndx)
         return;
 
     ColumnAttrMask attr = m_spec->get_column_attr(column_ndx);
+    if (!StringIndex::type_supported(get_column_type(column_ndx))) {
+        // FIXME: This is what we used to throw, so keep throwing that for compatibility reasons, even though it
+        // should probably be a type mismatch exception instead.
+        throw LogicError(LogicError::illegal_combination);
+    }
 
     // m_index_accessors always has the same number of pointers as the number of columns. Columns without search
     // index have 0-entries.
@@ -523,8 +528,6 @@ void Table::add_search_index(size_t column_ndx)
     // Mark the column as having an index
     attr = m_spec->get_column_attr(column_ndx);
     attr.set(col_attr_Indexed);
-    m_spec->set_column_attr(column_ndx, attr); // Throws
-
     m_spec->set_column_attr(column_ndx, attr); // Throws
 
     if (Replication* repl = get_repl())
@@ -745,7 +748,14 @@ bool Table::has_search_index(size_t col_ndx) const noexcept
 
 void Table::rebuild_search_index(size_t)
 {
-    REALM_ASSERT(false); // FIXME: Unimplemented
+    for (size_t col_ndx = 0; col_ndx < get_column_count(); col_ndx++) {
+        ColumnAttrMask attr = m_spec->get_column_attr(col_ndx);
+        if (attr.test(col_attr_Indexed)) {
+            attr.reset(col_attr_Indexed);
+            m_spec->set_column_attr(col_ndx, attr);
+            add_search_index(col_ndx);
+        }
+    }
 }
 
 
