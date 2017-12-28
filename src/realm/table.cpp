@@ -492,17 +492,56 @@ void Table::do_insert_column_unless_exists(size_t col_ndx, DataType type, String
     }
 }
 
+void Table::populate_search_index(size_t column_ndx)
+{
+    StringIndex* index = m_index_accessors[column_ndx];
+
+    // Insert ref to index
+    for (auto o : *this) {
+        Key key = o.get_key();
+        DataType type = get_column_type(column_ndx);
+
+        if (type == type_Int) {
+            if (is_nullable(column_ndx)) {
+                Optional<int64_t> value = o.get<Optional<int64_t>>(column_ndx);
+                index->insert(key, value); // Throws
+            }
+            else {
+                int64_t value = o.get<int64_t>(column_ndx);
+                index->insert(key, value); // Throws
+            }
+        }
+        else if (type == type_Bool) {
+            if (is_nullable(column_ndx)) {
+                Optional<bool> value = o.get<Optional<bool>>(column_ndx);
+                index->insert(key, value); // Throws
+            }
+            else {
+                bool value = o.get<bool>(column_ndx);
+                index->insert(key, value); // Throws
+            }
+        }
+        else if (type == type_String) {
+            StringData value = o.get<StringData>(column_ndx);
+            index->insert(key, value); // Throws
+        }
+        else {
+            REALM_ASSERT_RELEASE(false && "Data type does not support search index");
+        }
+    }
+}
 
 void Table::add_search_index(size_t column_ndx)
 {
     if (REALM_UNLIKELY(column_ndx >= get_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
 
+    ColumnAttrMask attr = m_spec->get_column_attr(column_ndx);
+
     // Early-out of already indexed
-    if (has_search_index(column_ndx))
+    if (attr.test(col_attr_Indexed))
         return;
 
-    ColumnAttrMask attr = m_spec->get_column_attr(column_ndx);
     if (!StringIndex::type_supported(get_column_type(column_ndx))) {
         // FIXME: This is what we used to throw, so keep throwing that for compatibility reasons, even though it
         // should probably be a type mismatch exception instead.
@@ -513,6 +552,16 @@ void Table::add_search_index(size_t column_ndx)
     // index have 0-entries.
     REALM_ASSERT(m_index_accessors.size() == get_column_count());
     REALM_ASSERT(m_index_accessors[column_ndx] == nullptr);
+
+    // Create the index
+    StringIndex* index = new StringIndex(ClusterColumn(&m_clusters, column_ndx), get_alloc()); // Throws
+    m_index_accessors[column_ndx] = index;
+
+    // Insert ref to index
+    index->set_parent(&m_index_refs, column_ndx);
+    m_index_refs.set(column_ndx, index->get_ref()); // Throws
+
+    populate_search_index(column_ndx);
 
     // Mark the column as having an index
     attr = m_spec->get_column_attr(column_ndx);
@@ -528,13 +577,18 @@ void Table::remove_search_index(size_t column_ndx)
     if (REALM_UNLIKELY(column_ndx >= get_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    // Early-out of non-indexed
-    if (!has_search_index(column_ndx))
-        return;
-
     ColumnAttrMask attr = m_spec->get_column_attr(column_ndx);
 
+    // Early-out of non-indexed
+    if (!attr.test(col_attr_Indexed))
+        return;
+
+
     // Destroy and remove the index column
+    StringIndex* index = m_index_accessors[column_ndx];
+    REALM_ASSERT(index != nullptr);
+    index->destroy();
+    delete index;
     m_index_accessors[column_ndx] = nullptr;
 
     m_index_refs.set(column_ndx, 0);
@@ -633,16 +687,18 @@ void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, 
 
 void Table::do_erase_root_column(size_t ndx)
 {
-    bool search_index = has_search_index(ndx);
     m_spec->erase_column(ndx); // Throws
 
     // If the column had a source index we have to remove and destroy that as well
-    if (search_index) {
-        ref_type index_ref = m_index_refs.get_as_ref(ndx);
+    ref_type index_ref = m_index_refs.get_as_ref(ndx);
+    if (index_ref) {
         Array::destroy_deep(index_ref, m_index_refs.get_alloc());
-        m_index_refs.erase(ndx);
-        m_index_accessors.erase(m_index_accessors.begin() + ndx);
     }
+    m_index_refs.erase(ndx);
+    StringIndex* index = m_index_accessors[ndx];
+    if (index)
+        delete index;
+    m_index_accessors.erase(m_index_accessors.begin() + ndx);
 
     m_clusters.remove_column(ndx);
 }
@@ -709,6 +765,10 @@ void Table::detach() noexcept
     m_next_key_value = -1; // trigger recomputation on next use
     m_spec->detach();
     m_top.detach();
+    for (auto& index : m_index_accessors) {
+        delete index;
+    }
+    m_index_accessors.clear();
 }
 
 
@@ -1771,9 +1831,47 @@ void Table::refresh_accessor_tree()
         // independent descriptor)
         m_top.init_from_parent();
         m_spec->init_from_parent();
-        if (m_top.size() > 2) {
+        if (m_top.size() > top_position_for_cluster_tree) {
             m_clusters.init_from_parent();
         }
+        if (m_top.size() > top_position_for_search_indexes) {
+            m_index_refs.init_from_parent();
+        }
+    }
+    refresh_index_accessors();
+}
+
+void Table::refresh_index_accessors()
+{
+    // Refresh search index accessors
+    size_t col_ndx_end = m_spec->get_public_column_count();
+
+    // Number of columns may have grown
+    if (col_ndx_end > m_index_accessors.size()) {
+        m_index_accessors.resize(col_ndx_end);
+    }
+
+    size_t col_ndx = 0;
+    for (StringIndex* search_index : m_index_accessors) {
+        bool has_search_index = (col_ndx < col_ndx_end) && m_spec->get_column_attr(col_ndx).test(col_attr_Indexed);
+
+        if (has_search_index) {
+            if (search_index) {
+                search_index->refresh_accessor_tree(col_ndx, *m_spec);
+            }
+            else {
+                ref_type ref = m_index_refs.get_as_ref(col_ndx);
+                ClusterColumn virtual_col(&m_clusters, col_ndx);
+                m_index_accessors[col_ndx] = new StringIndex(ref, &m_index_refs, col_ndx, virtual_col, get_alloc());
+            }
+        }
+        else {
+            if (search_index) {
+                delete search_index;
+                m_index_accessors[col_ndx] = nullptr;
+            }
+        }
+        col_ndx++;
     }
 }
 

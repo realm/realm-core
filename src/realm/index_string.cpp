@@ -25,10 +25,8 @@
 
 #include <realm/exceptions.hpp>
 #include <realm/index_string.hpp>
-#include <realm/column.hpp>
-#include <realm/column_string.hpp>
-#include <realm/column_string_enum.hpp>
-#include <realm/column_timestamp.hpp> // Timestamp
+#include <realm/table.hpp>
+#include <realm/timestamp.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -44,8 +42,59 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
 
 } // anonymous namespace
 
+DataType ClusterColumn::get_data_type() const
+{
+    const Table* table = m_cluster_tree->get_owner();
+    return table->get_column_type(m_column_ndx);
+}
+
+bool ClusterColumn::is_nullable() const
+{
+    const Spec& spec = m_cluster_tree->get_spec();
+    return spec.get_column_attr(m_column_ndx).test(col_attr_Nullable);
+}
+
+StringData ClusterColumn::get_index_data(Key key, StringConversionBuffer& buffer) const
+{
+    ConstObj obj = m_cluster_tree->get(key);
+    DataType type = get_data_type();
+
+    if (type == type_Int) {
+        if (is_nullable()) {
+            GetIndexData<Optional<int64_t>> stringifier;
+            return stringifier.get_index_data(obj.get<Optional<int64_t>>(m_column_ndx), buffer);
+        }
+        else {
+            GetIndexData<int64_t> stringifier;
+            return stringifier.get_index_data(obj.get<int64_t>(m_column_ndx), buffer);
+        }
+    }
+    else if (type == type_Bool) {
+        if (is_nullable()) {
+            GetIndexData<bool> stringifier;
+            return stringifier.get_index_data(obj.get<bool>(m_column_ndx), buffer);
+        }
+        else {
+            GetIndexData<Optional<bool>> stringifier;
+            return stringifier.get_index_data(obj.get<Optional<bool>>(m_column_ndx), buffer);
+        }
+    }
+    else if (type == type_String) {
+        GetIndexData<String> stringifier;
+        return stringifier.get_index_data(obj.get<String>(m_column_ndx), buffer);
+    }
+    else if (type == type_Timestamp) {
+        GetIndexData<Timestamp> stringifier;
+        return stringifier.get_index_data(obj.get<Timestamp>(m_column_ndx), buffer);
+    }
+    else {
+        // It should not be possible to reach this line through public Core API
+        REALM_ASSERT_RELEASE(false);
+    }
+}
+
 namespace realm {
-StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIndex::StringConversionBuffer& buffer)
+StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringConversionBuffer& buffer)
 {
     if (dt.is_null())
         return null{};
@@ -53,8 +102,7 @@ StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIn
     int64_t s = dt.get_seconds();
     int32_t ns = dt.get_nanoseconds();
     constexpr size_t index_size = sizeof(s) + sizeof(ns);
-    static_assert(index_size <= StringIndex::string_conversion_buffer_size,
-                  "Index string conversion buffer too small");
+    static_assert(index_size <= string_conversion_buffer_size, "Index string conversion buffer too small");
     const char* s_buf = reinterpret_cast<const char*>(&s);
     const char* ns_buf = reinterpret_cast<const char*>(&ns);
     realm::safe_copy_n(s_buf, sizeof(s), buffer.data());
@@ -63,67 +111,68 @@ StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIn
 }
 
 template <>
-size_t IndexArray::from_list<index_FindFirst>(StringData value, InternalFindResult& /* result_ref */,
-                                              const IntegerColumn& rows, ColumnBase* column) const
+int64_t IndexArray::from_list<index_FindFirst>(StringData value, InternalFindResult& /* result_ref */,
+                                               const IntegerColumn& key_values, const ClusterColumn& column) const
 {
-    SortedListComparator slc(*column);
+    SortedListComparator slc(column);
 
-    IntegerColumn::const_iterator it_end = rows.cend();
-    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    IntegerColumn::const_iterator it_end = key_values.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(key_values.cbegin(), it_end, value, slc);
     if (lower == it_end)
         return not_found;
 
-    const size_t first_row_ndx = to_size_t(*lower);
+    int64_t first_key_value = *lower;
 
     // The buffer is needed when for when this is an integer index.
-    StringIndex::StringConversionBuffer buffer;
-    StringData str = column->get_index_data(first_row_ndx, buffer);
+    StringConversionBuffer buffer;
+    StringData str = column.get_index_data(Key(first_key_value), buffer);
     if (str != value)
         return not_found;
 
-    return first_row_ndx;
+    return first_key_value;
 }
 
 template <>
-size_t IndexArray::from_list<index_Count>(StringData value, InternalFindResult& /* result_ref */,
-                                          const IntegerColumn& rows, ColumnBase* column) const
+int64_t IndexArray::from_list<index_Count>(StringData value, InternalFindResult& /* result_ref */,
+                                           const IntegerColumn& key_values, const ClusterColumn& column) const
 {
-    SortedListComparator slc(*column);
+    SortedListComparator slc(column);
 
-    IntegerColumn::const_iterator it_end = rows.cend();
-    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    IntegerColumn::const_iterator it_end = key_values.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(key_values.cbegin(), it_end, value, slc);
     if (lower == it_end)
         return 0;
 
-    const size_t first_row_ndx = to_size_t(*lower);
+    int64_t first_key_value = *lower;
 
     // The buffer is needed when for when this is an integer index.
-    StringIndex::StringConversionBuffer buffer;
-    StringData str = column->get_index_data(first_row_ndx, buffer);
+    StringConversionBuffer buffer;
+    StringData str = column.get_index_data(Key(first_key_value), buffer);
     if (str != value)
         return 0;
 
     IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value, slc);
-    size_t cnt = upper - lower;
+    int64_t cnt = upper - lower;
 
     return cnt;
 }
 
 template <>
-size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFindResult& result_ref,
-                                                   const IntegerColumn& rows, ColumnBase* column) const
+int64_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFindResult& result_ref,
+                                                    const IntegerColumn& key_values,
+                                                    const ClusterColumn& column) const
 {
-    SortedListComparator slc(*column);
-    IntegerColumn::const_iterator it_end = rows.cend();
-    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    SortedListComparator slc(column);
+    IntegerColumn::const_iterator it_end = key_values.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(key_values.cbegin(), it_end, value, slc);
     if (lower == it_end)
         return size_t(FindRes_not_found);
 
-    const size_t first_row_ndx = to_size_t(*lower);
+    Key first_key = Key(*lower);
 
     // The buffer is needed when for when this is an integer index.
-    StringIndex::StringConversionBuffer buffer;
-    StringData str = column->get_index_data(first_row_ndx, buffer);
+    StringConversionBuffer buffer;
+    StringData str = column.get_index_data(first_key, buffer);
     if (str != value)
         return size_t(FindRes_not_found);
 
@@ -137,10 +186,10 @@ size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFin
     }
 
     // Check string value at upper, if equal return matches in (lower, upper]
-    const size_t last_row_ndx = to_size_t(*upper);
-    str = column->get_index_data(last_row_ndx, buffer);
+    Key last_key = Key(*upper);
+    str = column.get_index_data(last_key, buffer);
     if (str == value) {
-        result_ref.payload = rows.get_ref();
+        result_ref.payload = key_values.get_ref();
         result_ref.start_ndx = lower.get_col_ndx();
         result_ref.end_ndx = upper.get_col_ndx() + 1; // one past last match
         return size_t(FindRes_column);
@@ -151,7 +200,7 @@ size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFin
     // checked the last item manually.
     upper = std::upper_bound(lower, upper, value, slc);
 
-    result_ref.payload = to_ref(rows.get_ref());
+    result_ref.payload = to_ref(key_values.get_ref());
     result_ref.start_ndx = lower.get_col_ndx();
     result_ref.end_ndx = upper.get_col_ndx();
     return size_t(FindRes_column);
@@ -159,7 +208,7 @@ size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFin
 
 
 template <IndexMethod method>
-size_t IndexArray::index_string(StringData value, InternalFindResult& result_ref, ColumnBase* column) const
+int64_t IndexArray::index_string(StringData value, InternalFindResult& result_ref, const ClusterColumn& column) const
 {
     // Return`realm::not_found`, or an index to the (any) match
     constexpr bool first(method == index_FindFirst);
@@ -172,7 +221,7 @@ size_t IndexArray::index_string(StringData value, InternalFindResult& result_ref
     // result_ref.result with the results in the bounds start_ndx, and end_ndx
     constexpr bool allnocopy(method == index_FindAll_nocopy);
 
-    constexpr size_t local_not_found = allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+    constexpr int64_t local_not_found = allnocopy ? int64_t(FindRes_not_found) : first ? null_key.value : 0;
 
     const char* data = m_data;
     const char* header;
@@ -218,14 +267,14 @@ size_t IndexArray::index_string(StringData value, InternalFindResult& result_ref
 
         // Literal row index (tagged)
         if (ref & 1) {
-            size_t row_ndx = size_t(uint64_t(ref) >> 1);
+            int64_t key_value = ref >> 1;
 
             // The buffer is needed when for when this is an integer index.
-            StringIndex::StringConversionBuffer buffer;
-            StringData str = column->get_index_data(row_ndx, buffer);
+            StringConversionBuffer buffer;
+            StringData str = column.get_index_data(Key(key_value), buffer);
             if (str == value) {
-                result_ref.payload = row_ndx;
-                return first ? row_ndx : get_count ? 1 : FindRes_single;
+                result_ref.payload = size_t(key_value);
+                return first ? key_value : get_count ? 1 : FindRes_single;
             }
             return local_not_found;
         }
@@ -254,24 +303,25 @@ size_t IndexArray::index_string(StringData value, InternalFindResult& result_ref
 }
 
 
-void IndexArray::from_list_all_ins(StringData upper_value, std::vector<size_t>& result, const IntegerColumn& rows,
-                                   ColumnBase* column) const
+void IndexArray::from_list_all_ins(StringData upper_value, std::vector<Key>& result, const IntegerColumn& rows,
+                                   const ClusterColumn& column) const
 {
     // The buffer is needed when for when this is an integer index.
-    StringIndex::StringConversionBuffer buffer;
+    StringConversionBuffer buffer;
 
     // optimization for the most common case, where all the strings under a given subindex are equal
-    StringData first_str = column->get_index_data(to_size_t(*rows.cbegin()), buffer);
-    StringData last_str = column->get_index_data(to_size_t(*(rows.cend() - 1)), buffer);
+    StringData first_str = column.get_index_data(Key(*rows.cbegin()), buffer);
+    StringData last_str = column.get_index_data(Key(*(rows.cend() - 1)), buffer);
     if (first_str == last_str) {
         auto first_str_upper = case_map(first_str, true);
         if (first_str_upper != upper_value) {
             return;
         }
 
+        size_t sz = result.size() + rows.size();
+        result.reserve(sz);
         for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
-            const size_t row_ndx = to_size_t(*it);
-            result.push_back(row_ndx);
+            result.push_back(Key(*it));
         }
         return;
     }
@@ -279,11 +329,11 @@ void IndexArray::from_list_all_ins(StringData upper_value, std::vector<size_t>& 
     // special case for very long strings, where they might have a common prefix and end up in the
     // same subindex column, but still not be identical
     for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
-        const size_t row_ndx = to_size_t(*it);
-        StringData str = column->get_index_data(row_ndx, buffer);
+        Key key = Key(*it);
+        StringData str = column.get_index_data(key, buffer);
         auto upper_str = case_map(str, true);
         if (upper_str == upper_value) {
-            result.push_back(row_ndx);
+            result.push_back(key);
         }
     }
 
@@ -291,30 +341,31 @@ void IndexArray::from_list_all_ins(StringData upper_value, std::vector<size_t>& 
 }
 
 
-void IndexArray::from_list_all(StringData value, IntegerColumn& result, const IntegerColumn& rows,
-                               ColumnBase* column) const
+void IndexArray::from_list_all(StringData value, std::vector<Key>& result, const IntegerColumn& rows,
+                               const ClusterColumn& column) const
 {
-    SortedListComparator slc(*column);
+    SortedListComparator slc(column);
 
     IntegerColumn::const_iterator it_end = rows.cend();
     IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
     if (lower == it_end)
         return;
 
-    const size_t first_row_ndx = to_size_t(*lower);
+    Key key = Key(*lower);
 
     // The buffer is needed when for when this is an integer index.
-    StringIndex::StringConversionBuffer buffer;
-    StringData str = column->get_index_data(first_row_ndx, buffer);
+    StringConversionBuffer buffer;
+    StringData str = column.get_index_data(key, buffer);
     if (str != value)
         return;
 
     IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value, slc);
 
     // Copy all matches into result column
+    size_t sz = result.size() + (upper - lower);
+    result.reserve(sz);
     for (IntegerColumn::const_iterator it = lower; it != upper; ++it) {
-        const size_t cur_row_ndx = to_size_t(*it);
-        result.add(cur_row_ndx);
+        result.push_back(Key(*it));
     }
 
     return;
@@ -418,7 +469,7 @@ private:
 } // namespace
 
 
-void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, ColumnBase* column) const
+void IndexArray::index_string_all_ins(StringData value, std::vector<Key>& result, const ClusterColumn& column) const
 {
     if (value.is_null()) {
         // we can't use case_map on null strings because it currently returns an
@@ -429,7 +480,6 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
     const util::Optional<std::string> upper_value = case_map(value, true);
     const util::Optional<std::string> lower_value = case_map(value, false);
     SearchList search_list(upper_value, lower_value);
-    std::vector<size_t> tmp_result;
 
     const char* top_header = get_header_from_data(m_data);
     search_list.add_all_for_level(top_header, 0);
@@ -475,14 +525,14 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
 
         // Literal row index (tagged)
         if (ref & 1) {
-            const size_t row_ndx = size_t(uint64_t(ref) >> 1);
+            Key k = Key(ref >> 1);
 
             // The buffer is needed when for when this is an integer index.
-            StringIndex::StringConversionBuffer buffer;
-            const StringData str = column->get_index_data(row_ndx, buffer);
+            StringConversionBuffer buffer;
+            const StringData str = column.get_index_data(k, buffer);
             const util::Optional<std::string> upper_str = case_map(str, true);
             if (upper_str == upper_value) {
-                tmp_result.push_back(row_ndx);
+                result.push_back(k);
             }
             continue;
         }
@@ -493,7 +543,7 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
         // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
             const IntegerColumn sub(m_alloc, to_ref(ref));
-            from_list_all_ins(upper_value, tmp_result, sub, column);
+            from_list_all_ins(upper_value, result, sub, column);
             continue;
         }
 
@@ -501,15 +551,12 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
         search_list.add_all_for_level(sub_header, string_offset + 4);
     }
 
-    // sort the result and return as IntegerColumn
-    std::sort(tmp_result.begin(), tmp_result.end());
-    for (size_t row_ndx : tmp_result) {
-        result.add(row_ndx);
-    }
+    // sort the result and return a std::vector
+    std::sort(result.begin(), result.end());
 }
 
 
-void IndexArray::index_string_all(StringData value, IntegerColumn& result, ColumnBase* column) const
+void IndexArray::index_string_all(StringData value, std::vector<Key>& result, const ClusterColumn& column) const
 {
     const char* data = m_data;
     const char* header;
@@ -555,13 +602,13 @@ void IndexArray::index_string_all(StringData value, IntegerColumn& result, Colum
 
         // Literal row index (tagged)
         if (ref & 1) {
-            size_t row_ndx = size_t(uint64_t(ref) >> 1);
+            Key k = Key(ref >> 1);
 
             // The buffer is needed when for when this is an integer index.
-            StringIndex::StringConversionBuffer buffer;
-            StringData str = column->get_index_data(row_ndx, buffer);
+            StringConversionBuffer buffer;
+            StringData str = column.get_index_data(k, buffer);
             if (str == value) {
-                result.add(row_ndx);
+                result.push_back(k);
                 return;
             }
             return;
@@ -593,14 +640,15 @@ void IndexArray::index_string_all(StringData value, IntegerColumn& result, Colum
 
 } // namespace realm
 
-size_t IndexArray::index_string_find_first(StringData value, ColumnBase* column) const
+Key IndexArray::index_string_find_first(StringData value, const ClusterColumn& column) const
 {
     InternalFindResult unused;
-    return index_string<index_FindFirst>(value, unused, column);
+    return Key(index_string<index_FindFirst>(value, unused, column));
 }
 
 
-void IndexArray::index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column, bool case_insensitive) const
+void IndexArray::index_string_find_all(std::vector<Key>& result, StringData value, const ClusterColumn& column,
+                                       bool case_insensitive) const
 {
     if (case_insensitive) {
         index_string_all_ins(value, result, column);
@@ -609,16 +657,16 @@ void IndexArray::index_string_find_all(IntegerColumn& result, StringData value, 
     }
 }
 
-FindRes IndexArray::index_string_find_all_no_copy(StringData value, ColumnBase* column,
+FindRes IndexArray::index_string_find_all_no_copy(StringData value, const ClusterColumn& column,
                                                   InternalFindResult& result) const
 {
     return static_cast<FindRes>(index_string<index_FindAll_nocopy>(value, result, column));
 }
 
-size_t IndexArray::index_string_count(StringData value, ColumnBase* column) const
+size_t IndexArray::index_string_count(StringData value, const ClusterColumn& column) const
 {
     InternalFindResult unused;
-    return index_string<index_Count>(value, unused, column);
+    return to_size_t(index_string<index_Count>(value, unused, column));
 }
 
 IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
@@ -642,12 +690,11 @@ IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 
 ref_type StringIndex::create_empty(Allocator& alloc)
 {
-    return StringIndex(nullptr, alloc).get_ref(); // Throws
+    return StringIndex(ClusterColumn(nullptr, 0), alloc).get_ref(); // Throws
 }
 
-void StringIndex::set_target(ColumnBase* target_column) noexcept
+void StringIndex::set_target(const ClusterColumn& target_column) noexcept
 {
-    REALM_ASSERT(target_column);
     m_target_column = target_column;
 }
 
@@ -660,17 +707,17 @@ StringIndex::key_type StringIndex::get_last_key() const
 }
 
 
-void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t offset)
+void StringIndex::insert_with_offset(Key obj_key, StringData value, size_t offset)
 {
     // Create 4 byte index key
     key_type key = create_key(value, offset);
-    TreeInsert(row_ndx, key, offset, value); // Throws
+    TreeInsert(obj_key, key, offset, value); // Throws
 }
 
-void StringIndex::insert_to_existing_list_at_lower(size_t row, StringData value, IntegerColumn& list,
+void StringIndex::insert_to_existing_list_at_lower(Key key, StringData value, IntegerColumn& list,
                                                    const IntegerColumnIterator& lower)
 {
-    SortedListComparator slc(*m_target_column);
+    SortedListComparator slc(m_target_column);
     // At this point there exists duplicates of this value, we need to
     // insert value beside it's duplicates so that rows are also sorted
     // in ascending order.
@@ -679,39 +726,39 @@ void StringIndex::insert_to_existing_list_at_lower(size_t row, StringData value,
     // In most cases the refs will be added to the end. So we test for that
     // first to see if we can avoid the binary search for insert position
     IntegerColumn::const_iterator last = upper - ptrdiff_t(1);
-    size_t last_ref_of_value = to_size_t(*last);
-    if (row >= last_ref_of_value) {
-        list.insert(upper.get_col_ndx(), row);
+    int64_t last_key_value = *last;
+    if (key.value >= last_key_value) {
+        list.insert(upper.get_col_ndx(), key.value);
     }
     else {
-        IntegerColumn::const_iterator inner_lower = std::lower_bound(lower, upper, int64_t(row));
-        list.insert(inner_lower.get_col_ndx(), row);
+        IntegerColumn::const_iterator inner_lower = std::lower_bound(lower, upper, key.value);
+        list.insert(inner_lower.get_col_ndx(), key.value);
     }
 }
 
-void StringIndex::insert_to_existing_list(size_t row, StringData value, IntegerColumn& list)
+void StringIndex::insert_to_existing_list(Key key, StringData value, IntegerColumn& list)
 {
-    SortedListComparator slc(*m_target_column);
+    SortedListComparator slc(m_target_column);
     IntegerColumn::const_iterator it_end = list.cend();
     IntegerColumn::const_iterator lower = std::lower_bound(list.cbegin(), it_end, value, slc);
 
     if (lower == it_end) {
         // Not found and everything is less, just append it to the end.
-        list.add(row);
+        list.add(key.value);
     }
     else {
-        size_t lower_row = to_size_t(*lower);
+        Key lower_key = Key(*lower);
         StringConversionBuffer buffer; // Used when this is an IntegerIndex
-        StringData lower_value = get(lower_row, buffer);
+        StringData lower_value = get(lower_key, buffer);
 
         if (lower_value != value) {
-            list.insert(lower.get_col_ndx(), row);
+            list.insert(lower.get_col_ndx(), key.value);
         }
         else {
             // At this point there exists duplicates of this value, we need to
             // insert value beside it's duplicates so that rows are also sorted
             // in ascending order.
-            insert_to_existing_list_at_lower(row, value, list, lower);
+            insert_to_existing_list_at_lower(key, value, list, lower);
         }
     }
 }
@@ -751,9 +798,9 @@ void StringIndex::insert_row_list(size_t ref, size_t offset, StringData value)
 }
 
 
-void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, StringData value)
+void StringIndex::TreeInsert(Key obj_key, key_type key, size_t offset, StringData value)
 {
-    NodeChange nc = do_insert(row_ndx, key, offset, value);
+    NodeChange nc = do_insert(obj_key, key, offset, value);
     switch (nc.type) {
         case NodeChange::none:
             return;
@@ -786,7 +833,7 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
 }
 
 
-StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, size_t offset, StringData value)
+StringIndex::NodeChange StringIndex::do_insert(Key obj_key, key_type key, size_t offset, StringData value)
 {
     Allocator& alloc = m_array->get_alloc();
     if (m_array->is_inner_bptree_node()) {
@@ -808,7 +855,7 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
         StringIndex target(ref, m_array.get(), refs_ndx, m_target_column, alloc);
 
         // Insert item
-        NodeChange nc = target.do_insert(row_ndx, key, offset, value);
+        NodeChange nc = target.do_insert(obj_key, key, offset, value);
         if (nc.type == NodeChange::none) {
             // update keys
             key_type last_key = target.get_last_key();
@@ -877,13 +924,13 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
 
         // See if we can fit entry into current leaf
         // Works if there is room or it can join existing entries
-        if (leaf_insert(row_ndx, key, offset, value, noextend))
+        if (leaf_insert(obj_key, key, offset, value, noextend))
             return NodeChange::none;
 
         // Create new list for item (a leaf)
         StringIndex new_list(m_target_column, alloc);
 
-        new_list.leaf_insert(row_ndx, key, offset, value);
+        new_list.leaf_insert(obj_key, key, offset, value);
 
         size_t ndx = old_keys.lower_bound_int(key);
 
@@ -965,7 +1012,7 @@ void StringIndex::node_insert(size_t ndx, size_t ref)
 }
 
 
-bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, StringData value, bool noextend)
+bool StringIndex::leaf_insert(Key obj_key, key_type key, size_t offset, StringData value, bool noextend)
 {
     REALM_ASSERT(!m_array->is_inner_bptree_node());
 
@@ -982,7 +1029,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
 
         // When key is outside current range, we can just add it
         keys.add(key);
-        int64_t shifted = int64_t((uint64_t(row_ndx) << 1) + 1); // shift to indicate literal
+        int64_t shifted = int64_t((uint64_t(obj_key.value) << 1) + 1); // shift to indicate literal
         m_array->add(shifted);
         return true;
     }
@@ -996,7 +1043,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
             return false;
 
         keys.insert(ins_pos, key);
-        int64_t shifted = int64_t((uint64_t(row_ndx) << 1) + 1); // shift to indicate literal
+        int64_t shifted = int64_t((uint64_t(obj_key.value) << 1) + 1); // shift to indicate literal
         m_array->insert(ins_pos_refs, shifted);
         return true;
     }
@@ -1008,10 +1055,10 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
 
     // Single match (lowest bit set indicates literal row_ndx)
     if ((slot_value & 1) != 0) {
-        size_t row_ndx2 = to_size_t(slot_value >> 1);
+        Key obj_key2 = Key(slot_value >> 1);
         // The buffer is needed for when this is an integer index.
         StringConversionBuffer buffer;
-        StringData v2 = get(row_ndx2, buffer);
+        StringData v2 = get(obj_key2, buffer);
         if (v2 == value) {
             // Strings are equal but this is not a list.
             // Create a list and add both rows.
@@ -1019,8 +1066,8 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
             // convert to list (in sorted order)
             Array row_list(alloc);
             row_list.create(Array::type_Normal); // Throws
-            row_list.add(row_ndx < row_ndx2 ? row_ndx : row_ndx2);
-            row_list.add(row_ndx < row_ndx2 ? row_ndx2 : row_ndx);
+            row_list.add(obj_key < obj_key2 ? obj_key.value : obj_key2.value);
+            row_list.add(obj_key < obj_key2 ? obj_key2.value : obj_key.value);
             m_array->set(ins_pos_refs, row_list.get_ref());
         }
         else {
@@ -1030,8 +1077,8 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
                 bool row_ndx_first = value < v2;
                 Array row_list(alloc);
                 row_list.create(Array::type_Normal); // Throws
-                row_list.add(row_ndx_first ? row_ndx : row_ndx2);
-                row_list.add(row_ndx_first ? row_ndx2 : row_ndx);
+                row_list.add(row_ndx_first ? obj_key.value : obj_key2.value);
+                row_list.add(row_ndx_first ? obj_key2.value : obj_key.value);
                 m_array->set(ins_pos_refs, row_list.get_ref());
             }
             else {
@@ -1039,8 +1086,8 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
                 // are actually not equal. Extend the tree recursivly until the
                 // prefix of these strings is different.
                 StringIndex subindex(m_target_column, m_array->get_alloc());
-                subindex.insert_with_offset(row_ndx2, v2, suboffset);
-                subindex.insert_with_offset(row_ndx, value, suboffset);
+                subindex.insert_with_offset(obj_key2, v2, suboffset);
+                subindex.insert_with_offset(obj_key, value, suboffset);
                 // Join the string of SubIndices to the current position of m_array
                 m_array->set(ins_pos_refs, subindex.get_ref());
             }
@@ -1056,14 +1103,14 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
         IntegerColumn sub(alloc, ref); // Throws
         sub.set_parent(m_array.get(), ins_pos_refs);
 
-        SortedListComparator slc(*m_target_column);
+        SortedListComparator slc(m_target_column);
         IntegerColumn::const_iterator it_end = sub.cend();
         IntegerColumn::const_iterator lower = std::lower_bound(sub.cbegin(), it_end, value, slc);
 
         bool value_exists_in_list = false;
         if (lower != it_end) {
             StringConversionBuffer buffer;
-            StringData lower_value = get(to_size_t(*lower), buffer);
+            StringData lower_value = get(Key(*lower), buffer);
             if (lower_value == value) {
                 value_exists_in_list = true;
             }
@@ -1071,21 +1118,21 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
 
         // If we found the value in this list, add the duplicate to the list.
         if (value_exists_in_list) {
-            insert_to_existing_list_at_lower(row_ndx, value, sub, lower);
+            insert_to_existing_list_at_lower(obj_key, value, sub, lower);
         }
         else {
             if (suboffset > s_max_offset) {
-                insert_to_existing_list(row_ndx, value, sub);
+                insert_to_existing_list(obj_key, value, sub);
             }
             else {
 #ifdef REALM_DEBUG
                 bool contains_only_duplicates = true;
                 if (sub.size() > 1) {
-                    size_t first_ref = to_size_t(sub.get(0));
-                    size_t last_ref = to_size_t(sub.back());
-                    StringIndex::StringConversionBuffer first_buffer, last_buffer;
-                    StringData first_str = get(first_ref, first_buffer);
-                    StringData last_str = get(last_ref, last_buffer);
+                    Key first_key = Key(sub.get(0));
+                    Key last_key = Key(sub.back());
+                    StringConversionBuffer first_buffer, last_buffer;
+                    StringData first_str = get(first_key, first_buffer);
+                    StringData last_str = get(last_key, last_buffer);
                     // Since the list is kept in sorted order, the first and
                     // last values will be the same only if the whole list is
                     // storing duplicate values.
@@ -1100,13 +1147,13 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
                 // leafs, but if the list doesn't only contain duplicates we
                 // must respect that we store a common key prefix up to this
                 // point and insert into the existing list.
-                size_t row_of_any_dup = to_size_t(sub.get(0));
+                Key key_of_any_dup = Key(sub.get(0));
                 // The buffer is needed for when this is an integer index.
                 StringConversionBuffer buffer;
-                StringData v2 = get(row_of_any_dup, buffer);
+                StringData v2 = get(key_of_any_dup, buffer);
                 StringIndex subindex(m_target_column, m_array->get_alloc());
                 subindex.insert_row_list(sub.get_ref(), suboffset, v2);
-                subindex.insert_with_offset(row_ndx, value, suboffset);
+                subindex.insert_with_offset(obj_key, value, suboffset);
                 m_array->set(ins_pos_refs, subindex.get_ref());
             }
         }
@@ -1115,7 +1162,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
 
     // The key matches, but there is a subindex here so go down a level in the tree.
     StringIndex subindex(ref, m_array.get(), ins_pos_refs, m_target_column, alloc);
-    subindex.insert_with_offset(row_ndx, value, suboffset);
+    subindex.insert_with_offset(obj_key, value, suboffset);
 
     return true;
 }
@@ -1160,11 +1207,11 @@ void StringIndex::distinct(IntegerColumn& result) const
                         // Add all unique values from this sorted list
                         IntegerColumn::const_iterator it = sub.cbegin();
                         IntegerColumn::const_iterator it_end = sub.cend();
-                        SortedListComparator slc(*m_target_column);
+                        SortedListComparator slc(m_target_column);
                         StringConversionBuffer buffer;
                         while (it != it_end) {
                             result.add(to_size_t(*it));
-                            StringData it_data = get(to_size_t(*it), buffer);
+                            StringData it_data = get(Key(*it), buffer);
                             it = std::upper_bound(it, it_end, it_data, slc);
                         }
                     }
@@ -1174,54 +1221,10 @@ void StringIndex::distinct(IntegerColumn& result) const
     }
 }
 
-StringData StringIndex::get(size_t ndx, StringConversionBuffer& buffer) const
+StringData StringIndex::get(Key key, StringConversionBuffer& buffer) const
 {
-    return m_target_column->get_index_data(ndx, buffer);
+    return m_target_column.get_index_data(key, buffer);
 }
-
-void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
-{
-    REALM_ASSERT(diff == 1 || diff == -1); // only used by insert and delete
-
-    Allocator& alloc = m_array->get_alloc();
-    const size_t array_size = m_array->size();
-
-    if (m_array->is_inner_bptree_node()) {
-        for (size_t i = 1; i < array_size; ++i) {
-            size_t ref = m_array->get_as_ref(i);
-            StringIndex ndx(ref, m_array.get(), i, m_target_column, alloc);
-            ndx.adjust_row_indexes(min_row_ndx, diff);
-        }
-    }
-    else {
-        for (size_t i = 1; i < array_size; ++i) {
-            int64_t ref = m_array->get(i);
-
-            // low bit set indicate literal ref (shifted)
-            if (ref & 1) {
-                size_t r = size_t(uint64_t(ref) >> 1);
-                if (r >= min_row_ndx) {
-                    size_t adjusted_ref = ((r + diff) << 1) + 1;
-                    m_array->set(i, adjusted_ref);
-                }
-            }
-            else {
-                // A real ref either points to a list or a subindex
-                char* header = alloc.translate(to_ref(ref));
-                if (Array::get_context_flag_from_header(header)) {
-                    StringIndex ndx(to_ref(ref), m_array.get(), i, m_target_column, alloc);
-                    ndx.adjust_row_indexes(min_row_ndx, diff);
-                }
-                else {
-                    IntegerColumn sub(alloc, to_ref(ref)); // Throws
-                    sub.set_parent(m_array.get(), i);
-                    sub.adjust_ge(min_row_ndx, diff);
-                }
-            }
-        }
-    }
-}
-
 
 void StringIndex::clear()
 {
@@ -1239,7 +1242,7 @@ void StringIndex::clear()
 }
 
 
-void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
+void StringIndex::do_delete(Key obj_key, StringData value, size_t offset)
 {
     Allocator& alloc = m_array->get_alloc();
     Array values(alloc);
@@ -1256,7 +1259,7 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
     if (m_array->is_inner_bptree_node()) {
         ref_type ref = m_array->get_as_ref(pos_refs);
         StringIndex node(ref, m_array.get(), pos_refs, m_target_column, alloc);
-        node.do_delete(row_ndx, value, offset);
+        node.do_delete(obj_key, value, offset);
 
         // Update the ref
         if (node.is_empty()) {
@@ -1273,7 +1276,7 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
     else {
         int64_t ref = m_array->get(pos_refs);
         if (ref & 1) {
-            REALM_ASSERT((uint64_t(ref) >> 1) == uint64_t(row_ndx));
+            REALM_ASSERT((ref >> 1) == obj_key.value);
             values.erase(pos);
             m_array->erase(pos_refs);
         }
@@ -1282,7 +1285,7 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
             char* header = alloc.translate(to_ref(ref));
             if (Array::get_context_flag_from_header(header)) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column, alloc);
-                subindex.do_delete(row_ndx, value, offset + s_index_key_length);
+                subindex.do_delete(obj_key, value, offset + s_index_key_length);
 
                 if (subindex.is_empty()) {
                     values.erase(pos);
@@ -1293,7 +1296,7 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
             else {
                 IntegerColumn sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(m_array.get(), pos_refs);
-                size_t r = sub.find_first(row_ndx);
+                size_t r = sub.find_first(obj_key.value);
                 size_t sub_size = sub.size(); // Slow
                 REALM_ASSERT_EX(r != sub_size, r, sub_size);
                 bool is_last = r == sub_size - 1;
@@ -1310,59 +1313,9 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
 }
 
 
-void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row_ndx, size_t offset)
-{
-    Allocator& alloc = m_array->get_alloc();
-    Array values(alloc);
-    get_child(*m_array, 0, values);
-    REALM_ASSERT(m_array->size() == values.size() + 1);
-
-    // Create 4 byte index key
-    key_type key = create_key(value, offset);
-
-    size_t pos = values.lower_bound_int(key);
-    size_t pos_refs = pos + 1; // first entry in refs points to offsets
-    REALM_ASSERT(pos != values.size());
-
-    if (m_array->is_inner_bptree_node()) {
-        ref_type ref = m_array->get_as_ref(pos_refs);
-        StringIndex node(ref, m_array.get(), pos_refs, m_target_column, alloc);
-        node.do_update_ref(value, row_ndx, new_row_ndx, offset);
-    }
-    else {
-        int64_t ref = m_array->get(pos_refs);
-        if (ref & 1) {
-            REALM_ASSERT((uint64_t(ref) >> 1) == uint64_t(row_ndx));
-            size_t shifted = (new_row_ndx << 1) + 1; // shift to indicate literal
-            m_array->set(pos_refs, shifted);
-        }
-        else {
-            // A real ref either points to a list or a subindex
-            char* header = alloc.translate(to_ref(ref));
-            if (Array::get_context_flag_from_header(header)) {
-                StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column, alloc);
-                subindex.do_update_ref(value, row_ndx, new_row_ndx, offset + s_index_key_length);
-            }
-            else {
-                IntegerColumn sub(alloc, to_ref(ref)); // Throws
-                sub.set_parent(m_array.get(), pos_refs);
-
-                size_t old_pos = sub.find_first(row_ndx);
-                size_t sub_size = sub.size();
-                REALM_ASSERT_EX(old_pos != sub_size, old_pos, sub_size);
-
-                bool is_last = (old_pos == sub_size - 1);
-                sub.erase_without_updating_index(old_pos, is_last);
-                insert_to_existing_list(new_row_ndx, value, sub);
-            }
-        }
-    }
-}
-
-
 namespace {
 
-bool has_duplicate_values(const Array& node, ColumnBase* target_col) noexcept
+bool has_duplicate_values(const Array& node, const ClusterColumn& target_col) noexcept
 {
     Allocator& alloc = node.get_alloc();
     BpTreeNode child(alloc);
@@ -1400,11 +1353,11 @@ bool has_duplicate_values(const Array& node, ColumnBase* target_col) noexcept
         size_t num_rows = child.is_inner_bptree_node() ? child.get_bptree_size() : child.size();
         if (num_rows > 1) {
             IntegerColumn sub(alloc, ref); // Throws
-            size_t first_row = to_size_t(sub.get(0));
-            size_t last_row = to_size_t(sub.back());
-            StringIndex::StringConversionBuffer first_buffer, last_buffer;
-            StringData first_str = target_col->get_index_data(first_row, first_buffer);
-            StringData last_str = target_col->get_index_data(last_row, last_buffer);
+            Key first_key = Key(sub.get(0));
+            Key last_key = Key(sub.back());
+            StringConversionBuffer first_buffer, last_buffer;
+            StringData first_str = target_col.get_index_data(first_key, first_buffer);
+            StringData last_str = target_col.get_index_data(last_key, last_buffer);
             // Since the list is kept in sorted order, the first and
             // last values will be the same only if the whole list is
             // storing duplicate values.
@@ -1415,10 +1368,10 @@ bool has_duplicate_values(const Array& node, ColumnBase* target_col) noexcept
             // check each of these individually for duplicates.
             IntegerColumn::const_iterator it = sub.cbegin();
             IntegerColumn::const_iterator it_end = sub.cend();
-            SortedListComparator slc(*target_col);
-            StringIndex::StringConversionBuffer buffer;
+            SortedListComparator slc(target_col);
+            StringConversionBuffer buffer;
             while (it != it_end) {
-                StringData it_data = target_col->get_index_data(to_size_t(*it), buffer);
+                StringData it_data = target_col.get_index_data(Key(*it), buffer);
                 IntegerColumn::const_iterator next = std::upper_bound(it, it_end, it_data, slc);
                 size_t count_of_value = next - it; // row index subtraction in `sub`
                 if (count_of_value > 1) {
@@ -1469,18 +1422,12 @@ void StringIndex::node_add_key(ref_type ref)
     m_array->add(ref);
 }
 
-SortedListComparator::SortedListComparator(ColumnBase& column_values)
-    : values(column_values)
-{
-}
-
-
-// Must return true iff value of ndx is less than needle.
-bool SortedListComparator::operator()(int64_t ndx, StringData needle) // used in lower_bound
+// Must return true if value of object(key) is less than needle.
+bool SortedListComparator::operator()(int64_t key_value, StringData needle) // used in lower_bound
 {
     // The buffer is needed when for when this is an integer index.
-    StringIndex::StringConversionBuffer buffer;
-    StringData a = values.get_index_data(to_size_t(ndx), buffer);
+    StringConversionBuffer buffer;
+    StringData a = m_column.get_index_data(Key(key_value), buffer);
     if (a.is_null() && !needle.is_null())
         return true;
     else if (needle.is_null() && !a.is_null())
@@ -1499,15 +1446,15 @@ bool SortedListComparator::operator()(int64_t ndx, StringData needle) // used in
 }
 
 
-// Must return true iff value of needle is less than value at ndx.
-bool SortedListComparator::operator()(StringData needle, int64_t ndx) // used in upper_bound
+// Must return true if value of needle is less than value of object(key).
+bool SortedListComparator::operator()(StringData needle, int64_t key_value) // used in upper_bound
 {
-    StringIndex::StringConversionBuffer buffer;
-    StringData a = values.get_index_data(to_size_t(ndx), buffer);
+    StringConversionBuffer buffer;
+    StringData a = m_column.get_index_data(Key(key_value), buffer);
     if (needle == a) {
         return false;
     }
-    return !(*this)(ndx, needle);
+    return !(*this)(key_value, needle);
 }
 
 // LCOV_EXCL_START ignore debug functions
@@ -1530,7 +1477,7 @@ void StringIndex::verify() const
         }
     }
     else {
-        size_t column_size = m_target_column->size();
+        size_t column_size = m_target_column.size();
         for (size_t i = 1; i < array_size; ++i) {
             int64_t ref = m_array->get(i);
 
@@ -1550,23 +1497,23 @@ void StringIndex::verify() const
                     IntegerColumn sub(alloc, to_ref(ref)); // Throws
                     IntegerColumn::const_iterator it = sub.cbegin();
                     IntegerColumn::const_iterator it_end = sub.cend();
-                    SortedListComparator slc(*m_target_column);
+                    SortedListComparator slc(m_target_column);
                     StringConversionBuffer buffer, buffer_prev;
-                    StringData previous_string = get(to_size_t(*it), buffer_prev);
+                    StringData previous_string = get(Key(*it), buffer_prev);
                     size_t last_row = to_size_t(*it);
 
                     // Check that strings listed in sub are in sorted order
                     // and if there are duplicates, that the row numbers are
                     // sorted in the group of duplicates.
                     while (it != it_end) {
-                        StringData it_data = get(to_size_t(*it), buffer);
+                        StringData it_data = get(Key(*it), buffer);
                         size_t it_row = to_size_t(*it);
                         REALM_ASSERT_EX(previous_string <= it_data, previous_string.data(), it_data.data());
                         if (it != sub.cbegin() && previous_string == it_data) {
                             REALM_ASSERT_EX(it_row > last_row, it_row, last_row);
                         }
                         last_row = it_row;
-                        previous_string = get(to_size_t(*it), buffer_prev);
+                        previous_string = get(Key(*it), buffer_prev);
                         ++it;
                     }
                 }
@@ -1579,30 +1526,27 @@ void StringIndex::verify() const
 
 #ifdef REALM_DEBUG
 
-template <typename T>
-void StringIndex::verify_entries(const T& column) const
+template <class T>
+void StringIndex::verify_entries(const ClusterColumn& column) const
 {
-    Allocator& alloc = Allocator::get_default();
-    ref_type results_ref = IntegerColumn::create(alloc); // Throws
-    IntegerColumn results(alloc, results_ref);           // Throws
+    std::vector<Key> results;
 
-    const size_t column_size = column.size();
-    for (size_t i = 0; i < column_size; ++i) {
-        StringData value = column.get(i);
+    auto it = column.begin();
+    auto end = column.end();
+    auto col_ndx = column.get_column_ndx();
+    while (it != end) {
+        Key key = it->get_key();
+        T value = it->get<T>(col_ndx);
 
         find_all(results, value);
 
-        size_t ndx = results.find_first(i);
-        REALM_ASSERT(ndx != not_found);
+        auto ndx = find(results.begin(), results.end(), key);
+        REALM_ASSERT(ndx != results.end());
         size_t found = count(value);
         REALM_ASSERT_EX(found >= 1, found);
         results.clear();
     }
-    results.destroy(); // clean-up
 }
-
-template void StringIndex::verify_entries(const StringColumn&) const;
-template void StringIndex::verify_entries(const StringEnumColumn&) const;
 
 void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int level)
 {

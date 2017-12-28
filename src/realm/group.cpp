@@ -708,6 +708,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
         table = tf::create_accessor(m_alloc, ref, this, table_ndx); // Throws
     }
     m_table_accessors[table_ndx] = table;
+    tf::complete_accessor(*table);
     return table;
 }
 

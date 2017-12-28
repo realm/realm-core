@@ -706,6 +706,7 @@ private:
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
 
+    void populate_search_index(size_t column_ndx);
     void rebuild_search_index(size_t current_file_format_version);
 
     /// Disable copying assignment.
@@ -945,11 +946,7 @@ private:
     /// Refresh the part of the accessor tree that is rooted at this
     /// table.
     void refresh_accessor_tree();
-
-    void refresh_column_accessors(size_t = 0)
-    {
-        REALM_ASSERT(false); // unimplemented
-    }
+    void refresh_index_accessors();
 
     // Look for link columns starting from col_ndx_begin.
     // If a link column is found, follow the link and update it's
@@ -1348,7 +1345,7 @@ public:
     // Intended to be used only by Group::create_table_accessor()
     static void complete_accessor(Table& table)
     {
-        table.refresh_column_accessors(); // Throws
+        table.refresh_index_accessors(); // Throws
     }
 
     static void set_top_parent(Table& table, ArrayParent* parent, size_t ndx_in_parent) noexcept
