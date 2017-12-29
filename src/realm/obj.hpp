@@ -245,6 +245,12 @@ inline Obj& Obj::set(size_t col_ndx, const char* str, bool is_default)
     return set(col_ndx, StringData(str), is_default);
 }
 
+template <>
+inline Obj& Obj::set(size_t col_ndx, char* str, bool is_default)
+{
+    return set(col_ndx, StringData(str), is_default);
+}
+
 template <typename U>
 Obj& Obj::set_list_values(size_t col_ndx, const std::vector<U>& values)
 {

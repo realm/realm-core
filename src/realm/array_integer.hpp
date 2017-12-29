@@ -97,9 +97,9 @@ public:
     explicit ArrayIntNull(Allocator&) noexcept;
     ~ArrayIntNull() noexcept override;
 
-    static value_type default_value(bool)
+    static value_type default_value(bool nullable)
     {
-        return util::none;
+        return nullable ? util::none : util::Optional<int64_t>(0);
     }
 
     /// Construct an array of the specified type and size, and return just the

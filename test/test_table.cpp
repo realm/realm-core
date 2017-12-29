@@ -8332,7 +8332,7 @@ TEST(Table_4)
 }
 
 // Very basic sanity check of search index when you add, remove and set objects
-TEST(Table_search_index_basics)
+TEST(Table_SearchIndexFindFirst)
 {
     Table table;
 
@@ -8479,4 +8479,27 @@ TEST(Table_search_index_basics)
     table.remove_search_index(c4);
 }
 
+TEST(Table_SearchIndexFindAll)
+{
+    Table table;
+    auto col_int = table.add_column(type_Int, "integers");
+    auto col_str = table.add_column(type_String, "strings");
+    // Add index before creating objects
+    table.add_search_index(col_int);
+    table.add_search_index(col_str);
+
+    std::vector<Key> keys;
+    table.create_objects(100, keys);
+    for (auto o : table) {
+        int64_t key_value = o.get_key().value;
+        o.set(col_int, key_value);
+        // When node size is 4 the objects with "Hello" will be in 2 clusters
+        if (key_value > 21 && key_value < 28) {
+            o.set(col_str, "Hello");
+        }
+    }
+
+    auto tv = table.find_all_string(col_str, "Hello");
+    CHECK_EQUAL(tv.size(), 6);
+}
 #endif // TEST_TABLE

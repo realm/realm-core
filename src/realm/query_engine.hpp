@@ -339,6 +339,7 @@ protected:
     Column_action_specialized m_column_action_specializer = nullptr;
     ConstTableRef m_table = ConstTableRef();
     const Cluster* m_cluster = nullptr;
+    QueryStateBase* m_state = nullptr;
     std::string error_code;
 
     ColumnType get_real_column_type(size_t ndx)
@@ -1101,7 +1102,7 @@ public:
         m_leaf_end = 0;
     }
 
-    void clear_leaf_state()
+    virtual void clear_leaf_state()
     {
         m_array_ptr = nullptr;
     }
@@ -1370,13 +1371,9 @@ public:
         : StringNodeBase(from, patches)
     {
     }
-    ~StringNodeEqualBase() noexcept override
-    {
-        deallocate();
-    }
 
-    void deallocate() noexcept;
     void init() override;
+
     size_t find_first_local(size_t start, size_t end) override;
 
     virtual std::string describe_condition() const override
@@ -1385,22 +1382,18 @@ public:
     }
 
 protected:
+    Key m_actual_key;
+    size_t m_results_start;
+    size_t m_results_end;
+
     inline BinaryData str_to_bin(const StringData& s) noexcept
     {
         return BinaryData(s.data(), s.size());
     }
 
+    virtual Key get_key(size_t ndx) = 0;
     virtual void _search_index_init() = 0;
     virtual size_t _find_first_local(size_t start, size_t end) = 0;
-
-    size_t m_last_indexed;
-
-    // Used for index lookup
-    std::unique_ptr<IntegerColumn> m_index_matches;
-    bool m_index_matches_destroy = false;
-    size_t m_results_start;
-    size_t m_results_end;
-    size_t m_last_start;
 };
 
 
@@ -1420,6 +1413,12 @@ public:
     }
 
 private:
+    std::unique_ptr<IntegerColumn> m_index_matches;
+
+    Key get_key(size_t ndx) override
+    {
+        return Key(m_index_matches->get(ndx));
+    }
     size_t _find_first_local(size_t start, size_t end) override;
 };
 
@@ -1443,6 +1442,12 @@ public:
         }
     }
 
+    void clear_leaf_state() override
+    {
+        StringNodeEqualBase::clear_leaf_state();
+        m_index_matches.clear();
+    }
+
     void _search_index_init() override;
 
     virtual std::string describe_condition() const override
@@ -1463,9 +1468,15 @@ public:
     }
 
 private:
+    // Used for index lookup
+    std::vector<Key> m_index_matches;
     std::string m_ucase;
     std::string m_lcase;
 
+    Key get_key(size_t ndx) override
+    {
+        return m_index_matches[ndx];
+    }
     size_t _find_first_local(size_t start, size_t end) override;
 };
 

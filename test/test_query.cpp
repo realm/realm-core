@@ -1526,6 +1526,7 @@ TEST(Query_Expressions0)
     CHECK_EQUAL(match, not_found);
 }
 
+#endif
 
 TEST(Query_StrIndexCrash)
 {
@@ -1535,7 +1536,7 @@ TEST(Query_StrIndexCrash)
     for (int iter = 0; iter < 5; ++iter) {
         Group group;
         TableRef table = group.add_table("test");
-        table->add_column(type_String, "first");
+        auto col = table->add_column(type_String, "first");
 
         size_t eights = 0;
 
@@ -1547,8 +1548,7 @@ TEST(Query_StrIndexCrash)
             char dst[100];
             memset(dst, 0, sizeof(dst));
             sprintf(dst, "%d", v);
-            table->insert_empty_row(i);
-            table->set_string(0, i, dst);
+            table->create_object().set(col, dst);
         }
 
         table->add_search_index(0);
@@ -1561,8 +1561,6 @@ TEST(Query_StrIndexCrash)
         CHECK_EQUAL(eights, v.size());
     }
 }
-
-#endif
 
 TEST(Query_Links)
 {
@@ -2610,7 +2608,7 @@ TEST(Query_StrEnum)
         CHECK_EQUAL(aa, s);
     }
 }
-
+#endif // LEGACY_TESTS
 
 TEST(Query_StrIndex)
 {
@@ -2628,35 +2626,35 @@ TEST(Query_StrIndex)
     int64_t s;
 
     for (size_t i = 0; i < itera; i++) {
-        TestTable ttt;
+        Table ttt;
         ttt.add_column(type_Int, "1");
-        ttt.add_column(type_String, "2");
+        auto str_col = ttt.add_column(type_String, "2");
 
         aa = 0;
         for (size_t t = 0; t < iterb; t++) {
             if (random.chance(1, 3)) {
-                add(ttt, 1, "AA");
+                ttt.create_object().set_all(1, "AA");
                 aa++;
             }
             else {
-                add(ttt, 1, "BB");
+                ttt.create_object().set_all(1, "BB");
             }
         }
 
-        s = ttt.where().equal(1, "AA").count();
+        s = ttt.where().equal(str_col, "AA").count();
         CHECK_EQUAL(aa, s);
 
-        ttt.optimize();
-        s = ttt.where().equal(1, "AA").count();
+        // FIXME ttt.optimize();
+        s = ttt.where().equal(str_col, "AA").count();
         CHECK_EQUAL(aa, s);
 
-        ttt.add_search_index(1);
-        s = ttt.where().equal(1, "AA").count();
+        ttt.add_search_index(str_col);
+        s = ttt.where().equal(str_col, "AA").count();
         CHECK_EQUAL(aa, s);
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Query_GA_Crash)
 {
     GROUP_TEST_PATH(path);
@@ -5875,35 +5873,38 @@ TEST(Query_Enums)
 #define ua "\x0c3\x0a5"       // danish lower case a with ring above (as in blaabaergroed)
 #define uad "\x061\x0cc\x08a" // decomposed form (a (41) followed by ring)
 
+#endif // LEGACY_TESTS
+
 TEST_TYPES(Query_CaseSensitivity, std::true_type, std::false_type)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2", nullable);
+    Table ttt;
+    auto col = ttt.add_column(type_String, "2", nullable);
 
-    add(ttt, 1, "BLAAbaergroed");
-    add(ttt, 1, "BLAAbaergroedandMORE");
-    add(ttt, 1, "BLAAbaergroedZ");
-    add(ttt, 1, "BLAAbaergroedZ");
-    add(ttt, 1, "BLAAbaergroedZ");
+    Key k = ttt.create_object().set(col, "BLAAbaergroed").get_key();
+    ttt.create_object().set(col, "BLAAbaergroedandMORE");
+    ttt.create_object().set(col, "BLAAbaergroedZ");
+    ttt.create_object().set(col, "BLAAbaergroedZ");
+    ttt.create_object().set(col, "BLAAbaergroedZ");
 
-    Query q1 = ttt.where().equal(1, "blaabaerGROED", false);
+    Query q1 = ttt.where().equal(col, "blaabaerGROED", false);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(k, tv1.get_key(0));
 
-    Query q2 = ttt.where().equal(1, "blaabaerGROEDz", false);
+    Query q2 = ttt.where().equal(col, "blaabaerGROEDz", false);
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(3, tv2.size());
 
-    ttt.add_search_index(1);
+    ttt.add_search_index(col);
 
-    Query q3 = ttt.where().equal(1, "blaabaerGROEDz", false);
+    Query q3 = ttt.where().equal(col, "blaabaerGROEDz", false);
     TableView tv3 = q3.find_all();
     CHECK_EQUAL(3, tv3.size());
 }
+
+#ifdef LEGACY_TESTS
 
 #if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
 
