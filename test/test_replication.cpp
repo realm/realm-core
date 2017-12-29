@@ -234,7 +234,7 @@ void my_table_add_columns(TableRef t)
 }
 }
 
-ONLY(Replication_General)
+TEST(Replication_General)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
