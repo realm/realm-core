@@ -466,7 +466,7 @@ void Cluster::create()
                 }
                 break;
             case col_type_Bool:
-                do_create<ArrayBool>(col_ndx);
+                do_create<ArrayBoolNull>(col_ndx);
                 break;
             case col_type_Float:
                 do_create<ArrayFloat>(col_ndx);
@@ -557,7 +557,7 @@ void Cluster::insert_row(size_t ndx, Key k)
                 }
                 break;
             case col_type_Bool:
-                do_insert_row<ArrayBool>(ndx, col_ndx, attr);
+                do_insert_row<ArrayBoolNull>(ndx, col_ndx, attr);
                 break;
             case col_type_Float:
                 do_insert_row<ArrayFloat>(ndx, col_ndx, attr);
@@ -629,7 +629,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 }
                 break;
             case col_type_Bool:
-                do_move<ArrayBool>(ndx, col_ndx, new_leaf);
+                do_move<ArrayBoolNull>(ndx, col_ndx, new_leaf);
                 break;
             case col_type_Float:
                 do_move<ArrayFloat>(ndx, col_ndx, new_leaf);
@@ -709,7 +709,7 @@ void Cluster::insert_column(size_t col_ndx)
             }
             break;
         case col_type_Bool:
-            do_insert_column<ArrayBool>(col_ndx, nullable);
+            do_insert_column<ArrayBoolNull>(col_ndx, nullable);
             break;
         case col_type_Float:
             do_insert_column<ArrayFloat>(col_ndx, nullable);
@@ -885,7 +885,7 @@ unsigned Cluster::erase(Key key, CascadeState& state)
                 }
                 break;
             case col_type_Bool:
-                do_erase<ArrayBool>(ndx, col_ndx);
+                do_erase<ArrayBoolNull>(ndx, col_ndx);
                 break;
             case col_type_Float:
                 do_erase<ArrayFloat>(ndx, col_ndx);
