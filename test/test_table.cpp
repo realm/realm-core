@@ -8240,6 +8240,7 @@ TEST(Table_addRowsToTableWithNoColumns)
     CHECK(u->is_null_link(0, 0));
 }
 
+
 TEST(Table_getVersionCounterAfterRowAccessor)
 {
     Table t;
