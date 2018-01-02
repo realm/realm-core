@@ -73,7 +73,7 @@ Group::Group()
 }
 
 
-std::vector<Table*> Group::g_table_recycler;
+Group::TableRecycler Group::g_table_recycler;
 std::mutex Group::g_table_recycler_mutex;
 
 

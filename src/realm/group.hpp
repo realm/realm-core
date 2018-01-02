@@ -591,7 +591,17 @@ private:
     std::shared_ptr<metrics::Metrics> m_metrics;
     size_t m_total_rows;
 
-    static std::vector<Table*> g_table_recycler;
+    class TableRecycler : public std::vector<Table*> {
+    public:
+        ~TableRecycler()
+        {
+            for (auto t : *this) {
+                delete t;
+            }
+        }
+    };
+
+    static TableRecycler g_table_recycler;
     static std::mutex g_table_recycler_mutex;
 
     struct shared_tag {
