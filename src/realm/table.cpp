@@ -1871,12 +1871,12 @@ void Table::refresh_index_accessors()
     }
 
     size_t col_ndx = 0;
-    for (StringIndex* search_index : m_index_accessors) {
-        bool has_search_index = (col_ndx < col_ndx_end) && m_spec->get_column_attr(col_ndx).test(col_attr_Indexed);
+    for (StringIndex* index : m_index_accessors) {
+        bool has_index = (col_ndx < col_ndx_end) && m_spec->get_column_attr(col_ndx).test(col_attr_Indexed);
 
-        if (has_search_index) {
-            if (search_index) {
-                search_index->refresh_accessor_tree(col_ndx, *m_spec);
+        if (has_index) {
+            if (index) {
+                index->refresh_accessor_tree(col_ndx, *m_spec);
             }
             else {
                 ref_type ref = m_index_refs.get_as_ref(col_ndx);
@@ -1885,8 +1885,8 @@ void Table::refresh_index_accessors()
             }
         }
         else {
-            if (search_index) {
-                delete search_index;
+            if (index) {
+                delete index;
                 m_index_accessors[col_ndx] = nullptr;
             }
         }

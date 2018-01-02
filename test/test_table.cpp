@@ -8502,4 +8502,162 @@ TEST(Table_SearchIndexFindAll)
     auto tv = table.find_all_string(col_str, "Hello");
     CHECK_EQUAL(tv.size(), 6);
 }
+
+namespace {
+
+template <class T, bool nullable>
+struct Tester {
+    using T2 = typename util::RemoveOptional<T>::type;
+
+    static std::vector<Key> find_all_reference(Table& table, T v)
+    {
+        std::vector<Key> res;
+        Table::Iterator it = table.begin();
+        while (it != table.end()) {
+            if (!it->is_null(0)) {
+                T v2 = it->get<T>(0);
+                if (v == v2) {
+                    res.push_back(it->get_key());
+                }
+            }
+            ++it;
+        };
+        // res is returned with nrvo optimization
+        return res;
+    }
+
+    static void validate(Table& table)
+    {
+        Table::Iterator it = table.begin();
+
+        if (it != table.end()) {
+            auto v = it->get<T>(0);
+
+            if (!it->is_null(0)) {
+                std::vector<Key> res;
+                table.get_search_index(0)->find_all(res, v, false);
+                std::vector<Key> ref = find_all_reference(table, v);
+
+                size_t a = ref.size();
+                size_t b = res.size();
+
+                REALM_ASSERT(a == b);
+            }
+        }
+    }
+
+    static void run(realm::DataType type)
+    {
+        Table table;
+        table.add_column(type, "name", nullable);
+        table.add_search_index(0);
+        const size_t iters = 1000;
+
+        bool add_trend = true;
+
+        for (size_t iter = 0; iter < iters; iter++) {
+
+            if (iter == iters / 2) {
+                add_trend = false;
+            }
+
+            // Add object (with 60% probability, so we grow the object count over time)
+            if (fastrand(100) < (add_trend ? 80 : 20)) {
+                Obj o = table.create_object();
+                bool set_to_null = fastrand(100) < 20;
+
+                if (!set_to_null) {
+                    auto t = create();
+                    o.set<T2>(0, t);
+                }
+            }
+
+            // Remove random object
+            if (fastrand(100) < 50 && table.size() > 0) {
+                Table::Iterator it = table.begin();
+                auto r = fastrand(table.size() - 1);
+                // FIXME: Is there a faster way to pick a random object?
+                for (unsigned t = 0; t < r; t++) {
+                    ++it;
+                }
+                Obj o = *it;
+                table.remove_object(o.get_key());
+            }
+
+            // Edit random object
+            if (table.size() > 0) {
+                Table::Iterator it = table.begin();
+                auto r = fastrand(table.size() - 1);
+                // FIXME: Is there a faster way to pick a random object?
+                for (unsigned t = 0; t < r; t++) {
+                    ++it;
+                }
+                Obj o = *it;
+                bool set_to_null = fastrand(100) < 20;
+                if (set_to_null && table.is_nullable(0)) {
+                    o.set_null(0);
+                }
+                else {
+                    auto t = create();
+                    o.set<T2>(0, t);
+                }
+            }
+
+            if (iter % (iters / 1000) == 0) {
+                validate(table);
+            }
+        }
+    }
+
+
+    // Create random data element of any type supported by the search index
+    template <typename Type = T2>
+    typename std::enable_if<std::is_same<Type, StringData>::value, std::string>::type static create()
+    {
+        std::string s = realm::util::to_string(fastrand(5));
+        return s;
+    }
+    template <typename Type = T2>
+    typename std::enable_if<std::is_same<Type, Timestamp>::value, T2>::type static create()
+    {
+        return Timestamp(fastrand(3), int32_t(fastrand(3)));
+    }
+    template <typename Type = T2>
+    typename std::enable_if<std::is_same<Type, int64_t>::value, T2>::type static create()
+    {
+        return fastrand(5);
+    }
+
+    template <typename Type = T2>
+    typename std::enable_if<std::is_same<Type, bool>::value, T2>::type static create()
+    {
+        return fastrand(100) > 50;
+    }
+};
+}
+
+// The run() method will first add lots of objects, and then remove them. This will test
+// both node splits and empty leaf destruction and get good search index code coverage
+TEST(Table_search_index_fuzzer)
+{
+    // Syntax for Tester<T, nullable>:
+    // T:         Type that must be used in calls too Obj::get<T>
+    // nullable:  If the columns must be is nullable or not
+    // Obj::set() will be automatically be called with set<RemoveOptional<T>>()
+
+    Tester<bool, false>::run(type_Bool);
+    Tester<Optional<bool>, true>::run(type_Bool);
+
+    Tester<int64_t, false>::run(type_Int);
+    Tester<Optional<int64_t>, true>::run(type_Int);
+
+    // Self-contained null state
+    Tester<Timestamp, false>::run(type_Timestamp);
+    Tester<Timestamp, true>::run(type_Timestamp);
+
+    // Self-contained null state
+    Tester<StringData, true>::run(type_String);
+    Tester<StringData, false>::run(type_String);
+}
+
 #endif // TEST_TABLE
