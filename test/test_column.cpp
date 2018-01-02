@@ -721,22 +721,6 @@ TEST_TYPES(Column_SwapRows, IntegerColumn, IntNullColumn)
 
         c.destroy();
     }
-
-    // With search index
-    {
-        ref_type col_ref = TEST_TYPE::create(Allocator::get_default());
-        TEST_TYPE c(Allocator::get_default(), col_ref);
-
-        auto search_index = c.create_search_index();
-        c.add({});
-        c.add({});
-        c.add({});
-
-        c.swap_rows(1, 2);
-
-        c.destroy();
-        search_index->destroy();
-    }
 }
 
 #ifdef LEGACY_TESTS
@@ -881,7 +865,6 @@ TEST_TYPES(Column_Min2, IntegerColumn, IntNullColumn)
 
     c.destroy();
 }
-#endif
 
 TEST(Column_IndexCrash)
 {
@@ -898,6 +881,7 @@ TEST(Column_IndexCrash)
 
     col.destroy();
 }
+#endif
 
 /*
 TEST_TYPES(Column_Sort2, IntegerColumn, IntNullColumn)
@@ -1156,24 +1140,6 @@ TEST(ColumnIntNull_Null)
 }
 
 
-TEST(ColumnIntNull_MoveLastOverPreservesNull)
-{
-    ref_type ref = IntNullColumn::create(Allocator::get_default());
-    IntNullColumn c(Allocator::get_default(), ref);
-    c.create_search_index();
-    c.insert(0, 0, 3);
-    c.set(0, 123);
-    c.set(1, 456);
-    c.set(2, 4776);
-    c.set_null(2);
-    c.move_last_over(0, 2);
-    CHECK(c.is_null(0));
-    c.move_last_over(0, 1);
-    CHECK_EQUAL(*c.get(0), 456);
-    c.destroy();
-}
-
-
 TEST(ColumnIntNull_CompareInts)
 {
     ref_type ref1 = IntNullColumn::create(Allocator::get_default());
@@ -1202,14 +1168,11 @@ TEST(ColumnIntNull_CompareInts)
 }
 
 
-TEST_TYPES(Column_Iterators, std::true_type, std::false_type)
+TEST(Column_Iterators)
 {
     std::vector<int64_t> list;
     ref_type ref = IntegerColumn::create(Allocator::get_default());
     IntegerColumn c(Allocator::get_default(), ref);
-    if (TEST_TYPE::value) {
-        c.create_search_index();
-    }
 
     Random random(random_int<long>());
     const size_t num_elements = 1000;
