@@ -49,10 +49,14 @@ void create_realm_with_data(std::string file_name, size_t data_size)
     Group& g = sg.begin_write();
     TableRef table = g.add_table("t0");
     table->add_column(type_Binary, "bin_col_0");
-    REALM_ASSERT(false); // unimplemented
     std::string blob(data_size, 'a');
     BinaryData binary(blob.data(), data_size);
-    table->create_object().set(0, binary); // copies data into realm
+#ifdef REALM_CLUSTER_IF
+    table->create_object().set(0, binary);
+#else
+    table->add_empty_row(1);
+    table->set_binary(0, 0, binary); // copies data into realm
+#endif
     sg.commit();
     sg.close();
 }
@@ -65,21 +69,32 @@ void create_realm_with_transactions(std::string file_name,
     SharedGroup sg(file_name);
     const std::string table_name = "table";
     size_t int_col = 0;
-    std::vector<Key> keys;
     {
         Group& g = sg.begin_write();
         TableRef table = g.add_table(table_name);
         int_col = table->add_column(type_Int, "int_col_0");
-        REALM_ASSERT(false); // unimplemented
+#ifdef REALM_CLUSTER_IF
+        std::vector<Key> keys;
         table->create_objects(num_rows, keys);
+#else
+        table->add_empty_row(num_rows);
+#endif
         sg.commit();
     }
     for (size_t i = 0; i < num_transactions; ++i) {
         Group& g = sg.begin_write();
         TableRef table = g.get_table(table_name);
-        for (size_t row = 0; row < num_rows; ++row) {
-            table->get_object(keys[row]).set(int_col, int64_t((i * num_rows) + row));
+#ifdef REALM_CLUSTER_IF
+        size_t row = 0;
+        for (auto obj : *table) {
+            obj.set<int64_t>(int_col, (i * num_rows) + row);
+            row++;
         }
+#else
+        for (size_t row = 0; row < num_rows; ++row) {
+            table->set_int(int_col, row, (i * num_rows) + row);
+        }
+#endif
         sg.commit();
     }
 }
@@ -101,7 +116,7 @@ int main(int argc, const char* argv[])
                 create_realm_with_data(file_name, static_cast<size_t>(data_size));
             }
             else {
-                std::cout << "Error: command " << command << " takes exactely 3 arguments.\n";
+                std::cout << "Error: command " << command << " takes exactly 3 arguments.\n";
                 print_useage(program_name);
                 return 1;
             }

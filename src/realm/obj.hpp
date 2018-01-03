@@ -24,6 +24,8 @@
 #include <realm/table_ref.hpp>
 #include <realm/keys.hpp>
 
+#define REALM_CLUSTER_IF
+
 namespace realm {
 
 class ListBase;
