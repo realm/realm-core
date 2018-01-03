@@ -259,7 +259,7 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
-    //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
     realm::parser::Predicate p2 = realm::parser::parse(description);
@@ -656,6 +656,33 @@ TEST(Parser_OverColumnIndexChanges)
     CHECK_EQUAL(ints_before, ints_after);
     CHECK_EQUAL(doubles_before, doubles_after);
     CHECK_EQUAL(strings_before, strings_after);
+}
+
+
+ONLY(Parser_TwoColumnExpressions)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    size_t int_col_ndx = table->add_column(type_Int, "ints", true);
+    size_t double_col_ndx = table->add_column(type_Double, "doubles");
+    size_t string_col_ndx = table->add_column(type_String, "strings");
+    table->add_empty_row(3);
+    for (size_t i = 0; i < table->size(); ++i) {
+        table->set_int(int_col_ndx, i, i);
+        table->set_double(double_col_ndx, i, double(i));
+        std::string str(i, 'a');
+        table->set_string(string_col_ndx, i, StringData(str));
+    }
+
+    Query q = table->where().and_query(table->column<Int>(int_col_ndx) == table->column<String>(string_col_ndx).size());
+    CHECK_EQUAL(q.count(), 3);
+    std::string desc = q.get_description();
+
+    //verify_query(test_context, table, "ints == ints", 3);
+    verify_query(test_context, table, "ints == strings.@count", 3);
+    verify_query(test_context, table, "ints == NULL", 0);
+    verify_query(test_context, table, "doubles == doubles", 3);
+    verify_query(test_context, table, "strings == strings", 3);
 }
 
 

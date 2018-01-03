@@ -185,6 +185,37 @@ struct PropertyExpression
     }
 };
 
+const char* data_type_to_str(DataType type)
+{
+    switch (type) {
+        case type_Int:
+            return "Int";
+        case type_Bool:
+            return "Bool";
+        case type_Float:
+            return "Float";
+        case type_Double:
+            return "Double";
+        case type_String:
+            return "String";
+        case type_Binary:
+            return "Binary";
+        case type_OldDateTime:
+            return "DateTime";
+        case type_Timestamp:
+            return "Timestamp";
+        case type_Table:
+            return "Table";
+        case type_Mixed:
+            return "Mixed";
+        case type_Link:
+            return "Link";
+        case type_LinkList:
+            return "LinkList";
+    }
+    return "type_Unknown"; // LCOV_EXCL_LINE
+}
+
 const char* collection_operator_to_str(parser::Expression::KeyPathOp op)
 {
     switch (op) {
@@ -335,6 +366,13 @@ void add_string_constraint_to_query(Query &query,
     }
 }
 
+void add_string_constraint_to_query(realm::Query &,
+                                    Predicate::Comparison ,
+                                    StringData &&,
+                                    StringData &&) {
+    throw std::logic_error("Comparing two string literals is an unsupported operation.");
+}
+
 void add_string_constraint_to_query(realm::Query &query,
                                     Predicate::Comparison cmp,
                                     StringData &&value,
@@ -352,6 +390,42 @@ void add_string_constraint_to_query(realm::Query &query,
         default:
             throw std::logic_error("Unsupported operator for keypath substring queries.");
     }
+}
+
+void add_string_constraint_to_query(realm::Query &query,
+                                    Predicate::Comparison cmp,
+                                    Columns<String> &&lhs_col,
+                                    Columns<String> &&rhs_col) {
+    bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
+    switch (cmp.op) {
+        case Predicate::Operator::BeginsWith:
+            query.and_query(lhs_col.begins_with(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::EndsWith:
+            query.and_query(lhs_col.ends_with(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::Contains:
+            query.and_query(lhs_col.contains(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::Equal:
+            query.and_query(lhs_col.equal(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::NotEqual:
+            query.and_query(lhs_col.not_equal(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::Like:
+            query.and_query(lhs_col.like(rhs_col, case_sensitive));
+            break;
+        default:
+            throw std::logic_error("Unsupported operator for string queries.");
+    }
+}
+
+void add_binary_constraint_to_query(Query &,
+                                    Predicate::Operator,
+                                    BinaryData &&,
+                                    BinaryData &&) {
+    throw std::logic_error("Unsupported operator for binary queries.");
 }
 
 void add_binary_constraint_to_query(Query &query,
@@ -395,6 +469,13 @@ void add_binary_constraint_to_query(realm::Query &query,
     }
 }
 
+void add_binary_constraint_to_query(Query &,
+                                    Predicate::Operator,
+                                    Columns<Binary> &&,
+                                    Columns<Binary> &&) {
+    throw std::logic_error("Comparing two binary columns is currently unsupported.");
+}
+
 void add_link_constraint_to_query(realm::Query &query,
                                   Predicate::Operator op,
                                   const PropertyExpression &prop_expr,
@@ -414,14 +495,42 @@ void add_link_constraint_to_query(realm::Query &query,
     }
 }
 
-auto link_argument(const PropertyExpression&, const parser::Expression &argExpr, Arguments &args)
+size_t link_argument(const PropertyExpression&, const PropertyExpression&, Arguments&)
+{
+    throw std::logic_error("Comparing two link properties is not supported at this time.");
+}
+
+size_t link_argument(const PropertyExpression&, const parser::Expression &argExpr, Arguments &args)
 {
     return args.object_index_for_argument(stot<int>(argExpr.s));
 }
 
-auto link_argument(const parser::Expression &argExpr, const PropertyExpression&, Arguments &args)
+size_t link_argument(const parser::Expression &argExpr, const PropertyExpression&, Arguments &args)
 {
     return args.object_index_for_argument(stot<int>(argExpr.s));
+}
+
+size_t link_argument(const CollectionOperatorExpression&, const parser::Expression &, Arguments &)
+{
+    throw std::logic_error("Unsupported link comparison");
+}
+
+size_t link_argument(const parser::Expression &, const CollectionOperatorExpression&, Arguments &)
+{
+    throw std::logic_error("Unsupported link comparison");
+}
+size_t link_argument(const CollectionOperatorExpression&, const PropertyExpression &, Arguments &)
+{
+    throw std::logic_error("Unsupported link comparison");
+}
+
+size_t link_argument(const PropertyExpression &, const CollectionOperatorExpression&, Arguments &)
+{
+    throw std::logic_error("Unsupported link comparison");
+}
+size_t link_argument(const CollectionOperatorExpression &, const CollectionOperatorExpression&, Arguments &)
+{
+    throw std::logic_error("Unsupported link comparison");
 }
 
 
@@ -433,58 +542,58 @@ struct ColumnGetter {
     }
 };
 
-template <typename RetType, typename TableGetter, class AggOpType>
+template <typename RetType, class AggOpType>
 struct CollectionOperatorGetter {
-    static SubColumnAggregate<RetType, AggOpType > convert(TableGetter&&, const CollectionOperatorExpression&, Arguments&) {
+    static SubColumnAggregate<RetType, AggOpType > convert(const CollectionOperatorExpression&, Arguments&) {
         throw std::runtime_error("Predicate error constructing collection aggregate operation");
     }
 };
 
-template <typename RetType, typename TableGetter>
-struct CollectionOperatorGetter<RetType, TableGetter, aggregate_operations::Minimum<RetType> >{
-    static SubColumnAggregate<RetType, aggregate_operations::Minimum<RetType> > convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
+template <typename RetType>
+struct CollectionOperatorGetter<RetType, aggregate_operations::Minimum<RetType> >{
+    static SubColumnAggregate<RetType, aggregate_operations::Minimum<RetType> > convert(const CollectionOperatorExpression& expr, Arguments&)
     {
-        return table()->template column<Link>(expr.pe.col_ndx).template column<RetType>(expr.post_link_col_ndx).min();
+        return expr.table_getter()->template column<Link>(expr.pe.col_ndx).template column<RetType>(expr.post_link_col_ndx).min();
     }
 };
 
-template <typename RetType, typename TableGetter>
-struct CollectionOperatorGetter<RetType, TableGetter, aggregate_operations::Maximum<RetType> >{
-    static SubColumnAggregate<RetType, aggregate_operations::Maximum<RetType> > convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
+template <typename RetType>
+struct CollectionOperatorGetter<RetType, aggregate_operations::Maximum<RetType> >{
+    static SubColumnAggregate<RetType, aggregate_operations::Maximum<RetType> > convert(const CollectionOperatorExpression& expr, Arguments&)
     {
-        return table()->template column<Link>(expr.pe.col_ndx).template column<RetType>(expr.post_link_col_ndx).max();
+        return expr.table_getter()->template column<Link>(expr.pe.col_ndx).template column<RetType>(expr.post_link_col_ndx).max();
     }
 };
 
-template <typename RetType, typename TableGetter>
-struct CollectionOperatorGetter<RetType, TableGetter, aggregate_operations::Sum<RetType> >{
-    static SubColumnAggregate<RetType, aggregate_operations::Sum<RetType> > convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
+template <typename RetType>
+struct CollectionOperatorGetter<RetType, aggregate_operations::Sum<RetType> >{
+    static SubColumnAggregate<RetType, aggregate_operations::Sum<RetType> > convert(const CollectionOperatorExpression& expr, Arguments&)
     {
-        return table()->template column<Link>(expr.pe.col_ndx).template column<RetType>(expr.post_link_col_ndx).sum();
+        return expr.table_getter()->template column<Link>(expr.pe.col_ndx).template column<RetType>(expr.post_link_col_ndx).sum();
     }
 };
 
-template <typename RetType, typename TableGetter>
-struct CollectionOperatorGetter<RetType, TableGetter, aggregate_operations::Average<RetType> >{
-    static SubColumnAggregate<RetType, aggregate_operations::Average<RetType> > convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
+template <typename RetType>
+struct CollectionOperatorGetter<RetType, aggregate_operations::Average<RetType> >{
+    static SubColumnAggregate<RetType, aggregate_operations::Average<RetType> > convert(const CollectionOperatorExpression& expr, Arguments&)
     {
-        return table()->template column<Link>(expr.pe.col_ndx).template column<RetType>(expr.post_link_col_ndx).average();
+        return expr.table_getter()->template column<Link>(expr.pe.col_ndx).template column<RetType>(expr.post_link_col_ndx).average();
     }
 };
 
-template <typename RetType, typename TableGetter>
-struct CollectionOperatorGetter<RetType, TableGetter, LinkCount >{
-    static LinkCount convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
+template <typename RetType>
+struct CollectionOperatorGetter<RetType, LinkCount >{
+    static LinkCount convert(const CollectionOperatorExpression& expr, Arguments&)
     {
-        return table()->template column<Link>(expr.pe.col_ndx).count();
+        return expr.table_getter()->template column<Link>(expr.pe.col_ndx).count();
     }
 };
 
-template <typename RetType, typename TableGetter>
-struct CollectionOperatorGetter<RetType, TableGetter, SizeOperator<Size<RetType> > >{
-    static SizeOperator<Size<RetType> > convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
+template <typename RetType>
+struct CollectionOperatorGetter<RetType, SizeOperator<Size<RetType> > >{
+    static SizeOperator<Size<RetType> > convert(const CollectionOperatorExpression& expr, Arguments&)
     {
-        return table()->template column<RetType>(expr.pe.col_ndx).size();
+        return expr.table_getter()->template column<RetType>(expr.pe.col_ndx).size();
     }
 };
 
@@ -605,103 +714,120 @@ struct ValueGetter<Binary, TableGetter> {
     }
 };
 
-template <typename RetType, typename Value, typename TableGetter>
+//template <typename RetType>
+//auto value_of_type_for_query(const std::function<Table *()>&, const CollectionOperatorExpression& value, Arguments &args)
+//{
+//    DataType type = value.post_link_col_type;
+//    using OpType = parser::Expression::KeyPathOp;
+//    switch (value.op) {
+//        case OpType::Min:
+//            if (type == type_Int) {
+//                return CollectionOperatorGetter<RetType, aggregate_operations::Minimum<Int> >::convert(value, args);
+//            } else if (type == type_Double) {
+//                return CollectionOperatorGetter<RetType, aggregate_operations::Minimum<Double> >::convert(value, args);
+//            } else if (type == type_Float) {
+//                return CollectionOperatorGetter<RetType, aggregate_operations::Minimum<Float> >::convert(value, args);
+//            }
+//            break;
+//        case OpType::Max:
+//            if (type == type_Int) {
+//                return CollectionOperatorGetter<RetType, aggregate_operations::Maximum<Int> >::convert(value, args);
+//            } else if (type == type_Double) {
+//                return CollectionOperatorGetter<RetType, aggregate_operations::Maximum<Double> >::convert(value, args);
+//            } else if (type == type_Float) {
+//                return CollectionOperatorGetter<RetType, aggregate_operations::Maximum<Float> >::convert(value, args);
+//            }
+//            break;
+//        case OpType::Avg:
+//            if (type == type_Int) {
+//                return CollectionOperatorGetter<RetType, aggregate_operations::Average<Int> >::convert(value, args);
+//            } else if (type == type_Double) {
+//                return CollectionOperatorGetter<RetType, aggregate_operations::Average<Double> >::convert(value, args);
+//            } else if (type == type_Float) {
+//                return CollectionOperatorGetter<RetType, aggregate_operations::Average<Float> >::convert(value, args);
+//            }
+//            break;
+//        case OpType::Sum:
+//            if (type == type_Int) {
+//                return CollectionOperatorGetter<RetType, aggregate_operations::Sum<Int> >::convert(value, args);
+//            } else if (type == type_Double) {
+//                return CollectionOperatorGetter<RetType, aggregate_operations::Sum<Double> >::convert(value, args);
+//            } else if (type == type_Float) {
+//                return CollectionOperatorGetter<RetType, aggregate_operations::Sum<Float> >::convert(value, args);
+//            }
+//            break;
+//        case OpType::Count:  // count and size mean the same thing for users
+//        case OpType::Size:
+//            //                return CollectionOperatorGetter<RetType, TableGetter, aggregate_operations::Average<RetType> >::convert(value.table_getter, value, args);
+//
+//            //            ENABLE_SUPPORT_WITH_VALUE(LinkList, LinkCount, Int)
+//            //            ENABLE_SUPPORT_WITH_VALUE(String, SizeOperator<Size<StringData> >, Int)
+//            //            ENABLE_SUPPORT_WITH_VALUE(Binary, SizeOperator<Size<BinaryData> >, Int)
+//            //            // FIXME: Subtable support ?
+//        case OpType::None:
+//            break;
+//    }
+//    throw std::runtime_error(util::format("Aggregate '%1' not supported on type '%2'",
+//                                          collection_operator_to_str(value.op),
+//                                          data_type_to_str(value.post_link_col_type)));
+//
+//}
+
+//template <typename RetType, typename TableGetter>
+//struct CollectionOperatorConverter {
+//    static Columns<RetType> convert(TableGetter&&, const CollectionOperatorExpression&, Arguments&) {
+//        throw std::logic_error("Unsupported query operation");
+//    }
+//};
+//
+//template <typename TableGetter>
+//    struct CollectionOperatorConverter<Int, TableGetter> {
+//    static auto convert(TableGetter&&, const CollectionOperatorExpression& value, Arguments& args)
+//    {
+//        using OpType = parser::Expression::KeyPathOp;
+//        switch (value.op) {
+//            case OpType::Min:
+//                    return CollectionOperatorGetter<Int, aggregate_operations::Minimum<Int> >::convert(value, args);
+//            case OpType::Max:
+//                    //return CollectionOperatorGetter<Int, aggregate_operations::Maximum<Int> >::convert(value, args);
+//            case OpType::Avg:
+//                    //return CollectionOperatorGetter<Int, aggregate_operations::Average<Int> >::convert(value, args);
+//            case OpType::Sum:
+//                    //return CollectionOperatorGetter<Int, aggregate_operations::Sum<Int> >::convert(value, args);
+//            case OpType::Count:  // count and size mean the same thing for users
+//            case OpType::Size:
+//            case OpType::None:
+//                break;
+//        }
+//        throw std::runtime_error(util::format("Aggregate '%1' not supported on type '%2'",
+//                                              collection_operator_to_str(value.op),
+//                                              data_type_to_str(value.post_link_col_type)));
+//    }
+//};
+
+template <typename RetType, typename TableGetter, parser::Expression::KeyPathOp Operation>
+struct CollectionOperatorConverter {
+    static Columns<RetType> convert(TableGetter&&, const CollectionOperatorExpression&, Arguments&) {
+        throw std::logic_error("Unsupported query operation");
+    }
+};
+
+template <typename TableGetter>
+struct CollectionOperatorConverter<Int, TableGetter, parser::Expression::KeyPathOp::Min> {
+    static auto convert(TableGetter&&, const CollectionOperatorExpression& value, Arguments& args)
+    {
+        return CollectionOperatorGetter<Int, aggregate_operations::Minimum<Int> >::convert(value, args);
+    }
+};
+
+template <typename RetType, typename TableGetter, typename Value>
 auto value_of_type_for_query(TableGetter&& tables, Value&& value, Arguments &args)
 {
     const bool isColumn = std::is_same<PropertyExpression, typename std::remove_reference<Value>::type>::value;
-    using helper = std::conditional_t<isColumn, ColumnGetter<RetType, TableGetter>, ValueGetter<RetType, TableGetter> >;
+    const bool is_collection = std::is_same<CollectionOperatorExpression, typename std::remove_reference<Value>::type>::value;
+    using nested_helper = std::conditional_t<is_collection, CollectionOperatorConverter<RetType, TableGetter, parser::Expression::KeyPathOp::Min>, ValueGetter<RetType, TableGetter> >;
+    using helper = std::conditional_t<isColumn, ColumnGetter<RetType, TableGetter>, nested_helper >;
     return helper::convert(tables, value, args);
-}
-
-template <typename RetType, typename OpType, typename ValueType, typename Value, typename TableGetter>
-auto value_of_agg_type_for_query(TableGetter&& tables, Value&& value, Arguments &args)
-{
-    const bool is_collection_operator = std::is_same<CollectionOperatorExpression, typename std::remove_reference<Value>::type>::value;
-    using helper = std::conditional_t<is_collection_operator, CollectionOperatorGetter<RetType, TableGetter, OpType>, ValueGetter<ValueType, TableGetter> >;
-    return helper::convert(tables, value, args);
-}
-
-const char* data_type_to_str(DataType type)
-{
-    switch (type) {
-        case type_Int:
-            return "Int";
-        case type_Bool:
-            return "Bool";
-        case type_Float:
-            return "Float";
-        case type_Double:
-            return "Double";
-        case type_String:
-            return "String";
-        case type_Binary:
-            return "Binary";
-        case type_OldDateTime:
-            return "DateTime";
-        case type_Timestamp:
-            return "Timestamp";
-        case type_Table:
-            return "Table";
-        case type_Mixed:
-            return "Mixed";
-        case type_Link:
-            return "Link";
-        case type_LinkList:
-            return "LinkList";
-    }
-    return "type_Unknown"; // LCOV_EXCL_LINE
-}
-
-template <typename A, typename B>
-void do_add_collection_op_comparison_to_query(Query &query, Predicate::Comparison cmp,
-                                const CollectionOperatorExpression &expr, A &lhs, B &rhs, Arguments &args)
-{
-    DataType type = expr.post_link_col_type;
-    using OpType = parser::Expression::KeyPathOp;
-
-#define ENABLE_SUPPORT_WITH_VALUE(TYPE, OP, VALUE_T) \
-    if (type == type_##TYPE) { \
-        add_numeric_constraint_to_query(query, cmp.op,  \
-            value_of_agg_type_for_query< realm::TYPE, OP, VALUE_T >(expr.table_getter, lhs, args), \
-            value_of_agg_type_for_query< realm::TYPE, OP, VALUE_T >(expr.table_getter, rhs, args)); \
-        return; \
-    }
-#define ENABLE_SUPPORT_OF(TYPE, OP) ENABLE_SUPPORT_WITH_VALUE(TYPE, OP, TYPE)
-
-    switch (expr.op) {
-        case OpType::Min:
-            ENABLE_SUPPORT_OF(Double, aggregate_operations::Minimum<Double>)
-            ENABLE_SUPPORT_OF(Float, aggregate_operations::Minimum<Float>)
-            ENABLE_SUPPORT_OF(Int, aggregate_operations::Minimum<Int>)
-            break;
-        case OpType::Max:
-            ENABLE_SUPPORT_OF(Double, aggregate_operations::Maximum<Double>)
-            ENABLE_SUPPORT_OF(Float, aggregate_operations::Maximum<Float>)
-            ENABLE_SUPPORT_OF(Int, aggregate_operations::Maximum<Int>)
-            break;
-        case OpType::Avg:
-            ENABLE_SUPPORT_OF(Double, aggregate_operations::Average<Double>)
-            ENABLE_SUPPORT_OF(Float, aggregate_operations::Average<Float>)
-            ENABLE_SUPPORT_OF(Int, aggregate_operations::Average<Int>)
-            break;
-        case OpType::Sum:
-            ENABLE_SUPPORT_OF(Double, aggregate_operations::Sum<Double>)
-            ENABLE_SUPPORT_OF(Float, aggregate_operations::Sum<Float>)
-            ENABLE_SUPPORT_OF(Int, aggregate_operations::Sum<Int>)
-            break;
-        case OpType::Count:  // count and size mean the same thing for users
-        case OpType::Size:
-            ENABLE_SUPPORT_WITH_VALUE(LinkList, LinkCount, Int)
-            ENABLE_SUPPORT_WITH_VALUE(String, SizeOperator<Size<StringData> >, Int)
-            ENABLE_SUPPORT_WITH_VALUE(Binary, SizeOperator<Size<BinaryData> >, Int)
-            // FIXME: Subtable support ?
-            break;
-        case OpType::None:
-            break;
-    }
-    throw std::runtime_error(util::format("Aggregate '%1' not supported on type '%2'",
-                                          collection_operator_to_str(expr.op),
-                                          data_type_to_str(expr.post_link_col_type)));
 }
 
 template <typename A, typename B>
@@ -845,30 +971,67 @@ void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &arg
 {
     const Predicate::Comparison &cmpr = pred.cmpr;
     auto t0 = cmpr.expr[0].type, t1 = cmpr.expr[1].type;
+
     if (t0 == parser::Expression::Type::KeyPath && t1 != parser::Expression::Type::KeyPath) {
         PropertyExpression expr(query, cmpr.expr[0].s);
-        if (cmpr.expr[0].collection_op != parser::Expression::KeyPathOp::None) {
-            CollectionOperatorExpression wrapper(expr, cmpr.expr[0].collection_op, cmpr.expr[0].op_suffix);
-            do_add_collection_op_comparison_to_query(query, cmpr, wrapper, wrapper, cmpr.expr[1], args);
-        }
-        else if (expression_is_null(cmpr.expr[1], args)) {
+        parser::Expression::KeyPathOp lhs_collection_op = cmpr.expr[0].collection_op;
+        if (expression_is_null(cmpr.expr[1], args)) {
+            precondition(lhs_collection_op == parser::Expression::KeyPathOp::None,
+                         util::format("Invalid query; cannot compare result of '%1' with NULL",
+                                      collection_operator_to_str(lhs_collection_op)));
             do_add_null_comparison_to_query(query, cmpr, expr);
         }
         else {
-            do_add_comparison_to_query(query, cmpr, expr, expr, cmpr.expr[1], args);
+            if (lhs_collection_op != parser::Expression::KeyPathOp::None) {
+                CollectionOperatorExpression wrapper(expr, lhs_collection_op, cmpr.expr[0].op_suffix);
+                do_add_comparison_to_query(query, cmpr, expr, wrapper, cmpr.expr[1], args);
+            }
+            else {
+                do_add_comparison_to_query(query, cmpr, expr, expr, cmpr.expr[1], args);
+            }
         }
     }
     else if (t0 != parser::Expression::Type::KeyPath && t1 == parser::Expression::Type::KeyPath) {
         PropertyExpression expr(query, cmpr.expr[1].s);
-        if (cmpr.expr[1].collection_op != parser::Expression::KeyPathOp::None) {
-            CollectionOperatorExpression wrapper(expr, cmpr.expr[1].collection_op, cmpr.expr[1].op_suffix);
-            do_add_collection_op_comparison_to_query(query, cmpr, wrapper, cmpr.expr[0], wrapper, args);
-        }
-        else if (expression_is_null(cmpr.expr[0], args)) {
+        parser::Expression::KeyPathOp rhs_collection_op = cmpr.expr[1].collection_op;
+
+        if (expression_is_null(cmpr.expr[0], args)) {
+            precondition(rhs_collection_op == parser::Expression::KeyPathOp::None,
+                         util::format("Invalid query; cannot compare result of '%1' with NULL",
+                                      collection_operator_to_str(rhs_collection_op)));
             do_add_null_comparison_to_query(query, cmpr, expr);
         }
         else {
-            do_add_comparison_to_query(query, cmpr, expr, cmpr.expr[0], expr, args);
+            if (cmpr.expr[1].collection_op != parser::Expression::KeyPathOp::None) {
+                CollectionOperatorExpression wrapper(expr, cmpr.expr[1].collection_op, cmpr.expr[1].op_suffix);
+                do_add_comparison_to_query(query, cmpr, expr, cmpr.expr[0], wrapper, args);
+            }
+            else {
+                do_add_comparison_to_query(query, cmpr, expr, cmpr.expr[0], expr, args);
+            }
+        }
+    }
+    else if (t0 == parser::Expression::Type::KeyPath && t1 == parser::Expression::Type::KeyPath) {
+        PropertyExpression lhs_expr(query, cmpr.expr[0].s);
+        PropertyExpression rhs_expr(query, cmpr.expr[1].s);
+        if (cmpr.expr[0].collection_op != parser::Expression::KeyPathOp::None && cmpr.expr[1].collection_op == parser::Expression::KeyPathOp::None) {
+            CollectionOperatorExpression wrapper(lhs_expr, cmpr.expr[0].collection_op, cmpr.expr[0].op_suffix);
+            do_add_comparison_to_query(query, cmpr, lhs_expr, wrapper, rhs_expr, args);
+//            do_add_double_expression_comparison_to_query(query, cmpr, wrapper, rhs_expr, args);
+        }
+        else if (cmpr.expr[0].collection_op == parser::Expression::KeyPathOp::None && cmpr.expr[1].collection_op != parser::Expression::KeyPathOp::None) {
+            CollectionOperatorExpression wrapper(rhs_expr, cmpr.expr[1].collection_op, cmpr.expr[1].op_suffix);
+            do_add_comparison_to_query(query, cmpr, lhs_expr, lhs_expr, wrapper, args);
+//            do_add_double_expression_comparison_to_query(query, cmpr, lhs_expr, wrapper, args);
+        }
+        else if (cmpr.expr[0].collection_op == parser::Expression::KeyPathOp::None && cmpr.expr[1].collection_op == parser::Expression::KeyPathOp::None) {
+            do_add_comparison_to_query(query, cmpr, lhs_expr, lhs_expr, rhs_expr, args);
+//            do_add_double_expression_comparison_to_query(query, cmpr, lhs_expr, rhs_expr, args);
+        }
+        else if (cmpr.expr[0].collection_op != parser::Expression::KeyPathOp::None && cmpr.expr[1].collection_op != parser::Expression::KeyPathOp::None) {
+            CollectionOperatorExpression lhs_wrapper(lhs_expr, cmpr.expr[0].collection_op, cmpr.expr[0].op_suffix);
+            CollectionOperatorExpression rhs_wrapper(rhs_expr, cmpr.expr[1].collection_op, cmpr.expr[1].op_suffix);
+            do_add_comparison_to_query(query, cmpr, lhs_expr, lhs_wrapper, rhs_wrapper, args);
         }
     }
     else {
