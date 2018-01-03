@@ -32,11 +32,11 @@ R Table::aggregate(size_t column_ndx, T value, size_t* resultcount, Key* return_
     QueryState<ResultType> st(action);
     LeafType leaf(get_alloc());
 
-    traverse_clusters([value, &leaf, column_ndx, &st, nullable](const Cluster* cluster, int64_t key_offsets) {
+    traverse_clusters([value, &leaf, column_ndx, &st, nullable](const Cluster* cluster) {
         // direct aggregate on the leaf
         cluster->init_leaf(column_ndx, &leaf);
         Aggregate<action, T> aggr(leaf, nullable);
-        st.m_key_offset = key_offsets;
+        st.m_key_offset = cluster->get_offset();
         st.m_key_values = cluster->get_key_array();
 
         aggr(st, value);

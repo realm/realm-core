@@ -859,15 +859,14 @@ void Table::clear()
             if (attr.test(col_attr_StrongLinks) && is_link_type(col_type)) {
 
                 // This function will add objects that should be deleted to 'state'
-                auto func = [col_ndx, col_type, &state, &alloc](const Cluster* cluster, int64_t key_offsets) {
+                auto func = [col_ndx, col_type, &state, &alloc](const Cluster* cluster) {
                     if (col_type == col_type_Link) {
                         ArrayKey values(alloc);
                         cluster->init_leaf(col_ndx, &values);
                         size_t sz = values.size();
                         for (size_t i = 0; i < sz; i++) {
                             if (Key key = values.get(i)) {
-                                cluster->remove_backlinks(Key(cluster->get_key(i) + key_offsets), col_ndx, {key},
-                                                          state);
+                                cluster->remove_backlinks(cluster->get_real_key(i), col_ndx, {key}, state);
                             }
                         }
                     }
@@ -880,8 +879,8 @@ void Table::clear()
                                 ArrayKey links(alloc);
                                 links.init_from_ref(ref);
                                 if (links.size() > 0) {
-                                    cluster->remove_backlinks(Key(cluster->get_key(i) + key_offsets), col_ndx,
-                                                              links.get_all(), state);
+                                    cluster->remove_backlinks(cluster->get_real_key(i), col_ndx, links.get_all(),
+                                                              state);
                                 }
                             }
                         }
@@ -1104,11 +1103,11 @@ Key Table::find_first(size_t col_ndx, T value) const
     Key key;
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType leaf(get_alloc());
-    traverse_clusters([&key, &col_ndx, &value, &leaf](const Cluster* cluster, int64_t key_offset) {
+    traverse_clusters([&key, &col_ndx, &value, &leaf](const Cluster* cluster) {
         cluster->init_leaf(col_ndx, &leaf);
         size_t row = leaf.find_first(value, 0, cluster->node_size());
         if (row != realm::npos) {
-            key = Key(cluster->get_key(row) + key_offset);
+            key = cluster->get_real_key(row);
             return true;
         }
         return false;
@@ -2067,7 +2066,7 @@ Obj Table::create_object(Key key)
 {
     if (key == null_key) {
         if (m_next_key_value == -1) {
-            m_next_key_value = m_clusters.get_last_key() + 1;
+            m_next_key_value = m_clusters.get_last_key_value() + 1;
         }
         key = Key(m_next_key_value++);
     }

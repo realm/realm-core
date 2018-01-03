@@ -28,7 +28,7 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx)
     if (value != 0) {
         auto cluster = dynamic_cast<Cluster*>(get_parent());
         size_t col_ndx = get_ndx_in_parent() - 1;
-        Key target_key_value = Key(cluster->get_key(ndx));
+        Key target_key_value = cluster->get_real_key(ndx);
 
         const Spec& spec = cluster->m_tree_top.get_spec();
 

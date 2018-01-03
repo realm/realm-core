@@ -27,7 +27,7 @@ class ClusterTree {
 public:
     class ConstIterator;
     class Iterator;
-    using TraverseFunction = std::function<bool(const Cluster*, int64_t)>;
+    using TraverseFunction = std::function<bool(const Cluster*)>;
 
     ClusterTree(Table* owner, Allocator& alloc);
     static MemRef create_empty_cluster(Allocator& alloc);
@@ -69,9 +69,9 @@ public:
     {
         return size() == 0;
     }
-    int64_t get_last_key() const
+    int64_t get_last_key_value() const
     {
-        return m_root->get_last_key();
+        return m_root->get_last_key_value();
     }
     MemRef ensure_writeable(Key k)
     {

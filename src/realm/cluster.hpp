@@ -130,7 +130,7 @@ public:
         return is_attached() ? unsigned(m_keys.size()) : 0;
     }
 
-    int64_t get_key(size_t ndx) const
+    int64_t get_key_value(size_t ndx) const
     {
         return m_keys.get(ndx);
     }
@@ -144,7 +144,7 @@ public:
     /// Number of elements in this subtree
     virtual size_t get_tree_size() const = 0;
     /// Last key in this subtree
-    virtual int64_t get_last_key() const = 0;
+    virtual int64_t get_last_key_value() const = 0;
 
     /// Create an empty node
     virtual void create() = 0;
@@ -183,7 +183,11 @@ protected:
 
 class Cluster : public ClusterNode {
 public:
-    using ClusterNode::ClusterNode;
+    Cluster(int64_t offset, Allocator& allocator, const ClusterTree& tree_top)
+        : ClusterNode(allocator, tree_top)
+        , m_offset(offset)
+    {
+    }
     ~Cluster() override;
 
     void create() override;
@@ -203,9 +207,9 @@ public:
     {
         return node_size();
     }
-    int64_t get_last_key() const override
+    int64_t get_last_key_value() const override
     {
-        return m_keys.size() ? get_key(m_keys.size() - 1) : 0;
+        return m_keys.size() ? get_key_value(m_keys.size() - 1) : 0;
     }
     size_t lower_bound_key(Key key)
     {
@@ -227,10 +231,24 @@ public:
     {
         return &m_keys;
     }
+    Key get_real_key(size_t ndx) const
+    {
+        return Key(m_keys.get(ndx) + m_offset);
+    }
+    void set_offset(int64_t offs)
+    {
+        m_offset = offs;
+    }
+    int64_t get_offset() const
+    {
+        return m_offset;
+    }
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
 private:
+    int64_t m_offset;
+
     friend class Table;
     void insert_row(size_t ndx, Key k);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;

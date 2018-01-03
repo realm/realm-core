@@ -8143,7 +8143,7 @@ TEST(Table_object_forward_iterator)
     }
 
     int tree_size = 0;
-    table.traverse_clusters([&tree_size](const Cluster* cluster, int64_t) {
+    table.traverse_clusters([&tree_size](const Cluster* cluster) {
         tree_size += cluster->node_size();
         return false;
     });
