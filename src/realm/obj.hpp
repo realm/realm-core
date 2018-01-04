@@ -53,7 +53,8 @@ public:
     ConstObj()
         : m_tree_top(nullptr)
         , m_row_ndx(size_t(-1))
-        , m_version(-1)
+        , m_storage_version(-1)
+        , m_instance_version(-1)
     {
     }
     ConstObj(const ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx);
@@ -119,14 +120,15 @@ protected:
     Key m_key;
     mutable MemRef m_mem;
     mutable size_t m_row_ndx;
-    mutable uint64_t m_version;
-
+    mutable uint64_t m_storage_version;
+    mutable uint64_t m_instance_version;
     bool update_if_needed() const;
     void update(ConstObj other) const
     {
         m_mem = other.m_mem;
         m_row_ndx = other.m_row_ndx;
-        m_version = other.m_version;
+        m_storage_version = other.m_storage_version;
+        m_instance_version = other.m_instance_version;
     }
     template <class T>
     bool do_is_null(size_t col_ndx) const;
@@ -137,6 +139,7 @@ protected:
     template <class T>
     int cmp(const ConstObj& other, size_t col_ndx) const;
 };
+
 
 class Obj : public ConstObj {
 public:
@@ -197,7 +200,7 @@ private:
         return m_writeable;
     }
     void ensure_writeable();
-    void bump_version();
+    void bump_content_version();
     template <class T>
     void do_set_null(size_t col_ndx);
 

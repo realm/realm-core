@@ -234,7 +234,7 @@ void my_table_add_columns(TableRef t)
 }
 }
 
-ONLY(Replication_General)
+TEST(Replication_General)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
@@ -1455,6 +1455,7 @@ TEST(Replication_NullStrings)
     }
 }
 
+
 TEST(Replication_NullInteger)
 {
     SHARED_GROUP_TEST_PATH(path_1);
@@ -1540,7 +1541,6 @@ TEST(Replication_RenameGroupLevelTable_RenameColumn)
     }
 }
 #endif
-
 
 #ifdef LEGACY_TESTS
 TEST(Replication_LinkListNullifyThroughTableView)

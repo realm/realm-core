@@ -188,18 +188,6 @@ inline Table* LangBindHelper::new_table()
     return table;
 }
 
-inline Table* LangBindHelper::copy_table(const Table& table)
-{
-    typedef _impl::TableFriend tf;
-    Allocator& alloc = Allocator::get_default();
-    size_t ref = tf::clone(table, alloc); // Throws
-    Table::Parent* parent = nullptr;
-    size_t ndx_in_parent = 0;
-    Table* copy_of_table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
-    bind_table_ptr(copy_of_table);
-    return copy_of_table;
-}
-
 
 inline Table* LangBindHelper::get_table(Group& group, TableKey key)
 {
@@ -259,12 +247,6 @@ inline void LangBindHelper::unbind_table_ptr(const Table* t) noexcept
 inline void LangBindHelper::bind_table_ptr(const Table* t) noexcept
 {
     t->bind_ptr();
-}
-
-inline const LinkViewRef& LangBindHelper::get_linklist_ptr(Row& row, size_t col_ndx)
-{
-    LinkViewRef* link_view = new LinkViewRef(row.get_linklist(col_ndx));
-    return *link_view;
 }
 
 inline void LangBindHelper::unbind_linklist_ptr(const LinkViewRef& link_view)

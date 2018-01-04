@@ -1096,13 +1096,18 @@ inline void TransactLogConvenientEncoder::erase_column(const Table* t, size_t co
     if (!tf::is_link_type(ColumnType(type))) {
         m_encoder.erase_column(col_ndx); // Throws
     }
-    else { // it's a link column:
-        const Table& target_table = *tf::get_link_target_table_accessor(*t, col_ndx);
-        size_t target_table_ndx = target_table.get_index_in_group();
-        const Spec& target_spec = tf::get_spec(target_table);
-        auto origin_table_key = t->get_key();
-        size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_key, col_ndx);
-        m_encoder.erase_link_column(col_ndx, target_table_ndx, backlink_col_ndx); // Throws
+    else {
+        /*
+          FIXME: Unimplemented. Need to be done differently based on keys.
+
+                // it's a link column:
+                const Table& target_table = *tf::get_link_target_table_accessor(*t, col_ndx);
+                size_t target_table_ndx = target_table.get_index_in_group();
+                const Spec& target_spec = tf::get_spec(target_table);
+                auto origin_table_key = t->get_key();
+                size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_key, col_ndx);
+                m_encoder.erase_link_column(col_ndx, target_table_ndx, backlink_col_ndx); // Throws
+        */
     }
 }
 

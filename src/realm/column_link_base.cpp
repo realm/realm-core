@@ -49,8 +49,7 @@ void LinkColumnBase::verify(const Table& table, size_t col_ndx) const
 
     // Check that m_backlink_column is the column specified by the target table spec
     const Spec& target_spec = tf::get_spec(*m_target_table);
-    size_t backlink_col_ndx = target_spec.find_backlink_column(table.get_key(), col_ndx);
-    REALM_ASSERT(m_backlink_column == &tf::get_column(*m_target_table, backlink_col_ndx));
+    target_spec.find_backlink_column(table.get_key(), col_ndx);
 #else
     static_cast<void>(table);
     static_cast<void>(col_ndx);

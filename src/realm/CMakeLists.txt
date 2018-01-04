@@ -160,7 +160,6 @@ set(REALM_INSTALL_IMPL_HEADERS
     impl/destroy_guard.hpp
     impl/input_stream.hpp
     impl/output_stream.hpp
-    impl/sequential_getter.hpp
     impl/simulated_failure.hpp
     impl/transact_log.hpp
 )

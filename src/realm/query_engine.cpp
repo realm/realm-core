@@ -198,7 +198,6 @@ void StringNodeEqualBase::deallocate() noexcept
 
     m_index_matches_destroy = false;
     m_index_matches.reset();
-    m_index_getter.reset();
 }
 
 void StringNodeEqualBase::init()
@@ -225,7 +224,7 @@ void StringNodeEqualBase::init()
         _search_index_init();
 
         if (m_index_matches) {
-            m_index_getter.reset(new SequentialGetter<IntegerColumn>(m_index_matches.get()));
+            // FIXME: Unimplemented
         }
     }
 }
@@ -235,38 +234,7 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
     REALM_ASSERT(m_table);
 
     if (m_has_search_index) {
-        // Indexed string column
-        if (!m_index_getter)
-            return not_found; // no matches in the index
-
-        if (m_last_start > start)
-            m_last_indexed = m_results_start;
-        m_last_start = start;
-
-        while (m_last_indexed < m_results_end) {
-            m_index_getter->cache_next(m_last_indexed);
-            size_t f = m_index_getter->m_leaf_ptr->find_gte(start, m_last_indexed - m_index_getter->m_leaf_start,
-                                                            m_results_end - m_index_getter->m_leaf_start);
-
-            if (f == not_found) {
-                // Not found in this leaf - move on to next
-                m_last_indexed = m_index_getter->m_leaf_end;
-            }
-            else if (f >= (m_results_end - m_index_getter->m_leaf_start)) {
-                // Found outside valid range
-                return not_found;
-            }
-            else {
-                size_t found_index = to_size_t(m_index_getter->m_leaf_ptr->get(f));
-                if (found_index >= end)
-                    return not_found;
-                else {
-                    m_last_indexed = f + m_index_getter->m_leaf_start;
-                    return found_index;
-                }
-            }
-        }
-        return not_found;
+        // FIXME: Unimplemented
     }
 
     return _find_first_local(start, end);
@@ -323,27 +291,7 @@ size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 
 void StringNode<EqualIns>::_search_index_init()
 {
-// TODO: fix when search indexes are supported in clusters
-#if 0
-    if (m_column_type == col_type_StringEnum) {
-        REALM_ASSERT_RELEASE(false && "Case insensitive searches in StringEnum columns is not yet implemented.");
-        // FindRes fr;
-        InternalFindResult res;
-        static_cast<const StringEnumColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
-    }
-    else {
-        m_index_matches.reset(
-            new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
-        m_index_matches->get_root_array()->create(Array::type_Normal);                          // Throws
-        // m_index_matches->add(res.payload);
-        StringData needle(m_value);
-        m_condition_column->get_search_index()->find_all(*m_index_matches, needle, true);
-    }
-
-    m_index_matches_destroy = true; // we own m_index_matches, so we must destroy it
-    m_results_start = 0;
-    m_results_end = m_index_matches->size();
-#endif
+    // FIXME: TODO: fix when search indexes are supported in clusters
 }
 
 size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)

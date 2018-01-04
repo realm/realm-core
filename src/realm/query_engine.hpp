@@ -98,7 +98,6 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/array_list.hpp>
 #include <realm/array_backlink.hpp>
 #include <realm/column_type_traits.hpp>
-#include <realm/impl/sequential_getter.hpp>
 #include <realm/link_view.hpp>
 #include <realm/metrics/query_info.hpp>
 #include <realm/query_conditions.hpp>
@@ -1399,7 +1398,6 @@ protected:
     // Used for index lookup
     std::unique_ptr<IntegerColumn> m_index_matches;
     bool m_index_matches_destroy = false;
-    std::unique_ptr<SequentialGetter<IntegerColumn>> m_index_getter;
     size_t m_results_start;
     size_t m_results_end;
     size_t m_last_start;

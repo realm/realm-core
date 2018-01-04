@@ -123,6 +123,7 @@ TEST_TYPES(TimestampColumn_Compare, std::true_type, std::false_type)
     c.destroy();
 }
 
+#ifdef LEGACY_TESTS
 TEST_TYPES(TimestampColumn_Index, std::true_type, std::false_type)
 {
     constexpr bool nullable_toggle = TEST_TYPE::value;
@@ -435,6 +436,7 @@ TEST(TimestampColumn_LargeNegativeTimestampSearchIndexErase)
     c.destroy_search_index();
     c.destroy();
 }
+#endif
 
 namespace { // anonymous namespace
 

@@ -57,7 +57,6 @@ public:
     virtual void do_update_link(size_t row_ndx, size_t old_target_row_ndx, size_t new_target_row_ndx) = 0;
     virtual void do_swap_link(size_t row_ndx, size_t target_row_ndx_1, size_t target_row_ndx_2) = 0;
 
-    void mark(int) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
     void bump_link_origin_table_version() noexcept override;
 
@@ -123,22 +122,13 @@ inline void LinkColumnBase::set_backlink_column(BacklinkColumn& column) noexcept
 }
 
 
-inline void LinkColumnBase::mark(int type) noexcept
-{
-    if (type & mark_LinkTargets) {
-        typedef _impl::TableFriend tf;
-        tf::mark(*m_target_table);
-    }
-}
-
 inline void LinkColumnBase::bump_link_origin_table_version() noexcept
 {
     // It is important to mark connected tables as modified.
     // Also see BacklinkColumn::bump_link_origin_table_version().
     typedef _impl::TableFriend tf;
     if (m_target_table) {
-        bool bump_global = false;
-        tf::bump_version(*m_target_table, bump_global);
+        tf::bump_content_version(*m_target_table);
     }
 }
 

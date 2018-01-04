@@ -406,7 +406,7 @@ public:
         if (old != value) {
             ensure_writeable();
             do_set(ndx, value);
-            m_obj.bump_version();
+            m_obj.bump_content_version();
             if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
                 set_repl(repl, ndx, value);
             }
@@ -431,7 +431,7 @@ public:
         T old = get(ndx);
         m_leaf->erase(ndx);
         ConstListBase::adj_remove(ndx);
-        m_obj.bump_version();
+        m_obj.bump_content_version();
 
         return old;
     }
@@ -477,7 +477,7 @@ public:
             ConstListBase::clear_repl(repl);
         }
         m_leaf->truncate_and_destroy_children(0);
-        m_obj.bump_version();
+        m_obj.bump_content_version();
     }
 
 protected:

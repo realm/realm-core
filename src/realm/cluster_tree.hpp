@@ -85,8 +85,11 @@ public:
         fallback.init_from_mem(mem);
         return fallback;
     }
-    uint64_t bump_version();
-    uint64_t get_version_counter() const;
+    uint64_t bump_content_version();
+    void bump_storage_version();
+    uint64_t get_content_version() const;
+    uint64_t get_storage_version(uint64_t instance_version) const;
+    uint64_t get_instance_version() const;
     void insert_column(size_t ndx)
     {
         m_root->insert_column(ndx);
@@ -166,9 +169,10 @@ public:
 
 protected:
     const ClusterTree& m_tree;
-    mutable uint64_t m_version = uint64_t(-1);
+    mutable uint64_t m_storage_version = uint64_t(-1);
     mutable Cluster m_leaf;
     mutable ClusterNode::IteratorState m_state;
+    mutable uint64_t m_instance_version = uint64_t(-1);
     mutable Key m_key;
     mutable std::aligned_storage<sizeof(Obj), alignof(Obj)>::type m_obj_cache_storage;
 

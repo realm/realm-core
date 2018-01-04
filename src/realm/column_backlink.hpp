@@ -67,7 +67,6 @@ public:
     void move_last_row_over(size_t, size_t, bool) override;
     void swap_rows(size_t, size_t) override;
     void clear(size_t, bool) override;
-    void mark(int) noexcept override;
 
     void bump_link_origin_table_version() noexcept override;
 
@@ -148,22 +147,13 @@ inline void BacklinkColumn::add_row()
 }
 
 
-inline void BacklinkColumn::mark(int type) noexcept
-{
-    if (type & mark_LinkOrigins) {
-        typedef _impl::TableFriend tf;
-        tf::mark(*m_origin_table);
-    }
-}
-
 inline void BacklinkColumn::bump_link_origin_table_version() noexcept
 {
     // It is important to mark connected tables as modified.
     // Also see LinkColumnBase::bump_link_origin_table_version().
     typedef _impl::TableFriend tf;
     if (m_origin_table) {
-        bool bump_global = false;
-        tf::bump_version(*m_origin_table, bump_global);
+        tf::bump_content_version(*m_origin_table);
     }
 }
 

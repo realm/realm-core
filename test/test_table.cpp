@@ -928,11 +928,6 @@ TEST(Table_GetName)
         Table table;
         CHECK_EQUAL("", table.get_name());
     }
-    // ... regardless of how they are created
-    {
-        TableRef table = Table::create();
-        CHECK_EQUAL("", table->get_name());
-    }
 
     // Direct members of groups do have names
     {
@@ -1026,8 +1021,10 @@ void setup_multi_table(Table& table, size_t rows, std::vector<Key>& keys)
         obj.set(bin_col, BinaryData("binary", 7));
     }
 
+#ifdef LEGACY_TESTS
     // We also want a StringEnumColumn
     table.optimize();
+#endif
 }
 
 } // anonymous namespace
@@ -1090,8 +1087,9 @@ TEST(Table_MoveAllTypes)
     Table table;
     std::vector<Key> keys;
     setup_multi_table(table, 15, keys);
+#ifdef LEGACY_TESTS
     table.add_search_index(6);
-
+#endif
     while (!table.is_empty()) {
         size_t size = keys.size();
         auto it = keys.begin() + random.draw_int_mod(size);
