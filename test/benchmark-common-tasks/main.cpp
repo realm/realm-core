@@ -68,6 +68,7 @@ const char* to_ident_cstr(RealmDurability level);
 #define KEY(x) Key(x)
 #else
 #define KEY(x) x
+using ColKey = size_t;
 #endif
 
 
@@ -177,7 +178,7 @@ struct BenchmarkWithStringsTable : Benchmark {
         g.remove_table("StringOnly");
         group.commit();
     }
-    size_t m_col;
+    ColKey m_col;
 };
 
 struct BenchmarkWithStrings : BenchmarkWithStringsTable {
@@ -265,7 +266,7 @@ struct BenchmarkDistinctStringFewDupes : BenchmarkWithStringsFewDup {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        ConstTableView view = table->get_distinct_view(0);
+        ConstTableView view = table->get_distinct_view(m_col);
     }
 };
 
@@ -279,7 +280,7 @@ struct BenchmarkDistinctStringManyDupes : BenchmarkWithStringsManyDup {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        ConstTableView view = table->get_distinct_view(0);
+        ConstTableView view = table->get_distinct_view(m_col);
     }
 };
 
@@ -293,7 +294,7 @@ struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        ConstTableView view = table->where().equal(0, StringData("10", 2)).find_all();
+        ConstTableView view = table->where().equal(m_col, StringData("10", 2)).find_all();
     }
 };
 
@@ -307,7 +308,7 @@ struct BenchmarkFindAllStringManyDupes : BenchmarkWithStringsManyDup {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        ConstTableView view = table->where().equal(0, StringData("10", 2)).find_all();
+        ConstTableView view = table->where().equal(m_col, StringData("10", 2)).find_all();
     }
 };
 
@@ -325,7 +326,7 @@ struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
             "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
         };
         for (auto s : strs) {
-            table->where().equal(0, StringData(s)).find();
+            table->where().equal(m_col, StringData(s)).find();
         }
     }
 };
@@ -344,7 +345,7 @@ struct BenchmarkFindFirstStringManyDupes : BenchmarkWithStringsManyDup {
             "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
         };
         for (auto s : strs) {
-            table->where().equal(0, StringData(s)).find();
+            table->where().equal(m_col, StringData(s)).find();
         }
     }
 };
@@ -389,7 +390,7 @@ struct BenchmarkWithIntsTable : Benchmark {
         g.remove_table("IntOnly");
         group.commit();
     }
-    size_t m_col;
+    ColKey m_col;
 };
 
 struct BenchmarkWithInts : BenchmarkWithIntsTable {
@@ -425,7 +426,7 @@ struct BenchmarkQuery : BenchmarkWithStrings {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        ConstTableView view = table->find_all_string(0, "200");
+        ConstTableView view = table->find_all_string(m_col, "200");
     }
 };
 
@@ -454,7 +455,7 @@ struct BenchmarkSort : BenchmarkWithStrings {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        ConstTableView view = table->get_sorted_view(0);
+        ConstTableView view = table->get_sorted_view(m_col);
     }
 };
 
@@ -481,7 +482,7 @@ struct BenchmarkSortInt : BenchmarkWithInts {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
-        ConstTableView view = table->get_sorted_view(0);
+        ConstTableView view = table->get_sorted_view(m_col);
     }
 };
 
@@ -516,7 +517,7 @@ struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
-        ConstTableView view = table->get_distinct_view(0);
+        ConstTableView view = table->get_distinct_view(m_col);
     }
 };
 
@@ -551,7 +552,7 @@ struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
-        ConstTableView view = table->get_distinct_view(0);
+        ConstTableView view = table->get_distinct_view(m_col);
     }
 };
 
@@ -853,15 +854,15 @@ struct BenchmarkQueryNot : Benchmark {
     {
         WriteTransaction tr(group);
         TableRef table = tr.add_table(name());
-        auto col = table->add_column(type_Int, "first");
+        m_col = table->add_column(type_Int, "first");
 #ifdef REALM_CLUSTER_IF
         for (size_t i = 0; i < 1000; ++i) {
-            table->create_object().set(col, 1);
+            table->create_object().set(m_col, 1);
         }
 #else
         table->add_empty_row(1000);
         for (size_t i = 0; i < 1000; ++i) {
-            table->set_int(col, i, 1);
+            table->set_int(m_col, i, 1);
         }
 #endif
         tr.commit();
@@ -872,7 +873,7 @@ struct BenchmarkQueryNot : Benchmark {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table(name());
         Query q = table->where();
-        q.not_equal(0, 2); // never found, = worst case
+        q.not_equal(m_col, 2); // never found, = worst case
         TableView results = q.find_all();
         results.size();
     }
@@ -883,6 +884,8 @@ struct BenchmarkQueryNot : Benchmark {
         g.remove_table(name());
         group.commit();
     }
+
+    ColKey m_col;
 };
 
 struct BenchmarkGetLinkList : Benchmark {
@@ -947,7 +950,7 @@ struct BenchmarkGetLinkList : Benchmark {
         group.commit();
     }
 
-    size_t m_col_link;
+    ColKey m_col_link;
 };
 
 struct BenchmarkNonInitatorOpen : Benchmark {

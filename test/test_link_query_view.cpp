@@ -923,7 +923,7 @@ TEST(LinkList_SortLinkView)
     table1->add_column(type_Double, "doubles");
     table1->add_column(type_String, "str2");
     table1->add_column(type_Timestamp, "ts");
-    size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+    auto col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
 
     // add some rows
     Key key0 = table1->create_object().set_all(300, "delta", 300.f, 300., "alfa", Timestamp(300, 300)).get_key();
@@ -1345,12 +1345,12 @@ TEST(LinkList_QueryOnLinkList)
 
     // q.m_table = target
     // q.m_view = list_ptr
-    Query q = target->where(list_ptr).and_query(target->column<Int>(0) > 100);
+    Query q = target->where(list_ptr).and_query(target->column<Int>(col_int) > 100);
 
     // tv.m_table == target
     tv = q.find_all(); // tv = { 0, 2 }
 
-    TableView tv2 = list_ptr->get_sorted_view(0);
+    TableView tv2 = list_ptr->get_sorted_view(col_int);
 
     CHECK_EQUAL(3, tv2.size());
     CHECK_EQUAL(key1, tv2.get_key(0));

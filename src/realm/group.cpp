@@ -765,8 +765,10 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     // replication instructions for each column removal with sufficient
     // information for Group::TransactAdvancer to handle them.
     size_t n = table->get_column_count();
-    for (size_t i = n; i > 0; --i)
-        table->remove_column(i - 1);
+    for (size_t i = n; i > 0; --i) {
+        ColKey col_key = table->ndx2colkey(i - 1);
+        table->remove_column(col_key);
+    }
 
     size_t prior_num_tables = m_tables.size();
     if (Replication* repl = m_alloc.get_replication())
@@ -1217,62 +1219,62 @@ public:
         return true;
     }
 
-    bool set_int(size_t, Key, int_fast64_t, _impl::Instruction, size_t) noexcept
+    bool set_int(ColKey, Key, int_fast64_t, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool add_int(size_t, Key, int_fast64_t) noexcept
+    bool add_int(ColKey, Key, int_fast64_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_bool(size_t, Key, bool, _impl::Instruction) noexcept
+    bool set_bool(ColKey, Key, bool, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_float(size_t, Key, float, _impl::Instruction) noexcept
+    bool set_float(ColKey, Key, float, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_double(size_t, Key, double, _impl::Instruction) noexcept
+    bool set_double(ColKey, Key, double, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_string(size_t, Key, StringData, _impl::Instruction, size_t) noexcept
+    bool set_string(ColKey, Key, StringData, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_binary(size_t, Key, BinaryData, _impl::Instruction) noexcept
+    bool set_binary(ColKey, Key, BinaryData, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_timestamp(size_t, Key, Timestamp, _impl::Instruction) noexcept
+    bool set_timestamp(ColKey, Key, Timestamp, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_null(size_t, Key, _impl::Instruction, size_t) noexcept
+    bool set_null(ColKey, Key, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_link(size_t, Key, Key, TableKey, _impl::Instruction) noexcept
+    bool set_link(ColKey, Key, Key, TableKey, _impl::Instruction) noexcept
     {
         return true;
     }
 
-    bool insert_substring(size_t, Key, size_t, StringData)
+    bool insert_substring(ColKey, Key, size_t, StringData)
     {
         return true; // No-op
     }
 
-    bool erase_substring(size_t, Key, size_t, size_t)
+    bool erase_substring(ColKey, Key, size_t, size_t)
     {
         return true; // No-op
     }
@@ -1317,46 +1319,46 @@ public:
         return true; // No-op
     }
 
-    bool insert_column(size_t, DataType, StringData, bool, bool)
+    bool insert_column(ColKey, DataType, StringData, bool, bool)
     {
         m_schema_changed = true;
 
         return true;
     }
 
-    bool insert_link_column(size_t, DataType, StringData, size_t, size_t)
+    bool insert_link_column(ColKey, DataType, StringData, TableKey, ColKey)
     {
         m_schema_changed = true;
 
         return true;
     }
 
-    bool erase_column(size_t)
+    bool erase_column(ColKey)
     {
         m_schema_changed = true;
 
         return true;
     }
 
-    bool erase_link_column(size_t, size_t, size_t)
+    bool erase_link_column(ColKey, TableKey, ColKey)
     {
         m_schema_changed = true;
 
         return true;
     }
 
-    bool rename_column(size_t, StringData) noexcept
+    bool rename_column(ColKey, StringData) noexcept
     {
         m_schema_changed = true;
         return true; // No-op
     }
 
-    bool add_search_index(size_t) noexcept
+    bool add_search_index(ColKey) noexcept
     {
         return true; // No-op
     }
 
-    bool remove_search_index(size_t) noexcept
+    bool remove_search_index(ColKey) noexcept
     {
         return true; // No-op
     }
@@ -1371,12 +1373,12 @@ public:
         return true; // No-op
     }
 
-    bool set_link_type(size_t, LinkType) noexcept
+    bool set_link_type(ColKey, LinkType) noexcept
     {
         return true; // No-op
     }
 
-    bool select_list(size_t, Key) noexcept
+    bool select_list(ColKey, Key) noexcept
     {
         return true; // No-op
     }
@@ -1411,7 +1413,7 @@ public:
         return true; // No-op
     }
 
-    bool nullify_link(size_t, Key, TableKey)
+    bool nullify_link(ColKey, Key, TableKey)
     {
         return true; // No-op
     }

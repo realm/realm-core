@@ -51,11 +51,17 @@ Allocator& ConstObj::get_alloc() const
     return m_tree_top->get_alloc();
 }
 
+int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
+{
+    return cmp(other, m_tree_top->get_owner()->colkey2ndx(col_key));
+}
+
+
 template <class T>
 inline int ConstObj::cmp(const ConstObj& other, size_t col_ndx) const
 {
-    T val1 = get<T>(col_ndx);
-    T val2 = other.get<T>(col_ndx);
+    T val1 = _get<T>(col_ndx);
+    T val2 = other._get<T>(col_ndx);
     if (val1 < val2) {
         return 1;
     }
@@ -124,19 +130,19 @@ void ConstObj::remove()
     const_cast<Table*>(get_table())->remove_object(m_key);
 }
 
-size_t ConstObj::get_column_index(StringData col_name) const
+ColKey ConstObj::get_column_key(StringData col_name) const
 {
-    return m_tree_top->get_spec().get_column_index(col_name);
+    return get_table()->get_column_key(col_name);
 }
 
 TableKey ConstObj::get_table_key() const
 {
-    return m_tree_top->get_owner()->get_key();
+    return get_table()->get_key();
 }
 
-TableRef ConstObj::get_target_table(size_t col_ndx) const
+TableRef ConstObj::get_target_table(ColKey col_key) const
 {
-    return _impl::TableFriend::get_opposite_link_table(*m_tree_top->get_owner(), col_ndx);
+    return _impl::TableFriend::get_opposite_link_table(*m_tree_top->get_owner(), col_key);
 }
 
 Obj::Obj(ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx)
@@ -162,10 +168,15 @@ bool ConstObj::update_if_needed() const
 }
 
 template <class T>
-T ConstObj::get(size_t col_ndx) const
+T ConstObj::get(ColKey col_key) const
 {
-    if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
-        throw LogicError(LogicError::column_index_out_of_range);
+    return _get<T>(get_table()->colkey2ndx(col_key));
+}
+
+template <class T>
+T ConstObj::_get(size_t col_ndx) const
+{
+    REALM_ASSERT(col_ndx < m_tree_top->get_spec().get_public_column_count());
     const Spec& spec = m_tree_top->get_spec();
     ColumnAttrMask attr = spec.get_column_attr(col_ndx);
     REALM_ASSERT(attr.test(col_attr_List) || (spec.get_column_type(col_ndx) == ColumnTypeTraits<T>::column_id));
@@ -188,15 +199,14 @@ inline bool ConstObj::do_is_null(size_t col_ndx) const
     return values.is_null(m_row_ndx);
 }
 
-size_t ConstObj::get_link_count(size_t col_ndx) const
+size_t ConstObj::get_link_count(ColKey col_key) const
 {
-    return get_list<Key>(col_ndx).size();
+    return get_list<Key>(col_key).size();
 }
 
-bool ConstObj::is_null(size_t col_ndx) const
+bool ConstObj::is_null(ColKey col_key) const
 {
-    if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
-        throw LogicError(LogicError::column_index_out_of_range);
+    size_t col_ndx = get_table()->colkey2ndx(col_key);
 
     update_if_needed();
     ColumnAttrMask attr = m_tree_top->get_spec().get_column_attr(col_ndx);
@@ -245,9 +255,11 @@ bool ConstObj::has_backlinks(bool only_strong_links) const
     const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
 
     for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
+        ColKey backlink_col_key = target_table->ndx2colkey(i);
+
         // Find origin table and column for this backlink column
-        TableRef origin_table = _impl::TableFriend::get_opposite_link_table(*target_table, i);
-        size_t origin_col = target_table_spec.get_origin_column_ndx(i);
+        TableRef origin_table = _impl::TableFriend::get_opposite_link_table(*target_table, backlink_col_key);
+        auto origin_col = target_table_spec.get_origin_column_key(i);
 
         if (!only_strong_links || origin_table->get_link_type(origin_col) == link_Strong) {
             auto cnt = get_backlink_count(*origin_table, origin_col);
@@ -259,23 +271,23 @@ bool ConstObj::has_backlinks(bool only_strong_links) const
     return false;
 }
 
-size_t ConstObj::get_backlink_count(const Table& origin, size_t origin_col_ndx) const
+size_t ConstObj::get_backlink_count(const Table& origin, ColKey origin_col_key) const
 {
     size_t cnt = 0;
     TableKey origin_table_key = origin.get_key();
     if (origin_table_key != TableKey()) {
-        size_t backlink_col_ndx = m_tree_top->get_spec().find_backlink_column(origin_table_key, origin_col_ndx);
-        cnt = get_backlink_count(backlink_col_ndx);
+        size_t backlink_col_key = m_tree_top->get_spec().find_backlink_column(origin_table_key, origin_col_key);
+        cnt = get_backlink_count(backlink_col_key);
     }
     return cnt;
 }
 
-Key ConstObj::get_backlink(const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const
+Key ConstObj::get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const
 {
     TableKey origin_key = origin.get_key();
-    size_t backlink_col_ndx = m_tree_top->get_spec().find_backlink_column(origin_key, origin_col_ndx);
+    size_t backlink_col_key = m_tree_top->get_spec().find_backlink_column(origin_key, origin_col_key);
 
-    return get_backlink(backlink_col_ndx, backlink_ndx);
+    return get_backlink(backlink_col_key, backlink_ndx);
 }
 
 size_t ConstObj::get_backlink_count(size_t backlink_col_ndx) const
@@ -329,15 +341,17 @@ void Obj::bump_content_version()
 }
 
 template <>
-Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
+Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
 {
-    if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
-        throw LogicError(LogicError::column_index_out_of_range);
+    size_t col_ndx = get_table()->colkey2ndx(col_key);
+    auto& spec = m_tree_top->get_spec();
+    if (spec.get_column_type(col_ndx) != ColumnTypeTraits<int64_t>::column_id)
+        throw LogicError(LogicError::illegal_type);
 
     update_if_needed();
     ensure_writeable();
 
-    if (StringIndex* index = m_tree_top->get_owner()->get_search_index(col_ndx)) {
+    if (StringIndex* index = m_tree_top->get_owner()->get_search_index(col_key)) {
         index->set<int64_t>(m_key, value);
     }
 
@@ -346,7 +360,7 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
     Array fallback(alloc);
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx + 1 < fields.size());
-    ColumnAttrMask attr = m_tree_top->get_spec().get_column_attr(col_ndx);
+    ColumnAttrMask attr = spec.get_column_attr(col_ndx);
     if (attr.test(col_attr_Nullable)) {
         ArrayIntNull values(alloc);
         values.set_parent(&fields, col_ndx + 1);
@@ -361,17 +375,16 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
     }
 
     if (Replication* repl = alloc.get_replication()) {
-        repl->set_int(m_tree_top->get_owner(), col_ndx, m_key, value,
+        repl->set_int(m_tree_top->get_owner(), col_key, m_key, value,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
     }
 
     return *this;
 }
 
-Obj& Obj::add_int(size_t col_ndx, int64_t value)
+Obj& Obj::add_int(ColKey col_key, int64_t value)
 {
-    if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
-        throw LogicError(LogicError::column_index_out_of_range);
+    size_t col_ndx = get_table()->colkey2ndx(col_key);
 
     update_if_needed();
     ensure_writeable();
@@ -409,18 +422,20 @@ Obj& Obj::add_int(size_t col_ndx, int64_t value)
     }
 
     if (Replication* repl = alloc.get_replication()) {
-        repl->add_int(m_tree_top->get_owner(), col_ndx, m_key, value); // Throws
+        repl->add_int(m_tree_top->get_owner(), col_key, m_key, value); // Throws
     }
 
     return *this;
 }
 
 template <>
-Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
+Obj& Obj::set<Key>(ColKey col_key, Key target_key, bool is_default)
 {
-    if (REALM_UNLIKELY(col_ndx >= m_tree_top->get_spec().get_public_column_count()))
-        throw LogicError(LogicError::column_index_out_of_range);
-    TableRef target_table = get_target_table(col_ndx);
+    size_t col_ndx = get_table()->colkey2ndx(col_key);
+    auto& spec = m_tree_top->get_spec();
+    if (spec.get_column_type(col_ndx) != ColumnTypeTraits<Key>::column_id)
+        throw LogicError(LogicError::illegal_type);
+    TableRef target_table = get_target_table(col_key);
     if (target_key != null_key && !target_table->is_valid(target_key)) {
         throw LogicError(LogicError::target_row_index_out_of_range);
     }
@@ -441,12 +456,12 @@ Obj& Obj::set<Key>(size_t col_ndx, Key target_key, bool is_default)
 
     if (target_key != old_key) {
         CascadeState state;
-        bool recurse = update_backlinks(col_ndx, old_key, target_key, state);
+        bool recurse = update_backlinks(col_key, old_key, target_key, state);
 
         values.set(m_row_ndx, target_key);
 
         if (Replication* repl = alloc.get_replication()) {
-            repl->set(m_tree_top->get_owner(), col_ndx, m_key, target_key,
+            repl->set(m_tree_top->get_owner(), col_key, m_key, target_key,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
         }
 
@@ -498,12 +513,12 @@ inline void check_range(const BinaryData& val)
 }
 
 template <class T>
-Obj& Obj::set(size_t col_ndx, T value, bool is_default)
+Obj& Obj::set(ColKey col_key, T value, bool is_default)
 {
     const Spec& spec = m_tree_top->get_spec();
-    REALM_ASSERT(spec.get_column_type(col_ndx) == ColumnTypeTraits<T>::column_id);
-    if (REALM_UNLIKELY(col_ndx > spec.get_public_column_count()))
-        throw LogicError(LogicError::column_index_out_of_range);
+    size_t col_ndx = get_table()->colkey2ndx(col_key);
+    if (spec.get_column_type(col_ndx) != ColumnTypeTraits<T>::column_id)
+        throw LogicError(LogicError::illegal_type);
     if (value_is_null(value) && !spec.get_column_attr(col_ndx).test(col_attr_Nullable))
         throw LogicError(LogicError::column_not_nullable);
     check_range(value);
@@ -511,7 +526,7 @@ Obj& Obj::set(size_t col_ndx, T value, bool is_default)
     update_if_needed();
     ensure_writeable();
 
-    if (StringIndex* index = m_tree_top->get_owner()->get_search_index(col_ndx)) {
+    if (StringIndex* index = m_tree_top->get_owner()->get_search_index(col_key)) {
         index->set<T>(m_key, value);
     }
 
@@ -526,17 +541,18 @@ Obj& Obj::set(size_t col_ndx, T value, bool is_default)
     values.set(m_row_ndx, value);
 
     if (Replication* repl = alloc.get_replication())
-        repl->set<T>(m_tree_top->get_owner(), col_ndx, m_key, value,
+        repl->set<T>(m_tree_top->get_owner(), col_key, m_key, value,
                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     return *this;
 }
 
-void Obj::set_int(size_t col_ndx, int64_t value)
+void Obj::set_int(ColKey col_key, int64_t value)
 {
     update_if_needed();
     ensure_writeable();
 
+    size_t col_ndx = get_table()->colkey2ndx(col_key);
     Allocator& alloc = m_tree_top->get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
@@ -548,41 +564,45 @@ void Obj::set_int(size_t col_ndx, int64_t value)
     values.set(m_row_ndx, value);
 }
 
-void Obj::add_backlink(size_t backlink_col, Key origin_key)
+void Obj::add_backlink(ColKey backlink_col_key, Key origin_key)
 {
     ensure_writeable();
 
+    size_t backlink_col_ndx = get_table()->colkey2ndx(backlink_col_key);
     Allocator& alloc = m_tree_top->get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
 
     ArrayBacklink backlinks(alloc);
-    backlinks.set_parent(&fields, backlink_col + 1);
+    backlinks.set_parent(&fields, backlink_col_ndx + 1);
     backlinks.init_from_parent();
 
     backlinks.add(m_row_ndx, origin_key);
 }
 
-bool Obj::remove_one_backlink(size_t backlink_col, Key origin_key)
+bool Obj::remove_one_backlink(ColKey backlink_col_key, Key origin_key)
 {
     ensure_writeable();
 
+    size_t backlink_col_ndx = get_table()->colkey2ndx(backlink_col_key);
     Allocator& alloc = m_tree_top->get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
 
     ArrayBacklink backlinks(alloc);
-    backlinks.set_parent(&fields, backlink_col + 1);
+    backlinks.set_parent(&fields, backlink_col_ndx + 1);
     backlinks.init_from_parent();
 
     return backlinks.remove(m_row_ndx, origin_key);
 }
 
-void Obj::nullify_link(size_t origin_col, Key target_key)
+void Obj::nullify_link(ColKey origin_col_key, Key target_key)
 {
     ensure_writeable();
+
+    size_t origin_col_ndx = get_table()->colkey2ndx(origin_col_key);
 
     Allocator& alloc = m_tree_top->get_alloc();
     alloc.bump_content_version();
@@ -590,10 +610,10 @@ void Obj::nullify_link(size_t origin_col, Key target_key)
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
 
     const Spec& spec = m_tree_top->get_spec();
-    ColumnAttrMask attr = spec.get_column_attr(origin_col);
+    ColumnAttrMask attr = spec.get_column_attr(origin_col_ndx);
     if (attr.test(col_attr_List)) {
         Array linklists(alloc);
-        linklists.set_parent(&fields, origin_col + 1);
+        linklists.set_parent(&fields, origin_col_ndx + 1);
         linklists.init_from_parent();
 
         ArrayKey links(alloc);
@@ -603,32 +623,31 @@ void Obj::nullify_link(size_t origin_col, Key target_key)
     }
     else {
         ArrayKey links(alloc);
-        links.set_parent(&fields, origin_col + 1);
+        links.set_parent(&fields, origin_col_ndx + 1);
         links.init_from_parent();
         Key key = links.get(m_row_ndx);
         REALM_ASSERT(key == target_key);
         links.set(m_row_ndx, Key{});
         if (Replication* repl = alloc.get_replication())
-            repl->set<Key>(m_tree_top->get_owner(), origin_col, m_key, Key{}, _impl::instr_Set); // Throws
+            repl->set<Key>(m_tree_top->get_owner(), origin_col_key, m_key, Key{}, _impl::instr_Set); // Throws
     }
 }
 
-bool Obj::update_backlinks(size_t col_ndx, Key old_key, Key new_key, CascadeState& state)
+bool Obj::update_backlinks(ColKey col_key, Key old_key, Key new_key, CascadeState& state)
 {
     bool recurse = false;
 
     const Table* origin_table = m_tree_top->get_owner();
 
-    TableRef target_table = get_target_table(col_ndx);
-    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-    size_t backlink_col = target_table_spec.find_backlink_column(get_table_key(), col_ndx);
+    TableRef target_table = get_target_table(col_key);
+    ColKey backlink_col_key = target_table->find_backlink_column(get_table_key(), col_key);
 
-    bool strong_links = (origin_table->get_link_type(col_ndx) == link_Strong);
+    bool strong_links = (origin_table->get_link_type(col_key) == link_Strong);
     CascadeState::Mode mode = state.m_mode;
 
     if (old_key != realm::null_key) {
         Obj target_obj = target_table->get_object(old_key);
-        bool last_removed = target_obj.remove_one_backlink(backlink_col, m_key); // Throws
+        bool last_removed = target_obj.remove_one_backlink(backlink_col_key, m_key); // Throws
 
         // Check if the object should be cascade deleted
         if (mode != CascadeState::none && (mode == CascadeState::all || (strong_links && last_removed))) {
@@ -643,7 +662,7 @@ bool Obj::update_backlinks(size_t col_ndx, Key old_key, Key new_key, CascadeStat
 
     if (new_key != realm::null_key) {
         Obj target_obj = target_table->get_object(new_key);
-        target_obj.add_backlink(backlink_col, m_key); // Throws
+        target_obj.add_backlink(backlink_col_key, m_key); // Throws
     }
 
     return recurse;
@@ -651,23 +670,23 @@ bool Obj::update_backlinks(size_t col_ndx, Key old_key, Key new_key, CascadeStat
 
 namespace realm {
 
-template int64_t ConstObj::get<int64_t>(size_t col_ndx) const;
-template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(size_t col_ndx) const;
-template bool ConstObj::get<Bool>(size_t col_ndx) const;
-template util::Optional<Bool> ConstObj::get<util::Optional<Bool>>(size_t col_ndx) const;
-template float ConstObj::get<float>(size_t col_ndx) const;
-template double ConstObj::get<double>(size_t col_ndx) const;
-template StringData ConstObj::get<StringData>(size_t col_ndx) const;
-template BinaryData ConstObj::get<BinaryData>(size_t col_ndx) const;
-template Timestamp ConstObj::get<Timestamp>(size_t col_ndx) const;
-template Key ConstObj::get<Key>(size_t col_ndx) const;
+template int64_t ConstObj::get<int64_t>(ColKey col_key) const;
+template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(ColKey col_key) const;
+template bool ConstObj::get<Bool>(ColKey col_key) const;
+template util::Optional<Bool> ConstObj::get<util::Optional<Bool>>(ColKey col_key) const;
+template float ConstObj::get<float>(ColKey col_key) const;
+template double ConstObj::get<double>(ColKey col_key) const;
+template StringData ConstObj::get<StringData>(ColKey col_key) const;
+template BinaryData ConstObj::get<BinaryData>(ColKey col_key) const;
+template Timestamp ConstObj::get<Timestamp>(ColKey col_key) const;
+template Key ConstObj::get<Key>(ColKey col_key) const;
 
-template Obj& Obj::set<bool>(size_t, bool, bool);
-template Obj& Obj::set<float>(size_t, float, bool);
-template Obj& Obj::set<double>(size_t, double, bool);
-template Obj& Obj::set<StringData>(size_t, StringData, bool);
-template Obj& Obj::set<BinaryData>(size_t, BinaryData, bool);
-template Obj& Obj::set<Timestamp>(size_t, Timestamp, bool);
+template Obj& Obj::set<bool>(ColKey, bool, bool);
+template Obj& Obj::set<float>(ColKey, float, bool);
+template Obj& Obj::set<double>(ColKey, double, bool);
+template Obj& Obj::set<StringData>(ColKey, StringData, bool);
+template Obj& Obj::set<BinaryData>(ColKey, BinaryData, bool);
+template Obj& Obj::set<Timestamp>(ColKey, Timestamp, bool);
 }
 
 template <class T>
@@ -684,8 +703,9 @@ inline void Obj::do_set_null(size_t col_ndx)
     values.set_null(m_row_ndx);
 }
 
-Obj& Obj::set_null(size_t col_ndx, bool is_default)
+Obj& Obj::set_null(ColKey col_key, bool is_default)
 {
+    size_t col_ndx = get_table()->colkey2ndx(col_key);
     if (REALM_UNLIKELY(col_ndx > m_tree_top->get_spec().get_public_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
     if (REALM_UNLIKELY(!m_tree_top->get_spec().get_column_attr(col_ndx).test(col_attr_Nullable))) {
@@ -695,7 +715,7 @@ Obj& Obj::set_null(size_t col_ndx, bool is_default)
     update_if_needed();
     ensure_writeable();
 
-    if (StringIndex* index = m_tree_top->get_owner()->get_search_index(col_ndx)) {
+    if (StringIndex* index = m_tree_top->get_owner()->get_search_index(col_key)) {
         index->set(m_key, null{});
     }
 
@@ -729,8 +749,14 @@ Obj& Obj::set_null(size_t col_ndx, bool is_default)
     }
 
     if (Replication* repl = m_tree_top->get_alloc().get_replication())
-        repl->set_null(m_tree_top->get_owner(), col_ndx, m_key,
+        repl->set_null(m_tree_top->get_owner(), col_key, m_key,
                        is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     return *this;
+}
+
+
+ColKey Obj::ndx2colkey(size_t col_ndx)
+{
+    return get_table()->ndx2colkey(col_ndx);
 }

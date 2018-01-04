@@ -179,10 +179,11 @@ void writer(std::string path, int id)
             // std::cerr << "       - " << getpid() << std::endl;
             WriteTransaction wt(sg);
             auto t1 = wt.get_table("test");
+            auto cols = t1->get_col_keys();
             Obj obj = t1->get_object(Key(id));
-            done = obj.get<Bool>(2);
+            done = obj.get<Bool>(cols[2]);
             if (i & 1) {
-                obj.add_int(0, 1);
+                obj.add_int(cols[0], 1);
             }
             std::this_thread::yield(); // increase chance of signal arriving in the middle of a transaction
             wt.commit();
@@ -213,7 +214,8 @@ void killer(TestContext& test_context, int pid, std::string path, int id)
             ReadTransaction rt(sg);
             rt.get_group().verify();
             auto t1 = rt.get_table("test");
-            done = 10 < t1->get_int(0, id);
+            auto cols = t1->get_col_keys();
+            done = 10 < t1->get_int(cols[0], id);
         } while (!done);
     }
     kill(pid, 9);
@@ -239,7 +241,8 @@ void killer(TestContext& test_context, int pid, std::string path, int id)
         ReadTransaction rt(sg);
         rt.get_group().verify();
         auto t1 = rt.get_table("test");
-        CHECK(10 < t1->get_int(0, id));
+        auto cols = t1->get_col_keys();
+        CHECK(10 < t1->get_int(cols[0], id));
     }
 }
 #endif
@@ -313,10 +316,12 @@ TEST(Shared_CompactingOnTheFly)
     {
         SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
         // Create table entries
+        std::vector<ColKey> cols;
         {
             WriteTransaction wt(sg);
             auto t1 = wt.add_table("test");
             test_table_add_columns(t1);
+            cols = t1->get_col_keys();
             for (int i = 0; i < 100; ++i) {
                 t1->create_object(Key(i)).set_all(0, i, false, "test");
             }
@@ -332,7 +337,7 @@ TEST(Shared_CompactingOnTheFly)
                 ReadTransaction rt(sg);
                 auto t1 = rt.get_table("test");
                 ConstObj obj = t1->get_object(Key(41));
-                waiting = obj.get<Int>(0) == 0;
+                waiting = obj.get<Int>(cols[0]) == 0;
                 // std::cerr << t1->get_int(0, 41) << std::endl;
             }
 
@@ -343,7 +348,7 @@ TEST(Shared_CompactingOnTheFly)
             // make the writer thread terminate:
             WriteTransaction wt(sg);
             auto t1 = wt.get_table("test");
-            t1->get_object(Key(41)).set(2, true);
+            t1->get_object(Key(41)).set(cols[2], true);
             wt.commit();
         }
     }
@@ -514,12 +519,13 @@ TEST(Shared_Initial2)
             ReadTransaction rt(sg);
             rt.get_group().verify();
             auto t1 = rt.get_table("test");
+            auto cols = t1->get_col_keys();
             CHECK_EQUAL(1, t1->size());
             ConstObj obj = t1->get_object(Key(7));
-            CHECK_EQUAL(1, obj.get<Int>(0));
-            CHECK_EQUAL(2, obj.get<Int>(1));
-            CHECK_EQUAL(false, obj.get<Bool>(2));
-            CHECK_EQUAL("test", obj.get<String>(3));
+            CHECK_EQUAL(1, obj.get<Int>(cols[0]));
+            CHECK_EQUAL(2, obj.get<Int>(cols[1]));
+            CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
+            CHECK_EQUAL("test", obj.get<String>(cols[3]));
         }
     }
 }
@@ -559,17 +565,18 @@ TEST(Shared_Initial2_Mem)
             ReadTransaction rt(sg);
             rt.get_group().verify();
             auto t1 = rt.get_table("test");
+            auto cols = t1->get_col_keys();
             CHECK_EQUAL(1, t1->size());
             ConstObj obj = t1->get_object(Key(7));
-            CHECK_EQUAL(1, obj.get<Int>(0));
-            CHECK_EQUAL(2, obj.get<Int>(1));
-            CHECK_EQUAL(false, obj.get<Bool>(2));
-            CHECK_EQUAL("test", obj.get<String>(3));
+            CHECK_EQUAL(1, obj.get<Int>(cols[0]));
+            CHECK_EQUAL(2, obj.get<Int>(cols[1]));
+            CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
+            CHECK_EQUAL("test", obj.get<String>(cols[3]));
         }
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Shared_1)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -673,8 +680,9 @@ TEST(Shared_1)
         }
     }
 }
+#endif
 
-
+#ifdef LEGACY_TESTS
 TEST(Shared_try_begin_write)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -761,7 +769,9 @@ TEST(Shared_try_begin_write)
         CHECK(gr.get_table(t2k)->get_name() == StringData("table 2"));
     }
 }
+#endif
 
+#ifdef LEGACY_TESTS
 TEST(Shared_Rollback)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -832,8 +842,9 @@ TEST(Shared_Rollback)
         }
     }
 }
+#endif
 
-
+#ifdef LEGACY_TESTS
 TEST(Shared_Writes)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -870,6 +881,7 @@ TEST(Shared_Writes)
         }
     }
 }
+#endif
 
 #ifdef LEGACY_TESTS
 namespace {
@@ -1153,7 +1165,7 @@ TEST(Many_ConcurrentReaders)
     SharedGroup sg_w(path_str);
     WriteTransaction wt(sg_w);
     TableRef t = wt.add_table("table");
-    size_t col_ndx = t->add_column(type_String, "column");
+    auto col_ndx = t->add_column(type_String, "column");
     t->create_object().set(col_ndx, StringData("string"));
     wt.commit();
     sg_w.close();
@@ -1209,7 +1221,7 @@ TEST(Shared_WritesSpecialOrder)
                 WriteTransaction wt(sg);
                 wt.get_group().verify();
                 auto table = wt.get_table("test");
-                auto col = table->get_column_index("first");
+                auto col = table->get_column_key("first");
                 Obj obj = table->get_object(Key(i));
                 CHECK_EQUAL(j, obj.get<Int>(col));
                 obj.add_int(col, 1);
@@ -1222,7 +1234,7 @@ TEST(Shared_WritesSpecialOrder)
         ReadTransaction rt(sg);
         rt.get_group().verify();
         auto table = rt.get_table("test");
-        auto col = table->get_column_index("first");
+        auto col = table->get_column_key("first");
         for (int i = 0; i < num_rows; ++i) {
             CHECK_EQUAL(num_reps, table->get_object(Key(i)).get<Int>(col));
         }
@@ -1242,7 +1254,8 @@ void writer_threads_thread(TestContext& test_context, std::string path, Key key)
             WriteTransaction wt(sg);
             wt.get_group().verify();
             auto t1 = wt.get_table("test");
-            t1->get_object(key).add_int(0, 1);
+            auto cols = t1->get_col_keys();
+            t1->get_object(key).add_int(cols[0], 1);
             // FIXME: For some reason this takes ages when running
             // inside valgrind, it is probably due to the "extreme
             // overallocation" bug. The 1000 transactions performed
@@ -1258,8 +1271,8 @@ void writer_threads_thread(TestContext& test_context, std::string path, Key key)
             ReadTransaction rt(sg);
             rt.get_group().verify();
             auto t = rt.get_table("test");
-
-            int64_t v = t->get_object(key).get<Int>(0);
+            auto cols = t->get_col_keys();
+            int64_t v = t->get_object(key).get<Int>(cols[0]);
             int64_t expected = i + 1;
             CHECK_EQUAL(expected, v);
         }
@@ -1302,9 +1315,10 @@ TEST(Shared_WriterThreads)
             ReadTransaction rt(sg);
             rt.get_group().verify();
             auto t = rt.get_table("test");
+            auto col = t->get_col_keys()[0];
 
             for (int i = 0; i < thread_count; ++i) {
-                int64_t v = t->get_object(Key(i)).get<Int>(0);
+                int64_t v = t->get_object(Key(i)).get<Int>(col);
                 CHECK_EQUAL(100, v);
             }
         }
@@ -1414,10 +1428,11 @@ TEST(Shared_SpaceOveruse)
             REALM_ASSERT(table);
             table->add_column(type_String, "text");
         }
+        auto cols = table->get_col_keys();
 
         for (int j = 0; j != n_inner; ++j) {
             REALM_ASSERT(table);
-            table->create_object().set(0, "x");
+            table->create_object().set(cols[0], "x");
         }
         wt.commit();
     }
@@ -1427,12 +1442,12 @@ TEST(Shared_SpaceOveruse)
         ReadTransaction rt(sg);
         rt.get_group().verify();
         auto table = rt.get_table("my_table");
-
+        auto col = table->get_col_keys()[0];
         size_t n = table->size();
         CHECK_EQUAL(n_outer * n_inner, n);
 
         for (auto it : *table) {
-            CHECK_EQUAL("x", it.get<String>(0));
+            CHECK_EQUAL("x", it.get<String>(col));
         }
 
         table->verify();
@@ -1483,10 +1498,11 @@ TEST(Shared_Notifications)
         auto t1 = rt.get_table("test");
         CHECK_EQUAL(1, t1->size());
         ConstObj obj = t1->get_object(Key(7));
-        CHECK_EQUAL(1, obj.get<Int>(0));
-        CHECK_EQUAL(2, obj.get<Int>(1));
-        CHECK_EQUAL(false, obj.get<Bool>(2));
-        CHECK_EQUAL("test", obj.get<String>(3));
+        auto cols = t1->get_col_keys();
+        CHECK_EQUAL(1, obj.get<Int>(cols[0]));
+        CHECK_EQUAL(2, obj.get<Int>(cols[1]));
+        CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
+        CHECK_EQUAL("test", obj.get<String>(cols[3]));
     }
 
     // No other instance have changed db since last transaction
@@ -1517,10 +1533,11 @@ TEST(Shared_FromSerialized)
         auto t1 = rt.get_table("test");
         CHECK_EQUAL(1, t1->size());
         ConstObj obj = t1->get_object(Key(7));
-        CHECK_EQUAL(1, obj.get<Int>(0));
-        CHECK_EQUAL(2, obj.get<Int>(1));
-        CHECK_EQUAL(false, obj.get<Bool>(2));
-        CHECK_EQUAL("test", obj.get<String>(3));
+        auto cols = t1->get_col_keys();
+        CHECK_EQUAL(1, obj.get<Int>(cols[0]));
+        CHECK_EQUAL(2, obj.get<Int>(cols[1]));
+        CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
+        CHECK_EQUAL("test", obj.get<String>(cols[3]));
     }
 }
 
@@ -1649,7 +1666,7 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
         SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
         ReadTransaction rt(sg);
         ConstTableRef test = rt.get_table("Test");
-        auto col = test->get_column_index("foo");
+        auto col = test->get_column_key("foo");
         CHECK_EQUAL(727.2, test->get_object(Key(7)).get<Double>(col));
     }
 }
@@ -1714,7 +1731,8 @@ void multiprocess_thread(TestContext& test_context, std::string path, Key key)
             WriteTransaction wt(sg);
             wt.get_group().verify();
             auto t1 = wt.get_table("test");
-            t1->get_object(key).add_int(0, 1);
+            auto cols = t1->get_col_keys();
+            t1->get_object(key).add_int(cols[0], 1);
             // FIXME: For some reason this takes ages when running
             // inside valgrind, it is probably due to the "extreme
             // overallocation" bug. The 1000 transactions performed
@@ -1729,8 +1747,8 @@ void multiprocess_thread(TestContext& test_context, std::string path, Key key)
             ReadTransaction rt(sg);
             rt.get_group().verify();
             auto t = rt.get_table("test");
-
-            int64_t v = t->get_object(key).get<Int>(0);
+            auto cols = t->get_col_keys();
+            int64_t v = t->get_object(key).get<Int>(cols[0]);
             int64_t expected = i + 1;
             CHECK_EQUAL(expected, v);
         }
@@ -1840,9 +1858,9 @@ void multiprocess_threaded(TestContext& test_context, std::string path, int64_t 
         ReadTransaction rt(sg);
         rt.get_group().verify();
         auto t = rt.get_table("test");
-
+        auto col = t->get_col_keys()[0];
         for (int64_t i = 0; i != num_threads; ++i) {
-            int64_t v = t->get_object(Key(i + base)).get<Int>(0);
+            int64_t v = t->get_object(Key(i + base)).get<Int>(col);
             CHECK_EQUAL(multiprocess_increments, v);
         }
     }
@@ -1862,11 +1880,11 @@ void multiprocess_validate_and_clear(TestContext& test_context, std::string path
         WriteTransaction wt(sg);
         wt.get_group().verify();
         auto t = wt.get_table("test");
-
+        auto cols = t->get_col_keys();
         auto it = t->begin();
         for (size_t i = 0; i != rows; ++i) {
-            int64_t v = it->get<Int>(0);
-            it->set(0, 0);
+            int64_t v = it->get<Int>(cols[0]);
+            it->set(cols[0], 0);
             CHECK_EQUAL(result, v);
             ++it;
         }
@@ -3071,8 +3089,9 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("table");
+        auto cols = table->get_col_keys();
         for (int i = 0; i < 32; ++i) {
-            table->create_object(Key(i)).set(0, long_string.c_str());
+            table->create_object(Key(i)).set(cols[0], long_string.c_str());
         }
         wt.commit();
     }
@@ -3081,8 +3100,9 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
         for (int j = 0; j < 20; ++j) {
             WriteTransaction wt(sg);
             TableRef table = wt.get_table("table");
+            auto cols = table->get_col_keys();
             for (int i = 0; i < 20; ++i) {
-                table->get_object(Key(i)).set(0, long_string.c_str());
+                table->get_object(Key(i)).set(cols[0], long_string.c_str());
             }
             wt.commit();
         }
@@ -3104,7 +3124,8 @@ NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
             WriteTransaction wt(sg);
             TableRef table = wt.add_table("table");
             table->add_column(type_String, "string_col");
-            table->create_object(Key(0)).set(0, long_string.c_str());
+            auto cols = table->get_col_keys();
+            table->create_object(Key(0)).set(cols[0], long_string.c_str());
             wt.commit();
         }
         sg.compact(); // <- required to provoke subsequent failures
@@ -3112,7 +3133,8 @@ NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
             WriteTransaction wt(sg);
             wt.get_group().verify();
             TableRef table = wt.get_table("table");
-            table->get_object(Key(0)).set(0, long_string.c_str());
+            auto cols = table->get_col_keys();
+            table->get_object(Key(0)).set(cols[0], long_string.c_str());
             wt.get_group().verify();
             wt.commit();
         }
@@ -3121,7 +3143,8 @@ NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
         WriteTransaction wt(sg); // <---- fails here
         wt.get_group().verify();
         TableRef table = wt.get_table("table");
-        table->get_object(Key(0)).set(0, long_string.c_str());
+        auto cols = table->get_col_keys();
+        table->get_object(Key(0)).set(cols[0], long_string.c_str());
         wt.get_group().verify();
         wt.commit();
     }
@@ -3552,15 +3575,15 @@ TEST(Shared_ConstObject)
     Group& g = sg_w.begin_write();
 
     TableRef t = g.add_table("Foo");
-    t->add_column(type_Int, "integers");
-    t->create_object(Key(47)).set(0, 5);
+    auto c = t->add_column(type_Int, "integers");
+    t->create_object(Key(47)).set(c, 5);
     sg_w.commit();
 
     SharedGroup sg_r(path);
     const Group& g2 = sg_r.begin_read();
     ConstTableRef t2 = g2.get_table("Foo");
     ConstObj obj = t2->get_object(Key(47));
-    CHECK_EQUAL(obj.get<int64_t>(0), 5);
+    CHECK_EQUAL(obj.get<int64_t>(c), 5);
 }
 
 TEST(Shared_ConstObjectIterator)
@@ -3570,9 +3593,9 @@ TEST(Shared_ConstObjectIterator)
     Group& g = sg.begin_write();
 
     TableRef t = g.add_table("Foo");
-    t->add_column(type_Int, "integers");
-    t->create_object(Key(47)).set(0, 5);
-    t->create_object(Key(99)).set(0, 8);
+    auto col = t->add_column(type_Int, "integers");
+    t->create_object(Key(47)).set(col, 5);
+    t->create_object(Key(99)).set(col, 8);
     sg.commit();
 
     SharedGroup sg2(path);
@@ -3580,12 +3603,12 @@ TEST(Shared_ConstObjectIterator)
     TableRef t2 = g2.get_or_add_table("Foo");
     auto i1 = t2->begin();
     auto i2 = t2->begin();
-    CHECK_EQUAL(i1->get<int64_t>(0), 5);
-    CHECK_EQUAL(i2->get<int64_t>(0), 5);
-    i1->set(0, 7);
-    CHECK_EQUAL(i2->get<int64_t>(0), 7);
+    CHECK_EQUAL(i1->get<int64_t>(col), 5);
+    CHECK_EQUAL(i2->get<int64_t>(col), 5);
+    i1->set(col, 7);
+    CHECK_EQUAL(i2->get<int64_t>(col), 7);
     ++i1;
-    CHECK_EQUAL(i1->get<int64_t>(0), 8);
+    CHECK_EQUAL(i1->get<int64_t>(col), 8);
     sg2.commit();
 
     // Now ensure that we can create a ConstIterator
@@ -3593,9 +3616,9 @@ TEST(Shared_ConstObjectIterator)
     const Group& g3 = sg_r.begin_read();
     ConstTableRef t3 = g3.get_table("Foo");
     auto i3 = t3->begin();
-    CHECK_EQUAL(i3->get<int64_t>(0), 7);
+    CHECK_EQUAL(i3->get<int64_t>(col), 7);
     ++i3;
-    CHECK_EQUAL(i3->get<int64_t>(0), 8);
+    CHECK_EQUAL(i3->get<int64_t>(col), 8);
 }
 
 TEST(Shared_ConstList)

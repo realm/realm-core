@@ -39,7 +39,7 @@ struct TableHandoverPatch {
 
 struct LinkListHandoverPatch {
     std::unique_ptr<TableHandoverPatch> m_table;
-    size_t m_col_num;
+    ColKey m_col_key;
     int64_t m_key_value;
 };
 
@@ -58,14 +58,14 @@ struct QueryHandoverPatch {
 };
 
 struct DescriptorOrderingHandoverPatch {
-    std::vector<std::vector<std::vector<size_t>>> columns;
+    std::vector<std::vector<std::vector<ColKey>>> columns;
     std::vector<std::vector<bool>> ascending;
 };
 
 struct TableViewHandoverPatch {
     std::unique_ptr<TableHandoverPatch> m_table;
     std::unique_ptr<ObjectHandoverPatch> linked_obj;
-    size_t linked_col;
+    ColKey linked_col;
     bool was_in_sync;
     QueryHandoverPatch query_patch;
     std::unique_ptr<LinkListHandoverPatch> linklist_patch;

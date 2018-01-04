@@ -335,7 +335,6 @@ public:
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_base_table(const Table* table) = 0;
     virtual void set_cluster(const Cluster*) = 0;
-    virtual void update_column() const = 0;
     virtual const Table* get_base_table() const = 0;
     virtual std::string description() const = 0;
 
@@ -373,7 +372,6 @@ public:
     {
     }
 
-    virtual void update_column() const = 0;
     virtual std::string description() const = 0;
 
     virtual void set_cluster(const Cluster*)
@@ -448,37 +446,37 @@ Query create(L left, const Subexpr2<R>& right)
         Query q = Query(*t);
 
         if (std::is_same<Cond, Less>::value)
-            q.greater(column->column_ndx(), _impl::only_numeric<R>(left));
+            q.greater(column->column_key(), _impl::only_numeric<R>(left));
         else if (std::is_same<Cond, Greater>::value)
-            q.less(column->column_ndx(), _impl::only_numeric<R>(left));
+            q.less(column->column_key(), _impl::only_numeric<R>(left));
         else if (std::is_same<Cond, Equal>::value)
-            q.equal(column->column_ndx(), left);
+            q.equal(column->column_key(), left);
         else if (std::is_same<Cond, NotEqual>::value)
-            q.not_equal(column->column_ndx(), left);
+            q.not_equal(column->column_key(), left);
         else if (std::is_same<Cond, LessEqual>::value)
-            q.greater_equal(column->column_ndx(), _impl::only_numeric<R>(left));
+            q.greater_equal(column->column_key(), _impl::only_numeric<R>(left));
         else if (std::is_same<Cond, GreaterEqual>::value)
-            q.less_equal(column->column_ndx(), _impl::only_numeric<R>(left));
+            q.less_equal(column->column_key(), _impl::only_numeric<R>(left));
         else if (std::is_same<Cond, EqualIns>::value)
-            q.equal(column->column_ndx(), _impl::only_string(left), false);
+            q.equal(column->column_key(), _impl::only_string(left), false);
         else if (std::is_same<Cond, NotEqualIns>::value)
-            q.not_equal(column->column_ndx(), _impl::only_string(left), false);
+            q.not_equal(column->column_key(), _impl::only_string(left), false);
         else if (std::is_same<Cond, BeginsWith>::value)
-            q.begins_with(column->column_ndx(), _impl::only_string(left));
+            q.begins_with(column->column_key(), _impl::only_string(left));
         else if (std::is_same<Cond, BeginsWithIns>::value)
-            q.begins_with(column->column_ndx(), _impl::only_string(left), false);
+            q.begins_with(column->column_key(), _impl::only_string(left), false);
         else if (std::is_same<Cond, EndsWith>::value)
-            q.ends_with(column->column_ndx(), _impl::only_string(left));
+            q.ends_with(column->column_key(), _impl::only_string(left));
         else if (std::is_same<Cond, EndsWithIns>::value)
-            q.ends_with(column->column_ndx(), _impl::only_string(left), false);
+            q.ends_with(column->column_key(), _impl::only_string(left), false);
         else if (std::is_same<Cond, Contains>::value)
-            q.contains(column->column_ndx(), _impl::only_string(left));
+            q.contains(column->column_key(), _impl::only_string(left));
         else if (std::is_same<Cond, ContainsIns>::value)
-            q.contains(column->column_ndx(), _impl::only_string(left), false);
+            q.contains(column->column_key(), _impl::only_string(left), false);
         else if (std::is_same<Cond, Like>::value)
-            q.like(column->column_ndx(), _impl::only_string(left));
+            q.like(column->column_key(), _impl::only_string(left));
         else if (std::is_same<Cond, LikeIns>::value)
-            q.like(column->column_ndx(), _impl::only_string(left), false);
+            q.like(column->column_key(), _impl::only_string(left), false);
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
             // fallback to using use 'return new Compare<>' instead.
@@ -601,51 +599,51 @@ public:
 
             if (std::numeric_limits<L>::is_integer) {
                 if (std::is_same<Cond, Less>::value)
-                    q.less_int(left_col->column_ndx(), right_col->column_ndx());
+                    q.less_int(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, Greater>::value)
-                    q.greater_int(left_col->column_ndx(), right_col->column_ndx());
+                    q.greater_int(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, Equal>::value)
-                    q.equal_int(left_col->column_ndx(), right_col->column_ndx());
+                    q.equal_int(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, NotEqual>::value)
-                    q.not_equal_int(left_col->column_ndx(), right_col->column_ndx());
+                    q.not_equal_int(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, LessEqual>::value)
-                    q.less_equal_int(left_col->column_ndx(), right_col->column_ndx());
+                    q.less_equal_int(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, GreaterEqual>::value)
-                    q.greater_equal_int(left_col->column_ndx(), right_col->column_ndx());
+                    q.greater_equal_int(left_col->column_key(), right_col->column_key());
                 else {
                     REALM_ASSERT(false);
                 }
             }
             else if (std::is_same<L, float>::value) {
                 if (std::is_same<Cond, Less>::value)
-                    q.less_float(left_col->column_ndx(), right_col->column_ndx());
+                    q.less_float(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, Greater>::value)
-                    q.greater_float(left_col->column_ndx(), right_col->column_ndx());
+                    q.greater_float(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, Equal>::value)
-                    q.equal_float(left_col->column_ndx(), right_col->column_ndx());
+                    q.equal_float(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, NotEqual>::value)
-                    q.not_equal_float(left_col->column_ndx(), right_col->column_ndx());
+                    q.not_equal_float(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, LessEqual>::value)
-                    q.less_equal_float(left_col->column_ndx(), right_col->column_ndx());
+                    q.less_equal_float(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, GreaterEqual>::value)
-                    q.greater_equal_float(left_col->column_ndx(), right_col->column_ndx());
+                    q.greater_equal_float(left_col->column_key(), right_col->column_key());
                 else {
                     REALM_ASSERT(false);
                 }
             }
             else if (std::is_same<L, double>::value) {
                 if (std::is_same<Cond, Less>::value)
-                    q.less_double(left_col->column_ndx(), right_col->column_ndx());
+                    q.less_double(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, Greater>::value)
-                    q.greater_double(left_col->column_ndx(), right_col->column_ndx());
+                    q.greater_double(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, Equal>::value)
-                    q.equal_double(left_col->column_ndx(), right_col->column_ndx());
+                    q.equal_double(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, NotEqual>::value)
-                    q.not_equal_double(left_col->column_ndx(), right_col->column_ndx());
+                    q.not_equal_double(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, LessEqual>::value)
-                    q.less_equal_double(left_col->column_ndx(), right_col->column_ndx());
+                    q.less_equal_double(left_col->column_key(), right_col->column_key());
                 else if (std::is_same<Cond, GreaterEqual>::value)
-                    q.greater_equal_double(left_col->column_ndx(), right_col->column_ndx());
+                    q.greater_equal_double(left_col->column_key(), right_col->column_key());
                 else {
                     REALM_ASSERT(false);
                 }
@@ -1079,9 +1077,6 @@ struct TrueExpression : Expression {
     {
         return nullptr;
     }
-    void update_column() const override
-    {
-    }
     std::string description() const override
     {
         return "TRUEPREDICATE";
@@ -1102,9 +1097,6 @@ struct FalseExpression : Expression {
     {
     }
     void set_cluster(const Cluster*) override
-    {
-    }
-    void update_column() const override
     {
     }
     std::string description() const override
@@ -1167,10 +1159,6 @@ public:
         m_storage.init(values);
         ValueBase::m_from_link_list = from_link_list;
         ValueBase::m_values = values.size();
-    }
-
-    void update_column() const override
-    {
     }
 
     virtual std::string description() const override
@@ -1719,22 +1707,21 @@ If all link columns are type_Link, then LinkMapFunction is only invoked for a si
 columns are type_LinkList, then it may result in multiple keys.
 
 The reason we use this map pattern is that we can exit the link-tree-traversal as early as possible, e.g. when we've
-found the first link that points to key '5'. Other solutions could be a std::vector<size_t> harvest_all_links(), or an
+found the first link that points to key '5'. Other solutions could be a std::vector<ColKey> harvest_all_links(), or an
 iterator pattern. First solution can't exit, second solution requires internal state.
 */
 class LinkMap {
 public:
     LinkMap() = default;
-    LinkMap(const Table* table, std::vector<size_t> columns)
-        : m_link_column_indexes(std::move(columns))
+    LinkMap(const Table* table, std::vector<ColKey> columns)
+        : m_link_column_keys(std::move(columns))
     {
         set_base_table(table);
     }
 
     LinkMap(LinkMap const& other)
     {
-        m_link_column_names = other.m_link_column_names;
-        m_link_column_indexes = other.m_link_column_indexes;
+        m_link_column_keys = other.m_link_column_keys;
         m_tables = other.m_tables;
         m_link_types = other.m_link_types;
         m_only_unary_links = other.m_only_unary_links;
@@ -1747,12 +1734,12 @@ public:
 
     size_t get_nb_hops() const
     {
-        return m_link_column_indexes.size();
+        return m_link_column_keys.size();
     }
 
     bool has_links() const
     {
-        return m_link_column_indexes.size() > 0;
+        return m_link_column_keys.size() > 0;
     }
 
     void set_base_table(const Table* table);
@@ -1774,18 +1761,9 @@ public:
             default:
                 break;
         }
-        cluster->init_leaf(m_link_column_indexes[0], m_array_ptr.get());
+        size_t col_ndx = m_tables[0]->colkey2ndx(m_link_column_keys[0]);
+        cluster->init_leaf(col_ndx, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
-    }
-
-    void update_columns() const
-    {
-        for (size_t i = 0; i < m_link_column_indexes.size(); i++) {
-            m_link_column_indexes[i] = m_tables[i]->get_column_index(m_link_column_names[i]);
-            if (m_link_column_indexes[i] == npos) {
-                throw LogicError(LogicError::column_does_not_exist);
-            }
-        }
     }
 
     std::string description() const;
@@ -1835,8 +1813,7 @@ private:
         map_links(row, mlv);
     }
 
-    mutable std::vector<size_t> m_link_column_indexes;
-    std::vector<std::string> m_link_column_names;
+    mutable std::vector<ColKey> m_link_column_keys;
     std::vector<ColumnType> m_link_types;
     std::vector<ConstTableRef> m_tables;
     bool m_only_unary_links = true;
@@ -1886,16 +1863,15 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
 template <class T>
 class SimpleQuerySupport : public Subexpr2<T> {
 public:
-    SimpleQuerySupport(size_t column, const Table* table, std::vector<size_t> links = {})
+    SimpleQuerySupport(ColKey column, const Table* table, std::vector<ColKey> links = {})
         : m_link_map(table, std::move(links))
-        , m_column_name(m_link_map.get_target_table()->get_column_name(column))
-        , m_column_ndx(column)
+        , m_column_key(column)
     {
     }
 
     bool is_nullable() const noexcept
     {
-        return m_link_map.get_base_table()->is_nullable(m_column_ndx);
+        return m_link_map.get_base_table()->is_nullable(m_column_key);
     }
 
     const Table* get_base_table() const override
@@ -1907,7 +1883,6 @@ public:
     {
         if (table != get_base_table()) {
             m_link_map.set_base_table(table);
-            m_column_name = m_link_map.get_target_table()->get_column_name(m_column_ndx);
         }
     }
 
@@ -1921,19 +1896,9 @@ public:
         else {
             // Create new Leaf
             m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_link_map.get_base_table()->get_alloc()));
-            cluster->init_leaf(this->m_column_ndx, m_array_ptr.get());
+            size_t column_ndx = get_base_table()->colkey2ndx(m_column_key);
+            cluster->init_leaf(column_ndx, m_array_ptr.get());
             m_leaf_ptr = m_array_ptr.get();
-        }
-    }
-
-    void update_column() const override
-    {
-        // update links
-        m_link_map.update_columns();
-        // update target column
-        m_column_ndx = m_link_map.get_target_table()->get_column_index(m_column_name);
-        if (m_column_ndx == realm::npos) {
-            throw LogicError(LogicError::column_does_not_exist);
         }
     }
 
@@ -1948,7 +1913,7 @@ public:
 
             for (size_t t = 0; t < links.size(); t++) {
                 ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
-                v.m_storage.set(t, obj.get<T>(m_column_ndx));
+                v.m_storage.set(t, obj.get<T>(m_column_key));
             }
             destination.import(v);
         }
@@ -1964,7 +1929,7 @@ public:
     void evaluate(Key key, ValueBase& destination) override
     {
         Value<T>& d = static_cast<Value<T>&>(destination);
-        d.m_storage.set(0, m_link_map.get_target_table()->get_object(key).template get<T>(m_column_ndx));
+        d.m_storage.set(0, m_link_map.get_target_table()->get_object(key).template get<T>(m_column_key));
     }
 
     bool links_exist() const
@@ -1980,7 +1945,7 @@ public:
         }
         auto target_table = m_link_map.get_target_table();
         if (target_table) {
-            desc += std::string(target_table->get_column_name(m_column_ndx));
+            desc += std::string(target_table->get_column_name(m_column_key));
         }
         return desc;
     }
@@ -1993,8 +1958,7 @@ public:
     SimpleQuerySupport(SimpleQuerySupport const& other, QueryNodeHandoverPatches* patches)
         : Subexpr2<T>(other)
         , m_link_map(other.m_link_map, patches)
-        , m_column_name(other.m_column_name)
-        , m_column_ndx(other.m_column_ndx)
+        , m_column_key(other.m_column_key)
     {
     }
 
@@ -2003,9 +1967,9 @@ public:
     {
     }
 
-    size_t column_ndx() const
+    ColKey column_key() const
     {
-        return m_column_ndx;
+        return m_column_key;
     }
 
     SizeOperator<T> size()
@@ -2016,9 +1980,8 @@ public:
 private:
     LinkMap m_link_map;
 
-    // Column index of payload column of m_table
-    std::string m_column_name;
-    mutable size_t m_column_ndx;
+    // Column key of payload column of m_table
+    mutable ColKey m_column_key;
 
     // Leaf cache
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
@@ -2043,7 +2006,7 @@ class Columns<BinaryData> : public SimpleQuerySupport<BinaryData> {
 template <>
 class Columns<StringData> : public SimpleQuerySupport<StringData> {
 public:
-    Columns(size_t column, const Table* table, std::vector<size_t> links = {})
+    Columns(ColKey column, const Table* table, std::vector<ColKey> links = {})
         : SimpleQuerySupport(column, table, links)
     {
     }
@@ -2163,11 +2126,6 @@ public:
         m_link_map.set_cluster(cluster);
     }
 
-    void update_column() const override
-    {
-        m_link_map.update_columns();
-    }
-
     // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as
     // any linked-to payload tables
     const Table* get_base_table() const override
@@ -2241,11 +2199,6 @@ public:
         m_link_map.set_cluster(cluster);
     }
 
-    void update_column() const override
-    {
-        m_link_map.update_columns();
-    }
-
     void evaluate(size_t index, ValueBase& destination) override
     {
         size_t count = m_link_map.count_links(index);
@@ -2278,11 +2231,6 @@ public:
     void set_cluster(const Cluster* cluster) override
     {
         m_expr->set_cluster(cluster);
-    }
-
-    void update_column() const override
-    {
-        m_expr->update_column();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
@@ -2354,10 +2302,6 @@ public:
     {
     }
 
-    void update_column() const override
-    {
-    }
-
     const Table* get_base_table() const override
     {
         return nullptr;
@@ -2420,9 +2364,9 @@ public:
     }
 
     template <typename C>
-    SubColumns<C> column(size_t column_ndx) const
+    SubColumns<C> column(ColKey column_key) const
     {
-        return SubColumns<C>(Columns<C>(column_ndx, m_link_map.get_target_table()), m_link_map);
+        return SubColumns<C>(Columns<C>(column_key, m_link_map.get_target_table()), m_link_map);
     }
 
     const LinkMap& link_map() const
@@ -2446,11 +2390,6 @@ public:
         m_link_map.set_cluster(cluster);
     }
 
-    void update_column() const override
-    {
-        m_link_map.update_columns();
-    }
-
     std::string description() const override
     {
         return m_link_map.description();
@@ -2468,10 +2407,10 @@ private:
     LinkMap m_link_map;
     friend class Table;
 
-    Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links = {})
+    Columns(ColKey column_key, const Table* table, const std::vector<ColKey>& links = {})
         : m_link_map(table, links)
     {
-        static_cast<void>(column_ndx);
+        static_cast<void>(column_key);
     }
     Columns(const Columns& other, QueryNodeHandoverPatches* patches)
         : Subexpr2<Link>(other)
@@ -2497,15 +2436,14 @@ class Average;
 
 class ColumnListBase {
 public:
-    ColumnListBase(size_t column_ndx, const Table* table, const std::vector<size_t>& links)
-        : m_column_ndx(column_ndx)
+    ColumnListBase(ColKey column_key, const Table* table, const std::vector<ColKey>& links)
+        : m_column_key(column_key)
         , m_link_map(table, links)
     {
     }
 
     ColumnListBase(const ColumnListBase& other, QueryNodeHandoverPatches* patches)
-        : m_column_name(other.m_column_name)
-        , m_column_ndx(other.m_column_ndx)
+        : m_column_key(other.m_column_key)
         , m_link_map(other.m_link_map, patches)
     {
     }
@@ -2524,8 +2462,7 @@ public:
         return m_link_map.has_links();
     }
 
-    std::string m_column_name;
-    mutable size_t m_column_ndx;
+    mutable ColKey m_column_key;
     LinkMap m_link_map;
     // Leaf cache
     using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayList), alignof(Array)>::type;
@@ -2566,21 +2503,11 @@ public:
     void set_base_table(const Table* table) override
     {
         m_link_map.set_base_table(table);
-        m_column_name = m_link_map.get_target_table()->get_column_name(m_column_ndx);
     }
 
     void set_cluster(const Cluster* cluster) override
     {
         ColumnListBase::set_cluster(cluster);
-    }
-
-    void update_column() const override
-    {
-        m_link_map.update_columns();
-        m_column_ndx = m_link_map.get_target_table()->get_column_index(m_column_name);
-        if (m_column_ndx == realm::npos) {
-            throw LogicError(LogicError::column_does_not_exist);
-        }
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2621,7 +2548,7 @@ public:
         }
         auto target_table = m_link_map.get_target_table();
         if (target_table) {
-            return std::string(target_table->get_column_name(m_column_ndx));
+            return std::string(target_table->get_column_name(m_column_key));
         }
         return "";
     }
@@ -2630,30 +2557,30 @@ public:
 
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
     {
-        return {m_column_ndx, *this};
+        return {m_column_key, *this};
     }
 
     ListColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
     {
-        return {m_column_ndx, *this};
+        return {m_column_key, *this};
     }
 
     ListColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
     {
-        return {m_column_ndx, *this};
+        return {m_column_key, *this};
     }
 
     ListColumnAggregate<T, aggregate_operations::Average<T>> average() const
     {
-        return {m_column_ndx, *this};
+        return {m_column_key, *this};
     }
 
 
 private:
     friend class Table;
 
-    Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links = {})
-        : ColumnListBase(column_ndx, table, links)
+    Columns(ColKey column_key, const Table* table, const std::vector<ColKey>& links = {})
+        : ColumnListBase(column_key, table, links)
     {
     }
 };
@@ -2706,14 +2633,14 @@ class ListColumnAggregate : public Subexpr2<typename Operation::ResultType> {
 public:
     using R = typename Operation::ResultType;
 
-    ListColumnAggregate(size_t column_ndx, Columns<List<T>> column)
-        : m_column_ndx(column_ndx)
+    ListColumnAggregate(ColKey column_key, Columns<List<T>> column)
+        : m_column_key(column_key)
         , m_list(std::move(column))
     {
     }
 
     ListColumnAggregate(const ListColumnAggregate& other, QueryNodeHandoverPatches* patches)
-        : m_column_ndx(other.m_column_ndx)
+        : m_column_key(other.m_column_key)
         , m_list(other.m_list, patches)
     {
     }
@@ -2736,11 +2663,6 @@ public:
     void set_cluster(const Cluster* cluster) override
     {
         m_list.set_cluster(cluster);
-    }
-
-    void update_column() const override
-    {
-        m_list.update_column();
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2777,14 +2699,14 @@ public:
     {
         auto table = get_base_table();
         if (table) {
-            return std::string(table->get_column_name(m_column_ndx)) + util::serializer::value_separator +
+            return std::string(table->get_column_name(m_column_key)) + util::serializer::value_separator +
                    Operation::description() + "()";
         }
         return "";
     }
 
 private:
-    size_t m_column_ndx;
+    ColKey m_column_key;
     Columns<List<T>> m_list;
 };
 
@@ -2811,7 +2733,7 @@ Query compare(const Subexpr2<Link>& left, const ConstObj& obj)
                     // Negate the following `links_to`.
                     query.Not();
                 }
-                query.links_to(link_map.m_link_column_indexes[0], obj.get_key());
+                query.links_to(link_map.m_link_column_keys[0], obj.get_key());
                 return query;
             }
         }
@@ -2869,18 +2791,16 @@ public:
     using ColType = typename ColumnTypeTraits<T>::column_type;
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
 
-    Columns(size_t column, const Table* table, std::vector<size_t> links = {})
+    Columns(ColKey column, const Table* table, std::vector<ColKey> links = {})
         : m_link_map(table, std::move(links))
-        , m_column_name(m_link_map.get_target_table()->get_column_name(column))
-        , m_column_ndx(column)
-        , m_nullable(m_link_map.get_target_table()->is_nullable(m_column_ndx))
+        , m_column_key(column)
+        , m_nullable(m_link_map.get_target_table()->is_nullable(m_column_key))
     {
     }
 
     Columns(const Columns& other, QueryNodeHandoverPatches* patches = nullptr)
         : m_link_map(other.m_link_map, patches)
-        , m_column_name(other.m_column_name)
-        , m_column_ndx(other.m_column_ndx)
+        , m_column_key(other.m_column_key)
         , m_nullable(other.m_nullable)
     {
     }
@@ -2889,8 +2809,7 @@ public:
     {
         if (this != &other) {
             m_link_map = other.m_link_map;
-            m_column_name = other.m_column_name;
-            m_column_ndx = other.m_column_ndx;
+            m_column_key = other.m_column_key;
             m_nullable = other.m_nullable;
         }
         return *this;
@@ -2908,8 +2827,7 @@ public:
             return;
 
         m_link_map.set_base_table(table);
-        m_nullable = m_link_map.get_target_table()->is_nullable(m_column_ndx);
-        m_column_name = m_link_map.get_target_table()->get_column_name(m_column_ndx);
+        m_nullable = m_link_map.get_target_table()->is_nullable(m_column_key);
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -2922,19 +2840,9 @@ public:
         else {
             // Create new Leaf
             m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(get_base_table()->get_alloc()));
-            cluster->init_leaf(this->m_column_ndx, m_array_ptr.get());
+            size_t column_ndx = get_base_table()->colkey2ndx(m_column_key);
+            cluster->init_leaf(column_ndx, m_array_ptr.get());
             m_leaf_ptr = m_array_ptr.get();
-        }
-    }
-
-    void update_column() const override
-    {
-        // update links
-        m_link_map.update_columns();
-        // update target column
-        m_column_ndx = m_link_map.get_target_table()->get_column_index(m_column_name);
-        if (m_column_ndx == realm::npos) {
-            throw LogicError(LogicError::column_does_not_exist);
         }
     }
 
@@ -2959,10 +2867,10 @@ public:
 
             for (size_t t = 0; t < links.size(); t++) {
                 ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
-                if (obj.is_null(m_column_ndx))
+                if (obj.is_null(m_column_key))
                     v.m_storage.set_null(t);
                 else
-                    v.m_storage.set(t, obj.get<U>(m_column_ndx));
+                    v.m_storage.set(t, obj.get<U>(m_column_key));
             }
             destination.import(v);
         }
@@ -3007,8 +2915,8 @@ public:
             desc = m_link_map.description() + util::serializer::value_separator;
         }
         auto target_table = m_link_map.get_target_table();
-        if (target_table && m_column_ndx != npos) {
-            desc += std::string(target_table->get_column_name(m_column_ndx));
+        if (target_table && m_column_key != ColKey()) {
+            desc += std::string(target_table->get_column_name(m_column_key));
             return desc;
         }
         return "";
@@ -3031,12 +2939,12 @@ public:
         auto obj = table->get_object(key);
         if (m_nullable && std::is_same<typename ColType::value_type, int64_t>::value) {
             Value<int64_t> v(false, 1);
-            v.m_storage.set(0, obj.template get<util::Optional<int64_t>>(m_column_ndx));
+            v.m_storage.set(0, obj.template get<util::Optional<int64_t>>(m_column_key));
             destination.import(v);
         }
         else {
             Value<typename util::RemoveOptional<T>::type> v(false, 1);
-            T val = obj.template get<T>(m_column_ndx);
+            T val = obj.template get<T>(m_column_key);
             v.m_storage.set(0, val);
             destination.import(v);
         }
@@ -3052,9 +2960,9 @@ public:
         return m_nullable;
     }
 
-    size_t column_ndx() const noexcept
+    ColKey column_key() const noexcept
     {
-        return m_column_ndx;
+        return m_column_key;
     }
 
 private:
@@ -3068,8 +2976,7 @@ private:
     const ArrayPayload* m_leaf_ptr = nullptr;
 
     // Column index of payload column of m_table
-    std::string m_column_name;
-    mutable size_t m_column_ndx;
+    mutable ColKey m_column_key;
 
     // set to false by default for stand-alone Columns declaration that are not yet associated with any table
     // or oclumn. Call init() to update it or use a constructor that takes table + column index as argument.
@@ -3102,12 +3009,6 @@ public:
     {
         m_link_map.set_base_table(table);
         m_column.set_base_table(m_link_map.get_target_table());
-    }
-
-    void update_column() const override
-    {
-        m_link_map.update_columns();
-        m_column.update_column();
     }
 
     void evaluate(size_t, ValueBase&) override
@@ -3182,12 +3083,6 @@ public:
         m_column.set_cluster(cluster);
     }
 
-    void update_column() const override
-    {
-        m_link_map.update_columns();
-        m_column.update_column();
-    }
-
     void evaluate(size_t index, ValueBase& destination) override
     {
         std::vector<Key> keys = m_link_map.get_links(index);
@@ -3247,11 +3142,6 @@ public:
     void set_cluster(const Cluster* cluster) override
     {
         m_link_map.set_cluster(cluster);
-    }
-
-    void update_column() const override
-    {
-        m_link_map.update_columns();
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -3465,11 +3355,6 @@ public:
         m_left->set_base_table(table);
     }
 
-    void update_column() const override
-    {
-        m_left->update_column();
-    }
-
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and binds it to a Query at a later time
     const Table* get_base_table() const override
@@ -3551,12 +3436,6 @@ public:
         m_right->set_cluster(cluster);
     }
 
-    void update_column() const override
-    {
-        m_left->update_column();
-        m_right->update_column();
-    }
-
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and
     // binds it to a Query at a later time
@@ -3635,12 +3514,6 @@ public:
     {
         m_left->set_cluster(cluster);
         m_right->set_cluster(cluster);
-    }
-
-    void update_column() const override
-    {
-        m_left->update_column();
-        m_right->update_column();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression

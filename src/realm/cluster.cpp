@@ -1019,21 +1019,23 @@ void Cluster::remove_backlinks(Key origin_key, size_t origin_col_ndx, const std:
     const Table* origin_table = m_tree_top.get_owner();
 
     // Find target table
-    TableRef target_table = _impl::TableFriend::get_opposite_link_table(*origin_table, origin_col_ndx);
+    ColKey origin_col_key = origin_table->ndx2colkey(origin_col_ndx);
+    TableRef target_table = _impl::TableFriend::get_opposite_link_table(*origin_table, origin_col_key);
     TableKey target_table_key = target_table->get_key();
 
     // Find actual backlink column
     const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-    size_t backlink_col = target_table_spec.find_backlink_column(origin_table->get_key(), origin_col_ndx);
+    size_t backlink_col = target_table_spec.find_backlink_column(origin_table->get_key(), origin_col_key);
+    ColKey backlink_col_key = target_table->ndx2colkey(backlink_col);
 
     CascadeState::Mode mode = state.m_mode;
-    bool strong_links = (origin_table->get_link_type(origin_col_ndx) == link_Strong);
+    bool strong_links = (origin_table->get_link_type(origin_col_key) == link_Strong);
     bool only_strong_links = (mode == CascadeState::Mode::strong);
 
     for (auto key : keys) {
         if (key != null_key) {
             Obj target_obj = target_table->get_object(key);
-            bool last_removed = target_obj.remove_one_backlink(backlink_col, origin_key); // Throws
+            bool last_removed = target_obj.remove_one_backlink(backlink_col_key, origin_key); // Throws
 
             // Check if the object should be cascade deleted
             if (mode != CascadeState::none && (mode == CascadeState::all || (strong_links && last_removed))) {
@@ -1162,7 +1164,8 @@ void ClusterTree::clear()
 {
     size_t num_cols = get_spec().get_public_column_count();
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
-        if (StringIndex* index = m_owner->get_search_index(col_ndx)) {
+        auto col_key = m_owner->ndx2colkey(col_ndx);
+        if (StringIndex* index = m_owner->get_search_index(col_key)) {
             index->clear();
         }
     }
@@ -1195,7 +1198,8 @@ Obj ClusterTree::insert(Key k)
     const Spec& spec = get_spec();
     size_t num_cols = spec.get_public_column_count();
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
-        if (StringIndex* index = m_owner->get_search_index(col_ndx)) {
+        auto col_key = m_owner->ndx2colkey(col_ndx);
+        if (StringIndex* index = m_owner->get_search_index(col_key)) {
             bool nullable = spec.get_column_attr(col_ndx).test(col_attr_Nullable);
             switch (spec.get_column_type(col_ndx)) {
                 case col_type_Int:
@@ -1254,7 +1258,8 @@ void ClusterTree::erase(Key k, CascadeState& state)
 {
     size_t num_cols = get_spec().get_public_column_count();
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
-        if (StringIndex* index = m_owner->get_search_index(col_ndx)) {
+        auto col_key = m_owner->ndx2colkey(col_ndx);
+        if (StringIndex* index = m_owner->get_search_index(col_key)) {
             index->erase(k);
         }
     }

@@ -267,14 +267,14 @@ TEST(Replication_General)
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("my_table");
-        auto col_id = table->get_column_index("my_int");
+        auto col_id = table->get_column_key("my_int");
         Obj obj = table->get_object(Key(0)).set(col_id, 9);
         wt.commit();
     }
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("my_table");
-        auto col_id = table->get_column_index("my_int");
+        auto col_id = table->get_column_key("my_int");
         table->get_object(Key(0)).set(col_id, 10);
         table->get_object(Key(3)).set(col_id, 2);
         wt.commit();
@@ -305,7 +305,8 @@ TEST(Replication_General)
         rt_2.get_group().verify();
         CHECK(rt_1.get_group() == rt_2.get_group());
         auto table = rt_2.get_table("my_table");
-        auto col_id = table->get_column_index("my_int");
+        auto col_id = table->get_column_key("my_int");
+        auto col_st = table->get_column_key("my_string");
 
         CHECK_EQUAL(5, table->size());
 
@@ -315,7 +316,7 @@ TEST(Replication_General)
         CHECK_EQUAL(2, table->get_object(Key(3)).get<Int>(col_id));
         CHECK_EQUAL(8, table->get_object(Key(4)).get<Int>(col_id));
 
-        StringData sd1 = table->get_object(Key(4)).get<String>(4);
+        StringData sd1 = table->get_object(Key(4)).get<String>(col_st);
 
         CHECK(!sd1.is_null());
     }
@@ -490,15 +491,15 @@ TEST(Replication_Links)
         CHECK_EQUAL(1, target_1->get_column_count());
         CHECK_EQUAL(1, target_2->get_column_count());
 
-        auto o_1_ll_1 = origin_1->get_column_index("o_1_ll_1");
-        auto o_1_f_2 = origin_1->get_column_index("o_1_f_2");
-        auto o_1_l_3 = origin_1->get_column_index("o_1_l_3");
-        auto o_1_l_4 = origin_1->get_column_index("o_1_l_4");
+        auto o_1_ll_1 = origin_1->get_column_key("o_1_ll_1");
+        auto o_1_f_2 = origin_1->get_column_key("o_1_f_2");
+        auto o_1_l_3 = origin_1->get_column_key("o_1_l_3");
+        auto o_1_l_4 = origin_1->get_column_key("o_1_l_4");
 
-        auto o_2_f_1 = origin_2->get_column_index("o_2_f_1");
-        auto o_2_l_2 = origin_2->get_column_index("o_2_l_2");
-        auto o_2_ll_3 = origin_2->get_column_index("o_2_ll_3");
-        auto o_2_l_4 = origin_2->get_column_index("o_2_l_4");
+        auto o_2_f_1 = origin_2->get_column_key("o_2_f_1");
+        auto o_2_l_2 = origin_2->get_column_key("o_2_l_2");
+        auto o_2_ll_3 = origin_2->get_column_key("o_2_ll_3");
+        auto o_2_l_4 = origin_2->get_column_key("o_2_l_4");
 
         CHECK_EQUAL(type_LinkList, origin_1->get_column_type(o_1_ll_1));
         CHECK_EQUAL(type_Int, origin_1->get_column_type(o_1_f_2));
@@ -562,10 +563,10 @@ TEST(Replication_Links)
         WriteTransaction wt(sg_1);
         TableRef origin_1 = wt.get_table("origin_1");
         TableRef origin_2 = wt.get_table("origin_2");
-        auto o_1_l_3 = origin_1->get_column_index("o_1_l_3");
-        auto o_1_l_4 = origin_1->get_column_index("o_1_l_4");
-        auto o_2_l_2 = origin_2->get_column_index("o_2_l_2");
-        auto o_2_l_4 = origin_2->get_column_index("o_2_l_4");
+        auto o_1_l_3 = origin_1->get_column_key("o_1_l_3");
+        auto o_1_l_4 = origin_1->get_column_key("o_1_l_4");
+        auto o_2_l_2 = origin_2->get_column_key("o_2_l_2");
+        auto o_2_l_4 = origin_2->get_column_key("o_2_l_4");
         Obj o_1_0 = origin_1->get_object(origin_1_keys[0]);
         Obj o_1_1 = origin_1->get_object(origin_1_keys[1]);
         Obj o_2_0 = origin_2->get_object(origin_2_keys[0]);
@@ -593,11 +594,11 @@ TEST(Replication_Links)
         ConstTableRef target_1 = rt.get_table("target_1");
         ConstTableRef target_2 = rt.get_table("target_2");
 
-        auto o_1_l_3 = origin_1->get_column_index("o_1_l_3");
-        auto o_1_l_4 = origin_1->get_column_index("o_1_l_4");
+        auto o_1_l_3 = origin_1->get_column_key("o_1_l_3");
+        auto o_1_l_4 = origin_1->get_column_key("o_1_l_4");
 
-        auto o_2_l_2 = origin_2->get_column_index("o_2_l_2");
-        auto o_2_l_4 = origin_2->get_column_index("o_2_l_4");
+        auto o_2_l_2 = origin_2->get_column_key("o_2_l_2");
+        auto o_2_l_4 = origin_2->get_column_key("o_2_l_4");
 
         ConstObj o_1_0 = origin_1->get_object(origin_1_keys[0]);
         ConstObj o_1_1 = origin_1->get_object(origin_1_keys[1]);
@@ -631,8 +632,8 @@ TEST(Replication_Links)
         WriteTransaction wt(sg_1);
         TableRef origin_1 = wt.get_table("origin_1");
         TableRef origin_2 = wt.get_table("origin_2");
-        auto o_1_ll_1 = origin_1->get_column_index("o_1_ll_1");
-        auto o_2_ll_3 = origin_2->get_column_index("o_2_ll_3");
+        auto o_1_ll_1 = origin_1->get_column_key("o_1_ll_1");
+        auto o_2_ll_3 = origin_2->get_column_key("o_2_ll_3");
         Obj o_1_0 = origin_1->get_object(origin_1_keys[0]);
         Obj o_1_1 = origin_1->get_object(origin_1_keys[1]);
         Obj o_2_0 = origin_2->get_object(origin_2_keys[0]);
@@ -658,13 +659,13 @@ TEST(Replication_Links)
         ConstTableRef target_1 = rt.get_table("target_1");
         ConstTableRef target_2 = rt.get_table("target_2");
 
-        auto o_1_ll_1 = origin_1->get_column_index("o_1_ll_1");
-        auto o_1_l_3 = origin_1->get_column_index("o_1_l_3");
-        auto o_1_l_4 = origin_1->get_column_index("o_1_l_4");
+        auto o_1_ll_1 = origin_1->get_column_key("o_1_ll_1");
+        auto o_1_l_3 = origin_1->get_column_key("o_1_l_3");
+        auto o_1_l_4 = origin_1->get_column_key("o_1_l_4");
 
-        auto o_2_l_2 = origin_2->get_column_index("o_2_l_2");
-        auto o_2_ll_3 = origin_2->get_column_index("o_2_ll_3");
-        auto o_2_l_4 = origin_2->get_column_index("o_2_l_4");
+        auto o_2_l_2 = origin_2->get_column_key("o_2_l_2");
+        auto o_2_ll_3 = origin_2->get_column_key("o_2_ll_3");
+        auto o_2_l_4 = origin_2->get_column_key("o_2_l_4");
 
         ConstObj o_1_0 = origin_1->get_object(origin_1_keys[0]);
         ConstObj o_1_1 = origin_1->get_object(origin_1_keys[1]);
@@ -704,8 +705,8 @@ TEST(Replication_Links)
     {
         WriteTransaction wt(sg_1);
         TableRef origin_2 = wt.get_table("origin_2");
-        auto o_2_l_2 = origin_2->get_column_index("o_2_l_2");
-        auto o_2_l_4 = origin_2->get_column_index("o_2_l_4");
+        auto o_2_l_2 = origin_2->get_column_key("o_2_l_2");
+        auto o_2_l_4 = origin_2->get_column_key("o_2_l_4");
 
         origin_2->create_objects(1, origin_2_keys);
         Obj o_2_2 = origin_2->get_object(origin_2_keys[2]);
@@ -730,9 +731,9 @@ TEST(Replication_Links)
         CHECK_EQUAL(2, origin_1->size());
         CHECK_EQUAL(3, origin_2->size());
 
-        auto o_2_l_2 = origin_2->get_column_index("o_2_l_2");
-        auto o_2_ll_3 = origin_2->get_column_index("o_2_ll_3");
-        auto o_2_l_4 = origin_2->get_column_index("o_2_l_4");
+        auto o_2_l_2 = origin_2->get_column_key("o_2_l_2");
+        auto o_2_ll_3 = origin_2->get_column_key("o_2_ll_3");
+        auto o_2_l_4 = origin_2->get_column_key("o_2_l_4");
 
         ConstObj o_2_2 = origin_2->get_object(origin_2_keys[2]);
         CHECK_EQUAL(target_1_keys[1], o_2_2.get<Key>(o_2_l_2));
@@ -751,9 +752,9 @@ TEST(Replication_Links)
         WriteTransaction wt(sg_1);
         TableRef origin_1 = wt.get_table("origin_1");
         TableRef origin_2 = wt.get_table("origin_2");
-        auto o_1_l_3 = origin_1->get_column_index("o_1_l_3");
-        auto o_2_l_2 = origin_2->get_column_index("o_2_l_2");
-        auto o_2_l_4 = origin_2->get_column_index("o_2_l_4");
+        auto o_1_l_3 = origin_1->get_column_key("o_1_l_3");
+        auto o_2_l_2 = origin_2->get_column_key("o_2_l_2");
+        auto o_2_l_4 = origin_2->get_column_key("o_2_l_4");
 
         Obj o_1_0 = origin_1->get_object(origin_1_keys[0]);
         Obj o_2_2 = origin_2->get_object(origin_2_keys[2]);
@@ -777,10 +778,10 @@ TEST(Replication_Links)
         ConstTableRef target_1 = rt.get_table("target_1");
         ConstTableRef target_2 = rt.get_table("target_2");
 
-        auto o_1_l_3 = origin_1->get_column_index("o_1_l_3");
-        auto o_2_l_2 = origin_2->get_column_index("o_2_l_2");
-        auto o_2_ll_3 = origin_2->get_column_index("o_2_ll_3");
-        auto o_2_l_4 = origin_2->get_column_index("o_2_l_4");
+        auto o_1_l_3 = origin_1->get_column_key("o_1_l_3");
+        auto o_2_l_2 = origin_2->get_column_key("o_2_l_2");
+        auto o_2_ll_3 = origin_2->get_column_key("o_2_ll_3");
+        auto o_2_l_4 = origin_2->get_column_key("o_2_l_4");
 
         ConstObj o_1_0 = origin_1->get_object(origin_1_keys[0]);
         CHECK_EQUAL(target_1_keys[1], o_1_0.get<Key>(o_1_l_3));
@@ -804,7 +805,7 @@ TEST(Replication_Links)
     {
         WriteTransaction wt(sg_1);
         TableRef origin_2 = wt.get_table("origin_2");
-        auto o_2_ll_3 = origin_2->get_column_index("o_2_ll_3");
+        auto o_2_ll_3 = origin_2->get_column_key("o_2_ll_3");
 
         Obj o_2_1 = origin_2->get_object(origin_2_keys[1]);
         Obj o_2_2 = origin_2->get_object(origin_2_keys[2]);
@@ -828,7 +829,7 @@ TEST(Replication_Links)
         ConstTableRef target_1 = rt.get_table("target_1");
         ConstTableRef target_2 = rt.get_table("target_2");
 
-        auto o_2_ll_3 = origin_2->get_column_index("o_2_ll_3");
+        auto o_2_ll_3 = origin_2->get_column_key("o_2_ll_3");
 
         ConstObj o_2_1 = origin_2->get_object(origin_2_keys[1]);
         CHECK_EQUAL(1, o_2_1.get_linklist(o_2_ll_3).size());
@@ -849,7 +850,7 @@ TEST(Replication_Links)
     {
         WriteTransaction wt(sg_1);
         TableRef origin_1 = wt.get_table("origin_1");
-        auto o_1_f_2 = origin_1->get_column_index("o_1_f_2");
+        auto o_1_f_2 = origin_1->get_column_key("o_1_f_2");
 
         Obj o_1_0 = origin_1->get_object(origin_1_keys[0]);
         Obj o_1_1 = origin_1->get_object(origin_1_keys[1]);
@@ -872,7 +873,7 @@ TEST(Replication_Links)
         check(test_context, sg_1, rt);
         ConstTableRef origin_1 = rt.get_table("origin_1");
 
-        auto o_1_f_2 = origin_1->get_column_index("o_1_f_2");
+        auto o_1_f_2 = origin_1->get_column_key("o_1_f_2");
 
         ConstObj o_1_0 = origin_1->get_object(origin_1_keys[0]);
         ConstObj o_1_1 = origin_1->get_object(origin_1_keys[1]);
@@ -891,9 +892,9 @@ TEST(Replication_Links)
         WriteTransaction wt(sg_1);
         TableRef origin_1 = wt.get_table("origin_1");
         TableRef origin_2 = wt.get_table("origin_2");
-        auto o_1_ll_1 = origin_1->get_column_index("o_1_ll_1");
-        auto o_1_f_2 = origin_1->get_column_index("o_1_f_2");
-        auto o_2_ll_3 = origin_2->get_column_index("o_2_ll_3");
+        auto o_1_ll_1 = origin_1->get_column_key("o_1_ll_1");
+        auto o_1_f_2 = origin_1->get_column_key("o_1_f_2");
+        auto o_2_ll_3 = origin_2->get_column_key("o_2_ll_3");
 
         Obj o_1_1 = origin_1->get_object(origin_1_keys[1]);
         Obj o_2_2 = origin_2->get_object(origin_2_keys[2]);
@@ -917,9 +918,9 @@ TEST(Replication_Links)
         ConstTableRef target_1 = rt.get_table("target_1");
         ConstTableRef target_2 = rt.get_table("target_2");
 
-        auto o_1_ll_1 = origin_1->get_column_index("o_1_ll_1");
-        auto o_1_f_2 = origin_1->get_column_index("o_1_f_2");
-        auto o_2_ll_3 = origin_2->get_column_index("o_2_ll_3");
+        auto o_1_ll_1 = origin_1->get_column_key("o_1_ll_1");
+        auto o_1_f_2 = origin_1->get_column_key("o_1_f_2");
+        auto o_2_ll_3 = origin_2->get_column_key("o_2_ll_3");
 
         ConstObj o_1_1 = origin_1->get_object(origin_1_keys[1]);
         CHECK_EQUAL(0, o_1_1.get_linklist(o_1_ll_1).size());
@@ -947,8 +948,8 @@ TEST(Replication_Links)
         WriteTransaction wt(sg_1);
         TableRef origin_1 = wt.get_table("origin_1");
         TableRef origin_2 = wt.get_table("origin_2");
-        auto o_1_f_2 = origin_1->get_column_index("o_1_f_2");
-        auto o_2_ll_3 = origin_2->get_column_index("o_2_ll_3");
+        auto o_1_f_2 = origin_1->get_column_key("o_1_f_2");
+        auto o_2_ll_3 = origin_2->get_column_key("o_2_ll_3");
 
         Obj o_1_1 = origin_1->get_object(origin_1_keys[1]);
         Obj o_2_2 = origin_2->get_object(origin_2_keys[2]);
@@ -971,8 +972,8 @@ TEST(Replication_Links)
         ConstTableRef target_1 = rt.get_table("target_1");
         ConstTableRef target_2 = rt.get_table("target_2");
 
-        auto o_1_f_2 = origin_1->get_column_index("o_1_f_2");
-        auto o_2_ll_3 = origin_2->get_column_index("o_2_ll_3");
+        auto o_1_f_2 = origin_1->get_column_key("o_1_f_2");
+        auto o_2_ll_3 = origin_2->get_column_key("o_2_ll_3");
 
         ConstObj o_1_1 = origin_1->get_object(origin_1_keys[1]);
         CHECK_EQUAL(3, o_1_1.get_list<Int>(o_1_f_2).size());
@@ -1034,13 +1035,13 @@ TEST(Replication_ListOfPrimitives)
         CHECK(table);
         CHECK_EQUAL(1, table->size());
 
-        auto col_int = table->get_column_index("integers");
-        auto col_boo = table->get_column_index("booleans");
-        auto col_flo = table->get_column_index("floats");
-        auto col_dou = table->get_column_index("doubles");
-        auto col_str = table->get_column_index("strings");
-        auto col_bin = table->get_column_index("binaries");
-        auto col_tim = table->get_column_index("dates");
+        auto col_int = table->get_column_key("integers");
+        auto col_boo = table->get_column_key("booleans");
+        auto col_flo = table->get_column_key("floats");
+        auto col_dou = table->get_column_key("doubles");
+        auto col_str = table->get_column_key("strings");
+        auto col_bin = table->get_column_key("binaries");
+        auto col_tim = table->get_column_key("dates");
 
         ConstObj obj = table->get_object(Key(0));
 
@@ -1056,13 +1057,13 @@ TEST(Replication_ListOfPrimitives)
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("table");
-        auto col_int = table->get_column_index("integers");
-        auto col_boo = table->get_column_index("booleans");
-        auto col_flo = table->get_column_index("floats");
-        auto col_dou = table->get_column_index("doubles");
-        auto col_str = table->get_column_index("strings");
-        auto col_bin = table->get_column_index("binaries");
-        auto col_tim = table->get_column_index("dates");
+        auto col_int = table->get_column_key("integers");
+        auto col_boo = table->get_column_key("booleans");
+        auto col_flo = table->get_column_key("floats");
+        auto col_dou = table->get_column_key("doubles");
+        auto col_str = table->get_column_key("strings");
+        auto col_bin = table->get_column_key("binaries");
+        auto col_tim = table->get_column_key("dates");
 
         char buf[10];
         memset(buf, 'A', sizeof(buf));
@@ -1086,13 +1087,13 @@ TEST(Replication_ListOfPrimitives)
         CHECK(table);
         CHECK_EQUAL(1, table->size());
 
-        auto col_int = table->get_column_index("integers");
-        auto col_boo = table->get_column_index("booleans");
-        auto col_flo = table->get_column_index("floats");
-        auto col_dou = table->get_column_index("doubles");
-        auto col_str = table->get_column_index("strings");
-        auto col_bin = table->get_column_index("binaries");
-        auto col_tim = table->get_column_index("dates");
+        auto col_int = table->get_column_key("integers");
+        auto col_boo = table->get_column_key("booleans");
+        auto col_flo = table->get_column_key("floats");
+        auto col_dou = table->get_column_key("doubles");
+        auto col_str = table->get_column_key("strings");
+        auto col_bin = table->get_column_key("binaries");
+        auto col_tim = table->get_column_key("dates");
 
         ConstObj obj = table->get_object(Key(0));
 
@@ -1111,13 +1112,13 @@ TEST(Replication_ListOfPrimitives)
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("table");
-        auto col_int = table->get_column_index("integers");
-        auto col_boo = table->get_column_index("booleans");
-        auto col_flo = table->get_column_index("floats");
-        auto col_dou = table->get_column_index("doubles");
-        auto col_str = table->get_column_index("strings");
-        auto col_bin = table->get_column_index("binaries");
-        auto col_tim = table->get_column_index("dates");
+        auto col_int = table->get_column_key("integers");
+        auto col_boo = table->get_column_key("booleans");
+        auto col_flo = table->get_column_key("floats");
+        auto col_dou = table->get_column_key("doubles");
+        auto col_str = table->get_column_key("strings");
+        auto col_bin = table->get_column_key("binaries");
+        auto col_tim = table->get_column_key("dates");
 
         char buf[10];
         memset(buf, 'A', sizeof(buf));
@@ -1141,13 +1142,13 @@ TEST(Replication_ListOfPrimitives)
         CHECK(table);
         CHECK_EQUAL(1, table->size());
 
-        auto col_int = table->get_column_index("integers");
-        auto col_boo = table->get_column_index("booleans");
-        auto col_flo = table->get_column_index("floats");
-        auto col_dou = table->get_column_index("doubles");
-        auto col_str = table->get_column_index("strings");
-        auto col_bin = table->get_column_index("binaries");
-        auto col_tim = table->get_column_index("dates");
+        auto col_int = table->get_column_key("integers");
+        auto col_boo = table->get_column_key("booleans");
+        auto col_flo = table->get_column_key("floats");
+        auto col_dou = table->get_column_key("doubles");
+        auto col_str = table->get_column_key("strings");
+        auto col_bin = table->get_column_key("binaries");
+        auto col_tim = table->get_column_key("dates");
 
         ConstObj obj = table->get_object(Key(0));
 
@@ -1438,8 +1439,8 @@ TEST(Replication_NullStrings)
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
-        auto col_string = table2->get_column_index("c1");
-        auto col_binary = table2->get_column_index("b1");
+        auto col_string = table2->get_column_key("c1");
+        auto col_binary = table2->get_column_key("b1");
 
         ConstObj obj0 = table2->get_object(Key(0));
         ConstObj obj1 = table2->get_object(Key(1));
@@ -1489,7 +1490,7 @@ TEST(Replication_NullInteger)
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
-        auto col_int = table2->get_column_index("c1");
+        auto col_int = table2->get_column_key("c1");
 
         ConstObj obj0 = table2->get_object(Key(0));
         ConstObj obj1 = table2->get_object(Key(1));
@@ -1537,7 +1538,7 @@ TEST(Replication_RenameGroupLevelTable_RenameColumn)
         ConstTableRef bar = rt.get_table("bar");
         CHECK(bar);
         CHECK_EQUAL(0, bar->get_index_in_group());
-        CHECK_EQUAL(0, bar->get_column_index("b"));
+        CHECK_EQUAL(0, bar->get_column_key("b"));
     }
 }
 #endif
@@ -1736,13 +1737,13 @@ TEST(Replication_CreateAndRemoveObject)
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
     SharedGroup sg_2(path_2);
-
+    ColKey c0;
     {
         WriteTransaction wt(sg_1);
         TableRef table1 = wt.add_table("table");
-        table1->add_column(type_Int, "int1");
-        table1->create_object(Key(123)).set(0, 0);
-        table1->create_object(Key(456)).set(0, 1);
+        c0 = table1->add_column(type_Int, "int1");
+        table1->create_object(Key(123)).set(c0, 0);
+        table1->create_object(Key(456)).set(c0, 1);
         CHECK_EQUAL(table1->size(), 2);
         wt.commit();
     }
@@ -1751,14 +1752,14 @@ TEST(Replication_CreateAndRemoveObject)
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
 
-        CHECK_EQUAL(table2->get_object(Key(123)).get<int64_t>(0), 0);
-        CHECK_EQUAL(table2->get_object(Key(456)).get<int64_t>(0), 1);
+        CHECK_EQUAL(table2->get_object(Key(123)).get<int64_t>(c0), 0);
+        CHECK_EQUAL(table2->get_object(Key(456)).get<int64_t>(c0), 1);
     }
     {
         WriteTransaction wt(sg_1);
         TableRef table1 = wt.get_table("table");
         table1->remove_object(Key(123));
-        table1->get_object(Key(456)).set(0, 7);
+        table1->get_object(Key(456)).set(c0, 7);
         CHECK_EQUAL(table1->size(), 1);
         wt.commit();
     }
@@ -1767,7 +1768,7 @@ TEST(Replication_CreateAndRemoveObject)
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
         CHECK_THROW(table2->get_object(Key(123)), InvalidKey);
-        CHECK_EQUAL(table2->get_object(Key(456)).get<int64_t>(0), 7);
+        CHECK_EQUAL(table2->get_object(Key(456)).get<int64_t>(c0), 7);
     }
 }
 

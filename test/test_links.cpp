@@ -102,7 +102,7 @@ TEST(Links_Basic)
     GROUP_TEST_PATH(path);
     Key key_origin;
     Key key_target;
-    size_t col_link;
+    ColKey col_link;
 
     // Test basic link operations
     {
@@ -191,7 +191,7 @@ TEST(Links_Basic)
         TableRef table2 = group.get_table("table2");
 
         // Verify that we are pointing to the right table
-        CHECK_EQUAL(table1, table2->get_link_target(0));
+        CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
         // Verify that links are still correct
         CHECK_EQUAL(key_target, table2->get_object(key_origin).get<Key>(col_link));
@@ -224,22 +224,23 @@ TEST(Links_SetLinkLogicErrors)
     Group group;
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
-    origin->add_column_link(type_Link, "a", *target);
+    auto col0 = origin->add_column_link(type_Link, "a", *target);
     origin->add_column(type_Int, "b");
     Obj obj = origin->create_object();
     target->create_object(Key(10));
 
-    CHECK_LOGIC_ERROR(obj.set(2, Key(10)), LogicError::column_index_out_of_range);
-    CHECK_LOGIC_ERROR(obj.set(0, Key(5)), LogicError::target_row_index_out_of_range);
+    // FIXME: Not really possible with column keys?
+    // CHECK_LOGIC_ERROR(obj.set(2, Key(10)), LogicError::column_index_out_of_range);
+    CHECK_LOGIC_ERROR(obj.set(col0, Key(5)), LogicError::target_row_index_out_of_range);
 
     // FIXME: Must also check that Logic::type_mismatch is thrown on column type mismatch, but Table::set_link() does
     // not properly check it yet.
 
     origin->remove_object(obj.get_key());
-    CHECK_THROW(obj.set(0, Key(10)), InvalidKey);
+    CHECK_THROW(obj.set(col0, Key(10)), InvalidKey);
 #ifdef LEGACY_TESTS
     group.remove_table("origin");
-    CHECK_LOGIC_ERROR(obj.set(0, Key(10)), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(obj.set(col0, Key(10)), LogicError::detached_accessor);
 #endif
 }
 
@@ -256,7 +257,7 @@ TEST(Links_Deletes)
 
     // create table with links to table1
     TableRef table2 = group.add_table("table2");
-    size_t col_link = table2->add_column_link(type_Link, "link", *TableRef(table1));
+    auto col_link = table2->add_column_link(type_Link, "link", *TableRef(table1));
     CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
     Obj obj0 = table1->create_object().set_all("test1", 1, true, int64_t(Mon));
@@ -515,7 +516,7 @@ TEST(Links_LinkList_TableOps)
 
     // create table with links to table1
     TableRef origin = group.add_table("origin");
-    size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
+    auto col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
     target->create_object().set_all("test1", 1, true, int64_t(Mon));
@@ -555,7 +556,7 @@ TEST(Links_LinkList_Basics)
 
     // create table with links to table1
     TableRef origin = group.add_table("origin");
-    size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
+    auto col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
     origin->add_column(type_Int, "integers"); // Make sure the link column is not the only column
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
@@ -1416,11 +1417,11 @@ TEST(Links_CascadeRemove_ColumnLink)
         TableRef target = group.add_table("target");
         std::vector<Key> origin_keys;
         std::vector<Key> target_keys;
-        size_t col_link;
+        ColKey col_link;
         Fixture()
         {
-            col_link = origin->add_column_link(type_Link, "o_1", *target, link_Strong);
             target->add_column(type_Int, "t_1");
+            col_link = origin->add_column_link(type_Link, "o_1", *target, link_Strong);
             origin->create_objects(3, origin_keys);
             target->create_objects(3, target_keys);
             origin->get_object(origin_keys[0]).set(col_link, target_keys[0]); // origin[0].o_1 -> target[0]
@@ -1576,11 +1577,19 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         std::vector<Key> origin_keys;
         std::vector<Key> target_keys;
         std::vector<LinkListPtr> linklists;
-        size_t col_link;
+        ColKey col_link;
         Fixture()
         {
             col_link = origin->add_column_link(type_LinkList, "o_1", *target, link_Strong);
+            // target now has a backlink column 0
+            auto key0 = target->ndx2colkey(0);
+            REALM_ASSERT(target->colkey2ndx(key0) == 0);
+            REALM_ASSERT(key0 == target->find_backlink_column(origin->get_key(), col_link));
             target->add_column(type_Int, "t_1");
+            // backlink column moves to pos 1
+            REALM_ASSERT(target->colkey2ndx(key0) == 1); // <--- ok
+            REALM_ASSERT(key0 == target->ndx2colkey(1)); // <--- fails
+            REALM_ASSERT(key0 == target->find_backlink_column(origin->get_key(), col_link));
             origin->create_objects(3, origin_keys);
             target->create_objects(3, target_keys);
             linklists.emplace_back(origin->get_object(origin_keys[0]).get_linklist_ptr(col_link));

@@ -272,11 +272,11 @@ TEST(Table_OptimizeCrash)
     // This will crash at the .add() method
     Table ttt;
     ttt.add_column(type_Int, "first");
-    ttt.add_column(type_String, "second");
+    auto col = ttt.add_column(type_String, "second");
 #ifdef LEGACY_TESTS
     ttt.optimize();
 #endif // LEGACY_TESTS
-    ttt.add_search_index(1);
+    ttt.add_search_index(col);
     ttt.clear();
     ttt.create_object().set_all(1, "AA");
 }
@@ -319,16 +319,16 @@ TEST(Table_DateTimeMinMax)
     objs[1].set(col, Timestamp{2, 2});
     objs[2].set(col, Timestamp{0, 0});
 
-    CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
-    CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
+    CHECK_EQUAL(table->maximum_timestamp(col), Timestamp(2, 2));
+    CHECK_EQUAL(table->minimum_timestamp(col), Timestamp(0, 0));
 
     objs[0].set(col, Timestamp{2, 2});
     objs[1].set_null(col);
     objs[2].set(col, Timestamp{0, 0});
 
-    CHECK_EQUAL(table->maximum_timestamp(0, &idx), Timestamp(2, 2));
+    CHECK_EQUAL(table->maximum_timestamp(col, &idx), Timestamp(2, 2));
     CHECK_EQUAL(idx, objs[0].get_key());
-    CHECK_EQUAL(table->minimum_timestamp(0, &idx), Timestamp(0, 0));
+    CHECK_EQUAL(table->minimum_timestamp(col, &idx), Timestamp(0, 0));
     CHECK_EQUAL(idx, objs[2].get_key());
 }
 
@@ -459,16 +459,17 @@ TEST(TableView_AggregateBugs)
         CHECK_EQUAL(vc, 3);
 
         // There are currently 3 ways of doing average: on tableview, table and query:
-        CHECK_APPROXIMATELY_EQUAL(table.average_double(double_col), table.where().average_double(1, &vc), 0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(double_col), table.where().average_double(double_col, &vc),
+                                  0.001);
         CHECK_EQUAL(vc, 3);
 
-        CHECK_APPROXIMATELY_EQUAL(table.average_double(double_col), table.where().find_all().average_double(1, &vc),
-                                  0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(double_col),
+                                  table.where().find_all().average_double(double_col, &vc), 0.001);
         CHECK_EQUAL(vc, 3);
 
         // Core has an optimization where it executes average directly on the column if there
         // are no query conditions. Bypass that here.
-        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(double_col, 1.).find_all().average_double(1, &vc),
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(double_col, 1.).find_all().average_double(double_col, &vc),
                                   (2. + 42.) / 2, 0.001);
         CHECK_EQUAL(vc, 2);
     }
@@ -502,6 +503,7 @@ TEST(TableView_AggregateBugs)
 }
 
 
+#ifdef LEGACY_TESTS
 TEST(Table_AggregateFuzz)
 {
     // Tests sum, avg, min, max on Table, TableView, Query, for types float, Timestamp, int
@@ -757,7 +759,7 @@ TEST(Table_AggregateFuzz)
         }
     }
 }
-
+#endif
 
 TEST(Table_ColumnNameTooLong)
 {
@@ -843,10 +845,10 @@ TEST(Table_Floats)
     auto float_col = table.add_column(type_Float, "first");
     auto double_col = table.add_column(type_Double, "second");
 
-    CHECK_EQUAL(type_Float, table.get_column_type(0));
-    CHECK_EQUAL(type_Double, table.get_column_type(1));
-    CHECK_EQUAL("first", table.get_column_name(0));
-    CHECK_EQUAL("second", table.get_column_name(1));
+    CHECK_EQUAL(type_Float, table.get_column_type(float_col));
+    CHECK_EQUAL(type_Double, table.get_column_type(double_col));
+    CHECK_EQUAL("first", table.get_column_name(float_col));
+    CHECK_EQUAL("second", table.get_column_name(double_col));
 
     // Test adding a single empty row
     // and filling it with values
@@ -943,19 +945,29 @@ TEST(Table_GetName)
 
 namespace {
 
-void setup_multi_table(Table& table, size_t rows, std::vector<Key>& keys)
+void setup_multi_table(Table& table, size_t rows, std::vector<Key>& keys, std::vector<ColKey>& column_keys)
 {
     // Create table with all column types
     auto int_col = table.add_column(type_Int, "int");                        //  0
+    column_keys.push_back(int_col);
     auto bool_col = table.add_column(type_Bool, "bool");                     //  1
+    column_keys.push_back(bool_col);
     auto float_col = table.add_column(type_Float, "float");                  //  3
+    column_keys.push_back(float_col);
     auto double_col = table.add_column(type_Double, "double");               //  4
+    column_keys.push_back(double_col);
     auto string_col = table.add_column(type_String, "string");               //  5
+    column_keys.push_back(string_col);
     auto string_long_col = table.add_column(type_String, "string_long");     //  6
+    column_keys.push_back(string_long_col);
     auto string_big_col = table.add_column(type_String, "string_big_blobs"); //  7
+    column_keys.push_back(string_big_col);
     auto string_enum_col = table.add_column(type_String, "string_enum");     //  8 - becomes StringEnumColumn
+    column_keys.push_back(string_enum_col);
     auto bin_col = table.add_column(type_Binary, "binary");                  //  9
+    column_keys.push_back(bin_col);
     auto int_null_col = table.add_column(type_Int, "int_null", true);        // 12, nullable = true
+    column_keys.push_back(int_null_col);
 
     std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
@@ -1030,7 +1042,8 @@ TEST(Table_DeleteAllTypes)
 {
     Table table;
     std::vector<Key> keys;
-    setup_multi_table(table, 15, keys);
+    std::vector<ColKey> column_keys;
+    setup_multi_table(table, 15, keys, column_keys);
 
     // Test Deletes
     table.remove_object(keys[14]);
@@ -1082,8 +1095,9 @@ TEST(Table_MoveAllTypes)
 
     Table table;
     std::vector<Key> keys;
-    setup_multi_table(table, 15, keys);
-    table.add_search_index(6);
+    std::vector<ColKey> column_keys;
+    setup_multi_table(table, 15, keys, column_keys);
+    table.add_search_index(column_keys[6]);
     while (!table.is_empty()) {
         size_t size = keys.size();
         auto it = keys.begin() + random.draw_int_mod(size);
@@ -1314,7 +1328,7 @@ TEST(Table_Sorted_Query_where)
 #endif
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Table_Multi_Sort)
 {
     Table table;
@@ -1350,7 +1364,7 @@ TEST(Table_Multi_Sort)
     CHECK_EQUAL(Key(4), v_sorted2.get_key(3));
     CHECK_EQUAL(Key(3), v_sorted2.get_key(4));
 }
-
+#endif
 
 TEST(Table_IndexString)
 {
@@ -1640,7 +1654,7 @@ TEST(Table_DistinctFromPersistedTable)
     {
         Group group(path, 0, Group::mode_ReadOnly);
         TableRef table = group.get_table("table");
-        auto col = table->get_column_index("first");
+        auto col = table->get_column_key("first");
         TableView view = table->get_distinct_view(col);
 
         CHECK_EQUAL(3, view.size());
@@ -2263,15 +2277,15 @@ TEST(Table_EmptyMinmax)
 {
     Group g;
     TableRef table = g.add_table("");
-    table->add_column(type_Timestamp, "date");
+    auto col = table->add_column(type_Timestamp, "date");
 
     Key min_key;
-    Timestamp min_ts = table->minimum_timestamp(0, &min_key);
+    Timestamp min_ts = table->minimum_timestamp(col, &min_key);
     CHECK_EQUAL(min_key, null_key);
     CHECK(min_ts.is_null());
 
     Key max_key;
-    Timestamp max_ts = table->maximum_timestamp(0, &max_key);
+    Timestamp max_ts = table->maximum_timestamp(col, &max_key);
     CHECK_EQUAL(max_key, null_key);
     CHECK(max_ts.is_null());
 }
@@ -3103,7 +3117,7 @@ TEST(Table_object_basic)
     table.remove_object(Key(5));
     CHECK_THROW(y.get<int64_t>(intnull_col), InvalidKey);
 
-    CHECK(table.get_object(Key(8)).is_null(1));
+    CHECK(table.get_object(Key(8)).is_null(intnull_col));
 
     Key k11 = table.create_object().get_key();
     Key k12 = table.create_object().get_key();
@@ -3127,7 +3141,7 @@ TEST(Table_remove_column)
     table.remove_column(int2_col);
 
     CHECK_EQUAL(obj.get<int64_t>("int1"), 100);
-    CHECK_THROW(obj.get<int64_t>("int2"), LogicError);
+    CHECK_THROW(obj.get<int64_t>("int2"), InvalidKey);
     CHECK_EQUAL(obj.get<int64_t>("int3"), 25);
     table.add_column(type_Int, "int4");
     CHECK_EQUAL(obj.get<int64_t>("int4"), 0);
@@ -3198,11 +3212,11 @@ TEST(Table_ListOfPrimitives)
 {
     Group g;
     TableRef t = g.add_table("table");
-    size_t int_col = t->add_column_list(type_Int, "integers");
-    size_t bool_col = t->add_column_list(type_Bool, "booleans");
-    size_t string_col = t->add_column_list(type_String, "strings");
-    size_t double_col = t->add_column_list(type_Double, "doubles");
-    size_t timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
+    ColKey int_col = t->add_column_list(type_Int, "integers");
+    ColKey bool_col = t->add_column_list(type_Bool, "booleans");
+    ColKey string_col = t->add_column_list(type_String, "strings");
+    ColKey double_col = t->add_column_list(type_Double, "doubles");
+    ColKey timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
     Obj obj = t->create_object(Key(7));
 
     std::vector<int64_t> integer_vector = {1, 2, 3, 4};
@@ -3311,8 +3325,8 @@ TEST(Table_object_merge_nodes)
     int nb_rows = REALM_MAX_BPNODE_SIZE * 8;
     Table table;
     std::vector<int64_t> key_set;
-    table.add_column(type_Int, "int1");
-    table.add_column(type_Int, "int2", true);
+    auto c0 = table.add_column(type_Int, "int1");
+    auto c1 = table.add_column(type_Int, "int2", true);
 
     for (int i = 0; i < nb_rows; i++) {
         table.create_object(Key(i)).set_all(i << 1, i << 2);
@@ -3331,8 +3345,8 @@ TEST(Table_object_merge_nodes)
         for (unsigned j = 0; j < key_set.size(); j++) {
             int64_t key_val = key_set[j];
             Obj o = table.get_object(Key(key_val));
-            CHECK_EQUAL(key_val << 1, o.get<int64_t>(0));
-            CHECK_EQUAL(key_val << 2, o.get<util::Optional<int64_t>>(1));
+            CHECK_EQUAL(key_val << 1, o.get<int64_t>(c0));
+            CHECK_EQUAL(key_val << 2, o.get<util::Optional<int64_t>>(c1));
         }
     }
 }
@@ -3341,8 +3355,8 @@ TEST(Table_object_forward_iterator)
 {
     int nb_rows = 1024;
     Table table;
-    table.add_column(type_Int, "int1");
-    table.add_column(type_Int, "int2", true);
+    auto c0 = table.add_column(type_Int, "int1");
+    auto c1 = table.add_column(type_Int, "int2", true);
 
     for (int i = 0; i < nb_rows; i++) {
         table.create_object(Key(i));
@@ -3365,8 +3379,8 @@ TEST(Table_object_forward_iterator)
     for (Obj o : table) {
         int64_t key_value = o.get_key().value;
         // std::cout << "Key value: " << std::hex << key_value << std::dec << std::endl;
-        CHECK_EQUAL(key_value << 1, o.get<int64_t>(0));
-        CHECK_EQUAL(key_value << 2, o.get<util::Optional<int64_t>>(1));
+        CHECK_EQUAL(key_value << 1, o.get<int64_t>(c0));
+        CHECK_EQUAL(key_value << 2, o.get<util::Optional<int64_t>>(c1));
     }
 
     auto it = table.begin();
@@ -3383,19 +3397,19 @@ TEST(Table_object_forward_iterator)
     auto it1 = table.begin();
     Key key = it1->get_key();
     ++it1;
-    int64_t val = it1->get<int64_t>(0);
+    int64_t val = it1->get<int64_t>(c0);
     table.remove_object(key);
-    CHECK_EQUAL(val, it1->get<int64_t>(0));
+    CHECK_EQUAL(val, it1->get<int64_t>(c0));
     table.remove_object(it1);
-    CHECK_THROW_ANY(it1->get<int64_t>(0));
+    CHECK_THROW_ANY(it1->get<int64_t>(c0));
 }
 
 TEST(Table_object_sequential)
 {
     int nb_rows = 1024;
     Table table;
-    table.add_column(type_Int, "int1");
-    table.add_column(type_Int, "int2", true);
+    auto c0 = table.add_column(type_Int, "int1");
+    auto c1 = table.add_column(type_Int, "int2", true);
 
     auto t1 = steady_clock::now();
 
@@ -3407,8 +3421,8 @@ TEST(Table_object_sequential)
 
     for (int i = 0; i < nb_rows; i++) {
         Obj o = table.get_object(Key(i));
-        CHECK_EQUAL(i << 1, o.get<int64_t>(0));
-        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(1));
+        CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(c1));
     }
 
     auto t3 = steady_clock::now();
@@ -3417,8 +3431,8 @@ TEST(Table_object_sequential)
         table.remove_object(Key(i));
         for (int j = i + 1; j < nb_rows; j++) {
             Obj o = table.get_object(Key(j));
-            CHECK_EQUAL(j << 1, o.get<int64_t>(0));
-            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(1));
+            CHECK_EQUAL(j << 1, o.get<int64_t>(c0));
+            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(c1));
         }
     }
 
@@ -3453,8 +3467,8 @@ TEST(Table_object_random)
     }
 
     Table table;
-    table.add_column(type_Int, "int1");
-    table.add_column(type_Int, "int2", true);
+    auto c0 = table.add_column(type_Int, "int1");
+    auto c1 = table.add_column(type_Int, "int2", true);
 
     auto t1 = steady_clock::now();
 
@@ -3466,8 +3480,8 @@ TEST(Table_object_random)
 
     for (int i = 0; i < nb_rows; i++) {
         Obj o = table.get_object(Key(key_values[i]));
-        CHECK_EQUAL(i << 1, o.get<int64_t>(0));
-        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(1));
+        CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(c1));
     }
 
     auto t3 = steady_clock::now();
@@ -3476,8 +3490,8 @@ TEST(Table_object_random)
         table.remove_object(Key(key_values[i]));
         for (int j = i + 1; j < nb_rows; j++) {
             Obj o = table.get_object(Key(key_values[j]));
-            CHECK_EQUAL(j << 1, o.get<int64_t>(0));
-            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(1));
+            CHECK_EQUAL(j << 1, o.get<int64_t>(c0));
+            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(c1));
         }
     }
 
@@ -3492,6 +3506,8 @@ TEST(Table_object_random)
               << std::endl;
 }
 
+
+#ifdef LEGACY_TESTS
 TEST(Table_3)
 {
     TestTable01 table;
@@ -3499,38 +3515,42 @@ TEST(Table_3)
     for (int64_t i = 0; i < 100; ++i) {
         table.create_object(Key(i)).set_all(i, 10, true, int(Wed));
     }
+    auto cols = table.get_key_cols();
 
     // Test column searching
-    CHECK_EQUAL(Key(0), table.find_first_int(0, 0));
-    CHECK_EQUAL(Key(50), table.find_first_int(0, 50));
-    CHECK_EQUAL(null_key, table.find_first_int(0, 500));
-    CHECK_EQUAL(Key(0), table.find_first_int(1, 10));
-    CHECK_EQUAL(null_key, table.find_first_int(1, 100));
-    CHECK_EQUAL(Key(0), table.find_first_bool(2, true));
-    CHECK_EQUAL(null_key, table.find_first_bool(2, false));
-    CHECK_EQUAL(Key(0), table.find_first_int(3, Wed));
-    CHECK_EQUAL(null_key, table.find_first_int(3, Mon));
+    CHECK_EQUAL(Key(0), table.find_first_int(cols[0], 0));
+    CHECK_EQUAL(Key(50), table.find_first_int(cols[0], 50));
+    CHECK_EQUAL(null_key, table.find_first_int(cols[0], 500));
+    CHECK_EQUAL(Key(0), table.find_first_int(cols[1], 10));
+    CHECK_EQUAL(null_key, table.find_first_int(cols[1], 100));
+    CHECK_EQUAL(Key(0), table.find_first_bool(cols[2], true));
+    CHECK_EQUAL(null_key, table.find_first_bool(cols[2], false));
+    CHECK_EQUAL(Key(0), table.find_first_int(cols[3], Wed));
+    CHECK_EQUAL(null_key, table.find_first_int(cols[3], Mon));
 
 #ifdef REALM_DEBUG
     table.verify();
 #endif
 }
+#endif
+
 
 TEST(Table_4)
 {
     Table table;
-    table.add_column(type_String, "strings");
+    auto c0 = table.add_column(type_String, "strings");
 
-    table.create_object(Key(5)).set(0, "Hello");
-    table.create_object(Key(7)).set(0, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
+    table.create_object(Key(5)).set(c0, "Hello");
+    table.create_object(Key(7)).set(c0,
+                                    "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
 
     CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello",
-                table.get_object(Key(7)).get<String>(0));
+                table.get_object(Key(7)).get<String>(c0));
 
     // Test string column searching
     CHECK_EQUAL(Key(7), table.find_first_string(
-                            0, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
-    CHECK_EQUAL(null_key, table.find_first_string(0, "Foo"));
+                            c0, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
+    CHECK_EQUAL(null_key, table.find_first_string(c0, "Foo"));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -3542,14 +3562,14 @@ TEST(Table_SearchIndexFindFirst)
 {
     Table table;
 
-    size_t c1 = table.add_column(type_Int, "a");
-    size_t c2 = table.add_column(type_Int, "b", true);
-    size_t c3 = table.add_column(type_String, "c");
-    size_t c4 = table.add_column(type_String, "d", true);
-    size_t c5 = table.add_column(type_Bool, "e");
-    size_t c6 = table.add_column(type_Bool, "f", true);
-    size_t c7 = table.add_column(type_Timestamp, "g");
-    size_t c8 = table.add_column(type_Timestamp, "h", true);
+    auto c1 = table.add_column(type_Int, "a");
+    auto c2 = table.add_column(type_Int, "b", true);
+    auto c3 = table.add_column(type_String, "c");
+    auto c4 = table.add_column(type_String, "d", true);
+    auto c5 = table.add_column(type_Bool, "e");
+    auto c6 = table.add_column(type_Bool, "f", true);
+    auto c7 = table.add_column(type_Timestamp, "g");
+    auto c8 = table.add_column(type_Timestamp, "h", true);
 
     Obj o0 = table.create_object();
     Obj o1 = table.create_object();
@@ -3574,46 +3594,46 @@ TEST(Table_SearchIndexFindFirst)
     table.add_search_index(c8);
 
     // Non-nullable integers
-    CHECK_EQUAL(table.find_first_int(0, 100), o0.get_key());
-    CHECK_EQUAL(table.find_first_int(0, 200), o1.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 100), o0.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 200), o1.get_key());
     // Uninitialized non-nullable integers equal 0
-    CHECK_EQUAL(table.find_first_int(0, 0), o3.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 0), o3.get_key());
 
     // Nullable integers
-    CHECK_EQUAL(table.find_first_int(1, 100), o0.get_key());
-    CHECK_EQUAL(table.find_first_int(1, 200), o1.get_key());
+    CHECK_EQUAL(table.find_first_int(c2, 100), o0.get_key());
+    CHECK_EQUAL(table.find_first_int(c2, 200), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(1), o3.get_key());
 
     // Non-nullable strings
-    CHECK_EQUAL(table.find_first_string(2, "100"), o0.get_key());
-    CHECK_EQUAL(table.find_first_string(2, "200"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, "100"), o0.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, "200"), o1.get_key());
     // Uninitialized non-nullable strings equal ""
-    CHECK_EQUAL(table.find_first_string(2, ""), o3.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, ""), o3.get_key());
 
     // Nullable strings
-    CHECK_EQUAL(table.find_first_string(3, "100"), o0.get_key());
-    CHECK_EQUAL(table.find_first_string(3, "200"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(c4, "100"), o0.get_key());
+    CHECK_EQUAL(table.find_first_string(c4, "200"), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(3), o3.get_key());
 
     // Non-nullable bools
-    CHECK_EQUAL(table.find_first_bool(4, false), o0.get_key());
-    CHECK_EQUAL(table.find_first_bool(4, true), o1.get_key());
+    CHECK_EQUAL(table.find_first_bool(c5, false), o0.get_key());
+    CHECK_EQUAL(table.find_first_bool(c5, true), o1.get_key());
 
     // Nullable bools
-    CHECK_EQUAL(table.find_first_bool(5, false), o0.get_key());
-    CHECK_EQUAL(table.find_first_bool(5, true), o1.get_key());
+    CHECK_EQUAL(table.find_first_bool(c6, false), o0.get_key());
+    CHECK_EQUAL(table.find_first_bool(c6, true), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(5), o3.get_key());
 
     // Non-nullable Timestamp
-    CHECK_EQUAL(table.find_first_timestamp(6, Timestamp(100, 100)), o0.get_key());
-    CHECK_EQUAL(table.find_first_timestamp(6, Timestamp(200, 200)), o1.get_key());
+    CHECK_EQUAL(table.find_first_timestamp(c7, Timestamp(100, 100)), o0.get_key());
+    CHECK_EQUAL(table.find_first_timestamp(c7, Timestamp(200, 200)), o1.get_key());
 
     // Nullable Timestamp
-    CHECK_EQUAL(table.find_first_timestamp(7, Timestamp(100, 100)), o0.get_key());
-    CHECK_EQUAL(table.find_first_timestamp(7, Timestamp(200, 200)), o1.get_key());
+    CHECK_EQUAL(table.find_first_timestamp(c8, Timestamp(100, 100)), o0.get_key());
+    CHECK_EQUAL(table.find_first_timestamp(c8, Timestamp(200, 200)), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(7), o3.get_key());
 
@@ -3622,58 +3642,58 @@ TEST(Table_SearchIndexFindFirst)
     table.remove_object(o0.get_key());
 
     // Integers
-    CHECK_EQUAL(table.find_first_int(0, 100), null_key);
-    CHECK_EQUAL(table.find_first_int(0, 200), o1.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 100), null_key);
+    CHECK_EQUAL(table.find_first_int(c1, 200), o1.get_key());
     // Uninitialized non-nullable integers equal 0
-    CHECK_EQUAL(table.find_first_int(0, 0), o3.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 0), o3.get_key());
 
-    CHECK_EQUAL(table.find_first_int(1, 200), o1.get_key());
+    CHECK_EQUAL(table.find_first_int(c2, 200), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(1), o3.get_key());
 
     // Non-nullable strings
-    CHECK_EQUAL(table.find_first_string(2, "100"), null_key);
-    CHECK_EQUAL(table.find_first_string(2, "200"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, "100"), null_key);
+    CHECK_EQUAL(table.find_first_string(c3, "200"), o1.get_key());
     // Uninitialized non-nullable strings equal ""
-    CHECK_EQUAL(table.find_first_string(2, ""), o3.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, ""), o3.get_key());
 
     // Nullable strings
-    CHECK_EQUAL(table.find_first_string(3, "100"), null_key);
-    CHECK_EQUAL(table.find_first_string(3, "200"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(c4, "100"), null_key);
+    CHECK_EQUAL(table.find_first_string(c4, "200"), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(3), o3.get_key());
 
     // Non-nullable bools
     // default value for non-nullable bool is false, so o3 is a match
-    CHECK_EQUAL(table.find_first_bool(4, false), o3.get_key());
-    CHECK_EQUAL(table.find_first_bool(4, true), o1.get_key());
+    CHECK_EQUAL(table.find_first_bool(c5, false), o3.get_key());
+    CHECK_EQUAL(table.find_first_bool(c5, true), o1.get_key());
 
     // Nullable bools
-    CHECK_EQUAL(table.find_first_bool(5, false), null_key);
-    CHECK_EQUAL(table.find_first_bool(5, true), o1.get_key());
+    CHECK_EQUAL(table.find_first_bool(c6, false), null_key);
+    CHECK_EQUAL(table.find_first_bool(c6, true), o1.get_key());
 
     // Call "set" and see if things still work
     // *******************************************************************************
     o1.set_all(500, 500, "500", "500");
     o2.set_all(600, 600, "600", "600");
 
-    CHECK_EQUAL(table.find_first_int(0, 500), o1.get_key());
-    CHECK_EQUAL(table.find_first_int(0, 600), o2.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 500), o1.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 600), o2.get_key());
     // Uninitialized non-nullable integers equal 0
-    CHECK_EQUAL(table.find_first_int(0, 0), o3.get_key());
-    CHECK_EQUAL(table.find_first_int(1, 500), o1.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 0), o3.get_key());
+    CHECK_EQUAL(table.find_first_int(c2, 500), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(1), o3.get_key());
 
     // Non-nullable strings
-    CHECK_EQUAL(table.find_first_string(2, "500"), o1.get_key());
-    CHECK_EQUAL(table.find_first_string(2, "600"), o2.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, "500"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, "600"), o2.get_key());
     // Uninitialized non-nullable strings equal ""
-    CHECK_EQUAL(table.find_first_string(2, ""), o3.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, ""), o3.get_key());
 
     // Nullable strings
-    CHECK_EQUAL(table.find_first_string(3, "500"), o1.get_key());
-    CHECK_EQUAL(table.find_first_string(3, "600"), o2.get_key());
+    CHECK_EQUAL(table.find_first_string(c4, "500"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(c4, "600"), o2.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(3), o3.get_key());
 
@@ -3715,13 +3735,15 @@ template <class T, bool nullable>
 struct Tester {
     using T2 = typename util::RemoveOptional<T>::type;
 
+    static ColKey col;
+
     static std::vector<Key> find_all_reference(Table& table, T v)
     {
         std::vector<Key> res;
         Table::Iterator it = table.begin();
         while (it != table.end()) {
-            if (!it->is_null(0)) {
-                T v2 = it->get<T>(0);
+            if (!it->is_null(col)) {
+                T v2 = it->get<T>(col);
                 if (v == v2) {
                     res.push_back(it->get_key());
                 }
@@ -3737,11 +3759,11 @@ struct Tester {
         Table::Iterator it = table.begin();
 
         if (it != table.end()) {
-            auto v = it->get<T>(0);
+            auto v = it->get<T>(col);
 
-            if (!it->is_null(0)) {
+            if (!it->is_null(col)) {
                 std::vector<Key> res;
-                table.get_search_index(0)->find_all(res, v, false);
+                table.get_search_index(col)->find_all(res, v, false);
                 std::vector<Key> ref = find_all_reference(table, v);
 
                 size_t a = ref.size();
@@ -3755,8 +3777,8 @@ struct Tester {
     static void run(realm::DataType type)
     {
         Table table;
-        table.add_column(type, "name", nullable);
-        table.add_search_index(0);
+        col = table.add_column(type, "name", nullable);
+        table.add_search_index(col);
         const size_t iters = 1000;
 
         bool add_trend = true;
@@ -3774,7 +3796,7 @@ struct Tester {
 
                 if (!set_to_null) {
                     auto t = create();
-                    o.set<T2>(0, t);
+                    o.set<T2>(col, t);
                 }
             }
 
@@ -3800,12 +3822,12 @@ struct Tester {
                 }
                 Obj o = *it;
                 bool set_to_null = fastrand(100) < 20;
-                if (set_to_null && table.is_nullable(0)) {
-                    o.set_null(0);
+                if (set_to_null && table.is_nullable(col)) {
+                    o.set_null(col);
                 }
                 else {
                     auto t = create();
-                    o.set<T2>(0, t);
+                    o.set<T2>(col, t);
                 }
             }
 
@@ -3840,6 +3862,9 @@ struct Tester {
         return fastrand(100) > 50;
     }
 };
+
+template <class T, bool nullable>
+ColKey Tester<T, nullable>::col;
 }
 
 // The run() method will first add lots of objects, and then remove them. This will test
@@ -3865,5 +3890,21 @@ TEST(Table_search_index_fuzzer)
     Tester<StringData, true>::run(type_String);
     Tester<StringData, false>::run(type_String);
 }
+
+TEST(Table_StaleColumnKey)
+{
+    Table table;
+
+    auto col = table.add_column(type_Int, "age");
+
+    Obj obj = table.create_object();
+    obj.set(col, 5);
+
+    table.remove_column(col);
+    // col is now obsolete
+    table.add_column(type_Int, "score");
+    CHECK_THROW_ANY(obj.get<Int>(col));
+}
+
 
 #endif // TEST_TABLE

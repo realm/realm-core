@@ -261,9 +261,9 @@ TEST(TableView_FloatsFindAndAggregations)
 
     // Test sum
     CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.sum_double(col_double), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.sum_float(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.sum_float(col_float), 10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.sum_double(col_double), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.sum_float(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.sum_float(col_float), 10 * epsilon);
 
     Key key;
 
@@ -280,6 +280,7 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(1.2f, v_some.maximum_float(col_float, &key));
     CHECK_EQUAL(Key(0), key);
 
+#ifdef LEGACY_TESTS
     // Max without ret_index
     CHECK_EQUAL(3.2, v_all.maximum_double(1));
     CHECK_EQUAL(-1.2, v_some.maximum_double(1));
@@ -291,7 +292,7 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(-1.2, v_some.minimum_double(1));
     CHECK_EQUAL(-1.1f, v_all.minimum_float(0));
     CHECK_EQUAL(-1.1f, v_some.minimum_float(0));
-
+#endif
     // min with ret_ndx
     CHECK_EQUAL(-1.2, v_all.minimum_double(col_double, &key));
     CHECK_EQUAL(Key(0), key);
@@ -306,10 +307,10 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(Key(3), key);
 
     // Test avg
-    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.average_double(1), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.average_double(1), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.average_float(0), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.average_float(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.average_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.average_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.average_float(col_float), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.average_float(col_float), 10 * epsilon);
 
     CHECK_EQUAL(1, v_some.count_float(col_float, 1.2f));
     CHECK_EQUAL(2, v_some.count_double(col_double, -1.2));
@@ -2213,9 +2214,9 @@ TEST(TableView_IsInTableOrder)
     TableRef source = g.add_table("source");
     TableRef target = g.add_table("target");
 
-    size_t col_link = source->add_column_link(type_LinkList, "link", *target);
-    size_t col_name = source->add_column(type_String, "name");
-    size_t col_id = target->add_column(type_Int, "id");
+    auto col_link = source->add_column_link(type_LinkList, "link", *target);
+    auto col_name = source->add_column(type_String, "name");
+    auto col_id = target->add_column(type_Int, "id");
     // target->add_search_index(col_id);
 
     target->create_object(Key(7));

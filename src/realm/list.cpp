@@ -33,32 +33,32 @@
 
 using namespace realm;
 
-ListBasePtr Obj::get_listbase_ptr(size_t col_ndx, DataType type)
+ListBasePtr Obj::get_listbase_ptr(ColKey col_key, DataType type)
 {
     switch (type) {
         case type_Int: {
-            return std::make_unique<List<Int>>(*this, col_ndx);
+            return std::make_unique<List<Int>>(*this, col_key);
         }
         case type_Bool: {
-            return std::make_unique<List<Bool>>(*this, col_ndx);
+            return std::make_unique<List<Bool>>(*this, col_key);
         }
         case type_Float: {
-            return std::make_unique<List<Float>>(*this, col_ndx);
+            return std::make_unique<List<Float>>(*this, col_key);
         }
         case type_Double: {
-            return std::make_unique<List<Double>>(*this, col_ndx);
+            return std::make_unique<List<Double>>(*this, col_key);
         }
         case type_String: {
-            return std::make_unique<List<String>>(*this, col_ndx);
+            return std::make_unique<List<String>>(*this, col_key);
         }
         case type_Binary: {
-            return std::make_unique<List<Binary>>(*this, col_ndx);
+            return std::make_unique<List<Binary>>(*this, col_key);
         }
         case type_Timestamp: {
-            return std::make_unique<List<Timestamp>>(*this, col_ndx);
+            return std::make_unique<List<Timestamp>>(*this, col_key);
         }
         case type_LinkList:
-            return get_linklist_ptr(col_ndx);
+            return get_linklist_ptr(col_key);
         case type_Link:
         case type_OldDateTime:
         case type_OldTable:
@@ -73,8 +73,8 @@ ListBasePtr Obj::get_listbase_ptr(size_t col_ndx, DataType type)
 /********************************* ListBase **********************************/
 
 template <class T>
-ConstList<T>::ConstList(const ConstObj& obj, size_t col_ndx)
-    : ConstListIf<T>(col_ndx, obj.get_alloc())
+ConstList<T>::ConstList(const ConstObj& obj, ColKey col_key)
+    : ConstListIf<T>(col_key, obj.get_alloc())
     , m_obj(obj)
 {
     this->set_obj(&m_obj);
@@ -87,7 +87,7 @@ ConstListBase::~ConstListBase()
 
 ref_type ConstListBase::get_child_ref(size_t) const noexcept
 {
-    return to_ref(m_const_obj->get<int64_t>(m_col_ndx));
+    return to_ref(m_const_obj->get<int64_t>(m_col_key));
 }
 
 std::pair<ref_type, size_t> ConstListBase::get_to_dot_parent(size_t) const
@@ -122,8 +122,8 @@ void ConstListBase::clear_repl(Replication* repl) const
 }
 
 template <class T>
-List<T>::List(const Obj& obj, size_t col_ndx)
-    : ConstListIf<T>(col_ndx, obj.m_tree_top->get_alloc())
+List<T>::List(const Obj& obj, ColKey col_key)
+    : ConstListIf<T>(col_key, obj.m_tree_top->get_alloc())
     , m_obj(obj)
 {
     this->set_obj(&m_obj);
@@ -131,33 +131,33 @@ List<T>::List(const Obj& obj, size_t col_ndx)
     if (!ConstListIf<T>::m_valid) {
         create();
         ref_type ref = m_leaf->get_ref();
-        m_obj.set_int(col_ndx, from_ref(ref));
+        m_obj.set_int(col_key, from_ref(ref));
     }
 }
 
 namespace realm {
-template ConstList<int64_t>::ConstList(const ConstObj& obj, size_t col_ndx);
-template ConstList<bool>::ConstList(const ConstObj& obj, size_t col_ndx);
-template ConstList<float>::ConstList(const ConstObj& obj, size_t col_ndx);
-template ConstList<double>::ConstList(const ConstObj& obj, size_t col_ndx);
-template ConstList<StringData>::ConstList(const ConstObj& obj, size_t col_ndx);
-template ConstList<BinaryData>::ConstList(const ConstObj& obj, size_t col_ndx);
-template ConstList<Timestamp>::ConstList(const ConstObj& obj, size_t col_ndx);
-template ConstList<Key>::ConstList(const ConstObj& obj, size_t col_ndx);
+template ConstList<int64_t>::ConstList(const ConstObj& obj, ColKey col_key);
+template ConstList<bool>::ConstList(const ConstObj& obj, ColKey col_key);
+template ConstList<float>::ConstList(const ConstObj& obj, ColKey col_key);
+template ConstList<double>::ConstList(const ConstObj& obj, ColKey col_key);
+template ConstList<StringData>::ConstList(const ConstObj& obj, ColKey col_key);
+template ConstList<BinaryData>::ConstList(const ConstObj& obj, ColKey col_key);
+template ConstList<Timestamp>::ConstList(const ConstObj& obj, ColKey col_key);
+template ConstList<Key>::ConstList(const ConstObj& obj, ColKey col_key);
 
-template List<int64_t>::List(const Obj& obj, size_t col_ndx);
-template List<bool>::List(const Obj& obj, size_t col_ndx);
-template List<float>::List(const Obj& obj, size_t col_ndx);
-template List<double>::List(const Obj& obj, size_t col_ndx);
-template List<StringData>::List(const Obj& obj, size_t col_ndx);
-template List<BinaryData>::List(const Obj& obj, size_t col_ndx);
-template List<Timestamp>::List(const Obj& obj, size_t col_ndx);
-template List<Key>::List(const Obj& obj, size_t col_ndx);
+template List<int64_t>::List(const Obj& obj, ColKey col_key);
+template List<bool>::List(const Obj& obj, ColKey col_key);
+template List<float>::List(const Obj& obj, ColKey col_key);
+template List<double>::List(const Obj& obj, ColKey col_key);
+template List<StringData>::List(const Obj& obj, ColKey col_key);
+template List<BinaryData>::List(const Obj& obj, ColKey col_key);
+template List<Timestamp>::List(const Obj& obj, ColKey col_key);
+template List<Key>::List(const Obj& obj, ColKey col_key);
 }
 
 ConstObj ConstLinkListIf::get(size_t link_ndx) const
 {
-    return m_const_obj->get_target_table(m_col_ndx)->get_object(ConstListIf<Key>::get(link_ndx));
+    return m_const_obj->get_target_table(m_col_key)->get_object(ConstListIf<Key>::get(link_ndx));
 }
 
 /********************************* LinkList **********************************/
@@ -174,7 +174,7 @@ void List<Key>::do_set(size_t ndx, Key target_key)
 {
     CascadeState state;
     Key old_key = get(ndx);
-    bool recurse = m_obj.update_backlinks(m_col_ndx, old_key, target_key, state);
+    bool recurse = m_obj.update_backlinks(m_col_key, old_key, target_key, state);
 
     m_leaf->set(ndx, target_key);
 
@@ -205,12 +205,11 @@ void List<Key>::clear()
 {
     update_if_needed();
     Table* origin_table = const_cast<Table*>(m_obj.get_table());
-    const Spec& origin_table_spec = _impl::TableFriend::get_spec(*origin_table);
 
     if (Replication* repl = m_const_obj->get_alloc().get_replication())
         repl->list_clear(*this); // Throws
 
-    if (!origin_table_spec.get_column_attr(m_col_ndx).test(col_attr_StrongLinks)) {
+    if (!origin_table->get_column_attr(m_col_key).test(col_attr_StrongLinks)) {
         size_t ndx = size();
         while (ndx--) {
             do_set(ndx, null_key);
@@ -220,13 +219,12 @@ void List<Key>::clear()
         return;
     }
 
-    TableRef target_table = m_obj.get_target_table(m_col_ndx);
+    TableRef target_table = m_obj.get_target_table(m_col_key);
     TableKey target_table_key = target_table->get_key();
-    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-    size_t backlink_col = target_table_spec.find_backlink_column(m_obj.get_table_key(), m_col_ndx);
+    ColKey backlink_col = target_table->find_backlink_column(m_obj.get_table_key(), m_col_key);
 
     CascadeState state;
-    state.stop_on_link_list_column_ndx = m_col_ndx;
+    state.stop_on_link_list_column_key = m_col_key;
     state.stop_on_link_list_key = m_obj.get_key();
 
     typedef _impl::TableFriend tf;
@@ -235,7 +233,7 @@ void List<Key>::clear()
         Key target_key = m_leaf->get(ndx);
         Obj target_obj = target_table->get_object(target_key);
         target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
-        size_t num_remaining = target_obj.get_backlink_count(*origin_table, m_col_ndx);
+        size_t num_remaining = target_obj.get_backlink_count(*origin_table, m_col_key);
         if (num_remaining == 0) {
             state.rows.emplace_back(target_table_key, target_key);
         }
@@ -255,9 +253,9 @@ TableView LinkList::get_sorted_view(SortDescriptor order) const
     return tv;
 }
 
-TableView LinkList::get_sorted_view(size_t column_index, bool ascending) const
+TableView LinkList::get_sorted_view(ColKey column_key, bool ascending) const
 {
-    TableView v = get_sorted_view(SortDescriptor(get_target_table(), {{column_index}}, {ascending}));
+    TableView v = get_sorted_view(SortDescriptor(get_target_table(), {{column_key}}, {ascending}));
     return v;
 }
 
@@ -276,9 +274,9 @@ void LinkList::sort(SortDescriptor&& order)
     m_obj.bump_content_version();
 }
 
-void LinkList::sort(size_t column_index, bool ascending)
+void LinkList::sort(ColKey column_key, bool ascending)
 {
-    sort(SortDescriptor(get_target_table(), {{column_index}}, {ascending}));
+    sort(SortDescriptor(get_target_table(), {{column_key}}, {ascending}));
 }
 
 void LinkList::remove_target_row(size_t link_ndx)
@@ -313,7 +311,7 @@ void LinkList::generate_patch(const LinkList* list, std::unique_ptr<LinkListHand
         if (list->is_valid()) {
             patch.reset(new LinkListHandoverPatch);
             Table::generate_patch(list->get_table(), patch->m_table);
-            patch->m_col_num = list->get_col_ndx();
+            patch->m_col_key = list->get_col_key();
             patch->m_key_value = list->ConstListBase::get_key().value;
         }
         else {
@@ -333,7 +331,7 @@ LinkListPtr LinkList::create_from_and_consume_patch(std::unique_ptr<LinkListHand
     if (patch) {
         if (patch->m_table) {
             TableRef tr = Table::create_from_and_consume_patch(patch->m_table, group);
-            auto result = tr->get_object(Key(patch->m_key_value)).get_linklist_ptr(patch->m_col_num);
+            auto result = tr->get_object(Key(patch->m_key_value)).get_linklist_ptr(patch->m_col_key);
             patch.reset();
             return result;
         }

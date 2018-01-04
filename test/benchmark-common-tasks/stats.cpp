@@ -5,7 +5,12 @@
 
 #include "realm.hpp"
 
+
 using namespace realm;
+
+#ifndef REALM_CLUSTER_IF
+using ColKey = size_t;
+#endif
 
 namespace function {
 
@@ -48,14 +53,14 @@ void create_realm_with_data(std::string file_name, size_t data_size)
     SharedGroup sg(file_name);
     Group& g = sg.begin_write();
     TableRef table = g.add_table("t0");
-    table->add_column(type_Binary, "bin_col_0");
+    auto c0 = table->add_column(type_Binary, "bin_col_0");
     std::string blob(data_size, 'a');
     BinaryData binary(blob.data(), data_size);
 #ifdef REALM_CLUSTER_IF
-    table->create_object().set(0, binary);
+    table->create_object().set(c0, binary);
 #else
     table->add_empty_row(1);
-    table->set_binary(0, 0, binary); // copies data into realm
+    table->set_binary(c0, 0, binary); // copies data into realm
 #endif
     sg.commit();
     sg.close();
@@ -68,7 +73,7 @@ void create_realm_with_transactions(std::string file_name,
     delete_file_if_exists(file_name);
     SharedGroup sg(file_name);
     const std::string table_name = "table";
-    size_t int_col = 0;
+    ColKey int_col;
     {
         Group& g = sg.begin_write();
         TableRef table = g.add_table(table_name);

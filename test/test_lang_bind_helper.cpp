@@ -307,9 +307,10 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(1, group.size());
     ConstTableRef foo = group.get_table("foo");
     CHECK_EQUAL(1, foo->get_column_count());
-    CHECK_EQUAL(type_Int, foo->get_column_type(0));
+    auto cols = foo->get_col_keys();
+    CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(1, foo->size());
-    CHECK_EQUAL(0, foo->get_object(k0).get<int64_t>(0));
+    CHECK_EQUAL(0, foo->get_object(k0).get<int64_t>(cols[0]));
     uint_fast64_t version = foo->get_content_version();
 
     // Modify the table via the other SharedGroup
@@ -318,41 +319,42 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         WriteTransaction wt(sg_w);
         TableRef foo_w = wt.get_table("foo");
         foo_w->add_column(type_String, "s");
+        cols = foo_w->get_col_keys();
         k1 = foo_w->create_object().get_key();
         auto obj0 = foo_w->get_object(k0);
         auto obj1 = foo_w->get_object(k1);
-        obj0.set<int>(0, 1);
-        obj1.set<int>(0, 2);
-        obj0.set<StringData>(1, "a");
-        obj1.set<StringData>(1, "b");
+        obj0.set<int>(cols[0], 1);
+        obj1.set<int>(cols[0], 2);
+        obj0.set<StringData>(cols[1], "a");
+        obj1.set<StringData>(cols[1], "b");
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
     CHECK(version != foo->get_content_version());
     group.verify();
     CHECK_EQUAL(2, foo->get_column_count());
-    CHECK_EQUAL(type_Int, foo->get_column_type(0));
-    CHECK_EQUAL(type_String, foo->get_column_type(1));
+    CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
+    CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
     auto obj0 = foo->get_object(k0);
     auto obj1 = foo->get_object(k1);
-    CHECK_EQUAL(1, obj0.get<int64_t>(0));
-    CHECK_EQUAL(2, obj1.get<int64_t>(0));
-    CHECK_EQUAL("a", obj0.get<StringData>(1));
-    CHECK_EQUAL("b", obj1.get<StringData>(1));
+    CHECK_EQUAL(1, obj0.get<int64_t>(cols[0]));
+    CHECK_EQUAL(2, obj1.get<int64_t>(cols[0]));
+    CHECK_EQUAL("a", obj0.get<StringData>(cols[1]));
+    CHECK_EQUAL("b", obj1.get<StringData>(cols[1]));
     CHECK_EQUAL(foo, group.get_table("foo"));
 
     // Again, with no change
     LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, foo->get_column_count());
-    CHECK_EQUAL(type_Int, foo->get_column_type(0));
-    CHECK_EQUAL(type_String, foo->get_column_type(1));
+    CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
+    CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
-    CHECK_EQUAL(1, obj0.get<int64_t>(0));
-    CHECK_EQUAL(2, obj1.get<int64_t>(0));
-    CHECK_EQUAL("a", obj0.get<StringData>(1));
-    CHECK_EQUAL("b", obj1.get<StringData>(1));
+    CHECK_EQUAL(1, obj0.get<int64_t>(cols[0]));
+    CHECK_EQUAL(2, obj1.get<int64_t>(cols[0]));
+    CHECK_EQUAL("a", obj0.get<StringData>(cols[1]));
+    CHECK_EQUAL("b", obj1.get<StringData>(cols[1]));
     CHECK_EQUAL(foo, group.get_table("foo"));
 
     // Perform several write transactions before advancing the read transaction
@@ -387,19 +389,21 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     group.verify();
     CHECK_EQUAL(2, group.size());
     CHECK_EQUAL(2, foo->get_column_count());
-    CHECK_EQUAL(type_Int, foo->get_column_type(0));
-    CHECK_EQUAL(type_String, foo->get_column_type(1));
+    cols = foo->get_col_keys();
+    CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
+    CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
-    CHECK_EQUAL(1, obj0.get<int64_t>(0));
-    CHECK_EQUAL(2, obj1.get<int64_t>(0));
-    CHECK_EQUAL("a", obj0.get<StringData>(1));
-    CHECK_EQUAL("b", obj1.get<StringData>(1));
+    CHECK_EQUAL(1, obj0.get<int64_t>(cols[0]));
+    CHECK_EQUAL(2, obj1.get<int64_t>(cols[0]));
+    CHECK_EQUAL("a", obj0.get<StringData>(cols[1]));
+    CHECK_EQUAL("b", obj1.get<StringData>(cols[1]));
     CHECK_EQUAL(foo, group.get_table("foo"));
     ConstTableRef bar = group.get_table("bar");
+    cols = bar->get_col_keys();
     CHECK_EQUAL(3, bar->get_column_count());
-    CHECK_EQUAL(type_Int, bar->get_column_type(0));
-    CHECK_EQUAL(type_Float, bar->get_column_type(1));
-    CHECK_EQUAL(type_Double, bar->get_column_type(2));
+    CHECK_EQUAL(type_Int, bar->get_column_type(cols[0]));
+    CHECK_EQUAL(type_Float, bar->get_column_type(cols[1]));
+    CHECK_EQUAL(type_Double, bar->get_column_type(cols[2]));
 
 #ifdef LEGACY_TESTS
     // Clear tables - not supported before backlinks work again
@@ -416,14 +420,14 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(2, group.size());
     CHECK(foo->is_attached());
     CHECK_EQUAL(2, foo->get_column_count());
-    CHECK_EQUAL(type_Int, foo->get_column_type(0));
-    CHECK_EQUAL(type_String, foo->get_column_type(1));
+    CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
+    CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(0, foo->size());
     CHECK(bar->is_attached());
     CHECK_EQUAL(3, bar->get_column_count());
-    CHECK_EQUAL(type_Int, bar->get_column_type(0));
-    CHECK_EQUAL(type_Float, bar->get_column_type(1));
-    CHECK_EQUAL(type_Double, bar->get_column_type(2));
+    CHECK_EQUAL(type_Int, bar->get_column_type(cols[0]));
+    CHECK_EQUAL(type_Float, bar->get_column_type(cols[1]));
+    CHECK_EQUAL(type_Double, bar->get_column_type(cols[2]));
     CHECK_EQUAL(0, bar->size());
 #endif
     CHECK_EQUAL(foo, group.get_table("foo"));
@@ -1288,6 +1292,11 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     ShortCircuitHistory hist(path);
     SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
     SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
+    ColKey col_int;
+    ColKey col_str1;
+    ColKey col_str2;
+    ColKey col_int3;
+    ColKey col_int4;
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -1299,45 +1308,45 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.add_table("t");
-        table_w->add_column(type_Int, "i0");
-        table_w->add_column(type_String, "s1");
-        table_w->add_column(type_String, "s2");
-        table_w->add_column(type_Int, "i3");
-        table_w->add_column(type_Int, "i4");
-        table_w->add_search_index(0);
-        table_w->add_search_index(2);
-        table_w->add_search_index(4);
+        col_int = table_w->add_column(type_Int, "i0");
+        col_str1 = table_w->add_column(type_String, "s1");
+        col_str2 = table_w->add_column(type_String, "s2");
+        col_int3 = table_w->add_column(type_Int, "i3");
+        col_int4 = table_w->add_column(type_Int, "i4");
+        table_w->add_search_index(col_int);
+        table_w->add_search_index(col_str2);
+        table_w->add_search_index(col_int4);
         table_w->create_objects(8, keys);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
     group.verify();
     ConstTableRef table = group.get_table("t");
-    CHECK(table->has_search_index(0));
-    CHECK_NOT(table->has_search_index(1));
-    CHECK(table->has_search_index(2));
-    CHECK_NOT(table->has_search_index(3));
-    CHECK(table->has_search_index(4));
+    CHECK(table->has_search_index(col_int));
+    CHECK_NOT(table->has_search_index(col_str1));
+    CHECK(table->has_search_index(col_str2));
+    CHECK_NOT(table->has_search_index(col_int3));
+    CHECK(table->has_search_index(col_int4));
 
     // Remove the previous search indexes and add 2 new ones
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
         table_w->create_objects(8, keys);
-        table_w->remove_search_index(2);
-        table_w->add_search_index(3);
-        table_w->remove_search_index(0);
-        table_w->add_search_index(1);
-        table_w->remove_search_index(4);
+        table_w->remove_search_index(col_str2);
+        table_w->add_search_index(col_int3);
+        table_w->remove_search_index(col_int);
+        table_w->add_search_index(col_str1);
+        table_w->remove_search_index(col_int4);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_NOT(table->has_search_index(0));
-    CHECK(table->has_search_index(1));
-    CHECK_NOT(table->has_search_index(2));
-    CHECK(table->has_search_index(3));
-    CHECK_NOT(table->has_search_index(4));
+    CHECK_NOT(table->has_search_index(col_int));
+    CHECK(table->has_search_index(col_str1));
+    CHECK_NOT(table->has_search_index(col_str2));
+    CHECK(table->has_search_index(col_int3));
+    CHECK_NOT(table->has_search_index(col_int4));
 
     // Add some searchable contents
     {
@@ -1346,8 +1355,8 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         int_fast64_t v = 7;
         for (auto obj : *table_w) {
             std::string out(util::to_string(v));
-            obj.set(1, StringData(out));
-            obj.set(3, v);
+            obj.set(col_str1, StringData(out));
+            obj.set(col_int3, v);
             v = (v + 1581757577LL) % 1000;
         }
         wt.commit();
@@ -1355,29 +1364,30 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     LangBindHelper::advance_read(sg);
     group.verify();
 
-    CHECK_NOT(table->has_search_index(0));
-    CHECK(table->has_search_index(1));
-    CHECK_NOT(table->has_search_index(2));
-    CHECK(table->has_search_index(3));
-    CHECK_NOT(table->has_search_index(4));
-    CHECK_EQUAL(Key(13), table->find_first_string(1, "931"));
-    CHECK_EQUAL(Key(5), table->find_first_int(3, 315));
+    CHECK_NOT(table->has_search_index(col_int));
+    CHECK(table->has_search_index(col_str1));
+    CHECK_NOT(table->has_search_index(col_str2));
+    CHECK(table->has_search_index(col_int3));
+    CHECK_NOT(table->has_search_index(col_int4));
+    CHECK_EQUAL(Key(13), table->find_first_string(col_str1, "931"));
+    CHECK_EQUAL(Key(5), table->find_first_int(col_int3, 315));
+    CHECK_EQUAL(Key(14), table->find_first_int(col_int3, 508));
 
     // Move the indexed columns by removal
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
-        table_w->remove_column(0);
-        table_w->remove_column(1);
+        table_w->remove_column(col_int);
+        table_w->remove_column(col_str2);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK(table->has_search_index(0));
-    CHECK(table->has_search_index(1));
-    CHECK_NOT(table->has_search_index(2));
-    CHECK_EQUAL(Key(4), table->find_first_string(0, "738"));
-    CHECK_EQUAL(Key(14), table->find_first_int(1, 508));
+    CHECK(table->has_search_index(col_str1));
+    CHECK(table->has_search_index(col_int3));
+    CHECK_NOT(table->has_search_index(col_int4));
+    CHECK_EQUAL(Key(4), table->find_first_string(col_str1, "738"));
+    CHECK_EQUAL(Key(14), table->find_first_int(col_int3, 508));
 }
 
 #ifdef LEGACY_TESTS
@@ -3477,7 +3487,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
 
     // Grab references to the LinkViews
     auto origin = group.get_table("origin");
-    auto col_link = origin->get_column_index("list");
+    auto col_link = origin->get_column_key("list");
     ConstObj obj0 = origin->get_object(Key(0));
     ConstObj obj1 = origin->get_object(Key(1));
 
@@ -8264,11 +8274,11 @@ TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
     LangBindHelper::promote_to_write(sg);
     TableRef filler = group->get_or_add_table("filler");
     TableRef table = group->get_or_add_table("table");
-    table->add_column(type_Int, "i");
+    auto col = table->add_column(type_Int, "i");
     Obj o = table->create_object();
     LangBindHelper::commit_and_continue_as_read(sg);
     LangBindHelper::promote_to_write(sg);
-    o.set<int>(0, 0);
+    o.set<int>(col, 0);
     group->remove_table("table");
     LangBindHelper::rollback_and_continue_as_read(sg);
 }
@@ -8603,13 +8613,13 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     TableRef target = g.add_table("target");
 
     target->add_column(type_Int, "int");
-    origin->add_column_link(type_LinkList, "linklist", *target);
-    origin->add_column_link(type_Link, "link", *target);
+    auto c1 = origin->add_column_link(type_LinkList, "linklist", *target);
+    auto c2 = origin->add_column_link(type_Link, "link", *target);
 
     Obj t = target->create_object();
     Obj o = origin->create_object();
-    o.set(1, t.get_key());
-    LinkList l = o.get_linklist(0);
+    o.set(c2, t.get_key());
+    LinkList l = o.get_linklist(c1);
     l.add(t.get_key());
     LangBindHelper::commit_and_continue_as_read(sg);
 

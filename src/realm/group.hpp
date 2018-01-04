@@ -445,7 +445,7 @@ public:
 
         struct link {
             const Table* origin_table; ///< A group-level table.
-            size_t origin_col_ndx;     ///< Link column being nullified.
+            ColKey origin_col_ndx;     ///< Link column being nullified.
             Key origin_key;            ///< Row in column being nullified.
             /// The target row index which is being removed. Mostly relevant for
             /// LinkList (to know which entries are being removed), but also
@@ -1401,7 +1401,7 @@ struct CascadeState : Group::CascadeNotification {
     /// on its behalf. This is used by LinkView::clear() to avoid reentrance.
     ///
     /// Must never be set concurrently with stop_on_table.
-    size_t stop_on_link_list_column_ndx = size_t(-1);
+    ColKey stop_on_link_list_column_key = ColKey();
 
     /// Is ignored if stop_on_link_list_column is null.
     Key stop_on_link_list_key;

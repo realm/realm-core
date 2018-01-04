@@ -24,13 +24,14 @@
 
 namespace realm {
 template <Action action, typename T, typename R>
-R Table::aggregate(size_t column_ndx, T value, size_t* resultcount, Key* return_ndx) const
+R Table::aggregate(ColKey column_key, T value, size_t* resultcount, Key* return_ndx) const
 {
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     using ResultType = typename AggregateResultType<T, action>::result_type;
-    bool nullable = is_nullable(column_ndx);
+    bool nullable = is_nullable(column_key);
     QueryState<ResultType> st(action);
     LeafType leaf(get_alloc());
+    size_t column_ndx = colkey2ndx(column_key);
 
     traverse_clusters([value, &leaf, column_ndx, &st, nullable](const Cluster* cluster) {
         // direct aggregate on the leaf
@@ -56,11 +57,11 @@ R Table::aggregate(size_t column_ndx, T value, size_t* resultcount, Key* return_
 }
 
 template <typename T>
-double Table::average(size_t col_ndx, size_t* resultcount) const
+double Table::average(ColKey col_key, size_t* resultcount) const
 {
     using ResultType = typename AggregateResultType<T, act_Sum>::result_type;
     size_t count;
-    auto sum = aggregate<act_Sum, T, ResultType>(col_ndx, T{}, &count, nullptr);
+    auto sum = aggregate<act_Sum, T, ResultType>(col_key, T{}, &count, nullptr);
     double avg = 0;
     if (count != 0)
         avg = double(sum) / count;

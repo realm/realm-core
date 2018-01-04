@@ -40,7 +40,7 @@ public:
     };
     struct ColumnId {
         const Table* table;
-        size_t col_ndx;
+        ColKey col_key;
     };
 
     CommonDescriptor() = default;
@@ -55,7 +55,7 @@ public:
     // supported), and the final is any column type that can be sorted on.
     // `column_indices` must be non-empty, and each vector within it must also
     // be non-empty.
-    CommonDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices);
+    CommonDescriptor(Table const& table, std::vector<std::vector<ColKey>> column_indices);
     virtual std::unique_ptr<CommonDescriptor> clone() const;
 
     // returns whether this descriptor is valid and can be used to sort
@@ -91,7 +91,7 @@ public:
             std::vector<bool> is_null;
             std::vector<Key> translated_keys;
             const Table* table;
-            size_t col_ndx;
+            ColKey col_key;
             bool ascending;
         };
         std::vector<SortColumn> m_columns;
@@ -99,7 +99,7 @@ public:
     virtual Sorter sorter(KeyColumn const& row_indexes) const;
 
     // handover support
-    std::vector<std::vector<size_t>> export_column_indices() const;
+    std::vector<std::vector<ColKey>> export_column_indices() const;
     virtual std::vector<bool> export_order() const
     {
         return {};
@@ -115,7 +115,7 @@ public:
     // See CommonDescriptor for restrictions on `column_indices`.
     // The sort order can be specified by using `ascending` which must either be
     // empty or have one entry for each column index chain.
-    SortDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices,
+    SortDescriptor(Table const& table, std::vector<std::vector<ColKey>> column_indices,
                    std::vector<bool> ascending = {});
     SortDescriptor() = default;
     ~SortDescriptor() = default;

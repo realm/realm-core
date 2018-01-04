@@ -62,6 +62,7 @@ public:
         Array::add(val);
     }
 
+    // nullify forward links corresponding to any backward links at index 'ndx'
     void nullify_fwd_links(size_t ndx, CascadeState& state);
     void add(size_t ndx, Key key);
     bool remove(size_t ndx, Key key);

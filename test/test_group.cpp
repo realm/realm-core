@@ -80,12 +80,14 @@ using namespace realm::test_util;
 namespace {
 
 template <class T>
-void test_table_add_columns(T t)
+std::vector<ColKey> test_table_add_columns(T t)
 {
-    t->add_column(type_String, "first");
-    t->add_column(type_Int, "second");
-    t->add_column(type_Bool, "third");
-    t->add_column(type_Int, "fourth");
+    std::vector<ColKey> retval;
+    retval.push_back(t->add_column(type_String, "first"));
+    retval.push_back(t->add_column(type_Int, "second"));
+    retval.push_back(t->add_column(type_Bool, "third"));
+    retval.push_back(t->add_column(type_Int, "fourth"));
+    return retval;
 }
 
 template <class T>
@@ -565,7 +567,7 @@ TEST(Group_BasicRemoveTable)
 TEST(Group_ObjUseAfterTableDetach)
 {
     Obj obj;
-    size_t col;
+    ColKey col;
     {
         Group group;
         TableRef alpha = group.add_table("alpha");
@@ -893,7 +895,7 @@ TEST(Group_Serialize0)
 
         // Create new table in group
         auto t = from_disk.add_table("test");
-        test_table_add_columns(t);
+        std::vector<ColKey> cols = test_table_add_columns(t);
 
         CHECK_EQUAL(4, t->get_column_count());
         CHECK_EQUAL(0, t->size());
@@ -902,10 +904,10 @@ TEST(Group_Serialize0)
         Obj obj = t->create_object();
         obj.set_all("Test", 1, true, int(Wed));
 
-        CHECK_EQUAL("Test", obj.get<String>(0));
-        CHECK_EQUAL(1, obj.get<Int>(1));
-        CHECK_EQUAL(true, obj.get<Bool>(2));
-        CHECK_EQUAL(Wed, obj.get<Int>(3));
+        CHECK_EQUAL("Test", obj.get<String>(cols[0]));
+        CHECK_EQUAL(1, obj.get<Int>(cols[1]));
+        CHECK_EQUAL(true, obj.get<Bool>(cols[2]));
+        CHECK_EQUAL(Wed, obj.get<Int>(cols[3]));
     }
     {
         // Load the group and let it clean up without loading
@@ -947,13 +949,13 @@ TEST(Group_Serialize1)
 
         CHECK_EQUAL(4, t->get_column_count());
         CHECK_EQUAL(10, t->size());
-
+        auto cols = t->get_col_keys();
         // Verify that original values are there
         CHECK(*table == *t);
 
         // Modify both tables
-        table->get_object(Key(0)).set(0, "test");
-        t->get_object(Key(0)).set(0, "test");
+        table->get_object(Key(0)).set(cols[0], "test");
+        t->get_object(Key(0)).set(cols[0], "test");
 
         table->create_object(Key(5)).set_all("hello", 100, false, int(Mon));
         t->create_object(Key(5)).set_all("hello", 100, false, int(Mon));
@@ -1172,13 +1174,14 @@ TEST(Group_Serialize_All)
 
     CHECK_EQUAL(5, t->get_column_count());
     CHECK_EQUAL(1, t->size());
+    auto cols = t->get_col_keys();
     Obj obj = t->get_object(Key(0));
-    CHECK_EQUAL(12, obj.get<Int>(0));
-    CHECK_EQUAL(true, obj.get<Bool>(1));
-    CHECK(obj.get<Timestamp>(2) == Timestamp(12345, 0));
-    CHECK_EQUAL("test", obj.get<String>(3));
-    CHECK_EQUAL(7, obj.get<Binary>(4).size());
-    CHECK_EQUAL("binary", obj.get<Binary>(4).data());
+    CHECK_EQUAL(12, obj.get<Int>(cols[0]));
+    CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
+    CHECK(obj.get<Timestamp>(cols[2]) == Timestamp(12345, 0));
+    CHECK_EQUAL("test", obj.get<String>(cols[3]));
+    CHECK_EQUAL(7, obj.get<Binary>(cols[4]).size());
+    CHECK_EQUAL("binary", obj.get<Binary>(cols[4]).data());
 }
 
 TEST(Group_Persist)
@@ -1207,16 +1210,17 @@ TEST(Group_Persist)
     {
         CHECK_EQUAL(5, table->get_column_count());
         CHECK_EQUAL(1, table->size());
+        auto cols = table->get_col_keys();
         Obj obj = table->get_object(Key(0));
-        CHECK_EQUAL(12, obj.get<Int>(0));
-        CHECK_EQUAL(true, obj.get<Bool>(1));
-        CHECK_EQUAL("test", obj.get<String>(2));
-        CHECK_EQUAL(7, obj.get<Binary>(3).size());
-        CHECK_EQUAL("binary", obj.get<Binary>(3).data());
-        CHECK(obj.get<Timestamp>(4) == Timestamp(111, 222));
+        CHECK_EQUAL(12, obj.get<Int>(cols[0]));
+        CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
+        CHECK_EQUAL("test", obj.get<String>(cols[2]));
+        CHECK_EQUAL(7, obj.get<Binary>(cols[3]).size());
+        CHECK_EQUAL("binary", obj.get<Binary>(cols[3]).data());
+        CHECK(obj.get<Timestamp>(cols[4]) == Timestamp(111, 222));
 
         // Change a bit
-        obj.set(2, "Changed!");
+        obj.set(cols[2], "Changed!");
 
         // Write changes to file
         db.commit();
@@ -1229,13 +1233,14 @@ TEST(Group_Persist)
     {
         CHECK_EQUAL(5, table->get_column_count());
         CHECK_EQUAL(1, table->size());
+        auto cols = table->get_col_keys();
         Obj obj = table->get_object(Key(0));
-        CHECK_EQUAL(12, obj.get<Int>(0));
-        CHECK_EQUAL(true, obj.get<Bool>(1));
-        CHECK_EQUAL("Changed!", obj.get<String>(2));
-        CHECK_EQUAL(7, obj.get<Binary>(3).size());
-        CHECK_EQUAL("binary", obj.get<Binary>(3).data());
-        CHECK(obj.get<Timestamp>(4) == Timestamp(111, 222));
+        CHECK_EQUAL(12, obj.get<Int>(cols[0]));
+        CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
+        CHECK_EQUAL("Changed!", obj.get<String>(cols[2]));
+        CHECK_EQUAL(7, obj.get<Binary>(cols[3]).size());
+        CHECK_EQUAL("binary", obj.get<Binary>(cols[3]).data());
+        CHECK(obj.get<Timestamp>(cols[4]) == Timestamp(111, 222));
     }
 }
 

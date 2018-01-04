@@ -52,7 +52,7 @@ void Spec::init(MemRef mem) noexcept
 {
     m_top.init_from_mem(mem);
     size_t top_size = m_top.size();
-    REALM_ASSERT(top_size >= 3 && top_size <= 5);
+    REALM_ASSERT(top_size > 3 && top_size <= 5);
 
     m_types.init_from_ref(m_top.get_as_ref(0));
     m_types.set_parent(&m_top, 0);
@@ -60,6 +60,8 @@ void Spec::init(MemRef mem) noexcept
     m_names.set_parent(&m_top, 1);
     m_attr.init_from_ref(m_top.get_as_ref(2));
     m_attr.set_parent(&m_top, 2);
+    m_keys.init_from_ref(m_top.get_as_ref(3));
+    m_keys.set_parent(&m_top, 3);
 
     // Reset optional subarrays in the case of moving
     // from initialized children to uninitialized
@@ -69,15 +71,15 @@ void Spec::init(MemRef mem) noexcept
     // Subspecs array is only there and valid when there are subtables
     // if there are enumkey, but no subtables yet it will be a zero-ref
     if (has_subspec()) {
-        ref_type ref = m_top.get_as_ref(3);
+        ref_type ref = m_top.get_as_ref(4);
         m_subspecs.init_from_ref(ref);
-        m_subspecs.set_parent(&m_top, 3);
+        m_subspecs.set_parent(&m_top, 4);
     }
 
     // Enumkeys array is only there when there are StringEnum columns
-    if (top_size >= 5) {
-        m_enumkeys.init_from_ref(m_top.get_as_ref(4));
-        m_enumkeys.set_parent(&m_top, 4);
+    if (top_size > 5) {
+        m_enumkeys.init_from_ref(m_top.get_as_ref(5));
+        m_enumkeys.set_parent(&m_top, 5);
     }
 
     update_internals();
@@ -108,12 +110,13 @@ bool Spec::update_from_parent(size_t old_baseline) noexcept
     m_types.update_from_parent(old_baseline);
     m_names.update_from_parent(old_baseline);
     m_attr.update_from_parent(old_baseline);
+    m_keys.update_from_parent(old_baseline);
 
     if (has_subspec()) {
         m_subspecs.update_from_parent(old_baseline);
     }
 
-    if (m_top.size() > 4)
+    if (m_top.size() > 5)
         m_enumkeys.update_from_parent(old_baseline);
 
     update_internals();
@@ -158,13 +161,22 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
         spec_set.add(v); // Throws
         dg_2.release();
     }
+    {
+        // One key for each column
+        bool context_flag = false;
+        MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc); // Throws
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v = from_ref(mem.get_ref());
+        spec_set.add(v); // Throws
+        dg_2.release();
+    }
 
     dg.release();
     return spec_set.get_mem();
 }
 
 
-void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, int attr)
+void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, StringData name, int attr)
 {
     REALM_ASSERT(column_ndx <= m_types.size());
 
@@ -185,6 +197,7 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, in
     m_types.insert(column_ndx, type);     // Throws
     // FIXME: So far, attributes are never reported to the replication system
     m_attr.insert(column_ndx, attr); // Throws
+    m_keys.insert(column_ndx, col_key.value);
 
     bool is_subspec_type = type == col_type_Link || type == col_type_LinkList || type == col_type_BackLink;
     if (is_subspec_type) {
@@ -195,16 +208,16 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, in
             bool context_flag = false;
             MemRef subspecs_mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
             _impl::DeepArrayRefDestroyGuard dg(subspecs_mem.get_ref(), alloc);
-            if (m_top.size() == 3) {
+            if (m_top.size() == 4) {
                 int_fast64_t v(from_ref(subspecs_mem.get_ref()));
                 m_top.add(v); // Throws
             }
             else {
                 int_fast64_t v(from_ref(subspecs_mem.get_ref()));
-                m_top.set(3, v); // Throws
+                m_top.set(4, v); // Throws
             }
             m_subspecs.init_from_ref(subspecs_mem.get_ref());
-            m_subspecs.set_parent(&m_top, 3);
+            m_subspecs.set_parent(&m_top, 4);
             dg.release();
         }
 
@@ -264,6 +277,7 @@ void Spec::erase_column(size_t column_ndx)
     m_names.erase(column_ndx);     // Throws
     m_types.erase(column_ndx);     // Throws
     m_attr.erase(column_ndx);      // Throws
+    m_keys.erase(column_ndx);
 
     update_internals();
 }
@@ -313,19 +327,19 @@ void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref, ArrayPar
 {
     REALM_ASSERT(get_column_type(column_ndx) == col_type_String);
 
-    REALM_ASSERT_EX(m_enumkeys.is_attached() == (m_top.size() > 4), m_enumkeys.is_attached(), m_top.size());
+    REALM_ASSERT_EX(m_enumkeys.is_attached() == (m_top.size() > 5), m_enumkeys.is_attached(), m_top.size());
     // Create the enumkeys list if needed
     if (!m_enumkeys.is_attached()) {
         m_enumkeys.create(Array::type_HasRefs);
-        if (m_top.size() == 3)
+        if (m_top.size() == 4)
             m_top.add(0); // no subtables
-        if (m_top.size() == 4) {
+        if (m_top.size() == 5) {
             m_top.add(m_enumkeys.get_ref());
         }
         else {
-            m_top.set(4, m_enumkeys.get_ref());
+            m_top.set(5, m_enumkeys.get_ref());
         }
-        m_enumkeys.set_parent(&m_top, 4);
+        m_enumkeys.set_parent(&m_top, 5);
     }
 
     // Insert the new key list
@@ -400,20 +414,20 @@ void Spec::set_opposite_link_table_key(size_t column_ndx, TableKey table_key)
 }
 
 
-void Spec::set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col_ndx)
+void Spec::set_backlink_origin_column(size_t backlink_col_ndx, ColKey origin_col_key)
 {
     REALM_ASSERT(backlink_col_ndx < get_column_count());
     REALM_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
 
     // position of target table is stored as tagged int
-    size_t tagged_ndx = (origin_col_ndx << 1) + 1;
+    size_t tagged_ndx = (origin_col_key.value << 1) + 1;
 
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
     m_subspecs.set(subspec_ndx + 1, tagged_ndx); // Throws
 }
 
 
-size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const noexcept
+ColKey Spec::get_origin_column_key(size_t backlink_col_ndx) const noexcept
 {
     REALM_ASSERT(backlink_col_ndx < get_column_count());
     REALM_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
@@ -423,19 +437,18 @@ size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const noexcept
     int64_t tagged_value = m_subspecs.get(subspec_ndx + 1);
     REALM_ASSERT(tagged_value != 0); // can't retrieve it if never set
 
-    size_t origin_col_ndx = size_t(uint64_t(tagged_value) >> 1);
-    return origin_col_ndx;
+    return ColKey(uint64_t(tagged_value) >> 1);
 }
 
 
-size_t Spec::find_backlink_column(TableKey origin_table_key, size_t origin_col_ndx) const noexcept
+size_t Spec::find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept
 {
     size_t backlinks_column_start = m_num_public_columns;
     size_t backlinks_start = get_subspec_ndx(backlinks_column_start);
     size_t count = m_subspecs.size();
 
     int64_t tagged_table_ndx = (origin_table_key.value << 1) + 1;
-    int64_t tagged_column_ndx = (origin_col_ndx << 1) + 1;
+    int64_t tagged_column_ndx = (origin_col_key.value << 1) + 1;
 
     for (size_t i = backlinks_start; i < count; i += 2) {
         if (m_subspecs.get(i) == tagged_table_ndx && m_subspecs.get(i + 1) == tagged_column_ndx) {
@@ -512,6 +525,12 @@ bool Spec::operator==(const Spec& spec) const noexcept
 }
 
 
+ColKey Spec::get_key(size_t column_ndx)
+{
+    return ColKey(m_keys.get(column_ndx));
+}
+
+
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void Spec::verify() const
@@ -559,5 +578,6 @@ void Spec::to_dot(std::ostream& out, StringData title) const
 
     out << "}" << std::endl;
 }
+
 
 #endif // LCOV_EXCL_STOP ignore debug functions

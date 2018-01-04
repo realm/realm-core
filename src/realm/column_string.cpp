@@ -1315,16 +1315,6 @@ void StringColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
     ColumnBaseSimple::refresh_accessor_tree(col_ndx, spec);
     refresh_root_accessor(); // Throws
-
-    // Refresh search index
-    if (m_search_index) {
-        size_t ndx_in_parent = m_array->get_ndx_in_parent();
-        size_t search_ndx_in_parent = m_search_index->get_ndx_in_parent();
-        // Index in parent should have been set before now, if it is incorrect we will
-        // fix it now, but we have probably already written to an incorrect index at this point.
-        REALM_ASSERT_DEBUG_EX(search_ndx_in_parent == ndx_in_parent + 1, search_ndx_in_parent, ndx_in_parent + 1);
-        m_search_index->refresh_accessor_tree(col_ndx, spec); // Throws
-    }
 }
 
 
