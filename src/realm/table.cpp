@@ -715,7 +715,8 @@ Table::~Table() noexcept
     if (m_top.get_parent() == nullptr) {
         m_top.destroy_deep();
     }
-    detach();
+    if (is_attached())
+        detach();
 }
 
 
