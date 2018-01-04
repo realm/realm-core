@@ -111,9 +111,6 @@ public:
 
     Allocator& get_alloc() const;
 
-    /// Construct a new freestanding top-level table with dynamic lifetime.
-    static TableRef create(Allocator& = Allocator::get_default());
-
     /// Construct a copy of the specified table as a new freestanding top-level
     /// table with dynamic lifetime.
     TableRef copy(Allocator& = Allocator::get_default()) const;
@@ -1238,16 +1235,6 @@ inline void Table::revive(Allocator& alloc)
 inline Allocator& Table::get_alloc() const
 {
     return m_alloc;
-}
-
-inline TableRef Table::create(Allocator& alloc)
-{
-    std::unique_ptr<Table> table(new Table(ref_count_tag(), alloc)); // Throws
-    ref_type ref = create_empty_table(alloc);                        // Throws
-    Parent* parent = nullptr;
-    size_t ndx_in_parent = 0;
-    table->init(ref, parent, ndx_in_parent); // Throws
-    return table.release()->get_table_ref();
 }
 
 // For use by queries

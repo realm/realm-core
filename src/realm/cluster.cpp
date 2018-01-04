@@ -1305,6 +1305,7 @@ ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, Key key)
     : m_tree(t)
     , m_leaf(t.get_alloc(), t)
     , m_state(m_leaf)
+    , m_instance_version(t.get_instance_version())
     , m_key(key)
 {
 }

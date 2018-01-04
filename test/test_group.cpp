@@ -565,7 +565,7 @@ TEST(Group_BasicRemoveTable)
 TEST(Group_ObjUseAfterTableDetach)
 {
     Obj obj;
-    int col;
+    size_t col;
     {
         Group group;
         TableRef alpha = group.add_table("alpha");
