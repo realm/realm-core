@@ -1782,9 +1782,9 @@ void Table::refresh_accessor_tree()
 
 bool Table::is_cross_table_link_target() const noexcept
 {
-    int begin = m_spec->first_backlink_column_index();
-    int end = m_spec->get_column_count();
-    for (int i = begin; i < end; ++i) {
+    size_t first_backlink_column = m_spec->first_backlink_column_index();
+    size_t end_backlink_column = m_spec->get_column_count();
+    for (size_t i = first_backlink_column; i < end_backlink_column; ++i) {
         auto t = m_spec->get_column_type(i);
         // look for a backlink with a different target than ourselves
         if (t == col_type_BackLink && m_spec->get_opposite_link_table_key(i) != get_key())
