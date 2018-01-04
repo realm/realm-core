@@ -928,11 +928,6 @@ TEST(Table_GetName)
         Table table;
         CHECK_EQUAL("", table.get_name());
     }
-    // ... regardless of how they are created
-    {
-        TableRef table = Table::create();
-        CHECK_EQUAL("", table->get_name());
-    }
 
     // Direct members of groups do have names
     {
