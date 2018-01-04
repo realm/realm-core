@@ -1506,6 +1506,15 @@ public:
         for (auto& condition : m_conditions) {
             condition->set_cluster(m_cluster);
         }
+
+        m_start.clear();
+        m_start.resize(m_conditions.size(), 0);
+
+        m_last.clear();
+        m_last.resize(m_conditions.size(), 0);
+
+        m_was_match.clear();
+        m_was_match.resize(m_conditions.size(), false);
     }
 
     void update_column() const override
@@ -1539,15 +1548,6 @@ public:
         ParentNode::init();
 
         m_dD = 10.0;
-
-        m_start.clear();
-        m_start.resize(m_conditions.size(), 0);
-
-        m_last.clear();
-        m_last.resize(m_conditions.size(), 0);
-
-        m_was_match.clear();
-        m_was_match.resize(m_conditions.size(), false);
 
         std::vector<ParentNode*> v;
         for (auto& condition : m_conditions) {
@@ -1654,6 +1654,10 @@ public:
     void cluster_changed() override
     {
         m_condition->set_cluster(m_cluster);
+        // Heuristics bookkeeping:
+        m_known_range_start = 0;
+        m_known_range_end = 0;
+        m_first_in_known_range = not_found;
     }
 
     void update_column() const override
@@ -1672,11 +1676,6 @@ public:
         m_condition->init();
         v.clear();
         m_condition->gather_children(v);
-
-        // Heuristics bookkeeping:
-        m_known_range_start = 0;
-        m_known_range_end = 0;
-        m_first_in_known_range = not_found;
     }
 
     size_t find_first_local(size_t start, size_t end) override;
