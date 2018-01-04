@@ -1959,8 +1959,8 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
         if (g.size() == 1) {
             g.remove_table("data");
             TableRef table = g.add_table("data");
-            table->add_column(type_Int, "ints");
-            table->create_object().set(0, 0);
+            auto col = table->add_column(type_Int, "ints");
+            table->create_object().set(col, 0);
         }
         sg->commit();
         sg->wait_for_change();
@@ -1975,7 +1975,9 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
         Group& g = sg->begin_write();
         if (g.size() == 1) {
             TableRef table = g.get_table("data");
-            int64_t v = table->begin()->get<int64_t>(0);
+            auto col = table->get_column_index("ints");
+            auto first_obj = table->begin();
+            int64_t v = first_obj->get<int64_t>(col);
 
             if (i == 0 && v == 0)
                 first = true;
@@ -1983,7 +1985,7 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
             // Note: If this fails in child process (pid != 0) it might go undetected. This is not
             // critical since it will most likely result in a failure in the parent process also.
             CHECK_EQUAL(v - (first ? 0 : 1), 2 * i);
-            table->set_int(0, 0, v + 1);
+            first_obj->set(col, v + 1);
         }
 
         // millisleep(0) might yield time slice on certain OS'es, so we use fastrand() to get cases
