@@ -20,8 +20,19 @@
 
 using namespace realm::util;
 
-GenericEventLoop (*realm::util::s_get_eventloop)() = [] { return GenericEventLoop(); };
+struct DummyLoop : public GenericEventLoop {
+public:
+    void post(std::function<void()>) override {}
+};
 
-void (*realm::util::s_post_on_eventloop)(GenericEventLoop, EventLoopPostHandler*, void* user_data) = [](GenericEventLoop, EventLoopPostHandler*, void*) { };
+static std::function<std::unique_ptr<GenericEventLoop>()> s_factory = [] { return std::unique_ptr<GenericEventLoop>(new DummyLoop); };
 
-void (*realm::util::s_release_eventloop)(GenericEventLoop) = [](GenericEventLoop) { };
+void GenericEventLoop::set_event_loop_factory(std::function<std::unique_ptr<GenericEventLoop>()> factory)
+{
+    s_factory = std::move(factory);
+}
+
+std::unique_ptr<GenericEventLoop> GenericEventLoop::get()
+{
+    return s_factory();
+}
