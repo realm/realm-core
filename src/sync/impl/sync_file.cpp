@@ -189,8 +189,13 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
         throw std::system_error(err, std::system_category());
     }
     // Remove the file so we can use the name for our own file.
+#ifdef _WIN32
+    _close(fd);
+    _unlink(path_buffer.c_str());
+#else
     close(fd);
     unlink(path_buffer.c_str());
+#endif
     return path_buffer;
 }
 
