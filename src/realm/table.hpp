@@ -459,12 +459,10 @@ public:
     double average_float(size_t column_ndx, size_t* value_count = nullptr) const;
     double average_double(size_t column_ndx, size_t* value_count = nullptr) const;
 
-    // Searching
+    // Will return pointer to search index accessor. Will return nullptr if no index
     StringIndex* get_search_index(size_t column_ndx) const noexcept
     {
-        if (!has_search_index(column_ndx)) {
-            throw(std::runtime_error(""));
-        }
+        REALM_ASSERT(column_ndx < m_index_accessors.size());
         return m_index_accessors[column_ndx];
     }
 
