@@ -52,7 +52,6 @@ public:
     BinaryData get_at(size_t ndx, size_t& pos) const noexcept;
 
     bool is_null(size_t ndx) const noexcept override;
-    StringData get_index_data(size_t, StringIndex::StringConversionBuffer&) const noexcept final;
 
     void add(BinaryData value);
     void set(size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -177,14 +176,6 @@ private:
 
 
 // Implementation
-
-// LCOV_EXCL_START
-inline StringData BinaryColumn::get_index_data(size_t, StringIndex::StringConversionBuffer&) const noexcept
-{
-    REALM_ASSERT(false && "Index not implemented for BinaryColumn.");
-    REALM_UNREACHABLE();
-}
-// LCOV_EXCL_STOP
 
 inline size_t BinaryColumn::size() const noexcept
 {

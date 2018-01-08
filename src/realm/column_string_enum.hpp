@@ -92,7 +92,6 @@ public:
     size_t count(StringData value) const;
     size_t find_first(StringData value, size_t begin = 0, size_t end = npos) const;
     void find_all(IntegerColumn& res, StringData value, size_t begin = 0, size_t end = npos) const;
-    FindRes find_all_no_copy(StringData value, InternalFindResult& result) const;
 
     size_t count(size_t key_index) const;
     size_t find_first(size_t key_index, size_t begin = 0, size_t end = -1) const;
@@ -109,16 +108,6 @@ public:
     void set_string(size_t, StringData) override;
 
     void adjust_keys_ndx_in_parent(int diff) noexcept;
-
-    // Search index
-    StringData get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept final;
-    bool supports_search_index() const noexcept final
-    {
-        return true;
-    }
-    StringIndex* create_search_index() override;
-    void install_search_index(std::unique_ptr<StringIndex>) noexcept;
-    void destroy_search_index() noexcept override;
 
     // Compare two string columns for equality
     bool compare_string(const StringColumn&) const;

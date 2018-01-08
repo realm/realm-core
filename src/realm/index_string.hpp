@@ -25,6 +25,7 @@
 
 #include <realm/array.hpp>
 #include <realm/column_fwd.hpp>
+#include <realm/cluster_tree.hpp>
 
 /*
 The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_OldDateTime and
@@ -104,6 +105,16 @@ public:
     StringIndex(ref_type, ArrayParent*, size_t ndx_in_parent, ColumnBase* target_column, Allocator&);
     ~StringIndex() noexcept
     {
+    }
+
+    template <class T>
+    static bool type_supported()
+    {
+        return realm::is_any<T, int64_t, int, StringData, bool, Timestamp>::value;
+    }
+    static bool type_supported(realm::DataType type)
+    {
+        return (type == type_Int || type == type_String || type == type_Bool || type == type_Timestamp);
     }
 
     static ref_type create_empty(Allocator& alloc);

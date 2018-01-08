@@ -127,10 +127,6 @@ bool TimestampColumn::is_null(size_t row_ndx) const noexcept
 /// \throw LogicError Thrown if this column is not nullable.
 void TimestampColumn::set_null(size_t row_ndx)
 {
-    if (has_search_index()) {
-        m_search_index->set(row_ndx, null{}); // Throws
-    }
-
     // FIXME: Consider not setting 0 on m_nanoseconds
     // The current setting of 0 forces an arguably unnecessary copy-on-write etc of that leaf node
     m_seconds->set_null(row_ndx);   // Throws
@@ -145,22 +141,10 @@ void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, siz
     util::Optional<int64_t> default_value = nullable ? util::none : util::make_optional<int64_t>(0);
     m_seconds->insert(row_ndx_or_npos, default_value, num_rows_to_insert); // Throws
     m_nanoseconds->insert(row_ndx_or_npos, 0, num_rows_to_insert);         // Throws
-
-    if (has_search_index()) {
-        if (nullable) {
-            m_search_index->insert(row_ndx, null{}, num_rows_to_insert, is_append); // Throws
-        }
-        else {
-            m_search_index->insert(row_ndx, Timestamp{0, 0}, num_rows_to_insert, is_append); // Throws
-        }
-    }
 }
 
 void TimestampColumn::erase(size_t row_ndx, bool is_last)
 {
-    if (has_search_index()) {
-        m_search_index->erase<StringData>(row_ndx, is_last); // Throws
-    }
     m_seconds->erase(row_ndx, is_last);     // Throws
     m_nanoseconds->erase(row_ndx, is_last); // Throws
 }
@@ -170,13 +154,6 @@ void TimestampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_
 {
     bool is_last = (row_ndx + num_rows_to_erase) == size();
     for (size_t i = 0; i < num_rows_to_erase; ++i) {
-        // Update search index
-        // (it is important here that we do it before actually setting
-        //  the value, or the index would not be able to find the correct
-        //  position to update (as it looks for the old value))
-        if (has_search_index()) {
-            m_search_index->erase<StringData>(row_ndx + num_rows_to_erase - i - 1, is_last); // Throws
-        }
         m_seconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last);     // Throws
         m_nanoseconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last); // Throws
     }
@@ -185,18 +162,6 @@ void TimestampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_
 void TimestampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool /*broken_reciprocal_backlinks*/)
 {
     size_t last_row_ndx = prior_num_rows - 1;
-
-    if (has_search_index()) {
-        // remove the value to be overwritten from index
-        bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
-        m_search_index->erase<StringData>(row_ndx, is_last); // Throws
-
-        // update index to point to new location
-        if (row_ndx != last_row_ndx) {
-            auto moved_value = get(last_row_ndx);
-            m_search_index->update_ref(moved_value, last_row_ndx, row_ndx); // Throws
-        }
-    }
 
     m_seconds->move_last_over(row_ndx, last_row_ndx);     // Throws
     m_nanoseconds->move_last_over(row_ndx, last_row_ndx); // Throws
@@ -208,25 +173,10 @@ void TimestampColumn::clear(size_t num_rows, bool /*broken_reciprocal_backlinks*
     static_cast<void>(num_rows);
     m_seconds->clear();     // Throws
     m_nanoseconds->clear(); // Throws
-    if (has_search_index()) {
-        m_search_index->clear(); // Throws
-    }
 }
 
 void TimestampColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
-    if (has_search_index()) {
-        auto value_1 = get(row_ndx_1);
-        auto value_2 = get(row_ndx_2);
-        size_t column_size = this->size();
-        bool row_ndx_1_is_last = row_ndx_1 == column_size - 1;
-        bool row_ndx_2_is_last = row_ndx_2 == column_size - 1;
-        m_search_index->erase<StringData>(row_ndx_1, row_ndx_1_is_last);  // Throws
-        m_search_index->insert(row_ndx_1, value_2, 1, row_ndx_1_is_last); // Throws
-        m_search_index->erase<StringData>(row_ndx_2, row_ndx_2_is_last);  // Throws
-        m_search_index->insert(row_ndx_2, value_1, 1, row_ndx_2_is_last); // Throws
-    }
-
     auto tmp1 = m_seconds->get(row_ndx_1);
     m_seconds->set(row_ndx_1, m_seconds->get(row_ndx_2)); // Throws
     m_seconds->set(row_ndx_2, tmp1);                      // Throws
@@ -246,43 +196,6 @@ void TimestampColumn::destroy() noexcept
         m_search_index->destroy();
 }
 
-StringData TimestampColumn::get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept
-{
-    return GetIndexData<Timestamp>::get_index_data(get(ndx), buffer);
-}
-
-void TimestampColumn::populate_search_index()
-{
-    REALM_ASSERT(has_search_index());
-    // Populate the index
-    size_t num_rows = size();
-    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
-        bool is_append = true;
-        auto value = get(row_ndx);
-        m_search_index->insert(row_ndx, value, 1, is_append); // Throws
-    }
-}
-
-StringIndex* TimestampColumn::create_search_index()
-{
-    REALM_ASSERT(!has_search_index());
-    m_search_index.reset(new StringIndex(this, get_alloc())); // Throws
-    populate_search_index();                                  // Throws
-    return m_search_index.get();
-}
-
-void TimestampColumn::destroy_search_index() noexcept
-{
-    m_search_index.reset();
-}
-
-void TimestampColumn::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
-{
-    REALM_ASSERT(!m_search_index);
-    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, get_alloc())); // Throws
-}
-
-
 ref_type TimestampColumn::write(size_t /*slice_offset*/, size_t /*slice_size*/, size_t /*table_size*/,
                                 _impl::OutputStream&) const
 {
@@ -293,9 +206,6 @@ ref_type TimestampColumn::write(size_t /*slice_offset*/, size_t /*slice_size*/, 
 void TimestampColumn::set_ndx_in_parent(size_t ndx) noexcept
 {
     m_array->set_ndx_in_parent(ndx);
-    if (has_search_index()) {
-        m_search_index->set_ndx_in_parent(ndx + 1);
-    }
 }
 
 void TimestampColumn::update_from_parent(size_t old_baseline) noexcept
@@ -304,9 +214,6 @@ void TimestampColumn::update_from_parent(size_t old_baseline) noexcept
 
     m_seconds->update_from_parent(old_baseline);
     m_nanoseconds->update_from_parent(old_baseline);
-    if (has_search_index()) {
-        m_search_index->update_from_parent(old_baseline);
-    }
 }
 
 void TimestampColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec)
@@ -317,10 +224,6 @@ void TimestampColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec
 
     m_seconds->init_from_parent();
     m_nanoseconds->init_from_parent();
-
-    if (has_search_index()) {
-        m_search_index->refresh_accessor_tree(new_col_ndx, spec); // Throws
-    }
 }
 
 // LCOV_EXCL_START ignore debug functions
@@ -363,11 +266,6 @@ void TimestampColumn::add(const Timestamp& ts)
     int32_t nanoseconds = ts_is_null ? 0 : ts.get_nanoseconds();
     m_seconds->insert(npos, seconds);         // Throws
     m_nanoseconds->insert(npos, nanoseconds); // Throws
-
-    if (has_search_index()) {
-        size_t ndx = size() - 1;                  // Slow
-        m_search_index->insert(ndx, ts, 1, true); // Throws
-    }
 }
 
 Timestamp TimestampColumn::get(size_t row_ndx) const noexcept
@@ -384,10 +282,6 @@ void TimestampColumn::set(size_t row_ndx, const Timestamp& ts)
 
     util::Optional<int64_t> seconds = util::make_optional(ts.get_seconds());
     int32_t nanoseconds = ts.get_nanoseconds();
-
-    if (has_search_index()) {
-        m_search_index->set(row_ndx, ts); // Throws
-    }
 
     m_seconds->set(row_ndx, seconds);         // Throws
     m_nanoseconds->set(row_ndx, nanoseconds); // Throws

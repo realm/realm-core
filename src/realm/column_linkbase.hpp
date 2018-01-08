@@ -37,12 +37,6 @@ public:
     void set_null(size_t) override = 0;
     bool is_null(size_t) const noexcept override = 0;
 
-    bool supports_search_index() const noexcept final
-    {
-        return false;
-    }
-    StringIndex* create_search_index() override;
-
     bool get_weak_links() const noexcept;
     void set_weak_links(bool) noexcept;
 
@@ -83,11 +77,6 @@ inline LinkColumnBase::LinkColumnBase(Allocator& alloc, ref_type ref, Table* tab
 
 inline LinkColumnBase::~LinkColumnBase() noexcept
 {
-}
-
-inline StringIndex* LinkColumnBase::create_search_index()
-{
-    return nullptr;
 }
 
 inline bool LinkColumnBase::get_weak_links() const noexcept

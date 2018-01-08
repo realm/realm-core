@@ -459,14 +459,19 @@ public:
     double average_float(size_t column_ndx, size_t* value_count = nullptr) const;
     double average_double(size_t column_ndx, size_t* value_count = nullptr) const;
 
-    // Searching
+    // Will return pointer to search index accessor. Will return nullptr if no index
+    StringIndex* get_search_index(size_t column_ndx) const noexcept
+    {
+        REALM_ASSERT(column_ndx < m_index_accessors.size());
+        return m_index_accessors[column_ndx];
+    }
+
     template <class T>
     Key find_first(size_t column_ndx, T value) const;
 
     Key find_first_link(size_t target_row_index) const;
     Key find_first_int(size_t column_ndx, int64_t value) const;
     Key find_first_bool(size_t column_ndx, bool value) const;
-    Key find_first_olddatetime(size_t column_ndx, OldDateTime value) const;
     Key find_first_timestamp(size_t column_ndx, Timestamp value) const;
     Key find_first_float(size_t column_ndx, float value) const;
     Key find_first_double(size_t column_ndx, double value) const;
@@ -480,8 +485,6 @@ public:
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
     TableView find_all_bool(size_t column_ndx, bool value);
     ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-    TableView find_all_olddatetime(size_t column_ndx, OldDateTime value);
-    ConstTableView find_all_olddatetime(size_t column_ndx, OldDateTime value) const;
     TableView find_all_float(size_t column_ndx, float value);
     ConstTableView find_all_float(size_t column_ndx, float value) const;
     TableView find_all_double(size_t column_ndx, double value);
@@ -493,7 +496,7 @@ public:
     TableView find_all_null(size_t column_ndx);
     ConstTableView find_all_null(size_t column_ndx) const;
 
-    /// The following column types are supported: String, Integer, OldDateTime, Bool
+    /// The following column types are supported: String, Integer, Bool
     TableView get_distinct_view(size_t column_ndx);
     ConstTableView get_distinct_view(size_t column_ndx) const;
 
@@ -707,10 +710,12 @@ private:
     Array m_top;
 
     using SpecPtr = std::unique_ptr<Spec>;
-    SpecPtr m_spec; // 1st slot in m_top (for root tables)
-    ClusterTree m_clusters;
+    SpecPtr m_spec;         // 1st slot in m_top
+    ClusterTree m_clusters; // 3rd slot in m_top
     int64_t m_next_key_value = -1;
-    TableKey m_key;
+    TableKey m_key;     // 4th slot in m_top
+    Array m_index_refs; // 5th slot in m_top
+    std::vector<StringIndex*> m_index_accessors;
 
     // Used for queries: Items are added with link() method during buildup of query
     mutable std::vector<size_t> m_link_chain;
@@ -829,22 +834,11 @@ private:
     /// any, and it does not discard column accessors either.
     void discard_child_accessors() noexcept;
 
-    void discard_row_accessors() noexcept;
-
     void bind_ptr() const noexcept
     {
     }
-    void unbind_ptr() const noexcept
-    {
-    }
 
-    void register_row_accessor(RowBase*) const noexcept
-    {
-    }
-    void unregister_row_accessor(RowBase*) const noexcept
-    {
-    }
-    void do_unregister_row_accessor(RowBase*) const noexcept
+    void unbind_ptr() const noexcept
     {
     }
 
@@ -1007,6 +1001,7 @@ private:
     static constexpr int top_position_for_columns = 1;
     static constexpr int top_position_for_cluster_tree = 2;
     static constexpr int top_position_for_key = 3;
+    static constexpr int top_position_for_search_indexes = 4;
 
     friend class SubtableNode;
     friend class _impl::TableFriend;
@@ -1193,6 +1188,7 @@ inline Table::Table(Allocator& alloc)
     : m_alloc(alloc)
     , m_top(m_alloc)
     , m_clusters(this, m_alloc)
+    , m_index_refs(m_alloc)
 {
     ref_type ref = create_empty_table(alloc); // Throws
     Parent* parent = nullptr;
@@ -1204,6 +1200,7 @@ inline Table::Table(ref_count_tag, Allocator& alloc)
     : m_alloc(alloc)
     , m_top(m_alloc)
     , m_clusters(this, m_alloc)
+    , m_index_refs(m_alloc)
 {
 }
 
@@ -1239,8 +1236,6 @@ inline Columns<T> Table::column(size_t column_ndx)
     if (std::is_same<T, int64_t>::value && ct != type_Int)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, bool>::value && ct != type_Bool)
-        throw(LogicError::type_mismatch);
-    else if (std::is_same<T, realm::OldDateTime>::value && ct != type_OldDateTime)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, float>::value && ct != type_Float)
         throw(LogicError::type_mismatch);
@@ -1451,11 +1446,6 @@ public:
     static void detach(Table& table) noexcept
     {
         table.detach();
-    }
-
-    static void discard_row_accessors(Table& table) noexcept
-    {
-        table.discard_row_accessors();
     }
 
     static void discard_child_accessors(Table& table) noexcept

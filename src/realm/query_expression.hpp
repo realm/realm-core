@@ -110,7 +110,7 @@ First note that at array level, nulls are distinguished between non-null in diff
 String:
     m_data == 0 && m_size == 0
 
-Integer, Bool, OldDateTime stored in ArrayIntNull:
+Integer, Bool stored in ArrayIntNull:
     value == get(0) (entry 0 determins a magic value that represents nulls)
 
 Float/double:
@@ -594,7 +594,7 @@ public:
             const Table* t = left_col->get_base_table();
             Query q = Query(*t);
 
-            if (std::numeric_limits<L>::is_integer || std::is_same<L, OldDateTime>::value) {
+            if (std::numeric_limits<L>::is_integer) {
                 if (std::is_same<Cond, Less>::value)
                     q.less_int(left_col->column_ndx(), right_col->column_ndx());
                 else if (std::is_same<Cond, Greater>::value)
@@ -699,7 +699,6 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, StringData>,
                  public Overloads<T, bool>,
                  public Overloads<T, Timestamp>,
-                 public Overloads<T, OldDateTime>,
                  public Overloads<T, null> {
 public:
     virtual ~Subexpr2()
@@ -712,7 +711,7 @@ public:
     RLM_U2(float, o)                                                                                                 \
     RLM_U2(double, o)                                                                                                \
     RLM_U2(int64_t, o)                                                                                               \
-    RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(OldDateTime, o) RLM_U2(Timestamp, o) RLM_U2(null, o)
+    RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(Timestamp, o) RLM_U2(null, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
 
@@ -739,7 +738,7 @@ public:
 };
 
 /*
-This class is used to store N values of type T = {int64_t, bool, OldDateTime or StringData}, and allows an entry
+This class is used to store N values of type T = {int64_t, bool or StringData}, and allows an entry
 to be null too. It's used by the Value class for internal storage.
 
 To indicate nulls, we could have chosen a separate bool vector or some other bitmask construction. But for
@@ -956,21 +955,6 @@ template <>
 inline bool NullableVector<null>::is_null(size_t) const
 {
     return true;
-}
-
-
-// OldDateTime
-template <>
-inline bool NullableVector<OldDateTime>::is_null(size_t index) const
-{
-    return m_first[index].get_olddatetime() == m_null;
-}
-
-
-template <>
-inline void NullableVector<OldDateTime>::set_null(size_t index)
-{
-    m_first[index] = m_null;
 }
 
 // StringData
@@ -1333,8 +1317,7 @@ public:
             source.export_float(*this);
         else if (std::is_same<T, double>::value)
             source.export_double(*this);
-        else if (std::is_same<T, int64_t>::value || std::is_same<T, bool>::value ||
-                 std::is_same<T, OldDateTime>::value)
+        else if (std::is_same<T, int64_t>::value || std::is_same<T, bool>::value)
             source.export_int64_t(*this);
         else if (std::is_same<T, StringData>::value)
             source.export_StringData(*this);

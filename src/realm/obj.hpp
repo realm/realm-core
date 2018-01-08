@@ -106,7 +106,7 @@ public:
     template <class T>
     bool evaluate(T func) const
     {
-        Cluster cluster(get_alloc(), *m_tree_top);
+        Cluster cluster(0, get_alloc(), *m_tree_top);
         cluster.init_from_mem(m_mem);
         return func(&cluster, m_row_ndx);
     }

@@ -72,39 +72,10 @@ void ColumnBase::refresh_accessor_tree(size_t new_col_ndx, const realm::Spec&)
     m_column_ndx = new_col_ndx;
 }
 
-void ColumnBaseWithIndex::move_assign(ColumnBaseWithIndex& col) noexcept
-{
-    ColumnBase::move_assign(col);
-    m_search_index = std::move(col.m_search_index);
-}
-
 void ColumnBase::set_string(size_t, StringData)
 {
     throw LogicError(LogicError::type_mismatch);
 }
-
-void ColumnBaseWithIndex::set_ndx_in_parent(size_t ndx) noexcept
-{
-    if (m_search_index) {
-        m_search_index->set_ndx_in_parent(ndx + 1);
-    }
-}
-
-void ColumnBaseWithIndex::update_from_parent(size_t old_baseline) noexcept
-{
-    if (m_search_index) {
-        m_search_index->update_from_parent(old_baseline);
-    }
-}
-
-void ColumnBaseWithIndex::refresh_accessor_tree(size_t new_col_ndx, const realm::Spec& spec)
-{
-    ColumnBase::refresh_accessor_tree(new_col_ndx, spec);
-    if (m_search_index) {
-        m_search_index->refresh_accessor_tree(new_col_ndx, spec);
-    }
-}
-
 
 void ColumnBase::cascade_break_backlinks_to(size_t, CascadeState&)
 {
@@ -115,13 +86,6 @@ void ColumnBase::cascade_break_backlinks_to(size_t, CascadeState&)
 void ColumnBase::cascade_break_backlinks_to_all_rows(size_t, CascadeState&)
 {
     // No-op by default
-}
-
-void ColumnBaseWithIndex::destroy() noexcept
-{
-    if (m_search_index) {
-        m_search_index->destroy();
-    }
 }
 
 void ColumnBase::verify(const Table&, size_t column_ndx) const
@@ -358,18 +322,6 @@ void IntegerColumn::reference_sort(size_t start, size_t end, Column& ref)
         ref.add(ResI->get(t));
 }
 */
-
-
-void ColumnBaseWithIndex::destroy_search_index() noexcept
-{
-    m_search_index.reset();
-}
-
-void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
-{
-    REALM_ASSERT(!m_search_index);
-    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, get_alloc())); // Throws
-}
 
 
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions

@@ -89,23 +89,6 @@ public:
 
     bool is_nullable() const noexcept final;
 
-    // Search index
-    StringData get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept final;
-    bool has_search_index() const noexcept override;
-    void set_search_index_ref(ref_type, ArrayParent*, size_t) override;
-    StringIndex* get_search_index() noexcept override;
-    const StringIndex* get_search_index() const noexcept override;
-    std::unique_ptr<StringIndex> release_search_index() noexcept;
-    bool supports_search_index() const noexcept final
-    {
-        return true;
-    }
-    StringIndex* create_search_index() override;
-
-    // Simply inserts all column values in the index in a loop
-    void populate_search_index();
-    void destroy_search_index() noexcept override;
-
     // Optimizing data layout. enforce == true will enforce enumeration;
     // enforce == false will auto-evaluate if it should be enumerated or not
     bool auto_enumerate(ref_type& keys, ref_type& values, bool enforce = false) const;
@@ -290,21 +273,6 @@ inline void StringColumn::set_string(size_t row_ndx, StringData value)
 {
     REALM_ASSERT(!(value.is_null() && !m_nullable));
     set(row_ndx, value); // Throws
-}
-
-inline bool StringColumn::has_search_index() const noexcept
-{
-    return m_search_index != 0;
-}
-
-inline StringIndex* StringColumn::get_search_index() noexcept
-{
-    return m_search_index.get();
-}
-
-inline const StringIndex* StringColumn::get_search_index() const noexcept
-{
-    return m_search_index.get();
 }
 
 inline size_t StringColumn::get_size_from_ref(ref_type root_ref, Allocator& alloc) noexcept

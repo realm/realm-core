@@ -41,7 +41,6 @@ set(REALM_SOURCES
     query_engine.cpp
     query_expression.cpp
     replication.cpp
-    row.cpp
     spec.cpp
     string_data.cpp
     table.cpp
@@ -121,7 +120,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     null.hpp
     list.hpp
     obj.hpp
-    olddatetime.hpp
     owned_data.hpp
     query.hpp
     query_conditions.hpp
@@ -129,7 +127,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     query_expression.hpp
     realm_nmmintrin.h
     replication.hpp
-    row.hpp
     spec.hpp
     string_data.hpp
     table.hpp

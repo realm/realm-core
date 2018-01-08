@@ -64,7 +64,7 @@ public:
     bool traverse(ClusterTree::TraverseFunction func, int64_t) const;
 
     size_t get_tree_size() const override;
-    int64_t get_last_key() const override;
+    int64_t get_last_key_value() const override;
 
     void insert_column(size_t ndx) override;
     void remove_column(size_t ndx) override;
@@ -182,7 +182,7 @@ T ClusterNodeInner::recurse(Key key, F func)
     char* child_header = m_alloc.translate(child_ref);
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
-        Cluster leaf(m_alloc, m_tree_top);
+        Cluster leaf(child_info.offset, m_alloc, m_tree_top);
         leaf.set_parent(&m_children, child_info.ndx);
         leaf.init(MemRef(child_header, child_ref, m_alloc));
         return func(&leaf, child_info);
@@ -256,7 +256,7 @@ unsigned ClusterNodeInner::erase(Key key, CascadeState& state)
             // Candidate for merge. First calculate if the combined size of current and
             // next sibling is small enough.
             size_t sibling_ndx = child_info.ndx + 1;
-            Cluster l2(m_alloc, m_tree_top);
+            Cluster l2(child_info.offset, m_alloc, m_tree_top);
             ClusterNodeInner n2(m_alloc, m_tree_top);
             ClusterNode* sibling_node =
                 erase_node->is_leaf() ? static_cast<ClusterNode*>(&l2) : static_cast<ClusterNode*>(&n2);
@@ -327,6 +327,7 @@ bool ClusterNodeInner::get_leaf(Key key, ClusterNode::IteratorState& state) cons
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
         if (child_is_leaf) {
             state.m_current_leaf.init(MemRef(child_header, child_ref, m_alloc));
+            state.m_current_leaf.set_offset(state.m_key_offset);
             state.m_current_index = state.m_current_leaf.lower_bound_key(new_key);
             if (state.m_current_index < state.m_current_leaf.node_size())
                 return true;
@@ -370,7 +371,7 @@ size_t ClusterNodeInner::get_tree_size() const
 {
     size_t tree_size = 0;
     traverse(
-        [&tree_size](const Cluster* cluster, int64_t) {
+        [&tree_size](const Cluster* cluster) {
             tree_size += cluster->node_size();
             return false;
         },
@@ -387,11 +388,11 @@ bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction func, int64_t key_
         char* header = m_alloc.translate(ref);
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
         MemRef mem(header, ref, m_alloc);
-        int64_t offs = key_offset + get_key(i);
+        int64_t offs = key_offset + get_key_value(i);
         if (child_is_leaf) {
-            Cluster leaf(m_alloc, m_tree_top);
+            Cluster leaf(offs, m_alloc, m_tree_top);
             leaf.init(mem);
-            if (func(&leaf, offs)) {
+            if (func(&leaf)) {
                 return true;
             }
         }
@@ -406,7 +407,7 @@ bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction func, int64_t key_
     return false;
 }
 
-int64_t ClusterNodeInner::get_last_key() const
+int64_t ClusterNodeInner::get_last_key_value() const
 {
     unsigned last_ndx = node_size() - 1;
 
@@ -416,14 +417,14 @@ int64_t ClusterNodeInner::get_last_key() const
     MemRef mem(header, ref, m_alloc);
     int64_t offset = m_keys.get(last_ndx);
     if (child_is_leaf) {
-        Cluster leaf(m_alloc, m_tree_top);
+        Cluster leaf(offset, m_alloc, m_tree_top);
         leaf.init(mem);
-        return offset + leaf.get_last_key();
+        return offset + leaf.get_last_key_value();
     }
     else {
         ClusterNodeInner node(m_alloc, m_tree_top);
         node.init(mem);
-        return offset + node.get_last_key();
+        return offset + node.get_last_key_value();
     }
 }
 
@@ -771,7 +772,7 @@ ref_type Cluster::insert(Key k, ClusterNode::State& state)
     }
     else {
         // Split leaf node
-        Cluster new_leaf(m_alloc, m_tree_top);
+        Cluster new_leaf(0, m_alloc, m_tree_top);
         new_leaf.create();
         if (ndx == sz) {
             new_leaf.insert_row(0, Key(0)); // Throws
@@ -818,7 +819,7 @@ inline void Cluster::do_erase_key(size_t ndx, size_t col_ndx, CascadeState& stat
 
     Key key = values.get(ndx);
     if (key != null_key) {
-        remove_backlinks(Key(get_key(ndx)), col_ndx, {key}, state);
+        remove_backlinks(get_real_key(ndx), col_ndx, {key}, state);
     }
     values.erase(ndx);
 }
@@ -1042,7 +1043,7 @@ void Cluster::remove_backlinks(Key origin_key, size_t col_ndx, const std::vector
 
 ClusterTree::ClusterTree(Table* owner, Allocator& alloc)
     : m_owner(owner)
-    , m_root(std::make_unique<Cluster>(alloc, *this))
+    , m_root(std::make_unique<Cluster>(0, alloc, *this))
 {
 }
 
@@ -1072,7 +1073,7 @@ std::unique_ptr<ClusterNode> ClusterTree::create_root_from_mem(Allocator& alloc,
     // Not reusing root note, allocating a new one.
     std::unique_ptr<ClusterNode> new_root;
     if (is_leaf) {
-        new_root = std::make_unique<Cluster>(alloc, *this);
+        new_root = std::make_unique<Cluster>(0, alloc, *this);
     }
     else {
         new_root = std::make_unique<ClusterNodeInner>(alloc, *this);
@@ -1152,7 +1153,7 @@ void ClusterTree::clear()
 {
     m_root->destroy_deep();
 
-    std::unique_ptr<ClusterNode> leaf = std::make_unique<Cluster>(m_root->get_alloc(), *this);
+    std::unique_ptr<ClusterNode> leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
     leaf->create();
     replace_root(std::move(leaf));
     m_size = 0;
@@ -1236,7 +1237,10 @@ bool ClusterTree::get_leaf(Key key, ClusterNode::IteratorState& state) const noe
 
     if (m_root->is_leaf()) {
         Cluster* node = static_cast<Cluster*>(m_root.get());
+        REALM_ASSERT_DEBUG(node->get_offset() == 0);
+        state.m_key_offset = 0;
         state.m_current_leaf.init(node->get_mem());
+        state.m_current_leaf.set_offset(state.m_key_offset);
         state.m_current_index = node->lower_bound_key(key);
         return state.m_current_index < state.m_current_leaf.node_size();
     }
@@ -1249,7 +1253,7 @@ bool ClusterTree::get_leaf(Key key, ClusterNode::IteratorState& state) const noe
 bool ClusterTree::traverse(TraverseFunction func) const
 {
     if (m_root->is_leaf()) {
-        return func(static_cast<Cluster*>(m_root.get()), 0);
+        return func(static_cast<Cluster*>(m_root.get()));
     }
     else {
         return static_cast<ClusterNodeInner*>(m_root.get())->traverse(func, 0);
@@ -1264,7 +1268,7 @@ std::unique_ptr<ClusterNode> ClusterTree::get_node(ref_type ref) const
     char* child_header = static_cast<char*>(alloc.translate(ref));
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
-        node = std::make_unique<Cluster>(alloc, *this);
+        node = std::make_unique<Cluster>(0, alloc, *this);
     }
     else {
         node = std::make_unique<ClusterNodeInner>(alloc, *this);
@@ -1287,7 +1291,7 @@ const Spec& ClusterTree::get_spec() const
 
 ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
     : m_tree(t)
-    , m_leaf(t.get_alloc(), t)
+    , m_leaf(0, t.get_alloc(), t)
     , m_state(m_leaf)
     , m_instance_version(t.get_instance_version())
 {
@@ -1303,7 +1307,7 @@ ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
 
 ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, Key key)
     : m_tree(t)
-    , m_leaf(t.get_alloc(), t)
+    , m_leaf(0, t.get_alloc(), t)
     , m_state(m_leaf)
     , m_instance_version(t.get_instance_version())
     , m_key(key)
@@ -1317,7 +1321,7 @@ Key ClusterTree::ConstIterator::load_leaf(Key key) const
     // to point to the next object in line.
     if (m_tree.get_leaf(key, m_state)) {
         // Get the actual key value
-        return Key(m_leaf.get_key(m_state.m_current_index) + m_state.m_key_offset);
+        return m_leaf.get_real_key(m_state.m_current_index);
     }
     else {
         // end of table
@@ -1354,7 +1358,7 @@ ClusterTree::ConstIterator& Table::ConstIterator::operator++()
         m_key = load_leaf(Key(m_key.value + 1));
     }
     else {
-        m_key = Key(m_leaf.get_key(m_state.m_current_index) + m_state.m_key_offset);
+        m_key = m_leaf.get_real_key(m_state.m_current_index);
     }
     return *this;
 }

@@ -24,7 +24,6 @@
 #include <realm/string_data.hpp>
 #include <realm/data_type.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/olddatetime.hpp>
 #include <realm/mixed.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/string_buffer.hpp>

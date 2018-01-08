@@ -484,10 +484,6 @@ public:
     template <typename T>
     std::unique_ptr<Handover<T>> export_for_handover(const T& accessor, ConstSourcePayload mode);
 
-    // specialization for handover of Rows
-    template <typename T>
-    std::unique_ptr<Handover<BasicRow<T>>> export_for_handover(const BasicRow<T>& accessor);
-
     // destructive export (mode is Move)
     template <typename T>
     std::unique_ptr<Handover<T>> export_for_handover(T& accessor, MutableSourcePayload mode);
@@ -905,19 +901,6 @@ std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const
     // no matter the type, clone() will clone the actual accessor instance, and
     // hence return an instance of the same type.
     result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
-    result->version = get_version_of_current_transaction();
-    return move(result);
-}
-
-
-template <typename T>
-std::unique_ptr<SharedGroup::Handover<BasicRow<T>>> SharedGroup::export_for_handover(const BasicRow<T>& accessor)
-{
-    if (m_transact_stage != transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
-    std::unique_ptr<Handover<BasicRow<T>>> result(new Handover<BasicRow<T>>());
-    // See implementation note above.
-    result->clone.reset(dynamic_cast<BasicRow<T>*>(accessor.clone_for_handover(result->patch).release()));
     result->version = get_version_of_current_transaction();
     return move(result);
 }

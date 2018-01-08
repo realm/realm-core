@@ -117,12 +117,6 @@ public:
     size_t get_origin_column_ndx(size_t backlink_col_ndx) const noexcept;
     size_t find_backlink_column(TableKey origin_table_key, size_t origin_col_ndx) const noexcept;
 
-    /// Get position in `Table::m_columns` of the specified column. It may be
-    /// different from the specified logical column index due to the presence of
-    /// search indexes, since their top refs are stored in Table::m_columns as
-    /// well.
-    size_t get_column_ndx_in_parent(size_t column_ndx) const;
-
     //@{
     /// Compare two table specs for equality.
     bool operator==(const Spec&) const noexcept;
@@ -186,13 +180,6 @@ private:
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
     static MemRef create_empty_spec(Allocator&);
-
-    struct ColumnInfo {
-        size_t m_column_ref_ndx = 0; ///< Index within Table::m_columns
-        bool m_has_search_index = false;
-    };
-
-    ColumnInfo get_column_info(size_t column_ndx) const noexcept;
 
     size_t get_subspec_ndx_after(size_t column_ndx, size_t skip_column_ndx) const noexcept;
     size_t get_subspec_entries_for_col_type(ColumnType type) const noexcept;

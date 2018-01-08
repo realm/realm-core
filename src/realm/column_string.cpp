@@ -190,12 +190,6 @@ bool StringColumn::is_null(size_t ndx) const noexcept
 #endif
 }
 
-StringData StringColumn::get_index_data(size_t ndx, StringIndex::StringConversionBuffer&) const noexcept
-{
-    return get(ndx);
-}
-
-
 void StringColumn::set_null(size_t ndx)
 {
     if (!m_nullable) {
@@ -205,58 +199,9 @@ void StringColumn::set_null(size_t ndx)
     set(ndx, sd);
 }
 
-void StringColumn::populate_search_index()
-{
-    REALM_ASSERT(m_search_index);
-
-    size_t num_rows = size();
-    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
-        StringData value = get(row_ndx);
-        size_t num_rows_to_insert = 1;
-        bool is_append = true;
-        m_search_index->insert(row_ndx, value, num_rows_to_insert, is_append); // Throws
-    }
-}
-
-StringIndex* StringColumn::create_search_index()
-{
-    REALM_ASSERT(!m_search_index);
-
-    std::unique_ptr<StringIndex> index;
-    index.reset(new StringIndex(this, m_array->get_alloc())); // Throws
-
-    // Populate the index
-    m_search_index = std::move(index);
-    populate_search_index();
-    return m_search_index.get();
-}
-
-
-void StringColumn::destroy_search_index() noexcept
-{
-    m_search_index.reset();
-}
-
-
-std::unique_ptr<StringIndex> StringColumn::release_search_index() noexcept
-{
-    return std::move(m_search_index);
-}
-
-
-void StringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
-{
-    REALM_ASSERT(!m_search_index);
-    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, m_array->get_alloc())); // Throws
-}
-
-
 void StringColumn::set_ndx_in_parent(size_t ndx_in_parent) noexcept
 {
     m_array->set_ndx_in_parent(ndx_in_parent);
-    if (m_search_index) {
-        m_search_index->set_ndx_in_parent(ndx_in_parent + 1);
-    }
 }
 
 
@@ -370,18 +315,6 @@ public:
 void StringColumn::set(size_t ndx, StringData value)
 {
     REALM_ASSERT_DEBUG(ndx < size());
-
-    // We must modify the search index before modifying the column, because we
-    // need to be able to abort the operation if the modification of the search
-    // index fails due to a unique constraint violation.
-
-    // Update search index
-    // (it is important here that we do it before actually setting
-    //  the value, or the index would not be able to find the correct
-    //  position to update (as it looks for the old value))
-    if (m_search_index) {
-        m_search_index->set(ndx, value); // Throws
-    }
 
     bool array_root_is_leaf = !m_array->is_inner_bptree_node();
     if (array_root_is_leaf) {
@@ -516,14 +449,6 @@ void StringColumn::do_erase(size_t ndx, bool is_last)
     REALM_ASSERT_3(ndx, <, size());
     REALM_ASSERT_3(is_last, ==, (ndx == size() - 1));
 
-    // Update search index
-    // (it is important here that we do it before actually setting
-    //  the value, or the index would not be able to find the correct
-    //  position to update (as it looks for the old value))
-    if (m_search_index) {
-        m_search_index->erase<StringData>(ndx, is_last);
-    }
-
     bool array_root_is_leaf = !m_array->is_inner_bptree_node();
     if (array_root_is_leaf) {
         bool long_strings = m_array->has_refs();
@@ -577,16 +502,6 @@ void StringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
     realm::safe_copy_n(value.data(), value.size(), buffer.get());
     StringData copy_of_value(value.is_null() ? nullptr : buffer.get(), value.size());
-
-    if (m_search_index) {
-        // remove the value to be overwritten from index
-        bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
-        m_search_index->erase<StringData>(row_ndx, is_last); // Throws
-
-        // update index to point to new location
-        if (row_ndx != last_row_ndx)
-            m_search_index->update_ref(copy_of_value, last_row_ndx, row_ndx); // Throws
-    }
 
     bool array_root_is_leaf = !m_array->is_inner_bptree_node();
     if (array_root_is_leaf) {
@@ -770,9 +685,6 @@ size_t StringColumn::find_first(StringData value, size_t begin, size_t end) cons
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
-    if (m_search_index && begin == 0 && end == npos)
-        return m_search_index->find_first(value); // Throws
-
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
@@ -852,11 +764,6 @@ void StringColumn::find_all(IntegerColumn& result, StringData value, size_t begi
 {
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
-
-    if (m_search_index && begin == 0 && end == npos) {
-        m_search_index->find_all(result, value); // Throws
-        return;
-    }
 
     if (root_is_leaf()) {
         size_t leaf_offset = 0;
@@ -1075,11 +982,6 @@ void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows)
 {
     bptree_insert(row_ndx, value, num_rows); // Throws
 
-    if (m_search_index) {
-        bool is_append = row_ndx == realm::npos;
-        size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
-        m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
-    }
 }
 
 
@@ -1087,9 +989,6 @@ void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, 
 {
     size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     bptree_insert(row_ndx_2, value, num_rows); // Throws
-
-    if (m_search_index)
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
 }
 
 
@@ -1574,11 +1473,6 @@ void StringColumn::verify() const
     else {
         // Non-leaf root
         m_array->verify_bptree(&verify_leaf);
-    }
-
-    if (m_search_index) {
-        m_search_index->verify();
-        m_search_index->verify_entries(*this);
     }
 #endif
 }
