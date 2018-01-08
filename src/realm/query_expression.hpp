@@ -389,6 +389,11 @@ public:
     }
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
+    // This function supports SubColumnAggregate
+    virtual void evaluate(Key, ValueBase&)
+    {
+        REALM_ASSERT(false); // Unimplemented
+    }
 };
 
 template <typename T, typename... Args>
@@ -1956,6 +1961,12 @@ public:
         }
     }
 
+    void evaluate(Key key, ValueBase& destination) override
+    {
+        Value<T>& d = static_cast<Value<T>&>(destination);
+        d.m_storage.set(0, m_link_map.target_table()->get_object(key).template get<T>(m_column_ndx));
+    }
+
     bool links_exist() const
     {
         return m_link_map.has_links();
@@ -3014,6 +3025,23 @@ public:
         }
     }
 
+    void evaluate(Key key, ValueBase& destination) override
+    {
+        auto table = m_link_map.target_table();
+        auto obj = table->get_object(key);
+        if (m_nullable && std::is_same<typename ColType::value_type, int64_t>::value) {
+            Value<int64_t> v(false, 1);
+            v.m_storage.set(0, obj.template get<util::Optional<int64_t>>(m_column_ndx));
+            destination.import(v);
+        }
+        else {
+            Value<typename util::RemoveOptional<T>::type> v(false, 1);
+            T val = obj.template get<T>(m_column_ndx);
+            v.m_storage.set(0, val);
+            destination.import(v);
+        }
+    }
+
     bool links_exist() const
     {
         return m_link_map.has_links();
@@ -3148,6 +3176,12 @@ public:
         m_column.set_base_table(m_link_map.target_table());
     }
 
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_link_map.set_cluster(cluster);
+        m_column.set_cluster(cluster);
+    }
+
     void update_column() const override
     {
         m_link_map.update_columns();
@@ -3157,29 +3191,16 @@ public:
     void evaluate(size_t index, ValueBase& destination) override
     {
         std::vector<Key> keys = m_link_map.get_links(index);
-        std::vector<size_t> links;
         std::sort(keys.begin(), keys.end());
 
         Operation op;
-        for (size_t link_index = 0; link_index < links.size();) {
-            Value<T> value;
-            size_t link = links[link_index];
-            m_column.evaluate(link, value);
-
-            // Columns<T>::evaluate fetches values in chunks of ValueBase::default_size. Process all values
-            // within the chunk that came from rows that we link to.
+        for (auto key : keys) {
+            Value<T> value(false, 1);
+            m_column.evaluate(key, value);
+            size_t value_index = 0;
             const auto& value_storage = value.m_storage;
-            for (size_t value_index = 0; value_index < value.m_values;) {
-                if (!value_storage.is_null(value_index)) {
-                    op.accumulate(value_storage[value_index]);
-                }
-                if (++link_index >= links.size()) {
-                    break;
-                }
-
-                size_t previous_link = link;
-                link = links[link_index];
-                value_index += link - previous_link;
+            if (!value_storage.is_null(value_index)) {
+                op.accumulate(value_storage[value_index]);
             }
         }
         if (op.is_null()) {
