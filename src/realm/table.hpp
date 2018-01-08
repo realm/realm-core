@@ -577,44 +577,6 @@ public:
     // enforce == false will auto-evaluate if they should be enumerated or not
     void optimize(bool enforce = false);
 
-    /// Write this table (or a slice of this table) to the specified
-    /// output stream.
-    ///
-    /// The output will have the same format as any other Realm
-    /// database file, such as those produced by Group::write(). In
-    /// this case, however, the resulting database file will contain
-    /// exactly one table, and that table will contain only the
-    /// specified slice of the source table (this table).
-    ///
-    /// The new table will always have the same dynamic type (see
-    /// Descriptor) as the source table (this table), and unless it is
-    /// overridden (\a override_table_name), the new table will have
-    /// the same name as the source table (see get_name()). Indexes
-    /// (see add_search_index()) will not be carried over to the new
-    /// table.
-    ///
-    /// \param out The destination output stream buffer.
-    ///
-    /// \param offset Index of first row to include (if `slice_size >
-    /// 0`). Must be less than, or equal to size().
-    ///
-    /// \param slice_size Number of rows to include. May be zero. If
-    /// `slice_size > size() - offset`, then the effective size of
-    /// the written slice will be `size() - offset`.
-    ///
-    /// \param override_table_name Custom name to write out instead of
-    /// the actual table name.
-    ///
-    /// \throw std::out_of_range If `offset > size()`.
-    ///
-    /// FIXME: While this function does provided a maximally efficient
-    /// way of serializing part of a table, it offers little in terms
-    /// of general utility. This is unfortunate, because it pulls
-    /// quite a large amount of code into the core library to support
-    /// it.
-    void write(std::ostream& out, size_t offset = 0, size_t slice_size = npos,
-               StringData override_table_name = StringData()) const;
-
     // Conversion
     void to_json(std::ostream& out, size_t link_depth = 0,
                  std::map<std::string, std::string>* renames = nullptr) const;
