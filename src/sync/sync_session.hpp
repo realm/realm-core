@@ -135,9 +135,6 @@ public:
     // FIXME: we need an API to allow the binding to tell sync that the access token fetch failed
     // or was cancelled, and cannot be retried.
 
-    // Give the `SyncSession` an administrator token, and ask it to immediately `bind()` the session.
-    void bind_with_admin_token(std::string admin_token, std::string server_url);
-
     // Set the multiplex identifier used for this session. Sessions with different identifiers are
     // never multiplexed into a single connection, even if they are connecting to the same host.
     // The value of the token is otherwise treated as an opaque token.
