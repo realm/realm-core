@@ -87,9 +87,6 @@ struct SyncSession::State {
                                       SyncSession&, std::string,
                                       const util::Optional<std::string>&) const { }
 
-    virtual void bind_with_admin_token(std::unique_lock<std::mutex>&,
-                                       SyncSession&, const std::string&, const std::string&) const { }
-
     // Returns true iff the lock is still locked when the method returns.
     virtual bool access_token_expired(std::unique_lock<std::mutex>&, SyncSession&) const { return true; }
 
@@ -343,14 +340,6 @@ struct sync_session_states::Dying : public SyncSession::State {
         return false;
     }
 
-    void bind_with_admin_token(std::unique_lock<std::mutex>& lock, SyncSession& session,
-                               const std::string& admin_token,
-                               const std::string& server_url) const override
-    {
-        session.advance_state(lock, waiting_for_access_token);
-        session.m_state->refresh_access_token(lock, session, admin_token, server_url);
-    }
-
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         session.advance_state(lock, inactive);
@@ -383,14 +372,6 @@ struct sync_session_states::Inactive : public SyncSession::State {
         session.m_completion_wait_packages.clear();
         session.m_session = nullptr;
         session.unregister(lock);
-    }
-
-    void bind_with_admin_token(std::unique_lock<std::mutex>& lock, SyncSession& session,
-                               const std::string& admin_token,
-                               const std::string& server_url) const override
-    {
-        session.advance_state(lock, waiting_for_access_token);
-        session.m_state->refresh_access_token(lock, session, admin_token, server_url);
     }
 
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
@@ -842,12 +823,6 @@ void SyncSession::refresh_access_token(std::string access_token, util::Optional<
         return;
     }
     m_state->refresh_access_token(lock, *this, std::move(access_token), server_url);
-}
-
-void SyncSession::bind_with_admin_token(std::string admin_token, std::string server_url)
-{
-    std::unique_lock<std::mutex> lock(m_state_mutex);
-    m_state->bind_with_admin_token(lock, *this, admin_token, server_url);
 }
 
 void SyncSession::override_server(std::string address, int port)
