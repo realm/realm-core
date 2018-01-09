@@ -631,10 +631,10 @@ void File::resize(SizeType size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
+    SizeType original_position = get_file_pos(m_fd);
+    SizeType original_size = get_size();
 
-    // Save file position
-    SizeType p = get_file_pos(m_fd);
+#ifdef _WIN32 // Windows version
 
     if (m_encryption_key)
         size = data_size_to_encrypted_size(size);
@@ -653,30 +653,46 @@ void File::resize(SizeType size)
         throw std::runtime_error(msg);
     }
 
-    // Restore file position
-    seek(p);
-
 #else // POSIX version
 
     if (m_encryption_key)
         size = data_size_to_encrypted_size(size);
 
-    off_t size2;
-    if (int_cast_with_overflow_detect(size, size2))
+    off_t new_size;
+    if (int_cast_with_overflow_detect(size, new_size))
         throw std::runtime_error("File size overflow");
 
-    // POSIX specifies that introduced bytes read as zero. This is not
-    // required by File::resize().
-    if (::ftruncate(m_fd, size2) != 0) {
-        int err = errno; // Eliminate any risk of clobbering
-        std::string msg = get_errno_msg("ftruncate() failed: ", err);
-        if (err == ENOSPC || err == EDQUOT) {
-            throw OutOfDiskSpace(msg);
+    // We cannot use ftruncate() to increase the file size because it will create sparse file blocks that might
+    // generate a sigbus at a random later time if the disk runs out of space. Also note that we cannot use
+    // File::prealloc(); see comments in prealloc_if_supported()
+    if (original_size > size) {
+        if (::ftruncate(m_fd, new_size) != 0) {
+            int err = errno; // Eliminate any risk of clobbering
+            std::string msg = get_errno_msg("ftruncate() failed: ", err);
+            if (err == ENOSPC || err == EDQUOT) {
+                throw OutOfDiskSpace(msg);
+            }
+            throw std::runtime_error(msg);
         }
-        throw std::runtime_error(msg);
+    }
+    else {
+        constexpr size_t chunk_size = 4096;
+        seek(original_size);
+        size_t num_bytes = new_size - original_size;
+        std::string zeros(chunk_size, '\0');
+        while (num_bytes > 0) {
+            size_t t = num_bytes > chunk_size ? chunk_size : num_bytes;
+            write_static(m_fd, zeros.c_str(), t);
+            num_bytes -= t;
+        }
     }
 
 #endif
+
+    // Restore original file position (note that it seems like we currently don't rely on this)
+    if (size > original_size) {
+        seek(original_position);
+    }
 }
 
 
