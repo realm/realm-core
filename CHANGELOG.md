@@ -2,7 +2,10 @@
 
 ### Bugfixes
 
-* The `realm-parser` static library now correctly includes both simulator and device architectures on Apple platforms.
+* Fixed handling of out-of-diskspace. With encryption in use it would ASSERT like
+  `group_writer.cpp:393: [realm-core-5.1.2] Assertion failed: ref + size <= ...`.
+  Without encryption it would give a SIGBUS error. It's unknown if it could corrupt
+  the .realm file.
 
 ### Breaking changes
 
@@ -17,6 +20,26 @@
 ### Internals
 
 * None.
+
+----------------------------------------------
+
+# 5.1.2 Release notes
+
+### Bugfixes
+
+* Include the parser libs in the published android packages.
+
+----------------------------------------------
+
+# 5.1.1 Release notes
+
+### Bugfixes
+
+* The `realm-parser` static library now correctly includes both simulator and device architectures on Apple platforms.
+* Fixed handling of out-of-diskspace which could, in some cases, result in a SIGBUS. It
+  now always throws an OutOfDiskSpace exception. It's uncertain if it could lead to
+  corrupted .realm files or not, so I'm hesitant to link it to any of the github issues 
+  with asserts.
 
 ----------------------------------------------
 

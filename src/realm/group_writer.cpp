@@ -668,6 +668,11 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
     return chunk;
 }
 
+// WARNING: This method will not allocate space on disk, so future writes to the file
+// might fail.
+//
+// FIXME: Seems like this method is never used and can be deleted?
+//
 // Extend the free space with at least the requested size.
 // Due to mmap constraints, the extension can not be guaranteed to
 // allow an allocation of the requested size, so multiple calls to

@@ -823,7 +823,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             // 
             // This will in particular set m_init_complete to 0.
             m_file.resize(0);
-            m_file.resize(sizeof(SharedInfo));
+            m_file.prealloc(sizeof(SharedInfo));
 
             // We can crash anytime during this process. A crash prior to
             // the first resize could allow another thread which could not
@@ -2305,7 +2305,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
             entries = entries + 32;
             size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(entries);
             // std::cout << "resizing: " << entries << " = " << new_info_size << std::endl;
-            m_file.prealloc(0, new_info_size);                                       // Throws
+            m_file.prealloc(new_info_size);                                       // Throws
             m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
             r_info = m_reader_map.get_addr();
             m_local_max_entry = entries;
@@ -2329,7 +2329,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     }
 }
 
-
+#ifdef REALM_DEBUG
 void SharedGroup::reserve(size_t size)
 {
     REALM_ASSERT(is_attached());
@@ -2341,7 +2341,7 @@ void SharedGroup::reserve(size_t size)
     // the file. This assumption must be verified though.
     m_group.m_alloc.reserve_disk_space(size); // Throws
 }
-
+#endif
 
 std::unique_ptr<SharedGroup::Handover<LinkView>>
 SharedGroup::export_linkview_for_handover(const LinkViewRef& accessor)
