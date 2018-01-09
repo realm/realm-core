@@ -1,22 +1,8 @@
-# NEXT RELEASE
+# 5.1.2 Release notes
 
 ### Bugfixes
 
 * Include the parser libs in the published android packages.
-
-### Breaking changes
-
-* None.
-
-### Enhancements
-
-* None.
-
------------
-
-### Internals
-
-* None.
 
 ----------------------------------------------
 
