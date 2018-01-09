@@ -1707,102 +1707,68 @@ TEST(Table_SetUniqueLoserAccessorUpdates)
     CHECK(lv_0 == origin->get_linklist(1, 0));
     CHECK(lv_1 == origin->get_linklist(1, 1));
 }
-
+#endif // LEGACY_TESTS
 
 TEST(Table_Distinct)
 {
-    TestTableEnum table;
+    Table table;
+    auto col_int = table.add_column(type_Int, "first");
+    auto col_str = table.add_column(type_String, "second");
 
-    add(table, Mon, "A");
-    add(table, Tue, "B");
-    add(table, Wed, "C");
-    add(table, Thu, "B");
-    add(table, Fri, "C");
-    add(table, Sat, "D");
-    add(table, Sun, "D");
-    add(table, Mon, "D");
+    Key k0 = table.create_object().set_all(int(Mon), "A").get_key();
+    Key k1 = table.create_object().set_all(int(Tue), "B").get_key();
+    Key k2 = table.create_object().set_all(int(Wed), "C").get_key();
+    Key k3 = table.create_object().set_all(int(Thu), "B").get_key();
+    Key k4 = table.create_object().set_all(int(Fri), "C").get_key();
+    Key k5 = table.create_object().set_all(int(Sat), "D").get_key();
+    Key k6 = table.create_object().set_all(int(Sun), "D").get_key();
+    table.create_object().set_all(int(Mon), "D");
 
-    table.add_search_index(1);
-    CHECK(table.has_search_index(1));
+    table.add_search_index(col_int);
+    CHECK(table.has_search_index(col_int));
 
-    auto view = table.get_distinct_view(1);
-
-    CHECK_EQUAL(4, view.size());
-    CHECK_EQUAL(0, view.get_source_ndx(0));
-    CHECK_EQUAL(1, view.get_source_ndx(1));
-    CHECK_EQUAL(2, view.get_source_ndx(2));
-    CHECK_EQUAL(5, view.get_source_ndx(3));
-}
-
-
-TEST(Table_DistinctEnums)
-{
-    TestTableEnum table;
-    add(table, Mon, "A");
-    add(table, Tue, "B");
-    add(table, Wed, "C");
-    add(table, Thu, "B");
-    add(table, Fri, "C");
-    add(table, Sat, "D");
-    add(table, Sun, "D");
-    add(table, Mon, "D");
-
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
-
-    auto view = table.get_distinct_view(0);
+    auto view = table.get_distinct_view(col_int);
 
     CHECK_EQUAL(7, view.size());
-    CHECK_EQUAL(0, view.get_source_ndx(0));
-    CHECK_EQUAL(1, view.get_source_ndx(1));
-    CHECK_EQUAL(2, view.get_source_ndx(2));
-    CHECK_EQUAL(3, view.get_source_ndx(3));
-    CHECK_EQUAL(4, view.get_source_ndx(4));
-    CHECK_EQUAL(5, view.get_source_ndx(5));
-    CHECK_EQUAL(6, view.get_source_ndx(6));
-}
+    CHECK_EQUAL(k0, view.get_key(0));
+    CHECK_EQUAL(k1, view.get_key(1));
+    CHECK_EQUAL(k2, view.get_key(2));
+    CHECK_EQUAL(k3, view.get_key(3));
+    CHECK_EQUAL(k4, view.get_key(4));
+    CHECK_EQUAL(k5, view.get_key(5));
+    CHECK_EQUAL(k6, view.get_key(6));
 
+    table.add_search_index(col_str);
+    CHECK(table.has_search_index(col_str));
 
-TEST(Table_DistinctIntegers)
-{
-    Table table;
-    table.add_column(type_Int, "first");
-    table.add_empty_row(4);
-    table.set_int(0, 0, 1);
-    table.set_int(0, 1, 2);
-    table.set_int(0, 2, 3);
-    table.set_int(0, 3, 3);
+    view = table.get_distinct_view(col_str);
 
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
-
-    TableView view = table.get_distinct_view(0);
-
-    CHECK_EQUAL(3, view.size());
-    CHECK_EQUAL(0, view.get_source_ndx(0));
-    CHECK_EQUAL(1, view.get_source_ndx(1));
-    CHECK_EQUAL(2, view.get_source_ndx(2));
+    CHECK_EQUAL(4, view.size());
+    CHECK_EQUAL(k0, view.get_key(0));
+    CHECK_EQUAL(k1, view.get_key(1));
+    CHECK_EQUAL(k2, view.get_key(2));
+    CHECK_EQUAL(k5, view.get_key(3));
 }
 
 
 TEST(Table_DistinctBool)
 {
     Table table;
-    table.add_column(type_Bool, "first");
-    table.add_empty_row(4);
-    table.set_bool(0, 0, true);
-    table.set_bool(0, 1, false);
-    table.set_bool(0, 2, true);
-    table.set_bool(0, 3, false);
+    auto col_bool = table.add_column(type_Bool, "first");
 
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
+    Key k0 = table.create_object().set(col_bool, true).get_key();
+    Key k1 = table.create_object().set(col_bool, false).get_key();
+    table.create_object().set(col_bool, true);
+    table.create_object().set(col_bool, false);
 
-    TableView view = table.get_distinct_view(0);
+    table.add_search_index(col_bool);
+    CHECK(table.has_search_index(col_bool));
+
+    TableView view = table.get_distinct_view(col_bool);
 
     CHECK_EQUAL(2, view.size());
-    CHECK_EQUAL(0, view.get_source_ndx(1));
-    CHECK_EQUAL(1, view.get_source_ndx(0));
+    CHECK_EQUAL(k0, view.get_key(1));
+    CHECK_EQUAL(k1, view.get_key(0));
 }
 
 
@@ -1851,19 +1817,20 @@ TEST(Table_DistinctDouble)
 TEST(Table_DistinctTimestamp)
 {
     Table table;
-    table.add_column(type_Timestamp, "first");
-    table.add_empty_row(4);
-    table.set_timestamp(0, 0, Timestamp(0, 0));
-    table.set_timestamp(0, 1, Timestamp(1, 0));
-    table.set_timestamp(0, 2, Timestamp(3, 0));
-    table.set_timestamp(0, 3, Timestamp(3, 0));
+    auto col_date = table.add_column(type_Timestamp, "first");
 
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
+    table.create_object().set(col_date, Timestamp(0, 0));
+    table.create_object().set(col_date, Timestamp(1, 0));
+    table.create_object().set(col_date, Timestamp(3, 0));
+    table.create_object().set(col_date, Timestamp(3, 0));
 
-    TableView view = table.get_distinct_view(0);
+    table.add_search_index(col_date);
+    CHECK(table.has_search_index(col_date));
+
+    TableView view = table.get_distinct_view(col_date);
     CHECK_EQUAL(3, view.size());
 }
+
 
 TEST(Table_DistinctFromPersistedTable)
 {
@@ -1872,115 +1839,121 @@ TEST(Table_DistinctFromPersistedTable)
     {
         Group group;
         TableRef table = group.add_table("table");
-        table->add_column(type_Int, "first");
-        table->add_empty_row(4);
-        table->set_int(0, 0, 1);
-        table->set_int(0, 1, 2);
-        table->set_int(0, 2, 3);
-        table->set_int(0, 3, 3);
+        auto col = table->add_column(type_Int, "first");
 
-        table->add_search_index(0);
-        CHECK(table->has_search_index(0));
+        table->create_object().set(col, 1);
+        table->create_object().set(col, 2);
+        table->create_object().set(col, 3);
+        table->create_object().set(col, 3);
+
+        table->add_search_index(col);
+        CHECK(table->has_search_index(col));
         group.write(path);
     }
 
     {
         Group group(path, 0, Group::mode_ReadOnly);
         TableRef table = group.get_table("table");
-        TableView view = table->get_distinct_view(0);
+        auto col = table->get_column_index("first");
+        TableView view = table->get_distinct_view(col);
 
         CHECK_EQUAL(3, view.size());
-        CHECK_EQUAL(0, view.get_source_ndx(0));
-        CHECK_EQUAL(1, view.get_source_ndx(1));
-        CHECK_EQUAL(2, view.get_source_ndx(2));
+        CHECK_EQUAL(table->get_object(view.get_key(0)).get<Int>(col), 1);
+        CHECK_EQUAL(table->get_object(view.get_key(1)).get<Int>(col), 2);
+        CHECK_EQUAL(table->get_object(view.get_key(2)).get<Int>(col), 3);
     }
 }
 
 
 TEST(Table_IndexInt)
 {
-    TestTable01 table;
+    Table table;
+    auto col = table.add_column(type_Int, "first");
 
-    add(table, 0, 1, true, Wed);
-    add(table, 0, 15, true, Wed);
-    add(table, 0, 10, true, Wed);
-    add(table, 0, 20, true, Wed);
-    add(table, 0, 11, true, Wed);
-    add(table, 0, 45, true, Wed);
-    add(table, 0, 10, true, Wed);
-    add(table, 0, 0, true, Wed);
-    add(table, 0, 30, true, Wed);
-    add(table, 0, 9, true, Wed);
+    Key k0 = table.create_object().set(col, 1).get_key();
+    Key k1 = table.create_object().set(col, 15).get_key();
+    Key k2 = table.create_object().set(col, 10).get_key();
+    Key k3 = table.create_object().set(col, 20).get_key();
+    Key k4 = table.create_object().set(col, 11).get_key();
+    Key k5 = table.create_object().set(col, 45).get_key();
+    Key k6 = table.create_object().set(col, 10).get_key();
+    Key k7 = table.create_object().set(col, 0).get_key();
+    Key k8 = table.create_object().set(col, 30).get_key();
+    Key k9 = table.create_object().set(col, 9).get_key();
 
     // Create index for column two
-    table.add_search_index(1);
+    table.add_search_index(col);
 
     // Search for a value that does not exits
-    const size_t r1 = table.find_first_int(1, 2);
-    CHECK_EQUAL(npos, r1);
+    Key k = table.find_first_int(col, 2);
+    CHECK_EQUAL(null_key, k);
 
     // Find existing values
-    CHECK_EQUAL(0, table.find_first_int(1, 1));
-    CHECK_EQUAL(1, table.find_first_int(1, 15));
-    CHECK_EQUAL(2, table.find_first_int(1, 10));
-    CHECK_EQUAL(3, table.find_first_int(1, 20));
-    CHECK_EQUAL(4, table.find_first_int(1, 11));
-    CHECK_EQUAL(5, table.find_first_int(1, 45));
-    // CHECK_EQUAL(6, table.find_first_int(1, 10)); // only finds first match
-    CHECK_EQUAL(7, table.find_first_int(1, 0));
-    CHECK_EQUAL(8, table.find_first_int(1, 30));
-    CHECK_EQUAL(9, table.find_first_int(1, 9));
+    CHECK_EQUAL(k0, table.find_first_int(col, 1));
+    CHECK_EQUAL(k1, table.find_first_int(col, 15));
+    CHECK_EQUAL(k2, table.find_first_int(col, 10));
+    CHECK_EQUAL(k3, table.find_first_int(col, 20));
+    CHECK_EQUAL(k4, table.find_first_int(col, 11));
+    CHECK_EQUAL(k5, table.find_first_int(col, 45));
+    // CHECK_EQUAL(6, table.find_first_int(col, 10)); // only finds first match
+    CHECK_EQUAL(k7, table.find_first_int(col, 0));
+    CHECK_EQUAL(k8, table.find_first_int(col, 30));
+    CHECK_EQUAL(k9, table.find_first_int(col, 9));
 
     // Change some values
-    table.set_int(1, 2, 13);
-    table.set_int(1, 9, 100);
+    table.get_object(k2).set(col, 13);
+    table.get_object(k9).set(col, 100);
 
-    CHECK_EQUAL(0, table.find_first_int(1, 1));
-    CHECK_EQUAL(1, table.find_first_int(1, 15));
-    CHECK_EQUAL(2, table.find_first_int(1, 13));
-    CHECK_EQUAL(3, table.find_first_int(1, 20));
-    CHECK_EQUAL(4, table.find_first_int(1, 11));
-    CHECK_EQUAL(5, table.find_first_int(1, 45));
-    CHECK_EQUAL(6, table.find_first_int(1, 10));
-    CHECK_EQUAL(7, table.find_first_int(1, 0));
-    CHECK_EQUAL(8, table.find_first_int(1, 30));
-    CHECK_EQUAL(9, table.find_first_int(1, 100));
+    CHECK_EQUAL(k0, table.find_first_int(col, 1));
+    CHECK_EQUAL(k1, table.find_first_int(col, 15));
+    CHECK_EQUAL(k2, table.find_first_int(col, 13));
+    CHECK_EQUAL(k3, table.find_first_int(col, 20));
+    CHECK_EQUAL(k4, table.find_first_int(col, 11));
+    CHECK_EQUAL(k5, table.find_first_int(col, 45));
+    CHECK_EQUAL(k6, table.find_first_int(col, 10));
+    CHECK_EQUAL(k7, table.find_first_int(col, 0));
+    CHECK_EQUAL(k8, table.find_first_int(col, 30));
+    CHECK_EQUAL(k9, table.find_first_int(col, 100));
 
     // Insert values
-    add(table, 0, 29, true, Wed);
+    Key k10 = table.create_object().set(col, 29).get_key();
     // TODO: More than add
 
-    CHECK_EQUAL(0, table.find_first_int(1, 1));
-    CHECK_EQUAL(1, table.find_first_int(1, 15));
-    CHECK_EQUAL(2, table.find_first_int(1, 13));
-    CHECK_EQUAL(3, table.find_first_int(1, 20));
-    CHECK_EQUAL(4, table.find_first_int(1, 11));
-    CHECK_EQUAL(5, table.find_first_int(1, 45));
-    CHECK_EQUAL(6, table.find_first_int(1, 10));
-    CHECK_EQUAL(7, table.find_first_int(1, 0));
-    CHECK_EQUAL(8, table.find_first_int(1, 30));
-    CHECK_EQUAL(9, table.find_first_int(1, 100));
-    CHECK_EQUAL(10, table.find_first_int(1, 29));
+    CHECK_EQUAL(k0, table.find_first_int(col, 1));
+    CHECK_EQUAL(k1, table.find_first_int(col, 15));
+    CHECK_EQUAL(k2, table.find_first_int(col, 13));
+    CHECK_EQUAL(k3, table.find_first_int(col, 20));
+    CHECK_EQUAL(k4, table.find_first_int(col, 11));
+    CHECK_EQUAL(k5, table.find_first_int(col, 45));
+    CHECK_EQUAL(k6, table.find_first_int(col, 10));
+    CHECK_EQUAL(k7, table.find_first_int(col, 0));
+    CHECK_EQUAL(k8, table.find_first_int(col, 30));
+    CHECK_EQUAL(k9, table.find_first_int(col, 100));
+    CHECK_EQUAL(k10, table.find_first_int(col, 29));
 
     // Delete some values
-    table.remove(0);
-    table.remove(5);
-    table.remove(8);
+    table.remove_object(k0);
+    table.remove_object(k5);
+    table.remove_object(k8);
 
-    CHECK_EQUAL(0, table.find_first_int(1, 15));
-    CHECK_EQUAL(1, table.find_first_int(1, 13));
-    CHECK_EQUAL(2, table.find_first_int(1, 20));
-    CHECK_EQUAL(3, table.find_first_int(1, 11));
-    CHECK_EQUAL(4, table.find_first_int(1, 45));
-    CHECK_EQUAL(5, table.find_first_int(1, 0));
-    CHECK_EQUAL(6, table.find_first_int(1, 30));
-    CHECK_EQUAL(7, table.find_first_int(1, 100));
+    CHECK_EQUAL(null_key, table.find_first_int(col, 1));
+    CHECK_EQUAL(k1, table.find_first_int(col, 15));
+    CHECK_EQUAL(k2, table.find_first_int(col, 13));
+    CHECK_EQUAL(k3, table.find_first_int(col, 20));
+    CHECK_EQUAL(k4, table.find_first_int(col, 11));
+    CHECK_EQUAL(null_key, table.find_first_int(col, 45));
+    CHECK_EQUAL(k6, table.find_first_int(col, 10));
+    CHECK_EQUAL(k7, table.find_first_int(col, 0));
+    CHECK_EQUAL(null_key, table.find_first_int(col, 30));
+    CHECK_EQUAL(k9, table.find_first_int(col, 100));
+    CHECK_EQUAL(k10, table.find_first_int(col, 29));
 
 #ifdef REALM_DEBUG
     table.verify();
 #endif
 }
 
+#ifdef LEGACY_TESTS
 
 namespace {
 

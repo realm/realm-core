@@ -210,7 +210,7 @@ public:
 
     void clear();
 
-    void distinct(IntegerColumn& result) const;
+    void distinct(ArrayKey& result) const;
     bool has_duplicate_values() const noexcept;
 
     void verify() const;

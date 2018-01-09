@@ -1167,7 +1167,7 @@ bool StringIndex::leaf_insert(Key obj_key, key_type key, size_t offset, StringDa
 }
 
 
-void StringIndex::distinct(IntegerColumn& result) const
+void StringIndex::distinct(ArrayKey& result) const
 {
     Allocator& alloc = m_array->get_alloc();
     const size_t array_size = m_array->size();
@@ -1186,8 +1186,8 @@ void StringIndex::distinct(IntegerColumn& result) const
 
             // low bit set indicate literal ref (shifted)
             if (ref & 1) {
-                size_t r = to_size_t((uint64_t(ref) >> 1));
-                result.add(r);
+                Key k = Key((uint64_t(ref) >> 1));
+                result.add(k);
             }
             else {
                 // A real ref either points to a list or a subindex
@@ -1199,8 +1199,8 @@ void StringIndex::distinct(IntegerColumn& result) const
                 else {
                     IntegerColumn sub(alloc, to_ref(ref)); // Throws
                     if (sub.size() == 1) {                 // Optimization.
-                        size_t r = to_size_t(sub.get(0));  // get first match
-                        result.add(r);
+                        Key k = Key(sub.get(0));           // get first match
+                        result.add(k);
                     }
                     else {
                         // Add all unique values from this sorted list
@@ -1209,7 +1209,7 @@ void StringIndex::distinct(IntegerColumn& result) const
                         SortedListComparator slc(m_target_column);
                         StringConversionBuffer buffer;
                         while (it != it_end) {
-                            result.add(to_size_t(*it));
+                            result.add(Key(*it));
                             StringData it_data = get(Key(*it), buffer);
                             it = std::upper_bound(it, it_end, it_data, slc);
                         }

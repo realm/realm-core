@@ -664,9 +664,9 @@ void TableViewBase::do_sync()
     }
     else if (m_distinct_column_source != npos) {
         m_key_values.clear();
-        REALM_ASSERT(m_table->has_search_index(m_distinct_column_source));
-        // const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
-        // col.get_search_index()->distinct(m_key_values);  TODO: enable when searchindex is supported
+        auto index = m_table->get_search_index(m_distinct_column_source);
+        REALM_ASSERT(index);
+        index->distinct(m_key_values);
     }
     else if (m_source_column_ndx != npos) {
         m_key_values.clear();
