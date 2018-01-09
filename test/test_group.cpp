@@ -589,10 +589,15 @@ TEST(Group_RemoveTableWithColumns)
     CHECK_EQUAL(5, group.size());
 
     alpha->add_column(type_Int, "alpha-1");
-    beta->add_column_link(type_Link, "beta-1", *delta);
+    auto col_link = beta->add_column_link(type_Link, "beta-1", *delta);
     gamma->add_column_link(type_Link, "gamma-1", *gamma);
     delta->add_column(type_Int, "delta-1");
     epsilon->add_column_link(type_Link, "epsilon-1", *delta);
+
+    Key k = delta->create_object().get_key();
+    beta->create_object().set<Key>(col_link, k);
+    auto view = delta->get_backlink_view(k, beta, col_link);
+    CHECK_EQUAL(view.size(), 1);
 
     // Remove table with columns, but no link columns, and table is not a link
     // target.
@@ -611,6 +616,8 @@ TEST(Group_RemoveTableWithColumns)
     CHECK(gamma);
     CHECK(delta);
     CHECK(epsilon);
+    view.sync_if_needed();
+    CHECK_EQUAL(view.size(), 0);
 
     // Remove table with self-link column, and table is not a target of link
     // columns of other tables.

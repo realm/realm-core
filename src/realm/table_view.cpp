@@ -670,15 +670,16 @@ void TableViewBase::do_sync()
     }
     else if (m_source_column_ndx != npos) {
         m_key_values.clear();
-        if (m_linked_obj.is_valid()) {
+        if (m_linked_obj.is_valid() && m_table) {
             TableKey origin_table_key = m_table->get_key();
             const Table* target_table = m_linked_obj.get_table();
             const Spec& spec = _impl::TableFriend::get_spec(*target_table);
             size_t backlink_col_ndx = spec.find_backlink_column(origin_table_key, m_source_column_ndx);
-
-            size_t backlink_count = m_linked_obj.get_backlink_count(backlink_col_ndx);
-            for (size_t i = 0; i < backlink_count; i++)
-                m_key_values.add(m_linked_obj.get_backlink(backlink_col_ndx, i));
+            if (backlink_col_ndx != realm::npos) {
+                size_t backlink_count = m_linked_obj.get_backlink_count(backlink_col_ndx);
+                for (size_t i = 0; i < backlink_count; i++)
+                    m_key_values.add(m_linked_obj.get_backlink(backlink_col_ndx, i));
+            }
         }
     }
     // FIXME: Unimplemented for link to a column

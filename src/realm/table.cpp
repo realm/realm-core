@@ -666,6 +666,13 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name, L
 void Table::erase_root_column(size_t col_ndx)
 {
     REALM_ASSERT_3(col_ndx, <, m_spec->get_public_column_count());
+    ColumnType col_type = m_spec->get_column_type(col_ndx);
+    if (is_link_type(col_type)) {
+        auto target_table_key = m_spec->get_opposite_link_table_key(col_ndx);
+        auto link_target_table = get_parent_group()->get_table(target_table_key);
+        auto origin_table_key = get_key();
+        link_target_table->erase_backlink_column(origin_table_key, col_ndx); // Throws
+    }
 
     do_erase_root_column(col_ndx); // Throws
 }
@@ -695,16 +702,18 @@ void Table::do_erase_root_column(size_t ndx)
 {
     m_spec->erase_column(ndx); // Throws
 
-    // If the column had a source index we have to remove and destroy that as well
-    ref_type index_ref = m_index_refs.get_as_ref(ndx);
-    if (index_ref) {
-        Array::destroy_deep(index_ref, m_index_refs.get_alloc());
+    if (ndx < m_spec->get_public_column_count()) {
+        // If the column had a source index we have to remove and destroy that as well
+        ref_type index_ref = m_index_refs.get_as_ref(ndx);
+        if (index_ref) {
+            Array::destroy_deep(index_ref, m_index_refs.get_alloc());
+        }
+        m_index_refs.erase(ndx);
+        StringIndex* index = m_index_accessors[ndx];
+        if (index)
+            delete index;
+        m_index_accessors.erase(m_index_accessors.begin() + ndx);
     }
-    m_index_refs.erase(ndx);
-    StringIndex* index = m_index_accessors[ndx];
-    if (index)
-        delete index;
-    m_index_accessors.erase(m_index_accessors.begin() + ndx);
 
     m_clusters.remove_column(ndx);
 }
@@ -748,6 +757,8 @@ void Table::erase_backlink_column(TableKey origin_table_key, size_t origin_col_n
 {
     size_t backlink_col_ndx = m_spec->find_backlink_column(origin_table_key, origin_col_ndx);
     REALM_ASSERT_3(backlink_col_ndx, !=, realm::not_found);
+    bump_content_version();
+    bump_storage_version();
     do_erase_root_column(backlink_col_ndx); // Throws
 }
 

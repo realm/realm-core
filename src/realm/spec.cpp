@@ -443,7 +443,6 @@ size_t Spec::find_backlink_column(TableKey origin_table_key, size_t origin_col_n
             return backlinks_column_start + pos;
         }
     }
-    REALM_ASSERT(false);
     return not_found;
 }
 
