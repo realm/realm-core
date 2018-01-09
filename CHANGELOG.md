@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* None.
+* Include the parser libs in the published android packages.
 
 ### Breaking changes
 
