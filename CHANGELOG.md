@@ -1,22 +1,8 @@
-# NEXT RELEASE
+# 5.1.1 Release notes
 
 ### Bugfixes
 
 * The `realm-parser` static library now correctly includes both simulator and device architectures on Apple platforms.
-
-### Breaking changes
-
-* None.
-
-### Enhancements
-
-* None.
-
------------
-
-### Internals
-
-* None.
 
 ----------------------------------------------
 
