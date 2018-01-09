@@ -198,11 +198,6 @@ public:
             session.set_sync_transact_callback(std::move(callback));
         }
 
-        static void set_error_handler(SyncSession& session, std::function<SyncSessionErrorHandler> callback)
-        {
-            session.set_error_handler(std::move(callback));
-        }
-
         static void nonsync_transact_notify(SyncSession& session, VersionID::version_type version)
         {
             session.nonsync_transact_notify(version);
@@ -264,7 +259,6 @@ private:
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, bool);
 
     void set_sync_transact_callback(std::function<SyncSessionTransactCallback>);
-    void set_error_handler(std::function<SyncSessionErrorHandler>);
     void nonsync_transact_notify(VersionID::version_type);
 
     void advance_state(std::unique_lock<std::mutex>& lock, const State&);
@@ -274,7 +268,6 @@ private:
     void did_drop_external_reference();
 
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
-    std::function<SyncSessionErrorHandler> m_error_handler;
 
     // How many bytes are uploadable or downloadable.
     struct Progress {

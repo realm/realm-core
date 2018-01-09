@@ -604,8 +604,8 @@ void SyncSession::handle_error(SyncError error)
             break;
         }
     }
-    if (m_error_handler) {
-        m_error_handler(shared_from_this(), std::move(error));
+    if (m_config.error_handler) {
+        m_config.error_handler(shared_from_this(), std::move(error));
     }
 }
 
@@ -734,11 +734,6 @@ void SyncSession::create_sync_session()
 void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTransactCallback> callback)
 {
     m_sync_transact_callback = std::move(callback);
-}
-
-void SyncSession::set_error_handler(std::function<SyncSessionErrorHandler> handler)
-{
-    m_error_handler = std::move(handler);
 }
 
 void SyncSession::advance_state(std::unique_lock<std::mutex>& lock, const State& state)
