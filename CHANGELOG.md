@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* None.
+* The `realm-parser` static library now correctly includes both simulator and device architectures on Apple platforms.
 
 ### Breaking changes
 
