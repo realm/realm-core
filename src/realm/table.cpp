@@ -356,22 +356,6 @@ void Table::remove_column(size_t col_ndx)
     if (REALM_UNLIKELY(col_ndx >= get_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    // It is possible that the column to be removed is the last column. If there
-    // are no backlink columns, then the removal of the last column is enough to
-    // effectively truncate the size (number of rows) to zero, since the number of rows
-    // is simply the number of entries in each column. Although the size of the table at
-    // this point will be zero (locally), we need to explicitly inject a clear operation
-    // so that sync can handle conflicts with adding rows. Additionally, if there
-    // are backlink columns, we need to inject a clear operation before
-    // the column removal to correctly reproduce the desired effect, namely that
-    // the table appears truncated after the removal of the last non-hidden
-    // column. The clear operation needs to be submitted to the replication
-    // handler as an individual operation, and precede the column removal
-    // operation in order to get the right behaviour in
-    // Group::advance_transact().
-    if (get_column_count() == 1)
-        clear(); // Throws
-
     if (Replication* repl = get_repl())
         repl->erase_column(this, col_ndx); // Throws
 

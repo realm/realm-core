@@ -7532,192 +7532,92 @@ TEST(Table_ColumnsSupportStringIndex)
     CHECK(enum_col.has_search_index());
     t->remove_column(0);
 }
+#endif // LEGACY_TESTS
 
 TEST(Table_addRowsToTableWithNoColumns)
 {
     Group g; // type_Link must be part of a group
     TableRef t = g.add_table("t");
 
-    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
-    CHECK_LOGIC_ERROR(t->insert_empty_row(0), LogicError::table_has_no_columns);
-    CHECK_EQUAL(t->size(), 0);
-    t->add_column(type_String, "str_col");
-    t->add_empty_row(1);
+    t->create_object();
     CHECK_EQUAL(t->size(), 1);
-    t->add_search_index(0);
-    t->insert_empty_row(0);
+    auto col = t->add_column(type_String, "str_col");
+    t->create_object();
     CHECK_EQUAL(t->size(), 2);
-    t->remove_column(0);
-    CHECK_EQUAL(t->size(), 0);
-    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
-
-    // Can add rows to a table with backlinks
-    TableRef u = g.add_table("u");
-    u->add_column_link(type_Link, "link from u to t", *t);
-    CHECK_EQUAL(u->size(), 0);
-    CHECK_EQUAL(t->size(), 0);
-    t->add_empty_row(1);
-    CHECK_EQUAL(t->size(), 1);
-    u->remove_column(0);
-    CHECK_EQUAL(u->size(), 0);
-    CHECK_EQUAL(t->size(), 0);
-    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
-
-    // Do the exact same as above but with LinkLists
-    u->add_column_link(type_LinkList, "link list from u to t", *t);
-    CHECK_EQUAL(u->size(), 0);
-    CHECK_EQUAL(t->size(), 0);
-    t->add_empty_row(1);
-    CHECK_EQUAL(t->size(), 1);
-    u->remove_column(0);
-    CHECK_EQUAL(u->size(), 0);
-    CHECK_EQUAL(t->size(), 0);
-    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
+    t->add_search_index(col);
+    t->create_object();
+    CHECK_EQUAL(t->size(), 3);
+    t->remove_column(col);
+    CHECK_EQUAL(t->size(), 3);
 
     // Check that links are nulled when connected table is cleared
-    u->add_column_link(type_Link, "link from u to t", *t);
-    u->add_empty_row(1);
+    TableRef u = g.add_table("u");
+    auto col_link = u->add_column_link(type_Link, "link from u to t", *t);
+    Obj obj = u->create_object();
     CHECK_EQUAL(u->size(), 1);
-    CHECK_EQUAL(t->size(), 0);
-    CHECK_LOGIC_ERROR(u->set_link(0, 0, 0), LogicError::target_row_index_out_of_range);
-    CHECK(u->is_null_link(0, 0));
-    CHECK_EQUAL(t->size(), 0);
-    t->add_empty_row();
-    u->set_link(0, 0, 0);
-    CHECK_EQUAL(u->get_link(0, 0), 0);
-    CHECK(!u->is_null_link(0, 0));
-    CHECK_EQUAL(t->size(), 1);
-    t->add_column(type_Int, "int column");
-    CHECK_EQUAL(t->size(), 1);
-    t->remove_column(0);
+    CHECK_EQUAL(t->size(), 3);
+    CHECK_LOGIC_ERROR(obj.set(col_link, Key(45)), LogicError::target_row_index_out_of_range);
+    CHECK(obj.is_null(col_link));
+    CHECK_EQUAL(t->size(), 3);
+    Key k = t->create_object().get_key();
+    obj.set(col_link, k);
+    CHECK_EQUAL(obj.get<Key>(col_link), k);
+    CHECK(!obj.is_null(col_link));
+    CHECK_EQUAL(t->size(), 4);
+    t->clear();
     CHECK_EQUAL(t->size(), 0);
     CHECK_EQUAL(u->size(), 1);
-    CHECK(u->is_null_link(0, 0));
+    CHECK(obj.is_null(col_link));
+    u->remove_column(col_link);
 }
 
 TEST(Table_getVersionCounterAfterRowAccessor)
 {
     Table t;
-    size_t col_bool = t.add_column(type_Bool, "bool", true);
-    size_t col_int = t.add_column(type_Int, "int", true);
-    size_t col_string = t.add_column(type_String, "string", true);
-    size_t col_float = t.add_column(type_Float, "float", true);
-    size_t col_double = t.add_column(type_Double, "double", true);
-    size_t col_date = t.add_column(type_OldDateTime, "date", true);
-    size_t col_binary = t.add_column(type_Binary, "binary", true);
-    size_t col_timestamp = t.add_column(type_Timestamp, "timestamp", true);
+    auto col_bool = t.add_column(type_Bool, "bool", true);
+    auto col_int = t.add_column(type_Int, "int", true);
+    auto col_string = t.add_column(type_String, "string", true);
+    auto col_float = t.add_column(type_Float, "float", true);
+    auto col_double = t.add_column(type_Double, "double", true);
+    auto col_binary = t.add_column(type_Binary, "binary", true);
+    auto col_date = t.add_column(type_Timestamp, "timestamp", true);
 
-    t.add_empty_row(1);
+    Obj obj = t.create_object();
 
-    int_fast64_t ver = t.get_version_counter();
+    int_fast64_t ver = t.get_content_version();
     int_fast64_t newVer;
 
     auto check_ver_bump = [&]() {
-        newVer = t.get_version_counter();
+        newVer = t.get_content_version();
         CHECK_GREATER(newVer, ver);
         ver = newVer;
     };
 
-    t.set_bool(col_bool, 0, true);
+    obj.set<Bool>(col_bool, true);
     check_ver_bump();
 
-    t.set_int(col_int, 0, 42);
+    obj.set<Int>(col_int, 42);
     check_ver_bump();
 
-    t.set_string(col_string, 0, "foo");
+    obj.set<String>(col_string, "foo");
     check_ver_bump();
 
-    t.set_float(col_float, 0, 0.42f);
+    obj.set<Float>(col_float, 0.42f);
     check_ver_bump();
 
-    t.set_double(col_double, 0, 0.42);
+    obj.set<Double>(col_double, 0.42);
     check_ver_bump();
 
-    t.set_olddatetime(col_date, 0, 1234);
+    obj.set<Binary>(col_binary, BinaryData("binary", 7));
     check_ver_bump();
 
-    t.set_binary(col_binary, 0, BinaryData("binary", 7));
+    obj.set<Timestamp>(col_date, Timestamp(777, 888));
     check_ver_bump();
 
-    t.set_timestamp(col_timestamp, 0, Timestamp(777, 888));
-    check_ver_bump();
-
-    t.set_null(0, 0);
+    obj.set_null(col_string);
     check_ver_bump();
 }
 
-
-// This test a bug where get_size_from_type_and_ref() returned off-by-one on nullable integer columns.
-// It seems to be only invoked from Table::get_size_from_ref() which is fast static method that lets
-// you find the size of a Table without having to create an instance of it. This seems to be only done
-// on subtables, so the bug has not been triggered in public.
-TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
-{
-    constexpr bool nullable_toggle = TEST_TYPE::value;
-    Group g;
-    TableRef t = g.add_table("table");
-    t->add_column(type_Int, "int", nullable_toggle);
-    t->add_column(type_Bool, "bool", nullable_toggle);
-    t->add_column(type_String, "string", nullable_toggle);
-    t->add_column(type_Binary, "binary", nullable_toggle);
-    t->add_column(type_Double, "double");
-    t->add_column(type_Float, "float");
-    t->add_column(type_Mixed, "mixed");
-    t->add_column(type_Timestamp, "timestamp");
-    t->add_column_link(type_Link, "link", *t);
-    t->add_column_link(type_LinkList, "LinkList", *t);
-
-    auto check_column_sizes = [this, &t](size_t num_rows) {
-        t->clear();
-        t->add_empty_row(num_rows);
-        CHECK_EQUAL(t->size(), num_rows);
-        using tf = _impl::TableFriend;
-        Spec& t_spec = tf::get_spec(*t);
-        size_t actual_num_cols = t_spec.get_column_count();
-        for (size_t col_ndx = 0; col_ndx < actual_num_cols; ++col_ndx) {
-            ColumnType col_type = t_spec.get_column_type(col_ndx);
-            ColumnBase& base = tf::get_column(*t, col_ndx);
-            ref_type col_ref = base.get_ref();
-            bool nullable = (t_spec.get_column_attr(col_ndx) & col_attr_Nullable) == col_attr_Nullable;
-            size_t col_size = ColumnBase::get_size_from_type_and_ref(col_type, col_ref, base.get_alloc(), nullable);
-            CHECK_EQUAL(col_size, num_rows);
-        }
-    };
-
-    // Test leafs
-    check_column_sizes(REALM_MAX_BPNODE_SIZE - 1);
-
-    // Test empty
-    check_column_sizes(0);
-
-    // Test internal nodes
-    check_column_sizes(REALM_MAX_BPNODE_SIZE + 1);
-
-    // Test on boundary for good measure
-    check_column_sizes(REALM_MAX_BPNODE_SIZE);
-
-    // Try with more levels in the tree
-    check_column_sizes(10 * REALM_MAX_BPNODE_SIZE);
-}
-
-TEST(Table_KeyRow)
-{
-    Table table;
-    table.add_column(type_Int, "int");
-    table.add_column(type_String, "string");
-    table.add_search_index(0);
-
-    size_t ndx = table.add_row_with_key(0, 123);
-    table.set_string(1, ndx, "Hello, ");
-    table.add_row_with_key(0, 456);
-
-    size_t i = table.find_first_int(0, 123);
-    CHECK_EQUAL(i, 0);
-    i = table.find_first_int(0, 456);
-    CHECK_EQUAL(i, 1);
-}
-
-#endif // LEGACY_TESTS
 
 TEST(Table_object_basic)
 {
