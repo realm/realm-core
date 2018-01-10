@@ -94,6 +94,8 @@ private:
     VersionID m_old_version;
     VersionID m_new_version;
     std::shared_ptr<GlobalNotifier::Impl> m_notifier;
+    mutable std::shared_ptr<Realm> m_old_realm;
+    mutable std::shared_ptr<Realm> m_new_realm;
     mutable std::unordered_map<std::string, CollectionChangeSet> m_changes;
     mutable bool m_have_calculated_changes = false;
 

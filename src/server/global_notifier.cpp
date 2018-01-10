@@ -252,7 +252,10 @@ GlobalNotifier::ChangeNotification::~ChangeNotification()
 {
     if (m_notifier)
         m_notifier->release_version(realm_path, m_old_version, m_new_version);
-
+    if (m_old_realm)
+        m_old_realm->close();
+    if (m_new_realm)
+        m_new_realm->close();
 }
 
 std::string GlobalNotifier::ChangeNotification::serialize() const
@@ -283,17 +286,21 @@ SharedRealm GlobalNotifier::ChangeNotification::get_old_realm() const
 {
     if (const_cast<VersionID&>(m_old_version) == VersionID{})
         return nullptr;
+    if (m_old_realm)
+        return m_old_realm;
 
-    auto old_realm = Realm::get_shared_realm(m_config);
-    Realm::Internal::begin_read(*old_realm, m_old_version);
-    return old_realm;
+    m_old_realm = Realm::get_shared_realm(m_config);
+    Realm::Internal::begin_read(*m_old_realm, m_old_version);
+    return m_old_realm;
 }
 
 SharedRealm GlobalNotifier::ChangeNotification::get_new_realm() const
 {
-    auto new_realm = Realm::get_shared_realm(m_config);
-    Realm::Internal::begin_read(*new_realm, m_new_version);
-    return new_realm;
+    if (m_new_realm)
+        return m_new_realm;
+    m_new_realm = Realm::get_shared_realm(m_config);
+    Realm::Internal::begin_read(*m_new_realm, m_new_version);
+    return m_new_realm;
 }
 
 std::unordered_map<std::string, CollectionChangeSet> const& GlobalNotifier::ChangeNotification::get_changes() const
