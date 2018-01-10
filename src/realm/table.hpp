@@ -260,6 +260,7 @@ public:
     ///
     /// \param link_type The type of links the column should store.
     void set_link_type(size_t col_ndx, LinkType);
+    LinkType get_link_type(size_t col_ndx) const;
 
     //@{
 

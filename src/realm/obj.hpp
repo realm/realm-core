@@ -97,6 +97,7 @@ public:
     size_t get_link_count(size_t col_ndx) const;
 
     bool is_null(size_t col_ndx) const;
+    bool has_backlinks(bool only_strong_links) const;
     size_t get_backlink_count(const Table& origin, size_t origin_col_ndx) const;
     Key get_backlink(const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const;
     size_t get_backlink_count(size_t backlink_col_ndx) const;
@@ -208,7 +209,7 @@ private:
 
     void set_int(size_t col_ndx, int64_t value);
     void add_backlink(size_t backlink_col, Key origin_key);
-    void remove_one_backlink(size_t backlink_col, Key origin_key);
+    bool remove_one_backlink(size_t backlink_col, Key origin_key);
     void nullify_link(size_t origin_col, Key target_key);
     bool update_backlinks(size_t col_ndx, Key old_key, Key new_key, CascadeState& state);
 };

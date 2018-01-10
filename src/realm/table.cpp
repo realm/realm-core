@@ -727,6 +727,10 @@ void Table::set_link_type(size_t col_ndx, LinkType link_type)
         repl->set_link_type(this, col_ndx, link_type); // Throws
 }
 
+LinkType Table::get_link_type(size_t col_ndx) const
+{
+    return m_spec->get_column_attr(col_ndx).test(col_attr_StrongLinks) ? link_Strong : link_Weak;
+}
 
 void Table::insert_backlink_column(TableKey origin_table_key, size_t origin_col_ndx, size_t backlink_col_ndx,
                                    StringData name)
@@ -864,6 +868,8 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
 
 void Table::batch_erase_rows(const KeyColumn& keys)
 {
+    Group* g = get_parent_group();
+
     size_t num_objs = keys.size();
     std::vector<Key> vec;
     vec.reserve(num_objs);
@@ -876,7 +882,16 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     sort(vec.begin(), vec.end());
     vec.erase(unique(vec.begin(), vec.end()), vec.end());
 
-    std::for_each(vec.begin(), vec.end(), [this](Key k) { remove_object(k); });
+    if (m_spec->has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
+        CascadeState state(CascadeState::Mode::strong);
+        state.track_link_nullifications = true;
+        std::for_each(vec.begin(), vec.end(), [this, &state](Key k) { state.rows.emplace_back(m_key, k); });
+        remove_recursive(state);
+    }
+    else {
+        CascadeState state(CascadeState::Mode::none);
+        std::for_each(vec.begin(), vec.end(), [this, &state](Key k) { m_clusters.erase(k, state); });
+    }
 }
 
 
@@ -2127,6 +2142,7 @@ void Table::remove_object(Key key)
 
     if (m_spec->has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::strong);
+        state.track_link_nullifications = true;
         state.rows.emplace_back(m_key, key);
         remove_recursive(state);
     }

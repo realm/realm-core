@@ -345,12 +345,12 @@ inline bool Spec::has_backlinks() const noexcept
 
 inline size_t Spec::first_backlink_column_index() const noexcept
 {
-    return m_names.size();
+    return m_num_public_columns;
 }
 
 inline size_t Spec::backlink_column_count() const noexcept
 {
-    return m_types.size() - m_names.size();
+    return m_types.size() - m_num_public_columns;
 }
 
 // Spec will have a subspec when it contains a column which is one of:

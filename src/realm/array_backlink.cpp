@@ -19,26 +19,30 @@
 #include <realm/array_backlink.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/table.hpp>
+#include <realm/group.hpp>
 
 using namespace realm;
 
-void ArrayBacklink::nullify_fwd_links(size_t ndx)
+void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
 {
     uint64_t value = Array::get(ndx);
     if (value != 0) {
         auto cluster = dynamic_cast<Cluster*>(get_parent());
         size_t col_ndx = get_ndx_in_parent() - 1;
-        Key target_key_value = cluster->get_real_key(ndx);
+        Key target_key = cluster->get_real_key(ndx);
 
         const Spec& spec = cluster->m_tree_top.get_spec();
 
-        TableRef target_table =
+        TableRef origin_table =
             _impl::TableFriend::get_opposite_link_table(*cluster->m_tree_top.get_owner(), col_ndx);
         size_t origin_col = spec.get_origin_column_ndx(col_ndx);
 
-        auto clear_link = [&target_table, origin_col, target_key_value](Key origin_key) {
-            Obj obj = target_table->get_object(origin_key);
-            obj.nullify_link(origin_col, target_key_value);
+        auto clear_link = [&origin_table, origin_col, target_key, &state](Key origin_key) {
+            Obj obj = origin_table->get_object(origin_key);
+            obj.nullify_link(origin_col, target_key);
+            if (state.track_link_nullifications) {
+                state.links.push_back({origin_table, origin_col, origin_key, target_key});
+            }
         };
 
         if ((value & 1) != 0) {
@@ -87,7 +91,8 @@ void ArrayBacklink::add(size_t ndx, Key key)
     backlink_list.add(key.value); // Throws
 }
 
-void ArrayBacklink::remove(size_t ndx, Key key)
+// Return true if the last link was removed
+bool ArrayBacklink::remove(size_t ndx, Key key)
 {
     int64_t value = Array::get(ndx);
     REALM_ASSERT(value != 0);
@@ -97,7 +102,7 @@ void ArrayBacklink::remove(size_t ndx, Key key)
     if ((value & 1) != 0) {
         REALM_ASSERT_3(value >> 1, ==, key.value);
         set(ndx, 0);
-        return;
+        return true;
     }
 
     // if there is a list of backlinks we have to find
@@ -118,6 +123,8 @@ void ArrayBacklink::remove(size_t ndx, Key key)
 
         set(ndx, key_value << 1 | 1);
     }
+
+    return false;
 }
 
 size_t ArrayBacklink::get_backlink_count(size_t ndx) const

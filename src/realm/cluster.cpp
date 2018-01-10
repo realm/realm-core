@@ -134,7 +134,7 @@ void ClusterNode::IteratorState::clear()
 /***************************** ClusterNodeInner ******************************/
 
 ClusterNodeInner::ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top)
-    : ClusterNode(allocator, tree_top)
+    : ClusterNode(0, allocator, tree_top)
     , m_children(allocator)
 {
     m_children.set_parent(this, 1);
@@ -182,7 +182,7 @@ T ClusterNodeInner::recurse(Key key, F func)
     char* child_header = m_alloc.translate(child_ref);
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
-        Cluster leaf(child_info.offset, m_alloc, m_tree_top);
+        Cluster leaf(child_info.offset + m_offset, m_alloc, m_tree_top);
         leaf.set_parent(&m_children, child_info.ndx);
         leaf.init(MemRef(child_header, child_ref, m_alloc));
         return func(&leaf, child_info);
@@ -191,6 +191,7 @@ T ClusterNodeInner::recurse(Key key, F func)
         ClusterNodeInner node(m_alloc, m_tree_top);
         node.set_parent(&m_children, child_info.ndx);
         node.init(MemRef(child_header, child_ref, m_alloc));
+        node.set_offset(child_info.offset + m_offset);
         return func(&node, child_info);
     }
 }
@@ -849,7 +850,7 @@ unsigned Cluster::erase(Key key, CascadeState& state)
         ArrayBacklink values(m_alloc);
         values.set_parent(this, col_ndx + 1);
         values.init_from_parent();
-        values.nullify_fwd_links(ndx);
+        values.nullify_fwd_links(ndx, state);
     }
 
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
@@ -866,7 +867,7 @@ unsigned Cluster::erase(Key key, CascadeState& state)
                     ArrayKey links(m_alloc);
                     links.init_from_ref(ref);
                     if (links.size() > 0) {
-                        remove_backlinks(key, col_ndx, links.get_all(), state);
+                        remove_backlinks(Key(key.value + m_offset), col_ndx, links.get_all(), state);
                     }
                 }
                 Array::destroy_deep(ref, m_alloc);
@@ -1012,27 +1013,34 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
     }
 }
 
-void Cluster::remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys,
+void Cluster::remove_backlinks(Key origin_key, size_t origin_col_ndx, const std::vector<Key>& keys,
                                CascadeState& state) const
 {
     const Table* origin_table = m_tree_top.get_owner();
-    TableRef target_table = _impl::TableFriend::get_opposite_link_table(*m_tree_top.get_owner(), col_ndx);
+
+    // Find target table
+    TableRef target_table = _impl::TableFriend::get_opposite_link_table(*origin_table, origin_col_ndx);
     TableKey target_table_key = target_table->get_key();
+
+    // Find actual backlink column
     const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
-    const Spec& origin_table_spec = _impl::TableFriend::get_spec(*origin_table);
-    size_t backlink_col = target_table_spec.find_backlink_column(m_tree_top.get_owner()->get_key(), col_ndx);
+    size_t backlink_col = target_table_spec.find_backlink_column(origin_table->get_key(), origin_col_ndx);
+
     CascadeState::Mode mode = state.m_mode;
+    bool strong_links = (origin_table->get_link_type(origin_col_ndx) == link_Strong);
+    bool only_strong_links = (mode == CascadeState::Mode::strong);
 
     for (auto key : keys) {
         if (key != null_key) {
             Obj target_obj = target_table->get_object(key);
-            target_obj.remove_one_backlink(backlink_col, origin_key); // Throws
+            bool last_removed = target_obj.remove_one_backlink(backlink_col, origin_key); // Throws
 
-            if (mode != CascadeState::Mode::none &&
-                (mode == CascadeState::Mode::all ||
-                 origin_table_spec.get_column_attr(col_ndx).test(col_attr_StrongLinks))) {
-                size_t num_remaining = target_obj.get_backlink_count(*origin_table, col_ndx);
-                if (num_remaining == 0) {
+            // Check if the object should be cascade deleted
+            if (mode != CascadeState::none && (mode == CascadeState::all || (strong_links && last_removed))) {
+                bool has_backlinks = target_obj.has_backlinks(only_strong_links);
+
+                if (!has_backlinks) {
+                    // Object has no more backlinks - add to list for deletion
                     state.rows.emplace_back(target_table_key, key);
                 }
             }
@@ -1337,6 +1345,7 @@ void ClusterTree::remove_links()
 {
     const Spec& spec = get_spec();
     CascadeState state(CascadeState::Mode::strong);
+    state.track_link_nullifications = true;
     Allocator& alloc = get_alloc();
     // This function will add objects that should be deleted to 'state'
     auto func = [&spec, &state, &alloc](const Cluster* cluster) {
@@ -1373,7 +1382,7 @@ void ClusterTree::remove_links()
                 values.set_parent(const_cast<Cluster*>(cluster), col_ndx + 1);
                 size_t sz = values.size();
                 for (size_t i = 0; i < sz; i++) {
-                    values.nullify_fwd_links(i);
+                    values.nullify_fwd_links(i, state);
                 }
             }
         }

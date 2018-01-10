@@ -233,6 +233,32 @@ bool ConstObj::is_null(size_t col_ndx) const
     return false;
 }
 
+
+// Figure out if this object has any remaining backlinkss
+bool ConstObj::has_backlinks(bool only_strong_links) const
+{
+    const Spec& spec = m_tree_top->get_spec();
+    size_t backlink_columns_begin = spec.first_backlink_column_index();
+    size_t backlink_columns_end = backlink_columns_begin + spec.backlink_column_count();
+
+    const Table* target_table = m_tree_top->get_owner();
+    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
+
+    for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
+        // Find origin table and column for this backlink column
+        TableRef origin_table = _impl::TableFriend::get_opposite_link_table(*target_table, i);
+        size_t origin_col = target_table_spec.get_origin_column_ndx(i);
+
+        if (!only_strong_links || origin_table->get_link_type(origin_col) == link_Strong) {
+            auto cnt = get_backlink_count(*origin_table, origin_col);
+            if (cnt)
+                return true;
+        }
+    }
+
+    return false;
+}
+
 size_t ConstObj::get_backlink_count(const Table& origin, size_t origin_col_ndx) const
 {
     size_t cnt = 0;
@@ -538,7 +564,7 @@ void Obj::add_backlink(size_t backlink_col, Key origin_key)
     backlinks.add(m_row_ndx, origin_key);
 }
 
-void Obj::remove_one_backlink(size_t backlink_col, Key origin_key)
+bool Obj::remove_one_backlink(size_t backlink_col, Key origin_key)
 {
     ensure_writeable();
 
@@ -551,7 +577,7 @@ void Obj::remove_one_backlink(size_t backlink_col, Key origin_key)
     backlinks.set_parent(&fields, backlink_col + 1);
     backlinks.init_from_parent();
 
-    backlinks.remove(m_row_ndx, origin_key);
+    return backlinks.remove(m_row_ndx, origin_key);
 }
 
 void Obj::nullify_link(size_t origin_col, Key target_key)
@@ -591,20 +617,24 @@ bool Obj::update_backlinks(size_t col_ndx, Key old_key, Key new_key, CascadeStat
 {
     bool recurse = false;
 
+    const Table* origin_table = m_tree_top->get_owner();
+
     TableRef target_table = get_target_table(col_ndx);
     const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
     size_t backlink_col = target_table_spec.find_backlink_column(get_table_key(), col_ndx);
 
+    bool strong_links = (origin_table->get_link_type(col_ndx) == link_Strong);
+    CascadeState::Mode mode = state.m_mode;
+
     if (old_key != realm::null_key) {
-        const Table* origin_table = get_table();
-        const Spec& origin_table_spec = _impl::TableFriend::get_spec(*origin_table);
-
         Obj target_obj = target_table->get_object(old_key);
-        target_obj.remove_one_backlink(backlink_col, m_key); // Throws
+        bool last_removed = target_obj.remove_one_backlink(backlink_col, m_key); // Throws
 
-        if (origin_table_spec.get_column_attr(col_ndx).test(col_attr_StrongLinks)) {
-            size_t num_remaining = target_obj.get_backlink_count(*origin_table, col_ndx);
-            if (num_remaining == 0) {
+        // Check if the object should be cascade deleted
+        if (mode != CascadeState::none && (mode == CascadeState::all || (strong_links && last_removed))) {
+            bool has_backlinks = target_obj.has_backlinks(state.m_mode == CascadeState::strong);
+
+            if (!has_backlinks) {
                 state.rows.emplace_back(target_table->get_key(), old_key);
                 recurse = true;
             }

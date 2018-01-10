@@ -62,9 +62,9 @@ public:
         Array::add(val);
     }
 
-    void nullify_fwd_links(size_t ndx);
+    void nullify_fwd_links(size_t ndx, CascadeState& state);
     void add(size_t ndx, Key key);
-    void remove(size_t ndx, Key key);
+    bool remove(size_t ndx, Key key);
     size_t get_backlink_count(size_t ndx) const;
     Key get_backlink(size_t ndx, size_t index) const;
 };
