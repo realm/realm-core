@@ -68,6 +68,7 @@ class Spec;
 class Timestamp;
 class ClusterColumn;
 
+/// Each StringIndex node contains an array of this type
 class IndexArray : public Array {
 public:
     IndexArray(Allocator& allocator)
@@ -107,6 +108,9 @@ private:
 constexpr size_t string_conversion_buffer_size = 12;
 using StringConversionBuffer = std::array<char, string_conversion_buffer_size>;
 
+// The purpose of this class is to get easy access to fields in a specific column in the
+// cluster. When you have an object like this, you can get a string version of the relevant
+// field based on the key for the object.
 class ClusterColumn {
 public:
     ClusterColumn(const ClusterTree* cluster_tree, size_t column_ndx)
@@ -210,7 +214,7 @@ public:
 
     void clear();
 
-    void distinct(IntegerColumn& result) const;
+    void distinct(ArrayKey& result) const;
     bool has_duplicate_values() const noexcept;
 
     void verify() const;

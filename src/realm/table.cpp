@@ -323,17 +323,19 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
 
 void Table::remove_recursive(CascadeState& cascade_state)
 {
-    Group& group = *get_parent_group();
-    // We will have to re-evaluate size() after each call to clusters.erase
-    for (size_t i = 0; i < cascade_state.rows.size(); ++i) {
-        CascadeState::row& row = cascade_state.rows[i];
-        typedef _impl::GroupFriend gf;
-        Table& table = gf::get_table(group, row.table_key);
-        // This might add to the list of objects that should be deleted
-        table.m_clusters.erase(row.key, cascade_state);
+    // recursive remove not relevant for free standing tables
+    if (Group* group = get_parent_group()) {
+        // We will have to re-evaluate size() after each call to clusters.erase
+        for (size_t i = 0; i < cascade_state.rows.size(); ++i) {
+            CascadeState::row& row = cascade_state.rows[i];
+            typedef _impl::GroupFriend gf;
+            Table& table = gf::get_table(*group, row.table_key);
+            // This might add to the list of objects that should be deleted
+            table.m_clusters.erase(row.key, cascade_state);
+        }
+        if (group->has_cascade_notification_handler())
+            _impl::GroupFriend::send_cascade_notification(*group, cascade_state);
     }
-    if (group.has_cascade_notification_handler())
-        _impl::GroupFriend::send_cascade_notification(group, cascade_state);
 }
 
 
@@ -664,6 +666,13 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name, L
 void Table::erase_root_column(size_t col_ndx)
 {
     REALM_ASSERT_3(col_ndx, <, m_spec->get_public_column_count());
+    ColumnType col_type = m_spec->get_column_type(col_ndx);
+    if (is_link_type(col_type)) {
+        auto target_table_key = m_spec->get_opposite_link_table_key(col_ndx);
+        auto link_target_table = get_parent_group()->get_table(target_table_key);
+        auto origin_table_key = get_key();
+        link_target_table->erase_backlink_column(origin_table_key, col_ndx); // Throws
+    }
 
     do_erase_root_column(col_ndx); // Throws
 }
@@ -693,16 +702,18 @@ void Table::do_erase_root_column(size_t ndx)
 {
     m_spec->erase_column(ndx); // Throws
 
-    // If the column had a source index we have to remove and destroy that as well
-    ref_type index_ref = m_index_refs.get_as_ref(ndx);
-    if (index_ref) {
-        Array::destroy_deep(index_ref, m_index_refs.get_alloc());
+    if (ndx < m_spec->get_public_column_count()) {
+        // If the column had a source index we have to remove and destroy that as well
+        ref_type index_ref = m_index_refs.get_as_ref(ndx);
+        if (index_ref) {
+            Array::destroy_deep(index_ref, m_index_refs.get_alloc());
+        }
+        m_index_refs.erase(ndx);
+        StringIndex* index = m_index_accessors[ndx];
+        if (index)
+            delete index;
+        m_index_accessors.erase(m_index_accessors.begin() + ndx);
     }
-    m_index_refs.erase(ndx);
-    StringIndex* index = m_index_accessors[ndx];
-    if (index)
-        delete index;
-    m_index_accessors.erase(m_index_accessors.begin() + ndx);
 
     m_clusters.remove_column(ndx);
 }
@@ -746,6 +757,8 @@ void Table::erase_backlink_column(TableKey origin_table_key, size_t origin_col_n
 {
     size_t backlink_col_ndx = m_spec->find_backlink_column(origin_table_key, origin_col_ndx);
     REALM_ASSERT_3(backlink_col_ndx, !=, realm::not_found);
+    bump_content_version();
+    bump_storage_version();
     do_erase_root_column(backlink_col_ndx); // Throws
 }
 
@@ -885,75 +898,17 @@ void Table::batch_erase_rows(const KeyColumn& keys)
 
 void Table::clear()
 {
-    bool skip_cascade = !m_spec->has_strong_link_columns();
     size_t old_size = size();
 
-    if (skip_cascade) {
-        bool broken_reciprocal_backlinks = false;
-        do_clear(broken_reciprocal_backlinks);
-    }
-    else {
-        CascadeState state(CascadeState::Mode::strong);
-        Allocator& alloc = get_alloc();
-        // Group-level tables may have links, so in those cases we need to
-        // discover all the rows that need to be cascade-removed.
-        size_t num_cols = m_spec->get_column_count();
-        for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-            auto attr = m_spec->get_column_attr(col_ndx);
-            auto col_type = m_spec->get_column_type(col_ndx);
-            if (attr.test(col_attr_StrongLinks) && is_link_type(col_type)) {
+    m_clusters.clear();
 
-                // This function will add objects that should be deleted to 'state'
-                auto func = [col_ndx, col_type, &state, &alloc](const Cluster* cluster) {
-                    if (col_type == col_type_Link) {
-                        ArrayKey values(alloc);
-                        cluster->init_leaf(col_ndx, &values);
-                        size_t sz = values.size();
-                        for (size_t i = 0; i < sz; i++) {
-                            if (Key key = values.get(i)) {
-                                cluster->remove_backlinks(cluster->get_real_key(i), col_ndx, {key}, state);
-                            }
-                        }
-                    }
-                    else if (col_type == col_type_LinkList) {
-                        ArrayInteger values(alloc);
-                        cluster->init_leaf(col_ndx, &values);
-                        size_t sz = values.size();
-                        for (size_t i = 0; i < sz; i++) {
-                            if (ref_type ref = values.get_as_ref(i)) {
-                                ArrayKey links(alloc);
-                                links.init_from_ref(ref);
-                                if (links.size() > 0) {
-                                    cluster->remove_backlinks(cluster->get_real_key(i), col_ndx, links.get_all(),
-                                                              state);
-                                }
-                            }
-                        }
-                    }
-                    // Continue
-                    return false;
-                };
-
-                // Go through all clusters
-                m_clusters.traverse(func);
-            }
-        }
-        remove_recursive(state);
-    }
+    bump_content_version();
+    bump_storage_version();
 
     if (Replication* repl = get_repl())
         repl->clear_table(this, old_size); // Throws
 }
 
-
-void Table::do_clear(bool /* broken_reciprocal_backlinks */)
-{
-    if (m_clusters.is_attached()) {
-        m_clusters.clear();
-    }
-    bump_content_version();
-    bump_storage_version();
-}
 
 const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const noexcept
 {

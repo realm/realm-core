@@ -703,7 +703,6 @@ private:
 
     void batch_erase_rows(const KeyColumn& keys);
     void do_remove_object(Key key);
-    void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
 
     void populate_search_index(size_t column_ndx);
@@ -1398,12 +1397,6 @@ public:
     static void do_remove_object(Table& table, Key key)
     {
         table.do_remove_object(key); // Throws
-    }
-
-    static void do_clear(Table& table)
-    {
-        bool broken_reciprocal_backlinks = false;
-        table.do_clear(broken_reciprocal_backlinks); // Throws
     }
 
     static void do_set_link(Table& table, size_t col_ndx, size_t row_ndx, size_t target_row_ndx)

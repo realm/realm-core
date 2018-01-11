@@ -418,8 +418,7 @@ public:
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table))) {
             log("table->clear();"); // Throws
-            typedef _impl::TableFriend tf;
-            tf::do_clear(*m_table); // Throws
+            m_table->clear();       // Throws
             return true;
         }
         return false;

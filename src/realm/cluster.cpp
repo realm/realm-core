@@ -1152,6 +1152,15 @@ uint64_t ClusterTree::get_storage_version(uint64_t instance_version) const
 
 void ClusterTree::clear()
 {
+    size_t num_cols = get_spec().get_public_column_count();
+    for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
+        if (StringIndex* index = m_owner->get_search_index(col_ndx)) {
+            index->clear();
+        }
+    }
+
+    remove_links(); // This will also delete objects loosing their last strong link
+
     m_root->destroy_deep();
 
     std::unique_ptr<ClusterNode> leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
@@ -1323,6 +1332,61 @@ const Spec& ClusterTree::get_spec() const
     typedef _impl::TableFriend tf;
     return tf::get_spec(*m_owner);
 }
+
+void ClusterTree::remove_links()
+{
+    const Spec& spec = get_spec();
+    CascadeState state(CascadeState::Mode::strong);
+    Allocator& alloc = get_alloc();
+    // This function will add objects that should be deleted to 'state'
+    auto func = [&spec, &state, &alloc](const Cluster* cluster) {
+        size_t num_cols = spec.get_column_count();
+        for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+            auto col_type = spec.get_column_type(col_ndx);
+            if (col_type == col_type_Link) {
+                ArrayKey values(alloc);
+                cluster->init_leaf(col_ndx, &values);
+                size_t sz = values.size();
+                for (size_t i = 0; i < sz; i++) {
+                    if (Key key = values.get(i)) {
+                        cluster->remove_backlinks(cluster->get_real_key(i), col_ndx, {key}, state);
+                    }
+                }
+            }
+            else if (col_type == col_type_LinkList) {
+                ArrayInteger values(alloc);
+                cluster->init_leaf(col_ndx, &values);
+                size_t sz = values.size();
+                for (size_t i = 0; i < sz; i++) {
+                    if (ref_type ref = values.get_as_ref(i)) {
+                        ArrayKey links(alloc);
+                        links.init_from_ref(ref);
+                        if (links.size() > 0) {
+                            cluster->remove_backlinks(cluster->get_real_key(i), col_ndx, links.get_all(), state);
+                        }
+                    }
+                }
+            }
+            else if (col_type == col_type_BackLink) {
+                ArrayBacklink values(alloc);
+                cluster->init_leaf(col_ndx, &values);
+                values.set_parent(const_cast<Cluster*>(cluster), col_ndx + 1);
+                size_t sz = values.size();
+                for (size_t i = 0; i < sz; i++) {
+                    values.nullify_fwd_links(i);
+                }
+            }
+        }
+        // Continue
+        return false;
+    };
+
+    // Go through all clusters
+    traverse(func);
+
+    m_owner->remove_recursive(state);
+}
+
 
 ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
     : m_tree(t)

@@ -247,9 +247,10 @@ public:
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
 private:
+    friend class ClusterTree;
+
     int64_t m_offset;
 
-    friend class Table;
     void insert_row(size_t ndx, Key k);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
     template <class T>

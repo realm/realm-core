@@ -29,6 +29,7 @@ public:
     using Array::init_from_parent;
     using Array::update_parent;
     using Array::get_ref;
+    using Array::size;
     using Array::erase;
     using Array::truncate_and_destroy_children;
 
