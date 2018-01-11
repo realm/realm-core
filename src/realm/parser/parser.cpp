@@ -344,7 +344,7 @@ COLLECTION_OPERATION_ACTION(max, Expression::KeyPathOp::Max)
 COLLECTION_OPERATION_ACTION(sum, Expression::KeyPathOp::Sum)
 COLLECTION_OPERATION_ACTION(avg, Expression::KeyPathOp::Avg)
 COLLECTION_OPERATION_ACTION(count, Expression::KeyPathOp::Count)
-COLLECTION_OPERATION_ACTION(size, Expression::KeyPathOp::Size)
+COLLECTION_OPERATION_ACTION(size, Expression::KeyPathOp::SizeString)
 
 template<> struct action< key_path_prefix > {
     template< typename Input >
