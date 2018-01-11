@@ -535,27 +535,27 @@ TEST(Group_BasicRemoveTable)
     CHECK_EQUAL(4, group.size());
     group.remove_table(gamma->get_key()); // By key
     CHECK_EQUAL(3, group.size());
-    CHECK(alpha->is_attached());
-    CHECK(beta->is_attached());
-    CHECK_NOT(gamma->is_attached());
-    CHECK(delta->is_attached());
+    CHECK(alpha);
+    CHECK(beta);
+    CHECK_NOT(gamma);
+    CHECK(delta);
     CHECK_EQUAL("alpha", group.get_table_name(alpha->get_key()));
     CHECK_EQUAL("beta", group.get_table_name(beta->get_key()));
     CHECK_EQUAL("delta", group.get_table_name(delta->get_key()));
     group.remove_table(alpha->get_key()); // By key
     CHECK_EQUAL(2, group.size());
-    CHECK_NOT(alpha->is_attached());
-    CHECK(beta->is_attached());
-    CHECK_NOT(gamma->is_attached());
-    CHECK(delta->is_attached());
+    CHECK_NOT(alpha);
+    CHECK(beta);
+    CHECK_NOT(gamma);
+    CHECK(delta);
     CHECK_EQUAL("beta", group.get_table_name(beta->get_key()));
     CHECK_EQUAL("delta", group.get_table_name(delta->get_key()));
     group.remove_table("delta"); // By name
     CHECK_EQUAL(1, group.size());
-    CHECK_NOT(alpha->is_attached());
-    CHECK(beta->is_attached());
-    CHECK_NOT(gamma->is_attached());
-    CHECK_NOT(delta->is_attached());
+    CHECK_NOT(alpha);
+    CHECK(beta);
+    CHECK_NOT(gamma);
+    CHECK_NOT(delta);
     CHECK_EQUAL("beta", group.get_table_name(beta->get_key()));
     CHECK_THROW(group.remove_table("epsilon"), NoSuchTable);
     group.verify();
@@ -598,35 +598,35 @@ TEST(Group_RemoveTableWithColumns)
     // target.
     group.remove_table("alpha");
     CHECK_EQUAL(4, group.size());
-    CHECK_NOT(alpha->is_attached());
-    CHECK(beta->is_attached());
-    CHECK(gamma->is_attached());
-    CHECK(delta->is_attached());
-    CHECK(epsilon->is_attached());
+    CHECK_NOT(alpha);
+    CHECK(beta);
+    CHECK(gamma);
+    CHECK(delta);
+    CHECK(epsilon);
 
     // Remove table with link column, and table is not a link target.
     group.remove_table("beta");
     CHECK_EQUAL(3, group.size());
-    CHECK_NOT(beta->is_attached());
-    CHECK(gamma->is_attached());
-    CHECK(delta->is_attached());
-    CHECK(epsilon->is_attached());
+    CHECK_NOT(beta);
+    CHECK(gamma);
+    CHECK(delta);
+    CHECK(epsilon);
 
     // Remove table with self-link column, and table is not a target of link
     // columns of other tables.
     group.remove_table("gamma");
     CHECK_EQUAL(2, group.size());
-    CHECK_NOT(gamma->is_attached());
-    CHECK(delta->is_attached());
-    CHECK(epsilon->is_attached());
+    CHECK_NOT(gamma);
+    CHECK(delta);
+    CHECK(epsilon);
 
 #ifdef LEGACY_TESTS
     // Try, but fail to remove table which is a target of link columns of other
     // tables.
     CHECK_THROW(group.remove_table("delta"), CrossTableLinkTarget);
     CHECK_EQUAL(2, group.size());
-    CHECK(delta->is_attached());
-    CHECK(epsilon->is_attached());
+    CHECK(delta);
+    CHECK(epsilon);
 #endif
 }
 

@@ -148,6 +148,7 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     // in a tight loop if so (instead of testing if there are sub criterias after each match). Harder: Specialize
     // data type array to make array call match() directly on each match, like for integers.
 
+    m_state = st;
     size_t local_matches = 0;
 
     size_t r = start - 1;
@@ -187,22 +188,8 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     }
 }
 
-void StringNodeEqualBase::deallocate() noexcept
-{
-    // Must be called after each query execution to free temporary resources used by the execution. Run in
-    // destructor, but also in Init because a user could define a query once and execute it multiple times.
-    clear_leaf_state();
-
-    if (m_index_matches_destroy)
-        m_index_matches->destroy();
-
-    m_index_matches_destroy = false;
-    m_index_matches.reset();
-}
-
 void StringNodeEqualBase::init()
 {
-    deallocate();
     m_dD = 10.0;
     StringNodeBase::init();
 
@@ -217,15 +204,8 @@ void StringNodeEqualBase::init()
     }
 
     if (m_has_search_index) {
-        m_index_matches_destroy = false;
-        m_last_start = size_t(-1);
-
         // Will set m_index_matches, m_index_matches_destroy, m_results_start and m_results_end
         _search_index_init();
-
-        if (m_index_matches) {
-            // FIXME: Unimplemented
-        }
     }
 }
 
@@ -234,35 +214,47 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
     REALM_ASSERT(m_table);
 
     if (m_has_search_index) {
-        // FIXME: Unimplemented
+        // Check if m_actual_key is in the current leaf
+
+        // Check if we can expect to find more keys
+        if (m_results_start < m_results_end && start < end) {
+            // Check if we should advance to next key to search for
+            Key first_key = m_cluster->get_real_key(start);
+            while (first_key > m_actual_key) {
+                m_results_start++;
+                if (m_results_start == m_results_end)
+                    return not_found;
+                m_actual_key = get_key(m_results_start);
+            }
+
+            // If actual_key is bigger than last key, it is not in this leaf
+            Key last_key = m_cluster->get_real_key(end - 1);
+            if (m_actual_key > last_key)
+                return not_found;
+
+            // Now actual_key must be found in leaf keys
+            return m_cluster->get_key_array()->lower_bound_int(m_actual_key.value - m_cluster->get_offset());
+        }
+        return not_found;
     }
 
     return _find_first_local(start, end);
 }
 
+
 namespace realm {
 
 void StringNode<Equal>::_search_index_init()
 {
-// TODO: fix when search indexes are supported in clusters
-#if 0
     FindRes fr;
     InternalFindResult res;
 
-    if (m_column_type == col_type_StringEnum) {
-        fr = static_cast<const StringEnumColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
-    }
-    else {
-        fr = static_cast<const StringColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
-    }
+    auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_idx);
+    fr = index->find_all_no_copy(StringData(StringNodeBase::m_value), res);
 
     switch (fr) {
         case FindRes_single:
-            m_index_matches.reset(
-                new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
-            m_index_matches->get_root_array()->create(Array::type_Normal);                          // Throws
-            m_index_matches->add(res.payload);
-            m_index_matches_destroy = true; // we own m_index_matches, so we must destroy it
+            m_actual_key = Key(res.payload);
             m_results_start = 0;
             m_results_end = 1;
             break;
@@ -270,18 +262,17 @@ void StringNode<Equal>::_search_index_init()
             // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which
             // simply makes
             // translate(x) = x. Shouldn't it inherit owner column's allocator?!
-            m_index_matches.reset(new IntegerColumn(m_condition_column->get_alloc(), res.payload)); // Throws
+            m_index_matches.reset(new IntegerColumn(m_table->get_alloc(), res.payload)); // Throws
             m_results_start = res.start_ndx;
             m_results_end = res.end_ndx;
-
-            // FIXME: handle start and end of find_result!
+            m_actual_key = Key(m_index_matches->get(m_results_start));
             break;
         case FindRes_not_found:
             m_index_matches.reset();
-            m_index_getter.reset();
+            m_results_start = 0;
+            m_results_end = 0;
             break;
     }
-#endif
 }
 
 size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
@@ -291,7 +282,13 @@ size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 
 void StringNode<EqualIns>::_search_index_init()
 {
-    // FIXME: TODO: fix when search indexes are supported in clusters
+    auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_idx);
+    index->find_all(m_index_matches, StringData(StringNodeBase::m_value), true);
+    m_results_start = 0;
+    m_results_end = m_index_matches.size();
+    if (m_results_start != m_results_end) {
+        m_actual_key = m_index_matches[0];
+    }
 }
 
 size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
@@ -451,7 +448,7 @@ ExpressionNode::ExpressionNode(std::unique_ptr<Expression> expression)
 
 void ExpressionNode::table_changed()
 {
-    m_expression->set_base_table(m_table.get());
+    m_expression->set_base_table(m_table);
 }
 
 void ExpressionNode::cluster_changed()

@@ -202,11 +202,6 @@ public:
     ColumnBase& operator=(const ColumnBase&) = delete;
     ColumnBase(const ColumnBase&) = delete;
 
-    StringData get_index_data(size_t, StringIndex::StringConversionBuffer&) const noexcept
-    {
-        return {};
-    }
-
     virtual Allocator& get_alloc() const noexcept = 0;
 
     /// Returns the 'ref' of the root array.

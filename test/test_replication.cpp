@@ -477,10 +477,10 @@ TEST(Replication_Links)
         ConstTableRef origin_2 = rt.get_table("origin_2");
         ConstTableRef target_1 = rt.get_table("target_1");
         ConstTableRef target_2 = rt.get_table("target_2");
-        CHECK(origin_1->is_attached());
-        CHECK(origin_2->is_attached());
-        CHECK(target_1->is_attached());
-        CHECK(target_2->is_attached());
+        CHECK(origin_1);
+        CHECK(origin_2);
+        CHECK(target_1);
+        CHECK(target_2);
         CHECK_EQUAL(2, origin_1->size());
         CHECK_EQUAL(2, origin_2->size());
         CHECK_EQUAL(2, target_1->size());
@@ -1031,7 +1031,7 @@ TEST(Replication_ListOfPrimitives)
         check(test_context, sg_1, rt);
 
         ConstTableRef table = rt.get_table("table");
-        CHECK(table->is_attached());
+        CHECK(table);
         CHECK_EQUAL(1, table->size());
 
         auto col_int = table->get_column_index("integers");
@@ -1083,7 +1083,7 @@ TEST(Replication_ListOfPrimitives)
         check(test_context, sg_1, rt);
 
         ConstTableRef table = rt.get_table("table");
-        CHECK(table->is_attached());
+        CHECK(table);
         CHECK_EQUAL(1, table->size());
 
         auto col_int = table->get_column_index("integers");
@@ -1138,7 +1138,7 @@ TEST(Replication_ListOfPrimitives)
         check(test_context, sg_1, rt);
 
         ConstTableRef table = rt.get_table("table");
-        CHECK(table->is_attached());
+        CHECK(table);
         CHECK_EQUAL(1, table->size());
 
         auto col_int = table->get_column_index("integers");

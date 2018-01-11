@@ -180,7 +180,7 @@ public:
         if (&table == m_table)
             return;
 
-        m_table.reset(&table);
+        m_table = ConstTableRef(&table);
         if (m_condition_column_idx != npos) {
             m_condition_column_name = m_table->get_column_name(m_condition_column_idx);
         }
@@ -337,8 +337,9 @@ public:
 protected:
     typedef bool (ParentNode::*Column_action_specialized)(QueryStateBase*, ArrayPayload*, size_t);
     Column_action_specialized m_column_action_specializer = nullptr;
-    ConstTableRef m_table;
+    ConstTableRef m_table = ConstTableRef();
     const Cluster* m_cluster = nullptr;
+    QueryStateBase* m_state = nullptr;
     std::string error_code;
 
     ColumnType get_real_column_type(size_t ndx)
@@ -1101,7 +1102,7 @@ public:
         m_leaf_end = 0;
     }
 
-    void clear_leaf_state()
+    virtual void clear_leaf_state()
     {
         m_array_ptr = nullptr;
     }
@@ -1370,13 +1371,9 @@ public:
         : StringNodeBase(from, patches)
     {
     }
-    ~StringNodeEqualBase() noexcept override
-    {
-        deallocate();
-    }
 
-    void deallocate() noexcept;
     void init() override;
+
     size_t find_first_local(size_t start, size_t end) override;
 
     virtual std::string describe_condition() const override
@@ -1385,22 +1382,18 @@ public:
     }
 
 protected:
+    Key m_actual_key;
+    size_t m_results_start;
+    size_t m_results_end;
+
     inline BinaryData str_to_bin(const StringData& s) noexcept
     {
         return BinaryData(s.data(), s.size());
     }
 
+    virtual Key get_key(size_t ndx) = 0;
     virtual void _search_index_init() = 0;
     virtual size_t _find_first_local(size_t start, size_t end) = 0;
-
-    size_t m_last_indexed;
-
-    // Used for index lookup
-    std::unique_ptr<IntegerColumn> m_index_matches;
-    bool m_index_matches_destroy = false;
-    size_t m_results_start;
-    size_t m_results_end;
-    size_t m_last_start;
 };
 
 
@@ -1420,6 +1413,12 @@ public:
     }
 
 private:
+    std::unique_ptr<IntegerColumn> m_index_matches;
+
+    Key get_key(size_t ndx) override
+    {
+        return Key(m_index_matches->get(ndx));
+    }
     size_t _find_first_local(size_t start, size_t end) override;
 };
 
@@ -1443,6 +1442,12 @@ public:
         }
     }
 
+    void clear_leaf_state() override
+    {
+        StringNodeEqualBase::clear_leaf_state();
+        m_index_matches.clear();
+    }
+
     void _search_index_init() override;
 
     virtual std::string describe_condition() const override
@@ -1463,9 +1468,15 @@ public:
     }
 
 private:
+    // Used for index lookup
+    std::vector<Key> m_index_matches;
     std::string m_ucase;
     std::string m_lcase;
 
+    Key get_key(size_t ndx) override
+    {
+        return m_index_matches[ndx];
+    }
     size_t _find_first_local(size_t start, size_t end) override;
 };
 
@@ -1506,6 +1517,15 @@ public:
         for (auto& condition : m_conditions) {
             condition->set_cluster(m_cluster);
         }
+
+        m_start.clear();
+        m_start.resize(m_conditions.size(), 0);
+
+        m_last.clear();
+        m_last.resize(m_conditions.size(), 0);
+
+        m_was_match.clear();
+        m_was_match.resize(m_conditions.size(), false);
     }
 
     void update_column() const override
@@ -1539,15 +1559,6 @@ public:
         ParentNode::init();
 
         m_dD = 10.0;
-
-        m_start.clear();
-        m_start.resize(m_conditions.size(), 0);
-
-        m_last.clear();
-        m_last.resize(m_conditions.size(), 0);
-
-        m_was_match.clear();
-        m_was_match.resize(m_conditions.size(), false);
 
         std::vector<ParentNode*> v;
         for (auto& condition : m_conditions) {
@@ -1654,6 +1665,10 @@ public:
     void cluster_changed() override
     {
         m_condition->set_cluster(m_cluster);
+        // Heuristics bookkeeping:
+        m_known_range_start = 0;
+        m_known_range_end = 0;
+        m_first_in_known_range = not_found;
     }
 
     void update_column() const override
@@ -1672,11 +1687,6 @@ public:
         m_condition->init();
         v.clear();
         m_condition->gather_children(v);
-
-        // Heuristics bookkeeping:
-        m_known_range_start = 0;
-        m_known_range_end = 0;
-        m_first_in_known_range = not_found;
     }
 
     size_t find_first_local(size_t start, size_t end) override;

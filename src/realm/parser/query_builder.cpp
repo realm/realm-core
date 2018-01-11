@@ -181,7 +181,7 @@ struct PropertyExpression
             for (size_t col : indexes) {
                 tbl->link(col); // mutates m_link_chain on table
             }
-            return tbl.get();
+            return tbl;
         };
     }
 };

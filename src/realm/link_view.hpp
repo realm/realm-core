@@ -200,7 +200,8 @@ inline void LinkView::detach()
 {
     REALM_ASSERT(is_attached());
     repl_unselect();
-    m_origin_table.reset();
+    // FIXME: m_origin_table.reset();
+    m_origin_table = TableRef();
     m_row_indexes.detach();
 }
 

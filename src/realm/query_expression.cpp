@@ -23,12 +23,12 @@ namespace realm {
 
 void LinkMap::set_base_table(const Table* table)
 {
-    if (table == base_table())
+    if (table == get_base_table())
         return;
 
     m_tables.clear();
     m_link_column_names.clear();
-    m_tables.push_back(table);
+    m_tables.push_back(ConstTableRef(table));
     m_link_types.clear();
     m_only_unary_links = true;
 
@@ -49,8 +49,8 @@ void LinkMap::set_base_table(const Table* table)
         m_link_types.push_back(type);
         m_link_column_names.emplace_back(spec.get_column_name(link_column_index));
         TableKey target_table_key = spec.get_opposite_link_table_key(link_column_index);
-        auto target_table_ref = group->get_table(target_table_key);
-        m_tables.push_back(target_table_ref.get());
+        auto target_table = group->get_table(target_table_key);
+        m_tables.push_back(target_table);
     }
 }
 
@@ -135,7 +135,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm)
     }
     else if (type == col_type_LinkList) {
         if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(row)) {
-            ArrayKey arr(base_table()->get_alloc());
+            ArrayKey arr(get_base_table()->get_alloc());
             arr.init_from_ref(ref);
             size_t sz = arr.size();
             for (size_t t = 0; t < sz; t++) {
@@ -198,7 +198,7 @@ void ColumnListBase::set_cluster(const Cluster* cluster)
     }
     else {
         // Create new Leaf
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayList(m_link_map.base_table()->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayList(m_link_map.get_base_table()->get_alloc()));
         cluster->init_leaf(this->m_column_ndx, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -213,7 +213,7 @@ void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_
         if (m_link_map.only_unary_links()) {
             ref_type val = 0;
             if (sz == 1) {
-                ConstObj obj = m_link_map.target_table()->get_object(links[0]);
+                ConstObj obj = m_link_map.get_target_table()->get_object(links[0]);
                 val = to_ref(obj.get<int64_t>(m_column_ndx));
             }
             destination.init(false, 1, val);
@@ -221,7 +221,7 @@ void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_
         else {
             destination.init(true, sz);
             for (size_t t = 0; t < sz; t++) {
-                ConstObj obj = m_link_map.target_table()->get_object(links[t]);
+                ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
                 ref_type val = to_ref(obj.get<int64_t>(m_column_ndx));
                 destination.m_storage.set(t, val);
             }

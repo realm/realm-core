@@ -416,7 +416,7 @@ public:
 
     bool clear_table(size_t)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table))) {
             log("table->clear();"); // Throws
             typedef _impl::TableFriend tf;
             tf::do_clear(*m_table); // Throws
@@ -427,7 +427,7 @@ public:
 
     bool add_search_index(size_t col_ndx)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_table->get_column_count()))) {
                 log("table->add_search_index(%1);", col_ndx); // Throws
                 m_table->add_search_index(col_ndx);           // Throws
@@ -439,7 +439,7 @@ public:
 
     bool remove_search_index(size_t col_ndx)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_table->get_column_count()))) {
                 log("desc->remove_search_index(%1);", col_ndx); // Throws
                 m_table->remove_search_index(col_ndx);          // Throws
@@ -451,7 +451,7 @@ public:
 
     bool set_link_type(size_t col_ndx, LinkType link_type)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_table->get_column_count()))) {
                 using tf = _impl::TableFriend;
                 DataType type = m_table->get_column_type(col_ndx);
@@ -468,7 +468,7 @@ public:
 
     bool insert_column(size_t col_ndx, DataType type, StringData name, bool nullable, bool listtype)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx <= m_table->get_column_count()))) {
                 log("desc->insert_column(%1, %2, \"%3\", %4);", col_ndx, data_type_to_str(type), name,
                     nullable); // Throws
@@ -485,7 +485,7 @@ public:
     bool insert_link_column(size_t col_ndx, DataType type, StringData name, size_t link_target_table_ndx,
                             size_t backlink_col_ndx)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx <= m_table->get_column_count()))) {
                 log("desc->insert_column_link(%1, %2, \"%3\", LinkTargetInfo(group->get_table(%4), %5));", col_ndx,
                     data_type_to_str(type), name, link_target_table_ndx, backlink_col_ndx); // Throws
@@ -502,7 +502,7 @@ public:
 
     bool erase_column(size_t col_ndx)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_table->get_column_count()))) {
                 log("desc->remove_column(%1);", col_ndx); // Throws
                 typedef _impl::TableFriend tf;
@@ -515,7 +515,7 @@ public:
 
     bool erase_link_column(size_t col_ndx, size_t, size_t)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_table->get_column_count()))) {
                 log("desc->remove_column(%1);", col_ndx); // Throws
                 typedef _impl::TableFriend tf;
@@ -528,7 +528,7 @@ public:
 
     bool rename_column(size_t col_ndx, StringData name)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_table->get_column_count()))) {
                 log("desc->rename_column(%1, \"%2\");", col_ndx, name); // Throws
                 typedef _impl::TableFriend tf;
@@ -581,7 +581,7 @@ public:
 
     bool optimize_table()
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table))) {
             log("table->optimize();"); // Throws
             m_table->optimize();       // Throws
             return true;
@@ -592,8 +592,6 @@ public:
     bool select_list(size_t col_ndx, Key key)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
-            return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table->is_attached())))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(col_ndx >= m_table->get_column_count())))
             return false;
@@ -606,8 +604,6 @@ public:
     bool select_link_list(size_t col_ndx, Key key)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
-            return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table->is_attached())))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(col_ndx >= m_table->get_column_count())))
             return false;
@@ -721,7 +717,7 @@ private:
     {
         static_cast<void>(col_ndx);
         static_cast<void>(key);
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_table->get_column_count()))) {
                 if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table->is_valid(key)))) {
                     return true;

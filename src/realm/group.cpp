@@ -708,6 +708,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
         table = tf::create_accessor(m_alloc, ref, this, table_ndx); // Throws
     }
     m_table_accessors[table_ndx] = table;
+    tf::complete_accessor(*table);
     return table;
 }
 
@@ -784,9 +785,9 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     --m_num_tables;
 
     table->detach();
-    recycle_table_accessor(table.get());
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
+    recycle_table_accessor(table);
 }
 
 
@@ -1426,9 +1427,6 @@ private:
 
 void Group::refresh_dirty_accessors()
 {
-    // FIXME:
-    // must bump versions on all changed tables (the version count has to be
-    // saved with the table to avoid bumping versions on all tables).
     // The array of Tables cannot have shrunk:
     REALM_ASSERT(m_tables.size() >= m_table_accessors.size());
 
@@ -1443,8 +1441,6 @@ void Group::refresh_dirty_accessors()
         if (table_accessor) {
             // If the table has changed it's key in the file, it's a
             // new table. This will detach the old accessor and remove it.
-            // FIXME: The detached accessor needs to be on a waiting list
-            // to allow for future references from Objs and TableRefs.
             RefOrTagged rot = m_tables.get_as_ref_or_tagged(i);
             bool same_table = false;
             if (rot.is_ref()) {
@@ -1463,7 +1459,6 @@ void Group::refresh_dirty_accessors()
                 table_accessor->detach();
                 recycle_table_accessor(table_accessor);
                 m_table_accessors[i] = nullptr;
-                delete table_accessor;
             }
         }
     }

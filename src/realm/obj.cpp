@@ -311,6 +311,10 @@ Obj& Obj::set<int64_t>(size_t col_ndx, int64_t value, bool is_default)
     update_if_needed();
     ensure_writeable();
 
+    if (StringIndex* index = m_tree_top->get_owner()->get_search_index(col_ndx)) {
+        index->set<int64_t>(m_key, value);
+    }
+
     Allocator& alloc = m_tree_top->get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
@@ -481,6 +485,10 @@ Obj& Obj::set(size_t col_ndx, T value, bool is_default)
     update_if_needed();
     ensure_writeable();
 
+    if (StringIndex* index = m_tree_top->get_owner()->get_search_index(col_ndx)) {
+        index->set<T>(m_key, value);
+    }
+
     Allocator& alloc = m_tree_top->get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
@@ -635,9 +643,6 @@ template Obj& Obj::set<Timestamp>(size_t, Timestamp, bool);
 template <class T>
 inline void Obj::do_set_null(size_t col_ndx)
 {
-    update_if_needed();
-    ensure_writeable();
-
     Allocator& alloc = m_tree_top->get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
@@ -659,6 +664,10 @@ Obj& Obj::set_null(size_t col_ndx, bool is_default)
 
     update_if_needed();
     ensure_writeable();
+
+    if (StringIndex* index = m_tree_top->get_owner()->get_search_index(col_ndx)) {
+        index->set(m_key, null{});
+    }
 
     switch (m_tree_top->get_spec().get_column_type(col_ndx)) {
         case col_type_Int:

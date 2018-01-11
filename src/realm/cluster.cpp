@@ -876,6 +876,7 @@ unsigned Cluster::erase(Key key, CascadeState& state)
 
             continue;
         }
+
         switch (col_type) {
             case col_type_Int:
                 if (attr.test(col_attr_Nullable)) {
@@ -1172,6 +1173,33 @@ Obj ClusterTree::insert(Key k)
 
         replace_root(std::move(new_root));
     }
+
+    // Update index
+    const Spec& spec = get_spec();
+    size_t num_cols = spec.get_public_column_count();
+    for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
+        if (StringIndex* index = m_owner->get_search_index(col_ndx)) {
+            bool nullable = spec.get_column_attr(col_ndx).test(col_attr_Nullable);
+            switch (spec.get_column_type(col_ndx)) {
+                case col_type_Int:
+                    index->insert(k, ArrayIntNull::default_value(nullable));
+                    break;
+                case col_type_Bool:
+                    index->insert(k, ArrayBoolNull::default_value(nullable));
+                    break;
+                case col_type_String:
+                case col_type_StringEnum:
+                    index->insert(k, ArrayString::default_value(nullable));
+                    break;
+                case col_type_Timestamp:
+                    index->insert(k, ArrayTimestamp::default_value(nullable));
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
     if (Replication* repl = get_alloc().get_replication()) {
         repl->create_object(get_owner(), k);
     }
@@ -1207,6 +1235,13 @@ Obj ClusterTree::get(Key k)
 
 void ClusterTree::erase(Key k, CascadeState& state)
 {
+    size_t num_cols = get_spec().get_public_column_count();
+    for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
+        if (StringIndex* index = m_owner->get_search_index(col_ndx)) {
+            index->erase(k);
+        }
+    }
+
     unsigned root_size = m_root->erase(k, state);
 
     if (Replication* repl = get_alloc().get_replication()) {

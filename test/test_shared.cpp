@@ -1409,10 +1409,16 @@ TEST(Shared_SpaceOveruse)
         WriteTransaction wt(sg);
         wt.get_group().verify();
         auto table = wt.get_or_add_table("my_table");
-        if (table->is_empty())
+
+        if (table->is_empty()) {
+            REALM_ASSERT(table);
             table->add_column(type_String, "text");
-        for (int j = 0; j != n_inner; ++j)
+        }
+
+        for (int j = 0; j != n_inner; ++j) {
+            REALM_ASSERT(table);
             table->create_object().set(0, "x");
+        }
         wt.commit();
     }
 

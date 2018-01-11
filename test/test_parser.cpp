@@ -267,32 +267,30 @@ void verify_query(test_util::unit_test::TestContext& test_context, TableRef t, s
     CHECK_EQUAL(q2.count(), num_results);
 }
 
-#ifdef LEGACY_TESTS
 TEST(Parser_basic_serialisation)
 {
     Group g;
     std::string table_name = "person";
     TableRef t = g.add_table(table_name);
-    size_t int_col_ndx = t->add_column(type_Int, "age");
-    size_t str_col_ndx = t->add_column(type_String, "name");
-    size_t double_col_ndx = t->add_column(type_Double, "fees");
+    t->add_column(type_Int, "age");
+    t->add_column(type_String, "name");
+    t->add_column(type_Double, "fees");
     size_t link_col_ndx = t->add_column_link(type_Link, "buddy", *t);
     size_t time_col_ndx = t->add_column(type_Timestamp, "time", true);
-    t->add_empty_row(5);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
+    std::vector<Key> keys;
 
+    t->create_objects(5, keys);
     for (size_t i = 0; i < t->size(); ++i) {
-        t->set_int(int_col_ndx, i, i);
-        t->set_string(str_col_ndx, i, names[i]);
-        t->set_double(double_col_ndx, i, fees[i]);
+        t->get_object(keys[i]).set_all(int(i), StringData(names[i]), fees[i]);
     }
-    t->set_timestamp(time_col_ndx, 0, Timestamp(realm::null()));
-    t->set_timestamp(time_col_ndx, 1, Timestamp(1512130073, 0)); // 2017/12/02 @ 12:47am (UTC)
-    t->set_timestamp(time_col_ndx, 2, Timestamp(1512130073, 505)); // with nanoseconds
-    t->set_timestamp(time_col_ndx, 3, Timestamp(1, 2));
-    t->set_timestamp(time_col_ndx, 4, Timestamp(0, 0));
-    t->set_link(link_col_ndx, 0, 1);
+    t->get_object(keys[0]).set(time_col_ndx, Timestamp(realm::null()));
+    t->get_object(keys[1]).set(time_col_ndx, Timestamp(1512130073, 0));   // 2017/12/02 @ 12:47am (UTC)
+    t->get_object(keys[2]).set(time_col_ndx, Timestamp(1512130073, 505)); // with nanoseconds
+    t->get_object(keys[3]).set(time_col_ndx, Timestamp(1, 2));
+    t->get_object(keys[4]).set(time_col_ndx, Timestamp(0, 0));
+    t->get_object(keys[0]).set(link_col_ndx, keys[1]);
 
     Query q = t->where();
 
@@ -340,6 +338,7 @@ TEST(Parser_basic_serialisation)
     CHECK(message.find("missing_property") != std::string::npos);
 }
 
+#ifdef LEGACY_TESTS
 TEST(Parser_LinksToSameTable)
 {
     Group g;
@@ -893,6 +892,7 @@ TEST(Parser_string_binary_encoding)
         CHECK_EQUAL(qbin2.count(), num_results);
     }
 }
+#endif // LEGACY_TESTS
 
 TEST(Parser_collection_aggregates)
 {
@@ -907,41 +907,48 @@ TEST(Parser_collection_aggregates)
     size_t str_col_ndx = people->add_column(type_String, "name");
     size_t courses_col_ndx = people->add_column_link(type_LinkList, "courses_taken", *courses);
     size_t binary_col_ndx = people->add_column(type_Binary, "hash");
-    using info_t = std::pair<std::string, size_t>;
+    using info_t = std::pair<std::string, int64_t>;
     std::vector<info_t> person_info
         = {{"Billy", 18}, {"Bob", 17}, {"Joe", 19}, {"Jane", 20}, {"Joel", 18}};
+    size_t j = 0;
     for (info_t i : person_info) {
-        size_t row_ndx = people->add_empty_row();
-        people->set_string(str_col_ndx, row_ndx, i.first);
-        people->set_int(int_col_ndx, row_ndx, i.second);
-        std::string hash(row_ndx, 'a'); // a repeated i times
+        Obj obj = people->create_object();
+        obj.set(str_col_ndx, StringData(i.first));
+        obj.set(int_col_ndx, i.second);
+        std::string hash(j++, 'a'); // a repeated j times
         BinaryData payload(hash);
-        people->set_binary(binary_col_ndx, row_ndx, payload);
+        obj.set(binary_col_ndx, payload);
     }
-    using cinfo = std::tuple<std::string, double, size_t, float>;
+    using cinfo = std::tuple<std::string, double, int64_t, float>;
     std::vector<cinfo> course_info
             = { cinfo{"Math", 5.0, 42, 0.36f}, cinfo{"Comp Sci", 4.5, 45, 0.25f}, cinfo{"Chemistry", 4.0, 41, 0.40f},
             cinfo{"English", 3.5, 40, 0.07f}, cinfo{"Physics", 4.5, 42, 0.42f} };
+    std::vector<Key> course_keys;
     for (cinfo course : course_info) {
-        size_t row_ndx = courses->add_empty_row();
-        courses->set_string(title_col_ndx, row_ndx, std::get<0>(course));
-        courses->set_double(credits_col_ndx, row_ndx, std::get<1>(course));
-        courses->set_int(hours_col_ndx, row_ndx, std::get<2>(course));
-        courses->set_float(fail_col_ndx, row_ndx, std::get<3>(course));
+        Obj obj = courses->create_object();
+        course_keys.push_back(obj.get_key());
+        obj.set(title_col_ndx, StringData(std::get<0>(course)));
+        obj.set(credits_col_ndx, std::get<1>(course));
+        obj.set(hours_col_ndx, std::get<2>(course));
+        obj.set(fail_col_ndx, std::get<3>(course));
     }
-    LinkViewRef billy_courses = people->get_linklist(courses_col_ndx, 0);
-    billy_courses->add(0);
-    billy_courses->add(1);
-    billy_courses->add(4);
-    LinkViewRef bob_courses = people->get_linklist(courses_col_ndx, 1);
-    bob_courses->add(0);
-    bob_courses->add(1);
-    bob_courses->add(1);
-    LinkViewRef joe_courses = people->get_linklist(courses_col_ndx, 2);
-    joe_courses->add(3);
-    LinkViewRef jane_courses = people->get_linklist(courses_col_ndx, 3);
-    jane_courses->add(2);
-    jane_courses->add(4);
+    auto it = people->begin();
+    LinkListPtr billy_courses = it->get_linklist_ptr(courses_col_ndx);
+    billy_courses->add(course_keys[0]);
+    billy_courses->add(course_keys[1]);
+    billy_courses->add(course_keys[4]);
+    ++it;
+    LinkListPtr bob_courses = it->get_linklist_ptr(courses_col_ndx);
+    bob_courses->add(course_keys[0]);
+    bob_courses->add(course_keys[1]);
+    bob_courses->add(course_keys[1]);
+    ++it;
+    LinkListPtr joe_courses = it->get_linklist_ptr(courses_col_ndx);
+    joe_courses->add(course_keys[3]);
+    ++it;
+    LinkListPtr jane_courses = it->get_linklist_ptr(courses_col_ndx);
+    jane_courses->add(course_keys[2]);
+    jane_courses->add(course_keys[4]);
 
     Query q = people->where();
 
@@ -1014,6 +1021,5 @@ TEST(Parser_collection_aggregates)
     CHECK_THROW_ANY(verify_query(test_context, courses, "credits.@size == 2", 0));
     CHECK_THROW_ANY(verify_query(test_context, courses, "failure_percentage.@size <= 2", 0));
 }
-#endif // LEGACY_TESTS
 
 #endif // TEST_PARSER

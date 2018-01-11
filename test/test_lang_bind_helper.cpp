@@ -1280,7 +1280,7 @@ TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
     CHECK_NOT_EQUAL(0, desc->get_num_unique_values(1)); // Must be "optimized" now
     CHECK_EQUAL(0, desc->get_num_unique_values(2));
 }
-
+#endif // LEGACY_TESTS
 
 TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
 {
@@ -1293,6 +1293,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     ReadTransaction rt(sg);
     const Group& group = rt.get_group();
     CHECK_EQUAL(0, group.size());
+    std::vector<Key> keys;
 
     // Create 5 columns, and make 3 of them indexed
     {
@@ -1306,7 +1307,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         table_w->add_search_index(0);
         table_w->add_search_index(2);
         table_w->add_search_index(4);
-        table_w->add_empty_row(8);
+        table_w->create_objects(8, keys);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -1322,7 +1323,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
-        table_w->add_empty_row(8);
+        table_w->create_objects(8, keys);
         table_w->remove_search_index(2);
         table_w->add_search_index(3);
         table_w->remove_search_index(0);
@@ -1343,12 +1344,10 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
         int_fast64_t v = 7;
-        size_t n = table_w->size();
-        for (size_t i = 0; i < n; ++i) {
-            //            std::cerr << i << " " << v << "\n";
+        for (auto obj : *table_w) {
             std::string out(util::to_string(v));
-            table_w->set_string(1, i, out);
-            table_w->set_int(3, i, v);
+            obj.set(1, StringData(out));
+            obj.set(3, v);
             v = (v + 1581757577LL) % 1000;
         }
         wt.commit();
@@ -1356,46 +1355,32 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     LangBindHelper::advance_read(sg);
     group.verify();
 
-    // Move the indexed columns by insertion
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        table_w->insert_column(2, type_Int, "x1");
-        table_w->insert_column(0, type_Int, "x2");
-        table_w->insert_column(3, type_Int, "x3");
-        table_w->insert_column(0, type_Int, "x4");
-        wt.commit();
-    }
-    LangBindHelper::advance_read(sg);
-    group.verify();
+    CHECK_NOT(table->has_search_index(0));
+    CHECK(table->has_search_index(1));
     CHECK_NOT(table->has_search_index(2));
     CHECK(table->has_search_index(3));
-    CHECK_NOT(table->has_search_index(6));
-    CHECK(table->has_search_index(7));
-    CHECK_NOT(table->has_search_index(8));
-    CHECK_EQUAL(12, table->find_first_string(3, "931"));
-    CHECK_EQUAL(4, table->find_first_int(7, 315));
+    CHECK_NOT(table->has_search_index(4));
+    CHECK_EQUAL(Key(13), table->find_first_string(1, "931"));
+    CHECK_EQUAL(Key(5), table->find_first_int(3, 315));
 
     // Move the indexed columns by removal
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
+        table_w->remove_column(0);
         table_w->remove_column(1);
-        table_w->remove_column(4);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_NOT(table->has_search_index(1));
-    CHECK(table->has_search_index(2));
-    CHECK_NOT(table->has_search_index(4));
-    CHECK(table->has_search_index(5));
-    CHECK_NOT(table->has_search_index(6));
-    CHECK_EQUAL(3, table->find_first_string(2, "738"));
-    CHECK_EQUAL(13, table->find_first_int(5, 508));
+    CHECK(table->has_search_index(0));
+    CHECK(table->has_search_index(1));
+    CHECK_NOT(table->has_search_index(2));
+    CHECK_EQUAL(Key(4), table->find_first_string(0, "738"));
+    CHECK_EQUAL(Key(14), table->find_first_int(1, 508));
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -6987,11 +6972,11 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     group.verify();
 
     CHECK_EQUAL(4, group.size());
-    CHECK_NOT(alpha->is_attached());
-    CHECK(beta->is_attached());
-    CHECK(gamma->is_attached());
-    CHECK(delta->is_attached());
-    CHECK(epsilon->is_attached());
+    CHECK_NOT(alpha);
+    CHECK(beta);
+    CHECK(gamma);
+    CHECK(delta);
+    CHECK(epsilon);
 
     // Remove table with link column, and table is not a link target.
     {
@@ -7003,10 +6988,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     group.verify();
 
     CHECK_EQUAL(3, group.size());
-    CHECK_NOT(beta->is_attached());
-    CHECK(gamma->is_attached());
-    CHECK(delta->is_attached());
-    CHECK(epsilon->is_attached());
+    CHECK_NOT(beta);
+    CHECK(gamma);
+    CHECK(delta);
+    CHECK(epsilon);
 
     // Remove table with self-link column, and table is not a target of link
     // columns of other tables.
@@ -7019,9 +7004,9 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     group.verify();
 
     CHECK_EQUAL(2, group.size());
-    CHECK_NOT(gamma->is_attached());
-    CHECK(delta->is_attached());
-    CHECK(epsilon->is_attached());
+    CHECK_NOT(gamma);
+    CHECK(delta);
+    CHECK(epsilon);
 
 #ifdef LEGACY_TESTS
     // Try, but fail to remove table which is a target of link columns of other
@@ -7035,8 +7020,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     group.verify();
 
     CHECK_EQUAL(2, group.size());
-    CHECK(delta->is_attached());
-    CHECK(epsilon->is_attached());
+    CHECK(delta);
+    CHECK(epsilon);
 #endif
 }
 
@@ -8632,7 +8617,10 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     CHECK_EQUAL(1, l.size());
     target->clear();
 #ifdef LEGACY_TESTS
-    // Fails due to some problem with refreshing link list size.
+    // ^ Fails CHECK due to some problem with refreshing link list size.
+    // it seems to not follow backlinks and remove forward links
+
+    // target->remove_object(t.get_key()); // <-- fails with double free
     CHECK_EQUAL(0, l.size());
 #endif
 
