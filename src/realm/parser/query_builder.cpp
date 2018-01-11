@@ -326,6 +326,66 @@ struct PropertyExpression
         return this->table_getter()->template column<RetType>(this->col_ndx);
     }
 };
+template <typename T>
+const char* type_to_str()
+{
+    return typeid(T).name();
+}
+template <>
+const char* type_to_str<bool>()
+{
+    return "Bool";
+}
+template <>
+const char* type_to_str<Int>()
+{
+    return "Int";
+}
+template <>
+const char* type_to_str<Float>()
+{
+    return "Float";
+}
+template <>
+const char* type_to_str<Double>()
+{
+    return "Double";
+}
+template <>
+const char* type_to_str<String>()
+{
+    return "String";
+}
+template <>
+const char* type_to_str<Binary>()
+{
+    return "Binary";
+}
+template <>
+const char* type_to_str<OldDateTime>()
+{
+    return "DateTime";
+}
+template <>
+const char* type_to_str<Timestamp>()
+{
+    return "Timestamp";
+}
+template <>
+const char* type_to_str<Table>()
+{
+    return "Table";
+}
+template <>
+const char* type_to_str<Mixed>()
+{
+    return "Mixed";
+}
+template <>
+const char* type_to_str<Link>()
+{
+    return "Link";
+}
 
 const char* data_type_to_str(DataType type)
 {
@@ -387,6 +447,7 @@ struct CollectionOperatorGetter;
 template <parser::Expression::KeyPathOp OpType>
 struct CollectionOperatorExpression
 {
+    static constexpr parser::Expression::KeyPathOp operation_type = OpType;
     std::function<Table *()> table_getter;
     PropertyExpression pe;
     size_t post_link_col_ndx;
@@ -451,9 +512,10 @@ struct CollectionOperatorExpression
 // default implementation. The return type is just a dummy to make things compile.
 template <typename RetType, parser::Expression::KeyPathOp AggOpType, class Enable>
 struct CollectionOperatorGetter {
-    static Columns<RetType> convert(const CollectionOperatorExpression<AggOpType>&) {
-        // FIXME: we have the type and operation available so print these.
-        throw std::runtime_error("Predicate error constructing collection aggregate operation");
+    static Columns<RetType> convert(const CollectionOperatorExpression<AggOpType>& op) {
+        throw std::runtime_error(util::format("Predicate error: comparison of type '%1' with result of '%2' is not supported.",
+                                              type_to_str<RetType>(),
+                                              collection_operator_to_str(op.operation_type)));
     }
 };
 
@@ -971,6 +1033,12 @@ void do_add_comparison_to_query(Query &query, Predicate::Comparison cmp, A &lhs,
     }
 }
 
+template <>
+void do_add_comparison_to_query(Query&, Predicate::Comparison, ValueExpression&, ValueExpression&, DataType)
+{
+    throw std::runtime_error("Invalid predicate: comparison between two literals is not supported.");
+}
+
 struct ExpressionContainer
 {
     enum class ExpressionInternal
@@ -1045,6 +1113,7 @@ struct ExpressionContainer
 
     void add_null_comparison_to_query(Query &query, Predicate::Comparison cmp)
     {
+
         switch (type) {
             case ExpressionInternal::exp_Value:
                 throw std::runtime_error("Unsupported query. A comparison must include at least one keypath.");
@@ -1161,280 +1230,71 @@ struct ExpressionContainer
         throw std::runtime_error("Unsupported query (type undeductable). A comparison must include at lease one keypath");
     }
 
+    template <typename LHS_T>
+    void internal_add_comparison_to_query(Query& query, LHS_T& lhs, Predicate::Comparison cmp, ExpressionContainer& rhs, DataType comparison_type)
+    {
+        switch (rhs.type) {
+            case ExpressionInternal::exp_Value:
+                do_add_comparison_to_query(query, cmp, lhs, rhs.get_value(), comparison_type);
+                return;
+            case ExpressionInternal::exp_Property:
+                do_add_comparison_to_query(query, cmp, lhs, rhs.get_property(), comparison_type);
+                return;
+            case ExpressionInternal::exp_OpMin:
+                do_add_comparison_to_query(query, cmp, lhs, rhs.get_min(), comparison_type);
+                return;
+            case ExpressionInternal::exp_OpMax:
+                do_add_comparison_to_query(query, cmp, lhs, rhs.get_max(), comparison_type);
+                return;
+            case ExpressionInternal::exp_OpSum:
+                do_add_comparison_to_query(query, cmp, lhs, rhs.get_sum(), comparison_type);
+                return;
+            case ExpressionInternal::exp_OpAvg:
+                do_add_comparison_to_query(query, cmp, lhs, rhs.get_avg(), comparison_type);
+                return;
+            case ExpressionInternal::exp_OpCount:
+                do_add_comparison_to_query(query, cmp, lhs, rhs.get_count(), comparison_type);
+                return;
+            case ExpressionInternal::exp_OpSizeString:
+                do_add_comparison_to_query(query, cmp, lhs, rhs.get_size_string(), comparison_type);
+                return;
+            case ExpressionInternal::exp_OpSizeBinary:
+                do_add_comparison_to_query(query, cmp, lhs, rhs.get_size_binary(), comparison_type);
+                return;
+        }
+    }
+
     void add_comparison_to_query(Query &query, Predicate::Comparison cmp, ExpressionContainer& rhs)
     {
         DataType comparison_type = get_comparison_type(rhs);
         switch (type) {
             case ExpressionInternal::exp_Value:
-                switch (rhs.type) {
-                    case ExpressionInternal::exp_Value:
-                        throw std::runtime_error("Unsupported query. A comparison must include at least one keypath.");
-                        return;
-                    case ExpressionInternal::exp_Property:
-                        do_add_comparison_to_query(query, cmp, get_value(), rhs.get_property(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMin:
-                        do_add_comparison_to_query(query, cmp, get_value(), rhs.get_min(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMax:
-                        do_add_comparison_to_query(query, cmp, get_value(), rhs.get_max(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSum:
-                        do_add_comparison_to_query(query, cmp, get_value(), rhs.get_sum(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpAvg:
-                        do_add_comparison_to_query(query, cmp, get_value(), rhs.get_avg(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpCount:
-                        do_add_comparison_to_query(query, cmp, get_value(), rhs.get_count(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeString:
-                        do_add_comparison_to_query(query, cmp, get_value(), rhs.get_size_string(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeBinary:
-                        do_add_comparison_to_query(query, cmp, get_value(), rhs.get_size_binary(), comparison_type);
-                        return;
-                }
+                internal_add_comparison_to_query(query, get_value(), cmp, rhs, comparison_type);
+                return;
             case ExpressionInternal::exp_Property:
-                switch (rhs.type) {
-                    case ExpressionInternal::exp_Value:
-                        do_add_comparison_to_query(query, cmp, get_property(), rhs.get_value(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_Property:
-                        do_add_comparison_to_query(query, cmp, get_property(), rhs.get_property(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMin:
-                        do_add_comparison_to_query(query, cmp, get_property(), rhs.get_min(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMax:
-                        do_add_comparison_to_query(query, cmp, get_property(), rhs.get_max(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSum:
-                        do_add_comparison_to_query(query, cmp, get_property(), rhs.get_sum(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpAvg:
-                        do_add_comparison_to_query(query, cmp, get_property(), rhs.get_avg(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpCount:
-                        do_add_comparison_to_query(query, cmp, get_property(), rhs.get_count(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeString:
-                        do_add_comparison_to_query(query, cmp, get_property(), rhs.get_size_string(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeBinary:
-                        do_add_comparison_to_query(query, cmp, get_property(), rhs.get_size_binary(), comparison_type);
-                        return;
-                }
+                internal_add_comparison_to_query(query, get_property(), cmp, rhs, comparison_type);
+                return;
             case ExpressionInternal::exp_OpMin:
-                switch (rhs.type) {
-                    case ExpressionInternal::exp_Value:
-                        do_add_comparison_to_query(query, cmp, get_min(), rhs.get_value(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_Property:
-                        do_add_comparison_to_query(query, cmp, get_min(), rhs.get_property(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMin:
-                        do_add_comparison_to_query(query, cmp, get_min(), rhs.get_min(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMax:
-                        do_add_comparison_to_query(query, cmp, get_min(), rhs.get_max(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSum:
-                        do_add_comparison_to_query(query, cmp, get_min(), rhs.get_sum(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpAvg:
-                        do_add_comparison_to_query(query, cmp, get_min(), rhs.get_avg(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpCount:
-                        do_add_comparison_to_query(query, cmp, get_min(), rhs.get_count(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeString:
-                        do_add_comparison_to_query(query, cmp, get_min(), rhs.get_size_string(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeBinary:
-                        do_add_comparison_to_query(query, cmp, get_min(), rhs.get_size_binary(), comparison_type);
-                        return;
-                }
+                internal_add_comparison_to_query(query, get_min(), cmp, rhs, comparison_type);
+                return;
             case ExpressionInternal::exp_OpMax:
-                switch (rhs.type) {
-                    case ExpressionInternal::exp_Value:
-                        do_add_comparison_to_query(query, cmp, get_max(), rhs.get_value(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_Property:
-                        do_add_comparison_to_query(query, cmp, get_max(), rhs.get_property(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMin:
-                        do_add_comparison_to_query(query, cmp, get_max(), rhs.get_min(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMax:
-                        do_add_comparison_to_query(query, cmp, get_max(), rhs.get_max(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSum:
-                        do_add_comparison_to_query(query, cmp, get_max(), rhs.get_sum(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpAvg:
-                        do_add_comparison_to_query(query, cmp, get_max(), rhs.get_avg(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpCount:
-                        do_add_comparison_to_query(query, cmp, get_max(), rhs.get_count(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeString:
-                        do_add_comparison_to_query(query, cmp, get_max(), rhs.get_size_string(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeBinary:
-                        do_add_comparison_to_query(query, cmp, get_max(), rhs.get_size_binary(), comparison_type);
-                        return;
-                }
+                internal_add_comparison_to_query(query, get_max(), cmp, rhs, comparison_type);
+                return;
             case ExpressionInternal::exp_OpSum:
-                switch (rhs.type) {
-                    case ExpressionInternal::exp_Value:
-                        do_add_comparison_to_query(query, cmp, get_sum(), rhs.get_value(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_Property:
-                        do_add_comparison_to_query(query, cmp, get_sum(), rhs.get_property(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMin:
-                        do_add_comparison_to_query(query, cmp, get_sum(), rhs.get_min(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMax:
-                        do_add_comparison_to_query(query, cmp, get_sum(), rhs.get_max(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSum:
-                        do_add_comparison_to_query(query, cmp, get_sum(), rhs.get_sum(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpAvg:
-                        do_add_comparison_to_query(query, cmp, get_sum(), rhs.get_avg(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpCount:
-                        do_add_comparison_to_query(query, cmp, get_sum(), rhs.get_count(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeString:
-                        do_add_comparison_to_query(query, cmp, get_sum(), rhs.get_size_string(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeBinary:
-                        do_add_comparison_to_query(query, cmp, get_sum(), rhs.get_size_binary(), comparison_type);
-                        return;
-                }
+                internal_add_comparison_to_query(query, get_sum(), cmp, rhs, comparison_type);
+                return;
             case ExpressionInternal::exp_OpAvg:
-                switch (rhs.type) {
-                    case ExpressionInternal::exp_Value:
-                        do_add_comparison_to_query(query, cmp, get_avg(), rhs.get_value(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_Property:
-                        do_add_comparison_to_query(query, cmp, get_avg(), rhs.get_property(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMin:
-                        do_add_comparison_to_query(query, cmp, get_avg(), rhs.get_min(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMax:
-                        do_add_comparison_to_query(query, cmp, get_avg(), rhs.get_max(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSum:
-                        do_add_comparison_to_query(query, cmp, get_avg(), rhs.get_sum(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpAvg:
-                        do_add_comparison_to_query(query, cmp, get_avg(), rhs.get_avg(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpCount:
-                        do_add_comparison_to_query(query, cmp, get_avg(), rhs.get_count(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeString:
-                        do_add_comparison_to_query(query, cmp, get_avg(), rhs.get_size_string(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeBinary:
-                        do_add_comparison_to_query(query, cmp, get_avg(), rhs.get_size_binary(), comparison_type);
-                        return;
-                }
+                internal_add_comparison_to_query(query, get_avg(), cmp, rhs, comparison_type);
+                return;
             case ExpressionInternal::exp_OpCount:
-                switch (rhs.type) {
-                    case ExpressionInternal::exp_Value:
-                        do_add_comparison_to_query(query, cmp, get_count(), rhs.get_value(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_Property:
-                        do_add_comparison_to_query(query, cmp, get_count(), rhs.get_property(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMin:
-                        do_add_comparison_to_query(query, cmp, get_count(), rhs.get_min(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMax:
-                        do_add_comparison_to_query(query, cmp, get_count(), rhs.get_max(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSum:
-                        do_add_comparison_to_query(query, cmp, get_count(), rhs.get_sum(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpAvg:
-                        do_add_comparison_to_query(query, cmp, get_count(), rhs.get_avg(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpCount:
-                        do_add_comparison_to_query(query, cmp, get_count(), rhs.get_count(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeString:
-                        do_add_comparison_to_query(query, cmp, get_count(), rhs.get_size_string(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeBinary:
-                        do_add_comparison_to_query(query, cmp, get_count(), rhs.get_size_binary(), comparison_type);
-                        return;
-                }
+                internal_add_comparison_to_query(query, get_count(), cmp, rhs, comparison_type);
+                return;
             case ExpressionInternal::exp_OpSizeString:
-                switch (rhs.type) {
-                    case ExpressionInternal::exp_Value:
-                        do_add_comparison_to_query(query, cmp, get_size_string(), rhs.get_value(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_Property:
-                        do_add_comparison_to_query(query, cmp, get_size_string(), rhs.get_property(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMin:
-                        do_add_comparison_to_query(query, cmp, get_size_string(), rhs.get_min(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMax:
-                        do_add_comparison_to_query(query, cmp, get_size_string(), rhs.get_max(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSum:
-                        do_add_comparison_to_query(query, cmp, get_size_string(), rhs.get_sum(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpAvg:
-                        do_add_comparison_to_query(query, cmp, get_size_string(), rhs.get_avg(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpCount:
-                        do_add_comparison_to_query(query, cmp, get_size_string(), rhs.get_count(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeString:
-                        do_add_comparison_to_query(query, cmp, get_size_string(), rhs.get_size_string(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeBinary:
-                        do_add_comparison_to_query(query, cmp, get_size_string(), rhs.get_size_binary(), comparison_type);
-                        return;
-                }
+                internal_add_comparison_to_query(query, get_size_string(), cmp, rhs, comparison_type);
+                return;
             case ExpressionInternal::exp_OpSizeBinary:
-                switch (rhs.type) {
-                    case ExpressionInternal::exp_Value:
-                        do_add_comparison_to_query(query, cmp, get_size_binary(), rhs.get_value(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_Property:
-                        do_add_comparison_to_query(query, cmp, get_size_binary(), rhs.get_property(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMin:
-                        do_add_comparison_to_query(query, cmp, get_size_binary(), rhs.get_min(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpMax:
-                        do_add_comparison_to_query(query, cmp, get_size_binary(), rhs.get_max(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSum:
-                        do_add_comparison_to_query(query, cmp, get_size_binary(), rhs.get_sum(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpAvg:
-                        do_add_comparison_to_query(query, cmp, get_size_binary(), rhs.get_avg(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpCount:
-                        do_add_comparison_to_query(query, cmp, get_size_binary(), rhs.get_count(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeString:
-                        do_add_comparison_to_query(query, cmp, get_size_binary(), rhs.get_size_string(), comparison_type);
-                        return;
-                    case ExpressionInternal::exp_OpSizeBinary:
-                        do_add_comparison_to_query(query, cmp, get_size_binary(), rhs.get_size_binary(), comparison_type);
-                        return;
-                }
+                internal_add_comparison_to_query(query, get_size_binary(), cmp, rhs, comparison_type);
+                return;
         }
     }
 
