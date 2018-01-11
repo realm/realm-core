@@ -93,11 +93,9 @@ jobWrapper {
                   parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
               }
           }
-/* FIXME
           if (env.CHANGE_TARGET) {
               parallelExecutors['performance'] = buildPerformance()
           }
-*/
           parallel parallelExecutors
       }
 
