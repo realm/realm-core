@@ -661,33 +661,35 @@ TEST(Parser_OverColumnIndexChanges)
 }
 
 
-//ONLY(Parser_TwoColumnExpressions)
-//{
-//    Group g;
-//    TableRef table = g.add_table("table");
-//    size_t int_col_ndx = table->add_column(type_Int, "ints", true);
-//    size_t double_col_ndx = table->add_column(type_Double, "doubles");
-//    size_t string_col_ndx = table->add_column(type_String, "strings");
-//    table->add_empty_row(3);
-//    for (size_t i = 0; i < table->size(); ++i) {
-//        table->set_int(int_col_ndx, i, i);
-//        table->set_double(double_col_ndx, i, double(i));
-//        std::string str(i, 'a');
-//        table->set_string(string_col_ndx, i, StringData(str));
-//    }
-//
-//    Query q = table->where().and_query(table->column<Int>(int_col_ndx) == table->column<String>(string_col_ndx).size());
-//    CHECK_EQUAL(q.count(), 3);
-//    std::string desc = q.get_description();
-//
-//    verify_query(test_context, table, "ints == 0", 1);
-//    verify_query(test_context, table, "ints == ints", 3);
-////    verify_query(test_context, table, "ints == ints.@max)
-//    verify_query(test_context, table, "ints == strings.@count", 3);
-//    verify_query(test_context, table, "ints == NULL", 0);
-//    verify_query(test_context, table, "doubles == doubles", 3);
-//    verify_query(test_context, table, "strings == strings", 3);
-//}
+TEST(Parser_TwoColumnExpressionBasics)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    size_t int_col_ndx = table->add_column(type_Int, "ints", true);
+    size_t double_col_ndx = table->add_column(type_Double, "doubles");
+    size_t string_col_ndx = table->add_column(type_String, "strings");
+    size_t link_col_ndx = table->add_column_link(type_Link, "link", *table);
+    table->add_empty_row(3);
+    for (size_t i = 0; i < table->size(); ++i) {
+        table->set_int(int_col_ndx, i, i);
+        table->set_double(double_col_ndx, i, double(i));
+        std::string str(i, 'a');
+        table->set_string(string_col_ndx, i, StringData(str));
+    }
+    table->set_link(link_col_ndx, 1, 0);
+
+    Query q = table->where().and_query(table->column<Int>(int_col_ndx) == table->column<String>(string_col_ndx).size());
+    CHECK_EQUAL(q.count(), 3);
+    std::string desc = q.get_description();
+
+    verify_query(test_context, table, "ints == 0", 1);
+    verify_query(test_context, table, "ints == ints", 3);
+    verify_query(test_context, table, "ints == strings.@count", 3);
+    verify_query(test_context, table, "ints == NULL", 0);
+    verify_query(test_context, table, "doubles == doubles", 3);
+    verify_query(test_context, table, "strings == strings", 3);
+    verify_query(test_context, table, "ints == link.@count", 2); // row 0 has 0 links, row 1 has 1 link
+}
 
 
 void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, const util::Any* arg_list, size_t num_args, size_t num_results) {
