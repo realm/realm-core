@@ -117,8 +117,8 @@ public:
     /*********************** Constructor / destructor ************************/
 
     // The object will not be fully initialized when using this constructor
-    explicit Node(Allocator& alloc) noexcept
-        : m_alloc(alloc)
+    explicit Node(Allocator& allocator) noexcept
+        : m_alloc(allocator)
     {
     }
 

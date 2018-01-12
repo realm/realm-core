@@ -33,9 +33,9 @@ void ArrayString::create()
     static_cast<ArrayStringShort*>(m_arr)->create();
 }
 
-void ArrayString::init_from_ref(ref_type ref) noexcept
+void ArrayString::init_from_mem(MemRef mem) noexcept
 {
-    char* header = m_alloc.translate(ref);
+    char* header = mem.get_addr();
 
     ArrayParent* parent = m_arr->get_parent();
     size_t ndx_in_parent = m_arr->get_ndx_in_parent();
@@ -46,12 +46,12 @@ void ArrayString::init_from_ref(ref_type ref) noexcept
         bool is_small = Array::get_wtype_from_header(header) == Array::wtype_Multiply;
         if (is_small) {
             auto arr = new (&m_storage.m_string_short) ArrayStringShort(m_alloc, true);
-            arr->init_from_mem(MemRef(header, ref, m_alloc));
+            arr->init_from_mem(mem);
             m_type = Type::small_strings;
         }
         else {
             auto arr = new (&m_storage.m_string_short) ArrayInteger(m_alloc);
-            arr->init_from_mem(MemRef(header, ref, m_alloc));
+            arr->init_from_mem(mem);
             m_string_enum_values = std::make_unique<ArrayString>(m_alloc);
             ArrayParent* p;
             REALM_ASSERT(m_spec != nullptr);
@@ -66,12 +66,12 @@ void ArrayString::init_from_ref(ref_type ref) noexcept
         bool is_big = Array::get_context_flag_from_header(header);
         if (!is_big) {
             auto arr = new (&m_storage.m_string_long) ArraySmallBlobs(m_alloc);
-            arr->init_from_mem(MemRef(header, ref, m_alloc));
+            arr->init_from_mem(mem);
             m_type = Type::medium_strings;
         }
         else {
             auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
-            arr->init_from_mem(MemRef(header, ref, m_alloc));
+            arr->init_from_mem(mem);
             m_type = Type::big_strings;
         }
     }

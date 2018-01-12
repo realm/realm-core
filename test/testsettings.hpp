@@ -35,6 +35,7 @@
 //#define REALM_PTHREADS_TEST
 
 #define TEST_BASIC_UTILS
+#define TEST_BPLUS_TREE
 #define TEST_COLUMN_MIXED
 #define TEST_ALLOC
 #define TEST_ARRAY

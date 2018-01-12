@@ -32,6 +32,8 @@ public:
 
     using Array::set_parent;
     using Array::update_parent;
+    using Array::get_parent;
+    using Array::get_ndx_in_parent;
     using Array::get_ref;
 
     static Timestamp default_value(bool nullable)
@@ -41,8 +43,15 @@ public:
 
     void create();
 
-    void init_from_ref(ref_type ref) noexcept override;
-    void init_from_parent();
+    void init_from_mem(MemRef mem) noexcept;
+    void init_from_ref(ref_type ref) noexcept override
+    {
+        init_from_mem(MemRef(m_alloc.translate(ref), ref, m_alloc));
+    }
+    void init_from_parent()
+    {
+        init_from_ref(Array::get_ref_from_parent());
+    }
 
     size_t size() const
     {
@@ -82,9 +91,11 @@ public:
 
     size_t find_first(Timestamp value, size_t begin, size_t end) const noexcept
     {
-        for (size_t t = begin; t < end; t++) {
-            if (get(t) == value)
-                return t;
+        while (begin < end) {
+            auto res = m_seconds.find_first(value.get_seconds(), begin, end);
+            if (m_nanoseconds.get(res) == value.get_nanoseconds())
+                return res;
+            begin = res + 1;
         }
         return not_found;
     }

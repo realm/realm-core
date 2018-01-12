@@ -44,18 +44,28 @@ public:
     {
         return m_arr->get_ref();
     }
-
-    void set_parent(ArrayParent* parent, size_t ndx_in_parent)
+    ArrayParent* get_parent() const
     {
-        m_arr->set_parent(parent, ndx_in_parent);
+        return m_arr->get_parent();
     }
-
+    size_t get_ndx_in_parent() const
+    {
+        return m_arr->get_ndx_in_parent();
+    }
+    void set_parent(ArrayParent* p, size_t n)
+    {
+        m_arr->set_parent(p, n);
+    }
     void update_parent()
     {
         m_arr->update_parent();
     }
 
-    void init_from_ref(ref_type ref) noexcept override;
+    void init_from_mem(MemRef mem) noexcept;
+    void init_from_ref(ref_type ref) noexcept override
+    {
+        init_from_mem(MemRef(m_alloc.translate(ref), ref, m_alloc));
+    }
     void init_from_parent();
 
     size_t size() const;

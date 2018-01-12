@@ -22,6 +22,7 @@ set(NORMAL_TESTS
     test_array_string_long.cpp
     test_basic_utils.cpp
     test_binary_data.cpp
+    test_bplus_tree.cpp
     test_column.cpp
     test_column_binary.cpp
     test_column_float.cpp
