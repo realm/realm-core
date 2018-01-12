@@ -689,6 +689,13 @@ TEST(Parser_TwoColumnExpressionBasics)
     verify_query(test_context, table, "doubles == doubles", 3);
     verify_query(test_context, table, "strings == strings", 3);
     verify_query(test_context, table, "ints == link.@count", 2); // row 0 has 0 links, row 1 has 1 link
+
+    // type mismatch
+    CHECK_THROW_ANY(verify_query(test_context, table, "doubles == ints", 0));
+    CHECK_THROW_ANY(verify_query(test_context, table, "doubles == strings", 0));
+    CHECK_THROW_ANY(verify_query(test_context, table, "ints == doubles", 0));
+    CHECK_THROW_ANY(verify_query(test_context, table, "strings == doubles", 0));
+
 }
 
 

@@ -125,44 +125,87 @@ CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>& Express
     return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>&>(storage);
 }
 
-DataType ExpressionContainer::get_comparison_type(ExpressionContainer& rhs) {
-    if (type == ExpressionInternal::exp_Property) {
-        return get_property().col_type;
-    } else if (rhs.type == ExpressionInternal::exp_Property) {
-        return rhs.get_property().col_type;
-    } else if (type == ExpressionInternal::exp_OpMin) {
-        return get_min().post_link_col_type;
-    } else if (type == ExpressionInternal::exp_OpMax) {
-        return get_max().post_link_col_type;
-    } else if (type == ExpressionInternal::exp_OpSum) {
-        return get_sum().post_link_col_type;
-    } else if (type == ExpressionInternal::exp_OpAvg) {
-        return get_avg().post_link_col_type;
-    } else if (type == ExpressionInternal::exp_OpCount) {
-        return type_Int;
-    } else if (type == ExpressionInternal::exp_OpSizeString) {
-        return type_Int;
-    } else if (type == ExpressionInternal::exp_OpSizeBinary) {
-        return type_Int;
+DataType ExpressionContainer::check_type_compatibility(DataType other_type)
+{
+    util::Optional<DataType> self_type;
+    switch (type) {
+        case ExpressionInternal::exp_Value:
+            self_type = other_type; // we'll try to parse the value as other_type and fail there if not possible
+            break;
+        case ExpressionInternal::exp_Property:
+            self_type = get_property().col_type; // must match
+            break;
+        case ExpressionInternal::exp_OpMin:
+            self_type = get_min().post_link_col_type;
+            break;
+        case ExpressionInternal::exp_OpMax:
+            self_type = get_max().post_link_col_type;
+            break;
+        case ExpressionInternal::exp_OpSum:
+            self_type = get_sum().post_link_col_type;
+            break;
+        case ExpressionInternal::exp_OpAvg:
+            self_type = get_avg().post_link_col_type;
+            break;
+        case ExpressionInternal::exp_OpCount:
+            REALM_FALLTHROUGH;
+        case ExpressionInternal::exp_OpSizeString:
+            REALM_FALLTHROUGH;
+        case ExpressionInternal::exp_OpSizeBinary:
+            // count/size can handle any numeric type
+            if (other_type == type_Int || other_type == type_Double || other_type == type_Float) {
+                self_type = other_type;
+            } // else other_type is unset
+            break;
     }
-    // rhs checks
-    else if (rhs.type == ExpressionInternal::exp_OpMin) {
-        return rhs.get_min().post_link_col_type;
+    if (!self_type) {
+        throw std::runtime_error(
+                util::format("The result of a @count or @size operation must be compaired to a numeric type (found type '%1').",
+                        data_type_to_str(other_type)));
+    }
+    else if (self_type.value() != other_type) {
+        throw std::runtime_error(
+                                 util::format("Comparison between properties of different types is not supported ('%1' and '%2').",
+                                              data_type_to_str(other_type), data_type_to_str(self_type.value())));
+    }
+    return other_type;
+}
+
+DataType ExpressionContainer::get_comparison_type(ExpressionContainer& rhs) {
+    // check for strongly typed expressions first
+    if (type == ExpressionInternal::exp_Property) {
+        return rhs.check_type_compatibility(get_property().col_type);
+    } else if (rhs.type == ExpressionInternal::exp_Property) {
+        return check_type_compatibility(rhs.get_property().col_type);
+    } else if (type == ExpressionInternal::exp_OpMin) {
+        return rhs.check_type_compatibility(get_min().post_link_col_type);
+    } else if (type == ExpressionInternal::exp_OpMax) {
+        return rhs.check_type_compatibility(get_max().post_link_col_type);
+    } else if (type == ExpressionInternal::exp_OpSum) {
+        return rhs.check_type_compatibility(get_sum().post_link_col_type);
+    } else if (type == ExpressionInternal::exp_OpAvg) {
+        return rhs.check_type_compatibility(get_avg().post_link_col_type);
+    } else if (rhs.type == ExpressionInternal::exp_OpMin) {
+        return check_type_compatibility(rhs.get_min().post_link_col_type);
     } else if (rhs.type == ExpressionInternal::exp_OpMax) {
-        return rhs.get_max().post_link_col_type;
+        return check_type_compatibility(rhs.get_max().post_link_col_type);
     } else if (rhs.type == ExpressionInternal::exp_OpSum) {
-        return rhs.get_sum().post_link_col_type;
+        return check_type_compatibility(rhs.get_sum().post_link_col_type);
     } else if (rhs.type == ExpressionInternal::exp_OpAvg) {
-        return rhs.get_avg().post_link_col_type;
-    } else if (rhs.type == ExpressionInternal::exp_OpCount) {
-        return type_Int;
-    } else if (rhs.type == ExpressionInternal::exp_OpSizeString) {
-        return type_Int;
-    } else if (rhs.type == ExpressionInternal::exp_OpSizeBinary) {
-        return type_Int;
+        return check_type_compatibility(rhs.get_avg().post_link_col_type);
+    // check weakly typed expressions last, we return type_Double for count/size because at this point the
+    // comparison is between a @count/@size and a value which is untyped. The value should be numeric if the query
+    // is well formed but we don't know what type it actually is so we assume double to get a precise comparison.
+    } else if (type == ExpressionInternal::exp_OpCount
+               || type == ExpressionInternal::exp_OpSizeString
+               || type == ExpressionInternal::exp_OpSizeBinary
+               || rhs.type == ExpressionInternal::exp_OpCount
+               || rhs.type == ExpressionInternal::exp_OpSizeString
+               || rhs.type == ExpressionInternal::exp_OpSizeBinary) {
+        return type_Double;
     }
 
-    throw std::runtime_error("Unsupported query (type undeductable). A comparison must include at lease one keypath");
+    throw std::runtime_error("Unsupported query (type undeductable). A comparison must include at lease one keypath.");
 }
 
 bool ExpressionContainer::is_null() {

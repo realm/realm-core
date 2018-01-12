@@ -47,6 +47,7 @@ public:
     CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>& get_size_string();
     CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>& get_size_binary();
 
+    DataType check_type_compatibility(DataType type);
     DataType get_comparison_type(ExpressionContainer& rhs);
 
     enum class ExpressionInternal
