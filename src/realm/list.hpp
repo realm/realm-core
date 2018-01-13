@@ -306,7 +306,7 @@ protected:
     void init_from_parent() const override
     {
         ref_type ref = get_child_ref(0);
-        if (ref && (!m_valid || ref != m_leaf->get_ref())) {
+        if (ref) {
             m_leaf->init_from_ref(ref);
             m_valid = true;
         }
@@ -394,6 +394,7 @@ public:
             insert_null(current_size++);
         }
         remove(new_size, current_size);
+        m_obj.bump_both_versions();
     }
     void add(T value)
     {
@@ -417,6 +418,7 @@ public:
     {
         insert_null(ndx);
         set(ndx, value);
+        m_obj.bump_both_versions();
     }
     T remove(ListIterator<T>& it)
     {
@@ -431,7 +433,7 @@ public:
         T old = get(ndx);
         m_leaf->erase(ndx);
         ConstListBase::adj_remove(ndx);
-        m_obj.bump_content_version();
+        m_obj.bump_both_versions();
 
         return old;
     }
@@ -477,7 +479,7 @@ public:
             ConstListBase::clear_repl(repl);
         }
         m_leaf->truncate_and_destroy_children(0);
-        m_obj.bump_content_version();
+        m_obj.bump_both_versions();
     }
 
 protected:
@@ -569,6 +571,10 @@ public:
     {
         return *m_obj.get_target_table(m_col_key);
     }
+    bool is_in_sync() const override
+    {
+        return m_obj.is_in_sync();
+    }
     size_t size() const override
     {
         return List<Key>::size();
@@ -593,7 +599,6 @@ private:
     friend class Query;
 
     uint_fast64_t sync_if_needed() const override;
-    bool is_in_sync() const override;
 
     static void generate_patch(const LinkList* ref, std::unique_ptr<LinkListHandoverPatch>& patch);
     static LinkListPtr create_from_and_consume_patch(std::unique_ptr<LinkListHandoverPatch>& patch, Group& group);

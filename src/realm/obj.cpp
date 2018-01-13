@@ -151,6 +151,12 @@ Obj::Obj(ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx)
 {
 }
 
+bool ConstObj::is_in_sync() const
+{
+    auto current_version = m_tree_top->get_storage_version(m_instance_version);
+    return (current_version == m_storage_version);
+}
+
 // FIXME: Optimization - all the work needed to bump version counters
 // and to check if it has changed must be optimized to avoid indirections
 // and to allow inline compilation of the whole code path.
@@ -338,6 +344,13 @@ void Obj::bump_content_version()
 {
     Allocator& alloc = m_tree_top->get_alloc();
     alloc.bump_content_version();
+}
+
+void Obj::bump_both_versions()
+{
+    Allocator& alloc = m_tree_top->get_alloc();
+    alloc.bump_content_version();
+    alloc.bump_storage_version();
 }
 
 template <>
@@ -605,7 +618,6 @@ void Obj::nullify_link(ColKey origin_col_key, Key target_key)
     size_t origin_col_ndx = get_table()->colkey2ndx(origin_col_key);
 
     Allocator& alloc = m_tree_top->get_alloc();
-    alloc.bump_content_version();
     Array fallback(alloc);
     Array& fields = m_tree_top->get_fields_accessor(fallback, m_mem);
 
@@ -620,6 +632,8 @@ void Obj::nullify_link(ColKey origin_col_key, Key target_key)
         links.set_parent(&linklists, m_row_ndx);
         links.init_from_parent();
         links.nullify(target_key);
+
+        alloc.bump_storage_version();
     }
     else {
         ArrayKey links(alloc);
@@ -630,6 +644,8 @@ void Obj::nullify_link(ColKey origin_col_key, Key target_key)
         links.set(m_row_ndx, Key{});
         if (Replication* repl = alloc.get_replication())
             repl->set<Key>(m_tree_top->get_owner(), origin_col_key, m_key, Key{}, _impl::instr_Set); // Throws
+
+        alloc.bump_content_version();
     }
 }
 

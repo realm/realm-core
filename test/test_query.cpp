@@ -9782,14 +9782,21 @@ TEST(Query_SyncViewIfNeeded)
         reset_table_contents();
         LinkViewRef restricting_view = source->get_linklist(col_links, 0);
         Query q = target->where(restricting_view).less(col_id, 10);
+        CHECK_EQUAL(restricting_view->size(), 9);
 
         // Modify the underlying table to remove rows from the LinkView.
         target->move_last_over(7);
         target->move_last_over(8);
 
-        // Verify that the view has remained in sync.
-        CHECK_EQUAL(true, restricting_view->is_in_sync());
+        // The view is out of sync.
+        CHECK_EQUAL(false, restricting_view->is_in_sync());
+        // Running the query will update embedded query
         CHECK_EQUAL(2, q.count());
+        // The view is still out of sync.
+        CHECK_EQUAL(false, restricting_view->is_in_sync());
+        // Accessing it will bring it up to date
+        CHECK_EQUAL(restricting_view->size(), 7);
+        CHECK_EQUAL(true, restricting_view->is_in_sync());
 
         // And that syncing the query does nothing.
         auto version = q.sync_view_if_needed();

@@ -125,6 +125,7 @@ protected:
     mutable size_t m_row_ndx;
     mutable uint64_t m_storage_version;
     mutable uint64_t m_instance_version;
+    bool is_in_sync() const;
     bool update_if_needed() const;
     void update(ConstObj other) const
     {
@@ -212,6 +213,7 @@ private:
     }
     void ensure_writeable();
     void bump_content_version();
+    void bump_both_versions();
     template <class T>
     void do_set_null(size_t col_ndx);
 

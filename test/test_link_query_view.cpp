@@ -918,17 +918,17 @@ TEST(LinkList_SortLinkView)
 
     // add some more columns to table1 and table2
     auto col_int = table1->add_column(type_Int, "ints");
-    table1->add_column(type_String, "str1");
-    table1->add_column(type_Float, "floats");
-    table1->add_column(type_Double, "doubles");
-    table1->add_column(type_String, "str2");
-    table1->add_column(type_Timestamp, "ts");
+    auto col_str1 = table1->add_column(type_String, "str1");
+    auto col_float = table1->add_column(type_Float, "floats");
+    auto col_double = table1->add_column(type_Double, "doubles");
+    auto col_str2 = table1->add_column(type_String, "str2");
+    auto col_date = table1->add_column(type_Timestamp, "ts");
     auto col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
 
     // add some rows
-    Key key0 = table1->create_object().set_all(300, "delta", 300.f, 300., "alfa", Timestamp(300, 300)).get_key();
-    Key key1 = table1->create_object().set_all(100, "alfa", 100.f, 100., "alfa", Timestamp(100, 100)).get_key();
-    Key key2 = table1->create_object().set_all(200, "beta", 200.f, 200., "alfa", Timestamp(200, 200)).get_key();
+    Key key0 = table1->create_object().set_all(300, "delta", 100.f, 300., "alfa", Timestamp(300, 300)).get_key();
+    Key key1 = table1->create_object().set_all(100, "beta", 300.f, 100., "alfa", Timestamp(200, 200)).get_key();
+    Key key2 = table1->create_object().set_all(200, "alfa", 200.f, 200., "alfa", Timestamp(100, 100)).get_key();
 
     Obj obj0 = table2->create_object();
     Obj obj1 = table2->create_object();
@@ -950,141 +950,116 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(0).get_key(), key1); // 2 1
     CHECK_EQUAL(tv.get(1).get_key(), key2);
     CHECK_EQUAL(tv.get(2).get_key(), key0);
-#ifdef LEGACY_TESTS
     // Sort Timestamp column
-    list_ptr->sort(5);
-    tv = list_ptr->get_sorted_view(0);
-    CHECK_EQUAL(list_ptr->get(0).get_index(), 1);
-    CHECK_EQUAL(list_ptr->get(1).get_index(), 2);
-    CHECK_EQUAL(list_ptr->get(2).get_index(), 0);
-    CHECK_EQUAL(tv.get(0).get_index(), 1);
-    CHECK_EQUAL(tv.get(1).get_index(), 2);
-    CHECK_EQUAL(tv.get(2).get_index(), 0);
+    list_ptr->sort(col_date);
+    tv = list_ptr->get_sorted_view(col_int);
+    CHECK_EQUAL(list_ptr->get(0).get_key(), key2);
+    CHECK_EQUAL(list_ptr->get(1).get_key(), key1);
+    CHECK_EQUAL(list_ptr->get(2).get_key(), key0);
+    CHECK_EQUAL(tv.get(0).get_key(), key1);
+    CHECK_EQUAL(tv.get(1).get_key(), key2);
+    CHECK_EQUAL(tv.get(2).get_key(), key0);
 
-    list_ptr = table2->get_linklist(col_link2, 1);
+    list_ptr = obj1.get_linklist_ptr(col_link2);
+    list_ptr->add(key2);
+    list_ptr->add(key1);
+    list_ptr->add(key0);
+
+    list_ptr->sort(col_int);
+    tv = list_ptr->get_sorted_view(col_int);
+    CHECK_EQUAL(list_ptr->get(0).get_key(), key1);
+    CHECK_EQUAL(list_ptr->get(1).get_key(), key2);
+    CHECK_EQUAL(list_ptr->get(2).get_key(), key0);
+    CHECK_EQUAL(tv.get(0).get_key(), key1);
+    CHECK_EQUAL(tv.get(1).get_key(), key2);
+    CHECK_EQUAL(tv.get(2).get_key(), key0);
+
     list_ptr->clear();
-    list_ptr->add(2);
-    list_ptr->add(1);
-    list_ptr->add(0);
+    list_ptr->add(key2);
+    list_ptr->add(key0);
+    list_ptr->add(key1);
 
-    list_ptr->sort(0);
-    tv = list_ptr->get_sorted_view(0);
-    CHECK_EQUAL(list_ptr->get(0).get_index(), 1);
-    CHECK_EQUAL(list_ptr->get(1).get_index(), 2);
-    CHECK_EQUAL(list_ptr->get(2).get_index(), 0);
-    CHECK_EQUAL(tv.get(0).get_index(), 1);
-    CHECK_EQUAL(tv.get(1).get_index(), 2);
-    CHECK_EQUAL(tv.get(2).get_index(), 0);
-
-    list_ptr = table2->get_linklist(col_link2, 1);
-    list_ptr->clear();
-    list_ptr->add(2);
-    list_ptr->add(0);
-    list_ptr->add(1);
-
-    list_ptr->sort(0, false);
-    tv = list_ptr->get_sorted_view(0, false);
-
-    CHECK_EQUAL(list_ptr->get(0).get_index(), 0);
-    CHECK_EQUAL(list_ptr->get(1).get_index(), 2);
-    CHECK_EQUAL(list_ptr->get(2).get_index(), 1);
-    CHECK_EQUAL(tv.get(0).get_index(), 0);
-    CHECK_EQUAL(tv.get(1).get_index(), 2);
-    CHECK_EQUAL(tv.get(2).get_index(), 1);
+    // Sort descending
+    list_ptr->sort(col_int, false);
+    tv = list_ptr->get_sorted_view(col_int, false);
+    CHECK_EQUAL(list_ptr->get(0).get_key(), key0);
+    CHECK_EQUAL(list_ptr->get(1).get_key(), key2);
+    CHECK_EQUAL(list_ptr->get(2).get_key(), key1);
+    CHECK_EQUAL(tv.get(0).get_key(), key0);
+    CHECK_EQUAL(tv.get(1).get_key(), key2);
+    CHECK_EQUAL(tv.get(2).get_key(), key1);
 
     // Floats
-    list_ptr = table2->get_linklist(col_link2, 1);
-    list_ptr->clear();
-    list_ptr->add(2);
-    list_ptr->add(0);
-    list_ptr->add(1);
-
-    list_ptr->sort(2, false);
-    tv = list_ptr->get_sorted_view(2, false);
-
-    CHECK_EQUAL(list_ptr->get(0).get_index(), 0);
-    CHECK_EQUAL(list_ptr->get(1).get_index(), 2);
-    CHECK_EQUAL(list_ptr->get(2).get_index(), 1);
-    CHECK_EQUAL(tv.get(0).get_index(), 0);
-    CHECK_EQUAL(tv.get(1).get_index(), 2);
-    CHECK_EQUAL(tv.get(2).get_index(), 1);
+    list_ptr->sort(col_float, false);
+    tv = list_ptr->get_sorted_view(col_float, false);
+    CHECK_EQUAL(list_ptr->get(0).get_key(), key1);
+    CHECK_EQUAL(list_ptr->get(1).get_key(), key2);
+    CHECK_EQUAL(list_ptr->get(2).get_key(), key0);
+    CHECK_EQUAL(tv.get(0).get_key(), key1);
+    CHECK_EQUAL(tv.get(1).get_key(), key2);
+    CHECK_EQUAL(tv.get(2).get_key(), key0);
 
     // Doubles
-    list_ptr = table2->get_linklist(col_link2, 1);
-    list_ptr->clear();
-    list_ptr->add(2);
-    list_ptr->add(0);
-    list_ptr->add(1);
-
-    list_ptr->sort(3, false);
-    tv = list_ptr->get_sorted_view(3, false);
-
-    CHECK_EQUAL(list_ptr->get(0).get_index(), 0);
-    CHECK_EQUAL(list_ptr->get(1).get_index(), 2);
-    CHECK_EQUAL(list_ptr->get(2).get_index(), 1);
-    CHECK_EQUAL(tv.get(0).get_index(), 0);
-    CHECK_EQUAL(tv.get(1).get_index(), 2);
-    CHECK_EQUAL(tv.get(2).get_index(), 1);
+    list_ptr->sort(col_double, false);
+    tv = list_ptr->get_sorted_view(col_double, false);
+    CHECK_EQUAL(list_ptr->get(0).get_key(), key0);
+    CHECK_EQUAL(list_ptr->get(1).get_key(), key2);
+    CHECK_EQUAL(list_ptr->get(2).get_key(), key1);
+    CHECK_EQUAL(tv.get(0).get_key(), key0);
+    CHECK_EQUAL(tv.get(1).get_key(), key2);
+    CHECK_EQUAL(tv.get(2).get_key(), key1);
 
     // String
-    list_ptr = table2->get_linklist(col_link2, 1);
-    list_ptr->clear();
-    list_ptr->add(2);
-    list_ptr->add(0);
-    list_ptr->add(1);
-
-    list_ptr->sort(1, false);
-    tv = list_ptr->get_sorted_view(1, false);
-
-    CHECK_EQUAL(list_ptr->get(0).get_index(), 0);
-    CHECK_EQUAL(list_ptr->get(1).get_index(), 2);
-    CHECK_EQUAL(list_ptr->get(2).get_index(), 1);
-    CHECK_EQUAL(tv.get(0).get_index(), 0);
-    CHECK_EQUAL(tv.get(1).get_index(), 2);
-    CHECK_EQUAL(tv.get(2).get_index(), 1);
+    list_ptr->sort(col_str1);
+    tv = list_ptr->get_sorted_view(col_str1);
+    CHECK_EQUAL(list_ptr->get(0).get_key(), key2);
+    CHECK_EQUAL(list_ptr->get(1).get_key(), key1);
+    CHECK_EQUAL(list_ptr->get(2).get_key(), key0);
+    CHECK_EQUAL(tv.get(0).get_key(), key2);
+    CHECK_EQUAL(tv.get(1).get_key(), key1);
+    CHECK_EQUAL(tv.get(2).get_key(), key0);
 
     // Test multi-column sorting
-    std::vector<std::vector<size_t>> v;
+    std::vector<std::vector<ColKey>> v;
     std::vector<bool> a = {true, true};
     std::vector<bool> a_false = {false, false};
 
-    v.push_back({4});
-    v.push_back({1});
+    v.push_back({col_str2});
+    v.push_back({col_str1});
     list_ptr->sort(SortDescriptor{list_ptr->get_target_table(), v, a_false});
     tv = list_ptr->get_sorted_view(SortDescriptor{list_ptr->get_target_table(), v, a_false});
-    CHECK_EQUAL(list_ptr->get(0).get_index(), 0);
-    CHECK_EQUAL(list_ptr->get(1).get_index(), 2);
-    CHECK_EQUAL(list_ptr->get(2).get_index(), 1);
-    CHECK_EQUAL(tv.get(0).get_index(), 0);
-    CHECK_EQUAL(tv.get(1).get_index(), 2);
-    CHECK_EQUAL(tv.get(2).get_index(), 1);
+    CHECK_EQUAL(list_ptr->get(0).get_key(), key0);
+    CHECK_EQUAL(list_ptr->get(1).get_key(), key1);
+    CHECK_EQUAL(list_ptr->get(2).get_key(), key2);
+    CHECK_EQUAL(tv.get(0).get_key(), key0);
+    CHECK_EQUAL(tv.get(1).get_key(), key1);
+    CHECK_EQUAL(tv.get(2).get_key(), key2);
 
     list_ptr->sort(SortDescriptor{list_ptr->get_target_table(), v, a});
     tv = list_ptr->get_sorted_view(SortDescriptor{list_ptr->get_target_table(), v, a});
-    CHECK_EQUAL(list_ptr->get(0).get_index(), 1);
-    CHECK_EQUAL(list_ptr->get(1).get_index(), 2);
-    CHECK_EQUAL(list_ptr->get(2).get_index(), 0);
-    CHECK_EQUAL(tv.get(0).get_index(), 1);
-    CHECK_EQUAL(tv.get(1).get_index(), 2);
-    CHECK_EQUAL(tv.get(2).get_index(), 0);
+    CHECK_EQUAL(list_ptr->get(0).get_key(), key2);
+    CHECK_EQUAL(list_ptr->get(1).get_key(), key1);
+    CHECK_EQUAL(list_ptr->get(2).get_key(), key0);
+    CHECK_EQUAL(tv.get(0).get_key(), key2);
+    CHECK_EQUAL(tv.get(1).get_key(), key1);
+    CHECK_EQUAL(tv.get(2).get_key(), key0);
 
-    v.push_back({2});
+    v.push_back({col_float});
     a.push_back(true);
 
     list_ptr->sort(SortDescriptor{list_ptr->get_target_table(), v, a});
     tv = list_ptr->get_sorted_view(SortDescriptor{list_ptr->get_target_table(), v, a});
-    CHECK_EQUAL(list_ptr->get(0).get_index(), 1);
-    CHECK_EQUAL(list_ptr->get(1).get_index(), 2);
-    CHECK_EQUAL(list_ptr->get(2).get_index(), 0);
-    CHECK_EQUAL(tv.get(0).get_index(), 1);
-    CHECK_EQUAL(tv.get(1).get_index(), 2);
-    CHECK_EQUAL(tv.get(2).get_index(), 0);
+    CHECK_EQUAL(list_ptr->get(0).get_key(), key2);
+    CHECK_EQUAL(list_ptr->get(1).get_key(), key1);
+    CHECK_EQUAL(list_ptr->get(2).get_key(), key0);
+    CHECK_EQUAL(tv.get(0).get_key(), key2);
+    CHECK_EQUAL(tv.get(1).get_key(), key1);
+    CHECK_EQUAL(tv.get(2).get_key(), key0);
 
-    table1->remove(0);
+    table1->remove_object(key0);
     tv.sync_if_needed();
-    CHECK_EQUAL(tv.get(0).get_index(), 0);
-    CHECK_EQUAL(tv.get(1).get_index(), 1);
-#endif
+    CHECK_EQUAL(tv.get(0).get_key(), key2);
+    CHECK_EQUAL(tv.get(1).get_key(), key1);
 }
 
 #ifdef LEGACY_TESTS
@@ -1366,13 +1341,13 @@ TEST(LinkList_QueryOnLinkList)
 
     // Modify the LinkList and see if sync_if_needed takes it in count
     list_ptr->remove(2); // bumps version of origin and only origin
-#ifdef LEGACY_TESTS
-    // Enable once we have new machinery for triggering sync across links.
     tv.sync_if_needed();
 
     CHECK_EQUAL(1, tv.size()); // fail
     CHECK_EQUAL(key0, tv.get_key(0));
 
+#ifdef LEGACY_TESTS
+    // Enable once we have new machinery for triggering sync across links.
     // Now test if changes in linked-to table bumps the version of the linked-from table and that
     // the query of 'tv' is re-run
     target->get_object(key0).set(col_int, 50); // exclude row 0 from tv because of the '> 100' condition in Query

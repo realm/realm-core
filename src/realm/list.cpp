@@ -194,7 +194,7 @@ Key List<Key>::remove(size_t ndx)
     }
     Key old = get(ndx);
     m_leaf->erase(ndx);
-    m_obj.bump_content_version();
+    m_obj.bump_both_versions();
     ConstListBase::adj_remove(ndx);
 
     return old;
@@ -240,7 +240,7 @@ void List<Key>::clear()
     }
 
     m_leaf->truncate_and_destroy_children(0);
-    m_obj.bump_content_version();
+    m_obj.bump_both_versions();
 
     tf::remove_recursive(*origin_table, state); // Throws
 }
@@ -298,11 +298,6 @@ uint_fast64_t LinkList::sync_if_needed() const
 {
     const_cast<LinkList*>(this)->update_if_needed();
     return get_table()->get_content_version();
-}
-
-bool LinkList::is_in_sync() const
-{
-    return const_cast<LinkList*>(this)->update_if_needed();
 }
 
 void LinkList::generate_patch(const LinkList* list, std::unique_ptr<LinkListHandoverPatch>& patch)
