@@ -159,8 +159,13 @@ std::is_same<RetType, Double>::value
     }
 };
 
-template <>
-struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::Count>{
+template <typename RetType>
+struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Count,
+    typename std::enable_if_t<
+    std::is_same<RetType, Int>::value ||
+    std::is_same<RetType, Float>::value ||
+    std::is_same<RetType, Double>::value
+    > >{
     static LinkCount convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>& expr)
     {
         return expr.table_getter()->template column<Link>(expr.pe.col_ndx).count();

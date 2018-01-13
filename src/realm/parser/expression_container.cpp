@@ -148,14 +148,15 @@ DataType ExpressionContainer::check_type_compatibility(DataType other_type)
             self_type = get_avg().post_link_col_type;
             break;
         case ExpressionInternal::exp_OpCount:
-            REALM_FALLTHROUGH;
-        case ExpressionInternal::exp_OpSizeString:
-            REALM_FALLTHROUGH;
-        case ExpressionInternal::exp_OpSizeBinary:
-            // count/size can handle any numeric type
+            // linklist count can handle any numeric type
             if (other_type == type_Int || other_type == type_Double || other_type == type_Float) {
                 self_type = other_type;
             } // else other_type is unset
+            break;
+        case ExpressionInternal::exp_OpSizeString:
+            REALM_FALLTHROUGH;
+        case ExpressionInternal::exp_OpSizeBinary:
+            self_type = type_Int; // count/size on string or binary must be an integer due to a core limitation.
             break;
     }
     if (!self_type) {
@@ -169,6 +170,13 @@ DataType ExpressionContainer::check_type_compatibility(DataType other_type)
                                               data_type_to_str(other_type), data_type_to_str(self_type.value())));
     }
     return other_type;
+}
+
+bool is_count_type(ExpressionContainer::ExpressionInternal exp_type)
+{
+    return exp_type == ExpressionContainer::ExpressionInternal::exp_OpCount
+        || exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeString
+        || exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeBinary;
 }
 
 DataType ExpressionContainer::get_comparison_type(ExpressionContainer& rhs) {
@@ -193,15 +201,12 @@ DataType ExpressionContainer::get_comparison_type(ExpressionContainer& rhs) {
         return check_type_compatibility(rhs.get_sum().post_link_col_type);
     } else if (rhs.type == ExpressionInternal::exp_OpAvg) {
         return check_type_compatibility(rhs.get_avg().post_link_col_type);
-    // check weakly typed expressions last, we return type_Double for count/size because at this point the
-    // comparison is between a @count/@size and a value which is untyped. The value should be numeric if the query
-    // is well formed but we don't know what type it actually is so we assume double to get a precise comparison.
-    } else if (type == ExpressionInternal::exp_OpCount
-               || type == ExpressionInternal::exp_OpSizeString
-               || type == ExpressionInternal::exp_OpSizeBinary
-               || rhs.type == ExpressionInternal::exp_OpCount
-               || rhs.type == ExpressionInternal::exp_OpSizeString
-               || rhs.type == ExpressionInternal::exp_OpSizeBinary) {
+    } else if (is_count_type(type) && is_count_type(rhs.type)) {
+        return type_Int;
+        // check weakly typed expressions last, we return type_Double for count/size because at this point the
+        // comparison is between a @count/@size and a value which is untyped. The value should be numeric if the query
+        // is well formed but we don't know what type it actually is so we assume double to get a precise comparison.
+    } else if (is_count_type(type) || is_count_type(rhs.type)) {
         return type_Double;
     }
 

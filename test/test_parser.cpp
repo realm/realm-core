@@ -685,6 +685,7 @@ TEST(Parser_TwoColumnExpressionBasics)
     verify_query(test_context, table, "ints == 0", 1);
     verify_query(test_context, table, "ints == ints", 3);
     verify_query(test_context, table, "ints == strings.@count", 3);
+    verify_query(test_context, table, "strings.@count == ints", 3);
     verify_query(test_context, table, "ints == NULL", 0);
     verify_query(test_context, table, "doubles == doubles", 3);
     verify_query(test_context, table, "strings == strings", 3);
@@ -698,6 +699,104 @@ TEST(Parser_TwoColumnExpressionBasics)
 
 }
 
+TEST(Parser_TwoColumnAggregates)
+{
+    Group g;
+
+    TableRef discounts = g.add_table("class_Discounts");
+    size_t discount_name_col = discounts->add_column(type_String, "promotion", true);
+    size_t discount_off_col = discounts->add_column(type_Float, "reduced_by");
+    size_t discount_active_col = discounts->add_column(type_Bool, "active");
+
+    using discount_t = std::pair<double, bool>;
+    std::vector<discount_t> discount_info = {{3.0, false}, {2.5, true}, {0.50, true}, {1.50, true}};
+    for (discount_t i : discount_info) {
+        size_t row_ndx = discounts->add_empty_row();
+        discounts->set_float(discount_off_col, row_ndx, i.first);
+        discounts->set_bool(discount_active_col, row_ndx, i.second);
+    }
+    discounts->set_string(discount_name_col, 0, "back to school");
+    discounts->set_string(discount_name_col, 1, "manager's special");
+
+    TableRef items = g.add_table("class_Items");
+    size_t item_name_col = items->add_column(type_String, "name");
+    size_t item_price_col = items->add_column(type_Double, "price");
+    size_t item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    for (item_t i : item_info) {
+        size_t row_ndx = items->add_empty_row();
+        items->set_string(item_name_col, row_ndx, i.first);
+        items->set_double(item_price_col, row_ndx, i.second);
+    }
+    items->set_link(item_discount_col, 0, 2); // milk -0.50
+    items->set_link(item_discount_col, 2, 1); // pizza -2.5
+    items->set_link(item_discount_col, 3, 0); // cereal -3.0 inactive
+
+    TableRef t = g.add_table("class_Person");
+    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
+    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
+    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
+    t->add_empty_row(3);
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(id_col_ndx, i, i);
+        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
+    }
+
+    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
+    list_0->add(0);
+    list_0->add(1);
+    list_0->add(2);
+    list_0->add(3);
+
+    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1->add(0);
+    }
+
+    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
+    list_2->add(2);
+    list_2->add(2);
+    list_2->add(3);
+
+    // int vs linklist count/size
+    verify_query(test_context, t, "customer_id < items.@count", 3);
+    verify_query(test_context, t, "customer_id < items.@size", 3);
+
+    // double vs linklist count/size
+    verify_query(test_context, t, "items.@min.price > items.@count", 1);
+    verify_query(test_context, t, "items.@min.price > items.@size", 1);
+
+    // double vs string/binary count/size is not supported due to a core implementation limitation
+    CHECK_THROW_ANY(verify_query(test_context, items, "name.@count > price", 3));
+    CHECK_THROW_ANY(verify_query(test_context, items, "price < name.@size", 3));
+
+    // double vs double
+    verify_query(test_context, t, "items.@sum.price > account_balance", 2);
+    verify_query(test_context, t, "items.@min.price > account_balance", 0);
+    verify_query(test_context, t, "items.@max.price > account_balance", 0);
+    verify_query(test_context, t, "items.@avg.price > account_balance", 0);
+
+    // cannot aggregate string
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@min.name > account_balance", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@max.name > account_balance", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@sum.name > account_balance", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@avg.name > account_balance", 0));
+    // cannot aggregate link
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@min.discount > account_balance", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@max.discount > account_balance", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@sum.discount > account_balance", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@avg.discount > account_balance", 0));
+
+    verify_query(test_context, t, "items.@count < account_balance", 3); // linklist count vs double
+    verify_query(test_context, t, "items.@count > 3", 2);   // linklist count vs literal int
+    verify_query(test_context, t, "items.@count == 3.1", 0); // linklist count vs literal double
+
+    // two string counts is allowed (int comparison)
+    verify_query(test_context, items, "discount.promotion.@count > name.@count", 2);
+    // link count vs string count (int comparison)
+    verify_query(test_context, items, "discount.@count < name.@count", 4);
+}
 
 void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, const util::Any* arg_list, size_t num_args, size_t num_results) {
 
