@@ -133,7 +133,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
 ) # REALM_INSTALL_GENERAL_HEADERS
 
 set(REALM_PARSER_SOURCES
-    parser/collection_operator_expression.cpp
     parser/expression_container.cpp
     parser/parser.cpp
     parser/parser_utils.cpp
