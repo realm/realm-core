@@ -1350,4 +1350,76 @@ TEST(Parser_collection_aggregates)
     CHECK_THROW_ANY(verify_query(test_context, courses, "failure_percentage.@size <= 2", 0));
 }
 
+
+TEST(Parser_SortAndDistinct)
+{
+    Group g;
+    TableRef people = g.add_table("person");
+    TableRef accounts = g.add_table("account");
+
+    size_t name_col = people->add_column(type_String, "name");
+    size_t age_col = people->add_column(type_Int, "age");
+    size_t account_col = people->add_column_link(type_Link, "account", *accounts);
+
+    size_t balance_col = accounts->add_column(type_Double, "balance");
+    size_t transaction_col = accounts->add_column(type_Int, "num_transactions");
+
+    accounts->add_empty_row(3);
+    accounts->set_double(balance_col, 0, 50.55);
+    accounts->set_int(transaction_col, 0, 2);
+    accounts->set_double(balance_col, 1, 175.23);
+    accounts->set_int(transaction_col, 1, 73);
+    accounts->set_double(balance_col, 2, 98.92);
+    accounts->set_int(transaction_col, 2, 17);
+
+    people->add_empty_row(3);
+    people->set_string(name_col, 0, "Adam");
+    people->set_int(age_col, 0, 28);
+    people->set_link(account_col, 0, 0);
+    people->set_string(name_col, 1, "Frank");
+    people->set_int(age_col, 1, 30);
+    people->set_link(account_col, 1, 1);
+    people->set_string(name_col, 2, "Ben");
+    people->set_int(age_col, 2, 18);
+    people->set_link(account_col, 2, 2);
+
+    // person:                      | account:
+    // name     age     account     | balance       num_transactions
+    // Adam     28      0 ->        | 50.55         2
+    // Frank    30      1 ->        | 175.23        73
+    // Ben      18      2 ->        | 98.92         17
+
+    // sort serialisation
+    TableView tv = people->where().find_all();
+    tv.sort(name_col, false);
+    tv.sort(age_col, true);
+    tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
+    std::string description = tv.get_descriptor_ordering_description();
+    CHECK(description.find("SORT BY") != std::string::npos);
+    CHECK(description.find("name DESC") != std::string::npos);
+    CHECK(description.find("age ASC") != std::string::npos);
+    CHECK(description.find("account.balance ASC") != std::string::npos);
+    CHECK(description.find("account.num_transactions DESC") != std::string::npos);
+
+    // distinct serialisation
+    tv = people->where().find_all();
+    tv.distinct(name_col);
+    tv.distinct(age_col);
+    tv.distinct(DistinctDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}));
+    description = tv.get_descriptor_ordering_description();
+    CHECK(description.find("DISTINCT") != std::string::npos);
+    CHECK(description.find("name") != std::string::npos);
+    CHECK(description.find("age") != std::string::npos);
+    CHECK(description.find("account.balance") != std::string::npos);
+    CHECK(description.find("account.num_transactions") != std::string::npos);
+
+    // combined sort and distinct serialisation
+    tv = people->where().find_all();
+    tv.distinct(DistinctDescriptor(*people, {{name_col}, {age_col}}));
+    tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
+    description = tv.get_descriptor_ordering_description();
+    CHECK(description.find("DISTINCT name age") != std::string::npos);
+    CHECK(description.find("SORT BY account.balance ASC account.num_transactions DESC") != std::string::npos);
+}
+
 #endif // TEST_PARSER
