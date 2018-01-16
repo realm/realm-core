@@ -24,6 +24,7 @@
 #include "parser.hpp"
 
 #include <sstream>
+#include <stdexcept>
 
 namespace realm {
 
