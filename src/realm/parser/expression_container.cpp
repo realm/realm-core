@@ -203,11 +203,11 @@ DataType ExpressionContainer::get_comparison_type(ExpressionContainer& rhs) {
         return check_type_compatibility(rhs.get_avg().post_link_col_type);
     } else if (is_count_type(type) && is_count_type(rhs.type)) {
         return type_Int;
-        // check weakly typed expressions last, we return type_Double for count/size because at this point the
+        // check weakly typed expressions last, we return type_Int for count/size because at this point the
         // comparison is between a @count/@size and a value which is untyped. The value should be numeric if the query
-        // is well formed but we don't know what type it actually is so we assume double to get a precise comparison.
+        // is well formed but we don't know what type it actually is so we will perform int promotion in a conversion.
     } else if (is_count_type(type) || is_count_type(rhs.type)) {
-        return type_Double;
+        return type_Int;
     }
 
     throw std::runtime_error("Unsupported query (type undeductable). A comparison must include at lease one keypath.");

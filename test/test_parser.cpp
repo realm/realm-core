@@ -869,7 +869,8 @@ TEST(Parser_TwoColumnAggregates)
 
     verify_query(test_context, t, "items.@count < account_balance", 3); // linklist count vs double
     verify_query(test_context, t, "items.@count > 3", 2);   // linklist count vs literal int
-    verify_query(test_context, t, "items.@count == 3.1", 0); // linklist count vs literal double
+    // linklist count vs literal double, integer promotion done here so this is true!
+    verify_query(test_context, t, "items.@count == 3.1", 1);
 
     // two string counts is allowed (int comparison)
     verify_query(test_context, items, "discount.promotion.@count > name.@count", 2);
