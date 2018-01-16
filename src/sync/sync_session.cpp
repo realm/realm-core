@@ -27,7 +27,6 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
 
-
 using namespace realm;
 using namespace realm::_impl;
 using namespace realm::_impl::sync_session_states;
@@ -602,63 +601,7 @@ void SyncSession::cancel_pending_waits()
 void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable,
                                          uint64_t uploaded, uint64_t uploadable, bool is_fresh)
 {
-    std::vector<std::function<void()>> invocations;
-    {
-        std::lock_guard<std::mutex> lock(m_progress_notifier_mutex);
-        m_current_progress = Progress{uploadable, downloadable, uploaded, downloaded};
-        m_latest_progress_data_is_fresh = is_fresh;
-
-        for (auto it = m_notifiers.begin(); it != m_notifiers.end();) {
-            auto& package = it->second;
-            package.update(*m_current_progress, is_fresh);
-
-            bool should_delete = false;
-            invocations.emplace_back(package.create_invocation(*m_current_progress, should_delete));
-
-            it = (should_delete ? m_notifiers.erase(it) : std::next(it));
-        }
-    }
-    // Run the notifiers only after we've released the lock.
-    for (auto& invocation : invocations) {
-        invocation();
-    }
-}
-
-void SyncSession::NotifierPackage::update(const Progress& current_progress, bool data_is_fresh)
-{
-    if (is_streaming || captured_transferrable || !data_is_fresh)
-        return;
-
-    captured_transferrable = direction == NotifierType::download ? current_progress.downloadable
-                                                                 : current_progress.uploadable;
-}
-
-// PRECONDITION: `update()` must first be called on the same package.
-std::function<void()> SyncSession::NotifierPackage::create_invocation(const Progress& current_progress,
-                                                                      bool& is_expired) const
-{
-    // It's possible for a non-streaming notifier to not yet have fresh transferrable bytes data.
-    // In that case, we don't call it at all.
-    // NOTE: `update()` is always called before `create_invocation()`, and will
-    // set `captured_transferrable` on the notifier package if fresh data has
-    // been received and the package is for a non-streaming notifier.
-    if (!is_streaming && !captured_transferrable)
-        return [](){ };
-
-    bool is_download = direction == NotifierType::download;
-    uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
-    uint64_t transferrable;
-    if (is_streaming) {
-        transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
-    } else {
-        transferrable = *captured_transferrable;
-    }
-    // A notifier is expired if at least as many bytes have been transferred
-    // as were originally considered transferrable.
-    is_expired = !is_streaming && transferred >= *captured_transferrable;
-    return [=, package=*this](){
-        package.notifier(transferred, transferrable);
-    };
+    m_notifier.update(downloaded, downloadable, uploaded, uploadable, is_fresh);
 }
 
 void SyncSession::create_sync_session()
@@ -785,34 +728,12 @@ bool SyncSession::wait_for_download_completion(std::function<void(std::error_cod
 uint64_t SyncSession::register_progress_notifier(std::function<SyncProgressNotifierCallback> notifier,
                                                  NotifierType direction, bool is_streaming)
 {
-    std::function<void()> invocation;
-    uint64_t token_value = 0;
-    {
-        std::lock_guard<std::mutex> lock(m_progress_notifier_mutex);
-        token_value = m_progress_notifier_token++;
-        NotifierPackage package{std::move(notifier), is_streaming, direction};
-        if (!m_current_progress) {
-            // Simply register the package, since we have no data yet.
-            m_notifiers.emplace(token_value, std::move(package));
-            return token_value;
-        }
-        package.update(*m_current_progress, m_latest_progress_data_is_fresh);
-        bool skip_registration = false;
-        invocation = package.create_invocation(*m_current_progress, skip_registration);
-        if (skip_registration) {
-            token_value = 0;
-        } else {
-            m_notifiers.emplace(token_value, std::move(package));
-        }
-    }
-    invocation();
-    return token_value;
+    return m_notifier.register_callback(std::move(notifier), direction == NotifierType::download, is_streaming);
 }
 
 void SyncSession::unregister_progress_notifier(uint64_t token)
 {
-    std::lock_guard<std::mutex> lock(m_progress_notifier_mutex);
-    m_notifiers.erase(token);
+    m_notifier.unregister_callback(token);
 }
 
 void SyncSession::refresh_access_token(std::string access_token, util::Optional<std::string> server_url)
@@ -898,4 +819,96 @@ void SyncSession::did_drop_external_reference()
         return;
 
     m_state->close(lock, *this);
+}
+
+uint64_t SyncProgressNotifier::register_callback(std::function<SyncProgressNotifierCallback> notifier,
+                                                 bool is_download, bool is_streaming)
+{
+    std::function<void()> invocation;
+    uint64_t token_value = 0;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        token_value = m_progress_notifier_token++;
+        NotifierPackage package{std::move(notifier), is_streaming, is_download};
+        if (!m_current_progress) {
+            // Simply register the package, since we have no data yet.
+            m_packages.emplace(token_value, std::move(package));
+            return token_value;
+        }
+        package.update(*m_current_progress, m_latest_progress_data_is_fresh);
+        bool skip_registration = false;
+        invocation = package.create_invocation(*m_current_progress, skip_registration);
+        if (skip_registration) {
+            token_value = 0;
+        } else {
+            m_packages.emplace(token_value, std::move(package));
+        }
+    }
+    invocation();
+    return token_value;
+}
+
+void SyncProgressNotifier::unregister_callback(uint64_t token)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_packages.erase(token);
+}
+
+void SyncProgressNotifier::update(uint64_t downloaded, uint64_t downloadable,
+                                  uint64_t uploaded, uint64_t uploadable, bool is_fresh)
+{
+    std::vector<std::function<void()>> invocations;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_current_progress = Progress{uploadable, downloadable, uploaded, downloaded};
+        m_latest_progress_data_is_fresh = is_fresh;
+
+        for (auto it = m_packages.begin(); it != m_packages.end();) {
+            auto& package = it->second;
+            package.update(*m_current_progress, is_fresh);
+
+            bool should_delete = false;
+            invocations.emplace_back(package.create_invocation(*m_current_progress, should_delete));
+
+            it = (should_delete ? m_packages.erase(it) : std::next(it));
+        }
+    }
+    // Run the notifiers only after we've released the lock.
+    for (auto& invocation : invocations) {
+        invocation();
+    }
+}
+
+void SyncProgressNotifier::NotifierPackage::update(const Progress& current_progress, bool data_is_fresh)
+{
+    if (is_streaming || captured_transferrable || !data_is_fresh)
+        return;
+
+    captured_transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
+}
+
+// PRECONDITION: `update()` must first be called on the same package.
+std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(const Progress& current_progress, bool& is_expired) const
+{
+    // It's possible for a non-streaming notifier to not yet have fresh transferrable bytes data.
+    // In that case, we don't call it at all.
+    // NOTE: `update()` is always called before `create_invocation()`, and will
+    // set `captured_transferrable` on the notifier package if fresh data has
+    // been received and the package is for a non-streaming notifier.
+    if (!is_streaming && !captured_transferrable)
+        return [](){ };
+
+    uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
+    uint64_t transferrable;
+    if (is_streaming) {
+        transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
+    } else {
+        transferrable = *captured_transferrable;
+    }
+    // A notifier is expired if at least as many bytes have been transferred
+    // as were originally considered transferrable.
+    is_expired = !is_streaming && transferred >= *captured_transferrable;
+    return [=, package=*this](){
+        package.notifier(transferred, transferrable);
+    };
 }

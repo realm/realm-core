@@ -52,6 +52,54 @@ class Session;
 using SyncSessionTransactCallback = void(VersionID old_version, VersionID new_version);
 using SyncProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes);
 
+namespace _impl {
+class SyncProgressNotifier {
+public:
+    uint64_t register_callback(std::function<SyncProgressNotifierCallback>, bool is_download, bool is_streaming);
+    void unregister_callback(uint64_t);
+
+    void update(uint64_t downloaded, uint64_t downloadable,
+                uint64_t uploaded, uint64_t uploadable, bool is_fresh=true);
+
+private:
+    mutable std::mutex m_mutex;
+
+    // How many bytes are uploadable or downloadable.
+    struct Progress {
+        uint64_t uploadable;
+        uint64_t downloadable;
+        uint64_t uploaded;
+        uint64_t downloaded;
+    };
+
+    // A PODS encapsulating some information for progress notifier callbacks a binding
+    // can register upon this session.
+    struct NotifierPackage {
+        std::function<SyncProgressNotifierCallback> notifier;
+        bool is_streaming;
+        bool is_download;
+        util::Optional<uint64_t> captured_transferrable;
+
+        void update(const Progress&, bool);
+        std::function<void()> create_invocation(const Progress&, bool&) const;
+    };
+
+    // A counter used as a token to identify progress notifier callbacks registered on this session.
+    uint64_t m_progress_notifier_token = 1;
+    bool m_latest_progress_data_is_fresh;
+
+    // Will be `none` until we've received the initial notification from sync.  Note that this
+    // happens only once ever during the lifetime of a given `SyncSession`, since these values are
+    // expected to semi-monotonically increase, and a lower-bounds estimate is still useful in the
+    // event more up-to-date information isn't yet available.  FIXME: If we support transparent
+    // client reset in the future, we might need to reset the progress state variables if the Realm
+    // is rolled back.
+    util::Optional<Progress> m_current_progress;
+
+    std::unordered_map<uint64_t, NotifierPackage> m_packages;
+};
+}
+
 class SyncSession : public std::enable_shared_from_this<SyncSession> {
 public:
     enum class PublicState {
@@ -207,21 +255,6 @@ public:
         {
             session.handle_error(std::move(error));
         }
-
-        static void handle_progress_update(SyncSession& session, uint64_t downloaded, uint64_t downloadable,
-                                           uint64_t uploaded, uint64_t uploadable, bool is_fresh=true) {
-            session.handle_progress_update(downloaded, downloadable, uploaded, uploadable, is_fresh);
-        }
-
-        static bool has_stale_progress(SyncSession& session)
-        {
-            return session.m_current_progress != none && !session.m_latest_progress_data_is_fresh;
-        }
-
-        static bool has_fresh_progress(SyncSession& session)
-        {
-            return session.m_latest_progress_data_is_fresh;
-        }
     };
 
 private:
@@ -266,42 +299,7 @@ private:
 
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
 
-    // How many bytes are uploadable or downloadable.
-    struct Progress {
-        uint64_t uploadable;
-        uint64_t downloadable;
-        uint64_t uploaded;
-        uint64_t downloaded;
-    };
-
-    // A PODS encapsulating some information for progress notifier callbacks a binding
-    // can register upon this session.
-    struct NotifierPackage {
-        std::function<SyncProgressNotifierCallback> notifier;
-        bool is_streaming;
-        NotifierType direction;
-        util::Optional<uint64_t> captured_transferrable;
-
-        void update(const Progress&, bool);
-        std::function<void()> create_invocation(const Progress&, bool&) const;
-    };
-
-    // A counter used as a token to identify progress notifier callbacks registered on this session.
-    uint64_t m_progress_notifier_token = 1;
-    bool m_latest_progress_data_is_fresh;
-
-    // Will be `none` until we've received the initial notification from sync.  Note that this
-    // happens only once ever during the lifetime of a given `SyncSession`, since these values are
-    // expected to semi-monotonically increase, and a lower-bounds estimate is still useful in the
-    // event more up-to-date information isn't yet available.  FIXME: If we support transparent
-    // client reset in the future, we might need to reset the progress state variables if the Realm
-    // is rolled back.
-    util::Optional<Progress> m_current_progress;
-
-    std::unordered_map<uint64_t, NotifierPackage> m_notifiers;
-
     mutable std::mutex m_state_mutex;
-    mutable std::mutex m_progress_notifier_mutex;
 
     const State* m_state = nullptr;
     size_t m_death_count = 0;
@@ -342,6 +340,8 @@ private:
     util::Optional<std::string> m_server_url;
 
     std::string m_multiplex_identity;
+
+    _impl::SyncProgressNotifier m_notifier;
 
     class ExternalReference;
     std::weak_ptr<ExternalReference> m_external_reference;
