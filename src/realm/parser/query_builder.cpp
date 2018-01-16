@@ -65,23 +65,6 @@ void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const
 }
 
 template<>
-void do_add_null_comparison_to_query<Binary>(Query &query, Predicate::Operator op, const PropertyExpression &expr)
-{
-    Columns<Binary> column = expr.table_getter()->template column<Binary>(expr.col_ndx);
-    BinaryData null_binary;
-    switch (op) {
-        case Predicate::Operator::NotEqual:
-            query.and_query(column != null_binary);
-            break;
-        case Predicate::Operator::Equal:
-            query.and_query(column == null_binary);
-            break;
-        default:
-            throw std::logic_error("Only 'equal' and 'not equal' operators supported when comparing against 'null'.");
-    }
-}
-
-template<>
 void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
     precondition(expr.indexes.empty(), "KeyPath queries not supported for object comparisons.");
@@ -94,42 +77,6 @@ void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op,
             break;
         default:
             throw std::logic_error("Only 'equal' and 'not equal' operators supported for object comparison.");
-    }
-}
-
-template <class T>
-void do_add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, const T &expr, DataType type)
-{
-    if (type == type_LinkList) { // when backlinks are supported, this should check those as well
-        throw std::logic_error("Comparing Lists to 'null' is not supported");
-    }
-    switch (type) {
-        case realm::type_Bool:
-            do_add_null_comparison_to_query<bool>(query, cmp.op, expr);
-            break;
-        case realm::type_Timestamp:
-            do_add_null_comparison_to_query<Timestamp>(query, cmp.op, expr);
-            break;
-        case realm::type_Double:
-            do_add_null_comparison_to_query<Double>(query, cmp.op, expr);
-            break;
-        case realm::type_Float:
-            do_add_null_comparison_to_query<Float>(query, cmp.op, expr);
-            break;
-        case realm::type_Int:
-            do_add_null_comparison_to_query<Int>(query, cmp.op, expr);
-            break;
-        case realm::type_String:
-            do_add_null_comparison_to_query<String>(query, cmp.op, expr);
-            break;
-        case realm::type_Binary:
-            do_add_null_comparison_to_query<Binary>(query, cmp.op, expr);
-            break;
-        case realm::type_Link:
-            do_add_null_comparison_to_query<Link>(query, cmp.op, expr);
-            break;
-        default:
-            throw std::logic_error(util::format("Object type '%1' not supported", util::data_type_to_str(type)));
     }
 }
 
@@ -256,24 +203,28 @@ void add_string_constraint_to_query(realm::Query &query,
 }
 
 void add_binary_constraint_to_query(Query &query,
-                                    Predicate::Operator op,
+                                    Predicate::Comparison cmp,
                                     Columns<Binary> &&column,
                                     BinaryData &&value) {
-    switch (op) {
+    bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
+    switch (cmp.op) {
         case Predicate::Operator::BeginsWith:
-            query.begins_with(column.column_ndx(), BinaryData(value));
+            query.and_query(column.begins_with(value, case_sensitive));
             break;
         case Predicate::Operator::EndsWith:
-            query.ends_with(column.column_ndx(), BinaryData(value));
+            query.and_query(column.ends_with(value, case_sensitive));
             break;
         case Predicate::Operator::Contains:
-            query.contains(column.column_ndx(), BinaryData(value));
+            query.and_query(column.contains(value, case_sensitive));
             break;
         case Predicate::Operator::Equal:
-            query.equal(column.column_ndx(), BinaryData(value));
+            query.and_query(column.equal(value, case_sensitive));
             break;
         case Predicate::Operator::NotEqual:
-            query.not_equal(column.column_ndx(), BinaryData(value));
+            query.and_query(column.not_equal(value, case_sensitive));
+            break;
+        case Predicate::Operator::Like:
+            query.and_query(column.like(value, case_sensitive));
             break;
         default:
             throw std::logic_error("Unsupported operator for binary queries.");
@@ -281,10 +232,10 @@ void add_binary_constraint_to_query(Query &query,
 }
 
 void add_binary_constraint_to_query(realm::Query &query,
-                                    Predicate::Operator op,
-                                    BinaryData value,
+                                    Predicate::Comparison cmp,
+                                    BinaryData &&value,
                                     Columns<Binary> &&column) {
-    switch (op) {
+    switch (cmp.op) {
         case Predicate::Operator::Equal:
             query.and_query(column == value);
             break;
@@ -296,11 +247,30 @@ void add_binary_constraint_to_query(realm::Query &query,
     }
 }
 
-void add_binary_constraint_to_query(Query &,
-                                    Predicate::Operator,
-                                    Columns<Binary> &&,
-                                    Columns<Binary> &&) {
-    throw std::logic_error("Comparing two binary columns is currently unsupported.");
+void add_binary_constraint_to_query(Query &query,
+                                    Predicate::Comparison cmp,
+                                    Columns<Binary> &&lhs_col,
+                                    Columns<Binary> &&rhs_col) {
+    bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
+    switch (cmp.op) {
+        case Predicate::Operator::BeginsWith:
+            query.and_query(lhs_col.begins_with(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::EndsWith:
+            query.and_query(lhs_col.ends_with(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::Contains:
+            query.and_query(lhs_col.contains(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::Equal:
+            query.and_query(lhs_col.equal(rhs_col, case_sensitive));
+            break;
+        case Predicate::Operator::NotEqual:
+            query.and_query(lhs_col.not_equal(rhs_col, case_sensitive));
+            break;
+        default:
+            throw std::logic_error("Unsupported operator for binary queries.");
+    }
 }
 
 
@@ -379,7 +349,7 @@ void do_add_comparison_to_query(Query &query, Predicate::Comparison cmp, A &lhs,
                                            rhs. template value_of_type_for_query<String>());
             break;
         case type_Binary:
-            add_binary_constraint_to_query(query, cmp.op,
+            add_binary_constraint_to_query(query, cmp,
                                            lhs. template value_of_type_for_query<Binary>(),
                                            rhs. template value_of_type_for_query<Binary>());
             break;
@@ -397,35 +367,85 @@ void do_add_comparison_to_query(Query&, Predicate::Comparison, ValueExpression&,
     throw std::runtime_error("Invalid predicate: comparison between two literals is not supported.");
 }
 
-void add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, ExpressionContainer& exp)
+enum class NullLocation {
+    NullOnLHS,
+    NullOnRHS
+};
+
+template <class T>
+void do_add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, const T &expr, DataType type, NullLocation location)
+{
+    if (type == type_LinkList) { // when backlinks are supported, this should check those as well
+        throw std::logic_error("Comparing Lists to 'null' is not supported");
+    }
+    switch (type) {
+        case realm::type_Bool:
+            do_add_null_comparison_to_query<bool>(query, cmp.op, expr);
+            break;
+        case realm::type_Timestamp:
+            do_add_null_comparison_to_query<Timestamp>(query, cmp.op, expr);
+            break;
+        case realm::type_Double:
+            do_add_null_comparison_to_query<Double>(query, cmp.op, expr);
+            break;
+        case realm::type_Float:
+            do_add_null_comparison_to_query<Float>(query, cmp.op, expr);
+            break;
+        case realm::type_Int:
+            do_add_null_comparison_to_query<Int>(query, cmp.op, expr);
+            break;
+        case realm::type_String: {
+            if (location == NullLocation::NullOnLHS) {
+                add_string_constraint_to_query(query, cmp, StringData(), expr. template value_of_type_for_query<String>());
+            }
+            else {
+                add_string_constraint_to_query(query, cmp, expr. template value_of_type_for_query<String>(), StringData());
+            }
+            break;
+        }
+        case realm::type_Binary: {
+            if (location == NullLocation::NullOnLHS) {
+                add_binary_constraint_to_query(query, cmp, BinaryData(), expr. template value_of_type_for_query<Binary>());
+            }
+            else {
+                add_binary_constraint_to_query(query, cmp, expr. template value_of_type_for_query<Binary>(), BinaryData());
+            }
+            break;
+        }
+        case realm::type_Link:
+            do_add_null_comparison_to_query<Link>(query, cmp.op, expr);
+            break;
+        default:
+            throw std::logic_error(util::format("Object type '%1' not supported", util::data_type_to_str(type)));
+    }
+}
+
+void add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, ExpressionContainer& exp, NullLocation location)
 {
     switch (exp.type) {
         case ExpressionContainer::ExpressionInternal::exp_Value:
-            throw std::runtime_error("Unsupported query. A comparison must include at least one keypath.");
+            throw std::runtime_error("Unsupported query comparing 'null' and a literal. A comparison must include at least one keypath.");
         case ExpressionContainer::ExpressionInternal::exp_Property:
-            do_add_null_comparison_to_query(query, cmp, exp.get_property(), exp.get_property().col_type);
+            do_add_null_comparison_to_query(query, cmp, exp.get_property(), exp.get_property().col_type, location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpMin:
-            do_add_null_comparison_to_query(query, cmp, exp.get_min(), exp.get_min().post_link_col_type);
+            do_add_null_comparison_to_query(query, cmp, exp.get_min(), exp.get_min().post_link_col_type, location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpMax:
-            do_add_null_comparison_to_query(query, cmp, exp.get_max(), exp.get_max().post_link_col_type);
+            do_add_null_comparison_to_query(query, cmp, exp.get_max(), exp.get_max().post_link_col_type, location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpSum:
-            do_add_null_comparison_to_query(query, cmp, exp.get_sum(), exp.get_sum().post_link_col_type);
+            do_add_null_comparison_to_query(query, cmp, exp.get_sum(), exp.get_sum().post_link_col_type, location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpAvg:
-            do_add_null_comparison_to_query(query, cmp, exp.get_avg(), exp.get_avg().post_link_col_type);
+            do_add_null_comparison_to_query(query, cmp, exp.get_avg(), exp.get_avg().post_link_col_type, location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpCount:
-            do_add_null_comparison_to_query(query, cmp, exp.get_count(), exp.get_count().post_link_col_type);
-            break;
+            REALM_FALLTHROUGH;
         case ExpressionContainer::ExpressionInternal::exp_OpSizeString:
-            do_add_null_comparison_to_query(query, cmp, exp.get_size_string(), exp.get_size_string().post_link_col_type);
-            break;
+            REALM_FALLTHROUGH;
         case ExpressionContainer::ExpressionInternal::exp_OpSizeBinary:
-            do_add_null_comparison_to_query(query, cmp, exp.get_size_binary(), exp.get_size_binary().post_link_col_type);
-            break;
+            throw std::runtime_error("Invalid predicate: comparison between 'null' and @size or @count");
     }
 }
 
@@ -511,10 +531,10 @@ void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &arg
     ExpressionContainer rhs(query, cmpr.expr[1], args);
 
     if (lhs.is_null()) {
-        add_null_comparison_to_query(query, cmpr, rhs);
+        add_null_comparison_to_query(query, cmpr, rhs, NullLocation::NullOnLHS);
     }
     else if (rhs.is_null()) {
-        add_null_comparison_to_query(query, cmpr, lhs);
+        add_null_comparison_to_query(query, cmpr, lhs, NullLocation::NullOnRHS);
     }
     else {
         add_comparison_to_query(query, lhs, cmpr, rhs);

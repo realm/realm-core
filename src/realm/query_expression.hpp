@@ -181,14 +181,20 @@ inline int only_numeric(const BinaryData&)
 }
 
 template <class T>
-inline StringData only_string(T in)
+inline StringData only_string_op_types(T in)
 {
     REALM_ASSERT(false);
     static_cast<void>(in);
     return StringData();
 }
 
-inline StringData only_string(StringData in)
+inline BinaryData only_string_op_types(BinaryData in)
+{
+    return in;
+}
+
+template <>
+inline StringData only_string_op_types<StringData>(StringData in)
 {
     return in;
 }
@@ -506,25 +512,25 @@ Query create(L left, const Subexpr2<R>& right)
         else if (std::is_same<Cond, GreaterEqual>::value)
             q.less_equal(column->column_ndx(), _impl::only_numeric<R>(left));
         else if (std::is_same<Cond, EqualIns>::value)
-            q.equal(column->column_ndx(), _impl::only_string(left), false);
+            q.equal(column->column_ndx(), _impl::only_string_op_types(left), false);
         else if (std::is_same<Cond, NotEqualIns>::value)
-            q.not_equal(column->column_ndx(), _impl::only_string(left), false);
+            q.not_equal(column->column_ndx(), _impl::only_string_op_types(left), false);
         else if (std::is_same<Cond, BeginsWith>::value)
-            q.begins_with(column->column_ndx(), _impl::only_string(left));
+            q.begins_with(column->column_ndx(), _impl::only_string_op_types(left));
         else if (std::is_same<Cond, BeginsWithIns>::value)
-            q.begins_with(column->column_ndx(), _impl::only_string(left), false);
+            q.begins_with(column->column_ndx(), _impl::only_string_op_types(left), false);
         else if (std::is_same<Cond, EndsWith>::value)
-            q.ends_with(column->column_ndx(), _impl::only_string(left));
+            q.ends_with(column->column_ndx(), _impl::only_string_op_types(left));
         else if (std::is_same<Cond, EndsWithIns>::value)
-            q.ends_with(column->column_ndx(), _impl::only_string(left), false);
+            q.ends_with(column->column_ndx(), _impl::only_string_op_types(left), false);
         else if (std::is_same<Cond, Contains>::value)
-            q.contains(column->column_ndx(), _impl::only_string(left));
+            q.contains(column->column_ndx(), _impl::only_string_op_types(left));
         else if (std::is_same<Cond, ContainsIns>::value)
-            q.contains(column->column_ndx(), _impl::only_string(left), false);
+            q.contains(column->column_ndx(), _impl::only_string_op_types(left), false);
         else if (std::is_same<Cond, Like>::value)
-            q.like(column->column_ndx(), _impl::only_string(left));
+            q.like(column->column_ndx(), _impl::only_string_op_types(left));
         else if (std::is_same<Cond, LikeIns>::value)
-            q.like(column->column_ndx(), _impl::only_string(left), false);
+            q.like(column->column_ndx(), _impl::only_string_op_types(left), false);
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
             // fallback to using use 'return new Compare<>' instead.
@@ -788,6 +794,24 @@ public:
     Query like(StringData sd, bool case_sensitive = true);
     Query like(const Subexpr2<StringData>& col, bool case_sensitive = true);
 };
+
+template <>
+class Subexpr2<BinaryData> : public Subexpr, public Overloads<BinaryData, BinaryData> {
+public:
+    Query equal(BinaryData sd, bool case_sensitive = true);
+    Query equal(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+    Query not_equal(BinaryData sd, bool case_sensitive = true);
+    Query not_equal(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+    Query begins_with(BinaryData sd, bool case_sensitive = true);
+    Query begins_with(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+    Query ends_with(BinaryData sd, bool case_sensitive = true);
+    Query ends_with(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+    Query contains(BinaryData sd, bool case_sensitive = true);
+    Query contains(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+    Query like(BinaryData sd, bool case_sensitive = true);
+    Query like(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+};
+
 
 /*
 This class is used to store N values of type T = {int64_t, bool, OldDateTime or StringData}, and allows an entry
@@ -2142,6 +2166,26 @@ Query string_compare(const Subexpr2<StringData>& left, const Subexpr2<StringData
     else
         return make_expression<Compare<I, StringData>>(right.clone(), left.clone());
 }
+
+template <class T, class S, class I>
+Query binary_compare(const Subexpr2<BinaryData>& left, T right, bool case_sensitive)
+{
+    BinaryData data(right);
+    if (case_sensitive)
+        return create<S>(data, left);
+    else
+        return create<I>(data, left);
+}
+
+template <class S, class I>
+Query binary_compare(const Subexpr2<BinaryData>& left, const Subexpr2<BinaryData>& right, bool case_sensitive)
+{
+    if (case_sensitive)
+        return make_expression<Compare<S, BinaryData>>(right.clone(), left.clone());
+    else
+        return make_expression<Compare<I, BinaryData>>(right.clone(), left.clone());
+}
+
 
 // Columns<String> == Columns<String>
 inline Query operator==(const Columns<StringData>& left, const Columns<StringData>& right)

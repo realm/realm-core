@@ -462,7 +462,7 @@ TEST(Parser_StringOperations)
 {
     Group g;
     TableRef t = g.add_table("person");
-    size_t name_col_ndx = t->add_column(type_String, "name");
+    size_t name_col_ndx = t->add_column(type_String, "name", true);
     size_t link_col_ndx = t->add_column_link(type_Link, "father", *t);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jake", "Joel"};
     t->add_empty_row(5);
@@ -470,6 +470,7 @@ TEST(Parser_StringOperations)
         t->set_string(name_col_ndx, i, names[i]);
         t->set_link(link_col_ndx, i, (i + 1) % t->size());
     }
+    t->add_empty_row(); // null
     t->nullify_link(link_col_ndx, 4);
 
     verify_query(test_context, t, "name == 'Bob'", 1);
@@ -477,10 +478,10 @@ TEST(Parser_StringOperations)
     verify_query(test_context, t, "name ==[c] 'Bob'", 1);
     verify_query(test_context, t, "father.name ==[c] 'Bob'", 1);
 
-    verify_query(test_context, t, "name != 'Bob'", 4);
-    verify_query(test_context, t, "father.name != 'Bob'", 4);
-    verify_query(test_context, t, "name !=[c] 'bOB'", 4);
-    verify_query(test_context, t, "father.name !=[c] 'bOB'", 4);
+    verify_query(test_context, t, "name != 'Bob'", 5);
+    verify_query(test_context, t, "father.name != 'Bob'", 5);
+    verify_query(test_context, t, "name !=[c] 'bOB'", 5);
+    verify_query(test_context, t, "father.name !=[c] 'bOB'", 5);
 
     verify_query(test_context, t, "name contains \"oe\"", 2);
     verify_query(test_context, t, "father.name contains \"oe\"", 2);
@@ -501,6 +502,35 @@ TEST(Parser_StringOperations)
     verify_query(test_context, t, "father.name like \"?o?\"", 2);
     verify_query(test_context, t, "name like[c] \"?O?\"", 2);
     verify_query(test_context, t, "father.name like[c] \"?O?\"", 2);
+
+    verify_query(test_context, t, "name == NULL", 1);
+    verify_query(test_context, t, "NULL == name", 1);
+    verify_query(test_context, t, "name != NULL", 5);
+    verify_query(test_context, t, "NULL != name", 5);
+    verify_query(test_context, t, "name ==[c] NULL", 1);
+    verify_query(test_context, t, "NULL ==[c] name", 1);
+    verify_query(test_context, t, "name !=[c] NULL", 5);
+    verify_query(test_context, t, "NULL !=[c] name", 5);
+
+    // for strings 'NULL' is also a synonym for the null string
+    verify_query(test_context, t, "name CONTAINS NULL", 6);
+    verify_query(test_context, t, "name CONTAINS[c] NULL", 6);
+    verify_query(test_context, t, "name BEGINSWITH NULL", 6);
+    verify_query(test_context, t, "name BEGINSWITH[c] NULL", 6);
+    verify_query(test_context, t, "name ENDSWITH NULL", 6);
+    verify_query(test_context, t, "name ENDSWITH[c] NULL", 6);
+    verify_query(test_context, t, "name LIKE NULL", 1);
+    verify_query(test_context, t, "name LIKE[c] NULL", 1);
+
+    // string operators are not commutative
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL CONTAINS name", 6));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL CONTAINS[c] name", 6));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL BEGINSWITH name", 6));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL BEGINSWITH[c] name", 6));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL ENDSWITH name", 6));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL ENDSWITH[c] name", 6));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL LIKE name", 1));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL LIKE[c] name", 1));
 }
 
 
@@ -598,13 +628,13 @@ TEST(Parser_NullableBinaries)
     size_t binary_col_ndx = items->add_column(type_Binary, "data");
     size_t nullable_binary_col_ndx = items->add_column(type_Binary, "nullable_data", true);
     items->add_empty_row(5);
-    BinaryData bd0("knife");
+    BinaryData bd0("knife", 5);
     items->set_binary(binary_col_ndx, 0, bd0);
     items->set_binary(nullable_binary_col_ndx, 0, bd0);
-    BinaryData bd1("plate");
+    BinaryData bd1("plate", 5);
     items->set_binary(binary_col_ndx, 1, bd1);
     items->set_binary(nullable_binary_col_ndx, 1, bd1);
-    BinaryData bd2("fork");
+    BinaryData bd2("fork", 4);
     items->set_binary(binary_col_ndx, 2, bd2);
     items->set_binary(nullable_binary_col_ndx, 2, bd2);
 
@@ -622,11 +652,60 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, items, "nullable_data == NULL", 2);
     verify_query(test_context, items, "nullable_data != NULL", 3);
 
+    verify_query(test_context, items, "nullable_data CONTAINS 'f'", 2);
+    verify_query(test_context, items, "nullable_data BEGINSWITH 'f'", 1);
+    verify_query(test_context, items, "nullable_data ENDSWITH 'e'", 2);
+    verify_query(test_context, items, "nullable_data LIKE 'f*'", 1);
+    verify_query(test_context, items, "nullable_data CONTAINS[c] 'F'", 2);
+    verify_query(test_context, items, "nullable_data BEGINSWITH[c] 'F'", 1);
+    verify_query(test_context, items, "nullable_data ENDSWITH[c] 'E'", 2);
+    verify_query(test_context, items, "nullable_data LIKE[c] 'F*'", 1);
+
+    verify_query(test_context, items, "nullable_data CONTAINS NULL", 5);
+    verify_query(test_context, items, "nullable_data BEGINSWITH NULL", 5);
+    verify_query(test_context, items, "nullable_data ENDSWITH NULL", 5);
+    verify_query(test_context, items, "nullable_data LIKE NULL", 2);
+    verify_query(test_context, items, "nullable_data CONTAINS[c] NULL", 3);
+    verify_query(test_context, items, "nullable_data BEGINSWITH[c] NULL", 5);
+    verify_query(test_context, items, "nullable_data ENDSWITH[c] NULL", 5);
+    verify_query(test_context, items, "nullable_data LIKE[c] NULL", 2);
+
+    // these operators are not commutative
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL CONTAINS nullable_data", 5));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL BEGINSWITH nullable_data", 5));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL ENDSWITH nullable_data", 5));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL LIKE nullable_data", 2));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL CONTAINS[c] nullable_data", 5));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL BEGINSWITH[c] nullable_data", 5));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL ENDSWITH[c] nullable_data", 5));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL LIKE[c] nullable_data", 2));
+
     // check across links
     verify_query(test_context, people, "fav_item.data == NULL", 0);
     verify_query(test_context, people, "fav_item.data != NULL", 5);
     verify_query(test_context, people, "fav_item.nullable_data == NULL", 2);
     verify_query(test_context, people, "fav_item.nullable_data != NULL", 3);
+    verify_query(test_context, people, "NULL == fav_item.data", 0);
+
+    verify_query(test_context, people, "fav_item.data ==[c] NULL", 0);
+    verify_query(test_context, people, "fav_item.data !=[c] NULL", 5);
+    verify_query(test_context, people, "fav_item.nullable_data ==[c] NULL", 2);
+    verify_query(test_context, people, "fav_item.nullable_data !=[c] NULL", 3);
+    verify_query(test_context, people, "NULL ==[c] fav_item.data", 0);
+
+    verify_query(test_context, people, "fav_item.data CONTAINS 'f'", 2);
+    verify_query(test_context, people, "fav_item.data BEGINSWITH 'f'", 1);
+    verify_query(test_context, people, "fav_item.data ENDSWITH 'e'", 2);
+    verify_query(test_context, people, "fav_item.data LIKE 'f*'", 1);
+    verify_query(test_context, people, "fav_item.data CONTAINS[c] 'F'", 2);
+    verify_query(test_context, people, "fav_item.data BEGINSWITH[c] 'F'", 1);
+    verify_query(test_context, people, "fav_item.data ENDSWITH[c] 'E'", 2);
+    verify_query(test_context, people, "fav_item.data LIKE[c] 'F*'", 1);
+
+    // two column
+    verify_query(test_context, people, "fav_item.data == fav_item.nullable_data", 3);
+    verify_query(test_context, people, "fav_item.data == fav_item.data", 5);
+    verify_query(test_context, people, "fav_item.nullable_data == fav_item.nullable_data", 5);
 }
 
 TEST(Parser_OverColumnIndexChanges)
