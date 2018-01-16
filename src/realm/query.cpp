@@ -1604,7 +1604,7 @@ std::string Query::get_description() const
     if (root_node()) {
         return root_node()->describe_expression();
     }
-    return "";
+    return "TRUEPREDICATE";
 }
 
 void Query::init() const

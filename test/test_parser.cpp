@@ -278,7 +278,16 @@ TEST(Parser_empty_input)
     t->add_column(type_Int, "int_col");
     t->add_empty_row(5);
 
-    verify_query(test_context, t, "", 5);
+    // an empty query string is an invalid predicate
+    CHECK_THROW_ANY(verify_query(test_context, t, "", 5));
+
+    Query q = t->where(); // empty query
+    std::string empty_description = q.get_description();
+    CHECK(!empty_description.empty());
+    CHECK_EQUAL(0, empty_description.compare("TRUEPREDICATE"));
+    realm::parser::Predicate p = realm::parser::parse(empty_description);
+    realm::query_builder::apply_predicate(q, p);
+    CHECK_EQUAL(q.count(), 5);
 
     verify_query(test_context, t, "TRUEPREDICATE", 5);
     verify_query(test_context, t, "!TRUEPREDICATE", 0);

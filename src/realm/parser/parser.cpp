@@ -471,11 +471,6 @@ Predicate parse(const std::string &query)
 {
     DEBUG_PRINT_TOKEN(query);
 
-    if (query.empty()) {
-        // an empty query should return all results
-        return Predicate(Predicate::Type::True);
-    }
-
     Predicate out_predicate(Predicate::Type::And);
 
     ParserState state;
