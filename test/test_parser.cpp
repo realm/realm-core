@@ -259,7 +259,7 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
-    std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
     realm::parser::Predicate p2 = realm::parser::parse(description);
@@ -267,6 +267,24 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
 
     CHECK_EQUAL(q2.count(), num_results);
     return q2;
+}
+
+
+TEST(Parser_empty_input)
+{
+    Group g;
+    std::string table_name = "table";
+    TableRef t = g.add_table(table_name);
+    t->add_column(type_Int, "int_col");
+    t->add_empty_row(5);
+
+    verify_query(test_context, t, "", 5);
+
+    verify_query(test_context, t, "TRUEPREDICATE", 5);
+    verify_query(test_context, t, "!TRUEPREDICATE", 0);
+
+    verify_query(test_context, t, "FALSEPREDICATE", 0);
+    verify_query(test_context, t, "!FALSEPREDICATE", 5);
 }
 
 

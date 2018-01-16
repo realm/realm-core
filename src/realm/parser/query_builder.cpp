@@ -594,6 +594,12 @@ namespace query_builder {
 
 void apply_predicate(Query &query, const Predicate &predicate, Arguments &arguments)
 {
+
+    if (predicate.type == Predicate::Type::True && !predicate.negate) {
+        // early out for a predicate which should return all results
+        return;
+    }
+
     update_query_with_predicate(query, predicate, arguments);
 
     // Test the constructed query in core
