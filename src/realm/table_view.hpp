@@ -253,7 +253,7 @@ public:
     //
     // This will make the TableView empty and in sync with the highest possible table version
     // if the TableView depends on an object (LinkView or row) that has been deleted.
-    uint_fast64_t sync_if_needed() const override;
+    TableVersions sync_if_needed() const override;
 
     // Sort m_key_values according to one column
     void sort(ColKey column, bool ascending = true);
@@ -288,7 +288,7 @@ protected:
     // - Table::get_distinct_view()
     // - Table::get_backlink_view()
     // Return the version of the source it was created from.
-    uint64_t outside_version() const;
+    TableVersions outside_version() const;
 
     void do_sync();
 
@@ -315,7 +315,7 @@ protected:
     size_t m_end;
     size_t m_limit;
 
-    mutable util::Optional<uint_fast64_t> m_last_seen_version;
+    mutable TableVersions m_last_seen_versions;
 
     size_t m_num_detached_refs = 0;
     /// Construct null view (no memory allocated).
@@ -603,10 +603,12 @@ inline size_t TableViewBase::find_by_source_ndx(Key key) const noexcept
 
 inline TableViewBase::TableViewBase(Table* parent)
     : ObjList(m_table_view_key_values, parent) // Throws
-    , m_last_seen_version(m_table ? util::make_optional(m_table->get_content_version()) : util::none)
     , m_table_view_key_values(Allocator::get_default())
 {
     m_table_view_key_values.create();
+    if (m_table) {
+        m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
+    }
 }
 
 inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit)
@@ -615,7 +617,6 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     , m_start(start)
     , m_end(end)
     , m_limit(limit)
-    , m_last_seen_version(outside_version())
     , m_table_view_key_values(Allocator::get_default())
 {
     m_table_view_key_values.create();
@@ -625,30 +626,36 @@ inline TableViewBase::TableViewBase(Table* src_table, ColKey src_column_key, con
     : ObjList(m_table_view_key_values, src_table) // Throws
     , m_source_column_key(src_column_key)
     , m_linked_obj(obj)
-    , m_last_seen_version(m_table ? util::make_optional(m_table->get_content_version()) : util::none)
     , m_table_view_key_values(Allocator::get_default())
 {
     m_table_view_key_values.create();
+    if (m_table) {
+        m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
+    }
 }
 
 inline TableViewBase::TableViewBase(DistinctViewTag, Table* parent, ColKey column_key)
     : ObjList(m_table_view_key_values, parent) // Throws
     , m_distinct_column_source(column_key)
-    , m_last_seen_version(m_table ? util::make_optional(m_table->get_content_version()) : util::none)
     , m_table_view_key_values(Allocator::get_default())
 {
     REALM_ASSERT(m_distinct_column_source != ColKey());
     m_table_view_key_values.create();
+    if (m_table) {
+        m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
+    }
 }
 
 inline TableViewBase::TableViewBase(Table* parent, ConstLinkListPtr link_list)
     : ObjList(m_table_view_key_values, parent) // Throws
     , m_linklist_source(std::move(link_list))
-    , m_last_seen_version(m_table ? util::make_optional(m_table->get_content_version()) : util::none)
     , m_table_view_key_values(Allocator::get_default())
 {
     REALM_ASSERT(m_linklist_source);
     m_table_view_key_values.create();
+    if (m_table) {
+        m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
+    }
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv)
@@ -662,7 +669,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv)
     , m_start(tv.m_start)
     , m_end(tv.m_end)
     , m_limit(tv.m_limit)
-    , m_last_seen_version(tv.m_last_seen_version)
+    , m_last_seen_versions(tv.m_last_seen_versions)
     , m_num_detached_refs(tv.m_num_detached_refs)
     , m_table_view_key_values(tv.m_table_view_key_values)
 {
@@ -682,7 +689,7 @@ inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
     ,
     // if we are created from a table view which is outdated, take care to use the outdated
     // version number so that we can later trigger a sync if needed.
-    m_last_seen_version(tv.m_last_seen_version)
+    m_last_seen_versions(std::move(tv.m_last_seen_versions))
     , m_num_detached_refs(tv.m_num_detached_refs)
     , m_table_view_key_values(std::move(tv.m_table_view_key_values))
 {
@@ -695,7 +702,7 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
     m_key_values = std::move(tv.m_key_values);
     m_query = std::move(tv.m_query);
     m_num_detached_refs = tv.m_num_detached_refs;
-    m_last_seen_version = tv.m_last_seen_version;
+    m_last_seen_versions = tv.m_last_seen_versions;
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
@@ -717,7 +724,7 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
 
     m_query = tv.m_query;
     m_num_detached_refs = tv.m_num_detached_refs;
-    m_last_seen_version = tv.m_last_seen_version;
+    m_last_seen_versions = tv.m_last_seen_versions;
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;

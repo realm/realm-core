@@ -466,6 +466,11 @@ std::string ExpressionNode::describe() const
     }
 }
 
+void ExpressionNode::collect_dependencies(std::vector<TableKey>& tables) const
+{
+    m_expression->collect_dependencies(tables);
+}
+
 size_t ExpressionNode::find_first_local(size_t start, size_t end)
 {
     return m_expression->find_first(start, end);

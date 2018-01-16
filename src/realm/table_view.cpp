@@ -58,8 +58,8 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSo
         patch.linked_col = src.m_source_column_key;
     }
 
-    src.m_last_seen_version = util::none; // bring source out-of-sync, now that it has lost its data
-    m_last_seen_version = 0;
+    src.m_last_seen_versions.clear(); // bring source out-of-sync, now that it has lost its data
+    m_last_seen_versions.clear();
     m_start = src.m_start;
     m_end = src.m_end;
     m_limit = src.m_limit;
@@ -92,7 +92,7 @@ TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch, Con
     LinkList::generate_patch(src.m_linklist_source.get(), patch.linklist_patch);
     DescriptorOrdering::generate_patch(src.m_descriptor_ordering, patch.descriptors_patch);
 
-    m_last_seen_version = 0;
+    m_last_seen_versions.clear();
     m_start = src.m_start;
     m_end = src.m_end;
     m_limit = src.m_limit;
@@ -112,9 +112,9 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
     }
 
     if (patch.was_in_sync)
-        m_last_seen_version = outside_version();
+        m_last_seen_versions = outside_version();
     else
-        m_last_seen_version = util::none;
+        m_last_seen_versions.clear();
 }
 
 // Searching
@@ -507,48 +507,43 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
 
 bool TableViewBase::depends_on_deleted_object() const
 {
-    uint64_t max = std::numeric_limits<uint64_t>::max();
     // outside_version() will call itself recursively for each TableView in the dependency chain
     // and terminate with `max` if the deepest depends on a deleted LinkList or Row
-    return outside_version() == max;
+    return outside_version().empty();
 }
 
 // Return version of whatever this TableView depends on
-uint64_t TableViewBase::outside_version() const
+TableVersions TableViewBase::outside_version() const
 {
     check_cookie();
 
-    // If the TableView directly or indirectly depends on a view that has been deleted, there is no way to know
-    // its version number. Return the biggest possible value to trigger a refresh later.
-    const uint64_t max = std::numeric_limits<uint64_t>::max();
-
     if (m_linklist_source) {
         // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
-        return m_linklist_source->is_valid() ? m_linklist_source->get_table()->get_content_version() : max;
+        if (m_linklist_source->is_attached()) {
+            auto table = m_linklist_source->get_table();
+            return {table->get_key(), table->get_content_version()};
+        }
+        else {
+            return {};
+        }
     }
 
     if (m_source_column_key) {
         // m_linked_column is set when this TableView was created by Table::get_backlink_view().
-        return m_linked_obj.is_valid() ? m_linked_obj.get_table()->get_content_version() : max;
-    }
-
-    // FIXME: Unimplemented for link to a column
-    if (m_query.m_table) {
-        // m_query.m_table is set when this TableView was created by a query.
-
-        if (auto* view = dynamic_cast<LinkList*>(m_query.m_view)) {
-            // This TableView depends on Query that is restricted by a LinkView (with where(&link_view))
-            return view->is_valid() ? view->get_table()->get_content_version() : max;
+        if (m_linked_obj.is_valid()) {
+            auto table = m_linked_obj.get_table();
+            return {table->get_key(), table->get_content_version()};
         }
-
-        if (auto* view = dynamic_cast<TableView*>(m_query.m_view)) {
-            // This LinkView depends on a Query that is restricted by a TableView (with where(&table_view))
-            return view->outside_version();
+        else {
+            return {};
         }
     }
+    else if (m_query.m_table) {
+        return m_query.get_outside_versions();
+    }
 
-    // This TableView was either created by Table::get_distinct_view(), or a Query that is not restricted to a view.
-    return m_table->get_content_version();
+    // This TableView was created by Table::get_distinct_view()
+    return {m_table->get_key(), m_table->get_content_version()};
 }
 
 bool TableViewBase::is_in_sync() const
@@ -556,19 +551,19 @@ bool TableViewBase::is_in_sync() const
     check_cookie();
 
     bool table = bool(m_table);
-    bool version = bool(m_last_seen_version == outside_version());
+    bool version = bool(m_last_seen_versions == outside_version());
     bool view = bool(m_query.m_view);
 
     return table && version && (view ? m_query.m_view->is_in_sync() : true);
 }
 
-uint_fast64_t TableViewBase::sync_if_needed() const
+TableVersions TableViewBase::sync_if_needed() const
 {
     if (!is_in_sync()) {
         // FIXME: Is this a reasonable handling of constness?
         const_cast<TableViewBase*>(this)->do_sync();
     }
-    return *m_last_seen_version;
+    return m_last_seen_versions;
 }
 
 
@@ -577,7 +572,7 @@ void TableView::remove(size_t row_ndx)
     REALM_ASSERT(m_table);
     REALM_ASSERT(row_ndx < m_key_values.size());
 
-    bool sync_to_keep = m_last_seen_version == outside_version();
+    bool sync_to_keep = m_last_seen_versions == outside_version();
 
     Key key = m_key_values.get(row_ndx);
 
@@ -590,7 +585,7 @@ void TableView::remove(size_t row_ndx)
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
-        m_last_seen_version = outside_version();
+        m_last_seen_versions = outside_version();
 
     // Adjustment of row indexes greater than the removed index is done by
     // adj_row_acc_move_over or adj_row_acc_erase_row as sideeffect of the actual
@@ -602,7 +597,7 @@ void TableView::clear()
 {
     REALM_ASSERT(m_table);
 
-    bool sync_to_keep = m_last_seen_version == outside_version();
+    bool sync_to_keep = m_last_seen_versions == outside_version();
 
     _impl::TableFriend::batch_erase_rows(*m_table, m_key_values); // Throws
 
@@ -612,7 +607,7 @@ void TableView::clear()
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
-        m_last_seen_version = outside_version();
+        m_last_seen_versions = outside_version();
 }
 
 void TableViewBase::distinct(ColKey column)
@@ -656,6 +651,7 @@ void TableViewBase::do_sync()
     // - Table::get_distinct_view()
     // - Table::get_backlink_view()
     // Here we sync with the respective source.
+    m_last_seen_versions.clear();
 
     if (m_linklist_source) {
         m_key_values.clear();
@@ -701,7 +697,7 @@ void TableViewBase::do_sync()
 
     do_sort(m_descriptor_ordering);
 
-    m_last_seen_version = outside_version();
+    m_last_seen_versions = outside_version();
 }
 
 bool TableViewBase::is_in_table_order() const

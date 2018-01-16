@@ -87,7 +87,12 @@ ConstListBase::~ConstListBase()
 
 ref_type ConstListBase::get_child_ref(size_t) const noexcept
 {
-    return to_ref(m_const_obj->get<int64_t>(m_col_key));
+    try {
+        return to_ref(m_const_obj->get<int64_t>(m_col_key));
+    }
+    catch (const InvalidKey&) {
+        return ref_type(0);
+    }
 }
 
 std::pair<ref_type, size_t> ConstListBase::get_to_dot_parent(size_t) const
@@ -128,7 +133,7 @@ List<T>::List(const Obj& obj, ColKey col_key)
 {
     this->set_obj(&m_obj);
     this->init_from_parent();
-    if (!ConstListIf<T>::m_valid) {
+    if (!ConstListIf<T>::m_valid && m_obj.is_valid()) {
         create();
         ref_type ref = m_leaf->get_ref();
         m_obj.set_int(col_key, from_ref(ref));
@@ -288,22 +293,27 @@ void LinkList::remove_target_row(size_t link_ndx)
 
 void LinkList::remove_all_target_rows()
 {
-    if (is_valid()) {
+    if (is_attached()) {
         auto table = const_cast<Table*>(get_table());
         _impl::TableFriend::batch_erase_rows(*table, *this->m_leaf);
     }
 }
 
-uint_fast64_t LinkList::sync_if_needed() const
+TableVersions LinkList::sync_if_needed() const
 {
-    const_cast<LinkList*>(this)->update_if_needed();
-    return get_table()->get_content_version();
+    TableVersions versions;
+    if (this->is_attached()) {
+        const_cast<LinkList*>(this)->update_if_needed();
+        auto table = get_table();
+        versions.emplace_back(table->get_key(), table->get_content_version());
+    }
+    return versions;
 }
 
 void LinkList::generate_patch(const LinkList* list, std::unique_ptr<LinkListHandoverPatch>& patch)
 {
     if (list) {
-        if (list->is_valid()) {
+        if (list->is_attached()) {
             patch.reset(new LinkListHandoverPatch);
             Table::generate_patch(list->get_table(), patch->m_table);
             patch->m_col_key = list->get_col_key();

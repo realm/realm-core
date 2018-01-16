@@ -54,6 +54,7 @@ class ConstObj {
 public:
     ConstObj()
         : m_tree_top(nullptr)
+        , m_valid(false)
         , m_row_ndx(size_t(-1))
         , m_storage_version(-1)
         , m_instance_version(-1)
@@ -121,6 +122,7 @@ protected:
 
     const ClusterTree* m_tree_top;
     Key m_key;
+    mutable bool m_valid;
     mutable MemRef m_mem;
     mutable size_t m_row_ndx;
     mutable uint64_t m_storage_version;

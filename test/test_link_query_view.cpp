@@ -1062,72 +1062,58 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(1).get_key(), key1);
 }
 
-#ifdef LEGACY_TESTS
 TEST(Link_EmptySortedView)
 {
     Group group;
     TableRef source = group.add_table("source");
     TableRef destination = group.add_table("destination");
 
-    source->add_column_link(type_LinkList, "link", *destination);
-    source->add_empty_row();
-    auto lvr = source->get_linklist_ptr(0, 0);
+    auto col_link_list = source->add_column_link(type_LinkList, "link", *destination);
+    auto ll = source->create_object().get_linklist(col_link_list);
 
-    CHECK_EQUAL(list_ptr->size(), 0);
-    CHECK_EQUAL(list_ptr->get_slist_ptred_view(0).size(), 0);
+    CHECK_EQUAL(ll.size(), 0);
+    CHECK_EQUAL(ll.get_sorted_view(col_link_list).size(), 0);
 }
 
 
 TEST(Link_FindNullLink)
 {
-    size_t match;
-
     Group group;
 
     TableRef table0 = group.add_table("table0");
     TableRef table1 = group.add_table("table1");
     TableRef table2 = group.add_table("table2");
 
-    table0->add_column(type_String, "str1");
-    table0->add_empty_row();
-    table0->set_string(0, 0, "hello");
+    auto col_str0 = table0->add_column(type_String, "str1");
+    Key k0 = table0->create_object().set(col_str0, "hello").get_key();
 
     // add some more columns to table1 and table2
-    table1->add_column(type_Int, "col1");
+    table1->add_column(type_Int, "int1");
     table1->add_column(type_String, "str1");
 
     // add some rows
-    table1->add_empty_row();
-    table1->set_int(0, 0, 100);
-    table1->set_string(1, 0, "foo");
-    table1->add_empty_row();
-    table1->set_int(0, 1, 200);
-    table1->set_string(1, 1, "!");
-    table1->add_empty_row();
-    table1->set_int(0, 2, 300);
-    table1->set_string(1, 2, "bar");
+    Obj obj_1_0 = table1->create_object().set_all(100, "foo");
+    Obj obj_1_1 = table1->create_object().set_all(200, "!");
+    Obj obj_1_2 = table1->create_object().set_all(300, "bar");
 
-    size_t col_link1 = table1->add_column_link(type_Link, "link", *table1);
-    table1->set_link(col_link1, 0, 0);
-    table1->set_link(col_link1, 2, 0);
+    auto col_link1 = table1->add_column_link(type_Link, "link", *table0);
+    obj_1_0.set(col_link1, k0);
+    obj_1_2.set(col_link1, k0);
 
-    size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
-    size_t col_linklist2 = table2->add_column_link(type_LinkList, "link", *table1);
-    table2->add_empty_row();
-    table2->add_empty_row();
-    table2->add_empty_row();
-    table2->add_empty_row();
+    auto col_link2 = table2->add_column_link(type_Link, "link", *table1);
+    auto col_linklist2 = table2->add_column_link(type_LinkList, "link_list", *table1);
+    Obj obj_2_0 = table2->create_object();
+    Obj obj_2_1 = table2->create_object();
+    Obj obj_2_2 = table2->create_object();
+    Obj obj_2_3 = table2->create_object();
 
-    table2->set_link(col_link2, 0, 1);
-    table2->set_link(col_link2, 2, 2);
+    obj_2_0.set(col_link2, obj_1_1.get_key());
+    obj_2_2.set(col_link2, obj_1_2.get_key());
 
-    LinkViewRef lvr;
-
-    lvr = table2->get_linklist(col_linklist2, 0);
-    lvr->add(0);
-    lvr->add(1);
-    lvr = table2->get_linklist(col_linklist2, 2);
-    lvr->add(0);
+    LinkList ll = obj_2_0.get_linklist(col_linklist2);
+    ll.add(obj_1_0.get_key());
+    ll.add(obj_1_1.get_key());
+    obj_2_2.get_linklist(col_linklist2).add(obj_1_0.get_key());
 
     /*
         Table setup. table2 has links to table1 and table1 to table0:
@@ -1144,46 +1130,41 @@ TEST(Link_FindNullLink)
     Query q5 = table1->column<Link>(col_link1).is_not_null();
     TableView tv5 = q5.find_all();
     CHECK_EQUAL(2, tv5.size());
-    CHECK_EQUAL(0, tv5.get_source_ndx(0));
-    CHECK_EQUAL(2, tv5.get_source_ndx(1));
+    CHECK_EQUAL(obj_1_0.get_key(), tv5.get_key(0));
+    CHECK_EQUAL(obj_1_2.get_key(), tv5.get_key(1));
 
     // Find all non-null links on LinkList
-    Query q6 = table2->column<LinkList>(col_link2).is_not_null();
+    Query q6 = table2->column<Link>(col_link2).is_not_null();
     TableView tv6 = q6.find_all();
     CHECK_EQUAL(2, tv6.size());
-    CHECK_EQUAL(0, tv6.get_source_ndx(0));
-    CHECK_EQUAL(2, tv6.get_source_ndx(1));
+    CHECK_EQUAL(obj_2_0.get_key(), tv6.get_key(0));
+    CHECK_EQUAL(obj_2_2.get_key(), tv6.get_key(1));
 
-    // Test find_all on Link
+    // Test find_all null on Link
     Query q3 = table2->column<Link>(col_link2).is_null();
     TableView tv = q3.find_all();
     CHECK_EQUAL(2, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
-    CHECK_EQUAL(3, tv.get_source_ndx(1));
+    CHECK_EQUAL(obj_2_1.get_key(), tv.get_key(0));
+    CHECK_EQUAL(obj_2_3.get_key(), tv.get_key(1));
 
     // Test find() on Link
-    match = table2->column<Link>(col_link2).is_null().find();
-    CHECK_EQUAL(1, match);
-    match = table2->column<Link>(col_link2).is_null().find(2);
-    CHECK_EQUAL(3, match);
+    auto match = table2->column<Link>(col_link2).is_null().find();
+    CHECK_EQUAL(obj_2_1.get_key(), match);
 
     // Test find_all() on LinkList
-    Query q4 = table2->column<LinkList>(col_linklist2).is_null();
+    Query q4 = table2->column<Link>(col_linklist2).is_null();
     TableView tv2 = q4.find_all();
     CHECK_EQUAL(2, tv2.size());
-    CHECK_EQUAL(1, tv2.get_source_ndx(0));
-    CHECK_EQUAL(3, tv2.get_source_ndx(1));
+    CHECK_EQUAL(obj_2_1.get_key(), tv2.get_key(0));
+    CHECK_EQUAL(obj_2_3.get_key(), tv2.get_key(1));
 
     // Test find() on LinkList
-    match = table2->column<LinkList>(col_linklist2).is_null().find();
-    CHECK_EQUAL(1, match);
-    match = table2->column<LinkList>(col_linklist2).is_null().find(2);
-    CHECK_EQUAL(3, match);
+    match = table2->column<Link>(col_linklist2).is_null().find();
+    CHECK_EQUAL(obj_2_1.get_key(), match);
 
     // We have not yet defined behaviour of finding realm::null()-links in a linked-to table, so we just throw. Todo.
     CHECK_THROW_ANY(table2->link(col_linklist2).column<Link>(col_link1).is_null());
 }
-
 
 TEST(Link_FindNotNullLink)
 {
@@ -1193,25 +1174,27 @@ TEST(Link_FindNotNullLink)
 
     TableRef t0 = g.add_table("t0");
     TableRef t1 = g.add_table("t1");
-    t0->add_column_link(type_Link, "link", *t1);
-    t1->add_column(type_Int, "int");
+    auto col_link = t0->add_column_link(type_Link, "link", *t1);
+    auto col_int = t1->add_column(type_Int, "int");
 
-    t0->add_empty_row(6);
-    t1->add_empty_row(6);
+    std::vector<Key> keys0;
+    std::vector<Key> keys1;
+    t0->create_objects(6, keys0);
+    t1->create_objects(6, keys1);
     for (size_t i = 0; i < 6; ++i) {
-        t1->set_int(0, i, 123);
-        t0->nullify_link(0, i);
+        t1->get_object(keys1[i]).set(col_int, 123);
+        t0->get_object(keys0[i]).set(col_link, null_key);
     }
 
-    Query q0 = t0->column<Link>(0).is_null();
+    Query q0 = t0->column<Link>(col_link).is_null();
     TableView tv0 = q0.find_all();
     CHECK_EQUAL(6, tv0.size());
 
     for (size_t i = 0; i < 6; ++i) {
-        t0->set_link(0, i, i);
+        t0->get_object(keys0[i]).set(col_link, keys1[i]);
     }
 
-    Query q1 = t0->column<Link>(0).is_null();
+    Query q1 = t0->column<Link>(col_link).is_null();
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(0, tv1.size());
 
@@ -1233,35 +1216,38 @@ TEST(LinkList_FindNotNullLink)
     TableRef items = g.add_table("ListItem");
     TableRef datas = g.add_table("ListItemData");
 
-    lists->add_column_link(type_LinkList, "listItems", *items);
-    items->add_column_link(type_Link, "localData", *datas);
-    datas->add_column(type_String, "title");
+    auto col_linklist = lists->add_column_link(type_LinkList, "listItems", *items);
+    auto col_link = items->add_column_link(type_Link, "localData", *datas);
+    auto col_str = datas->add_column(type_String, "title");
 
-    lists->add_empty_row();
-    items->add_empty_row(6);
-    datas->add_empty_row(6);
-    LinkViewRef ll = lists->get_linklist(0, 0);
+    Obj obj0 = lists->create_object();
+    std::vector<Key> item_keys;
+    std::vector<Key> data_keys;
+    items->create_objects(6, item_keys);
+    datas->create_objects(6, data_keys);
+
+    auto ll = obj0.get_linklist_ptr(col_linklist);
     for (size_t i = 0; i < 6; ++i) {
-        datas->set_string(0, i, "foo");
-        items->set_link(0, i, 0);
-        ll->insert(0, i);
+        datas->get_object(data_keys[i]).set(col_str, "foo");
+        items->get_object(item_keys[i]).set(col_link, data_keys[0]);
+        ll->insert(0, item_keys[i]);
     }
 
     // This is how the Cocoa bindings do it normally:
     Query q0 = ll->get_target_table().where(ll);
-    q0.and_query(q0.get_table()->column<Link>(0).is_null());
+    q0.and_query(q0.get_table()->column<Link>(col_linklist).is_null());
     CHECK_EQUAL(0, q0.find_all().size());
 
     // This is the "correct" way to do the "Not":
     Query q2 = items->where(ll);
     q2.Not();
-    q2.and_query(items->column<Link>(0).is_null());
+    q2.and_query(items->column<Link>(col_linklist).is_null());
     CHECK_EQUAL(6, q2.find_all().size());
 
     // This is how the Cocoa bindings to the "Not":
     Query q1 = ll->get_target_table().where(ll);
     q1.Not();
-    q1.and_query(q1.get_table()->column<Link>(0).is_null());
+    q1.and_query(q1.get_table()->column<Link>(col_linklist).is_null());
     CHECK_EQUAL(6, q1.find_all().size());
 }
 
@@ -1271,17 +1257,17 @@ TEST(Link_FirstResultPastRow1000)
 
     TableRef data_table = g.add_table("data_table");
     TableRef link_table = g.add_table("link_table");
-    link_table->add_column_link(type_Link, "link", *data_table);
+    auto col_link = link_table->add_column_link(type_Link, "link", *data_table);
 
-    data_table->add_empty_row();
-    link_table->add_empty_row(1001);
+    Obj obj = data_table->create_object();
+    std::vector<Key> keys;
+    link_table->create_objects(1001, keys);
 
-    link_table->set_link(0, 1000, 0);
+    link_table->get_object(keys[1000]).set(col_link, obj.get_key());
 
-    TableView tv = (link_table->column<Link>(0) == data_table->get(0)).find_all();
+    TableView tv = (link_table->column<Link>(col_link) == obj).find_all();
     CHECK_EQUAL(1, tv.size());
 }
-#endif
 
 // Tests queries on a LinkList
 TEST(LinkList_QueryOnLinkList)
@@ -1301,13 +1287,16 @@ TEST(LinkList_QueryOnLinkList)
     Key key1 = target->create_object().set_all(100, "alfa").get_key();
     Key key2 = target->create_object().set_all(200, "beta").get_key();
     Key key4 = target->create_object().set_all(400, "charlie").get_key();
+    Key key5 = target->create_object().set_all(300, "ecco").get_key();
 
 
     Obj obj0 = origin->create_object();
     Obj obj1 = origin->create_object();
+    Obj obj2 = origin->create_object();
 
     LinkListPtr list_ptr;
     TableView tv;
+    TableView tv1;
 
     list_ptr = obj0.get_linklist_ptr(col_link2);
     list_ptr->add(key0);
@@ -1315,15 +1304,18 @@ TEST(LinkList_QueryOnLinkList)
     list_ptr->add(key2);
 
     obj1.get_linklist(col_link2).add(key4);
+    obj2.get_linklist(col_link2).add(key5);
 
     // Return all rows of target (the linked-to-table) that match the criteria and is in the LinkList
 
     // q.m_table = target
     // q.m_view = list_ptr
     Query q = target->where(list_ptr).and_query(target->column<Int>(col_int) > 100);
+    Query q1 = origin->link(col_link2).column<Int>(col_int) == 300;
 
     // tv.m_table == target
     tv = q.find_all(); // tv = { 0, 2 }
+    tv1 = q1.find_all(); // tv = { 0, 2 }
 
     TableView tv2 = list_ptr->get_sorted_view(col_int);
 
@@ -1336,6 +1328,10 @@ TEST(LinkList_QueryOnLinkList)
     CHECK_EQUAL(key0, tv.get_key(0));
     CHECK_EQUAL(key2, tv.get_key(1));
 
+    CHECK_EQUAL(2, tv1.size());
+    CHECK_EQUAL(obj0.get_key(), tv1.get_key(0));
+    CHECK_EQUAL(obj2.get_key(), tv1.get_key(1));
+
     // Should of course work even if nothing has changed
     tv.sync_if_needed();
 
@@ -1345,14 +1341,17 @@ TEST(LinkList_QueryOnLinkList)
 
     CHECK_EQUAL(1, tv.size()); // fail
     CHECK_EQUAL(key0, tv.get_key(0));
+    // tv1 should not be affected by this as linklist still contains an entry with 300
+    tv1.sync_if_needed();
+    CHECK_EQUAL(2, tv1.size());
 
-#ifdef LEGACY_TESTS
-    // Enable once we have new machinery for triggering sync across links.
     // Now test if changes in linked-to table bumps the version of the linked-from table and that
     // the query of 'tv' is re-run
     target->get_object(key0).set(col_int, 50); // exclude row 0 from tv because of the '> 100' condition in Query
     tv.sync_if_needed();
     CHECK_EQUAL(0, tv.size());
+    tv1.sync_if_needed();
+    CHECK_EQUAL(1, tv1.size());
 
     // See if we can keep a LinkView alive for the lifetime of a Query (used by objc lang. binding)
     Query query2;
@@ -1365,9 +1364,6 @@ TEST(LinkList_QueryOnLinkList)
     CHECK_EQUAL(1, tv.size());
     Key match = query2.find();
     CHECK_EQUAL(key4, match);
-#else
-    static_cast<void>(col_int); // silence a warning
-#endif
 }
 
 #ifdef LEGACY_TESTS

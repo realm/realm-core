@@ -82,7 +82,7 @@ public:
     {
         return m_const_obj->get_key();
     }
-    bool is_valid() const
+    bool is_attached() const
     {
         return m_const_obj->is_valid();
     }
@@ -256,8 +256,12 @@ public:
      */
     size_t size() const override
     {
+        if (!is_attached())
+            return 0;
+
         update_if_needed();
-        return m_valid ? m_leaf->size() : 0;
+
+        return is_null() ? 0 : m_leaf->size();
     }
     bool is_null() const override
     {
@@ -598,7 +602,7 @@ private:
     friend class TableViewBase;
     friend class Query;
 
-    uint_fast64_t sync_if_needed() const override;
+    TableVersions sync_if_needed() const override;
 
     static void generate_patch(const LinkList* ref, std::unique_ptr<LinkListHandoverPatch>& patch);
     static LinkListPtr create_from_and_consume_patch(std::unique_ptr<LinkListHandoverPatch>& patch, Group& group);

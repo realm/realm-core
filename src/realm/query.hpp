@@ -258,6 +258,8 @@ public:
         return m_table;
     }
 
+    TableVersions get_outside_versions() const;
+
     // True if matching rows are guaranteed to be returned in table order.
     bool produces_results_in_table_order() const
     {
@@ -266,8 +268,8 @@ public:
 
     // Calls sync_if_needed on the restricting view, if present.
     // Returns the current version of the table(s) this query depends on,
-    // or util::none if the query is not associated with a table.
-    util::Optional<uint_fast64_t> sync_view_if_needed() const;
+    // or empty vector if the query is not associated with a table.
+    TableVersions sync_view_if_needed() const;
 
     std::string validate();
 
@@ -367,6 +369,7 @@ private:
     std::string error_code;
 
     std::vector<QueryGroup> m_groups;
+    mutable std::vector<TableKey> m_table_keys;
 
     TableRef m_table;
 

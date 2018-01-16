@@ -3314,7 +3314,7 @@ TEST(Table_ListOfPrimitives)
     }
 
     t->remove_object(Key(7));
-    CHECK_NOT(timestamp_list.is_valid());
+    CHECK_NOT(timestamp_list.is_attached());
 }
 
 TEST(Table_object_merge_nodes)

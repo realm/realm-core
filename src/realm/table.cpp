@@ -271,6 +271,18 @@ using namespace realm::util;
 const int_fast64_t realm::Table::max_integer;
 const int_fast64_t realm::Table::min_integer;
 
+bool TableVersions::operator==(const TableVersions& other) const
+{
+    if (size() != other.size())
+        return false;
+    size_t sz = size();
+    for (size_t i = 0; i < sz; i++) {
+        REALM_ASSERT_DEBUG(this->at(i).first == other.at(i).first);
+        if (this->at(i).second != other.at(i).second)
+            return false;
+    }
+    return true;
+}
 
 // fixme, we need to gather all these typetraits definitions to just 1 single
 

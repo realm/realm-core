@@ -9399,6 +9399,7 @@ TEST(Query_MaximumSumAverage)
         }
     }
 }
+#endif
 
 TEST(Query_ReferDeletedLinkView)
 {
@@ -9407,16 +9408,14 @@ TEST(Query_ReferDeletedLinkView)
     // They will no longer throw exceptions or crash.
     Group group;
     TableRef table = group.add_table("table");
-    table->add_column_link(type_LinkList, "children", *table);
-    table->add_column(type_Int, "age");
-    table->add_empty_row();
-    table->set_int(1, 0, 123);
-    LinkViewRef links = table->get_linklist(0, 0);
+    auto col_link = table->add_column_link(type_LinkList, "children", *table);
+    auto col_int = table->add_column(type_Int, "age");
+    auto links = table->create_object().set(col_int, 123).get_linklist_ptr(col_link);
     Query q = table->where(links);
     TableView tv = q.find_all();
 
     // TableView that depends on LinkView soon to be deleted
-    TableView tv_sorted = links->get_sorted_view(1);
+    TableView tv_sorted = links->get_sorted_view(col_int);
 
     // First test depends_on_deleted_object()
     CHECK(!tv_sorted.depends_on_deleted_object());
@@ -9424,28 +9423,28 @@ TEST(Query_ReferDeletedLinkView)
     CHECK(!tv2.depends_on_deleted_object());
 
     // Delete LinkList so LinkView gets detached
-    table->move_last_over(0);
+    table->remove_object(table->begin());
     CHECK(!links->is_attached());
     CHECK(tv_sorted.depends_on_deleted_object());
 
     // See if "Query that depends on LinkView" returns sane "empty"-like values
     CHECK_EQUAL(q.find_all().size(), 0);
-    CHECK_EQUAL(q.find(), npos);
-    CHECK_EQUAL(q.sum_int(1), 0);
+    CHECK_EQUAL(q.find(), null_key);
+    CHECK_EQUAL(q.sum_int(col_int), 0);
     CHECK_EQUAL(q.count(), 0);
     size_t rows;
-    q.average_int(1, &rows);
+    q.average_int(col_int, &rows);
     CHECK_EQUAL(rows, 0);
 
     tv_sorted.sync_if_needed();
     // See if "TableView that depends on LinkView" returns sane "empty"-like values
-    tv_sorted.average_int(1, &rows);
+    tv_sorted.average_int(col_int, &rows);
     CHECK_EQUAL(rows, 0);
 
     // Now check a "Query that depends on (TableView that depends on LinkView)"
     Query q2 = table->where(&tv_sorted);
     CHECK_EQUAL(q2.count(), 0);
-    CHECK_EQUAL(q2.find(), npos);
+    CHECK_EQUAL(q2.find(), null_key);
 
     CHECK(!links->is_attached());
     tv.sync_if_needed();
@@ -9454,11 +9453,10 @@ TEST(Query_ReferDeletedLinkView)
     // the LinkView through multiple levels!
     CHECK(tv.is_attached());
 
-    // Before executing any methods on a LinkViewRef, you must still always check is_attached(). If you
+    // Before executing any methods on a LinkList, you must still always check is_attached(). If you
     // call links->add() on a deleted LinkViewRef (where is_attached() == false), it will assert
     CHECK(!links->is_attached());
 }
-#endif
 
 TEST(Query_SubQueries)
 {
@@ -9543,7 +9541,6 @@ TEST(Query_SubQueries)
     CHECK_EQUAL(Key(2), tv.get_key(1));
 }
 
-#ifdef LEGACY_TESTS
 // Ensure that Query's move constructor and move assignment operator don't result in
 // a TableView owned by the query being double-deleted when the queries are destroyed.
 TEST(Query_MoveDoesntDoubleDelete)
@@ -9561,7 +9558,6 @@ TEST(Query_MoveDoesntDoubleDelete)
         q2 = std::move(q1);
     }
 }
-#endif // LEGACY_TESTS
 
 TEST(Query_Timestamp)
 {
@@ -9730,6 +9726,7 @@ TEST(Query_CopyRestrictingTableViewWhenOwned)
         CHECK_EQUAL(0, q2.count());
     }
 }
+#endif // LEGACY_TESTS
 
 TEST(Query_SyncViewIfNeeded)
 {
@@ -9737,22 +9734,20 @@ TEST(Query_SyncViewIfNeeded)
     TableRef source = group.add_table("source");
     TableRef target = group.add_table("target");
 
-    size_t col_links = source->add_column_link(type_LinkList, "link", *target);
-    size_t col_id = target->add_column(type_Int, "id");
+    auto col_links = source->add_column_link(type_LinkList, "link", *target);
+    auto col_id = target->add_column(type_Int, "id");
 
     auto reset_table_contents = [&] {
         source->clear();
         target->clear();
 
-        for (size_t i = 0; i < 15; ++i) {
-            target->add_empty_row();
-            target->set_int(col_id, i, i);
+        for (int64_t i = 0; i < 15; ++i) {
+            target->create_object(Key(i)).set(col_id, i);
         }
 
-        source->add_empty_row();
-        LinkViewRef ll = source->get_linklist(col_links, 0);
+        LinkList ll = source->create_object().get_linklist(col_links);
         for (size_t i = 6; i < 15; ++i) {
-            ll->add(i);
+            ll.add(Key(i));
         }
     };
 
@@ -9763,8 +9758,8 @@ TEST(Query_SyncViewIfNeeded)
         Query q = target->where(&restricting_view).less(col_id, 10);
 
         // Bring the view out of sync with the table.
-        target->set_int(col_id, 7, -7);
-        target->set_int(col_id, 8, -8);
+        target->get_object(Key(7)).set(col_id, -7);
+        target->get_object(Key(8)).set(col_id, -8);
 
         // Verify that the query uses the view as-is.
         CHECK_EQUAL(4, q.count());
@@ -9774,19 +9769,20 @@ TEST(Query_SyncViewIfNeeded)
         auto version = q.sync_view_if_needed();
         CHECK_EQUAL(true, restricting_view.is_in_sync());
         CHECK_EQUAL(2, q.count());
-        CHECK_EQUAL(version, target->get_version_counter());
+        CHECK_EQUAL(version[0].first, target->get_key());
+        CHECK_EQUAL(version[0].second, target->get_content_version());
     }
 
-    // Restricting LinkView. Query::sync_view_if_needed() does nothing as LinkViews are always in sync.
+    // Restricting LinkView.
     {
         reset_table_contents();
-        LinkViewRef restricting_view = source->get_linklist(col_links, 0);
+        LinkListPtr restricting_view = source->begin()->get_linklist_ptr(col_links);
         Query q = target->where(restricting_view).less(col_id, 10);
         CHECK_EQUAL(restricting_view->size(), 9);
 
         // Modify the underlying table to remove rows from the LinkView.
-        target->move_last_over(7);
-        target->move_last_over(8);
+        target->remove_object(Key(7));
+        target->remove_object(Key(8));
 
         // The view is out of sync.
         CHECK_EQUAL(false, restricting_view->is_in_sync());
@@ -9801,7 +9797,8 @@ TEST(Query_SyncViewIfNeeded)
         // And that syncing the query does nothing.
         auto version = q.sync_view_if_needed();
         CHECK_EQUAL(true, restricting_view->is_in_sync());
-        CHECK_EQUAL(version, target->get_version_counter());
+        CHECK_EQUAL(version[0].first, target->get_key());
+        CHECK_EQUAL(version[0].second, target->get_content_version());
         CHECK_EQUAL(2, q.count());
     }
 
@@ -9810,13 +9807,14 @@ TEST(Query_SyncViewIfNeeded)
         reset_table_contents();
         Query q = target->where().greater(col_id, 5).less(col_id, 10);
 
-        target->set_int(col_id, 7, -7);
-        target->set_int(col_id, 8, -8);
+        target->get_object(Key(7)).set(col_id, -7);
+        target->get_object(Key(8)).set(col_id, -8);
 
         CHECK_EQUAL(2, q.count());
 
         auto version = q.sync_view_if_needed();
-        CHECK_EQUAL(version, target->get_version_counter());
+        CHECK_EQUAL(version[0].first, target->get_key());
+        CHECK_EQUAL(version[0].second, target->get_content_version());
         CHECK_EQUAL(2, q.count());
     }
 
@@ -9826,10 +9824,11 @@ TEST(Query_SyncViewIfNeeded)
         Query q;
 
         auto version = q.sync_view_if_needed();
-        CHECK_EQUAL(bool(version), false);
+        CHECK(version.empty());
     }
 }
 
+#ifdef LEGACY_TESTS
 // Ensure that two queries can be combined via Query::and_query, &&, and || even if one of them has no conditions.
 TEST(Query_CombineWithEmptyQueryDoesntCrash)
 {

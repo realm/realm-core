@@ -39,6 +39,7 @@ using namespace realm;
 ConstObj::ConstObj(const ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx)
     : m_tree_top(tree_top)
     , m_key(key)
+    , m_valid(true)
     , m_mem(ref, tree_top->get_alloc())
     , m_row_ndx(row_ndx)
 {
@@ -122,7 +123,11 @@ const Table* ConstObj::get_table() const
 
 bool ConstObj::is_valid() const
 {
-    return m_key && get_table()->is_valid(m_key);
+    // Cache valid state. If once invalid, it can never become valid again
+    if (m_valid)
+        m_valid = get_table()->is_valid(m_key);
+
+    return m_valid;
 }
 
 void ConstObj::remove()

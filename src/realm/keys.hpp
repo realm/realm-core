@@ -52,6 +52,18 @@ struct TableKey {
     int64_t value;
 };
 
+class TableVersions : public std::vector<std::pair<TableKey, uint64_t>> {
+public:
+    TableVersions()
+    {
+    }
+    TableVersions(TableKey key, uint64_t version)
+    {
+        emplace_back(key, version);
+    }
+    bool operator==(const TableVersions& other) const;
+};
+
 inline std::ostream& operator<<(std::ostream& os, TableKey tk)
 {
     os << tk.value;

@@ -371,7 +371,7 @@ public:
     ConstIterator end() const;
     Iterator begin();
     Iterator end();
-    void remove_object(ConstIterator& it)
+    void remove_object(const ConstIterator& it)
     {
         remove_object(it->get_key());
     }

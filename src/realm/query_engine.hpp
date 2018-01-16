@@ -172,6 +172,13 @@ public:
         m_column_action_specializer = nullptr;
     }
 
+    void get_link_dependencies(std::vector<TableKey>& tables) const
+    {
+        collect_dependencies(tables);
+        if (m_child)
+            m_child->collect_dependencies(tables);
+    }
+
     void set_table(const Table& table)
     {
         if (&table == m_table)
@@ -192,6 +199,10 @@ public:
         if (m_child)
             m_child->set_cluster(cluster);
         cluster_changed();
+    }
+
+    virtual void collect_dependencies(std::vector<TableKey>&) const
+    {
     }
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
@@ -1859,6 +1870,7 @@ public:
 
     void table_changed() override;
     void cluster_changed() override;
+    void collect_dependencies(std::vector<TableKey>&) const override;
 
     virtual std::string describe() const override;
 

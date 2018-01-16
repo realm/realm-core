@@ -1273,7 +1273,8 @@ void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit)
         end = m_table->size();
 
     if (m_view) {
-        for (size_t t = 0; t < m_view->size() && ret.size() < limit; t++) {
+        size_t sz = m_view->size();
+        for (size_t t = 0; t < sz && ret.size() < limit; t++) {
             ConstObj obj = m_view->get(t);
             if (t >= begin && t < end && eval_object(obj)) {
                 ret.m_key_values.add(obj.get_key());
@@ -1311,7 +1312,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 #endif
 
     TableView ret(*m_table, *this, start, end, limit);
-    find_all(ret, start, end, limit);
+    ret.do_sync();
     return ret;
 }
 
@@ -1335,7 +1336,8 @@ size_t Query::count() const
     size_t cnt = 0;
 
     if (m_view) {
-        for (size_t t = 0; t < m_view->size(); t++) {
+        size_t sz = m_view->size();
+        for (size_t t = 0; t < sz; t++) {
             ConstObj obj = m_view->get(t);
             if (eval_object(obj)) {
                 cnt++;
@@ -1527,8 +1529,8 @@ void Query::init() const
     REALM_ASSERT(m_table);
     if (ParentNode* root = root_node()) {
         root->init();
-        std::vector<ParentNode*> v;
-        root->gather_children(v);
+        std::vector<ParentNode*> vec;
+        root->gather_children(vec);
     }
 }
 
@@ -1651,15 +1653,34 @@ Query Query::operator!()
     return q;
 }
 
-util::Optional<uint_fast64_t> Query::sync_view_if_needed() const
+TableVersions Query::get_outside_versions() const
 {
-    if (m_view)
-        return m_view->sync_if_needed();
+    TableVersions versions;
+    if (m_table) {
+        if (m_table_keys.empty()) {
+            // Store primary table info
+            REALM_ASSERT_DEBUG(m_table);
+            m_table_keys.push_back(m_table->get_key());
 
-    if (m_table)
-        return m_table->get_content_version();
+            if (ParentNode* root = root_node())
+                root->get_link_dependencies(m_table_keys);
+        }
+        // update table versions
+        if (Group* g = m_table->get_parent_group()) {
+            for (auto k : m_table_keys) {
+                versions.emplace_back(k, g->get_table(k)->get_content_version());
+            }
+        }
+    }
+    return versions;
+}
 
-    return util::none;
+TableVersions Query::sync_view_if_needed() const
+{
+    if (m_view) {
+        m_view->sync_if_needed();
+    }
+    return get_outside_versions();
 }
 
 QueryGroup::QueryGroup(const QueryGroup& other)

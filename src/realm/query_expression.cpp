@@ -53,6 +53,16 @@ void LinkMap::set_base_table(const Table* table)
     }
 }
 
+void LinkMap::collect_dependencies(std::vector<TableKey>& tables) const
+{
+    for (auto& t : m_tables) {
+        TableKey k = t->get_key();
+        if (find(tables.begin(), tables.end(), k) == tables.end()) {
+            tables.push_back(k);
+        }
+    }
+}
+
 std::string LinkMap::description() const
 {
     std::string s;

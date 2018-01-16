@@ -335,6 +335,9 @@ public:
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_base_table(const Table* table) = 0;
     virtual void set_cluster(const Cluster*) = 0;
+    virtual void collect_dependencies(std::vector<TableKey>&) const
+    {
+    }
     virtual const Table* get_base_table() const = 0;
     virtual std::string description() const = 0;
 
@@ -384,6 +387,10 @@ public:
     virtual const Table* get_base_table() const
     {
         return nullptr;
+    }
+
+    virtual void collect_dependencies(std::vector<TableKey>&) const
+    {
     }
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
@@ -1766,6 +1773,8 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
+    void collect_dependencies(std::vector<TableKey>& tables) const;
+
     std::string description() const;
 
     std::vector<Key> get_links(size_t index)
@@ -1900,6 +1909,11 @@ public:
             cluster->init_leaf(column_ndx, m_array_ptr.get());
             m_leaf_ptr = m_array_ptr.get();
         }
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_link_map.collect_dependencies(tables);
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2126,6 +2140,11 @@ public:
         m_link_map.set_cluster(cluster);
     }
 
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_link_map.collect_dependencies(tables);
+    }
+
     // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as
     // any linked-to payload tables
     const Table* get_base_table() const override
@@ -2197,6 +2216,11 @@ public:
     void set_cluster(const Cluster* cluster) override
     {
         m_link_map.set_cluster(cluster);
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_link_map.collect_dependencies(tables);
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2390,6 +2414,11 @@ public:
         m_link_map.set_cluster(cluster);
     }
 
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_link_map.collect_dependencies(tables);
+    }
+
     std::string description() const override
     {
         return m_link_map.description();
@@ -2508,6 +2537,11 @@ public:
     void set_cluster(const Cluster* cluster) override
     {
         ColumnListBase::set_cluster(cluster);
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_link_map.collect_dependencies(tables);
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2846,6 +2880,11 @@ public:
         }
     }
 
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_link_map.collect_dependencies(tables);
+    }
+
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and binds it to a Query at a later time
     const Table* get_base_table() const override
@@ -3011,6 +3050,11 @@ public:
         m_column.set_base_table(m_link_map.get_target_table());
     }
 
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_link_map.collect_dependencies(tables);
+    }
+
     void evaluate(size_t, ValueBase&) override
     {
         // SubColumns can only be used in an expression in conjunction with its aggregate methods.
@@ -3083,6 +3127,11 @@ public:
         m_column.set_cluster(cluster);
     }
 
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_link_map.collect_dependencies(tables);
+    }
+
     void evaluate(size_t index, ValueBase& destination) override
     {
         std::vector<Key> keys = m_link_map.get_links(index);
@@ -3142,6 +3191,11 @@ public:
     void set_cluster(const Cluster* cluster) override
     {
         m_link_map.set_cluster(cluster);
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_link_map.collect_dependencies(tables);
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -3529,6 +3583,12 @@ public:
 
         // nullptr pointer means expression which isn't yet associated with any table, or is a Value<T>
         return l ? l : r;
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_left->collect_dependencies(tables);
+        m_right->collect_dependencies(tables);
     }
 
     size_t find_first(size_t start, size_t end) const override
