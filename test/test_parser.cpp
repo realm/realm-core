@@ -811,18 +811,19 @@ TEST(Parser_TwoColumnAggregates)
 
     TableRef discounts = g.add_table("class_Discounts");
     size_t discount_name_col = discounts->add_column(type_String, "promotion", true);
-    size_t discount_off_col = discounts->add_column(type_Float, "reduced_by");
+    size_t discount_off_col = discounts->add_column(type_Double, "reduced_by");
     size_t discount_active_col = discounts->add_column(type_Bool, "active");
 
     using discount_t = std::pair<double, bool>;
     std::vector<discount_t> discount_info = {{3.0, false}, {2.5, true}, {0.50, true}, {1.50, true}};
     for (discount_t i : discount_info) {
         size_t row_ndx = discounts->add_empty_row();
-        discounts->set_float(discount_off_col, row_ndx, i.first);
+        discounts->set_double(discount_off_col, row_ndx, i.first);
         discounts->set_bool(discount_active_col, row_ndx, i.second);
     }
     discounts->set_string(discount_name_col, 0, "back to school");
-    discounts->set_string(discount_name_col, 1, "manager's special");
+    discounts->set_string(discount_name_col, 1, "pizza lunch special");
+    discounts->set_string(discount_name_col, 2, "manager's special");
 
     TableRef items = g.add_table("class_Items");
     size_t item_name_col = items->add_column(type_String, "name");
@@ -900,9 +901,23 @@ TEST(Parser_TwoColumnAggregates)
     verify_query(test_context, t, "items.@count == 3.1", 1);
 
     // two string counts is allowed (int comparison)
-    verify_query(test_context, items, "discount.promotion.@count > name.@count", 2);
+    verify_query(test_context, items, "discount.promotion.@count > name.@count", 3);
     // link count vs string count (int comparison)
     verify_query(test_context, items, "discount.@count < name.@count", 4);
+
+    // string operators
+    verify_query(test_context, items, "discount.promotion == name", 0);
+    verify_query(test_context, items, "discount.promotion != name", 4);
+    verify_query(test_context, items, "discount.promotion CONTAINS name", 1);
+    verify_query(test_context, items, "discount.promotion BEGINSWITH name", 1);
+    verify_query(test_context, items, "discount.promotion ENDSWITH name", 0);
+    verify_query(test_context, items, "discount.promotion LIKE name", 0);
+    verify_query(test_context, items, "discount.promotion ==[c] name", 0);
+    verify_query(test_context, items, "discount.promotion !=[c] name", 4);
+    verify_query(test_context, items, "discount.promotion CONTAINS[c] name", 1);
+    verify_query(test_context, items, "discount.promotion BEGINSWITH[c] name", 1);
+    verify_query(test_context, items, "discount.promotion ENDSWITH[c] name", 0);
+    verify_query(test_context, items, "discount.promotion LIKE[c] name", 0);
 }
 
 void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, const util::Any* arg_list, size_t num_args, size_t num_results) {
