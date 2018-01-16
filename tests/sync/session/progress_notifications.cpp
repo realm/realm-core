@@ -26,11 +26,19 @@ using namespace realm;
 
 TEST_CASE("progress notification", "[sync]") {
     _impl::SyncProgressNotifier progress;
-    progress.update(0, 0, 0, 0);
 
-    SECTION("runs at least once (initially when registered)") {
+    SECTION("callback is not called prior to first update") {
         bool callback_was_called = false;
+        progress.register_callback([&](auto, auto) { callback_was_called = true; }, false, false);
+        progress.register_callback([&](auto, auto) { callback_was_called = true; }, true, false);
+        REQUIRE_FALSE(callback_was_called);
+    }
 
+    SECTION("callback is invoked immediately when a progress update has already occurred") {
+        progress.set_local_version(1);
+        progress.update(0, 0, 0, 0, 1, 1);
+
+        bool callback_was_called = false;
         SECTION("for upload notifications, with no data transfer ongoing") {
             progress.register_callback([&](auto, auto) { callback_was_called = true; }, false, false);
             REQUIRE(callback_was_called);
@@ -52,7 +60,9 @@ TEST_CASE("progress notification", "[sync]") {
         }
     }
 
-    SECTION("properly runs for streaming notifiers") {
+    SECTION("callback is invoked after each update for streaming notifiers") {
+        progress.update(0, 0, 0, 0, 1, 1);
+
         bool callback_was_called = false;
         uint64_t transferred = 0;
         uint64_t transferrable = 0;
@@ -71,7 +81,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = 60;
             current_transferrable = 912;
-            progress.update(25, 26, current_transferred, current_transferrable);
+            progress.update(25, 26, current_transferred, current_transferrable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_transferred);
             CHECK(transferrable == current_transferrable);
@@ -80,7 +90,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = 79;
             current_transferrable = 1021;
-            progress.update(68, 191, current_transferred, current_transferrable);
+            progress.update(68, 191, current_transferred, current_transferrable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_transferred);
             CHECK(transferrable == current_transferrable);
@@ -89,7 +99,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = 150;
             current_transferrable = 1228;
-            progress.update(199, 591, current_transferred, current_transferrable);
+            progress.update(199, 591, current_transferred, current_transferrable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_transferred);
             CHECK(transferrable == current_transferrable);
@@ -107,7 +117,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = 60;
             current_transferrable = 912;
-            progress.update(current_transferred, current_transferrable, 25, 26);
+            progress.update(current_transferred, current_transferrable, 25, 26, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_transferred);
             CHECK(transferrable == current_transferrable);
@@ -116,7 +126,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = 79;
             current_transferrable = 1021;
-            progress.update(current_transferred, current_transferrable, 68, 191);
+            progress.update(current_transferred, current_transferrable, 68, 191, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_transferred);
             CHECK(transferrable == current_transferrable);
@@ -125,7 +135,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = 150;
             current_transferrable = 1228;
-            progress.update(current_transferred, current_transferrable, 199, 591);
+            progress.update(current_transferred, current_transferrable, 199, 591, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_transferred);
             CHECK(transferrable == current_transferrable);
@@ -143,7 +153,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = 60;
             current_transferrable = 912;
-            progress.update(current_transferred, current_transferrable, 25, 26);
+            progress.update(current_transferred, current_transferrable, 25, 26, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_transferred);
             CHECK(transferrable == current_transferrable);
@@ -155,7 +165,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = 150;
             current_transferrable = 1228;
-            progress.update(current_transferred, current_transferrable, 199, 591);
+            progress.update(current_transferred, current_transferrable, 199, 591, 1, 1);
             CHECK(!callback_was_called);
         }
 
@@ -185,7 +195,7 @@ TEST_CASE("progress notification", "[sync]") {
             uint64_t current_uploadable = 201;
             uint64_t current_downloaded = 68;
             uint64_t current_downloadable = 182;
-            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable);
+            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_downloaded);
             CHECK(transferrable == current_downloadable);
@@ -200,7 +210,7 @@ TEST_CASE("progress notification", "[sync]") {
             current_uploadable = 329;
             current_downloaded = 76;
             current_downloadable = 191;
-            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable);
+            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_downloaded);
             CHECK(transferrable == current_downloadable);
@@ -222,7 +232,7 @@ TEST_CASE("progress notification", "[sync]") {
             current_transferred = 60;
             current_transferrable = 501;
             const uint64_t original_transferrable = current_transferrable;
-            progress.update(21, 26, current_transferred, current_transferrable);
+            progress.update(21, 26, current_transferred, current_transferrable, 1, 1);
 
             progress.register_callback([&](auto xferred, auto xferable) {
                 transferred = xferred;
@@ -236,7 +246,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = 66;
             current_transferrable = 582;
-            progress.update(25, 26, current_transferred, current_transferrable);
+            progress.update(25, 26, current_transferred, current_transferrable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_transferred);
             CHECK(transferrable == original_transferrable);
@@ -245,7 +255,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = original_transferrable + 100;
             current_transferrable = 1021;
-            progress.update(68, 191, current_transferred, current_transferrable);
+            progress.update(68, 191, current_transferred, current_transferrable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_transferred);
             CHECK(transferrable == original_transferrable);
@@ -254,8 +264,32 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = original_transferrable + 250;
             current_transferrable = 1228;
-            progress.update(199, 591, current_transferred, current_transferrable);
+            progress.update(199, 591, current_transferred, current_transferrable, 1, 1);
             CHECK(!callback_was_called);
+        }
+
+        SECTION("upload notifications are not sent until all local changesets have been processed") {
+            progress.set_local_version(4);
+
+            progress.register_callback([&](auto xferred, auto xferable) {
+                transferred = xferred;
+                transferrable = xferable;
+                callback_was_called = true;
+            }, false, false);
+            REQUIRE_FALSE(callback_was_called);
+
+            current_transferred = 66;
+            current_transferrable = 582;
+            progress.update(0, 0, current_transferred, current_transferrable, 1, 3);
+            REQUIRE_FALSE(callback_was_called);
+
+            current_transferred = 77;
+            current_transferrable = 1021;
+            progress.update(0, 0, current_transferred, current_transferrable, 1, 4);
+            REQUIRE(callback_was_called);
+            CHECK(transferred == current_transferred);
+            // should not have captured transferrable from the first update
+            CHECK(transferrable == current_transferrable);
         }
 
         SECTION("for download notifications") {
@@ -263,7 +297,7 @@ TEST_CASE("progress notification", "[sync]") {
             current_transferred = 60;
             current_transferrable = 501;
             const uint64_t original_transferrable = current_transferrable;
-            progress.update(current_transferred, current_transferrable, 21, 26);
+            progress.update(current_transferred, current_transferrable, 21, 26, 1, 1);
 
             progress.register_callback([&](auto xferred, auto xferable) {
                 transferred = xferred;
@@ -277,7 +311,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = 66;
             current_transferrable = 582;
-            progress.update(current_transferred, current_transferrable, 25, 26);
+            progress.update(current_transferred, current_transferrable, 25, 26, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_transferred);
             CHECK(transferrable == original_transferrable);
@@ -286,7 +320,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = original_transferrable + 100;
             current_transferrable = 1021;
-            progress.update(current_transferred, current_transferrable, 68, 191);
+            progress.update(current_transferred, current_transferrable, 68, 191, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_transferred);
             CHECK(transferrable == original_transferrable);
@@ -295,8 +329,51 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = original_transferrable + 250;
             current_transferrable = 1228;
-            progress.update(current_transferred, current_transferrable, 199, 591);
+            progress.update(current_transferred, current_transferrable, 199, 591, 1, 1);
             CHECK(!callback_was_called);
+        }
+
+        SECTION("download notifications are not sent until all a DOWNLOAD message has been received") {
+            _impl::SyncProgressNotifier progress;
+
+            progress.register_callback([&](auto xferred, auto xferable) {
+                transferred = xferred;
+                transferrable = xferable;
+                callback_was_called = true;
+            }, true, false);
+
+            current_transferred = 100;
+            current_transferrable = 100;
+            // Last time we ran we downloaded everything, so sync will send us an
+            // update reporting that
+            progress.update(current_transferred, current_transferrable, 0, 0, 0, 1);
+            REQUIRE_FALSE(callback_was_called);
+
+            current_transferred = 100;
+            current_transferrable = 200;
+            // Next we get a DOWNLOAD message telling us there's more to download
+            progress.update(current_transferred, current_transferrable, 0, 0, 1, 1);
+            REQUIRE(callback_was_called);
+            REQUIRE(current_transferrable == transferrable);
+            REQUIRE(current_transferred == transferred);
+
+            current_transferred = 200;
+            progress.update(current_transferred, current_transferrable, 0, 0, 1, 1);
+
+            // After the download has completed, new notifications complete immediately
+            transferred = 0;
+            transferrable = 0;
+            callback_was_called = false;
+
+            progress.register_callback([&](auto xferred, auto xferable) {
+                transferred = xferred;
+                transferrable = xferable;
+                callback_was_called = true;
+            }, true, false);
+
+            REQUIRE(callback_was_called);
+            REQUIRE(current_transferrable == transferrable);
+            REQUIRE(current_transferred == transferred);
         }
 
         SECTION("token unregistration works") {
@@ -304,7 +381,7 @@ TEST_CASE("progress notification", "[sync]") {
             current_transferred = 60;
             current_transferrable = 501;
             const uint64_t original_transferrable = current_transferrable;
-            progress.update(21, 26, current_transferred, current_transferrable);
+            progress.update(21, 26, current_transferred, current_transferrable, 1, 1);
 
             uint64_t token = progress.register_callback([&](auto xferred, auto xferable) {
                 transferred = xferred;
@@ -318,7 +395,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = 66;
             current_transferrable = 912;
-            progress.update(25, 26, current_transferred, current_transferrable);
+            progress.update(25, 26, current_transferred, current_transferrable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_transferred);
             CHECK(transferrable == original_transferrable);
@@ -330,7 +407,7 @@ TEST_CASE("progress notification", "[sync]") {
             callback_was_called = false;
             current_transferred = 67;
             current_transferrable = 1228;
-            progress.update(199, 591, current_transferred, current_transferrable);
+            progress.update(199, 591, current_transferred, current_transferrable, 1, 1);
             CHECK(!callback_was_called);
         }
 
@@ -342,7 +419,7 @@ TEST_CASE("progress notification", "[sync]") {
             uint64_t current_downloadable = 182;
             const uint64_t original_uploadable = current_uploadable;
             const uint64_t original_downloadable = current_downloadable;
-            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable);
+            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
 
             progress.register_callback([&](auto xferred, auto xferable) {
                 transferred = xferred;
@@ -369,7 +446,7 @@ TEST_CASE("progress notification", "[sync]") {
             current_uploadable = 310;
             current_downloaded = 171;
             current_downloadable = 185;
-            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable);
+            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_uploaded);
             CHECK(transferrable == original_uploadable);
@@ -384,7 +461,7 @@ TEST_CASE("progress notification", "[sync]") {
             current_uploadable = 310;
             current_downloaded = 174;
             current_downloadable = 190;
-            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable);
+            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_uploaded);
             CHECK(transferrable == original_uploadable);
@@ -399,7 +476,7 @@ TEST_CASE("progress notification", "[sync]") {
             current_uploadable = 310;
             current_downloaded = 182;
             current_downloadable = 196;
-            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable);
+            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(!callback_was_called);
             CHECK(callback_was_called_2);
             CHECK(downloaded == current_downloaded);
@@ -411,7 +488,7 @@ TEST_CASE("progress notification", "[sync]") {
             current_uploadable = 410;
             current_downloaded = 192;
             current_downloadable = 591;
-            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable);
+            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(!callback_was_called);
             CHECK(!callback_was_called_2);;
         }
@@ -423,7 +500,7 @@ TEST_CASE("progress notification", "[sync]") {
             uint64_t current_downloaded = 68;
             uint64_t current_downloadable = 182;
             const uint64_t original_downloadable = current_downloadable;
-            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable);
+            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
 
             progress.register_callback([&](auto xferred, auto xferable) {
                 transferred = xferred;
@@ -438,7 +515,7 @@ TEST_CASE("progress notification", "[sync]") {
             current_uploadable = 310;
             current_downloaded = 171;
             current_downloadable = 185;
-            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable);
+            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_downloaded);
             CHECK(transferrable == original_downloadable);
@@ -463,7 +540,7 @@ TEST_CASE("progress notification", "[sync]") {
             current_uploadable = 310;
             current_downloaded = 182;
             current_downloadable = 190;
-            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable);
+            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_downloaded);
             CHECK(transferrable == original_downloadable);
@@ -478,7 +555,7 @@ TEST_CASE("progress notification", "[sync]") {
             current_uploadable = 310;
             current_downloaded = 189;
             current_downloadable = 250;
-            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable);
+            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(!callback_was_called);
             CHECK(callback_was_called_2);
             CHECK(downloaded == current_downloaded);
@@ -490,7 +567,7 @@ TEST_CASE("progress notification", "[sync]") {
             current_uploadable = 310;
             current_downloaded = 201;
             current_downloadable = 289;
-            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable);
+            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(!callback_was_called_2);
         }
     }

@@ -599,9 +599,10 @@ void SyncSession::cancel_pending_waits()
 }
 
 void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable,
-                                         uint64_t uploaded, uint64_t uploadable, bool is_fresh)
+                                         uint64_t uploaded, uint64_t uploadable,
+                                         uint64_t download_version, uint64_t snapshot_version)
 {
-    m_notifier.update(downloaded, downloadable, uploaded, uploadable, is_fresh);
+    m_notifier.update(downloaded, downloadable, uploaded, uploadable, download_version, snapshot_version);
 }
 
 void SyncSession::create_sync_session()
@@ -645,14 +646,14 @@ void SyncSession::create_sync_session()
     m_session->set_sync_transact_callback(std::move(wrapped_callback));
 
     // Set up the wrapped progress handler callback
-    auto wrapped_progress_handler = [this, weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
+    m_session->set_progress_handler([weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
                                                       uint_fast64_t uploaded, uint_fast64_t uploadable,
-                                                      bool is_fresh, uint_fast64_t /*snapshot_version*/) {
+                                                      uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
         if (auto self = weak_self.lock()) {
-            handle_progress_update(downloaded, downloadable, uploaded, uploadable, is_fresh);
+            self->handle_progress_update(downloaded, downloadable, uploaded,
+                                         uploadable, progress_version, snapshot_version);
         }
-    };
-    m_session->set_progress_handler(std::move(wrapped_progress_handler));
+    });
 }
 
 void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTransactCallback> callback)
@@ -670,6 +671,8 @@ void SyncSession::advance_state(std::unique_lock<std::mutex>& lock, const State&
 
 void SyncSession::nonsync_transact_notify(sync::Session::version_type version)
 {
+    m_notifier.set_local_version(version);
+
     std::unique_lock<std::mutex> lock(m_state_mutex);
     m_state->nonsync_transact_notify(lock, *this, version);
 }
@@ -829,13 +832,12 @@ uint64_t SyncProgressNotifier::register_callback(std::function<SyncProgressNotif
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         token_value = m_progress_notifier_token++;
-        NotifierPackage package{std::move(notifier), is_streaming, is_download};
+        NotifierPackage package{std::move(notifier), util::none, m_local_transaction_version, is_streaming, is_download};
         if (!m_current_progress) {
             // Simply register the package, since we have no data yet.
             m_packages.emplace(token_value, std::move(package));
             return token_value;
         }
-        package.update(*m_current_progress, m_latest_progress_data_is_fresh);
         bool skip_registration = false;
         invocation = package.create_invocation(*m_current_progress, skip_registration);
         if (skip_registration) {
@@ -855,60 +857,61 @@ void SyncProgressNotifier::unregister_callback(uint64_t token)
 }
 
 void SyncProgressNotifier::update(uint64_t downloaded, uint64_t downloadable,
-                                  uint64_t uploaded, uint64_t uploadable, bool is_fresh)
+                                  uint64_t uploaded, uint64_t uploadable,
+                                  uint64_t download_version, uint64_t snapshot_version)
 {
+    // Ignore progress messages from before we first receive a DOWNLOAD message
+    if (download_version == 0)
+        return;
+
     std::vector<std::function<void()>> invocations;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        m_current_progress = Progress{uploadable, downloadable, uploaded, downloaded};
-        m_latest_progress_data_is_fresh = is_fresh;
+        m_current_progress = Progress{uploadable, downloadable, uploaded, downloaded, snapshot_version};
 
-        for (auto it = m_packages.begin(); it != m_packages.end();) {
-            auto& package = it->second;
-            package.update(*m_current_progress, is_fresh);
-
+        for (auto it = m_packages.begin(); it != m_packages.end(); ) {
             bool should_delete = false;
-            invocations.emplace_back(package.create_invocation(*m_current_progress, should_delete));
-
-            it = (should_delete ? m_packages.erase(it) : std::next(it));
+            invocations.emplace_back(it->second.create_invocation(*m_current_progress, should_delete));
+            it = should_delete ? m_packages.erase(it) : std::next(it);
         }
     }
     // Run the notifiers only after we've released the lock.
-    for (auto& invocation : invocations) {
+    for (auto& invocation : invocations)
         invocation();
-    }
 }
 
-void SyncProgressNotifier::NotifierPackage::update(const Progress& current_progress, bool data_is_fresh)
+void SyncProgressNotifier::set_local_version(uint64_t snapshot_version)
 {
-    if (is_streaming || captured_transferrable || !data_is_fresh)
-        return;
-
-    captured_transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_local_transaction_version = snapshot_version;
 }
 
-// PRECONDITION: `update()` must first be called on the same package.
-std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(const Progress& current_progress, bool& is_expired) const
+std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress, bool& is_expired)
 {
-    // It's possible for a non-streaming notifier to not yet have fresh transferrable bytes data.
-    // In that case, we don't call it at all.
-    // NOTE: `update()` is always called before `create_invocation()`, and will
-    // set `captured_transferrable` on the notifier package if fresh data has
-    // been received and the package is for a non-streaming notifier.
-    if (!is_streaming && !captured_transferrable)
-        return [](){ };
-
-    uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     uint64_t transferrable;
     if (is_streaming) {
         transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
-    } else {
+    }
+    else if (captured_transferrable) {
         transferrable = *captured_transferrable;
     }
+    else {
+        if (is_download)
+            captured_transferrable = current_progress.downloadable;
+        else {
+            // If the sync client has not yet processed all of the local
+            // transactions then the uploadable data is incorrect and we should
+            // not invoke the callback
+            if (snapshot_version > current_progress.snapshot_version)
+                return []{};
+            captured_transferrable = current_progress.uploadable;
+        }
+        transferrable = *captured_transferrable;
+    }
+
+    uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     // A notifier is expired if at least as many bytes have been transferred
     // as were originally considered transferrable.
-    is_expired = !is_streaming && transferred >= *captured_transferrable;
-    return [=, package=*this](){
-        package.notifier(transferred, transferrable);
-    };
+    is_expired = !is_streaming && transferred >= transferrable;
+    return [=, notifier=notifier] { notifier(transferred, transferrable); };
 }

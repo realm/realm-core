@@ -58,8 +58,9 @@ public:
     uint64_t register_callback(std::function<SyncProgressNotifierCallback>, bool is_download, bool is_streaming);
     void unregister_callback(uint64_t);
 
+    void set_local_version(uint64_t);
     void update(uint64_t downloaded, uint64_t downloadable,
-                uint64_t uploaded, uint64_t uploadable, bool is_fresh=true);
+                uint64_t uploaded, uint64_t uploadable, uint64_t, uint64_t);
 
 private:
     mutable std::mutex m_mutex;
@@ -70,23 +71,25 @@ private:
         uint64_t downloadable;
         uint64_t uploaded;
         uint64_t downloaded;
+        uint64_t snapshot_version;
     };
 
     // A PODS encapsulating some information for progress notifier callbacks a binding
     // can register upon this session.
     struct NotifierPackage {
         std::function<SyncProgressNotifierCallback> notifier;
+        util::Optional<uint64_t> captured_transferrable;
+        uint64_t snapshot_version;
         bool is_streaming;
         bool is_download;
-        util::Optional<uint64_t> captured_transferrable;
 
-        void update(const Progress&, bool);
-        std::function<void()> create_invocation(const Progress&, bool&) const;
+        std::function<void()> create_invocation(const Progress&, bool&);
     };
 
     // A counter used as a token to identify progress notifier callbacks registered on this session.
     uint64_t m_progress_notifier_token = 1;
-    bool m_latest_progress_data_is_fresh;
+    // Version of the last locally-created transaction that we're expecting to be uploaded.
+    uint64_t m_local_transaction_version = 0;
 
     // Will be `none` until we've received the initial notification from sync.  Note that this
     // happens only once ever during the lifetime of a given `SyncSession`, since these values are
@@ -286,7 +289,7 @@ private:
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup);
     static std::string get_recovery_file_path();
-    void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, bool);
+    void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 
     void set_sync_transact_callback(std::function<SyncSessionTransactCallback>);
     void nonsync_transact_notify(VersionID::version_type);
