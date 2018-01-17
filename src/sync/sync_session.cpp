@@ -731,7 +731,7 @@ bool SyncSession::wait_for_download_completion(std::function<void(std::error_cod
 uint64_t SyncSession::register_progress_notifier(std::function<SyncProgressNotifierCallback> notifier,
                                                  NotifierType direction, bool is_streaming)
 {
-    return m_notifier.register_callback(std::move(notifier), direction == NotifierType::download, is_streaming);
+    return m_notifier.register_callback(std::move(notifier), direction, is_streaming);
 }
 
 void SyncSession::unregister_progress_notifier(uint64_t token)
@@ -825,14 +825,15 @@ void SyncSession::did_drop_external_reference()
 }
 
 uint64_t SyncProgressNotifier::register_callback(std::function<SyncProgressNotifierCallback> notifier,
-                                                 bool is_download, bool is_streaming)
+                                                 NotifierType direction, bool is_streaming)
 {
     std::function<void()> invocation;
     uint64_t token_value = 0;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         token_value = m_progress_notifier_token++;
-        NotifierPackage package{std::move(notifier), util::none, m_local_transaction_version, is_streaming, is_download};
+        NotifierPackage package{std::move(notifier), util::none, m_local_transaction_version,
+            is_streaming, direction == NotifierType::download};
         if (!m_current_progress) {
             // Simply register the package, since we have no data yet.
             m_packages.emplace(token_value, std::move(package));

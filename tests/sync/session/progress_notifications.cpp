@@ -25,12 +25,13 @@
 using namespace realm;
 
 TEST_CASE("progress notification", "[sync]") {
+    using NotifierType = SyncSession::NotifierType;
     _impl::SyncProgressNotifier progress;
 
     SECTION("callback is not called prior to first update") {
         bool callback_was_called = false;
-        progress.register_callback([&](auto, auto) { callback_was_called = true; }, false, false);
-        progress.register_callback([&](auto, auto) { callback_was_called = true; }, true, false);
+        progress.register_callback([&](auto, auto) { callback_was_called = true; }, NotifierType::upload, false);
+        progress.register_callback([&](auto, auto) { callback_was_called = true; }, NotifierType::download, false);
         REQUIRE_FALSE(callback_was_called);
     }
 
@@ -40,12 +41,12 @@ TEST_CASE("progress notification", "[sync]") {
 
         bool callback_was_called = false;
         SECTION("for upload notifications, with no data transfer ongoing") {
-            progress.register_callback([&](auto, auto) { callback_was_called = true; }, false, false);
+            progress.register_callback([&](auto, auto) { callback_was_called = true; }, NotifierType::upload, false);
             REQUIRE(callback_was_called);
         }
 
         SECTION("for download notifications, with no data transfer ongoing") {
-            progress.register_callback([&](auto, auto) { callback_was_called = true; }, true, false);
+            progress.register_callback([&](auto, auto) { callback_was_called = true; }, NotifierType::download, false);
         }
 
         SECTION("can register another notifier while in the initial notification without deadlock") {
@@ -54,8 +55,8 @@ TEST_CASE("progress notification", "[sync]") {
                 counter++;
                 progress.register_callback([&](auto, auto) {
                     counter++;
-                }, false, false);
-            }, true, false);
+                }, NotifierType::upload, false);
+            }, NotifierType::download, false);
             REQUIRE(counter == 2);
         }
     }
@@ -74,7 +75,7 @@ TEST_CASE("progress notification", "[sync]") {
                 transferred = xferred;
                 transferrable = xferable;
                 callback_was_called = true;
-            }, false, true);
+            }, NotifierType::upload, true);
             REQUIRE(callback_was_called);
 
             // Now manually call the notifier handler a few times.
@@ -110,7 +111,7 @@ TEST_CASE("progress notification", "[sync]") {
                 transferred = xferred;
                 transferrable = xferable;
                 callback_was_called = true;
-            }, true, true);
+            }, NotifierType::download, true);
             REQUIRE(callback_was_called);
 
             // Now manually call the notifier handler a few times.
@@ -146,7 +147,7 @@ TEST_CASE("progress notification", "[sync]") {
                 transferred = xferred;
                 transferrable = xferable;
                 callback_was_called = true;
-            }, true, true);
+            }, NotifierType::download, true);
             REQUIRE(callback_was_called);
 
             // Now manually call the notifier handler a few times.
@@ -174,7 +175,7 @@ TEST_CASE("progress notification", "[sync]") {
                 transferred = xferred;
                 transferrable = xferable;
                 callback_was_called = true;
-            }, true, true);
+            }, NotifierType::download, true);
             REQUIRE(callback_was_called);
 
             // Register a second notifier.
@@ -185,7 +186,7 @@ TEST_CASE("progress notification", "[sync]") {
                 transferred_2 = xferred;
                 transferrable_2 = xferable;
                 callback_was_called_2 = true;
-            }, false, true);
+            }, NotifierType::upload, true);
             REQUIRE(callback_was_called_2);
 
             // Now manually call the notifier handler a few times.
@@ -238,7 +239,7 @@ TEST_CASE("progress notification", "[sync]") {
                 transferred = xferred;
                 transferrable = xferable;
                 callback_was_called = true;
-            }, false, false);
+            }, NotifierType::upload, false);
             // Wait for the initial callback.
             REQUIRE(callback_was_called);
 
@@ -275,7 +276,7 @@ TEST_CASE("progress notification", "[sync]") {
                 transferred = xferred;
                 transferrable = xferable;
                 callback_was_called = true;
-            }, false, false);
+            }, NotifierType::upload, false);
             REQUIRE_FALSE(callback_was_called);
 
             current_transferred = 66;
@@ -303,7 +304,7 @@ TEST_CASE("progress notification", "[sync]") {
                 transferred = xferred;
                 transferrable = xferable;
                 callback_was_called = true;
-            }, true, false);
+            }, NotifierType::download, false);
             // Wait for the initial callback.
             REQUIRE(callback_was_called);
 
@@ -340,7 +341,7 @@ TEST_CASE("progress notification", "[sync]") {
                 transferred = xferred;
                 transferrable = xferable;
                 callback_was_called = true;
-            }, true, false);
+            }, NotifierType::download, false);
 
             current_transferred = 100;
             current_transferrable = 100;
@@ -369,7 +370,7 @@ TEST_CASE("progress notification", "[sync]") {
                 transferred = xferred;
                 transferrable = xferable;
                 callback_was_called = true;
-            }, true, false);
+            }, NotifierType::download, false);
 
             REQUIRE(callback_was_called);
             REQUIRE(current_transferrable == transferrable);
@@ -387,7 +388,7 @@ TEST_CASE("progress notification", "[sync]") {
                 transferred = xferred;
                 transferrable = xferable;
                 callback_was_called = true;
-            }, false, false);
+            }, NotifierType::upload, false);
             // Wait for the initial callback.
             REQUIRE(callback_was_called);
 
@@ -425,7 +426,7 @@ TEST_CASE("progress notification", "[sync]") {
                 transferred = xferred;
                 transferrable = xferable;
                 callback_was_called = true;
-            }, false, false);
+            }, NotifierType::upload, false);
             REQUIRE(callback_was_called);
 
             // Register a second notifier.
@@ -436,7 +437,7 @@ TEST_CASE("progress notification", "[sync]") {
                 downloaded = xferred;
                 downloadable = xferable;
                 callback_was_called_2 = true;
-            }, true, false);
+            }, NotifierType::download, false);
             REQUIRE(callback_was_called_2);
 
             // Now manually call the notifier handler a few times.
@@ -490,7 +491,7 @@ TEST_CASE("progress notification", "[sync]") {
             current_downloadable = 591;
             progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(!callback_was_called);
-            CHECK(!callback_was_called_2);;
+            CHECK(!callback_was_called_2);
         }
 
         SECTION("for multiple notifiers, same direction") {
@@ -506,7 +507,7 @@ TEST_CASE("progress notification", "[sync]") {
                 transferred = xferred;
                 transferrable = xferable;
                 callback_was_called = true;
-            }, true, false);
+            }, NotifierType::download, false);
             REQUIRE(callback_was_called);
 
             // Now manually call the notifier handler a few times.
@@ -529,7 +530,7 @@ TEST_CASE("progress notification", "[sync]") {
                 downloaded = xferred;
                 downloadable = xferable;
                 callback_was_called_2 = true;
-            }, true, false);
+            }, NotifierType::download, false);
             // Wait for the initial callback.
             REQUIRE(callback_was_called_2);
 

@@ -55,7 +55,12 @@ using SyncProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t t
 namespace _impl {
 class SyncProgressNotifier {
 public:
-    uint64_t register_callback(std::function<SyncProgressNotifierCallback>, bool is_download, bool is_streaming);
+    enum class NotifierType {
+        upload, download
+    };
+
+    uint64_t register_callback(std::function<SyncProgressNotifierCallback>,
+                               NotifierType direction, bool is_streaming);
     void unregister_callback(uint64_t);
 
     void set_local_version(uint64_t);
@@ -136,9 +141,7 @@ public:
     // Works the same way as `wait_for_upload_completion()`.
     bool wait_for_download_completion(std::function<void(std::error_code)> callback);
 
-    enum class NotifierType {
-        upload, download
-    };
+    using NotifierType = _impl::SyncProgressNotifier::NotifierType;
     // Register a notifier that updates the app regarding progress.
     //
     // If `m_current_progress` is populated when this method is called, the notifier
