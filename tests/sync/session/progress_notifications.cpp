@@ -333,7 +333,7 @@ TEST_CASE("progress notification", "[sync]") {
             CHECK(!callback_was_called);
         }
 
-        SECTION("download notifications are not sent until all a DOWNLOAD message has been received") {
+        SECTION("download notifications are not sent until a DOWNLOAD message has been received") {
             _impl::SyncProgressNotifier progress;
 
             progress.register_callback([&](auto xferred, auto xferable) {
