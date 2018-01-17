@@ -936,7 +936,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         // Validate compatible sizes of mutex and condvar types. Sizes of all
         // other fields are architecture independent, so if condvar and mutex
         // sizes match, the entire struct matches. The offsets of
-        // `v` and `size_of_condvar` are known to be as expected due
+        // `size_of_mutex` and `size_of_condvar` are known to be as expected due
         // to the preceeding check in `shared_info_version`.
         if (info->size_of_mutex != sizeof info->shared_controlmutex) {
             if (retries_left) {
