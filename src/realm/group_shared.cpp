@@ -436,7 +436,7 @@ struct alignas(8) SharedGroup::SharedInfo {
     /// mutex for the remaining and much smaller critical section.
     ///
     /// Note that std::atomic<uint8_t> is guaranteed to have standard layout.
-    std::atomic<uint8_t> commit_in_critical_phase = 0; // Offset 3
+    std::atomic<uint8_t> commit_in_critical_phase = { 0 }; // Offset 3
 
     /// The target Realm file format version for the current session. This
     /// allows all session participants to be in agreement. It can only differ
