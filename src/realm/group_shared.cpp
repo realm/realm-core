@@ -594,7 +594,7 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
                   offsetof(SharedInfo, size_of_condvar) == 2 &&
                   std::is_same<decltype(size_of_condvar), uint8_t>::value &&
                   offsetof(SharedInfo, commit_in_critical_phase) == 3 &&
-                  std::is_same<decltype(commit_in_critical_phase), uint8_t>::value &&
+                  std::is_same<decltype(commit_in_critical_phase), std::atomic<uint8_t>>::value &&
                   offsetof(SharedInfo, file_format_version) == 4 &&
                   std::is_same<decltype(file_format_version), uint8_t>::value &&
                   offsetof(SharedInfo, history_type) == 5 &&
