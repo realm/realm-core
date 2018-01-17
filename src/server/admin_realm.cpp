@@ -65,8 +65,16 @@ void AdminRealmListener::start()
         return;
     }
 
-    m_download_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
     std::weak_ptr<AdminRealmListener> weak_self = shared_from_this();
+
+    m_config.sync_config->error_handler = EventLoopDispatcher<void(std::shared_ptr<SyncSession>, SyncError)>([weak_self, this](std::shared_ptr<SyncSession>, SyncError e) {
+        auto self = weak_self.lock();
+        if (!self)
+            return;
+        error(std::make_exception_ptr(std::system_error(e.error_code)));
+        m_download_session.reset();
+    });
+
     EventLoopDispatcher<void(std::error_code)> download_callback([weak_self, this](std::error_code ec) {
         auto self = weak_self.lock();
         if (!self)
@@ -106,6 +114,7 @@ void AdminRealmListener::start()
             }
         });
     });
+    m_download_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
     bool result = m_download_session->wait_for_download_completion(std::move(download_callback));
     REALM_ASSERT_RELEASE(result);
 }
