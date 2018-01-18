@@ -183,7 +183,7 @@ std::vector<bool> SortDescriptor::export_order() const
 
 std::string SortDescriptor::get_description(TableRef attached_table) const
 {
-    std::string description = "SORT BY ";
+    std::string description = "SORT(";
     for (size_t i = 0; i < m_columns.size(); ++i) {
         const size_t chain_size = m_columns[i].size();
         TableRef cur_link_table = attached_table;
@@ -200,18 +200,22 @@ std::string SortDescriptor::get_description(TableRef attached_table) const
         description += " ";
         if (i < m_ascending.size()) {
             if (m_ascending[i]) {
-                description += "ASC ";
+                description += "ASC";
             } else {
-                description += "DESC ";
+                description += "DESC";
             }
         }
+        if (i < m_columns.size() - 1) {
+            description += " ";
+        }
     }
+    description += ")";
     return description;
 }
 
 std::string CommonDescriptor::get_description(TableRef attached_table) const
 {
-    std::string description = "DISTINCT ";
+    std::string description = "DISTINCT(";
     for (size_t i = 0; i < m_columns.size(); ++i) {
         const size_t chain_size = m_columns[i].size();
         TableRef cur_link_table = attached_table;
@@ -225,8 +229,11 @@ std::string CommonDescriptor::get_description(TableRef attached_table) const
                 cur_link_table = cur_link_table->get_link_target(col_ndx);
             }
         }
-        description += " ";
+        if (i < m_columns.size() - 1) {
+            description += " ";
+        }
     }
+    description += ")";
     return description;
 }
 
@@ -351,6 +358,9 @@ std::string DescriptorOrdering::get_description(TableRef target_table) const
     for (auto it = m_descriptors.begin(); it != m_descriptors.end(); ++it) {
         REALM_ASSERT_DEBUG(bool(*it));
         description += (*it)->get_description(target_table);
+        if (it != m_descriptors.end() - 1) {
+            description += " ";
+        }
     }
     return description;
 }

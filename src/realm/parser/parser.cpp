@@ -24,6 +24,7 @@
 #include <pegtl/analyze.hpp>
 #include <pegtl/contrib/tracer.hpp>
 
+#include <realm/util/assert.hpp>
 // String tokens can't be followed by [A-z0-9_].
 #define string_token_t(s) seq< TAOCPP_PEGTL_ISTRING(s), not_at< identifier_other > >
 
@@ -116,6 +117,15 @@ struct begins : string_token_t("beginswith") {};
 struct ends : string_token_t("endswith") {};
 struct like : string_token_t("like") {};
 
+struct sort_prefix : seq< string_token_t("sort"), star< blank >, one< '(' > > {};
+struct distinct_prefix : seq< string_token_t("distinct"), star< blank >, one< '(' > > {};
+struct ascending : seq< sor< string_token_t("ascending"), string_token_t("asc") > > {};
+struct descending : seq< sor< string_token_t("descending"), string_token_t("desc") > > {};
+struct descriptor_property : disable< key_path > {};
+struct sort : seq< sort_prefix, plus< star< blank >, descriptor_property, plus< blank >, sor< ascending, descending > >, star< blank >, one< ')' > > {};
+struct distinct : seq < distinct_prefix, plus< star< blank >, descriptor_property >, star< blank >, one< ')' > > {};
+struct descriptor_ordering : sor< sort, distinct > {};
+
 struct string_oper : seq< sor< contains, begins, ends, like>, star< blank >, opt< case_insensitive > > {};
 // "=" is equality and since other operators can start with "=" we must check equal last
 struct symbolic_oper : sor< noteq, lteq, lt, gteq, gt, eq > {};
@@ -129,7 +139,7 @@ struct true_pred : string_token_t("truepredicate") {};
 struct false_pred : string_token_t("falsepredicate") {};
 
 struct not_pre : seq< sor< one< '!' >, string_token_t("not") > > {};
-struct atom_pred : seq< opt< not_pre >, pad< sor< group_pred, true_pred, false_pred, comparison_pred >, blank > > {};
+struct atom_pred : seq< opt< not_pre >, pad< sor< group_pred, true_pred, false_pred, comparison_pred >, blank >, star< pad< descriptor_ordering, blank > > > {};
 
 struct and_op : pad< sor< two< '&' >, string_token_t("and") >, blank > {};
 struct or_op : pad< sor< two< '|' >, string_token_t("or") >, blank > {};
@@ -147,6 +157,8 @@ struct ParserState
     std::vector<std::string> timestamp_input_buffer;
     std::string collection_key_path_prefix, collection_key_path_suffix;
     Expression::KeyPathOp pending_op;
+    DescriptorOrderingState ordering_state;
+    DescriptorOrderingState::SingleOrderingState temp_ordering;
 
     Predicate *current_group()
     {
@@ -331,6 +343,91 @@ template<> struct action< timestamp_number >
     }
 };
 
+
+template<> struct action< descriptor_property >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string());
+        DescriptorOrderingState::PropertyState p;
+        p.key_path = in.string();
+        p.ascending = false; // will be overwritten by the required order specification next
+        state.temp_ordering.properties.push_back(p);
+    }
+};
+
+template<> struct action< ascending >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string());
+        REALM_ASSERT_DEBUG(state.temp_ordering.properties.size() > 0);
+        state.temp_ordering.properties.back().ascending = true;
+    }
+};
+
+template<> struct action< descending >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string());
+        REALM_ASSERT_DEBUG(state.temp_ordering.properties.size() > 0);
+        state.temp_ordering.properties.back().ascending = false;
+    }
+};
+
+template<> struct action< sort_prefix >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string());
+        // This clears the temp buffer when a distinct clause starts. It makes sure there is no temp properties that
+        // were added if previous properties started matching but it wasn't actuallly a full distinct/sort match
+        state.temp_ordering.properties.clear();
+    }
+};
+
+template<> struct action< distinct_prefix >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string());
+        // This clears the temp buffer when a distinct clause starts. It makes sure there is no temp properties that
+        // were added if previous properties started matching but it wasn't actuallly a full distinct/sort match
+        state.temp_ordering.properties.clear();
+    }
+};
+
+template<> struct action< sort >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string());
+        state.temp_ordering.is_distinct = false;
+        state.ordering_state.orderings.push_back(state.temp_ordering);
+        state.temp_ordering.properties.clear();
+    }
+};
+
+template<> struct action< distinct >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string());
+        state.temp_ordering.is_distinct = true;
+        state.ordering_state.orderings.push_back(state.temp_ordering);
+        state.temp_ordering.properties.clear();
+    }
+};
+
+
 #define COLLECTION_OPERATION_ACTION(rule, type)                     \
 template<> struct action< rule > {                                  \
 template< typename Input >                                          \
@@ -467,7 +564,7 @@ const std::string error_message_control< chars >::error_message = "Invalid chara
 template< typename Rule>
 const std::string error_message_control< Rule >::error_message = "Invalid predicate.";
 
-Predicate parse(const std::string &query)
+ParserResult parse(const std::string &query)
 {
     DEBUG_PRINT_TOKEN(query);
 
@@ -479,9 +576,10 @@ Predicate parse(const std::string &query)
     tao::pegtl::memory_input<> input(query, query);
     tao::pegtl::parse< must< pred, eof >, action, error_message_control >(input, state);
     if (out_predicate.type == Predicate::Type::And && out_predicate.cpnd.sub_predicates.size() == 1) {
-        return std::move(out_predicate.cpnd.sub_predicates.back());
+        return ParserResult{ std::move(out_predicate.cpnd.sub_predicates.back()), state.ordering_state };
     }
-    return out_predicate;
+
+    return ParserResult{ out_predicate, state.ordering_state};
 }
 
 size_t analyze_grammar()

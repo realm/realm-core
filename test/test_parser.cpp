@@ -173,6 +173,23 @@ static std::vector<std::string> valid_queries = {
     "and=='AND'&&'or'=='||'",
     "and == or && ORE > GRAND",
     "a=1AND NOTb=2",
+
+    // sort/distinct
+    "a=b SORT(p ASCENDING)",
+    "a=b SORT(p asc)",
+    "a=b SORT(p Descending)",
+    "a=b sort (p.q desc)",
+    "a=b distinct(p)",
+    "a=b DISTINCT(P)",
+    "a=b DISTINCT(p)",
+    "a == b sort(a ASC b DESC)",
+    "a == b sort(a ASC b DESC) sort(c ASC)",
+    "a=b DISTINCT(p) DISTINCT(q)",
+    "a=b DISTINCT(p q r) DISTINCT(q)",
+    "a == b sort(a ASC b DESC) DISTINCT(p)",
+    "a == b sort(a ASC b DESC) DISTINCT(p) sort(c ASC d DESC) DISTINCT(q.r)",
+    "a == b and c==d sort(a ASC b DESC) DISTINCT(p) sort(c ASC d DESC) DISTINCT(q.r)",
+    "a == b  sort(     a   ASC b DESC) and c==d   DISTINCT(   p )  sort(   c   ASC   d   DESC  )  DISTINCT(   q.r    p)   ",
 };
 
 static std::vector<std::string> invalid_queries = {
@@ -230,6 +247,24 @@ static std::vector<std::string> invalid_queries = {
 
     "truepredicate &&",
     "truepredicate & truepredicate",
+
+    // sort/distinct
+    "SORT(p ASCENDING)",  // no query conditions
+    "a=b SORT(p)",        // no asc/desc
+    "a=b SORT(0 Descending)", // bad keypath
+    "a=b sort()",             // missing condition
+    "a=b sort",      // no target property
+    "distinct(p)",           // no query condition
+    "a=b DISTINCT()",      // no target property
+    "a=b Distinct",      // no target property
+    "sort(a ASC b DESC) a == b", // before query condition
+    "sort(a ASC b DESC) a == b sort(c ASC)", // before query condition
+    "a=bDISTINCT(p)", // bad spacing
+    "a=b sort p.q desc", // no braces
+    "a=b sort(p.qDESC)", // bad spacing
+    "a=b DISTINCT p", // no braces
+    "a=b SORT(p ASC", // bad braces
+    "a=b DISTINCT(p", // no braces
 };
 
 TEST(Parser_valid_queries) {
@@ -254,7 +289,7 @@ TEST(Parser_grammar_analysis)
 Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, size_t num_results) {
     Query q = t->where();
 
-    realm::parser::Predicate p = realm::parser::parse(query_string);
+    realm::parser::Predicate p = realm::parser::parse(query_string).predicate;
     realm::query_builder::apply_predicate(q, p);
 
     CHECK_EQUAL(q.count(), num_results);
@@ -262,7 +297,7 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
     //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
-    realm::parser::Predicate p2 = realm::parser::parse(description);
+    realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
     realm::query_builder::apply_predicate(q2, p2);
 
     CHECK_EQUAL(q2.count(), num_results);
@@ -285,7 +320,7 @@ TEST(Parser_empty_input)
     std::string empty_description = q.get_description();
     CHECK(!empty_description.empty());
     CHECK_EQUAL(0, empty_description.compare("TRUEPREDICATE"));
-    realm::parser::Predicate p = realm::parser::parse(empty_description);
+    realm::parser::Predicate p = realm::parser::parse(empty_description).predicate;
     realm::query_builder::apply_predicate(q, p);
     CHECK_EQUAL(q.count(), 5);
 
@@ -928,7 +963,7 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
 
     Query q = t->where();
 
-    realm::parser::Predicate p = realm::parser::parse(query_string);
+    realm::parser::Predicate p = realm::parser::parse(query_string).predicate;
     realm::query_builder::apply_predicate(q, p, args);
 
     CHECK_EQUAL(q.count(), num_results);
@@ -936,7 +971,7 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
-    realm::parser::Predicate p2 = realm::parser::parse(description);
+    realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
     realm::query_builder::apply_predicate(q2, p2);
 
     CHECK_EQUAL(q2.count(), num_results);
@@ -1218,12 +1253,12 @@ TEST(Parser_string_binary_encoding)
         //std::cerr << "original: " << buff << "\tdescribed: " << string_description << "\n";
 
         Query qstr2 = t->where();
-        realm::parser::Predicate pstr2 = realm::parser::parse(string_description);
+        realm::parser::Predicate pstr2 = realm::parser::parse(string_description).predicate;
         realm::query_builder::apply_predicate(qstr2, pstr2);
         CHECK_EQUAL(qstr2.count(), num_results);
 
         Query qbin2 = t->where();
-        realm::parser::Predicate pbin2 = realm::parser::parse(binary_description);
+        realm::parser::Predicate pbin2 = realm::parser::parse(binary_description).predicate;
         realm::query_builder::apply_predicate(qbin2, pbin2);
         CHECK_EQUAL(qbin2.count(), num_results);
     }
@@ -1351,7 +1386,7 @@ TEST(Parser_collection_aggregates)
 }
 
 
-TEST(Parser_SortAndDistinct)
+TEST(Parser_SortAndDistinctSerialisation)
 {
     Group g;
     TableRef people = g.add_table("person");
@@ -1395,7 +1430,7 @@ TEST(Parser_SortAndDistinct)
     tv.sort(age_col, true);
     tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
     std::string description = tv.get_descriptor_ordering_description();
-    CHECK(description.find("SORT BY") != std::string::npos);
+    CHECK(description.find("SORT(") != std::string::npos);
     CHECK(description.find("name DESC") != std::string::npos);
     CHECK(description.find("age ASC") != std::string::npos);
     CHECK(description.find("account.balance ASC") != std::string::npos);
@@ -1407,7 +1442,7 @@ TEST(Parser_SortAndDistinct)
     tv.distinct(age_col);
     tv.distinct(DistinctDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}));
     description = tv.get_descriptor_ordering_description();
-    CHECK(description.find("DISTINCT") != std::string::npos);
+    CHECK(description.find("DISTINCT(") != std::string::npos);
     CHECK(description.find("name") != std::string::npos);
     CHECK(description.find("age") != std::string::npos);
     CHECK(description.find("account.balance") != std::string::npos);
@@ -1418,8 +1453,132 @@ TEST(Parser_SortAndDistinct)
     tv.distinct(DistinctDescriptor(*people, {{name_col}, {age_col}}));
     tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
     description = tv.get_descriptor_ordering_description();
-    CHECK(description.find("DISTINCT name age") != std::string::npos);
-    CHECK(description.find("SORT BY account.balance ASC account.num_transactions DESC") != std::string::npos);
+    CHECK(description.find("DISTINCT(name age)") != std::string::npos);
+    CHECK(description.find("SORT(account.balance ASC account.num_transactions DESC)") != std::string::npos);
+}
+
+TableView get_sorted_view(TableRef t, std::string query_string)
+{
+    Query q = t->where();
+
+    parser::ParserResult result = realm::parser::parse(query_string);
+    realm::query_builder::apply_predicate(q, result.predicate);
+    DescriptorOrdering ordering;
+    realm::query_builder::apply_ordering(ordering, t, result.ordering);
+
+    std::string query_description = q.get_description();
+    std::string ordering_description = ordering.get_description(t);
+    std::string combined = query_description + " " + ordering_description;
+
+    //std::cerr << "original: " << query_string << "\tdescribed: " << combined << "\n";
+    Query q2 = t->where();
+
+    parser::ParserResult result2 = realm::parser::parse(combined);
+    realm::query_builder::apply_predicate(q2, result2.predicate);
+    DescriptorOrdering ordering2;
+    realm::query_builder::apply_ordering(ordering2, t, result2.ordering);
+
+    TableView tv = q2.find_all();
+    tv.apply_descriptor_ordering(ordering2);
+    return tv;
+}
+
+TEST(Parser_SortAndDistinct)
+{
+    Group g;
+    TableRef people = g.add_table("person");
+    TableRef accounts = g.add_table("account");
+
+    size_t name_col = people->add_column(type_String, "name");
+    size_t age_col = people->add_column(type_Int, "age");
+    size_t account_col = people->add_column_link(type_Link, "account", *accounts);
+
+    size_t balance_col = accounts->add_column(type_Double, "balance");
+    size_t transaction_col = accounts->add_column(type_Int, "num_transactions");
+
+    accounts->add_empty_row(3);
+    accounts->set_double(balance_col, 0, 50.55);
+    accounts->set_int(transaction_col, 0, 2);
+    accounts->set_double(balance_col, 1, 50.55);
+    accounts->set_int(transaction_col, 1, 73);
+    accounts->set_double(balance_col, 2, 98.92);
+    accounts->set_int(transaction_col, 2, 17);
+
+    people->add_empty_row(3);
+    people->set_string(name_col, 0, "Adam");
+    people->set_int(age_col, 0, 28);
+    people->set_link(account_col, 0, 0);
+    people->set_string(name_col, 1, "Frank");
+    people->set_int(age_col, 1, 30);
+    people->set_link(account_col, 1, 1);
+    people->set_string(name_col, 2, "Ben");
+    people->set_int(age_col, 2, 28);
+    people->set_link(account_col, 2, 2);
+
+    // person:                      | account:
+    // name     age     account     | balance       num_transactions
+    // Adam     28      0 ->        | 50.55         2
+    // Frank    30      1 ->        | 50.55         73
+    // Ben      28      2 ->        | 98.92         17
+
+    // sort serialisation
+    TableView tv = get_sorted_view(people, "age > 0 SORT(age ASC)");
+    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+        CHECK(tv.get_int(age_col, row_ndx - 1) <= tv.get_int(age_col, row_ndx));
+    }
+
+    tv = get_sorted_view(people, "age > 0 SORT(age DESC)");
+    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+        CHECK(tv.get_int(age_col, row_ndx - 1) >= tv.get_int(age_col, row_ndx));
+    }
+
+    tv = get_sorted_view(people, "age > 0 SORT(age ASC name DESC)");
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Ben");
+    CHECK_EQUAL(tv.get_string(name_col, 1), "Adam");
+    CHECK_EQUAL(tv.get_string(name_col, 2), "Frank");
+
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(account.balance ascending)");
+    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+        size_t link_ndx1 = tv.get_link(account_col, row_ndx - 1);
+        size_t link_ndx2 = tv.get_link(account_col, row_ndx);
+        CHECK(accounts->get_double(balance_col, link_ndx1) <= accounts->get_double(balance_col, link_ndx2));
+    }
+
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(account.balance descending)");
+    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+        size_t link_ndx1 = tv.get_link(account_col, row_ndx - 1);
+        size_t link_ndx2 = tv.get_link(account_col, row_ndx);
+        CHECK(accounts->get_double(balance_col, link_ndx1) >= accounts->get_double(balance_col, link_ndx2));
+    }
+
+    tv = get_sorted_view(people, "TRUEPREDICATE DISTINCT(age)");
+    CHECK_EQUAL(tv.size(), 2);
+    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+        CHECK(tv.get_int(age_col, row_ndx - 1) != tv.get_int(age_col, row_ndx));
+    }
+
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(age ASC) DISTINCT(age)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_int(age_col, 0), 28);
+    CHECK_EQUAL(tv.get_int(age_col, 1), 30);
+
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name DESC) DISTINCT(age) SORT(name ASC) DISTINCT(name)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Ben");
+    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
+
+    tv = get_sorted_view(people, "account.num_transactions > 10 SORT(name ASC)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Ben");
+    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "TRUEPREDICATE DISTINCT(balance)"), message);
+    CHECK_EQUAL(message, "No property 'balance' found on object type 'person' specified in 'distinct' clause");
+
+    CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "TRUEPREDICATE sort(account.name ASC)"), message);
+    CHECK_EQUAL(message, "No property 'name' found on object type 'account' specified in 'sort' clause");
 }
 
 #endif // TEST_PARSER
