@@ -122,8 +122,10 @@ struct distinct_prefix : seq< string_token_t("distinct"), star< blank >, one< '(
 struct ascending : seq< sor< string_token_t("ascending"), string_token_t("asc") > > {};
 struct descending : seq< sor< string_token_t("descending"), string_token_t("desc") > > {};
 struct descriptor_property : disable< key_path > {};
-struct sort : seq< sort_prefix, plus< star< blank >, descriptor_property, plus< blank >, sor< ascending, descending > >, star< blank >, one< ')' > > {};
-struct distinct : seq < distinct_prefix, plus< star< blank >, descriptor_property >, star< blank >, one< ')' > > {};
+struct sort_param : seq< star< blank >, descriptor_property, plus< blank >, sor< ascending, descending >, star< blank > > {};
+struct sort : seq< sort_prefix, sort_param, star< seq< one< ',' >, sort_param > >, one< ')' > > {};
+struct distinct_param : seq< star< blank >, descriptor_property, star< blank > > {};
+struct distinct : seq < distinct_prefix, distinct_param, star< seq< one< ',' >, distinct_param > >, one< ')' > > {};
 struct descriptor_ordering : sor< sort, distinct > {};
 
 struct string_oper : seq< sor< contains, begins, ends, like>, star< blank >, opt< case_insensitive > > {};

@@ -113,7 +113,7 @@ public:
     bool any_is_null(IndexPair i) const
     {
         return std::any_of(m_columns.begin(), m_columns.end(),
-                           [=](auto&& col) { return col.is_null[i.index_in_view]; });
+                           [=](auto&& col) { return col.is_null.empty() ? false : col.is_null[i.index_in_view]; });
     }
 
 private:
@@ -206,7 +206,7 @@ std::string SortDescriptor::get_description(TableRef attached_table) const
             }
         }
         if (i < m_columns.size() - 1) {
-            description += " ";
+            description += ", ";
         }
     }
     description += ")";
@@ -230,7 +230,7 @@ std::string CommonDescriptor::get_description(TableRef attached_table) const
             }
         }
         if (i < m_columns.size() - 1) {
-            description += " ";
+            description += ", ";
         }
     }
     description += ")";

@@ -182,14 +182,14 @@ static std::vector<std::string> valid_queries = {
     "a=b distinct(p)",
     "a=b DISTINCT(P)",
     "a=b DISTINCT(p)",
-    "a == b sort(a ASC b DESC)",
-    "a == b sort(a ASC b DESC) sort(c ASC)",
+    "a == b sort(a ASC, b DESC)",
+    "a == b sort(a ASC, b DESC) sort(c ASC)",
     "a=b DISTINCT(p) DISTINCT(q)",
-    "a=b DISTINCT(p q r) DISTINCT(q)",
-    "a == b sort(a ASC b DESC) DISTINCT(p)",
-    "a == b sort(a ASC b DESC) DISTINCT(p) sort(c ASC d DESC) DISTINCT(q.r)",
-    "a == b and c==d sort(a ASC b DESC) DISTINCT(p) sort(c ASC d DESC) DISTINCT(q.r)",
-    "a == b  sort(     a   ASC b DESC) and c==d   DISTINCT(   p )  sort(   c   ASC   d   DESC  )  DISTINCT(   q.r    p)   ",
+    "a=b DISTINCT(p, q, r) DISTINCT(q)",
+    "a == b sort(a ASC, b DESC) DISTINCT(p)",
+    "a == b sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
+    "a == b and c==d sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
+    "a == b  sort(     a   ASC  ,  b DESC) and c==d   DISTINCT(   p )  sort(   c   ASC  ,  d   DESC  )  DISTINCT(   q.r ,   p)   ",
 };
 
 static std::vector<std::string> invalid_queries = {
@@ -257,14 +257,16 @@ static std::vector<std::string> invalid_queries = {
     "distinct(p)",           // no query condition
     "a=b DISTINCT()",      // no target property
     "a=b Distinct",      // no target property
-    "sort(a ASC b DESC) a == b", // before query condition
-    "sort(a ASC b DESC) a == b sort(c ASC)", // before query condition
+    "sort(a ASC b, DESC) a == b", // before query condition
+    "sort(a ASC b, DESC) a == b sort(c ASC)", // before query condition
     "a=bDISTINCT(p)", // bad spacing
     "a=b sort p.q desc", // no braces
     "a=b sort(p.qDESC)", // bad spacing
     "a=b DISTINCT p", // no braces
     "a=b SORT(p ASC", // bad braces
     "a=b DISTINCT(p", // no braces
+    "a=b sort(p.q DESC a ASC)", // missing comma
+    "a=b DISTINCT(p q)", // missing comma
 };
 
 TEST(Parser_valid_queries) {
@@ -1430,11 +1432,7 @@ TEST(Parser_SortAndDistinctSerialisation)
     tv.sort(age_col, true);
     tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
     std::string description = tv.get_descriptor_ordering_description();
-    CHECK(description.find("SORT(") != std::string::npos);
-    CHECK(description.find("name DESC") != std::string::npos);
-    CHECK(description.find("age ASC") != std::string::npos);
-    CHECK(description.find("account.balance ASC") != std::string::npos);
-    CHECK(description.find("account.num_transactions DESC") != std::string::npos);
+    CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC, age ASC, name DESC)") != std::string::npos);
 
     // distinct serialisation
     tv = people->where().find_all();
@@ -1442,19 +1440,15 @@ TEST(Parser_SortAndDistinctSerialisation)
     tv.distinct(age_col);
     tv.distinct(DistinctDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}));
     description = tv.get_descriptor_ordering_description();
-    CHECK(description.find("DISTINCT(") != std::string::npos);
-    CHECK(description.find("name") != std::string::npos);
-    CHECK(description.find("age") != std::string::npos);
-    CHECK(description.find("account.balance") != std::string::npos);
-    CHECK(description.find("account.num_transactions") != std::string::npos);
+    CHECK(description.find("DISTINCT(name) DISTINCT(age) DISTINCT(account.balance, account.num_transactions)") != std::string::npos);
 
     // combined sort and distinct serialisation
     tv = people->where().find_all();
     tv.distinct(DistinctDescriptor(*people, {{name_col}, {age_col}}));
     tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
     description = tv.get_descriptor_ordering_description();
-    CHECK(description.find("DISTINCT(name age)") != std::string::npos);
-    CHECK(description.find("SORT(account.balance ASC account.num_transactions DESC)") != std::string::npos);
+    CHECK(description.find("DISTINCT(name, age)") != std::string::npos);
+    CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC)") != std::string::npos);
 }
 
 TableView get_sorted_view(TableRef t, std::string query_string)
@@ -1532,7 +1526,7 @@ TEST(Parser_SortAndDistinct)
         CHECK(tv.get_int(age_col, row_ndx - 1) >= tv.get_int(age_col, row_ndx));
     }
 
-    tv = get_sorted_view(people, "age > 0 SORT(age ASC name DESC)");
+    tv = get_sorted_view(people, "age > 0 SORT(age ASC, name DESC)");
     CHECK_EQUAL(tv.size(), 3);
     CHECK_EQUAL(tv.get_string(name_col, 0), "Ben");
     CHECK_EQUAL(tv.get_string(name_col, 1), "Adam");
@@ -1557,6 +1551,16 @@ TEST(Parser_SortAndDistinct)
     for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
         CHECK(tv.get_int(age_col, row_ndx - 1) != tv.get_int(age_col, row_ndx));
     }
+
+    tv = get_sorted_view(people, "TRUEPREDICATE DISTINCT(age, account.balance)");
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
+    CHECK_EQUAL(tv.get_string(name_col, 2), "Ben");
+
+    tv = get_sorted_view(people, "TRUEPREDICATE DISTINCT(age) DISTINCT(account.balance)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
 
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(age ASC) DISTINCT(age)");
     CHECK_EQUAL(tv.size(), 2);
