@@ -2,6 +2,66 @@
 
 ### Bugfixes
 
+* None.
+
+### Breaking changes
+
+* None.
+
+### Enhancements
+
+* None.
+
+-----------
+
+### Internals
+
+* None.
+
+----------------------------------------------
+
+# 5.1.2 Release notes
+
+### Bugfixes
+
+* Include the parser libs in the published android packages.
+
+----------------------------------------------
+
+# 5.1.1 Release notes
+
+### Bugfixes
+
+* The `realm-parser` static library now correctly includes both simulator and device architectures on Apple platforms.
+
+----------------------------------------------
+
+# 5.1.0 Release notes
+
+### Enhancements
+
+* Change the allocation scheme to (hopefully) perform better in scenarios
+  with high fragmentation.
+  PR [#2963](https://github.com/realm/realm-core/pull/2963)
+* Avoid excessive bumping of counters in the version management machinery that is
+  responsible for supporting live queries. We now prune version bumping earlier if
+  when we have sequences of changes without queries in between.
+  PR [#2962](https://github.com/realm/realm-core/pull/2962)
+
+----------------------------------------------
+
+# 5.0.1 Release notes
+
+### Bugfixes
+
+* Add a CMake import target for the `realm-parser` library.
+
+----------------------------------------------
+
+# 5.0.0 Release notes
+
+### Bugfixes
+
 * Fix possible corruption or crashes when a `move_row` operates on a subtable.
   PR [#2927](https://github.com/realm/realm-core/pull/2926).
 * Table::set_int() did not check if the target column was indeed type_Int. It
@@ -34,12 +94,6 @@
         - The nanoseconds part can be optionally omitted
         - Conversion works for UTC from dates between ~1970-3000 on windows and ~1901-2038 on other platforms
   PR [#2947](https://github.com/realm/realm-core/pull/2947).
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
