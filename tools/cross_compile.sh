@@ -105,6 +105,10 @@ else
          -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a"
+    lipo -create \
+         -output "src/realm/${BUILD_TYPE}/librealm-parser${suffix}.a" \
+         "src/realm/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
+         "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
     xcodebuild -sdk "${SDK}os" \
                -configuration "${BUILD_TYPE}" \
                -target install \
@@ -115,6 +119,7 @@ else
                ONLY_ACTIVE_ARCH=NO
     mkdir -p install/lib
     cp "src/realm/${BUILD_TYPE}/librealm${suffix}.a" install/lib
+    cp "src/realm/${BUILD_TYPE}/librealm-parser${suffix}.a" install/lib
     cd install || exit 1
     tar -cvzf "realm-core-${BUILD_TYPE}-${VERSION}-${SDK}os.tar.gz" lib include
     mv ./*.tar.gz ..
