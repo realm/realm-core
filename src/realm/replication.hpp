@@ -345,7 +345,7 @@ public:
     }
 
     template <class T>
-    void set(const Table*, ColKey col_key, Key key, T value, _impl::Instruction variant);
+    void set(const Table*, ColKey col_key, ObjKey key, T value, _impl::Instruction variant);
 
 protected:
     Replication();
@@ -475,45 +475,47 @@ inline bool Replication::is_sync_agent() const noexcept
 }
 
 template <>
-inline void Replication::set(const Table* table, ColKey col_key, Key key, StringData value,
+inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, StringData value,
                              _impl::Instruction variant)
 {
     set_string(table, col_key, key, value, variant);
 }
 
 template <>
-inline void Replication::set(const Table* table, ColKey col_key, Key key, BinaryData value,
+inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, BinaryData value,
                              _impl::Instruction variant)
 {
     set_binary(table, col_key, key, value, variant);
 }
 
 template <>
-inline void Replication::set(const Table* table, ColKey col_key, Key key, Timestamp value, _impl::Instruction variant)
+inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, Timestamp value,
+                             _impl::Instruction variant)
 {
     set_timestamp(table, col_key, key, value, variant);
 }
 
 template <>
-inline void Replication::set(const Table* table, ColKey col_key, Key key, bool value, _impl::Instruction variant)
+inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, bool value, _impl::Instruction variant)
 {
     set_bool(table, col_key, key, value, variant);
 }
 
 template <>
-inline void Replication::set(const Table* table, ColKey col_key, Key key, float value, _impl::Instruction variant)
+inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, float value, _impl::Instruction variant)
 {
     set_float(table, col_key, key, value, variant);
 }
 
 template <>
-inline void Replication::set(const Table* table, ColKey col_key, Key key, double value, _impl::Instruction variant)
+inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, double value, _impl::Instruction variant)
 {
     set_double(table, col_key, key, value, variant);
 }
 
 template <>
-inline void Replication::set(const Table* table, ColKey col_key, Key key, Key target_key, _impl::Instruction variant)
+inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, ObjKey target_key,
+                             _impl::Instruction variant)
 {
     set_link(table, col_key, key, target_key, variant);
 }

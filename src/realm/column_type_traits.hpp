@@ -26,7 +26,7 @@
 
 namespace realm {
 
-struct Key;
+struct ObjKey;
 class Timestamp;
 class OldDateTime;
 class ArraySmallBlobs;
@@ -92,7 +92,7 @@ struct ColumnTypeTraits<bool> : ColumnTypeTraits<int64_t> {
 };
 
 template <>
-struct ColumnTypeTraits<Key> {
+struct ColumnTypeTraits<ObjKey> {
     using cluster_leaf_type = ArrayKey;
     static const DataType id = type_Link;
     static const ColumnType column_id = col_type_Link;

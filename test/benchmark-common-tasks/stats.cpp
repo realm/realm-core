@@ -79,7 +79,7 @@ void create_realm_with_transactions(std::string file_name,
         TableRef table = g.add_table(table_name);
         int_col = table->add_column(type_Int, "int_col_0");
 #ifdef REALM_CLUSTER_IF
-        std::vector<Key> keys;
+        std::vector<ObjKey> keys;
         table->create_objects(num_rows, keys);
 #else
         table->add_empty_row(num_rows);

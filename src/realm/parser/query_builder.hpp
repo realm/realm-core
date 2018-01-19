@@ -76,7 +76,7 @@ public:
     virtual StringData string_for_argument(size_t argument_index) = 0;
     virtual BinaryData binary_for_argument(size_t argument_index) = 0;
     virtual Timestamp timestamp_for_argument(size_t argument_index) = 0;
-    virtual Key object_index_for_argument(size_t argument_index) = 0;
+    virtual ObjKey object_index_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
     util::StringBuffer buffer_space; // dynamic conversion space with lifetime tied to this
 };
@@ -97,7 +97,10 @@ public:
     StringData string_for_argument(size_t i) override { return get<StringData>(i); }
     BinaryData binary_for_argument(size_t i) override { return get<BinaryData>(i); }
     Timestamp timestamp_for_argument(size_t i) override { return get<Timestamp>(i); }
-    Key object_index_for_argument(size_t i) override { return get<Key>(i); }
+    ObjKey object_index_for_argument(size_t i) override
+    {
+        return get<ObjKey>(i);
+    }
     bool is_argument_null(size_t i) override { return m_ctx.is_null(at(i)); }
 
 private:

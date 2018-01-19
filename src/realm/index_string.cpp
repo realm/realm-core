@@ -57,7 +57,7 @@ bool ClusterColumn::is_nullable() const
     return spec.get_column_attr(col_ndx).test(col_attr_Nullable);
 }
 
-StringData ClusterColumn::get_index_data(Key key, StringConversionBuffer& buffer) const
+StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buffer) const
 {
     ConstObj obj = m_cluster_tree->get(key);
     DataType type = get_data_type();
@@ -127,7 +127,7 @@ int64_t IndexArray::from_list<index_FindFirst>(StringData value, InternalFindRes
 
     // The buffer is needed when for when this is an integer index.
     StringConversionBuffer buffer;
-    StringData str = column.get_index_data(Key(first_key_value), buffer);
+    StringData str = column.get_index_data(ObjKey(first_key_value), buffer);
     if (str != value)
         return null_key.value;
 
@@ -149,7 +149,7 @@ int64_t IndexArray::from_list<index_Count>(StringData value, InternalFindResult&
 
     // The buffer is needed when for when this is an integer index.
     StringConversionBuffer buffer;
-    StringData str = column.get_index_data(Key(first_key_value), buffer);
+    StringData str = column.get_index_data(ObjKey(first_key_value), buffer);
     if (str != value)
         return 0;
 
@@ -170,7 +170,7 @@ int64_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFi
     if (lower == it_end)
         return size_t(FindRes_not_found);
 
-    Key first_key = Key(*lower);
+    ObjKey first_key = ObjKey(*lower);
 
     // The buffer is needed when for when this is an integer index.
     StringConversionBuffer buffer;
@@ -188,7 +188,7 @@ int64_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFi
     }
 
     // Check string value at upper, if equal return matches in (lower, upper]
-    Key last_key = Key(*upper);
+    ObjKey last_key = ObjKey(*upper);
     str = column.get_index_data(last_key, buffer);
     if (str == value) {
         result_ref.payload = key_values.get_ref();
@@ -273,7 +273,7 @@ int64_t IndexArray::index_string(StringData value, InternalFindResult& result_re
 
             // The buffer is needed when for when this is an integer index.
             StringConversionBuffer buffer;
-            StringData str = column.get_index_data(Key(key_value), buffer);
+            StringData str = column.get_index_data(ObjKey(key_value), buffer);
             if (str == value) {
                 result_ref.payload = size_t(key_value);
                 return first ? key_value : get_count ? 1 : FindRes_single;
@@ -305,15 +305,15 @@ int64_t IndexArray::index_string(StringData value, InternalFindResult& result_re
 }
 
 
-void IndexArray::from_list_all_ins(StringData upper_value, std::vector<Key>& result, const IntegerColumn& rows,
+void IndexArray::from_list_all_ins(StringData upper_value, std::vector<ObjKey>& result, const IntegerColumn& rows,
                                    const ClusterColumn& column) const
 {
     // The buffer is needed when for when this is an integer index.
     StringConversionBuffer buffer;
 
     // optimization for the most common case, where all the strings under a given subindex are equal
-    StringData first_str = column.get_index_data(Key(*rows.cbegin()), buffer);
-    StringData last_str = column.get_index_data(Key(*(rows.cend() - 1)), buffer);
+    StringData first_str = column.get_index_data(ObjKey(*rows.cbegin()), buffer);
+    StringData last_str = column.get_index_data(ObjKey(*(rows.cend() - 1)), buffer);
     if (first_str == last_str) {
         auto first_str_upper = case_map(first_str, true);
         if (first_str_upper != upper_value) {
@@ -323,7 +323,7 @@ void IndexArray::from_list_all_ins(StringData upper_value, std::vector<Key>& res
         size_t sz = result.size() + rows.size();
         result.reserve(sz);
         for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
-            result.push_back(Key(*it));
+            result.push_back(ObjKey(*it));
         }
         return;
     }
@@ -331,7 +331,7 @@ void IndexArray::from_list_all_ins(StringData upper_value, std::vector<Key>& res
     // special case for very long strings, where they might have a common prefix and end up in the
     // same subindex column, but still not be identical
     for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
-        Key key = Key(*it);
+        ObjKey key = ObjKey(*it);
         StringData str = column.get_index_data(key, buffer);
         auto upper_str = case_map(str, true);
         if (upper_str == upper_value) {
@@ -343,7 +343,7 @@ void IndexArray::from_list_all_ins(StringData upper_value, std::vector<Key>& res
 }
 
 
-void IndexArray::from_list_all(StringData value, std::vector<Key>& result, const IntegerColumn& rows,
+void IndexArray::from_list_all(StringData value, std::vector<ObjKey>& result, const IntegerColumn& rows,
                                const ClusterColumn& column) const
 {
     SortedListComparator slc(column);
@@ -353,7 +353,7 @@ void IndexArray::from_list_all(StringData value, std::vector<Key>& result, const
     if (lower == it_end)
         return;
 
-    Key key = Key(*lower);
+    ObjKey key = ObjKey(*lower);
 
     // The buffer is needed when for when this is an integer index.
     StringConversionBuffer buffer;
@@ -367,7 +367,7 @@ void IndexArray::from_list_all(StringData value, std::vector<Key>& result, const
     size_t sz = result.size() + (upper - lower);
     result.reserve(sz);
     for (IntegerColumn::const_iterator it = lower; it != upper; ++it) {
-        result.push_back(Key(*it));
+        result.push_back(ObjKey(*it));
     }
 
     return;
@@ -471,7 +471,8 @@ private:
 } // namespace
 
 
-void IndexArray::index_string_all_ins(StringData value, std::vector<Key>& result, const ClusterColumn& column) const
+void IndexArray::index_string_all_ins(StringData value, std::vector<ObjKey>& result,
+                                      const ClusterColumn& column) const
 {
     if (value.is_null()) {
         // we can't use case_map on null strings because it currently returns an
@@ -527,7 +528,7 @@ void IndexArray::index_string_all_ins(StringData value, std::vector<Key>& result
 
         // Literal row index (tagged)
         if (ref & 1) {
-            Key k = Key(ref >> 1);
+            ObjKey k = ObjKey(ref >> 1);
 
             // The buffer is needed when for when this is an integer index.
             StringConversionBuffer buffer;
@@ -558,7 +559,7 @@ void IndexArray::index_string_all_ins(StringData value, std::vector<Key>& result
 }
 
 
-void IndexArray::index_string_all(StringData value, std::vector<Key>& result, const ClusterColumn& column) const
+void IndexArray::index_string_all(StringData value, std::vector<ObjKey>& result, const ClusterColumn& column) const
 {
     const char* data = m_data;
     const char* header;
@@ -604,7 +605,7 @@ void IndexArray::index_string_all(StringData value, std::vector<Key>& result, co
 
         // Literal row index (tagged)
         if (ref & 1) {
-            Key k = Key(ref >> 1);
+            ObjKey k = ObjKey(ref >> 1);
 
             // The buffer is needed when for when this is an integer index.
             StringConversionBuffer buffer;
@@ -642,14 +643,14 @@ void IndexArray::index_string_all(StringData value, std::vector<Key>& result, co
 
 } // namespace realm
 
-Key IndexArray::index_string_find_first(StringData value, const ClusterColumn& column) const
+ObjKey IndexArray::index_string_find_first(StringData value, const ClusterColumn& column) const
 {
     InternalFindResult unused;
-    return Key(index_string<index_FindFirst>(value, unused, column));
+    return ObjKey(index_string<index_FindFirst>(value, unused, column));
 }
 
 
-void IndexArray::index_string_find_all(std::vector<Key>& result, StringData value, const ClusterColumn& column,
+void IndexArray::index_string_find_all(std::vector<ObjKey>& result, StringData value, const ClusterColumn& column,
                                        bool case_insensitive) const
 {
     if (case_insensitive) {
@@ -709,14 +710,14 @@ StringIndex::key_type StringIndex::get_last_key() const
 }
 
 
-void StringIndex::insert_with_offset(Key obj_key, StringData value, size_t offset)
+void StringIndex::insert_with_offset(ObjKey obj_key, StringData value, size_t offset)
 {
     // Create 4 byte index key
     key_type key = create_key(value, offset);
     TreeInsert(obj_key, key, offset, value); // Throws
 }
 
-void StringIndex::insert_to_existing_list_at_lower(Key key, StringData value, IntegerColumn& list,
+void StringIndex::insert_to_existing_list_at_lower(ObjKey key, StringData value, IntegerColumn& list,
                                                    const IntegerColumnIterator& lower)
 {
     SortedListComparator slc(m_target_column);
@@ -738,7 +739,7 @@ void StringIndex::insert_to_existing_list_at_lower(Key key, StringData value, In
     }
 }
 
-void StringIndex::insert_to_existing_list(Key key, StringData value, IntegerColumn& list)
+void StringIndex::insert_to_existing_list(ObjKey key, StringData value, IntegerColumn& list)
 {
     SortedListComparator slc(m_target_column);
     IntegerColumn::const_iterator it_end = list.cend();
@@ -749,7 +750,7 @@ void StringIndex::insert_to_existing_list(Key key, StringData value, IntegerColu
         list.add(key.value);
     }
     else {
-        Key lower_key = Key(*lower);
+        ObjKey lower_key = ObjKey(*lower);
         StringConversionBuffer buffer; // Used when this is an IntegerIndex
         StringData lower_value = get(lower_key, buffer);
 
@@ -800,7 +801,7 @@ void StringIndex::insert_row_list(size_t ref, size_t offset, StringData value)
 }
 
 
-void StringIndex::TreeInsert(Key obj_key, key_type key, size_t offset, StringData value)
+void StringIndex::TreeInsert(ObjKey obj_key, key_type key, size_t offset, StringData value)
 {
     NodeChange nc = do_insert(obj_key, key, offset, value);
     switch (nc.type) {
@@ -835,7 +836,7 @@ void StringIndex::TreeInsert(Key obj_key, key_type key, size_t offset, StringDat
 }
 
 
-StringIndex::NodeChange StringIndex::do_insert(Key obj_key, key_type key, size_t offset, StringData value)
+StringIndex::NodeChange StringIndex::do_insert(ObjKey obj_key, key_type key, size_t offset, StringData value)
 {
     Allocator& alloc = m_array->get_alloc();
     if (m_array->is_inner_bptree_node()) {
@@ -1014,7 +1015,7 @@ void StringIndex::node_insert(size_t ndx, size_t ref)
 }
 
 
-bool StringIndex::leaf_insert(Key obj_key, key_type key, size_t offset, StringData value, bool noextend)
+bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, StringData value, bool noextend)
 {
     REALM_ASSERT(!m_array->is_inner_bptree_node());
 
@@ -1057,7 +1058,7 @@ bool StringIndex::leaf_insert(Key obj_key, key_type key, size_t offset, StringDa
 
     // Single match (lowest bit set indicates literal row_ndx)
     if ((slot_value & 1) != 0) {
-        Key obj_key2 = Key(slot_value >> 1);
+        ObjKey obj_key2 = ObjKey(slot_value >> 1);
         // The buffer is needed for when this is an integer index.
         StringConversionBuffer buffer;
         StringData v2 = get(obj_key2, buffer);
@@ -1112,7 +1113,7 @@ bool StringIndex::leaf_insert(Key obj_key, key_type key, size_t offset, StringDa
         bool value_exists_in_list = false;
         if (lower != it_end) {
             StringConversionBuffer buffer;
-            StringData lower_value = get(Key(*lower), buffer);
+            StringData lower_value = get(ObjKey(*lower), buffer);
             if (lower_value == value) {
                 value_exists_in_list = true;
             }
@@ -1130,8 +1131,8 @@ bool StringIndex::leaf_insert(Key obj_key, key_type key, size_t offset, StringDa
 #ifdef REALM_DEBUG
                 bool contains_only_duplicates = true;
                 if (sub.size() > 1) {
-                    Key first_key = Key(sub.get(0));
-                    Key last_key = Key(sub.back());
+                    ObjKey first_key = ObjKey(sub.get(0));
+                    ObjKey last_key = ObjKey(sub.back());
                     StringConversionBuffer first_buffer, last_buffer;
                     StringData first_str = get(first_key, first_buffer);
                     StringData last_str = get(last_key, last_buffer);
@@ -1149,7 +1150,7 @@ bool StringIndex::leaf_insert(Key obj_key, key_type key, size_t offset, StringDa
                 // leafs, but if the list doesn't only contain duplicates we
                 // must respect that we store a common key prefix up to this
                 // point and insert into the existing list.
-                Key key_of_any_dup = Key(sub.get(0));
+                ObjKey key_of_any_dup = ObjKey(sub.get(0));
                 // The buffer is needed for when this is an integer index.
                 StringConversionBuffer buffer;
                 StringData v2 = get(key_of_any_dup, buffer);
@@ -1189,7 +1190,7 @@ void StringIndex::distinct(ArrayKey& result) const
 
             // low bit set indicate literal ref (shifted)
             if (ref & 1) {
-                Key k = Key((uint64_t(ref) >> 1));
+                ObjKey k = ObjKey((uint64_t(ref) >> 1));
                 result.add(k);
             }
             else {
@@ -1202,7 +1203,7 @@ void StringIndex::distinct(ArrayKey& result) const
                 else {
                     IntegerColumn sub(alloc, to_ref(ref)); // Throws
                     if (sub.size() == 1) {                 // Optimization.
-                        Key k = Key(sub.get(0));           // get first match
+                        ObjKey k = ObjKey(sub.get(0));     // get first match
                         result.add(k);
                     }
                     else {
@@ -1212,8 +1213,8 @@ void StringIndex::distinct(ArrayKey& result) const
                         SortedListComparator slc(m_target_column);
                         StringConversionBuffer buffer;
                         while (it != it_end) {
-                            result.add(Key(*it));
-                            StringData it_data = get(Key(*it), buffer);
+                            result.add(ObjKey(*it));
+                            StringData it_data = get(ObjKey(*it), buffer);
                             it = std::upper_bound(it, it_end, it_data, slc);
                         }
                     }
@@ -1223,7 +1224,7 @@ void StringIndex::distinct(ArrayKey& result) const
     }
 }
 
-StringData StringIndex::get(Key key, StringConversionBuffer& buffer) const
+StringData StringIndex::get(ObjKey key, StringConversionBuffer& buffer) const
 {
     return m_target_column.get_index_data(key, buffer);
 }
@@ -1244,7 +1245,7 @@ void StringIndex::clear()
 }
 
 
-void StringIndex::do_delete(Key obj_key, StringData value, size_t offset)
+void StringIndex::do_delete(ObjKey obj_key, StringData value, size_t offset)
 {
     Allocator& alloc = m_array->get_alloc();
     Array values(alloc);
@@ -1314,7 +1315,7 @@ void StringIndex::do_delete(Key obj_key, StringData value, size_t offset)
     }
 }
 
-void StringIndex::erase(Key key)
+void StringIndex::erase(ObjKey key)
 {
     StringConversionBuffer buffer;
     StringData value = get(key, buffer);
@@ -1375,8 +1376,8 @@ bool has_duplicate_values(const Array& node, const ClusterColumn& target_col) no
         size_t num_rows = child.is_inner_bptree_node() ? child.get_bptree_size() : child.size();
         if (num_rows > 1) {
             IntegerColumn sub(alloc, ref); // Throws
-            Key first_key = Key(sub.get(0));
-            Key last_key = Key(sub.back());
+            ObjKey first_key = ObjKey(sub.get(0));
+            ObjKey last_key = ObjKey(sub.back());
             StringConversionBuffer first_buffer, last_buffer;
             StringData first_str = target_col.get_index_data(first_key, first_buffer);
             StringData last_str = target_col.get_index_data(last_key, last_buffer);
@@ -1393,7 +1394,7 @@ bool has_duplicate_values(const Array& node, const ClusterColumn& target_col) no
             SortedListComparator slc(target_col);
             StringConversionBuffer buffer;
             while (it != it_end) {
-                StringData it_data = target_col.get_index_data(Key(*it), buffer);
+                StringData it_data = target_col.get_index_data(ObjKey(*it), buffer);
                 IntegerColumn::const_iterator next = std::upper_bound(it, it_end, it_data, slc);
                 size_t count_of_value = next - it; // row index subtraction in `sub`
                 if (count_of_value > 1) {
@@ -1449,7 +1450,7 @@ bool SortedListComparator::operator()(int64_t key_value, StringData needle) // u
 {
     // The buffer is needed when for when this is an integer index.
     StringConversionBuffer buffer;
-    StringData a = m_column.get_index_data(Key(key_value), buffer);
+    StringData a = m_column.get_index_data(ObjKey(key_value), buffer);
     if (a.is_null() && !needle.is_null())
         return true;
     else if (needle.is_null() && !a.is_null())
@@ -1472,7 +1473,7 @@ bool SortedListComparator::operator()(int64_t key_value, StringData needle) // u
 bool SortedListComparator::operator()(StringData needle, int64_t key_value) // used in upper_bound
 {
     StringConversionBuffer buffer;
-    StringData a = m_column.get_index_data(Key(key_value), buffer);
+    StringData a = m_column.get_index_data(ObjKey(key_value), buffer);
     if (needle == a) {
         return false;
     }
@@ -1521,21 +1522,21 @@ void StringIndex::verify() const
                     IntegerColumn::const_iterator it_end = sub.cend();
                     SortedListComparator slc(m_target_column);
                     StringConversionBuffer buffer, buffer_prev;
-                    StringData previous_string = get(Key(*it), buffer_prev);
+                    StringData previous_string = get(ObjKey(*it), buffer_prev);
                     size_t last_row = to_size_t(*it);
 
                     // Check that strings listed in sub are in sorted order
                     // and if there are duplicates, that the row numbers are
                     // sorted in the group of duplicates.
                     while (it != it_end) {
-                        StringData it_data = get(Key(*it), buffer);
+                        StringData it_data = get(ObjKey(*it), buffer);
                         size_t it_row = to_size_t(*it);
                         REALM_ASSERT_EX(previous_string <= it_data, previous_string.data(), it_data.data());
                         if (it != sub.cbegin() && previous_string == it_data) {
                             REALM_ASSERT_EX(it_row > last_row, it_row, last_row);
                         }
                         last_row = it_row;
-                        previous_string = get(Key(*it), buffer_prev);
+                        previous_string = get(ObjKey(*it), buffer_prev);
                         ++it;
                     }
                 }
@@ -1551,13 +1552,13 @@ void StringIndex::verify() const
 template <class T>
 void StringIndex::verify_entries(const ClusterColumn& column) const
 {
-    std::vector<Key> results;
+    std::vector<ObjKey> results;
 
     auto it = column.begin();
     auto end = column.end();
     auto col = column.get_column_key();
     while (it != end) {
-        Key key = it->get_key();
+        ObjKey key = it->get_key();
         T value = it->get<T>(col);
 
         find_all(results, value);

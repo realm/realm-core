@@ -247,7 +247,7 @@ TEST(Replication_General)
         WriteTransaction wt(sg_1);
         TableRef table = wt.add_table("my_table");
         my_table_add_columns(table);
-        table->create_object(Key(0));
+        table->create_object(ObjKey(0));
         wt.commit();
     }
     {
@@ -255,28 +255,28 @@ TEST(Replication_General)
         TableRef table = wt.get_table("my_table");
         char buf[] = {'1'};
         BinaryData bin(buf);
-        Obj obj = table->get_object(Key(0));
+        Obj obj = table->get_object(ObjKey(0));
         obj.set_all(2, true, 2.0f, 2.0, "xx", bin);
-        table->create_object(Key(1)).set_all(3, true, 3.0f, 3.0, "xxx", bin);
-        table->create_object(Key(2)).set_all(1, true, 1.0f, 1.0, "x", bin);
+        table->create_object(ObjKey(1)).set_all(3, true, 3.0f, 3.0, "xxx", bin);
+        table->create_object(ObjKey(2)).set_all(1, true, 1.0f, 1.0, "x", bin);
 
-        table->create_object(Key(3)).set_all(3, true, 3.0f, 0.0, "", bin); // empty string
-        table->create_object(Key(4)).set_all(8, true, 3.0f, 1.0, "", bin); // empty string
+        table->create_object(ObjKey(3)).set_all(3, true, 3.0f, 0.0, "", bin); // empty string
+        table->create_object(ObjKey(4)).set_all(8, true, 3.0f, 1.0, "", bin); // empty string
         wt.commit();
     }
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("my_table");
         auto col_id = table->get_column_key("my_int");
-        Obj obj = table->get_object(Key(0)).set(col_id, 9);
+        Obj obj = table->get_object(ObjKey(0)).set(col_id, 9);
         wt.commit();
     }
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("my_table");
         auto col_id = table->get_column_key("my_int");
-        table->get_object(Key(0)).set(col_id, 10);
-        table->get_object(Key(3)).set(col_id, 2);
+        table->get_object(ObjKey(0)).set(col_id, 10);
+        table->get_object(ObjKey(3)).set(col_id, 2);
         wt.commit();
     }
     {
@@ -284,13 +284,13 @@ TEST(Replication_General)
         TableRef table = wt.get_table("my_table");
         char buf[] = {'9'};
         BinaryData bin(buf);
-        table->create_object(Key(100)).set_all(8, false, 8.0f, 8.0, "y8", bin);
+        table->create_object(ObjKey(100)).set_all(8, false, 8.0f, 8.0, "y8", bin);
         wt.commit();
     }
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("my_table");
-        table->remove_object(Key(100));
+        table->remove_object(ObjKey(100));
         wt.commit();
     }
 
@@ -311,12 +311,12 @@ TEST(Replication_General)
         CHECK_EQUAL(5, table->size());
 
 
-        CHECK_EQUAL(10, table->get_object(Key(0)).get<Int>(col_id));
-        CHECK_EQUAL(3, table->get_object(Key(1)).get<Int>(col_id));
-        CHECK_EQUAL(2, table->get_object(Key(3)).get<Int>(col_id));
-        CHECK_EQUAL(8, table->get_object(Key(4)).get<Int>(col_id));
+        CHECK_EQUAL(10, table->get_object(ObjKey(0)).get<Int>(col_id));
+        CHECK_EQUAL(3, table->get_object(ObjKey(1)).get<Int>(col_id));
+        CHECK_EQUAL(2, table->get_object(ObjKey(3)).get<Int>(col_id));
+        CHECK_EQUAL(8, table->get_object(ObjKey(4)).get<Int>(col_id));
 
-        StringData sd1 = table->get_object(Key(4)).get<String>(col_st);
+        StringData sd1 = table->get_object(ObjKey(4)).get<String>(col_st);
 
         CHECK(!sd1.is_null());
     }
@@ -424,10 +424,10 @@ TEST(Replication_Links)
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
     SharedGroup sg_2(path_2);
-    std::vector<Key> origin_1_keys{Key(0), Key(1)};
-    std::vector<Key> origin_2_keys{Key(10), Key(11)};
-    const std::vector<Key> target_1_keys{Key(20), Key(21)};
-    const std::vector<Key> target_2_keys{Key(30), Key(31)};
+    std::vector<ObjKey> origin_1_keys{ObjKey(0), ObjKey(1)};
+    std::vector<ObjKey> origin_2_keys{ObjKey(10), ObjKey(11)};
+    const std::vector<ObjKey> target_1_keys{ObjKey(20), ObjKey(21)};
+    const std::vector<ObjKey> target_2_keys{ObjKey(30), ObjKey(31)};
 
     // First create two target tables
     {
@@ -605,12 +605,12 @@ TEST(Replication_Links)
         ConstObj o_2_0 = origin_2->get_object(origin_2_keys[0]);
         ConstObj o_2_1 = origin_2->get_object(origin_2_keys[1]);
 
-        CHECK_EQUAL(target_1_keys[0], o_1_1.get<Key>(o_1_l_3));
-        CHECK_EQUAL(target_2_keys[0], o_1_0.get<Key>(o_1_l_4));
-        CHECK_EQUAL(target_2_keys[1], o_1_1.get<Key>(o_1_l_4));
-        CHECK_EQUAL(target_1_keys[1], o_2_0.get<Key>(o_2_l_2));
-        CHECK_EQUAL(target_2_keys[1], o_2_0.get<Key>(o_2_l_4));
-        CHECK_EQUAL(target_2_keys[0], o_2_1.get<Key>(o_2_l_4));
+        CHECK_EQUAL(target_1_keys[0], o_1_1.get<ObjKey>(o_1_l_3));
+        CHECK_EQUAL(target_2_keys[0], o_1_0.get<ObjKey>(o_1_l_4));
+        CHECK_EQUAL(target_2_keys[1], o_1_1.get<ObjKey>(o_1_l_4));
+        CHECK_EQUAL(target_1_keys[1], o_2_0.get<ObjKey>(o_2_l_2));
+        CHECK_EQUAL(target_2_keys[1], o_2_0.get<ObjKey>(o_2_l_4));
+        CHECK_EQUAL(target_2_keys[0], o_2_1.get<ObjKey>(o_2_l_4));
 
         ConstObj t_1_0 = target_1->get_object(target_1_keys[0]);
         ConstObj t_1_1 = target_1->get_object(target_1_keys[1]);
@@ -736,9 +736,9 @@ TEST(Replication_Links)
         auto o_2_l_4 = origin_2->get_column_key("o_2_l_4");
 
         ConstObj o_2_2 = origin_2->get_object(origin_2_keys[2]);
-        CHECK_EQUAL(target_1_keys[1], o_2_2.get<Key>(o_2_l_2));
+        CHECK_EQUAL(target_1_keys[1], o_2_2.get<ObjKey>(o_2_l_2));
         CHECK_EQUAL(0, o_2_2.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[0], o_2_2.get<Key>(o_2_l_4));
+        CHECK_EQUAL(target_2_keys[0], o_2_2.get<ObjKey>(o_2_l_4));
 
         ConstObj t_1_1 = target_1->get_object(target_1_keys[1]);
         ConstObj t_2_0 = target_2->get_object(target_2_keys[0]);
@@ -784,12 +784,12 @@ TEST(Replication_Links)
         auto o_2_l_4 = origin_2->get_column_key("o_2_l_4");
 
         ConstObj o_1_0 = origin_1->get_object(origin_1_keys[0]);
-        CHECK_EQUAL(target_1_keys[1], o_1_0.get<Key>(o_1_l_3));
+        CHECK_EQUAL(target_1_keys[1], o_1_0.get<ObjKey>(o_1_l_3));
 
         ConstObj o_2_2 = origin_2->get_object(origin_2_keys[2]);
         CHECK(o_2_2.is_null(o_2_l_2));
         CHECK_EQUAL(0, o_2_2.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[1], o_2_2.get<Key>(o_2_l_4));
+        CHECK_EQUAL(target_2_keys[1], o_2_2.get<ObjKey>(o_2_l_4));
 
         ConstObj t_1_1 = target_1->get_object(target_1_keys[1]);
         ConstObj t_2_0 = target_2->get_object(target_2_keys[0]);
@@ -1023,7 +1023,7 @@ TEST(Replication_ListOfPrimitives)
         table->add_column_list(type_String, "strings");
         table->add_column_list(type_Binary, "binaries");
         table->add_column_list(type_Timestamp, "dates");
-        table->create_object(Key(0));
+        table->create_object(ObjKey(0));
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger);
@@ -1043,7 +1043,7 @@ TEST(Replication_ListOfPrimitives)
         auto col_bin = table->get_column_key("binaries");
         auto col_tim = table->get_column_key("dates");
 
-        ConstObj obj = table->get_object(Key(0));
+        ConstObj obj = table->get_object(ObjKey(0));
 
         CHECK(obj.is_null(col_int));
         CHECK(obj.is_null(col_boo));
@@ -1067,7 +1067,7 @@ TEST(Replication_ListOfPrimitives)
 
         char buf[10];
         memset(buf, 'A', sizeof(buf));
-        Obj obj = table->get_object(Key(0));
+        Obj obj = table->get_object(ObjKey(0));
         obj.get_list<Int>(col_int).add(100);
         obj.get_list<Bool>(col_boo).add(true);
         obj.get_list<Float>(col_flo).add(100.f);
@@ -1095,7 +1095,7 @@ TEST(Replication_ListOfPrimitives)
         auto col_bin = table->get_column_key("binaries");
         auto col_tim = table->get_column_key("dates");
 
-        ConstObj obj = table->get_object(Key(0));
+        ConstObj obj = table->get_object(ObjKey(0));
 
         char buf[10];
         memset(buf, 'A', sizeof(buf));
@@ -1122,7 +1122,7 @@ TEST(Replication_ListOfPrimitives)
 
         char buf[10];
         memset(buf, 'A', sizeof(buf));
-        Obj obj = table->get_object(Key(0));
+        Obj obj = table->get_object(ObjKey(0));
         obj.get_list<Int>(col_int).clear();
         obj.get_list<Bool>(col_boo).clear();
         obj.get_list<Float>(col_flo).clear();
@@ -1150,7 +1150,7 @@ TEST(Replication_ListOfPrimitives)
         auto col_bin = table->get_column_key("binaries");
         auto col_tim = table->get_column_key("dates");
 
-        ConstObj obj = table->get_object(Key(0));
+        ConstObj obj = table->get_object(ObjKey(0));
 
         char buf[10];
         memset(buf, 'A', sizeof(buf));
@@ -1415,9 +1415,9 @@ TEST(Replication_NullStrings)
         auto col_string = table1->add_column(type_String, "c1", true);
         auto col_binary = table1->add_column(type_Binary, "b1", true);
 
-        Obj obj0 = table1->create_object(Key(0));
-        Obj obj1 = table1->create_object(Key(1));
-        Obj obj2 = table1->create_object(Key(2));
+        Obj obj0 = table1->create_object(ObjKey(0));
+        Obj obj1 = table1->create_object(ObjKey(1));
+        Obj obj2 = table1->create_object(ObjKey(2));
 
         obj1.set(col_string, StringData("")); // empty string
         obj2.set(col_string, StringData());   // null
@@ -1442,9 +1442,9 @@ TEST(Replication_NullStrings)
         auto col_string = table2->get_column_key("c1");
         auto col_binary = table2->get_column_key("b1");
 
-        ConstObj obj0 = table2->get_object(Key(0));
-        ConstObj obj1 = table2->get_object(Key(1));
-        ConstObj obj2 = table2->get_object(Key(2));
+        ConstObj obj0 = table2->get_object(ObjKey(0));
+        ConstObj obj1 = table2->get_object(ObjKey(1));
+        ConstObj obj2 = table2->get_object(ObjKey(2));
 
         CHECK(obj0.get<String>(col_string).is_null());
         CHECK(!obj1.get<String>(col_string).is_null());
@@ -1473,9 +1473,9 @@ TEST(Replication_NullInteger)
         TableRef table1 = wt.add_table("table");
         auto col_int = table1->add_column(type_Int, "c1", true);
 
-        Obj obj0 = table1->create_object(Key(0));
-        Obj obj1 = table1->create_object(Key(1));
-        Obj obj2 = table1->create_object(Key(2));
+        Obj obj0 = table1->create_object(ObjKey(0));
+        Obj obj1 = table1->create_object(ObjKey(1));
+        Obj obj2 = table1->create_object(ObjKey(2));
 
         obj1.set(col_int, 0);
         obj2.set_null(col_int);
@@ -1492,9 +1492,9 @@ TEST(Replication_NullInteger)
         ConstTableRef table2 = rt.get_table("table");
         auto col_int = table2->get_column_key("c1");
 
-        ConstObj obj0 = table2->get_object(Key(0));
-        ConstObj obj1 = table2->get_object(Key(1));
-        ConstObj obj2 = table2->get_object(Key(2));
+        ConstObj obj0 = table2->get_object(ObjKey(0));
+        ConstObj obj1 = table2->get_object(ObjKey(1));
+        ConstObj obj2 = table2->get_object(ObjKey(2));
 
         CHECK(obj0.is_null(col_int));
         CHECK_NOT(obj1.is_null(col_int));
@@ -1742,8 +1742,8 @@ TEST(Replication_CreateAndRemoveObject)
         WriteTransaction wt(sg_1);
         TableRef table1 = wt.add_table("table");
         c0 = table1->add_column(type_Int, "int1");
-        table1->create_object(Key(123)).set(c0, 0);
-        table1->create_object(Key(456)).set(c0, 1);
+        table1->create_object(ObjKey(123)).set(c0, 0);
+        table1->create_object(ObjKey(456)).set(c0, 1);
         CHECK_EQUAL(table1->size(), 2);
         wt.commit();
     }
@@ -1752,14 +1752,14 @@ TEST(Replication_CreateAndRemoveObject)
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
 
-        CHECK_EQUAL(table2->get_object(Key(123)).get<int64_t>(c0), 0);
-        CHECK_EQUAL(table2->get_object(Key(456)).get<int64_t>(c0), 1);
+        CHECK_EQUAL(table2->get_object(ObjKey(123)).get<int64_t>(c0), 0);
+        CHECK_EQUAL(table2->get_object(ObjKey(456)).get<int64_t>(c0), 1);
     }
     {
         WriteTransaction wt(sg_1);
         TableRef table1 = wt.get_table("table");
-        table1->remove_object(Key(123));
-        table1->get_object(Key(456)).set(c0, 7);
+        table1->remove_object(ObjKey(123));
+        table1->get_object(ObjKey(456)).set(c0, 7);
         CHECK_EQUAL(table1->size(), 1);
         wt.commit();
     }
@@ -1767,8 +1767,8 @@ TEST(Replication_CreateAndRemoveObject)
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
-        CHECK_THROW(table2->get_object(Key(123)), InvalidKey);
-        CHECK_EQUAL(table2->get_object(Key(456)).get<int64_t>(c0), 7);
+        CHECK_THROW(table2->get_object(ObjKey(123)), InvalidKey);
+        CHECK_EQUAL(table2->get_object(ObjKey(456)).get<int64_t>(c0), 7);
     }
 }
 

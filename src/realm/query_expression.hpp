@@ -396,7 +396,7 @@ public:
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
     // This function supports SubColumnAggregate
-    virtual void evaluate(Key, ValueBase&)
+    virtual void evaluate(ObjKey, ValueBase&)
     {
         REALM_ASSERT(false); // Unimplemented
     }
@@ -845,9 +845,9 @@ struct NullableVector {
     }
 
     template <typename Type = T>
-    typename std::enable_if<
-        realm::is_any<Type, float, double, BinaryData, StringData, Key, Timestamp, ref_type, SizeOfList, null>::value,
-        void>::type
+    typename std::enable_if<realm::is_any<Type, float, double, BinaryData, StringData, ObjKey, Timestamp, ref_type,
+                                          SizeOfList, null>::value,
+                            void>::type
     set(size_t index, t_storage value)
     {
         m_first[index] = value;
@@ -1036,14 +1036,14 @@ inline void NullableVector<SizeOfList>::set_null(size_t index)
 
 // Key
 template <>
-inline bool NullableVector<Key>::is_null(size_t index) const
+inline bool NullableVector<ObjKey>::is_null(size_t index) const
 {
     return m_first[index] == null_key;
 }
 template <>
-inline void NullableVector<Key>::set_null(size_t index)
+inline void NullableVector<ObjKey>::set_null(size_t index)
 {
-    m_first[index] = Key{};
+    m_first[index] = ObjKey{};
 }
 
 template <typename Operator>
@@ -1660,11 +1660,11 @@ struct LinkMapFunction {
     // not you want the LinkMapFunction to exit (return false) or continue (return true) harvesting the link tree
     // for the current main table object (it will be a link tree if you have multiple type_LinkList columns
     // in a link()->link() query.
-    virtual bool consume(Key) = 0;
+    virtual bool consume(ObjKey) = 0;
 };
 
 struct FindNullLinks : public LinkMapFunction {
-    bool consume(Key) override
+    bool consume(ObjKey) override
     {
         m_has_link = true;
         return false; // we've found a key, so this can't be a null-link, so exit link harvesting
@@ -1674,21 +1674,21 @@ struct FindNullLinks : public LinkMapFunction {
 };
 
 struct MakeLinkVector : public LinkMapFunction {
-    MakeLinkVector(std::vector<Key>& result)
+    MakeLinkVector(std::vector<ObjKey>& result)
         : m_links(result)
     {
     }
 
-    bool consume(Key key) override
+    bool consume(ObjKey key) override
     {
         m_links.push_back(key);
         return true; // continue evaluation
     }
-    std::vector<Key>& m_links;
+    std::vector<ObjKey>& m_links;
 };
 
 struct CountLinks : public LinkMapFunction {
-    bool consume(Key) override
+    bool consume(ObjKey) override
     {
         m_link_count++;
         return true;
@@ -1778,9 +1778,9 @@ public:
 
     std::string description() const;
 
-    std::vector<Key> get_links(size_t index)
+    std::vector<ObjKey> get_links(size_t index)
     {
-        std::vector<Key> res;
+        std::vector<ObjKey> res;
         get_links(index, res);
         return res;
     }
@@ -1814,10 +1814,10 @@ public:
     }
 
 private:
-    void map_links(size_t column, Key key, LinkMapFunction& lm);
+    void map_links(size_t column, ObjKey key, LinkMapFunction& lm);
     void map_links(size_t column, size_t row, LinkMapFunction& lm);
 
-    void get_links(size_t row, std::vector<Key>& result)
+    void get_links(size_t row, std::vector<ObjKey>& result)
     {
         MakeLinkVector mlv = MakeLinkVector(result);
         map_links(row, mlv);
@@ -1923,7 +1923,7 @@ public:
 
         if (links_exist()) {
             REALM_ASSERT(m_leaf_ptr == nullptr);
-            std::vector<Key> links = m_link_map.get_links(index);
+            std::vector<ObjKey> links = m_link_map.get_links(index);
             Value<T> v = make_value_for_link<T>(m_link_map.only_unary_links(), links.size());
 
             for (size_t t = 0; t < links.size(); t++) {
@@ -1941,7 +1941,7 @@ public:
         }
     }
 
-    void evaluate(Key key, ValueBase& destination) override
+    void evaluate(ObjKey key, ValueBase& destination) override
     {
         Value<T>& d = static_cast<Value<T>&>(destination);
         d.m_storage.set(0, m_link_map.get_target_table()->get_object(key).template get<T>(m_column_key));
@@ -2318,7 +2318,7 @@ private:
 
 class KeyValue : public Subexpr2<Link> {
 public:
-    KeyValue(Key key)
+    KeyValue(ObjKey key)
         : m_key(key)
     {
     }
@@ -2336,7 +2336,7 @@ public:
     {
         // Destination must be of Key type. It only makes sense to
         // compare keys with keys
-        auto d = dynamic_cast<Value<Key>*>(&destination);
+        auto d = dynamic_cast<Value<ObjKey>*>(&destination);
         REALM_ASSERT(d != nullptr);
         d->init(false, 1, m_key);
     }
@@ -2357,7 +2357,7 @@ private:
     {
     }
 
-    Key m_key;
+    ObjKey m_key;
 };
 
 template <typename T>
@@ -2774,7 +2774,7 @@ Query compare(const Subexpr2<Link>& left, const ConstObj& obj)
         }
 #endif
     }
-    return make_expression<Compare<Operator, Key>>(left.clone(), make_subexpr<KeyValue>(obj.get_key()));
+    return make_expression<Compare<Operator, ObjKey>>(left.clone(), make_subexpr<KeyValue>(obj.get_key()));
 }
 
 inline Query operator==(const Subexpr2<Link>& left, const ConstObj& row)
@@ -2799,7 +2799,7 @@ Query compare(const Subexpr2<Link>& left, null)
 {
     static_assert(std::is_same<Operator, Equal>::value || std::is_same<Operator, NotEqual>::value,
                   "Links can only be compared for equality.");
-    return make_expression<Compare<Operator, Key>>(left.clone(), make_subexpr<KeyValue>(Key{}));
+    return make_expression<Compare<Operator, ObjKey>>(left.clone(), make_subexpr<KeyValue>(ObjKey{}));
 }
 
 inline Query operator==(const Subexpr2<Link>& left, null)
@@ -2901,7 +2901,7 @@ public:
         if (links_exist()) {
             REALM_ASSERT(m_leaf_ptr == nullptr);
             // LinkList with more than 0 values. Create Value with payload for all fields
-            std::vector<Key> links = m_link_map.get_links(index);
+            std::vector<ObjKey> links = m_link_map.get_links(index);
             auto v = make_value_for_link<typename util::RemoveOptional<U>::type>(m_link_map.only_unary_links(),
                                                                                  links.size());
 
@@ -2973,7 +2973,7 @@ public:
         }
     }
 
-    void evaluate(Key key, ValueBase& destination) override
+    void evaluate(ObjKey key, ValueBase& destination) override
     {
         auto table = m_link_map.get_target_table();
         auto obj = table->get_object(key);
@@ -3135,7 +3135,7 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        std::vector<Key> keys = m_link_map.get_links(index);
+        std::vector<ObjKey> keys = m_link_map.get_links(index);
         std::sort(keys.begin(), keys.end());
 
         Operation op;
@@ -3201,10 +3201,10 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        std::vector<Key> links = m_link_map.get_links(index);
+        std::vector<ObjKey> links = m_link_map.get_links(index);
         // std::sort(links.begin(), links.end());
 
-        size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, Key k) {
+        size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, ObjKey k) {
             ConstObj obj = m_link_map.get_target_table()->get_object(k);
             return running_count + m_query.eval_object(obj);
         });

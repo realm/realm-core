@@ -47,9 +47,9 @@ public:
     }
 
     // Get key for object this view is "looking" at.
-    Key get_key(size_t ndx) const
+    ObjKey get_key(size_t ndx) const
     {
-        return Key(m_key_values.get(ndx));
+        return ObjKey(m_key_values.get(ndx));
     }
 
     ConstObj get(size_t row_ndx) const noexcept;

@@ -219,7 +219,7 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
         // Check if we can expect to find more keys
         if (m_results_start < m_results_end && start < end) {
             // Check if we should advance to next key to search for
-            Key first_key = m_cluster->get_real_key(start);
+            ObjKey first_key = m_cluster->get_real_key(start);
             while (first_key > m_actual_key) {
                 m_results_start++;
                 if (m_results_start == m_results_end)
@@ -228,7 +228,7 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
             }
 
             // If actual_key is bigger than last key, it is not in this leaf
-            Key last_key = m_cluster->get_real_key(end - 1);
+            ObjKey last_key = m_cluster->get_real_key(end - 1);
             if (m_actual_key > last_key)
                 return not_found;
 
@@ -254,7 +254,7 @@ void StringNode<Equal>::_search_index_init()
 
     switch (fr) {
         case FindRes_single:
-            m_actual_key = Key(res.payload);
+            m_actual_key = ObjKey(res.payload);
             m_results_start = 0;
             m_results_end = 1;
             break;
@@ -265,7 +265,7 @@ void StringNode<Equal>::_search_index_init()
             m_index_matches.reset(new IntegerColumn(m_table->get_alloc(), res.payload)); // Throws
             m_results_start = res.start_ndx;
             m_results_end = res.end_ndx;
-            m_actual_key = Key(m_index_matches->get(m_results_start));
+            m_actual_key = ObjKey(m_index_matches->get(m_results_start));
             break;
         case FindRes_not_found:
             m_index_matches.reset();

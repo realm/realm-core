@@ -98,7 +98,7 @@ public:
     Query& operator=(Query&&);
 
     // Find links that point to a specific target row
-    Query& links_to(ColKey column_key, Key target_key);
+    Query& links_to(ColKey column_key, ObjKey target_key);
 
     // Conditions: null
     Query& equal(ColKey column_key, null);
@@ -221,7 +221,7 @@ public:
 
 
     // Searching
-    Key find(size_t begin_at_table_row = size_t(0));
+    ObjKey find(size_t begin_at_table_row = size_t(0));
     TableView find_all(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1));
     ConstTableView find_all(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
 
@@ -229,18 +229,18 @@ public:
     size_t count() const;
     int64_t sum_int(ColKey column_key) const;
     double average_int(ColKey column_key, size_t* resultcount = nullptr) const;
-    int64_t maximum_int(ColKey column_key, Key* return_ndx = nullptr) const;
-    int64_t minimum_int(ColKey column_key, Key* return_ndx = nullptr) const;
+    int64_t maximum_int(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    int64_t minimum_int(ColKey column_key, ObjKey* return_ndx = nullptr) const;
     double sum_float(ColKey column_key) const;
     double average_float(ColKey column_key, size_t* resultcount = nullptr) const;
-    float maximum_float(ColKey column_key, Key* return_ndx = nullptr) const;
-    float minimum_float(ColKey column_key, Key* return_ndx = nullptr) const;
+    float maximum_float(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    float minimum_float(ColKey column_key, ObjKey* return_ndx = nullptr) const;
     double sum_double(ColKey column_key) const;
     double average_double(ColKey column_key, size_t* resultcount = nullptr) const;
-    double maximum_double(ColKey column_key, Key* return_ndx = nullptr) const;
-    double minimum_double(ColKey column_key, Key* return_ndx = nullptr) const;
-    Timestamp maximum_timestamp(ColKey column_key, Key* return_ndx = nullptr);
-    Timestamp minimum_timestamp(ColKey column_key, Key* return_ndx = nullptr);
+    double maximum_double(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    double minimum_double(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    Timestamp maximum_timestamp(ColKey column_key, ObjKey* return_ndx = nullptr);
+    Timestamp minimum_timestamp(ColKey column_key, ObjKey* return_ndx = nullptr);
 
     // Deletion
     size_t remove();
@@ -341,7 +341,7 @@ private:
     double average(ColKey column_key, size_t* resultcount = nullptr) const;
 
     template <Action action, typename T, typename R>
-    R aggregate(ColKey column_key, size_t* resultcount = nullptr, Key* return_ndx = nullptr) const;
+    R aggregate(ColKey column_key, size_t* resultcount = nullptr, ObjKey* return_ndx = nullptr) const;
 
     void aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable, ParentNode* pn, QueryStateBase* st,
                             size_t start, size_t end, ArrayPayload* source_column) const;

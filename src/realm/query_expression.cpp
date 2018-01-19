@@ -82,13 +82,13 @@ std::string LinkMap::description() const
     return s;
 }
 
-void LinkMap::map_links(size_t column, Key key, LinkMapFunction& lm)
+void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm)
 {
     bool last = (column + 1 == m_link_column_keys.size());
     ColumnType type = m_link_types[column];
     ConstObj obj = m_tables[column]->get_object(key);
     if (type == col_type_Link) {
-        if (Key k = obj.get<Key>(m_link_column_keys[column])) {
+        if (ObjKey k = obj.get<ObjKey>(m_link_column_keys[column])) {
             if (last)
                 lm.consume(k);
             else
@@ -96,10 +96,10 @@ void LinkMap::map_links(size_t column, Key key, LinkMapFunction& lm)
         }
     }
     else if (type == col_type_LinkList) {
-        auto linklist = obj.get_list<Key>(m_link_column_keys[column]);
+        auto linklist = obj.get_list<ObjKey>(m_link_column_keys[column]);
         size_t sz = linklist.size();
         for (size_t t = 0; t < sz; t++) {
-            Key k = linklist.get(t);
+            ObjKey k = linklist.get(t);
             if (last) {
                 bool continue2 = lm.consume(k);
                 if (!continue2)
@@ -114,7 +114,7 @@ void LinkMap::map_links(size_t column, Key key, LinkMapFunction& lm)
         size_t backlink_column_ndx = m_tables[column]->colkey2ndx(backlink_column);
         size_t sz = obj.get_backlink_count(backlink_column_ndx);
         for (size_t t = 0; t < sz; t++) {
-            Key k = obj.get_backlink(backlink_column_ndx, t);
+            ObjKey k = obj.get_backlink(backlink_column_ndx, t);
             if (last) {
                 bool continue2 = lm.consume(k);
                 if (!continue2)
@@ -136,7 +136,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm)
     bool last = (column + 1 == m_link_column_keys.size());
     ColumnType type = m_link_types[column];
     if (type == col_type_Link) {
-        if (Key k = static_cast<const ArrayKey*>(m_leaf_ptr)->get(row)) {
+        if (ObjKey k = static_cast<const ArrayKey*>(m_leaf_ptr)->get(row)) {
             if (last)
                 lm.consume(k);
             else
@@ -149,7 +149,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm)
             arr.init_from_ref(ref);
             size_t sz = arr.size();
             for (size_t t = 0; t < sz; t++) {
-                Key k = arr.get(t);
+                ObjKey k = arr.get(t);
                 if (last) {
                     bool continue2 = lm.consume(k);
                     if (!continue2)
@@ -164,7 +164,7 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm)
         auto back_links = static_cast<const ArrayBacklink*>(m_leaf_ptr);
         size_t sz = back_links->get_backlink_count(row);
         for (size_t t = 0; t < sz; t++) {
-            Key k = back_links->get_backlink(row, t);
+            ObjKey k = back_links->get_backlink(row, t);
             if (last) {
                 bool continue2 = lm.consume(k);
                 if (!continue2)
@@ -183,12 +183,12 @@ void Columns<Link>::evaluate(size_t index, ValueBase& destination)
 {
     // Destination must be of Key type. It only makes sense to
     // compare keys with keys
-    auto d = dynamic_cast<Value<Key>*>(&destination);
+    auto d = dynamic_cast<Value<ObjKey>*>(&destination);
     REALM_ASSERT(d != nullptr);
-    std::vector<Key> links = m_link_map.get_links(index);
+    std::vector<ObjKey> links = m_link_map.get_links(index);
 
     if (m_link_map.only_unary_links()) {
-        Key key;
+        ObjKey key;
         if (!links.empty()) {
             key = links[0];
         }
@@ -218,7 +218,7 @@ void ColumnListBase::set_cluster(const Cluster* cluster)
 void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_t nb_elements)
 {
     if (m_link_map.has_links()) {
-        std::vector<Key> links = m_link_map.get_links(index);
+        std::vector<ObjKey> links = m_link_map.get_links(index);
         auto sz = links.size();
 
         if (m_link_map.only_unary_links()) {

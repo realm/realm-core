@@ -32,7 +32,7 @@ using namespace realm::util;
 using namespace realm::test_util;
 
 #ifdef REALM_CLUSTER_IF
-using OrderVec = std::vector<Key>;
+using OrderVec = std::vector<ObjKey>;
 #else
 using OrderVec = std::vector<size_t>;
 #endif

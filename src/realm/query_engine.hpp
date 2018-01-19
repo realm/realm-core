@@ -1386,7 +1386,7 @@ public:
     }
 
 protected:
-    Key m_actual_key;
+    ObjKey m_actual_key;
     size_t m_results_start;
     size_t m_results_end;
 
@@ -1395,7 +1395,7 @@ protected:
         return BinaryData(s.data(), s.size());
     }
 
-    virtual Key get_key(size_t ndx) = 0;
+    virtual ObjKey get_key(size_t ndx) = 0;
     virtual void _search_index_init() = 0;
     virtual size_t _find_first_local(size_t start, size_t end) = 0;
 };
@@ -1419,9 +1419,9 @@ public:
 private:
     std::unique_ptr<IntegerColumn> m_index_matches;
 
-    Key get_key(size_t ndx) override
+    ObjKey get_key(size_t ndx) override
     {
-        return Key(m_index_matches->get(ndx));
+        return ObjKey(m_index_matches->get(ndx));
     }
     size_t _find_first_local(size_t start, size_t end) override;
 };
@@ -1473,11 +1473,11 @@ public:
 
 private:
     // Used for index lookup
-    std::vector<Key> m_index_matches;
+    std::vector<ObjKey> m_index_matches;
     std::string m_ucase;
     std::string m_lcase;
 
-    Key get_key(size_t ndx) override
+    ObjKey get_key(size_t ndx) override
     {
         return m_index_matches[ndx];
     }
@@ -1891,7 +1891,7 @@ struct LinksToNodeHandoverPatch : public QueryNodeHandoverPatch {
 
 class LinksToNode : public ParentNode {
 public:
-    LinksToNode(ColKey origin_column_key, Key target_key)
+    LinksToNode(ColKey origin_column_key, ObjKey target_key)
         : m_target_key(target_key)
     {
         m_dD = 10.0;
@@ -1954,7 +1954,7 @@ public:
     }
 
 private:
-    Key m_target_key;
+    ObjKey m_target_key;
     DataType m_column_type = type_Link;
     using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
     union Storage {

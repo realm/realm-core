@@ -81,7 +81,7 @@ TEST(Query_NoConditions)
         Query query = table.where();
         CHECK_EQUAL(null_key, query.find());
     }
-    table.create_object(Key(5));
+    table.create_object(ObjKey(5));
     {
         Query query(table.where());
         CHECK_EQUAL(5, query.find().value);
@@ -155,7 +155,7 @@ TEST(Query_NextGenSyntaxTypedString)
 
 TEST(Query_NextGenSyntax)
 {
-    Key match;
+    ObjKey match;
 
     // Setup untyped table
     Table untyped;
@@ -164,8 +164,8 @@ TEST(Query_NextGenSyntax)
     auto c2 = untyped.add_column(type_Double, "third");
     auto c3 = untyped.add_column(type_Bool, "third2");
     auto c4 = untyped.add_column(type_String, "fourth");
-    Key k0 = untyped.create_object().set_all(20, 19.9f, 3.0, true, "hello").get_key();
-    Key k1 = untyped.create_object().set_all(20, 20.1f, 4.0, false, "world").get_key();
+    ObjKey k0 = untyped.create_object().set_all(20, 19.9f, 3.0, true, "hello").get_key();
+    ObjKey k1 = untyped.create_object().set_all(20, 20.1f, 4.0, false, "world").get_key();
 
     match = (untyped.column<String>(c4) == "world").find();
     CHECK_EQUAL(match, k1);
@@ -1576,11 +1576,11 @@ TEST(Query_Links)
     auto link_col = origin->add_column_link(type_Link, "link", *target1);
     auto double_col = origin->add_column(type_Double, "doubles");
 
-    std::vector<Key> origin_keys;
+    std::vector<ObjKey> origin_keys;
     origin->create_objects(10, origin_keys);
-    std::vector<Key> target1_keys;
+    std::vector<ObjKey> target1_keys;
     target1->create_objects(10, target1_keys);
-    std::vector<Key> target2_keys;
+    std::vector<ObjKey> target2_keys;
     target2->create_objects(10, target2_keys);
 
     for (int i = 0; i < 10; i++) {
@@ -1639,17 +1639,17 @@ TEST(Query_size)
     auto link_col = table3->add_column_link(type_Link, "link", *table1);
     auto linklist_col1 = table3->add_column_link(type_LinkList, "linklist", *table1);
 
-    std::vector<Key> table1_keys;
+    std::vector<ObjKey> table1_keys;
     table1->create_objects(10, table1_keys);
-    std::vector<Key> table2_keys;
+    std::vector<ObjKey> table2_keys;
     table2->create_objects(10, table2_keys);
-    std::vector<Key> table3_keys;
+    std::vector<ObjKey> table3_keys;
     table3->create_objects(10, table3_keys);
 
     auto strings = table1->column<String>(string_col);
     auto binaries = table1->column<Binary>(bin_col);
     auto intlist = table1->column<List<Int>>(int_list_col);
-    auto linklist = table1->column<List<Key>>(linklist_col);
+    auto linklist = table1->column<List<ObjKey>>(linklist_col);
 
     for (int i = 0; i < 10; i++) {
         table2->get_object(table2_keys[i]).set(int_col, i);
@@ -1697,7 +1697,7 @@ TEST(Query_size)
 
     Query q;
     Query q1;
-    Key match;
+    ObjKey match;
     TableView tv;
 
     q = strings.size() == 5;
@@ -1764,7 +1764,7 @@ TEST(Query_ListOfPrimitives)
     auto col_int_list = table->add_column_list(type_Int, "integers");
     auto col_string_list = table->add_column_list(type_String, "strings");
     auto col_string = table->add_column(type_String, "other");
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
 
     table->create_objects(4, keys);
 
@@ -5769,7 +5769,7 @@ TEST(Query_Binary)
 
     const char bin_2[4] = {6, 6, 6, 6}; // Not occuring above
 
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     t.create_objects(9, keys);
 
     t.get_object(keys[0]).set_all(0, BinaryData(bin + 0, 16));
@@ -5882,7 +5882,7 @@ TEST_TYPES(Query_CaseSensitivity, std::true_type, std::false_type)
     Table ttt;
     auto col = ttt.add_column(type_String, "2", nullable);
 
-    Key k = ttt.create_object().set(col, "BLAAbaergroed").get_key();
+    ObjKey k = ttt.create_object().set(col, "BLAAbaergroed").get_key();
     ttt.create_object().set(col, "BLAAbaergroedandMORE");
     ttt.create_object().set(col, "BLAAbaergroedZ");
     ttt.create_object().set(col, "BLAAbaergroedZ");
@@ -6207,7 +6207,7 @@ TEST(Query_SumMinMaxAvg)
     t.add_column(type_Float, "4");
     t.add_column(type_Double, "5");
 
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     t.create_objects(9, keys);
     t.get_object(keys[0]).set_all(1, "a", Timestamp{200, 0}, 1.0f, 2.0);
     t.get_object(keys[1]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 1.0);
@@ -6224,7 +6224,7 @@ TEST(Query_SumMinMaxAvg)
     CHECK_EQUAL(0, t.where().minimum_int(int_col));
     CHECK_EQUAL(3, t.where().maximum_int(int_col));
 
-    Key resindex;
+    ObjKey resindex;
 
     t.where().maximum_int(int_col, &resindex);
     CHECK_EQUAL(keys[5], resindex);
@@ -6298,7 +6298,7 @@ TEST(Query_SumMinMaxAvg_where)
     CHECK_EQUAL(0, t.where(&v).minimum_int(0));
     CHECK_EQUAL(3, t.where(&v).maximum_int(0));
 
-    Key resindex;
+    ObjKey resindex;
 
     t.where(&v).maximum_int(0, &resindex);
     CHECK_EQUAL(5, resindex);
@@ -9473,24 +9473,24 @@ TEST(Query_SubQueries)
 
 
     // add some rows
-    origin->create_object(Key(0));
-    origin->create_object(Key(1));
-    origin->create_object(Key(2));
+    origin->create_object(ObjKey(0));
+    origin->create_object(ObjKey(1));
+    origin->create_object(ObjKey(2));
 
-    target->create_object(Key(0)).set_all(400, "hello");
-    target->create_object(Key(1)).set_all(500, "world");
-    target->create_object(Key(2)).set_all(600, "!");
-    target->create_object(Key(3)).set_all(600, "world");
+    target->create_object(ObjKey(0)).set_all(400, "hello");
+    target->create_object(ObjKey(1)).set_all(500, "world");
+    target->create_object(ObjKey(2)).set_all(600, "!");
+    target->create_object(ObjKey(3)).set_all(600, "world");
 
     // set some links
-    auto links0 = origin->get_object(Key(0)).get_linklist(col_link_o);
-    links0.add(Key(1));
+    auto links0 = origin->get_object(ObjKey(0)).get_linklist(col_link_o);
+    links0.add(ObjKey(1));
 
-    auto links1 = origin->get_object(Key(1)).get_linklist(col_link_o);
-    links1.add(Key(1));
-    links1.add(Key(2));
+    auto links1 = origin->get_object(ObjKey(1)).get_linklist(col_link_o);
+    links1.add(ObjKey(1));
+    links1.add(ObjKey(2));
 
-    Key match;
+    ObjKey match;
     TableView tv;
     Query q;
     Query sub_query;
@@ -9500,8 +9500,8 @@ TEST(Query_SubQueries)
     q = origin->column<Link>(col_link_o, sub_query).count() == origin->column<Link>(col_link_o).count();
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(Key(0), tv.get_key(0));
-    CHECK_EQUAL(Key(2), tv.get_key(1));
+    CHECK_EQUAL(ObjKey(0), tv.get_key(0));
+    CHECK_EQUAL(ObjKey(2), tv.get_key(1));
 
     // No linked rows match ("world, 600).
     sub_query = target->column<String>(col_string_t) == "world" && target->column<Int>(col_int_t) == 600;
@@ -9514,22 +9514,22 @@ TEST(Query_SubQueries)
     q = origin->column<Link>(col_link_o, sub_query).count() >= 1;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(Key(0), tv.get_key(0));
-    CHECK_EQUAL(Key(1), tv.get_key(1));
+    CHECK_EQUAL(ObjKey(0), tv.get_key(0));
+    CHECK_EQUAL(ObjKey(1), tv.get_key(1));
 
     // Row 1 has at least one linked row that matches ("!", 600).
     sub_query = target->column<String>(col_string_t) == "!" && target->column<Int>(col_int_t) == 600;
     q = origin->column<Link>(col_link_o, sub_query).count() >= 1;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(Key(1), tv.get_key(0));
+    CHECK_EQUAL(ObjKey(1), tv.get_key(0));
 
     // Row 1 has two linked rows that contain either "world" or 600.
     sub_query = target->column<String>(col_string_t) == "world" || target->column<Int>(col_int_t) == 600;
     q = origin->column<Link>(col_link_o, sub_query).count() == 2;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(Key(1), tv.get_key(0));
+    CHECK_EQUAL(ObjKey(1), tv.get_key(0));
 
     // Rows 0 and 2 have at most one linked row that contains either "world" or 600. Row 2 does by virtue of having no
     // rows.
@@ -9537,8 +9537,8 @@ TEST(Query_SubQueries)
     q = origin->column<Link>(col_link_o, sub_query).count() <= 1;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(Key(0), tv.get_key(0));
-    CHECK_EQUAL(Key(2), tv.get_key(1));
+    CHECK_EQUAL(ObjKey(0), tv.get_key(0));
+    CHECK_EQUAL(ObjKey(2), tv.get_key(1));
 }
 
 // Ensure that Query's move constructor and move assignment operator don't result in
@@ -9561,7 +9561,7 @@ TEST(Query_MoveDoesntDoubleDelete)
 
 TEST(Query_Timestamp)
 {
-    Key match;
+    ObjKey match;
     size_t cnt;
     Table table;
     auto col_first = table.add_column(type_Timestamp, "first", true);
@@ -9569,7 +9569,7 @@ TEST(Query_Timestamp)
     Columns<Timestamp> first = table.column<Timestamp>(col_first);
     Columns<Timestamp> second = table.column<Timestamp>(col_second);
 
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     table.create_objects(6, keys);
     table.get_object(keys[0]).set(col_first, Timestamp(111, 222));
     table.get_object(keys[1]).set(col_first, Timestamp(111, 333));
@@ -9742,12 +9742,12 @@ TEST(Query_SyncViewIfNeeded)
         target->clear();
 
         for (int64_t i = 0; i < 15; ++i) {
-            target->create_object(Key(i)).set(col_id, i);
+            target->create_object(ObjKey(i)).set(col_id, i);
         }
 
         LinkList ll = source->create_object().get_linklist(col_links);
         for (size_t i = 6; i < 15; ++i) {
-            ll.add(Key(i));
+            ll.add(ObjKey(i));
         }
     };
 
@@ -9758,8 +9758,8 @@ TEST(Query_SyncViewIfNeeded)
         Query q = target->where(&restricting_view).less(col_id, 10);
 
         // Bring the view out of sync with the table.
-        target->get_object(Key(7)).set(col_id, -7);
-        target->get_object(Key(8)).set(col_id, -8);
+        target->get_object(ObjKey(7)).set(col_id, -7);
+        target->get_object(ObjKey(8)).set(col_id, -8);
 
         // Verify that the query uses the view as-is.
         CHECK_EQUAL(4, q.count());
@@ -9781,8 +9781,8 @@ TEST(Query_SyncViewIfNeeded)
         CHECK_EQUAL(restricting_view->size(), 9);
 
         // Modify the underlying table to remove rows from the LinkView.
-        target->remove_object(Key(7));
-        target->remove_object(Key(8));
+        target->remove_object(ObjKey(7));
+        target->remove_object(ObjKey(8));
 
         // The view is out of sync.
         CHECK_EQUAL(false, restricting_view->is_in_sync());
@@ -9807,8 +9807,8 @@ TEST(Query_SyncViewIfNeeded)
         reset_table_contents();
         Query q = target->where().greater(col_id, 5).less(col_id, 10);
 
-        target->get_object(Key(7)).set(col_id, -7);
-        target->get_object(Key(8)).set(col_id, -8);
+        target->get_object(ObjKey(7)).set(col_id, -7);
+        target->get_object(ObjKey(8)).set(col_id, -8);
 
         CHECK_EQUAL(2, q.count());
 
@@ -10754,29 +10754,29 @@ TEST(Query_IntOnly)
     auto c0 = table.add_column(type_Int, "i1");
     auto c1 = table.add_column(type_Int, "i2");
 
-    table.create_object(Key(7)).set_all(7, 6);
-    table.create_object(Key(19)).set_all(19, 9);
-    table.create_object(Key(5)).set_all(19, 22);
-    table.create_object(Key(21)).set_all(2, 6);
+    table.create_object(ObjKey(7)).set_all(7, 6);
+    table.create_object(ObjKey(19)).set_all(19, 9);
+    table.create_object(ObjKey(5)).set_all(19, 22);
+    table.create_object(ObjKey(21)).set_all(2, 6);
 
     auto q = table.column<Int>(c1) == 6;
-    Key key = q.find();
-    CHECK_EQUAL(key, Key(7));
+    ObjKey key = q.find();
+    CHECK_EQUAL(key, ObjKey(7));
 
     TableView tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get(0).get_key(), Key(7));
-    CHECK_EQUAL(tv.get(1).get_key(), Key(21));
+    CHECK_EQUAL(tv.get(0).get_key(), ObjKey(7));
+    CHECK_EQUAL(tv.get(1).get_key(), ObjKey(21));
 
     auto q1 = table.where(&tv).equal(c0, 2);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(tv1.size(), 1);
-    CHECK_EQUAL(tv1.get(0).get_key(), Key(21));
+    CHECK_EQUAL(tv1.get(0).get_key(), ObjKey(21));
 
     q1 = table.where(&tv).greater(c0, 5);
     tv1 = q1.find_all();
     CHECK_EQUAL(tv1.size(), 1);
-    CHECK_EQUAL(tv1.get(0).get_key(), Key(7));
+    CHECK_EQUAL(tv1.get(0).get_key(), ObjKey(7));
 
     q = table.column<Int>(c0) == 19 && table.column<Int>(c1) == 9;
     key = q.find();
@@ -10784,20 +10784,20 @@ TEST(Query_IntOnly)
 
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get(0).get_key(), Key(19));
+    CHECK_EQUAL(tv.get(0).get_key(), ObjKey(19));
 
     // Two column expression
     q = table.column<Int>(c0) < table.column<Int>(c1);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get(0).get_key(), Key(5));
-    CHECK_EQUAL(tv.get(1).get_key(), Key(21));
+    CHECK_EQUAL(tv.get(0).get_key(), ObjKey(5));
+    CHECK_EQUAL(tv.get(1).get_key(), ObjKey(21));
 }
 
 TEST(Query_LinksTo)
 {
     Query q;
-    Key found_key;
+    ObjKey found_key;
     Group group;
 
     TableRef source = group.add_table("source");
@@ -10806,10 +10806,10 @@ TEST(Query_LinksTo)
     auto col_link = source->add_column_link(type_Link, "link", *target);
     auto col_linklist = source->add_column_link(type_LinkList, "linklist", *target);
 
-    std::vector<Key> target_keys;
+    std::vector<ObjKey> target_keys;
     target->create_objects(10, target_keys);
 
-    std::vector<Key> source_keys;
+    std::vector<ObjKey> source_keys;
     source->create_objects(10, source_keys);
 
     source->get_object(source_keys[2]).set(col_link, target_keys[2]);

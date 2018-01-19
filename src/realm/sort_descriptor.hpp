@@ -35,7 +35,7 @@ class SortDescriptor;
 class CommonDescriptor {
 public:
     struct IndexPair {
-        Key key_for_object;
+        ObjKey key_for_object;
         size_t index_in_view;
     };
     struct ColumnId {
@@ -89,7 +89,7 @@ public:
     private:
         struct SortColumn {
             std::vector<bool> is_null;
-            std::vector<Key> translated_keys;
+            std::vector<ObjKey> translated_keys;
             const Table* table;
             ColKey col_key;
             bool ascending;

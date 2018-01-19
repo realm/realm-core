@@ -596,8 +596,8 @@ TEST(Group_RemoveTableWithColumns)
     delta->add_column(type_Int, "delta-1");
     epsilon->add_column_link(type_Link, "epsilon-1", *delta);
 
-    Key k = delta->create_object().get_key();
-    beta->create_object().set<Key>(col_link, k);
+    ObjKey k = delta->create_object().get_key();
+    beta->create_object().set<ObjKey>(col_link, k);
     auto view = delta->get_backlink_view(k, beta, col_link);
     CHECK_EQUAL(view.size(), 1);
 
@@ -661,9 +661,9 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     auto four = fourth->add_column_link(type_Link, "four", *first);
     auto five = fourth->add_column_link(type_Link, "five", *third);
 
-    std::vector<Key> first_keys;
-    std::vector<Key> third_keys;
-    std::vector<Key> fourth_keys;
+    std::vector<ObjKey> first_keys;
+    std::vector<ObjKey> third_keys;
+    std::vector<ObjKey> fourth_keys;
     first->create_objects(2, first_keys);
     third->create_objects(2, third_keys);
     fourth->create_object();
@@ -712,16 +712,16 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     group.verify();
 
     CHECK_EQUAL(2, first->size());
-    CHECK_EQUAL(third_keys[1], first->get_object(first_keys[0]).get<Key>(one));
-    CHECK_EQUAL(third_keys[1], first->get_object(first_keys[1]).get<Key>(one));
+    CHECK_EQUAL(third_keys[1], first->get_object(first_keys[0]).get<ObjKey>(one));
+    CHECK_EQUAL(third_keys[1], first->get_object(first_keys[1]).get<ObjKey>(one));
     CHECK_EQUAL(1, first->get_object(first_keys[0]).get_backlink_count(*fourth, one));
     CHECK_EQUAL(1, first->get_object(first_keys[1]).get_backlink_count(*fourth, one));
 
     CHECK_EQUAL(2, third->size());
-    CHECK_EQUAL(fourth_keys[0], third->get_object(third_keys[0]).get<Key>(two));
-    CHECK_EQUAL(fourth_keys[0], third->get_object(third_keys[1]).get<Key>(two));
-    CHECK_EQUAL(third_keys[1], third->get_object(third_keys[0]).get<Key>(three));
-    CHECK_EQUAL(third_keys[1], third->get_object(third_keys[1]).get<Key>(three));
+    CHECK_EQUAL(fourth_keys[0], third->get_object(third_keys[0]).get<ObjKey>(two));
+    CHECK_EQUAL(fourth_keys[0], third->get_object(third_keys[1]).get<ObjKey>(two));
+    CHECK_EQUAL(third_keys[1], third->get_object(third_keys[0]).get<ObjKey>(three));
+    CHECK_EQUAL(third_keys[1], third->get_object(third_keys[1]).get<ObjKey>(three));
 
     CHECK_EQUAL(0, third->get_object(third_keys[0]).get_backlink_count(*first, one));
     CHECK_EQUAL(2, third->get_object(third_keys[1]).get_backlink_count(*first, one));
@@ -731,10 +731,10 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     CHECK_EQUAL(1, third->get_object(third_keys[1]).get_backlink_count(*fourth, five));
 
     CHECK_EQUAL(4, fourth->size());
-    CHECK_EQUAL(first_keys[0], fourth->get_object(fourth_keys[0]).get<Key>(four));
-    CHECK_EQUAL(first_keys[1], fourth->get_object(fourth_keys[1]).get<Key>(four));
-    CHECK_EQUAL(third_keys[0], fourth->get_object(fourth_keys[0]).get<Key>(five));
-    CHECK_EQUAL(third_keys[1], fourth->get_object(fourth_keys[1]).get<Key>(five));
+    CHECK_EQUAL(first_keys[0], fourth->get_object(fourth_keys[0]).get<ObjKey>(four));
+    CHECK_EQUAL(first_keys[1], fourth->get_object(fourth_keys[1]).get<ObjKey>(four));
+    CHECK_EQUAL(third_keys[0], fourth->get_object(fourth_keys[0]).get<ObjKey>(five));
+    CHECK_EQUAL(third_keys[1], fourth->get_object(fourth_keys[1]).get<ObjKey>(five));
 
     CHECK_EQUAL(2, fourth->get_object(fourth_keys[0]).get_backlink_count(*third, two));
     CHECK_EQUAL(0, fourth->get_object(fourth_keys[1]).get_backlink_count(*third, two));
@@ -925,16 +925,16 @@ TEST(Group_Serialize1)
         Group to_disk;
         auto table = to_disk.add_table("test");
         test_table_add_columns(table);
-        table->create_object(Key(0)).set_all("", 1, true, int(Wed));
-        table->create_object(Key(1)).set_all("", 15, true, int(Wed));
-        table->create_object(Key(2)).set_all("", 10, true, int(Wed));
-        table->create_object(Key(3)).set_all("", 20, true, int(Wed));
-        table->create_object(Key(4)).set_all("", 11, true, int(Wed));
-        table->create_object(Key(6)).set_all("", 45, true, int(Wed));
-        table->create_object(Key(7)).set_all("", 10, true, int(Wed));
-        table->create_object(Key(8)).set_all("", 0, true, int(Wed));
-        table->create_object(Key(9)).set_all("", 30, true, int(Wed));
-        table->create_object(Key(10)).set_all("", 9, true, int(Wed));
+        table->create_object(ObjKey(0)).set_all("", 1, true, int(Wed));
+        table->create_object(ObjKey(1)).set_all("", 15, true, int(Wed));
+        table->create_object(ObjKey(2)).set_all("", 10, true, int(Wed));
+        table->create_object(ObjKey(3)).set_all("", 20, true, int(Wed));
+        table->create_object(ObjKey(4)).set_all("", 11, true, int(Wed));
+        table->create_object(ObjKey(6)).set_all("", 45, true, int(Wed));
+        table->create_object(ObjKey(7)).set_all("", 10, true, int(Wed));
+        table->create_object(ObjKey(8)).set_all("", 0, true, int(Wed));
+        table->create_object(ObjKey(9)).set_all("", 30, true, int(Wed));
+        table->create_object(ObjKey(10)).set_all("", 9, true, int(Wed));
 
 #ifdef REALM_DEBUG
         to_disk.verify();
@@ -954,13 +954,13 @@ TEST(Group_Serialize1)
         CHECK(*table == *t);
 
         // Modify both tables
-        table->get_object(Key(0)).set(cols[0], "test");
-        t->get_object(Key(0)).set(cols[0], "test");
+        table->get_object(ObjKey(0)).set(cols[0], "test");
+        t->get_object(ObjKey(0)).set(cols[0], "test");
 
-        table->create_object(Key(5)).set_all("hello", 100, false, int(Mon));
-        t->create_object(Key(5)).set_all("hello", 100, false, int(Mon));
-        table->remove_object(Key(1));
-        t->remove_object(Key(1));
+        table->create_object(ObjKey(5)).set_all("hello", 100, false, int(Mon));
+        t->create_object(ObjKey(5)).set_all("hello", 100, false, int(Mon));
+        table->remove_object(ObjKey(1));
+        t->remove_object(ObjKey(1));
 
         // Verify that both changed correctly
         CHECK(*table == *t);
@@ -1163,7 +1163,7 @@ TEST(Group_Serialize_All)
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
 
-    table->create_object(Key(0)).set_all(12, true, Timestamp{12345, 0}, "test", BinaryData("binary", 7));
+    table->create_object(ObjKey(0)).set_all(12, true, Timestamp{12345, 0}, "test", BinaryData("binary", 7));
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -1175,7 +1175,7 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL(5, t->get_column_count());
     CHECK_EQUAL(1, t->size());
     auto cols = t->get_col_keys();
-    Obj obj = t->get_object(Key(0));
+    Obj obj = t->get_object(ObjKey(0));
     CHECK_EQUAL(12, obj.get<Int>(cols[0]));
     CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
     CHECK(obj.get<Timestamp>(cols[2]) == Timestamp(12345, 0));
@@ -1198,7 +1198,7 @@ TEST(Group_Persist)
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
     table->add_column(type_Timestamp, "timestamp");
-    table->create_object(Key(0)).set_all(12, true, "test", BinaryData("binary", 7), Timestamp{111, 222});
+    table->create_object(ObjKey(0)).set_all(12, true, "test", BinaryData("binary", 7), Timestamp{111, 222});
 
     // Write changes to file
     db.commit();
@@ -1211,7 +1211,7 @@ TEST(Group_Persist)
         CHECK_EQUAL(5, table->get_column_count());
         CHECK_EQUAL(1, table->size());
         auto cols = table->get_col_keys();
-        Obj obj = table->get_object(Key(0));
+        Obj obj = table->get_object(ObjKey(0));
         CHECK_EQUAL(12, obj.get<Int>(cols[0]));
         CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
         CHECK_EQUAL("test", obj.get<String>(cols[2]));
@@ -1234,7 +1234,7 @@ TEST(Group_Persist)
         CHECK_EQUAL(5, table->get_column_count());
         CHECK_EQUAL(1, table->size());
         auto cols = table->get_col_keys();
-        Obj obj = table->get_object(Key(0));
+        Obj obj = table->get_object(ObjKey(0));
         CHECK_EQUAL(12, obj.get<Int>(cols[0]));
         CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
         CHECK_EQUAL("Changed!", obj.get<String>(cols[2]));
@@ -1422,7 +1422,7 @@ TEST(Group_CascadeNotify_Simple)
     t->add_column(type_Int, "int");
 
     // Add some extra rows so that the indexes being tested aren't all 0
-    std::vector<Key> t_keys;
+    std::vector<ObjKey> t_keys;
     t->create_objects(100, t_keys);
 
     bool called = false;
@@ -1449,7 +1449,7 @@ TEST(Group_CascadeNotify_Simple)
     auto col_link = origin->add_column_link(type_Link, "link", *t);
     auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t);
 
-    std::vector<Key> o_keys;
+    std::vector<ObjKey> o_keys;
     origin->create_objects(100, o_keys);
 
     // move_last_over() on an un-linked-to row should still just send that row
@@ -1612,7 +1612,7 @@ TEST(Group_CascadeNotify_TableClear)
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
 
-    std::vector<Key> t_keys;
+    std::vector<ObjKey> t_keys;
     t->create_objects(10, t_keys);
 
     // clear() does not list the rows in the table being cleared because it
@@ -1632,7 +1632,7 @@ TEST(Group_CascadeNotify_TableClear)
     auto col_link = origin->add_column_link(type_Link, "link", *t);
     auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t);
 
-    std::vector<Key> o_keys;
+    std::vector<ObjKey> o_keys;
     origin->create_objects(10, o_keys);
     t->create_objects(10, t_keys);
 
@@ -1690,7 +1690,7 @@ TEST(Group_CascadeNotify_TableViewClear)
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
 
-    std::vector<Key> t_keys;
+    std::vector<ObjKey> t_keys;
     t->create_objects(10, t_keys);
 
     // No link columns, so remove() is used
@@ -1712,7 +1712,7 @@ TEST(Group_CascadeNotify_TableViewClear)
     auto col_link = origin->add_column_link(type_Link, "link", *t);
     auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t);
 
-    std::vector<Key> o_keys;
+    std::vector<ObjKey> o_keys;
     origin->create_objects(10, o_keys);
     t->create_objects(10, t_keys);
 
@@ -1958,9 +1958,9 @@ TEST(Group_RemoveRecursive)
     auto link_col_o = origin->add_column_link(type_Link, "links", *target);
 
     // Delete one at a time
-    Key key_target = target->create_object().get_key();
-    Key k0 = origin->create_object().set(link_col_o, key_target).get_key();
-    Key k1 = origin->create_object().set(link_col_o, key_target).get_key();
+    ObjKey key_target = target->create_object().get_key();
+    ObjKey k0 = origin->create_object().set(link_col_o, key_target).get_key();
+    ObjKey k1 = origin->create_object().set(link_col_o, key_target).get_key();
     CHECK_EQUAL(target->size(), 1);
     origin->remove_object_recursive(k0);
     // Should not have deleted child
@@ -1971,7 +1971,7 @@ TEST(Group_RemoveRecursive)
     CHECK_EQUAL(target->size(), 0);
 
     // 3 rows linked together in a list
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     target->create_objects(3, keys);
     target->get_object(keys[0]).set(link_col_t, keys[1]);
     target->get_object(keys[1]).set(link_col_t, keys[2]);

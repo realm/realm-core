@@ -925,9 +925,9 @@ TEST(LinkList_SortLinkView)
     auto col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
 
     // add some rows
-    Key key0 = table1->create_object().set_all(300, "delta", 100.f, 300., "alfa", Timestamp(300, 300)).get_key();
-    Key key1 = table1->create_object().set_all(100, "beta", 300.f, 100., "alfa", Timestamp(200, 200)).get_key();
-    Key key2 = table1->create_object().set_all(200, "alfa", 200.f, 200., "alfa", Timestamp(100, 100)).get_key();
+    ObjKey key0 = table1->create_object().set_all(300, "delta", 100.f, 300., "alfa", Timestamp(300, 300)).get_key();
+    ObjKey key1 = table1->create_object().set_all(100, "beta", 300.f, 100., "alfa", Timestamp(200, 200)).get_key();
+    ObjKey key2 = table1->create_object().set_all(200, "alfa", 200.f, 200., "alfa", Timestamp(100, 100)).get_key();
 
     Obj obj0 = table2->create_object();
     Obj obj1 = table2->create_object();
@@ -1084,7 +1084,7 @@ TEST(Link_FindNullLink)
     TableRef table2 = group.add_table("table2");
 
     auto col_str0 = table0->add_column(type_String, "str1");
-    Key k0 = table0->create_object().set(col_str0, "hello").get_key();
+    ObjKey k0 = table0->create_object().set(col_str0, "hello").get_key();
 
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "int1");
@@ -1176,8 +1176,8 @@ TEST(Link_FindNotNullLink)
     auto col_link = t0->add_column_link(type_Link, "link", *t1);
     auto col_int = t1->add_column(type_Int, "int");
 
-    std::vector<Key> keys0;
-    std::vector<Key> keys1;
+    std::vector<ObjKey> keys0;
+    std::vector<ObjKey> keys1;
     t0->create_objects(6, keys0);
     t1->create_objects(6, keys1);
     for (size_t i = 0; i < 6; ++i) {
@@ -1220,8 +1220,8 @@ TEST(LinkList_FindNotNullLink)
     auto col_str = datas->add_column(type_String, "title");
 
     Obj obj0 = lists->create_object();
-    std::vector<Key> item_keys;
-    std::vector<Key> data_keys;
+    std::vector<ObjKey> item_keys;
+    std::vector<ObjKey> data_keys;
     items->create_objects(6, item_keys);
     datas->create_objects(6, data_keys);
 
@@ -1259,7 +1259,7 @@ TEST(Link_FirstResultPastRow1000)
     auto col_link = link_table->add_column_link(type_Link, "link", *data_table);
 
     Obj obj = data_table->create_object();
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     link_table->create_objects(1001, keys);
 
     link_table->get_object(keys[1000]).set(col_link, obj.get_key());
@@ -1282,11 +1282,11 @@ TEST(LinkList_QueryOnLinkList)
     auto col_link2 = origin->add_column_link(type_LinkList, "linklist", *target);
 
     // add some rows
-    Key key0 = target->create_object().set_all(300, "delta").get_key();
-    Key key1 = target->create_object().set_all(100, "alfa").get_key();
-    Key key2 = target->create_object().set_all(200, "beta").get_key();
-    Key key4 = target->create_object().set_all(400, "charlie").get_key();
-    Key key5 = target->create_object().set_all(300, "ecco").get_key();
+    ObjKey key0 = target->create_object().set_all(300, "delta").get_key();
+    ObjKey key1 = target->create_object().set_all(100, "alfa").get_key();
+    ObjKey key2 = target->create_object().set_all(200, "beta").get_key();
+    ObjKey key4 = target->create_object().set_all(400, "charlie").get_key();
+    ObjKey key5 = target->create_object().set_all(300, "ecco").get_key();
 
 
     Obj obj0 = origin->create_object();
@@ -1361,7 +1361,7 @@ TEST(LinkList_QueryOnLinkList)
     }
     tv = query2.find_all();
     CHECK_EQUAL(1, tv.size());
-    Key match = query2.find();
+    ObjKey match = query2.find();
     CHECK_EQUAL(key4, match);
 }
 

@@ -73,7 +73,7 @@ public:
     {
         return m_root->get_last_key_value();
     }
-    MemRef ensure_writeable(Key k)
+    MemRef ensure_writeable(ObjKey k)
     {
         return m_root->ensure_writeable(k);
     }
@@ -98,12 +98,12 @@ public:
     {
         m_root->remove_column(ndx);
     }
-    Obj insert(Key k);
-    void erase(Key k, CascadeState& state);
-    bool is_valid(Key k) const;
-    ConstObj get(Key k) const;
-    Obj get(Key k);
-    bool get_leaf(Key key, ClusterNode::IteratorState& state) const noexcept;
+    Obj insert(ObjKey k);
+    void erase(ObjKey k, CascadeState& state);
+    bool is_valid(ObjKey k) const;
+    ConstObj get(ObjKey k) const;
+    Obj get(ObjKey k);
+    bool get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept;
     bool traverse(TraverseFunction func) const;
     void dump_objects()
     {
@@ -145,7 +145,7 @@ public:
     typedef const Obj& reference;
 
     ConstIterator(const ClusterTree& t, size_t ndx);
-    ConstIterator(const ClusterTree& t, Key key);
+    ConstIterator(const ClusterTree& t, ObjKey key);
     ConstIterator(Iterator&&);
     ConstIterator(const ConstIterator& other)
         : ConstIterator(other.m_tree, other.m_key)
@@ -174,10 +174,10 @@ protected:
     mutable Cluster m_leaf;
     mutable ClusterNode::IteratorState m_state;
     mutable uint64_t m_instance_version = uint64_t(-1);
-    mutable Key m_key;
+    mutable ObjKey m_key;
     mutable std::aligned_storage<sizeof(Obj), alignof(Obj)>::type m_obj_cache_storage;
 
-    Key load_leaf(Key key) const;
+    ObjKey load_leaf(ObjKey key) const;
 };
 
 class ClusterTree::Iterator : public ClusterTree::ConstIterator {

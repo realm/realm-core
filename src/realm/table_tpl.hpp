@@ -24,7 +24,7 @@
 
 namespace realm {
 template <Action action, typename T, typename R>
-R Table::aggregate(ColKey column_key, T value, size_t* resultcount, Key* return_ndx) const
+R Table::aggregate(ColKey column_key, T value, size_t* resultcount, ObjKey* return_ndx) const
 {
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     using ResultType = typename AggregateResultType<T, action>::result_type;

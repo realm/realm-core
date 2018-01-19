@@ -258,8 +258,8 @@ TEST(Table_DeleteCrash)
     table->add_column(type_String, "name");
     table->add_column(type_Int, "age");
 
-    Key k0 = table->create_object().set_all("Alice", 17).get_key();
-    Key k1 = table->create_object().set_all("Bob", 50).get_key();
+    ObjKey k0 = table->create_object().set_all("Alice", 17).get_key();
+    ObjKey k1 = table->create_object().set_all("Bob", 50).get_key();
     table->create_object().set_all("Peter", 44);
 
     table->remove_object(k0);
@@ -308,7 +308,7 @@ TEST(Table_DateTimeMinMax)
     objs[1].set_null(col);
     objs[2].set(col, Timestamp{2, 2});
 
-    Key idx; // tableview entry that points at the max/min value
+    ObjKey idx; // tableview entry that points at the max/min value
 
     CHECK_EQUAL(table->maximum_timestamp(col, &idx), Timestamp(2, 2));
     CHECK_EQUAL(idx, objs[2].get_key());
@@ -344,7 +344,7 @@ TEST(Table_MinMaxSingleNullRow)
     auto float_col = table->add_column(type_Float, "float", true);
     table->create_object();
 
-    Key key;
+    ObjKey key;
 
     // NOTE: Return-values of method calls are undefined if you have only null-entries in the table.
     // The return-value is not necessarily a null-object. Always test the return_ndx argument!
@@ -517,12 +517,12 @@ TEST(Table_AggregateFuzz)
         auto float_col = table->add_column(type_Float, "float", true);
 
         size_t rows = size_t(fastrand(10));
-        std::vector<Key> keys;
+        std::vector<ObjKey> keys;
         table->create_objects(rows, keys);
         int64_t largest = 0;
         int64_t smallest = 0;
-        Key largest_pos = null_key;
-        Key smallest_pos = null_key;
+        ObjKey largest_pos = null_key;
+        ObjKey smallest_pos = null_key;
 
         double avg = 0;
         int64_t sum = 0;
@@ -551,7 +551,7 @@ TEST(Table_AggregateFuzz)
 
         avg = double(sum) / (rows - nulls == 0 ? 1 : rows - nulls);
 
-        Key key;
+        ObjKey key;
         size_t cnt;
         float f;
         int64_t i;
@@ -858,7 +858,7 @@ TEST(Table_Floats)
     CHECK_EQUAL(102.13, obj.get<double>(double_col));
 
     // Test adding multiple rows
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     table.create_objects(7, keys);
     for (size_t i = 0; i < 7; ++i) {
         table.get_object(keys[i]).set(float_col, 1.12f + 100 * i).set(double_col, 102.13 * 200 * i);
@@ -882,20 +882,20 @@ TEST(Table_Delete)
     auto col_int = table.add_column(type_Int, "ints");
 
     for (int i = 0; i < 10; ++i) {
-        table.create_object(Key(i)).set(col_int, i);
+        table.create_object(ObjKey(i)).set(col_int, i);
     }
 
-    table.remove_object(Key(0));
-    table.remove_object(Key(4));
-    table.remove_object(Key(7));
+    table.remove_object(ObjKey(0));
+    table.remove_object(ObjKey(4));
+    table.remove_object(ObjKey(7));
 
-    CHECK_EQUAL(1, table.get_object(Key(1)).get<int64_t>(col_int));
-    CHECK_EQUAL(2, table.get_object(Key(2)).get<int64_t>(col_int));
-    CHECK_EQUAL(3, table.get_object(Key(3)).get<int64_t>(col_int));
-    CHECK_EQUAL(5, table.get_object(Key(5)).get<int64_t>(col_int));
-    CHECK_EQUAL(6, table.get_object(Key(6)).get<int64_t>(col_int));
-    CHECK_EQUAL(8, table.get_object(Key(8)).get<int64_t>(col_int));
-    CHECK_EQUAL(9, table.get_object(Key(9)).get<int64_t>(col_int));
+    CHECK_EQUAL(1, table.get_object(ObjKey(1)).get<int64_t>(col_int));
+    CHECK_EQUAL(2, table.get_object(ObjKey(2)).get<int64_t>(col_int));
+    CHECK_EQUAL(3, table.get_object(ObjKey(3)).get<int64_t>(col_int));
+    CHECK_EQUAL(5, table.get_object(ObjKey(5)).get<int64_t>(col_int));
+    CHECK_EQUAL(6, table.get_object(ObjKey(6)).get<int64_t>(col_int));
+    CHECK_EQUAL(8, table.get_object(ObjKey(8)).get<int64_t>(col_int));
+    CHECK_EQUAL(9, table.get_object(ObjKey(9)).get<int64_t>(col_int));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -904,7 +904,7 @@ TEST(Table_Delete)
     // Delete all items one at a time
     for (size_t i = 0; i < 10; ++i) {
         try {
-            table.remove_object(Key(i));
+            table.remove_object(ObjKey(i));
         }
         catch (...) {
         }
@@ -945,7 +945,7 @@ TEST(Table_GetName)
 
 namespace {
 
-void setup_multi_table(Table& table, size_t rows, std::vector<Key>& keys, std::vector<ColKey>& column_keys)
+void setup_multi_table(Table& table, size_t rows, std::vector<ObjKey>& keys, std::vector<ColKey>& column_keys)
 {
     // Create table with all column types
     auto int_col = table.add_column(type_Int, "int");                        //  0
@@ -1041,7 +1041,7 @@ void setup_multi_table(Table& table, size_t rows, std::vector<Key>& keys, std::v
 TEST(Table_DeleteAllTypes)
 {
     Table table;
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     std::vector<ColKey> column_keys;
     setup_multi_table(table, 15, keys, column_keys);
 
@@ -1094,7 +1094,7 @@ TEST(Table_MoveAllTypes)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
     Table table;
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     std::vector<ColKey> column_keys;
     setup_multi_table(table, 15, keys, column_keys);
     table.add_search_index(column_keys[6]);
@@ -1225,16 +1225,16 @@ TEST(Table_FindAllInt)
 
     auto col_int = table.add_column(type_Int, "integers");
 
-    table.create_object(Key(0)).set(col_int, 10);
-    table.create_object(Key(1)).set(col_int, 20);
-    table.create_object(Key(2)).set(col_int, 10);
-    table.create_object(Key(3)).set(col_int, 20);
-    table.create_object(Key(4)).set(col_int, 10);
-    table.create_object(Key(5)).set(col_int, 20);
-    table.create_object(Key(6)).set(col_int, 10);
-    table.create_object(Key(7)).set(col_int, 20);
-    table.create_object(Key(8)).set(col_int, 10);
-    table.create_object(Key(9)).set(col_int, 20);
+    table.create_object(ObjKey(0)).set(col_int, 10);
+    table.create_object(ObjKey(1)).set(col_int, 20);
+    table.create_object(ObjKey(2)).set(col_int, 10);
+    table.create_object(ObjKey(3)).set(col_int, 20);
+    table.create_object(ObjKey(4)).set(col_int, 10);
+    table.create_object(ObjKey(5)).set(col_int, 20);
+    table.create_object(ObjKey(6)).set(col_int, 10);
+    table.create_object(ObjKey(7)).set(col_int, 20);
+    table.create_object(ObjKey(8)).set(col_int, 10);
+    table.create_object(ObjKey(9)).set(col_int, 20);
 
     // Search for a value that does not exits
     auto v0 = table.find_all_int(col_int, 5);
@@ -1244,11 +1244,11 @@ TEST(Table_FindAllInt)
     auto v = table.find_all_int(col_int, 20);
 
     CHECK_EQUAL(5, v.size());
-    CHECK_EQUAL(Key(1), v.get_key(0));
-    CHECK_EQUAL(Key(3), v.get_key(1));
-    CHECK_EQUAL(Key(5), v.get_key(2));
-    CHECK_EQUAL(Key(7), v.get_key(3));
-    CHECK_EQUAL(Key(9), v.get_key(4));
+    CHECK_EQUAL(ObjKey(1), v.get_key(0));
+    CHECK_EQUAL(ObjKey(3), v.get_key(1));
+    CHECK_EQUAL(ObjKey(5), v.get_key(2));
+    CHECK_EQUAL(ObjKey(7), v.get_key(3));
+    CHECK_EQUAL(ObjKey(9), v.get_key(4));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -1261,31 +1261,31 @@ TEST(Table_SortedInt)
 
     auto col_int = table.add_column(type_Int, "integers");
 
-    table.create_object(Key(0)).set(col_int, 10); // 0: 4
-    table.create_object(Key(1)).set(col_int, 20); // 1: 7
-    table.create_object(Key(2)).set(col_int, 0);  // 2: 0
-    table.create_object(Key(3)).set(col_int, 40); // 3: 8
-    table.create_object(Key(4)).set(col_int, 15); // 4: 6
-    table.create_object(Key(5)).set(col_int, 11); // 5: 5
-    table.create_object(Key(6)).set(col_int, 6);  // 6: 3
-    table.create_object(Key(7)).set(col_int, 4);  // 7: 2
-    table.create_object(Key(8)).set(col_int, 99); // 8: 9
-    table.create_object(Key(9)).set(col_int, 2);  // 9: 1
+    table.create_object(ObjKey(0)).set(col_int, 10); // 0: 4
+    table.create_object(ObjKey(1)).set(col_int, 20); // 1: 7
+    table.create_object(ObjKey(2)).set(col_int, 0);  // 2: 0
+    table.create_object(ObjKey(3)).set(col_int, 40); // 3: 8
+    table.create_object(ObjKey(4)).set(col_int, 15); // 4: 6
+    table.create_object(ObjKey(5)).set(col_int, 11); // 5: 5
+    table.create_object(ObjKey(6)).set(col_int, 6);  // 6: 3
+    table.create_object(ObjKey(7)).set(col_int, 4);  // 7: 2
+    table.create_object(ObjKey(8)).set(col_int, 99); // 8: 9
+    table.create_object(ObjKey(9)).set(col_int, 2);  // 9: 1
 
     // Search for a value that does not exits
     auto v = table.get_sorted_view(col_int);
     CHECK_EQUAL(table.size(), v.size());
 
-    CHECK_EQUAL(Key(2), v.get_key(0));
-    CHECK_EQUAL(Key(9), v.get_key(1));
-    CHECK_EQUAL(Key(7), v.get_key(2));
-    CHECK_EQUAL(Key(6), v.get_key(3));
-    CHECK_EQUAL(Key(0), v.get_key(4));
-    CHECK_EQUAL(Key(5), v.get_key(5));
-    CHECK_EQUAL(Key(4), v.get_key(6));
-    CHECK_EQUAL(Key(1), v.get_key(7));
-    CHECK_EQUAL(Key(3), v.get_key(8));
-    CHECK_EQUAL(Key(8), v.get_key(9));
+    CHECK_EQUAL(ObjKey(2), v.get_key(0));
+    CHECK_EQUAL(ObjKey(9), v.get_key(1));
+    CHECK_EQUAL(ObjKey(7), v.get_key(2));
+    CHECK_EQUAL(ObjKey(6), v.get_key(3));
+    CHECK_EQUAL(ObjKey(0), v.get_key(4));
+    CHECK_EQUAL(ObjKey(5), v.get_key(5));
+    CHECK_EQUAL(ObjKey(4), v.get_key(6));
+    CHECK_EQUAL(ObjKey(1), v.get_key(7));
+    CHECK_EQUAL(ObjKey(3), v.get_key(8));
+    CHECK_EQUAL(ObjKey(8), v.get_key(9));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -1301,16 +1301,16 @@ TEST(Table_Sorted_Query_where)
     auto col_int = table.add_column(type_Int, "integers");
     auto col_bool = table.add_column(type_Bool, "booleans");
 
-    table.create_object(Key(0)).set(col_int, 10).set(col_bool, true);  // 0: 4
-    table.create_object(Key(1)).set(col_int, 20).set(col_bool, false); // 1: 7
-    table.create_object(Key(2)).set(col_int, 0).set(col_bool, false);  // 2: 0
-    table.create_object(Key(3)).set(col_int, 40).set(col_bool, false); // 3: 8
-    table.create_object(Key(4)).set(col_int, 15).set(col_bool, false); // 4: 6
-    table.create_object(Key(5)).set(col_int, 11).set(col_bool, true);  // 5: 5
-    table.create_object(Key(6)).set(col_int, 6).set(col_bool, true);   // 6: 3
-    table.create_object(Key(7)).set(col_int, 4).set(col_bool, true);   // 7: 2
-    table.create_object(Key(8)).set(col_int, 99).set(col_bool, true);  // 8: 9
-    table.create_object(Key(9)).set(col_int, 2).set(col_bool, true);   // 9: 1
+    table.create_object(ObjKey(0)).set(col_int, 10).set(col_bool, true);  // 0: 4
+    table.create_object(ObjKey(1)).set(col_int, 20).set(col_bool, false); // 1: 7
+    table.create_object(ObjKey(2)).set(col_int, 0).set(col_bool, false);  // 2: 0
+    table.create_object(ObjKey(3)).set(col_int, 40).set(col_bool, false); // 3: 8
+    table.create_object(ObjKey(4)).set(col_int, 15).set(col_bool, false); // 4: 6
+    table.create_object(ObjKey(5)).set(col_int, 11).set(col_bool, true);  // 5: 5
+    table.create_object(ObjKey(6)).set(col_int, 6).set(col_bool, true);   // 6: 3
+    table.create_object(ObjKey(7)).set(col_int, 4).set(col_bool, true);   // 7: 2
+    table.create_object(ObjKey(8)).set(col_int, 99).set(col_bool, true);  // 8: 9
+    table.create_object(ObjKey(9)).set(col_int, 2).set(col_bool, true);   // 9: 1
 
     // Get a view containing the complete table
     auto v = table.find_all_int(col_dummy, 0);
@@ -1335,11 +1335,11 @@ TEST(Table_Multi_Sort)
     table.add_column(type_Int, "first");
     table.add_column(type_Int, "second");
 
-    table.create_object(Key(0)).set_all(1, 10);
-    table.create_object(Key(1)).set_all(2, 10);
-    table.create_object(Key(2)).set_all(0, 10);
-    table.create_object(Key(3)).set_all(2, 14);
-    table.create_object(Key(4)).set_all(1, 14);
+    table.create_object(ObjKey(0)).set_all(1, 10);
+    table.create_object(ObjKey(1)).set_all(2, 10);
+    table.create_object(ObjKey(2)).set_all(0, 10);
+    table.create_object(ObjKey(3)).set_all(2, 14);
+    table.create_object(ObjKey(4)).set_all(1, 14);
 
     std::vector<std::vector<size_t>> col_ndx1 = {{0}, {1}};
     std::vector<bool> asc = {true, true};
@@ -1347,22 +1347,22 @@ TEST(Table_Multi_Sort)
     // (0, 10); (1, 10); (1, 14); (2, 10); (2; 14)
     TableView v_sorted1 = table.get_sorted_view(SortDescriptor{table, col_ndx1, asc});
     CHECK_EQUAL(table.size(), v_sorted1.size());
-    CHECK_EQUAL(Key(2), v_sorted1.get_key(0));
-    CHECK_EQUAL(Key(0), v_sorted1.get_key(1));
-    CHECK_EQUAL(Key(4), v_sorted1.get_key(2));
-    CHECK_EQUAL(Key(1), v_sorted1.get_key(3));
-    CHECK_EQUAL(Key(3), v_sorted1.get_key(4));
+    CHECK_EQUAL(ObjKey(2), v_sorted1.get_key(0));
+    CHECK_EQUAL(ObjKey(0), v_sorted1.get_key(1));
+    CHECK_EQUAL(ObjKey(4), v_sorted1.get_key(2));
+    CHECK_EQUAL(ObjKey(1), v_sorted1.get_key(3));
+    CHECK_EQUAL(ObjKey(3), v_sorted1.get_key(4));
 
     std::vector<std::vector<size_t>> col_ndx2 = {{1}, {0}};
 
     // (0, 10); (1, 10); (2, 10); (1, 14); (2, 14)
     TableView v_sorted2 = table.get_sorted_view(SortDescriptor{table, col_ndx2, asc});
     CHECK_EQUAL(table.size(), v_sorted2.size());
-    CHECK_EQUAL(Key(2), v_sorted2.get_key(0));
-    CHECK_EQUAL(Key(0), v_sorted2.get_key(1));
-    CHECK_EQUAL(Key(1), v_sorted2.get_key(2));
-    CHECK_EQUAL(Key(4), v_sorted2.get_key(3));
-    CHECK_EQUAL(Key(3), v_sorted2.get_key(4));
+    CHECK_EQUAL(ObjKey(2), v_sorted2.get_key(0));
+    CHECK_EQUAL(ObjKey(0), v_sorted2.get_key(1));
+    CHECK_EQUAL(ObjKey(1), v_sorted2.get_key(2));
+    CHECK_EQUAL(ObjKey(4), v_sorted2.get_key(3));
+    CHECK_EQUAL(ObjKey(3), v_sorted2.get_key(4));
 }
 #endif
 
@@ -1372,25 +1372,25 @@ TEST(Table_IndexString)
     table.add_column(type_Int, "first");
     auto col_str = table.add_column(type_String, "second");
 
-    Key k0 = table.create_object().set_all(int(Mon), "jeff").get_key();
-    Key k1 = table.create_object().set_all(int(Tue), "jim").get_key();
+    ObjKey k0 = table.create_object().set_all(int(Mon), "jeff").get_key();
+    ObjKey k1 = table.create_object().set_all(int(Tue), "jim").get_key();
     table.create_object().set_all(int(Wed), "jennifer");
     table.create_object().set_all(int(Thu), "john");
     table.create_object().set_all(int(Fri), "jimmy");
-    Key k5 = table.create_object().set_all(int(Sat), "jimbo").get_key();
-    Key k6 = table.create_object().set_all(int(Sun), "johnny").get_key();
+    ObjKey k5 = table.create_object().set_all(int(Sat), "jimbo").get_key();
+    ObjKey k6 = table.create_object().set_all(int(Sun), "johnny").get_key();
     table.create_object().set_all(int(Mon), "jennifer"); // duplicate
 
     table.add_search_index(col_str);
     CHECK(table.has_search_index(col_str));
 
-    Key r1 = table.find_first_string(col_str, "jimmi");
+    ObjKey r1 = table.find_first_string(col_str, "jimmi");
     CHECK_EQUAL(null_key, r1);
 
-    Key r2 = table.find_first_string(col_str, "jeff");
-    Key r3 = table.find_first_string(col_str, "jim");
-    Key r4 = table.find_first_string(col_str, "jimbo");
-    Key r5 = table.find_first_string(col_str, "johnny");
+    ObjKey r2 = table.find_first_string(col_str, "jeff");
+    ObjKey r3 = table.find_first_string(col_str, "jim");
+    ObjKey r4 = table.find_first_string(col_str, "jimbo");
+    ObjKey r5 = table.find_first_string(col_str, "johnny");
     CHECK_EQUAL(k0, r2);
     CHECK_EQUAL(k1, r3);
     CHECK_EQUAL(k5, r4);
@@ -1428,13 +1428,13 @@ TEST(Table_IndexStringTwice)
 TEST(Table_IndexInteger)
 {
     Table table;
-    Key k;
+    ObjKey k;
 
     auto col_int = table.add_column(type_Int, "ints");
     auto col_date = table.add_column(type_Timestamp, "date");
     auto col_bool = table.add_column(type_Bool, "booleans");
 
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     table.create_objects(13, keys);
 
     table.get_object(keys[0]).set(col_int, 3);  // 0
@@ -1515,13 +1515,13 @@ TEST(Table_Distinct)
     auto col_int = table.add_column(type_Int, "first");
     auto col_str = table.add_column(type_String, "second");
 
-    Key k0 = table.create_object().set_all(int(Mon), "A").get_key();
-    Key k1 = table.create_object().set_all(int(Tue), "B").get_key();
-    Key k2 = table.create_object().set_all(int(Wed), "C").get_key();
-    Key k3 = table.create_object().set_all(int(Thu), "B").get_key();
-    Key k4 = table.create_object().set_all(int(Fri), "C").get_key();
-    Key k5 = table.create_object().set_all(int(Sat), "D").get_key();
-    Key k6 = table.create_object().set_all(int(Sun), "D").get_key();
+    ObjKey k0 = table.create_object().set_all(int(Mon), "A").get_key();
+    ObjKey k1 = table.create_object().set_all(int(Tue), "B").get_key();
+    ObjKey k2 = table.create_object().set_all(int(Wed), "C").get_key();
+    ObjKey k3 = table.create_object().set_all(int(Thu), "B").get_key();
+    ObjKey k4 = table.create_object().set_all(int(Fri), "C").get_key();
+    ObjKey k5 = table.create_object().set_all(int(Sat), "D").get_key();
+    ObjKey k6 = table.create_object().set_all(int(Sun), "D").get_key();
     table.create_object().set_all(int(Mon), "D");
 
     table.add_search_index(col_int);
@@ -1556,8 +1556,8 @@ TEST(Table_DistinctBool)
     Table table;
     auto col_bool = table.add_column(type_Bool, "first");
 
-    Key k0 = table.create_object().set(col_bool, true).get_key();
-    Key k1 = table.create_object().set(col_bool, false).get_key();
+    ObjKey k0 = table.create_object().set(col_bool, true).get_key();
+    ObjKey k1 = table.create_object().set(col_bool, false).get_key();
     table.create_object().set(col_bool, true);
     table.create_object().set(col_bool, false);
 
@@ -1670,22 +1670,22 @@ TEST(Table_IndexInt)
     Table table;
     auto col = table.add_column(type_Int, "first");
 
-    Key k0 = table.create_object().set(col, 1).get_key();
-    Key k1 = table.create_object().set(col, 15).get_key();
-    Key k2 = table.create_object().set(col, 10).get_key();
-    Key k3 = table.create_object().set(col, 20).get_key();
-    Key k4 = table.create_object().set(col, 11).get_key();
-    Key k5 = table.create_object().set(col, 45).get_key();
-    Key k6 = table.create_object().set(col, 10).get_key();
-    Key k7 = table.create_object().set(col, 0).get_key();
-    Key k8 = table.create_object().set(col, 30).get_key();
-    Key k9 = table.create_object().set(col, 9).get_key();
+    ObjKey k0 = table.create_object().set(col, 1).get_key();
+    ObjKey k1 = table.create_object().set(col, 15).get_key();
+    ObjKey k2 = table.create_object().set(col, 10).get_key();
+    ObjKey k3 = table.create_object().set(col, 20).get_key();
+    ObjKey k4 = table.create_object().set(col, 11).get_key();
+    ObjKey k5 = table.create_object().set(col, 45).get_key();
+    ObjKey k6 = table.create_object().set(col, 10).get_key();
+    ObjKey k7 = table.create_object().set(col, 0).get_key();
+    ObjKey k8 = table.create_object().set(col, 30).get_key();
+    ObjKey k9 = table.create_object().set(col, 9).get_key();
 
     // Create index for column two
     table.add_search_index(col);
 
     // Search for a value that does not exits
-    Key k = table.find_first_int(col, 2);
+    ObjKey k = table.find_first_int(col, 2);
     CHECK_EQUAL(null_key, k);
 
     // Find existing values
@@ -1716,7 +1716,7 @@ TEST(Table_IndexInt)
     CHECK_EQUAL(k9, table.find_first_int(col, 100));
 
     // Insert values
-    Key k10 = table.create_object().set(col, 29).get_key();
+    ObjKey k10 = table.create_object().set(col, 29).get_key();
     // TODO: More than add
 
     CHECK_EQUAL(k0, table.find_first_int(col, 1));
@@ -1949,9 +1949,9 @@ TEST(Table_SlabAlloc)
 
     // Add some more rows
     table.create_object().set_all(1, 10, true, int(Wed));
-    Key k0 = table.create_object().set_all(2, 20, true, int(Wed)).get_key();
+    ObjKey k0 = table.create_object().set_all(2, 20, true, int(Wed)).get_key();
     table.create_object().set_all(3, 10, true, int(Wed));
-    Key k1 = table.create_object().set_all(4, 20, true, int(Wed)).get_key();
+    ObjKey k1 = table.create_object().set_all(4, 20, true, int(Wed)).get_key();
     table.create_object().set_all(5, 10, true, int(Wed));
 
     // Delete some rows
@@ -1978,7 +1978,7 @@ TEST(Table_NullInEnum)
     r = table->where().equal(col, "hello").count();
     CHECK_EQUAL(100, r);
 
-    Obj obj50 = table->get_object(Key(50));
+    Obj obj50 = table->get_object(ObjKey(50));
     obj50.set<String>(col, realm::null());
     r = table->where().equal(col, "hello").count();
     CHECK_EQUAL(99, r);
@@ -2002,14 +2002,14 @@ TEST(Table_NullInEnum)
     r = table->where().equal(col, realm::null()).count();
     CHECK_EQUAL(1, r);
 
-    table->get_object(Key(55)).set(col, realm::null());
+    table->get_object(ObjKey(55)).set(col, realm::null());
     r = table->where().equal(col, realm::null()).count();
     CHECK_EQUAL(2, r);
 
     r = table->where().equal(col, "hello").count();
     CHECK_EQUAL(98, r);
 
-    table->remove_object(Key(55));
+    table->remove_object(ObjKey(55));
     r = table->where().equal(col, realm::null()).count();
     CHECK_EQUAL(1, r);
 }
@@ -2130,9 +2130,9 @@ TEST(Table_Aggregates3)
         auto col_rating = table->add_column(type_Double, "Rating", nullable);
         auto col_date = table->add_column(type_Timestamp, "Delivery date", nullable);
 
-        Obj obj0 = table->create_object(Key(0));
-        Obj obj1 = table->create_object(Key(1));
-        Obj obj2 = table->create_object(Key(2));
+        Obj obj0 = table->create_object(ObjKey(0));
+        Obj obj1 = table->create_object(ObjKey(1));
+        Obj obj2 = table->create_object(ObjKey(2));
 
         obj0.set(col_price, 1);
         // table->set_null(0, 1);
@@ -2151,49 +2151,49 @@ TEST(Table_Aggregates3)
         obj2.set(col_date, Timestamp(6, 6));
 
         size_t count;
-        Key pos;
+        ObjKey pos;
         if (nullable) {
             // max
             pos = 123;
             CHECK_EQUAL(table->maximum_int(col_price), 3);
             CHECK_EQUAL(table->maximum_int(col_price, &pos), 3);
-            CHECK_EQUAL(pos, Key(2));
+            CHECK_EQUAL(pos, ObjKey(2));
 
             pos = 123;
             CHECK_EQUAL(table->maximum_float(col_shipping), 30.f);
             CHECK_EQUAL(table->maximum_float(col_shipping, &pos), 30.f);
-            CHECK_EQUAL(pos, Key(2));
+            CHECK_EQUAL(pos, ObjKey(2));
 
             pos = 123;
             CHECK_EQUAL(table->maximum_double(col_rating), 2.2);
             CHECK_EQUAL(table->maximum_double(col_rating, &pos), 2.2);
-            CHECK_EQUAL(pos, Key(1));
+            CHECK_EQUAL(pos, ObjKey(1));
 
             pos = 123;
             CHECK_EQUAL(table->maximum_timestamp(col_date), Timestamp(6, 6));
             CHECK_EQUAL(table->maximum_timestamp(col_date, &pos), Timestamp(6, 6));
-            CHECK_EQUAL(pos, Key(2));
+            CHECK_EQUAL(pos, ObjKey(2));
 
             // min
             pos = 123;
             CHECK_EQUAL(table->minimum_int(col_price), 1);
             CHECK_EQUAL(table->minimum_int(col_price, &pos), 1);
-            CHECK_EQUAL(pos, Key(0));
+            CHECK_EQUAL(pos, ObjKey(0));
 
             pos = 123;
             CHECK_EQUAL(table->minimum_float(col_shipping), 30.f);
             CHECK_EQUAL(table->minimum_float(col_shipping, &pos), 30.f);
-            CHECK_EQUAL(pos, Key(2));
+            CHECK_EQUAL(pos, ObjKey(2));
 
             pos = 123;
             CHECK_EQUAL(table->minimum_double(col_rating), 1.1);
             CHECK_EQUAL(table->minimum_double(col_rating, &pos), 1.1);
-            CHECK_EQUAL(pos, Key(0));
+            CHECK_EQUAL(pos, ObjKey(0));
 
             pos = 123;
             CHECK_EQUAL(table->minimum_timestamp(col_date), Timestamp(2, 2));
             CHECK_EQUAL(table->minimum_timestamp(col_date, &pos), Timestamp(2, 2));
-            CHECK_EQUAL(pos, Key(0));
+            CHECK_EQUAL(pos, ObjKey(0));
 
             // average
             count = 123;
@@ -2220,37 +2220,37 @@ TEST(Table_Aggregates3)
             // max
             pos = 123;
             CHECK_EQUAL(table->maximum_int(col_price, &pos), 3);
-            CHECK_EQUAL(pos, Key(2));
+            CHECK_EQUAL(pos, ObjKey(2));
 
             pos = 123;
             CHECK_EQUAL(table->maximum_float(col_shipping, &pos), 30.f);
-            CHECK_EQUAL(pos, Key(2));
+            CHECK_EQUAL(pos, ObjKey(2));
 
             pos = 123;
             CHECK_EQUAL(table->maximum_double(col_rating, &pos), 2.2);
-            CHECK_EQUAL(pos, Key(1));
+            CHECK_EQUAL(pos, ObjKey(1));
 
             pos = 123;
             CHECK_EQUAL(table->maximum_timestamp(col_date, &pos), Timestamp(6, 6));
-            CHECK_EQUAL(pos, Key(2));
+            CHECK_EQUAL(pos, ObjKey(2));
 
             // min
             pos = 123;
             CHECK_EQUAL(table->minimum_int(col_price, &pos), 0);
-            CHECK_EQUAL(pos, Key(1));
+            CHECK_EQUAL(pos, ObjKey(1));
 
             pos = 123;
             CHECK_EQUAL(table->minimum_float(col_shipping, &pos), 0.f);
-            CHECK_EQUAL(pos, Key(0));
+            CHECK_EQUAL(pos, ObjKey(0));
 
             pos = 123;
             CHECK_EQUAL(table->minimum_double(col_rating, &pos), 0.);
-            CHECK_EQUAL(pos, Key(2));
+            CHECK_EQUAL(pos, ObjKey(2));
 
             pos = 123;
             // Timestamp(0, 0) is default value for non-nullable column
             CHECK_EQUAL(table->minimum_timestamp(col_date, &pos), Timestamp(0, 0));
-            CHECK_EQUAL(pos, Key(1));
+            CHECK_EQUAL(pos, ObjKey(1));
 
             // average
             count = 123;
@@ -2279,12 +2279,12 @@ TEST(Table_EmptyMinmax)
     TableRef table = g.add_table("");
     auto col = table->add_column(type_Timestamp, "date");
 
-    Key min_key;
+    ObjKey min_key;
     Timestamp min_ts = table->minimum_timestamp(col, &min_key);
     CHECK_EQUAL(min_key, null_key);
     CHECK(min_ts.is_null());
 
-    Key max_key;
+    ObjKey max_key;
     Timestamp max_ts = table->maximum_timestamp(col, &max_key);
     CHECK_EQUAL(max_key, null_key);
     CHECK(max_ts.is_null());
@@ -2311,7 +2311,7 @@ TEST(Table_EnumStringInsertEmptyRow)
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     table.add_column(type_Int, "int0");
     table.create_objects(REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1, keys);
     table.add_column(type_Int, "int1");
@@ -2322,7 +2322,7 @@ TEST(Table_AddColumnWithThreeLevelBptree)
 TEST(Table_ClearWithTwoLevelBptree)
 {
     Table table;
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     table.add_column(type_String, "strings");
     table.create_objects(REALM_MAX_BPNODE_SIZE + 1, keys);
     table.clear();
@@ -2902,12 +2902,12 @@ TEST(Table_addRowsToTableWithNoColumns)
     Obj obj = u->create_object();
     CHECK_EQUAL(u->size(), 1);
     CHECK_EQUAL(t->size(), 3);
-    CHECK_LOGIC_ERROR(obj.set(col_link, Key(45)), LogicError::target_row_index_out_of_range);
+    CHECK_LOGIC_ERROR(obj.set(col_link, ObjKey(45)), LogicError::target_row_index_out_of_range);
     CHECK(obj.is_null(col_link));
     CHECK_EQUAL(t->size(), 3);
-    Key k = t->create_object().get_key();
+    ObjKey k = t->create_object().get_key();
     obj.set(col_link, k);
-    CHECK_EQUAL(obj.get<Key>(col_link), k);
+    CHECK_EQUAL(obj.get<ObjKey>(col_link), k);
     CHECK(!obj.is_null(col_link));
     CHECK_EQUAL(t->size(), 4);
     t->clear();
@@ -2977,17 +2977,17 @@ TEST(Table_object_basic)
     BinaryData bin_data(data, 10);
     BinaryData bin_zero(data, 0);
 
-    table.create_object(Key(5)).set_all(100, 7);
+    table.create_object(ObjKey(5)).set_all(100, 7);
     CHECK_EQUAL(table.size(), 1);
-    CHECK_THROW(table.create_object(Key(5)), InvalidKey);
+    CHECK_THROW(table.create_object(ObjKey(5)), InvalidKey);
     CHECK_EQUAL(table.size(), 1);
-    table.create_object(Key(2));
-    Obj x = table.create_object(Key(7));
-    table.create_object(Key(8));
-    table.create_object(Key(10));
-    table.create_object(Key(6));
+    table.create_object(ObjKey(2));
+    Obj x = table.create_object(ObjKey(7));
+    table.create_object(ObjKey(8));
+    table.create_object(ObjKey(10));
+    table.create_object(ObjKey(6));
 
-    Obj y = table.get_object(Key(5));
+    Obj y = table.get_object(ObjKey(5));
 
     // Int
     CHECK(!x.is_null(int_col));
@@ -3114,13 +3114,13 @@ TEST(Table_object_basic)
     CHECK(y.is_null(binnull_col));
 
     // Check that accessing a removed object will throw
-    table.remove_object(Key(5));
+    table.remove_object(ObjKey(5));
     CHECK_THROW(y.get<int64_t>(intnull_col), InvalidKey);
 
-    CHECK(table.get_object(Key(8)).is_null(intnull_col));
+    CHECK(table.get_object(ObjKey(8)).is_null(intnull_col));
 
-    Key k11 = table.create_object().get_key();
-    Key k12 = table.create_object().get_key();
+    ObjKey k11 = table.create_object().get_key();
+    ObjKey k12 = table.create_object().get_key();
     CHECK_EQUAL(k11.value, 11);
     CHECK_EQUAL(k12.value, 12);
 }
@@ -3132,7 +3132,7 @@ TEST(Table_remove_column)
     auto int2_col = table.add_column(type_Int, "int2");
     table.add_column(type_Int, "int3");
 
-    Obj obj = table.create_object(Key(5)).set_all(100, 7, 25);
+    Obj obj = table.create_object(ObjKey(5)).set_all(100, 7, 25);
 
     CHECK_EQUAL(obj.get<int64_t>("int1"), 100);
     CHECK_EQUAL(obj.get<int64_t>("int2"), 7);
@@ -3153,7 +3153,7 @@ TEST(Table_list_basic)
     auto list_col = table.add_column_list(type_Int, "int_list");
 
     {
-        Obj obj = table.create_object(Key(5));
+        Obj obj = table.create_object(ObjKey(5));
         CHECK(obj.is_null(list_col));
         auto list = obj.get_list<int64_t>(list_col);
         CHECK_NOT(obj.is_null(list_col));
@@ -3162,7 +3162,7 @@ TEST(Table_list_basic)
         }
     }
     {
-        Obj obj = table.get_object(Key(5));
+        Obj obj = table.get_object(ObjKey(5));
         auto list1 = obj.get_list<int64_t>(list_col);
         CHECK_EQUAL(list1.size(), 100);
         CHECK_EQUAL(list1.get(0), 1000);
@@ -3171,7 +3171,7 @@ TEST(Table_list_basic)
         list2.set(50, 747);
         CHECK_EQUAL(list1.get(50), 747);
     }
-    table.remove_object(Key(5));
+    table.remove_object(ObjKey(5));
 }
 
 TEST(Table_StableIteration)
@@ -3179,7 +3179,7 @@ TEST(Table_StableIteration)
     Table table;
     auto list_col = table.add_column_list(type_Int, "int_list");
     std::vector<int64_t> values = {1, 7, 3, 5, 5, 2, 4};
-    Obj obj = table.create_object(Key(5)).set_list_values(list_col, values);
+    Obj obj = table.create_object(ObjKey(5)).set_list_values(list_col, values);
 
     auto list = obj.get_list<int64_t>(list_col);
     auto x = list.begin();
@@ -3217,7 +3217,7 @@ TEST(Table_ListOfPrimitives)
     ColKey string_col = t->add_column_list(type_String, "strings");
     ColKey double_col = t->add_column_list(type_Double, "doubles");
     ColKey timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
-    Obj obj = t->create_object(Key(7));
+    Obj obj = t->create_object(ObjKey(7));
 
     std::vector<int64_t> integer_vector = {1, 2, 3, 4};
     obj.set_list_values(int_col, integer_vector);
@@ -3313,7 +3313,7 @@ TEST(Table_ListOfPrimitives)
         CHECK_EQUAL(timestamp_vector[i], timestamp_list.get(i));
     }
 
-    t->remove_object(Key(7));
+    t->remove_object(ObjKey(7));
     CHECK_NOT(timestamp_list.is_attached());
 }
 
@@ -3329,7 +3329,7 @@ TEST(Table_object_merge_nodes)
     auto c1 = table.add_column(type_Int, "int2", true);
 
     for (int i = 0; i < nb_rows; i++) {
-        table.create_object(Key(i)).set_all(i << 1, i << 2);
+        table.create_object(ObjKey(i)).set_all(i << 1, i << 2);
         key_set.push_back(i);
     }
 
@@ -3340,11 +3340,11 @@ TEST(Table_object_merge_nodes)
         // table.dump_objects();
         // std::cout << "Key to remove: " << std::hex << *it << std::dec << std::endl;
 
-        table.remove_object(Key(*it));
+        table.remove_object(ObjKey(*it));
         key_set.erase(it);
         for (unsigned j = 0; j < key_set.size(); j++) {
             int64_t key_val = key_set[j];
-            Obj o = table.get_object(Key(key_val));
+            Obj o = table.get_object(ObjKey(key_val));
             CHECK_EQUAL(key_val << 1, o.get<int64_t>(c0));
             CHECK_EQUAL(key_val << 2, o.get<util::Optional<int64_t>>(c1));
         }
@@ -3359,7 +3359,7 @@ TEST(Table_object_forward_iterator)
     auto c1 = table.add_column(type_Int, "int2", true);
 
     for (int i = 0; i < nb_rows; i++) {
-        table.create_object(Key(i));
+        table.create_object(ObjKey(i));
     }
 
     int tree_size = 0;
@@ -3395,7 +3395,7 @@ TEST(Table_object_forward_iterator)
     CHECK_EQUAL(table.size(), nb_rows * 6 / 7);
 
     auto it1 = table.begin();
-    Key key = it1->get_key();
+    ObjKey key = it1->get_key();
     ++it1;
     int64_t val = it1->get<int64_t>(c0);
     table.remove_object(key);
@@ -3414,13 +3414,13 @@ TEST(Table_object_sequential)
     auto t1 = steady_clock::now();
 
     for (int i = 0; i < nb_rows; i++) {
-        table.create_object(Key(i)).set_all(i << 1, i << 2);
+        table.create_object(ObjKey(i)).set_all(i << 1, i << 2);
     }
 
     auto t2 = steady_clock::now();
 
     for (int i = 0; i < nb_rows; i++) {
-        Obj o = table.get_object(Key(i));
+        Obj o = table.get_object(ObjKey(i));
         CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
         CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(c1));
     }
@@ -3428,9 +3428,9 @@ TEST(Table_object_sequential)
     auto t3 = steady_clock::now();
 
     for (int i = 0; i < nb_rows; i++) {
-        table.remove_object(Key(i));
+        table.remove_object(ObjKey(i));
         for (int j = i + 1; j < nb_rows; j++) {
-            Obj o = table.get_object(Key(j));
+            Obj o = table.get_object(ObjKey(j));
             CHECK_EQUAL(j << 1, o.get<int64_t>(c0));
             CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(c1));
         }
@@ -3473,13 +3473,13 @@ TEST(Table_object_random)
     auto t1 = steady_clock::now();
 
     for (int i = 0; i < nb_rows; i++) {
-        table.create_object(Key(key_values[i])).set_all(i << 1, i << 2);
+        table.create_object(ObjKey(key_values[i])).set_all(i << 1, i << 2);
     }
 
     auto t2 = steady_clock::now();
 
     for (int i = 0; i < nb_rows; i++) {
-        Obj o = table.get_object(Key(key_values[i]));
+        Obj o = table.get_object(ObjKey(key_values[i]));
         CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
         CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(c1));
     }
@@ -3487,9 +3487,9 @@ TEST(Table_object_random)
     auto t3 = steady_clock::now();
 
     for (int i = 0; i < nb_rows; i++) {
-        table.remove_object(Key(key_values[i]));
+        table.remove_object(ObjKey(key_values[i]));
         for (int j = i + 1; j < nb_rows; j++) {
-            Obj o = table.get_object(Key(key_values[j]));
+            Obj o = table.get_object(ObjKey(key_values[j]));
             CHECK_EQUAL(j << 1, o.get<int64_t>(c0));
             CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(c1));
         }
@@ -3513,19 +3513,19 @@ TEST(Table_3)
     TestTable01 table;
 
     for (int64_t i = 0; i < 100; ++i) {
-        table.create_object(Key(i)).set_all(i, 10, true, int(Wed));
+        table.create_object(ObjKey(i)).set_all(i, 10, true, int(Wed));
     }
     auto cols = table.get_key_cols();
 
     // Test column searching
-    CHECK_EQUAL(Key(0), table.find_first_int(cols[0], 0));
-    CHECK_EQUAL(Key(50), table.find_first_int(cols[0], 50));
+    CHECK_EQUAL(ObjKey(0), table.find_first_int(cols[0], 0));
+    CHECK_EQUAL(ObjKey(50), table.find_first_int(cols[0], 50));
     CHECK_EQUAL(null_key, table.find_first_int(cols[0], 500));
-    CHECK_EQUAL(Key(0), table.find_first_int(cols[1], 10));
+    CHECK_EQUAL(ObjKey(0), table.find_first_int(cols[1], 10));
     CHECK_EQUAL(null_key, table.find_first_int(cols[1], 100));
-    CHECK_EQUAL(Key(0), table.find_first_bool(cols[2], true));
+    CHECK_EQUAL(ObjKey(0), table.find_first_bool(cols[2], true));
     CHECK_EQUAL(null_key, table.find_first_bool(cols[2], false));
-    CHECK_EQUAL(Key(0), table.find_first_int(cols[3], Wed));
+    CHECK_EQUAL(ObjKey(0), table.find_first_int(cols[3], Wed));
     CHECK_EQUAL(null_key, table.find_first_int(cols[3], Mon));
 
 #ifdef REALM_DEBUG
@@ -3539,17 +3539,15 @@ TEST(Table_4)
 {
     Table table;
     auto c0 = table.add_column(type_String, "strings");
+    const char* hello_hello = "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello";
 
-    table.create_object(Key(5)).set(c0, "Hello");
-    table.create_object(Key(7)).set(c0,
-                                    "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
+    table.create_object(ObjKey(5)).set(c0, "Hello");
+    table.create_object(ObjKey(7)).set(c0, hello_hello);
 
-    CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello",
-                table.get_object(Key(7)).get<String>(c0));
+    CHECK_EQUAL(hello_hello, table.get_object(ObjKey(7)).get<String>(c0));
 
     // Test string column searching
-    CHECK_EQUAL(Key(7), table.find_first_string(
-                            c0, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
+    CHECK_EQUAL(ObjKey(7), table.find_first_string(c0, hello_hello));
     CHECK_EQUAL(null_key, table.find_first_string(c0, "Foo"));
 
 #ifdef REALM_DEBUG
@@ -3714,7 +3712,7 @@ TEST(Table_SearchIndexFindAll)
     table.add_search_index(col_int);
     table.add_search_index(col_str);
 
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     table.create_objects(100, keys);
     for (auto o : table) {
         int64_t key_value = o.get_key().value;
@@ -3737,9 +3735,9 @@ struct Tester {
 
     static ColKey col;
 
-    static std::vector<Key> find_all_reference(Table& table, T v)
+    static std::vector<ObjKey> find_all_reference(Table& table, T v)
     {
-        std::vector<Key> res;
+        std::vector<ObjKey> res;
         Table::Iterator it = table.begin();
         while (it != table.end()) {
             if (!it->is_null(col)) {
@@ -3762,9 +3760,9 @@ struct Tester {
             auto v = it->get<T>(col);
 
             if (!it->is_null(col)) {
-                std::vector<Key> res;
+                std::vector<ObjKey> res;
                 table.get_search_index(col)->find_all(res, v, false);
-                std::vector<Key> ref = find_all_reference(table, v);
+                std::vector<ObjKey> ref = find_all_reference(table, v);
 
                 size_t a = ref.size();
                 size_t b = res.size();

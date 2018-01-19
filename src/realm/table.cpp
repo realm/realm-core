@@ -496,7 +496,7 @@ void Table::populate_search_index(ColKey col_key)
 
     // Insert ref to index
     for (auto o : *this) {
-        Key key = o.get_key();
+        ObjKey key = o.get_key();
         DataType type = get_column_type(col_key);
 
         if (type == type_Int) {
@@ -910,10 +910,10 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     Group* g = get_parent_group();
 
     size_t num_objs = keys.size();
-    std::vector<Key> vec;
+    std::vector<ObjKey> vec;
     vec.reserve(num_objs);
     for (size_t i = 0; i < num_objs; ++i) {
-        Key key = keys.get(i);
+        ObjKey key = keys.get(i);
         if (key != null_key) {
             vec.push_back(key);
         }
@@ -924,12 +924,12 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     if (m_spec->has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::strong);
         state.track_link_nullifications = true;
-        std::for_each(vec.begin(), vec.end(), [this, &state](Key k) { state.rows.emplace_back(m_key, k); });
+        std::for_each(vec.begin(), vec.end(), [this, &state](ObjKey k) { state.rows.emplace_back(m_key, k); });
         remove_recursive(state);
     }
     else {
         CascadeState state(CascadeState::Mode::none);
-        std::for_each(vec.begin(), vec.end(), [this, &state](Key k) { m_clusters.erase(k, state); });
+        std::for_each(vec.begin(), vec.end(), [this, &state](ObjKey k) { m_clusters.erase(k, state); });
     }
 }
 
@@ -1084,7 +1084,7 @@ double Table::average_double(ColKey col_key, size_t* value_count) const
 
 #define USE_COLUMN_AGGREGATE 1
 
-int64_t Table::minimum_int(ColKey col_key, Key* return_ndx) const
+int64_t Table::minimum_int(ColKey col_key, ObjKey* return_ndx) const
 {
     if (is_nullable(col_key)) {
         return aggregate<act_Min, util::Optional<int64_t>, int64_t>(col_key, 0, nullptr, return_ndx);
@@ -1092,24 +1092,24 @@ int64_t Table::minimum_int(ColKey col_key, Key* return_ndx) const
     return aggregate<act_Min, int64_t, int64_t>(col_key, 0, nullptr, return_ndx);
 }
 
-float Table::minimum_float(ColKey col_key, Key* return_ndx) const
+float Table::minimum_float(ColKey col_key, ObjKey* return_ndx) const
 {
     return aggregate<act_Min, float, float>(col_key, 0.f, nullptr, return_ndx);
 }
 
-double Table::minimum_double(ColKey col_key, Key* return_ndx) const
+double Table::minimum_double(ColKey col_key, ObjKey* return_ndx) const
 {
     return aggregate<act_Min, double, double>(col_key, 0., nullptr, return_ndx);
 }
 
-Timestamp Table::minimum_timestamp(ColKey col_key, Key* return_ndx) const
+Timestamp Table::minimum_timestamp(ColKey col_key, ObjKey* return_ndx) const
 {
     return aggregate<act_Min, Timestamp, Timestamp>(col_key, Timestamp{}, nullptr, return_ndx);
 }
 
 // maximum ----------------------------------------------
 
-int64_t Table::maximum_int(ColKey col_key, Key* return_ndx) const
+int64_t Table::maximum_int(ColKey col_key, ObjKey* return_ndx) const
 {
     if (is_nullable(col_key)) {
         return aggregate<act_Max, util::Optional<int64_t>, int64_t>(col_key, 0, nullptr, return_ndx);
@@ -1117,23 +1117,23 @@ int64_t Table::maximum_int(ColKey col_key, Key* return_ndx) const
     return aggregate<act_Max, int64_t, int64_t>(col_key, 0, nullptr, return_ndx);
 }
 
-float Table::maximum_float(ColKey col_key, Key* return_ndx) const
+float Table::maximum_float(ColKey col_key, ObjKey* return_ndx) const
 {
     return aggregate<act_Max, float, float>(col_key, 0.f, nullptr, return_ndx);
 }
 
-double Table::maximum_double(ColKey col_key, Key* return_ndx) const
+double Table::maximum_double(ColKey col_key, ObjKey* return_ndx) const
 {
     return aggregate<act_Max, double, double>(col_key, 0., nullptr, return_ndx);
 }
 
-Timestamp Table::maximum_timestamp(ColKey col_key, Key* return_ndx) const
+Timestamp Table::maximum_timestamp(ColKey col_key, ObjKey* return_ndx) const
 {
     return aggregate<act_Max, Timestamp, Timestamp>(col_key, Timestamp{}, nullptr, return_ndx);
 }
 
 template <class T>
-Key Table::find_first(ColKey col_key, T value) const
+ObjKey Table::find_first(ColKey col_key, T value) const
 {
     if (REALM_UNLIKELY(!valid_column(col_key)))
         throw InvalidKey("Non-existing column");
@@ -1146,7 +1146,7 @@ Key Table::find_first(ColKey col_key, T value) const
         return index->find_first(value);
     }
 
-    Key key;
+    ObjKey key;
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType leaf(get_alloc());
     size_t col_ndx = colkey2ndx(col_key);
@@ -1165,32 +1165,32 @@ Key Table::find_first(ColKey col_key, T value) const
 namespace realm {
 
 template <>
-Key Table::find_first(ColKey col_key, util::Optional<float> value) const
+ObjKey Table::find_first(ColKey col_key, util::Optional<float> value) const
 {
     return value ? find_first(col_key, *value) : find_first_null(col_key);
 }
 
 template <>
-Key Table::find_first(ColKey col_key, util::Optional<double> value) const
+ObjKey Table::find_first(ColKey col_key, util::Optional<double> value) const
 {
     return value ? find_first(col_key, *value) : find_first_null(col_key);
 }
 
 template <>
-Key Table::find_first(ColKey col_key, null) const
+ObjKey Table::find_first(ColKey col_key, null) const
 {
     return find_first_null(col_key);
 }
 }
 
 // Explicitly instantiate the generic case of the template for the types we care about.
-template Key Table::find_first(ColKey col_key, bool) const;
-template Key Table::find_first(ColKey col_key, int64_t) const;
-template Key Table::find_first(ColKey col_key, float) const;
-template Key Table::find_first(ColKey col_key, double) const;
-template Key Table::find_first(ColKey col_key, util::Optional<bool>) const;
-template Key Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
-template Key Table::find_first(ColKey col_key, BinaryData) const;
+template ObjKey Table::find_first(ColKey col_key, bool) const;
+template ObjKey Table::find_first(ColKey col_key, int64_t) const;
+template ObjKey Table::find_first(ColKey col_key, float) const;
+template ObjKey Table::find_first(ColKey col_key, double) const;
+template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
+template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
+template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
 
 
 /*
@@ -1205,7 +1205,7 @@ Key Table::find_first_link(ColKey) const
 }
 */
 
-Key Table::find_first_int(ColKey col_key, int64_t value) const
+ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {
     if (is_nullable(col_key))
         return find_first<util::Optional<int64_t>>(col_key, value);
@@ -1213,7 +1213,7 @@ Key Table::find_first_int(ColKey col_key, int64_t value) const
         return find_first<int64_t>(col_key, value);
 }
 
-Key Table::find_first_bool(ColKey col_key, bool value) const
+ObjKey Table::find_first_bool(ColKey col_key, bool value) const
 {
     if (is_nullable(col_key))
         return find_first<util::Optional<bool>>(col_key, value);
@@ -1221,32 +1221,32 @@ Key Table::find_first_bool(ColKey col_key, bool value) const
         return find_first<bool>(col_key, value);
 }
 
-Key Table::find_first_timestamp(ColKey col_key, Timestamp value) const
+ObjKey Table::find_first_timestamp(ColKey col_key, Timestamp value) const
 {
     return find_first(col_key, value);
 }
 
-Key Table::find_first_float(ColKey col_key, float value) const
+ObjKey Table::find_first_float(ColKey col_key, float value) const
 {
     return find_first<Float>(col_key, value);
 }
 
-Key Table::find_first_double(ColKey col_key, double value) const
+ObjKey Table::find_first_double(ColKey col_key, double value) const
 {
     return find_first<Double>(col_key, value);
 }
 
-Key Table::find_first_string(ColKey col_key, StringData value) const
+ObjKey Table::find_first_string(ColKey col_key, StringData value) const
 {
     return find_first(col_key, value);
 }
 
-Key Table::find_first_binary(ColKey col_key, BinaryData value) const
+ObjKey Table::find_first_binary(ColKey col_key, BinaryData value) const
 {
     return find_first<BinaryData>(col_key, value);
 }
 
-Key Table::find_first_null(ColKey) const
+ObjKey Table::find_first_null(ColKey) const
 {
     // return where().equal(column_ndx, null{}).find();
     // TODO
@@ -1381,7 +1381,7 @@ ConstTableView Table::get_sorted_view(SortDescriptor order) const
 }
 
 
-TableView Table::get_backlink_view(Key key, Table* src_table, ColKey src_col_key)
+TableView Table::get_backlink_view(ObjKey key, Table* src_table, ColKey src_col_key)
 {
     // FIXME: Assert not possible as get_column_link_base no longer exists
     // REALM_ASSERT(&src_table->get_column_link_base(src_col_ndx).get_target_table() == this);
@@ -1596,7 +1596,7 @@ void Table::to_string(std::ostream& out, size_t limit) const
     }
 }
 
-void Table::row_to_string(Key key, std::ostream& out) const
+void Table::row_to_string(ObjKey key, std::ostream& out) const
 {
     // Print header (will also calculate widths)
     std::vector<size_t> widths;
@@ -1713,7 +1713,7 @@ inline void out_timestamp(std::ostream& out, Timestamp value)
 } // anonymous namespace
 
 
-void Table::to_string_row(Key key, std::ostream& out, const std::vector<size_t>& widths) const
+void Table::to_string_row(ObjKey key, std::ostream& out, const std::vector<size_t>& widths) const
 {
     size_t column_count = get_column_count();
     size_t row_ndx_width = widths[0];
@@ -1759,7 +1759,7 @@ void Table::to_string_row(Key key, std::ostream& out, const std::vector<size_t>&
                 break;
             case type_Link:
                 // FIXME: print linked row
-                out << obj.get<Key>(col);
+                out << obj.get<ObjKey>(col);
                 break;
             case type_LinkList:
                 // FIXME: print number of links in list
@@ -2162,13 +2162,13 @@ void Table::dump_node_structure(std::ostream& out, int level) const
 
 #endif // LCOV_EXCL_STOP ignore debug functions
 
-Obj Table::create_object(Key key)
+Obj Table::create_object(ObjKey key)
 {
     if (key == null_key) {
         if (m_next_key_value == -1) {
             m_next_key_value = m_clusters.get_last_key_value() + 1;
         }
-        key = Key(m_next_key_value++);
+        key = ObjKey(m_next_key_value++);
     }
 
     Obj obj = m_clusters.insert(key);
@@ -2178,14 +2178,14 @@ Obj Table::create_object(Key key)
     return obj;
 }
 
-void Table::create_objects(size_t number, std::vector<Key>& keys)
+void Table::create_objects(size_t number, std::vector<ObjKey>& keys)
 {
     while (number--) {
         keys.push_back(create_object().get_key());
     }
 }
 
-void Table::create_objects(const std::vector<Key>& keys)
+void Table::create_objects(const std::vector<ObjKey>& keys)
 {
     for (auto k : keys) {
         create_object(k);
@@ -2193,14 +2193,14 @@ void Table::create_objects(const std::vector<Key>& keys)
 }
 
 // Called by replication with mode = none
-void Table::do_remove_object(Key key)
+void Table::do_remove_object(ObjKey key)
 {
     CascadeState state(CascadeState::Mode::none);
     state.rows.emplace_back(m_key, key);
     remove_recursive(state);
 }
 
-void Table::remove_object(Key key)
+void Table::remove_object(ObjKey key)
 {
     Group* g = get_parent_group();
 
@@ -2216,7 +2216,7 @@ void Table::remove_object(Key key)
     }
 }
 
-void Table::remove_object_recursive(Key key)
+void Table::remove_object_recursive(ObjKey key)
 {
     size_t table_ndx = get_index_in_group();
     if (table_ndx != realm::npos) {

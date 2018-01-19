@@ -232,7 +232,7 @@ TEST(TableView_FloatsFindAndAggregations)
     double sum_f = 0.0;
     double sum_d = 0.0;
     for (int i = 0; i < 6; ++i) {
-        table.create_object(Key(i)).set_all(f_val[i], d_val[i], 1);
+        table.create_object(ObjKey(i)).set_all(f_val[i], d_val[i], 1);
         sum_d += d_val[i];
         sum_f += f_val[i];
     }
@@ -243,8 +243,8 @@ TEST(TableView_FloatsFindAndAggregations)
 
     TableView v_some = table.find_all_double(col_double, -1.2);
     CHECK_EQUAL(2, v_some.size());
-    CHECK_EQUAL(Key(0), v_some.get_key(0));
-    CHECK_EQUAL(Key(3), v_some.get_key(1));
+    CHECK_EQUAL(ObjKey(0), v_some.get_key(0));
+    CHECK_EQUAL(ObjKey(3), v_some.get_key(1));
 
     // Test find_first
     CHECK_EQUAL(0, v_all.find_first_double(col_double, -1.2));
@@ -265,20 +265,20 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.sum_double(col_double), 10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.sum_float(col_float), 10 * epsilon);
 
-    Key key;
+    ObjKey key;
 
     // Test max
     CHECK_EQUAL(3.2, v_all.maximum_double(col_double, &key));
-    CHECK_EQUAL(Key(2), key);
+    CHECK_EQUAL(ObjKey(2), key);
 
     CHECK_EQUAL(-1.2, v_some.maximum_double(col_double, &key));
-    CHECK_EQUAL(Key(0), key);
+    CHECK_EQUAL(ObjKey(0), key);
 
     CHECK_EQUAL(3.1f, v_all.maximum_float(col_float, &key));
-    CHECK_EQUAL(Key(2), key);
+    CHECK_EQUAL(ObjKey(2), key);
 
     CHECK_EQUAL(1.2f, v_some.maximum_float(col_float, &key));
-    CHECK_EQUAL(Key(0), key);
+    CHECK_EQUAL(ObjKey(0), key);
 
 #ifdef LEGACY_TESTS
     // Max without ret_index
@@ -295,16 +295,16 @@ TEST(TableView_FloatsFindAndAggregations)
 #endif
     // min with ret_ndx
     CHECK_EQUAL(-1.2, v_all.minimum_double(col_double, &key));
-    CHECK_EQUAL(Key(0), key);
+    CHECK_EQUAL(ObjKey(0), key);
 
     CHECK_EQUAL(-1.2, v_some.minimum_double(col_double, &key));
-    CHECK_EQUAL(Key(0), key);
+    CHECK_EQUAL(ObjKey(0), key);
 
     CHECK_EQUAL(-1.1f, v_all.minimum_float(col_float, &key));
-    CHECK_EQUAL(Key(3), key);
+    CHECK_EQUAL(ObjKey(3), key);
 
     CHECK_EQUAL(-1.1f, v_some.minimum_float(col_float, &key));
-    CHECK_EQUAL(Key(3), key);
+    CHECK_EQUAL(ObjKey(3), key);
 
     // Test avg
     CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.average_double(col_double), 10 * epsilon);
@@ -2219,9 +2219,9 @@ TEST(TableView_IsInTableOrder)
     auto col_id = target->add_column(type_Int, "id");
     // target->add_search_index(col_id);
 
-    target->create_object(Key(7));
+    target->create_object(ObjKey(7));
     Obj src_obj = source->create_object();
-    src_obj.get_list<Key>(col_link).add(Key(7));
+    src_obj.get_list<ObjKey>(col_link).add(ObjKey(7));
 
     // Detached views are in table order.
     TableView tv;
@@ -2245,7 +2245,7 @@ TEST(TableView_IsInTableOrder)
     CHECK_EQUAL(false, tv.is_in_table_order());
 
     // Backlinks are not guaranteed to be in table order.
-    tv = target->get_backlink_view(Key(7), source, col_link);
+    tv = target->get_backlink_view(ObjKey(7), source, col_link);
     CHECK_EQUAL(false, tv.is_in_table_order());
 
     // Views derived from a LinkView are not guaranteed to be in table order.

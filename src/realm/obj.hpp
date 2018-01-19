@@ -60,13 +60,13 @@ public:
         , m_instance_version(-1)
     {
     }
-    ConstObj(const ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx);
+    ConstObj(const ClusterTree* tree_top, ref_type ref, ObjKey key, size_t row_ndx);
 
     Allocator& get_alloc() const;
 
     bool operator==(const ConstObj& other) const;
 
-    Key get_key() const
+    ObjKey get_key() const
     {
         return m_key;
     }
@@ -100,7 +100,7 @@ public:
     bool is_null(ColKey col_key) const;
     bool has_backlinks(bool only_strong_links) const;
     size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
-    Key get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const;
+    ObjKey get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const;
 
     // To be used by the query system when a single object should
     // be tested. Will allow a function to be called in the context
@@ -121,7 +121,7 @@ protected:
     friend class TableViewBase;
 
     const ClusterTree* m_tree_top;
-    Key m_key;
+    ObjKey m_key;
     mutable bool m_valid;
     mutable MemRef m_mem;
     mutable size_t m_row_ndx;
@@ -150,7 +150,7 @@ protected:
     int cmp(const ConstObj& other, size_t col_ndx) const;
     int cmp(const ConstObj& other, size_t col_ndx) const;
     size_t get_backlink_count(size_t backlink_col_ndx) const;
-    Key get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) const;
+    ObjKey get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) const;
 };
 
 
@@ -160,7 +160,7 @@ public:
         : m_writeable(false)
     {
     }
-    Obj(ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx);
+    Obj(ClusterTree* tree_top, ref_type ref, ObjKey key, size_t row_ndx);
 
     template <typename U>
     Obj& set(ColKey col_key, U value, bool is_default = false);
@@ -220,10 +220,10 @@ private:
     void do_set_null(size_t col_ndx);
 
     void set_int(ColKey col_key, int64_t value);
-    void add_backlink(ColKey backlink_col, Key origin_key);
-    bool remove_one_backlink(ColKey backlink_col, Key origin_key);
-    void nullify_link(ColKey origin_col, Key target_key);
-    bool update_backlinks(ColKey col_key, Key old_key, Key new_key, CascadeState& state);
+    void add_backlink(ColKey backlink_col, ObjKey origin_key);
+    bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
+    void nullify_link(ColKey origin_col, ObjKey target_key);
+    bool update_backlinks(ColKey col_key, ObjKey old_key, ObjKey new_key, CascadeState& state);
 };
 
 
@@ -245,7 +245,7 @@ template <>
 Obj& Obj::set(ColKey, int64_t value, bool is_default);
 
 template <>
-Obj& Obj::set(ColKey, Key value, bool is_default);
+Obj& Obj::set(ColKey, ObjKey value, bool is_default);
 
 
 template <>

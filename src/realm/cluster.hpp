@@ -33,33 +33,33 @@ class ClusterTree;
 class ColumnAttrMask;
 struct CascadeState;
 
-struct Key {
-    constexpr Key()
+struct ObjKey {
+    constexpr ObjKey()
         : value(-1)
     {
     }
-    explicit Key(int64_t val)
+    explicit ObjKey(int64_t val)
         : value(val)
     {
     }
-    Key& operator=(int64_t val)
+    ObjKey& operator=(int64_t val)
     {
         value = val;
         return *this;
     }
-    bool operator==(const Key& rhs) const
+    bool operator==(const ObjKey& rhs) const
     {
         return value == rhs.value;
     }
-    bool operator!=(const Key& rhs) const
+    bool operator!=(const ObjKey& rhs) const
     {
         return value != rhs.value;
     }
-    bool operator<(const Key& rhs) const
+    bool operator<(const ObjKey& rhs) const
     {
         return value < rhs.value;
     }
-    bool operator>(const Key& rhs) const
+    bool operator>(const ObjKey& rhs) const
     {
         return value > rhs.value;
     }
@@ -77,13 +77,13 @@ private:
     }
 };
 
-inline std::ostream& operator<<(std::ostream& ostr, Key key)
+inline std::ostream& operator<<(std::ostream& ostr, ObjKey key)
 {
     ostr << "Key(" << key.value << ")";
     return ostr;
 }
 
-constexpr Key null_key;
+constexpr ObjKey null_key;
 
 class ClusterNode : public Array {
 public:
@@ -153,7 +153,7 @@ public:
     virtual void init(MemRef mem) = 0;
     /// Descend the tree from the root and copy-on-write the leaf
     /// This will update all parents accordingly
-    virtual MemRef ensure_writeable(Key k) = 0;
+    virtual MemRef ensure_writeable(ObjKey k) = 0;
 
     /// Insert a column at position 'ndx'
     virtual void insert_column(size_t ndx) = 0;
@@ -161,12 +161,12 @@ public:
     virtual void remove_column(size_t ndx) = 0;
     /// Create a new object identified by 'key' and update 'state' accordingly
     /// Return reference to new node created (if any)
-    virtual ref_type insert(Key k, State& state) = 0;
+    virtual ref_type insert(ObjKey k, State& state) = 0;
     /// Locate object identified by 'key' and update 'state' accordingly
-    virtual void get(Key key, State& state) const = 0;
+    virtual void get(ObjKey key, State& state) const = 0;
 
     /// Erase element identified by 'key'
-    virtual unsigned erase(Key key, CascadeState& state) = 0;
+    virtual unsigned erase(ObjKey key, CascadeState& state) = 0;
 
     /// Move elements from position 'ndx' to 'new_node'. The new node is supposed
     /// to be a sibling positioned right after this one. All key values must
@@ -175,9 +175,9 @@ public:
 
     virtual void dump_objects(int64_t key_offset, std::string lead) const = 0;
 
-    Key get_real_key(size_t ndx) const
+    ObjKey get_real_key(size_t ndx) const
     {
-        return Key(m_keys.get(ndx) + m_offset);
+        return ObjKey(m_keys.get(ndx) + m_offset);
     }
     void set_offset(int64_t offs)
     {
@@ -211,7 +211,7 @@ public:
     {
         return !Array::is_read_only();
     }
-    MemRef ensure_writeable(Key k) override;
+    MemRef ensure_writeable(ObjKey k) override;
 
     bool is_leaf() const override
     {
@@ -225,16 +225,16 @@ public:
     {
         return m_keys.size() ? get_key_value(m_keys.size() - 1) : 0;
     }
-    size_t lower_bound_key(Key key)
+    size_t lower_bound_key(ObjKey key)
     {
         return m_keys.lower_bound_int(key.value);
     }
 
     void insert_column(size_t ndx) override;
     void remove_column(size_t ndx) override;
-    ref_type insert(Key k, State& state) override;
-    void get(Key k, State& state) const override;
-    unsigned erase(Key k, CascadeState& state) override;
+    ref_type insert(ObjKey k, State& state) override;
+    void get(ObjKey k, State& state) const override;
+    unsigned erase(ObjKey k, CascadeState& state) override;
 
     void init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept
     {
@@ -249,7 +249,7 @@ public:
 
 private:
     friend class ClusterTree;
-    void insert_row(size_t ndx, Key k);
+    void insert_row(size_t ndx, ObjKey k);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
     template <class T>
     void do_create(size_t col_ndx);
@@ -261,7 +261,8 @@ private:
     void do_move(size_t ndx, size_t col_ndx, Cluster* to);
     template <class T>
     void do_erase(size_t ndx, size_t col_ndx);
-    void remove_backlinks(Key origin_key, size_t col_ndx, const std::vector<Key>& keys, CascadeState& state) const;
+    void remove_backlinks(ObjKey origin_key, size_t col_ndx, const std::vector<ObjKey>& keys,
+                          CascadeState& state) const;
     void do_erase_key(size_t ndx, size_t col_ndx, CascadeState& state);
 };
 

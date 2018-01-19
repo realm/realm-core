@@ -605,7 +605,7 @@ TEST(TimestampColumn_AddColumnAfterRows)
 
     Table t;
     auto col_0 = t.add_column(type_Int, "1", non_nullable);
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     t.create_objects(REALM_MAX_BPNODE_SIZE * 2 + 1, keys);
     t.get_object(keys[0]).set<Int>(col_0, 100);
 

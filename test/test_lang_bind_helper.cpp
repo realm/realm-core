@@ -293,7 +293,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(0, group.size());
 
     // Create a table via the other SharedGroup
-    Key k0;
+    ObjKey k0;
     {
         WriteTransaction wt(sg_w);
         TableRef foo_w = wt.add_table("foo");
@@ -314,7 +314,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     uint_fast64_t version = foo->get_content_version();
 
     // Modify the table via the other SharedGroup
-    Key k1;
+    ObjKey k1;
     {
         WriteTransaction wt(sg_w);
         TableRef foo_w = wt.get_table("foo");
@@ -1302,7 +1302,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     ReadTransaction rt(sg);
     const Group& group = rt.get_group();
     CHECK_EQUAL(0, group.size());
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
 
     // Create 5 columns, and make 3 of them indexed
     {
@@ -1369,9 +1369,9 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     CHECK_NOT(table->has_search_index(col_str2));
     CHECK(table->has_search_index(col_int3));
     CHECK_NOT(table->has_search_index(col_int4));
-    CHECK_EQUAL(Key(13), table->find_first_string(col_str1, "931"));
-    CHECK_EQUAL(Key(5), table->find_first_int(col_int3, 315));
-    CHECK_EQUAL(Key(14), table->find_first_int(col_int3, 508));
+    CHECK_EQUAL(ObjKey(13), table->find_first_string(col_str1, "931"));
+    CHECK_EQUAL(ObjKey(5), table->find_first_int(col_int3, 315));
+    CHECK_EQUAL(ObjKey(14), table->find_first_int(col_int3, 508));
 
     // Move the indexed columns by removal
     {
@@ -1386,8 +1386,8 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     CHECK(table->has_search_index(col_str1));
     CHECK(table->has_search_index(col_int3));
     CHECK_NOT(table->has_search_index(col_int4));
-    CHECK_EQUAL(Key(4), table->find_first_string(col_str1, "738"));
-    CHECK_EQUAL(Key(14), table->find_first_int(col_int3, 508));
+    CHECK_EQUAL(ObjKey(4), table->find_first_string(col_str1, "738"));
+    CHECK_EQUAL(ObjKey(14), table->find_first_int(col_int3, 508));
 }
 
 #ifdef LEGACY_TESTS
@@ -3469,11 +3469,11 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
         target->add_column(type_Int, "value");
         auto col = origin->add_column_link(type_LinkList, "list", *target);
         // origin->add_search_index(0);
-        std::vector<Key> keys;
+        std::vector<ObjKey> keys;
         target->create_objects(10, keys);
 
-        Obj o0 = origin->create_object(Key(0));
-        Obj o1 = origin->create_object(Key(1));
+        Obj o0 = origin->create_object(ObjKey(0));
+        Obj o1 = origin->create_object(ObjKey(1));
 
         o0.get_linklist(col).add(keys[1]);
         o1.get_linklist(col).add(keys[2]);
@@ -3488,8 +3488,8 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
     // Grab references to the LinkViews
     auto origin = group.get_table("origin");
     auto col_link = origin->get_column_key("list");
-    ConstObj obj0 = origin->get_object(Key(0));
-    ConstObj obj1 = origin->get_object(Key(1));
+    ConstObj obj0 = origin->get_object(ObjKey(0));
+    ConstObj obj1 = origin->get_object(ObjKey(1));
 
     auto ll1 = obj0.get_linklist(col_link); // lv1[0] -> target[1]
     auto ll2 = obj1.get_linklist(col_link); // lv2[0] -> target[2]
@@ -13338,16 +13338,16 @@ TEST(LangBindHelper_RemoveObject)
         Group& group = wt.get_group();
         TableRef t = group.add_table("Foo");
         t->add_column(type_Int, "int");
-        t->create_object(Key(123)).set(0, 1);
-        t->create_object(Key(456)).set(0, 2);
+        t->create_object(ObjKey(123)).set(0, 1);
+        t->create_object(ObjKey(456)).set(0, 2);
         wt.commit();
     }
 
     LangBindHelper::advance_read(sg_r);
     const Group& g = rt.get_group();
     auto table = g.get_table("Foo");
-    ConstObj o1 = table->get_object(Key(123));
-    ConstObj o2 = table->get_object(Key(456));
+    ConstObj o1 = table->get_object(ObjKey(123));
+    ConstObj o2 = table->get_object(ObjKey(456));
     CHECK_EQUAL(o1.get<int64_t>(0), 1);
     CHECK_EQUAL(o2.get<int64_t>(0), 2);
 
@@ -13355,7 +13355,7 @@ TEST(LangBindHelper_RemoveObject)
         WriteTransaction wt(sg_w);
         Group& group = wt.get_group();
         TableRef t = group.get_table("Foo");
-        t->remove_object(Key(123));
+        t->remove_object(ObjKey(123));
         wt.commit();
     }
     LangBindHelper::advance_read(sg_r);
@@ -13438,7 +13438,7 @@ TEST(LangBindHelper_AdvanceReadCluster)
         TableRef t = group.add_table("Foo");
         auto int_col = t->add_column(type_Int, "int");
         for (int64_t i = 0; i < 100; i++) {
-            t->create_object(Key(i)).set(int_col, i);
+            t->create_object(ObjKey(i)).set(int_col, i);
         }
         wt.commit();
     }
@@ -13448,7 +13448,7 @@ TEST(LangBindHelper_AdvanceReadCluster)
     auto table = g.get_table("Foo");
     auto int_col = table->get_column_index("int");
     for (int64_t i = 0; i < 100; i++) {
-        ConstObj o = table->get_object(Key(i));
+        ConstObj o = table->get_object(ObjKey(i));
         CHECK_EQUAL(o.get<int64_t>(int_col), i);
     }
 }

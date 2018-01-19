@@ -50,7 +50,7 @@ public:
         m_logger = logger;
     }
 
-    bool set_int(ColKey col_key, Key key, int_fast64_t value, _impl::Instruction variant, size_t prior_num_rows)
+    bool set_int(ColKey col_key, ObjKey key, int_fast64_t value, _impl::Instruction variant, size_t prior_num_rows)
     {
         static_cast<void>(prior_num_rows);
         static_cast<void>(variant);
@@ -78,7 +78,7 @@ public:
         return false;
     }
 
-    bool add_int(ColKey col_key, Key key, int_fast64_t value)
+    bool add_int(ColKey col_key, ObjKey key, int_fast64_t value)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_key, key)))) {
             log("table(%1)->add_int(%2, %3);", key.value, col_key, value); // Throws
@@ -92,7 +92,7 @@ public:
         return false;
     }
 
-    bool set_bool(ColKey col_key, Key key, bool value, _impl::Instruction)
+    bool set_bool(ColKey col_key, ObjKey key, bool value, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_key, key)))) {
             log("table(%1)->set_bool(%2, %3);", key.value, col_key, value); // Throws
@@ -106,7 +106,7 @@ public:
         return false;
     }
 
-    bool set_float(ColKey col_key, Key key, float value, _impl::Instruction)
+    bool set_float(ColKey col_key, ObjKey key, float value, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_key, key)))) {
             log("table(%1)->set_float(%2, %3);", key.value, col_key, value); // Throws
@@ -120,7 +120,7 @@ public:
         return false;
     }
 
-    bool set_double(ColKey col_key, Key key, double value, _impl::Instruction)
+    bool set_double(ColKey col_key, ObjKey key, double value, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_key, key)))) {
             log("table(%1)->set_double(%2, %3);", key.value, col_key, value); // Throws
@@ -134,7 +134,7 @@ public:
         return false;
     }
 
-    bool set_string(ColKey col_key, Key key, StringData value, _impl::Instruction variant, size_t prior_num_rows)
+    bool set_string(ColKey col_key, ObjKey key, StringData value, _impl::Instruction variant, size_t prior_num_rows)
     {
         static_cast<void>(prior_num_rows);
         static_cast<void>(variant);
@@ -162,7 +162,7 @@ public:
         return false;
     }
 
-    bool set_binary(ColKey col_key, Key key, BinaryData value, _impl::Instruction)
+    bool set_binary(ColKey col_key, ObjKey key, BinaryData value, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_key, key)))) {
             log("table(%1)->set_binary(%2, %3);", key.value, col_key, value); // Throws
@@ -178,7 +178,7 @@ public:
         return false;
     }
 
-    bool set_timestamp(ColKey col_key, Key key, Timestamp value, _impl::Instruction)
+    bool set_timestamp(ColKey col_key, ObjKey key, Timestamp value, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_key, key)))) {
             log("table(%1)->set_timestamp(%2, %3);", key.value, col_key, value); // Throws
@@ -192,7 +192,7 @@ public:
         return false;
     }
 
-    bool set_null(ColKey col_key, Key key, _impl::Instruction variant, size_t prior_num_rows)
+    bool set_null(ColKey col_key, ObjKey key, _impl::Instruction variant, size_t prior_num_rows)
     {
         static_cast<void>(prior_num_rows);
         static_cast<void>(variant);
@@ -220,7 +220,7 @@ public:
         return false;
     }
 
-    bool set_link(ColKey col_key, Key key, Key target_obj_key, TableKey, _impl::Instruction)
+    bool set_link(ColKey col_key, ObjKey key, ObjKey target_obj_key, TableKey, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_key, key)))) {
             if (target_obj_key == null_key) {
@@ -239,7 +239,7 @@ public:
         return false;
     }
 
-    bool insert_substring(ColKey col_key, Key key, size_t pos, StringData value)
+    bool insert_substring(ColKey col_key, ObjKey key, size_t pos, StringData value)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
@@ -253,7 +253,7 @@ public:
         } // LCOV_EXCL_STOP
     }
 
-    bool erase_substring(ColKey col_key, Key key, size_t pos, size_t size)
+    bool erase_substring(ColKey col_key, ObjKey key, size_t pos, size_t size)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
@@ -351,7 +351,7 @@ public:
         return true;
     }
 
-    bool create_object(Key key)
+    bool create_object(ObjKey key)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
@@ -360,7 +360,7 @@ public:
         return true;
     }
 
-    bool remove_object(Key key)
+    bool remove_object(ObjKey key)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
@@ -583,7 +583,7 @@ public:
         return false;
     }
 
-    bool select_list(ColKey col_key, Key key)
+    bool select_list(ColKey col_key, ObjKey key)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
@@ -595,7 +595,7 @@ public:
         return true;
     }
 
-    bool select_link_list(ColKey col_key, Key key)
+    bool select_link_list(ColKey col_key, ObjKey key)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
@@ -610,7 +610,7 @@ public:
         return true;
     }
 
-    bool list_set_link(size_t link_ndx, Key value)
+    bool list_set_link(size_t link_ndx, ObjKey value)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
@@ -691,7 +691,7 @@ public:
         return true;
     }
 
-    bool nullify_link(ColKey col_key, Key key, TableKey target_table_key)
+    bool nullify_link(ColKey col_key, ObjKey key, TableKey target_table_key)
     {
         return set_link(col_key, key, realm::null_key, target_table_key, _impl::instr_Set);
     }
@@ -707,7 +707,7 @@ private:
     ListBasePtr m_list;
     util::Logger* m_logger = nullptr;
 
-    bool check_set_cell(ColKey col_key, Key key) noexcept
+    bool check_set_cell(ColKey col_key, ObjKey key) noexcept
     {
         static_cast<void>(col_key);
         static_cast<void>(key);

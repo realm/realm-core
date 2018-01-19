@@ -65,7 +65,7 @@ const char* to_lead_cstr(RealmDurability level);
 const char* to_ident_cstr(RealmDurability level);
 
 #ifdef REALM_CLUSTER_IF
-#define KEY(x) Key(x)
+#define KEY(x) ObjKey(x)
 #else
 #define KEY(x) x
 using ColKey = size_t;
@@ -99,7 +99,7 @@ struct Benchmark {
     RealmDurability m_durability = RealmDurability::Full;
     const char* m_encryption_key = nullptr;
 #ifdef REALM_CLUSTER_IF
-    std::vector<Key> m_keys;
+    std::vector<ObjKey> m_keys;
 #endif
 };
 

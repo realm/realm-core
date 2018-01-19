@@ -76,10 +76,10 @@ public:
     {
     }
 
-    Key index_string_find_first(StringData value, const ClusterColumn& column) const;
+    ObjKey index_string_find_first(StringData value, const ClusterColumn& column) const;
     void index_string_find_all(IntegerColumn& result, StringData value, const ClusterColumn& column,
                                bool case_insensitive = false) const;
-    void index_string_find_all(std::vector<Key>& result, StringData value, const ClusterColumn& column,
+    void index_string_find_all(std::vector<ObjKey>& result, StringData value, const ClusterColumn& column,
                                bool case_insensitive = false) const;
     FindRes index_string_find_all_no_copy(StringData value, const ClusterColumn& column,
                                           InternalFindResult& result) const;
@@ -90,18 +90,18 @@ private:
     int64_t from_list(StringData value, InternalFindResult& result_ref, const IntegerColumn& key_values,
                       const ClusterColumn& column) const;
 
-    void from_list_all(StringData value, std::vector<Key>& result, const IntegerColumn& rows,
+    void from_list_all(StringData value, std::vector<ObjKey>& result, const IntegerColumn& rows,
                        const ClusterColumn& column) const;
 
-    void from_list_all_ins(StringData value, std::vector<Key>& result, const IntegerColumn& rows,
+    void from_list_all_ins(StringData value, std::vector<ObjKey>& result, const IntegerColumn& rows,
                            const ClusterColumn& column) const;
 
     template <IndexMethod method>
     int64_t index_string(StringData value, InternalFindResult& result_ref, const ClusterColumn& column) const;
 
-    void index_string_all(StringData value, std::vector<Key>& result, const ClusterColumn& column) const;
+    void index_string_all(StringData value, std::vector<ObjKey>& result, const ClusterColumn& column) const;
 
-    void index_string_all_ins(StringData value, std::vector<Key>& result, const ClusterColumn& column) const;
+    void index_string_all_ins(StringData value, std::vector<ObjKey>& result, const ClusterColumn& column) const;
 };
 
 // 12 is the biggest element size of any non-string/binary Realm type
@@ -144,7 +144,7 @@ public:
         return m_column_key;
     }
     bool is_nullable() const;
-    StringData get_index_data(Key key, StringConversionBuffer& buffer) const;
+    StringData get_index_data(ObjKey key, StringConversionBuffer& buffer) const;
 
 private:
     const ClusterTree* m_cluster_tree;
@@ -195,21 +195,21 @@ public:
     bool is_empty() const;
 
     template <class T>
-    void insert(Key key, T value);
+    void insert(ObjKey key, T value);
     template <class T>
-    void insert(Key key, util::Optional<T> value);
+    void insert(ObjKey key, util::Optional<T> value);
 
     template <class T>
-    void set(Key key, T new_value);
+    void set(ObjKey key, T new_value);
     template <class T>
-    void set(Key key, util::Optional<T> new_value);
+    void set(ObjKey key, util::Optional<T> new_value);
 
-    void erase(Key key);
+    void erase(ObjKey key);
 
     template <class T>
-    Key find_first(T value) const;
+    ObjKey find_first(T value) const;
     template <class T>
-    void find_all(std::vector<Key>& result, T value, bool case_insensitive = false) const;
+    void find_all(std::vector<ObjKey>& result, T value, bool case_insensitive = false) const;
     template <class T>
     FindRes find_all_no_copy(T value, InternalFindResult& result) const;
     template <class T>
@@ -275,10 +275,10 @@ private:
 
     static IndexArray* create_node(Allocator&, bool is_leaf);
 
-    void insert_with_offset(Key key, StringData value, size_t offset);
+    void insert_with_offset(ObjKey key, StringData value, size_t offset);
     void insert_row_list(size_t ref, size_t offset, StringData value);
-    void insert_to_existing_list(Key key, StringData value, IntegerColumn& list);
-    void insert_to_existing_list_at_lower(Key key, StringData value, IntegerColumn& list,
+    void insert_to_existing_list(ObjKey key, StringData value, IntegerColumn& list);
+    void insert_to_existing_list_at_lower(ObjKey key, StringData value, IntegerColumn& list,
                                           const IntegerColumnIterator& lower);
     key_type get_last_key() const;
 
@@ -301,15 +301,15 @@ private:
     };
 
     // B-Tree functions
-    void TreeInsert(Key obj_key, key_type, size_t offset, StringData value);
-    NodeChange do_insert(Key, key_type, size_t offset, StringData value);
+    void TreeInsert(ObjKey obj_key, key_type, size_t offset, StringData value);
+    NodeChange do_insert(ObjKey, key_type, size_t offset, StringData value);
     /// Returns true if there is room or it can join existing entries
-    bool leaf_insert(Key obj_key, key_type, size_t offset, StringData value, bool noextend = false);
+    bool leaf_insert(ObjKey obj_key, key_type, size_t offset, StringData value, bool noextend = false);
     void node_insert_split(size_t ndx, size_t new_ref);
     void node_insert(size_t ndx, size_t ref);
-    void do_delete(Key key, StringData, size_t offset);
+    void do_delete(ObjKey key, StringData, size_t offset);
 
-    StringData get(Key key, StringConversionBuffer& buffer) const;
+    StringData get(ObjKey key, StringConversionBuffer& buffer) const;
 
     void node_add_key(ref_type ref);
 
@@ -518,7 +518,7 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
 }
 
 template <class T>
-void StringIndex::insert(Key key, T value)
+void StringIndex::insert(ObjKey key, T value)
 {
     StringConversionBuffer buffer;
     size_t offset = 0;                                      // First key from beginning of string
@@ -526,7 +526,7 @@ void StringIndex::insert(Key key, T value)
 }
 
 template <class T>
-void StringIndex::insert(Key key, util::Optional<T> value)
+void StringIndex::insert(ObjKey key, util::Optional<T> value)
 {
     if (value) {
         insert(key, *value);
@@ -537,7 +537,7 @@ void StringIndex::insert(Key key, util::Optional<T> value)
 }
 
 template <class T>
-void StringIndex::set(Key key, T new_value)
+void StringIndex::set(ObjKey key, T new_value)
 {
     StringConversionBuffer buffer;
     StringConversionBuffer buffer2;
@@ -557,7 +557,7 @@ void StringIndex::set(Key key, T new_value)
 }
 
 template <class T>
-void StringIndex::set(Key key, util::Optional<T> new_value)
+void StringIndex::set(ObjKey key, util::Optional<T> new_value)
 {
     if (new_value) {
         set(key, *new_value);
@@ -568,7 +568,7 @@ void StringIndex::set(Key key, util::Optional<T> new_value)
 }
 
 template <class T>
-Key StringIndex::find_first(T value) const
+ObjKey StringIndex::find_first(T value) const
 {
     // Use direct access method
     StringConversionBuffer buffer;
@@ -576,7 +576,7 @@ Key StringIndex::find_first(T value) const
 }
 
 template <class T>
-void StringIndex::find_all(std::vector<Key>& result, T value, bool case_insensitive) const
+void StringIndex::find_all(std::vector<ObjKey>& result, T value, bool case_insensitive) const
 {
     // Use direct access method
     StringConversionBuffer buffer;

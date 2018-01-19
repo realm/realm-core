@@ -195,35 +195,35 @@ public:
     size_t find_first_timestamp(ColKey column_key, Timestamp value) const;
 
     template <Action action, typename T, typename R>
-    R aggregate(ColKey column_key, size_t* result_count = nullptr, Key* return_key = nullptr) const;
+    R aggregate(ColKey column_key, size_t* result_count = nullptr, ObjKey* return_key = nullptr) const;
     template <typename T>
     size_t aggregate_count(ColKey column_key, T count_target) const;
 
     int64_t sum_int(ColKey column_key) const;
-    int64_t maximum_int(ColKey column_key, Key* return_key = nullptr) const;
-    int64_t minimum_int(ColKey column_key, Key* return_key = nullptr) const;
+    int64_t maximum_int(ColKey column_key, ObjKey* return_key = nullptr) const;
+    int64_t minimum_int(ColKey column_key, ObjKey* return_key = nullptr) const;
     double average_int(ColKey column_key, size_t* value_count = nullptr) const;
     size_t count_int(ColKey column_key, int64_t target) const;
 
     double sum_float(ColKey column_key) const;
-    float maximum_float(ColKey column_key, Key* return_key = nullptr) const;
-    float minimum_float(ColKey column_key, Key* return_key = nullptr) const;
+    float maximum_float(ColKey column_key, ObjKey* return_key = nullptr) const;
+    float minimum_float(ColKey column_key, ObjKey* return_key = nullptr) const;
     double average_float(ColKey column_key, size_t* value_count = nullptr) const;
     size_t count_float(ColKey column_key, float target) const;
 
     double sum_double(ColKey column_key) const;
-    double maximum_double(ColKey column_key, Key* return_key = nullptr) const;
-    double minimum_double(ColKey column_key, Key* return_key = nullptr) const;
+    double maximum_double(ColKey column_key, ObjKey* return_key = nullptr) const;
+    double minimum_double(ColKey column_key, ObjKey* return_key = nullptr) const;
     double average_double(ColKey column_key, size_t* value_count = nullptr) const;
     size_t count_double(ColKey column_key, double target) const;
 
-    Timestamp minimum_timestamp(ColKey column_key, Key* return_key = nullptr) const;
-    Timestamp maximum_timestamp(ColKey column_key, Key* return_key = nullptr) const;
+    Timestamp minimum_timestamp(ColKey column_key, ObjKey* return_key = nullptr) const;
+    Timestamp maximum_timestamp(ColKey column_key, ObjKey* return_key = nullptr) const;
     size_t count_timestamp(ColKey column_key, Timestamp target) const;
 
     /// Search this view for the specified key. If found, the index of that row
     /// within this view is returned, otherwise `realm::not_found` is returned.
-    size_t find_by_source_ndx(Key key) const noexcept;
+    size_t find_by_source_ndx(ObjKey key) const noexcept;
 
     // Conversion
     void to_json(std::ostream&) const;
@@ -382,7 +382,7 @@ private:
     void detach() const noexcept; // may have to remove const
     size_t find_first_integer(ColKey column_key, int64_t value) const;
     template <class oper>
-    Timestamp minmax_timestamp(ColKey column_key, Key* return_key) const;
+    Timestamp minmax_timestamp(ColKey column_key, ObjKey* return_key) const;
 
     friend class Table;
     friend class Query;
@@ -587,7 +587,7 @@ inline bool TableViewBase::is_attached() const noexcept
 
 inline bool TableViewBase::is_row_attached(size_t row_ndx) const noexcept
 {
-    return m_table->is_valid(Key(m_key_values.get(row_ndx)));
+    return m_table->is_valid(ObjKey(m_key_values.get(row_ndx)));
 }
 
 inline size_t TableViewBase::num_attached_rows() const noexcept
@@ -595,7 +595,7 @@ inline size_t TableViewBase::num_attached_rows() const noexcept
     return m_key_values.size() - m_num_detached_refs;
 }
 
-inline size_t TableViewBase::find_by_source_ndx(Key key) const noexcept
+inline size_t TableViewBase::find_by_source_ndx(ObjKey key) const noexcept
 {
     return m_key_values.find_first(key, 0, m_key_values.size());
 }
@@ -1067,7 +1067,7 @@ inline ConstTableView ConstTableView::find_all_bool(ColKey column_key, bool valu
 inline Obj TableView::get(size_t row_ndx) noexcept
 {
     REALM_ASSERT_ROW(row_ndx);
-    Key key(m_key_values.get(row_ndx));
+    ObjKey key(m_key_values.get(row_ndx));
     REALM_ASSERT(key != realm::null_key);
     return m_table->get_object(key);
 }

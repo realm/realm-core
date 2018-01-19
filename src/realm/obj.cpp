@@ -36,7 +36,7 @@ using namespace realm;
 
 /********************************* ConstObj **********************************/
 
-ConstObj::ConstObj(const ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx)
+ConstObj::ConstObj(const ClusterTree* tree_top, ref_type ref, ObjKey key, size_t row_ndx)
     : m_tree_top(tree_top)
     , m_key(key)
     , m_valid(true)
@@ -94,7 +94,7 @@ int ConstObj::cmp(const ConstObj& other, size_t col_ndx) const
         case type_Timestamp:
             return cmp<Timestamp>(other, col_ndx);
         case type_Link:
-            return cmp<Key>(other, col_ndx);
+            return cmp<ObjKey>(other, col_ndx);
         case type_OldDateTime:
         case type_OldTable:
         case type_OldMixed:
@@ -150,7 +150,7 @@ TableRef ConstObj::get_target_table(ColKey col_key) const
     return _impl::TableFriend::get_opposite_link_table(*m_tree_top->get_owner(), col_key);
 }
 
-Obj::Obj(ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx)
+Obj::Obj(ClusterTree* tree_top, ref_type ref, ObjKey key, size_t row_ndx)
     : ConstObj(tree_top, ref, key, row_ndx)
     , m_writeable(!tree_top->get_alloc().is_read_only(ref))
 {
@@ -212,7 +212,7 @@ inline bool ConstObj::do_is_null(size_t col_ndx) const
 
 size_t ConstObj::get_link_count(ColKey col_key) const
 {
-    return get_list<Key>(col_key).size();
+    return get_list<ObjKey>(col_key).size();
 }
 
 bool ConstObj::is_null(ColKey col_key) const
@@ -293,7 +293,7 @@ size_t ConstObj::get_backlink_count(const Table& origin, ColKey origin_col_key) 
     return cnt;
 }
 
-Key ConstObj::get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const
+ObjKey ConstObj::get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const
 {
     TableKey origin_key = origin.get_key();
     size_t backlink_col_key = m_tree_top->get_spec().find_backlink_column(origin_key, origin_col_key);
@@ -314,7 +314,7 @@ size_t ConstObj::get_backlink_count(size_t backlink_col_ndx) const
     return backlinks.get_backlink_count(m_row_ndx);
 }
 
-Key ConstObj::get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) const
+ObjKey ConstObj::get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) const
 {
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
@@ -447,11 +447,11 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
 }
 
 template <>
-Obj& Obj::set<Key>(ColKey col_key, Key target_key, bool is_default)
+Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
 {
     size_t col_ndx = get_table()->colkey2ndx(col_key);
     auto& spec = m_tree_top->get_spec();
-    if (spec.get_column_type(col_ndx) != ColumnTypeTraits<Key>::column_id)
+    if (spec.get_column_type(col_ndx) != ColumnTypeTraits<ObjKey>::column_id)
         throw LogicError(LogicError::illegal_type);
     TableRef target_table = get_target_table(col_key);
     if (target_key != null_key && !target_table->is_valid(target_key)) {
@@ -470,7 +470,7 @@ Obj& Obj::set<Key>(ColKey col_key, Key target_key, bool is_default)
     values.set_parent(&fields, col_ndx + 1);
     values.init_from_parent();
 
-    Key old_key = values.get(m_row_ndx);
+    ObjKey old_key = values.get(m_row_ndx);
 
     if (target_key != old_key) {
         CascadeState state;
@@ -582,7 +582,7 @@ void Obj::set_int(ColKey col_key, int64_t value)
     values.set(m_row_ndx, value);
 }
 
-void Obj::add_backlink(ColKey backlink_col_key, Key origin_key)
+void Obj::add_backlink(ColKey backlink_col_key, ObjKey origin_key)
 {
     ensure_writeable();
 
@@ -599,7 +599,7 @@ void Obj::add_backlink(ColKey backlink_col_key, Key origin_key)
     backlinks.add(m_row_ndx, origin_key);
 }
 
-bool Obj::remove_one_backlink(ColKey backlink_col_key, Key origin_key)
+bool Obj::remove_one_backlink(ColKey backlink_col_key, ObjKey origin_key)
 {
     ensure_writeable();
 
@@ -616,7 +616,7 @@ bool Obj::remove_one_backlink(ColKey backlink_col_key, Key origin_key)
     return backlinks.remove(m_row_ndx, origin_key);
 }
 
-void Obj::nullify_link(ColKey origin_col_key, Key target_key)
+void Obj::nullify_link(ColKey origin_col_key, ObjKey target_key)
 {
     ensure_writeable();
 
@@ -644,17 +644,17 @@ void Obj::nullify_link(ColKey origin_col_key, Key target_key)
         ArrayKey links(alloc);
         links.set_parent(&fields, origin_col_ndx + 1);
         links.init_from_parent();
-        Key key = links.get(m_row_ndx);
+        ObjKey key = links.get(m_row_ndx);
         REALM_ASSERT(key == target_key);
-        links.set(m_row_ndx, Key{});
+        links.set(m_row_ndx, ObjKey{});
         if (Replication* repl = alloc.get_replication())
-            repl->set<Key>(m_tree_top->get_owner(), origin_col_key, m_key, Key{}, _impl::instr_Set); // Throws
+            repl->set<ObjKey>(m_tree_top->get_owner(), origin_col_key, m_key, ObjKey{}, _impl::instr_Set); // Throws
 
         alloc.bump_content_version();
     }
 }
 
-bool Obj::update_backlinks(ColKey col_key, Key old_key, Key new_key, CascadeState& state)
+bool Obj::update_backlinks(ColKey col_key, ObjKey old_key, ObjKey new_key, CascadeState& state)
 {
     bool recurse = false;
 
@@ -700,7 +700,7 @@ template double ConstObj::get<double>(ColKey col_key) const;
 template StringData ConstObj::get<StringData>(ColKey col_key) const;
 template BinaryData ConstObj::get<BinaryData>(ColKey col_key) const;
 template Timestamp ConstObj::get<Timestamp>(ColKey col_key) const;
-template Key ConstObj::get<Key>(ColKey col_key) const;
+template ObjKey ConstObj::get<ObjKey>(ColKey col_key) const;
 
 template Obj& Obj::set<bool>(ColKey, bool, bool);
 template Obj& Obj::set<float>(ColKey, float, bool);

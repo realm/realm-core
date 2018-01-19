@@ -279,7 +279,7 @@ TEST(Parser_basic_serialisation)
     auto time_col = t->add_column(type_Timestamp, "time", true);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
 
     t->create_objects(5, keys);
     for (size_t i = 0; i < t->size(); ++i) {
@@ -923,7 +923,7 @@ TEST(Parser_collection_aggregates)
     std::vector<cinfo> course_info
             = { cinfo{"Math", 5.0, 42, 0.36f}, cinfo{"Comp Sci", 4.5, 45, 0.25f}, cinfo{"Chemistry", 4.0, 41, 0.40f},
             cinfo{"English", 3.5, 40, 0.07f}, cinfo{"Physics", 4.5, 42, 0.42f} };
-    std::vector<Key> course_keys;
+    std::vector<ObjKey> course_keys;
     for (cinfo course : course_info) {
         Obj obj = courses->create_object();
         course_keys.push_back(obj.get_key());

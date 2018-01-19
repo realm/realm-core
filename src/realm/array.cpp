@@ -569,7 +569,7 @@ void Array::add_to_column(IntegerColumn* column, int64_t value)
 
 void Array::add_to_column(KeyColumn* column, int64_t value)
 {
-    column->add(Key(value));
+    column->add(ObjKey(value));
 }
 
 void Array::set(size_t ndx, int64_t value)

@@ -39,7 +39,7 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
         size_t target_col_ndx = get_ndx_in_parent() - 1;
         auto target_col_key = target_table->ndx2colkey(target_col_ndx);
 
-        Key target_key = cluster->get_real_key(ndx);
+        ObjKey target_key = cluster->get_real_key(ndx);
 
         // determine the source table/col - which is the one holding the forward links
         // FIXME: May have to be moved to Table so that we don't have spec access here.
@@ -50,7 +50,7 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
 
         // helper which will clear fwd link residing in source table/column/key
         // and pointing to target_key.
-        auto clear_link = [&source_table, source_col_key, target_key, &state](Key source_key) {
+        auto clear_link = [&source_table, source_col_key, target_key, &state](ObjKey source_key) {
             Obj obj = source_table->get_object(source_key);
             obj.nullify_link(source_col_key, target_key);
             if (state.track_link_nullifications) {
@@ -61,7 +61,7 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
         // Now follow all backlinks to their origin and clear forward links.
         if ((value & 1) != 0) {
             // just a single one
-            clear_link(Key(value >> 1));
+            clear_link(ObjKey(value >> 1));
         }
         else {
             // There is more than one backlink - Iterate through them all
@@ -71,14 +71,14 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
 
             size_t sz = backlink_list.size();
             for (size_t i = 0; i < sz; i++) {
-                clear_link(Key(backlink_list.get(i)));
+                clear_link(ObjKey(backlink_list.get(i)));
             }
             backlink_list.destroy();
         }
     }
 }
 
-void ArrayBacklink::add(size_t ndx, Key key)
+void ArrayBacklink::add(size_t ndx, ObjKey key)
 {
     uint64_t value = Array::get(ndx);
 
@@ -106,7 +106,7 @@ void ArrayBacklink::add(size_t ndx, Key key)
 }
 
 // Return true if the last link was removed
-bool ArrayBacklink::remove(size_t ndx, Key key)
+bool ArrayBacklink::remove(size_t ndx, ObjKey key)
 {
     int64_t value = Array::get(ndx);
     REALM_ASSERT(value != 0);
@@ -159,7 +159,7 @@ size_t ArrayBacklink::get_backlink_count(size_t ndx) const
     return Array::get_size_from_header(mem.get_addr());
 }
 
-Key ArrayBacklink::get_backlink(size_t ndx, size_t index) const
+ObjKey ArrayBacklink::get_backlink(size_t ndx, size_t index) const
 {
     int64_t value = Array::get(ndx);
     REALM_ASSERT(value != 0);
@@ -168,7 +168,7 @@ Key ArrayBacklink::get_backlink(size_t ndx, size_t index) const
     // a tagged value
     if ((value & 1) != 0) {
         REALM_ASSERT(index == 0);
-        return Key(value >> 1);
+        return ObjKey(value >> 1);
     }
 
     ref_type ref = to_ref(value);
@@ -176,5 +176,5 @@ Key ArrayBacklink::get_backlink(size_t ndx, size_t index) const
     backlink_list.init_from_ref(ref);
 
     REALM_ASSERT(index < backlink_list.size());
-    return Key(backlink_list.get(index));
+    return ObjKey(backlink_list.get(index));
 }

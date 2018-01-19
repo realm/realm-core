@@ -98,7 +98,7 @@ CommonDescriptor::Sorter::Sorter(std::vector<std::vector<ColumnId>> const& colum
         is_null.resize(num_objs);
 
         for (size_t row_ndx = 0; row_ndx < num_objs; row_ndx++) {
-            Key translated_key = Key(key_values.get(row_ndx));
+            ObjKey translated_key = ObjKey(key_values.get(row_ndx));
             for (size_t j = 0; j + 1 < columns[i].size(); ++j) {
                 ConstObj obj = columns[i][j].table->get_object(translated_key);
                 // type was checked when creating the CommonDescriptor
@@ -106,7 +106,7 @@ CommonDescriptor::Sorter::Sorter(std::vector<std::vector<ColumnId>> const& colum
                     is_null[row_ndx] = true;
                     break;
                 }
-                translated_key = obj.get<Key>(columns[i][j].col_key);
+                translated_key = obj.get<ObjKey>(columns[i][j].col_key);
             }
             translated_keys[row_ndx] = translated_key;
         }
@@ -149,8 +149,8 @@ SortDescriptor::Sorter SortDescriptor::sorter(KeyColumn const& row_indexes) cons
 bool SortDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ordering) const
 {
     for (size_t t = 0; t < m_columns.size(); t++) {
-        Key key_i = i.key_for_object;
-        Key key_j = j.key_for_object;
+        ObjKey key_i = i.key_for_object;
+        ObjKey key_j = j.key_for_object;
 
         if (!m_columns[t].translated_keys.empty()) {
             bool null_i = m_columns[t].is_null[i.index_in_view];

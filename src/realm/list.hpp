@@ -78,7 +78,7 @@ public:
      */
     virtual size_t size() const = 0;
     virtual bool is_null() const = 0;
-    Key get_key() const
+    ObjKey get_key() const
     {
         return m_const_obj->get_key();
     }
@@ -511,15 +511,15 @@ protected:
 };
 
 template <>
-void List<Key>::do_set(size_t ndx, Key target_key);
+void List<ObjKey>::do_set(size_t ndx, ObjKey target_key);
 
 template <>
-Key List<Key>::remove(size_t ndx);
+ObjKey List<ObjKey>::remove(size_t ndx);
 
 template <>
-void List<Key>::clear();
+void List<ObjKey>::clear();
 
-class ConstLinkListIf : public ConstListIf<Key> {
+class ConstLinkListIf : public ConstListIf<ObjKey> {
 public:
     // Getting links
     ConstObj operator[](size_t link_ndx) const
@@ -530,7 +530,7 @@ public:
 
 protected:
     ConstLinkListIf(ColKey col_key, Allocator& alloc)
-        : ConstListIf<Key>(col_key, alloc)
+        : ConstListIf<ObjKey>(col_key, alloc)
     {
     }
 };
@@ -558,12 +558,12 @@ private:
     ConstObj m_obj;
 };
 
-class LinkList : public List<Key>, public ObjList {
+class LinkList : public List<ObjKey>, public ObjList {
 public:
     using HandoverPatch = LinkListHandoverPatch;
 
     LinkList(const Obj& owner, ColKey col_key)
-        : List<Key>(owner, col_key)
+        : List<ObjKey>(owner, col_key)
         , ObjList(*this->m_leaf, &get_target_table())
     {
     }
@@ -581,7 +581,7 @@ public:
     }
     size_t size() const override
     {
-        return List<Key>::size();
+        return List<ObjKey>::size();
     }
     // Getting links
     Obj operator[](size_t link_ndx)
@@ -634,7 +634,7 @@ ListPtr<U> Obj::get_list_ptr(ColKey col_key)
 }
 
 template <>
-inline ListPtr<Key> Obj::get_list_ptr(ColKey col_key)
+inline ListPtr<ObjKey> Obj::get_list_ptr(ColKey col_key)
 {
     return get_linklist_ptr(col_key);
 }

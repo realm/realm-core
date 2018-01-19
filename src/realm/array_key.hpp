@@ -27,7 +27,7 @@ namespace realm {
 
 class ArrayKey : public ArrayPayload, private Array {
 public:
-    using value_type = Key;
+    using value_type = ObjKey;
 
     using Array::set_parent;
     using Array::is_attached;
@@ -82,7 +82,7 @@ public:
         return *this;
     }
 
-    static Key default_value(bool)
+    static ObjKey default_value(bool)
     {
         return {};
     }
@@ -97,11 +97,11 @@ public:
         Array::create(type_Normal);
     }
 
-    void add(Key value)
+    void add(ObjKey value)
     {
         Array::add(value.value + 1);
     }
-    void set(size_t ndx, Key value)
+    void set(size_t ndx, ObjKey value)
     {
         Array::set(ndx, value.value + 1);
     }
@@ -110,18 +110,18 @@ public:
     {
         Array::set(ndx, 0);
     }
-    void insert(size_t ndx, Key value)
+    void insert(size_t ndx, ObjKey value)
     {
         Array::insert(ndx, value.value + 1);
     }
-    Key get(size_t ndx) const
+    ObjKey get(size_t ndx) const
     {
-        return Key{Array::get(ndx) - 1};
+        return ObjKey{Array::get(ndx) - 1};
     }
-    std::vector<Key> get_all() const
+    std::vector<ObjKey> get_all() const
     {
         size_t sz = size();
-        std::vector<Key> keys;
+        std::vector<ObjKey> keys;
         keys.reserve(sz);
         for (size_t i = 0; i < sz; i++) {
             keys.push_back(get(i));
@@ -137,12 +137,12 @@ public:
         Array::truncate(ndx);
     }
 
-    size_t find_first(Key value, size_t begin, size_t end) const noexcept
+    size_t find_first(ObjKey value, size_t begin, size_t end) const noexcept
     {
         return Array::find_first(value.value + 1, begin, end);
     }
 
-    void nullify(Key key)
+    void nullify(ObjKey key)
     {
         size_t begin = find_first(key, 0, Array::size());
         // There must be one

@@ -394,10 +394,9 @@ void add_binary_constraint_to_query(realm::Query &query,
     }
 }
 
-void add_link_constraint_to_query(realm::Query &query,
-                                  Predicate::Operator op,
-                                  const PropertyExpression &prop_expr,
-                                  Key target_key) {
+void add_link_constraint_to_query(realm::Query& query, Predicate::Operator op, const PropertyExpression& prop_expr,
+                                  ObjKey target_key)
+{
     precondition(prop_expr.col_keys.empty(), "KeyPath queries not supported for object comparisons.");
     switch (op) {
         case Predicate::Operator::NotEqual:

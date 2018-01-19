@@ -148,7 +148,7 @@ template ConstList<double>::ConstList(const ConstObj& obj, ColKey col_key);
 template ConstList<StringData>::ConstList(const ConstObj& obj, ColKey col_key);
 template ConstList<BinaryData>::ConstList(const ConstObj& obj, ColKey col_key);
 template ConstList<Timestamp>::ConstList(const ConstObj& obj, ColKey col_key);
-template ConstList<Key>::ConstList(const ConstObj& obj, ColKey col_key);
+template ConstList<ObjKey>::ConstList(const ConstObj& obj, ColKey col_key);
 
 template List<int64_t>::List(const Obj& obj, ColKey col_key);
 template List<bool>::List(const Obj& obj, ColKey col_key);
@@ -157,28 +157,28 @@ template List<double>::List(const Obj& obj, ColKey col_key);
 template List<StringData>::List(const Obj& obj, ColKey col_key);
 template List<BinaryData>::List(const Obj& obj, ColKey col_key);
 template List<Timestamp>::List(const Obj& obj, ColKey col_key);
-template List<Key>::List(const Obj& obj, ColKey col_key);
+template List<ObjKey>::List(const Obj& obj, ColKey col_key);
 }
 
 ConstObj ConstLinkListIf::get(size_t link_ndx) const
 {
-    return m_const_obj->get_target_table(m_col_key)->get_object(ConstListIf<Key>::get(link_ndx));
+    return m_const_obj->get_target_table(m_col_key)->get_object(ConstListIf<ObjKey>::get(link_ndx));
 }
 
 /********************************* LinkList **********************************/
 
 Obj LinkList::get(size_t link_ndx)
 {
-    return get_target_table().get_object(List<Key>::get(link_ndx));
+    return get_target_table().get_object(List<ObjKey>::get(link_ndx));
 }
 
 /********************************* List<Key> *********************************/
 
 template <>
-void List<Key>::do_set(size_t ndx, Key target_key)
+void List<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 {
     CascadeState state;
-    Key old_key = get(ndx);
+    ObjKey old_key = get(ndx);
     bool recurse = m_obj.update_backlinks(m_col_key, old_key, target_key, state);
 
     m_leaf->set(ndx, target_key);
@@ -190,14 +190,14 @@ void List<Key>::do_set(size_t ndx, Key target_key)
 }
 
 template <>
-Key List<Key>::remove(size_t ndx)
+ObjKey List<ObjKey>::remove(size_t ndx)
 {
     ensure_writeable();
     do_set(ndx, null_key);
     if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
         ConstListBase::erase_repl(repl, ndx);
     }
-    Key old = get(ndx);
+    ObjKey old = get(ndx);
     m_leaf->erase(ndx);
     m_obj.bump_both_versions();
     ConstListBase::adj_remove(ndx);
@@ -206,7 +206,7 @@ Key List<Key>::remove(size_t ndx)
 }
 
 template <>
-void List<Key>::clear()
+void List<ObjKey>::clear()
 {
     update_if_needed();
     Table* origin_table = const_cast<Table*>(m_obj.get_table());
@@ -235,7 +235,7 @@ void List<Key>::clear()
     typedef _impl::TableFriend tf;
     size_t num_links = size();
     for (size_t ndx = 0; ndx < num_links; ++ndx) {
-        Key target_key = m_leaf->get(ndx);
+        ObjKey target_key = m_leaf->get(ndx);
         Obj target_obj = target_table->get_object(target_key);
         target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
         size_t num_remaining = target_obj.get_backlink_count(*origin_table, m_col_key);
@@ -336,7 +336,7 @@ LinkListPtr LinkList::create_from_and_consume_patch(std::unique_ptr<LinkListHand
     if (patch) {
         if (patch->m_table) {
             TableRef tr = Table::create_from_and_consume_patch(patch->m_table, group);
-            auto result = tr->get_object(Key(patch->m_key_value)).get_linklist_ptr(patch->m_col_key);
+            auto result = tr->get_object(ObjKey(patch->m_key_value)).get_linklist_ptr(patch->m_col_key);
             patch.reset();
             return result;
         }
@@ -396,7 +396,7 @@ void List<Timestamp>::set_repl(Replication* repl, size_t ndx, Timestamp value)
 }
 
 template <>
-void List<Key>::set_repl(Replication* repl, size_t ndx, Key key)
+void List<ObjKey>::set_repl(Replication* repl, size_t ndx, ObjKey key)
 {
     repl->list_set_link(*this, ndx, key);
 }
@@ -406,9 +406,9 @@ void List<Key>::set_repl(Replication* repl, size_t ndx, Key key)
 // For some strange reason these functions needs to be explicitly instantiated
 // on Visual Studio 2017. Otherwise the code is not generated.
 namespace realm {
-template void List<Key>::add(Key target_key);
-template void List<Key>::insert(size_t ndx, Key target_key);
-template Key List<Key>::remove(size_t ndx);
-template void List<Key>::clear();
+template void List<ObjKey>::add(ObjKey target_key);
+template void List<ObjKey>::insert(size_t ndx, ObjKey target_key);
+template ObjKey List<ObjKey>::remove(size_t ndx);
+template void List<ObjKey>::clear();
 }
 #endif

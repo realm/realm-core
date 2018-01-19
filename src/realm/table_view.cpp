@@ -105,7 +105,7 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
 
     if (patch.linked_obj) {
         TableRef table = Table::create_from_and_consume_patch(patch.m_table, group);
-        m_linked_obj = table->get_object(Key(patch.linked_obj->key_value));
+        m_linked_obj = table->get_object(ObjKey(patch.linked_obj->key_value));
         m_source_column_key = patch.linked_col;
     }
 
@@ -122,7 +122,7 @@ size_t TableViewBase::find_first(ColKey column_key, T value) const
 {
     check_cookie();
     for (size_t i = 0, num_rows = m_key_values.size(); i < num_rows; ++i) {
-        Key key(m_key_values.get(i));
+        ObjKey key(m_key_values.get(i));
         try {
             if (m_table->get_object(key).get<T>(column_key) == value)
                 return i;
@@ -150,7 +150,7 @@ template size_t TableViewBase::find_first(ColKey, BinaryData) const;
 // Aggregates ----------------------------------------------------
 
 template <Action action, typename T, typename R>
-R TableViewBase::aggregate(ColKey column_key, size_t* result_count, Key* return_key) const
+R TableViewBase::aggregate(ColKey column_key, size_t* result_count, ObjKey* return_key) const
 {
     check_cookie();
     size_t non_nulls = 0;
@@ -196,7 +196,7 @@ R TableViewBase::aggregate(ColKey column_key, size_t* result_count, Key* return_
 */
     R res = R{};
     {
-        Key key(m_key_values.get(0));
+        ObjKey key(m_key_values.get(0));
         Obj obj = m_table->get_object(key);
         auto first = obj.get<T>(column_key);
 
@@ -211,7 +211,7 @@ R TableViewBase::aggregate(ColKey column_key, size_t* result_count, Key* return_
 
     for (size_t tv_index = 1; tv_index < m_key_values.size(); ++tv_index) {
 
-        Key key(m_key_values.get(tv_index));
+        ObjKey key(m_key_values.get(tv_index));
 
         // skip detached references:
         if (key == realm::null_key)
@@ -273,7 +273,7 @@ size_t TableViewBase::aggregate_count(ColKey column_key, T count_target) const
     size_t cnt = 0;
     for (size_t tv_index = 0; tv_index < m_key_values.size(); ++tv_index) {
 
-        Key key(m_key_values.get(tv_index));
+        ObjKey key(m_key_values.get(tv_index));
 
         // skip detached references:
         if (key == realm::null_key)
@@ -293,13 +293,13 @@ size_t TableViewBase::aggregate_count(ColKey column_key, T count_target) const
 // Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume
 // numeric types that support arithmetic (+, /, etc).
 template <class C>
-Timestamp TableViewBase::minmax_timestamp(ColKey column_key, Key* return_key) const
+Timestamp TableViewBase::minmax_timestamp(ColKey column_key, ObjKey* return_key) const
 {
     C compare;
     Timestamp best_value;
-    Key best_key;
+    ObjKey best_key;
     for (size_t t = 0; t < size(); t++) {
-        Key key = Key(m_key_values.get(t));
+        ObjKey key = ObjKey(m_key_values.get(t));
 
         // skip detached references:
         if (key == null_key)
@@ -340,44 +340,44 @@ double TableViewBase::sum_double(ColKey column_key) const
 }
 
 // Maximum
-int64_t TableViewBase::maximum_int(ColKey column_key, Key* return_key) const
+int64_t TableViewBase::maximum_int(ColKey column_key, ObjKey* return_key) const
 {
     if (m_table->is_nullable(column_key))
         return aggregate<act_Max, util::Optional<int64_t>, int64_t>(column_key, nullptr, return_key);
     else
         return aggregate<act_Max, int64_t, int64_t>(column_key, nullptr, return_key);
 }
-float TableViewBase::maximum_float(ColKey column_key, Key* return_key) const
+float TableViewBase::maximum_float(ColKey column_key, ObjKey* return_key) const
 {
     return aggregate<act_Max, float, float>(column_key, nullptr, return_key);
 }
-double TableViewBase::maximum_double(ColKey column_key, Key* return_key) const
+double TableViewBase::maximum_double(ColKey column_key, ObjKey* return_key) const
 {
     return aggregate<act_Max, double, double>(column_key, nullptr, return_key);
 }
-Timestamp TableViewBase::maximum_timestamp(ColKey column_key, Key* return_key) const
+Timestamp TableViewBase::maximum_timestamp(ColKey column_key, ObjKey* return_key) const
 {
     return minmax_timestamp<realm::Greater>(column_key, return_key);
 }
 
 
 // Minimum
-int64_t TableViewBase::minimum_int(ColKey column_key, Key* return_key) const
+int64_t TableViewBase::minimum_int(ColKey column_key, ObjKey* return_key) const
 {
     if (m_table->is_nullable(column_key))
         return aggregate<act_Min, util::Optional<int64_t>, int64_t>(column_key, nullptr, return_key);
     else
         return aggregate<act_Min, int64_t, int64_t>(column_key, nullptr, return_key);
 }
-float TableViewBase::minimum_float(ColKey column_key, Key* return_key) const
+float TableViewBase::minimum_float(ColKey column_key, ObjKey* return_key) const
 {
     return aggregate<act_Min, float, float>(column_key, nullptr, return_key);
 }
-double TableViewBase::minimum_double(ColKey column_key, Key* return_key) const
+double TableViewBase::minimum_double(ColKey column_key, ObjKey* return_key) const
 {
     return aggregate<act_Min, double, double>(column_key, nullptr, return_key);
 }
-Timestamp TableViewBase::minimum_timestamp(ColKey column_key, Key* return_key) const
+Timestamp TableViewBase::minimum_timestamp(ColKey column_key, ObjKey* return_key) const
 {
     return minmax_timestamp<realm::Less>(column_key, return_key);
 }
@@ -421,7 +421,7 @@ size_t TableViewBase::count_timestamp(ColKey column_key, Timestamp target) const
     size_t count = 0;
     for (size_t t = 0; t < size(); t++) {
         try {
-            Key key = m_key_values.get(t);
+            ObjKey key = m_key_values.get(t);
             Obj obj = m_table->get_object(key);
             auto ts = obj.get<Timestamp>(column_key);
             realm::Equal e;
@@ -445,7 +445,7 @@ void TableViewBase::to_json(std::ostream& out) const
 
     const size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
-        Key key = get_key(r);
+        ObjKey key = get_key(r);
         if (key != realm::null_key) {
             if (r > 0)
                 out << ",";
@@ -472,7 +472,7 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
     size_t i = 0;
     size_t count = out_count;
     while (count) {
-        Key key = get_key(count);
+        ObjKey key = get_key(count);
         if (key != realm::null_key) {
             m_table->to_string_row(key, out, widths); // FIXME
             --count;
@@ -497,7 +497,7 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
     m_table->to_string_header(out, widths);
 
     // Print row contents
-    Key key = get_key(row_ndx);
+    ObjKey key = get_key(row_ndx);
     REALM_ASSERT(key != realm::null_key);
     m_table->to_string_row(key, out, widths); // FIXME
 }
@@ -572,7 +572,7 @@ void TableView::remove(size_t row_ndx)
 
     bool sync_to_keep = m_last_seen_versions == outside_version();
 
-    Key key = m_key_values.get(row_ndx);
+    ObjKey key = m_key_values.get(row_ndx);
 
     // Update refs
     m_key_values.erase(row_ndx);
@@ -654,7 +654,7 @@ void TableViewBase::do_sync()
     if (m_linklist_source) {
         m_key_values.clear();
         std::for_each(m_linklist_source->begin(), m_linklist_source->end(),
-                      [this](Key key) { m_key_values.add(key); });
+                      [this](ObjKey key) { m_key_values.add(key); });
     }
     else if (m_distinct_column_source) {
         m_key_values.clear();

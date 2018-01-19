@@ -40,7 +40,7 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
     // FIXME: consider specialized implementations in derived classes
     // (handling detached refs is not required in linkviews)
     for (size_t t = 0; t < sz; t++) {
-        Key key = get_key(t);
+        ObjKey key = get_key(t);
         if (m_table->is_valid(key)) {
             v.push_back({key, t});
         }
@@ -128,7 +128,7 @@ ConstObj ObjList::get(size_t row_ndx) const noexcept
 {
     REALM_ASSERT(m_table);
     REALM_ASSERT(row_ndx < m_key_values.size());
-    Key key(m_key_values.get(row_ndx));
+    ObjKey key(m_key_values.get(row_ndx));
     REALM_ASSERT(key != realm::null_key);
     return m_table->get_object(key);
 }

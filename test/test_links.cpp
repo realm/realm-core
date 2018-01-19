@@ -68,8 +68,8 @@ TEST(Links_Columns)
     auto col_1 = table1->add_column(type_String, "col1");
     table2->add_column(type_String, "col2");
 
-    std::vector<Key> table_1_keys;
-    std::vector<Key> table_2_keys;
+    std::vector<ObjKey> table_1_keys;
+    std::vector<ObjKey> table_2_keys;
     // add some rows
     table1->create_objects(2, table_1_keys);
     table2->create_objects(2, table_2_keys);
@@ -100,8 +100,8 @@ TEST(Links_Columns)
 TEST(Links_Basic)
 {
     GROUP_TEST_PATH(path);
-    Key key_origin;
-    Key key_target;
+    ObjKey key_origin;
+    ObjKey key_target;
     ColKey col_link;
 
     // Test basic link operations
@@ -117,9 +117,9 @@ TEST(Links_Basic)
         Obj obj0 = table1->create_object().set_all("test1", 1, true, int64_t(Mon));
         Obj obj1 = table1->create_object().set_all("test2", 2, false, int64_t(Tue));
         Obj obj2 = table1->create_object().set_all("test3", 3, true, int64_t(Wed));
-        Key key0 = obj0.get_key();
-        Key key1 = obj1.get_key();
-        Key key2 = obj2.get_key();
+        ObjKey key0 = obj0.get_key();
+        ObjKey key1 = obj1.get_key();
+        ObjKey key2 = obj2.get_key();
 
         // create table with links to table1
         TableRef table2 = group.add_table("table2");
@@ -129,12 +129,12 @@ TEST(Links_Basic)
         // add a few links
         Obj obj3 = table2->create_object().set(col_link, key1);
         Obj obj4 = table2->create_object().set(col_link, key0);
-        Key key3 = obj3.get_key();
+        ObjKey key3 = obj3.get_key();
         key_origin = obj4.get_key();
 
         // Verify that links were set correctly
-        Key link3 = obj3.get<Key>(col_link);
-        Key link4 = obj4.get<Key>(col_link);
+        ObjKey link3 = obj3.get<ObjKey>(col_link);
+        ObjKey link4 = obj4.get<ObjKey>(col_link);
         CHECK_EQUAL(key1, link3);
         CHECK_EQUAL(key0, link4);
 
@@ -148,7 +148,7 @@ TEST(Links_Basic)
         // Change a link to point to a new location
         obj4.set(col_link, key2);
 
-        link4 = obj4.get<Key>(col_link);
+        link4 = obj4.get<ObjKey>(col_link);
         CHECK_EQUAL(key2, link4);
         CHECK_EQUAL(0, obj0.get_backlink_count(*table2, col_link));
         CHECK_EQUAL(1, obj2.get_backlink_count(*table2, col_link));
@@ -159,7 +159,7 @@ TEST(Links_Basic)
 
         // Verify that delete went correctly
         CHECK_EQUAL(1, table2->size());
-        CHECK_EQUAL(key2, obj4.get<Key>(col_link));
+        CHECK_EQUAL(key2, obj4.get<ObjKey>(col_link));
 
         CHECK_EQUAL(0, obj0.get_backlink_count(*table2, col_link));
         CHECK_EQUAL(0, obj1.get_backlink_count(*table2, col_link));
@@ -194,7 +194,7 @@ TEST(Links_Basic)
         CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
         // Verify that links are still correct
-        CHECK_EQUAL(key_target, table2->get_object(key_origin).get<Key>(col_link));
+        CHECK_EQUAL(key_target, table2->get_object(key_origin).get<ObjKey>(col_link));
     }
 }
 
@@ -207,7 +207,7 @@ TEST(Group_LinksToSameTable)
     auto link_col = table->add_column_link(type_Link, "links", *table);
 
     // 3 rows linked together in a list
-    std::vector<Key> keys;
+    std::vector<ObjKey> keys;
     table->create_objects(3, keys);
     table->get_object(keys[0]).set(link_col, keys[1]);
     table->get_object(keys[1]).set(link_col, keys[2]);
@@ -227,20 +227,20 @@ TEST(Links_SetLinkLogicErrors)
     auto col0 = origin->add_column_link(type_Link, "a", *target);
     origin->add_column(type_Int, "b");
     Obj obj = origin->create_object();
-    target->create_object(Key(10));
+    target->create_object(ObjKey(10));
 
     // FIXME: Not really possible with column keys?
     // CHECK_LOGIC_ERROR(obj.set(2, Key(10)), LogicError::column_index_out_of_range);
-    CHECK_LOGIC_ERROR(obj.set(col0, Key(5)), LogicError::target_row_index_out_of_range);
+    CHECK_LOGIC_ERROR(obj.set(col0, ObjKey(5)), LogicError::target_row_index_out_of_range);
 
     // FIXME: Must also check that Logic::type_mismatch is thrown on column type mismatch, but Table::set_link() does
     // not properly check it yet.
 
     origin->remove_object(obj.get_key());
-    CHECK_THROW(obj.set(col0, Key(10)), InvalidKey);
+    CHECK_THROW(obj.set(col0, ObjKey(10)), InvalidKey);
 #ifdef LEGACY_TESTS
     group.remove_table("origin");
-    CHECK_LOGIC_ERROR(obj.set(col0, Key(10)), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(obj.set(col0, ObjKey(10)), LogicError::detached_accessor);
 #endif
 }
 
@@ -263,16 +263,16 @@ TEST(Links_Deletes)
     Obj obj0 = table1->create_object().set_all("test1", 1, true, int64_t(Mon));
     Obj obj1 = table1->create_object().set_all("test2", 2, false, int64_t(Tue));
     Obj obj2 = table1->create_object().set_all("test3", 3, true, int64_t(Wed));
-    Key key0 = obj0.get_key();
-    Key key1 = obj1.get_key();
-    Key key2 = obj2.get_key();
+    ObjKey key0 = obj0.get_key();
+    ObjKey key1 = obj1.get_key();
+    ObjKey key2 = obj2.get_key();
 
     {
         // add a few links
         Obj obj3 = table2->create_object().set(col_link, key1);
         Obj obj4 = table2->create_object().set(col_link, key0);
-        Key key3 = obj3.get_key();
-        Key key4 = obj4.get_key();
+        ObjKey key3 = obj3.get_key();
+        ObjKey key4 = obj4.get_key();
 
         table2->remove_object(key3);
         table2->remove_object(key4);
@@ -523,8 +523,8 @@ TEST(Links_LinkList_TableOps)
     target->create_object().set_all("test2", 2, false, int64_t(Tue));
     target->create_object().set_all("test3", 3, true, int64_t(Wed));
 
-    ConstObj obj1 = origin->create_object(Key(0));
-    CHECK(obj1.get_list<Key>(col_link).is_null());
+    ConstObj obj1 = origin->create_object(ObjKey(0));
+    CHECK(obj1.get_list<ObjKey>(col_link).is_null());
     CHECK_EQUAL(0, obj1.get_link_count(col_link));
 
     // add some more rows and test that they can be deleted
@@ -563,12 +563,12 @@ TEST(Links_LinkList_Basics)
     Obj obj0 = target->create_object().set_all("test1", 1, true, int64_t(Mon));
     Obj obj1 = target->create_object().set_all("test2", 2, false, int64_t(Tue));
     Obj obj2 = target->create_object().set_all("test3", 3, true, int64_t(Wed));
-    Key key0 = obj0.get_key();
-    Key key1 = obj1.get_key();
-    Key key2 = obj2.get_key();
+    ObjKey key0 = obj0.get_key();
+    ObjKey key1 = obj1.get_key();
+    ObjKey key2 = obj2.get_key();
 
-    Obj obj3 = origin->create_object(Key(0));
-    Key key3 = obj3.get_key();
+    Obj obj3 = origin->create_object(ObjKey(0));
+    ObjKey key3 = obj3.get_key();
     auto links = obj3.get_linklist(col_link);
 
     // add several links to a single linklist
@@ -1415,8 +1415,8 @@ TEST(Links_CascadeRemove_ColumnLink)
         Group group;
         TableRef origin = group.add_table("origin");
         TableRef target = group.add_table("target");
-        std::vector<Key> origin_keys;
-        std::vector<Key> target_keys;
+        std::vector<ObjKey> origin_keys;
+        std::vector<ObjKey> target_keys;
         ColKey col_link;
         Fixture()
         {
@@ -1445,8 +1445,8 @@ TEST(Links_CascadeRemove_ColumnLink)
         // Cascade: target->remove_object(key[0])
         CHECK(!f.target->is_valid(f.target_keys[0]));
         CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
     }
     {
         Fixture f;
@@ -1454,8 +1454,8 @@ TEST(Links_CascadeRemove_ColumnLink)
         // Cascade: target->remove_object(key[1])
         CHECK(!f.target->is_valid(f.target_keys[1]));
         CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
     }
     {
         Fixture f;
@@ -1463,8 +1463,8 @@ TEST(Links_CascadeRemove_ColumnLink)
         // Cascade: target->remove_object(key[2])
         CHECK(!f.target->is_valid(f.target_keys[2]));
         CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
     }
 
     // Break link by reassign
@@ -1474,9 +1474,9 @@ TEST(Links_CascadeRemove_ColumnLink)
         // Cascade: target->remove_object(key[0])
         CHECK(!f.target->is_valid(f.target_keys[0]));
         CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(0).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(0).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
     }
     {
         Fixture f;
@@ -1484,9 +1484,9 @@ TEST(Links_CascadeRemove_ColumnLink)
         // Cascade: target->remove_object(key[1])
         CHECK(!f.target->is_valid(f.target_keys[1]));
         CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(1).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(1).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
     }
     {
         Fixture f;
@@ -1494,9 +1494,9 @@ TEST(Links_CascadeRemove_ColumnLink)
         // Cascade: target->remove_object(key[2])
         CHECK(!f.target->is_valid(f.target_keys[2]));
         CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(2).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(2).get<ObjKey>(f.col_link));
     }
 
     // Avoid breaking link by reassigning self
@@ -1506,9 +1506,9 @@ TEST(Links_CascadeRemove_ColumnLink)
         // Cascade: target->remove_object(key[2])
         CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
               f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
     }
     {
         Fixture f;
@@ -1516,9 +1516,9 @@ TEST(Links_CascadeRemove_ColumnLink)
         // Cascade: target->remove_object(key[2])
         CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
               f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
     }
     {
         Fixture f;
@@ -1526,9 +1526,9 @@ TEST(Links_CascadeRemove_ColumnLink)
         // Cascade: target->remove_object(key[2])
         CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]) &&
               f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
     }
 
     // Break link by explicit object removal
@@ -1537,24 +1537,24 @@ TEST(Links_CascadeRemove_ColumnLink)
         f.get_origin_obj(0).remove(); // Cascade: target->remove_object(key[0])
         CHECK(!f.target->is_valid(f.target_keys[0]));
         CHECK(f.target->is_valid(f.target_keys[1]) && f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
     }
     {
         Fixture f;
         f.get_origin_obj(1).remove(); // Cascade: target->remove_object(key[1])
         CHECK(!f.target->is_valid(f.target_keys[1]));
         CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[2]));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[2], f.get_origin_obj(2).get<ObjKey>(f.col_link));
     }
     {
         Fixture f;
         f.get_origin_obj(2).remove(); // Cascade: target->remove_object(key[2])
         CHECK(!f.target->is_valid(f.target_keys[2]));
         CHECK(f.target->is_valid(f.target_keys[0]) && f.target->is_valid(f.target_keys[1]));
-        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<Key>(f.col_link));
-        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<Key>(f.col_link));
+        CHECK_EQUAL(f.target_keys[0], f.get_origin_obj(0).get<ObjKey>(f.col_link));
+        CHECK_EQUAL(f.target_keys[1], f.get_origin_obj(1).get<ObjKey>(f.col_link));
     }
 
     // Break link by clearing table
@@ -1574,8 +1574,8 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         Group group;
         TableRef origin = group.add_table("origin");
         TableRef target = group.add_table("target");
-        std::vector<Key> origin_keys;
-        std::vector<Key> target_keys;
+        std::vector<ObjKey> origin_keys;
+        std::vector<ObjKey> target_keys;
         std::vector<LinkListPtr> linklists;
         ColKey col_link;
         Fixture()

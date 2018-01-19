@@ -419,11 +419,11 @@ public:
             TableKey table_key;
 
             /// Row index which will be removed.
-            Key key;
+            ObjKey key;
 
             row() = default;
 
-            row(TableKey tk, Key k)
+            row(TableKey tk, ObjKey k)
                 : table_key(tk)
                 , key(k)
             {
@@ -446,11 +446,11 @@ public:
         struct link {
             const Table* origin_table; ///< A group-level table.
             ColKey origin_col_ndx;     ///< Link column being nullified.
-            Key origin_key;            ///< Row in column being nullified.
+            ObjKey origin_key;         ///< Row in column being nullified.
             /// The target row index which is being removed. Mostly relevant for
             /// LinkList (to know which entries are being removed), but also
             /// valid for Link.
-            Key old_target_key;
+            ObjKey old_target_key;
         };
 
         /// A sorted list of rows which will be removed by the current operation.
@@ -1404,7 +1404,7 @@ struct CascadeState : Group::CascadeNotification {
     ColKey stop_on_link_list_column_key = ColKey();
 
     /// Is ignored if stop_on_link_list_column is null.
-    Key stop_on_link_list_key;
+    ObjKey stop_on_link_list_key;
 
     /// If false, the links field is not needed, so any work done just for that
     /// can be skipped.

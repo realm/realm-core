@@ -69,7 +69,7 @@ void TransactLogConvenientEncoder::do_select_table(const Table* table)
     m_selected_table = table;
 }
 
-bool TransactLogEncoder::select_list(ColKey col_key, Key key)
+bool TransactLogEncoder::select_list(ColKey col_key, ObjKey key)
 {
     append_simple_instr(instr_SelectList, col_key, key.value); // Throws
     return true;
@@ -80,7 +80,7 @@ void TransactLogConvenientEncoder::do_select_list(const ConstListBase& list)
 {
     select_table(list.get_table());
     ColKey col_key = list.get_col_key();
-    Key key = list.ConstListBase::get_key();
+    ObjKey key = list.ConstListBase::get_key();
 
     m_encoder.select_list(col_key, key); // Throws
     m_selected_list = LinkListId(list.get_table()->get_key(), key, col_key);

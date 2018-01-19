@@ -54,7 +54,7 @@ public:
     void create() override;
     void init(MemRef mem) override;
     bool update_from_parent(size_t old_baseline) noexcept override;
-    MemRef ensure_writeable(Key k) override;
+    MemRef ensure_writeable(ObjKey k) override;
 
     bool is_leaf() const override
     {
@@ -68,9 +68,9 @@ public:
 
     void insert_column(size_t ndx) override;
     void remove_column(size_t ndx) override;
-    ref_type insert(Key k, State& state) override;
-    void get(Key k, State& state) const override;
-    unsigned erase(Key k, CascadeState& state) override;
+    ref_type insert(ObjKey k, State& state) override;
+    void get(ObjKey k, State& state) const override;
+    unsigned erase(ObjKey k, CascadeState& state) override;
     void add(ref_type ref, int64_t key_value = 0);
 
     ref_type get_child(size_t ndx) const
@@ -92,7 +92,7 @@ public:
         return m_keys.get(0);
     }
 
-    bool get_leaf(Key key, ClusterNode::IteratorState& state) const noexcept;
+    bool get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept;
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
@@ -102,9 +102,9 @@ private:
     struct ChildInfo {
         size_t ndx;
         int64_t offset;
-        Key key;
+        ObjKey key;
     };
-    ChildInfo find_child(Key key) const
+    ChildInfo find_child(ObjKey key) const
     {
         ChildInfo ret;
         auto upper = m_keys.upper_bound_int(key.value);
@@ -113,14 +113,14 @@ private:
         REALM_ASSERT_DEBUG(upper > 0);
         ret.ndx = upper - 1;
         ret.offset = m_keys.get(ret.ndx);
-        ret.key = Key(key.value - ret.offset);
+        ret.key = ObjKey(key.value - ret.offset);
         return ret;
     }
 
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
 
     template <class T, class F>
-    T recurse(Key key, F func);
+    T recurse(ObjKey key, F func);
 };
 }
 
@@ -174,7 +174,7 @@ bool ClusterNodeInner::update_from_parent(size_t old_baseline) noexcept
 }
 
 template <class T, class F>
-T ClusterNodeInner::recurse(Key key, F func)
+T ClusterNodeInner::recurse(ObjKey key, F func)
 {
     ChildInfo child_info = find_child(key);
 
@@ -196,13 +196,13 @@ T ClusterNodeInner::recurse(Key key, F func)
     }
 }
 
-MemRef ClusterNodeInner::ensure_writeable(Key key)
+MemRef ClusterNodeInner::ensure_writeable(ObjKey key)
 {
     return recurse<MemRef>(
         key, [](ClusterNode* node, ChildInfo& child_info) { return node->ensure_writeable(child_info.key); });
 }
 
-ref_type ClusterNodeInner::insert(Key key, ClusterNode::State& state)
+ref_type ClusterNodeInner::insert(ObjKey key, ClusterNode::State& state)
 {
     return recurse<ref_type>(key, [this, &state](ClusterNode* node, ChildInfo& child_info) {
         ref_type new_sibling_ref = node->insert(child_info.key, state);
@@ -237,13 +237,13 @@ ref_type ClusterNodeInner::insert(Key key, ClusterNode::State& state)
     });
 }
 
-void ClusterNodeInner::get(Key key, ClusterNode::State& state) const
+void ClusterNodeInner::get(ObjKey key, ClusterNode::State& state) const
 {
     return const_cast<ClusterNodeInner*>(this)->recurse<void>(
         key, [&state](const ClusterNode* node, ChildInfo& child_info) { return node->get(child_info.key, state); });
 }
 
-unsigned ClusterNodeInner::erase(Key key, CascadeState& state)
+unsigned ClusterNodeInner::erase(ObjKey key, CascadeState& state)
 {
     return recurse<unsigned>(key, [this, &state](ClusterNode* erase_node, ChildInfo& child_info) {
         unsigned erase_node_size = erase_node->erase(child_info.key, state);
@@ -312,7 +312,7 @@ void ClusterNodeInner::add(ref_type ref, int64_t key_value)
 
 // Find leaf that contains the object identified by key. If this does not exist return the
 // leaf that contains the next object
-bool ClusterNodeInner::get_leaf(Key key, ClusterNode::IteratorState& state) const noexcept
+bool ClusterNodeInner::get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept
 {
     size_t child_ndx = m_keys.upper_bound_int(key.value);
     if (child_ndx > 0)
@@ -320,7 +320,7 @@ bool ClusterNodeInner::get_leaf(Key key, ClusterNode::IteratorState& state) cons
 
     while (child_ndx < m_children.size()) {
         int64_t key_offset = m_keys.get(child_ndx);
-        Key new_key = Key(key.value - key_offset);
+        ObjKey new_key = ObjKey(key.value - key_offset);
         state.m_key_offset += key_offset;
 
         ref_type child_ref = m_children.get_as_ref(child_ndx);
@@ -514,7 +514,7 @@ bool Cluster::update_from_parent(size_t old_baseline) noexcept
     return false;
 }
 
-MemRef Cluster::ensure_writeable(Key)
+MemRef Cluster::ensure_writeable(ObjKey)
 {
     copy_on_write();
     return get_mem();
@@ -537,7 +537,7 @@ inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, ColumnAttrMask at
     }
 }
 
-void Cluster::insert_row(size_t ndx, Key k)
+void Cluster::insert_row(size_t ndx, ObjKey k)
 {
     m_keys.insert(ndx, k.value);
     size_t nb_columns = size() - 1;
@@ -751,7 +751,7 @@ void Cluster::remove_column(size_t col_ndx)
     Array::erase(col_ndx);
 }
 
-ref_type Cluster::insert(Key k, ClusterNode::State& state)
+ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
 {
     int64_t current_key_value = -1;
     size_t ndx = m_keys.lower_bound_int(k.value);
@@ -776,7 +776,7 @@ ref_type Cluster::insert(Key k, ClusterNode::State& state)
         Cluster new_leaf(0, m_alloc, m_tree_top);
         new_leaf.create();
         if (ndx == sz) {
-            new_leaf.insert_row(0, Key(0)); // Throws
+            new_leaf.insert_row(0, ObjKey(0)); // Throws
             state.split_key = k.value;
             state.ref = new_leaf.get_ref();
             state.index = 0;
@@ -794,7 +794,7 @@ ref_type Cluster::insert(Key k, ClusterNode::State& state)
     return ret;
 }
 
-void Cluster::get(Key k, ClusterNode::State& state) const
+void Cluster::get(ObjKey k, ClusterNode::State& state) const
 {
     state.ref = get_ref();
     state.index = m_keys.lower_bound_int(k.value);
@@ -818,14 +818,14 @@ inline void Cluster::do_erase_key(size_t ndx, size_t col_ndx, CascadeState& stat
     values.set_parent(this, col_ndx + 1);
     values.init_from_parent();
 
-    Key key = values.get(ndx);
+    ObjKey key = values.get(ndx);
     if (key != null_key) {
         remove_backlinks(get_real_key(ndx), col_ndx, {key}, state);
     }
     values.erase(ndx);
 }
 
-unsigned Cluster::erase(Key key, CascadeState& state)
+unsigned Cluster::erase(ObjKey key, CascadeState& state)
 {
     size_t ndx = m_keys.lower_bound_int(key.value);
     if (ndx == m_keys.size() || m_keys.get(ndx) != key.value) {
@@ -867,7 +867,7 @@ unsigned Cluster::erase(Key key, CascadeState& state)
                     ArrayKey links(m_alloc);
                     links.init_from_ref(ref);
                     if (links.size() > 0) {
-                        remove_backlinks(Key(key.value + m_offset), col_ndx, links.get_all(), state);
+                        remove_backlinks(ObjKey(key.value + m_offset), col_ndx, links.get_all(), state);
                     }
                 }
                 Array::destroy_deep(ref, m_alloc);
@@ -1013,7 +1013,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
     }
 }
 
-void Cluster::remove_backlinks(Key origin_key, size_t origin_col_ndx, const std::vector<Key>& keys,
+void Cluster::remove_backlinks(ObjKey origin_key, size_t origin_col_ndx, const std::vector<ObjKey>& keys,
                                CascadeState& state) const
 {
     const Table* origin_table = m_tree_top.get_owner();
@@ -1180,7 +1180,7 @@ void ClusterTree::clear()
     m_size = 0;
 }
 
-Obj ClusterTree::insert(Key k)
+Obj ClusterTree::insert(ObjKey k)
 {
     ClusterNode::State state;
     ref_type new_sibling_ref = m_root->insert(k, state);
@@ -1228,7 +1228,7 @@ Obj ClusterTree::insert(Key k)
     return Obj(this, state.ref, k, state.index);
 }
 
-bool ClusterTree::is_valid(Key k) const
+bool ClusterTree::is_valid(ObjKey k) const
 {
     try {
         ClusterNode::State state;
@@ -1240,21 +1240,21 @@ bool ClusterTree::is_valid(Key k) const
     return true;
 }
 
-ConstObj ClusterTree::get(Key k) const
+ConstObj ClusterTree::get(ObjKey k) const
 {
     ClusterNode::State state;
     m_root->get(k, state);
     return ConstObj(this, state.ref, k, state.index);
 }
 
-Obj ClusterTree::get(Key k)
+Obj ClusterTree::get(ObjKey k)
 {
     ClusterNode::State state;
     m_root->get(k, state);
     return Obj(this, state.ref, k, state.index);
 }
 
-void ClusterTree::erase(Key k, CascadeState& state)
+void ClusterTree::erase(ObjKey k, CascadeState& state)
 {
     size_t num_cols = get_spec().get_public_column_count();
     for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
@@ -1288,7 +1288,7 @@ void ClusterTree::erase(Key k, CascadeState& state)
     }
 }
 
-bool ClusterTree::get_leaf(Key key, ClusterNode::IteratorState& state) const noexcept
+bool ClusterTree::get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept
 {
     state.clear();
 
@@ -1362,7 +1362,7 @@ void ClusterTree::remove_links()
                 cluster->init_leaf(col_ndx, &values);
                 size_t sz = values.size();
                 for (size_t i = 0; i < sz; i++) {
-                    if (Key key = values.get(i)) {
+                    if (ObjKey key = values.get(i)) {
                         cluster->remove_backlinks(cluster->get_real_key(i), col_ndx, {key}, state);
                     }
                 }
@@ -1410,7 +1410,7 @@ ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
 {
     if (ndx == 0) {
         // begin
-        m_key = load_leaf(Key(0));
+        m_key = load_leaf(ObjKey(0));
     }
     else {
         // end
@@ -1418,7 +1418,7 @@ ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
     }
 }
 
-ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, Key key)
+ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, ObjKey key)
     : m_tree(t)
     , m_leaf(0, t.get_alloc(), t)
     , m_state(m_leaf)
@@ -1427,7 +1427,7 @@ ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, Key key)
 {
 }
 
-Key ClusterTree::ConstIterator::load_leaf(Key key) const
+ObjKey ClusterTree::ConstIterator::load_leaf(ObjKey key) const
 {
     m_storage_version = m_tree.get_storage_version(m_instance_version);
     // 'key' may or may not exist. If it does not exist, state is updated
@@ -1445,7 +1445,7 @@ Key ClusterTree::ConstIterator::load_leaf(Key key) const
 ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
 {
     if (m_storage_version != m_tree.get_storage_version(m_instance_version)) {
-        Key k = load_leaf(m_key);
+        ObjKey k = load_leaf(m_key);
         if (k != m_key)
             throw std::out_of_range("Object was deleted");
     }
@@ -1459,7 +1459,7 @@ ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
 ClusterTree::ConstIterator& Table::ConstIterator::operator++()
 {
     if (m_storage_version != m_tree.get_storage_version(m_instance_version)) {
-        Key k = load_leaf(m_key);
+        ObjKey k = load_leaf(m_key);
         if (k != m_key) {
             // Objects was deleted. k points to the next object
             m_key = k;
@@ -1468,7 +1468,7 @@ ClusterTree::ConstIterator& Table::ConstIterator::operator++()
     }
     m_state.m_current_index++;
     if (m_state.m_current_index == m_leaf.node_size()) {
-        m_key = load_leaf(Key(m_key.value + 1));
+        m_key = load_leaf(ObjKey(m_key.value + 1));
     }
     else {
         m_key = m_leaf.get_real_key(m_state.m_current_index);

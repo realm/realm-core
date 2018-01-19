@@ -410,7 +410,7 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, ColKey 
                 return std::unique_ptr<ParentNode>{new SizeListNode<Timestamp, Cond>(value, column_key)};
             }
             case type_LinkList: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<Key, Cond>(value, column_key)};
+                return std::unique_ptr<ParentNode>{new SizeListNode<ObjKey, Cond>(value, column_key)};
             }
             default: {
                 throw LogicError{LogicError::type_mismatch};
@@ -630,7 +630,7 @@ Query& Query::between(ColKey column_key, int from, int to)
     return between(column_key, static_cast<int64_t>(from), static_cast<int64_t>(to));
 }
 
-Query& Query::links_to(ColKey origin_column_key, Key target_key)
+Query& Query::links_to(ColKey origin_column_key, ObjKey target_key)
 {
     add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column_key, target_key)));
     return *this;
@@ -887,7 +887,7 @@ bool Query::eval_object(ConstObj& obj) const
 }
 
 template <Action action, typename T, typename R>
-R Query::aggregate(ColKey column_key, size_t* resultcount, Key* return_ndx) const
+R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) const
 {
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     using ResultType = typename AggregateResultType<T, action>::result_type;
@@ -1022,7 +1022,7 @@ double Query::sum_double(ColKey column_key) const
 
 // Maximum
 
-int64_t Query::maximum_int(ColKey column_key, Key* return_ndx) const
+int64_t Query::maximum_int(ColKey column_key, ObjKey* return_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
@@ -1034,7 +1034,7 @@ int64_t Query::maximum_int(ColKey column_key, Key* return_ndx) const
     return aggregate<act_Max, int64_t, int64_t>(column_key, nullptr, return_ndx);
 }
 
-float Query::maximum_float(ColKey column_key, Key* return_ndx) const
+float Query::maximum_float(ColKey column_key, ObjKey* return_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
@@ -1042,7 +1042,7 @@ float Query::maximum_float(ColKey column_key, Key* return_ndx) const
 
     return aggregate<act_Max, float, float>(column_key, nullptr, return_ndx);
 }
-double Query::maximum_double(ColKey column_key, Key* return_ndx) const
+double Query::maximum_double(ColKey column_key, ObjKey* return_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
@@ -1054,7 +1054,7 @@ double Query::maximum_double(ColKey column_key, Key* return_ndx) const
 
 // Minimum
 
-int64_t Query::minimum_int(ColKey column_key, Key* return_ndx) const
+int64_t Query::minimum_int(ColKey column_key, ObjKey* return_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
@@ -1065,7 +1065,7 @@ int64_t Query::minimum_int(ColKey column_key, Key* return_ndx) const
     }
     return aggregate<act_Min, int64_t, int64_t>(column_key, nullptr, return_ndx);
 }
-float Query::minimum_float(ColKey column_key, Key* return_ndx) const
+float Query::minimum_float(ColKey column_key, ObjKey* return_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
@@ -1073,7 +1073,7 @@ float Query::minimum_float(ColKey column_key, Key* return_ndx) const
 
     return aggregate<act_Min, float, float>(column_key, nullptr, return_ndx);
 }
-double Query::minimum_double(ColKey column_key, Key* return_ndx) const
+double Query::minimum_double(ColKey column_key, ObjKey* return_ndx) const
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
@@ -1082,7 +1082,7 @@ double Query::minimum_double(ColKey column_key, Key* return_ndx) const
     return aggregate<act_Min, double, double>(column_key, nullptr, return_ndx);
 }
 
-Timestamp Query::minimum_timestamp(ColKey column_key, Key* return_ndx)
+Timestamp Query::minimum_timestamp(ColKey column_key, ObjKey* return_ndx)
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
@@ -1091,7 +1091,7 @@ Timestamp Query::minimum_timestamp(ColKey column_key, Key* return_ndx)
     return aggregate<act_Min, Timestamp, Timestamp>(column_key, nullptr, return_ndx);
 }
 
-Timestamp Query::maximum_timestamp(ColKey column_key, Key* return_ndx)
+Timestamp Query::maximum_timestamp(ColKey column_key, ObjKey* return_ndx)
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
@@ -1208,7 +1208,7 @@ Query& Query::Or()
 }
 
 // todo, add size_t end? could be useful
-Key Query::find(size_t begin)
+ObjKey Query::find(size_t begin)
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Find);
@@ -1222,7 +1222,7 @@ Key Query::find(size_t begin)
     if (!has_conditions()) {
         if (m_view) {
             if (begin < m_view->size()) {
-                return Key(m_view->m_key_values.get(begin));
+                return ObjKey(m_view->m_key_values.get(begin));
             }
             return null_key;
         }
@@ -1242,7 +1242,7 @@ Key Query::find(size_t begin)
     }
     else {
         auto node = root_node();
-        Key key;
+        ObjKey key;
         m_table->traverse_clusters([&node, &key](const Cluster* cluster) {
             size_t end = cluster->node_size();
             node->set_cluster(cluster);

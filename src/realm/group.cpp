@@ -1204,12 +1204,12 @@ public:
         return true;
     }
 
-    bool create_object(Key) noexcept
+    bool create_object(ObjKey) noexcept
     {
         return true;
     }
 
-    bool remove_object(Key) noexcept
+    bool remove_object(ObjKey) noexcept
     {
         return true;
     }
@@ -1219,62 +1219,62 @@ public:
         return true;
     }
 
-    bool set_int(ColKey, Key, int_fast64_t, _impl::Instruction, size_t) noexcept
+    bool set_int(ColKey, ObjKey, int_fast64_t, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool add_int(ColKey, Key, int_fast64_t) noexcept
+    bool add_int(ColKey, ObjKey, int_fast64_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_bool(ColKey, Key, bool, _impl::Instruction) noexcept
+    bool set_bool(ColKey, ObjKey, bool, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_float(ColKey, Key, float, _impl::Instruction) noexcept
+    bool set_float(ColKey, ObjKey, float, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_double(ColKey, Key, double, _impl::Instruction) noexcept
+    bool set_double(ColKey, ObjKey, double, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_string(ColKey, Key, StringData, _impl::Instruction, size_t) noexcept
+    bool set_string(ColKey, ObjKey, StringData, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_binary(ColKey, Key, BinaryData, _impl::Instruction) noexcept
+    bool set_binary(ColKey, ObjKey, BinaryData, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_timestamp(ColKey, Key, Timestamp, _impl::Instruction) noexcept
+    bool set_timestamp(ColKey, ObjKey, Timestamp, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_null(ColKey, Key, _impl::Instruction, size_t) noexcept
+    bool set_null(ColKey, ObjKey, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_link(ColKey, Key, Key, TableKey, _impl::Instruction) noexcept
+    bool set_link(ColKey, ObjKey, ObjKey, TableKey, _impl::Instruction) noexcept
     {
         return true;
     }
 
-    bool insert_substring(ColKey, Key, size_t, StringData)
+    bool insert_substring(ColKey, ObjKey, size_t, StringData)
     {
         return true; // No-op
     }
 
-    bool erase_substring(ColKey, Key, size_t, size_t)
+    bool erase_substring(ColKey, ObjKey, size_t, size_t)
     {
         return true; // No-op
     }
@@ -1378,12 +1378,12 @@ public:
         return true; // No-op
     }
 
-    bool select_list(ColKey, Key) noexcept
+    bool select_list(ColKey, ObjKey) noexcept
     {
         return true; // No-op
     }
 
-    bool list_set_link(size_t, Key) noexcept
+    bool list_set_link(size_t, ObjKey) noexcept
     {
         return true; // No-op
     }
@@ -1413,7 +1413,7 @@ public:
         return true; // No-op
     }
 
-    bool nullify_link(ColKey, Key, TableKey)
+    bool nullify_link(ColKey, ObjKey, TableKey)
     {
         return true; // No-op
     }
