@@ -17,9 +17,7 @@
  **************************************************************************/
 
 #include <realm/table_view.hpp>
-//#include <realm/column.hpp>
-//#include <realm/column_timestamp.hpp>
-//#include <realm/column_tpl.hpp>
+#include <realm/column.hpp>
 
 #include <unordered_set>
 

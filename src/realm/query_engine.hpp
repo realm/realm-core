@@ -98,10 +98,10 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/array_list.hpp>
 #include <realm/array_backlink.hpp>
 #include <realm/column_type_traits.hpp>
-#include <realm/link_view.hpp>
 #include <realm/metrics/query_info.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/table.hpp>
+#include <realm/column.hpp>
 #include <realm/unicode.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/serializer.hpp>

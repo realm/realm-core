@@ -26,7 +26,6 @@
 
 #include <realm/query_expression.hpp>
 #include <realm/table_view.hpp>
-#include <realm/link_view.hpp> // lasse todo remove
 #include <realm/util/to_string.hpp>
 #include <realm.hpp>
 

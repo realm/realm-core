@@ -20,6 +20,7 @@
 #define REALM_COLUMN_LINKBASE_HPP
 
 #include <realm/table.hpp>
+#include <realm/column.hpp>
 
 namespace realm {
 

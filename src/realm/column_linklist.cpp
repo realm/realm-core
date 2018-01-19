@@ -21,7 +21,6 @@
 
 #include <realm/column_linklist.hpp>
 #include <realm/group.hpp>
-#include <realm/link_view.hpp>
 
 using namespace realm;
 
@@ -183,93 +182,8 @@ void LinkListColumn::clear(size_t, bool broken_reciprocal_backlinks)
     // IntegerColumn::clear_without_updating_index() forgets about the leaf
     // type. A better solution should probably be sought after.
     get_root_array()->set_type(Array::type_HasRefs); // Throws
-
-    discard_child_accessors();
 }
 
-
-bool LinkListColumn::compare_link_list(const LinkListColumn& c) const
-{
-    size_t n = size();
-    if (c.size() != n)
-        return false;
-    for (size_t i = 0; i < n; ++i) {
-        if (*get(i) != *c.get(i))
-            return false;
-    }
-    return true;
-}
-
-
-void LinkListColumn::do_nullify_link(size_t row_ndx, size_t old_target_row_ndx)
-{
-    LinkViewRef links = get(row_ndx);
-    links->do_nullify_link(old_target_row_ndx);
-}
-
-
-void LinkListColumn::do_update_link(size_t row_ndx, size_t old_target_row_ndx, size_t new_target_row_ndx)
-{
-    LinkViewRef links = get(row_ndx);
-    links->do_update_link(old_target_row_ndx, new_target_row_ndx);
-}
-
-void LinkListColumn::do_swap_link(size_t row_ndx, size_t target_row_ndx_1, size_t target_row_ndx_2)
-{
-    LinkViewRef links = get(row_ndx);
-    links->do_swap_link(target_row_ndx_1, target_row_ndx_2);
-}
-
-void LinkListColumn::unregister_linkview()
-{
-    m_list_accessors_contains_tombstones = true;
-}
-
-
-LinkViewRef LinkListColumn::get_ptr(size_t row_ndx) const
-{
-    REALM_ASSERT_3(row_ndx, <, size());
-    validate_list_accessors();
-
-    auto create_view = [this, row_ndx](list_entry& entry) {
-        entry.m_row_ndx = row_ndx;
-        auto ptr = LinkView::create(m_table, const_cast<LinkListColumn&>(*this), row_ndx); // Throws
-        entry.m_list = ptr;
-        return ptr;
-    };
-
-    // Check if we already have a LinkView for this row.
-    list_entry key;
-    key.m_row_ndx = row_ndx;
-    auto it = std::lower_bound(m_list_accessors.begin(), m_list_accessors.end(), key);
-    if (it != m_list_accessors.end()) {
-        if (it->m_row_ndx == row_ndx) {
-            // If we have an existing LinkView, return it.
-            if (LinkViewRef list = it->m_list.lock()) {
-                REALM_ASSERT_DEBUG(list->is_attached());
-                return list;
-            }
-        }
-        if (it->m_list.expired()) {
-            // We found an expired entry at the appropriate position. Reuse it with a new LinkView.
-            return create_view(*it);
-        }
-    }
-
-    // No existing entry for this row. If the entry prior to the insertion point has expired we can reuse it
-    // as doing so preserves the desired ordering of m_list_accessors.
-    if (it != m_list_accessors.begin()) {
-        auto previous = std::prev(it);
-        if (previous->m_list.expired()) {
-            // We found an expired entry at the previous position. Reuse it with a new LinkView.
-            return create_view(*previous);
-        }
-    }
-
-    // Could not find an entry to reuse, so insert a new one.
-    it = m_list_accessors.insert(it, std::move(key)); // Throws
-    return create_view(*it);
-}
 
 void LinkListColumn::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
@@ -281,30 +195,6 @@ ref_type LinkListColumn::get_child_ref(size_t child_ndx) const noexcept
 {
     return LinkColumnBase::get_as_ref(child_ndx);
 }
-
-
-void LinkListColumn::discard_child_accessors() noexcept
-{
-    validate_list_accessors();
-    for (auto& entry : m_list_accessors) {
-        if (LinkViewRef list = entry.m_list.lock())
-            list->detach();
-    }
-    m_list_accessors.clear();
-}
-
-
-void LinkListColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
-{
-    prune_list_accessor_tombstones();
-
-    LinkColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
-    for (auto& entry : m_list_accessors) {
-        if (LinkViewRef list = entry.m_list.lock())
-            list->refresh_accessor_tree(entry.m_row_ndx);
-    }
-}
-
 
 
 template <bool fix_ndx_in_parent>
@@ -326,43 +216,6 @@ void LinkListColumn::update_from_parent(size_t old_baseline) noexcept
     if (!get_root_array()->update_from_parent(old_baseline))
         return;
 
-    prune_list_accessor_tombstones();
-
-    for (auto& list_accessor : m_list_accessors) {
-        if (LinkViewRef list = list_accessor.m_list.lock())
-            list->update_from_parent(old_baseline);
-    }
-}
-
-
-void LinkListColumn::validate_list_accessors() const noexcept
-{
-#ifdef REALM_DEBUG
-    auto begin = m_list_accessors.begin();
-    auto end = m_list_accessors.end();
-    REALM_ASSERT_DEBUG(std::is_sorted(begin, end));
-    REALM_ASSERT_DEBUG(end == std::adjacent_find(begin, end, [](const list_entry& a, const list_entry& b) {
-                           return a.m_row_ndx == b.m_row_ndx;
-                       }));
-#endif
-}
-
-
-void LinkListColumn::prune_list_accessor_tombstones() noexcept
-{
-    validate_list_accessors();
-    bool had_tombstones = m_list_accessors_contains_tombstones.exchange(false);
-    if (!had_tombstones)
-        return;
-    // While we scan through and remove tombstones, new one may be generated.
-    // this is ok, because it does not actually change the list. Tombstones are
-    // represented by expired weak_ptrs. This also implies, that after a call
-    // to prune_list_accessor_tombstones() there is *no* guarantee that all tombstones
-    // have been removed. It is merely a best effort at reducing the size of the
-    // vector.
-    auto remove_from = std::remove_if(m_list_accessors.begin(), m_list_accessors.end(),
-                                      [](const list_entry& e) { return e.m_list.expired(); });
-    m_list_accessors.erase(remove_from, m_list_accessors.end());
 }
 
 // LCOV_EXCL_START ignore debug functions

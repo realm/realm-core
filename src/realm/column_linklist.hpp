@@ -26,7 +26,6 @@
 #include <realm/column_linkbase.hpp>
 #include <realm/table.hpp>
 #include <realm/column_backlink.hpp>
-#include <realm/link_view_fwd.hpp>
 
 namespace realm {
 
@@ -45,7 +44,6 @@ class TransactLogConvenientEncoder;
 class LinkListColumn : public LinkColumnBase, public ArrayParent {
 public:
     using LinkColumnBase::LinkColumnBase;
-    using value_type = ConstLinkViewRef;
     LinkListColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx);
     ~LinkListColumn() noexcept override;
 
@@ -56,14 +54,8 @@ public:
     bool has_links(size_t row_ndx) const noexcept;
     size_t get_link_count(size_t row_ndx) const noexcept;
 
-    ConstLinkViewRef get(size_t row_ndx) const;
-    LinkViewRef get(size_t row_ndx);
-
     bool is_null(size_t row_ndx) const noexcept final;
     void set_null(size_t row_ndx) final;
-
-    /// Compare two columns for equality.
-    bool compare_link_list(const LinkListColumn&) const;
 
     void to_json_row(size_t row_ndx, std::ostream& out) const;
 
@@ -73,41 +65,11 @@ public:
     void swap_rows(size_t, size_t) override;
     void clear(size_t, bool) override;
     void update_from_parent(size_t) noexcept override;
-    void refresh_accessor_tree(size_t, const Spec&) override;
 
     void verify() const override;
     void verify(const Table&, size_t) const override;
 
-protected:
-    void do_discard_child_accessors() noexcept override;
-
 private:
-    struct list_entry {
-        size_t m_row_ndx;
-        std::weak_ptr<LinkView> m_list;
-        bool operator<(const list_entry& other) const
-        {
-            return m_row_ndx < other.m_row_ndx;
-        }
-    };
-
-    // The accessors stored in `m_list_accessors` are sorted by their row index.
-    // When a LinkList accessor is destroyed because the last shared_ptr pointing
-    // to it dies, its entry is implicitly replaced by a tombstone (an entry with
-    // an empty `m_list`). These tombstones are pruned at a later time by
-    // `prune_list_accessor_tombstones`. This is done to amortize the O(n) cost
-    // of `std::vector::erase` that would otherwise be incurred each time an
-    // accessor is removed.
-    mutable std::vector<list_entry> m_list_accessors;
-    mutable std::atomic<bool> m_list_accessors_contains_tombstones;
-
-    std::shared_ptr<LinkView> get_ptr(size_t row_ndx) const;
-
-    void do_nullify_link(size_t row_ndx, size_t old_target_row_ndx) override;
-    void do_update_link(size_t row_ndx, size_t old_target_row_ndx, size_t new_target_row_ndx) override;
-    void do_swap_link(size_t row_ndx, size_t target_row_ndx_1, size_t target_row_ndx_2) override;
-
-    void unregister_linkview();
     ref_type get_row_ref(size_t row_ndx) const noexcept;
     void set_row_ref(size_t row_ndx, ref_type new_ref);
     void add_backlink(size_t target_row, size_t source_row);
@@ -116,8 +78,6 @@ private:
     // ArrayParent overrides
     void update_child_ref(size_t child_ndx, ref_type new_ref) override;
     ref_type get_child_ref(size_t child_ndx) const noexcept override;
-
-    void discard_child_accessors() noexcept;
 
     template <bool fix_ndx_in_parent>
     void adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept;
@@ -134,9 +94,6 @@ private:
     template <bool fix_ndx_in_parent>
     void adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept;
 
-    void prune_list_accessor_tombstones() noexcept;
-    void validate_list_accessors() const noexcept;
-
     std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
 
     friend class BacklinkColumn;
@@ -150,12 +107,10 @@ private:
 inline LinkListColumn::LinkListColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
     : LinkColumnBase(alloc, ref, table, column_ndx)
 {
-    m_list_accessors_contains_tombstones.store(false);
 }
 
 inline LinkListColumn::~LinkListColumn() noexcept
 {
-    discard_child_accessors();
 }
 
 inline ref_type LinkListColumn::create(Allocator& alloc, size_t size)
@@ -182,16 +137,6 @@ inline size_t LinkListColumn::get_link_count(size_t row_ndx) const noexcept
     return ColumnBase::get_size_from_ref(ref, get_alloc());
 }
 
-inline ConstLinkViewRef LinkListColumn::get(size_t row_ndx) const
-{
-    return get_ptr(row_ndx);
-}
-
-inline LinkViewRef LinkListColumn::get(size_t row_ndx)
-{
-    return get_ptr(row_ndx);
-}
-
 inline bool LinkListColumn::is_null(size_t) const noexcept
 {
     return false;
@@ -200,11 +145,6 @@ inline bool LinkListColumn::is_null(size_t) const noexcept
 inline void LinkListColumn::set_null(size_t)
 {
     throw LogicError{LogicError::column_not_nullable};
-}
-
-inline void LinkListColumn::do_discard_child_accessors() noexcept
-{
-    discard_child_accessors();
 }
 
 inline ref_type LinkListColumn::get_row_ref(size_t row_ndx) const noexcept

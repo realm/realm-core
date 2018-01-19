@@ -34,7 +34,6 @@ set(REALM_SOURCES
     impl/transact_log.cpp
     index_string.cpp
     lang_bind_helper.cpp
-    link_view.cpp
     list.cpp
     obj.cpp
     query.cpp
@@ -65,7 +64,6 @@ set(REALM_SOURCES
     util/to_string.cpp
     utilities.cpp
     version.cpp
-    views.cpp
 ) # REALM_SOURCES
 
 set(REALM_INSTALL_GENERAL_HEADERS
@@ -115,8 +113,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     index_string.hpp
     keys.hpp
     lang_bind_helper.hpp
-    link_view.hpp
-    link_view_fwd.hpp
     mixed.hpp
     null.hpp
     list.hpp
@@ -139,7 +135,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     unicode.hpp
     utilities.hpp
     version_id.hpp
-    views.hpp
 ) # REALM_INSTALL_GENERAL_HEADERS
 
 set(REALM_PARSER_SOURCES

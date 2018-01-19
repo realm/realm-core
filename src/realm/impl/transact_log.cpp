@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include <realm/impl/transact_log.hpp>
-#include <realm/link_view.hpp>
 
 namespace realm {
 namespace _impl {

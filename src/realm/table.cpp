@@ -30,17 +30,8 @@
 #include <realm/exceptions.hpp>
 #include <realm/table.hpp>
 #include <realm/alloc_slab.hpp>
-#include <realm/column.hpp>
-#include <realm/column_string.hpp>
-#include <realm/column_string_enum.hpp>
-#include <realm/column_binary.hpp>
-#include <realm/column_link.hpp>
-#include <realm/column_linklist.hpp>
-#include <realm/column_backlink.hpp>
-#include <realm/column_timestamp.hpp>
 #include <realm/index_string.hpp>
 #include <realm/group.hpp>
-#include <realm/link_view.hpp>
 #include <realm/replication.hpp>
 #include <realm/table_view.hpp>
 #include <realm/query_engine.hpp>
@@ -614,15 +605,20 @@ void Table::remove_search_index(ColKey col_key)
         repl->remove_search_index(this, col_key); // Throws
 }
 
-size_t Table::get_num_unique_values(ColKey column_key) const
+size_t Table::get_num_unique_values(ColKey) const
 {
+    // FIXME: not implemented
+    REALM_ASSERT(false);
+    /*
     size_t column_ndx = colkey2ndx(column_key);
     ColumnType col_type = m_spec->get_column_type(column_ndx);
     if (col_type != col_type_StringEnum)
-        return 0;
+     return 0;
     ref_type ref = m_spec->get_enumkeys_ref(column_ndx);
     StringColumn col(m_spec->get_alloc(), ref); // Throws
     return col.size();
+    */
+    return 0;
 }
 
 ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target,

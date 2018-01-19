@@ -135,8 +135,9 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/array_key.hpp>
 #include <realm/array_bool.hpp>
 #include <realm/column_type_traits.hpp>
+#include <realm/table.hpp>
+#include <realm/query.hpp>
 #include <realm/list.hpp>
-#include <realm/link_view.hpp>
 #include <realm/metrics/query_info.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/serializer.hpp>

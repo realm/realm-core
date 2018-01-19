@@ -27,6 +27,7 @@
 #include <realm/index_string.hpp>
 #include <realm/table.hpp>
 #include <realm/timestamp.hpp>
+#include <realm/column.hpp>
 
 using namespace realm;
 using namespace realm::util;

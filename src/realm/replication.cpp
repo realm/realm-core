@@ -22,7 +22,6 @@
 
 #include <realm/group.hpp>
 #include <realm/table.hpp>
-#include <realm/link_view.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/replication.hpp>
 #include <realm/util/logger.hpp>

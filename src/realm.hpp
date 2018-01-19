@@ -22,7 +22,6 @@
 #include <realm/group_shared.hpp>
 #include <realm/obj.hpp>
 #include <realm/list.hpp>
-#include <realm/link_view.hpp>
 #include <realm/table_view.hpp>
 #include <realm/query.hpp>
 #include <realm/query_engine.hpp>

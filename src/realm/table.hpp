@@ -29,11 +29,9 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/table_ref.hpp>
-#include <realm/link_view_fwd.hpp>
 #include <realm/list.hpp>
 #include <realm/spec.hpp>
 #include <realm/query.hpp>
-#include <realm/column.hpp>
 #include <realm/cluster_tree.hpp>
 #include <realm/keys.hpp>
 
