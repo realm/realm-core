@@ -6,9 +6,22 @@
 
 ### Breaking changes
 
+* Column identifier changed from size_t to ColKey. This identifier is subsequently
+  used when accessing/mutating the data and when making queries.
+* Table identifiers changed from size_t to TableKey.
+* Row interface on Table removed. All access to data goes through the new Obj
+  interface. Obj objects are created with an ObjKey identifier, which subsequently
+  is used to get access to and optionally delete the object.
+* Support for sub-tables removed. The feature was only used to implement support for
+  array-of-primitives. This is now implemented by a more specific List class.
+* Descriptor class removed. No longer needed as we don't have sub-tables.
+* Mixed column no longer supported. Will be revived at a later point in time.
+* LinkView is replaced by the more general list interface
 * Limiting parameters removed from Query aggregate functions (start, end, limit)
 * Table::get_range_view() has been removed.
 * Table::merge_rows() not supported. Not needed anymore.
+* Ref-counted freestanding tables can no longer be created (by Table::create)
+* OldDateTime is no longer supported
 
 ### Enhancements
 
