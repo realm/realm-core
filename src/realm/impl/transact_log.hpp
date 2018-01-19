@@ -1879,17 +1879,10 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         case instr_SelectTable: {
             int levels = read_int<int>(); // Throws
-            if (levels < 0 || levels > m_max_levels)
-                parser_error();
+            REALM_ASSERT(levels == 0);
             m_path.reserve(0, 2 * levels); // Throws
             size_t* path = m_path.data();
             size_t group_level_ndx = read_int<size_t>(); // Throws
-            for (int i = 0; i != levels; ++i) {
-                ColKey col_key = ColKey(read_int<size_t>()); // Throws
-                size_t row_ndx = read_int<size_t>(); // Throws
-                path[2 * i + 0] = col_key.value;
-                path[2 * i + 1] = row_ndx;
-            }
             if (!handler.select_table(group_level_ndx, levels, path)) // Throws
                 parser_error();
             return;

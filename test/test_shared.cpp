@@ -1999,7 +1999,7 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
         Group& g = sg->begin_write();
         if (g.size() == 1) {
             TableRef table = g.get_table("data");
-            auto col = table->get_column_index("ints");
+            auto col = table->get_column_key("ints");
             auto first_obj = table->begin();
             int64_t v = first_obj->get<int64_t>(col);
 

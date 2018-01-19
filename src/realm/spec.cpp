@@ -420,7 +420,7 @@ void Spec::set_backlink_origin_column(size_t backlink_col_ndx, ColKey origin_col
     REALM_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
 
     // position of target table is stored as tagged int
-    size_t tagged_ndx = (origin_col_key.value << 1) + 1;
+    int64_t tagged_ndx = (origin_col_key.value << 1) + 1;
 
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
     m_subspecs.set(subspec_ndx + 1, tagged_ndx); // Throws

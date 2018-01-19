@@ -2277,13 +2277,13 @@ void Table::insert_col_mapping(size_t ndx, ColKey key)
         m_ndx2colkey.insert(m_ndx2colkey.begin() + ndx, key);
 
     // make sure there is a free entry in key->ndx
-    uint16_t idx = key.value;
+    uint16_t idx = uint16_t(key.value);
 
     // fill new positions with a blocked entry
     while (idx >= m_colkey2ndx.size()) {
         m_colkey2ndx.push_back(max_num_columns);
     }
-    m_colkey2ndx[idx] = ndx;
+    m_colkey2ndx[idx] = uint16_t(ndx);
 }
 
 // remove a mapping, moving all later mappings to a lower index
@@ -2298,7 +2298,7 @@ void Table::remove_col_mapping(size_t ndx)
             --e;
     }
     // remove selected entry
-    uint16_t idx = key.value;
+    uint16_t idx = uint16_t(key.value);
     m_colkey2ndx[idx] = max_num_columns;
 
     // and opposite mapping
@@ -2315,10 +2315,10 @@ ColKey Table::generate_col_key()
     rot = RefOrTagged::make_tagged(upper + 1);
     m_top.set(top_position_for_column_key, rot);
 
-    uint16_t lower = m_colkey2ndx.size();
+    uint64_t lower = m_colkey2ndx.size();
     // look for an unused entry in m_colkey2ndx:
     for (uint16_t idx = 0; idx < lower; ++idx) {
-        uint16_t ndx = m_colkey2ndx[idx];
+        size_t ndx = m_colkey2ndx[idx];
         if (ndx >= max_num_columns) {
             lower = idx;
             break;
@@ -2329,7 +2329,7 @@ ColKey Table::generate_col_key()
 
 size_t Table::colkey2ndx(ColKey key) const
 {
-    uint16_t idx = key.value;
+    uint16_t idx = uint16_t(key.value);
     if (idx >= m_colkey2ndx.size())
         throw InvalidKey("Nonexisting column key");
     // FIXME: Optimization! There are many scenarios where this test may be avoided.
@@ -2353,7 +2353,7 @@ ColumnAttrMask Table::get_column_attr(ColKey column_key) const noexcept
 
 bool Table::valid_column(ColKey col_key) const
 {
-    uint16_t idx = col_key.value;
+    uint16_t idx = uint16_t(col_key.value);
     if (idx >= m_colkey2ndx.size())
         return false;
     uint16_t ndx = m_colkey2ndx[idx];
