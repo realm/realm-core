@@ -79,8 +79,7 @@ public:
     /// instance on the stack, and it is then the responsibility of
     /// the application that there are no objects of type TableRef or
     /// ConstTableRef that refer to it, or to any of its subtables,
-    /// when it goes out of scope. To create a top-level table with
-    /// dynamic lifetime, use Table::create() instead.
+    /// when it goes out of scope.
     Table(Allocator& = Allocator::get_default());
 
     /// Construct a copy of the specified table as a new freestanding
@@ -90,8 +89,7 @@ public:
     /// instance on the stack, and it is then the responsibility of
     /// the application that there are no objects of type TableRef or
     /// ConstTableRef that refer to it, or to any of its subtables,
-    /// when it goes out of scope. To create a top-level table with
-    /// dynamic lifetime, use Table::copy() instead.
+    /// when it goes out of scope.
     Table(const Table&, Allocator& = Allocator::get_default());
     void revive(Allocator& new_allocator);
 
@@ -100,35 +98,9 @@ public:
     Allocator& get_alloc() const;
 
     /// Construct a copy of the specified table as a new freestanding top-level
-    /// table with dynamic lifetime.
+    /// table with dynamic lifetime. This method is deprecated.
     TableRef copy(Allocator& = Allocator::get_default()) const;
 
-    /// Returns true if, and only if this accessor is currently attached to an
-    /// underlying table.
-    ///
-    /// A table accessor may get detached from the underlying row for various
-    /// reasons (see below). When it does, it no longer refers to anything, and
-    /// can no longer be used, except for calling is_attached(). The
-    /// consequences of calling other non-static functions on a detached table
-    /// accessor are unspecified. Table accessors obtained by calling functions in
-    /// the Realm API are always in the 'attached' state immediately upon
-    /// return from those functions.
-    ///
-    /// A table accessor of a free-standing table never becomes detached (except
-    /// during its eventual destruction). A group-level table accessor becomes
-    /// detached if the underlying table is removed from the group, or when the
-    /// group accessor is destroyed. A subtable accessor becomes detached if the
-    /// underlying subtable is removed, or if the parent table accessor is
-    /// detached. A table accessor does not become detached for any other reason
-    /// than those mentioned here.
-    ///
-    /// FIXME: High level language bindings will probably want to be able to
-    /// explicitely detach a group and all tables of that group if any modifying
-    /// operation fails (e.g. memory allocation failure) (and something similar
-    /// for freestanding tables) since that leaves the group in state where any
-    /// further access is disallowed. This way they will be able to reliably
-    /// intercept any attempt at accessing such a failed group.
-    ///
     /// Get the name of this table, if it has one. Only group-level tables have
     /// names. For a table of any other kind, this function returns the empty
     /// string.
@@ -140,8 +112,6 @@ public:
     //@{
     /// Conventience functions for inspecting the dynamic table type.
     ///
-    /// These functions behave as if they were called on the descriptor returned
-    /// by get_descriptor().
     size_t get_column_count() const noexcept;
     DataType get_column_type(ColKey column_key) const noexcept;
     StringData get_column_name(ColKey column_key) const noexcept;
@@ -153,25 +123,6 @@ public:
     //@{
     /// Convenience functions for manipulating the dynamic table type.
     ///
-    /// These function must be called only for tables with independent dynamic
-    /// type. A table has independent dynamic type if the function
-    /// has_shared_type() returns false. A table that is a direct member of a
-    /// group has independent dynamic type. So does a free-standing table, and a
-    /// subtable in a column of type 'mixed'. All other tables have shared
-    /// dynamic type. The consequences of calling any of these functions for a
-    /// table with shared dynamic type are undefined.
-    ///
-    /// Apart from that, these functions behave as if they were called on the
-    /// descriptor returned by get_descriptor(). Note especially that the
-    /// `_link` suffixed functions must be used when inserting link-type
-    /// columns.
-    ///
-    /// If you need to change the shared dynamic type of the subtables in a
-    /// subtable column, consider using the API offered by the Descriptor class.
-    ///
-    /// \sa has_shared_type()
-    /// \sa get_descriptor()
-
     static const size_t max_column_name_length = 63;
     static const size_t max_num_columns = 65535;
     ColKey add_column(DataType type, StringData name, bool nullable = false);
@@ -181,6 +132,7 @@ public:
 
     // Pass a ColKey() as first argument to have a new colkey generated
     // Requesting a specific ColKey may fail with invalidkey exception, if the key is already in use
+    // We recommend allowing Core to choose the ColKey.
     ColKey insert_column(ColKey col_key, DataType type, StringData name, bool nullable = false);
     ColKey insert_column_link(ColKey col_key, DataType type, StringData name, Table& target,
                               LinkType link_type = link_Weak);
@@ -190,47 +142,44 @@ public:
     //@}
 
     /// There are two kinds of links, 'weak' and 'strong'. A strong link is one
-    /// that implies ownership, i.e., that the origin row (parent) owns the
-    /// target row (child). Simply stated, this means that when the origin row
-    /// (parent) is removed, so is the target row (child). If there are multiple
-    /// strong links to a target row, the origin rows share ownership, and the
-    /// target row is removed when the last owner disappears. Weak links do not
-    /// imply ownership, and will be nullified or removed when the target row
+    /// that implies ownership, i.e., that the origin object (parent) owns the
+    /// target parent (child). Simply stated, this means that when the origin object
+    /// (parent) is removed, so is the target object (child). If there are multiple
+    /// strong links to an object, the origin objects share ownership, and the
+    /// target object is removed when the last owner disappears. Weak links do not
+    /// imply ownership, and will be nullified or removed when the target object
     /// disappears.
     ///
     /// To put this in precise terms; when a strong link is broken, and the
-    /// target row has no other strong links to it, the target row is removed. A
-    /// row that is implicitly removed in this way, is said to be
+    /// target object has no other strong links to it, the target object is removed. A
+    /// object that is implicitly removed in this way, is said to be
     /// *cascade-removed*. When a weak link is broken, nothing is
     /// cascade-removed.
     ///
     /// A link is considered broken if
     ///
     ///  - the link is nullified, removed, or replaced by a different link
-    ///    (Row::nullify_link(), Row::set_link(), LinkView::remove_link(),
-    ///    LinkView::set_link(), LinkView::clear()), or if
     ///
-    ///  - the origin row is explicitly removed (Row::move_last_over(),
-    ///    Table::clear()), or if
+    ///  - the origin object is explicitly removed
     ///
-    ///  - the origin row is cascade-removed, or if
+    ///  - the origin object is cascade-removed, or if
     ///
-    ///  - the origin column is removed from the table (Table::remove_column()),
+    ///  - the origin field is removed from the table (Table::remove_column()),
     ///    or if
     ///
     ///  - the origin table is removed from the group.
     ///
     /// Note that a link is *not* considered broken when it is replaced by a
-    /// link to the same target row. I.e., no no rows will be cascade-removed
+    /// link to the same target object. I.e., no objects will be cascade-removed
     /// due to such an operation.
     ///
-    /// When a row is explicitly removed (such as by Table::move_last_over()),
+    /// When a object is explicitly removed (such as by Table::move_last_over()),
     /// all links to it are automatically removed or nullified. For single link
-    /// columns (type_Link), links to the removed row are nullified. For link
-    /// list columns (type_LinkList), links to the removed row are removed from
+    /// columns (type_Link), links to the removed object are nullified. For link
+    /// list columns (type_LinkList), links to the removed object are removed from
     /// the list.
     ///
-    /// When a row is cascade-removed there can no longer be any strong links to
+    /// When a object is cascade-removed there can no longer be any strong links to
     /// it, but if there are any weak links, they will be removed or nullified.
     ///
     /// It is important to understand that this cascade-removal scheme is too
@@ -239,28 +188,14 @@ public:
     /// counting scheme generally does.
     ///
     /// It is also important to understand, that the possible presence of a link
-    /// cycle can cause a row to be cascade-removed as a consequence of being
-    /// modified. This happens, for example, if two rows, A and B, have strong
+    /// cycle can cause a object to be cascade-removed as a consequence of being
+    /// modified. This happens, for example, if two objects, A and B, have strong
     /// links to each other, and there are no other strong links to either of
     /// them. In this case, if A->B is changed to A->C, then both A and B will
-    /// be cascade-removed. This can lead to obscure bugs in some applications,
-    /// such as in the following case:
+    /// be cascade-removed. This can lead to obscure bugs in some applications.
     ///
-    ///     table.set_link(col_ndx_1, row_ndx, ...);
-    ///     table.set_int(col_ndx_2, row_ndx, ...); // Oops, `row_ndx` may no longer refer to the same row
-    ///
-    /// To be safe, applications, that may encounter cycles, are advised to
-    /// adopt the following pattern:
-    ///
-    ///     Row row = table[row_ndx];
-    ///     row.set_link(col_ndx_1, ...);
-    ///     if (row)
-    ///         row.set_int(col_ndx_2, ...); // Ok, because we check whether the row has disappeared
-    ///
-    /// \param col_ndx The index of the link column (`type_Link` or
-    /// `type_LinkList`) to be modified. It is an error to specify an index that
-    /// is greater than, or equal to the number of columns, or to specify the
-    /// index of a non-link column.
+    /// \param col_key The key of the link column (`type_Link` or
+    /// `type_LinkList`) to be modified.
     ///
     /// \param link_type The type of links the column should store.
     void set_link_type(ColKey col_key, LinkType);
@@ -281,13 +216,7 @@ public:
     /// index. The search index cannot be removed from the primary key of a
     /// table.
     ///
-    /// This table must be a root table; that is, it must have an independent
-    /// descriptor. Freestanding tables, group-level tables, and subtables in a
-    /// column of type 'mixed' are all examples of root tables. See add_column()
-    /// for more on this. If you want to manipulate subtable indexes, you must use
-    /// the Descriptor interface.
-    ///
-    /// \param col_key The index of a column of the table.
+    /// \param col_key The key of a column of the table.
 
     bool has_search_index(ColKey col_key) const noexcept;
     void add_search_index(ColKey col_key);
@@ -390,6 +319,8 @@ public:
     static constexpr int_fast64_t min_integer = std::numeric_limits<int64_t>::min();
 
     //@{
+
+    /// Deprecated:
 
     /// If this accessor is attached to a subtable, then that subtable has a
     /// parent table, and the subtable either resides in a column of type
@@ -495,17 +426,16 @@ public:
 
     TableView get_backlink_view(ObjKey key, Table* src_table, ColKey src_col_key);
 
-    /// Report the current versioning counter for the table. The versioning counter is guaranteed to
-    /// change when the contents of the table changes after advance_read() or promote_to_write(), or
-    /// immediately after calls to methods which change the table. The term "change" means "change of
-    /// value": The storage layout of the table may change, for example due to optimization, but this
-    /// is not considered a change of a value. This means that you *cannot* use a non-changing version
-    /// count to indicate that object addresses (e.g. strings, binary data) remain the same.
-    /// The versioning counter *may* change (but is not required to do so) when another table linked
-    /// from this table, or linking to this table, is changed. The version counter *may* also change
-    /// without any apparent reason.
+    // Report the current content version. This is a 64-bit value which is bumped whenever
+    // the content in the table changes.
     uint_fast64_t get_content_version() const noexcept;
+
+    // Report the current instance version. This is a 64-bit value which is bumped
+    // whenever the table accessor is recycled.
     uint_fast64_t get_instance_version() const noexcept;
+
+    // Report the current storage version. This is a 64-bit value which is bumped
+    // whenever the location in memory of any part of the table changes.
     uint_fast64_t get_storage_version(uint64_t instance_version) const;
     void bump_storage_version() const noexcept;
     void bump_content_version() const noexcept;
@@ -552,6 +482,8 @@ public:
     ///
     /// The string versions assume that the column is sorted according
     /// to StringData::operator<().
+    ///
+    /// FIXME: Deprecate or change to return ObjKey.
     size_t lower_bound_int(ColKey col_key, int64_t value) const noexcept;
     size_t upper_bound_int(ColKey col_key, int64_t value) const noexcept;
     size_t lower_bound_bool(ColKey col_key, bool value) const noexcept;
@@ -761,23 +693,8 @@ private:
     void to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth = 0,
                      std::map<std::string, std::string>* renames = nullptr) const;
 
-    // Detach accessor from underlying table. Caller must ensure that
-    // a reference count exists upon return, for example by obtaining
-    // an extra reference count before the call.
-    //
-    // This function puts this table accessor into the detached
-    // state. This detaches it from the underlying structure of array
-    // nodes. All TableRefs for this table instance becomes detached.
-    //
-    // This function may be called for a table accessor that is
-    // already in the detached state (idempotency).
-    //
-    // It is also valid to call this function for a table accessor
-    // that has not yet been detached, but whose underlying structure
-    // of arrays have changed in an unpredictable/unknown way. This
-    // kind of change generally happens when a modifying table
-    // operation fails, and also when one transaction is ended and a
-    // new one is started.
+    // Detach accessor. This recycles the Table accessor and all subordinate
+    // accessors become invalid.
     void detach() noexcept;
 
     /// Detach and remove all attached row, link list, and subtable
@@ -810,6 +727,8 @@ private:
     //@{
 
     /// Cascading removal of strong links.
+    ///
+    /// FIXME: Update this explanation
     ///
     /// cascade_break_backlinks_to() removes all backlinks pointing to the row
     /// at \a row_ndx. Additionally, if this causes the number of **strong**

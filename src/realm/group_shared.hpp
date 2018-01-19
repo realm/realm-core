@@ -418,7 +418,7 @@ public:
     void test_ringbuf();
 #endif
 
-    /// To handover a table view, query, linkview or row accessor of type T, you
+    /// To handover a table view, query, List<T> or Obj accessor of type T, you
     /// must wrap it into a Handover<T> for the transfer. Wrapping and
     /// unwrapping of a handover object is done by the methods
     /// 'export_for_handover()' and 'import_from_handover()' declared below.
