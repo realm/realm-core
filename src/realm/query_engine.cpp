@@ -249,7 +249,7 @@ void StringNode<Equal>::_search_index_init()
     FindRes fr;
     InternalFindResult res;
 
-    auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_idx);
+    auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
     fr = index->find_all_no_copy(StringData(StringNodeBase::m_value), res);
 
     switch (fr) {
@@ -282,7 +282,7 @@ size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 
 void StringNode<EqualIns>::_search_index_init()
 {
-    auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_idx);
+    auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
     index->find_all(m_index_matches, StringData(StringNodeBase::m_value), true);
     m_results_start = 0;
     m_results_end = m_index_matches.size();
@@ -466,9 +466,9 @@ std::string ExpressionNode::describe() const
     }
 }
 
-void ExpressionNode::update_column() const
+void ExpressionNode::collect_dependencies(std::vector<TableKey>& tables) const
 {
-    m_expression->update_column();
+    m_expression->collect_dependencies(tables);
 }
 
 size_t ExpressionNode::find_first_local(size_t start, size_t end)

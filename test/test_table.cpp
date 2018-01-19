@@ -267,21 +267,19 @@ TEST(Table_DeleteCrash)
     table->remove_object(k1);
 }
 
-#ifdef LEGACY_TESTS
 TEST(Table_OptimizeCrash)
 {
     // This will crash at the .add() method
     Table ttt;
     ttt.add_column(type_Int, "first");
-    ttt.add_column(type_String, "second");
+    auto col = ttt.add_column(type_String, "second");
+#ifdef LEGACY_TESTS
     ttt.optimize();
-    ttt.add_search_index(1);
+#endif // LEGACY_TESTS
+    ttt.add_search_index(col);
     ttt.clear();
-    ttt.add_empty_row(1);
-    ttt.set_int(0, 0, 1);
-    ttt.set_string(1, 0, "AA");
+    ttt.create_object().set_all(1, "AA");
 }
-#endif
 
 TEST(Table_DateTimeMinMax)
 {
@@ -321,16 +319,16 @@ TEST(Table_DateTimeMinMax)
     objs[1].set(col, Timestamp{2, 2});
     objs[2].set(col, Timestamp{0, 0});
 
-    CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
-    CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
+    CHECK_EQUAL(table->maximum_timestamp(col), Timestamp(2, 2));
+    CHECK_EQUAL(table->minimum_timestamp(col), Timestamp(0, 0));
 
     objs[0].set(col, Timestamp{2, 2});
     objs[1].set_null(col);
     objs[2].set(col, Timestamp{0, 0});
 
-    CHECK_EQUAL(table->maximum_timestamp(0, &idx), Timestamp(2, 2));
+    CHECK_EQUAL(table->maximum_timestamp(col, &idx), Timestamp(2, 2));
     CHECK_EQUAL(idx, objs[0].get_key());
-    CHECK_EQUAL(table->minimum_timestamp(0, &idx), Timestamp(0, 0));
+    CHECK_EQUAL(table->minimum_timestamp(col, &idx), Timestamp(0, 0));
     CHECK_EQUAL(idx, objs[2].get_key());
 }
 
@@ -461,16 +459,17 @@ TEST(TableView_AggregateBugs)
         CHECK_EQUAL(vc, 3);
 
         // There are currently 3 ways of doing average: on tableview, table and query:
-        CHECK_APPROXIMATELY_EQUAL(table.average_double(double_col), table.where().average_double(1, &vc), 0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(double_col), table.where().average_double(double_col, &vc),
+                                  0.001);
         CHECK_EQUAL(vc, 3);
 
-        CHECK_APPROXIMATELY_EQUAL(table.average_double(double_col), table.where().find_all().average_double(1, &vc),
-                                  0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(double_col),
+                                  table.where().find_all().average_double(double_col, &vc), 0.001);
         CHECK_EQUAL(vc, 3);
 
         // Core has an optimization where it executes average directly on the column if there
         // are no query conditions. Bypass that here.
-        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(double_col, 1.).find_all().average_double(1, &vc),
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(double_col, 1.).find_all().average_double(double_col, &vc),
                                   (2. + 42.) / 2, 0.001);
         CHECK_EQUAL(vc, 2);
     }
@@ -504,6 +503,7 @@ TEST(TableView_AggregateBugs)
 }
 
 
+#ifdef LEGACY_TESTS
 TEST(Table_AggregateFuzz)
 {
     // Tests sum, avg, min, max on Table, TableView, Query, for types float, Timestamp, int
@@ -759,7 +759,7 @@ TEST(Table_AggregateFuzz)
         }
     }
 }
-
+#endif
 
 TEST(Table_ColumnNameTooLong)
 {
@@ -845,10 +845,10 @@ TEST(Table_Floats)
     auto float_col = table.add_column(type_Float, "first");
     auto double_col = table.add_column(type_Double, "second");
 
-    CHECK_EQUAL(type_Float, table.get_column_type(0));
-    CHECK_EQUAL(type_Double, table.get_column_type(1));
-    CHECK_EQUAL("first", table.get_column_name(0));
-    CHECK_EQUAL("second", table.get_column_name(1));
+    CHECK_EQUAL(type_Float, table.get_column_type(float_col));
+    CHECK_EQUAL(type_Double, table.get_column_type(double_col));
+    CHECK_EQUAL("first", table.get_column_name(float_col));
+    CHECK_EQUAL("second", table.get_column_name(double_col));
 
     // Test adding a single empty row
     // and filling it with values
@@ -872,9 +872,7 @@ TEST(Table_Floats)
         CHECK_EQUAL(v2, o.get<double>(double_col));
     }
 
-#ifdef REALM_DEBUG
     table.verify();
-#endif
 }
 
 TEST(Table_Delete)
@@ -947,19 +945,29 @@ TEST(Table_GetName)
 
 namespace {
 
-void setup_multi_table(Table& table, size_t rows, std::vector<Key>& keys)
+void setup_multi_table(Table& table, size_t rows, std::vector<Key>& keys, std::vector<ColKey>& column_keys)
 {
     // Create table with all column types
     auto int_col = table.add_column(type_Int, "int");                        //  0
+    column_keys.push_back(int_col);
     auto bool_col = table.add_column(type_Bool, "bool");                     //  1
+    column_keys.push_back(bool_col);
     auto float_col = table.add_column(type_Float, "float");                  //  3
+    column_keys.push_back(float_col);
     auto double_col = table.add_column(type_Double, "double");               //  4
+    column_keys.push_back(double_col);
     auto string_col = table.add_column(type_String, "string");               //  5
+    column_keys.push_back(string_col);
     auto string_long_col = table.add_column(type_String, "string_long");     //  6
+    column_keys.push_back(string_long_col);
     auto string_big_col = table.add_column(type_String, "string_big_blobs"); //  7
+    column_keys.push_back(string_big_col);
     auto string_enum_col = table.add_column(type_String, "string_enum");     //  8 - becomes StringEnumColumn
+    column_keys.push_back(string_enum_col);
     auto bin_col = table.add_column(type_Binary, "binary");                  //  9
+    column_keys.push_back(bin_col);
     auto int_null_col = table.add_column(type_Int, "int_null", true);        // 12, nullable = true
+    column_keys.push_back(int_null_col);
 
     std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
@@ -1034,7 +1042,8 @@ TEST(Table_DeleteAllTypes)
 {
     Table table;
     std::vector<Key> keys;
-    setup_multi_table(table, 15, keys);
+    std::vector<ColKey> column_keys;
+    setup_multi_table(table, 15, keys, column_keys);
 
     // Test Deletes
     table.remove_object(keys[14]);
@@ -1086,10 +1095,9 @@ TEST(Table_MoveAllTypes)
 
     Table table;
     std::vector<Key> keys;
-    setup_multi_table(table, 15, keys);
-#ifdef LEGACY_TESTS
-    table.add_search_index(6);
-#endif
+    std::vector<ColKey> column_keys;
+    setup_multi_table(table, 15, keys, column_keys);
+    table.add_search_index(column_keys[6]);
     while (!table.is_empty()) {
         size_t size = keys.size();
         auto it = keys.begin() + random.draw_int_mod(size);
@@ -1320,7 +1328,7 @@ TEST(Table_Sorted_Query_where)
 #endif
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Table_Multi_Sort)
 {
     Table table;
@@ -1356,60 +1364,62 @@ TEST(Table_Multi_Sort)
     CHECK_EQUAL(Key(4), v_sorted2.get_key(3));
     CHECK_EQUAL(Key(3), v_sorted2.get_key(4));
 }
-
-
-#ifdef LEGACY_TESTS
+#endif
 
 TEST(Table_IndexString)
 {
-    TestTableEnum table;
+    Table table;
+    table.add_column(type_Int, "first");
+    auto col_str = table.add_column(type_String, "second");
 
-    add(table, Mon, "jeff");
-    add(table, Tue, "jim");
-    add(table, Wed, "jennifer");
-    add(table, Thu, "john");
-    add(table, Fri, "jimmy");
-    add(table, Sat, "jimbo");
-    add(table, Sun, "johnny");
-    add(table, Mon, "jennifer"); // duplicate
+    Key k0 = table.create_object().set_all(int(Mon), "jeff").get_key();
+    Key k1 = table.create_object().set_all(int(Tue), "jim").get_key();
+    table.create_object().set_all(int(Wed), "jennifer");
+    table.create_object().set_all(int(Thu), "john");
+    table.create_object().set_all(int(Fri), "jimmy");
+    Key k5 = table.create_object().set_all(int(Sat), "jimbo").get_key();
+    Key k6 = table.create_object().set_all(int(Sun), "johnny").get_key();
+    table.create_object().set_all(int(Mon), "jennifer"); // duplicate
 
-    table.add_search_index(1);
-    CHECK(table.has_search_index(1));
+    table.add_search_index(col_str);
+    CHECK(table.has_search_index(col_str));
 
-    const size_t r1 = table.find_first_string(1, "jimmi");
-    CHECK_EQUAL(not_found, r1);
+    Key r1 = table.find_first_string(col_str, "jimmi");
+    CHECK_EQUAL(null_key, r1);
 
-    const size_t r2 = table.find_first_string(1, "jeff");
-    const size_t r3 = table.find_first_string(1, "jim");
-    const size_t r4 = table.find_first_string(1, "jimbo");
-    const size_t r5 = table.find_first_string(1, "johnny");
-    CHECK_EQUAL(0, r2);
-    CHECK_EQUAL(1, r3);
-    CHECK_EQUAL(5, r4);
-    CHECK_EQUAL(6, r5);
+    Key r2 = table.find_first_string(col_str, "jeff");
+    Key r3 = table.find_first_string(col_str, "jim");
+    Key r4 = table.find_first_string(col_str, "jimbo");
+    Key r5 = table.find_first_string(col_str, "johnny");
+    CHECK_EQUAL(k0, r2);
+    CHECK_EQUAL(k1, r3);
+    CHECK_EQUAL(k5, r4);
+    CHECK_EQUAL(k6, r5);
 
-    const size_t c1 = table.count_string(1, "jennifer");
+    const size_t c1 = table.count_string(col_str, "jennifer");
     CHECK_EQUAL(2, c1);
 }
 
 
 TEST(Table_IndexStringTwice)
 {
-    TestTableEnum table;
+    Table table;
+    table.add_column(type_Int, "first");
+    auto col_str = table.add_column(type_String, "second");
 
-    add(table, Mon, "jeff");
-    add(table, Tue, "jim");
-    add(table, Wed, "jennifer");
-    add(table, Thu, "john");
-    add(table, Fri, "jimmy");
-    add(table, Sat, "jimbo");
-    add(table, Sun, "johnny");
-    add(table, Mon, "jennifer"); // duplicate
+    table.create_object().set_all(int(Mon), "jeff");
+    table.create_object().set_all(int(Tue), "jim");
+    table.create_object().set_all(int(Wed), "jennifer");
+    table.create_object().set_all(int(Thu), "john");
+    table.create_object().set_all(int(Fri), "jimmy");
+    table.create_object().set_all(int(Sat), "jimbo");
+    table.create_object().set_all(int(Sun), "johnny");
+    table.create_object().set_all(int(Mon), "jennifer"); // duplicate
 
-    table.add_search_index(1);
-    CHECK_EQUAL(true, table.has_search_index(1));
-    table.add_search_index(1);
-    CHECK_EQUAL(true, table.has_search_index(1));
+    table.add_search_index(col_str);
+    CHECK_EQUAL(true, table.has_search_index(col_str));
+    table.add_search_index(col_str);
+    CHECK_EQUAL(true, table.has_search_index(col_str));
 }
 
 
@@ -1418,296 +1428,86 @@ TEST(Table_IndexStringTwice)
 TEST(Table_IndexInteger)
 {
     Table table;
-    size_t r;
+    Key k;
 
-    table.add_column(type_Int, "ints");
-    table.add_column(type_OldDateTime, "date");
-    table.add_column(type_Bool, "date");
+    auto col_int = table.add_column(type_Int, "ints");
+    auto col_date = table.add_column(type_Timestamp, "date");
+    auto col_bool = table.add_column(type_Bool, "booleans");
 
-    table.add_empty_row(13);
+    std::vector<Key> keys;
+    table.create_objects(13, keys);
 
-    table.set_int(0, 0, 3);  // 0
-    table.set_int(0, 1, 1);  // 1
-    table.set_int(0, 2, 2);  // 2
-    table.set_int(0, 3, 2);  // 3
-    table.set_int(0, 4, 2);  // 4
-    table.set_int(0, 5, 3);  // 5
-    table.set_int(0, 6, 3);  // 6
-    table.set_int(0, 7, 2);  // 7
-    table.set_int(0, 8, 4);  // 8
-    table.set_int(0, 9, 2);  // 9
-    table.set_int(0, 10, 6); // 10
-    table.set_int(0, 11, 2); // 11
-    table.set_int(0, 12, 3); // 12
+    table.get_object(keys[0]).set(col_int, 3);  // 0
+    table.get_object(keys[1]).set(col_int, 1);  // 1
+    table.get_object(keys[2]).set(col_int, 2);  // 2
+    table.get_object(keys[3]).set(col_int, 2);  // 3
+    table.get_object(keys[4]).set(col_int, 2);  // 4
+    table.get_object(keys[5]).set(col_int, 3);  // 5
+    table.get_object(keys[6]).set(col_int, 3);  // 6
+    table.get_object(keys[7]).set(col_int, 2);  // 7
+    table.get_object(keys[8]).set(col_int, 4);  // 8
+    table.get_object(keys[9]).set(col_int, 2);  // 9
+    table.get_object(keys[10]).set(col_int, 6); // 10
+    table.get_object(keys[11]).set(col_int, 2); // 11
+    table.get_object(keys[12]).set(col_int, 3); // 12
 
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
-    table.add_search_index(1);
-    CHECK(table.has_search_index(1));
-    table.add_search_index(2);
-    CHECK(table.has_search_index(2));
+    table.add_search_index(col_int);
+    CHECK(table.has_search_index(col_int));
+    table.add_search_index(col_date);
+    CHECK(table.has_search_index(col_date));
+    table.add_search_index(col_bool);
+    CHECK(table.has_search_index(col_bool));
 
-    table.set_olddatetime(1, 10, OldDateTime(43));
-    r = table.find_first_olddatetime(1, OldDateTime(43));
-    CHECK_EQUAL(10, r);
+    table.get_object(keys[10]).set(col_date, Timestamp(43, 0));
+    k = table.find_first_timestamp(col_date, Timestamp(43, 0));
+    CHECK_EQUAL(keys[10], k);
 
-    table.set_bool(2, 11, true);
-    r = table.find_first_bool(2, true);
-    CHECK_EQUAL(11, r);
+    table.get_object(keys[11]).set(col_bool, true);
+    k = table.find_first_bool(col_bool, true);
+    CHECK_EQUAL(keys[11], k);
 
-    r = table.find_first_int(0, 11);
-    CHECK_EQUAL(not_found, r);
+    k = table.find_first_int(col_int, 11);
+    CHECK_EQUAL(null_key, k);
 
-    r = table.find_first_int(0, 3);
-    CHECK_EQUAL(0, r);
+    k = table.find_first_int(col_int, 3);
+    CHECK_EQUAL(keys[0], k);
 
-    r = table.find_first_int(0, 4);
-    CHECK_EQUAL(8, r);
+    k = table.find_first_int(col_int, 4);
+    CHECK_EQUAL(keys[8], k);
 
-    TableView tv = table.find_all_int(0, 2);
+    TableView tv = table.find_all_int(col_int, 2);
     CHECK_EQUAL(6, tv.size());
 
-    CHECK_EQUAL(2, tv[0].get_index());
-    CHECK_EQUAL(3, tv[1].get_index());
-    CHECK_EQUAL(4, tv[2].get_index());
-    CHECK_EQUAL(7, tv[3].get_index());
-    CHECK_EQUAL(9, tv[4].get_index());
-    CHECK_EQUAL(11, tv[5].get_index());
-}
-
-TEST(Table_SetIntUnique)
-{
-    Table table;
-    table.add_column(type_Int, "ints");
-    table.add_column(type_Int, "ints_null", true);
-    table.add_column(type_Int, "ints_null", true);
-    table.add_empty_row(10);
-
-    CHECK_LOGIC_ERROR(table.set_int_unique(0, 0, 123), LogicError::no_search_index);
-    CHECK_LOGIC_ERROR(table.set_int_unique(1, 0, 123), LogicError::no_search_index);
-    CHECK_LOGIC_ERROR(table.set_null_unique(2, 0), LogicError::no_search_index);
-    table.add_search_index(0);
-    table.add_search_index(1);
-    table.add_search_index(2);
-
-    table.set_int_unique(0, 0, 123);
-    CHECK_EQUAL(table.size(), 10);
-
-    table.set_int_unique(1, 0, 123);
-    CHECK_EQUAL(table.size(), 10);
-
-    table.set_int_unique(2, 0, 123);
-    CHECK_EQUAL(table.size(), 10);
-
-    // Check that conflicting SetIntUniques result in rows being deleted. First a collision in column 0:
-    table.set_int_unique(0, 1, 123); // This will delete row 1
-    CHECK_EQUAL(table.size(), 9);
-
-    table.set_int_unique(1, 1, 123); // This will delete row 1
-    CHECK_EQUAL(table.size(), 8);
-
-    table.set_int_unique(1, 2, 123); // This will delete row 1
-    CHECK_EQUAL(table.size(), 7);
-
-    // Collision in column 1:
-    table.set_int_unique(1, 0, 123); // no-op
-    CHECK_EQUAL(table.size(), 7);
-    table.set_int_unique(0, 0, 123); // no-op
-    CHECK_EQUAL(table.size(), 7);
-    table.set_int_unique(2, 0, 123); // no-op
-    CHECK_EQUAL(table.size(), 7);
-
-    // Collision in column 2:
-    table.set_int_unique(2, 1, 123); // This will delete a row
-    CHECK_EQUAL(table.size(), 6);
-    table.set_int_unique(0, 1, 123); // This will delete a row
-    CHECK_EQUAL(table.size(), 5);
-    table.set_int_unique(1, 1, 123); // This will delete a row
-    CHECK_EQUAL(table.size(), 4);
-
-    // Since table.add_empty_row(10); filled the column with all nulls, only two rows should now remain
-    table.set_null_unique(2, 1);
-    CHECK_EQUAL(table.size(), 2);
-
-    table.set_null_unique(2, 0);
-    CHECK_EQUAL(table.size(), 1);
-}
-
-
-TEST_TYPES(Table_SetStringUnique, std::true_type, std::false_type)
-{
-    bool string_enum_column = TEST_TYPE::value;
-    Table table;
-    table.add_column(type_Int, "ints");
-    table.add_column(type_String, "strings");
-    table.add_column(type_String, "strings_nullable", true);
-    table.add_empty_row(10); // all duplicates!
-
-    CHECK_LOGIC_ERROR(table.set_string_unique(1, 0, "foo"), LogicError::no_search_index);
-    CHECK_LOGIC_ERROR(table.set_string_unique(2, 0, "foo"), LogicError::no_search_index);
-    table.add_search_index(1);
-    table.add_search_index(2);
-
-    if (string_enum_column) {
-        bool force = true;
-        table.optimize(force);
-    }
-
-    table.set_string_unique(1, 0, "bar");
-
-    // Check that conflicting SetStringUniques result in rows with duplicate values being deleted.
-    table.set_string_unique(1, 1, "bar");
-    CHECK_EQUAL(table.size(), 9); // Only duplicates of "bar" are removed.
-
-    table.set_string_unique(2, 0, realm::null());
-    CHECK_EQUAL(table.size(), 1);
+    CHECK_EQUAL(keys[2], tv[0].get_key());
+    CHECK_EQUAL(keys[3], tv[1].get_key());
+    CHECK_EQUAL(keys[4], tv[2].get_key());
+    CHECK_EQUAL(keys[7], tv[3].get_key());
+    CHECK_EQUAL(keys[9], tv[4].get_key());
+    CHECK_EQUAL(keys[11], tv[5].get_key());
 }
 
 
 TEST(Table_AddInt)
 {
     Table t;
-    t.add_column(type_Int, "i");
-    t.add_column(type_Int, "ni", /*nullable*/ true);
-    t.add_empty_row(1);
+    auto col_int = t.add_column(type_Int, "i");
+    auto col_int_null = t.add_column(type_Int, "ni", /*nullable*/ true);
+    Obj obj = t.create_object();
 
-    t.add_int(0, 0, 1);
-    CHECK_EQUAL(t.get_int(0, 0), 1);
+    obj.add_int(col_int, 1);
+    CHECK_EQUAL(obj.get<Int>(col_int), 1);
 
     // Check that signed integers wrap around. This invariant is necessary for
     // full commutativity.
-    t.add_int(0, 0, Table::max_integer);
-    CHECK_EQUAL(t.get_int(0, 0), Table::min_integer);
-    t.add_int(0, 0, -1);
-    CHECK_EQUAL(t.get_int(0, 0), Table::max_integer);
+    obj.add_int(col_int, Table::max_integer);
+    CHECK_EQUAL(obj.get<Int>(col_int), Table::min_integer);
+    obj.add_int(col_int, -1);
+    CHECK_EQUAL(obj.get<Int>(col_int), Table::max_integer);
 
     // add_int() has no effect on a NULL
-    CHECK(t.is_null(1, 0));
-    CHECK_LOGIC_ERROR(t.add_int(1, 0, 123), LogicError::illegal_combination);
+    CHECK(obj.is_null(col_int_null));
+    CHECK_LOGIC_ERROR(obj.add_int(col_int_null, 123), LogicError::illegal_combination);
 }
-
-
-TEST(Table_SetUniqueAccessorUpdating)
-{
-    Group g;
-    TableRef origin = g.add_table("origin");
-    TableRef target = g.add_table("target");
-
-    target->add_column(type_Int, "col");
-    origin->add_column(type_Int, "pk");
-    origin->add_column_link(type_LinkList, "list", *target);
-    origin->add_search_index(0);
-
-    origin->add_empty_row(2);
-    origin->set_int_unique(0, 0, 1);
-    origin->set_int_unique(0, 1, 2);
-
-    Row row_0 = (*origin)[0];
-    Row row_1 = (*origin)[1];
-    LinkViewRef lv_0 = origin->get_linklist(1, 0);
-    LinkViewRef lv_1 = origin->get_linklist(1, 1);
-
-    // check new row number > old row number
-
-    origin->add_empty_row(2);
-    // leaves row 0 as winner, move last over of 2
-    origin->set_int_unique(0, 2, 1);
-
-    CHECK_EQUAL(origin->size(), 3);
-    CHECK(row_0.is_attached());
-    CHECK(row_1.is_attached());
-    CHECK_EQUAL(row_0.get_index(), 0);
-    CHECK_EQUAL(row_1.get_index(), 1);
-
-    CHECK(lv_0->is_attached());
-    CHECK(lv_1->is_attached());
-    CHECK(lv_0 == origin->get_linklist(1, 0));
-    CHECK(lv_1 == origin->get_linklist(1, 1));
-
-    // check new row number < old row number
-
-    origin->insert_empty_row(0, 2);
-    CHECK_EQUAL(origin->size(), 5);
-    // winner is row 3, row 0 is deleted via move_last_over(0)
-    origin->set_int_unique(0, 0, 2);
-    CHECK_EQUAL(origin->size(), 4);
-
-    CHECK(row_0.is_attached());
-    CHECK(row_1.is_attached());
-    CHECK_EQUAL(row_0.get_index(), 2); // unchanged
-    CHECK_EQUAL(row_1.get_index(), 3); // unchanged
-
-    CHECK(lv_0->is_attached());
-    CHECK(lv_1->is_attached());
-    CHECK(lv_0 == origin->get_linklist(1, 2));
-    CHECK(lv_1 == origin->get_linklist(1, 3));
-}
-
-
-TEST(Table_SetUniqueLoserAccessorUpdates)
-{
-    Group g;
-    TableRef origin = g.add_table("origin");
-    TableRef target = g.add_table("target");
-
-    target->add_column(type_Int, "col");
-    target->add_empty_row(6);
-    size_t int_col = origin->add_column(type_Int, "pk");
-    size_t ll_col = origin->add_column_link(type_LinkList, "list", *target);
-    size_t str_col = origin->add_column(type_String, "description");
-    origin->add_search_index(0);
-    origin->add_search_index(2);
-
-    origin->add_empty_row(4);
-    origin->set_int_unique(int_col, 0, 1);
-    origin->set_int_unique(int_col, 1, 2);
-    origin->set_string(str_col, 0, "zero");
-    origin->set_string(str_col, 1, "one");
-    origin->set_string(str_col, 2, "two");
-    origin->set_string(str_col, 3, "three");
-
-    Row row_0 = (*origin)[0];
-    Row row_1 = (*origin)[1];
-    Row row_2 = (*origin)[2];
-    LinkViewRef lv_0 = origin->get_linklist(ll_col, 0);
-    LinkViewRef lv_1 = origin->get_linklist(ll_col, 1);
-    lv_0->add(0); // one link
-    lv_1->add(1); // two links
-    lv_1->add(2);
-
-    CHECK_EQUAL(origin->size(), 4);
-    CHECK(row_0.is_attached());
-    CHECK(row_1.is_attached());
-    CHECK(row_2.is_attached());
-    CHECK_EQUAL(row_0.get_string(str_col), "zero");
-    CHECK_EQUAL(row_1.get_string(str_col), "one");
-    CHECK_EQUAL(row_2.get_string(str_col), "two");
-
-    // leaves row 0 as winner, move last over of 2
-    origin->set_int_unique(int_col, 2, 1);
-
-    CHECK_EQUAL(origin->size(), 3);
-    CHECK(row_0.is_attached());
-    CHECK(row_1.is_attached());
-    CHECK(row_2.is_attached());
-    CHECK_EQUAL(row_0.get_index(), 0);
-    CHECK_EQUAL(row_1.get_index(), 1);
-    CHECK_EQUAL(row_2.get_index(), 0);
-    CHECK_EQUAL(row_0.get_string(str_col), "zero");
-    CHECK_EQUAL(row_1.get_string(str_col), "one");
-    CHECK_EQUAL(row_2.get_string(str_col), "zero");
-    CHECK_EQUAL(row_0.get_linklist(ll_col)->size(), 1);
-    CHECK_EQUAL(row_1.get_linklist(ll_col)->size(), 2);
-    CHECK_EQUAL(row_2.get_linklist(ll_col)->size(), 1); // subsumed
-    CHECK_EQUAL(lv_0->size(), 1);
-    CHECK_EQUAL(lv_1->size(), 2);
-
-    CHECK(lv_0->is_attached());
-    CHECK(lv_1->is_attached());
-    CHECK(lv_0 == origin->get_linklist(1, 0));
-    CHECK(lv_1 == origin->get_linklist(1, 1));
-}
-#endif // LEGACY_TESTS
 
 TEST(Table_Distinct)
 {
@@ -1854,7 +1654,7 @@ TEST(Table_DistinctFromPersistedTable)
     {
         Group group(path, 0, Group::mode_ReadOnly);
         TableRef table = group.get_table("table");
-        auto col = table->get_column_index("first");
+        auto col = table->get_column_key("first");
         TableView view = table->get_distinct_view(col);
 
         CHECK_EQUAL(3, view.size());
@@ -2101,54 +1901,6 @@ TEST(Table_AutoEnumerationOptimize)
 #endif
 }
 
-TEST(Table_OptimizeSubtable)
-{
-    Table t;
-    DescriptorRef descr;
-    t.add_column(type_Table, "sub", false, &descr);
-    descr->add_column(type_String, "str");
-    t.add_empty_row();
-    t.add_empty_row();
-
-    {
-        // Non-enumerable
-        auto r = t.get_subtable(0, 0);
-        std::string s;
-        for (int i = 0; i < 100; ++i) {
-            auto ndx = r->add_empty_row();
-            r->set_string(0, ndx, s.c_str());
-            s += 'x';
-        }
-    }
-
-    {
-        // Enumerable
-        auto r = t.get_subtable(0, 1);
-        for (int i = 0; i < 100; ++i) {
-            auto ndx = r->add_empty_row();
-            r->set_string(0, ndx, "foo");
-        }
-        r->optimize();
-    }
-
-    // Verify
-    {
-        // Non-enumerable
-        auto r = t.get_subtable(0, 0);
-        std::string s;
-        for (size_t i = 0; i < r->size(); ++i) {
-            CHECK_EQUAL(s.c_str(), r->get_string(0, i));
-            s += 'x';
-        }
-    }
-    {
-        // Non-enumerable
-        auto r = t.get_subtable(0, 1);
-        for (size_t i = 0; i < r->size(); ++i) {
-            CHECK_EQUAL("foo", r->get_string(0, i));
-        }
-    }
-}
 
 TEST(Table_OptimizeCompare)
 {
@@ -2175,1447 +1927,116 @@ TEST(Table_OptimizeCompare)
     t2.set_string(0, 50, "foo");
     CHECK(t1 == t2);
 }
+#endif // LEGACY_TESTS
 
 
 TEST(Table_SlabAlloc)
 {
     SlabAlloc alloc;
     alloc.attach_empty();
-    TestTable01 table(alloc);
+    Table table(alloc);
 
-    add(table, 0, 10, true, Wed);
+    auto col_int0 = table.add_column(type_Int, "int0");
+    auto col_int1 = table.add_column(type_Int, "int1");
+    auto col_bool = table.add_column(type_Bool, "bool");
+    auto col_int2 = table.add_column(type_Int, "int2");
 
-    CHECK_EQUAL(0, table.get_int(0, 0));
-    CHECK_EQUAL(10, table.get_int(1, 0));
-    CHECK_EQUAL(true, table.get_bool(2, 0));
-    CHECK_EQUAL(Wed, table.get_int(3, 0));
+    Obj obj = table.create_object().set_all(0, 10, true, int(Wed));
+    CHECK_EQUAL(0, obj.get<Int>(col_int0));
+    CHECK_EQUAL(10, obj.get<Int>(col_int1));
+    CHECK_EQUAL(true, obj.get<Bool>(col_bool));
+    CHECK_EQUAL(Wed, obj.get<Int>(col_int2));
 
     // Add some more rows
-    add(table, 1, 10, true, Wed);
-    add(table, 2, 20, true, Wed);
-    add(table, 3, 10, true, Wed);
-    add(table, 4, 20, true, Wed);
-    add(table, 5, 10, true, Wed);
+    table.create_object().set_all(1, 10, true, int(Wed));
+    Key k0 = table.create_object().set_all(2, 20, true, int(Wed)).get_key();
+    table.create_object().set_all(3, 10, true, int(Wed));
+    Key k1 = table.create_object().set_all(4, 20, true, int(Wed)).get_key();
+    table.create_object().set_all(5, 10, true, int(Wed));
 
     // Delete some rows
-    table.remove(2);
-    table.remove(4);
+    table.remove_object(k0);
+    table.remove_object(k1);
 
 #ifdef REALM_DEBUG
     table.verify();
 #endif
 }
-
-
-TEST(Table_Spec)
-{
-    Group group;
-    TableRef table = group.add_table("test");
-
-    // Create specification with sub-table
-    {
-        DescriptorRef sub_1;
-        table->add_column(type_Int, "first");
-        table->add_column(type_String, "second");
-        table->add_column(type_Table, "third", &sub_1);
-        sub_1->add_column(type_Int, "sub_first");
-        sub_1->add_column(type_String, "sub_second");
-    }
-
-    CHECK_EQUAL(3, table->get_column_count());
-
-    // Add a row
-    table->insert_empty_row(0);
-    table->set_int(0, 0, 4);
-    table->set_string(1, 0, "Hello");
-
-    CHECK_EQUAL(0, table->get_subtable_size(2, 0));
-
-    // Get the sub-table
-    {
-        TableRef subtable = table->get_subtable(2, 0);
-        CHECK(subtable->is_empty());
-
-        subtable->insert_empty_row(0);
-        subtable->set_int(0, 0, 42);
-        subtable->set_string(1, 0, "test");
-
-        CHECK_EQUAL(42, subtable->get_int(0, 0));
-        CHECK_EQUAL("test", subtable->get_string(1, 0));
-    }
-
-    CHECK_EQUAL(1, table->get_subtable_size(2, 0));
-
-    // Get the sub-table again and see if the values
-    // still match.
-    {
-        TableRef subtable = table->get_subtable(2, 0);
-
-        CHECK_EQUAL(1, subtable->size());
-        CHECK_EQUAL(42, subtable->get_int(0, 0));
-        CHECK_EQUAL("test", subtable->get_string(1, 0));
-    }
-
-    // Write the group to disk
-    GROUP_TEST_PATH(path);
-    group.write(path);
-
-    // Read back tables
-    {
-        Group from_disk(path, 0, Group::mode_ReadOnly);
-        TableRef from_disk_table = from_disk.get_table("test");
-
-        TableRef subtable2 = from_disk_table->get_subtable(2, 0);
-
-        CHECK_EQUAL(1, subtable2->size());
-        CHECK_EQUAL(42, subtable2->get_int(0, 0));
-        CHECK_EQUAL("test", subtable2->get_string(1, 0));
-    }
-}
-
-TEST(Table_SubtableIndex)
-{
-    GROUP_TEST_PATH(path);
-
-    {
-        Group group;
-        DescriptorRef sub_1;
-        TableRef table = group.add_table("test");
-
-        // Create specification with sub-table
-        table->add_column(type_String, "first");
-        table->add_column(type_Table, "second", &sub_1);
-
-        sub_1->add_column(type_Int, "sub_first");
-        sub_1->add_column(type_String, "sub_second");
-
-        // Add search index to `degenerate` subtable (subtable which does not yet exist because it has
-        // no rows yet, so it's just a 0-ref in the ColumnTable object). Important to test because the
-        // search index is then constructed in a different place in the source code
-        sub_1->add_search_index(0);
-        CHECK(sub_1->has_search_index(0));
-        sub_1->remove_search_index(0);
-        CHECK(!sub_1->has_search_index(0));
-        sub_1->add_search_index(0);
-        CHECK(sub_1->has_search_index(0));
-
-        CHECK_EQUAL(2, table->get_column_count());
-
-        // Add two rows to parent table
-        table->add_empty_row();
-        table->add_empty_row();
-        table->set_string(0, 0, "Hello");
-
-        // Add rows to first subtable
-        TableRef subtable = table->get_subtable(1, 0);
-        CHECK(subtable->is_empty());
-        subtable->add_empty_row();
-        subtable->set_int(0, 0, 42);
-        subtable->set_string(1, 0, "testsub1");
-        subtable->add_empty_row();
-        subtable->set_int(0, 1, 43);
-        subtable->set_string(1, 1, "testsub2");
-        CHECK_THROW_ANY(subtable->remove_search_index(0));
-        CHECK_THROW_ANY(subtable->add_search_index(0));
-
-        // Add rows to second subtable
-        subtable = table->get_subtable(1, 1);
-        CHECK(subtable->is_empty());
-        subtable->add_empty_row();
-        subtable->set_int(0, 0, 66);
-        subtable->set_string(1, 0, "testsub3");
-        subtable->add_empty_row();
-        subtable->set_int(0, 1, 77);
-        subtable->set_string(1, 1, "testsub4");
-
-        int64_t tt = subtable.get()->get_int(0, 0);
-        CHECK_EQUAL(tt, 66);
-
-        subtable = table->get_subtable(1, 0);
-        CHECK(subtable.get()->has_search_index(0));
-
-        size_t match;
-
-        match = subtable->where().equal(0, 43).find();
-        CHECK_EQUAL(match, 1);
-        match = subtable->where().equal(1, "testsub2").find();
-        CHECK_EQUAL(match, 1);
-
-        // group.verify();
-        // group.to_dot("group.dot");
-
-        subtable = table->get_subtable(1, 1);
-
-        match = subtable->where().equal(0, 77).find();
-        CHECK_EQUAL(match, 1);
-
-        // Query column that follows indexed column to test if refresh_column_accessors()
-        // has worked
-        match = subtable->where().equal(1, "testsub4").find();
-        CHECK_EQUAL(match, 1);
-
-        sub_1->remove_search_index(1);
-        CHECK(!subtable.get()->has_search_index(1));
-
-        // Query column that follows indexed column to test if refresh_column_accessors()
-        // has worked
-        match = subtable->where().equal(1, "testsub4").find();
-        CHECK_EQUAL(match, 1);
-
-
-        match = subtable->where().equal(0, 77).find();
-        CHECK_EQUAL(match, 1);
-
-        // Tests non-degenerate construction of index
-        sub_1->add_search_index(1);
-
-        match = subtable->where().equal(0, 77).find();
-        CHECK_EQUAL(match, 1);
-        match = subtable->where().equal(1, "testsub4").find();
-        CHECK_EQUAL(match, 1);
-
-        // Add more data and see if that works
-        subtable.get()->add_empty_row();
-        match = subtable->where().equal(0, 0).find();
-        CHECK_EQUAL(match, 2);
-
-        group.write(path);
-    }
-
-    {
-        // Check persistence
-        Group g2(path);
-        DescriptorRef sub_1;
-        TableRef table = g2.get_table("test");
-
-        TableRef subtable = table->get_subtable(1, 0);
-        CHECK(subtable.get()->has_search_index(0));
-
-        size_t match;
-
-        match = subtable->where().equal(0, 43).find();
-        CHECK_EQUAL(match, 1);
-        match = subtable->where().equal(1, "testsub2").find();
-        CHECK_EQUAL(match, 1);
-
-        subtable = table->get_subtable(1, 1);
-
-        match = subtable->where().equal(0, 77).find();
-        CHECK_EQUAL(match, 1);
-        match = subtable->where().equal(1, "testsub4").find();
-        CHECK_EQUAL(match, 1);
-
-        DescriptorRef subsub;
-        DescriptorRef sub = table.get()->get_subdescriptor(1);
-        sub->add_column(type_Table, "foobar", &subsub);
-        CHECK_THROW_ANY(subsub->add_search_index(0));
-    }
-
-    {
-        // Check that you are not allowed to add index to subtable of subtable
-        Group g2(path);
-        DescriptorRef sub_1;
-        TableRef table = g2.get_table("test");
-        DescriptorRef subsub;
-        DescriptorRef sub = table.get()->get_subdescriptor(1);
-        sub->add_column(type_Table, "baz", &subsub);
-        CHECK_THROW_ANY(subsub->add_search_index(0));
-    }
-
-    {
-        // Check correct updating of other subtable accessors than the one you called add_search_index() on
-        Group g2(path);
-        DescriptorRef des;
-        TableRef table = g2.get_table("test");
-        TableRef sub1 = table->get_subtable(1, 0);
-        TableRef sub2 = table->get_subtable(1, 1);
-
-        size_t match;
-
-        des = table->get_subdescriptor(1);
-
-        des->remove_search_index(0);
-
-        CHECK(!sub1->has_search_index(0));
-        match = sub1->where().equal(1, "testsub2").find();
-        CHECK_EQUAL(match, 1);
-
-        CHECK(!sub2->has_search_index(0));
-        match = sub2->where().equal(1, "testsub4").find();
-        CHECK_EQUAL(match, 1);
-
-        des->add_search_index(0);
-
-        CHECK(sub1->has_search_index(0));
-        match = sub1->where().equal(1, "testsub2").find();
-        CHECK_EQUAL(match, 1);
-
-        CHECK(sub2->has_search_index(0));
-        match = sub2->where().equal(1, "testsub4").find();
-        CHECK_EQUAL(match, 1);
-
-        // Check what happens if user given column index is out of range
-        CHECK_THROW(des->add_search_index(100), LogicError);
-        CHECK_THROW(des->remove_search_index(100), LogicError);
-        CHECK(!des->has_search_index(100));
-    }
-}
-
-TEST(LangBindHelper_SubtableSizeIncorrect)
-{
-    // Based on finding from AFL
-    // Problem was that creating a subtable if both search index and nullable flag
-    // was set in column attributes would clear the nullable flag. This would prevent
-    // accessors to already existing subtables to be created correctly (IntegerColumn on
-    // a IntNullColumn structure).
-    Table table;
-    DescriptorRef subdescr;
-    table.add_column(type_Table, "col", true, &subdescr);
-    // add int column that is nullable
-    subdescr->add_column(type_Int, "integers", nullptr, true);
-    table.add_empty_row(2);
-    // Create subtable entry
-    table.get_subtable(0, 1)->clear();
-    // Now we have one degenerate and one proper table
-    table.get_subdescriptor(0)->add_search_index(0);
-    table.add_empty_row();
-
-    // Before the fix this operation cleared the nullable flag in the spec
-    table.get_subtable(0, 2)->clear();
-    // Create subtable accessor
-    TableRef sub1 = table.get_subtable(0, 1);
-    CHECK_EQUAL(sub1->size(), 0);
-    sub1->add_empty_row(1);
-    sub1->set_int(0, 0, 7, false);
-}
-
-TEST(Table_SpecColumnPath)
-{
-    Group group;
-    TableRef table = group.add_table("test");
-
-    // Create path to sub-table column (starting with root)
-    std::vector<size_t> column_path;
-
-    // Create specification with sub-table
-    table->add_subcolumn(column_path, type_Int, "first");
-    table->add_subcolumn(column_path, type_String, "second");
-    table->add_subcolumn(column_path, type_Table, "third");
-
-    column_path.push_back(2); // third column (which is a sub-table col)
-
-    table->add_subcolumn(column_path, type_Int, "sub_first");
-    table->add_subcolumn(column_path, type_String, "sub_second");
-
-    // Add a row
-    table->insert_empty_row(0);
-    table->set_int(0, 0, 4);
-    table->set_string(1, 0, "Hello");
-
-    // Get the sub-table
-    {
-        TableRef subtable = table->get_subtable(2, 0);
-        CHECK(subtable->is_empty());
-
-        subtable->insert_empty_row(0);
-        subtable->set_int(0, 0, 42);
-        subtable->set_string(1, 0, "test");
-
-        CHECK_EQUAL(42, subtable->get_int(0, 0));
-        CHECK_EQUAL("test", subtable->get_string(1, 0));
-    }
-}
-
-TEST(Table_SpecRenameColumns)
-{
-    Group group;
-    TableRef table = group.add_table("test");
-
-    // Create specification with sub-table
-    table->add_column(type_Int, "first");
-    table->add_column(type_String, "second");
-    table->add_column(type_Table, "third");
-
-    // Create path to sub-table column
-    std::vector<size_t> column_path;
-    column_path.push_back(2); // third
-
-    table->add_subcolumn(column_path, type_Int, "sub_first");
-    table->add_subcolumn(column_path, type_String, "sub_second");
-
-    // Add a row
-    table->insert_empty_row(0);
-    table->set_int(0, 0, 4);
-    table->set_string(1, 0, "Hello");
-
-    // Get the sub-table
-    {
-        TableRef subtable = table->get_subtable(2, 0);
-        CHECK(subtable->is_empty());
-
-        subtable->insert_empty_row(0);
-        subtable->set_int(0, 0, 42);
-        subtable->set_string(1, 0, "test");
-
-        CHECK_EQUAL(42, subtable->get_int(0, 0));
-        CHECK_EQUAL("test", subtable->get_string(1, 0));
-    }
-
-    // Rename first column
-    table->rename_column(0, "1st");
-    CHECK_EQUAL(0, table->get_column_index("1st"));
-
-    // Rename sub-column
-    table->rename_subcolumn(column_path, 0, "sub_1st"); // third
-
-    // Get the sub-table
-    {
-        TableRef subtable = table->get_subtable(2, 0);
-        CHECK_EQUAL(0, subtable->get_column_index("sub_1st"));
-    }
-}
-
-TEST(Table_SpecDeleteColumns)
-{
-    Group group;
-    TableRef table = group.add_table("test");
-
-    // Create specification with sub-table
-    table->add_column(type_Int, "first");
-    table->add_column(type_String, "second");
-    table->add_column(type_Table, "third");
-    table->add_column(type_String, "fourth"); // will be auto-enumerated
-
-    // Create path to sub-table column
-    std::vector<size_t> column_path;
-    column_path.push_back(2); // third
-
-    table->add_subcolumn(column_path, type_Int, "sub_first");
-    table->add_subcolumn(column_path, type_String, "sub_second");
-
-    // Put in an index as well
-    table->add_search_index(1);
-
-    CHECK_EQUAL(4, table->get_column_count());
-
-    // Add a few rows
-    table->insert_empty_row(0);
-    table->set_int(0, 0, 4);
-    table->set_string(1, 0, "Hello");
-    table->set_string(3, 0, "X");
-
-    table->insert_empty_row(1);
-    table->set_int(0, 1, 4);
-    table->set_string(1, 1, "World");
-    table->set_string(3, 1, "X");
-
-    table->insert_empty_row(2);
-    table->set_int(0, 2, 4);
-    table->set_string(1, 2, "Goodbye");
-    table->set_string(3, 2, "X");
-
-    // We want the last column to be StringEnum column
-    table->optimize();
-
-    CHECK_EQUAL(0, table->get_subtable_size(2, 0));
-
-    // Get the sub-table
-    {
-        TableRef subtable = table->get_subtable(2, 0);
-        CHECK(subtable->is_empty());
-
-        subtable->insert_empty_row(0);
-        subtable->set_int(0, 0, 42);
-        subtable->set_string(1, 0, "test");
-
-        CHECK_EQUAL(42, subtable->get_int(0, 0));
-        CHECK_EQUAL("test", subtable->get_string(1, 0));
-    }
-
-    CHECK_EQUAL(1, table->get_subtable_size(2, 0));
-
-    // Remove the first column
-    table->remove_column(0);
-    CHECK_EQUAL(3, table->get_column_count());
-    CHECK_EQUAL("Hello", table->get_string(0, 0));
-    CHECK_EQUAL("X", table->get_string(2, 0));
-
-    // Get the sub-table again and see if the values
-    // still match.
-    {
-        TableRef subtable = table->get_subtable(1, 0);
-
-        CHECK_EQUAL(2, subtable->get_column_count());
-        CHECK_EQUAL(1, subtable->size());
-        CHECK_EQUAL(42, subtable->get_int(0, 0));
-        CHECK_EQUAL("test", subtable->get_string(1, 0));
-    }
-
-    // Create path to column in sub-table
-    column_path.clear();
-    column_path.push_back(1); // third
-
-    // Remove a column in sub-table
-    table->remove_subcolumn(column_path, 1); // sub_second
-
-    // Get the sub-table again and see if the values
-    // still match.
-    {
-        TableRef subtable = table->get_subtable(1, 0);
-
-        CHECK_EQUAL(1, subtable->get_column_count());
-        CHECK_EQUAL(1, subtable->size());
-        CHECK_EQUAL(42, subtable->get_int(0, 0));
-    }
-
-    // Remove sub-table column (with all members)
-    table->remove_column(1);
-    CHECK_EQUAL(2, table->get_column_count());
-    CHECK_EQUAL("Hello", table->get_string(0, 0));
-    CHECK_EQUAL("X", table->get_string(1, 0));
-
-    // Remove optimized string column
-    table->remove_column(1);
-    CHECK_EQUAL(1, table->get_column_count());
-    CHECK_EQUAL("Hello", table->get_string(0, 0));
-
-    // Remove last column
-    table->remove_column(0);
-    CHECK_EQUAL(0, table->get_column_count());
-    CHECK(table->is_empty());
-
-#ifdef REALM_DEBUG
-    table->verify();
-#endif
-}
-
 
 TEST(Table_NullInEnum)
 {
     Group group;
     TableRef table = group.add_table("test");
-    table->add_column(type_String, "second", true);
+    auto col = table->add_column(type_String, "second", true);
 
     for (size_t c = 0; c < 100; c++) {
-        table->insert_empty_row(c);
-        table->set_string(0, c, "hello");
+        table->create_object().set(col, "hello");
     }
 
     size_t r;
 
-    r = table->where().equal(0, "hello").count();
+    r = table->where().equal(col, "hello").count();
     CHECK_EQUAL(100, r);
 
-    table->set_string(0, 50, realm::null());
-    r = table->where().equal(0, "hello").count();
+    Obj obj50 = table->get_object(Key(50));
+    obj50.set<String>(col, realm::null());
+    r = table->where().equal(col, "hello").count();
     CHECK_EQUAL(99, r);
 
+#ifdef LEGACY_TESTS
     table->optimize();
+#endif
 
-    table->set_string(0, 50, realm::null());
-    r = table->where().equal(0, "hello").count();
+    obj50.set<String>(col, realm::null());
+    r = table->where().equal(col, "hello").count();
     CHECK_EQUAL(99, r);
 
-    table->set_string(0, 50, "hello");
-    r = table->where().equal(0, "hello").count();
+    obj50.set<String>(col, "hello");
+    r = table->where().equal(col, "hello").count();
     CHECK_EQUAL(100, r);
 
-    table->set_string(0, 50, realm::null());
-    r = table->where().equal(0, "hello").count();
+    obj50.set<String>(col, realm::null());
+    r = table->where().equal(col, "hello").count();
     CHECK_EQUAL(99, r);
 
-    r = table->where().equal(0, realm::null()).count();
+    r = table->where().equal(col, realm::null()).count();
     CHECK_EQUAL(1, r);
 
-    table->set_string(0, 55, realm::null());
-    r = table->where().equal(0, realm::null()).count();
+    table->get_object(Key(55)).set(col, realm::null());
+    r = table->where().equal(col, realm::null()).count();
     CHECK_EQUAL(2, r);
 
-    r = table->where().equal(0, "hello").count();
+    r = table->where().equal(col, "hello").count();
     CHECK_EQUAL(98, r);
 
-    table->remove(55);
-    r = table->where().equal(0, realm::null()).count();
+    table->remove_object(Key(55));
+    r = table->where().equal(col, realm::null()).count();
     CHECK_EQUAL(1, r);
 }
 
-TEST(Table_SpecAddColumns)
-{
-    Group group;
-    TableRef table = group.add_table("test");
-
-    // Create specification with sub-table
-    table->add_column(type_Int, "first");
-    table->add_column(type_String, "second");
-    table->add_column(type_Table, "third");
-
-    // Create path to sub-table column
-    std::vector<size_t> column_path;
-    column_path.push_back(2); // third
-
-    table->add_subcolumn(column_path, type_Int, "sub_first");
-    table->add_subcolumn(column_path, type_String, "sub_second");
-
-    // Put in an index as well
-    table->add_search_index(1);
-
-    CHECK_EQUAL(3, table->get_column_count());
-
-    // Add a row
-    table->insert_empty_row(0);
-    table->set_int(0, 0, 4);
-    table->set_string(1, 0, "Hello");
-
-    CHECK_EQUAL(0, table->get_subtable_size(2, 0));
-
-    // Get the sub-table
-    {
-        TableRef subtable = table->get_subtable(2, 0);
-        CHECK(subtable->is_empty());
-
-        subtable->insert_empty_row(0);
-        subtable->set_int(0, 0, 42);
-        subtable->set_string(1, 0, "test");
-
-        CHECK_EQUAL(42, subtable->get_int(0, 0));
-        CHECK_EQUAL("test", subtable->get_string(1, 0));
-    }
-
-    CHECK_EQUAL(1, table->get_subtable_size(2, 0));
-
-    // Add a new bool column
-    table->add_column(type_Bool, "fourth");
-    CHECK_EQUAL(4, table->get_column_count());
-    CHECK_EQUAL(false, table->get_bool(3, 0));
-
-    // Add a new string column
-    table->add_column(type_String, "fifth");
-    CHECK_EQUAL(5, table->get_column_count());
-    CHECK_EQUAL("", table->get_string(4, 0));
-
-    // Add a new table column
-    table->add_column(type_Table, "sixth");
-    CHECK_EQUAL(6, table->get_column_count());
-    CHECK_EQUAL(0, table->get_subtable_size(5, 0));
-
-    // Add a new mixed column
-    table->add_column(type_Mixed, "seventh");
-    CHECK_EQUAL(7, table->get_column_count());
-    CHECK_EQUAL(0, table->get_mixed(6, 0).get_int());
-
-    // Create path to column in sub-table
-    column_path.clear();
-    column_path.push_back(2); // third
-
-    // Add new int column to sub-table
-    table->add_subcolumn(column_path, type_Int, "sub_third");
-
-    // Get the sub-table again and see if the values
-    // still match.
-    {
-        TableRef subtable = table->get_subtable(2, 0);
-
-        CHECK_EQUAL(3, subtable->get_column_count());
-        CHECK_EQUAL(1, subtable->size());
-        CHECK_EQUAL(42, subtable->get_int(0, 0));
-        CHECK_EQUAL("test", subtable->get_string(1, 0));
-        CHECK_EQUAL(0, subtable->get_int(2, 0));
-    }
-
-    // Add new table column to sub-table
-    table->add_subcolumn(column_path, type_Table, "sub_fourth");
-
-    // Get the sub-table again and see if the values
-    // still match.
-    {
-        TableRef subtable = table->get_subtable(2, 0);
-
-        CHECK_EQUAL(4, subtable->get_column_count());
-        CHECK_EQUAL(1, subtable->size());
-        CHECK_EQUAL(42, subtable->get_int(0, 0));
-        CHECK_EQUAL("test", subtable->get_string(1, 0));
-        CHECK_EQUAL(0, subtable->get_int(2, 0));
-        CHECK_EQUAL(0, subtable->get_subtable_size(3, 0));
-        CHECK_EQUAL(1, table->get_subtable_size(2, 0));
-    }
-
-    // Add new column to new sub-table
-    column_path.push_back(3); // sub_forth
-    table->add_subcolumn(column_path, type_String, "first");
-
-    // Get the sub-table again and see if the values
-    // still match.
-    {
-        TableRef subtable = table->get_subtable(2, 0);
-        CHECK_EQUAL(4, subtable->get_column_count());
-
-        TableRef subsubtable = subtable->get_subtable(3, 0);
-        CHECK_EQUAL(1, subsubtable->get_column_count());
-    }
-
-    // Add a new mixed column
-    table->add_column(type_Mixed, "eighth");
-    CHECK_EQUAL(8, table->get_column_count());
-    table->set_mixed(7, 0, Mixed::subtable_tag());
-    TableRef stab = table->get_subtable(7, 0);
-    stab->add_column(type_Int, "smurf");
-    stab->insert_empty_row(0);
-    stab->set_int(0, 0, 1);
-    stab->insert_empty_row(1);
-    stab->set_int(0, 1, 2);
-    CHECK_EQUAL(2, table->get_subtable_size(7, 0));
-
-#ifdef REALM_DEBUG
-    table->verify();
-#endif
-}
-
-
-TEST(Table_SpecDeleteColumnsBug)
-{
-    TableRef table = Table::create();
-
-    // Create specification with sub-table
-    table->add_column(type_String, "name");
-    table->add_search_index(0);
-    table->add_column(type_Int, "age");
-    table->add_column(type_Bool, "hired");
-    table->add_column(type_Table, "phones");
-
-    // Create path to sub-table column
-    std::vector<size_t> column_path;
-    column_path.push_back(3); // phones
-
-    table->add_subcolumn(column_path, type_String, "type");
-    table->add_subcolumn(column_path, type_String, "number");
-
-    // Add rows
-    table->add_empty_row();
-    table->set_string(0, 0, "jessica");
-    table->set_int(1, 0, 22);
-    table->set_bool(2, 0, true);
-    {
-        TableRef phones = table->get_subtable(3, 0);
-        phones->add_empty_row();
-        phones->set_string(0, 0, "home");
-        phones->set_string(1, 0, "232-323-3242");
-    }
-
-    table->add_empty_row();
-    table->set_string(0, 1, "joe");
-    table->set_int(1, 1, 42);
-    table->set_bool(2, 1, false);
-    {
-        TableRef phones = table->get_subtable(3, 0);
-        phones->add_empty_row();
-        phones->set_string(0, 0, "work");
-        phones->set_string(1, 0, "434-434-4343");
-    }
-
-    table->add_empty_row();
-    table->set_string(0, 1, "jared");
-    table->set_int(1, 1, 35);
-    table->set_bool(2, 1, true);
-    {
-        TableRef phones = table->get_subtable(3, 0);
-        phones->add_empty_row();
-        phones->set_string(0, 0, "home");
-        phones->set_string(1, 0, "342-323-3242");
-
-        phones->add_empty_row();
-        phones->set_string(0, 0, "school");
-        phones->set_string(1, 0, "434-432-5433");
-    }
-
-    // Add new column
-    table->add_column(type_Mixed, "extra");
-    table->set_mixed(4, 0, true);
-    table->set_mixed(4, 2, "Random string!");
-
-    // Remove some columns
-    table->remove_column(1); // age
-    table->remove_column(3); // extra
-
-#ifdef REALM_DEBUG
-    table->verify();
-#endif
-}
-
-
-TEST(Table_Mixed)
-{
-    Table table;
-    table.add_column(type_Int, "first");
-    table.add_column(type_Mixed, "second");
-
-    CHECK_EQUAL(type_Int, table.get_column_type(0));
-    CHECK_EQUAL(type_Mixed, table.get_column_type(1));
-    CHECK_EQUAL("first", table.get_column_name(0));
-    CHECK_EQUAL("second", table.get_column_name(1));
-
-    const size_t ndx = table.add_empty_row();
-    table.set_int(0, ndx, 0);
-    table.set_mixed(1, ndx, true);
-
-    CHECK_EQUAL(0, table.get_int(0, 0));
-    CHECK_EQUAL(type_Bool, table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
-
-    table.insert_empty_row(1);
-    table.set_int(0, 1, 43);
-    table.set_mixed(1, 1, int64_t(12));
-
-    CHECK_EQUAL(0, table.get_int(0, ndx));
-    CHECK_EQUAL(43, table.get_int(0, 1));
-    CHECK_EQUAL(type_Bool, table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int, table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
-    CHECK_EQUAL(12, table.get_mixed(1, 1).get_int());
-
-    table.insert_empty_row(2);
-    table.set_int(0, 2, 100);
-    table.set_mixed(1, 2, "test");
-
-    CHECK_EQUAL(0, table.get_int(0, 0));
-    CHECK_EQUAL(43, table.get_int(0, 1));
-    CHECK_EQUAL(type_Bool, table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int, table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
-    CHECK_EQUAL(12, table.get_mixed(1, 1).get_int());
-    CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-
-    table.insert_empty_row(3);
-    table.set_int(0, 3, 0);
-    table.set_mixed(1, 3, OldDateTime(324234));
-
-    CHECK_EQUAL(0, table.get_int(0, 0));
-    CHECK_EQUAL(43, table.get_int(0, 1));
-    CHECK_EQUAL(0, table.get_int(0, 3));
-    CHECK_EQUAL(type_Bool, table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int, table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_OldDateTime, table.get_mixed(1, 3).get_type());
-    CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
-    CHECK_EQUAL(12, table.get_mixed(1, 1).get_int());
-    CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_olddatetime());
-
-    table.insert_empty_row(4);
-    table.set_int(0, 4, 43);
-    table.set_mixed(1, 4, Mixed(BinaryData("binary", 7)));
-
-    CHECK_EQUAL(0, table.get_int(0, 0));
-    CHECK_EQUAL(43, table.get_int(0, 1));
-    CHECK_EQUAL(0, table.get_int(0, 3));
-    CHECK_EQUAL(43, table.get_int(0, 4));
-    CHECK_EQUAL(type_Bool, table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int, table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_OldDateTime, table.get_mixed(1, 3).get_type());
-    CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
-    CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
-    CHECK_EQUAL(12, table.get_mixed(1, 1).get_int());
-    CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_olddatetime());
-    CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
-    CHECK_EQUAL(7, table.get_mixed(1, 4).get_binary().size());
-
-    table.insert_empty_row(5);
-    table.set_int(0, 5, 0);
-    table.set_mixed(1, 5, Mixed::subtable_tag());
-
-    CHECK_EQUAL(0, table.get_int(0, 0));
-    CHECK_EQUAL(43, table.get_int(0, 1));
-    CHECK_EQUAL(0, table.get_int(0, 3));
-    CHECK_EQUAL(43, table.get_int(0, 4));
-    CHECK_EQUAL(0, table.get_int(0, 5));
-    CHECK_EQUAL(type_Bool, table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int, table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_OldDateTime, table.get_mixed(1, 3).get_type());
-    CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
-    CHECK_EQUAL(type_Table, table.get_mixed(1, 5).get_type());
-    CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
-    CHECK_EQUAL(12, table.get_mixed(1, 1).get_int());
-    CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_olddatetime());
-    CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
-    CHECK_EQUAL(7, table.get_mixed(1, 4).get_binary().size());
-
-    // Get table from mixed column and add schema and some values
-    TableRef subtable = table.get_subtable(1, 5);
-    subtable->add_column(type_String, "name");
-    subtable->add_column(type_Int, "age");
-
-    subtable->insert_empty_row(0);
-    subtable->set_string(0, 0, "John");
-    subtable->set_int(1, 0, 40);
-
-    // Get same table again and verify values
-    TableRef subtable2 = table.get_subtable(1, 5);
-    CHECK_EQUAL(1, subtable2->size());
-    CHECK_EQUAL("John", subtable2->get_string(0, 0));
-    CHECK_EQUAL(40, subtable2->get_int(1, 0));
-
-    // Insert float, double
-    table.insert_empty_row(6);
-    table.set_int(0, 6, 31);
-    table.set_mixed(1, 6, float(1.123));
-    table.insert_empty_row(7);
-    table.set_int(0, 7, 0);
-    table.set_mixed(1, 7, double(2.234));
-
-    CHECK_EQUAL(0, table.get_int(0, 0));
-    CHECK_EQUAL(43, table.get_int(0, 1));
-    CHECK_EQUAL(0, table.get_int(0, 3));
-    CHECK_EQUAL(43, table.get_int(0, 4));
-    CHECK_EQUAL(0, table.get_int(0, 5));
-    CHECK_EQUAL(31, table.get_int(0, 6));
-    CHECK_EQUAL(0, table.get_int(0, 7));
-    CHECK_EQUAL(type_Bool, table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int, table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_OldDateTime, table.get_mixed(1, 3).get_type());
-    CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
-    CHECK_EQUAL(type_Table, table.get_mixed(1, 5).get_type());
-    CHECK_EQUAL(type_Float, table.get_mixed(1, 6).get_type());
-    CHECK_EQUAL(type_Double, table.get_mixed(1, 7).get_type());
-    CHECK_EQUAL(true, table.get_mixed(1, 0).get_bool());
-    CHECK_EQUAL(12, table.get_mixed(1, 1).get_int());
-    CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_olddatetime());
-    CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
-    CHECK_EQUAL(7, table.get_mixed(1, 4).get_binary().size());
-    CHECK_EQUAL(float(1.123), table.get_mixed(1, 6).get_float());
-    CHECK_EQUAL(double(2.234), table.get_mixed(1, 7).get_double());
-
-#ifdef REALM_DEBUG
-    table.verify();
-#endif
-}
-
-TEST(Table_Mixed2)
-{
-    Table table;
-    table.add_column(type_Mixed, "first");
-
-    table.add_empty_row(4);
-    table.set_mixed(0, 0, int64_t(1));
-    table.set_mixed(0, 1, true);
-    table.set_mixed(0, 2, OldDateTime(1234));
-    table.set_mixed(0, 3, "test");
-
-    CHECK_EQUAL(type_Int, table.get_mixed_type(0, 0));
-    CHECK_EQUAL(type_Bool, table.get_mixed_type(0, 1));
-    CHECK_EQUAL(type_OldDateTime, table.get_mixed_type(0, 2));
-    CHECK_EQUAL(type_String, table.get_mixed_type(0, 3));
-
-    CHECK_EQUAL(1, table.get_mixed(0, 0));
-    CHECK_EQUAL(true, table.get_mixed(0, 1));
-    CHECK_EQUAL(OldDateTime(1234), table.get_mixed(0, 2));
-    CHECK_EQUAL("test", table.get_mixed(0, 3));
-}
-
-
-TEST(Table_SubtableSizeAndClear)
-{
-    Table table;
-    DescriptorRef subdesc;
-    table.add_column(type_Table, "subtab", &subdesc);
-    table.add_column(type_Mixed, "mixed");
-    subdesc->add_column(type_Int, "int");
-
-    table.insert_empty_row(0);
-    table.insert_empty_row(1);
-    Table subtable;
-    table.set_mixed_subtable(1, 1, &subtable);
-
-    CHECK_EQUAL(0, table.get_subtable_size(0, 0)); // Subtable column
-    CHECK_EQUAL(0, table.get_subtable_size(1, 0)); // Mixed column, bool value
-    CHECK_EQUAL(0, table.get_subtable_size(1, 1)); // Mixed column, table value
-
-    CHECK(table.get_subtable(0, 0));  // Subtable column
-    CHECK(!table.get_subtable(1, 0)); // Mixed column, bool value, must return nullptr
-    CHECK(table.get_subtable(1, 1));  // Mixed column, table value
-
-    table.set_mixed(1, 0, Mixed::subtable_tag());
-    table.set_mixed(1, 1, false);
-    CHECK(table.get_subtable(1, 0));
-    CHECK(!table.get_subtable(1, 1));
-
-    TableRef subtab1 = table.get_subtable(0, 0);
-    TableRef subtab2 = table.get_subtable(1, 0);
-    subtab2->add_column(type_Int, "int");
-
-    CHECK_EQUAL(0, table.get_subtable_size(1, 0));
-    CHECK(table.get_subtable(1, 0));
-
-    subtab1->insert_empty_row(0);
-    subtab2->insert_empty_row(0);
-
-    CHECK_EQUAL(1, table.get_subtable_size(0, 0));
-    CHECK_EQUAL(1, table.get_subtable_size(1, 0));
-
-    table.clear_subtable(0, 0);
-    table.clear_subtable(1, 0);
-
-    CHECK_EQUAL(0, table.get_subtable_size(0, 0));
-    CHECK_EQUAL(0, table.get_subtable_size(1, 0));
-
-    CHECK(table.get_subtable(1, 0));
-}
-
-
-TEST(Table_LowLevelSubtables)
-{
-    Table table;
-    std::vector<size_t> column_path;
-    table.add_column(type_Table, "subtab");
-    table.add_column(type_Mixed, "mixed");
-    column_path.push_back(0);
-    table.add_subcolumn(column_path, type_Table, "subtab");
-    table.add_subcolumn(column_path, type_Mixed, "mixed");
-    column_path.push_back(0);
-    table.add_subcolumn(column_path, type_Table, "subtab");
-    table.add_subcolumn(column_path, type_Mixed, "mixed");
-
-    table.add_empty_row(2);
-    CHECK_EQUAL(2, table.size());
-    for (int i_1 = 0; i_1 != 2; ++i_1) {
-        TableRef subtab = table.get_subtable(0, i_1);
-        subtab->add_empty_row(2 + i_1);
-        CHECK_EQUAL(2 + i_1, subtab->size());
-        {
-            TableRef subsubtab = subtab->get_subtable(0, 0 + i_1);
-            subsubtab->add_empty_row(3 + i_1);
-            CHECK_EQUAL(3 + i_1, subsubtab->size());
-
-            for (int i_3 = 0; i_3 != 3 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(subsubtab->get_subtable(0, i_3)));
-                CHECK_EQUAL(false, bool(subsubtab->get_subtable(1, i_3))); // Mixed
-                CHECK_EQUAL(0, subsubtab->get_subtable_size(0, i_3));
-                CHECK_EQUAL(0, subsubtab->get_subtable_size(1, i_3)); // Mixed
-            }
-
-            subtab->clear_subtable(1, 1 + i_1); // Mixed
-            TableRef subsubtab_mix = subtab->get_subtable(1, 1 + i_1);
-            subsubtab_mix->add_column(type_Table, "subtab");
-            subsubtab_mix->add_column(type_Mixed, "mixed");
-            subsubtab_mix->add_empty_row(1 + i_1);
-            CHECK_EQUAL(1 + i_1, subsubtab_mix->size());
-
-            for (int i_3 = 0; i_3 != 1 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(subsubtab_mix->get_subtable(0, i_3)));
-                CHECK_EQUAL(false, bool(subsubtab_mix->get_subtable(1, i_3))); // Mixed
-                CHECK_EQUAL(0, subsubtab_mix->get_subtable_size(0, i_3));
-                CHECK_EQUAL(0, subsubtab_mix->get_subtable_size(1, i_3)); // Mixed
-            }
-        }
-        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true, bool(subtab->get_subtable(0, i_2)));
-            CHECK_EQUAL(i_2 == 1 + i_1, bool(subtab->get_subtable(1, i_2))); // Mixed
-            CHECK_EQUAL(i_2 == 0 + i_1 ? 3 + i_1 : 0, subtab->get_subtable_size(0, i_2));
-            CHECK_EQUAL(i_2 == 1 + i_1 ? 1 + i_1 : 0, subtab->get_subtable_size(1, i_2)); // Mixed
-        }
-
-        table.clear_subtable(1, i_1); // Mixed
-        TableRef subtab_mix = table.get_subtable(1, i_1);
-        std::vector<size_t> subcol_path;
-        subtab_mix->add_column(type_Table, "subtab");
-        subtab_mix->add_column(type_Mixed, "mixed");
-        subcol_path.push_back(0);
-        subtab_mix->add_subcolumn(subcol_path, type_Table, "subtab");
-        subtab_mix->add_subcolumn(subcol_path, type_Mixed, "mixed");
-        subtab_mix->add_empty_row(3 + i_1);
-        CHECK_EQUAL(3 + i_1, subtab_mix->size());
-        {
-            TableRef subsubtab = subtab_mix->get_subtable(0, 1 + i_1);
-            subsubtab->add_empty_row(7 + i_1);
-            CHECK_EQUAL(7 + i_1, subsubtab->size());
-
-            for (int i_3 = 0; i_3 != 7 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(subsubtab->get_subtable(0, i_3)));
-                CHECK_EQUAL(false, bool(subsubtab->get_subtable(1, i_3))); // Mixed
-                CHECK_EQUAL(0, subsubtab->get_subtable_size(0, i_3));
-                CHECK_EQUAL(0, subsubtab->get_subtable_size(1, i_3)); // Mixed
-            }
-
-            subtab_mix->clear_subtable(1, 2 + i_1); // Mixed
-            TableRef subsubtab_mix = subtab_mix->get_subtable(1, 2 + i_1);
-            subsubtab_mix->add_column(type_Table, "subtab");
-            subsubtab_mix->add_column(type_Mixed, "mixed");
-            subsubtab_mix->add_empty_row(5 + i_1);
-            CHECK_EQUAL(5 + i_1, subsubtab_mix->size());
-
-            for (int i_3 = 0; i_3 != 5 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(subsubtab_mix->get_subtable(0, i_3)));
-                CHECK_EQUAL(false, bool(subsubtab_mix->get_subtable(1, i_3))); // Mixed
-                CHECK_EQUAL(0, subsubtab_mix->get_subtable_size(0, i_3));
-                CHECK_EQUAL(0, subsubtab_mix->get_subtable_size(1, i_3)); // Mixed
-            }
-        }
-        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true, bool(subtab_mix->get_subtable(0, i_2)));
-            CHECK_EQUAL(i_2 == 2 + i_1, bool(subtab_mix->get_subtable(1, i_2))); // Mixed
-            CHECK_EQUAL(i_2 == 1 + i_1 ? 7 + i_1 : 0, subtab_mix->get_subtable_size(0, i_2));
-            CHECK_EQUAL(i_2 == 2 + i_1 ? 5 + i_1 : 0, subtab_mix->get_subtable_size(1, i_2)); // Mixed
-        }
-
-        CHECK_EQUAL(true, bool(table.get_subtable(0, i_1)));
-        CHECK_EQUAL(true, bool(table.get_subtable(1, i_1))); // Mixed
-        CHECK_EQUAL(2 + i_1, table.get_subtable_size(0, i_1));
-        CHECK_EQUAL(3 + i_1, table.get_subtable_size(1, i_1)); // Mixed
-    }
-}
-
-
-namespace {
-
-template <class T>
-void my_table_1_add_columns(T t)
-{
-    t->add_column(type_Int, "val");
-    t->add_column(type_Int, "val2");
-}
-
-template <class T>
-void my_table_2_add_columns(T t)
-{
-    DescriptorRef sub_descr;
-    t->add_column(type_Int, "val");
-    t->add_column(type_Table, "subtab", &sub_descr);
-    my_table_1_add_columns(sub_descr);
-}
-
-template <class T>
-void my_table_3_add_columns(T t)
-{
-    DescriptorRef sub_descr;
-    t->add_column(type_Table, "subtab", &sub_descr);
-    my_table_2_add_columns(sub_descr);
-}
-
-} // anonymous namespace
-
-// Disabled because we do not support nested subtables ATM
-#if 0
-TEST(Table_HighLevelSubtables)
-{
-    Table t;
-    my_table_3_add_columns(&t);
-    {
-        TableRef r1 = t.get_table_ref();
-        ConstTableRef r2 = t.get_table_ref();
-        ConstTableRef r3 = r2->get_table_ref();
-        r3 = t.get_table_ref(); // Also test assigment that converts to const
-        static_cast<void>(r1);
-        static_cast<void>(r3);
-    }
-
-    t.add_empty_row();
-    const Table& ct = t;
-    {
-        TableRef s1 = t.get_subtable(0, 0);
-        ConstTableRef s2 = t.get_subtable(0, 0);
-        TableRef s3 = t.get_subtable(0, 0)->get_table_ref();
-        ConstTableRef s4 = t.get_subtable(0, 0)->get_table_ref();
-
-        ConstTableRef cs1 = ct.get_subtable(0, 0);
-        ConstTableRef cs2 = ct.get_subtable(0, 0)->get_table_ref();
-
-        static_cast<void>(s1);
-        static_cast<void>(s2);
-        static_cast<void>(s3);
-        static_cast<void>(s4);
-        static_cast<void>(cs1);
-        static_cast<void>(cs2);
-    }
-
-    t.get_subtable(0, 0)->add_empty_row();
-    {
-        TableRef s1 = t.get_subtable(0, 0)->get_subtable(1, 0);
-        ConstTableRef s2 = t.get_subtable(0, 0)->get_subtable(1, 0);
-        TableRef s3 = t.get_subtable(0, 0)->get_subtable(1, 0)->get_table_ref();
-        ConstTableRef s4 = t.get_subtable(0, 0)->get_subtable(1, 0)->get_table_ref();
-
-        ConstTableRef cs1 = ct.get_subtable(0, 0)->get_subtable(1, 0);
-        ConstTableRef cs2 = ct.get_subtable(0, 0)->get_subtable(1, 0)->get_table_ref();
-
-        static_cast<void>(s1);
-        static_cast<void>(s2);
-        static_cast<void>(s3);
-        static_cast<void>(s4);
-        static_cast<void>(cs1);
-        static_cast<void>(cs2);
-    }
-
-    t.get_subtable(0, 0)->set_int(0, 0, 1);
-    CHECK_EQUAL(t.get_subtable(0, 0)->get_int(0, 0), 1);
-}
-#endif // LEGACY_TESTS
-
-TEST(Table_SubtableCopyOnSetAndInsert)
-{
-    TestTable t1;
-    my_table_1_add_columns(&t1);
-    add(t1, 7, 8);
-
-    Table t2;
-    my_table_2_add_columns(&t2);
-    t2.add_empty_row();
-    t2.set_subtable(1, 0, &t1);
-
-    TableRef r1 = t2.get_subtable(1, 0);
-    CHECK(t1 == *r1);
-
-    Table t4;
-    t4.add_column(type_Mixed, "mix");
-    t4.add_empty_row();
-    t4.set_mixed_subtable(0, 0, &t2);
-    auto r2 = t4.get_subtable(0, 0);
-    CHECK(t2 == *r2);
-}
-
-
-TEST(Table_SetMethod)
-{
-    TestTable t;
-    my_table_1_add_columns(&t);
-    add(t, 8, 9);
-    CHECK_EQUAL(t.get_int(0, 0), 8);
-    CHECK_EQUAL(t.get_int(1, 0), 9);
-    set(t, 0, 2, 4);
-    CHECK_EQUAL(t.get_int(0, 0), 2);
-    CHECK_EQUAL(t.get_int(1, 0), 4);
-}
-
-
-namespace {
-
-class TableDateAndBinary : public TestTable {
-public:
-    TableDateAndBinary()
-    {
-        add_column(type_OldDateTime, "date");
-        add_column(type_Binary, "bin");
-    }
-};
-
-} // anonymous namespace
 
 TEST(Table_DateAndBinary)
 {
-    {
-        TableDateAndBinary t;
+    Table t;
+    auto col_date = t.add_column(type_Timestamp, "date");
+    auto col_bin = t.add_column(type_Binary, "bin");
 
-        const size_t size = 10;
-        char data[size];
-        for (size_t i = 0; i < size; ++i)
-            data[i] = static_cast<char>(i);
-        add(t, 8, BinaryData(data, size));
-        CHECK_EQUAL(t.get_olddatetime(0, 0), 8);
-        BinaryData bin = t.get_binary(1, 0);
-        CHECK_EQUAL(bin.size(), size);
-        CHECK(std::equal(bin.data(), bin.data() + size, data));
-    }
+    const size_t size = 10;
+    char data[size];
+    for (size_t i = 0; i < size; ++i)
+        data[i] = static_cast<char>(i);
+    t.create_object().set_all(Timestamp(8, 0), BinaryData(data, size));
+    Obj& obj = *t.begin();
+    CHECK_EQUAL(obj.get<Timestamp>(col_date), Timestamp(8, 0));
+    BinaryData bin = obj.get<Binary>(col_bin);
+    CHECK_EQUAL(bin.size(), size);
+    CHECK(std::equal(bin.data(), bin.data() + size, data));
 
     // Test that 64-bit dates are preserved
-    {
-        TableDateAndBinary t;
-
-        int64_t date = std::numeric_limits<int64_t>::max() - 400;
-
-        add(t, date, BinaryData(""));
-        CHECK_EQUAL(t.get_olddatetime(0, 0), date);
-    }
+    Timestamp date(std::numeric_limits<int64_t>::max() - 400, 0);
+    obj.set(col_date, date);
+    CHECK_EQUAL(obj.get<Timestamp>(col_date), date);
 }
-
-// Test for a specific bug found: Calling clear on a group with a table with a subtable
-TEST(Table_ClearWithSubtableAndGroup)
-{
-    Group group;
-    TableRef table = group.add_table("test");
-    DescriptorRef sub_1;
-
-    // Create specification with sub-table
-    table->add_column(type_String, "name");
-    table->add_column(type_Table, "sub", &sub_1);
-    sub_1->add_column(type_Int, "num");
-
-    CHECK_EQUAL(2, table->get_column_count());
-
-    // Add a row
-    table->insert_empty_row(0);
-    table->set_string(0, 0, "Foo");
-
-    CHECK_EQUAL(0, table->get_subtable_size(1, 0));
-
-    // Get the sub-table
-    {
-        TableRef subtable = table->get_subtable(1, 0);
-        CHECK(subtable->is_empty());
-
-        subtable->insert_empty_row(0);
-        subtable->set_int(0, 0, 123);
-
-        CHECK_EQUAL(123, subtable->get_int(0, 0));
-    }
-
-    CHECK_EQUAL(1, table->get_subtable_size(1, 0));
-
-    table->clear();
-}
-
-
-// set a subtable in an already exisitng row by providing an existing subtable as the example to copy
-// FIXME: Do we need both this one and Table_SetSubTableByExample2?
-TEST(Table_SetSubTableByExample1)
-{
-    Group group;
-    TableRef table = group.add_table("test");
-
-    // Create specification with sub-table
-    table->add_column(type_Int, "first");
-    table->add_column(type_String, "second");
-    table->add_column(type_Table, "third");
-
-    // Create path to sub-table column
-    std::vector<size_t> column_path;
-    column_path.push_back(2); // third
-
-    table->add_subcolumn(column_path, type_Int, "sub_first");
-    table->add_subcolumn(column_path, type_String, "sub_second");
-
-    // Add a row
-    table->insert_empty_row(0);
-    table->set_int(0, 0, 4);
-    table->set_string(1, 0, "Hello");
-
-    // create a freestanding table to be used as a source by set_subtable
-
-    Table sub = Table();
-    sub.add_column(type_Int, "sub_first");
-    sub.add_column(type_String, "sub_second");
-    sub.add_empty_row();
-    sub.set_int(0, 0, 42);
-    sub.set_string(1, 0, "forty two");
-    sub.add_empty_row();
-    sub.set_int(0, 1, 3);
-    sub.set_string(1, 1, "PI");
-
-    // Get the sub-table back for inspection
-    {
-        TableRef subtable = table->get_subtable(2, 0);
-        CHECK(subtable->is_empty());
-
-        // add a subtable into the row, resembling the sub we just created
-        table->set_subtable(2, 0, &sub);
-
-        TableRef subtable2 = table->get_subtable(2, 0);
-
-        CHECK_EQUAL(42, subtable2->get_int(0, 0));
-        CHECK_EQUAL("forty two", subtable2->get_string(1, 0));
-        CHECK_EQUAL(3, subtable2->get_int(0, 1));
-        CHECK_EQUAL("PI", subtable2->get_string(1, 1));
-    }
-}
-
-// In the tableview class, set a subtable in an already exisitng row by providing an existing subtable as the example
-// to copy
-// FIXME: Do we need both this one and Table_SetSubTableByExample1?
-TEST(Table_SetSubTableByExample2)
-{
-    Group group;
-    TableRef table = group.add_table("test");
-
-    // Create specification with sub-table
-    table->add_column(type_Int, "first");
-    table->add_column(type_String, "second");
-    table->add_column(type_Table, "third");
-
-    // Create path to sub-table column
-    std::vector<size_t> column_path;
-    column_path.push_back(2); // third
-
-    table->add_subcolumn(column_path, type_Int, "sub_first");
-    table->add_subcolumn(column_path, type_String, "sub_second");
-
-    // Add two rows
-    table->insert_empty_row(0);
-    table->set_int(0, 0, 4);
-    table->set_string(1, 0, "Hello");
-
-    table->insert_empty_row(1);
-    table->set_int(0, 1, 8);
-    table->set_string(1, 1, "Hi!, Hello?");
-
-    Table sub = Table();
-    sub.add_column(type_Int, "sub_first");
-    sub.add_column(type_String, "sub_second");
-    sub.add_empty_row();
-    sub.set_int(0, 0, 42);
-    sub.set_string(1, 0, "forty two");
-    sub.add_empty_row();
-    sub.set_int(0, 1, 3);
-    sub.set_string(1, 1, "PI");
-
-    // create a tableview with the table as source
-
-    TableView view = table->find_all_int(0, 8); // select the second of the two rows
-
-    // Verify the sub table is empty
-    {
-        TableRef subtable = view.get_subtable(2, 0);
-        CHECK(subtable->is_empty());
-
-        // add a subtable into the second table row (first view row), resembling the sub we just created
-        view.set_subtable(2, 0, &sub);
-
-        TableRef subtable2 = view.get_subtable(2, 0); // fetch back the subtable from the view
-
-        CHECK_EQUAL(false, subtable->is_empty());
-        CHECK_EQUAL(42, subtable2->get_int(0, 0));
-        CHECK_EQUAL("forty two", subtable2->get_string(1, 0));
-        CHECK_EQUAL(3, subtable2->get_int(0, 1));
-        CHECK_EQUAL("PI", subtable2->get_string(1, 1));
-
-        TableRef subtable3 = table->get_subtable(2, 1); // fetch back the subtable from the table.
-
-        CHECK_EQUAL(42, subtable3->get_int(0, 0));
-        CHECK_EQUAL("forty two", subtable3->get_string(1, 0));
-        CHECK_EQUAL(3, subtable3->get_int(0, 1));
-        CHECK_EQUAL("PI", subtable3->get_string(1, 1));
-    }
-}
-
-
-TEST(Table_HasSharedSpec)
-{
-    Group g;
-    auto table2 = g.add_table("foo");
-    my_table_2_add_columns(table2);
-    CHECK(!table2->has_shared_type());
-    table2->add_empty_row();
-    CHECK(table2->get_subtable(1, 0)->has_shared_type());
-
-    // Subtable in mixed column
-    auto table3 = g.add_table("bar");
-    table3->add_column(type_Mixed, "first");
-
-    CHECK(!table3->has_shared_type());
-    table3->add_empty_row();
-    table3->clear_subtable(0, 0);
-    TableRef table4 = table3->get_subtable(0, 0);
-    CHECK(table4);
-    CHECK(!table4->has_shared_type());
-    my_table_2_add_columns(table4);
-    table4->add_empty_row();
-    CHECK(!table4->has_shared_type());
-    CHECK(table4->get_subtable(1, 0)->has_shared_type());
-}
-
-#endif // LEGACY_TESTS
 
 #if TEST_DURATION > 0
 #define TBL_SIZE REALM_MAX_BPNODE_SIZE * 10
@@ -3690,7 +2111,6 @@ TEST(Table_Aggregates2)
     CHECK_EQUAL(s, table.sum_int(int_col));
 }
 
-#ifdef LEGACY_TESTS
 // Test Table methods max, min, avg, sum, on both nullable and non-nullable columns
 TEST(Table_Aggregates3)
 {
@@ -3705,2632 +2125,172 @@ TEST(Table_Aggregates3)
         Group g;
         TableRef table = g.add_table("Inventory");
 
-        table->insert_column(0, type_Int, "Price", nullable);
-        table->insert_column(1, type_Float, "Shipping", nullable);
-        table->insert_column(2, type_Double, "Rating", nullable);
-        table->insert_column(3, type_OldDateTime, "Delivery date", nullable);
-        table->insert_column(4, type_Timestamp, "Delivery date 2", nullable);
+        auto col_price = table->add_column(type_Int, "Price", nullable);
+        auto col_shipping = table->add_column(type_Float, "Shipping", nullable);
+        auto col_rating = table->add_column(type_Double, "Rating", nullable);
+        auto col_date = table->add_column(type_Timestamp, "Delivery date", nullable);
 
-        table->add_empty_row(3);
+        Obj obj0 = table->create_object(Key(0));
+        Obj obj1 = table->create_object(Key(1));
+        Obj obj2 = table->create_object(Key(2));
 
-        table->set_int(0, 0, 1);
+        obj0.set(col_price, 1);
         // table->set_null(0, 1);
-        table->set_int(0, 2, 3);
+        obj2.set(col_price, 3);
 
         // table->set_null(1, 0);
         // table->set_null(1, 1);
-        table->set_float(1, 2, 30.f);
+        obj2.set(col_shipping, 30.f);
 
-        table->set_double(2, 0, 1.1);
-        table->set_double(2, 1, 2.2);
+        obj0.set(col_rating, 1.1);
+        obj1.set(col_rating, 2.2);
         // table->set_null(2, 2);
 
-        table->set_olddatetime(3, 0, OldDateTime(2016, 2, 2));
-        // table->set_null(3, 1);
-        table->set_olddatetime(3, 2, OldDateTime(2016, 6, 6));
-
-        table->set_timestamp(4, 0, Timestamp(2, 2));
+        obj0.set(col_date, Timestamp(2, 2));
         // table->set_null(4, 1);
-        table->set_timestamp(4, 2, Timestamp(6, 6));
+        obj2.set(col_date, Timestamp(6, 6));
 
         size_t count;
         Key pos;
         if (nullable) {
             // max
             pos = 123;
-            CHECK_EQUAL(table->maximum_int(0), 3);
-            CHECK_EQUAL(table->maximum_int(0, &pos), 3);
-            CHECK_EQUAL(pos, 2);
+            CHECK_EQUAL(table->maximum_int(col_price), 3);
+            CHECK_EQUAL(table->maximum_int(col_price, &pos), 3);
+            CHECK_EQUAL(pos, Key(2));
 
             pos = 123;
-            CHECK_EQUAL(table->maximum_float(1), 30.f);
-            CHECK_EQUAL(table->maximum_float(1, &pos), 30.f);
-            CHECK_EQUAL(pos, 2);
+            CHECK_EQUAL(table->maximum_float(col_shipping), 30.f);
+            CHECK_EQUAL(table->maximum_float(col_shipping, &pos), 30.f);
+            CHECK_EQUAL(pos, Key(2));
 
             pos = 123;
-            CHECK_EQUAL(table->maximum_double(2), 2.2);
-            CHECK_EQUAL(table->maximum_double(2, &pos), 2.2);
-            CHECK_EQUAL(pos, 1);
+            CHECK_EQUAL(table->maximum_double(col_rating), 2.2);
+            CHECK_EQUAL(table->maximum_double(col_rating, &pos), 2.2);
+            CHECK_EQUAL(pos, Key(1));
 
             pos = 123;
-            CHECK_EQUAL(table->maximum_olddatetime(3), OldDateTime(2016, 6, 6));
-            CHECK_EQUAL(table->maximum_olddatetime(3, &pos), OldDateTime(2016, 6, 6));
-            CHECK_EQUAL(pos, 2);
-
-            pos = 123;
-            CHECK_EQUAL(table->maximum_timestamp(4), Timestamp(6, 6));
-            CHECK_EQUAL(table->maximum_timestamp(4, &pos), Timestamp(6, 6));
-            CHECK_EQUAL(pos, 2);
+            CHECK_EQUAL(table->maximum_timestamp(col_date), Timestamp(6, 6));
+            CHECK_EQUAL(table->maximum_timestamp(col_date, &pos), Timestamp(6, 6));
+            CHECK_EQUAL(pos, Key(2));
 
             // min
             pos = 123;
-            CHECK_EQUAL(table->minimum_int(0), 1);
-            CHECK_EQUAL(table->minimum_int(0, &pos), 1);
-            CHECK_EQUAL(pos, 0);
+            CHECK_EQUAL(table->minimum_int(col_price), 1);
+            CHECK_EQUAL(table->minimum_int(col_price, &pos), 1);
+            CHECK_EQUAL(pos, Key(0));
 
             pos = 123;
-            CHECK_EQUAL(table->minimum_float(1), 30.f);
-            CHECK_EQUAL(table->minimum_float(1, &pos), 30.f);
-            CHECK_EQUAL(pos, 2);
+            CHECK_EQUAL(table->minimum_float(col_shipping), 30.f);
+            CHECK_EQUAL(table->minimum_float(col_shipping, &pos), 30.f);
+            CHECK_EQUAL(pos, Key(2));
 
             pos = 123;
-            CHECK_EQUAL(table->minimum_double(2), 1.1);
-            CHECK_EQUAL(table->minimum_double(2, &pos), 1.1);
-            CHECK_EQUAL(pos, 0);
+            CHECK_EQUAL(table->minimum_double(col_rating), 1.1);
+            CHECK_EQUAL(table->minimum_double(col_rating, &pos), 1.1);
+            CHECK_EQUAL(pos, Key(0));
 
             pos = 123;
-            CHECK_EQUAL(table->minimum_olddatetime(3), OldDateTime(2016, 2, 2));
-            CHECK_EQUAL(table->minimum_olddatetime(3, &pos), OldDateTime(2016, 2, 2));
-            CHECK_EQUAL(pos, 0);
-
-            pos = 123;
-            CHECK_EQUAL(table->minimum_timestamp(4), Timestamp(2, 2));
-            CHECK_EQUAL(table->minimum_timestamp(4, &pos), Timestamp(2, 2));
-            CHECK_EQUAL(pos, 0);
+            CHECK_EQUAL(table->minimum_timestamp(col_date), Timestamp(2, 2));
+            CHECK_EQUAL(table->minimum_timestamp(col_date, &pos), Timestamp(2, 2));
+            CHECK_EQUAL(pos, Key(0));
 
             // average
             count = 123;
-            CHECK_APPROXIMATELY_EQUAL(table->average_int(0), (1 + 3) / 2., 0.01);
-            CHECK_APPROXIMATELY_EQUAL(table->average_int(0, &count), (1 + 3) / 2., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->average_int(col_price), (1 + 3) / 2., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->average_int(col_price, &count), (1 + 3) / 2., 0.01);
             CHECK_EQUAL(count, 2);
 
             count = 123;
-            CHECK_EQUAL(table->average_float(1), 30.f);
-            CHECK_EQUAL(table->average_float(1, &count), 30.f);
+            CHECK_EQUAL(table->average_float(col_shipping), 30.f);
+            CHECK_EQUAL(table->average_float(col_shipping, &count), 30.f);
             CHECK_EQUAL(count, 1);
 
             count = 123;
-            CHECK_APPROXIMATELY_EQUAL(table->average_double(2), (1.1 + 2.2) / 2., 0.01);
-            CHECK_APPROXIMATELY_EQUAL(table->average_double(2, &count), (1.1 + 2.2) / 2., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->average_double(col_rating), (1.1 + 2.2) / 2., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->average_double(col_rating, &count), (1.1 + 2.2) / 2., 0.01);
             CHECK_EQUAL(count, 2);
 
             // sum
-            CHECK_EQUAL(table->sum_int(0), 4);
-            CHECK_EQUAL(table->sum_float(1), 30.f);
-            CHECK_APPROXIMATELY_EQUAL(table->sum_double(2), 1.1 + 2.2, 0.01);
+            CHECK_EQUAL(table->sum_int(col_price), 4);
+            CHECK_EQUAL(table->sum_float(col_shipping), 30.f);
+            CHECK_APPROXIMATELY_EQUAL(table->sum_double(col_rating), 1.1 + 2.2, 0.01);
         }
         else { // not nullable
             // max
             pos = 123;
-            CHECK_EQUAL(table->maximum_int(0, &pos), 3);
-            CHECK_EQUAL(pos, 2);
+            CHECK_EQUAL(table->maximum_int(col_price, &pos), 3);
+            CHECK_EQUAL(pos, Key(2));
 
             pos = 123;
-            CHECK_EQUAL(table->maximum_float(1, &pos), 30.f);
-            CHECK_EQUAL(pos, 2);
+            CHECK_EQUAL(table->maximum_float(col_shipping, &pos), 30.f);
+            CHECK_EQUAL(pos, Key(2));
 
             pos = 123;
-            CHECK_EQUAL(table->maximum_double(2, &pos), 2.2);
-            CHECK_EQUAL(pos, 1);
+            CHECK_EQUAL(table->maximum_double(col_rating, &pos), 2.2);
+            CHECK_EQUAL(pos, Key(1));
 
             pos = 123;
-            CHECK_EQUAL(table->maximum_olddatetime(3, &pos), OldDateTime(2016, 6, 6));
-            CHECK_EQUAL(pos, 2);
-
-            pos = 123;
-            CHECK_EQUAL(table->maximum_timestamp(4, &pos), Timestamp(6, 6));
-            CHECK_EQUAL(pos, 2);
+            CHECK_EQUAL(table->maximum_timestamp(col_date, &pos), Timestamp(6, 6));
+            CHECK_EQUAL(pos, Key(2));
 
             // min
             pos = 123;
-            CHECK_EQUAL(table->minimum_int(0, &pos), 0);
-            CHECK_EQUAL(pos, 1);
+            CHECK_EQUAL(table->minimum_int(col_price, &pos), 0);
+            CHECK_EQUAL(pos, Key(1));
 
             pos = 123;
-            CHECK_EQUAL(table->minimum_float(1, &pos), 0.f);
-            CHECK_EQUAL(pos, 0);
+            CHECK_EQUAL(table->minimum_float(col_shipping, &pos), 0.f);
+            CHECK_EQUAL(pos, Key(0));
 
             pos = 123;
-            CHECK_EQUAL(table->minimum_double(2, &pos), 0.);
-            CHECK_EQUAL(pos, 2);
-
-            pos = 123;
-            CHECK_EQUAL(table->minimum_olddatetime(3, &pos), OldDateTime(0));
-            CHECK_EQUAL(pos, 1);
+            CHECK_EQUAL(table->minimum_double(col_rating, &pos), 0.);
+            CHECK_EQUAL(pos, Key(2));
 
             pos = 123;
             // Timestamp(0, 0) is default value for non-nullable column
-            CHECK_EQUAL(table->minimum_timestamp(4, &pos), Timestamp(0, 0));
-            CHECK_EQUAL(pos, 1);
+            CHECK_EQUAL(table->minimum_timestamp(col_date, &pos), Timestamp(0, 0));
+            CHECK_EQUAL(pos, Key(1));
 
             // average
             count = 123;
-            CHECK_APPROXIMATELY_EQUAL(table->average_int(0, &count), (1 + 3 + 0) / 3., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->average_int(col_price, &count), (1 + 3 + 0) / 3., 0.01);
             CHECK_EQUAL(count, 3);
 
             count = 123;
-            CHECK_APPROXIMATELY_EQUAL(table->average_float(1, &count), 30.f / 3., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->average_float(col_shipping, &count), 30.f / 3., 0.01);
             CHECK_EQUAL(count, 3);
 
             count = 123;
-            CHECK_APPROXIMATELY_EQUAL(table->average_double(2, &count), (1.1 + 2.2 + 0.) / 3., 0.01);
+            CHECK_APPROXIMATELY_EQUAL(table->average_double(col_rating, &count), (1.1 + 2.2 + 0.) / 3., 0.01);
             CHECK_EQUAL(count, 3);
 
             // sum
-            CHECK_EQUAL(table->sum_int(0), 4);
-            CHECK_EQUAL(table->sum_float(1), 30.f);
-            CHECK_APPROXIMATELY_EQUAL(table->sum_double(2), 1.1 + 2.2, 0.01);
+            CHECK_EQUAL(table->sum_int(col_price), 4);
+            CHECK_EQUAL(table->sum_float(col_shipping), 30.f);
+            CHECK_APPROXIMATELY_EQUAL(table->sum_double(col_rating), 1.1 + 2.2, 0.01);
         }
     }
 }
-
 
 TEST(Table_EmptyMinmax)
 {
     Group g;
     TableRef table = g.add_table("");
-    table->add_column(type_Timestamp, "");
+    auto col = table->add_column(type_Timestamp, "date");
 
-    size_t min_index;
-    Timestamp min_ts = table->minimum_timestamp(0, &min_index);
-    CHECK_EQUAL(min_index, realm::npos);
+    Key min_key;
+    Timestamp min_ts = table->minimum_timestamp(col, &min_key);
+    CHECK_EQUAL(min_key, null_key);
     CHECK(min_ts.is_null());
 
-    size_t max_index;
-    Timestamp max_ts = table->maximum_timestamp(0, &max_index);
-    CHECK_EQUAL(max_index, realm::npos);
+    Key max_key;
+    Timestamp max_ts = table->maximum_timestamp(col, &max_key);
+    CHECK_EQUAL(max_key, null_key);
     CHECK(max_ts.is_null());
 }
 
-TEST(Table_LanguageBindings)
-{
-    Table* table = LangBindHelper::new_table();
-    CHECK(table->is_attached());
-
-    table->add_column(type_Int, "i");
-    table->insert_empty_row(0);
-    table->set_int(0, 0, 10);
-    table->insert_empty_row(1);
-    table->set_int(0, 1, 12);
-
-    Table* table2 = LangBindHelper::copy_table(*table);
-    CHECK(table2->is_attached());
-
-    CHECK(*table == *table2);
-
-    LangBindHelper::unbind_table_ptr(table);
-    LangBindHelper::unbind_table_ptr(table2);
-}
-
-TEST(Table_MultipleColumn)
-{
-    Table table;
-    table.add_column(type_Int, "first");
-    table.add_column(type_Int, "first");
-    CHECK_EQUAL(table.get_column_count(), 2);
-    CHECK_EQUAL(table.get_column_index("first"), 0);
-}
-
-
-TEST(Table_FormerLeakCase)
-{
-    Table sub;
-    sub.add_column(type_Int, "a");
-
-    Table root;
-    DescriptorRef subdesc;
-    root.add_column(type_Table, "b", &subdesc);
-    subdesc->add_column(type_Int, "a");
-    root.add_empty_row(1);
-    root.set_subtable(0, 0, &sub);
-    root.set_subtable(0, 0, nullptr);
-}
-
-
-TEST(Table_Pivot)
-{
-    size_t count = 1717;
-    TestTable table;
-    table.add_column(type_String, "sex");
-    table.add_column(type_Int, "age");
-    table.add_column(type_Bool, "hired");
-    int64_t age_sum[2] = {0, 0};
-    int64_t age_cnt[2] = {0, 0};
-    int64_t age_min[2];
-    int64_t age_max[2];
-    double age_avg[2];
-
-    for (size_t i = 0; i < count; ++i) {
-        size_t sex = i % 2;
-        int64_t age = 3 + (i % 117);
-        add(table, (sex == 0) ? "Male" : "Female", age, true);
-
-        age_sum[sex] += age;
-        age_cnt[sex] += 1;
-        if ((i < 2) || age < age_min[sex])
-            age_min[sex] = age;
-        if ((i < 2) || age > age_max[sex])
-            age_max[sex] = age;
-    }
-    for (size_t sex = 0; sex < 2; ++sex) {
-        age_avg[sex] = double(age_sum[sex]) / double(age_cnt[sex]);
-    }
-
-
-    for (int i = 0; i < 2; ++i) {
-        Table result_count;
-        table.aggregate(0, 1, Table::aggr_count, result_count);
-        CHECK_EQUAL(2, result_count.get_column_count());
-        CHECK_EQUAL(2, result_count.size());
-        for (size_t sex = 0; sex < 2; ++sex) {
-            CHECK_EQUAL(age_cnt[sex], result_count.get_int(1, sex));
-        }
-
-        Table result_sum;
-        table.aggregate(0, 1, Table::aggr_sum, result_sum);
-        for (size_t sex = 0; sex < 2; ++sex) {
-            CHECK_EQUAL(age_sum[sex], result_sum.get_int(1, sex));
-        }
-
-        Table result_avg;
-        table.aggregate(0, 1, Table::aggr_avg, result_avg);
-        if ((false)) {
-            std::ostringstream ss;
-            result_avg.to_string(ss);
-            std::cerr << "\nMax:\n" << ss.str();
-        }
-        CHECK_EQUAL(2, result_avg.get_column_count());
-        CHECK_EQUAL(2, result_avg.size());
-        for (size_t sex = 0; sex < 2; ++sex) {
-            CHECK_EQUAL(age_avg[sex], result_avg.get_double(1, sex));
-        }
-
-        Table result_min;
-        table.aggregate(0, 1, Table::aggr_min, result_min);
-        CHECK_EQUAL(2, result_min.get_column_count());
-        CHECK_EQUAL(2, result_min.size());
-        for (size_t sex = 0; sex < 2; ++sex) {
-            CHECK_EQUAL(age_min[sex], result_min.get_int(1, sex));
-        }
-
-        Table result_max;
-        table.aggregate(0, 1, Table::aggr_max, result_max);
-        CHECK_EQUAL(2, result_max.get_column_count());
-        CHECK_EQUAL(2, result_max.size());
-        for (size_t sex = 0; sex < 2; ++sex) {
-            CHECK_EQUAL(age_max[sex], result_max.get_int(1, sex));
-        }
-
-        // Test with enumerated strings in second loop
-        table.optimize();
-    }
-}
-
-
-namespace {
-
-void compare_table_with_slice(TestContext& test_context, const Table& table, const Table& slice, size_t offset,
-                              size_t size)
-{
-    ConstDescriptorRef table_desc = table.get_descriptor();
-    ConstDescriptorRef slice_desc = slice.get_descriptor();
-    CHECK(*table_desc == *slice_desc);
-    if (*table_desc != *slice_desc)
-        return;
-
-    size_t num_cols = table.get_column_count();
-    for (size_t col_i = 0; col_i != num_cols; ++col_i) {
-        DataType type = table.get_column_type(col_i);
-        switch (type) {
-            case type_Int:
-            case type_Link:
-                for (size_t i = 0; i != size; ++i) {
-                    int_fast64_t v_1 = table.get_int(col_i, offset + i);
-                    int_fast64_t v_2 = slice.get_int(col_i, i);
-                    CHECK_EQUAL(v_1, v_2);
-                }
-                break;
-            case type_Bool:
-                for (size_t i = 0; i != size; ++i) {
-                    bool v_1 = table.get_bool(col_i, offset + i);
-                    bool v_2 = slice.get_bool(col_i, i);
-                    CHECK_EQUAL(v_1, v_2);
-                }
-                break;
-            case type_Float:
-                for (size_t i = 0; i != size; ++i) {
-                    float v_1 = table.get_float(col_i, offset + i);
-                    float v_2 = slice.get_float(col_i, i);
-                    CHECK_EQUAL(v_1, v_2);
-                }
-                break;
-            case type_Double:
-                for (size_t i = 0; i != size; ++i) {
-                    double v_1 = table.get_double(col_i, offset + i);
-                    double v_2 = slice.get_double(col_i, i);
-                    CHECK_EQUAL(v_1, v_2);
-                }
-                break;
-            case type_String:
-                for (size_t i = 0; i != size; ++i) {
-                    StringData v_1 = table.get_string(col_i, offset + i);
-                    StringData v_2 = slice.get_string(col_i, i);
-                    CHECK_EQUAL(v_1, v_2);
-                }
-                break;
-            case type_Binary:
-                for (size_t i = 0; i != size; ++i) {
-                    BinaryData v_1 = table.get_binary(col_i, offset + i);
-                    BinaryData v_2 = slice.get_binary(col_i, i);
-                    CHECK_EQUAL(v_1, v_2);
-                }
-                break;
-            case type_OldDateTime:
-                for (size_t i = 0; i != size; ++i) {
-                    OldDateTime v_1 = table.get_olddatetime(col_i, offset + i);
-                    OldDateTime v_2 = slice.get_olddatetime(col_i, i);
-                    CHECK_EQUAL(v_1, v_2);
-                }
-                break;
-            case type_Timestamp:
-                for (size_t i = 0; i != size; ++i) {
-                    Timestamp v_1 = table.get_timestamp(col_i, offset + i);
-                    Timestamp v_2 = slice.get_timestamp(col_i, i);
-                    CHECK_EQUAL(v_1, v_2);
-                }
-                break;
-            case type_Table:
-                for (size_t i = 0; i != size; ++i) {
-                    ConstTableRef t_1 = table.get_subtable(col_i, offset + i);
-                    ConstTableRef t_2 = slice.get_subtable(col_i, i);
-                    CHECK(*t_1 == *t_2);
-                }
-                break;
-            case type_Mixed:
-                for (size_t i = 0; i != size; ++i) {
-                    Mixed v_1 = table.get_mixed(col_i, offset + i);
-                    Mixed v_2 = slice.get_mixed(col_i, i);
-                    CHECK_EQUAL(v_1.get_type(), v_2.get_type());
-                    if (v_1.get_type() == v_2.get_type()) {
-                        switch (v_1.get_type()) {
-                            case type_Int:
-                                CHECK_EQUAL(v_1.get_int(), v_2.get_int());
-                                break;
-                            case type_Bool:
-                                CHECK_EQUAL(v_1.get_bool(), v_2.get_bool());
-                                break;
-                            case type_Float:
-                                CHECK_EQUAL(v_1.get_float(), v_2.get_float());
-                                break;
-                            case type_Double:
-                                CHECK_EQUAL(v_1.get_double(), v_2.get_double());
-                                break;
-                            case type_String:
-                                CHECK_EQUAL(v_1.get_string(), v_2.get_string());
-                                break;
-                            case type_Binary:
-                                CHECK_EQUAL(v_1.get_binary(), v_2.get_binary());
-                                break;
-                            case type_OldDateTime:
-                                CHECK_EQUAL(v_1.get_olddatetime(), v_2.get_olddatetime());
-                                break;
-                            case type_Timestamp:
-                                CHECK_EQUAL(v_1.get_timestamp(), v_2.get_timestamp());
-                                break;
-                            case type_Table: {
-                                ConstTableRef t_1 = table.get_subtable(col_i, offset + i);
-                                ConstTableRef t_2 = slice.get_subtable(col_i, i);
-                                CHECK(*t_1 == *t_2);
-                                break;
-                            }
-                            case type_Mixed:
-                            case type_Link:
-                            case type_LinkList:
-                                REALM_ASSERT(false);
-                        }
-                    }
-                }
-                break;
-            case type_LinkList:
-                break;
-        }
-    }
-}
-
-
-void test_write_slice_name(TestContext& test_context, const Table& table, StringData expect_name, bool override_name)
-{
-    size_t offset = 0, size = 0;
-    std::ostringstream out;
-    if (override_name) {
-        table.write(out, offset, size, expect_name);
-    }
-    else {
-        table.write(out, offset, size);
-    }
-    std::string str = out.str();
-    BinaryData buffer(str.data(), str.size());
-    bool take_ownership = false;
-    Group group(buffer, take_ownership);
-    TableRef slice = group.get_table(expect_name);
-    CHECK(slice);
-}
-
-void test_write_slice_contents(TestContext& test_context, const Table& table, size_t offset, size_t size)
-{
-    std::ostringstream out;
-    table.write(out, offset, size);
-    std::string str = out.str();
-    BinaryData buffer(str.data(), str.size());
-    bool take_ownership = false;
-    Group group(buffer, take_ownership);
-    TableRef slice = group.get_table("test");
-    CHECK(slice);
-    if (slice) {
-        size_t remaining_size = table.size() - offset;
-        size_t size_2 = size;
-        if (size_2 > remaining_size)
-            size_2 = remaining_size;
-        CHECK_EQUAL(size_2, slice->size());
-        if (size_2 == slice->size())
-            compare_table_with_slice(test_context, table, *slice, offset, size_2);
-    }
-}
-
-} // anonymous namespace
-
-
-TEST(Table_WriteSlice)
-{
-    // check that the name of the written table is as expected
-    {
-        Table table;
-        test_write_slice_name(test_context, table, "", false);
-        test_write_slice_name(test_context, table, "foo", true); // Override
-        test_write_slice_name(test_context, table, "", true);    // Override
-    }
-    {
-        Group group;
-        TableRef table = group.add_table("test");
-        test_write_slice_name(test_context, *table, "test", false);
-        test_write_slice_name(test_context, *table, "foo", true); // Override
-        test_write_slice_name(test_context, *table, "", true);    // Override
-    }
-
-// Run through a 3-D matrix of table sizes, slice offsets, and
-// slice sizes. Each test involves a table with columns of each
-// possible type.
-#if TEST_DURATION > 0
-    int table_sizes[] = {0, 1, 2, 3, 5, 9, 27, 81, 82, 243, 729, 2187, 6561};
-#else
-    int table_sizes[] = {0, 1, 2, 3, 5, 9, 27, 81, 82, 243, 729, 2187};
-#endif // TEST_DURATION
-
-    int num_sizes = sizeof table_sizes / sizeof *table_sizes;
-    for (int table_size_i = 0; table_size_i != num_sizes; ++table_size_i) {
-        int table_size = table_sizes[table_size_i];
-        Group group;
-        TableRef table = group.add_table("test");
-        bool fixed_subtab_sizes = true;
-        setup_multi_table(*table, table_size, 1, fixed_subtab_sizes);
-        for (int offset_i = 0; offset_i != num_sizes; ++offset_i) {
-            int offset = table_sizes[offset_i];
-            if (offset > table_size)
-                break;
-            for (int size_i = 0; size_i != num_sizes; ++size_i) {
-                int size = table_sizes[size_i];
-                // This also checks that the range can extend beyond
-                // end of table
-                test_write_slice_contents(test_context, *table, offset, size);
-                if (offset + size > table_size)
-                    break;
-            }
-        }
-    }
-}
-
-
-TEST(Table_Parent)
-{
-    TableRef table = Table::create();
-    CHECK_EQUAL(TableRef(), table->get_parent_table());
-    CHECK_EQUAL(realm::npos, table->get_parent_row_index()); // Not a subtable
-    CHECK_EQUAL(realm::npos, table->get_index_in_group());   // Not a group-level table
-
-    DescriptorRef subdesc;
-    table->add_column(type_Table, "", &subdesc);
-    table->add_column(type_Mixed, "");
-    subdesc->add_column(type_Int, "");
-    table->add_empty_row(2);
-    table->set_mixed(1, 0, Mixed::subtable_tag());
-    table->set_mixed(1, 1, Mixed::subtable_tag());
-
-    TableRef subtab;
-    size_t column_ndx = 0;
-
-    subtab = table->get_subtable(0, 0);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(0, column_ndx);
-    CHECK_EQUAL(0, subtab->get_parent_row_index());
-
-    subtab = table->get_subtable(0, 1);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(0, column_ndx);
-    CHECK_EQUAL(1, subtab->get_parent_row_index());
-
-    subtab = table->get_subtable(1, 0);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(1, column_ndx);
-    CHECK_EQUAL(0, subtab->get_parent_row_index());
-
-    subtab = table->get_subtable(1, 1);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(1, column_ndx);
-    CHECK_EQUAL(1, subtab->get_parent_row_index());
-
-    // Check that column indexes are properly adjusted after new
-    // column is insert.
-    table->insert_column(0, type_Int, "");
-
-    subtab = table->get_subtable(1, 0);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(1, column_ndx);
-    CHECK_EQUAL(0, subtab->get_parent_row_index());
-
-    subtab = table->get_subtable(1, 1);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(1, column_ndx);
-    CHECK_EQUAL(1, subtab->get_parent_row_index());
-
-    subtab = table->get_subtable(2, 0);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(2, column_ndx);
-    CHECK_EQUAL(0, subtab->get_parent_row_index());
-
-    subtab = table->get_subtable(2, 1);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(2, column_ndx);
-    CHECK_EQUAL(1, subtab->get_parent_row_index());
-
-    // Check that column indexes are properly adjusted after inserted
-    // column is removed.
-    table->remove_column(0);
-
-    subtab = table->get_subtable(0, 0);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(0, column_ndx);
-    CHECK_EQUAL(0, subtab->get_parent_row_index());
-
-    subtab = table->get_subtable(0, 1);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(0, column_ndx);
-    CHECK_EQUAL(1, subtab->get_parent_row_index());
-
-    subtab = table->get_subtable(1, 0);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(1, column_ndx);
-    CHECK_EQUAL(0, subtab->get_parent_row_index());
-
-    subtab = table->get_subtable(1, 1);
-    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
-    CHECK_EQUAL(1, column_ndx);
-    CHECK_EQUAL(1, subtab->get_parent_row_index());
-}
-
-
-TEST(Table_RegularSubtablesRetain)
-{
-    // Create one degenerate subtable
-    TableRef parent = Table::create();
-    DescriptorRef subdesc;
-    parent->add_column(type_Table, "a", &subdesc);
-    subdesc->add_column(type_Int, "x");
-    parent->add_empty_row();
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL(1, parent->size());
-    TableRef subtab_0_0 = parent->get_subtable(0, 0);
-    CHECK_EQUAL(1, subtab_0_0->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
-    CHECK_EQUAL(0, subtab_0_0->size());
-
-    // Expand to 4 subtables in a 2-by-2 parent.
-    parent->add_column(type_Table, "b", &subdesc);
-    subdesc->add_column(type_Int, "x");
-    parent->add_empty_row();
-    subtab_0_0->add_empty_row();
-    CHECK_EQUAL(2, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL(type_Table, parent->get_column_type(1));
-    CHECK_EQUAL(2, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
-    CHECK_EQUAL(1, subtab_0_0->size());
-    TableRef subtab_0_1 = parent->get_subtable(0, 1);
-    CHECK_EQUAL(1, subtab_0_1->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_0_1->get_column_type(0));
-    CHECK_EQUAL(0, subtab_0_1->size());
-    TableRef subtab_1_0 = parent->get_subtable(1, 0);
-    CHECK_EQUAL(1, subtab_1_0->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_1_0->get_column_type(0));
-    CHECK_EQUAL(0, subtab_1_0->size());
-    TableRef subtab_1_1 = parent->get_subtable(1, 1);
-    CHECK_EQUAL(1, subtab_1_1->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_1_1->get_column_type(0));
-    CHECK_EQUAL(0, subtab_1_1->size());
-
-    // Check that subtables get their specs correctly updated
-    subdesc = parent->get_subdescriptor(0);
-    subdesc->add_column(type_Float, "f");
-    subdesc = parent->get_subdescriptor(1);
-    subdesc->add_column(type_Double, "d");
-    CHECK_EQUAL(2, subtab_0_0->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
-    CHECK_EQUAL(type_Float, subtab_0_0->get_column_type(1));
-    CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
-    CHECK_EQUAL("f", subtab_0_0->get_column_name(1));
-    CHECK_EQUAL(2, subtab_0_1->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_0_1->get_column_type(0));
-    CHECK_EQUAL(type_Float, subtab_0_1->get_column_type(1));
-    CHECK_EQUAL("x", subtab_0_1->get_column_name(0));
-    CHECK_EQUAL("f", subtab_0_1->get_column_name(1));
-    CHECK_EQUAL(2, subtab_1_0->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_1_0->get_column_type(0));
-    CHECK_EQUAL(type_Double, subtab_1_0->get_column_type(1));
-    CHECK_EQUAL("x", subtab_1_0->get_column_name(0));
-    CHECK_EQUAL("d", subtab_1_0->get_column_name(1));
-    CHECK_EQUAL(2, subtab_1_1->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_1_1->get_column_type(0));
-    CHECK_EQUAL(type_Double, subtab_1_1->get_column_type(1));
-    CHECK_EQUAL("x", subtab_1_1->get_column_name(0));
-    CHECK_EQUAL("d", subtab_1_1->get_column_name(1));
-
-    // Check that cell changes in subtables are visible
-    subtab_1_1->add_empty_row();
-    subtab_0_0->set_int(0, 0, 10000);
-    subtab_0_0->set_float(1, 0, 10010.0f);
-    subtab_1_1->set_int(0, 0, 11100);
-    subtab_1_1->set_double(1, 0, 11110.0);
-    parent->add_empty_row();
-    CHECK_EQUAL(3, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(subtab_0_1->is_attached());
-    CHECK(subtab_1_0->is_attached());
-    CHECK(subtab_1_1->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL(0, subtab_0_1->size());
-    CHECK_EQUAL(0, subtab_1_0->size());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10000, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10010.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11100, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11110.0, subtab_1_1->get_double(1, 0));
-
-    // Insert a row and a column before all the subtables
-    parent->insert_column(0, type_Table, "dummy_1");
-    parent->insert_empty_row(0);
-    subtab_0_0->set_int(0, 0, 10001);
-    subtab_0_0->set_float(1, 0, 10011.0f);
-    subtab_1_1->set_int(0, 0, 11101);
-    subtab_1_1->set_double(1, 0, 11111.0);
-    CHECK_EQUAL(3, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL(type_Table, parent->get_column_type(1));
-    CHECK_EQUAL(type_Table, parent->get_column_type(2));
-    CHECK_EQUAL(4, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(subtab_0_1->is_attached());
-    CHECK(subtab_1_0->is_attached());
-    CHECK(subtab_1_1->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL(0, subtab_0_1->size());
-    CHECK_EQUAL(0, subtab_1_0->size());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10001, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10011.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11101, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11111.0, subtab_1_1->get_double(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 2));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2, 1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2, 2));
-
-    // Insert a row and a column between the subtables
-    parent->insert_column(2, type_Int, "dummy_2");
-    parent->insert_empty_row(2);
-    subtab_0_0->set_int(0, 0, 10002);
-    subtab_0_0->set_float(1, 0, 10012.0f);
-    subtab_1_1->set_int(0, 0, 11102);
-    subtab_1_1->set_double(1, 0, 11112.0);
-    CHECK_EQUAL(4, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL(type_Table, parent->get_column_type(1));
-    CHECK_EQUAL(type_Int, parent->get_column_type(2));
-    CHECK_EQUAL(type_Table, parent->get_column_type(3));
-    CHECK_EQUAL(5, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(subtab_0_1->is_attached());
-    CHECK(subtab_1_0->is_attached());
-    CHECK(subtab_1_1->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL(0, subtab_0_1->size());
-    CHECK_EQUAL(0, subtab_1_0->size());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10002, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10012.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11102, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11112.0, subtab_1_1->get_double(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 3));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3, 1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3, 3));
-
-    // Insert a column after the subtables
-    parent->insert_column(4, type_Table, "dummy_3");
-    subtab_0_0->set_int(0, 0, 10003);
-    subtab_0_0->set_float(1, 0, 10013.0f);
-    subtab_1_1->set_int(0, 0, 11103);
-    subtab_1_1->set_double(1, 0, 11113.0);
-    CHECK_EQUAL(5, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL(type_Table, parent->get_column_type(1));
-    CHECK_EQUAL(type_Int, parent->get_column_type(2));
-    CHECK_EQUAL(type_Table, parent->get_column_type(3));
-    CHECK_EQUAL(type_Table, parent->get_column_type(4));
-    CHECK_EQUAL(5, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(subtab_0_1->is_attached());
-    CHECK(subtab_1_0->is_attached());
-    CHECK(subtab_1_1->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL(0, subtab_0_1->size());
-    CHECK_EQUAL(0, subtab_1_0->size());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10003, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10013.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11103, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11113.0, subtab_1_1->get_double(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 3));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3, 1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3, 3));
-
-    // Remove the row and the column between the subtables
-    parent->remove_column(2);
-    parent->remove(2);
-    subtab_0_0->set_int(0, 0, 10004);
-    subtab_0_0->set_float(1, 0, 10014.0f);
-    subtab_1_1->set_int(0, 0, 11104);
-    subtab_1_1->set_double(1, 0, 11114.0);
-    CHECK_EQUAL(4, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL(type_Table, parent->get_column_type(1));
-    CHECK_EQUAL(type_Table, parent->get_column_type(2));
-    CHECK_EQUAL(type_Table, parent->get_column_type(3));
-    CHECK_EQUAL(4, parent->size());
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL(0, subtab_0_1->size());
-    CHECK_EQUAL(0, subtab_1_0->size());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10004, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10014.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11104, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11114.0, subtab_1_1->get_double(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 2));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2, 1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2, 2));
-
-    // Remove the row and the column before the subtables
-    parent->remove_column(0);
-    parent->remove(0);
-    subtab_0_0->set_int(0, 0, 10005);
-    subtab_0_0->set_float(1, 0, 10015.0f);
-    subtab_1_1->set_int(0, 0, 11105);
-    subtab_1_1->set_double(1, 0, 11115.0);
-    CHECK_EQUAL(3, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL(type_Table, parent->get_column_type(1));
-    CHECK_EQUAL(type_Table, parent->get_column_type(2));
-    CHECK_EQUAL(3, parent->size());
-    CHECK_EQUAL(10005, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10015.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11105, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11115.0, subtab_1_1->get_double(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0, 1));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1, 1));
-
-    // Remove the row and the column after the subtables
-    parent->remove_column(2);
-    parent->remove(2);
-    subtab_0_0->set_int(0, 0, 10006);
-    subtab_0_0->set_float(1, 0, 10016.0f);
-    subtab_1_1->set_int(0, 0, 11106);
-    subtab_1_1->set_double(1, 0, 11116.0);
-    CHECK_EQUAL(2, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL(type_Table, parent->get_column_type(1));
-    CHECK_EQUAL(2, parent->size());
-    CHECK_EQUAL(10006, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10016.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11106, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11116.0, subtab_1_1->get_double(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0, 1));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1, 1));
-
-    // Check that subtable accessors are detached when the subtables are removed
-    parent->remove(1);
-    subtab_0_0->set_int(0, 0, 10007);
-    subtab_0_0->set_float(1, 0, 10017.0f);
-    CHECK_EQUAL(2, parent->get_column_count());
-    CHECK_EQUAL(1, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(!subtab_0_1->is_attached());
-    CHECK(subtab_1_0->is_attached());
-    CHECK(!subtab_1_1->is_attached());
-    CHECK_EQUAL(10007, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10017.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
-    parent->remove_column(1);
-    subtab_0_0->set_int(0, 0, 10008);
-    subtab_0_0->set_float(1, 0, 10018.0f);
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(1, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(!subtab_0_1->is_attached());
-    CHECK(!subtab_1_0->is_attached());
-    CHECK(!subtab_1_1->is_attached());
-    CHECK_EQUAL(10008, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10018.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
-
-    // Clear subtable
-    parent->clear_subtable(0, 0);
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(1, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK_EQUAL(2, subtab_0_0->get_column_count());
-    CHECK_EQUAL(0, subtab_0_0->size());
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
-
-    // Clear parent table
-    parent->clear();
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(0, parent->size());
-    CHECK(!subtab_0_0->is_attached());
-    CHECK(!subtab_0_1->is_attached());
-    CHECK(!subtab_1_0->is_attached());
-    CHECK(!subtab_1_1->is_attached());
-
-    // Insert 4 new subtables, then remove some of them in a different way
-    parent->add_column(type_Table, "c", &subdesc);
-    subdesc->add_column(type_String, "x");
-    parent->add_empty_row(2);
-    subtab_0_0 = parent->get_subtable(0, 0);
-    subtab_0_1 = parent->get_subtable(0, 1);
-    subtab_1_0 = parent->get_subtable(1, 0);
-    subtab_1_1 = parent->get_subtable(1, 1);
-    subtab_1_1->add_empty_row();
-    subtab_1_1->set_string(0, 0, "pneumonoultramicroscopicsilicovolcanoconiosis");
-    CHECK_EQUAL(2, parent->get_column_count());
-    CHECK_EQUAL(2, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(subtab_0_1->is_attached());
-    CHECK(subtab_1_0->is_attached());
-    CHECK(subtab_1_1->is_attached());
-    CHECK_EQUAL(0, subtab_0_0->size());
-    CHECK_EQUAL(0, subtab_0_1->size());
-    CHECK_EQUAL(0, subtab_1_0->size());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0, 0));
-    parent->remove(0);
-    parent->remove_column(0);
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(1, parent->size());
-    subtab_1_1 = parent->get_subtable(0, 0);
-    CHECK(!subtab_0_0->is_attached());
-    CHECK(!subtab_0_1->is_attached());
-    CHECK(!subtab_1_0->is_attached());
-    CHECK(subtab_1_1->is_attached());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0, 0));
-
-    // Insert 2x2 new subtables, then remove them all together
-    parent->add_column(type_Table, "d", &subdesc);
-    subdesc->add_column(type_String, "x");
-    parent->add_empty_row(2);
-    subtab_0_0 = parent->get_subtable(0, 0);
-    subtab_0_1 = parent->get_subtable(0, 1);
-    subtab_1_0 = parent->get_subtable(1, 0);
-    subtab_1_1 = parent->get_subtable(1, 1);
-    subtab_1_1->add_empty_row();
-    subtab_1_1->set_string(0, 0, "supercalifragilisticexpialidocious");
-    parent->clear();
-    CHECK_EQUAL(2, parent->get_column_count());
-    CHECK_EQUAL(0, parent->size());
-    CHECK(!subtab_0_0->is_attached());
-    CHECK(!subtab_0_1->is_attached());
-    CHECK(!subtab_1_0->is_attached());
-    CHECK(!subtab_1_1->is_attached());
-
-    // Insert 1x1 new subtable, then remove it by removing the last row
-    parent->add_empty_row(1);
-    parent->remove_column(0);
-    subtab_0_0 = parent->get_subtable(0, 0);
-    subtab_0_0->add_empty_row(1);
-    subtab_0_0->set_string(0, 0, "brahmaputra");
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL("d", parent->get_column_name(0));
-    CHECK_EQUAL(1, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->get_column_count());
-    CHECK_EQUAL(type_String, subtab_0_0->get_column_type(0));
-    CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL("brahmaputra", subtab_0_0->get_string(0, 0));
-    parent->remove(0);
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(0, parent->size());
-    CHECK(!subtab_0_0->is_attached());
-
-    // Insert 1x1 new subtable, then remove it by removing the last column
-    parent->add_empty_row(1);
-    subtab_0_0 = parent->get_subtable(0, 0);
-    subtab_0_0->add_empty_row(1);
-    subtab_0_0->set_string(0, 0, "baikonur");
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL("d", parent->get_column_name(0));
-    CHECK_EQUAL(1, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->get_column_count());
-    CHECK_EQUAL(type_String, subtab_0_0->get_column_type(0));
-    CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL("baikonur", subtab_0_0->get_string(0, 0));
-    parent->remove_column(0);
-    CHECK_EQUAL(0, parent->get_column_count());
-    CHECK_EQUAL(0, parent->size());
-    CHECK(!subtab_0_0->is_attached());
-}
-
-
-TEST(Table_MixedSubtablesRetain)
-{
-    // Create one degenerate subtable
-    TableRef parent = Table::create();
-    parent->add_column(type_Mixed, "a");
-    parent->add_empty_row();
-    parent->set_mixed(0, 0, Mixed::subtable_tag());
-    TableRef subtab_0_0 = parent->get_subtable(0, 0);
-    subtab_0_0->add_column(type_Int, "x");
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
-    CHECK_EQUAL(1, parent->size());
-    CHECK_EQUAL(1, subtab_0_0->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
-    CHECK_EQUAL(0, subtab_0_0->size());
-
-    // Expand to 4 subtables in a 2-by-2 parent.
-    subtab_0_0->add_empty_row();
-    parent->add_column(type_Mixed, "b");
-    parent->set_mixed(1, 0, Mixed::subtable_tag());
-    TableRef subtab_1_0 = parent->get_subtable(1, 0);
-    subtab_1_0->add_column(type_Int, "x");
-    parent->add_empty_row();
-    parent->set_mixed(0, 1, Mixed::subtable_tag());
-    TableRef subtab_0_1 = parent->get_subtable(0, 1);
-    subtab_0_1->add_column(type_Int, "x");
-    parent->set_mixed(1, 1, Mixed::subtable_tag());
-    TableRef subtab_1_1 = parent->get_subtable(1, 1);
-    subtab_1_1->add_column(type_Int, "x");
-    CHECK_EQUAL(2, parent->get_column_count());
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
-    CHECK_EQUAL(2, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL(1, subtab_0_1->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_0_1->get_column_type(0));
-    CHECK_EQUAL(0, subtab_0_1->size());
-    CHECK_EQUAL(1, subtab_1_0->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_1_0->get_column_type(0));
-    CHECK_EQUAL(0, subtab_1_0->size());
-    CHECK_EQUAL(1, subtab_1_1->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_1_1->get_column_type(0));
-    CHECK_EQUAL(0, subtab_1_1->size());
-
-    // Check that subtables get their specs correctly updated
-    subtab_0_0->add_column(type_Float, "f");
-    subtab_0_1->add_column(type_Float, "f");
-    subtab_1_0->add_column(type_Double, "d");
-    subtab_1_1->add_column(type_Double, "d");
-    CHECK_EQUAL(2, subtab_0_0->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
-    CHECK_EQUAL(type_Float, subtab_0_0->get_column_type(1));
-    CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
-    CHECK_EQUAL("f", subtab_0_0->get_column_name(1));
-    CHECK_EQUAL(2, subtab_0_1->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_0_1->get_column_type(0));
-    CHECK_EQUAL(type_Float, subtab_0_1->get_column_type(1));
-    CHECK_EQUAL("x", subtab_0_1->get_column_name(0));
-    CHECK_EQUAL("f", subtab_0_1->get_column_name(1));
-    CHECK_EQUAL(2, subtab_1_0->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_1_0->get_column_type(0));
-    CHECK_EQUAL(type_Double, subtab_1_0->get_column_type(1));
-    CHECK_EQUAL("x", subtab_1_0->get_column_name(0));
-    CHECK_EQUAL("d", subtab_1_0->get_column_name(1));
-    CHECK_EQUAL(2, subtab_1_1->get_column_count());
-    CHECK_EQUAL(type_Int, subtab_1_1->get_column_type(0));
-    CHECK_EQUAL(type_Double, subtab_1_1->get_column_type(1));
-    CHECK_EQUAL("x", subtab_1_1->get_column_name(0));
-    CHECK_EQUAL("d", subtab_1_1->get_column_name(1));
-
-    // Check that cell changes in subtables are visible
-    subtab_1_1->add_empty_row();
-    subtab_0_0->set_int(0, 0, 10000);
-    subtab_0_0->set_float(1, 0, 10010.0f);
-    subtab_1_1->set_int(0, 0, 11100);
-    subtab_1_1->set_double(1, 0, 11110.0);
-    parent->add_empty_row();
-    CHECK_EQUAL(3, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(subtab_0_1->is_attached());
-    CHECK(subtab_1_0->is_attached());
-    CHECK(subtab_1_1->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL(0, subtab_0_1->size());
-    CHECK_EQUAL(0, subtab_1_0->size());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10000, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10010.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11100, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11110.0, subtab_1_1->get_double(1, 0));
-
-    // Insert a row and a column before all the subtables
-    parent->insert_column(0, type_Table, "dummy_1");
-    parent->insert_empty_row(0);
-    subtab_0_0->set_int(0, 0, 10001);
-    subtab_0_0->set_float(1, 0, 10011.0f);
-    subtab_1_1->set_int(0, 0, 11101);
-    subtab_1_1->set_double(1, 0, 11111.0);
-    CHECK_EQUAL(3, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(2));
-    CHECK_EQUAL(4, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(subtab_0_1->is_attached());
-    CHECK(subtab_1_0->is_attached());
-    CHECK(subtab_1_1->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL(0, subtab_0_1->size());
-    CHECK_EQUAL(0, subtab_1_0->size());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10001, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10011.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11101, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11111.0, subtab_1_1->get_double(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 2));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2, 1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2, 2));
-
-    // Insert a row and a column between the subtables
-    parent->insert_column(2, type_Int, "dummy_2");
-    parent->insert_empty_row(2);
-    parent->set_mixed(3, 2, "Lopadotemachoselachogaleokranioleipsanodrimhypotrimmatosilphio"
-                            "paraomelitokatakechy­menokichlepikossyphophattoperisteralektryonopte"
-                            "kephalliokigklopeleiolagoiosiraiobaphetraganopterygon");
-    subtab_0_0->set_int(0, 0, 10002);
-    subtab_0_0->set_float(1, 0, 10012.0f);
-    subtab_1_1->set_int(0, 0, 11102);
-    subtab_1_1->set_double(1, 0, 11112.0);
-    CHECK_EQUAL(4, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
-    CHECK_EQUAL(type_Int, parent->get_column_type(2));
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(3));
-    CHECK_EQUAL(5, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(subtab_0_1->is_attached());
-    CHECK(subtab_1_0->is_attached());
-    CHECK(subtab_1_1->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL(0, subtab_0_1->size());
-    CHECK_EQUAL(0, subtab_1_0->size());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10002, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10012.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11102, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11112.0, subtab_1_1->get_double(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 3));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3, 1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3, 3));
-
-    // Insert a column after the subtables
-    parent->insert_column(4, type_Table, "dummy_3");
-    subtab_0_0->set_int(0, 0, 10003);
-    subtab_0_0->set_float(1, 0, 10013.0f);
-    subtab_1_1->set_int(0, 0, 11103);
-    subtab_1_1->set_double(1, 0, 11113.0);
-    CHECK_EQUAL(5, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
-    CHECK_EQUAL(type_Int, parent->get_column_type(2));
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(3));
-    CHECK_EQUAL(type_Table, parent->get_column_type(4));
-    CHECK_EQUAL(5, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(subtab_0_1->is_attached());
-    CHECK(subtab_1_0->is_attached());
-    CHECK(subtab_1_1->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL(0, subtab_0_1->size());
-    CHECK_EQUAL(0, subtab_1_0->size());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10003, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10013.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11103, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11113.0, subtab_1_1->get_double(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 3));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3, 1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3, 3));
-
-    // Remove the row and the column between the subtables
-    parent->remove_column(2);
-    parent->remove(2);
-    subtab_0_0->set_int(0, 0, 10004);
-    subtab_0_0->set_float(1, 0, 10014.0f);
-    subtab_1_1->set_int(0, 0, 11104);
-    subtab_1_1->set_double(1, 0, 11114.0);
-    CHECK_EQUAL(4, parent->get_column_count());
-    CHECK_EQUAL(type_Table, parent->get_column_type(0));
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(2));
-    CHECK_EQUAL(type_Table, parent->get_column_type(3));
-    CHECK_EQUAL(4, parent->size());
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL(0, subtab_0_1->size());
-    CHECK_EQUAL(0, subtab_1_0->size());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10004, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10014.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11104, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11114.0, subtab_1_1->get_double(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 2));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2, 1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2, 2));
-
-    // Remove the row and the column before the subtables
-    parent->remove_column(0);
-    parent->remove(0);
-    subtab_0_0->set_int(0, 0, 10005);
-    subtab_0_0->set_float(1, 0, 10015.0f);
-    subtab_1_1->set_int(0, 0, 11105);
-    subtab_1_1->set_double(1, 0, 11115.0);
-    CHECK_EQUAL(3, parent->get_column_count());
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
-    CHECK_EQUAL(type_Table, parent->get_column_type(2));
-    CHECK_EQUAL(3, parent->size());
-    CHECK_EQUAL(10005, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10015.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11105, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11115.0, subtab_1_1->get_double(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0, 1));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1, 1));
-
-    // Remove the row and the column after the subtables
-    parent->remove_column(2);
-    parent->remove(2);
-    subtab_0_0->set_int(0, 0, 10006);
-    subtab_0_0->set_float(1, 0, 10016.0f);
-    subtab_1_1->set_int(0, 0, 11106);
-    subtab_1_1->set_double(1, 0, 11116.0);
-    CHECK_EQUAL(2, parent->get_column_count());
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
-    CHECK_EQUAL(2, parent->size());
-    CHECK_EQUAL(10006, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10016.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(11106, subtab_1_1->get_int(0, 0));
-    CHECK_EQUAL(11116.0, subtab_1_1->get_double(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0, 1));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1, 1));
-
-    // Check that subtable accessors are detached when the subtables are removed
-    parent->remove(1);
-    subtab_0_0->set_int(0, 0, 10007);
-    subtab_0_0->set_float(1, 0, 10017.0f);
-    CHECK_EQUAL(2, parent->get_column_count());
-    CHECK_EQUAL(1, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(!subtab_0_1->is_attached());
-    CHECK(subtab_1_0->is_attached());
-    CHECK(!subtab_1_1->is_attached());
-    CHECK_EQUAL(10007, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10017.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
-    parent->remove_column(1);
-    subtab_0_0->set_int(0, 0, 10008);
-    subtab_0_0->set_float(1, 0, 10018.0f);
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(1, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(!subtab_0_1->is_attached());
-    CHECK(!subtab_1_0->is_attached());
-    CHECK(!subtab_1_1->is_attached());
-    CHECK_EQUAL(10008, subtab_0_0->get_int(0, 0));
-    CHECK_EQUAL(10018.0f, subtab_0_0->get_float(1, 0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
-
-    // Remove subtable
-    parent->clear_subtable(0, 0);
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(1, parent->size());
-    CHECK(!subtab_0_0->is_attached());
-
-    // Clear parent table
-    parent->clear();
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(0, parent->size());
-    CHECK(!subtab_0_0->is_attached());
-
-    // Insert 4 new subtables, then remove some of them in a different way
-    parent->add_column(type_Mixed, "c");
-    parent->add_empty_row(2);
-    parent->set_mixed(0, 0, Mixed::subtable_tag());
-    parent->set_mixed(0, 1, Mixed::subtable_tag());
-    parent->set_mixed(1, 0, Mixed::subtable_tag());
-    parent->set_mixed(1, 1, Mixed::subtable_tag());
-    subtab_0_0 = parent->get_subtable(0, 0);
-    subtab_0_1 = parent->get_subtable(0, 1);
-    subtab_1_0 = parent->get_subtable(1, 0);
-    subtab_1_1 = parent->get_subtable(1, 1);
-    CHECK(subtab_0_0);
-    CHECK(subtab_0_1);
-    CHECK(subtab_1_0);
-    CHECK(subtab_1_1);
-    subtab_1_1->add_column(type_String, "x");
-    subtab_1_1->add_empty_row();
-    subtab_1_1->set_string(0, 0, "pneumonoultramicroscopicsilicovolcanoconiosis");
-    CHECK_EQUAL(2, parent->get_column_count());
-    CHECK_EQUAL(2, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK(subtab_0_1->is_attached());
-    CHECK(subtab_1_0->is_attached());
-    CHECK(subtab_1_1->is_attached());
-    CHECK_EQUAL(0, subtab_0_0->size());
-    CHECK_EQUAL(0, subtab_0_1->size());
-    CHECK_EQUAL(0, subtab_1_0->size());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0, 0));
-    parent->remove(0);
-    parent->remove_column(0);
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(1, parent->size());
-    subtab_1_1 = parent->get_subtable(0, 0);
-    CHECK(!subtab_0_0->is_attached());
-    CHECK(!subtab_0_1->is_attached());
-    CHECK(!subtab_1_0->is_attached());
-    CHECK(subtab_1_1->is_attached());
-    CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0, 0));
-
-    // Insert 2x2 new subtables, then remove them all together
-    parent->add_column(type_Mixed, "d");
-    parent->add_empty_row(2);
-    parent->set_mixed(0, 0, Mixed::subtable_tag());
-    parent->set_mixed(0, 1, Mixed::subtable_tag());
-    parent->set_mixed(1, 0, Mixed::subtable_tag());
-    parent->set_mixed(1, 1, Mixed::subtable_tag());
-    subtab_0_0 = parent->get_subtable(0, 0);
-    subtab_0_1 = parent->get_subtable(0, 1);
-    subtab_1_0 = parent->get_subtable(1, 0);
-    subtab_1_1 = parent->get_subtable(1, 1);
-    subtab_1_1->add_column(type_String, "x");
-    subtab_1_1->add_empty_row();
-    subtab_1_1->set_string(0, 0, "supercalifragilisticexpialidocious");
-    parent->clear();
-    CHECK_EQUAL(2, parent->get_column_count());
-    CHECK_EQUAL(0, parent->size());
-    CHECK(!subtab_0_0->is_attached());
-    CHECK(!subtab_0_1->is_attached());
-    CHECK(!subtab_1_0->is_attached());
-    CHECK(!subtab_1_1->is_attached());
-
-    // Insert 1x1 new subtable, then remove it by removing the last row
-    parent->add_empty_row(1);
-    parent->remove_column(0);
-    parent->set_mixed(0, 0, Mixed::subtable_tag());
-    subtab_0_0 = parent->get_subtable(0, 0);
-    subtab_0_0->add_column(type_String, "x");
-    subtab_0_0->add_empty_row(1);
-    subtab_0_0->set_string(0, 0, "brahmaputra");
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
-    CHECK_EQUAL("d", parent->get_column_name(0));
-    CHECK_EQUAL(1, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->get_column_count());
-    CHECK_EQUAL(type_String, subtab_0_0->get_column_type(0));
-    CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL("brahmaputra", subtab_0_0->get_string(0, 0));
-    parent->remove(0);
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(0, parent->size());
-    CHECK(!subtab_0_0->is_attached());
-
-    // Insert 1x1 new subtable, then remove it by removing the last column
-    parent->add_empty_row(1);
-    parent->set_mixed(0, 0, Mixed::subtable_tag());
-    subtab_0_0 = parent->get_subtable(0, 0);
-    subtab_0_0->add_column(type_String, "x");
-    subtab_0_0->add_empty_row(1);
-    subtab_0_0->set_string(0, 0, "baikonur");
-    CHECK_EQUAL(1, parent->get_column_count());
-    CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
-    CHECK_EQUAL("d", parent->get_column_name(0));
-    CHECK_EQUAL(1, parent->size());
-    CHECK(subtab_0_0->is_attached());
-    CHECK_EQUAL(1, subtab_0_0->get_column_count());
-    CHECK_EQUAL(type_String, subtab_0_0->get_column_type(0));
-    CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
-    CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL("baikonur", subtab_0_0->get_string(0, 0));
-    parent->remove_column(0);
-    CHECK_EQUAL(0, parent->get_column_count());
-    CHECK_EQUAL(0, parent->size());
-    CHECK(!subtab_0_0->is_attached());
-}
-
-
-TEST(Table_RowAccessor)
-{
-    Table table;
-    DescriptorRef subdesc;
-    table.add_column(type_Int, "int");
-    table.add_column(type_Bool, "bool");
-    table.add_column(type_Float, "");
-    table.add_column(type_Double, "");
-    table.add_column(type_String, "");
-    table.add_column(type_Binary, "", true);
-    table.add_column(type_OldDateTime, "");
-    table.add_column(type_Table, "", &subdesc);
-    table.add_column(type_Mixed, "");
-    subdesc->add_column(type_Int, "i");
-    table.add_empty_row(2);
-
-    BinaryData bin("bin", 3);
-
-    Table empty_subtab;
-    empty_subtab.add_column(type_Int, "i");
-
-    Table one_subtab;
-    one_subtab.add_column(type_Int, "i");
-    one_subtab.add_empty_row(1);
-    one_subtab.set_int(0, 0, 19);
-
-    Table two_subtab;
-    two_subtab.add_column(type_Int, "i");
-    two_subtab.add_empty_row(1);
-    two_subtab.set_int(0, 0, 29);
-
-    table.set_int(0, 1, 4923);
-    table.set_bool(1, 1, true);
-    table.set_float(2, 1, 5298.0f);
-    table.set_double(3, 1, 2169.0);
-    table.set_string(4, 1, "str");
-    table.set_binary(5, 1, bin);
-    table.set_olddatetime(6, 1, 7739);
-    table.set_subtable(7, 1, &one_subtab);
-    table.set_mixed(8, 1, Mixed("mix"));
-
-    // Check getters for `RowExpr`
-    {
-        CHECK_EQUAL(9, table[0].get_column_count());
-        CHECK_EQUAL(type_Int, table[0].get_column_type(0));
-        CHECK_EQUAL(type_Bool, table[0].get_column_type(1));
-        CHECK_EQUAL("int", table[0].get_column_name(0));
-        CHECK_EQUAL("bool", table[0].get_column_name(1));
-        CHECK_EQUAL(0, table[0].get_column_index("int"));
-        CHECK_EQUAL(1, table[0].get_column_index("bool"));
-
-        CHECK_EQUAL(int_fast64_t(), table[0].get_int(0));
-        CHECK_EQUAL(bool(), table[0].get_bool(1));
-        CHECK_EQUAL(float(), table[0].get_float(2));
-        CHECK_EQUAL(double(), table[0].get_double(3));
-        CHECK_EQUAL(StringData(""), table[0].get_string(4));
-        CHECK_EQUAL(BinaryData(), table[0].get_binary(5));
-        CHECK_EQUAL(OldDateTime(), table[0].get_olddatetime(6));
-        CHECK_EQUAL(0, table[0].get_subtable_size(7));
-        CHECK_EQUAL(int_fast64_t(), table[0].get_mixed(8));
-        CHECK_EQUAL(type_Int, table[0].get_mixed_type(8));
-
-        CHECK_EQUAL(4923, table[1].get_int(0));
-        CHECK_EQUAL(true, table[1].get_bool(1));
-        CHECK_EQUAL(5298.0f, table[1].get_float(2));
-        CHECK_EQUAL(2169.0, table[1].get_double(3));
-        CHECK_EQUAL("str", table[1].get_string(4));
-        CHECK_EQUAL(bin, table[1].get_binary(5));
-        CHECK_EQUAL(OldDateTime(7739), table[1].get_olddatetime(6));
-        CHECK_EQUAL(1, table[1].get_subtable_size(7));
-        CHECK_EQUAL("mix", table[1].get_mixed(8));
-        CHECK_EQUAL(type_String, table[1].get_mixed_type(8));
-
-        TableRef subtab_0 = table[0].get_subtable(7);
-        CHECK(*subtab_0 == empty_subtab);
-        TableRef subtab_1 = table[1].get_subtable(7);
-        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
-        CHECK(*subtab_1 == one_subtab);
-    }
-
-    // Check getters for `ConstRowExpr`
-    {
-        const Table& const_table = table;
-
-        CHECK_EQUAL(9, const_table[0].get_column_count());
-        CHECK_EQUAL(type_Int, const_table[0].get_column_type(0));
-        CHECK_EQUAL(type_Bool, const_table[0].get_column_type(1));
-        CHECK_EQUAL("int", const_table[0].get_column_name(0));
-        CHECK_EQUAL("bool", const_table[0].get_column_name(1));
-        CHECK_EQUAL(0, const_table[0].get_column_index("int"));
-        CHECK_EQUAL(1, const_table[0].get_column_index("bool"));
-
-        CHECK_EQUAL(int_fast64_t(), const_table[0].get_int(0));
-        CHECK_EQUAL(bool(), const_table[0].get_bool(1));
-        CHECK_EQUAL(float(), const_table[0].get_float(2));
-        CHECK_EQUAL(double(), const_table[0].get_double(3));
-        CHECK_EQUAL(StringData(""), const_table[0].get_string(4));
-        CHECK_EQUAL(BinaryData(), const_table[0].get_binary(5));
-        CHECK_EQUAL(OldDateTime(), const_table[0].get_olddatetime(6));
-        CHECK_EQUAL(0, const_table[0].get_subtable_size(7));
-        CHECK_EQUAL(int_fast64_t(), const_table[0].get_mixed(8));
-        CHECK_EQUAL(type_Int, const_table[0].get_mixed_type(8));
-
-        CHECK_EQUAL(4923, const_table[1].get_int(0));
-        CHECK_EQUAL(true, const_table[1].get_bool(1));
-        CHECK_EQUAL(5298.0f, const_table[1].get_float(2));
-        CHECK_EQUAL(2169.0, const_table[1].get_double(3));
-        CHECK_EQUAL("str", const_table[1].get_string(4));
-        CHECK_EQUAL(bin, const_table[1].get_binary(5));
-        CHECK_EQUAL(OldDateTime(7739), const_table[1].get_olddatetime(6));
-        CHECK_EQUAL(1, const_table[1].get_subtable_size(7));
-        CHECK_EQUAL("mix", const_table[1].get_mixed(8));
-        CHECK_EQUAL(type_String, const_table[1].get_mixed_type(8));
-
-        ConstTableRef subtab_0 = const_table[0].get_subtable(7);
-        CHECK(*subtab_0 == empty_subtab);
-        ConstTableRef subtab_1 = const_table[1].get_subtable(7);
-        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
-        CHECK(*subtab_1 == one_subtab);
-    }
-
-    // Check getters for `Row`
-    {
-        Row row_0 = table[0];
-        Row row_1 = table[1];
-
-        CHECK_EQUAL(9, row_0.get_column_count());
-        CHECK_EQUAL(type_Int, row_0.get_column_type(0));
-        CHECK_EQUAL(type_Bool, row_0.get_column_type(1));
-        CHECK_EQUAL("int", row_0.get_column_name(0));
-        CHECK_EQUAL("bool", row_0.get_column_name(1));
-        CHECK_EQUAL(0, row_0.get_column_index("int"));
-        CHECK_EQUAL(1, row_0.get_column_index("bool"));
-
-        CHECK_EQUAL(int_fast64_t(), row_0.get_int(0));
-        CHECK_EQUAL(bool(), row_0.get_bool(1));
-        CHECK_EQUAL(float(), row_0.get_float(2));
-        CHECK_EQUAL(double(), row_0.get_double(3));
-        CHECK_EQUAL(StringData(""), row_0.get_string(4));
-        CHECK_EQUAL(BinaryData(), row_0.get_binary(5));
-        CHECK_EQUAL(OldDateTime(), row_0.get_olddatetime(6));
-        CHECK_EQUAL(0, row_0.get_subtable_size(7));
-        CHECK_EQUAL(int_fast64_t(), row_0.get_mixed(8));
-        CHECK_EQUAL(type_Int, row_0.get_mixed_type(8));
-
-        CHECK_EQUAL(4923, row_1.get_int(0));
-        CHECK_EQUAL(true, row_1.get_bool(1));
-        CHECK_EQUAL(5298.0f, row_1.get_float(2));
-        CHECK_EQUAL(2169.0, row_1.get_double(3));
-        CHECK_EQUAL("str", row_1.get_string(4));
-        CHECK_EQUAL(bin, row_1.get_binary(5));
-        CHECK_EQUAL(OldDateTime(7739), row_1.get_olddatetime(6));
-        CHECK_EQUAL(1, row_1.get_subtable_size(7));
-        CHECK_EQUAL("mix", row_1.get_mixed(8));
-        CHECK_EQUAL(type_String, row_1.get_mixed_type(8));
-
-        TableRef subtab_0 = row_0.get_subtable(7);
-        CHECK(*subtab_0 == empty_subtab);
-        TableRef subtab_1 = row_1.get_subtable(7);
-        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
-        CHECK(*subtab_1 == one_subtab);
-    }
-
-    // Check getters for `const Row`
-    {
-        const Row row_0 = table[0];
-        const Row row_1 = table[1];
-
-        CHECK_EQUAL(int_fast64_t(), row_0.get_int(0));
-        CHECK_EQUAL(bool(), row_0.get_bool(1));
-        CHECK_EQUAL(float(), row_0.get_float(2));
-        CHECK_EQUAL(double(), row_0.get_double(3));
-        CHECK_EQUAL(StringData(""), row_0.get_string(4));
-        CHECK_EQUAL(BinaryData(), row_0.get_binary(5));
-        CHECK_EQUAL(OldDateTime(), row_0.get_olddatetime(6));
-        CHECK_EQUAL(0, row_0.get_subtable_size(7));
-        CHECK_EQUAL(int_fast64_t(), row_0.get_mixed(8));
-        CHECK_EQUAL(type_Int, row_0.get_mixed_type(8));
-
-        CHECK_EQUAL(4923, row_1.get_int(0));
-        CHECK_EQUAL(true, row_1.get_bool(1));
-        CHECK_EQUAL(5298.0f, row_1.get_float(2));
-        CHECK_EQUAL(2169.0, row_1.get_double(3));
-        CHECK_EQUAL("str", row_1.get_string(4));
-        CHECK_EQUAL(bin, row_1.get_binary(5));
-        CHECK_EQUAL(OldDateTime(7739), row_1.get_olddatetime(6));
-        CHECK_EQUAL(1, row_1.get_subtable_size(7));
-        CHECK_EQUAL("mix", row_1.get_mixed(8));
-        CHECK_EQUAL(type_String, row_1.get_mixed_type(8));
-
-        ConstTableRef subtab_0 = row_0.get_subtable(7);
-        CHECK(*subtab_0 == empty_subtab);
-        ConstTableRef subtab_1 = row_1.get_subtable(7);
-        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
-        CHECK(*subtab_1 == one_subtab);
-    }
-
-    // Check getters for `ConstRow`
-    {
-        ConstRow row_0 = table[0];
-        ConstRow row_1 = table[1];
-
-        CHECK_EQUAL(int_fast64_t(), row_0.get_int(0));
-        CHECK_EQUAL(bool(), row_0.get_bool(1));
-        CHECK_EQUAL(float(), row_0.get_float(2));
-        CHECK_EQUAL(double(), row_0.get_double(3));
-        CHECK_EQUAL(StringData(""), row_0.get_string(4));
-        CHECK_EQUAL(BinaryData(), row_0.get_binary(5));
-        CHECK_EQUAL(OldDateTime(), row_0.get_olddatetime(6));
-        CHECK_EQUAL(0, row_0.get_subtable_size(7));
-        CHECK_EQUAL(int_fast64_t(), row_0.get_mixed(8));
-        CHECK_EQUAL(type_Int, row_0.get_mixed_type(8));
-
-        CHECK_EQUAL(4923, row_1.get_int(0));
-        CHECK_EQUAL(true, row_1.get_bool(1));
-        CHECK_EQUAL(5298.0f, row_1.get_float(2));
-        CHECK_EQUAL(2169.0, row_1.get_double(3));
-        CHECK_EQUAL("str", row_1.get_string(4));
-        CHECK_EQUAL(bin, row_1.get_binary(5));
-        CHECK_EQUAL(OldDateTime(7739), row_1.get_olddatetime(6));
-        CHECK_EQUAL(1, row_1.get_subtable_size(7));
-        CHECK_EQUAL("mix", row_1.get_mixed(8));
-        CHECK_EQUAL(type_String, row_1.get_mixed_type(8));
-
-        ConstTableRef subtab_0 = row_0.get_subtable(7);
-        CHECK(*subtab_0 == empty_subtab);
-        ConstTableRef subtab_1 = row_1.get_subtable(7);
-        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
-        CHECK(*subtab_1 == one_subtab);
-    }
-
-    // Check getters for `const ConstRow` (double constness)
-    {
-        const ConstRow row_0 = table[0];
-        const ConstRow row_1 = table[1];
-
-        CHECK_EQUAL(int_fast64_t(), row_0.get_int(0));
-        CHECK_EQUAL(bool(), row_0.get_bool(1));
-        CHECK_EQUAL(float(), row_0.get_float(2));
-        CHECK_EQUAL(double(), row_0.get_double(3));
-        CHECK_EQUAL(StringData(""), row_0.get_string(4));
-        CHECK_EQUAL(BinaryData(), row_0.get_binary(5));
-        CHECK_EQUAL(OldDateTime(), row_0.get_olddatetime(6));
-        CHECK_EQUAL(0, row_0.get_subtable_size(7));
-        CHECK_EQUAL(int_fast64_t(), row_0.get_mixed(8));
-        CHECK_EQUAL(type_Int, row_0.get_mixed_type(8));
-
-        CHECK_EQUAL(4923, row_1.get_int(0));
-        CHECK_EQUAL(true, row_1.get_bool(1));
-        CHECK_EQUAL(5298.0f, row_1.get_float(2));
-        CHECK_EQUAL(2169.0, row_1.get_double(3));
-        CHECK_EQUAL("str", row_1.get_string(4));
-        CHECK_EQUAL(bin, row_1.get_binary(5));
-        CHECK_EQUAL(OldDateTime(7739), row_1.get_olddatetime(6));
-        CHECK_EQUAL(1, row_1.get_subtable_size(7));
-        CHECK_EQUAL("mix", row_1.get_mixed(8));
-        CHECK_EQUAL(type_String, row_1.get_mixed_type(8));
-
-        ConstTableRef subtab_0 = row_0.get_subtable(7);
-        CHECK(*subtab_0 == empty_subtab);
-        ConstTableRef subtab_1 = row_1.get_subtable(7);
-        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
-        CHECK(*subtab_1 == one_subtab);
-    }
-
-    // Check setters for `Row`
-    {
-        Row row_0 = table[0];
-        Row row_1 = table[1];
-
-        row_0.set_int(0, 5651);
-        row_0.set_bool(1, true);
-        row_0.set_float(2, 8397.0f);
-        row_0.set_double(3, 1937.0);
-        row_0.set_string(4, "foo");
-        row_0.set_binary(5, bin);
-        row_0.set_olddatetime(6, OldDateTime(9992));
-        row_0.set_subtable(7, &one_subtab);
-        row_0.set_mixed(8, Mixed(3637.0f));
-
-        row_1.set_int(0, int_fast64_t());
-        row_1.set_bool(1, bool());
-        row_1.set_float(2, float());
-        row_1.set_double(3, double());
-        row_1.set_string(4, StringData(""));
-        row_1.set_binary(5, BinaryData());
-        row_1.set_olddatetime(6, OldDateTime());
-        row_1.set_subtable(7, nullptr);
-        row_1.set_mixed(8, Mixed());
-
-        Mixed mix_subtab((Mixed::subtable_tag()));
-
-        CHECK_EQUAL(5651, table.get_int(0, 0));
-        CHECK_EQUAL(true, table.get_bool(1, 0));
-        CHECK_EQUAL(8397.0f, table.get_float(2, 0));
-        CHECK_EQUAL(1937.0, table.get_double(3, 0));
-        CHECK_EQUAL("foo", table.get_string(4, 0));
-        CHECK_EQUAL(bin, table.get_binary(5, 0));
-        CHECK_EQUAL(OldDateTime(9992), table.get_olddatetime(6, 0));
-        CHECK_EQUAL(3637.0f, table.get_mixed(8, 0));
-
-        CHECK_EQUAL(int_fast64_t(), table.get_int(0, 1));
-        CHECK_EQUAL(bool(), table.get_bool(1, 1));
-        CHECK_EQUAL(float(), table.get_float(2, 1));
-        CHECK_EQUAL(double(), table.get_double(3, 1));
-        CHECK_EQUAL(StringData(""), table.get_string(4, 1));
-        CHECK_EQUAL(BinaryData(), table.get_binary(5, 1));
-        CHECK_EQUAL(OldDateTime(), table.get_olddatetime(6, 1));
-        CHECK_EQUAL(int_fast64_t(), table.get_mixed(8, 1));
-
-        TableRef subtab_0 = table.get_subtable(7, 0);
-        CHECK_EQUAL(19, subtab_0->get_int(0, 0));
-        CHECK(*subtab_0 == one_subtab);
-        TableRef subtab_1 = table.get_subtable(7, 1);
-        CHECK(*subtab_1 == empty_subtab);
-
-        row_0.set_mixed_subtable(8, 0);
-        row_1.set_mixed_subtable(8, &two_subtab);
-        subtab_0 = table.get_subtable(8, 0);
-        subtab_1 = table.get_subtable(8, 1);
-        CHECK(subtab_0);
-        CHECK(subtab_1);
-        CHECK(subtab_0->is_attached());
-        CHECK(subtab_1->is_attached());
-        CHECK(*subtab_0 == Table());
-        CHECK_EQUAL(29, subtab_1->get_int(0, 0));
-        CHECK(*subtab_1 == two_subtab);
-    }
-
-    // Check setters for `RowExpr`
-    {
-        table[0].set_int(0, int_fast64_t());
-        table[0].set_bool(1, bool());
-        table[0].set_float(2, float());
-        table[0].set_double(3, double());
-        table[0].set_string(4, StringData(""));
-        table[0].set_binary(5, BinaryData());
-        table[0].set_olddatetime(6, OldDateTime());
-        table[0].set_subtable(7, nullptr);
-        table[0].set_mixed(8, Mixed());
-
-        table[1].set_int(0, 5651);
-        table[1].set_bool(1, true);
-        table[1].set_float(2, 8397.0f);
-        table[1].set_double(3, 1937.0);
-        table[1].set_string(4, "foo");
-        table[1].set_binary(5, bin);
-        table[1].set_olddatetime(6, OldDateTime(9992));
-        table[1].set_subtable(7, &one_subtab);
-        table[1].set_mixed(8, Mixed(3637.0f));
-
-        Mixed mix_subtab((Mixed::subtable_tag()));
-
-        CHECK_EQUAL(int_fast64_t(), table.get_int(0, 0));
-        CHECK_EQUAL(bool(), table.get_bool(1, 0));
-        CHECK_EQUAL(float(), table.get_float(2, 0));
-        CHECK_EQUAL(double(), table.get_double(3, 0));
-        CHECK_EQUAL(StringData(""), table.get_string(4, 0));
-        CHECK_EQUAL(BinaryData(), table.get_binary(5, 0));
-        CHECK_EQUAL(OldDateTime(), table.get_olddatetime(6, 0));
-        CHECK_EQUAL(int_fast64_t(), table.get_mixed(8, 0));
-
-        CHECK_EQUAL(5651, table.get_int(0, 1));
-        CHECK_EQUAL(true, table.get_bool(1, 1));
-        CHECK_EQUAL(8397.0f, table.get_float(2, 1));
-        CHECK_EQUAL(1937.0, table.get_double(3, 1));
-        CHECK_EQUAL("foo", table.get_string(4, 1));
-        CHECK_EQUAL(bin, table.get_binary(5, 1));
-        CHECK_EQUAL(OldDateTime(9992), table.get_olddatetime(6, 1));
-        CHECK_EQUAL(3637.0f, table.get_mixed(8, 1));
-
-        TableRef subtab_0 = table.get_subtable(7, 0);
-        CHECK(*subtab_0 == empty_subtab);
-        TableRef subtab_1 = table.get_subtable(7, 1);
-        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
-        CHECK(*subtab_1 == one_subtab);
-
-        table[0].set_mixed_subtable(8, &two_subtab);
-        table[1].set_mixed_subtable(8, 0);
-        subtab_0 = table.get_subtable(8, 0);
-        subtab_1 = table.get_subtable(8, 1);
-        CHECK(subtab_0);
-        CHECK(subtab_1);
-        CHECK(subtab_0->is_attached());
-        CHECK(subtab_1->is_attached());
-        CHECK_EQUAL(29, subtab_0->get_int(0, 0));
-        CHECK(*subtab_0 == two_subtab);
-        CHECK(*subtab_1 == Table());
-    }
-
-    // Check that we can also create ConstRow's from `const Table`
-    {
-        const Table& const_table = table;
-        ConstRow row_0 = const_table[0];
-        ConstRow row_1 = const_table[1];
-        CHECK_EQUAL(0, row_0.get_int(0));
-        CHECK_EQUAL(5651, row_1.get_int(0));
-    }
-
-    // Check that we can get the table and the row index from a Row
-    {
-        Row row_0 = table[0];
-        Row row_1 = table[1];
-        CHECK_EQUAL(&table, row_0.get_table());
-        CHECK_EQUAL(&table, row_1.get_table());
-        CHECK_EQUAL(0, row_0.get_index());
-        CHECK_EQUAL(1, row_1.get_index());
-    }
-}
-
-
-TEST(Table_RowAccessorLinks)
-{
-    Group group;
-    TableRef target_table = group.add_table("target");
-    target_table->add_column(type_Int, "");
-    target_table->add_empty_row(16);
-    TableRef origin_table = group.add_table("origin");
-    origin_table->add_column_link(type_Link, "", *target_table);
-    origin_table->add_column_link(type_LinkList, "", *target_table);
-    origin_table->add_empty_row(2);
-
-    Row source_row_1 = origin_table->get(0);
-    Row source_row_2 = origin_table->get(1);
-    CHECK(source_row_1.is_null_link(0));
-    CHECK(source_row_2.is_null_link(0));
-    CHECK(source_row_1.linklist_is_empty(1));
-    CHECK(source_row_2.linklist_is_empty(1));
-    CHECK_EQUAL(0, source_row_1.get_link_count(1));
-    CHECK_EQUAL(0, source_row_2.get_link_count(1));
-    CHECK_EQUAL(0, target_table->get(7).get_backlink_count());
-    CHECK_EQUAL(0, target_table->get(13).get_backlink_count());
-    CHECK_EQUAL(0, target_table->get(11).get_backlink_count());
-    CHECK_EQUAL(0, target_table->get(15).get_backlink_count());
-    CHECK_EQUAL(0, target_table->get(7).get_backlink_count(*origin_table, 0));
-    CHECK_EQUAL(0, target_table->get(13).get_backlink_count(*origin_table, 0));
-    CHECK_EQUAL(0, target_table->get(11).get_backlink_count(*origin_table, 1));
-    CHECK_EQUAL(0, target_table->get(15).get_backlink_count(*origin_table, 1));
-
-    // Set links
-    source_row_1.set_link(0, 7);
-    source_row_2.set_link(0, 13);
-    CHECK(!source_row_1.is_null_link(0));
-    CHECK(!source_row_2.is_null_link(0));
-    CHECK_EQUAL(7, source_row_1.get_link(0));
-    CHECK_EQUAL(13, source_row_2.get_link(0));
-    CHECK_EQUAL(1, target_table->get(7).get_backlink_count(*origin_table, 0));
-    CHECK_EQUAL(1, target_table->get(13).get_backlink_count(*origin_table, 0));
-    CHECK_EQUAL(0, target_table->get(7).get_backlink(*origin_table, 0, 0));
-    CHECK_EQUAL(1, target_table->get(13).get_backlink(*origin_table, 0, 0));
-
-    // Nullify links
-    source_row_1.nullify_link(0);
-    source_row_2.nullify_link(0);
-    CHECK(source_row_1.is_null_link(0));
-    CHECK(source_row_2.is_null_link(0));
-    CHECK_EQUAL(0, target_table->get(7).get_backlink_count(*origin_table, 0));
-    CHECK_EQUAL(0, target_table->get(13).get_backlink_count(*origin_table, 0));
-
-    // Add stuff to link lists
-    LinkViewRef link_list_1 = source_row_1.get_linklist(1);
-    LinkViewRef link_list_2 = source_row_2.get_linklist(1);
-    link_list_1->add(15);
-    link_list_2->add(11);
-    link_list_2->add(15);
-    CHECK(!source_row_1.linklist_is_empty(1));
-    CHECK(!source_row_2.linklist_is_empty(1));
-    CHECK_EQUAL(1, source_row_1.get_link_count(1));
-    CHECK_EQUAL(2, source_row_2.get_link_count(1));
-    CHECK_EQUAL(1, target_table->get(11).get_backlink_count());
-    CHECK_EQUAL(2, target_table->get(15).get_backlink_count());
-    CHECK_EQUAL(1, target_table->get(11).get_backlink_count(*origin_table, 1));
-    CHECK_EQUAL(2, target_table->get(15).get_backlink_count(*origin_table, 1));
-    CHECK_EQUAL(1, target_table->get(11).get_backlink(*origin_table, 1, 0));
-    size_t back_link_1 = target_table->get(15).get_backlink(*origin_table, 1, 0);
-    size_t back_link_2 = target_table->get(15).get_backlink(*origin_table, 1, 1);
-    CHECK((back_link_1 == 0 && back_link_2 == 1) || (back_link_1 == 1 && back_link_2 == 0));
-
-    // Links from multiple columns (count total)
-    source_row_1.set_link(0, 15);
-    CHECK_EQUAL(3, target_table->get(15).get_backlink_count());
-
-    // Clear link lists
-    link_list_1->clear();
-    link_list_2->clear();
-    CHECK(source_row_1.linklist_is_empty(1));
-    CHECK(source_row_2.linklist_is_empty(1));
-    CHECK_EQUAL(0, source_row_1.get_link_count(1));
-    CHECK_EQUAL(0, source_row_2.get_link_count(1));
-    CHECK_EQUAL(0, target_table->get(11).get_backlink_count(*origin_table, 1));
-    CHECK_EQUAL(0, target_table->get(15).get_backlink_count(*origin_table, 1));
-}
-
-
-TEST(Table_RowAccessorDetach)
-{
-    Table table;
-    table.add_column(type_Int, "");
-    table.add_empty_row();
-    Row row = table[0];
-    CHECK(row.is_attached());
-    row.detach();
-    CHECK(!row.is_attached());
-    row = table[0];
-    CHECK(row.is_attached());
-}
-
-
-TEST(Table_RowAccessor_DetachedRowExpr)
-{
-    // Check that it is possible to create a detached RowExpr from scratch.
-    BasicRowExpr<Table> row;
-    CHECK_NOT(row.is_attached());
-}
-
-
-TEST(Table_RowAccessorCopyAndAssign)
-{
-    Table table;
-    const Table& ctable = table;
-    table.add_column(type_Int, "");
-    table.add_empty_row(3);
-    table.set_int(0, 0, 750);
-    table.set_int(0, 1, 751);
-    table.set_int(0, 2, 752);
-
-    {
-        // Check copy construction of row accessor from row expression
-        Row row_1 = table[0];        // Copy construct `Row` from `RowExpr`
-        ConstRow crow_1 = table[1];  // Copy construct `ConstRow` from `RowExpr`
-        ConstRow crow_2 = ctable[2]; // Copy construct `ConstRow` from `ConstRowExpr`
-        CHECK(row_1.is_attached());
-        CHECK(crow_1.is_attached());
-        CHECK(crow_2.is_attached());
-        CHECK_EQUAL(&table, row_1.get_table());
-        CHECK_EQUAL(&table, crow_1.get_table());
-        CHECK_EQUAL(&table, crow_2.get_table());
-        CHECK_EQUAL(0, row_1.get_index());
-        CHECK_EQUAL(1, crow_1.get_index());
-        CHECK_EQUAL(2, crow_2.get_index());
-
-        // Check copy construction of row accessor from other row accessor
-        Row drow_1;
-        ConstRow dcrow_1;
-        CHECK(!drow_1.is_attached());
-        CHECK(!dcrow_1.is_attached());
-        Row drow_2 = drow_1;        // Copy construct `Row` from detached `Row`
-        ConstRow dcrow_2 = drow_1;  // Copy construct `ConstRow` from detached `Row`
-        ConstRow dcrow_3 = dcrow_1; // Copy construct `ConstRow` from detached `ConstRow`
-        Row row_2 = row_1;          // Copy construct `Row` from attached `Row`
-        ConstRow crow_3 = row_1;    // Copy construct `ConstRow` from attached `Row`
-        ConstRow crow_4 = crow_1;   // Copy construct `ConstRow` from attached `ConstRow`
-        CHECK(!drow_2.is_attached());
-        CHECK(!dcrow_2.is_attached());
-        CHECK(!dcrow_3.is_attached());
-        CHECK(row_2.is_attached());
-        CHECK(crow_3.is_attached());
-        CHECK(crow_4.is_attached());
-        CHECK(!drow_2.get_table());
-        CHECK(!dcrow_2.get_table());
-        CHECK(!dcrow_3.get_table());
-        CHECK_EQUAL(&table, row_2.get_table());
-        CHECK_EQUAL(&table, crow_3.get_table());
-        CHECK_EQUAL(&table, crow_4.get_table());
-        CHECK_EQUAL(0, row_2.get_index());
-        CHECK_EQUAL(0, crow_3.get_index());
-        CHECK_EQUAL(1, crow_4.get_index());
-    }
-    table.verify();
-
-    // Check assignment of row expression to row accessor
-    {
-        Row row;
-        ConstRow crow_1, crow_2;
-        row = table[0];     // Assign `RowExpr` to detached `Row`
-        crow_1 = table[1];  // Assign `RowExpr` to detached `ConstRow`
-        crow_2 = ctable[2]; // Assign `ConstRowExpr` to detached `ConstRow`
-        CHECK(row.is_attached());
-        CHECK(crow_1.is_attached());
-        CHECK(crow_2.is_attached());
-        CHECK_EQUAL(&table, row.get_table());
-        CHECK_EQUAL(&table, crow_1.get_table());
-        CHECK_EQUAL(&table, crow_2.get_table());
-        CHECK_EQUAL(0, row.get_index());
-        CHECK_EQUAL(1, crow_1.get_index());
-        CHECK_EQUAL(2, crow_2.get_index());
-        row = table[1];     // Assign `RowExpr` to attached `Row`
-        crow_1 = table[2];  // Assign `RowExpr` to attached `ConstRow`
-        crow_2 = ctable[0]; // Assign `ConstRowExpr` to attached `ConstRow`
-        CHECK(row.is_attached());
-        CHECK(crow_1.is_attached());
-        CHECK(crow_2.is_attached());
-        CHECK_EQUAL(&table, row.get_table());
-        CHECK_EQUAL(&table, crow_1.get_table());
-        CHECK_EQUAL(&table, crow_2.get_table());
-        CHECK_EQUAL(1, row.get_index());
-        CHECK_EQUAL(2, crow_1.get_index());
-        CHECK_EQUAL(0, crow_2.get_index());
-    }
-
-    // Check assignment of row accessor to row accessor
-    {
-        Row drow, row_1;
-        ConstRow dcrow, crow_1, crow_2;
-        row_1 = row_1;   // Assign detached `Row` to self
-        crow_1 = crow_1; // Assign detached `ConstRow` to self
-        CHECK(!row_1.is_attached());
-        CHECK(!crow_1.is_attached());
-        row_1 = drow;   // Assign detached `Row` to detached `Row`
-        crow_1 = drow;  // Assign detached `Row` to detached `ConstRow`
-        crow_2 = dcrow; // Assign detached `ConstRow` to detached `ConstRow`
-        CHECK(!row_1.is_attached());
-        CHECK(!crow_1.is_attached());
-        CHECK(!crow_2.is_attached());
-        Row row_2 = table[0];
-        Row row_3 = table[1];
-        ConstRow crow_3 = table[2];
-        CHECK(row_2.is_attached());
-        CHECK(row_3.is_attached());
-        CHECK(crow_3.is_attached());
-        CHECK_EQUAL(&table, row_2.get_table());
-        CHECK_EQUAL(&table, row_3.get_table());
-        CHECK_EQUAL(&table, crow_3.get_table());
-        CHECK_EQUAL(0, row_2.get_index());
-        CHECK_EQUAL(1, row_3.get_index());
-        CHECK_EQUAL(2, crow_3.get_index());
-        row_1 = row_2;   // Assign attached `Row` to detached `Row`
-        crow_1 = row_3;  // Assign attached `Row` to detached `ConstRow`
-        crow_2 = crow_3; // Assign attached `ConstRow` to detached `ConstRow`
-        CHECK(row_1.is_attached());
-        CHECK(crow_1.is_attached());
-        CHECK(crow_2.is_attached());
-        CHECK_EQUAL(&table, row_1.get_table());
-        CHECK_EQUAL(&table, crow_1.get_table());
-        CHECK_EQUAL(&table, crow_2.get_table());
-        CHECK_EQUAL(0, row_1.get_index());
-        CHECK_EQUAL(1, crow_1.get_index());
-        CHECK_EQUAL(2, crow_2.get_index());
-        row_1 = row_1;   // Assign attached `Row` to self
-        crow_1 = crow_1; // Assign attached `ConstRow` to self
-        CHECK(row_1.is_attached());
-        CHECK(crow_1.is_attached());
-        CHECK_EQUAL(&table, row_1.get_table());
-        CHECK_EQUAL(&table, crow_1.get_table());
-        CHECK_EQUAL(0, row_1.get_index());
-        CHECK_EQUAL(1, crow_1.get_index());
-        Row row_4 = table[2];
-        Row row_5 = table[0];
-        ConstRow crow_4 = table[1];
-        row_1 = row_4;   // Assign attached `Row` to attached `Row`
-        crow_1 = row_5;  // Assign attached `Row` to attached `ConstRow`
-        crow_2 = crow_4; // Assign attached `ConstRow` to attached `ConstRow`
-        CHECK(row_1.is_attached());
-        CHECK(crow_1.is_attached());
-        CHECK(crow_2.is_attached());
-        CHECK_EQUAL(&table, row_1.get_table());
-        CHECK_EQUAL(&table, crow_1.get_table());
-        CHECK_EQUAL(&table, crow_2.get_table());
-        CHECK_EQUAL(2, row_1.get_index());
-        CHECK_EQUAL(0, crow_1.get_index());
-        CHECK_EQUAL(1, crow_2.get_index());
-        row_1 = drow;   // Assign detached `Row` to attached `Row`
-        crow_1 = drow;  // Assign detached `Row` to attached `ConstRow`
-        crow_2 = dcrow; // Assign detached `ConstRow` to attached `ConstRow`
-        CHECK(!row_1.is_attached());
-        CHECK(!crow_1.is_attached());
-        CHECK(!crow_2.is_attached());
-    }
-}
-
-TEST(Table_RowAccessorCopyConstructionBug)
-{
-    Table table;
-    table.add_column(type_Int, "");
-    table.add_empty_row();
-
-    BasicRowExpr<Table> row_expr(table[0]);
-    BasicRow<Table> row_from_expr(row_expr);
-    BasicRow<Table> row_copy(row_from_expr);
-
-    table.remove(0);
-
-    CHECK_NOT(row_from_expr.is_attached());
-    CHECK_NOT(row_copy.is_attached());
-}
-
-TEST(Table_RowAccessorAssignMultipleTables)
-{
-    Table tables[2];
-    for (int i = 0; i < 2; ++i) {
-        tables[i].add_column(type_Int, "");
-        tables[i].add_empty_row(3);
-        tables[i].set_int(0, 0, 750);
-        tables[i].set_int(0, 1, 751);
-        tables[i].set_int(0, 2, 752);
-    }
-
-    Row row_1 = tables[0][2];
-    Row row_2 = tables[1][2];
-    Row row_3 = tables[0][2];
-    row_1 = tables[1][2]; // Assign attached `Row` to a different table via RowExpr
-
-    // Veriy that the correct accessors are updated when removing from a table
-    tables[0].remove(0);
-    CHECK_EQUAL(row_1.get_index(), 2);
-    CHECK_EQUAL(row_2.get_index(), 2);
-    CHECK_EQUAL(row_3.get_index(), 1);
-
-    row_1 = row_3; // Assign attached `Row` to a different table via Row
-
-    // Veriy that the correct accessors are updated when removing from a table
-    tables[0].remove(0);
-    CHECK_EQUAL(row_1.get_index(), 0);
-    CHECK_EQUAL(row_2.get_index(), 2);
-    CHECK_EQUAL(row_3.get_index(), 0);
-}
-
-TEST(Table_RowAccessorRetain)
-{
-    // Create a table with two rows
-    TableRef parent = Table::create();
-    parent->add_column(type_Int, "a");
-    parent->add_empty_row(2);
-    parent->set_int(0, 0, 27);
-    parent->set_int(0, 1, 227);
-    parent->verify();
-    CHECK_EQUAL(2, parent->size());
-    ConstRow row_1 = (*parent)[0];
-    ConstRow row_2 = (*parent)[1];
-    CHECK(row_1.is_attached());
-    CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), row_1.get_table());
-    CHECK_EQUAL(parent.get(), row_2.get_table());
-    CHECK_EQUAL(0, row_1.get_index());
-    CHECK_EQUAL(1, row_2.get_index());
-
-    // Check that row insertion does not detach the row accessors, and that the
-    // row indexes is properly adjusted
-    parent->insert_empty_row(1); // Between
-    parent->add_empty_row();     // After
-    parent->insert_empty_row(0); // Before
-    parent->verify();
-    CHECK_EQUAL(5, parent->size());
-    CHECK(row_1.is_attached());
-    CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), row_1.get_table());
-    CHECK_EQUAL(parent.get(), row_2.get_table());
-    CHECK_EQUAL(1, row_1.get_index());
-    CHECK_EQUAL(3, row_2.get_index());
-    CHECK_EQUAL(27, row_1.get_int(0));
-    CHECK_EQUAL(227, row_2.get_int(0));
-    parent->insert_empty_row(1); // Immediately before row_1
-    parent->insert_empty_row(5); // Immediately after  row_2
-    parent->insert_empty_row(3); // Immediately after  row_1
-    parent->insert_empty_row(5); // Immediately before row_2
-    parent->verify();
-    CHECK_EQUAL(9, parent->size());
-    CHECK(row_1.is_attached());
-    CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), row_1.get_table());
-    CHECK_EQUAL(parent.get(), row_2.get_table());
-    CHECK_EQUAL(2, row_1.get_index());
-    CHECK_EQUAL(6, row_2.get_index());
-    CHECK_EQUAL(27, row_1.get_int(0));
-    CHECK_EQUAL(227, row_2.get_int(0));
-
-    // Check that removal of rows (other than row_1 and row_2) does not detach
-    // the row accessors, and that the row indexes is properly adjusted
-    parent->remove(3); // Immediately after  row_1
-    parent->remove(1); // Immediately before row_1
-    parent->remove(3); // Immediately before row_2
-    parent->remove(4); // Immediately after  row_2
-    parent->verify();
-    CHECK_EQUAL(5, parent->size());
-    CHECK(row_1.is_attached());
-    CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), row_1.get_table());
-    CHECK_EQUAL(parent.get(), row_2.get_table());
-    CHECK_EQUAL(1, row_1.get_index());
-    CHECK_EQUAL(3, row_2.get_index());
-    CHECK_EQUAL(27, row_1.get_int(0));
-    CHECK_EQUAL(227, row_2.get_int(0));
-    parent->remove(4); // After
-    parent->remove(0); // Before
-    parent->remove(1); // Between
-    parent->verify();
-    CHECK_EQUAL(2, parent->size());
-    CHECK(row_1.is_attached());
-    CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), row_1.get_table());
-    CHECK_EQUAL(parent.get(), row_2.get_table());
-    CHECK_EQUAL(0, row_1.get_index());
-    CHECK_EQUAL(1, row_2.get_index());
-    CHECK_EQUAL(27, row_1.get_int(0));
-    CHECK_EQUAL(227, row_2.get_int(0));
-
-    // Check that removal of first row detaches row_1
-    parent->remove(0);
-    parent->verify();
-    CHECK_EQUAL(1, parent->size());
-    CHECK(!row_1.is_attached());
-    CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), row_2.get_table());
-    CHECK_EQUAL(0, row_2.get_index());
-    CHECK_EQUAL(227, row_2.get_int(0));
-    // Restore first row and recover row_1
-    parent->insert_empty_row(0);
-    parent->set_int(0, 0, 27);
-    parent->verify();
-    CHECK_EQUAL(2, parent->size());
-    row_1 = (*parent)[0];
-    CHECK(row_1.is_attached());
-    CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), row_1.get_table());
-    CHECK_EQUAL(parent.get(), row_2.get_table());
-    CHECK_EQUAL(0, row_1.get_index());
-    CHECK_EQUAL(1, row_2.get_index());
-    CHECK_EQUAL(27, row_1.get_int(0));
-    CHECK_EQUAL(227, row_2.get_int(0));
-
-    // Check that removal of second row detaches row_2
-    parent->remove(1);
-    parent->verify();
-    CHECK_EQUAL(1, parent->size());
-    CHECK(row_1.is_attached());
-    CHECK(!row_2.is_attached());
-    CHECK_EQUAL(parent.get(), row_1.get_table());
-    CHECK_EQUAL(0, row_1.get_index());
-    CHECK_EQUAL(27, row_1.get_int(0));
-    // Restore second row and recover row_2
-    parent->add_empty_row();
-    parent->set_int(0, 1, 227);
-    parent->verify();
-    CHECK_EQUAL(2, parent->size());
-    row_2 = (*parent)[1];
-    CHECK(row_1.is_attached());
-    CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), row_1.get_table());
-    CHECK_EQUAL(parent.get(), row_2.get_table());
-    CHECK_EQUAL(0, row_1.get_index());
-    CHECK_EQUAL(1, row_2.get_index());
-    CHECK_EQUAL(27, row_1.get_int(0));
-    CHECK_EQUAL(227, row_2.get_int(0));
-
-    // Check that descriptor modifications do not affect the row accessors (as
-    // long as we do not remove the last column)
-    parent->add_column(type_String, "x");
-    parent->insert_column(0, type_Float, "y");
-    parent->verify();
-    CHECK_EQUAL(2, parent->size());
-    CHECK(row_1.is_attached());
-    CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), row_1.get_table());
-    CHECK_EQUAL(parent.get(), row_2.get_table());
-    CHECK_EQUAL(0, row_1.get_index());
-    CHECK_EQUAL(1, row_2.get_index());
-    CHECK_EQUAL(27, row_1.get_int(1));
-    CHECK_EQUAL(227, row_2.get_int(1));
-    parent->remove_column(0);
-    parent->remove_column(1);
-    parent->verify();
-    CHECK_EQUAL(2, parent->size());
-    CHECK(row_1.is_attached());
-    CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), row_1.get_table());
-    CHECK_EQUAL(parent.get(), row_2.get_table());
-    CHECK_EQUAL(0, row_1.get_index());
-    CHECK_EQUAL(1, row_2.get_index());
-    CHECK_EQUAL(27, row_1.get_int(0));
-    CHECK_EQUAL(227, row_2.get_int(0));
-
-    // Check that removal of the last column detaches all row accessors
-    parent->remove_column(0);
-    parent->verify();
-    CHECK_EQUAL(0, parent->get_column_count());
-    CHECK_EQUAL(0, parent->size());
-    CHECK(!row_1.is_attached());
-    CHECK(!row_2.is_attached());
-    // Restore rows and recover row accessors
-    parent->add_column(type_Int, "a");
-    parent->add_empty_row(2);
-    parent->set_int(0, 0, 27);
-    parent->set_int(0, 1, 227);
-    parent->verify();
-    CHECK_EQUAL(2, parent->size());
-    row_1 = (*parent)[0];
-    row_2 = (*parent)[1];
-    CHECK(row_1.is_attached());
-    CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), row_1.get_table());
-    CHECK_EQUAL(parent.get(), row_2.get_table());
-    CHECK_EQUAL(0, row_1.get_index());
-    CHECK_EQUAL(1, row_2.get_index());
-
-    // Check that clearing of the table detaches all row accessors
-    parent->clear();
-    parent->verify();
-    CHECK_EQUAL(0, parent->size());
-    CHECK(!row_1.is_attached());
-    CHECK(!row_2.is_attached());
-}
-
-
-TEST(Table_SubtableRowAccessorsRetain)
-{
-    // Create a mixed and a regular subtable each with one row
-    TableRef parent = Table::create();
-    parent->add_column(type_Mixed, "a");
-    parent->add_column(type_Table, "b");
-    DescriptorRef subdesc = parent->get_subdescriptor(1);
-    subdesc->add_column(type_Int, "regular");
-    parent->add_empty_row();
-    parent->set_mixed(0, 0, Mixed::subtable_tag());
-    TableRef mixed = parent->get_subtable(0, 0);
-    CHECK(mixed && mixed->is_attached());
-    mixed->add_column(type_Int, "mixed");
-    mixed->add_empty_row();
-    mixed->set_int(0, 0, 19);
-    TableRef regular = parent->get_subtable(1, 0);
-    CHECK(regular && regular->is_attached());
-    regular->add_empty_row();
-    regular->set_int(0, 0, 29);
-    CHECK(mixed->size() == 1);
-    CHECK(regular->size() == 1);
-    ConstRow row_m = (*mixed)[0];
-    ConstRow row_r = (*regular)[0];
-    CHECK_EQUAL(19, row_m.get_int(0));
-    CHECK_EQUAL(29, row_r.get_int(0));
-
-    // Check that all row accessors in a mixed subtable are detached if the
-    // subtable is overridden
-    parent->set_mixed(0, 0, Mixed("foo"));
-    CHECK(!mixed->is_attached());
-    CHECK(regular->is_attached());
-    CHECK(!row_m.is_attached());
-    CHECK(row_r.is_attached());
-    // Restore mixed
-    parent->set_mixed(0, 0, Mixed::subtable_tag());
-    mixed = parent->get_subtable(0, 0);
-    CHECK(mixed);
-    CHECK(mixed->is_attached());
-    mixed->add_column(type_Int, "mixed_2");
-    mixed->add_empty_row();
-    mixed->set_int(0, 0, 19);
-    CHECK(regular->is_attached());
-    CHECK_EQUAL(1, mixed->size());
-    CHECK_EQUAL(1, regular->size());
-    row_m = (*mixed)[0];
-    CHECK_EQUAL(19, row_m.get_int(0));
-    CHECK_EQUAL(29, row_r.get_int(0));
-
-    // Check that all row accessors in a regular subtable are detached if the
-    // subtable is overridden
-    parent->set_subtable(1, 0, nullptr); // Clear
-    CHECK(mixed->is_attached());
-    CHECK(regular->is_attached());
-    CHECK(row_m.is_attached());
-    CHECK(!row_r.is_attached());
-}
-
-
-TEST(Table_MoveLastOverRetain)
-{
-    // Create three parent tables, each with with 5 rows, and each row
-    // containing one regular and one mixed subtable
-    TableRef parent_1, parent_2, parent_3;
-    for (int i = 0; i < 3; ++i) {
-        TableRef& parent = i == 0 ? parent_1 : i == 1 ? parent_2 : parent_3;
-        parent = Table::create();
-        parent->add_column(type_Table, "a");
-        parent->add_column(type_Mixed, "b");
-        DescriptorRef subdesc = parent->get_subdescriptor(0);
-        subdesc->add_column(type_Int, "regular");
-        parent->add_empty_row(5);
-        for (int row_ndx = 0; row_ndx < 5; ++row_ndx) {
-            TableRef regular = parent->get_subtable(0, row_ndx);
-            regular->add_empty_row();
-            regular->set_int(0, 0, 10 + row_ndx);
-            parent->set_mixed(1, row_ndx, Mixed::subtable_tag());
-            TableRef mixed = parent->get_subtable(1, row_ndx);
-            mixed->add_column(type_Int, "mixed");
-            mixed->add_empty_row();
-            mixed->set_int(0, 0, 20 + row_ndx);
-        }
-    }
-
-    // Use first table to check with accessors on row indexes 0, 1, and 4, but
-    // none at index 2 and 3.
-    {
-        TableRef parent = parent_1;
-        ConstRow row_0 = (*parent)[0];
-        ConstRow row_1 = (*parent)[1];
-        ConstRow row_4 = (*parent)[4];
-        TableRef regular_0 = parent->get_subtable(0, 0);
-        TableRef regular_1 = parent->get_subtable(0, 1);
-        TableRef regular_4 = parent->get_subtable(0, 4);
-        TableRef mixed_0 = parent->get_subtable(1, 0);
-        TableRef mixed_1 = parent->get_subtable(1, 1);
-        TableRef mixed_4 = parent->get_subtable(1, 4);
-        CHECK(row_0.is_attached());
-        CHECK(row_1.is_attached());
-        CHECK(row_4.is_attached());
-        CHECK_EQUAL(0, row_0.get_index());
-        CHECK_EQUAL(1, row_1.get_index());
-        CHECK_EQUAL(4, row_4.get_index());
-        CHECK(regular_0->is_attached());
-        CHECK(regular_1->is_attached());
-        CHECK(regular_4->is_attached());
-        CHECK_EQUAL(10, regular_0->get_int(0, 0));
-        CHECK_EQUAL(11, regular_1->get_int(0, 0));
-        CHECK_EQUAL(14, regular_4->get_int(0, 0));
-        CHECK(mixed_0 && mixed_0->is_attached());
-        CHECK(mixed_1 && mixed_1->is_attached());
-        CHECK(mixed_4 && mixed_4->is_attached());
-        CHECK_EQUAL(20, mixed_0->get_int(0, 0));
-        CHECK_EQUAL(21, mixed_1->get_int(0, 0));
-        CHECK_EQUAL(24, mixed_4->get_int(0, 0));
-
-        // Perform two 'move last over' operations which brings the number of
-        // rows down from 5 to 3
-        parent->move_last_over(2); // Move row at index 4 to index 2
-        parent->move_last_over(0); // Move row at index 3 to index 0
-        CHECK(!row_0.is_attached());
-        CHECK(row_1.is_attached());
-        CHECK(row_4.is_attached());
-        CHECK_EQUAL(1, row_1.get_index());
-        CHECK_EQUAL(2, row_4.get_index());
-        CHECK(!regular_0->is_attached());
-        CHECK(regular_1->is_attached());
-        CHECK(regular_4->is_attached());
-        CHECK_EQUAL(11, regular_1->get_int(0, 0));
-        CHECK_EQUAL(14, regular_4->get_int(0, 0));
-        CHECK_EQUAL(regular_1, parent->get_subtable(0, 1));
-        CHECK_EQUAL(regular_4, parent->get_subtable(0, 2));
-        CHECK(!mixed_0->is_attached());
-        CHECK(mixed_1->is_attached());
-        CHECK(mixed_4->is_attached());
-        CHECK_EQUAL(21, mixed_1->get_int(0, 0));
-        CHECK_EQUAL(24, mixed_4->get_int(0, 0));
-        CHECK_EQUAL(mixed_1, parent->get_subtable(1, 1));
-        CHECK_EQUAL(mixed_4, parent->get_subtable(1, 2));
-
-        // Perform two more 'move last over' operations which brings the number
-        // of rows down from 3 to 1
-        parent->move_last_over(1); // Move row at index 2 to index 1
-        parent->move_last_over(0); // Move row at index 1 to index 0
-        CHECK(!row_0.is_attached());
-        CHECK(!row_1.is_attached());
-        CHECK(row_4.is_attached());
-        CHECK_EQUAL(0, row_4.get_index());
-        CHECK(!regular_0->is_attached());
-        CHECK(!regular_1->is_attached());
-        CHECK(regular_4->is_attached());
-        CHECK_EQUAL(14, regular_4->get_int(0, 0));
-        CHECK_EQUAL(regular_4, parent->get_subtable(0, 0));
-        CHECK(!mixed_0->is_attached());
-        CHECK(!mixed_1->is_attached());
-        CHECK(mixed_4->is_attached());
-        CHECK_EQUAL(24, mixed_4->get_int(0, 0));
-        CHECK_EQUAL(mixed_4, parent->get_subtable(1, 0));
-    }
-
-    // Use second table to check with accessors on row indexes 0, 2, and 3, but
-    // none at index 1 and 4.
-    {
-        TableRef parent = parent_2;
-        ConstRow row_0 = (*parent)[0];
-        ConstRow row_2 = (*parent)[2];
-        ConstRow row_3 = (*parent)[3];
-        TableRef regular_0 = parent->get_subtable(0, 0);
-        TableRef regular_2 = parent->get_subtable(0, 2);
-        TableRef regular_3 = parent->get_subtable(0, 3);
-        TableRef mixed_0 = parent->get_subtable(1, 0);
-        TableRef mixed_2 = parent->get_subtable(1, 2);
-        TableRef mixed_3 = parent->get_subtable(1, 3);
-        CHECK(row_0.is_attached());
-        CHECK(row_2.is_attached());
-        CHECK(row_3.is_attached());
-        CHECK_EQUAL(0, row_0.get_index());
-        CHECK_EQUAL(2, row_2.get_index());
-        CHECK_EQUAL(3, row_3.get_index());
-        CHECK(regular_0->is_attached());
-        CHECK(regular_2->is_attached());
-        CHECK(regular_3->is_attached());
-        CHECK_EQUAL(10, regular_0->get_int(0, 0));
-        CHECK_EQUAL(12, regular_2->get_int(0, 0));
-        CHECK_EQUAL(13, regular_3->get_int(0, 0));
-        CHECK(mixed_0 && mixed_0->is_attached());
-        CHECK(mixed_2 && mixed_2->is_attached());
-        CHECK(mixed_3 && mixed_3->is_attached());
-        CHECK_EQUAL(20, mixed_0->get_int(0, 0));
-        CHECK_EQUAL(22, mixed_2->get_int(0, 0));
-        CHECK_EQUAL(23, mixed_3->get_int(0, 0));
-
-        // Perform two 'move last over' operations which brings the number of
-        // rows down from 5 to 3
-        parent->move_last_over(2); // Move row at index 4 to index 2
-        parent->move_last_over(0); // Move row at index 3 to index 0
-        CHECK(!row_0.is_attached());
-        CHECK(!row_2.is_attached());
-        CHECK(row_3.is_attached());
-        CHECK_EQUAL(0, row_3.get_index());
-        CHECK(!regular_0->is_attached());
-        CHECK(!regular_2->is_attached());
-        CHECK(regular_3->is_attached());
-        CHECK_EQUAL(13, regular_3->get_int(0, 0));
-        CHECK_EQUAL(regular_3, parent->get_subtable(0, 0));
-        CHECK(!mixed_0->is_attached());
-        CHECK(!mixed_2->is_attached());
-        CHECK(mixed_3->is_attached());
-        CHECK_EQUAL(23, mixed_3->get_int(0, 0));
-        CHECK_EQUAL(mixed_3, parent->get_subtable(1, 0));
-
-        // Perform one more 'move last over' operation which brings the number
-        // of rows down from 3 to 2
-        parent->move_last_over(1); // Move row at index 2 to index 1
-        CHECK(!row_0.is_attached());
-        CHECK(!row_2.is_attached());
-        CHECK(row_3.is_attached());
-        CHECK_EQUAL(0, row_3.get_index());
-        CHECK(!regular_0->is_attached());
-        CHECK(!regular_2->is_attached());
-        CHECK(regular_3->is_attached());
-        CHECK_EQUAL(13, regular_3->get_int(0, 0));
-        CHECK_EQUAL(regular_3, parent->get_subtable(0, 0));
-        CHECK(!mixed_0->is_attached());
-        CHECK(!mixed_2->is_attached());
-        CHECK(mixed_3->is_attached());
-        CHECK_EQUAL(23, mixed_3->get_int(0, 0));
-        CHECK_EQUAL(mixed_3, parent->get_subtable(1, 0));
-
-        // Perform one final 'move last over' operation which brings the number
-        // of rows down from 2 to 1
-        parent->move_last_over(0); // Move row at index 1 to index 0
-        CHECK(!row_0.is_attached());
-        CHECK(!row_2.is_attached());
-        CHECK(!row_3.is_attached());
-        CHECK(!regular_0->is_attached());
-        CHECK(!regular_2->is_attached());
-        CHECK(!regular_3->is_attached());
-        CHECK(!mixed_0->is_attached());
-        CHECK(!mixed_2->is_attached());
-        CHECK(!mixed_3->is_attached());
-    }
-
-    // Use third table to check with accessors on row indexes 1 and 3, but none
-    // at index 0, 2, and 4.
-    {
-        TableRef parent = parent_3;
-        ConstRow row_1 = (*parent)[1];
-        ConstRow row_3 = (*parent)[3];
-        TableRef regular_1 = parent->get_subtable(0, 1);
-        TableRef regular_3 = parent->get_subtable(0, 3);
-        TableRef mixed_1 = parent->get_subtable(1, 1);
-        TableRef mixed_3 = parent->get_subtable(1, 3);
-        CHECK(row_1.is_attached());
-        CHECK(row_3.is_attached());
-        CHECK_EQUAL(1, row_1.get_index());
-        CHECK_EQUAL(3, row_3.get_index());
-        CHECK(regular_1->is_attached());
-        CHECK(regular_3->is_attached());
-        CHECK_EQUAL(11, regular_1->get_int(0, 0));
-        CHECK_EQUAL(13, regular_3->get_int(0, 0));
-        CHECK(mixed_1 && mixed_1->is_attached());
-        CHECK(mixed_3 && mixed_3->is_attached());
-        CHECK_EQUAL(21, mixed_1->get_int(0, 0));
-        CHECK_EQUAL(23, mixed_3->get_int(0, 0));
-
-        // Perform two 'move last over' operations which brings the number of
-        // rows down from 5 to 3
-        parent->move_last_over(2); // Move row at index 4 to index 2
-        parent->move_last_over(0); // Move row at index 3 to index 0
-        CHECK(row_1.is_attached());
-        CHECK(row_3.is_attached());
-        CHECK_EQUAL(1, row_1.get_index());
-        CHECK_EQUAL(0, row_3.get_index());
-        CHECK(regular_1->is_attached());
-        CHECK(regular_3->is_attached());
-        CHECK_EQUAL(11, regular_1->get_int(0, 0));
-        CHECK_EQUAL(13, regular_3->get_int(0, 0));
-        CHECK_EQUAL(regular_1, parent->get_subtable(0, 1));
-        CHECK_EQUAL(regular_3, parent->get_subtable(0, 0));
-        CHECK(mixed_1->is_attached());
-        CHECK(mixed_3->is_attached());
-        CHECK_EQUAL(21, mixed_1->get_int(0, 0));
-        CHECK_EQUAL(23, mixed_3->get_int(0, 0));
-        CHECK_EQUAL(mixed_1, parent->get_subtable(1, 1));
-        CHECK_EQUAL(mixed_3, parent->get_subtable(1, 0));
-
-        // Perform one more 'move last over' operation which brings the number
-        // of rows down from 3 to 2
-        parent->move_last_over(1); // Move row at index 2 to index 1
-        CHECK(!row_1.is_attached());
-        CHECK(row_3.is_attached());
-        CHECK_EQUAL(0, row_3.get_index());
-        CHECK(!regular_1->is_attached());
-        CHECK(regular_3->is_attached());
-        CHECK_EQUAL(13, regular_3->get_int(0, 0));
-        CHECK_EQUAL(regular_3, parent->get_subtable(0, 0));
-        CHECK(!mixed_1->is_attached());
-        CHECK(mixed_3->is_attached());
-        CHECK_EQUAL(23, mixed_3->get_int(0, 0));
-        CHECK_EQUAL(mixed_3, parent->get_subtable(1, 0));
-
-        // Perform one final 'move last over' operation which brings the number
-        // of rows down from 2 to 1
-        parent->move_last_over(0); // Move row at index 1 to index 0
-        CHECK(!row_1.is_attached());
-        CHECK(!row_3.is_attached());
-        CHECK(!regular_1->is_attached());
-        CHECK(!regular_3->is_attached());
-        CHECK(!mixed_1->is_attached());
-        CHECK(!mixed_3->is_attached());
-    }
-}
-
-
+#ifdef LEGACY_TESTS
 TEST(Table_EnumStringInsertEmptyRow)
 {
     Table table;
@@ -6346,36 +2306,15 @@ TEST(Table_EnumStringInsertEmptyRow)
     table.add_empty_row();
     CHECK_EQUAL("", table.get_string(0, 128));
 }
-
-
-TEST(Table_InsertColumnMaintainsBacklinkIndices)
-{
-    Group g;
-
-    TableRef t0 = g.add_table("hrnetprsafd");
-    TableRef t1 = g.add_table("qrsfdrpnkd");
-
-    t1->add_column_link(type_Link, "bbb", *t0);
-    t1->add_column_link(type_Link, "ccc", *t0);
-    t1->insert_column(0, type_Int, "aaa");
-
-    t1->add_empty_row();
-
-    t0->add_column(type_Int, "foo");
-    t0->add_empty_row();
-
-    t1->remove_column(0);
-    t1->set_link(0, 0, 0);
-    t1->remove_column(0);
-    t1->set_link(0, 0, 0);
-}
+#endif // LEGACY_TESTS
 
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
-    table.add_column(type_Int, "");
-    table.add_empty_row(REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1);
-    table.add_column(type_Int, "");
+    std::vector<Key> keys;
+    table.add_column(type_Int, "int0");
+    table.create_objects(REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1, keys);
+    table.add_column(type_Int, "int1");
     table.verify();
 }
 
@@ -6383,84 +2322,85 @@ TEST(Table_AddColumnWithThreeLevelBptree)
 TEST(Table_ClearWithTwoLevelBptree)
 {
     Table table;
-    table.add_column(type_Mixed, "");
-    table.add_empty_row(REALM_MAX_BPNODE_SIZE + 1);
+    std::vector<Key> keys;
+    table.add_column(type_String, "strings");
+    table.create_objects(REALM_MAX_BPNODE_SIZE + 1, keys);
     table.clear();
     table.verify();
 }
 
-
 TEST(Table_IndexStringDelete)
 {
     Table t;
-    t.add_column(type_String, "str");
-    t.add_search_index(0);
+    auto col = t.add_column(type_String, "str");
+    t.add_search_index(col);
 
     for (size_t i = 0; i < 1000; ++i) {
-        t.add_empty_row();
         std::string out(util::to_string(i));
-        t.set_string(0, i, out);
+        t.create_object().set<String>(col, out);
     }
 
     t.clear();
 
     for (size_t i = 0; i < 1000; ++i) {
-        t.add_empty_row();
         std::string out(util::to_string(i));
-        t.set_string(0, i, out);
+        t.create_object().set<String>(col, out);
     }
 }
+
 
 TEST(Table_NullableChecks)
 {
     Table t;
     TableView tv;
     constexpr bool nullable = true;
-    size_t str_col = t.add_column(type_String, "str", nullable);
-    size_t int_col = t.add_column(type_Int, "int", nullable);
-    size_t bool_col = t.add_column(type_Bool, "bool", nullable);
-    size_t ts_col = t.add_column(type_Timestamp, "timestamp", nullable);
-    size_t float_col = t.add_column(type_Float, "float", nullable);
-    size_t double_col = t.add_column(type_Double, "double", nullable);
-    size_t binary_col = t.add_column(type_Binary, "binary", nullable);
+    auto str_col = t.add_column(type_String, "str", nullable);
+    auto int_col = t.add_column(type_Int, "int", nullable);
+    auto bool_col = t.add_column(type_Bool, "bool", nullable);
+    auto ts_col = t.add_column(type_Timestamp, "timestamp", nullable);
+    auto float_col = t.add_column(type_Float, "float", nullable);
+    auto double_col = t.add_column(type_Double, "double", nullable);
+    auto binary_col = t.add_column(type_Binary, "binary", nullable);
 
-    t.add_empty_row();
+    Obj obj = t.create_object();
     StringData sd; // construct a null reference
     Timestamp ts; // null
     BinaryData bd;; // null
-    t.set(str_col, 0, sd);
-    t.set(int_col, 0, realm::null());
-    t.set(bool_col, 0, realm::null());
-    t.set(ts_col, 0, ts);
-    t.set(float_col, 0, realm::null());
-    t.set(double_col, 0, realm::null());
-    t.set(binary_col, 0, bd);
+    obj.set(str_col, sd);
+    obj.set(int_col, realm::null());
+    obj.set(bool_col, realm::null());
+    obj.set(ts_col, ts);
+    obj.set(float_col, realm::null());
+    obj.set(double_col, realm::null());
+    obj.set(binary_col, bd);
 
     // is_null is always reliable regardless of type
-    CHECK(t.is_null(str_col, 0));
-    CHECK(t.is_null(int_col, 0));
-    CHECK(t.is_null(bool_col, 0));
-    CHECK(t.is_null(ts_col, 0));
-    CHECK(t.is_null(float_col, 0));
-    CHECK(t.is_null(double_col, 0));
-    CHECK(t.is_null(binary_col, 0));
+    CHECK(obj.is_null(str_col));
+    CHECK(obj.is_null(int_col));
+    CHECK(obj.is_null(bool_col));
+    CHECK(obj.is_null(ts_col));
+    CHECK(obj.is_null(float_col));
+    CHECK(obj.is_null(double_col));
+    CHECK(obj.is_null(binary_col));
 
-    StringData str0 = t.get_string(str_col, 0);
+    StringData str0 = obj.get<String>(str_col);
     CHECK(str0.is_null());
-    util::Optional<int64_t> int0 = t.get<util::Optional<int64_t>>(int_col, 0);
+    util::Optional<int64_t> int0 = obj.get<util::Optional<int64_t>>(int_col);
     CHECK(!int0);
-    util::Optional<bool> bool0 = t.get<util::Optional<bool>>(bool_col, 0);
+    util::Optional<bool> bool0 = obj.get<util::Optional<bool>>(bool_col);
     CHECK(!bool0);
-    Timestamp ts0 = t.get_timestamp(ts_col, 0);
+    Timestamp ts0 = obj.get<Timestamp>(ts_col);
     CHECK(ts0.is_null());
-    util::Optional<float> float0 = t.get<util::Optional<float>>(float_col, 0);
+    util::Optional<float> float0 = obj.get<util::Optional<float>>(float_col);
     CHECK(!float0);
-    util::Optional<double> double0 = t.get<util::Optional<double>>(double_col, 0);
+    util::Optional<double> double0 = obj.get<util::Optional<double>>(double_col);
     CHECK(!double0);
-    BinaryData binary0 = t.get_binary(binary_col, 0);
+    BinaryData binary0 = obj.get<Binary>(binary_col);
     CHECK(binary0.is_null());
 }
 
+
+#ifdef LEGACY_TESTS
 TEST(Table_Nulls)
 {
     // 'round' lets us run this entire test both with and without index and with/without optimize/enum
@@ -6752,92 +2692,6 @@ TEST(Table_RemoveSubstring)
 }
 
 
-TEST(Table_SwapRowsThenMoveLastOverWithBacklinks)
-{
-    // Attempts to trigger bug where LinkColumn::swap_rows() would only swap its backlinks but forgot
-    // to swap its own values
-    Group g;
-    TableRef t1 = g.add_table("t1");
-    TableRef t2 = g.add_table("t2");
-    t1->add_column(type_Int, "i");
-    t2->add_column_link(type_Link, "l", *t1);
-
-    t1->add_empty_row(2);
-    t2->add_empty_row(2);
-
-    t2->set_link(0, 0, 0);
-    t2->set_link(0, 1, 1);
-
-    t2->swap_rows(0, 1);
-    t2->verify();
-    t2->move_last_over(0);
-    t2->verify();
-}
-
-
-TEST(Table_RowAccessor_Null)
-{
-    Table table;
-    size_t col_bool = table.add_column(type_Bool, "bool", true);
-    size_t col_int = table.add_column(type_Int, "int", true);
-    size_t col_string = table.add_column(type_String, "string", true);
-    size_t col_float = table.add_column(type_Float, "float", true);
-    size_t col_double = table.add_column(type_Double, "double", true);
-    size_t col_date = table.add_column(type_OldDateTime, "date", true);
-    size_t col_binary = table.add_column(type_Binary, "binary", true);
-    size_t col_timestamp = table.add_column(type_Timestamp, "timestamp", true);
-
-    {
-        table.add_empty_row();
-        Row row = table[0];
-        row.set_null(col_bool);
-        row.set_null(col_int);
-        row.set_string(col_string, realm::null());
-        row.set_null(col_float);
-        row.set_null(col_double);
-        row.set_null(col_date);
-        row.set_binary(col_binary, BinaryData());
-        row.set_null(col_timestamp);
-    }
-    {
-        table.add_empty_row();
-        Row row = table[1];
-        row.set_bool(col_bool, true);
-        row.set_int(col_int, 1);
-        row.set_string(col_string, "1");
-        row.set_float(col_float, 1.0f);
-        row.set_double(col_double, 1.0);
-        row.set_olddatetime(col_date, OldDateTime(1));
-        row.set_binary(col_binary, BinaryData("a"));
-        row.set_timestamp(col_timestamp, Timestamp(1, 2));
-    }
-
-    {
-        Row row = table[0];
-        CHECK(row.is_null(col_bool));
-        CHECK(row.is_null(col_int));
-        CHECK(row.is_null(col_string));
-        CHECK(row.is_null(col_float));
-        CHECK(row.is_null(col_double));
-        CHECK(row.is_null(col_date));
-        CHECK(row.is_null(col_binary));
-        CHECK(row.is_null(col_timestamp));
-    }
-
-    {
-        Row row = table[1];
-        CHECK_EQUAL(true, row.get_bool(col_bool));
-        CHECK_EQUAL(1, row.get_int(col_int));
-        CHECK_EQUAL("1", row.get_string(col_string));
-        CHECK_EQUAL(1.0, row.get_float(col_float));
-        CHECK_EQUAL(1.0, row.get_double(col_double));
-        CHECK_EQUAL(OldDateTime(1), row.get_olddatetime(col_date));
-        CHECK_EQUAL(BinaryData("a"), row.get_binary(col_binary));
-        CHECK_EQUAL(Timestamp(1, 2), row.get_timestamp(col_timestamp));
-    }
-}
-
-
 // This triggers a severe bug in the Array::alloc() allocator in which its capacity-doubling
 // scheme forgets to test of the doubling has overflowed the maximum allowed size of an
 // array which is 2^24 - 1 bytes
@@ -6882,403 +2736,6 @@ TEST(Table_AllocatorCapacityBug)
     }
 }
 
-
-// Exposes crash when setting a int, float or double that has its least significant bit set
-TEST(Table_MixedCrashValues)
-{
-    GROUP_TEST_PATH(path);
-    const char* encryption_key = nullptr;
-    Group group(path, encryption_key, Group::mode_ReadWrite);
-    TableRef table = group.add_table("t");
-    table->add_column(type_Mixed, "m");
-    table->add_empty_row(3);
-
-    table->set_mixed(0, 0, Mixed(int64_t(-1)));
-    table->set_mixed(0, 1, Mixed(2.0f));
-    table->set_mixed(0, 2, Mixed(2.0));
-
-    CHECK_EQUAL(table->get_mixed(0, 0).get_int(), int64_t(-1));
-    CHECK_EQUAL(table->get_mixed(0, 1).get_float(), 2.0f);
-    CHECK_EQUAL(table->get_mixed(0, 2).get_double(), 2.0);
-
-    group.verify();
-}
-
-
-TEST(Table_MoveRow)
-{
-    Group g;
-
-    // The things which need to be validated for moving rows:
-    // 1. Values are moved
-    // 2. Outgoing links/linklists to moved rows are updated
-    // 3. Backlinks to moved rows are updated
-    // 4. Row, LinkView and Subtable accessors for moved rows are updated
-    // 5. TableViews containing moved rows are updated
-
-    TableRef t0 = g.add_table("t0");
-    size_t col_value = t0->add_column(type_Int, "value");
-    size_t col_link = t0->add_column_link(type_Link, "self link", *t0);
-    size_t col_linklist = t0->add_column_link(type_LinkList, "self linklist", *t0);
-    size_t col_table = t0->add_column(type_Table, "subtable");
-    t0->get_subdescriptor(col_table)->add_column(type_Int, "value");
-
-    TableRef t1 = g.add_table("t1");
-    t1->add_column_link(type_Link, "link", *t0);
-    t1->add_column_link(type_LinkList, "linklist", *t0);
-
-    Row rows[5];
-    LinkViewRef t0_lvs[5];
-    LinkViewRef t1_lvs[5];
-    TableRef t0_subtables[5];
-
-    t0->add_empty_row(5);
-    t1->add_empty_row(5);
-    for (int i = 0; i < 5; ++i) {
-        rows[i] = t0->get(i);
-        t0_lvs[i] = t0->get_linklist(col_linklist, i);
-        t1_lvs[i] = t1->get_linklist(1, i);
-        t0_subtables[i] = t0->get_subtable(col_table, i);
-
-        t0->set_int(col_value, i, i);
-        t0->set_link(col_link, i, i);
-        for (int j = 0; j < 5; ++j) {
-            if (i != j)
-                t0_lvs[i]->add(j);
-        }
-        t0_subtables[i]->add_empty_row(i + 1);
-
-        t1->set_link(0, i, (i + 1) % 5);
-        t1_lvs[i]->add((i + 2) % 5);
-    }
-
-    TableView tv = t0->where().find_all();
-
-    CHECK_EQUAL(t1_lvs[0]->get(0).get_index(), 2);
-    CHECK_EQUAL(t1_lvs[1]->get(0).get_index(), 3);
-    CHECK_EQUAL(t1_lvs[2]->get(0).get_index(), 4);
-    CHECK_EQUAL(t1_lvs[3]->get(0).get_index(), 0);
-    CHECK_EQUAL(t1_lvs[4]->get(0).get_index(), 1);
-
-    // move from == to
-    t0->move_row(1, 1);
-    for (int i = 0; i < 5; ++i)
-        CHECK_EQUAL(t0->get_int(col_value, i), i);
-
-    // swap adjacent, from < to
-    t0->move_row(1, 2);
-    // 0, 2, 1, 3, 4
-
-    CHECK_EQUAL(rows[0].get_index(), 0);
-    CHECK_EQUAL(rows[1].get_index(), 2);
-    CHECK_EQUAL(rows[2].get_index(), 1);
-    CHECK_EQUAL(rows[3].get_index(), 3);
-    CHECK_EQUAL(rows[4].get_index(), 4);
-
-    CHECK_EQUAL(rows[0].get_int(col_value), 0);
-    CHECK_EQUAL(rows[1].get_int(col_value), 1);
-    CHECK_EQUAL(rows[2].get_int(col_value), 2);
-    CHECK_EQUAL(rows[3].get_int(col_value), 3);
-
-    CHECK_EQUAL(rows[0].get_link(col_link), 0);
-    CHECK_EQUAL(rows[1].get_link(col_link), 2);
-    CHECK_EQUAL(rows[2].get_link(col_link), 1);
-    CHECK_EQUAL(rows[3].get_link(col_link), 3);
-
-    CHECK_EQUAL(t0_lvs[0]->get(0).get_index(), 2);
-    CHECK_EQUAL(t0_lvs[0]->get(1).get_index(), 1);
-    CHECK_EQUAL(t0_lvs[0]->get(2).get_index(), 3);
-    CHECK_EQUAL(t0_lvs[1]->get(0).get_index(), 0);
-    CHECK_EQUAL(t0_lvs[1]->get(1).get_index(), 1);
-    CHECK_EQUAL(t0_lvs[1]->get(2).get_index(), 3);
-    CHECK_EQUAL(t0_lvs[2]->get(0).get_index(), 0);
-    CHECK_EQUAL(t0_lvs[2]->get(1).get_index(), 2);
-    CHECK_EQUAL(t0_lvs[2]->get(2).get_index(), 3);
-    CHECK_EQUAL(t0_lvs[3]->get(0).get_index(), 0);
-    CHECK_EQUAL(t0_lvs[3]->get(1).get_index(), 2);
-    CHECK_EQUAL(t0_lvs[3]->get(2).get_index(), 1);
-
-    CHECK_EQUAL(t0_subtables[0]->get_parent_row_index(), 0);
-    CHECK_EQUAL(t0_subtables[1]->get_parent_row_index(), 2);
-    CHECK_EQUAL(t0_subtables[2]->get_parent_row_index(), 1);
-    CHECK_EQUAL(t0_subtables[3]->get_parent_row_index(), 3);
-    CHECK_EQUAL(t0_subtables[0]->size(), 1);
-    CHECK_EQUAL(t0_subtables[1]->size(), 2);
-    CHECK_EQUAL(t0_subtables[2]->size(), 3);
-    CHECK_EQUAL(t0_subtables[3]->size(), 4);
-
-    CHECK_EQUAL(t0->get_backlink(0, *t1, 0, 0), 4);
-    CHECK_EQUAL(t0->get_backlink(1, *t1, 0, 0), 1);
-    CHECK_EQUAL(t0->get_backlink(2, *t1, 0, 0), 0);
-    CHECK_EQUAL(t0->get_backlink(3, *t1, 0, 0), 2);
-    CHECK_EQUAL(t0->get_backlink(4, *t1, 0, 0), 3);
-    CHECK_EQUAL(t0->get_backlink(0, *t1, 1, 0), 3);
-    CHECK_EQUAL(t0->get_backlink(1, *t1, 1, 0), 0);
-    CHECK_EQUAL(t0->get_backlink(2, *t1, 1, 0), 4);
-    CHECK_EQUAL(t0->get_backlink(3, *t1, 1, 0), 1);
-    CHECK_EQUAL(t0->get_backlink(4, *t1, 1, 0), 2);
-
-    CHECK(tv.is_row_attached(0));
-    CHECK(tv.is_row_attached(1));
-    CHECK(tv.is_row_attached(2));
-    CHECK(tv.is_row_attached(3));
-    CHECK_EQUAL(tv.get(0).get_index(), 0);
-    CHECK_EQUAL(tv.get(1).get_index(), 2);
-    CHECK_EQUAL(tv.get(2).get_index(), 1);
-    CHECK_EQUAL(tv.get(3).get_index(), 3);
-
-    CHECK_EQUAL(t1->get_link(0, 0), 2);
-    CHECK_EQUAL(t1->get_link(0, 1), 1);
-    CHECK_EQUAL(t1->get_link(0, 2), 3);
-    CHECK_EQUAL(t1->get_link(0, 3), 4);
-    CHECK_EQUAL(t1->get_link(0, 4), 0);
-
-    CHECK_EQUAL(t1_lvs[0]->get(0).get_index(), 1);
-    CHECK_EQUAL(t1_lvs[1]->get(0).get_index(), 3);
-    CHECK_EQUAL(t1_lvs[2]->get(0).get_index(), 4);
-    CHECK_EQUAL(t1_lvs[3]->get(0).get_index(), 0);
-    CHECK_EQUAL(t1_lvs[4]->get(0).get_index(), 2);
-
-    // swap adjacent, from > to
-    // 0, 2, 1, 3, 4
-    t0->move_row(3, 2);
-    // 0, 2, 3, 1, 4
-
-    CHECK_EQUAL(rows[0].get_index(), 0);
-    CHECK_EQUAL(rows[1].get_index(), 3);
-    CHECK_EQUAL(rows[2].get_index(), 1);
-    CHECK_EQUAL(rows[3].get_index(), 2);
-    CHECK_EQUAL(rows[4].get_index(), 4);
-
-    CHECK_EQUAL(rows[0].get_int(col_value), 0);
-    CHECK_EQUAL(rows[1].get_int(col_value), 1);
-    CHECK_EQUAL(rows[2].get_int(col_value), 2);
-    CHECK_EQUAL(rows[3].get_int(col_value), 3);
-
-    CHECK_EQUAL(rows[0].get_link(col_link), 0);
-    CHECK_EQUAL(rows[1].get_link(col_link), 3);
-    CHECK_EQUAL(rows[2].get_link(col_link), 1);
-    CHECK_EQUAL(rows[3].get_link(col_link), 2);
-
-    CHECK_EQUAL(t0_lvs[0]->get(0).get_index(), 3);
-    CHECK_EQUAL(t0_lvs[0]->get(1).get_index(), 1);
-    CHECK_EQUAL(t0_lvs[0]->get(2).get_index(), 2);
-    CHECK_EQUAL(t0_lvs[1]->get(0).get_index(), 0);
-    CHECK_EQUAL(t0_lvs[1]->get(1).get_index(), 1);
-    CHECK_EQUAL(t0_lvs[1]->get(2).get_index(), 2);
-    CHECK_EQUAL(t0_lvs[2]->get(0).get_index(), 0);
-    CHECK_EQUAL(t0_lvs[2]->get(1).get_index(), 3);
-    CHECK_EQUAL(t0_lvs[2]->get(2).get_index(), 2);
-    CHECK_EQUAL(t0_lvs[3]->get(0).get_index(), 0);
-    CHECK_EQUAL(t0_lvs[3]->get(1).get_index(), 3);
-    CHECK_EQUAL(t0_lvs[3]->get(2).get_index(), 1);
-
-    CHECK_EQUAL(t0_subtables[0]->get_parent_row_index(), 0);
-    CHECK_EQUAL(t0_subtables[1]->get_parent_row_index(), 3);
-    CHECK_EQUAL(t0_subtables[2]->get_parent_row_index(), 1);
-    CHECK_EQUAL(t0_subtables[3]->get_parent_row_index(), 2);
-    CHECK_EQUAL(t0_subtables[0]->size(), 1);
-    CHECK_EQUAL(t0_subtables[1]->size(), 2);
-    CHECK_EQUAL(t0_subtables[2]->size(), 3);
-    CHECK_EQUAL(t0_subtables[3]->size(), 4);
-
-    CHECK_EQUAL(t0->get_backlink(0, *t1, 0, 0), 4);
-    CHECK_EQUAL(t0->get_backlink(1, *t1, 0, 0), 1);
-    CHECK_EQUAL(t0->get_backlink(2, *t1, 0, 0), 2);
-    CHECK_EQUAL(t0->get_backlink(3, *t1, 0, 0), 0);
-    CHECK_EQUAL(t0->get_backlink(4, *t1, 0, 0), 3);
-    CHECK_EQUAL(t0->get_backlink(0, *t1, 1, 0), 3);
-    CHECK_EQUAL(t0->get_backlink(1, *t1, 1, 0), 0);
-    CHECK_EQUAL(t0->get_backlink(2, *t1, 1, 0), 1);
-    CHECK_EQUAL(t0->get_backlink(3, *t1, 1, 0), 4);
-    CHECK_EQUAL(t0->get_backlink(4, *t1, 1, 0), 2);
-
-    CHECK(tv.is_row_attached(0));
-    CHECK(tv.is_row_attached(1));
-    CHECK(tv.is_row_attached(2));
-    CHECK(tv.is_row_attached(3));
-    CHECK_EQUAL(tv.get(0).get_index(), 0);
-    CHECK_EQUAL(tv.get(1).get_index(), 3);
-    CHECK_EQUAL(tv.get(2).get_index(), 1);
-    CHECK_EQUAL(tv.get(3).get_index(), 2);
-    CHECK_EQUAL(tv.get(4).get_index(), 4);
-
-    CHECK_EQUAL(t1->get_link(0, 0), 3);
-    CHECK_EQUAL(t1->get_link(0, 1), 1);
-    CHECK_EQUAL(t1->get_link(0, 2), 2);
-    CHECK_EQUAL(t1->get_link(0, 3), 4);
-    CHECK_EQUAL(t1->get_link(0, 4), 0);
-
-    CHECK_EQUAL(t1_lvs[0]->get(0).get_index(), 1);
-    CHECK_EQUAL(t1_lvs[1]->get(0).get_index(), 2);
-    CHECK_EQUAL(t1_lvs[2]->get(0).get_index(), 4);
-    CHECK_EQUAL(t1_lvs[3]->get(0).get_index(), 0);
-    CHECK_EQUAL(t1_lvs[4]->get(0).get_index(), 3);
-
-    // non-adjacent, from < to
-    // 0, 2, 3, 1, 4
-    t0->move_row(1, 3);
-    // 0, 3, 1, 2, 4
-
-    CHECK_EQUAL(rows[0].get_index(), 0);
-    CHECK_EQUAL(rows[1].get_index(), 2);
-    CHECK_EQUAL(rows[2].get_index(), 3);
-    CHECK_EQUAL(rows[3].get_index(), 1);
-    CHECK_EQUAL(rows[4].get_index(), 4);
-
-    CHECK_EQUAL(rows[0].get_int(col_value), 0);
-    CHECK_EQUAL(rows[1].get_int(col_value), 1);
-    CHECK_EQUAL(rows[2].get_int(col_value), 2);
-    CHECK_EQUAL(rows[3].get_int(col_value), 3);
-    CHECK_EQUAL(rows[4].get_int(col_value), 4);
-
-    CHECK_EQUAL(rows[0].get_link(col_link), 0);
-    CHECK_EQUAL(rows[1].get_link(col_link), 2);
-    CHECK_EQUAL(rows[2].get_link(col_link), 3);
-    CHECK_EQUAL(rows[3].get_link(col_link), 1);
-    CHECK_EQUAL(rows[4].get_link(col_link), 4);
-
-    CHECK_EQUAL(t0_lvs[0]->get(0).get_index(), 2);
-    CHECK_EQUAL(t0_lvs[0]->get(1).get_index(), 3);
-    CHECK_EQUAL(t0_lvs[0]->get(2).get_index(), 1);
-    CHECK_EQUAL(t0_lvs[1]->get(0).get_index(), 0);
-    CHECK_EQUAL(t0_lvs[1]->get(1).get_index(), 3);
-    CHECK_EQUAL(t0_lvs[1]->get(2).get_index(), 1);
-    CHECK_EQUAL(t0_lvs[2]->get(0).get_index(), 0);
-    CHECK_EQUAL(t0_lvs[2]->get(1).get_index(), 2);
-    CHECK_EQUAL(t0_lvs[2]->get(2).get_index(), 1);
-    CHECK_EQUAL(t0_lvs[3]->get(0).get_index(), 0);
-    CHECK_EQUAL(t0_lvs[3]->get(1).get_index(), 2);
-    CHECK_EQUAL(t0_lvs[3]->get(2).get_index(), 3);
-
-    CHECK_EQUAL(t0_subtables[0]->get_parent_row_index(), 0);
-    CHECK_EQUAL(t0_subtables[1]->get_parent_row_index(), 2);
-    CHECK_EQUAL(t0_subtables[2]->get_parent_row_index(), 3);
-    CHECK_EQUAL(t0_subtables[3]->get_parent_row_index(), 1);
-    CHECK_EQUAL(t0_subtables[4]->get_parent_row_index(), 4);
-    CHECK_EQUAL(t0_subtables[0]->size(), 1);
-    CHECK_EQUAL(t0_subtables[1]->size(), 2);
-    CHECK_EQUAL(t0_subtables[2]->size(), 3);
-    CHECK_EQUAL(t0_subtables[3]->size(), 4);
-    CHECK_EQUAL(t0_subtables[4]->size(), 5);
-
-    CHECK_EQUAL(t0->get_backlink(0, *t1, 0, 0), 4);
-    CHECK_EQUAL(t0->get_backlink(1, *t1, 0, 0), 2);
-    CHECK_EQUAL(t0->get_backlink(2, *t1, 0, 0), 0);
-    CHECK_EQUAL(t0->get_backlink(3, *t1, 0, 0), 1);
-    CHECK_EQUAL(t0->get_backlink(4, *t1, 0, 0), 3);
-    CHECK_EQUAL(t0->get_backlink(0, *t1, 1, 0), 3);
-    CHECK_EQUAL(t0->get_backlink(1, *t1, 1, 0), 1);
-    CHECK_EQUAL(t0->get_backlink(2, *t1, 1, 0), 4);
-    CHECK_EQUAL(t0->get_backlink(3, *t1, 1, 0), 0);
-    CHECK_EQUAL(t0->get_backlink(4, *t1, 1, 0), 2);
-
-    CHECK(tv.is_row_attached(0));
-    CHECK(tv.is_row_attached(1));
-    CHECK(tv.is_row_attached(2));
-    CHECK(tv.is_row_attached(3));
-    CHECK(tv.is_row_attached(4));
-    CHECK_EQUAL(tv.get_int(0, 0), 0);
-    CHECK_EQUAL(tv.get_int(0, 1), 1);
-    CHECK_EQUAL(tv.get_int(0, 2), 2);
-    CHECK_EQUAL(tv.get_int(0, 3), 3);
-    CHECK_EQUAL(tv.get_int(0, 4), 4);
-    CHECK_EQUAL(tv.get(0).get_index(), 0);
-    CHECK_EQUAL(tv.get(1).get_index(), 2);
-    CHECK_EQUAL(tv.get(2).get_index(), 3);
-    CHECK_EQUAL(tv.get(3).get_index(), 1);
-    CHECK_EQUAL(tv.get(4).get_index(), 4);
-
-    CHECK_EQUAL(t1->get_link(0, 0), 2);
-    CHECK_EQUAL(t1->get_link(0, 1), 3);
-    CHECK_EQUAL(t1->get_link(0, 2), 1);
-    CHECK_EQUAL(t1->get_link(0, 3), 4);
-    CHECK_EQUAL(t1->get_link(0, 4), 0);
-
-    CHECK_EQUAL(t1_lvs[0]->get(0).get_index(), 3);
-    CHECK_EQUAL(t1_lvs[1]->get(0).get_index(), 1);
-    CHECK_EQUAL(t1_lvs[2]->get(0).get_index(), 4);
-    CHECK_EQUAL(t1_lvs[3]->get(0).get_index(), 0);
-    CHECK_EQUAL(t1_lvs[4]->get(0).get_index(), 2);
-
-    // non-adjacent, from > to
-    // 0, 3, 1, 2, 4
-    t0->move_row(3, 1);
-    // 0, 2, 3, 1, 4
-
-    CHECK_EQUAL(rows[0].get_index(), 0);
-    CHECK_EQUAL(rows[1].get_index(), 3);
-    CHECK_EQUAL(rows[2].get_index(), 1);
-    CHECK_EQUAL(rows[3].get_index(), 2);
-    CHECK_EQUAL(rows[4].get_index(), 4);
-
-    CHECK_EQUAL(rows[0].get_int(col_value), 0);
-    CHECK_EQUAL(rows[1].get_int(col_value), 1);
-    CHECK_EQUAL(rows[2].get_int(col_value), 2);
-    CHECK_EQUAL(rows[3].get_int(col_value), 3);
-
-    CHECK_EQUAL(rows[0].get_link(col_link), 0);
-    CHECK_EQUAL(rows[1].get_link(col_link), 3);
-    CHECK_EQUAL(rows[2].get_link(col_link), 1);
-    CHECK_EQUAL(rows[3].get_link(col_link), 2);
-
-    CHECK_EQUAL(t0_lvs[0]->get(0).get_index(), 3);
-    CHECK_EQUAL(t0_lvs[0]->get(1).get_index(), 1);
-    CHECK_EQUAL(t0_lvs[0]->get(2).get_index(), 2);
-    CHECK_EQUAL(t0_lvs[1]->get(0).get_index(), 0);
-    CHECK_EQUAL(t0_lvs[1]->get(1).get_index(), 1);
-    CHECK_EQUAL(t0_lvs[1]->get(2).get_index(), 2);
-    CHECK_EQUAL(t0_lvs[2]->get(0).get_index(), 0);
-    CHECK_EQUAL(t0_lvs[2]->get(1).get_index(), 3);
-    CHECK_EQUAL(t0_lvs[2]->get(2).get_index(), 2);
-    CHECK_EQUAL(t0_lvs[3]->get(0).get_index(), 0);
-    CHECK_EQUAL(t0_lvs[3]->get(1).get_index(), 3);
-    CHECK_EQUAL(t0_lvs[3]->get(2).get_index(), 1);
-
-    CHECK_EQUAL(t0_subtables[0]->get_parent_row_index(), 0);
-    CHECK_EQUAL(t0_subtables[1]->get_parent_row_index(), 3);
-    CHECK_EQUAL(t0_subtables[2]->get_parent_row_index(), 1);
-    CHECK_EQUAL(t0_subtables[3]->get_parent_row_index(), 2);
-    CHECK_EQUAL(t0_subtables[0]->size(), 1);
-    CHECK_EQUAL(t0_subtables[1]->size(), 2);
-    CHECK_EQUAL(t0_subtables[2]->size(), 3);
-    CHECK_EQUAL(t0_subtables[3]->size(), 4);
-
-    CHECK_EQUAL(t0->get_backlink(0, *t1, 0, 0), 4);
-    CHECK_EQUAL(t0->get_backlink(1, *t1, 0, 0), 1);
-    CHECK_EQUAL(t0->get_backlink(2, *t1, 0, 0), 2);
-    CHECK_EQUAL(t0->get_backlink(3, *t1, 0, 0), 0);
-    CHECK_EQUAL(t0->get_backlink(4, *t1, 0, 0), 3);
-    CHECK_EQUAL(t0->get_backlink(0, *t1, 1, 0), 3);
-    CHECK_EQUAL(t0->get_backlink(1, *t1, 1, 0), 0);
-    CHECK_EQUAL(t0->get_backlink(2, *t1, 1, 0), 1);
-    CHECK_EQUAL(t0->get_backlink(3, *t1, 1, 0), 4);
-    CHECK_EQUAL(t0->get_backlink(4, *t1, 1, 0), 2);
-
-    CHECK(tv.is_row_attached(0));
-    CHECK(tv.is_row_attached(1));
-    CHECK(tv.is_row_attached(2));
-    CHECK(tv.is_row_attached(3));
-    CHECK_EQUAL(tv.get(0).get_index(), 0);
-    CHECK_EQUAL(tv.get(1).get_index(), 3);
-    CHECK_EQUAL(tv.get(2).get_index(), 1);
-    CHECK_EQUAL(tv.get(3).get_index(), 2);
-    CHECK_EQUAL(tv.get(4).get_index(), 4);
-
-    CHECK_EQUAL(t1->get_link(0, 0), 3);
-    CHECK_EQUAL(t1->get_link(0, 1), 1);
-    CHECK_EQUAL(t1->get_link(0, 2), 2);
-    CHECK_EQUAL(t1->get_link(0, 3), 4);
-    CHECK_EQUAL(t1->get_link(0, 4), 0);
-
-    CHECK_EQUAL(t1_lvs[0]->get(0).get_index(), 1);
-    CHECK_EQUAL(t1_lvs[1]->get(0).get_index(), 2);
-    CHECK_EQUAL(t1_lvs[2]->get(0).get_index(), 4);
-    CHECK_EQUAL(t1_lvs[3]->get(0).get_index(), 0);
-    CHECK_EQUAL(t1_lvs[4]->get(0).get_index(), 3);
-}
-
-
 // Minimal test case causing an assertion error because
 // backlink columns are storing stale values referencing
 // their respective link column index. If a link column
@@ -7302,117 +2759,6 @@ TEST(Table_MinimalStaleLinkColumnIndex)
 
     CHECK_EQUAL(t->get_int(0, 0), 4444);
     CHECK_EQUAL(t->size(), 1);
-}
-
-// This test case is a simplified version of a bug revealed by fuzz testing
-// set_int_unique triggers backlinks to update if the element to insert is
-// not unique. The expected behaviour is that the new row containing the
-// unique int will be removed and the old row will remain; this ensures
-// uniques without throwing errors. This test was crashing (assert failed)
-// when inserting a unique duplicate because backlink indices hadn't been
-// updated after a column had been removed from the table containing the link.
-TEST(Table_FuzzTestRevealed_SetUniqueAssert)
-{
-    Group g;
-    g.add_table("string_index_test_table");
-    g.get_table(0)->add_search_index(g.get_table(0)->add_column(DataType(0), "aa", true));
-    g.get_table(0)->add_search_index(g.get_table(0)->add_column(DataType(0), "bb", true));
-    g.get_table(0)->insert_column(0, DataType(0), "cc", true);
-    g.get_table(0)->add_search_index(0);
-    g.get_table(0)->insert_column_link(3, type_Link, "dd", *g.get_table(0));
-    g.get_table(0)->add_empty_row(225);
-    {
-        TableRef t = g.get_table(0);
-        t->remove_column(1);
-    }
-    {
-        TableRef t = g.get_table(0);
-        t->remove_column(0);
-    }
-    g.get_table(0)->add_empty_row(186);
-    g.get_table(0)->find_first_int(0, 0);
-    g.get_table(0)->set_int_unique(0, 255, 1);
-    g.get_table(0)->find_first_int(0, 0);
-    g.get_table(0)->set_null(0, 53);
-    g.get_table(0)->set_int_unique(0, 97, 'l');
-    g.get_table(0)->add_empty_row(85);
-    g.get_table(0)->set_int_unique(0, 100, 'l'); // duplicate
-    CHECK_EQUAL(g.get_table(0)->get_int(0, 97), 'l');
-    CHECK_EQUAL(g.get_table(0)->get_int(0, 100), 0);
-}
-
-TEST(Table_InsertUniqueDuplicate_LinkedColumns)
-{
-    Group g;
-    TableRef t = g.add_table("table");
-    t->add_column(type_Int, "int1");
-    t->add_search_index(0);
-    t->add_empty_row(2);
-    t->set_int_unique(0, 0, 42);
-    t->set_int_unique(0, 1, 42);
-    CHECK_EQUAL(t->size(), 1);
-    CHECK_EQUAL(t->get_int(0, 0), 42);
-
-    t->insert_column(0, type_String, "string1");
-    t->add_search_index(0);
-    t->add_empty_row(1);
-    t->set_string_unique(0, 0, "fourty-two");
-    t->set_string_unique(0, 1, "fourty-two");
-    CHECK_EQUAL(t->size(), 1);
-    CHECK_EQUAL(t->get_string(0, 0), "fourty-two");
-    CHECK_EQUAL(t->get_int(1, 0), 42);
-
-    TableRef t2 = g.add_table("table2");
-    t2->add_column(type_Int, "int_col");
-    t2->add_column(type_String, "string_col");
-    t2->add_column_link(type_Link, "link", *t);
-    t2->add_search_index(0);
-    t2->add_search_index(1);
-    t2->add_empty_row(2);
-    t2->set_int_unique(0, 0, 43);
-    t2->set_string_unique(1, 0, "fourty-three");
-    t2->set_string_unique(1, 1, "FOURTY_THREE");
-    t2->set_link(2, 0, 0);
-    t2->set_int_unique(0, 1, 43); // deletes row 1, row 0 is winner
-
-    CHECK_EQUAL(t2->size(), 1);
-    CHECK_EQUAL(t2->get_int(0, 0), 43);
-    CHECK_EQUAL(t2->get_string(1, 0), "fourty-three");
-    CHECK_EQUAL(t2->get_link(2, 0), 0);
-
-    t2->remove_column(0);
-    t->insert_empty_row(0); // update t2 link through backlinks
-    t->set_int(1, 0, 333);
-    CHECK_EQUAL(t->get_int(1, 0), 333);
-    CHECK_EQUAL(t->get_int(1, 1), 42);
-    CHECK_EQUAL(t2->get_link(1, 0), 1); // bumped forward by insert at t(0), updated through backlinks
-
-    DescriptorRef t2_descriptor = t2->get_descriptor();
-    CHECK_EQUAL(t2->get_link(1, 0), 1); // unchanged
-    t->insert_empty_row(0);
-    t->set_int(1, 0, 4444);
-    CHECK_EQUAL(t2->get_link(1, 0), 2); // bumped forward via backlinks
-    t2->remove_column(0);
-    CHECK_EQUAL(t2->get_link(0, 0), 2); // unchanged
-    t->insert_empty_row(0);             // update through backlinks
-    t->set_int(1, 0, 55555);
-    CHECK_EQUAL(t2->get_link(0, 0), 3);
-
-    t->set_int_unique(1, 0, 4444);      // duplicate, row 1 wins, move_last_over(0)
-    CHECK_EQUAL(t2->get_link(0, 0), 0); // changed by duplicate overwrite in linked table via backlinks
-
-    t2->insert_column(0, type_Int, "type_Int col");
-    CHECK_EQUAL(t2->get_link(1, 0), 0); // no change after insert col
-    t->insert_empty_row(0);
-    t->set_int(1, 0, 666666);
-    CHECK_EQUAL(t2->get_link(1, 0), 1); // bumped forward via backlinks
-
-    CHECK_EQUAL(t2->get_link(1, 0), 1);    // no change
-    t->insert_empty_row(0);
-    t->set_int(1, 0, 7777777);
-    CHECK_EQUAL(t2->get_link(1, 0), 2); // bumped forward via backlinks
-    t->remove(0);
-    CHECK_EQUAL(t2->get_link(1, 0), 1); // bumped back via backlinks
 }
 
 
@@ -7532,192 +2878,93 @@ TEST(Table_ColumnsSupportStringIndex)
     CHECK(enum_col.has_search_index());
     t->remove_column(0);
 }
+#endif // LEGACY_TESTS
 
 TEST(Table_addRowsToTableWithNoColumns)
 {
     Group g; // type_Link must be part of a group
     TableRef t = g.add_table("t");
 
-    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
-    CHECK_LOGIC_ERROR(t->insert_empty_row(0), LogicError::table_has_no_columns);
-    CHECK_EQUAL(t->size(), 0);
-    t->add_column(type_String, "str_col");
-    t->add_empty_row(1);
+    t->create_object();
     CHECK_EQUAL(t->size(), 1);
-    t->add_search_index(0);
-    t->insert_empty_row(0);
+    auto col = t->add_column(type_String, "str_col");
+    t->create_object();
     CHECK_EQUAL(t->size(), 2);
-    t->remove_column(0);
-    CHECK_EQUAL(t->size(), 0);
-    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
-
-    // Can add rows to a table with backlinks
-    TableRef u = g.add_table("u");
-    u->add_column_link(type_Link, "link from u to t", *t);
-    CHECK_EQUAL(u->size(), 0);
-    CHECK_EQUAL(t->size(), 0);
-    t->add_empty_row(1);
-    CHECK_EQUAL(t->size(), 1);
-    u->remove_column(0);
-    CHECK_EQUAL(u->size(), 0);
-    CHECK_EQUAL(t->size(), 0);
-    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
-
-    // Do the exact same as above but with LinkLists
-    u->add_column_link(type_LinkList, "link list from u to t", *t);
-    CHECK_EQUAL(u->size(), 0);
-    CHECK_EQUAL(t->size(), 0);
-    t->add_empty_row(1);
-    CHECK_EQUAL(t->size(), 1);
-    u->remove_column(0);
-    CHECK_EQUAL(u->size(), 0);
-    CHECK_EQUAL(t->size(), 0);
-    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
+    t->add_search_index(col);
+    t->create_object();
+    CHECK_EQUAL(t->size(), 3);
+    t->remove_column(col);
+    CHECK_EQUAL(t->size(), 3);
 
     // Check that links are nulled when connected table is cleared
-    u->add_column_link(type_Link, "link from u to t", *t);
-    u->add_empty_row(1);
+    TableRef u = g.add_table("u");
+    auto col_link = u->add_column_link(type_Link, "link from u to t", *t);
+    Obj obj = u->create_object();
     CHECK_EQUAL(u->size(), 1);
-    CHECK_EQUAL(t->size(), 0);
-    CHECK_LOGIC_ERROR(u->set_link(0, 0, 0), LogicError::target_row_index_out_of_range);
-    CHECK(u->is_null_link(0, 0));
-    CHECK_EQUAL(t->size(), 0);
-    t->add_empty_row();
-    u->set_link(0, 0, 0);
-    CHECK_EQUAL(u->get_link(0, 0), 0);
-    CHECK(!u->is_null_link(0, 0));
-    CHECK_EQUAL(t->size(), 1);
-    t->add_column(type_Int, "int column");
-    CHECK_EQUAL(t->size(), 1);
-    t->remove_column(0);
+    CHECK_EQUAL(t->size(), 3);
+    CHECK_LOGIC_ERROR(obj.set(col_link, Key(45)), LogicError::target_row_index_out_of_range);
+    CHECK(obj.is_null(col_link));
+    CHECK_EQUAL(t->size(), 3);
+    Key k = t->create_object().get_key();
+    obj.set(col_link, k);
+    CHECK_EQUAL(obj.get<Key>(col_link), k);
+    CHECK(!obj.is_null(col_link));
+    CHECK_EQUAL(t->size(), 4);
+    t->clear();
     CHECK_EQUAL(t->size(), 0);
     CHECK_EQUAL(u->size(), 1);
-    CHECK(u->is_null_link(0, 0));
+    CHECK(obj.is_null(col_link));
+    u->remove_column(col_link);
 }
+
 
 TEST(Table_getVersionCounterAfterRowAccessor)
 {
     Table t;
-    size_t col_bool = t.add_column(type_Bool, "bool", true);
-    size_t col_int = t.add_column(type_Int, "int", true);
-    size_t col_string = t.add_column(type_String, "string", true);
-    size_t col_float = t.add_column(type_Float, "float", true);
-    size_t col_double = t.add_column(type_Double, "double", true);
-    size_t col_date = t.add_column(type_OldDateTime, "date", true);
-    size_t col_binary = t.add_column(type_Binary, "binary", true);
-    size_t col_timestamp = t.add_column(type_Timestamp, "timestamp", true);
+    auto col_bool = t.add_column(type_Bool, "bool", true);
+    auto col_int = t.add_column(type_Int, "int", true);
+    auto col_string = t.add_column(type_String, "string", true);
+    auto col_float = t.add_column(type_Float, "float", true);
+    auto col_double = t.add_column(type_Double, "double", true);
+    auto col_binary = t.add_column(type_Binary, "binary", true);
+    auto col_date = t.add_column(type_Timestamp, "timestamp", true);
 
-    t.add_empty_row(1);
+    Obj obj = t.create_object();
 
-    int_fast64_t ver = t.get_version_counter();
+    int_fast64_t ver = t.get_content_version();
     int_fast64_t newVer;
 
     auto check_ver_bump = [&]() {
-        newVer = t.get_version_counter();
+        newVer = t.get_content_version();
         CHECK_GREATER(newVer, ver);
         ver = newVer;
     };
 
-    t.set_bool(col_bool, 0, true);
+    obj.set<Bool>(col_bool, true);
     check_ver_bump();
 
-    t.set_int(col_int, 0, 42);
+    obj.set<Int>(col_int, 42);
     check_ver_bump();
 
-    t.set_string(col_string, 0, "foo");
+    obj.set<String>(col_string, "foo");
     check_ver_bump();
 
-    t.set_float(col_float, 0, 0.42f);
+    obj.set<Float>(col_float, 0.42f);
     check_ver_bump();
 
-    t.set_double(col_double, 0, 0.42);
+    obj.set<Double>(col_double, 0.42);
     check_ver_bump();
 
-    t.set_olddatetime(col_date, 0, 1234);
+    obj.set<Binary>(col_binary, BinaryData("binary", 7));
     check_ver_bump();
 
-    t.set_binary(col_binary, 0, BinaryData("binary", 7));
+    obj.set<Timestamp>(col_date, Timestamp(777, 888));
     check_ver_bump();
 
-    t.set_timestamp(col_timestamp, 0, Timestamp(777, 888));
-    check_ver_bump();
-
-    t.set_null(0, 0);
+    obj.set_null(col_string);
     check_ver_bump();
 }
 
-
-// This test a bug where get_size_from_type_and_ref() returned off-by-one on nullable integer columns.
-// It seems to be only invoked from Table::get_size_from_ref() which is fast static method that lets
-// you find the size of a Table without having to create an instance of it. This seems to be only done
-// on subtables, so the bug has not been triggered in public.
-TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
-{
-    constexpr bool nullable_toggle = TEST_TYPE::value;
-    Group g;
-    TableRef t = g.add_table("table");
-    t->add_column(type_Int, "int", nullable_toggle);
-    t->add_column(type_Bool, "bool", nullable_toggle);
-    t->add_column(type_String, "string", nullable_toggle);
-    t->add_column(type_Binary, "binary", nullable_toggle);
-    t->add_column(type_Double, "double");
-    t->add_column(type_Float, "float");
-    t->add_column(type_Mixed, "mixed");
-    t->add_column(type_Timestamp, "timestamp");
-    t->add_column_link(type_Link, "link", *t);
-    t->add_column_link(type_LinkList, "LinkList", *t);
-
-    auto check_column_sizes = [this, &t](size_t num_rows) {
-        t->clear();
-        t->add_empty_row(num_rows);
-        CHECK_EQUAL(t->size(), num_rows);
-        using tf = _impl::TableFriend;
-        Spec& t_spec = tf::get_spec(*t);
-        size_t actual_num_cols = t_spec.get_column_count();
-        for (size_t col_ndx = 0; col_ndx < actual_num_cols; ++col_ndx) {
-            ColumnType col_type = t_spec.get_column_type(col_ndx);
-            ColumnBase& base = tf::get_column(*t, col_ndx);
-            ref_type col_ref = base.get_ref();
-            bool nullable = (t_spec.get_column_attr(col_ndx) & col_attr_Nullable) == col_attr_Nullable;
-            size_t col_size = ColumnBase::get_size_from_type_and_ref(col_type, col_ref, base.get_alloc(), nullable);
-            CHECK_EQUAL(col_size, num_rows);
-        }
-    };
-
-    // Test leafs
-    check_column_sizes(REALM_MAX_BPNODE_SIZE - 1);
-
-    // Test empty
-    check_column_sizes(0);
-
-    // Test internal nodes
-    check_column_sizes(REALM_MAX_BPNODE_SIZE + 1);
-
-    // Test on boundary for good measure
-    check_column_sizes(REALM_MAX_BPNODE_SIZE);
-
-    // Try with more levels in the tree
-    check_column_sizes(10 * REALM_MAX_BPNODE_SIZE);
-}
-
-TEST(Table_KeyRow)
-{
-    Table table;
-    table.add_column(type_Int, "int");
-    table.add_column(type_String, "string");
-    table.add_search_index(0);
-
-    size_t ndx = table.add_row_with_key(0, 123);
-    table.set_string(1, ndx, "Hello, ");
-    table.add_row_with_key(0, 456);
-
-    size_t i = table.find_first_int(0, 123);
-    CHECK_EQUAL(i, 0);
-    i = table.find_first_int(0, 456);
-    CHECK_EQUAL(i, 1);
-}
-
-#endif // LEGACY_TESTS
 
 TEST(Table_object_basic)
 {
@@ -7870,7 +3117,7 @@ TEST(Table_object_basic)
     table.remove_object(Key(5));
     CHECK_THROW(y.get<int64_t>(intnull_col), InvalidKey);
 
-    CHECK(table.get_object(Key(8)).is_null(1));
+    CHECK(table.get_object(Key(8)).is_null(intnull_col));
 
     Key k11 = table.create_object().get_key();
     Key k12 = table.create_object().get_key();
@@ -7894,7 +3141,7 @@ TEST(Table_remove_column)
     table.remove_column(int2_col);
 
     CHECK_EQUAL(obj.get<int64_t>("int1"), 100);
-    CHECK_THROW(obj.get<int64_t>("int2"), LogicError);
+    CHECK_THROW(obj.get<int64_t>("int2"), InvalidKey);
     CHECK_EQUAL(obj.get<int64_t>("int3"), 25);
     table.add_column(type_Int, "int4");
     CHECK_EQUAL(obj.get<int64_t>("int4"), 0);
@@ -7965,11 +3212,11 @@ TEST(Table_ListOfPrimitives)
 {
     Group g;
     TableRef t = g.add_table("table");
-    size_t int_col = t->add_column_list(type_Int, "integers");
-    size_t bool_col = t->add_column_list(type_Bool, "booleans");
-    size_t string_col = t->add_column_list(type_String, "strings");
-    size_t double_col = t->add_column_list(type_Double, "doubles");
-    size_t timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
+    ColKey int_col = t->add_column_list(type_Int, "integers");
+    ColKey bool_col = t->add_column_list(type_Bool, "booleans");
+    ColKey string_col = t->add_column_list(type_String, "strings");
+    ColKey double_col = t->add_column_list(type_Double, "doubles");
+    ColKey timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
     Obj obj = t->create_object(Key(7));
 
     std::vector<int64_t> integer_vector = {1, 2, 3, 4};
@@ -8067,7 +3314,7 @@ TEST(Table_ListOfPrimitives)
     }
 
     t->remove_object(Key(7));
-    CHECK_NOT(timestamp_list.is_valid());
+    CHECK_NOT(timestamp_list.is_attached());
 }
 
 TEST(Table_object_merge_nodes)
@@ -8078,8 +3325,8 @@ TEST(Table_object_merge_nodes)
     int nb_rows = REALM_MAX_BPNODE_SIZE * 8;
     Table table;
     std::vector<int64_t> key_set;
-    table.add_column(type_Int, "int1");
-    table.add_column(type_Int, "int2", true);
+    auto c0 = table.add_column(type_Int, "int1");
+    auto c1 = table.add_column(type_Int, "int2", true);
 
     for (int i = 0; i < nb_rows; i++) {
         table.create_object(Key(i)).set_all(i << 1, i << 2);
@@ -8098,8 +3345,8 @@ TEST(Table_object_merge_nodes)
         for (unsigned j = 0; j < key_set.size(); j++) {
             int64_t key_val = key_set[j];
             Obj o = table.get_object(Key(key_val));
-            CHECK_EQUAL(key_val << 1, o.get<int64_t>(0));
-            CHECK_EQUAL(key_val << 2, o.get<util::Optional<int64_t>>(1));
+            CHECK_EQUAL(key_val << 1, o.get<int64_t>(c0));
+            CHECK_EQUAL(key_val << 2, o.get<util::Optional<int64_t>>(c1));
         }
     }
 }
@@ -8108,8 +3355,8 @@ TEST(Table_object_forward_iterator)
 {
     int nb_rows = 1024;
     Table table;
-    table.add_column(type_Int, "int1");
-    table.add_column(type_Int, "int2", true);
+    auto c0 = table.add_column(type_Int, "int1");
+    auto c1 = table.add_column(type_Int, "int2", true);
 
     for (int i = 0; i < nb_rows; i++) {
         table.create_object(Key(i));
@@ -8132,8 +3379,8 @@ TEST(Table_object_forward_iterator)
     for (Obj o : table) {
         int64_t key_value = o.get_key().value;
         // std::cout << "Key value: " << std::hex << key_value << std::dec << std::endl;
-        CHECK_EQUAL(key_value << 1, o.get<int64_t>(0));
-        CHECK_EQUAL(key_value << 2, o.get<util::Optional<int64_t>>(1));
+        CHECK_EQUAL(key_value << 1, o.get<int64_t>(c0));
+        CHECK_EQUAL(key_value << 2, o.get<util::Optional<int64_t>>(c1));
     }
 
     auto it = table.begin();
@@ -8150,19 +3397,19 @@ TEST(Table_object_forward_iterator)
     auto it1 = table.begin();
     Key key = it1->get_key();
     ++it1;
-    int64_t val = it1->get<int64_t>(0);
+    int64_t val = it1->get<int64_t>(c0);
     table.remove_object(key);
-    CHECK_EQUAL(val, it1->get<int64_t>(0));
+    CHECK_EQUAL(val, it1->get<int64_t>(c0));
     table.remove_object(it1);
-    CHECK_THROW_ANY(it1->get<int64_t>(0));
+    CHECK_THROW_ANY(it1->get<int64_t>(c0));
 }
 
 TEST(Table_object_sequential)
 {
     int nb_rows = 1024;
     Table table;
-    table.add_column(type_Int, "int1");
-    table.add_column(type_Int, "int2", true);
+    auto c0 = table.add_column(type_Int, "int1");
+    auto c1 = table.add_column(type_Int, "int2", true);
 
     auto t1 = steady_clock::now();
 
@@ -8174,8 +3421,8 @@ TEST(Table_object_sequential)
 
     for (int i = 0; i < nb_rows; i++) {
         Obj o = table.get_object(Key(i));
-        CHECK_EQUAL(i << 1, o.get<int64_t>(0));
-        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(1));
+        CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(c1));
     }
 
     auto t3 = steady_clock::now();
@@ -8184,8 +3431,8 @@ TEST(Table_object_sequential)
         table.remove_object(Key(i));
         for (int j = i + 1; j < nb_rows; j++) {
             Obj o = table.get_object(Key(j));
-            CHECK_EQUAL(j << 1, o.get<int64_t>(0));
-            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(1));
+            CHECK_EQUAL(j << 1, o.get<int64_t>(c0));
+            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(c1));
         }
     }
 
@@ -8220,8 +3467,8 @@ TEST(Table_object_random)
     }
 
     Table table;
-    table.add_column(type_Int, "int1");
-    table.add_column(type_Int, "int2", true);
+    auto c0 = table.add_column(type_Int, "int1");
+    auto c1 = table.add_column(type_Int, "int2", true);
 
     auto t1 = steady_clock::now();
 
@@ -8233,8 +3480,8 @@ TEST(Table_object_random)
 
     for (int i = 0; i < nb_rows; i++) {
         Obj o = table.get_object(Key(key_values[i]));
-        CHECK_EQUAL(i << 1, o.get<int64_t>(0));
-        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(1));
+        CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(c1));
     }
 
     auto t3 = steady_clock::now();
@@ -8243,8 +3490,8 @@ TEST(Table_object_random)
         table.remove_object(Key(key_values[i]));
         for (int j = i + 1; j < nb_rows; j++) {
             Obj o = table.get_object(Key(key_values[j]));
-            CHECK_EQUAL(j << 1, o.get<int64_t>(0));
-            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(1));
+            CHECK_EQUAL(j << 1, o.get<int64_t>(c0));
+            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(c1));
         }
     }
 
@@ -8259,6 +3506,8 @@ TEST(Table_object_random)
               << std::endl;
 }
 
+
+#ifdef LEGACY_TESTS
 TEST(Table_3)
 {
     TestTable01 table;
@@ -8266,38 +3515,42 @@ TEST(Table_3)
     for (int64_t i = 0; i < 100; ++i) {
         table.create_object(Key(i)).set_all(i, 10, true, int(Wed));
     }
+    auto cols = table.get_key_cols();
 
     // Test column searching
-    CHECK_EQUAL(Key(0), table.find_first_int(0, 0));
-    CHECK_EQUAL(Key(50), table.find_first_int(0, 50));
-    CHECK_EQUAL(null_key, table.find_first_int(0, 500));
-    CHECK_EQUAL(Key(0), table.find_first_int(1, 10));
-    CHECK_EQUAL(null_key, table.find_first_int(1, 100));
-    CHECK_EQUAL(Key(0), table.find_first_bool(2, true));
-    CHECK_EQUAL(null_key, table.find_first_bool(2, false));
-    CHECK_EQUAL(Key(0), table.find_first_int(3, Wed));
-    CHECK_EQUAL(null_key, table.find_first_int(3, Mon));
+    CHECK_EQUAL(Key(0), table.find_first_int(cols[0], 0));
+    CHECK_EQUAL(Key(50), table.find_first_int(cols[0], 50));
+    CHECK_EQUAL(null_key, table.find_first_int(cols[0], 500));
+    CHECK_EQUAL(Key(0), table.find_first_int(cols[1], 10));
+    CHECK_EQUAL(null_key, table.find_first_int(cols[1], 100));
+    CHECK_EQUAL(Key(0), table.find_first_bool(cols[2], true));
+    CHECK_EQUAL(null_key, table.find_first_bool(cols[2], false));
+    CHECK_EQUAL(Key(0), table.find_first_int(cols[3], Wed));
+    CHECK_EQUAL(null_key, table.find_first_int(cols[3], Mon));
 
 #ifdef REALM_DEBUG
     table.verify();
 #endif
 }
+#endif
+
 
 TEST(Table_4)
 {
     Table table;
-    table.add_column(type_String, "strings");
+    auto c0 = table.add_column(type_String, "strings");
 
-    table.create_object(Key(5)).set(0, "Hello");
-    table.create_object(Key(7)).set(0, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
+    table.create_object(Key(5)).set(c0, "Hello");
+    table.create_object(Key(7)).set(c0,
+                                    "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
 
     CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello",
-                table.get_object(Key(7)).get<String>(0));
+                table.get_object(Key(7)).get<String>(c0));
 
     // Test string column searching
     CHECK_EQUAL(Key(7), table.find_first_string(
-                            0, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
-    CHECK_EQUAL(null_key, table.find_first_string(0, "Foo"));
+                            c0, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
+    CHECK_EQUAL(null_key, table.find_first_string(c0, "Foo"));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -8309,14 +3562,14 @@ TEST(Table_SearchIndexFindFirst)
 {
     Table table;
 
-    size_t c1 = table.add_column(type_Int, "a");
-    size_t c2 = table.add_column(type_Int, "b", true);
-    size_t c3 = table.add_column(type_String, "c");
-    size_t c4 = table.add_column(type_String, "d", true);
-    size_t c5 = table.add_column(type_Bool, "e");
-    size_t c6 = table.add_column(type_Bool, "f", true);
-    size_t c7 = table.add_column(type_Timestamp, "g");
-    size_t c8 = table.add_column(type_Timestamp, "h", true);
+    auto c1 = table.add_column(type_Int, "a");
+    auto c2 = table.add_column(type_Int, "b", true);
+    auto c3 = table.add_column(type_String, "c");
+    auto c4 = table.add_column(type_String, "d", true);
+    auto c5 = table.add_column(type_Bool, "e");
+    auto c6 = table.add_column(type_Bool, "f", true);
+    auto c7 = table.add_column(type_Timestamp, "g");
+    auto c8 = table.add_column(type_Timestamp, "h", true);
 
     Obj o0 = table.create_object();
     Obj o1 = table.create_object();
@@ -8341,46 +3594,46 @@ TEST(Table_SearchIndexFindFirst)
     table.add_search_index(c8);
 
     // Non-nullable integers
-    CHECK_EQUAL(table.find_first_int(0, 100), o0.get_key());
-    CHECK_EQUAL(table.find_first_int(0, 200), o1.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 100), o0.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 200), o1.get_key());
     // Uninitialized non-nullable integers equal 0
-    CHECK_EQUAL(table.find_first_int(0, 0), o3.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 0), o3.get_key());
 
     // Nullable integers
-    CHECK_EQUAL(table.find_first_int(1, 100), o0.get_key());
-    CHECK_EQUAL(table.find_first_int(1, 200), o1.get_key());
+    CHECK_EQUAL(table.find_first_int(c2, 100), o0.get_key());
+    CHECK_EQUAL(table.find_first_int(c2, 200), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(1), o3.get_key());
 
     // Non-nullable strings
-    CHECK_EQUAL(table.find_first_string(2, "100"), o0.get_key());
-    CHECK_EQUAL(table.find_first_string(2, "200"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, "100"), o0.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, "200"), o1.get_key());
     // Uninitialized non-nullable strings equal ""
-    CHECK_EQUAL(table.find_first_string(2, ""), o3.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, ""), o3.get_key());
 
     // Nullable strings
-    CHECK_EQUAL(table.find_first_string(3, "100"), o0.get_key());
-    CHECK_EQUAL(table.find_first_string(3, "200"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(c4, "100"), o0.get_key());
+    CHECK_EQUAL(table.find_first_string(c4, "200"), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(3), o3.get_key());
 
     // Non-nullable bools
-    CHECK_EQUAL(table.find_first_bool(4, false), o0.get_key());
-    CHECK_EQUAL(table.find_first_bool(4, true), o1.get_key());
+    CHECK_EQUAL(table.find_first_bool(c5, false), o0.get_key());
+    CHECK_EQUAL(table.find_first_bool(c5, true), o1.get_key());
 
     // Nullable bools
-    CHECK_EQUAL(table.find_first_bool(5, false), o0.get_key());
-    CHECK_EQUAL(table.find_first_bool(5, true), o1.get_key());
+    CHECK_EQUAL(table.find_first_bool(c6, false), o0.get_key());
+    CHECK_EQUAL(table.find_first_bool(c6, true), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(5), o3.get_key());
 
     // Non-nullable Timestamp
-    CHECK_EQUAL(table.find_first_timestamp(6, Timestamp(100, 100)), o0.get_key());
-    CHECK_EQUAL(table.find_first_timestamp(6, Timestamp(200, 200)), o1.get_key());
+    CHECK_EQUAL(table.find_first_timestamp(c7, Timestamp(100, 100)), o0.get_key());
+    CHECK_EQUAL(table.find_first_timestamp(c7, Timestamp(200, 200)), o1.get_key());
 
     // Nullable Timestamp
-    CHECK_EQUAL(table.find_first_timestamp(7, Timestamp(100, 100)), o0.get_key());
-    CHECK_EQUAL(table.find_first_timestamp(7, Timestamp(200, 200)), o1.get_key());
+    CHECK_EQUAL(table.find_first_timestamp(c8, Timestamp(100, 100)), o0.get_key());
+    CHECK_EQUAL(table.find_first_timestamp(c8, Timestamp(200, 200)), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(7), o3.get_key());
 
@@ -8389,58 +3642,58 @@ TEST(Table_SearchIndexFindFirst)
     table.remove_object(o0.get_key());
 
     // Integers
-    CHECK_EQUAL(table.find_first_int(0, 100), null_key);
-    CHECK_EQUAL(table.find_first_int(0, 200), o1.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 100), null_key);
+    CHECK_EQUAL(table.find_first_int(c1, 200), o1.get_key());
     // Uninitialized non-nullable integers equal 0
-    CHECK_EQUAL(table.find_first_int(0, 0), o3.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 0), o3.get_key());
 
-    CHECK_EQUAL(table.find_first_int(1, 200), o1.get_key());
+    CHECK_EQUAL(table.find_first_int(c2, 200), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(1), o3.get_key());
 
     // Non-nullable strings
-    CHECK_EQUAL(table.find_first_string(2, "100"), null_key);
-    CHECK_EQUAL(table.find_first_string(2, "200"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, "100"), null_key);
+    CHECK_EQUAL(table.find_first_string(c3, "200"), o1.get_key());
     // Uninitialized non-nullable strings equal ""
-    CHECK_EQUAL(table.find_first_string(2, ""), o3.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, ""), o3.get_key());
 
     // Nullable strings
-    CHECK_EQUAL(table.find_first_string(3, "100"), null_key);
-    CHECK_EQUAL(table.find_first_string(3, "200"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(c4, "100"), null_key);
+    CHECK_EQUAL(table.find_first_string(c4, "200"), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(3), o3.get_key());
 
     // Non-nullable bools
     // default value for non-nullable bool is false, so o3 is a match
-    CHECK_EQUAL(table.find_first_bool(4, false), o3.get_key());
-    CHECK_EQUAL(table.find_first_bool(4, true), o1.get_key());
+    CHECK_EQUAL(table.find_first_bool(c5, false), o3.get_key());
+    CHECK_EQUAL(table.find_first_bool(c5, true), o1.get_key());
 
     // Nullable bools
-    CHECK_EQUAL(table.find_first_bool(5, false), null_key);
-    CHECK_EQUAL(table.find_first_bool(5, true), o1.get_key());
+    CHECK_EQUAL(table.find_first_bool(c6, false), null_key);
+    CHECK_EQUAL(table.find_first_bool(c6, true), o1.get_key());
 
     // Call "set" and see if things still work
     // *******************************************************************************
     o1.set_all(500, 500, "500", "500");
     o2.set_all(600, 600, "600", "600");
 
-    CHECK_EQUAL(table.find_first_int(0, 500), o1.get_key());
-    CHECK_EQUAL(table.find_first_int(0, 600), o2.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 500), o1.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 600), o2.get_key());
     // Uninitialized non-nullable integers equal 0
-    CHECK_EQUAL(table.find_first_int(0, 0), o3.get_key());
-    CHECK_EQUAL(table.find_first_int(1, 500), o1.get_key());
+    CHECK_EQUAL(table.find_first_int(c1, 0), o3.get_key());
+    CHECK_EQUAL(table.find_first_int(c2, 500), o1.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(1), o3.get_key());
 
     // Non-nullable strings
-    CHECK_EQUAL(table.find_first_string(2, "500"), o1.get_key());
-    CHECK_EQUAL(table.find_first_string(2, "600"), o2.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, "500"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, "600"), o2.get_key());
     // Uninitialized non-nullable strings equal ""
-    CHECK_EQUAL(table.find_first_string(2, ""), o3.get_key());
+    CHECK_EQUAL(table.find_first_string(c3, ""), o3.get_key());
 
     // Nullable strings
-    CHECK_EQUAL(table.find_first_string(3, "500"), o1.get_key());
-    CHECK_EQUAL(table.find_first_string(3, "600"), o2.get_key());
+    CHECK_EQUAL(table.find_first_string(c4, "500"), o1.get_key());
+    CHECK_EQUAL(table.find_first_string(c4, "600"), o2.get_key());
     // FIXME: Waiting for fix outside scope of search index PR
     // CHECK_EQUAL(table.find_first_null(3), o3.get_key());
 
@@ -8482,13 +3735,15 @@ template <class T, bool nullable>
 struct Tester {
     using T2 = typename util::RemoveOptional<T>::type;
 
+    static ColKey col;
+
     static std::vector<Key> find_all_reference(Table& table, T v)
     {
         std::vector<Key> res;
         Table::Iterator it = table.begin();
         while (it != table.end()) {
-            if (!it->is_null(0)) {
-                T v2 = it->get<T>(0);
+            if (!it->is_null(col)) {
+                T v2 = it->get<T>(col);
                 if (v == v2) {
                     res.push_back(it->get_key());
                 }
@@ -8504,11 +3759,11 @@ struct Tester {
         Table::Iterator it = table.begin();
 
         if (it != table.end()) {
-            auto v = it->get<T>(0);
+            auto v = it->get<T>(col);
 
-            if (!it->is_null(0)) {
+            if (!it->is_null(col)) {
                 std::vector<Key> res;
-                table.get_search_index(0)->find_all(res, v, false);
+                table.get_search_index(col)->find_all(res, v, false);
                 std::vector<Key> ref = find_all_reference(table, v);
 
                 size_t a = ref.size();
@@ -8522,8 +3777,8 @@ struct Tester {
     static void run(realm::DataType type)
     {
         Table table;
-        table.add_column(type, "name", nullable);
-        table.add_search_index(0);
+        col = table.add_column(type, "name", nullable);
+        table.add_search_index(col);
         const size_t iters = 1000;
 
         bool add_trend = true;
@@ -8541,7 +3796,7 @@ struct Tester {
 
                 if (!set_to_null) {
                     auto t = create();
-                    o.set<T2>(0, t);
+                    o.set<T2>(col, t);
                 }
             }
 
@@ -8567,12 +3822,12 @@ struct Tester {
                 }
                 Obj o = *it;
                 bool set_to_null = fastrand(100) < 20;
-                if (set_to_null && table.is_nullable(0)) {
-                    o.set_null(0);
+                if (set_to_null && table.is_nullable(col)) {
+                    o.set_null(col);
                 }
                 else {
                     auto t = create();
-                    o.set<T2>(0, t);
+                    o.set<T2>(col, t);
                 }
             }
 
@@ -8607,6 +3862,9 @@ struct Tester {
         return fastrand(100) > 50;
     }
 };
+
+template <class T, bool nullable>
+ColKey Tester<T, nullable>::col;
 }
 
 // The run() method will first add lots of objects, and then remove them. This will test
@@ -8632,5 +3890,21 @@ TEST(Table_search_index_fuzzer)
     Tester<StringData, true>::run(type_String);
     Tester<StringData, false>::run(type_String);
 }
+
+TEST(Table_StaleColumnKey)
+{
+    Table table;
+
+    auto col = table.add_column(type_Int, "age");
+
+    Obj obj = table.create_object();
+    obj.set(col, 5);
+
+    table.remove_column(col);
+    // col is now obsolete
+    table.add_column(type_Int, "score");
+    CHECK_THROW_ANY(obj.get<Int>(col));
+}
+
 
 #endif // TEST_TABLE

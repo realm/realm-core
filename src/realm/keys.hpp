@@ -52,6 +52,18 @@ struct TableKey {
     int64_t value;
 };
 
+class TableVersions : public std::vector<std::pair<TableKey, uint64_t>> {
+public:
+    TableVersions()
+    {
+    }
+    TableVersions(TableKey key, uint64_t version)
+    {
+        emplace_back(key, version);
+    }
+    bool operator==(const TableVersions& other) const;
+};
+
 inline std::ostream& operator<<(std::ostream& os, TableKey tk)
 {
     os << tk.value;
@@ -65,6 +77,57 @@ inline std::string to_string(TableKey tk)
     return to_string(tk.value);
 }
 }
+
+
+struct ColKey {
+    constexpr ColKey()
+        : value(uint64_t(-1) >> 1) // free top bit
+    {
+    }
+    explicit ColKey(int64_t val)
+        : value(val)
+    {
+    }
+    ColKey& operator=(int64_t val)
+    {
+        value = val;
+        return *this;
+    }
+    bool operator==(const ColKey& rhs) const
+    {
+        return value == rhs.value;
+    }
+    bool operator!=(const ColKey& rhs) const
+    {
+        return value != rhs.value;
+    }
+    bool operator<(const ColKey& rhs) const
+    {
+        return value < rhs.value;
+    }
+    explicit operator bool() const
+    {
+        return value != ColKey().value;
+    }
+    int64_t value;
+};
+
+inline std::ostream& operator<<(std::ostream& os, ColKey ck)
+{
+    os << ck.value;
+    return os;
 }
+
+namespace util {
+
+inline std::string to_string(ColKey ck)
+{
+    return to_string(ck.value);
+}
+
+} // namespace util
+
+} // namespace realm
+
 
 #endif

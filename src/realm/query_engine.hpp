@@ -98,10 +98,10 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/array_list.hpp>
 #include <realm/array_backlink.hpp>
 #include <realm/column_type_traits.hpp>
-#include <realm/link_view.hpp>
 #include <realm/metrics/query_info.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/table.hpp>
+#include <realm/column.hpp>
 #include <realm/unicode.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/serializer.hpp>
@@ -166,13 +166,17 @@ public:
 
     virtual void init()
     {
-        // Update column index
-        update_column();
-
         if (m_child)
             m_child->init();
 
         m_column_action_specializer = nullptr;
+    }
+
+    void get_link_dependencies(std::vector<TableKey>& tables) const
+    {
+        collect_dependencies(tables);
+        if (m_child)
+            m_child->collect_dependencies(tables);
     }
 
     void set_table(const Table& table)
@@ -181,8 +185,8 @@ public:
             return;
 
         m_table = ConstTableRef(&table);
-        if (m_condition_column_idx != npos) {
-            m_condition_column_name = m_table->get_column_name(m_condition_column_idx);
+        if (m_condition_column_key != ColKey()) {
+            m_condition_column_name = m_table->get_column_name(m_condition_column_key);
         }
         if (m_child)
             m_child->set_table(table);
@@ -195,6 +199,10 @@ public:
         if (m_child)
             m_child->set_cluster(cluster);
         cluster_changed();
+    }
+
+    virtual void collect_dependencies(std::vector<TableKey>&) const
+    {
     }
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
@@ -248,7 +256,7 @@ public:
     ParentNode(const ParentNode& from, QueryNodeHandoverPatches* patches)
         : m_child(from.m_child ? from.m_child->clone(patches) : nullptr)
         , m_condition_column_name(from.m_condition_column_name)
-        , m_condition_column_idx(from.m_condition_column_idx)
+        , m_condition_column_key(from.m_condition_column_key)
         , m_dD(from.m_dD)
         , m_dT(from.m_dT)
         , m_probes(from.m_probes)
@@ -273,31 +281,27 @@ public:
             m_child->apply_handover_patch(patches, group);
     }
 
-    size_t get_column_index(StringData column_name) const
+    ColKey get_column_key(StringData column_name) const
     {
-        size_t column_idx = npos;
+        ColKey column_key;
         if (column_name.size() > 0) {
-            column_idx = m_table->get_column_index(column_name);
-            if (column_idx == realm::npos) {
+            column_key = m_table->get_column_key(column_name);
+            if (column_key == ColKey()) {
                 throw LogicError(LogicError::column_does_not_exist);
             }
         }
-        return column_idx;
-    }
-    virtual void update_column() const
-    {
-        m_condition_column_idx = get_column_index(m_condition_column_name);
+        return column_key;
     }
 
     virtual std::string describe_column() const
     {
-        return describe_column(m_condition_column_idx);
+        return describe_column(m_condition_column_key);
     }
 
-    virtual std::string describe_column(size_t col_ndx) const
+    virtual std::string describe_column(ColKey col_key) const
     {
-        if (m_table && col_ndx != npos) {
-            return std::string(m_table->get_column_name(col_ndx));
+        if (m_table && col_key != ColKey()) {
+            return std::string(m_table->get_column_name(col_key));
         }
         return "";
     }
@@ -325,7 +329,7 @@ public:
     std::unique_ptr<ParentNode> m_child;
     std::vector<ParentNode*> m_children;
     std::string m_condition_column_name;
-    mutable size_t m_condition_column_idx = npos; // Column of search criteria
+    mutable ColKey m_condition_column_key = ColKey(); // Column of search criteria
 
     double m_dD;       // Average row distance between each local match at current position
     double m_dT = 0.0; // Time overhead of testing index i + 1 if we have just tested index i. > 1 for linear scans, 0
@@ -342,9 +346,9 @@ protected:
     QueryStateBase* m_state = nullptr;
     std::string error_code;
 
-    ColumnType get_real_column_type(size_t ndx)
+    ColumnType get_real_column_type(ColKey key)
     {
-        return m_table->get_real_column_type(ndx);
+        return m_table->get_real_column_type(key);
     }
 
 private:
@@ -392,9 +396,9 @@ struct CostHeuristic<ArrayIntNull> {
 
 class ColumnNodeBase : public ParentNode {
 protected:
-    ColumnNodeBase(size_t column_idx)
+    ColumnNodeBase(ColKey column_key)
     {
-        m_condition_column_idx = column_idx;
+        m_condition_column_key = column_key;
     }
 
     ColumnNodeBase(const ColumnNodeBase& from, QueryNodeHandoverPatches* patches)
@@ -515,8 +519,8 @@ protected:
         }
     }
 
-    IntegerNodeBase(TConditionValue value, size_t column_idx)
-        : ColumnNodeBase(column_idx)
+    IntegerNodeBase(TConditionValue value, ColKey column_key)
+        : ColumnNodeBase(column_key)
         , m_value(std::move(value))
     {
     }
@@ -537,7 +541,7 @@ protected:
         m_array_ptr = nullptr;
         // Create new Leaf
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
-        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -586,8 +590,8 @@ public:
     static const bool special_null_node = false;
     using TConditionValue = typename BaseType::TConditionValue;
 
-    IntegerNode(TConditionValue value, size_t column_ndx)
-        : BaseType(value, column_ndx)
+    IntegerNode(TConditionValue value, ColKey column_key)
+        : BaseType(value, column_key)
     {
     }
     IntegerNode(const IntegerNode& from, QueryNodeHandoverPatches* patches)
@@ -704,16 +708,16 @@ public:
     using TConditionValue = typename LeafType::value_type;
     static const bool special_null_node = false;
 
-    FloatDoubleNode(TConditionValue v, size_t column_ndx)
+    FloatDoubleNode(TConditionValue v, ColKey column_key)
         : m_value(v)
     {
-        m_condition_column_idx = column_ndx;
+        m_condition_column_key = column_key;
         m_dT = 1.0;
     }
-    FloatDoubleNode(null, size_t column_ndx)
+    FloatDoubleNode(null, ColKey column_key)
         : m_value(null::get_null_float<TConditionValue>())
     {
-        m_condition_column_idx = column_ndx;
+        m_condition_column_key = column_key;
         m_dT = 1.0;
     }
 
@@ -726,7 +730,7 @@ public:
         m_array_ptr = nullptr;
         // Create new Leaf
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
-        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -752,7 +756,7 @@ public:
         };
 
         // This will inline the second case but no the first. Todo, use templated lambda when switching to c++14
-        if (m_table->is_nullable(m_condition_column_idx))
+        if (m_table->is_nullable(m_condition_column_key))
             return find(true);
         else
             return find(false);
@@ -792,10 +796,10 @@ protected:
 template <class T, class TConditionFunction>
 class SizeNode : public ParentNode {
 public:
-    SizeNode(int64_t v, size_t column)
+    SizeNode(int64_t v, ColKey column)
         : m_value(v)
     {
-        m_condition_column_idx = column;
+        m_condition_column_key = column;
     }
 
     void cluster_changed() override
@@ -806,7 +810,7 @@ public:
         // the object has the same address. (As in this case)
         m_array_ptr = nullptr;
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
-        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -856,10 +860,10 @@ private:
 template <class T, class TConditionFunction>
 class SizeListNode : public ParentNode {
 public:
-    SizeListNode(int64_t v, size_t column)
+    SizeListNode(int64_t v, ColKey column)
         : m_value(v)
     {
-        m_condition_column_idx = column;
+        m_condition_column_key = column;
     }
 
     void cluster_changed() override
@@ -870,7 +874,7 @@ public:
         // the object has the same address. (As in this case)
         m_array_ptr = nullptr;
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayList(m_table->get_alloc()));
-        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -925,14 +929,14 @@ public:
     using TConditionValue = BinaryData;
     static const bool special_null_node = false;
 
-    BinaryNode(BinaryData v, size_t column)
+    BinaryNode(BinaryData v, ColKey column)
         : m_value(v)
     {
         m_dT = 100.0;
-        m_condition_column_idx = column;
+        m_condition_column_key = column;
     }
 
-    BinaryNode(null, size_t column)
+    BinaryNode(null, ColKey column)
         : BinaryNode(BinaryData{}, column)
     {
     }
@@ -941,7 +945,7 @@ public:
     {
         m_array_ptr = nullptr;
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayBinary(m_table->get_alloc()));
-        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -996,13 +1000,13 @@ public:
     using TConditionValue = Timestamp;
     static const bool special_null_node = false;
 
-    TimestampNode(Timestamp v, size_t column)
+    TimestampNode(Timestamp v, ColKey column)
         : m_value(v)
     {
-        m_condition_column_idx = column;
+        m_condition_column_key = column;
     }
 
-    TimestampNode(null, size_t column)
+    TimestampNode(null, ColKey column)
         : TimestampNode(Timestamp{}, column)
     {
     }
@@ -1011,7 +1015,7 @@ public:
     {
         m_array_ptr = nullptr;
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayTimestamp(m_table->get_alloc()));
-        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -1065,16 +1069,16 @@ public:
     using TConditionValue = StringData;
     static const bool special_null_node = true;
 
-    StringNodeBase(StringData v, size_t column)
+    StringNodeBase(StringData v, ColKey column)
         : m_value(v.is_null() ? util::none : util::make_optional(std::string(v)))
     {
-        m_condition_column_idx = column;
+        m_condition_column_key = column;
     }
 
     void table_changed() override
     {
-        m_column_type = get_real_column_type(m_condition_column_idx);
-        m_has_search_index = m_table->has_search_index(m_condition_column_idx);
+        m_column_type = get_real_column_type(m_condition_column_key);
+        m_has_search_index = m_table->has_search_index(m_condition_column_key);
     }
 
     void cluster_changed() override
@@ -1086,7 +1090,7 @@ public:
         m_array_ptr = nullptr;
         // Create new Leaf
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayString(m_table->get_alloc()));
-        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 
@@ -1149,7 +1153,7 @@ protected:
 template <class TConditionFunction>
 class StringNode : public StringNodeBase {
 public:
-    StringNode(StringData v, size_t column)
+    StringNode(StringData v, ColKey column)
         : StringNodeBase(v, column)
     {
         auto upper = case_map(v, true);
@@ -1212,7 +1216,7 @@ protected:
 template <>
 class StringNode<Contains> : public StringNodeBase {
 public:
-    StringNode(StringData v, size_t column)
+    StringNode(StringData v, ColKey column)
         : StringNodeBase(v, column)
         , m_charmap()
     {
@@ -1279,7 +1283,7 @@ protected:
 template <>
 class StringNode<ContainsIns> : public StringNodeBase {
 public:
-    StringNode(StringData v, size_t column)
+    StringNode(StringData v, ColKey column)
         : StringNodeBase(v, column)
         , m_charmap()
     {
@@ -1363,7 +1367,7 @@ protected:
 
 class StringNodeEqualBase : public StringNodeBase {
 public:
-    StringNodeEqualBase(StringData v, size_t column)
+    StringNodeEqualBase(StringData v, ColKey column)
         : StringNodeBase(v, column)
     {
     }
@@ -1428,7 +1432,7 @@ private:
 template <>
 class StringNode<EqualIns> : public StringNodeEqualBase {
 public:
-    StringNode(StringData v, size_t column)
+    StringNode(StringData v, ColKey column)
         : StringNodeEqualBase(v, column)
     {
         auto upper = case_map(v, true);
@@ -1528,12 +1532,6 @@ public:
         m_was_match.resize(m_conditions.size(), false);
     }
 
-    void update_column() const override
-    {
-        for (auto& condition : m_conditions) {
-            condition->update_column();
-        }
-    }
     std::string describe() const override
     {
         if (m_conditions.size() >= 2) {
@@ -1671,11 +1669,6 @@ public:
         m_first_in_known_range = not_found;
     }
 
-    void update_column() const override
-    {
-        m_condition->update_column();
-    }
-
     void init() override
     {
         ParentNode::init();
@@ -1762,39 +1755,28 @@ class TwoColumnsNode : public ParentNode {
 public:
     using TConditionValue = typename LeafType::value_type;
 
-    TwoColumnsNode(size_t column1, size_t column2)
+    TwoColumnsNode(ColKey column1, ColKey column2)
     {
         m_dT = 100.0;
-        m_condition_column_idx1 = column1;
-        m_condition_column_idx2 = column2;
+        m_condition_column_key1 = column1;
+        m_condition_column_key2 = column2;
     }
 
     ~TwoColumnsNode() noexcept override
     {
     }
 
-    void table_changed() override
-    {
-        m_condition_column_name1 = m_table->get_column_name(m_condition_column_idx1);
-        m_condition_column_name2 = m_table->get_column_name(m_condition_column_idx2);
-    }
     void cluster_changed() override
     {
         m_array_ptr1 = nullptr;
         m_array_ptr1 = LeafPtr(new (&m_leaf_cache_storage1) LeafType(m_table->get_alloc()));
-        this->m_cluster->init_leaf(this->m_condition_column_idx1, m_array_ptr1.get());
+        this->m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key1), m_array_ptr1.get());
         m_leaf_ptr1 = m_array_ptr1.get();
 
         m_array_ptr2 = nullptr;
         m_array_ptr2 = LeafPtr(new (&m_leaf_cache_storage2) LeafType(m_table->get_alloc()));
-        this->m_cluster->init_leaf(this->m_condition_column_idx2, m_array_ptr2.get());
+        this->m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key2), m_array_ptr2.get());
         m_leaf_ptr2 = m_array_ptr2.get();
-    }
-
-    void update_column() const override
-    {
-        m_condition_column_idx1 = get_column_index(m_condition_column_name1);
-        m_condition_column_idx2 = get_column_index(m_condition_column_name2);
     }
 
     void init() override
@@ -1855,20 +1837,16 @@ public:
     TwoColumnsNode(const TwoColumnsNode& from, QueryNodeHandoverPatches* patches)
         : ParentNode(from, patches)
         , m_column_type(from.m_column_type)
-        , m_condition_column_name1(from.m_condition_column_name1)
-        , m_condition_column_name2(from.m_condition_column_name2)
-        , m_condition_column_idx1(from.m_condition_column_idx1)
-        , m_condition_column_idx2(from.m_condition_column_idx2)
+        , m_condition_column_key1(from.m_condition_column_key1)
+        , m_condition_column_key2(from.m_condition_column_key2)
     {
     }
 
 private:
     ColumnType m_column_type;
 
-    std::string m_condition_column_name1;
-    std::string m_condition_column_name2;
-    mutable size_t m_condition_column_idx1;
-    mutable size_t m_condition_column_idx2;
+    mutable ColKey m_condition_column_key1;
+    mutable ColKey m_condition_column_key2;
 
     using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
     using LeafPtr = std::unique_ptr<LeafType, PlacementDelete>;
@@ -1892,7 +1870,7 @@ public:
 
     void table_changed() override;
     void cluster_changed() override;
-    void update_column() const override;
+    void collect_dependencies(std::vector<TableKey>&) const override;
 
     virtual std::string describe() const override;
 
@@ -1913,17 +1891,17 @@ struct LinksToNodeHandoverPatch : public QueryNodeHandoverPatch {
 
 class LinksToNode : public ParentNode {
 public:
-    LinksToNode(size_t origin_column_index, Key target_key)
+    LinksToNode(ColKey origin_column_key, Key target_key)
         : m_target_key(target_key)
     {
         m_dD = 10.0;
         m_dT = 50.0;
-        m_condition_column_idx = origin_column_index;
+        m_condition_column_key = origin_column_key;
     }
 
     void table_changed() override
     {
-        m_column_type = m_table->get_column_type(m_condition_column_idx);
+        m_column_type = m_table->get_column_type(m_condition_column_key);
         REALM_ASSERT(m_column_type == type_Link || m_column_type == type_LinkList);
     }
 
@@ -1936,7 +1914,7 @@ public:
         else if (m_column_type == type_LinkList) {
             m_array_ptr = LeafPtr(new (&m_storage.m_linklist) ArrayList(m_table->get_alloc()));
         }
-        m_cluster->init_leaf(this->m_condition_column_idx, m_array_ptr.get());
+        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
 

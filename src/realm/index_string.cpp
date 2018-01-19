@@ -27,6 +27,7 @@
 #include <realm/index_string.hpp>
 #include <realm/table.hpp>
 #include <realm/timestamp.hpp>
+#include <realm/column.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -45,13 +46,15 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
 DataType ClusterColumn::get_data_type() const
 {
     const Table* table = m_cluster_tree->get_owner();
-    return table->get_column_type(m_column_ndx);
+    return table->get_column_type(m_column_key);
 }
 
 bool ClusterColumn::is_nullable() const
 {
+    const Table* table = m_cluster_tree->get_owner();
     const Spec& spec = m_cluster_tree->get_spec();
-    return spec.get_column_attr(m_column_ndx).test(col_attr_Nullable);
+    size_t col_ndx = table->colkey2ndx(m_column_key);
+    return spec.get_column_attr(col_ndx).test(col_attr_Nullable);
 }
 
 StringData ClusterColumn::get_index_data(Key key, StringConversionBuffer& buffer) const
@@ -62,30 +65,30 @@ StringData ClusterColumn::get_index_data(Key key, StringConversionBuffer& buffer
     if (type == type_Int) {
         if (is_nullable()) {
             GetIndexData<Optional<int64_t>> stringifier;
-            return stringifier.get_index_data(obj.get<Optional<int64_t>>(m_column_ndx), buffer);
+            return stringifier.get_index_data(obj.get<Optional<int64_t>>(m_column_key), buffer);
         }
         else {
             GetIndexData<int64_t> stringifier;
-            return stringifier.get_index_data(obj.get<int64_t>(m_column_ndx), buffer);
+            return stringifier.get_index_data(obj.get<int64_t>(m_column_key), buffer);
         }
     }
     else if (type == type_Bool) {
         if (is_nullable()) {
             GetIndexData<Optional<bool>> stringifier;
-            return stringifier.get_index_data(obj.get<Optional<bool>>(m_column_ndx), buffer);
+            return stringifier.get_index_data(obj.get<Optional<bool>>(m_column_key), buffer);
         }
         else {
             GetIndexData<bool> stringifier;
-            return stringifier.get_index_data(obj.get<bool>(m_column_ndx), buffer);
+            return stringifier.get_index_data(obj.get<bool>(m_column_key), buffer);
         }
     }
     else if (type == type_String) {
         GetIndexData<String> stringifier;
-        return stringifier.get_index_data(obj.get<String>(m_column_ndx), buffer);
+        return stringifier.get_index_data(obj.get<String>(m_column_key), buffer);
     }
     else if (type == type_Timestamp) {
         GetIndexData<Timestamp> stringifier;
-        return stringifier.get_index_data(obj.get<Timestamp>(m_column_ndx), buffer);
+        return stringifier.get_index_data(obj.get<Timestamp>(m_column_key), buffer);
     }
     // It should not be possible to reach this line through public Core API
     REALM_ASSERT_RELEASE(false);
@@ -689,7 +692,7 @@ IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 
 ref_type StringIndex::create_empty(Allocator& alloc)
 {
-    return StringIndex(ClusterColumn(nullptr, 0), alloc).get_ref(); // Throws
+    return StringIndex(ClusterColumn(nullptr, {}), alloc).get_ref(); // Throws
 }
 
 void StringIndex::set_target(const ClusterColumn& target_column) noexcept
@@ -1552,10 +1555,10 @@ void StringIndex::verify_entries(const ClusterColumn& column) const
 
     auto it = column.begin();
     auto end = column.end();
-    auto col_ndx = column.get_column_ndx();
+    auto col = column.get_column_key();
     while (it != end) {
         Key key = it->get_key();
-        T value = it->get<T>(col_ndx);
+        T value = it->get<T>(col);
 
         find_all(results, value);
 

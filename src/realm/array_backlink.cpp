@@ -19,34 +19,52 @@
 #include <realm/array_backlink.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/table.hpp>
+#include <realm/group.hpp>
 
 using namespace realm;
 
-void ArrayBacklink::nullify_fwd_links(size_t ndx)
+// nullify forward links corresponding to any backward links at index 'ndx'.
+void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
 {
     uint64_t value = Array::get(ndx);
     if (value != 0) {
+        // Naming: Links go from source to target.
+        // Backlinks go from target to source.
+        // This array holds backlinks, hence it is the target.
+        // The table which holds the corresponding fwd links is the source.
+
+        // determine target table, column and key.
         auto cluster = dynamic_cast<Cluster*>(get_parent());
-        size_t col_ndx = get_ndx_in_parent() - 1;
-        Key target_key_value = cluster->get_real_key(ndx);
+        const Table* target_table = cluster->m_tree_top.get_owner();
+        size_t target_col_ndx = get_ndx_in_parent() - 1;
+        auto target_col_key = target_table->ndx2colkey(target_col_ndx);
 
-        const Spec& spec = cluster->m_tree_top.get_spec();
+        Key target_key = cluster->get_real_key(ndx);
 
-        TableRef target_table =
-            _impl::TableFriend::get_opposite_link_table(*cluster->m_tree_top.get_owner(), col_ndx);
-        size_t origin_col = spec.get_origin_column_ndx(col_ndx);
+        // determine the source table/col - which is the one holding the forward links
+        // FIXME: May have to be moved to Table so that we don't have spec access here.
+        // FIXME: This mix of using keys and indexes are not good.
+        TableRef source_table = _impl::TableFriend::get_opposite_link_table(*target_table, target_col_key);
+        const Spec& target_spec = cluster->m_tree_top.get_spec();
+        ColKey source_col_key = target_spec.get_origin_column_key(target_col_ndx);
 
-        auto clear_link = [&target_table, origin_col, target_key_value](Key origin_key) {
-            Obj obj = target_table->get_object(origin_key);
-            obj.nullify_link(origin_col, target_key_value);
+        // helper which will clear fwd link residing in source table/column/key
+        // and pointing to target_key.
+        auto clear_link = [&source_table, source_col_key, target_key, &state](Key source_key) {
+            Obj obj = source_table->get_object(source_key);
+            obj.nullify_link(source_col_key, target_key);
+            if (state.track_link_nullifications) {
+                state.links.push_back({source_table, source_col_key, source_key, target_key});
+            }
         };
 
+        // Now follow all backlinks to their origin and clear forward links.
         if ((value & 1) != 0) {
+            // just a single one
             clear_link(Key(value >> 1));
         }
         else {
-            // There is more than one backlink
-            // Iterate through them all
+            // There is more than one backlink - Iterate through them all
             ref_type ref = to_ref(value);
             Array backlink_list(m_alloc);
             backlink_list.init_from_ref(ref);
@@ -87,7 +105,8 @@ void ArrayBacklink::add(size_t ndx, Key key)
     backlink_list.add(key.value); // Throws
 }
 
-void ArrayBacklink::remove(size_t ndx, Key key)
+// Return true if the last link was removed
+bool ArrayBacklink::remove(size_t ndx, Key key)
 {
     int64_t value = Array::get(ndx);
     REALM_ASSERT(value != 0);
@@ -97,7 +116,7 @@ void ArrayBacklink::remove(size_t ndx, Key key)
     if ((value & 1) != 0) {
         REALM_ASSERT_3(value >> 1, ==, key.value);
         set(ndx, 0);
-        return;
+        return true;
     }
 
     // if there is a list of backlinks we have to find
@@ -118,6 +137,8 @@ void ArrayBacklink::remove(size_t ndx, Key key)
 
         set(ndx, key_value << 1 | 1);
     }
+
+    return false;
 }
 
 size_t ArrayBacklink::get_backlink_count(size_t ndx) const

@@ -68,7 +68,7 @@ public:
     }
 
     // These two methods are overridden by TableView and LinkView.
-    virtual uint_fast64_t sync_if_needed() const = 0;
+    virtual TableVersions sync_if_needed() const = 0;
     virtual bool is_in_sync() const = 0;
     void check_cookie() const
     {

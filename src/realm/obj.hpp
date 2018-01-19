@@ -54,6 +54,7 @@ class ConstObj {
 public:
     ConstObj()
         : m_tree_top(nullptr)
+        , m_valid(false)
         , m_row_ndx(size_t(-1))
         , m_storage_version(-1)
         , m_instance_version(-1)
@@ -63,7 +64,6 @@ public:
 
     Allocator& get_alloc() const;
 
-    int cmp(const ConstObj& other, size_t col_ndx) const;
     bool operator==(const ConstObj& other) const;
 
     Key get_key() const
@@ -78,29 +78,29 @@ public:
     void remove();
 
     template <typename U>
-    U get(size_t col_ndx) const;
+    U get(ColKey col_key) const;
 
     template <typename U>
     U get(StringData col_name) const
     {
-        return get<U>(get_column_index(col_name));
+        return get<U>(get_column_key(col_name));
     }
+    int cmp(const ConstObj& other, ColKey col_key) const;
 
     template <typename U>
-    ConstList<U> get_list(size_t col_ndx) const;
+    ConstList<U> get_list(ColKey col_key) const;
     template <typename U>
-    ConstListPtr<U> get_list_ptr(size_t col_ndx) const;
+    ConstListPtr<U> get_list_ptr(ColKey col_key) const;
 
-    ConstLinkList get_linklist(size_t col_ndx);
-    ConstLinkListPtr get_linklist_ptr(size_t col_ndx);
+    ConstLinkList get_linklist(ColKey col_key);
+    ConstLinkListPtr get_linklist_ptr(ColKey col_key);
 
-    size_t get_link_count(size_t col_ndx) const;
+    size_t get_link_count(ColKey col_key) const;
 
-    bool is_null(size_t col_ndx) const;
-    size_t get_backlink_count(const Table& origin, size_t origin_col_ndx) const;
-    Key get_backlink(const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const;
-    size_t get_backlink_count(size_t backlink_col_ndx) const;
-    Key get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) const;
+    bool is_null(ColKey col_key) const;
+    bool has_backlinks(bool only_strong_links) const;
+    size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
+    Key get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const;
 
     // To be used by the query system when a single object should
     // be tested. Will allow a function to be called in the context
@@ -117,13 +117,17 @@ protected:
     friend class ConstListBase;
     friend class ConstLinkListIf;
     friend class LinkList;
+    friend class LinkMap;
+    friend class TableViewBase;
 
     const ClusterTree* m_tree_top;
     Key m_key;
+    mutable bool m_valid;
     mutable MemRef m_mem;
     mutable size_t m_row_ndx;
     mutable uint64_t m_storage_version;
     mutable uint64_t m_instance_version;
+    bool is_in_sync() const;
     bool update_if_needed() const;
     void update(ConstObj other) const
     {
@@ -135,11 +139,18 @@ protected:
     template <class T>
     bool do_is_null(size_t col_ndx) const;
 
-    size_t get_column_index(StringData col_name) const;
+    ColKey get_column_key(StringData col_name) const;
     TableKey get_table_key() const;
-    TableRef get_target_table(size_t col_ndx) const;
+    TableRef get_target_table(ColKey col_key) const;
+
+    template <typename U>
+    U _get(size_t col_ndx) const;
+
     template <class T>
     int cmp(const ConstObj& other, size_t col_ndx) const;
+    int cmp(const ConstObj& other, size_t col_ndx) const;
+    size_t get_backlink_count(size_t backlink_col_ndx) const;
+    Key get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) const;
 };
 
 
@@ -152,29 +163,29 @@ public:
     Obj(ClusterTree* tree_top, ref_type ref, Key key, size_t row_ndx);
 
     template <typename U>
-    Obj& set(size_t col_ndx, U value, bool is_default = false);
-    Obj& set_null(size_t col_ndx, bool is_default = false);
+    Obj& set(ColKey col_key, U value, bool is_default = false);
+    Obj& set_null(ColKey col_key, bool is_default = false);
 
-    Obj& add_int(size_t col_ndx, int64_t value);
-
-    template <typename U>
-    Obj& set_list_values(size_t col_ndx, const std::vector<U>& values);
+    Obj& add_int(ColKey col_key, int64_t value);
 
     template <typename U>
-    std::vector<U> get_list_values(size_t col_ndx);
+    Obj& set_list_values(ColKey col_key, const std::vector<U>& values);
+
+    template <typename U>
+    std::vector<U> get_list_values(ColKey col_key);
 
     template <class Head, class... Tail>
     Obj& set_all(Head v, Tail... tail);
 
     template <typename U>
-    List<U> get_list(size_t col_ndx);
+    List<U> get_list(ColKey col_key);
     template <typename U>
-    ListPtr<U> get_list_ptr(size_t col_ndx);
+    ListPtr<U> get_list_ptr(ColKey col_key);
 
-    LinkList get_linklist(size_t col_ndx);
-    LinkListPtr get_linklist_ptr(size_t col_ndx);
+    LinkList get_linklist(ColKey col_key);
+    LinkListPtr get_linklist_ptr(ColKey col_key);
 
-    ListBasePtr get_listbase_ptr(size_t col_ndx, DataType type);
+    ListBasePtr get_listbase_ptr(ColKey col_key, DataType type);
 
 private:
     friend class Cluster;
@@ -196,6 +207,7 @@ private:
     Obj& _set(size_t col_ndx, Val v);
     template <class Head, class... Tail>
     Obj& _set(size_t col_ndx, Head v, Tail... tail);
+    ColKey ndx2colkey(size_t col_ndx);
     bool update_if_needed() const;
     bool is_writeable() const
     {
@@ -203,61 +215,68 @@ private:
     }
     void ensure_writeable();
     void bump_content_version();
+    void bump_both_versions();
     template <class T>
     void do_set_null(size_t col_ndx);
 
-    void set_int(size_t col_ndx, int64_t value);
-    void add_backlink(size_t backlink_col, Key origin_key);
-    void remove_one_backlink(size_t backlink_col, Key origin_key);
-    void nullify_link(size_t origin_col, Key target_key);
-    bool update_backlinks(size_t col_ndx, Key old_key, Key new_key, CascadeState& state);
+    void set_int(ColKey col_key, int64_t value);
+    void add_backlink(ColKey backlink_col, Key origin_key);
+    bool remove_one_backlink(ColKey backlink_col, Key origin_key);
+    void nullify_link(ColKey origin_col, Key target_key);
+    bool update_backlinks(ColKey col_key, Key old_key, Key new_key, CascadeState& state);
 };
 
 
 template <>
-inline Optional<float> ConstObj::get<Optional<float>>(size_t col_ndx) const
+inline Optional<float> ConstObj::get<Optional<float>>(ColKey col_key) const
 {
-    float f = get<float>(col_ndx);
+    float f = get<float>(col_key);
     return null::is_null_float(f) ? util::none : util::make_optional(f);
 }
 
 template <>
-inline Optional<double> ConstObj::get<Optional<double>>(size_t col_ndx) const
+inline Optional<double> ConstObj::get<Optional<double>>(ColKey col_key) const
 {
-    double f = get<double>(col_ndx);
+    double f = get<double>(col_key);
     return null::is_null_float(f) ? util::none : util::make_optional(f);
 }
 
 template <>
-Obj& Obj::set(size_t, int64_t value, bool is_default);
+Obj& Obj::set(ColKey, int64_t value, bool is_default);
 
 template <>
-Obj& Obj::set(size_t, Key value, bool is_default);
+Obj& Obj::set(ColKey, Key value, bool is_default);
 
 
 template <>
-inline Obj& Obj::set(size_t col_ndx, int value, bool is_default)
+inline Obj& Obj::set(ColKey col_key, int value, bool is_default)
 {
-    return set(col_ndx, int_fast64_t(value), is_default);
+    return set(col_key, int_fast64_t(value), is_default);
 }
 
 template <>
-inline Obj& Obj::set(size_t col_ndx, const char* str, bool is_default)
+inline Obj& Obj::set(ColKey col_key, const char* str, bool is_default)
 {
-    return set(col_ndx, StringData(str), is_default);
+    return set(col_key, StringData(str), is_default);
 }
 
 template <>
-inline Obj& Obj::set(size_t col_ndx, char* str, bool is_default)
+inline Obj& Obj::set(ColKey col_key, char* str, bool is_default)
 {
-    return set(col_ndx, StringData(str), is_default);
+    return set(col_key, StringData(str), is_default);
+}
+
+template <>
+inline Obj& Obj::set(ColKey col_key, realm::null, bool is_default)
+{
+    return set_null(col_key, is_default);
 }
 
 template <typename U>
-Obj& Obj::set_list_values(size_t col_ndx, const std::vector<U>& values)
+Obj& Obj::set_list_values(ColKey col_key, const std::vector<U>& values)
 {
     size_t sz = values.size();
-    auto list = get_list<U>(col_ndx);
+    auto list = get_list<U>(col_key);
     list.resize(sz);
     for (size_t i = 0; i < sz; i++)
         list.set(i, values[i]);
@@ -266,10 +285,10 @@ Obj& Obj::set_list_values(size_t col_ndx, const std::vector<U>& values)
 }
 
 template <typename U>
-std::vector<U> Obj::get_list_values(size_t col_ndx)
+std::vector<U> Obj::get_list_values(ColKey col_key)
 {
     std::vector<U> values;
-    auto list = get_list<U>(col_ndx);
+    auto list = get_list<U>(col_key);
     for (auto v : list)
         values.push_back(v);
 
@@ -279,13 +298,13 @@ std::vector<U> Obj::get_list_values(size_t col_ndx)
 template <class Val>
 inline Obj& Obj::_set(size_t col_ndx, Val v)
 {
-    return set(col_ndx, v);
+    return set(ndx2colkey(col_ndx), v);
 }
 
 template <class Head, class... Tail>
 inline Obj& Obj::_set(size_t col_ndx, Head v, Tail... tail)
 {
-    set(col_ndx, v);
+    set(ndx2colkey(col_ndx), v);
     return _set(col_ndx + 1, tail...);
 }
 

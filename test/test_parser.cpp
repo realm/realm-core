@@ -275,8 +275,8 @@ TEST(Parser_basic_serialisation)
     t->add_column(type_Int, "age");
     t->add_column(type_String, "name");
     t->add_column(type_Double, "fees");
-    size_t link_col_ndx = t->add_column_link(type_Link, "buddy", *t);
-    size_t time_col_ndx = t->add_column(type_Timestamp, "time", true);
+    auto link_col = t->add_column_link(type_Link, "buddy", *t);
+    auto time_col = t->add_column(type_Timestamp, "time", true);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
     std::vector<Key> keys;
@@ -285,12 +285,12 @@ TEST(Parser_basic_serialisation)
     for (size_t i = 0; i < t->size(); ++i) {
         t->get_object(keys[i]).set_all(int(i), StringData(names[i]), fees[i]);
     }
-    t->get_object(keys[0]).set(time_col_ndx, Timestamp(realm::null()));
-    t->get_object(keys[1]).set(time_col_ndx, Timestamp(1512130073, 0));   // 2017/12/02 @ 12:47am (UTC)
-    t->get_object(keys[2]).set(time_col_ndx, Timestamp(1512130073, 505)); // with nanoseconds
-    t->get_object(keys[3]).set(time_col_ndx, Timestamp(1, 2));
-    t->get_object(keys[4]).set(time_col_ndx, Timestamp(0, 0));
-    t->get_object(keys[0]).set(link_col_ndx, keys[1]);
+    t->get_object(keys[0]).set(time_col, Timestamp(realm::null()));
+    t->get_object(keys[1]).set(time_col, Timestamp(1512130073, 0));   // 2017/12/02 @ 12:47am (UTC)
+    t->get_object(keys[2]).set(time_col, Timestamp(1512130073, 505)); // with nanoseconds
+    t->get_object(keys[3]).set(time_col, Timestamp(1, 2));
+    t->get_object(keys[4]).set(time_col, Timestamp(0, 0));
+    t->get_object(keys[0]).set(link_col, keys[1]);
 
     Query q = t->where();
 
@@ -899,25 +899,25 @@ TEST(Parser_collection_aggregates)
     Group g;
     TableRef people = g.add_table("class_Person");
     TableRef courses = g.add_table("class_Course");
-    size_t title_col_ndx = courses->add_column(type_String, "title");
-    size_t credits_col_ndx = courses->add_column(type_Double, "credits");
-    size_t hours_col_ndx = courses->add_column(type_Int, "hours_required");
-    size_t fail_col_ndx = courses->add_column(type_Float, "failure_percentage");
-    size_t int_col_ndx = people->add_column(type_Int, "age");
-    size_t str_col_ndx = people->add_column(type_String, "name");
-    size_t courses_col_ndx = people->add_column_link(type_LinkList, "courses_taken", *courses);
-    size_t binary_col_ndx = people->add_column(type_Binary, "hash");
+    auto title_col = courses->add_column(type_String, "title");
+    auto credits_col = courses->add_column(type_Double, "credits");
+    auto hours_col = courses->add_column(type_Int, "hours_required");
+    auto fail_col = courses->add_column(type_Float, "failure_percentage");
+    auto int_col = people->add_column(type_Int, "age");
+    auto str_col = people->add_column(type_String, "name");
+    auto courses_col = people->add_column_link(type_LinkList, "courses_taken", *courses);
+    auto binary_col = people->add_column(type_Binary, "hash");
     using info_t = std::pair<std::string, int64_t>;
     std::vector<info_t> person_info
         = {{"Billy", 18}, {"Bob", 17}, {"Joe", 19}, {"Jane", 20}, {"Joel", 18}};
     size_t j = 0;
     for (info_t i : person_info) {
         Obj obj = people->create_object();
-        obj.set(str_col_ndx, StringData(i.first));
-        obj.set(int_col_ndx, i.second);
+        obj.set(str_col, StringData(i.first));
+        obj.set(int_col, i.second);
         std::string hash(j++, 'a'); // a repeated j times
         BinaryData payload(hash);
-        obj.set(binary_col_ndx, payload);
+        obj.set(binary_col, payload);
     }
     using cinfo = std::tuple<std::string, double, int64_t, float>;
     std::vector<cinfo> course_info
@@ -927,26 +927,26 @@ TEST(Parser_collection_aggregates)
     for (cinfo course : course_info) {
         Obj obj = courses->create_object();
         course_keys.push_back(obj.get_key());
-        obj.set(title_col_ndx, StringData(std::get<0>(course)));
-        obj.set(credits_col_ndx, std::get<1>(course));
-        obj.set(hours_col_ndx, std::get<2>(course));
-        obj.set(fail_col_ndx, std::get<3>(course));
+        obj.set(title_col, StringData(std::get<0>(course)));
+        obj.set(credits_col, std::get<1>(course));
+        obj.set(hours_col, std::get<2>(course));
+        obj.set(fail_col, std::get<3>(course));
     }
     auto it = people->begin();
-    LinkListPtr billy_courses = it->get_linklist_ptr(courses_col_ndx);
+    LinkListPtr billy_courses = it->get_linklist_ptr(courses_col);
     billy_courses->add(course_keys[0]);
     billy_courses->add(course_keys[1]);
     billy_courses->add(course_keys[4]);
     ++it;
-    LinkListPtr bob_courses = it->get_linklist_ptr(courses_col_ndx);
+    LinkListPtr bob_courses = it->get_linklist_ptr(courses_col);
     bob_courses->add(course_keys[0]);
     bob_courses->add(course_keys[1]);
     bob_courses->add(course_keys[1]);
     ++it;
-    LinkListPtr joe_courses = it->get_linklist_ptr(courses_col_ndx);
+    LinkListPtr joe_courses = it->get_linklist_ptr(courses_col);
     joe_courses->add(course_keys[3]);
     ++it;
-    LinkListPtr jane_courses = it->get_linklist_ptr(courses_col_ndx);
+    LinkListPtr jane_courses = it->get_linklist_ptr(courses_col);
     jane_courses->add(course_keys[2]);
     jane_courses->add(course_keys[4]);
 

@@ -109,10 +109,11 @@ public:
         size_t m_current_index = 0;
     };
 
-    ClusterNode(Allocator& allocator, const ClusterTree& tree_top)
+    ClusterNode(int64_t offset, Allocator& allocator, const ClusterTree& tree_top)
         : Array(allocator)
         , m_tree_top(tree_top)
         , m_keys(allocator)
+        , m_offset(offset)
     {
         m_keys.set_parent(this, 0);
     }
@@ -174,18 +175,31 @@ public:
 
     virtual void dump_objects(int64_t key_offset, std::string lead) const = 0;
 
+    Key get_real_key(size_t ndx) const
+    {
+        return Key(m_keys.get(ndx) + m_offset);
+    }
+    void set_offset(int64_t offs)
+    {
+        m_offset = offs;
+    }
+    int64_t get_offset() const
+    {
+        return m_offset;
+    }
+
 protected:
     friend class ArrayBacklink;
 
     const ClusterTree& m_tree_top;
     Array m_keys;
+    int64_t m_offset;
 };
 
 class Cluster : public ClusterNode {
 public:
     Cluster(int64_t offset, Allocator& allocator, const ClusterTree& tree_top)
-        : ClusterNode(allocator, tree_top)
-        , m_offset(offset)
+        : ClusterNode(offset, allocator, tree_top)
     {
     }
     ~Cluster() override;
@@ -231,26 +245,10 @@ public:
     {
         return &m_keys;
     }
-    Key get_real_key(size_t ndx) const
-    {
-        return Key(m_keys.get(ndx) + m_offset);
-    }
-    void set_offset(int64_t offs)
-    {
-        m_offset = offs;
-    }
-    int64_t get_offset() const
-    {
-        return m_offset;
-    }
-
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
 private:
     friend class ClusterTree;
-
-    int64_t m_offset;
-
     void insert_row(size_t ndx, Key k);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
     template <class T>

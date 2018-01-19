@@ -82,7 +82,7 @@ public:
     {
         return m_const_obj->get_key();
     }
-    bool is_valid() const
+    bool is_attached() const
     {
         return m_const_obj->is_valid();
     }
@@ -90,9 +90,9 @@ public:
     {
         return m_const_obj->get_table();
     }
-    size_t get_col_ndx() const
+    ColKey get_col_key() const
     {
-        return m_col_ndx;
+        return m_col_key;
     }
 
 protected:
@@ -100,12 +100,12 @@ protected:
     friend class ListIterator;
 
     const ConstObj* m_const_obj = nullptr;
-    const size_t m_col_ndx;
+    const ColKey m_col_key;
 
     mutable std::vector<size_t> m_deleted;
 
-    ConstListBase(size_t col_ndx)
-        : m_col_ndx(col_ndx)
+    ConstListBase(ColKey col_key)
+        : m_col_key(col_key)
     {
     }
     virtual void init_from_parent() const = 0;
@@ -256,8 +256,12 @@ public:
      */
     size_t size() const override
     {
+        if (!is_attached())
+            return 0;
+
         update_if_needed();
-        return m_valid ? m_leaf->size() : 0;
+
+        return is_null() ? 0 : m_leaf->size();
     }
     bool is_null() const override
     {
@@ -287,8 +291,8 @@ protected:
     mutable std::unique_ptr<LeafType> m_leaf;
     mutable bool m_valid = false;
 
-    ConstListIf(size_t col_ndx, Allocator& alloc)
-        : ConstListBase(col_ndx)
+    ConstListIf(ColKey col_key, Allocator& alloc)
+        : ConstListBase(col_key)
         , m_leaf(new LeafType(alloc))
     {
         m_leaf->set_parent(this, 0); // ndx not used, implicit in m_owner
@@ -306,7 +310,7 @@ protected:
     void init_from_parent() const override
     {
         ref_type ref = get_child_ref(0);
-        if (ref && (!m_valid || ref != m_leaf->get_ref())) {
+        if (ref) {
             m_leaf->init_from_ref(ref);
             m_valid = true;
         }
@@ -316,7 +320,7 @@ protected:
 template <class T>
 class ConstList : public ConstListIf<T> {
 public:
-    ConstList(const ConstObj& owner, size_t col_ndx);
+    ConstList(const ConstObj& owner, ColKey col_key);
     ConstList(ConstList&& other)
         : ConstListIf<T>(std::move(other))
         , m_obj(std::move(other.m_obj))
@@ -353,7 +357,7 @@ public:
     using ConstListIf<T>::m_leaf;
     using ConstListIf<T>::get;
 
-    List(const Obj& owner, size_t col_ndx);
+    List(const Obj& owner, ColKey col_key);
     List(List&& other)
         : ConstListIf<T>(std::move(other))
         , m_obj(std::move(other.m_obj))
@@ -363,7 +367,7 @@ public:
 
     void update_child_ref(size_t, ref_type new_ref) override
     {
-        m_obj.set_int(ConstListBase::m_col_ndx, from_ref(new_ref));
+        m_obj.set_int(ConstListBase::m_col_key, from_ref(new_ref));
     }
 
     void create()
@@ -394,6 +398,7 @@ public:
             insert_null(current_size++);
         }
         remove(new_size, current_size);
+        m_obj.bump_both_versions();
     }
     void add(T value)
     {
@@ -417,6 +422,7 @@ public:
     {
         insert_null(ndx);
         set(ndx, value);
+        m_obj.bump_both_versions();
     }
     T remove(ListIterator<T>& it)
     {
@@ -431,7 +437,7 @@ public:
         T old = get(ndx);
         m_leaf->erase(ndx);
         ConstListBase::adj_remove(ndx);
-        m_obj.bump_content_version();
+        m_obj.bump_both_versions();
 
         return old;
     }
@@ -477,7 +483,7 @@ public:
             ConstListBase::clear_repl(repl);
         }
         m_leaf->truncate_and_destroy_children(0);
-        m_obj.bump_content_version();
+        m_obj.bump_both_versions();
     }
 
 protected:
@@ -523,16 +529,16 @@ public:
     ConstObj get(size_t link_ndx) const;
 
 protected:
-    ConstLinkListIf(size_t col_ndx, Allocator& alloc)
-        : ConstListIf<Key>(col_ndx, alloc)
+    ConstLinkListIf(ColKey col_key, Allocator& alloc)
+        : ConstListIf<Key>(col_key, alloc)
     {
     }
 };
 
 class ConstLinkList : public ConstLinkListIf {
 public:
-    ConstLinkList(const ConstObj& obj, size_t col_ndx)
-        : ConstLinkListIf(col_ndx, obj.get_alloc())
+    ConstLinkList(const ConstObj& obj, ColKey col_key)
+        : ConstLinkListIf(col_key, obj.get_alloc())
         , m_obj(obj)
     {
         this->set_obj(&m_obj);
@@ -556,18 +562,22 @@ class LinkList : public List<Key>, public ObjList {
 public:
     using HandoverPatch = LinkListHandoverPatch;
 
-    LinkList(const Obj& owner, size_t col_ndx)
-        : List<Key>(owner, col_ndx)
+    LinkList(const Obj& owner, ColKey col_key)
+        : List<Key>(owner, col_key)
         , ObjList(*this->m_leaf, &get_target_table())
     {
     }
     LinkListPtr clone() const
     {
-        return std::make_unique<LinkList>(m_obj, m_col_ndx);
+        return std::make_unique<LinkList>(m_obj, m_col_key);
     }
     Table& get_target_table() const
     {
-        return *m_obj.get_target_table(m_col_ndx);
+        return *m_obj.get_target_table(m_col_key);
+    }
+    bool is_in_sync() const override
+    {
+        return m_obj.is_in_sync();
     }
     size_t size() const override
     {
@@ -581,9 +591,9 @@ public:
     Obj get(size_t link_ndx);
 
     TableView get_sorted_view(SortDescriptor order) const;
-    TableView get_sorted_view(size_t column_index, bool ascending = true) const;
+    TableView get_sorted_view(ColKey column_key, bool ascending = true) const;
     void sort(SortDescriptor&& order);
-    void sort(size_t column, bool ascending = true);
+    void sort(ColKey column, bool ascending = true);
     void remove_target_row(size_t link_ndx);
     void remove_all_target_rows();
 
@@ -592,63 +602,62 @@ private:
     friend class TableViewBase;
     friend class Query;
 
-    uint_fast64_t sync_if_needed() const override;
-    bool is_in_sync() const override;
+    TableVersions sync_if_needed() const override;
 
     static void generate_patch(const LinkList* ref, std::unique_ptr<LinkListHandoverPatch>& patch);
     static LinkListPtr create_from_and_consume_patch(std::unique_ptr<LinkListHandoverPatch>& patch, Group& group);
 };
 
 template <typename U>
-ConstList<U> ConstObj::get_list(size_t col_ndx) const
+ConstList<U> ConstObj::get_list(ColKey col_key) const
 {
-    return ConstList<U>(*this, col_ndx);
+    return ConstList<U>(*this, col_key);
 }
 
 template <typename U>
-ConstListPtr<U> ConstObj::get_list_ptr(size_t col_ndx) const
+ConstListPtr<U> ConstObj::get_list_ptr(ColKey col_key) const
 {
     Obj obj(*this);
-    return std::const_pointer_cast<const List<U>>(obj.get_list_ptr<U>(col_ndx));
+    return std::const_pointer_cast<const List<U>>(obj.get_list_ptr<U>(col_key));
 }
 
 template <typename U>
-List<U> Obj::get_list(size_t col_ndx)
+List<U> Obj::get_list(ColKey col_key)
 {
-    return List<U>(*this, col_ndx);
+    return List<U>(*this, col_key);
 }
 
 template <typename U>
-ListPtr<U> Obj::get_list_ptr(size_t col_ndx)
+ListPtr<U> Obj::get_list_ptr(ColKey col_key)
 {
-    return std::make_unique<List<U>>(*this, col_ndx);
+    return std::make_unique<List<U>>(*this, col_key);
 }
 
 template <>
-inline ListPtr<Key> Obj::get_list_ptr(size_t col_ndx)
+inline ListPtr<Key> Obj::get_list_ptr(ColKey col_key)
 {
-    return get_linklist_ptr(col_ndx);
+    return get_linklist_ptr(col_key);
 }
 
-inline ConstLinkList ConstObj::get_linklist(size_t col_ndx)
+inline ConstLinkList ConstObj::get_linklist(ColKey col_key)
 {
-    return ConstLinkList(*this, col_ndx);
+    return ConstLinkList(*this, col_key);
 }
 
-inline ConstLinkListPtr ConstObj::get_linklist_ptr(size_t col_ndx)
+inline ConstLinkListPtr ConstObj::get_linklist_ptr(ColKey col_key)
 {
     Obj obj(*this);
-    return obj.get_linklist_ptr(col_ndx);
+    return obj.get_linklist_ptr(col_key);
 }
 
-inline LinkList Obj::get_linklist(size_t col_ndx)
+inline LinkList Obj::get_linklist(ColKey col_key)
 {
-    return LinkList(*this, col_ndx);
+    return LinkList(*this, col_key);
 }
 
-inline LinkListPtr Obj::get_linklist_ptr(size_t col_ndx)
+inline LinkListPtr Obj::get_linklist_ptr(ColKey col_key)
 {
-    return std::make_unique<LinkList>(*this, col_ndx);
+    return std::make_unique<LinkList>(*this, col_key);
 }
 }
 

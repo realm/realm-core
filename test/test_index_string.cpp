@@ -21,8 +21,6 @@
 
 #include <realm.hpp>
 #include <realm/index_string.hpp>
-#include <realm/column_linklist.hpp>
-#include <realm/column_string.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/util/to_string.hpp>
 #include <set>

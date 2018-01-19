@@ -36,6 +36,7 @@ void LinkColumnBase::verify(const Table& table, size_t col_ndx) const
 {
 #ifdef REALM_DEBUG
     IntegerColumn::verify(table, col_ndx);
+    auto col_key = table.ndx2colkey(col_ndx);
 
     // Check that the backlink column specifies the right origin
     REALM_ASSERT(&m_backlink_column->get_origin_table() == &table);
@@ -49,7 +50,7 @@ void LinkColumnBase::verify(const Table& table, size_t col_ndx) const
 
     // Check that m_backlink_column is the column specified by the target table spec
     const Spec& target_spec = tf::get_spec(*m_target_table);
-    target_spec.find_backlink_column(table.get_key(), col_ndx);
+    target_spec.find_backlink_column(table.get_key(), col_key);
 #else
     static_cast<void>(table);
     static_cast<void>(col_ndx);

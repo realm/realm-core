@@ -146,9 +146,9 @@ StringData get_printable_table_name(const Table& table)
 
 struct PropertyExpression
 {
-    std::vector<size_t> indexes;
+    std::vector<ColKey> col_keys;
     std::function<Table *()> table_getter;
-    size_t col_ndx;
+    ColKey col_key;
     DataType col_type;
 
     PropertyExpression(Query &query, const std::string &key_path_string)
@@ -156,29 +156,29 @@ struct PropertyExpression
         KeyPath key_path = key_path_from_string(key_path_string);
         TableRef cur_table = query.get_table();;
         for (size_t index = 0; index < key_path.size(); index++) {
-            size_t cur_col_ndx = cur_table->get_column_index(key_path[index]);
+            ColKey cur_col_key = cur_table->get_column_key(key_path[index]);
 
             StringData object_name = get_printable_table_name(*cur_table);
 
-            precondition(cur_col_ndx != realm::not_found,
+            precondition(cur_table->valid_column(cur_col_key),
                          util::format("No property '%1' on object of type '%2'", key_path[index], object_name));
 
-            DataType cur_col_type = cur_table->get_column_type(cur_col_ndx);
+            DataType cur_col_type = cur_table->get_column_type(cur_col_key);
             if (index != key_path.size() - 1) {
                 precondition(cur_col_type == type_Link || cur_col_type == type_LinkList,
                              util::format("Property '%1' is not a link in object of type '%2'", key_path[index], object_name));
-                indexes.push_back(cur_col_ndx);
-                cur_table = cur_table->get_link_target(cur_col_ndx);
+                col_keys.push_back(cur_col_key);
+                cur_table = cur_table->get_link_target(cur_col_key);
             }
             else {
-                col_ndx = cur_col_ndx;
+                col_key = cur_col_key;
                 col_type = cur_col_type;
             }
         }
 
         table_getter = [&] {
             auto& tbl = query.get_table();
-            for (size_t col : indexes) {
+            for (ColKey col : col_keys) {
                 tbl->link(col); // mutates m_link_chain on table
             }
             return tbl;
@@ -212,12 +212,11 @@ struct CollectionOperatorExpression
     std::function<Table *()> table_getter;
     PropertyExpression pe;
     parser::Expression::KeyPathOp op;
-    size_t post_link_col_ndx;
+    ColKey post_link_col_key;
     DataType post_link_col_type;
     CollectionOperatorExpression(PropertyExpression exp, parser::Expression::KeyPathOp o, std::string suffix_path)
     : pe(exp)
     , op(o)
-    , post_link_col_ndx(realm::not_found)
     {
         table_getter = pe.table_getter;
 
@@ -227,12 +226,12 @@ struct CollectionOperatorExpression
         if (requires_suffix_path) {
             Table* pre_link_table = pe.table_getter();
             REALM_ASSERT(pre_link_table);
-            StringData list_property_name = pre_link_table->get_column_name(pe.col_ndx);
+            StringData list_property_name = pre_link_table->get_column_name(pe.col_key);
             precondition(pe.col_type == type_LinkList,
                          util::format("The '%1' operation must be used on a list property, but '%2' is not a list",
                                       collection_operator_to_str(op), list_property_name));
 
-            TableRef post_link_table = pe.table_getter()->get_link_target(pe.col_ndx);
+            TableRef post_link_table = pe.table_getter()->get_link_target(pe.col_key);
             REALM_ASSERT(post_link_table);
             StringData printable_post_link_table_name = get_printable_table_name(*post_link_table);
 
@@ -245,12 +244,11 @@ struct CollectionOperatorExpression
                          util::format("Unable to use '%1' because collection aggreate operations are only supported "
                                       "for direct properties at this time", suffix_path));
 
-            post_link_col_ndx = pe.table_getter()->get_link_target(pe.col_ndx)->get_column_index(suffix_key_path[0]);
+            post_link_col_key = pe.table_getter()->get_link_target(pe.col_key)->get_column_key(suffix_key_path[0]);
 
-            precondition(post_link_col_ndx != realm::not_found,
-                         util::format("No property '%1' on object of type '%2'",
-                                      suffix_path, printable_post_link_table_name));
-            post_link_col_type = pe.table_getter()->get_link_target(pe.col_ndx)->get_column_type(post_link_col_ndx);
+            precondition(bool(post_link_col_key), util::format("No property '%1' on object of type '%2'", suffix_path,
+                                                               printable_post_link_table_name));
+            post_link_col_type = pe.table_getter()->get_link_target(pe.col_key)->get_column_type(post_link_col_key);
         }
         else {  // !requires_suffix_path
             post_link_col_type = pe.col_type;
@@ -361,19 +359,19 @@ void add_binary_constraint_to_query(Query &query,
                                     BinaryData &&value) {
     switch (op) {
         case Predicate::Operator::BeginsWith:
-            query.begins_with(column.column_ndx(), BinaryData(value));
+            query.begins_with(column.column_key(), BinaryData(value));
             break;
         case Predicate::Operator::EndsWith:
-            query.ends_with(column.column_ndx(), BinaryData(value));
+            query.ends_with(column.column_key(), BinaryData(value));
             break;
         case Predicate::Operator::Contains:
-            query.contains(column.column_ndx(), BinaryData(value));
+            query.contains(column.column_key(), BinaryData(value));
             break;
         case Predicate::Operator::Equal:
-            query.equal(column.column_ndx(), BinaryData(value));
+            query.equal(column.column_key(), BinaryData(value));
             break;
         case Predicate::Operator::NotEqual:
-            query.not_equal(column.column_ndx(), BinaryData(value));
+            query.not_equal(column.column_key(), BinaryData(value));
             break;
         default:
             throw std::logic_error("Unsupported operator for binary queries.");
@@ -386,10 +384,10 @@ void add_binary_constraint_to_query(realm::Query &query,
                                     Columns<Binary> &&column) {
     switch (op) {
         case Predicate::Operator::Equal:
-            query.equal(column.column_ndx(), BinaryData(value));
+            query.equal(column.column_key(), BinaryData(value));
             break;
         case Predicate::Operator::NotEqual:
-            query.not_equal(column.column_ndx(), BinaryData(value));
+            query.not_equal(column.column_key(), BinaryData(value));
             break;
         default:
             throw std::logic_error("Substring comparison not supported for keypath substrings.");
@@ -400,13 +398,13 @@ void add_link_constraint_to_query(realm::Query &query,
                                   Predicate::Operator op,
                                   const PropertyExpression &prop_expr,
                                   Key target_key) {
-    precondition(prop_expr.indexes.empty(), "KeyPath queries not supported for object comparisons.");
+    precondition(prop_expr.col_keys.empty(), "KeyPath queries not supported for object comparisons.");
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
             REALM_FALLTHROUGH;
         case Predicate::Operator::Equal: {
-            size_t col = prop_expr.col_ndx;
+            auto col = prop_expr.col_key;
             query.links_to(col, target_key);
             break;
         }
@@ -430,7 +428,7 @@ template <typename RetType, typename TableGetter>
 struct ColumnGetter {
     static Columns<RetType> convert(TableGetter&& table, const PropertyExpression& expr, Arguments&)
     {
-        return table()->template column<RetType>(expr.col_ndx);
+        return table()->template column<RetType>(expr.col_key);
     }
 };
 
@@ -441,11 +439,15 @@ struct CollectionOperatorGetter {
     }
 };
 
+/*
+
+FIXME: Template instantiation fails
+*/
 template <typename RetType, typename TableGetter>
 struct CollectionOperatorGetter<RetType, TableGetter, aggregate_operations::Minimum<RetType> >{
     static SubColumnAggregate<RetType, aggregate_operations::Minimum<RetType> > convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
     {
-        return table()->template column<Link>(expr.pe.col_ndx).template column<RetType>(expr.post_link_col_ndx).min();
+        return table()->template column<Link>(expr.pe.col_key).template column<RetType>(expr.post_link_col_key).min();
     }
 };
 
@@ -453,7 +455,7 @@ template <typename RetType, typename TableGetter>
 struct CollectionOperatorGetter<RetType, TableGetter, aggregate_operations::Maximum<RetType> >{
     static SubColumnAggregate<RetType, aggregate_operations::Maximum<RetType> > convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
     {
-        return table()->template column<Link>(expr.pe.col_ndx).template column<RetType>(expr.post_link_col_ndx).max();
+        return table()->template column<Link>(expr.pe.col_key).template column<RetType>(expr.post_link_col_key).max();
     }
 };
 
@@ -461,7 +463,7 @@ template <typename RetType, typename TableGetter>
 struct CollectionOperatorGetter<RetType, TableGetter, aggregate_operations::Sum<RetType> >{
     static SubColumnAggregate<RetType, aggregate_operations::Sum<RetType> > convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
     {
-        return table()->template column<Link>(expr.pe.col_ndx).template column<RetType>(expr.post_link_col_ndx).sum();
+        return table()->template column<Link>(expr.pe.col_key).template column<RetType>(expr.post_link_col_key).sum();
     }
 };
 
@@ -469,7 +471,10 @@ template <typename RetType, typename TableGetter>
 struct CollectionOperatorGetter<RetType, TableGetter, aggregate_operations::Average<RetType> >{
     static SubColumnAggregate<RetType, aggregate_operations::Average<RetType> > convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
     {
-        return table()->template column<Link>(expr.pe.col_ndx).template column<RetType>(expr.post_link_col_ndx).average();
+        return table()
+            ->template column<Link>(expr.pe.col_key)
+            .template column<RetType>(expr.post_link_col_key)
+            .average();
     }
 };
 
@@ -477,7 +482,7 @@ template <typename RetType, typename TableGetter>
 struct CollectionOperatorGetter<RetType, TableGetter, LinkCount >{
     static LinkCount convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
     {
-        return table()->template column<Link>(expr.pe.col_ndx).count();
+        return table()->template column<Link>(expr.pe.col_key).count();
     }
 };
 
@@ -485,10 +490,9 @@ template <typename RetType, typename TableGetter>
 struct CollectionOperatorGetter<RetType, TableGetter, SizeOperator<RetType> >{
     static SizeOperator<RetType> convert(TableGetter&& table, const CollectionOperatorExpression& expr, Arguments&)
     {
-        return table()->template column<RetType>(expr.pe.col_ndx).size();
+        return table()->template column<RetType>(expr.pe.col_key).size();
     }
 };
-
 
 
 template <typename RequestedType, typename TableGetter>
@@ -750,7 +754,7 @@ void do_add_comparison_to_query(Query &query, Predicate::Comparison cmp,
 template<typename T>
 void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
-    Columns<T> column = expr.table_getter()->template column<T>(expr.col_ndx);
+    Columns<T> column = expr.table_getter()->template column<T>(expr.col_key);
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.and_query(column != realm::null());
@@ -766,14 +770,14 @@ void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const
 template<>
 void do_add_null_comparison_to_query<Binary>(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
-    precondition(expr.indexes.empty(), "KeyPath queries not supported for data comparisons.");
-    Columns<Binary> column = expr.table_getter()->template column<Binary>(expr.col_ndx);
+    precondition(expr.col_keys.empty(), "KeyPath queries not supported for data comparisons.");
+    Columns<Binary> column = expr.table_getter()->template column<Binary>(expr.col_key);
     switch (op) {
         case Predicate::Operator::NotEqual:
-            query.not_equal(expr.col_ndx, realm::null());
+            query.not_equal(expr.col_key, realm::null());
             break;
         case Predicate::Operator::Equal:
-            query.equal(expr.col_ndx, realm::null());
+            query.equal(expr.col_key, realm::null());
             break;
         default:
             throw std::logic_error("Only 'equal' and 'not equal' operators supported when comparing against 'null'.");
@@ -783,13 +787,13 @@ void do_add_null_comparison_to_query<Binary>(Query &query, Predicate::Operator o
 template<>
 void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
-    precondition(expr.indexes.empty(), "KeyPath queries not supported for object comparisons.");
+    precondition(expr.col_keys.empty(), "KeyPath queries not supported for object comparisons.");
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
             REALM_FALLTHROUGH;
         case Predicate::Operator::Equal:
-            query.and_query(query.get_table()->column<Link>(expr.col_ndx).is_null());
+            query.and_query(query.get_table()->column<Link>(expr.col_key).is_null());
             break;
         default:
             throw std::logic_error("Only 'equal' and 'not equal' operators supported for object comparison.");

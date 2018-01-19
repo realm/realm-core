@@ -27,7 +27,7 @@
 #include <realm/cluster_tree.hpp>
 
 /*
-The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_OldDateTime and
+The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_Timestamp and
 type_Int. When used for integral types, the 64-bit integer is simply casted to a string of 8 bytes through a
 pretty simple "wrapper layer" in all public methods.
 
@@ -113,14 +113,14 @@ using StringConversionBuffer = std::array<char, string_conversion_buffer_size>;
 // field based on the key for the object.
 class ClusterColumn {
 public:
-    ClusterColumn(const ClusterTree* cluster_tree, size_t column_ndx)
+    ClusterColumn(const ClusterTree* cluster_tree, ColKey column_key)
         : m_cluster_tree(cluster_tree)
-        , m_column_ndx(column_ndx)
+        , m_column_key(column_key)
     {
     }
     ClusterColumn(const ClusterColumn& other)
         : m_cluster_tree(other.m_cluster_tree)
-        , m_column_ndx(other.m_column_ndx)
+        , m_column_key(other.m_column_key)
     {
     }
     size_t size() const
@@ -139,16 +139,16 @@ public:
 
 
     DataType get_data_type() const;
-    size_t get_column_ndx() const
+    ColKey get_column_key() const
     {
-        return m_column_ndx;
+        return m_column_key;
     }
     bool is_nullable() const;
     StringData get_index_data(Key key, StringConversionBuffer& buffer) const;
 
 private:
     const ClusterTree* m_cluster_tree;
-    size_t m_column_ndx;
+    ColKey m_column_key;
 };
 
 class StringIndex {
@@ -157,6 +157,11 @@ public:
     StringIndex(ref_type, ArrayParent*, size_t ndx_in_parent, const ClusterColumn& target_column, Allocator&);
     ~StringIndex() noexcept
     {
+    }
+
+    ColKey get_column_key() const
+    {
+        return m_target_column.get_column_key();
     }
 
     template <class T>
@@ -182,7 +187,7 @@ public:
     size_t get_ndx_in_parent() const noexcept;
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
     void update_from_parent(size_t old_baseline) noexcept;
-    void refresh_accessor_tree(size_t, const Spec&);
+    void refresh_accessor_tree();
     ref_type get_ref() const noexcept;
 
     // StringIndex interface:
@@ -317,8 +322,8 @@ private:
 
 class SortedListComparator {
 public:
-    SortedListComparator(const ClusterTree* cluster_tree, size_t column_ndx)
-        : m_column(cluster_tree, column_ndx)
+    SortedListComparator(const ClusterTree* cluster_tree, ColKey column_key)
+        : m_column(cluster_tree, column_key)
     {
     }
     SortedListComparator(const ClusterColumn& column)
@@ -450,7 +455,7 @@ inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in
 
 inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc)
     : m_array(create_node(alloc, false)) // Throws
-    , m_target_column(ClusterColumn(nullptr, 0))
+    , m_target_column(ClusterColumn(nullptr, {}))
 {
 }
 
@@ -611,7 +616,7 @@ inline bool StringIndex::is_attached() const noexcept
     return m_array->is_attached();
 }
 
-inline void StringIndex::refresh_accessor_tree(size_t, const Spec&)
+inline void StringIndex::refresh_accessor_tree()
 {
     m_array->init_from_parent();
 }

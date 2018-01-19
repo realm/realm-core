@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include <realm/impl/transact_log.hpp>
-#include <realm/link_view.hpp>
 
 namespace realm {
 namespace _impl {
@@ -70,9 +69,9 @@ void TransactLogConvenientEncoder::do_select_table(const Table* table)
     m_selected_table = table;
 }
 
-bool TransactLogEncoder::select_list(size_t col_ndx, Key key)
+bool TransactLogEncoder::select_list(ColKey col_key, Key key)
 {
-    append_simple_instr(instr_SelectList, col_ndx, key.value); // Throws
+    append_simple_instr(instr_SelectList, col_key, key.value); // Throws
     return true;
 }
 
@@ -80,11 +79,11 @@ bool TransactLogEncoder::select_list(size_t col_ndx, Key key)
 void TransactLogConvenientEncoder::do_select_list(const ConstListBase& list)
 {
     select_table(list.get_table());
-    size_t col_ndx = list.get_col_ndx();
+    ColKey col_key = list.get_col_key();
     Key key = list.ConstListBase::get_key();
 
-    m_encoder.select_list(col_ndx, key); // Throws
-    m_selected_list = LinkListId(list.get_table()->get_key(), key, col_ndx);
+    m_encoder.select_list(col_key, key); // Throws
+    m_selected_list = LinkListId(list.get_table()->get_key(), key, col_key);
 }
 
 void TransactLogConvenientEncoder::list_clear(const ConstListBase& list)

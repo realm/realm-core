@@ -33,7 +33,6 @@
 #include <realm/group_writer.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/group_writer.hpp>
-#include <realm/link_view.hpp>
 #include <realm/replication.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/disable_sync_to_disk.hpp>

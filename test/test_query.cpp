@@ -121,8 +121,8 @@ TEST(Query_Count)
                 not_matching++;
         }
 
-        CHECK_EQUAL(matching, table.where().equal(0, 2).count());
-        CHECK_EQUAL(not_matching, table.where().not_equal(0, 2).count());
+        CHECK_EQUAL(matching, table.where().equal(col_ndx, 2).count());
+        CHECK_EQUAL(not_matching, table.where().not_equal(col_ndx, 2).count());
     }
 }
 
@@ -130,24 +130,24 @@ TEST(Query_NextGenSyntaxTypedString)
 {
     Table books;
     books.add_column(type_String, "1");
-    books.add_column(type_String, "2");
-    books.add_column(type_Int, "3");
+    auto c1 = books.add_column(type_String, "2");
+    auto c2 = books.add_column(type_Int, "3");
 
     Obj obj1 = books.create_object().set_all("Computer Architecture and Organization", "B. Govindarajalu", 752);
     Obj obj2 = books.create_object().set_all("Introduction to Quantum Mechanics", "David Griffiths", 480);
     Obj obj3 = books.create_object().set_all("Biophysics: Searching for Principles", "William Bialek", 640);
 
     // Typed table:
-    Query q = books.column<Int>(2) >= 200 && books.column<String>(1) == "David Griffiths";
+    Query q = books.column<Int>(c2) >= 200 && books.column<String>(c1) == "David Griffiths";
     auto match = q.find();
     CHECK_EQUAL(obj2.get_key(), match);
     // You don't need to create a query object first:
-    match = (books.column<Int>(2) >= 200 && books.column<String>(1) == "David Griffiths").find();
+    match = (books.column<Int>(c2) >= 200 && books.column<String>(c1) == "David Griffiths").find();
     CHECK_EQUAL(obj2.get_key(), match);
 
     // You can also create column objects and use them in expressions:
-    Columns<Int> pages = books.column<Int>(2);
-    Columns<String> author = books.column<String>(1);
+    Columns<Int> pages = books.column<Int>(c2);
+    Columns<String> author = books.column<String>(c1);
     match = (pages >= 200 && author == "David Griffiths").find();
     CHECK_EQUAL(obj2.get_key(), match);
 }
@@ -159,96 +159,96 @@ TEST(Query_NextGenSyntax)
 
     // Setup untyped table
     Table untyped;
-    untyped.add_column(type_Int, "firs1");
-    untyped.add_column(type_Float, "second");
-    untyped.add_column(type_Double, "third");
-    untyped.add_column(type_Bool, "third2");
-    untyped.add_column(type_String, "fourth");
+    auto c0 = untyped.add_column(type_Int, "firs1");
+    auto c1 = untyped.add_column(type_Float, "second");
+    auto c2 = untyped.add_column(type_Double, "third");
+    auto c3 = untyped.add_column(type_Bool, "third2");
+    auto c4 = untyped.add_column(type_String, "fourth");
     Key k0 = untyped.create_object().set_all(20, 19.9f, 3.0, true, "hello").get_key();
     Key k1 = untyped.create_object().set_all(20, 20.1f, 4.0, false, "world").get_key();
 
-    match = (untyped.column<String>(4) == "world").find();
+    match = (untyped.column<String>(c4) == "world").find();
     CHECK_EQUAL(match, k1);
 
-    match = ("world" == untyped.column<String>(4)).find();
+    match = ("world" == untyped.column<String>(c4)).find();
     CHECK_EQUAL(match, k1);
 
-    match = ("hello" != untyped.column<String>(4)).find();
+    match = ("hello" != untyped.column<String>(c4)).find();
     CHECK_EQUAL(match, k1);
 
-    match = (!("hello" == untyped.column<String>(4))).find();
+    match = (!("hello" == untyped.column<String>(c4))).find();
     CHECK_EQUAL(match, k1);
 
-    match = (untyped.column<String>(4) != StringData("hello")).find();
+    match = (untyped.column<String>(c4) != StringData("hello")).find();
     CHECK_EQUAL(match, k1);
 
-    match = (!(untyped.column<String>(4) == StringData("hello"))).find();
+    match = (!(untyped.column<String>(c4) == StringData("hello"))).find();
     CHECK_EQUAL(match, k1);
 
-    match = (!(!(untyped.column<String>(4) != StringData("hello")))).find();
+    match = (!(!(untyped.column<String>(c4) != StringData("hello")))).find();
     CHECK_EQUAL(match, k1);
 
 
     // This is a demonstration of fallback to old query_engine for the specific cases where it's possible
     // because old engine is faster. This will return a ->less(...) query
-    match = (untyped.column<int64_t>(0) == untyped.column<int64_t>(0)).find();
+    match = (untyped.column<int64_t>(c0) == untyped.column<int64_t>(c0)).find();
     CHECK_EQUAL(match, k0);
 
 
-    match = (untyped.column<bool>(3) == false).find();
+    match = (untyped.column<bool>(c3) == false).find();
     CHECK_EQUAL(match, k1);
 
-    match = (20.3 > untyped.column<double>(2) + 2).find();
+    match = (20.3 > untyped.column<double>(c2) + 2).find();
     CHECK_EQUAL(match, k0);
 
 
-    match = (untyped.column<int64_t>(0) > untyped.column<int64_t>(0)).find();
+    match = (untyped.column<int64_t>(c0) > untyped.column<int64_t>(c0)).find();
     CHECK_EQUAL(match, realm::null_key);
 
     // Left condition makes first row non-match
-    match = (untyped.column<float>(1) + 1 > 21 && untyped.column<double>(2) > 2).find();
+    match = (untyped.column<float>(c1) + 1 > 21 && untyped.column<double>(c2) > 2).find();
     CHECK_EQUAL(match, k1);
 
     // Right condition makes first row a non-match
-    match = (untyped.column<float>(1) > 10 && untyped.column<double>(2) > 3.5).find();
+    match = (untyped.column<float>(c1) > 10 && untyped.column<double>(c2) > 3.5).find();
     CHECK_EQUAL(match, k1);
 
     // Both make first row match
-    match = (untyped.column<float>(1) < 20 && untyped.column<double>(2) > 2).find();
+    match = (untyped.column<float>(c1) < 20 && untyped.column<double>(c2) > 2).find();
     CHECK_EQUAL(match, k0);
 
     // Both make first row non-match
-    match = (untyped.column<float>(1) > 20 && untyped.column<double>(2) > 3.5).find();
+    match = (untyped.column<float>(c1) > 20 && untyped.column<double>(c2) > 3.5).find();
     CHECK_EQUAL(match, k1);
 
     // Left cond match 0, right match 1
-    match = (untyped.column<float>(1) < 20 && untyped.column<double>(2) > 3.5).find();
+    match = (untyped.column<float>(c1) < 20 && untyped.column<double>(c2) > 3.5).find();
     CHECK_EQUAL(match, realm::null_key);
 
     // Left match 1, right match 0
-    match = (untyped.column<float>(1) > 20 && untyped.column<double>(2) < 3.5).find();
+    match = (untyped.column<float>(c1) > 20 && untyped.column<double>(c2) < 3.5).find();
     CHECK_EQUAL(match, realm::null_key);
 
     // Untyped ||
 
     // Left match 0
-    match = (untyped.column<float>(1) < 20 || untyped.column<double>(2) < 3.5).find();
+    match = (untyped.column<float>(c1) < 20 || untyped.column<double>(c2) < 3.5).find();
     CHECK_EQUAL(match, k0);
 
     // Right match 0
-    match = (untyped.column<float>(1) > 20 || untyped.column<double>(2) < 3.5).find();
+    match = (untyped.column<float>(c1) > 20 || untyped.column<double>(c2) < 3.5).find();
     CHECK_EQUAL(match, k0);
 
     // Left match 1
 
-    match = (untyped.column<float>(1) > 20 || untyped.column<double>(2) > 9.5).find();
+    match = (untyped.column<float>(c1) > 20 || untyped.column<double>(c2) > 9.5).find();
 
     CHECK_EQUAL(match, k1);
 
-    Query q4 = untyped.column<float>(1) + untyped.column<int64_t>(0) > 40;
+    Query q4 = untyped.column<float>(c1) + untyped.column<int64_t>(c0) > 40;
 
 
-    Query q5 = 20 < untyped.column<float>(1);
+    Query q5 = 20 < untyped.column<float>(c1);
 
     match = q4.and_query(q5).find();
     CHECK_EQUAL(match, k1);
@@ -257,7 +257,7 @@ TEST(Query_NextGenSyntax)
     // Untyped, direct column addressing
     Value<int64_t> uv1(1);
 
-    Columns<float> uc1 = untyped.column<float>(1);
+    Columns<float> uc1 = untyped.column<float>(c1);
 
     Query q2 = uv1 <= uc1;
     match = q2.find();
@@ -268,38 +268,38 @@ TEST(Query_NextGenSyntax)
     match = q0.find();
     CHECK_EQUAL(match, k0);
 
-    Query q99 = uv1 <= untyped.column<float>(1);
+    Query q99 = uv1 <= untyped.column<float>(c1);
     match = q99.find();
     CHECK_EQUAL(match, k0);
 
 
-    Query q8 = 1 > untyped.column<float>(1) + 5;
+    Query q8 = 1 > untyped.column<float>(c1) + 5;
     match = q8.find();
     CHECK_EQUAL(match, null_key);
 
-    Query q3 = untyped.column<float>(1) + untyped.column<int64_t>(0) > 10 + untyped.column<int64_t>(0);
+    Query q3 = untyped.column<float>(c1) + untyped.column<int64_t>(c0) > 10 + untyped.column<int64_t>(c0);
     match = q3.find();
 
     match = q2.find();
     CHECK_EQUAL(match, k0);
 
-    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) > 40).find();
+    match = (untyped.column<int64_t>(c0) + untyped.column<float>(c1) > 40).find();
     CHECK_EQUAL(match, k1);
 
-    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) < 40).find();
+    match = (untyped.column<int64_t>(c0) + untyped.column<float>(c1) < 40).find();
     CHECK_EQUAL(match, k0);
 
-    match = (untyped.column<float>(1) <= untyped.column<int64_t>(0)).find();
+    match = (untyped.column<float>(c1) <= untyped.column<int64_t>(c0)).find();
     CHECK_EQUAL(match, k0);
 
-    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) >=
-             untyped.column<int64_t>(0) + untyped.column<float>(1))
+    match = (untyped.column<int64_t>(c0) + untyped.column<float>(c1) >=
+             untyped.column<int64_t>(c0) + untyped.column<float>(c1))
                 .find();
     CHECK_EQUAL(match, k0);
 
     // Untyped, column objects
-    Columns<int64_t> u0 = untyped.column<int64_t>(0);
-    Columns<float> u1 = untyped.column<float>(1);
+    Columns<int64_t> u0 = untyped.column<int64_t>(c0);
+    Columns<float> u1 = untyped.column<float>(c1);
 
     match = (u0 + u1 > 40).find();
     CHECK_EQUAL(match, k1);
@@ -1551,13 +1551,13 @@ TEST(Query_StrIndexCrash)
             table->create_object().set(col, dst);
         }
 
-        table->add_search_index(0);
-        TableView v = table->where().equal(0, StringData("8")).find_all();
+        table->add_search_index(col);
+        TableView v = table->where().equal(col, StringData("8")).find_all();
         CHECK_EQUAL(eights, v.size());
 
-        v = table->where().equal(0, StringData("10")).find_all();
+        v = table->where().equal(col, StringData("10")).find_all();
 
-        v = table->where().equal(0, StringData("8")).find_all();
+        v = table->where().equal(col, StringData("8")).find_all();
         CHECK_EQUAL(eights, v.size());
     }
 }
@@ -1814,11 +1814,11 @@ TEST(Query_ListOfPrimitives)
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_key(0), keys[2]);
-    q = table->column<List<String>>(col_string_list).begins_with(table->column<String>(2), false);
+    q = table->column<List<String>>(col_string_list).begins_with(table->column<String>(col_string), false);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_key(0), keys[1]);
-    q = table->column<String>(2).begins_with(table->column<List<String>>(col_string_list), false);
+    q = table->column<String>(col_string).begins_with(table->column<List<String>>(col_string_list), false);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_key(0), keys[2]);
@@ -1864,11 +1864,11 @@ TEST(Query_ListOfPrimitives)
     // enable once we can again trigger sync_if_needed over Links
     CHECK_EQUAL(tv.get_key(0), keys[0]);
 #endif
-    q = baa->link(1).column<List<String>>(col_string_list) == "Str_5";
+    q = baa->link(col_linklist).column<List<String>>(col_string_list) == "Str_5";
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
 
-    q = baa->link(1).column<List<Int>>(0).average() >= 3.0;
+    q = baa->link(col_linklist).column<List<Int>>(col_int_list).average() >= 3.0;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     table->get_object(keys[1]).get_list<Int>(col_int_list).set(3, -10); // {2, 3, 4, -10}
@@ -5761,7 +5761,7 @@ TEST(Query_Binary)
 {
     Table t;
     t.add_column(type_Int, "1");
-    t.add_column(type_Binary, "2");
+    auto c1 = t.add_column(type_Binary, "2");
 
     const char bin[64] = {6, 3, 9, 5, 9, 7, 6, 3, 2, 6, 0, 0, 5, 4, 2, 4, 5, 7, 9, 5, 7, 1,
                           1, 2, 0, 8, 3, 8, 0, 9, 6, 8, 4, 7, 3, 4, 9, 5, 2, 3, 6, 2, 7, 4,
@@ -5782,37 +5782,37 @@ TEST(Query_Binary)
     t.get_object(keys[7]).set_all(0, BinaryData(bin + 24, 16)); // The "odd ball"
     t.get_object(keys[8]).set_all(0, BinaryData(bin + 0, 32));  // Repeat an entry
 
-    CHECK_EQUAL(0, t.where().equal(1, BinaryData(bin + 16, 16)).count());
-    CHECK_EQUAL(1, t.where().equal(1, BinaryData(bin + 0, 16)).count());
-    CHECK_EQUAL(1, t.where().equal(1, BinaryData(bin + 48, 16)).count());
-    CHECK_EQUAL(2, t.where().equal(1, BinaryData(bin + 0, 32)).count());
+    CHECK_EQUAL(0, t.where().equal(c1, BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(1, t.where().equal(c1, BinaryData(bin + 0, 16)).count());
+    CHECK_EQUAL(1, t.where().equal(c1, BinaryData(bin + 48, 16)).count());
+    CHECK_EQUAL(2, t.where().equal(c1, BinaryData(bin + 0, 32)).count());
 
-    CHECK_EQUAL(9, t.where().not_equal(1, BinaryData(bin + 16, 16)).count());
-    CHECK_EQUAL(8, t.where().not_equal(1, BinaryData(bin + 0, 16)).count());
+    CHECK_EQUAL(9, t.where().not_equal(c1, BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(8, t.where().not_equal(c1, BinaryData(bin + 0, 16)).count());
 
-    CHECK_EQUAL(0, t.where().begins_with(1, BinaryData(bin + 8, 16)).count());
-    CHECK_EQUAL(1, t.where().begins_with(1, BinaryData(bin + 16, 16)).count());
-    CHECK_EQUAL(4, t.where().begins_with(1, BinaryData(bin + 0, 32)).count());
-    CHECK_EQUAL(5, t.where().begins_with(1, BinaryData(bin + 0, 16)).count());
-    CHECK_EQUAL(1, t.where().begins_with(1, BinaryData(bin + 48, 16)).count());
-    CHECK_EQUAL(9, t.where().begins_with(1, BinaryData(bin + 0, 0)).count());
+    CHECK_EQUAL(0, t.where().begins_with(c1, BinaryData(bin + 8, 16)).count());
+    CHECK_EQUAL(1, t.where().begins_with(c1, BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(4, t.where().begins_with(c1, BinaryData(bin + 0, 32)).count());
+    CHECK_EQUAL(5, t.where().begins_with(c1, BinaryData(bin + 0, 16)).count());
+    CHECK_EQUAL(1, t.where().begins_with(c1, BinaryData(bin + 48, 16)).count());
+    CHECK_EQUAL(9, t.where().begins_with(c1, BinaryData(bin + 0, 0)).count());
 
-    CHECK_EQUAL(0, t.where().ends_with(1, BinaryData(bin + 40, 16)).count());
-    CHECK_EQUAL(1, t.where().ends_with(1, BinaryData(bin + 32, 16)).count());
-    CHECK_EQUAL(3, t.where().ends_with(1, BinaryData(bin + 32, 32)).count());
-    CHECK_EQUAL(4, t.where().ends_with(1, BinaryData(bin + 48, 16)).count());
-    CHECK_EQUAL(1, t.where().ends_with(1, BinaryData(bin + 0, 16)).count());
-    CHECK_EQUAL(9, t.where().ends_with(1, BinaryData(bin + 64, 0)).count());
+    CHECK_EQUAL(0, t.where().ends_with(c1, BinaryData(bin + 40, 16)).count());
+    CHECK_EQUAL(1, t.where().ends_with(c1, BinaryData(bin + 32, 16)).count());
+    CHECK_EQUAL(3, t.where().ends_with(c1, BinaryData(bin + 32, 32)).count());
+    CHECK_EQUAL(4, t.where().ends_with(c1, BinaryData(bin + 48, 16)).count());
+    CHECK_EQUAL(1, t.where().ends_with(c1, BinaryData(bin + 0, 16)).count());
+    CHECK_EQUAL(9, t.where().ends_with(c1, BinaryData(bin + 64, 0)).count());
 
-    CHECK_EQUAL(0, t.where().contains(1, BinaryData(bin_2)).count());
-    CHECK_EQUAL(5, t.where().contains(1, BinaryData(bin + 0, 16)).count());
-    CHECK_EQUAL(5, t.where().contains(1, BinaryData(bin + 16, 16)).count());
-    CHECK_EQUAL(4, t.where().contains(1, BinaryData(bin + 24, 16)).count());
-    CHECK_EQUAL(4, t.where().contains(1, BinaryData(bin + 32, 16)).count());
-    CHECK_EQUAL(9, t.where().contains(1, BinaryData(bin + 0, 0)).count());
+    CHECK_EQUAL(0, t.where().contains(c1, BinaryData(bin_2)).count());
+    CHECK_EQUAL(5, t.where().contains(c1, BinaryData(bin + 0, 16)).count());
+    CHECK_EQUAL(5, t.where().contains(c1, BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(4, t.where().contains(c1, BinaryData(bin + 24, 16)).count());
+    CHECK_EQUAL(4, t.where().contains(c1, BinaryData(bin + 32, 16)).count());
+    CHECK_EQUAL(9, t.where().contains(c1, BinaryData(bin + 0, 0)).count());
 
     {
-        TableView tv = t.where().equal(1, BinaryData(bin + 0, 32)).find_all();
+        TableView tv = t.where().equal(c1, BinaryData(bin + 0, 32)).find_all();
         if (tv.size() == 2) {
             CHECK_EQUAL(keys[1], tv.get_key(0));
             CHECK_EQUAL(keys[8], tv.get_key(1));
@@ -5822,7 +5822,7 @@ TEST(Query_Binary)
     }
 
     {
-        TableView tv = t.where().contains(1, BinaryData(bin + 24, 16)).find_all();
+        TableView tv = t.where().contains(c1, BinaryData(bin + 24, 16)).find_all();
         if (tv.size() == 4) {
             CHECK_EQUAL(keys[2], tv.get_key(0));
             CHECK_EQUAL(keys[3], tv.get_key(1));
@@ -6196,6 +6196,7 @@ TEST(Query_TestTV_where)
 }
 #endif
 
+#ifdef LEGACY_TESTS
 TEST(Query_SumMinMaxAvg)
 {
     Table t;
@@ -6267,6 +6268,7 @@ TEST(Query_SumMinMaxAvg)
     CHECK_EQUAL(t.where().maximum_timestamp(2), Timestamp(3000, 0));
     CHECK_EQUAL(t.where().minimum_timestamp(2), Timestamp(5, 0));
 }
+#endif
 
 #ifdef LEGACY_TESTS
 TEST(Query_SumMinMaxAvg_where)
@@ -9397,6 +9399,7 @@ TEST(Query_MaximumSumAverage)
         }
     }
 }
+#endif
 
 TEST(Query_ReferDeletedLinkView)
 {
@@ -9405,16 +9408,14 @@ TEST(Query_ReferDeletedLinkView)
     // They will no longer throw exceptions or crash.
     Group group;
     TableRef table = group.add_table("table");
-    table->add_column_link(type_LinkList, "children", *table);
-    table->add_column(type_Int, "age");
-    table->add_empty_row();
-    table->set_int(1, 0, 123);
-    LinkViewRef links = table->get_linklist(0, 0);
+    auto col_link = table->add_column_link(type_LinkList, "children", *table);
+    auto col_int = table->add_column(type_Int, "age");
+    auto links = table->create_object().set(col_int, 123).get_linklist_ptr(col_link);
     Query q = table->where(links);
     TableView tv = q.find_all();
 
     // TableView that depends on LinkView soon to be deleted
-    TableView tv_sorted = links->get_sorted_view(1);
+    TableView tv_sorted = links->get_sorted_view(col_int);
 
     // First test depends_on_deleted_object()
     CHECK(!tv_sorted.depends_on_deleted_object());
@@ -9422,28 +9423,28 @@ TEST(Query_ReferDeletedLinkView)
     CHECK(!tv2.depends_on_deleted_object());
 
     // Delete LinkList so LinkView gets detached
-    table->move_last_over(0);
+    table->remove_object(table->begin());
     CHECK(!links->is_attached());
     CHECK(tv_sorted.depends_on_deleted_object());
 
     // See if "Query that depends on LinkView" returns sane "empty"-like values
     CHECK_EQUAL(q.find_all().size(), 0);
-    CHECK_EQUAL(q.find(), npos);
-    CHECK_EQUAL(q.sum_int(1), 0);
+    CHECK_EQUAL(q.find(), null_key);
+    CHECK_EQUAL(q.sum_int(col_int), 0);
     CHECK_EQUAL(q.count(), 0);
     size_t rows;
-    q.average_int(1, &rows);
+    q.average_int(col_int, &rows);
     CHECK_EQUAL(rows, 0);
 
     tv_sorted.sync_if_needed();
     // See if "TableView that depends on LinkView" returns sane "empty"-like values
-    tv_sorted.average_int(1, &rows);
+    tv_sorted.average_int(col_int, &rows);
     CHECK_EQUAL(rows, 0);
 
     // Now check a "Query that depends on (TableView that depends on LinkView)"
     Query q2 = table->where(&tv_sorted);
     CHECK_EQUAL(q2.count(), 0);
-    CHECK_EQUAL(q2.find(), npos);
+    CHECK_EQUAL(q2.find(), null_key);
 
     CHECK(!links->is_attached());
     tv.sync_if_needed();
@@ -9452,11 +9453,10 @@ TEST(Query_ReferDeletedLinkView)
     // the LinkView through multiple levels!
     CHECK(tv.is_attached());
 
-    // Before executing any methods on a LinkViewRef, you must still always check is_attached(). If you
+    // Before executing any methods on a LinkList, you must still always check is_attached(). If you
     // call links->add() on a deleted LinkViewRef (where is_attached() == false), it will assert
     CHECK(!links->is_attached());
 }
-#endif
 
 TEST(Query_SubQueries)
 {
@@ -9466,10 +9466,11 @@ TEST(Query_SubQueries)
     TableRef target = group.add_table("target");
 
     // add some more columns to origin and target
-    auto col_link_o = origin->add_column_link(type_LinkList, "link", *target);
-
     auto col_int_t = target->add_column(type_Int, "integers");
     auto col_string_t = target->add_column(type_String, "strings");
+    // in order to use set_all, columns involved in set_all must be inserted first.
+    auto col_link_o = origin->add_column_link(type_LinkList, "link", *target);
+
 
     // add some rows
     origin->create_object(Key(0));
@@ -9540,7 +9541,6 @@ TEST(Query_SubQueries)
     CHECK_EQUAL(Key(2), tv.get_key(1));
 }
 
-#ifdef LEGACY_TESTS
 // Ensure that Query's move constructor and move assignment operator don't result in
 // a TableView owned by the query being double-deleted when the queries are destroyed.
 TEST(Query_MoveDoesntDoubleDelete)
@@ -9558,7 +9558,6 @@ TEST(Query_MoveDoesntDoubleDelete)
         q2 = std::move(q1);
     }
 }
-#endif // LEGACY_TESTS
 
 TEST(Query_Timestamp)
 {
@@ -9727,6 +9726,7 @@ TEST(Query_CopyRestrictingTableViewWhenOwned)
         CHECK_EQUAL(0, q2.count());
     }
 }
+#endif // LEGACY_TESTS
 
 TEST(Query_SyncViewIfNeeded)
 {
@@ -9734,22 +9734,20 @@ TEST(Query_SyncViewIfNeeded)
     TableRef source = group.add_table("source");
     TableRef target = group.add_table("target");
 
-    size_t col_links = source->add_column_link(type_LinkList, "link", *target);
-    size_t col_id = target->add_column(type_Int, "id");
+    auto col_links = source->add_column_link(type_LinkList, "link", *target);
+    auto col_id = target->add_column(type_Int, "id");
 
     auto reset_table_contents = [&] {
         source->clear();
         target->clear();
 
-        for (size_t i = 0; i < 15; ++i) {
-            target->add_empty_row();
-            target->set_int(col_id, i, i);
+        for (int64_t i = 0; i < 15; ++i) {
+            target->create_object(Key(i)).set(col_id, i);
         }
 
-        source->add_empty_row();
-        LinkViewRef ll = source->get_linklist(col_links, 0);
+        LinkList ll = source->create_object().get_linklist(col_links);
         for (size_t i = 6; i < 15; ++i) {
-            ll->add(i);
+            ll.add(Key(i));
         }
     };
 
@@ -9760,8 +9758,8 @@ TEST(Query_SyncViewIfNeeded)
         Query q = target->where(&restricting_view).less(col_id, 10);
 
         // Bring the view out of sync with the table.
-        target->set_int(col_id, 7, -7);
-        target->set_int(col_id, 8, -8);
+        target->get_object(Key(7)).set(col_id, -7);
+        target->get_object(Key(8)).set(col_id, -8);
 
         // Verify that the query uses the view as-is.
         CHECK_EQUAL(4, q.count());
@@ -9771,27 +9769,36 @@ TEST(Query_SyncViewIfNeeded)
         auto version = q.sync_view_if_needed();
         CHECK_EQUAL(true, restricting_view.is_in_sync());
         CHECK_EQUAL(2, q.count());
-        CHECK_EQUAL(version, target->get_version_counter());
+        CHECK_EQUAL(version[0].first, target->get_key());
+        CHECK_EQUAL(version[0].second, target->get_content_version());
     }
 
-    // Restricting LinkView. Query::sync_view_if_needed() does nothing as LinkViews are always in sync.
+    // Restricting LinkView.
     {
         reset_table_contents();
-        LinkViewRef restricting_view = source->get_linklist(col_links, 0);
+        LinkListPtr restricting_view = source->begin()->get_linklist_ptr(col_links);
         Query q = target->where(restricting_view).less(col_id, 10);
+        CHECK_EQUAL(restricting_view->size(), 9);
 
         // Modify the underlying table to remove rows from the LinkView.
-        target->move_last_over(7);
-        target->move_last_over(8);
+        target->remove_object(Key(7));
+        target->remove_object(Key(8));
 
-        // Verify that the view has remained in sync.
-        CHECK_EQUAL(true, restricting_view->is_in_sync());
+        // The view is out of sync.
+        CHECK_EQUAL(false, restricting_view->is_in_sync());
+        // Running the query will update embedded query
         CHECK_EQUAL(2, q.count());
+        // The view is still out of sync.
+        CHECK_EQUAL(false, restricting_view->is_in_sync());
+        // Accessing it will bring it up to date
+        CHECK_EQUAL(restricting_view->size(), 7);
+        CHECK_EQUAL(true, restricting_view->is_in_sync());
 
         // And that syncing the query does nothing.
         auto version = q.sync_view_if_needed();
         CHECK_EQUAL(true, restricting_view->is_in_sync());
-        CHECK_EQUAL(version, target->get_version_counter());
+        CHECK_EQUAL(version[0].first, target->get_key());
+        CHECK_EQUAL(version[0].second, target->get_content_version());
         CHECK_EQUAL(2, q.count());
     }
 
@@ -9800,13 +9807,14 @@ TEST(Query_SyncViewIfNeeded)
         reset_table_contents();
         Query q = target->where().greater(col_id, 5).less(col_id, 10);
 
-        target->set_int(col_id, 7, -7);
-        target->set_int(col_id, 8, -8);
+        target->get_object(Key(7)).set(col_id, -7);
+        target->get_object(Key(8)).set(col_id, -8);
 
         CHECK_EQUAL(2, q.count());
 
         auto version = q.sync_view_if_needed();
-        CHECK_EQUAL(version, target->get_version_counter());
+        CHECK_EQUAL(version[0].first, target->get_key());
+        CHECK_EQUAL(version[0].second, target->get_content_version());
         CHECK_EQUAL(2, q.count());
     }
 
@@ -9816,10 +9824,11 @@ TEST(Query_SyncViewIfNeeded)
         Query q;
 
         auto version = q.sync_view_if_needed();
-        CHECK_EQUAL(bool(version), false);
+        CHECK(version.empty());
     }
 }
 
+#ifdef LEGACY_TESTS
 // Ensure that two queries can be combined via Query::and_query, &&, and || even if one of them has no conditions.
 TEST(Query_CombineWithEmptyQueryDoesntCrash)
 {
@@ -10742,15 +10751,15 @@ TEST_TYPES(Query_Rover, std::true_type, std::false_type)
 TEST(Query_IntOnly)
 {
     Table table;
-    table.add_column(type_Int, "i1");
-    table.add_column(type_Int, "i2");
+    auto c0 = table.add_column(type_Int, "i1");
+    auto c1 = table.add_column(type_Int, "i2");
 
     table.create_object(Key(7)).set_all(7, 6);
     table.create_object(Key(19)).set_all(19, 9);
     table.create_object(Key(5)).set_all(19, 22);
     table.create_object(Key(21)).set_all(2, 6);
 
-    auto q = table.column<Int>(1) == 6;
+    auto q = table.column<Int>(c1) == 6;
     Key key = q.find();
     CHECK_EQUAL(key, Key(7));
 
@@ -10759,17 +10768,17 @@ TEST(Query_IntOnly)
     CHECK_EQUAL(tv.get(0).get_key(), Key(7));
     CHECK_EQUAL(tv.get(1).get_key(), Key(21));
 
-    auto q1 = table.where(&tv).equal(0, 2);
+    auto q1 = table.where(&tv).equal(c0, 2);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(tv1.size(), 1);
     CHECK_EQUAL(tv1.get(0).get_key(), Key(21));
 
-    q1 = table.where(&tv).greater(0, 5);
+    q1 = table.where(&tv).greater(c0, 5);
     tv1 = q1.find_all();
     CHECK_EQUAL(tv1.size(), 1);
     CHECK_EQUAL(tv1.get(0).get_key(), Key(7));
 
-    q = table.column<Int>(0) == 19 && table.column<Int>(1) == 9;
+    q = table.column<Int>(c0) == 19 && table.column<Int>(c1) == 9;
     key = q.find();
     CHECK_EQUAL(key.value, 19);
 
@@ -10778,7 +10787,7 @@ TEST(Query_IntOnly)
     CHECK_EQUAL(tv.get(0).get_key(), Key(19));
 
     // Two column expression
-    q = table.column<Int>(0) < table.column<Int>(1);
+    q = table.column<Int>(c0) < table.column<Int>(c1);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get(0).get_key(), Key(5));
@@ -10794,8 +10803,8 @@ TEST(Query_LinksTo)
     TableRef source = group.add_table("source");
     TableRef target = group.add_table("target");
 
-    size_t col_link = source->add_column_link(type_Link, "link", *target);
-    size_t col_linklist = source->add_column_link(type_LinkList, "linklist", *target);
+    auto col_link = source->add_column_link(type_Link, "link", *target);
+    auto col_linklist = source->add_column_link(type_LinkList, "linklist", *target);
 
     std::vector<Key> target_keys;
     target->create_objects(10, target_keys);

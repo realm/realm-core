@@ -43,9 +43,12 @@ inline int_fast64_t read(TableRef table, const OrderVec& order)
 {
     int_fast64_t dummy = 0;
     size_t n = order.size();
+#ifdef REALM_CLUSTER_IF
+    ColKey col0 = table->ndx2colkey(0);
+#endif
     for (size_t i = 0; i != n; ++i)
 #ifdef REALM_CLUSTER_IF
-        dummy += table->get_object(order[i]).get<Int>(0);
+        dummy += table->get_object(order[i]).get<Int>(col0);
 #else
         dummy += table->get_int(0, order[i]);
 #endif
@@ -55,9 +58,12 @@ inline int_fast64_t read(TableRef table, const OrderVec& order)
 inline void write(TableRef table, const OrderVec& order)
 {
     size_t n = order.size();
+#ifdef REALM_CLUSTER_IF
+    ColKey col0 = table->ndx2colkey(0);
+#endif
     for (size_t i = 0; i != n; ++i)
 #ifdef REALM_CLUSTER_IF
-        table->get_object(order[i]).set(0, 125);
+        table->get_object(order[i]).set(col0, 125);
 #else
         table->set_int(0, order[i], 125);
 #endif
@@ -66,9 +72,12 @@ inline void write(TableRef table, const OrderVec& order)
 inline void insert(TableRef table, const OrderVec& order)
 {
     size_t n = order.size();
+#ifdef REALM_CLUSTER_IF
+    ColKey col0 = table->ndx2colkey(0);
+#endif
     for (size_t i = 0; i != n; ++i) {
 #ifdef REALM_CLUSTER_IF
-        table->create_object(order[i]).set(0, 127);
+        table->create_object(order[i]).set(col0, 127);
 #else
         table->insert_empty_row(order[i]);
         table->set_int(0, order[i], 127);

@@ -23,7 +23,6 @@
 
 #include <realm/table.hpp>
 #include <realm/table_view.hpp>
-#include <realm/link_view.hpp>
 #include <realm/group.hpp>
 #include <realm/group_shared.hpp>
 

@@ -71,7 +71,9 @@ public:
 
     bool has_strong_link_columns() noexcept;
 
-    void insert_column(size_t column_ndx, ColumnType type, StringData name, int attr = col_attr_None);
+    void insert_column(size_t column_ndx, ColKey column_key, ColumnType type, StringData name,
+                       int attr = col_attr_None);
+    ColKey get_key(size_t column_ndx);
     void rename_column(size_t column_ndx, StringData new_name);
 
     /// Erase the column at the specified index, and move columns at
@@ -113,9 +115,9 @@ public:
     bool has_backlinks() const noexcept;
     size_t first_backlink_column_index() const noexcept;
     size_t backlink_column_count() const noexcept;
-    void set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col_ndx);
-    size_t get_origin_column_ndx(size_t backlink_col_ndx) const noexcept;
-    size_t find_backlink_column(TableKey origin_table_key, size_t origin_col_ndx) const noexcept;
+    void set_backlink_origin_column(size_t backlink_col_ndx, ColKey origin_col_key);
+    ColKey get_origin_column_key(size_t backlink_col_ndx) const noexcept;
+    size_t find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept;
 
     //@{
     /// Compare two table specs for equality.
@@ -149,8 +151,9 @@ private:
     ArrayInteger m_types; // 1st slot in m_top
     ArrayStringShort m_names; // 2nd slot in m_top
     ArrayInteger m_attr;  // 3rd slot in m_top
-    Array m_subspecs;     // 4th slot in m_top (optional)
-    Array m_enumkeys;     // 5th slot in m_top (optional)
+    ArrayInteger m_keys;  // 4th slot in m_top
+    Array m_subspecs;     // 5th slot in m_top (optional)
+    Array m_enumkeys;     // 6th slot in m_top (optional)
     size_t m_num_public_columns;
     bool m_has_strong_link_columns;
 
@@ -221,6 +224,7 @@ inline Spec::Spec(Allocator& alloc) noexcept
     , m_types(alloc)
     , m_names(alloc)
     , m_attr(alloc)
+    , m_keys(alloc)
     , m_subspecs(alloc)
     , m_enumkeys(alloc)
 {
@@ -345,12 +349,12 @@ inline bool Spec::has_backlinks() const noexcept
 
 inline size_t Spec::first_backlink_column_index() const noexcept
 {
-    return m_names.size();
+    return m_num_public_columns;
 }
 
 inline size_t Spec::backlink_column_count() const noexcept
 {
-    return m_types.size() - m_names.size();
+    return m_types.size() - m_num_public_columns;
 }
 
 // Spec will have a subspec when it contains a column which is one of:
@@ -359,7 +363,7 @@ inline size_t Spec::backlink_column_count() const noexcept
 // may be empty if the spec contains enumkeys (at index 4) but no subspec types.
 inline bool Spec::has_subspec() const noexcept
 {
-    return (m_top.size() >= 4) && (m_top.get_as_ref(3) != 0);
+    return (m_top.size() >= 5) && (m_top.get_as_ref(4) != 0);
 }
 
 inline bool Spec::operator!=(const Spec& s) const noexcept

@@ -80,12 +80,14 @@ using namespace realm::test_util;
 namespace {
 
 template <class T>
-void test_table_add_columns(T t)
+std::vector<ColKey> test_table_add_columns(T t)
 {
-    t->add_column(type_String, "first");
-    t->add_column(type_Int, "second");
-    t->add_column(type_Bool, "third");
-    t->add_column(type_Int, "fourth");
+    std::vector<ColKey> retval;
+    retval.push_back(t->add_column(type_String, "first"));
+    retval.push_back(t->add_column(type_Int, "second"));
+    retval.push_back(t->add_column(type_Bool, "third"));
+    retval.push_back(t->add_column(type_Int, "fourth"));
+    return retval;
 }
 
 template <class T>
@@ -565,7 +567,7 @@ TEST(Group_BasicRemoveTable)
 TEST(Group_ObjUseAfterTableDetach)
 {
     Obj obj;
-    size_t col;
+    ColKey col;
     {
         Group group;
         TableRef alpha = group.add_table("alpha");
@@ -893,7 +895,7 @@ TEST(Group_Serialize0)
 
         // Create new table in group
         auto t = from_disk.add_table("test");
-        test_table_add_columns(t);
+        std::vector<ColKey> cols = test_table_add_columns(t);
 
         CHECK_EQUAL(4, t->get_column_count());
         CHECK_EQUAL(0, t->size());
@@ -902,10 +904,10 @@ TEST(Group_Serialize0)
         Obj obj = t->create_object();
         obj.set_all("Test", 1, true, int(Wed));
 
-        CHECK_EQUAL("Test", obj.get<String>(0));
-        CHECK_EQUAL(1, obj.get<Int>(1));
-        CHECK_EQUAL(true, obj.get<Bool>(2));
-        CHECK_EQUAL(Wed, obj.get<Int>(3));
+        CHECK_EQUAL("Test", obj.get<String>(cols[0]));
+        CHECK_EQUAL(1, obj.get<Int>(cols[1]));
+        CHECK_EQUAL(true, obj.get<Bool>(cols[2]));
+        CHECK_EQUAL(Wed, obj.get<Int>(cols[3]));
     }
     {
         // Load the group and let it clean up without loading
@@ -947,13 +949,13 @@ TEST(Group_Serialize1)
 
         CHECK_EQUAL(4, t->get_column_count());
         CHECK_EQUAL(10, t->size());
-
+        auto cols = t->get_col_keys();
         // Verify that original values are there
         CHECK(*table == *t);
 
         // Modify both tables
-        table->get_object(Key(0)).set(0, "test");
-        t->get_object(Key(0)).set(0, "test");
+        table->get_object(Key(0)).set(cols[0], "test");
+        t->get_object(Key(0)).set(cols[0], "test");
 
         table->create_object(Key(5)).set_all("hello", 100, false, int(Mon));
         t->create_object(Key(5)).set_all("hello", 100, false, int(Mon));
@@ -1172,13 +1174,14 @@ TEST(Group_Serialize_All)
 
     CHECK_EQUAL(5, t->get_column_count());
     CHECK_EQUAL(1, t->size());
+    auto cols = t->get_col_keys();
     Obj obj = t->get_object(Key(0));
-    CHECK_EQUAL(12, obj.get<Int>(0));
-    CHECK_EQUAL(true, obj.get<Bool>(1));
-    CHECK(obj.get<Timestamp>(2) == Timestamp(12345, 0));
-    CHECK_EQUAL("test", obj.get<String>(3));
-    CHECK_EQUAL(7, obj.get<Binary>(4).size());
-    CHECK_EQUAL("binary", obj.get<Binary>(4).data());
+    CHECK_EQUAL(12, obj.get<Int>(cols[0]));
+    CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
+    CHECK(obj.get<Timestamp>(cols[2]) == Timestamp(12345, 0));
+    CHECK_EQUAL("test", obj.get<String>(cols[3]));
+    CHECK_EQUAL(7, obj.get<Binary>(cols[4]).size());
+    CHECK_EQUAL("binary", obj.get<Binary>(cols[4]).data());
 }
 
 TEST(Group_Persist)
@@ -1207,16 +1210,17 @@ TEST(Group_Persist)
     {
         CHECK_EQUAL(5, table->get_column_count());
         CHECK_EQUAL(1, table->size());
+        auto cols = table->get_col_keys();
         Obj obj = table->get_object(Key(0));
-        CHECK_EQUAL(12, obj.get<Int>(0));
-        CHECK_EQUAL(true, obj.get<Bool>(1));
-        CHECK_EQUAL("test", obj.get<String>(2));
-        CHECK_EQUAL(7, obj.get<Binary>(3).size());
-        CHECK_EQUAL("binary", obj.get<Binary>(3).data());
-        CHECK(obj.get<Timestamp>(4) == Timestamp(111, 222));
+        CHECK_EQUAL(12, obj.get<Int>(cols[0]));
+        CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
+        CHECK_EQUAL("test", obj.get<String>(cols[2]));
+        CHECK_EQUAL(7, obj.get<Binary>(cols[3]).size());
+        CHECK_EQUAL("binary", obj.get<Binary>(cols[3]).data());
+        CHECK(obj.get<Timestamp>(cols[4]) == Timestamp(111, 222));
 
         // Change a bit
-        obj.set(2, "Changed!");
+        obj.set(cols[2], "Changed!");
 
         // Write changes to file
         db.commit();
@@ -1229,13 +1233,14 @@ TEST(Group_Persist)
     {
         CHECK_EQUAL(5, table->get_column_count());
         CHECK_EQUAL(1, table->size());
+        auto cols = table->get_col_keys();
         Obj obj = table->get_object(Key(0));
-        CHECK_EQUAL(12, obj.get<Int>(0));
-        CHECK_EQUAL(true, obj.get<Bool>(1));
-        CHECK_EQUAL("Changed!", obj.get<String>(2));
-        CHECK_EQUAL(7, obj.get<Binary>(3).size());
-        CHECK_EQUAL("binary", obj.get<Binary>(3).data());
-        CHECK(obj.get<Timestamp>(4) == Timestamp(111, 222));
+        CHECK_EQUAL(12, obj.get<Int>(cols[0]));
+        CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
+        CHECK_EQUAL("Changed!", obj.get<String>(cols[2]));
+        CHECK_EQUAL(7, obj.get<Binary>(cols[3]).size());
+        CHECK_EQUAL("binary", obj.get<Binary>(cols[3]).data());
+        CHECK(obj.get<Timestamp>(cols[4]) == Timestamp(111, 222));
     }
 }
 
@@ -1406,6 +1411,8 @@ TEST(Group_Commit_Update_Integer_Index)
     CHECK(t->find_first_int(0, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == 0);
 }
 
+#endif // REALM_TESTS
+
 TEST(Group_CascadeNotify_Simple)
 {
     GROUP_TEST_PATH(path);
@@ -1415,34 +1422,35 @@ TEST(Group_CascadeNotify_Simple)
     t->add_column(type_Int, "int");
 
     // Add some extra rows so that the indexes being tested aren't all 0
-    t->add_empty_row(100);
+    std::vector<Key> t_keys;
+    t->create_objects(100, t_keys);
 
     bool called = false;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification&) { called = true; });
-    t->remove(5);
+    t->remove_object(t_keys[5]);
+    t_keys.erase(t_keys.begin() + 5);
     CHECK(called);
-
-    // move_last_over() on a table with no (back)links just sends that single
+    // remove_object() on a table with no (back)links just sends that single
     // row in the notification
     called = false;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
         CHECK_EQUAL(0, notification.links.size());
         CHECK_EQUAL(1, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(5, notification.rows[0].row_ndx);
+        CHECK_EQUAL(t->get_key(), notification.rows[0].table_key);
+        CHECK_EQUAL(t_keys[5], notification.rows[0].key);
     });
-    t->move_last_over(5);
+    t->remove_object(t_keys[5]);
+    t_keys.erase(t_keys.begin() + 5);
     CHECK(called);
 
     // Add another table which links to the target table
     TableRef origin = g.add_table("origin");
-    origin->add_column_link(type_Link, "link", *t);
-    origin->add_column_link(type_LinkList, "linklist", *t);
+    auto col_link = origin->add_column_link(type_Link, "link", *t);
+    auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t);
 
-    origin->add_empty_row(100);
-
-    // calling remove() is now an error, so no more tests of it
+    std::vector<Key> o_keys;
+    origin->create_objects(100, o_keys);
 
     // move_last_over() on an un-linked-to row should still just send that row
     // in the notification
@@ -1451,129 +1459,147 @@ TEST(Group_CascadeNotify_Simple)
         called = true;
         CHECK_EQUAL(0, notification.links.size());
         CHECK_EQUAL(1, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(5, notification.rows[0].row_ndx);
+        CHECK_EQUAL(t->get_key(), notification.rows[0].table_key);
+        CHECK_EQUAL(t_keys[5], notification.rows[0].key);
     });
-    t->move_last_over(5);
+    t->remove_object(t_keys[5]);
+    t_keys.erase(t_keys.begin() + 5);
     CHECK(called);
 
     // move_last_over() on a linked-to row should send information about the
     // links which had linked to it
-    origin->set_link(0, 10, 11); // rows are arbitrarily different to make things less likely to pass by coincidence
-    LinkViewRef lv = origin->get_linklist(1, 15);
-    lv->add(11);
-    lv->add(30);
+    // rows are arbitrarily different to make things less likely to pass by coincidence
+    Obj obj10 = origin->get_object(o_keys[10]);
+    Obj obj15 = origin->get_object(o_keys[15]);
+    obj10.set(col_link, t_keys[11]);
+    LinkListPtr lv = obj15.get_linklist_ptr(col_link_list);
+    lv->add(t_keys[11]);
+    lv->add(t_keys[30]);
     called = false;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
         CHECK_EQUAL(1, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(11, notification.rows[0].row_ndx);
+        CHECK_EQUAL(t->get_key(), notification.rows[0].table_key);
+        CHECK_EQUAL(t_keys[11], notification.rows[0].key);
 
         CHECK_EQUAL(2, notification.links.size());
-        CHECK_EQUAL(0, notification.links[0].origin_col_ndx);
-        CHECK_EQUAL(10, notification.links[0].origin_row_ndx);
-        CHECK_EQUAL(11, notification.links[0].old_target_row_ndx);
 
-        CHECK_EQUAL(1, notification.links[1].origin_col_ndx);
-        CHECK_EQUAL(15, notification.links[1].origin_row_ndx);
-        CHECK_EQUAL(11, notification.links[1].old_target_row_ndx);
+        CHECK_EQUAL(col_link_list, notification.links[0].origin_col_ndx);
+        CHECK_EQUAL(o_keys[15], notification.links[0].origin_key);
+        CHECK_EQUAL(t_keys[11], notification.links[0].old_target_key);
+
+        CHECK_EQUAL(col_link, notification.links[1].origin_col_ndx);
+        CHECK_EQUAL(o_keys[10], notification.links[1].origin_key);
+        CHECK_EQUAL(t_keys[11], notification.links[1].old_target_key);
     });
-    t->move_last_over(11);
+    t->remove_object(t_keys[11]);
+    t_keys.erase(t_keys.begin() + 11);
     CHECK(called);
 
     // move_last_over() on the origin table just sends the row being removed
     // because the links are weak
-    origin->set_link(0, 10, 11);
-    origin->get_linklist(1, 10)->add(11);
+    obj10.set(col_link, t_keys[11]);
     called = false;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
         CHECK_EQUAL(1, notification.rows.size());
-        CHECK_EQUAL(1, notification.rows[0].table_ndx);
-        CHECK_EQUAL(10, notification.rows[0].row_ndx);
+        CHECK_EQUAL(origin->get_key(), notification.rows[0].table_key);
+        CHECK_EQUAL(o_keys[10], notification.rows[0].key);
 
         CHECK_EQUAL(0, notification.links.size());
     });
-    origin->move_last_over(10);
+    origin->remove_object(o_keys[10]);
+    o_keys.erase(o_keys.begin() + 10);
     CHECK(called);
 
     // move_last_over() on the origin table with strong links lists the target
     // rows that are removed
-    origin->set_link_type(0, link_Strong);
-    origin->set_link_type(1, link_Strong);
+    origin->set_link_type(col_link, link_Strong);
+    origin->set_link_type(col_link_list, link_Strong);
 
-    origin->set_link(0, 10, 50);
-    origin->set_link(0, 11, 62);
-    lv = origin->get_linklist(1, 10);
-    lv->add(60);
-    lv->add(61);
-    lv->add(61);
-    lv->add(62);
+    Obj obj12 = origin->get_object(o_keys[12]);
+    Obj obj13 = origin->get_object(o_keys[13]);
+    obj12.set(col_link, t_keys[50]);
+    lv = obj12.get_linklist_ptr(col_link_list);
+    lv->add(t_keys[60]);
+    lv->add(t_keys[61]);
+    lv->add(t_keys[61]);
+    lv->add(t_keys[62]);
+    obj13.set(col_link, t_keys[62]); // hold on to 62
     // 50, 60 and 61 should be removed; 62 should not as there's still a strong link
     called = false;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
         CHECK_EQUAL(4, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(50, notification.rows[0].row_ndx);
-        CHECK_EQUAL(0, notification.rows[1].table_ndx);
-        CHECK_EQUAL(60, notification.rows[1].row_ndx);
-        CHECK_EQUAL(0, notification.rows[2].table_ndx);
-        CHECK_EQUAL(61, notification.rows[2].row_ndx);
-        CHECK_EQUAL(1, notification.rows[3].table_ndx);
-        CHECK_EQUAL(10, notification.rows[3].row_ndx);
+        CHECK_EQUAL(origin->get_key(), notification.rows[0].table_key);
+        CHECK_EQUAL(o_keys[12], notification.rows[0].key);
+        CHECK_EQUAL(t->get_key(), notification.rows[1].table_key);
+        CHECK_EQUAL(t_keys[50], notification.rows[1].key);
+        CHECK_EQUAL(t->get_key(), notification.rows[2].table_key);
+        CHECK_EQUAL(t_keys[60], notification.rows[2].key);
+        CHECK_EQUAL(t->get_key(), notification.rows[3].table_key);
+        CHECK_EQUAL(t_keys[61], notification.rows[3].key);
 
         CHECK_EQUAL(0, notification.links.size());
     });
-    origin->move_last_over(10);
+    origin->remove_object(o_keys[12]);
     CHECK(called);
-
-    g.set_cascade_notification_handler(nullptr);
-    t->clear();
-    origin->clear();
-    t->add_empty_row(100);
-    origin->add_empty_row(100);
 
     // Indirect nullifications: move_last_over() on a row with the last strong
     // links to a row that still has weak links to it
-    origin->add_column_link(type_Link, "link2", *t);
-    origin->add_column_link(type_LinkList, "linklist2", *t);
+    auto col_link_weak = origin->add_column_link(type_Link, "link2", *t);
+    auto col_link_list_weak = origin->add_column_link(type_LinkList, "linklist2", *t);
 
-    CHECK_EQUAL(0, t->get_backlink_count(30, *origin, 0));
-    CHECK_EQUAL(0, t->get_backlink_count(30, *origin, 1));
-    CHECK_EQUAL(0, t->get_backlink_count(30, *origin, 2));
-    CHECK_EQUAL(0, t->get_backlink_count(30, *origin, 3));
-    origin->set_link(0, 20, 30);
-    origin->get_linklist(1, 20)->add(31);
-    origin->set_link(2, 25, 31);
-    origin->get_linklist(3, 25)->add(30);
-    CHECK_EQUAL(1, t->get_backlink_count(30, *origin, 0));
-    CHECK_EQUAL(1, t->get_backlink_count(31, *origin, 1));
-    CHECK_EQUAL(1, t->get_backlink_count(31, *origin, 2));
-    CHECK_EQUAL(1, t->get_backlink_count(30, *origin, 3));
+    Obj obj30 = t->get_object(t_keys[30]);
+    Obj obj31 = t->get_object(t_keys[31]);
+    CHECK_EQUAL(0, obj30.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(0, obj30.get_backlink_count(*origin, col_link_list));
+    CHECK_EQUAL(0, obj30.get_backlink_count(*origin, col_link_weak));
+    CHECK_EQUAL(0, obj30.get_backlink_count(*origin, col_link_list_weak));
+    CHECK_EQUAL(0, obj31.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(0, obj31.get_backlink_count(*origin, col_link_list));
+    CHECK_EQUAL(0, obj31.get_backlink_count(*origin, col_link_weak));
+    CHECK_EQUAL(0, obj31.get_backlink_count(*origin, col_link_list_weak));
+
+    Obj obj20 = origin->get_object(o_keys[20]);
+    Obj obj25 = origin->get_object(o_keys[25]);
+    obj20.set(col_link, t_keys[30]);
+    obj20.get_linklist(col_link_list).add(t_keys[31]);
+    obj25.set(col_link_weak, t_keys[31]);
+    obj25.get_linklist(col_link_list_weak).add(t_keys[30]);
+
+    CHECK_EQUAL(1, obj30.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(0, obj30.get_backlink_count(*origin, col_link_list));
+    CHECK_EQUAL(0, obj30.get_backlink_count(*origin, col_link_weak));
+    CHECK_EQUAL(1, obj30.get_backlink_count(*origin, col_link_list_weak));
+    CHECK_EQUAL(0, obj31.get_backlink_count(*origin, col_link));
+    CHECK_EQUAL(1, obj31.get_backlink_count(*origin, col_link_list));
+    CHECK_EQUAL(1, obj31.get_backlink_count(*origin, col_link_weak));
+    CHECK_EQUAL(0, obj31.get_backlink_count(*origin, col_link_list_weak));
 
     called = false;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
         CHECK_EQUAL(3, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(30, notification.rows[0].row_ndx);
-        CHECK_EQUAL(0, notification.rows[1].table_ndx);
-        CHECK_EQUAL(31, notification.rows[1].row_ndx);
-        CHECK_EQUAL(1, notification.rows[2].table_ndx);
-        CHECK_EQUAL(20, notification.rows[2].row_ndx);
+
+        CHECK_EQUAL(origin->get_key(), notification.rows[0].table_key);
+        CHECK_EQUAL(o_keys[20], notification.rows[0].key);
+        CHECK_EQUAL(t->get_key(), notification.rows[1].table_key);
+        CHECK_EQUAL(t_keys[30], notification.rows[1].key);
+        CHECK_EQUAL(t->get_key(), notification.rows[2].table_key);
+        CHECK_EQUAL(t_keys[31], notification.rows[2].key);
 
         CHECK_EQUAL(2, notification.links.size());
-        CHECK_EQUAL(3, notification.links[0].origin_col_ndx);
-        CHECK_EQUAL(25, notification.links[0].origin_row_ndx);
-        CHECK_EQUAL(30, notification.links[0].old_target_row_ndx);
 
-        CHECK_EQUAL(2, notification.links[1].origin_col_ndx);
-        CHECK_EQUAL(25, notification.links[1].origin_row_ndx);
-        CHECK_EQUAL(31, notification.links[1].old_target_row_ndx);
+        CHECK_EQUAL(col_link_list_weak, notification.links[0].origin_col_ndx);
+        CHECK_EQUAL(o_keys[25], notification.links[0].origin_key);
+        CHECK_EQUAL(t_keys[30], notification.links[0].old_target_key);
+
+        CHECK_EQUAL(col_link_weak, notification.links[1].origin_col_ndx);
+        CHECK_EQUAL(o_keys[25], notification.links[1].origin_key);
+        CHECK_EQUAL(t_keys[31], notification.links[1].old_target_key);
     });
-    origin->move_last_over(20);
+    origin->remove_object(o_keys[20]);
     CHECK(called);
 }
 
@@ -1586,7 +1612,8 @@ TEST(Group_CascadeNotify_TableClear)
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
 
-    t->add_empty_row(10);
+    std::vector<Key> t_keys;
+    t->create_objects(10, t_keys);
 
     // clear() does not list the rows in the table being cleared because it
     // would be expensive and mostly pointless to do so
@@ -1597,53 +1624,59 @@ TEST(Group_CascadeNotify_TableClear)
         CHECK_EQUAL(0, notification.rows.size());
     });
     t->clear();
+    t_keys.clear();
     CHECK(called);
 
     // Add another table which links to the target table
     TableRef origin = g.add_table("origin");
-    origin->add_column_link(type_Link, "link", *t);
-    origin->add_column_link(type_LinkList, "linklist", *t);
+    auto col_link = origin->add_column_link(type_Link, "link", *t);
+    auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t);
 
-    t->add_empty_row(10);
-    origin->add_empty_row(10);
+    std::vector<Key> o_keys;
+    origin->create_objects(10, o_keys);
+    t->create_objects(10, t_keys);
 
     // clear() does report nullified links
-    origin->set_link(0, 1, 2);
-    origin->get_linklist(1, 3)->add(4);
+    origin->get_object(o_keys[1]).set(col_link, t_keys[2]);
+    origin->get_object(o_keys[3]).get_linklist(col_link_list).add(t_keys[4]);
+
     called = false;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
         CHECK_EQUAL(0, notification.rows.size());
 
         CHECK_EQUAL(2, notification.links.size());
-        CHECK_EQUAL(0, notification.links[0].origin_col_ndx);
-        CHECK_EQUAL(1, notification.links[0].origin_row_ndx);
-        CHECK_EQUAL(2, notification.links[0].old_target_row_ndx);
+        CHECK_EQUAL(col_link, notification.links[0].origin_col_ndx);
+        CHECK_EQUAL(o_keys[1], notification.links[0].origin_key);
+        CHECK_EQUAL(t_keys[2], notification.links[0].old_target_key);
 
-        CHECK_EQUAL(1, notification.links[1].origin_col_ndx);
-        CHECK_EQUAL(3, notification.links[1].origin_row_ndx);
-        CHECK_EQUAL(4, notification.links[1].old_target_row_ndx);
+        CHECK_EQUAL(col_link_list, notification.links[1].origin_col_ndx);
+        CHECK_EQUAL(o_keys[3], notification.links[1].origin_key);
+        CHECK_EQUAL(t_keys[4], notification.links[1].old_target_key);
     });
     t->clear();
+    t_keys.clear();
     CHECK(called);
 
-    t->add_empty_row(10);
-    origin->add_empty_row(10);
+    t->create_objects(10, t_keys);
 
     // and cascaded deletions
-    origin->set_link_type(0, link_Strong);
-    origin->set_link_type(1, link_Strong);
-    origin->set_link(0, 1, 2);
-    origin->get_linklist(1, 3)->add(4);
+    origin->set_link_type(col_link, link_Strong);
+    origin->set_link_type(col_link_list, link_Strong);
+
+    origin->get_object(o_keys[1]).set(col_link, t_keys[2]);
+    origin->get_object(o_keys[3]).get_linklist(col_link_list).add(t_keys[4]);
+
     called = false;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
-        CHECK_EQUAL(0, notification.links.size());
         CHECK_EQUAL(2, notification.rows.size());
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(2, notification.rows[0].row_ndx);
-        CHECK_EQUAL(0, notification.rows[1].table_ndx);
-        CHECK_EQUAL(4, notification.rows[1].row_ndx);
+        CHECK_EQUAL(t->get_key(), notification.rows[0].table_key);
+        CHECK_EQUAL(t_keys[2], notification.rows[0].key);
+        CHECK_EQUAL(t->get_key(), notification.rows[1].table_key);
+        CHECK_EQUAL(t_keys[4], notification.rows[1].key);
+
+        CHECK_EQUAL(0, notification.links.size());
     });
     origin->clear();
     CHECK(called);
@@ -1657,85 +1690,76 @@ TEST(Group_CascadeNotify_TableViewClear)
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
 
-    t->add_empty_row(10);
+    std::vector<Key> t_keys;
+    t->create_objects(10, t_keys);
 
     // No link columns, so remove() is used
     // Unlike clearing a table, the rows removed by the clear() are included in
     // the notification so that cascaded deletions and direct deletions don't
     // need to be handled separately
-    bool called = false;
+    int called = 0;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-        called = true;
+        called++;
         CHECK_EQUAL(0, notification.links.size());
         CHECK_EQUAL(10, notification.rows.size());
     });
     t->where().find_all().clear();
-    CHECK(called);
+    t_keys.clear();
+    CHECK_EQUAL(called, 1);
 
     // Add another table which links to the target table
     TableRef origin = g.add_table("origin");
-    origin->add_column_link(type_Link, "link", *t);
-    origin->add_column_link(type_LinkList, "linklist", *t);
+    auto col_link = origin->add_column_link(type_Link, "link", *t);
+    auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t);
 
-    // Now has backlinks, so move_last_over() is used
-    t->add_empty_row(10);
-    called = false;
-    g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-        called = true;
-        CHECK_EQUAL(0, notification.links.size());
-        CHECK_EQUAL(10, notification.rows.size());
-    });
-    t->where().find_all().clear();
-    CHECK(called);
-
-    t->add_empty_row(10);
-    origin->add_empty_row(10);
+    std::vector<Key> o_keys;
+    origin->create_objects(10, o_keys);
+    t->create_objects(10, t_keys);
 
     // should list which links were nullified
-    origin->set_link(0, 1, 2);
-    origin->get_linklist(1, 3)->add(4);
-    called = false;
+    origin->get_object(o_keys[1]).set(col_link, t_keys[2]);
+    origin->get_object(o_keys[3]).get_linklist(col_link_list).add(t_keys[4]);
+
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-        called = true;
+        called++;
         CHECK_EQUAL(10, notification.rows.size());
         CHECK_EQUAL(2, notification.links.size());
 
-        CHECK_EQUAL(0, notification.links[0].origin_col_ndx);
-        CHECK_EQUAL(1, notification.links[0].origin_row_ndx);
-        CHECK_EQUAL(2, notification.links[0].old_target_row_ndx);
+        CHECK_EQUAL(col_link, notification.links[0].origin_col_ndx);
+        CHECK_EQUAL(o_keys[1], notification.links[0].origin_key);
+        CHECK_EQUAL(t_keys[2], notification.links[0].old_target_key);
 
-        CHECK_EQUAL(1, notification.links[1].origin_col_ndx);
-        CHECK_EQUAL(3, notification.links[1].origin_row_ndx);
-        CHECK_EQUAL(4, notification.links[1].old_target_row_ndx);
+        CHECK_EQUAL(col_link_list, notification.links[1].origin_col_ndx);
+        CHECK_EQUAL(o_keys[3], notification.links[1].origin_key);
+        CHECK_EQUAL(t_keys[4], notification.links[1].old_target_key);
     });
     t->where().find_all().clear();
-    CHECK(called);
+    t_keys.clear();
+    CHECK_EQUAL(called, 2);
 
-    g.set_cascade_notification_handler(nullptr);
-    origin->clear();
-    t->add_empty_row(10);
-    origin->add_empty_row(10);
+    t->create_objects(10, t_keys);
 
     // should included cascaded deletions
-    origin->get_descriptor()->set_link_type(0, link_Strong);
-    origin->get_descriptor()->set_link_type(1, link_Strong);
-    origin->set_link(0, 1, 2);
-    origin->get_linklist(1, 3)->add(4);
-    called = false;
+    origin->set_link_type(col_link, link_Strong);
+    origin->set_link_type(col_link_list, link_Strong);
+
+    origin->get_object(o_keys[1]).set(col_link, t_keys[2]);
+    origin->get_object(o_keys[3]).get_linklist(col_link_list).add(t_keys[4]);
+
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
-        called = true;
+        called++;
         CHECK_EQUAL(0, notification.links.size());
         CHECK_EQUAL(12, notification.rows.size()); // 10 from origin, 2 from target
-        CHECK_EQUAL(0, notification.rows[0].table_ndx);
-        CHECK_EQUAL(2, notification.rows[0].row_ndx);
-        CHECK_EQUAL(0, notification.rows[1].table_ndx);
-        CHECK_EQUAL(4, notification.rows[1].row_ndx);
+        CHECK_EQUAL(t->get_key(), notification.rows[10].table_key);
+        CHECK_EQUAL(t_keys[2], notification.rows[10].key);
+        CHECK_EQUAL(t->get_key(), notification.rows[11].table_key);
+        CHECK_EQUAL(t_keys[4], notification.rows[11].key);
     });
     origin->where().find_all().clear();
-    CHECK(called);
+    CHECK_EQUAL(called, 3);
 }
 
-
+#ifdef REALM_TESTS
 TEST(Group_WriteEmpty)
 {
     GROUP_TEST_PATH(path_1);
