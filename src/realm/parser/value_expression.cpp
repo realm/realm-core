@@ -46,7 +46,7 @@ Timestamp from_timestamp_values(std::vector<std::string> const& time_inputs) {
     }
     else if (time_inputs.size() == 6 || time_inputs.size() == 7) {
         // readable format YYYY-MM-DD-HH:MM:SS:NANOS nanos optional
-        tm created{};
+        struct tm created = tm();
         created.tm_year = stot<int>(time_inputs[0]) - 1900; // epoch offset (see man mktime)
         created.tm_mon = stot<int>(time_inputs[1]) - 1; // converts from 1-12 to 0-11
         created.tm_mday = stot<int>(time_inputs[2]);
