@@ -418,7 +418,7 @@ public:
             /// Key identifying a group-level table.
             TableKey table_key;
 
-            /// Row index which will be removed.
+            /// Key identifying object to be removed.
             ObjKey key;
 
             row() = default;
@@ -709,8 +709,6 @@ private:
     class TransactAdvancer;
     void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&);
     void refresh_dirty_accessors();
-    template <class F>
-    void update_table_indices(F&& map_function);
 
     /// \brief The version of the format of the node structure (in file or in
     /// memory) in use by Realm objects associated with this group.
