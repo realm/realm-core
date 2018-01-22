@@ -22,6 +22,22 @@
 
 ----------------------------------------------
 
+# 5.1.2 Release notes
+
+### Bugfixes
+
+* Include the parser libs in the published android packages.
+
+----------------------------------------------
+
+# 5.1.1 Release notes
+
+### Bugfixes
+
+* The `realm-parser` static library now correctly includes both simulator and device architectures on Apple platforms.
+
+----------------------------------------------
+
 # 5.1.0 Release notes
 
 ### Enhancements
