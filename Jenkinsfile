@@ -183,7 +183,7 @@ def doBuildInDocker(String buildType, String sanitizeMode='') {
                            cd build-dir
                            cmake -D CMAKE_BUILD_TYPE=${buildType} ${sanitizeFlags} -G Ninja ..
                         """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
+                        runAndCollectWarnings(parser:'gcc_any', script: "cd build-dir && ninja")
                         sh """
                            cd build-dir/test
                            ./realm-tests
@@ -210,7 +210,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             withEnv(environment) {
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
-                        runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                        runAndCollectWarnings(parser:'gcc_any', script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
                         dir(buildDir) {
                             archiveArtifacts('realm-*.tar.gz')
                         }
@@ -223,7 +223,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                 } else {
                     docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
                         buildEnv.inside("--link ${emulator.id}:emulator") {
-                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                            runAndCollectWarnings(parser:'gcc_any', script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
                             dir(buildDir) {
                                 archiveArtifacts('realm-*.tar.gz')
                             }
