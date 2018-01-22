@@ -1,8 +1,4 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* None.
+# 6.0.0-rc1 Release notes
 
 ### Breaking changes
 
@@ -23,15 +19,6 @@
 * Ref-counted freestanding tables can no longer be created (by Table::create)
 * OldDateTime is no longer supported
 
-### Enhancements
-
-* None.
-
------------
-
-### Internals
-
-* None.
 
 ----------------------------------------------
 
