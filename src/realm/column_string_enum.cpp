@@ -103,6 +103,9 @@ void StringEnumColumn::set(size_t ndx, StringData value)
 
 void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows)
 {
+    if (num_rows == 0)
+        return; // do not add a key if no rows are actually being inserted
+
     size_t key_ndx = get_key_ndx_or_add(value);
     int64_t value_2 = int64_t(key_ndx);
     insert_without_updating_index(row_ndx, value_2, num_rows); // Throws
