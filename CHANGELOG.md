@@ -36,10 +36,6 @@
 ### Bugfixes
 
 * The `realm-parser` static library now correctly includes both simulator and device architectures on Apple platforms.
-* Fixed handling of out-of-diskspace which could, in some cases, result in a SIGBUS. It
-  now always throws an OutOfDiskSpace exception. It's uncertain if it could lead to
-  corrupted .realm files or not, so I'm hesitant to link it to any of the github issues 
-  with asserts.
 
 ----------------------------------------------
 
