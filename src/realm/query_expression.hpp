@@ -1861,7 +1861,8 @@ public:
         for (size_t i = 0; i < m_link_column_indexes.size(); ++i) {
             if (i < m_tables.size() && m_tables[i]) {
                 if (m_link_types[i] == col_type_BackLink) {
-                    s += "backlink";
+                    throw SerialisationError("Serialising a query which contains backlinks is currently unsupported.");
+                    //s += "backlink";
                 } else if (m_link_column_indexes[i] < m_tables[i]->get_column_count()) {
                     s += std::string(m_tables[i]->get_column_name(m_link_column_indexes[i]));
                 }
@@ -2476,10 +2477,12 @@ public:
 
     virtual std::string description() const override
     {
-        if (!m_row.is_attached()) {
-            return util::serializer::print_value("detached object");
-        }
-        return util::serializer::print_value(m_row.get_index());
+        throw SerialisationError("Serialising a query which links to an object is currently unsupported.");
+        // TODO: we can do something like the following when core gets stable keys:
+        //if (!m_row.is_attached()) {
+        //    return util::serializer::print_value("detached object");
+        //}
+        //return util::serializer::print_value(m_row.get_index());
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -3386,8 +3389,9 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + util::serializer::value_separator + "SUBQUERY(" + m_query.get_description() + ")"
-            + util::serializer::value_separator + "@count";
+        throw SerialisationError("Serialising a subquery expression is currently unsupported.");
+        //return m_link_map.description() + util::serializer::value_separator + "SUBQUERY(" + m_query.get_description() + ")"
+        //    + util::serializer::value_separator + "@count";
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override

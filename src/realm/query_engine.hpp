@@ -421,7 +421,7 @@ public:
 
     std::string describe() const override
     {
-        return "subtable expression";
+        throw SerialisationError("Serialising a query which contains a subtable expression is currently unsupported.");
     }
 
 
@@ -2101,7 +2101,9 @@ public:
 
     virtual std::string describe() const override
     {
-        return describe_column() + " " + describe_condition() + " " + util::serializer::print_value(m_target_row.get_index());
+        throw SerialisationError("Serialising a query which links to an object is currently unsupported.");
+        // We can do something like the following when core gets stable keys
+        //return describe_column() + " " + describe_condition() + " " + util::serializer::print_value(m_target_row.get_index());
     }
     virtual std::string describe_condition() const override
     {
