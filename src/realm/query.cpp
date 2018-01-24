@@ -1602,8 +1602,13 @@ std::string Query::validate()
 std::string Query::get_description() const
 {
     if (root_node()) {
+        if (m_view) {
+            throw SerialisationError("Serialisation of a query constrianed by a view is not currently supported");
+        }
         return root_node()->describe_expression();
     }
+    // An empty query returns all results and one way to indicate this
+    // is to serialise TRUEPREDICATE which is functionally equivilent
     return "TRUEPREDICATE";
 }
 

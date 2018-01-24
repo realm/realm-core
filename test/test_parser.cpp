@@ -334,6 +334,35 @@ TEST(Parser_empty_input)
 }
 
 
+TEST(Parser_ConstrainedQuery)
+{
+    Group g;
+    std::string table_name = "table";
+    TableRef t = g.add_table(table_name);
+    size_t int_col = t->add_column(type_Int, "age");
+    size_t list_col = t->add_column_link(type_LinkList, "self_list", *t);
+    t->add_empty_row(2);
+    t->set_int(int_col, 1, 1);
+
+    LinkViewRef list_0 = t->get_linklist(list_col, 0);
+    list_0->add(0);
+    list_0->add(1);
+
+    TableView tv = t->get_backlink_view(0, t.get(), list_col);
+    Query q(const_cast<const Table&>(*t), &tv);
+    CHECK_EQUAL(q.count(), 1);
+    q.and_query(t->column<Int>(int_col) <= 0);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_THROW(q.get_description(), SerialisationError);
+
+    Query q2(const_cast<const Table&>(*t), list_0);
+    CHECK_EQUAL(q2.count(), 2);
+    q2.and_query(t->column<Int>(int_col) <= 0);
+    CHECK_EQUAL(q2.count(), 1);
+    CHECK_THROW(q2.get_description(), SerialisationError);
+}
+
+
 TEST(Parser_basic_serialisation)
 {
     Group g;
