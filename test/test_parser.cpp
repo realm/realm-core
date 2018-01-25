@@ -296,7 +296,7 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
-    //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
     realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
@@ -1612,6 +1612,130 @@ TEST(Parser_SortAndDistinct)
 
     CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "TRUEPREDICATE sort(account.name ASC)"), message);
     CHECK_EQUAL(message, "No property 'name' found on object type 'account' specified in 'sort' clause");
+}
+
+
+TEST(Parser_SubqueryVariableNames)
+{
+    Group g;
+    util::serializer::SerialisationState test_state;
+
+    TableRef test_table = g.add_table("test");
+
+    CHECK_EQUAL(test_state.get_variable_name(test_table), "$x");
+
+    for (char c = 'a'; c <= 'z'; ++c) {
+        std::string col_name = std::string("$") + c;
+        test_table->add_column(type_Int, col_name);
+    }
+    test_state.subquery_prefix_list.push_back("$xx");
+    test_state.subquery_prefix_list.push_back("$xy");
+    std::string unique_variable = test_state.get_variable_name(test_table);
+
+    CHECK_EQUAL(unique_variable, "$xz");
+}
+
+TEST(Parsr_Subquery)
+{
+    Group g;
+
+    TableRef discounts = g.add_table("class_Discounts");
+    size_t discount_name_col = discounts->add_column(type_String, "promotion", true);
+    size_t discount_off_col = discounts->add_column(type_Double, "reduced_by");
+    size_t discount_active_col = discounts->add_column(type_Bool, "active");
+
+    using discount_t = std::pair<double, bool>;
+    std::vector<discount_t> discount_info = {{3.0, false}, {2.5, true}, {0.50, true}, {1.50, true}};
+    for (discount_t i : discount_info) {
+        size_t row_ndx = discounts->add_empty_row();
+        discounts->set_double(discount_off_col, row_ndx, i.first);
+        discounts->set_bool(discount_active_col, row_ndx, i.second);
+    }
+    discounts->set_string(discount_name_col, 0, "back to school");
+    discounts->set_string(discount_name_col, 1, "pizza lunch special");
+    discounts->set_string(discount_name_col, 2, "manager's special");
+
+    TableRef ingredients = g.add_table("class_Ingredients");
+    size_t ingredient_name_col = ingredients->add_column(type_String, "name");
+    std::vector<std::string> ingredients_list = { "dairy", "nuts", "wheat", "soy" };
+    for (size_t i = 0; i < ingredients_list.size(); ++i) {
+        size_t row_ndx = ingredients->add_empty_row();
+        ingredients->set_string(ingredient_name_col, row_ndx, ingredients_list[i]);
+    }
+
+    TableRef items = g.add_table("class_Items");
+    size_t item_name_col = items->add_column(type_String, "name");
+    size_t item_price_col = items->add_column(type_Double, "price");
+    size_t item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
+    size_t item_contains_col = items->add_column_link(type_LinkList, "allergens", *ingredients);
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    for (item_t i : item_info) {
+        size_t row_ndx = items->add_empty_row();
+        items->set_string(item_name_col, row_ndx, i.first);
+        items->set_double(item_price_col, row_ndx, i.second);
+    }
+    items->set_link(item_discount_col, 0, 2); // milk -0.50
+    items->set_link(item_discount_col, 2, 1); // pizza -2.5
+    items->set_link(item_discount_col, 3, 0); // cereal -3.0 inactive
+    LinkViewRef milk_contains = items->get_linklist(item_contains_col, 0);
+    milk_contains->add(0);
+    LinkViewRef pizza_contains = items->get_linklist(item_contains_col, 2);
+    pizza_contains->add(0);
+    pizza_contains->add(2);
+    pizza_contains->add(3);
+    LinkViewRef cereal_contains = items->get_linklist(item_contains_col, 3);
+    cereal_contains->add(0);
+    cereal_contains->add(1);
+    cereal_contains->add(2);
+
+    TableRef t = g.add_table("class_Person");
+    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
+    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
+    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
+    t->add_empty_row(3);
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(id_col_ndx, i, i);
+        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
+    }
+
+    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
+    list_0->add(0);
+    list_0->add(1);
+    list_0->add(2);
+    list_0->add(3);
+
+    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1->add(0);
+    }
+
+    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
+    list_2->add(2);
+    list_2->add(2);
+    list_2->add(3);
+
+    // SUBQUERY(items, $x, $x.name CONTAINS 'a' && $x.price > 5)
+    // SUBQUERY(items, name CONTAINS 'a' && price > 5)
+    Query q = t->column<LinkList>(items_col_ndx, items->column<String>(item_name_col).contains("a")
+                                  && items->column<Double>(item_price_col) > 5.0
+                                  && items->link(item_discount_col).column<Double>(discount_off_col) > 0.5
+                                  && items->column<Link>(item_contains_col).count() > 1).count() > 1;
+
+//    Query q = t->column<LinkList>(items_col_ndx, items->column<Double>(item_price_col) > items->link(item_discount_col).column<Double>(discount_off_col)).count() > 1;
+
+    std::string subquery_description = q.get_description();
+    CHECK(subquery_description.find("SUBQUERY(items, $x,") != std::string::npos);
+    CHECK(subquery_description.find(" $x.name ") != std::string::npos);
+    CHECK(subquery_description.find(" $x.price ") != std::string::npos);
+    CHECK(subquery_description.find(" $x.discount.reduced_by ") != std::string::npos);
+    CHECK(subquery_description.find(" $x.allergens.@count") != std::string::npos);
+
+    TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+
+    //verify_query(test_context, t, "SUBQUERY(items, $x, TRUEPREDICATE).@count > 0", 2);
+    //verify_query(test_context, t, "SUBQUERY(items, $x, $x.name CONTAINS 'a' && $x.price > 5).@count > 0", 2);
 }
 
 #endif // TEST_PARSER

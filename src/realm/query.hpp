@@ -42,6 +42,7 @@
 #include <realm/link_view_fwd.hpp>
 #include <realm/descriptor_fwd.hpp>
 #include <realm/row.hpp>
+#include <realm/util/serializer.hpp>
 
 namespace realm {
 
@@ -343,6 +344,7 @@ public:
     std::string validate();
 
     std::string get_description() const;
+    std::string get_description(util::serializer::SerialisationState& state) const;
 
 private:
     Query(Table& table, TableViewBase* tv = nullptr);

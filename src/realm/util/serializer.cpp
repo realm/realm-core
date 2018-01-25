@@ -20,6 +20,7 @@
 
 #include <realm/binary_data.hpp>
 #include <realm/null.hpp>
+#include <realm/query_expression.hpp>
 #include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/util/base64.hpp>
@@ -97,6 +98,80 @@ std::string print_value<>(realm::Timestamp t)
     std::stringstream ss;
     ss << "T" << t.get_seconds() << ":" << t.get_nanoseconds();
     return ss.str();
+}
+
+
+// The variable name must be unique with respect to the already chosen variables at
+// this level of subquery nesting and with respect to the names of the columns in the table.
+// This assumes that columns can start with '$' and that we might one day want to support
+// referencing the parent table columns in the subquery. This is currently disabled by an assertion in the
+// core SubQuery constructor.
+std::string SerialisationState::get_variable_name(ConstTableRef table) {
+    std::string guess_prefix = "$";
+    const char start_char = 'x';
+    char add_char = start_char;
+
+    auto next_guess = [&]() {
+        add_char = ((++add_char - 'a') % 26) + 'a';
+        if (add_char == start_char) {
+            guess_prefix += add_char;
+        }
+    };
+
+    while (true) {
+        std::string guess = guess_prefix + add_char;
+        bool found_duplicate = false;
+        for (size_t i = 0; i < subquery_prefix_list.size(); ++i) {
+            if (guess.compare(subquery_prefix_list[i]) == 0) {
+                found_duplicate = true;
+                break;
+            }
+        }
+        if (found_duplicate) {
+            next_guess();
+            continue;
+        }
+        if (table->get_column_index(guess) != realm::npos) {
+            next_guess();
+            continue;
+        }
+        return guess;
+    }
+}
+
+std::string SerialisationState::describe_column(ConstTableRef table, size_t col_ndx)
+{
+    if (table && col_ndx != npos) {
+        std::string desc;
+        if (!subquery_prefix_list.empty()) {
+            desc += subquery_prefix_list.back() + util::serializer::value_separator;
+        }
+        desc += std::string(table->get_column_name(col_ndx));
+        return desc;
+    }
+    return "";
+}
+
+std::string SerialisationState::describe_columns(const LinkMap& link_map, size_t target_col_ndx)
+{
+    std::string desc;
+    if (!subquery_prefix_list.empty()) {
+        desc += subquery_prefix_list.back();
+    }
+    if (link_map.links_exist()) {
+        if (!desc.empty()) {
+            desc += util::serializer::value_separator;
+        }
+        desc += link_map.description();
+    }
+    const Table* target = link_map.target_table();
+    if (target && target_col_ndx != npos) {
+        if (!desc.empty()) {
+            desc += util::serializer::value_separator;
+        }
+        desc += target->get_column_name(target_col_ndx);
+    }
+    return desc;
 }
 
 } // namespace serializer
