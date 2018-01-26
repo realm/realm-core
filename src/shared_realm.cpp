@@ -489,11 +489,16 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         });
 
         ObjectStore::apply_schema_changes(read_group(), version, m_schema, m_schema_version,
-                                          m_config.schema_mode, required_changes, wrapper, is_partial());
+                                          m_config.schema_mode, required_changes, util::none, wrapper);
     }
     else {
+        util::Optional<std::string> sync_user_id;
+#if REALM_ENABLE_SYNC
+        if (m_config.sync_config && m_config.sync_config->is_partial)
+            sync_user_id = m_config.sync_config->user->identity();
+#endif
         ObjectStore::apply_schema_changes(read_group(), m_schema_version, schema, version,
-                                          m_config.schema_mode, required_changes,{}, is_partial());
+                                          m_config.schema_mode, required_changes, std::move(sync_user_id));
         REALM_ASSERT_DEBUG(additive || (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
 
