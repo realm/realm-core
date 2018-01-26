@@ -19,22 +19,71 @@
 #ifndef REALM_OS_PARTIAL_SYNC_HPP
 #define REALM_OS_PARTIAL_SYNC_HPP
 
+#include "results.hpp"
+
+#include <realm/util/optional.hpp>
+
 #include <functional>
 #include <memory>
 #include <string>
 
 namespace realm {
 
+class Group;
+class Object;
 class Realm;
-class Results;
 
 namespace partial_sync {
+enum class SubscriptionState : int8_t;
 
-void register_query(std::shared_ptr<Realm>, const std::string &object_class,
-                    const std::string &query,
-                    std::function<void (Results, std::exception_ptr)>);
+class Subscription {
+public:
+    ~Subscription();
+    Subscription(Subscription&&);
+    Subscription& operator=(Subscription&&);
+
+    Subscription(Subscription const&) = delete;
+    Subscription& operator=(Subscription const&) = delete;
+
+    SubscriptionState status() const;
+    util::Optional<std::string> error_message() const;
+
+    Results results() const;
+
+    NotificationToken add_notification_callback(std::function<void()> callback);
+
+private:
+    Subscription(std::string name, std::string object_type, std::shared_ptr<Realm>);
+
+    util::Optional<Object> result_set_object() const;
+
+    void error_occurred();
+
+    std::unique_ptr<ObjectSchema> m_object_schema;
+
+    mutable Results m_result_sets;
+
+    struct ErrorNotifier;
+    std::shared_ptr<ErrorNotifier> m_error_notifier;
+
+    friend Subscription subscribe(Results const&, util::Optional<std::string>);
+};
+
+Subscription subscribe(Results const& results, util::Optional<std::string> name);
+
+void reset_for_testing();
+
+// Deprecated
+void register_query(std::shared_ptr<Realm>, const std::string &object_class, const std::string &query,
+					std::function<void (Results, std::exception_ptr)>);
 
 } // namespace partial_sync
+
+namespace _impl {
+
+void initialize_schema(Group&);
+
+} // namespace _impl
 } // namespace realm
 
 #endif // REALM_OS_PARTIAL_SYNC_HPP

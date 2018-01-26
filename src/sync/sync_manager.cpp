@@ -21,6 +21,7 @@
 #include "sync/impl/sync_client.hpp"
 #include "sync/impl/sync_file.hpp"
 #include "sync/impl/sync_metadata.hpp"
+#include "sync/partial_sync.hpp"
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
 
@@ -212,6 +213,8 @@ void SyncManager::reset_for_testing()
         // Stop the client. This will abort any uploads that inactive sessions are waiting for.
         if (m_sync_client)
             m_sync_client->stop();
+
+        partial_sync::reset_for_testing();
 
         {
             std::lock_guard<std::mutex> lock(m_session_mutex);

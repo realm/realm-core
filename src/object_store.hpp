@@ -53,7 +53,7 @@ public:
     // set the schema version without any checks
     // and the tables for the schema version and the primary key are created if they don't exist
     // NOTE: must be performed within a write transaction
-    static void set_schema_version(Group& group, uint64_t version);
+    static void set_schema_version(Group& group, uint64_t version, bool partial_realm = false);
 
     // check if all of the changes in the list can be applied automatically, or
     // throw if any of them require a schema version bump and migration function
@@ -85,7 +85,8 @@ public:
     static void apply_schema_changes(Group& group, uint64_t schema_version,
                                      Schema& target_schema, uint64_t target_schema_version,
                                      SchemaMode mode, std::vector<SchemaChange> const& changes,
-                                     std::function<void()> migration_function={});
+                                     std::function<void()> migration_function={}, 
+                                     bool partial_realm = false);
 
     static void apply_additive_changes(Group&, std::vector<SchemaChange> const&, bool update_indexes);
 

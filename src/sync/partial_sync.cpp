@@ -23,16 +23,41 @@
 #include "object_schema.hpp"
 #include "results.hpp"
 #include "shared_realm.hpp"
+#include "sync/subscription_state.hpp"
 #include "sync/sync_config.hpp"
+#include "util/event_loop_signal.hpp"
 
 #include <realm/util/scope_exit.hpp>
 
+namespace {
+constexpr const char* result_sets_type_name = "__ResultSets";
+}
+
 namespace realm {
+
+namespace _impl {
+
+void initialize_schema(Group& group)
+{
+    std::string result_sets_table_name = ObjectStore::table_name_for_object_type(result_sets_type_name);
+    if (group.has_table(result_sets_table_name))
+        return;
+
+    TableRef table = sync::create_table(group, result_sets_table_name);
+    size_t indexable_column_idx = table->add_column(type_String, "name"); // Custom property
+    table->add_search_index(indexable_column_idx);
+    table->add_column(type_String, "query");
+    table->add_column(type_String, "matches_property");
+    table->add_column(type_Int, "status");
+    table->add_column(type_String, "error_message");
+    table->add_column(type_Int, "query_parse_counter");
+}
+
+} // namespace _impl
+
 namespace partial_sync {
 
 namespace {
-
-constexpr const char* result_sets_type_name = "__ResultSets";
 
 void update_schema(Group& group, Property matches_property)
 {
@@ -43,6 +68,7 @@ void update_schema(Group& group, Property matches_property)
 
     Schema desired_schema({
         ObjectSchema(result_sets_type_name, {
+            {"name", PropertyType::String, Property::IsPrimary{false}, Property::IsIndexed{true}},
             {"matches_property", PropertyType::String},
             {"query", PropertyType::String},
             {"status", PropertyType::Int},
@@ -54,6 +80,152 @@ void update_schema(Group& group, Property matches_property)
     auto required_changes = current_schema.compare(desired_schema);
     if (!required_changes.empty())
         ObjectStore::apply_additive_changes(group, required_changes, true);
+}
+
+bool validate_existing_subscription(std::shared_ptr<Realm> realm,
+                                    std::string const& name,
+                                    std::string const& query,
+                                    std::string const& matches_property,
+                                    ObjectSchema const& result_sets_schema)
+{
+    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), result_sets_type_name);
+    size_t name_idx = result_sets_schema.property_for_name("name")->table_column;
+    auto existing_row_ndx = table->find_first_string(name_idx, name);
+    if (existing_row_ndx == npos)
+        return false;
+
+    Object existing_object(realm, result_sets_schema, table->get(existing_row_ndx));
+
+    CppContext context;
+    std::string existing_query = any_cast<std::string>(existing_object.get_property_value<util::Any>(context, "query"));
+    if (existing_query != query)
+        throw std::runtime_error("An existing subscription exists with the same name, but a different query.");
+
+    std::string existing_matches_property = any_cast<std::string>(existing_object.get_property_value<util::Any>(context, "matches_property"));
+    if (existing_matches_property != matches_property)
+        throw std::runtime_error("An existing subscription exists with the same name, but a different result type.");
+
+    return true;
+}
+
+class WorkQueue {
+public:
+    ~WorkQueue()
+    {
+        reset();
+    }
+
+    void reset()
+    {
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            m_stopping = true;
+        }
+        m_cv.notify_one();
+
+        if (m_thread.joinable())
+            m_thread.join();
+
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            m_stopping = false;
+        }
+    }
+
+    void enqueue(std::function<void()> function)
+    {
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            m_queue.push_back(std::move(function));
+
+            if (m_stopped)
+                create_thread();
+        }
+        m_cv.notify_one();
+    }
+
+private:
+    void create_thread()
+    {
+        if (m_thread.joinable())
+            m_thread.join();
+
+        m_thread = std::thread([this] {
+            std::vector<std::function<void()>> queue;
+
+            std::unique_lock<std::mutex> lock(m_mutex);
+            while (!m_stopping &&
+                   m_cv.wait_for(lock, std::chrono::milliseconds(500),
+                                 [&] { return !m_queue.empty() || m_stopping; })) {
+
+                swap(queue, m_queue);
+
+                lock.unlock();
+                for (auto& f : queue)
+                    f();
+                queue.clear();
+                lock.lock();
+            }
+
+            m_stopped = true;
+        });
+        m_stopped = false;
+    }
+
+    std::mutex m_mutex;
+    std::condition_variable m_cv;
+    std::vector<std::function<void()>> m_queue;
+    std::thread m_thread;
+    bool m_stopping = false;
+    bool m_stopped = true;
+};
+
+static auto& work_queue = *new WorkQueue;
+
+void async_register_query(Realm& realm, std::string object_type, std::string query, std::string name,
+                          std::function<void(std::exception_ptr)> callback)
+{
+    work_queue.enqueue([object_type=std::move(object_type), query=std::move(query), name=std::move(name),
+                        callback=std::move(callback), config=realm.config()] {
+        auto realm = Realm::get_shared_realm(config);
+        realm->begin_transaction();
+        auto cleanup = util::make_scope_exit([&]() noexcept {
+            if (realm->is_in_transaction())
+                realm->cancel_transaction();
+        });
+
+        auto matches_property = std::string(object_type) + "_matches";
+
+        update_schema(realm->read_group(), Property(matches_property, PropertyType::Object|PropertyType::Array, object_type));
+        auto result_sets_schema = std::make_unique<ObjectSchema>(realm->read_group(), result_sets_type_name);
+
+        try {
+            if (!validate_existing_subscription(realm, name, query,
+                                                matches_property, *result_sets_schema)) {
+                CppContext context;
+                auto object = Object::create<util::Any>(context, realm, *result_sets_schema,
+                                                        AnyDict{
+                                                            {"matches_property", matches_property},
+                                                            {"name", name},
+                                                            {"query", query},
+                                                            {"status", int64_t(0)},
+                                                            {"error_message", std::string()},
+                                                            {"query_parse_counter", int64_t(0)},
+                                                        }, false);
+            }
+        } catch (...) {
+            callback(std::current_exception());
+            return;
+        }
+
+        realm->commit_transaction();
+        realm->close();
+    });
+}
+
+std::string default_name_for_query(const std::string& query, const std::string& object_type)
+{
+    return util::format("[%1] %2", object_type, query);
 }
 
 } // unnamed namespace
@@ -88,6 +260,7 @@ void register_query(std::shared_ptr<Realm> realm, const std::string &object_clas
         CppContext context;
         raw_object = Object::create<util::Any>(context, realm, *result_sets_schema,
                                                AnyDict{
+                                                   {"name", query},
                                                    {"matches_property", matches_property},
                                                    {"query", query},
                                                    {"status", int64_t(0)},
@@ -127,6 +300,182 @@ void register_query(std::shared_ptr<Realm> realm, const std::string &object_clas
         object.reset();
     };
     object->add_notification_callback(std::move(notification_callback));
+}
+
+struct Subscription::ErrorNotifier : std::enable_shared_from_this<Subscription::ErrorNotifier> {
+    ErrorNotifier(Subscription* subscription)
+    : m_subscription(subscription)
+    {
+    }
+
+    void initialize()
+    {
+        std::weak_ptr<ErrorNotifier> weak_self = shared_from_this();
+        m_signal = std::make_unique<util::EventLoopSignal<std::function<void()>>>([=]{
+            if (auto self = weak_self.lock())
+                self->notify_subscription();
+        });
+    }
+
+    void error_occurred(std::exception_ptr error)
+    {
+        REALM_ASSERT(m_signal);
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            m_error = error;
+        }
+        m_signal->notify();
+    }
+
+    void subscription_moved(Subscription *from, Subscription *to)
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        REALM_ASSERT(m_subscription == from);
+        m_subscription = to;
+    }
+
+    void invalidate()
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_subscription = nullptr;
+    }
+
+private:
+
+    void notify_subscription()
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        if (m_subscription)
+            m_subscription->error_occurred();
+    }
+
+    Subscription *m_subscription = nullptr;
+    std::exception_ptr m_error = nullptr;
+    std::unique_ptr<util::EventLoopSignal<std::function<void()>>> m_signal;
+    std::mutex m_mutex;
+};
+
+Subscription subscribe(Results const& results, util::Optional<std::string> user_provided_name)
+{
+    auto realm = results.get_realm();
+
+    auto sync_config = realm->config().sync_config;
+    if (!sync_config || !sync_config->is_partial)
+        throw std::logic_error("A partial sync query can only be registered in a partially synced Realm");
+
+    auto query = results.get_query().get_description();
+    std::string name = user_provided_name ? std::move(*user_provided_name) : default_name_for_query(query,results.get_object_type());
+
+    Subscription subscription(name, results.get_object_type(), realm);
+    std::weak_ptr<Subscription::ErrorNotifier> weak_notifier = subscription.m_error_notifier;
+    async_register_query(*realm, results.get_object_type(), std::move(query), std::move(name),
+                         [weak_notifier=std::move(weak_notifier)](std::exception_ptr error) {
+        if (auto notifier = weak_notifier.lock()) {
+            notifier->error_occurred(error);
+        }
+    });
+    return subscription;
+}
+
+void reset_for_testing()
+{
+    work_queue.reset();
+}
+
+Subscription::Subscription(std::string name, std::string object_type, std::shared_ptr<Realm> realm)
+: m_object_schema(std::make_unique<ObjectSchema>(realm->read_group(), result_sets_type_name))
+, m_error_notifier(std::make_shared<ErrorNotifier>(this))
+{
+    m_error_notifier->initialize();
+
+    auto matches_property = std::string(object_type) + "_matches";
+
+    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), result_sets_type_name);
+    Query query = table->where();
+    query.equal(m_object_schema->property_for_name("name")->table_column, name);
+    query.equal(m_object_schema->property_for_name("matches_property")->table_column, matches_property);
+    m_result_sets = Results(realm, std::move(query));
+}
+
+Subscription::~Subscription()
+{
+    if (m_error_notifier)
+        m_error_notifier->invalidate();
+}
+
+Subscription::Subscription(Subscription&& other)
+: m_object_schema(std::move(other.m_object_schema))
+, m_result_sets(std::move(other.m_result_sets))
+, m_error_notifier(std::move(other.m_error_notifier))
+{
+    if (m_error_notifier)
+        m_error_notifier->subscription_moved(&other, this);
+}
+
+Subscription& Subscription::operator=(Subscription&& other)
+{
+    if (this != &other) {
+        m_object_schema = std::move(other.m_object_schema);
+        m_result_sets = std::move(other.m_result_sets);
+        m_error_notifier = std::move(other.m_error_notifier);
+        if (m_error_notifier)
+            m_error_notifier->subscription_moved(&other, this);
+    }
+
+    return *this;
+}
+
+NotificationToken Subscription::add_notification_callback(std::function<void ()> callback)
+{
+    return m_result_sets.add_notification_callback([callback=std::move(callback)] (CollectionChangeSet, std::exception_ptr) {
+        callback();
+    });
+}
+
+util::Optional<Object> Subscription::result_set_object() const
+{
+    if (auto row = m_result_sets.first())
+        return Object(m_result_sets.get_realm(), *m_object_schema, *row);
+
+    return util::none;
+}
+
+SubscriptionState Subscription::status() const
+{
+    if (auto object = result_set_object()) {
+        CppContext context;
+        auto value = any_cast<int64_t>(object->get_property_value<util::Any>(context, "status"));
+        return (SubscriptionState)value;
+    }
+
+    return SubscriptionState::Uninitialized;
+}
+
+util::Optional<std::string> Subscription::error_message() const
+{
+    if (auto object = result_set_object()) {
+        CppContext context;
+        auto message = any_cast<std::string>(object->get_property_value<util::Any>(context, "error_message"));
+        return message.size() ? util::make_optional(message) : util::none;
+    }
+
+    return util::none;
+}
+
+Results Subscription::results() const
+{
+    auto object = result_set_object();
+    REALM_ASSERT_RELEASE(object);
+
+    CppContext context;
+    auto matches_property = any_cast<std::string>(object->get_property_value<util::Any>(context, "matches_property"));
+    auto list = any_cast<List>(object->get_property_value<util::Any>(context, matches_property));
+    return list.as_results();
+}
+
+void Subscription::error_occurred()
+{
+    // FIXME: we should trigger our notification callbacks so that callers know our state has changed.
 }
 
 } // namespace partial_sync

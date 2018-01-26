@@ -91,6 +91,7 @@ set(INCLUDE_DIRS
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/partial_sync.hpp
+        sync/subscription_state.hpp
         sync/sync_config.hpp
         sync/sync_manager.hpp
         sync/sync_permission.hpp
