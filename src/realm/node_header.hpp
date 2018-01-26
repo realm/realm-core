@@ -197,6 +197,45 @@ public:
         h[1] = uchar((value >> 8) & 0x000000FF);
         h[2] = uchar(value & 0x000000FF);
     }
+
+    static size_t get_byte_size_from_header(const char* header) noexcept
+    {
+        size_t size = get_size_from_header(header);
+        uint_least8_t width = get_width_from_header(header);
+        WidthType wtype = get_wtype_from_header(header);
+        size_t num_bytes = calc_byte_size(wtype, size, width);
+
+        return num_bytes;
+    }
+
+    static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
+    {
+        size_t num_bytes = 0;
+        switch (wtype) {
+            case wtype_Bits: {
+                // Current assumption is that size is at most 2^24 and that width is at most 64.
+                // In that case the following will never overflow. (Assuming that size_t is at least 32 bits)
+                REALM_ASSERT_3(size, <, 0x1000000);
+                size_t num_bits = size * width;
+                num_bytes = (num_bits + 7) >> 3;
+                break;
+            }
+            case wtype_Multiply: {
+                num_bytes = size * width;
+                break;
+            }
+            case wtype_Ignore:
+                num_bytes = size;
+                break;
+        }
+
+        // Ensure 8-byte alignment
+        num_bytes = (num_bytes + 7) & ~size_t(7);
+
+        num_bytes += header_size;
+
+        return num_bytes;
+    }
 };
 }
 

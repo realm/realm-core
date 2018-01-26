@@ -316,7 +316,6 @@ protected:
     // Includes array header. Not necessarily 8-byte aligned.
     virtual size_t calc_byte_len(size_t num_items, size_t width) const;
     virtual size_t calc_item_count(size_t bytes, size_t width) const noexcept;
-    static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept;
     static void init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
                             WidthType width_type, int width, size_t size, size_t capacity) noexcept;
 
@@ -345,35 +344,6 @@ protected:
     mutable size_t m_col_ndx = realm::npos;
 };
 
-
-inline size_t Node::calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
-{
-    size_t num_bytes = 0;
-    switch (wtype) {
-        case wtype_Bits: {
-            // Current assumption is that size is at most 2^24 and that width is at most 64.
-            // In that case the following will never overflow. (Assuming that size_t is at least 32 bits)
-            REALM_ASSERT_3(size, <, 0x1000000);
-            size_t num_bits = size * width;
-            num_bytes = (num_bits + 7) >> 3;
-            break;
-        }
-        case wtype_Multiply: {
-            num_bytes = size * width;
-            break;
-        }
-        case wtype_Ignore:
-            num_bytes = size;
-            break;
-    }
-
-    // Ensure 8-byte alignment
-    num_bytes = (num_bytes + 7) & ~size_t(7);
-
-    num_bytes += header_size;
-
-    return num_bytes;
-}
 
 inline void Node::init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
                               WidthType width_type, int width, size_t size, size_t capacity) noexcept

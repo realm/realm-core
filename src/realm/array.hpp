@@ -745,9 +745,6 @@ protected:
 
     static MemRef clone(MemRef header, Allocator& alloc, Allocator& target_alloc);
 
-    /// Same as get_byte_size().
-    static size_t get_byte_size_from_header(const char*) noexcept;
-
     // Overriding method in ArrayParent
     void update_child_ref(size_t, ref_type) override;
 
@@ -798,6 +795,7 @@ private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
     ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
 
+    friend class Allocator;
     friend class SlabAlloc;
     friend class GroupWriter;
     friend class StringColumn;
@@ -817,7 +815,7 @@ public:
 template <>
 class QueryState<int64_t> : public QueryStateBase {
 public:
-    int64_t m_state;
+    int64_t m_state = 0;
 
     template <Action action>
     bool uses_val()
@@ -1318,20 +1316,9 @@ inline size_t Array::get_byte_size() const noexcept
 {
     const char* header = get_header_from_data(m_data);
     WidthType wtype = Node::get_wtype_from_header(header);
-    size_t num_bytes = calc_byte_size(wtype, m_size, m_width);
+    size_t num_bytes = NodeHeader::calc_byte_size(wtype, m_size, m_width);
 
     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||, num_bytes, <=, get_capacity_from_header(header));
-
-    return num_bytes;
-}
-
-
-inline size_t Array::get_byte_size_from_header(const char* header) noexcept
-{
-    size_t size = Node::get_size_from_header(header);
-    uint_least8_t width = Node::get_width_from_header(header);
-    WidthType wtype = Node::get_wtype_from_header(header);
-    size_t num_bytes = calc_byte_size(wtype, size, width);
 
     return num_bytes;
 }

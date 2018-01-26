@@ -277,6 +277,15 @@ public:
     /// and force any later address translations to trigger decryption if required.
     void update_reader_view(size_t file_size);
 
+    /// Get an ID for the current mapping version. This ID changes whenever any part
+    /// of an existing mapping is changed. Such a change requires all refs to be
+    /// retranslated to new pointers. The allocator tries to avoid this, and we
+    /// believe it will only ever occur on Windows based platforms.
+    uint64_t get_mapping_version()
+    {
+        return m_mapping_version;
+    }
+
     /// Returns true initially, and after a call to reset_free_space_tracking()
     /// up until the point of the first call to SlabAlloc::alloc(). Note that a
     /// call to SlabAlloc::alloc() corresponds to a mutation event.
@@ -291,7 +300,6 @@ public:
     bool is_all_free() const;
     void print() const;
 #endif
-    struct MappedFile;
 
 protected:
     MemRef do_alloc(const size_t size) override;
@@ -301,25 +309,16 @@ protected:
     char* do_translate(ref_type) const noexcept override;
 
     /// Returns the first section boundary *above* the given position.
-    size_t get_upper_section_boundary(size_t start_pos) const noexcept;
+    uint64_t get_upper_section_boundary(uint64_t start_pos) const noexcept;
+
+    /// Returns the section boundary at or above the given size
+    uint64_t align_size_to_section_boundary(uint64_t size) const noexcept;
 
     /// Returns the first section boundary *at or below* the given position.
-    size_t get_lower_section_boundary(size_t start_pos) const noexcept;
+    uint64_t get_lower_section_boundary(uint64_t start_pos) const noexcept;
 
     /// Returns true if the given position is at a section boundary
     bool matches_section_boundary(size_t pos) const noexcept;
-
-    /// Returns the index of the section holding a given address.
-    /// The section index is determined solely by the minimal section size,
-    /// and does not necessarily reflect the mapping. A mapping may
-    /// cover multiple sections - the initial mapping often does.
-    size_t get_section_index(size_t pos) const noexcept;
-
-    /// Reverse: get the base offset of a section at a given index. Since the
-    /// computation is very time critical, this method just looks it up in
-    /// a table. The actual computation and setup of that table is done
-    /// during initialization with the help of compute_section_base() below.
-    inline size_t get_section_base(size_t index) const noexcept;
 
     /// Actually compute the starting offset of a section. Only used to initialize
     /// a table of predefined results, which are then used by get_section_base().
@@ -331,7 +330,6 @@ protected:
     size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
 
 private:
-    void internal_invalidate_cache() noexcept;
     enum AttachMode {
         attach_None,        // Nothing is attached
         attach_OwnedBuffer, // We own the buffer (m_data = nullptr for empty buffer)
@@ -385,23 +383,14 @@ private:
 
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
-    // The mappings are shared, if they are from a file
-    std::shared_ptr<MappedFile> m_file_mappings;
-
-    // We are caching local copies of all the additional mappings to allow
-    // for lock-free lookup during ref->address translation (we do not need
-    // to cache the first mapping, because it is immutable) (well, all the
-    // mappings are immutable, but the array holding them is not - it may
-    // have to be relocated)
-    std::unique_ptr<std::shared_ptr<const util::File::Map<char>>[]> m_local_mappings;
-    size_t m_num_local_mappings = 0;
+    std::vector<std::shared_ptr<util::File::Map<char>>> m_mappings;
+    std::vector<FastMap> m_fast_mapping;
+    uint64_t m_mapping_version = 1;
+    util::File m_file;
 
     const char* m_data = nullptr;
-    size_t m_initial_chunk_size = 0;
     size_t m_initial_section_size = 0;
     int m_section_shifts = 0;
-    std::unique_ptr<size_t[]> m_section_bases;
-    size_t m_num_section_bases = 0;
     AttachMode m_attach_mode = attach_None;
     enum FeeeSpaceState {
         free_space_Clean,
@@ -426,13 +415,6 @@ private:
     chunks m_free_read_only;
 
     bool m_debug_out = false;
-    struct hash_entry {
-        ref_type ref = 0;
-        const char* addr = nullptr;
-        size_t version = 0;
-    };
-    mutable hash_entry cache[256];
-    mutable size_t version = 1;
 
     /// Throws if free-lists are no longer valid.
     void consolidate_free_read_only();
@@ -468,10 +450,6 @@ private:
     friend class GroupWriter;
 };
 
-inline void SlabAlloc::internal_invalidate_cache() noexcept
-{
-    ++version;
-}
 
 class SlabAlloc::DetachGuard {
 public:
@@ -500,7 +478,6 @@ inline void SlabAlloc::own_buffer() noexcept
 {
     REALM_ASSERT_3(m_attach_mode, ==, attach_UsersBuffer);
     REALM_ASSERT(m_data);
-    REALM_ASSERT(m_file_mappings == nullptr);
     m_attach_mode = attach_OwnedBuffer;
 }
 
@@ -543,24 +520,27 @@ inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab
     return ref < slab.ref_end;
 }
 
-inline size_t SlabAlloc::get_upper_section_boundary(size_t start_pos) const noexcept
+inline uint64_t SlabAlloc::get_upper_section_boundary(uint64_t start_pos) const noexcept
 {
     return get_section_base(1 + get_section_index(start_pos));
 }
 
-inline size_t SlabAlloc::get_lower_section_boundary(size_t start_pos) const noexcept
+inline uint64_t SlabAlloc::align_size_to_section_boundary(uint64_t size) const noexcept
+{
+    if (matches_section_boundary(size))
+        return size;
+    else
+        return get_upper_section_boundary(size);
+}
+
+inline uint64_t SlabAlloc::get_lower_section_boundary(uint64_t start_pos) const noexcept
 {
     return get_section_base(get_section_index(start_pos));
 }
 
-inline bool SlabAlloc::matches_section_boundary(size_t pos) const noexcept
+inline bool SlabAlloc::matches_section_boundary(uint64_t pos) const noexcept
 {
     return pos == get_lower_section_boundary(pos);
-}
-
-inline size_t SlabAlloc::get_section_base(size_t index) const noexcept
-{
-    return m_section_bases[index];
 }
 
 } // namespace realm

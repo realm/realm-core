@@ -1670,7 +1670,7 @@ inline bool TransactLogParser::has_next() noexcept
 template <class InstructionHandler>
 void TransactLogParser::parse_one(InstructionHandler& handler)
 {
-    char instr_ch;
+    char instr_ch = 0; // silence a warning
     if (!read_char(instr_ch))
         parser_error(); // Throws
     //    std::cerr << "parsing " << util::promote(instr) << " @ " << std::hex << long(m_input_begin) << std::dec <<

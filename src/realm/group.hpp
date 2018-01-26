@@ -579,6 +579,7 @@ private:
     Array m_top;
     Array m_tables;
     ArrayStringShort m_table_names;
+    uint64_t m_last_seen_mapping_version = 0;
 
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
@@ -835,6 +836,7 @@ inline Group::Group(const std::string& file, const char* key, OpenMode mode)
 
     open(file, key, mode); // Throws
 }
+
 
 inline Group::Group(BinaryData buffer, bool take_ownership)
     : m_alloc() // Throws

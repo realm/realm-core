@@ -102,7 +102,7 @@ inline void erase(TableRef table, const OrderVec& order)
 int main()
 {
     const size_t target_size = 1100 * 100L;
-    const int num_tables = 500;
+    const int num_tables = 20;
     std::cout << "Number of tables: " << num_tables << "\n";
     std::cout << "Elements per table: " << target_size << "\n";
 
