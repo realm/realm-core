@@ -164,6 +164,10 @@ public:
     // Whether or not elements can be null.
     bool is_nullable(size_t col_ndx) const;
 
+    // Returns the link type for the given column.
+    // Throws an LogicError if target column is not a link column.
+    LinkType get_link_type(size_t col_ndx) const;
+
     //@{
     /// Conventience functions for inspecting the dynamic table type.
     ///
