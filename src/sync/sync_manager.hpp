@@ -88,10 +88,6 @@ public:
     void set_log_level(util::Logger::Level) noexcept;
     void set_logger_factory(SyncLoggerFactory&) noexcept;
 
-    /// Control whether the sync client attempts to reconnect immediately. Only set this to `true` for testing purposes.
-    void set_client_should_reconnect_immediately(bool reconnect_immediately);
-    bool client_should_reconnect_immediately() const noexcept;
-
     /// Ask all valid sync sessions to perform whatever tasks might be necessary to
     /// re-establish connectivity with the Realm Object Server. It is presumed that
     /// the caller knows that network connectivity has been restored.
