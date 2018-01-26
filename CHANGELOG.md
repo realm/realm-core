@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* None.
+* Added `Tabe::get_link_type()` as a helper method for getting the link type from link columns.
 
 -----------
 
