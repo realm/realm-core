@@ -36,35 +36,37 @@ class Realm;
 namespace partial_sync {
 enum class SubscriptionState : int8_t;
 
+struct SubscriptionNotificationToken {
+    NotificationToken subscription_token;
+    NotificationToken error_token;
+};
+
 class Subscription {
 public:
     ~Subscription();
     Subscription(Subscription&&);
     Subscription& operator=(Subscription&&);
 
-    Subscription(Subscription const&) = delete;
-    Subscription& operator=(Subscription const&) = delete;
-
     SubscriptionState status() const;
     util::Optional<std::string> error_message() const;
 
     Results results() const;
 
-    NotificationToken add_notification_callback(std::function<void()> callback);
+    SubscriptionNotificationToken add_notification_callback(std::function<void()> callback);
 
 private:
     Subscription(std::string name, std::string object_type, std::shared_ptr<Realm>);
 
     util::Optional<Object> result_set_object() const;
 
-    void error_occurred();
+    void error_occurred(std::exception_ptr);
 
     std::unique_ptr<ObjectSchema> m_object_schema;
 
     mutable Results m_result_sets;
 
     struct ErrorNotifier;
-    std::shared_ptr<ErrorNotifier> m_error_notifier;
+    _impl::CollectionNotifier::Handle<ErrorNotifier> m_error_notifier;
 
     friend Subscription subscribe(Results const&, util::Optional<std::string>);
 };
