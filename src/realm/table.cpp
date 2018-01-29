@@ -1841,6 +1841,19 @@ bool Table::is_nullable(size_t col_ndx) const
            m_spec->get_column_type(col_ndx) == col_type_Link;
 }
 
+LinkType Table::get_link_type(size_t col_ndx) const
+{
+    if (!is_attached()) {
+        throw LogicError{LogicError::detached_accessor};
+    }
+    if (!(m_spec->get_column_type(col_ndx) == col_type_Link) &&
+        !(m_spec->get_column_type(col_ndx) == col_type_LinkList)) {
+        throw LogicError{LogicError::illegal_type};
+    }
+    REALM_ASSERT_DEBUG(col_ndx < m_spec->get_column_count());
+    return (m_spec->get_column_attr(col_ndx) & col_attr_StrongLinks) ? LinkType::link_Strong : LinkType::link_Weak;
+}
+
 const ColumnBase& Table::get_column_base(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(ndx < m_spec->get_column_count());
