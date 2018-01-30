@@ -138,6 +138,20 @@ KeyPath key_path_from_string(const std::string &s) {
     return key_path;
 }
 
+std::string key_path_to_string(const KeyPath& keypath)
+{
+    std::string path = "";
+    for (size_t i = 0; i < keypath.size(); ++i) {
+        if (!keypath[i].empty()) {
+            path += keypath[i];
+            if (i < keypath.size() - 1) {
+                path += serializer::value_separator;
+            }
+        }
+    }
+    return path;
+}
+
 StringData get_printable_table_name(const Table& table)
 {
     StringData name = table.get_name();

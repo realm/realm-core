@@ -24,10 +24,10 @@
 namespace realm {
 namespace parser {
 
-ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression& e, query_builder::Arguments& args)
+ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression& e, query_builder::Arguments& args, parser::KeyPathMapping& mapping)
 {
     if (e.type == parser::Expression::Type::KeyPath) {
-        PropertyExpression pe(query, e.s);
+        PropertyExpression pe(query, e.s, mapping);
         switch (e.collection_op) {
             case parser::Expression::KeyPathOp::Min:
                 type = ExpressionInternal::exp_OpMin;
@@ -71,6 +71,19 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
                 storage = std::move(pe);
                 break;
         }
+    }
+    else if (e.type == parser::Expression::Type::SubQuery) {
+        REALM_ASSERT_DEBUG(e.subquery);
+        type = ExpressionInternal::exp_SubQuery;
+        SubqueryExpression exp(query, e.subquery_path, e.subquery_var, mapping);
+        // The least invasive way to do the variable substituion is to simply remove the variable prefix
+        // from all query keypaths. This only works because core does not support anything else (such as referencing
+        // other properties of the parent table).
+        // This means that every keypath must start with the variable, we require it to be there and remove it.
+        mapping.add_mapping(exp.get_subquery().get_table(), e.subquery_var, "");
+        query_builder::apply_predicate(exp.get_subquery(), *e.subquery, args, mapping);
+        mapping.remove_mapping(exp.get_subquery().get_table(), e.subquery_var);
+        storage = std::move(exp);
     }
     else {
         type = ExpressionInternal::exp_Value;
@@ -125,6 +138,12 @@ CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>& Express
     return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>&>(storage);
 }
 
+SubqueryExpression& ExpressionContainer::get_subexpression()
+{
+    REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_SubQuery);
+    return util::any_cast<SubqueryExpression&>(storage);
+}
+
 DataType ExpressionContainer::check_type_compatibility(DataType other_type)
 {
     util::Optional<DataType> self_type;
@@ -147,6 +166,8 @@ DataType ExpressionContainer::check_type_compatibility(DataType other_type)
         case ExpressionInternal::exp_OpAvg:
             self_type = get_avg().post_link_col_type;
             break;
+        case ExpressionInternal::exp_SubQuery:
+            REALM_FALLTHROUGH;
         case ExpressionInternal::exp_OpCount:
             // linklist count can handle any numeric type
             if (other_type == type_Int || other_type == type_Double || other_type == type_Float) {
@@ -176,7 +197,8 @@ bool is_count_type(ExpressionContainer::ExpressionInternal exp_type)
 {
     return exp_type == ExpressionContainer::ExpressionInternal::exp_OpCount
         || exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeString
-        || exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeBinary;
+        || exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeBinary
+        || exp_type == ExpressionContainer::ExpressionInternal::exp_SubQuery;
 }
 
 DataType ExpressionContainer::get_comparison_type(ExpressionContainer& rhs) {

@@ -104,6 +104,11 @@ static std::vector<std::string> valid_queries = {
     "a09._br.z = __-__.Z-9",
     "$0 = $19",
     "$0=$0",
+    // properties can contain '$'
+    "a$a = a",
+    "$-1 = $0",
+    "$a = $0",
+    "$ = $",
 
     // operators
     "0=0",
@@ -190,6 +195,12 @@ static std::vector<std::string> valid_queries = {
     "a == b sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
     "a == b and c==d sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
     "a == b  sort(     a   ASC  ,  b DESC) and c==d   DISTINCT(   p )  sort(   c   ASC  ,  d   DESC  )  DISTINCT(   q.r ,   p)   ",
+
+    // subquery expression
+    "SUBQUERY(items, $x, $x.name == 'Tom').@size > 0",
+    "SUBQUERY(items, $x, $x.name == 'Tom').@count > 0",
+    "SUBQUERY(items, $x, $x.allergens.@min.population_affected < 0.10).@count > 0",
+    "SUBQUERY(items, $x, $x.name == 'Tom').@count == SUBQUERY(items, $x, $x.price < 10).@count",
 };
 
 static std::vector<std::string> invalid_queries = {
@@ -212,11 +223,7 @@ static std::vector<std::string> invalid_queries = {
     "0x = 1",
     "- = a",
     "a..b = a",
-    "a$a = a",
     "{} = $0",
-    "$-1 = $0",
-    "$a = $0",
-    "$ = $",
 
     // operators
     "0===>0",
@@ -267,6 +274,17 @@ static std::vector<std::string> invalid_queries = {
     "a=b DISTINCT(p", // no braces
     "a=b sort(p.q DESC a ASC)", // missing comma
     "a=b DISTINCT(p q)", // missing comma
+
+    // subquery
+    "SUBQUERY(items, $x, $x.name == 'Tom') > 0", // missing .@count
+    "SUBQUERY(items, $x, $x.name == 'Tom').@min > 0", // @min not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom').@max > 0", // @max not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom').@sum > 0", // @sum not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom').@avg > 0", // @avg not yet supported
+    "SUBQUERY(items, var, var.name == 'Tom').@avg > 0", // variable must start with '$'
+    "SUBQUERY(, $x, $x.name == 'Tom').@avg > 0", // a target keypath is required
+    "SUBQUERY(items, , name == 'Tom').@avg > 0", // a variable name is required
+    "SUBQUERY(items, $x, ).@avg > 0", // the subquery is required
 };
 
 TEST(Parser_valid_queries) {
@@ -296,7 +314,7 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
-    std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
     realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
@@ -1630,9 +1648,12 @@ TEST(Parser_SubqueryVariableNames)
     }
     test_state.subquery_prefix_list.push_back("$xx");
     test_state.subquery_prefix_list.push_back("$xy");
+    test_state.subquery_prefix_list.push_back("$xz");
+    test_state.subquery_prefix_list.push_back("$xa");
+
     std::string unique_variable = test_state.get_variable_name(test_table);
 
-    CHECK_EQUAL(unique_variable, "$xz");
+    CHECK_EQUAL(unique_variable, "$xb");
 }
 
 TEST(Parsr_Subquery)
@@ -1655,12 +1676,14 @@ TEST(Parsr_Subquery)
     discounts->set_string(discount_name_col, 1, "pizza lunch special");
     discounts->set_string(discount_name_col, 2, "manager's special");
 
-    TableRef ingredients = g.add_table("class_Ingredients");
+    TableRef ingredients = g.add_table("class_Allergens");
     size_t ingredient_name_col = ingredients->add_column(type_String, "name");
-    std::vector<std::string> ingredients_list = { "dairy", "nuts", "wheat", "soy" };
+    size_t population_col = ingredients->add_column(type_Double, "population_affected");
+    std::vector<std::pair<std::string, double>> ingredients_list = { {"dairy", 0.75}, {"nuts", 0.01}, {"wheat", 0.01}, {"soy", 0.005} };
     for (size_t i = 0; i < ingredients_list.size(); ++i) {
         size_t row_ndx = ingredients->add_empty_row();
-        ingredients->set_string(ingredient_name_col, row_ndx, ingredients_list[i]);
+        ingredients->set_string(ingredient_name_col, row_ndx, ingredients_list[i].first);
+        ingredients->set_double(population_col, row_ndx, ingredients_list[i].second);
     }
 
     TableRef items = g.add_table("class_Items");
@@ -1693,10 +1716,12 @@ TEST(Parsr_Subquery)
     size_t id_col_ndx = t->add_column(type_Int, "customer_id");
     size_t account_col_ndx = t->add_column(type_Double, "account_balance");
     size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
+    size_t fav_col_ndx = t->add_column_link(type_Link, "fav_item", *items);
     t->add_empty_row(3);
     for (size_t i = 0; i < t->size(); ++i) {
         t->set_int(id_col_ndx, i, i);
         t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
+        t->set_link(fav_col_ndx, i, i);
     }
 
     LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
@@ -1715,14 +1740,10 @@ TEST(Parsr_Subquery)
     list_2->add(2);
     list_2->add(3);
 
-    // SUBQUERY(items, $x, $x.name CONTAINS 'a' && $x.price > 5)
-    // SUBQUERY(items, name CONTAINS 'a' && price > 5)
     Query q = t->column<LinkList>(items_col_ndx, items->column<String>(item_name_col).contains("a")
                                   && items->column<Double>(item_price_col) > 5.0
                                   && items->link(item_discount_col).column<Double>(discount_off_col) > 0.5
                                   && items->column<Link>(item_contains_col).count() > 1).count() > 1;
-
-//    Query q = t->column<LinkList>(items_col_ndx, items->column<Double>(item_price_col) > items->link(item_discount_col).column<Double>(discount_off_col)).count() > 1;
 
     std::string subquery_description = q.get_description();
     CHECK(subquery_description.find("SUBQUERY(items, $x,") != std::string::npos);
@@ -1730,12 +1751,54 @@ TEST(Parsr_Subquery)
     CHECK(subquery_description.find(" $x.price ") != std::string::npos);
     CHECK(subquery_description.find(" $x.discount.reduced_by ") != std::string::npos);
     CHECK(subquery_description.find(" $x.allergens.@count") != std::string::npos);
-
     TableView tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
 
-    //verify_query(test_context, t, "SUBQUERY(items, $x, TRUEPREDICATE).@count > 0", 2);
-    //verify_query(test_context, t, "SUBQUERY(items, $x, $x.name CONTAINS 'a' && $x.price > 5).@count > 0", 2);
+    // not variations inside/outside subquery, no variable substitution
+    verify_query(test_context, t, "SUBQUERY(items, $x, TRUEPREDICATE).@count > 0", 3);
+    verify_query(test_context, t, "!SUBQUERY(items, $x, TRUEPREDICATE).@count > 0", 0);
+    verify_query(test_context, t, "SUBQUERY(items, $x, !TRUEPREDICATE).@count > 0", 0);
+    verify_query(test_context, t, "SUBQUERY(items, $x, FALSEPREDICATE).@count == 0", 3);
+    verify_query(test_context, t, "!SUBQUERY(items, $x, FALSEPREDICATE).@count == 0", 0);
+    verify_query(test_context, t, "SUBQUERY(items, $x, !FALSEPREDICATE).@count == 0", 0);
+
+    // simple variable substitution
+    verify_query(test_context, t, "SUBQUERY(items, $x, 5.5 == $x.price ).@count > 0", 2);
+    // string constraint subquery
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.name CONTAINS[c] 'MILK').@count >= 1", 2);
+    // compound subquery &&
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.name CONTAINS[c] 'MILK' && $x.price == 5.5).@count >= 1", 2);
+    // compound subquery ||
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.name CONTAINS[c] 'MILK' || $x.price >= 5.5).@count >= 1", 3);
+    // variable name change
+    verify_query(test_context, t, "SUBQUERY(items, $anyNAME_-0123456789, 5.5 == $anyNAME_-0123456789.price ).@count > 0", 2);
+    // variable names cannot contain '.'
+    CHECK_THROW_ANY(verify_query(test_context, t, "SUBQUERY(items, $x.y, 5.5 == $x.y.price ).@count > 0", 2));
+    // variable name must begin with '$'
+    CHECK_THROW_ANY(verify_query(test_context, t, "SUBQUERY(items, x, 5.5 == x.y.price ).@count > 0", 2));
+    // subquery with string size
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.name.@size == 4).@count > 0", 2);
+    // subquery with list count
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.allergens.@count > 1).@count > 0", 2);
+    // subquery with list aggregate operation
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.allergens.@min.population_affected < 0.10).@count > 0", 2);
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.allergens.@max.population_affected > 0.50).@count > 0", 3);
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.allergens.@sum.population_affected > 0.75).@count > 0", 2);
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.allergens.@avg.population_affected > 0.50).@count > 0", 2);
+    // two column subquery
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.discount.promotion CONTAINS[c] $x.name).@count > 0", 2);
+    // subquery count (int) vs double
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.discount.promotion CONTAINS[c] $x.name).@count < account_balance", 3);
+    // subquery over link
+    verify_query(test_context, t, "SUBQUERY(fav_item.allergens, $x, $x.name CONTAINS[c] 'dairy').@count > 0", 2);
+    // nested subquery
+    verify_query(test_context, t, "SUBQUERY(items, $x, SUBQUERY($x.allergens, $allergy, $allergy.name CONTAINS[c] 'dairy').@count > 0).@count > 0", 3);
+    // target property must be a list
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(account_balance, $x, TRUEPREDICATE).@count > 0", 3), message);
+    CHECK_EQUAL(message, "A subquery must operate on a list property, but 'account_balance' is type 'Double'");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(fav_item, $x, TRUEPREDICATE).@count > 0", 3), message);
+    CHECK_EQUAL(message, "A subquery must operate on a list property, but 'fav_item' is type 'Link'");
 }
 
 #endif // TEST_PARSER

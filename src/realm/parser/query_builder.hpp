@@ -24,6 +24,7 @@
 #include <vector>
 
 #include <realm/binary_data.hpp>
+#include <realm/parser/keypath_mapping.hpp>
 #include <realm/null.hpp>
 #include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
@@ -46,7 +47,7 @@ namespace parser {
 namespace query_builder {
 class Arguments;
 
-void apply_predicate(Query& query, const parser::Predicate& predicate, Arguments& arguments);
+void apply_predicate(Query& query, const parser::Predicate& predicate, Arguments& arguments, parser::KeyPathMapping = parser::KeyPathMapping());
 void apply_predicate(Query& query, const parser::Predicate& predicate); // zero out of string args version
 
 void apply_ordering(DescriptorOrdering& ordering, TableRef target, const parser::DescriptorOrderingState& state, Arguments& arguments);

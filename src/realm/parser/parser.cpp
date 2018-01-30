@@ -91,7 +91,7 @@ struct single_collection_operators : sor< count, size > {};
 struct key_collection_operators : sor< min, max, sum, avg > {};
 
 // key paths
-struct key_path : list< seq< sor< alpha, one< '_' > >, star< sor< alnum, one< '_', '-' > > > >, one< '.' > > {};
+struct key_path : list< seq< sor< alpha, one< '_' >, one< '$' > >, star< sor< alnum, one< '_', '-', '$' > > > >, one< '.' > > {};
 
 struct key_path_prefix : disable< key_path > {};
 struct key_path_suffix : disable< key_path > {};
@@ -100,10 +100,21 @@ struct collection_operator_match : sor< seq< key_path_prefix, key_collection_ope
 
 // argument
 struct argument_index : plus< digit > {};
-struct argument : seq< one< '$' >, must< argument_index > > {};
+struct argument : seq< one< '$' >, argument_index > {};
+
+struct pred;
+// subquery eg: SUBQUERY(items, $x, $x.name CONTAINS 'a' && $x.price > 5).@count
+//struct sub_conditions : disable< pred > {};
+struct subq_prefix : seq< string_token_t("subquery"), star< blank >, one< '(' > > {};
+struct subq_suffix : one< ')' > {};
+struct sub_path : disable < key_path > {};
+struct sub_var_name : seq < one< '$' >, seq< sor< alpha, one< '_', '$' > >, star< sor< alnum, one< '_', '-', '$' > > > > > {};
+struct sub_result_op : sor< count, size > {};
+struct sub_preamble : seq< subq_prefix, pad< sub_path, blank >, one< ',' >, pad< sub_var_name, blank >, one< ',' > > {};
+struct subquery :  seq< sub_preamble, pad< pred, blank >, pad< subq_suffix, blank >, sub_result_op > {};
 
 // expressions and operators
-struct expr : sor< dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, base64, collection_operator_match, key_path > {};
+struct expr : sor< dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, base64, collection_operator_match, subquery, key_path > {};
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
 
 struct eq : seq< sor< two< '=' >, one< '=' > >, star< blank >, opt< case_insensitive > >{};
@@ -135,8 +146,12 @@ struct symbolic_oper : sor< noteq, lteq, lt, gteq, gt, eq > {};
 // predicates
 struct comparison_pred : seq< expr, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
 
-struct pred;
-struct group_pred : if_must< one< '(' >, pad< pred, blank >, one< ')' > > {};
+// we need to alias the group tokens because these are also used in other expressions above and we have to match
+// the predicae group tokens without also matching () in other expressions.
+struct begin_pred_group : one< '(' > {};
+struct end_pred_group : one< ')' > {};
+
+struct group_pred : if_must< begin_pred_group, pad< pred, blank >, end_pred_group > {};
 struct true_pred : string_token_t("truepredicate") {};
 struct false_pred : string_token_t("falsepredicate") {};
 
@@ -161,6 +176,8 @@ struct ParserState
     Expression::KeyPathOp pending_op;
     DescriptorOrderingState ordering_state;
     DescriptorOrderingState::SingleOrderingState temp_ordering;
+    std::string subquery_path, subquery_var;
+    std::vector<Predicate> subqueries;
 
     Predicate *current_group()
     {
@@ -429,6 +446,56 @@ template<> struct action< distinct >
     }
 };
 
+template<> struct action< sub_path >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string() + " SUB PATH");
+        state.subquery_path = in.string();
+    }
+};
+
+template<> struct action< sub_var_name >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string() + " SUB VAR NAME");
+        state.subquery_var = in.string();
+    }
+};
+
+// the preamble acts as the opening for a sub predicate group which is the subquery conditions
+template<> struct action< sub_preamble >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string() + "<BEGIN SUBQUERY CONDITIONS>");
+
+        Expression exp(Expression::Type::SubQuery);
+        exp.subquery_path = state.subquery_path;
+        exp.subquery_var = state.subquery_var;
+        exp.subquery = std::make_shared<Predicate>(Predicate::Type::And);
+        REALM_ASSERT_DEBUG(!state.subquery_var.empty() && !state.subquery_path.empty());
+        Predicate* sub_pred = exp.subquery.get();
+        state.add_expression(std::move(exp));
+        state.group_stack.push_back(sub_pred);
+    }
+};
+
+
+// once the whole subquery syntax is matched, we close the subquery group and add the expression
+template<> struct action< subquery >
+{
+    template< typename Input >
+    static void apply(const Input& in, ParserState & state)
+    {
+        DEBUG_PRINT_TOKEN(in.string() + "<END SUBQUERY CONDITIONS>");
+        state.group_stack.pop_back();
+    }
+};
 
 #define COLLECTION_OPERATION_ACTION(rule, type)                     \
 template<> struct action< rule > {                                  \
@@ -517,7 +584,7 @@ template<> struct action< case_insensitive >
     }
 };
 
-template<> struct action< one< '(' > >
+template<> struct action< begin_pred_group >
 {
     template< typename Input >
     static void apply(const Input&, ParserState & state)

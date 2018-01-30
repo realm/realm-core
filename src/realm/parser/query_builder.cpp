@@ -440,6 +440,8 @@ void add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, Expre
         case ExpressionContainer::ExpressionInternal::exp_OpAvg:
             do_add_null_comparison_to_query(query, cmp, exp.get_avg(), exp.get_avg().post_link_col_type, location);
             break;
+        case ExpressionContainer::ExpressionInternal::exp_SubQuery:
+            REALM_FALLTHROUGH;
         case ExpressionContainer::ExpressionInternal::exp_OpCount:
             REALM_FALLTHROUGH;
         case ExpressionContainer::ExpressionInternal::exp_OpSizeString:
@@ -480,6 +482,9 @@ void internal_add_comparison_to_query(Query& query, LHS_T& lhs, Predicate::Compa
         case ExpressionContainer::ExpressionInternal::exp_OpSizeBinary:
             do_add_comparison_to_query(query, cmp, lhs, rhs.get_size_binary(), comparison_type);
             return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_SubQuery:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_subexpression(), comparison_type);
+            return;
     }
 }
 
@@ -514,21 +519,29 @@ void add_comparison_to_query(Query &query, ExpressionContainer& lhs, Predicate::
         case ExpressionContainer::ExpressionInternal::exp_OpSizeBinary:
             internal_add_comparison_to_query(query, lhs.get_size_binary(), cmp, rhs, comparison_type);
             return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_SubQuery:
+            internal_add_comparison_to_query(query, lhs.get_subexpression(), cmp, rhs, comparison_type);
+            return;
     }
 }
 
-void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &args)
+bool is_property_operation(parser::Expression::Type type)
+{
+    return type == parser::Expression::Type::KeyPath || type == parser::Expression::Type::SubQuery;
+}
+
+void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &args, parser::KeyPathMapping& mapping)
 {
     const Predicate::Comparison &cmpr = pred.cmpr;
     auto lhs_type = cmpr.expr[0].type, rhs_type = cmpr.expr[1].type;
 
-    if (lhs_type != parser::Expression::Type::KeyPath && rhs_type != parser::Expression::Type::KeyPath) {
+    if (!is_property_operation(lhs_type) && !is_property_operation(rhs_type)) {
         // value vs value expressions are not supported (ex: 2 < 3 or null != null)
         throw std::logic_error("Predicate expressions must compare a keypath and another keypath or a constant value");
     }
 
-    ExpressionContainer lhs(query, cmpr.expr[0], args);
-    ExpressionContainer rhs(query, cmpr.expr[1], args);
+    ExpressionContainer lhs(query, cmpr.expr[0], args, mapping);
+    ExpressionContainer rhs(query, cmpr.expr[1], args, mapping);
 
     if (lhs.is_null()) {
         add_null_comparison_to_query(query, cmpr, rhs, NullLocation::NullOnLHS);
@@ -541,7 +554,7 @@ void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &arg
     }
 }
 
-void update_query_with_predicate(Query &query, const Predicate &pred, Arguments &arguments)
+void update_query_with_predicate(Query &query, const Predicate &pred, Arguments &arguments, parser::KeyPathMapping& mapping)
 {
     if (pred.negate) {
         query.Not();
@@ -551,7 +564,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
         case Predicate::Type::And:
             query.group();
             for (auto &sub : pred.cpnd.sub_predicates) {
-                update_query_with_predicate(query, sub, arguments);
+                update_query_with_predicate(query, sub, arguments, mapping);
             }
             if (!pred.cpnd.sub_predicates.size()) {
                 query.and_query(std::unique_ptr<realm::Expression>(new TrueExpression));
@@ -563,7 +576,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
             query.group();
             for (auto &sub : pred.cpnd.sub_predicates) {
                 query.Or();
-                update_query_with_predicate(query, sub, arguments);
+                update_query_with_predicate(query, sub, arguments, mapping);
             }
             if (!pred.cpnd.sub_predicates.size()) {
                 query.and_query(std::unique_ptr<realm::Expression>(new FalseExpression));
@@ -572,7 +585,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
             break;
 
         case Predicate::Type::Comparison: {
-            add_comparison_to_query(query, pred, arguments);
+            add_comparison_to_query(query, pred, arguments, mapping);
             break;
         }
         case Predicate::Type::True:
@@ -592,7 +605,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
 namespace realm {
 namespace query_builder {
 
-void apply_predicate(Query &query, const Predicate &predicate, Arguments &arguments)
+void apply_predicate(Query &query, const Predicate &predicate, Arguments &arguments, parser::KeyPathMapping mapping)
 {
 
     if (predicate.type == Predicate::Type::True && !predicate.negate) {
@@ -600,7 +613,7 @@ void apply_predicate(Query &query, const Predicate &predicate, Arguments &argume
         return;
     }
 
-    update_query_with_predicate(query, predicate, arguments);
+    update_query_with_predicate(query, predicate, arguments, mapping);
 
     // Test the constructed query in core
     std::string validateMessage = query.validate();

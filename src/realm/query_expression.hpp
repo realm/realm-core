@@ -3314,7 +3314,8 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        return state.describe_columns(m_link_map, realm::npos) + util::serializer::value_separator + Operation::description() + util::serializer::value_separator + m_column.description(state);
+        util::serializer::SerialisationState empty_state;
+        return state.describe_columns(m_link_map, realm::npos) + util::serializer::value_separator + Operation::description() + util::serializer::value_separator + m_column.description(empty_state);
     }
 
 private:
@@ -3364,9 +3365,10 @@ public:
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_link_map.base_table() != nullptr);
+        std::string target = state.describe_columns(m_link_map, realm::npos);
         std::string var_name = state.get_variable_name(m_link_map.base_table()->get_table_ref());
         state.subquery_prefix_list.push_back(var_name);
-        std::string desc = "SUBQUERY(" + m_link_map.description() + ", " + var_name + ", " + m_query.get_description(state) + ")"
+        std::string desc = "SUBQUERY(" + target + ", " + var_name + ", " + m_query.get_description(state) + ")"
             + util::serializer::value_separator + "@count";
         state.subquery_prefix_list.pop_back();
         return desc;

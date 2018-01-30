@@ -16,36 +16,41 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_PROPERTY_EXPRESSION_HPP
-#define REALM_PROPERTY_EXPRESSION_HPP
+#include "keypath_mapping.hpp"
+#include "parser_utils.hpp"
 
-#include <realm/parser/keypath_mapping.hpp>
-#include <realm/query.hpp>
-#include <realm/table.hpp>
 
 namespace realm {
 namespace parser {
 
-struct PropertyExpression
+KeyPathMapping::KeyPathMapping()
 {
-    std::vector<size_t> indexes;
-    size_t col_ndx;
-    DataType col_type;
-    Query &query;
+}
 
-    PropertyExpression(Query &q, const std::string &key_path_string, parser::KeyPathMapping& mapping);
+void KeyPathMapping::add_mapping(TableRef table, std::string name, std::string alias)
+{
+    m_mapping[{table, name}] = alias;
+}
 
-    Table* table_getter() const;
-
-    template <typename RetType>
-    auto value_of_type_for_query() const
-    {
-        return this->table_getter()->template column<RetType>(this->col_ndx);
+std::string KeyPathMapping::process_keypath(TableRef table, std::string path)
+{
+    KeyPath keypath = key_path_from_string(path);
+    if (keypath.size() == 0) {
+        return path;
     }
-};
+    auto it = m_mapping.find({table, keypath[0]});
+    if (it != m_mapping.end()) {
+        keypath[0] = it->second;
+    }
+    return key_path_to_string(keypath);
+}
+
+void KeyPathMapping::remove_mapping(TableRef table, std::string name)
+{
+    auto it = m_mapping.find({table, name});
+    REALM_ASSERT_DEBUG(it != m_mapping.end());
+    m_mapping.erase(it);
+}
 
 } // namespace parser
 } // namespace realm
-
-#endif // REALM_PROPERTY_EXPRESSION_HPP
-

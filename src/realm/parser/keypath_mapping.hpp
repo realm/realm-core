@@ -16,36 +16,32 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_PROPERTY_EXPRESSION_HPP
-#define REALM_PROPERTY_EXPRESSION_HPP
+#ifndef REALM_KEYPATH_MAPPING_HPP
+#define REALM_KEYPATH_MAPPING_HPP
 
-#include <realm/parser/keypath_mapping.hpp>
-#include <realm/query.hpp>
 #include <realm/table.hpp>
+
+#include <map>
+#include <string>
 
 namespace realm {
 namespace parser {
 
-struct PropertyExpression
+// This class holds state which allows aliasing variable names in key paths used in queries.
+// It is currently used to allow variable naming in subqueries such as 'SUBQUERY(list, $obj, $obj.intCol = 5).@count'
+// It could also be concievably used to allow querying named backlinks if bindings provide the mappings themselves.
+class KeyPathMapping
 {
-    std::vector<size_t> indexes;
-    size_t col_ndx;
-    DataType col_type;
-    Query &query;
-
-    PropertyExpression(Query &q, const std::string &key_path_string, parser::KeyPathMapping& mapping);
-
-    Table* table_getter() const;
-
-    template <typename RetType>
-    auto value_of_type_for_query() const
-    {
-        return this->table_getter()->template column<RetType>(this->col_ndx);
-    }
+public:
+    KeyPathMapping();
+    void add_mapping(TableRef table, std::string name, std::string alias);
+    void remove_mapping(TableRef table, std::string name);
+    std::string process_keypath(TableRef table, std::string path);
+protected:
+    std::map<std::pair<TableRef, std::string>, std::string> m_mapping;
 };
 
 } // namespace parser
 } // namespace realm
 
-#endif // REALM_PROPERTY_EXPRESSION_HPP
-
+#endif // REALM_KEYPATH_MAPPING_HPP

@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "property_expression.hpp"
+#include "subquery_expression.hpp"
 #include "parser_utils.hpp"
 
 #include <realm/table.hpp>
@@ -26,12 +26,12 @@
 namespace realm {
 namespace parser {
 
-PropertyExpression::PropertyExpression(Query &q, const std::string &key_path_string, parser::KeyPathMapping& mapping)
-: query(q)
+SubqueryExpression::SubqueryExpression(Query &q, const std::string &key_path_string, const std::string &variable_name, parser::KeyPathMapping &mapping)
+: var_name(variable_name), query(q)
 {
     TableRef cur_table = query.get_table();
-    std::string mapped_keypath = mapping.process_keypath(cur_table, key_path_string);
-    KeyPath key_path = key_path_from_string(mapped_keypath);
+    std::string processed_keypath = mapping.process_keypath(cur_table, key_path_string);
+    KeyPath key_path = key_path_from_string(processed_keypath);
     for (size_t index = 0; index < key_path.size(); index++) {
         size_t cur_col_ndx = cur_table->get_column_index(key_path[index]);
 
@@ -50,11 +50,21 @@ PropertyExpression::PropertyExpression(Query &q, const std::string &key_path_str
         else {
             col_ndx = cur_col_ndx;
             col_type = cur_col_type;
+            precondition(col_type == type_LinkList,
+                         util::format("A subquery must operate on a list property, but '%1' is type '%2'",
+                                      key_path[index], data_type_to_str(col_type)));
+            cur_table = cur_table->get_link_target(col_ndx);
+            subquery = cur_table->where();
         }
     }
 }
 
-Table* PropertyExpression::table_getter() const
+Query& SubqueryExpression::get_subquery()
+{
+    return subquery;
+}
+
+Table* SubqueryExpression::table_getter() const
 {
     auto& tbl = query.get_table();
     for (size_t col : indexes) {
