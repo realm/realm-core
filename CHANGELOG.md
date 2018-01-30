@@ -16,7 +16,7 @@
 
 ### Internals
 
-* None.
+* The devel-dbg Linux packages now correctly include static libraries instead of shared ones.
 
 ----------------------------------------------
 
