@@ -19,6 +19,7 @@
 #ifndef REALM_OS_PARTIAL_SYNC_HPP
 #define REALM_OS_PARTIAL_SYNC_HPP
 
+#include "object_schema.hpp"
 #include "results.hpp"
 
 #include <realm/util/optional.hpp>
@@ -61,7 +62,7 @@ private:
 
     void error_occurred(std::exception_ptr);
 
-    std::unique_ptr<ObjectSchema> m_object_schema;
+    ObjectSchema m_object_schema;
 
     mutable Results m_result_sets;
 

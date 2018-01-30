@@ -198,13 +198,13 @@ void async_register_query(Realm& realm, std::string object_type, std::string que
         auto matches_property = std::string(object_type) + "_matches";
 
         update_schema(realm->read_group(), Property(matches_property, PropertyType::Object|PropertyType::Array, object_type));
-        auto result_sets_schema = std::make_unique<ObjectSchema>(realm->read_group(), result_sets_type_name);
+        ObjectSchema result_sets_schema(realm->read_group(), result_sets_type_name);
 
         try {
             if (!validate_existing_subscription(realm, name, query,
-                                                matches_property, *result_sets_schema)) {
+                                                matches_property, result_sets_schema)) {
                 CppContext context;
-                auto object = Object::create<util::Any>(context, realm, *result_sets_schema,
+                auto object = Object::create<util::Any>(context, realm, result_sets_schema,
                                                         AnyDict{
                                                             {"matches_property", matches_property},
                                                             {"name", name},
@@ -403,7 +403,7 @@ void reset_for_testing()
 }
 
 Subscription::Subscription(std::string name, std::string object_type, std::shared_ptr<Realm> realm)
-: m_object_schema(std::make_unique<ObjectSchema>(realm->read_group(), result_sets_type_name))
+: m_object_schema(realm->read_group(), result_sets_type_name)
 {
     // FIXME: Why can't I do this in the initializer list?
     m_notifier = std::make_shared<Notifier>(realm);
@@ -413,8 +413,8 @@ Subscription::Subscription(std::string name, std::string object_type, std::share
 
     TableRef table = ObjectStore::table_for_object_type(realm->read_group(), result_sets_type_name);
     Query query = table->where();
-    query.equal(m_object_schema->property_for_name("name")->table_column, name);
-    query.equal(m_object_schema->property_for_name("matches_property")->table_column, matches_property);
+    query.equal(m_object_schema.property_for_name("name")->table_column, name);
+    query.equal(m_object_schema.property_for_name("matches_property")->table_column, matches_property);
     m_result_sets = Results(realm, std::move(query));
 }
 
@@ -437,7 +437,7 @@ util::Optional<Object> Subscription::result_set_object() const
 {
     if (m_notifier->subscription_completed()) {
         if (auto row = m_result_sets.first())
-            return Object(m_result_sets.get_realm(), *m_object_schema, *row);
+            return Object(m_result_sets.get_realm(), m_object_schema, *row);
     }
 
     return util::none;
