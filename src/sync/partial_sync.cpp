@@ -25,6 +25,7 @@
 #include "object_schema.hpp"
 #include "results.hpp"
 #include "shared_realm.hpp"
+#include "sync/impl/work_queue.hpp"
 #include "sync/subscription_state.hpp"
 #include "sync/sync_config.hpp"
 
@@ -109,85 +110,13 @@ bool validate_existing_subscription(std::shared_ptr<Realm> realm,
     return true;
 }
 
-class WorkQueue {
-public:
-    ~WorkQueue()
-    {
-        reset();
-    }
-
-    void reset()
-    {
-        {
-            std::unique_lock<std::mutex> lock(m_mutex);
-            m_stopping = true;
-        }
-        m_cv.notify_one();
-
-        if (m_thread.joinable())
-            m_thread.join();
-
-        {
-            std::unique_lock<std::mutex> lock(m_mutex);
-            m_stopping = false;
-        }
-    }
-
-    void enqueue(std::function<void()> function)
-    {
-        {
-            std::unique_lock<std::mutex> lock(m_mutex);
-            m_queue.push_back(std::move(function));
-
-            if (m_stopped)
-                create_thread();
-        }
-        m_cv.notify_one();
-    }
-
-private:
-    void create_thread()
-    {
-        if (m_thread.joinable())
-            m_thread.join();
-
-        m_thread = std::thread([this] {
-            std::vector<std::function<void()>> queue;
-
-            std::unique_lock<std::mutex> lock(m_mutex);
-            while (!m_stopping &&
-                   m_cv.wait_for(lock, std::chrono::milliseconds(500),
-                                 [&] { return !m_queue.empty() || m_stopping; })) {
-
-                swap(queue, m_queue);
-
-                lock.unlock();
-                for (auto& f : queue)
-                    f();
-                queue.clear();
-                lock.lock();
-            }
-
-            m_stopped = true;
-        });
-        m_stopped = false;
-    }
-
-    std::mutex m_mutex;
-    std::condition_variable m_cv;
-    std::vector<std::function<void()>> m_queue;
-    std::thread m_thread;
-    bool m_stopping = false;
-    bool m_stopped = true;
-};
-
-static auto& work_queue = *new WorkQueue;
-
 void async_register_query(Realm& realm, std::string object_type, std::string query, std::string name,
                           std::function<void(std::exception_ptr)> callback)
 {
+    const auto& config = realm.config();
+    auto& work_queue = _impl::RealmCoordinator::get_coordinator(config)->partial_sync_work_queue();
     work_queue.enqueue([object_type=std::move(object_type), query=std::move(query), name=std::move(name),
-                        callback=std::move(callback), config=realm.config()] {
+                        callback=std::move(callback), config] {
         auto realm = Realm::get_shared_realm(config);
         realm->begin_transaction();
         auto cleanup = util::make_scope_exit([&]() noexcept {
@@ -395,11 +324,6 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
         }
     });
     return subscription;
-}
-
-void reset_for_testing()
-{
-    work_queue.reset();
 }
 
 Subscription::Subscription(std::string name, std::string object_type, std::shared_ptr<Realm> realm)

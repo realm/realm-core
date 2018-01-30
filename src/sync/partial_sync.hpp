@@ -74,8 +74,6 @@ private:
 
 Subscription subscribe(Results const& results, util::Optional<std::string> name);
 
-void reset_for_testing();
-
 // Deprecated
 void register_query(std::shared_ptr<Realm>, const std::string &object_class, const std::string &query,
 					std::function<void (Results, std::exception_ptr)>);

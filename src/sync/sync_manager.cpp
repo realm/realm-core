@@ -21,7 +21,6 @@
 #include "sync/impl/sync_client.hpp"
 #include "sync/impl/sync_file.hpp"
 #include "sync/impl/sync_metadata.hpp"
-#include "sync/partial_sync.hpp"
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
 
@@ -196,8 +195,6 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
 
 void SyncManager::reset_for_testing()
 {
-    partial_sync::reset_for_testing();
-
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     m_file_manager = nullptr;
     m_metadata_manager = nullptr;
