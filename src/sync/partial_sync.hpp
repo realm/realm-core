@@ -37,8 +37,8 @@ namespace partial_sync {
 enum class SubscriptionState : int8_t;
 
 struct SubscriptionNotificationToken {
-    NotificationToken subscription_token;
-    NotificationToken error_token;
+    NotificationToken registration_token;
+    NotificationToken result_sets_token;
 };
 
 class Subscription {
@@ -48,7 +48,7 @@ public:
     Subscription& operator=(Subscription&&);
 
     SubscriptionState status() const;
-    util::Optional<std::string> error_message() const;
+    std::exception_ptr error() const;
 
     Results results() const;
 
@@ -65,8 +65,8 @@ private:
 
     mutable Results m_result_sets;
 
-    struct ErrorNotifier;
-    _impl::CollectionNotifier::Handle<ErrorNotifier> m_error_notifier;
+    struct Notifier;
+    _impl::CollectionNotifier::Handle<Notifier> m_notifier;
 
     friend Subscription subscribe(Results const&, util::Optional<std::string>);
 };

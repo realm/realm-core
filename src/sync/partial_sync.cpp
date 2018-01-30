@@ -219,6 +219,7 @@ void async_register_query(Realm& realm, std::string object_type, std::string que
             return;
         }
 
+        callback(nullptr);
         realm->commit_transaction();
         realm->close();
     });
@@ -303,10 +304,10 @@ void register_query(std::shared_ptr<Realm> realm, const std::string &object_clas
     object->add_notification_callback(std::move(notification_callback));
 }
 
-struct Subscription::ErrorNotifier : public _impl::CollectionNotifier {
-    ErrorNotifier(std::shared_ptr<Realm> realm)
+struct Subscription::Notifier : public _impl::CollectionNotifier {
+    Notifier(std::shared_ptr<Realm> realm)
     : _impl::CollectionNotifier(std::move(realm))
-    , m_coordinator(_impl::RealmCoordinator::get_coordinator(get_realm()->config()))
+    , m_coordinator(_impl::RealmCoordinator::get_coordinator(get_realm()->config()).get())
     {
     }
 
@@ -314,24 +315,26 @@ struct Subscription::ErrorNotifier : public _impl::CollectionNotifier {
     void run() override
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        if (m_pending_error)
+        if (m_has_results_to_deliver)
             m_changes.modify(0);
     }
 
     void deliver(SharedGroup&) override
     {
-        fprintf(stderr, "ErrorNotifier::deliver(this=%p): m_pending_error = %d\n", this, bool(m_pending_error));
-
         std::unique_lock<std::mutex> lock(m_mutex);
         m_error = m_pending_error;
         m_pending_error = nullptr;
+
+        m_subscription_completed = true;
+        m_has_results_to_deliver = false;
     }
 
-    void error_occurred(std::exception_ptr error)
+    void finished_subscribing(std::exception_ptr error)
     {
         {
             std::unique_lock<std::mutex> lock(m_mutex);
             m_pending_error = error;
+            m_has_results_to_deliver = true;
         }
 
         // Trigger processing of change notifications.
@@ -344,6 +347,12 @@ struct Subscription::ErrorNotifier : public _impl::CollectionNotifier {
         return m_error;
     }
 
+    bool subscription_completed() const
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return m_subscription_completed;
+    }
+
 private:
     void do_attach_to(SharedGroup&) override { }
     void do_detach_from(SharedGroup&) override { }
@@ -354,13 +363,16 @@ private:
     }
 
     bool do_add_required_change_info(_impl::TransactionChangeInfo&) override { return false; }
+    bool prepare_to_deliver() override { return m_has_results_to_deliver; }
 
-    std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
+    _impl::RealmCoordinator *m_coordinator;
 
     mutable std::mutex m_mutex;
     _impl::CollectionChangeBuilder m_changes;
     std::exception_ptr m_pending_error = nullptr;
     std::exception_ptr m_error = nullptr;
+    bool m_has_results_to_deliver = false;
+    bool m_subscription_completed = false;
 };
 
 Subscription subscribe(Results const& results, util::Optional<std::string> user_provided_name)
@@ -375,11 +387,11 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
     std::string name = user_provided_name ? std::move(*user_provided_name) : default_name_for_query(query,results.get_object_type());
 
     Subscription subscription(name, results.get_object_type(), realm);
-    std::weak_ptr<Subscription::ErrorNotifier> weak_notifier = subscription.m_error_notifier;
+    std::weak_ptr<Subscription::Notifier> weak_notifier = subscription.m_notifier;
     async_register_query(*realm, results.get_object_type(), std::move(query), std::move(name),
                          [weak_notifier=std::move(weak_notifier)](std::exception_ptr error) {
         if (auto notifier = weak_notifier.lock()) {
-            notifier->error_occurred(error);
+            notifier->finished_subscribing(error);
         }
     });
     return subscription;
@@ -394,8 +406,8 @@ Subscription::Subscription(std::string name, std::string object_type, std::share
 : m_object_schema(std::make_unique<ObjectSchema>(realm->read_group(), result_sets_type_name))
 {
     // FIXME: Why can't I do this in the initializer list?
-    m_error_notifier = std::make_shared<ErrorNotifier>(realm);
-    _impl::RealmCoordinator::register_notifier(m_error_notifier);
+    m_notifier = std::make_shared<Notifier>(realm);
+    _impl::RealmCoordinator::register_notifier(m_notifier);
 
     auto matches_property = std::string(object_type) + "_matches";
 
@@ -412,25 +424,30 @@ Subscription& Subscription::operator=(Subscription&&) = default;
 
 SubscriptionNotificationToken Subscription::add_notification_callback(std::function<void ()> callback)
 {
-    auto subscription_token = m_result_sets.add_notification_callback([callback] (CollectionChangeSet, std::exception_ptr) {
+    auto result_sets_token = m_result_sets.add_notification_callback([callback] (CollectionChangeSet, std::exception_ptr) {
         callback();
     });
-    NotificationToken error_token(m_error_notifier, m_error_notifier->add_callback([callback] (CollectionChangeSet, std::exception_ptr) {
+    NotificationToken registration_token(m_notifier, m_notifier->add_callback([callback] (CollectionChangeSet, std::exception_ptr) {
         callback();
     }));
-    return SubscriptionNotificationToken{std::move(subscription_token), std::move(error_token)};
+    return SubscriptionNotificationToken{std::move(registration_token), std::move(result_sets_token)};
 }
 
 util::Optional<Object> Subscription::result_set_object() const
 {
-    if (auto row = m_result_sets.first())
-        return Object(m_result_sets.get_realm(), *m_object_schema, *row);
+    if (m_notifier->subscription_completed()) {
+        if (auto row = m_result_sets.first())
+            return Object(m_result_sets.get_realm(), *m_object_schema, *row);
+    }
 
     return util::none;
 }
 
 SubscriptionState Subscription::status() const
 {
+    if (m_notifier->error())
+        return SubscriptionState::Error;
+
     if (auto object = result_set_object()) {
         CppContext context;
         auto value = any_cast<int64_t>(object->get_property_value<util::Any>(context, "status"));
@@ -440,23 +457,19 @@ SubscriptionState Subscription::status() const
     return SubscriptionState::Uninitialized;
 }
 
-util::Optional<std::string> Subscription::error_message() const
+std::exception_ptr Subscription::error() const
 {
-    if (auto error = m_error_notifier->error()) {
-        try {
-            std::rethrow_exception(error);
-        } catch (std::exception const& e) {
-            return std::string(e.what());
-        }
-    }
+    if (auto error = m_notifier->error())
+        return error;
 
     if (auto object = result_set_object()) {
         CppContext context;
         auto message = any_cast<std::string>(object->get_property_value<util::Any>(context, "error_message"));
-        return message.size() ? util::make_optional(message) : util::none;
+        if (message.size())
+            return make_exception_ptr(std::runtime_error(message));
     }
 
-    return util::none;
+    return nullptr;
 }
 
 Results Subscription::results() const
