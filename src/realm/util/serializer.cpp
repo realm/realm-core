@@ -112,7 +112,7 @@ std::string SerialisationState::get_variable_name(ConstTableRef table) {
     char add_char = start_char;
 
     auto next_guess = [&]() {
-        add_char = ((++add_char - 'a') % 26) + 'a';
+        add_char = (((add_char + 1) - 'a') % 26) + 'a';
         if (add_char == start_char) {
             guess_prefix += add_char;
         }

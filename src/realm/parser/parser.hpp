@@ -19,8 +19,9 @@
 #ifndef REALM_PARSER_HPP
 #define REALM_PARSER_HPP
 
-#include <vector>
+#include <memory>
 #include <string>
+#include <vector>
 
 namespace realm {
 
