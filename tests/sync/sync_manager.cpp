@@ -65,13 +65,6 @@ TEST_CASE("sync_manager: basic properties and APIs", "[sync]") {
         REQUIRE(SyncManager::shared().log_level() == util::Logger::Level::error);
     }
 
-    SECTION("should work for 'should reconnect immediately'") {
-        SyncManager::shared().set_client_should_reconnect_immediately(true);
-        REQUIRE(SyncManager::shared().client_should_reconnect_immediately());
-        SyncManager::shared().set_client_should_reconnect_immediately(false);
-        REQUIRE(!SyncManager::shared().client_should_reconnect_immediately());
-    }
-
     SECTION("should not crash on 'reconnect()'") {
         SyncManager::shared().reconnect();
     }

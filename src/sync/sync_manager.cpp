@@ -251,18 +251,6 @@ void SyncManager::set_logger_factory(SyncLoggerFactory& factory) noexcept
     m_logger_factory = &factory;
 }
 
-void SyncManager::set_client_should_reconnect_immediately(bool reconnect_immediately)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_client_reconnect_mode = reconnect_immediately ? ReconnectMode::immediate : ReconnectMode::normal;
-}
-
-bool SyncManager::client_should_reconnect_immediately() const noexcept
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    return m_client_reconnect_mode == ReconnectMode::immediate;
-}
-
 void SyncManager::reconnect()
 {
     std::lock_guard<std::mutex> lock(m_session_mutex);

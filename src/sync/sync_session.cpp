@@ -89,7 +89,7 @@ struct SyncSession::State {
     // Returns true iff the lock is still locked when the method returns.
     virtual bool access_token_expired(std::unique_lock<std::mutex>&, SyncSession&) const { return true; }
 
-    virtual void nonsync_transact_notify(std::unique_lock<std::mutex>&, SyncSession&, sync::Session::version_type) const { }
+    virtual void nonsync_transact_notify(std::unique_lock<std::mutex>&, SyncSession&, sync::version_type) const { }
 
     // Perform any work needed to reactivate a session that is not already active.
     // Returns true iff the session should ask the binding to get a token for `bind()`.
@@ -191,7 +191,7 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
 
     void nonsync_transact_notify(std::unique_lock<std::mutex>&,
                                  SyncSession& session,
-                                 sync::Session::version_type version) const override
+                                 sync::version_type version) const override
     {
         // Notify at first available opportunity.
         session.m_deferred_commit_notification = version;
@@ -254,7 +254,7 @@ struct sync_session_states::Active : public SyncSession::State {
     }
 
     void nonsync_transact_notify(std::unique_lock<std::mutex>&, SyncSession& session,
-                                 sync::Session::version_type version) const override
+                                 sync::version_type version) const override
     {
         // Fully ready sync session, notify immediately.
         session.m_session->nonsync_transact_notify(version);
@@ -497,6 +497,7 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::bad_changesets:
             case ProtocolError::bad_decompression:
             case ProtocolError::partial_sync_disabled:
+            case ProtocolError::unsupported_session_feature:
                 break;
             // Session errors
             case ProtocolError::session_closed:
@@ -529,6 +530,7 @@ void SyncSession::handle_error(SyncError error)
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::no);
                 break;
             }
+            case ProtocolError::bad_origin_file_ident:
             case ProtocolError::bad_server_file_ident:
             case ProtocolError::bad_client_file_ident:
             case ProtocolError::bad_server_version:
@@ -549,7 +551,6 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::limits_exceeded:
             case ClientError::bad_session_ident:
             case ClientError::bad_message_order:
-            case ClientError::bad_file_ident_pair:
             case ClientError::bad_progress:
             case ClientError::bad_changeset_header_syntax:
             case ClientError::bad_changeset_size:
@@ -561,6 +562,9 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::bad_compression:
             case ClientError::bad_client_version:
             case ClientError::ssl_server_cert_rejected:
+            case ClientError::bad_file_ident:
+            case ClientError::bad_client_file_ident:
+            case ClientError::bad_client_file_ident_salt:
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.
@@ -669,7 +673,7 @@ void SyncSession::advance_state(std::unique_lock<std::mutex>& lock, const State&
     m_state->enter_state(lock, *this);
 }
 
-void SyncSession::nonsync_transact_notify(sync::Session::version_type version)
+void SyncSession::nonsync_transact_notify(sync::version_type version)
 {
     m_notifier.set_local_version(version);
 
