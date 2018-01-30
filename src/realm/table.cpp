@@ -2257,6 +2257,7 @@ TableRef _impl::TableFriend::get_opposite_link_table(const Table& table, ColKey 
     return table.get_parent_group()->get_table(target_table_key);
 }
 
+const uint64_t Table::max_num_columns;
 
 // insert a mapping, moving all later mappings to a higher index
 void Table::insert_col_mapping(size_t ndx, ColKey key)
@@ -2267,7 +2268,8 @@ void Table::insert_col_mapping(size_t ndx, ColKey key)
 
     // increment index at all entries in key->ndx map pointing at ndx or above
     for (auto& e : m_colkey2ndx) {
-        if (e >= ndx)
+        uint64_t e_ndx = e & max_num_columns;
+        if ((e_ndx >= ndx) && (e_ndx != max_num_columns))
             ++e;
     }
     // insert new entry into ndx->key
@@ -2277,13 +2279,16 @@ void Table::insert_col_mapping(size_t ndx, ColKey key)
         m_ndx2colkey.insert(m_ndx2colkey.begin() + ndx, key);
 
     // make sure there is a free entry in key->ndx
-    uint16_t idx = uint16_t(key.value);
+    size_t idx = key.value & max_num_columns;
 
     // fill new positions with a blocked entry
     while (idx >= m_colkey2ndx.size()) {
+        //auto tmp = max_num_columns;
+        //m_colkey2ndx.push_back(tmp);
         m_colkey2ndx.push_back(max_num_columns);
     }
-    m_colkey2ndx[idx] = uint16_t(ndx);
+    // store tag of key along with ndx
+    m_colkey2ndx[idx] = ndx | (key.value & ~max_num_columns);
 }
 
 // remove a mapping, moving all later mappings to a lower index
@@ -2294,11 +2299,12 @@ void Table::remove_col_mapping(size_t ndx)
 
     // decrement index at all entries in key->ndx map pointing above ndx
     for (auto& e : m_colkey2ndx) {
-        if (e > ndx)
+        uint64_t e_ndx = e & max_num_columns;
+        if ((e_ndx > ndx) && (e_ndx != max_num_columns))
             --e;
     }
     // remove selected entry
-    uint16_t idx = uint16_t(key.value);
+    size_t idx = key.value & max_num_columns;
     m_colkey2ndx[idx] = max_num_columns;
 
     // and opposite mapping
@@ -2317,8 +2323,8 @@ ColKey Table::generate_col_key()
 
     uint64_t lower = m_colkey2ndx.size();
     // look for an unused entry in m_colkey2ndx:
-    for (uint16_t idx = 0; idx < lower; ++idx) {
-        size_t ndx = m_colkey2ndx[idx];
+    for (size_t idx = 0; idx < lower; ++idx) {
+        size_t ndx = m_colkey2ndx[idx] & max_num_columns;
         if (ndx >= max_num_columns) {
             lower = idx;
             break;
@@ -2327,39 +2333,10 @@ ColKey Table::generate_col_key()
     return ColKey((upper << 16) | lower);
 }
 
-size_t Table::colkey2ndx(ColKey key) const
-{
-    uint16_t idx = uint16_t(key.value);
-    if (idx >= m_colkey2ndx.size())
-        throw InvalidKey("Nonexisting column key");
-    // FIXME: Optimization! There are many scenarios where this test may be avoided.
-    size_t ndx = m_colkey2ndx[idx];
-    if (ndx2colkey(ndx) != key)
-        throw InvalidKey("Nonexisting column key");
-    return ndx;
-}
-
-ColKey Table::ndx2colkey(size_t ndx) const
-{
-    REALM_ASSERT(ndx < m_ndx2colkey.size());
-    return m_ndx2colkey[ndx];
-}
-
 ColumnAttrMask Table::get_column_attr(ColKey column_key) const noexcept
 {
     size_t ndx = colkey2ndx(column_key);
     return m_spec->get_column_attr(ndx);
-}
-
-bool Table::valid_column(ColKey col_key) const
-{
-    uint16_t idx = uint16_t(col_key.value);
-    if (idx >= m_colkey2ndx.size())
-        return false;
-    uint16_t ndx = m_colkey2ndx[idx];
-    if (ndx == max_num_columns)
-        return false;
-    return (col_key == m_ndx2colkey[ndx]);
 }
 
 ColKey Table::find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept
@@ -2389,24 +2366,26 @@ void Table::verify_inv() const
     std::cerr << std::endl;
     std::cerr << "       colkey -> ndx: ";
     for (size_t idx = 0; idx < m_colkey2ndx.size(); ++idx) {
-        size_t ndx = m_colkey2ndx[idx];
-        std::cerr << "{ " << idx << " -> " << ndx << " } ";
+        uint64_t ndx = m_colkey2ndx[idx];
+        std::cerr << "{ " << idx << " -> " << (ndx & max_num_columns) << ", " << (ndx & ~max_num_columns) << " } ";
     }
     std::cerr << std::endl;
 #endif
     for (size_t ndx = 0; ndx < m_ndx2colkey.size(); ++ndx) {
         ColKey col_key = m_ndx2colkey[ndx];
-        size_t idx = col_key.value & 0xFFFF;
+        size_t idx = col_key.value & max_num_columns;
         REALM_ASSERT(ndx < m_colkey2ndx.size());
-        REALM_ASSERT(ndx == m_colkey2ndx[idx]);
+        REALM_ASSERT(ndx == (m_colkey2ndx[idx] & max_num_columns));
     }
     for (size_t idx = 0; idx < m_colkey2ndx.size(); ++idx) {
-        size_t ndx = m_colkey2ndx[idx];
+        uint64_t ndx_and_tag = m_colkey2ndx[idx];
+        size_t ndx = ndx_and_tag & max_num_columns;
         if (ndx != max_num_columns) {
             // valid entry, must be verified
             REALM_ASSERT(ndx < m_ndx2colkey.size());
             ColKey col_key = m_ndx2colkey[ndx];
-            REALM_ASSERT((col_key.value & 0xFFFF) == idx);
+            REALM_ASSERT((col_key.value & max_num_columns) == idx);
+            REALM_ASSERT((col_key.value ^ ndx_and_tag) <= max_num_columns);
         }
     }
 }
