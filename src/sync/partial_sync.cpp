@@ -369,6 +369,9 @@ util::Optional<Object> Subscription::result_set_object() const
 
 SubscriptionState Subscription::status() const
 {
+    if (!m_notifier->subscription_completed())
+        return SubscriptionState::Creating;
+
     if (m_notifier->error())
         return SubscriptionState::Error;
 
@@ -378,7 +381,9 @@ SubscriptionState Subscription::status() const
         return (SubscriptionState)value;
     }
 
-    return SubscriptionState::Uninitialized;
+    // We may not have an object even if the subscription has completed if the completion callback fired
+    // but the result sets callback is yet to fire.
+    return SubscriptionState::Creating;
 }
 
 std::exception_ptr Subscription::error() const

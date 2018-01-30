@@ -137,14 +137,15 @@ void run_query(Results results, util::Optional<std::string> name,
     std::exception_ptr exception;
     auto token = subscription.add_notification_callback([&] {
         switch (subscription.status()) {
-            case partial_sync::SubscriptionState::Uninitialized:
-                // Ignore this, temporary state
+            case partial_sync::SubscriptionState::Creating:
+            case partial_sync::SubscriptionState::Pending:
+                // Ignore these. They're temporary states.
                 break;
             case partial_sync::SubscriptionState::Error:
                 exception = subscription.error();
                 partial_sync_done = true;
                 break;
-            case partial_sync::SubscriptionState::Initialized:
+            case partial_sync::SubscriptionState::Complete:
                 partial_sync_done = true;
                 break;
             default:
