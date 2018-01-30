@@ -43,6 +43,7 @@
 #include <realm/util/optional.hpp>
 
 using namespace realm;
+using namespace std::string_literals;
 
 struct TypeA {
     size_t first_number;
@@ -67,12 +68,16 @@ Schema partial_sync_schema()
         {"partial_sync_object_a", {
             {"first_number", PropertyType::Int},
             {"second_number", PropertyType::Int},
-            {"string", PropertyType::String}
+            {"string", PropertyType::String},
+            {"link", PropertyType::Object|PropertyType::Nullable, "link_target"},
         }},
         {"partial_sync_object_b", {
             {"number", PropertyType::Int},
             {"first_string", PropertyType::String},
             {"second_string", PropertyType::String},
+        }},
+        {"link_target", {
+            {"id", PropertyType::Int}
         }}
     };
 }
@@ -107,6 +112,14 @@ void populate_realm(Realm::Config& config, std::vector<TypeA> a={}, std::vector<
             table->set_string(second_string_prop.table_column, row_idx, current.second_string);
         }
     }
+    {
+        const auto& object_schema = *r->schema().find("link_target");
+        const auto& id_prop = *object_schema.property_for_name("id");
+        TableRef table = ObjectStore::table_for_object_type(r->read_group(), "link_target");
+
+        size_t row_idx = sync::create_object(r->read_group(), *table);
+        table->set_int(id_prop.table_column, row_idx, 0);
+    }
     r->commit_transaction();
     // Wait for uploads
     std::atomic<bool> upload_done(false);
@@ -115,20 +128,12 @@ void populate_realm(Realm::Config& config, std::vector<TypeA> a={}, std::vector<
     EventLoop::main().run_until([&] { return upload_done.load(); });
 }
 
-/// Run a partial sync query, wait for the results, and then perform checks.
-void run_query(const std::string& query, const Realm::Config& partial_config, PartialSyncTestObjects type,
-                   std::function<void(Results, std::exception_ptr)> check)
+void run_query(Results results, util::Optional<std::string> name,
+               std::function<void(Results, std::exception_ptr)> check)
 {
-    std::atomic<bool> partial_sync_done(false);
-    auto r = Realm::get_shared_realm(partial_config);
-    auto table_name = (type == PartialSyncTestObjects::A) ? "class_partial_sync_object_a" : "class_partial_sync_object_b";
-    auto table = r->read_group().get_table(table_name);
-    Query q = table->where();
-    parser::Predicate p = realm::parser::parse(query);
-    query_builder::apply_predicate(q, p);
-    Results results(r, q);
-    auto subscription = partial_sync::subscribe(results, util::none);
+    auto subscription = partial_sync::subscribe(results, name);
 
+    std::atomic<bool> partial_sync_done(false);
     std::exception_ptr exception;
     auto token = subscription.add_notification_callback([&] {
         switch (subscription.status()) {
@@ -136,8 +141,8 @@ void run_query(const std::string& query, const Realm::Config& partial_config, Pa
                 // Ignore this, temporary state
                 break;
             case partial_sync::SubscriptionState::Error:
+                exception = subscription.error();
                 partial_sync_done = true;
-                // FIXME: Retrieve the error!
                 break;
             case partial_sync::SubscriptionState::Initialized:
                 partial_sync_done = true;
@@ -148,6 +153,21 @@ void run_query(const std::string& query, const Realm::Config& partial_config, Pa
     });
     EventLoop::main().run_until([&] { return partial_sync_done.load(); });
     check(std::move(results), std::move(exception));
+}
+
+/// Run a partial sync query, wait for the results, and then perform checks.
+void run_query(const std::string& query, const Realm::Config& partial_config,
+               std::string object_type, util::Optional<std::string> name,
+               std::function<void(Results, std::exception_ptr)> check)
+{
+    auto r = Realm::get_shared_realm(partial_config);
+    auto table = ObjectStore::table_for_object_type(r->read_group(), object_type);
+    Query q = table->where();
+    parser::Predicate p = realm::parser::parse(query);
+    query_builder::apply_predicate(q, p);
+    Results results(r, q);
+
+    run_query(std::move(results), std::move(name), std::move(check));
 }
 
 bool results_contains(Results& r, TypeA a)
@@ -201,7 +221,7 @@ TEST_CASE("Partial sync", "[sync]") {
 
     SECTION("works in the most basic case") {
         // Open the partially synced Realm and run a query.
-        run_query("string = \"partial\"", partial_config, PartialSyncTestObjects::A, [](Results results, std::exception_ptr) {
+        run_query("string = \"partial\"", partial_config, "partial_sync_object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {1, 10, "partial"}));
             REQUIRE(results_contains(results, {2, 2, "partial"}));
@@ -209,75 +229,110 @@ TEST_CASE("Partial sync", "[sync]") {
     }
 
     SECTION("works when multiple queries are made on the same property") {
-        run_query("first_number > 1", partial_config, PartialSyncTestObjects::A, [](Results results, std::exception_ptr) {
+        run_query("first_number > 1", partial_config, "partial_sync_object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {2, 2, "partial"}));
             REQUIRE(results_contains(results, {3, 8, "sync"}));
         });
 
-        run_query("first_number = 1", partial_config, PartialSyncTestObjects::A, [](Results results, std::exception_ptr) {
+        run_query("first_number = 1", partial_config, "partial_sync_object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 1);
             REQUIRE(results_contains(results, {1, 10, "partial"}));
         });
     }
 
     SECTION("works when queries are made on different properties") {
-        run_query("first_string = \"jyaku\"", partial_config, PartialSyncTestObjects::B, [](Results results, std::exception_ptr) {
+        run_query("first_string = \"jyaku\"", partial_config, "partial_sync_object_b", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {4, "jyaku", "kiwi"}));
             REQUIRE(results_contains(results, {7, "jyaku", "orange"}));
         });
 
-        run_query("second_string = \"cherry\"", partial_config, PartialSyncTestObjects::B, [](Results results, std::exception_ptr) {
+        run_query("second_string = \"cherry\"", partial_config, "partial_sync_object_b", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 1);
             REQUIRE(results_contains(results, {5, "meela", "cherry"}));
         });
     }
 
     SECTION("works when queries are made on different object types") {
-        run_query("second_number < 9", partial_config, PartialSyncTestObjects::A, [](Results results, std::exception_ptr) {
+        run_query("second_number < 9", partial_config, "partial_sync_object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {2, 2, "partial"}));
             REQUIRE(results_contains(results, {3, 8, "sync"}));
         });
 
-        run_query("first_string = \"meela\"", partial_config, PartialSyncTestObjects::B, [](Results results, std::exception_ptr) {
+        run_query("first_string = \"meela\"", partial_config, "partial_sync_object_b", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 3);
             REQUIRE(results_contains(results, {3, "meela", "orange"}));
             REQUIRE(results_contains(results, {5, "meela", "cherry"}));
             REQUIRE(results_contains(results, {6, "meela", "kiwi"}));
         });
     }
-
-//    TODO: Figure out how to test this.
-//    SECTION("invalid queries") {
-//        run_query("this isn't a valid query!", partial_config, PartialSyncTestObjects::A, [](Results, std::exception_ptr e) {
-//            REQUIRE(e);
-//        });
-//    }
 }
 
 TEST_CASE("Partial sync error checking", "[sync]") {
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
-    SECTION("non-synced Realm") {
-        TestFile config;
-        auto realm = Realm::get_shared_realm(config);
-        CHECK_THROWS(partial_sync::register_query(realm, "object", "query", [&](Results, std::exception_ptr) { }));
+    SECTION("API misuse") {
+        SECTION("non-synced Realm") {
+            TestFile config;
+            config.schema = partial_sync_schema();
+            auto realm = Realm::get_shared_realm(config);
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "partial_sync_object_a");
+            CHECK_THROWS(run_query(Results(realm, *table), util::none, [](Results, std::exception_ptr) { }));
+        }
+
+        SECTION("synced, non-partial Realm") {
+            SyncServer server;
+            SyncTestFile config(server, "test", partial_sync_schema());
+            auto realm = Realm::get_shared_realm(config);
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "partial_sync_object_a");
+            CHECK_THROWS(run_query(Results(realm, *table), util::none, [](Results, std::exception_ptr) { }));
+        }
     }
 
-    SECTION("synced, non-partial Realm") {
+    SECTION("subscription error handling") {
         SyncServer server;
-        SyncTestFile config(server, "test");
-        auto realm = Realm::get_shared_realm(config);
-        CHECK_THROWS(partial_sync::register_query(realm, "object", "query", [&](Results, std::exception_ptr) { }));
-    }
+        SyncTestFile config(server, "test", partial_sync_schema());
+        SyncTestFile partial_config(server, "test", partial_sync_schema(), true);
+        // Add some objects for test purposes.
+        populate_realm(config,
+            {{1, 10, "partial"}, {2, 2, "partial"}, {3, 8, "sync"}},
+            {{3, "meela", "orange"}, {4, "jyaku", "kiwi"}, {5, "meela", "cherry"}, {6, "meela", "kiwi"}, {7, "jyaku", "orange"}}
+            );
 
-    SECTION("query on type that doesn't exist") {
-        SyncServer server;
-        SyncTestFile config(server, "test", partial_sync_schema(), true);
-        auto realm = Realm::get_shared_realm(config);
-        CHECK_THROWS(partial_sync::register_query(realm, "this type doesn't exist", "query",
-                                                  [&](Results, std::exception_ptr) { }));
+        SECTION("reusing the same name for different queries should raise an error") {
+            run_query("first_number > 0", partial_config, "partial_sync_object_a", "query"s, [](Results results, std::exception_ptr error) {
+                REQUIRE(!error);
+                REQUIRE(results.size() == 3);
+            });
+
+            run_query("first_number <= 0", partial_config, "partial_sync_object_a", "query"s, [](Results, std::exception_ptr error) {
+                REQUIRE(error);
+            });
+        }
+
+        SECTION("unsupported queries should raise an error") {
+            // To test handling of invalid queries, we rely on the fact that core does not yet support `links_to`
+            // queries as it cannot serialize an object reference until we have stable ID support.
+
+            // Ensure that the placeholder object in `link_target` is available.
+            run_query("TRUEPREDICATE", partial_config, "link_target", util::none, [](Results results, std::exception_ptr error) {
+                REQUIRE(!error);
+                REQUIRE(results.size() == 1);
+            });
+
+            auto r = Realm::get_shared_realm(partial_config);
+            const auto& object_schema = r->schema().find("partial_sync_object_a");
+            auto source_table = ObjectStore::table_for_object_type(r->read_group(), "partial_sync_object_a");
+            auto target_table = ObjectStore::table_for_object_type(r->read_group(), "link_target");
+
+            // Attempt to subscribe to a `links_to` query.
+            Query q = source_table->where().links_to(object_schema->property_for_name("link")->table_column,
+                                                     target_table->get(0));
+            run_query(Results(r, q), util::none, [](Results, std::exception_ptr error) {
+                REQUIRE(error);
+            });
+        }
     }
 }
