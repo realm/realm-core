@@ -497,6 +497,7 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::bad_changesets:
             case ProtocolError::bad_decompression:
             case ProtocolError::partial_sync_disabled:
+            case ProtocolError::unsupported_session_feature:
                 break;
             // Session errors
             case ProtocolError::session_closed:
@@ -529,6 +530,7 @@ void SyncSession::handle_error(SyncError error)
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::no);
                 break;
             }
+            case ProtocolError::bad_origin_file_ident:
             case ProtocolError::bad_server_file_ident:
             case ProtocolError::bad_client_file_ident:
             case ProtocolError::bad_server_version:
@@ -560,13 +562,9 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::bad_compression:
             case ClientError::bad_client_version:
             case ClientError::ssl_server_cert_rejected:
-#if REALM_SYNC_VER_MAJOR == 2 && REALM_SYNC_VER_MINOR < 3
-            case ClientError::bad_file_ident_pair:
-#else
             case ClientError::bad_file_ident:
             case ClientError::bad_client_file_ident:
             case ClientError::bad_client_file_ident_salt:
-#endif
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.
