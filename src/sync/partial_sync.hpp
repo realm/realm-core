@@ -48,7 +48,7 @@ public:
     Subscription(Subscription&&);
     Subscription& operator=(Subscription&&);
 
-    SubscriptionState status() const;
+    SubscriptionState state() const;
     std::exception_ptr error() const;
 
     Results results() const;

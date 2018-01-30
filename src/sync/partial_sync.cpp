@@ -367,7 +367,7 @@ util::Optional<Object> Subscription::result_set_object() const
     return util::none;
 }
 
-SubscriptionState Subscription::status() const
+SubscriptionState Subscription::state() const
 {
     if (!m_notifier->subscription_completed())
         return SubscriptionState::Creating;

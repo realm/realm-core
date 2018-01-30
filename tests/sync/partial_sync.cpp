@@ -136,7 +136,7 @@ void run_query(Results results, util::Optional<std::string> name,
     std::atomic<bool> partial_sync_done(false);
     std::exception_ptr exception;
     auto token = subscription.add_notification_callback([&] {
-        switch (subscription.status()) {
+        switch (subscription.state()) {
             case partial_sync::SubscriptionState::Creating:
             case partial_sync::SubscriptionState::Pending:
                 // Ignore these. They're temporary states.
@@ -149,7 +149,7 @@ void run_query(Results results, util::Optional<std::string> name,
                 partial_sync_done = true;
                 break;
             default:
-                throw std::logic_error(util::format("Unexpected state: %1", static_cast<uint8_t>(subscription.status())));
+                throw std::logic_error(util::format("Unexpected state: %1", static_cast<uint8_t>(subscription.state())));
         }
     });
     EventLoop::main().run_until([&] { return partial_sync_done.load(); });
