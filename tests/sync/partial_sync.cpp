@@ -269,12 +269,44 @@ TEST_CASE("Partial sync", "[sync]") {
             REQUIRE(results_contains(results, {6, "meela", "kiwi"}));
         });
     }
+
+    SECTION("re-registering the same query with no name on the same type should succeed") {
+        run_query("number > 1", partial_config, "object_a", util::none, [](Results results, std::exception_ptr error) {
+            REQUIRE(!error);
+            REQUIRE(results.size() == 2);
+            REQUIRE(results_contains(results, {2, 2, "partial"}));
+            REQUIRE(results_contains(results, {3, 8, "sync"}));
+        });
+
+        run_query("number > 1", partial_config, "object_a", util::none, [](Results results, std::exception_ptr error) {
+            REQUIRE(!error);
+            REQUIRE(results.size() == 2);
+            REQUIRE(results_contains(results, {2, 2, "partial"}));
+            REQUIRE(results_contains(results, {3, 8, "sync"}));
+        });
+    }
+
+    SECTION("re-registering the same query with the same name on the same type should succeed") {
+        run_query("number > 1", partial_config, "object_a", "query"s, [](Results results, std::exception_ptr error) {
+            REQUIRE(!error);
+            REQUIRE(results.size() == 2);
+            REQUIRE(results_contains(results, {2, 2, "partial"}));
+            REQUIRE(results_contains(results, {3, 8, "sync"}));
+        });
+
+        run_query("number > 1", partial_config, "object_a", "query"s, [](Results results, std::exception_ptr error) {
+            REQUIRE(!error);
+            REQUIRE(results.size() == 2);
+            REQUIRE(results_contains(results, {2, 2, "partial"}));
+            REQUIRE(results_contains(results, {3, 8, "sync"}));
+        });
+    }
 }
 
 TEST_CASE("Partial sync error checking", "[sync]") {
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
-    SECTION("API misuse") {
+    SECTION("API misuse throws an exception from `subscribe`") {
         SECTION("non-synced Realm") {
             TestFile config;
             config.schema = partial_sync_schema();
@@ -309,6 +341,17 @@ TEST_CASE("Partial sync error checking", "[sync]") {
             });
 
             run_query("number <= 0", partial_config, "object_a", "query"s, [](Results, std::exception_ptr error) {
+                REQUIRE(error);
+            });
+        }
+
+        SECTION("reusing the same name for identical queries on different types should raise an error") {
+            run_query("number > 0", partial_config, "object_a", "query"s, [](Results results, std::exception_ptr error) {
+                REQUIRE(!error);
+                REQUIRE(results.size() == 3);
+            });
+
+            run_query("number > 0", partial_config, "object_b", "query"s, [](Results, std::exception_ptr error) {
                 REQUIRE(error);
             });
         }
