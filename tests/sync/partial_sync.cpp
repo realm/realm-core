@@ -46,14 +46,14 @@ using namespace realm;
 using namespace std::string_literals;
 
 struct TypeA {
-    size_t first_number;
+    size_t number;
     size_t second_number;
     std::string string;
 };
 
 struct TypeB {
     size_t number;
-    std::string first_string;
+    std::string string;
     std::string second_string;
 };
 
@@ -65,15 +65,15 @@ namespace {
 Schema partial_sync_schema()
 {
     return Schema{
-        {"partial_sync_object_a", {
-            {"first_number", PropertyType::Int},
+        {"object_a", {
+            {"number", PropertyType::Int},
             {"second_number", PropertyType::Int},
             {"string", PropertyType::String},
             {"link", PropertyType::Object|PropertyType::Nullable, "link_target"},
         }},
-        {"partial_sync_object_b", {
+        {"object_b", {
             {"number", PropertyType::Int},
-            {"first_string", PropertyType::String},
+            {"string", PropertyType::String},
             {"second_string", PropertyType::String},
         }},
         {"link_target", {
@@ -87,28 +87,28 @@ void populate_realm(Realm::Config& config, std::vector<TypeA> a={}, std::vector<
     auto r = Realm::get_shared_realm(config);
     r->begin_transaction();
     {
-        const auto& object_schema = *r->schema().find("partial_sync_object_a");
-        const auto& first_number_prop = *object_schema.property_for_name("first_number");
+        const auto& object_schema = *r->schema().find("object_a");
+        const auto& number_prop = *object_schema.property_for_name("number");
         const auto& second_number_prop = *object_schema.property_for_name("second_number");
         const auto& string_prop = *object_schema.property_for_name("string");
-        TableRef table = ObjectStore::table_for_object_type(r->read_group(), "partial_sync_object_a");
+        TableRef table = ObjectStore::table_for_object_type(r->read_group(), "object_a");
         for (auto& current : a) {
             size_t row_idx = sync::create_object(r->read_group(), *table);
-            table->set_int(first_number_prop.table_column, row_idx, current.first_number);
+            table->set_int(number_prop.table_column, row_idx, current.number);
             table->set_int(second_number_prop.table_column, row_idx, current.second_number);
             table->set_string(string_prop.table_column, row_idx, current.string);
         }
     }
     {
-        const auto& object_schema = *r->schema().find("partial_sync_object_b");
+        const auto& object_schema = *r->schema().find("object_b");
         const auto& number_prop = *object_schema.property_for_name("number");
-        const auto& first_string_prop = *object_schema.property_for_name("first_string");
+        const auto& string_prop = *object_schema.property_for_name("string");
         const auto& second_string_prop = *object_schema.property_for_name("second_string");
-        TableRef table = ObjectStore::table_for_object_type(r->read_group(), "partial_sync_object_b");
+        TableRef table = ObjectStore::table_for_object_type(r->read_group(), "object_b");
         for (auto& current : b) {
             size_t row_idx = sync::create_object(r->read_group(), *table);
             table->set_int(number_prop.table_column, row_idx, current.number);
-            table->set_string(first_string_prop.table_column, row_idx, current.first_string);
+            table->set_string(string_prop.table_column, row_idx, current.string);
             table->set_string(second_string_prop.table_column, row_idx, current.second_string);
         }
     }
@@ -175,13 +175,13 @@ bool results_contains(Results& r, TypeA a)
 {
     CppContext ctx;
     SharedRealm realm = r.get_realm();
-    const ObjectSchema os = *realm->schema().find("partial_sync_object_a");
+    const ObjectSchema os = *realm->schema().find("object_a");
     for (size_t i = 0; i < r.size(); ++i) {
         Object obj(realm, os, r.get(i));
-        size_t first = any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "first_number"));
+        size_t first = any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "number"));
         size_t second = any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "second_number"));
         auto str = any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string"));
-        if (first == a.first_number && second == a.second_number && str == a.string)
+        if (first == a.number && second == a.second_number && str == a.string)
             return true;
     }
     return false;
@@ -191,13 +191,13 @@ bool results_contains(Results& r, TypeB b)
 {
     CppContext ctx;
     SharedRealm realm = r.get_realm();
-    const ObjectSchema os = *realm->schema().find("partial_sync_object_b");
+    const ObjectSchema os = *realm->schema().find("object_b");
     for (size_t i = 0;  i < r.size(); ++i) {
         Object obj(realm, os, r.get(i));
         size_t number = any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "number"));
-        auto first_str = any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "first_string"));
+        auto first_str = any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string"));
         auto second_str = any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "second_string"));
-        if (number == b.number && first_str == b.first_string && second_str == b.second_string)
+        if (number == b.number && first_str == b.string && second_str == b.second_string)
             return true;
     }
     return false;
@@ -222,7 +222,7 @@ TEST_CASE("Partial sync", "[sync]") {
 
     SECTION("works in the most basic case") {
         // Open the partially synced Realm and run a query.
-        run_query("string = \"partial\"", partial_config, "partial_sync_object_a", util::none, [](Results results, std::exception_ptr) {
+        run_query("string = \"partial\"", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {1, 10, "partial"}));
             REQUIRE(results_contains(results, {2, 2, "partial"}));
@@ -230,39 +230,39 @@ TEST_CASE("Partial sync", "[sync]") {
     }
 
     SECTION("works when multiple queries are made on the same property") {
-        run_query("first_number > 1", partial_config, "partial_sync_object_a", util::none, [](Results results, std::exception_ptr) {
+        run_query("number > 1", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {2, 2, "partial"}));
             REQUIRE(results_contains(results, {3, 8, "sync"}));
         });
 
-        run_query("first_number = 1", partial_config, "partial_sync_object_a", util::none, [](Results results, std::exception_ptr) {
+        run_query("number = 1", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 1);
             REQUIRE(results_contains(results, {1, 10, "partial"}));
         });
     }
 
     SECTION("works when queries are made on different properties") {
-        run_query("first_string = \"jyaku\"", partial_config, "partial_sync_object_b", util::none, [](Results results, std::exception_ptr) {
+        run_query("string = \"jyaku\"", partial_config, "object_b", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {4, "jyaku", "kiwi"}));
             REQUIRE(results_contains(results, {7, "jyaku", "orange"}));
         });
 
-        run_query("second_string = \"cherry\"", partial_config, "partial_sync_object_b", util::none, [](Results results, std::exception_ptr) {
+        run_query("second_string = \"cherry\"", partial_config, "object_b", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 1);
             REQUIRE(results_contains(results, {5, "meela", "cherry"}));
         });
     }
 
     SECTION("works when queries are made on different object types") {
-        run_query("second_number < 9", partial_config, "partial_sync_object_a", util::none, [](Results results, std::exception_ptr) {
+        run_query("second_number < 9", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {2, 2, "partial"}));
             REQUIRE(results_contains(results, {3, 8, "sync"}));
         });
 
-        run_query("first_string = \"meela\"", partial_config, "partial_sync_object_b", util::none, [](Results results, std::exception_ptr) {
+        run_query("string = \"meela\"", partial_config, "object_b", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 3);
             REQUIRE(results_contains(results, {3, "meela", "orange"}));
             REQUIRE(results_contains(results, {5, "meela", "cherry"}));
@@ -279,7 +279,7 @@ TEST_CASE("Partial sync error checking", "[sync]") {
             TestFile config;
             config.schema = partial_sync_schema();
             auto realm = Realm::get_shared_realm(config);
-            auto table = ObjectStore::table_for_object_type(realm->read_group(), "partial_sync_object_a");
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
             CHECK_THROWS(run_query(Results(realm, *table), util::none, [](Results, std::exception_ptr) { }));
         }
 
@@ -287,7 +287,7 @@ TEST_CASE("Partial sync error checking", "[sync]") {
             SyncServer server;
             SyncTestFile config(server, "test", partial_sync_schema());
             auto realm = Realm::get_shared_realm(config);
-            auto table = ObjectStore::table_for_object_type(realm->read_group(), "partial_sync_object_a");
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
             CHECK_THROWS(run_query(Results(realm, *table), util::none, [](Results, std::exception_ptr) { }));
         }
     }
@@ -303,12 +303,12 @@ TEST_CASE("Partial sync error checking", "[sync]") {
             );
 
         SECTION("reusing the same name for different queries should raise an error") {
-            run_query("first_number > 0", partial_config, "partial_sync_object_a", "query"s, [](Results results, std::exception_ptr error) {
+            run_query("number > 0", partial_config, "object_a", "query"s, [](Results results, std::exception_ptr error) {
                 REQUIRE(!error);
                 REQUIRE(results.size() == 3);
             });
 
-            run_query("first_number <= 0", partial_config, "partial_sync_object_a", "query"s, [](Results, std::exception_ptr error) {
+            run_query("number <= 0", partial_config, "object_a", "query"s, [](Results, std::exception_ptr error) {
                 REQUIRE(error);
             });
         }
@@ -324,8 +324,8 @@ TEST_CASE("Partial sync error checking", "[sync]") {
             });
 
             auto r = Realm::get_shared_realm(partial_config);
-            const auto& object_schema = r->schema().find("partial_sync_object_a");
-            auto source_table = ObjectStore::table_for_object_type(r->read_group(), "partial_sync_object_a");
+            const auto& object_schema = r->schema().find("object_a");
+            auto source_table = ObjectStore::table_for_object_type(r->read_group(), "object_a");
             auto target_table = ObjectStore::table_for_object_type(r->read_group(), "link_target");
 
             // Attempt to subscribe to a `links_to` query.
