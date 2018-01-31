@@ -1921,15 +1921,15 @@ inline Columns<T> Table::column(size_t column_ndx)
 
     realm::DataType ct = table->get_column_type(column_ndx);
     if (std::is_same<T, int64_t>::value && ct != type_Int)
-        throw(LogicError::type_mismatch);
+        throw LogicError(LogicError::type_mismatch);
     else if (std::is_same<T, bool>::value && ct != type_Bool)
-        throw(LogicError::type_mismatch);
+        throw LogicError(LogicError::type_mismatch);
     else if (std::is_same<T, realm::OldDateTime>::value && ct != type_OldDateTime)
-        throw(LogicError::type_mismatch);
+        throw LogicError(LogicError::type_mismatch);
     else if (std::is_same<T, float>::value && ct != type_Float)
-        throw(LogicError::type_mismatch);
+        throw LogicError(LogicError::type_mismatch);
     else if (std::is_same<T, double>::value && ct != type_Double)
-        throw(LogicError::type_mismatch);
+        throw LogicError(LogicError::type_mismatch);
 
     if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value || std::is_same<T, BackLink>::value) {
         link_chain.push_back(column_ndx);

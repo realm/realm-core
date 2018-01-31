@@ -40,14 +40,17 @@ using RowExpr = BasicRowExpr<Table>;
 
 namespace parser {
     struct Predicate;
+    struct DescriptorOrderingState;
 }
 
 namespace query_builder {
 class Arguments;
 
 void apply_predicate(Query& query, const parser::Predicate& predicate, Arguments& arguments);
-
 void apply_predicate(Query& query, const parser::Predicate& predicate); // zero out of string args version
+
+void apply_ordering(DescriptorOrdering& ordering, TableRef target, const parser::DescriptorOrderingState& state, Arguments& arguments);
+void apply_ordering(DescriptorOrdering& ordering, TableRef target, const parser::DescriptorOrderingState& state);
 
 
 struct AnyContext

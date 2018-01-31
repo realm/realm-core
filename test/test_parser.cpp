@@ -173,6 +173,23 @@ static std::vector<std::string> valid_queries = {
     "and=='AND'&&'or'=='||'",
     "and == or && ORE > GRAND",
     "a=1AND NOTb=2",
+
+    // sort/distinct
+    "a=b SORT(p ASCENDING)",
+    "a=b SORT(p asc)",
+    "a=b SORT(p Descending)",
+    "a=b sort (p.q desc)",
+    "a=b distinct(p)",
+    "a=b DISTINCT(P)",
+    "a=b DISTINCT(p)",
+    "a == b sort(a ASC, b DESC)",
+    "a == b sort(a ASC, b DESC) sort(c ASC)",
+    "a=b DISTINCT(p) DISTINCT(q)",
+    "a=b DISTINCT(p, q, r) DISTINCT(q)",
+    "a == b sort(a ASC, b DESC) DISTINCT(p)",
+    "a == b sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
+    "a == b and c==d sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
+    "a == b  sort(     a   ASC  ,  b DESC) and c==d   DISTINCT(   p )  sort(   c   ASC  ,  d   DESC  )  DISTINCT(   q.r ,   p)   ",
 };
 
 static std::vector<std::string> invalid_queries = {
@@ -230,6 +247,26 @@ static std::vector<std::string> invalid_queries = {
 
     "truepredicate &&",
     "truepredicate & truepredicate",
+
+    // sort/distinct
+    "SORT(p ASCENDING)",  // no query conditions
+    "a=b SORT(p)",        // no asc/desc
+    "a=b SORT(0 Descending)", // bad keypath
+    "a=b sort()",             // missing condition
+    "a=b sort",      // no target property
+    "distinct(p)",           // no query condition
+    "a=b DISTINCT()",      // no target property
+    "a=b Distinct",      // no target property
+    "sort(a ASC b, DESC) a == b", // before query condition
+    "sort(a ASC b, DESC) a == b sort(c ASC)", // before query condition
+    "a=bDISTINCT(p)", // bad spacing
+    "a=b sort p.q desc", // no braces
+    "a=b sort(p.qDESC)", // bad spacing
+    "a=b DISTINCT p", // no braces
+    "a=b SORT(p ASC", // bad braces
+    "a=b DISTINCT(p", // no braces
+    "a=b sort(p.q DESC a ASC)", // missing comma
+    "a=b DISTINCT(p q)", // missing comma
 };
 
 TEST(Parser_valid_queries) {
@@ -251,10 +288,10 @@ TEST(Parser_grammar_analysis)
     CHECK(realm::parser::analyze_grammar() == 0);
 }
 
-void verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, size_t num_results) {
+Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, size_t num_results) {
     Query q = t->where();
 
-    realm::parser::Predicate p = realm::parser::parse(query_string);
+    realm::parser::Predicate p = realm::parser::parse(query_string).predicate;
     realm::query_builder::apply_predicate(q, p);
 
     CHECK_EQUAL(q.count(), num_results);
@@ -262,10 +299,67 @@ void verify_query(test_util::unit_test::TestContext& test_context, TableRef t, s
     //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
-    realm::parser::Predicate p2 = realm::parser::parse(description);
+    realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
     realm::query_builder::apply_predicate(q2, p2);
 
     CHECK_EQUAL(q2.count(), num_results);
+    return q2;
+}
+
+
+TEST(Parser_empty_input)
+{
+    Group g;
+    std::string table_name = "table";
+    TableRef t = g.add_table(table_name);
+    t->add_column(type_Int, "int_col");
+    t->add_empty_row(5);
+
+    // an empty query string is an invalid predicate
+    CHECK_THROW_ANY(verify_query(test_context, t, "", 5));
+
+    Query q = t->where(); // empty query
+    std::string empty_description = q.get_description();
+    CHECK(!empty_description.empty());
+    CHECK_EQUAL(0, empty_description.compare("TRUEPREDICATE"));
+    realm::parser::Predicate p = realm::parser::parse(empty_description).predicate;
+    realm::query_builder::apply_predicate(q, p);
+    CHECK_EQUAL(q.count(), 5);
+
+    verify_query(test_context, t, "TRUEPREDICATE", 5);
+    verify_query(test_context, t, "!TRUEPREDICATE", 0);
+
+    verify_query(test_context, t, "FALSEPREDICATE", 0);
+    verify_query(test_context, t, "!FALSEPREDICATE", 5);
+}
+
+
+TEST(Parser_ConstrainedQuery)
+{
+    Group g;
+    std::string table_name = "table";
+    TableRef t = g.add_table(table_name);
+    size_t int_col = t->add_column(type_Int, "age");
+    size_t list_col = t->add_column_link(type_LinkList, "self_list", *t);
+    t->add_empty_row(2);
+    t->set_int(int_col, 1, 1);
+
+    LinkViewRef list_0 = t->get_linklist(list_col, 0);
+    list_0->add(0);
+    list_0->add(1);
+
+    TableView tv = t->get_backlink_view(0, t.get(), list_col);
+    Query q(const_cast<const Table&>(*t), &tv);
+    CHECK_EQUAL(q.count(), 1);
+    q.and_query(t->column<Int>(int_col) <= 0);
+    CHECK_EQUAL(q.count(), 1);
+    CHECK_THROW(q.get_description(), SerialisationError);
+
+    Query q2(const_cast<const Table&>(*t), list_0);
+    CHECK_EQUAL(q2.count(), 2);
+    q2.and_query(t->column<Int>(int_col) <= 0);
+    CHECK_EQUAL(q2.count(), 1);
+    CHECK_THROW(q2.get_description(), SerialisationError);
 }
 
 
@@ -461,7 +555,7 @@ TEST(Parser_StringOperations)
 {
     Group g;
     TableRef t = g.add_table("person");
-    size_t name_col_ndx = t->add_column(type_String, "name");
+    size_t name_col_ndx = t->add_column(type_String, "name", true);
     size_t link_col_ndx = t->add_column_link(type_Link, "father", *t);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jake", "Joel"};
     t->add_empty_row(5);
@@ -469,6 +563,7 @@ TEST(Parser_StringOperations)
         t->set_string(name_col_ndx, i, names[i]);
         t->set_link(link_col_ndx, i, (i + 1) % t->size());
     }
+    t->add_empty_row(); // null
     t->nullify_link(link_col_ndx, 4);
 
     verify_query(test_context, t, "name == 'Bob'", 1);
@@ -476,10 +571,10 @@ TEST(Parser_StringOperations)
     verify_query(test_context, t, "name ==[c] 'Bob'", 1);
     verify_query(test_context, t, "father.name ==[c] 'Bob'", 1);
 
-    verify_query(test_context, t, "name != 'Bob'", 4);
-    verify_query(test_context, t, "father.name != 'Bob'", 4);
-    verify_query(test_context, t, "name !=[c] 'bOB'", 4);
-    verify_query(test_context, t, "father.name !=[c] 'bOB'", 4);
+    verify_query(test_context, t, "name != 'Bob'", 5);
+    verify_query(test_context, t, "father.name != 'Bob'", 5);
+    verify_query(test_context, t, "name !=[c] 'bOB'", 5);
+    verify_query(test_context, t, "father.name !=[c] 'bOB'", 5);
 
     verify_query(test_context, t, "name contains \"oe\"", 2);
     verify_query(test_context, t, "father.name contains \"oe\"", 2);
@@ -500,6 +595,35 @@ TEST(Parser_StringOperations)
     verify_query(test_context, t, "father.name like \"?o?\"", 2);
     verify_query(test_context, t, "name like[c] \"?O?\"", 2);
     verify_query(test_context, t, "father.name like[c] \"?O?\"", 2);
+
+    verify_query(test_context, t, "name == NULL", 1);
+    verify_query(test_context, t, "NULL == name", 1);
+    verify_query(test_context, t, "name != NULL", 5);
+    verify_query(test_context, t, "NULL != name", 5);
+    verify_query(test_context, t, "name ==[c] NULL", 1);
+    verify_query(test_context, t, "NULL ==[c] name", 1);
+    verify_query(test_context, t, "name !=[c] NULL", 5);
+    verify_query(test_context, t, "NULL !=[c] name", 5);
+
+    // for strings 'NULL' is also a synonym for the null string
+    verify_query(test_context, t, "name CONTAINS NULL", 6);
+    verify_query(test_context, t, "name CONTAINS[c] NULL", 6);
+    verify_query(test_context, t, "name BEGINSWITH NULL", 6);
+    verify_query(test_context, t, "name BEGINSWITH[c] NULL", 6);
+    verify_query(test_context, t, "name ENDSWITH NULL", 6);
+    verify_query(test_context, t, "name ENDSWITH[c] NULL", 6);
+    verify_query(test_context, t, "name LIKE NULL", 1);
+    verify_query(test_context, t, "name LIKE[c] NULL", 1);
+
+    // string operators are not commutative
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL CONTAINS name", 6));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL CONTAINS[c] name", 6));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL BEGINSWITH name", 6));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL BEGINSWITH[c] name", 6));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL ENDSWITH name", 6));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL ENDSWITH[c] name", 6));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL LIKE name", 1));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NULL LIKE[c] name", 1));
 }
 
 
@@ -560,6 +684,9 @@ TEST(Parser_Timestamps)
     verify_query(test_context, t, "birthday > 1905-12-31@23:59:59:2020", 5);
 #endif
 
+    // two column timestamps
+    verify_query(test_context, t, "birthday == T399", 1); // a null entry matches
+
     // dates pre 1900 are not supported by functions like timegm
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday > 1800-12-31@23:59:59", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday > 1800-12-31@23:59:59:2020", 4));
@@ -574,7 +701,6 @@ TEST(Parser_Timestamps)
     // Invalid predicate
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T:1", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T399", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0", 0));
@@ -586,6 +712,280 @@ TEST(Parser_Timestamps)
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:0:0", 0));
 }
 
+
+TEST(Parser_NullableBinaries)
+{
+    Group g;
+    TableRef items = g.add_table("item");
+    TableRef people = g.add_table("person");
+    size_t binary_col_ndx = items->add_column(type_Binary, "data");
+    size_t nullable_binary_col_ndx = items->add_column(type_Binary, "nullable_data", true);
+    items->add_empty_row(5);
+    BinaryData bd0("knife", 5);
+    items->set_binary(binary_col_ndx, 0, bd0);
+    items->set_binary(nullable_binary_col_ndx, 0, bd0);
+    BinaryData bd1("plate", 5);
+    items->set_binary(binary_col_ndx, 1, bd1);
+    items->set_binary(nullable_binary_col_ndx, 1, bd1);
+    BinaryData bd2("fork", 4);
+    items->set_binary(binary_col_ndx, 2, bd2);
+    items->set_binary(nullable_binary_col_ndx, 2, bd2);
+
+    size_t fav_item_col_ndx = people->add_column_link(type_Link, "fav_item", *items);
+    people->add_empty_row(5);
+    people->set_link(fav_item_col_ndx, 0, 0);
+    people->set_link(fav_item_col_ndx, 1, 1);
+    people->set_link(fav_item_col_ndx, 2, 2);
+    people->set_link(fav_item_col_ndx, 3, 3);
+    people->set_link(fav_item_col_ndx, 4, 4);
+
+    // direct checks
+    verify_query(test_context, items, "data == NULL", 0);
+    verify_query(test_context, items, "data != NULL", 5);
+    verify_query(test_context, items, "nullable_data == NULL", 2);
+    verify_query(test_context, items, "nullable_data != NULL", 3);
+
+    verify_query(test_context, items, "nullable_data CONTAINS 'f'", 2);
+    verify_query(test_context, items, "nullable_data BEGINSWITH 'f'", 1);
+    verify_query(test_context, items, "nullable_data ENDSWITH 'e'", 2);
+    verify_query(test_context, items, "nullable_data LIKE 'f*'", 1);
+    verify_query(test_context, items, "nullable_data CONTAINS[c] 'F'", 2);
+    verify_query(test_context, items, "nullable_data BEGINSWITH[c] 'F'", 1);
+    verify_query(test_context, items, "nullable_data ENDSWITH[c] 'E'", 2);
+    verify_query(test_context, items, "nullable_data LIKE[c] 'F*'", 1);
+
+    verify_query(test_context, items, "nullable_data CONTAINS NULL", 5);
+    verify_query(test_context, items, "nullable_data BEGINSWITH NULL", 5);
+    verify_query(test_context, items, "nullable_data ENDSWITH NULL", 5);
+    verify_query(test_context, items, "nullable_data LIKE NULL", 2);
+    verify_query(test_context, items, "nullable_data CONTAINS[c] NULL", 3);
+    verify_query(test_context, items, "nullable_data BEGINSWITH[c] NULL", 5);
+    verify_query(test_context, items, "nullable_data ENDSWITH[c] NULL", 5);
+    verify_query(test_context, items, "nullable_data LIKE[c] NULL", 2);
+
+    // these operators are not commutative
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL CONTAINS nullable_data", 5));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL BEGINSWITH nullable_data", 5));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL ENDSWITH nullable_data", 5));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL LIKE nullable_data", 2));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL CONTAINS[c] nullable_data", 5));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL BEGINSWITH[c] nullable_data", 5));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL ENDSWITH[c] nullable_data", 5));
+    CHECK_THROW_ANY(verify_query(test_context, items, "NULL LIKE[c] nullable_data", 2));
+
+    // check across links
+    verify_query(test_context, people, "fav_item.data == NULL", 0);
+    verify_query(test_context, people, "fav_item.data != NULL", 5);
+    verify_query(test_context, people, "fav_item.nullable_data == NULL", 2);
+    verify_query(test_context, people, "fav_item.nullable_data != NULL", 3);
+    verify_query(test_context, people, "NULL == fav_item.data", 0);
+
+    verify_query(test_context, people, "fav_item.data ==[c] NULL", 0);
+    verify_query(test_context, people, "fav_item.data !=[c] NULL", 5);
+    verify_query(test_context, people, "fav_item.nullable_data ==[c] NULL", 2);
+    verify_query(test_context, people, "fav_item.nullable_data !=[c] NULL", 3);
+    verify_query(test_context, people, "NULL ==[c] fav_item.data", 0);
+
+    verify_query(test_context, people, "fav_item.data CONTAINS 'f'", 2);
+    verify_query(test_context, people, "fav_item.data BEGINSWITH 'f'", 1);
+    verify_query(test_context, people, "fav_item.data ENDSWITH 'e'", 2);
+    verify_query(test_context, people, "fav_item.data LIKE 'f*'", 1);
+    verify_query(test_context, people, "fav_item.data CONTAINS[c] 'F'", 2);
+    verify_query(test_context, people, "fav_item.data BEGINSWITH[c] 'F'", 1);
+    verify_query(test_context, people, "fav_item.data ENDSWITH[c] 'E'", 2);
+    verify_query(test_context, people, "fav_item.data LIKE[c] 'F*'", 1);
+
+    // two column
+    verify_query(test_context, people, "fav_item.data == fav_item.nullable_data", 3);
+    verify_query(test_context, people, "fav_item.data == fav_item.data", 5);
+    verify_query(test_context, people, "fav_item.nullable_data == fav_item.nullable_data", 5);
+}
+
+TEST(Parser_OverColumnIndexChanges)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    size_t first_col_ndx = table->add_column(type_Int, "to_remove");
+    size_t int_col_ndx = table->add_column(type_Int, "ints");
+    size_t double_col_ndx = table->add_column(type_Double, "doubles");
+    size_t string_col_ndx = table->add_column(type_String, "strings");
+    table->add_empty_row(3);
+    for (size_t i = 0; i < table->size(); ++i) {
+        table->set_int(int_col_ndx, i, i);
+        table->set_double(double_col_ndx, i, double(i));
+        std::string str(i, 'a');
+        table->set_string(string_col_ndx, i, StringData(str));
+    }
+
+    std::string ints_before = verify_query(test_context, table, "ints >= 1", 2).get_description();
+    std::string doubles_before = verify_query(test_context, table, "doubles >= 1", 2).get_description();
+    std::string strings_before = verify_query(test_context, table, "strings.@count >= 1", 2).get_description();
+
+    table->remove_column(first_col_ndx);
+
+    std::string ints_after = verify_query(test_context, table, "ints >= 1", 2).get_description();
+    std::string doubles_after = verify_query(test_context, table, "doubles >= 1", 2).get_description();
+    std::string strings_after = verify_query(test_context, table, "strings.@count >= 1", 2).get_description();
+
+    CHECK_EQUAL(ints_before, ints_after);
+    CHECK_EQUAL(doubles_before, doubles_after);
+    CHECK_EQUAL(strings_before, strings_after);
+}
+
+
+TEST(Parser_TwoColumnExpressionBasics)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    size_t int_col_ndx = table->add_column(type_Int, "ints", true);
+    size_t double_col_ndx = table->add_column(type_Double, "doubles");
+    size_t string_col_ndx = table->add_column(type_String, "strings");
+    size_t link_col_ndx = table->add_column_link(type_Link, "link", *table);
+    table->add_empty_row(3);
+    for (size_t i = 0; i < table->size(); ++i) {
+        table->set_int(int_col_ndx, i, i);
+        table->set_double(double_col_ndx, i, double(i));
+        std::string str(i, 'a');
+        table->set_string(string_col_ndx, i, StringData(str));
+    }
+    table->set_link(link_col_ndx, 1, 0);
+
+    Query q = table->where().and_query(table->column<Int>(int_col_ndx) == table->column<String>(string_col_ndx).size());
+    CHECK_EQUAL(q.count(), 3);
+    std::string desc = q.get_description();
+
+    verify_query(test_context, table, "ints == 0", 1);
+    verify_query(test_context, table, "ints == ints", 3);
+    verify_query(test_context, table, "ints == strings.@count", 3);
+    verify_query(test_context, table, "strings.@count == ints", 3);
+    verify_query(test_context, table, "ints == NULL", 0);
+    verify_query(test_context, table, "doubles == doubles", 3);
+    verify_query(test_context, table, "strings == strings", 3);
+    verify_query(test_context, table, "ints == link.@count", 2); // row 0 has 0 links, row 1 has 1 link
+
+    // type mismatch
+    CHECK_THROW_ANY(verify_query(test_context, table, "doubles == ints", 0));
+    CHECK_THROW_ANY(verify_query(test_context, table, "doubles == strings", 0));
+    CHECK_THROW_ANY(verify_query(test_context, table, "ints == doubles", 0));
+    CHECK_THROW_ANY(verify_query(test_context, table, "strings == doubles", 0));
+
+}
+
+TEST(Parser_TwoColumnAggregates)
+{
+    Group g;
+
+    TableRef discounts = g.add_table("class_Discounts");
+    size_t discount_name_col = discounts->add_column(type_String, "promotion", true);
+    size_t discount_off_col = discounts->add_column(type_Double, "reduced_by");
+    size_t discount_active_col = discounts->add_column(type_Bool, "active");
+
+    using discount_t = std::pair<double, bool>;
+    std::vector<discount_t> discount_info = {{3.0, false}, {2.5, true}, {0.50, true}, {1.50, true}};
+    for (discount_t i : discount_info) {
+        size_t row_ndx = discounts->add_empty_row();
+        discounts->set_double(discount_off_col, row_ndx, i.first);
+        discounts->set_bool(discount_active_col, row_ndx, i.second);
+    }
+    discounts->set_string(discount_name_col, 0, "back to school");
+    discounts->set_string(discount_name_col, 1, "pizza lunch special");
+    discounts->set_string(discount_name_col, 2, "manager's special");
+
+    TableRef items = g.add_table("class_Items");
+    size_t item_name_col = items->add_column(type_String, "name");
+    size_t item_price_col = items->add_column(type_Double, "price");
+    size_t item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    for (item_t i : item_info) {
+        size_t row_ndx = items->add_empty_row();
+        items->set_string(item_name_col, row_ndx, i.first);
+        items->set_double(item_price_col, row_ndx, i.second);
+    }
+    items->set_link(item_discount_col, 0, 2); // milk -0.50
+    items->set_link(item_discount_col, 2, 1); // pizza -2.5
+    items->set_link(item_discount_col, 3, 0); // cereal -3.0 inactive
+
+    TableRef t = g.add_table("class_Person");
+    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
+    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
+    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
+    t->add_empty_row(3);
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(id_col_ndx, i, i);
+        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
+    }
+
+    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
+    list_0->add(0);
+    list_0->add(1);
+    list_0->add(2);
+    list_0->add(3);
+
+    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1->add(0);
+    }
+
+    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
+    list_2->add(2);
+    list_2->add(2);
+    list_2->add(3);
+
+    // int vs linklist count/size
+    verify_query(test_context, t, "customer_id < items.@count", 3);
+    verify_query(test_context, t, "customer_id < items.@size", 3);
+
+    // double vs linklist count/size
+    verify_query(test_context, t, "items.@min.price > items.@count", 1);
+    verify_query(test_context, t, "items.@min.price > items.@size", 1);
+
+    // double vs string/binary count/size is not supported due to a core implementation limitation
+    CHECK_THROW_ANY(verify_query(test_context, items, "name.@count > price", 3));
+    CHECK_THROW_ANY(verify_query(test_context, items, "price < name.@size", 3));
+
+    // double vs double
+    verify_query(test_context, t, "items.@sum.price > account_balance", 2);
+    verify_query(test_context, t, "items.@min.price > account_balance", 0);
+    verify_query(test_context, t, "items.@max.price > account_balance", 0);
+    verify_query(test_context, t, "items.@avg.price > account_balance", 0);
+
+    // cannot aggregate string
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@min.name > account_balance", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@max.name > account_balance", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@sum.name > account_balance", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@avg.name > account_balance", 0));
+    // cannot aggregate link
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@min.discount > account_balance", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@max.discount > account_balance", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@sum.discount > account_balance", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@avg.discount > account_balance", 0));
+
+    verify_query(test_context, t, "items.@count < account_balance", 3); // linklist count vs double
+    verify_query(test_context, t, "items.@count > 3", 2);   // linklist count vs literal int
+    // linklist count vs literal double, integer promotion done here so this is true!
+    verify_query(test_context, t, "items.@count == 3.1", 1);
+
+    // two string counts is allowed (int comparison)
+    verify_query(test_context, items, "discount.promotion.@count > name.@count", 3);
+    // link count vs string count (int comparison)
+    verify_query(test_context, items, "discount.@count < name.@count", 4);
+
+    // string operators
+    verify_query(test_context, items, "discount.promotion == name", 0);
+    verify_query(test_context, items, "discount.promotion != name", 4);
+    verify_query(test_context, items, "discount.promotion CONTAINS name", 1);
+    verify_query(test_context, items, "discount.promotion BEGINSWITH name", 1);
+    verify_query(test_context, items, "discount.promotion ENDSWITH name", 0);
+    verify_query(test_context, items, "discount.promotion LIKE name", 0);
+    verify_query(test_context, items, "discount.promotion ==[c] name", 0);
+    verify_query(test_context, items, "discount.promotion !=[c] name", 4);
+    verify_query(test_context, items, "discount.promotion CONTAINS[c] name", 1);
+    verify_query(test_context, items, "discount.promotion BEGINSWITH[c] name", 1);
+    verify_query(test_context, items, "discount.promotion ENDSWITH[c] name", 0);
+    verify_query(test_context, items, "discount.promotion LIKE[c] name", 0);
+}
+
 void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, const util::Any* arg_list, size_t num_args, size_t num_results) {
 
     query_builder::AnyContext ctx;
@@ -594,7 +994,7 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
 
     Query q = t->where();
 
-    realm::parser::Predicate p = realm::parser::parse(query_string);
+    realm::parser::Predicate p = realm::parser::parse(query_string).predicate;
     realm::query_builder::apply_predicate(q, p, args);
 
     CHECK_EQUAL(q.count(), num_results);
@@ -602,7 +1002,7 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
-    realm::parser::Predicate p2 = realm::parser::parse(description);
+    realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
     realm::query_builder::apply_predicate(q2, p2);
 
     CHECK_EQUAL(q2.count(), num_results);
@@ -884,12 +1284,12 @@ TEST(Parser_string_binary_encoding)
         //std::cerr << "original: " << buff << "\tdescribed: " << string_description << "\n";
 
         Query qstr2 = t->where();
-        realm::parser::Predicate pstr2 = realm::parser::parse(string_description);
+        realm::parser::Predicate pstr2 = realm::parser::parse(string_description).predicate;
         realm::query_builder::apply_predicate(qstr2, pstr2);
         CHECK_EQUAL(qstr2.count(), num_results);
 
         Query qbin2 = t->where();
-        realm::parser::Predicate pbin2 = realm::parser::parse(binary_description);
+        realm::parser::Predicate pbin2 = realm::parser::parse(binary_description).predicate;
         realm::query_builder::apply_predicate(qbin2, pbin2);
         CHECK_EQUAL(qbin2.count(), num_results);
     }
@@ -1014,6 +1414,204 @@ TEST(Parser_collection_aggregates)
     CHECK_THROW_ANY(verify_query(test_context, people, "age.@size <= 2", 0));
     CHECK_THROW_ANY(verify_query(test_context, courses, "credits.@size == 2", 0));
     CHECK_THROW_ANY(verify_query(test_context, courses, "failure_percentage.@size <= 2", 0));
+}
+
+
+TEST(Parser_SortAndDistinctSerialisation)
+{
+    Group g;
+    TableRef people = g.add_table("person");
+    TableRef accounts = g.add_table("account");
+
+    size_t name_col = people->add_column(type_String, "name");
+    size_t age_col = people->add_column(type_Int, "age");
+    size_t account_col = people->add_column_link(type_Link, "account", *accounts);
+
+    size_t balance_col = accounts->add_column(type_Double, "balance");
+    size_t transaction_col = accounts->add_column(type_Int, "num_transactions");
+
+    accounts->add_empty_row(3);
+    accounts->set_double(balance_col, 0, 50.55);
+    accounts->set_int(transaction_col, 0, 2);
+    accounts->set_double(balance_col, 1, 175.23);
+    accounts->set_int(transaction_col, 1, 73);
+    accounts->set_double(balance_col, 2, 98.92);
+    accounts->set_int(transaction_col, 2, 17);
+
+    people->add_empty_row(3);
+    people->set_string(name_col, 0, "Adam");
+    people->set_int(age_col, 0, 28);
+    people->set_link(account_col, 0, 0);
+    people->set_string(name_col, 1, "Frank");
+    people->set_int(age_col, 1, 30);
+    people->set_link(account_col, 1, 1);
+    people->set_string(name_col, 2, "Ben");
+    people->set_int(age_col, 2, 18);
+    people->set_link(account_col, 2, 2);
+
+    // person:                      | account:
+    // name     age     account     | balance       num_transactions
+    // Adam     28      0 ->        | 50.55         2
+    // Frank    30      1 ->        | 175.23        73
+    // Ben      18      2 ->        | 98.92         17
+
+    // sort serialisation
+    TableView tv = people->where().find_all();
+    tv.sort(name_col, false);
+    tv.sort(age_col, true);
+    tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
+    std::string description = tv.get_descriptor_ordering_description();
+    CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC, age ASC, name DESC)") != std::string::npos);
+
+    // distinct serialisation
+    tv = people->where().find_all();
+    tv.distinct(name_col);
+    tv.distinct(age_col);
+    tv.distinct(DistinctDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}));
+    description = tv.get_descriptor_ordering_description();
+    CHECK(description.find("DISTINCT(name) DISTINCT(age) DISTINCT(account.balance, account.num_transactions)") != std::string::npos);
+
+    // combined sort and distinct serialisation
+    tv = people->where().find_all();
+    tv.distinct(DistinctDescriptor(*people, {{name_col}, {age_col}}));
+    tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
+    description = tv.get_descriptor_ordering_description();
+    CHECK(description.find("DISTINCT(name, age)") != std::string::npos);
+    CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC)") != std::string::npos);
+}
+
+TableView get_sorted_view(TableRef t, std::string query_string)
+{
+    Query q = t->where();
+
+    parser::ParserResult result = realm::parser::parse(query_string);
+    realm::query_builder::apply_predicate(q, result.predicate);
+    DescriptorOrdering ordering;
+    realm::query_builder::apply_ordering(ordering, t, result.ordering);
+
+    std::string query_description = q.get_description();
+    std::string ordering_description = ordering.get_description(t);
+    std::string combined = query_description + " " + ordering_description;
+
+    //std::cerr << "original: " << query_string << "\tdescribed: " << combined << "\n";
+    Query q2 = t->where();
+
+    parser::ParserResult result2 = realm::parser::parse(combined);
+    realm::query_builder::apply_predicate(q2, result2.predicate);
+    DescriptorOrdering ordering2;
+    realm::query_builder::apply_ordering(ordering2, t, result2.ordering);
+
+    TableView tv = q2.find_all();
+    tv.apply_descriptor_ordering(ordering2);
+    return tv;
+}
+
+TEST(Parser_SortAndDistinct)
+{
+    Group g;
+    TableRef people = g.add_table("person");
+    TableRef accounts = g.add_table("account");
+
+    size_t name_col = people->add_column(type_String, "name");
+    size_t age_col = people->add_column(type_Int, "age");
+    size_t account_col = people->add_column_link(type_Link, "account", *accounts);
+
+    size_t balance_col = accounts->add_column(type_Double, "balance");
+    size_t transaction_col = accounts->add_column(type_Int, "num_transactions");
+
+    accounts->add_empty_row(3);
+    accounts->set_double(balance_col, 0, 50.55);
+    accounts->set_int(transaction_col, 0, 2);
+    accounts->set_double(balance_col, 1, 50.55);
+    accounts->set_int(transaction_col, 1, 73);
+    accounts->set_double(balance_col, 2, 98.92);
+    accounts->set_int(transaction_col, 2, 17);
+
+    people->add_empty_row(3);
+    people->set_string(name_col, 0, "Adam");
+    people->set_int(age_col, 0, 28);
+    people->set_link(account_col, 0, 0);
+    people->set_string(name_col, 1, "Frank");
+    people->set_int(age_col, 1, 30);
+    people->set_link(account_col, 1, 1);
+    people->set_string(name_col, 2, "Ben");
+    people->set_int(age_col, 2, 28);
+    people->set_link(account_col, 2, 2);
+
+    // person:                      | account:
+    // name     age     account     | balance       num_transactions
+    // Adam     28      0 ->        | 50.55         2
+    // Frank    30      1 ->        | 50.55         73
+    // Ben      28      2 ->        | 98.92         17
+
+    // sort serialisation
+    TableView tv = get_sorted_view(people, "age > 0 SORT(age ASC)");
+    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+        CHECK(tv.get_int(age_col, row_ndx - 1) <= tv.get_int(age_col, row_ndx));
+    }
+
+    tv = get_sorted_view(people, "age > 0 SORT(age DESC)");
+    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+        CHECK(tv.get_int(age_col, row_ndx - 1) >= tv.get_int(age_col, row_ndx));
+    }
+
+    tv = get_sorted_view(people, "age > 0 SORT(age ASC, name DESC)");
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Ben");
+    CHECK_EQUAL(tv.get_string(name_col, 1), "Adam");
+    CHECK_EQUAL(tv.get_string(name_col, 2), "Frank");
+
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(account.balance ascending)");
+    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+        size_t link_ndx1 = tv.get_link(account_col, row_ndx - 1);
+        size_t link_ndx2 = tv.get_link(account_col, row_ndx);
+        CHECK(accounts->get_double(balance_col, link_ndx1) <= accounts->get_double(balance_col, link_ndx2));
+    }
+
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(account.balance descending)");
+    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+        size_t link_ndx1 = tv.get_link(account_col, row_ndx - 1);
+        size_t link_ndx2 = tv.get_link(account_col, row_ndx);
+        CHECK(accounts->get_double(balance_col, link_ndx1) >= accounts->get_double(balance_col, link_ndx2));
+    }
+
+    tv = get_sorted_view(people, "TRUEPREDICATE DISTINCT(age)");
+    CHECK_EQUAL(tv.size(), 2);
+    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+        CHECK(tv.get_int(age_col, row_ndx - 1) != tv.get_int(age_col, row_ndx));
+    }
+
+    tv = get_sorted_view(people, "TRUEPREDICATE DISTINCT(age, account.balance)");
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
+    CHECK_EQUAL(tv.get_string(name_col, 2), "Ben");
+
+    tv = get_sorted_view(people, "TRUEPREDICATE DISTINCT(age) DISTINCT(account.balance)");
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(age ASC) DISTINCT(age)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_int(age_col, 0), 28);
+    CHECK_EQUAL(tv.get_int(age_col, 1), 30);
+
+    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name DESC) DISTINCT(age) SORT(name ASC) DISTINCT(name)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Ben");
+    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
+
+    tv = get_sorted_view(people, "account.num_transactions > 10 SORT(name ASC)");
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_string(name_col, 0), "Ben");
+    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "TRUEPREDICATE DISTINCT(balance)"), message);
+    CHECK_EQUAL(message, "No property 'balance' found on object type 'person' specified in 'distinct' clause");
+
+    CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "TRUEPREDICATE sort(account.name ASC)"), message);
+    CHECK_EQUAL(message, "No property 'name' found on object type 'account' specified in 'sort' clause");
 }
 
 #endif // TEST_PARSER

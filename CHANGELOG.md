@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* None.
+* Fix a crash when distinct is applied on two or more properties where
+  the properties contain a link and non-link column.
+  PR [#2979](https://github.com/realm/realm-core/pull/2979).
 
 ### Breaking changes
 
@@ -10,7 +12,28 @@
 
 ### Enhancements
 
-* Added `Table::get_link_type()` as a helper method for getting the link type from link columns. PR [#2987](https://github.com/realm/realm-core/pull/2987).
+* Parser improvements:
+    - Support for comparing two columns of the same type. For example:
+        - `wins > losses`
+        - `account_balance > purchases.@sum.price`
+        - `purchases.@count > max_allowed_items`
+        - `team_name CONTAINS[c] location.city_name`
+    - Support for sort and distinct clauses
+        - At least one query filter is required
+        - Columns are a comma separated value list
+        - Order of sorting can be `ASC, ASCENDING, DESC, DESCENDING` (case insensitive)
+        - `SORT(property1 ASC, property2 DESC)`
+        - `DISTINCT(property1, property2)`
+        - Any number of sort/distinct expressions can be indicated
+    - Better support for NULL synonym in binary and string expressions:
+        - `name == NULL` finds null strings
+        - `data == NULL` finds null binary data
+    - Binary properties can now be queried over links
+    - Binary properties now support the full range of string operators
+      (BEGINSWITH, ENDSWITH, CONTAINS, LIKE)
+    PR [#2979](https://github.com/realm/realm-core/pull/2979).
+* Added `Table::get_link_type()` as a helper method for getting the link type from link columns. 
+  PR [#2987](https://github.com/realm/realm-core/pull/2987).
 
 -----------
 

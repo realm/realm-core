@@ -710,6 +710,11 @@ void TableViewBase::apply_descriptor_ordering(DescriptorOrdering new_ordering)
     do_sync();
 }
 
+std::string TableViewBase::get_descriptor_ordering_description() const
+{
+    return m_descriptor_ordering.get_description(m_table);
+}
+
 // Sort according to one column
 void TableViewBase::sort(size_t column, bool ascending)
 {
