@@ -125,4 +125,68 @@ Query Subexpr2<StringData>::like(const Subexpr2<StringData>& col, bool case_sens
 {
     return string_compare<Like, LikeIns>(*this, col, case_sensitive);
 }
+
+
+// BinaryData
+
+Query Subexpr2<BinaryData>::equal(BinaryData sd, bool case_sensitive)
+{
+    return binary_compare<BinaryData, Equal, EqualIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<BinaryData>::equal(const Subexpr2<BinaryData>& col, bool case_sensitive)
+{
+    return binary_compare<Equal, EqualIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<BinaryData>::not_equal(BinaryData sd, bool case_sensitive)
+{
+    return binary_compare<BinaryData, NotEqual, NotEqualIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<BinaryData>::not_equal(const Subexpr2<BinaryData>& col, bool case_sensitive)
+{
+    return binary_compare<NotEqual, NotEqualIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<BinaryData>::begins_with(BinaryData sd, bool case_sensitive)
+{
+    return binary_compare<BinaryData, BeginsWith, BeginsWithIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<BinaryData>::begins_with(const Subexpr2<BinaryData>& col, bool case_sensitive)
+{
+    return binary_compare<BeginsWith, BeginsWithIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<BinaryData>::ends_with(BinaryData sd, bool case_sensitive)
+{
+    return binary_compare<BinaryData, EndsWith, EndsWithIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<BinaryData>::ends_with(const Subexpr2<BinaryData>& col, bool case_sensitive)
+{
+    return binary_compare<EndsWith, EndsWithIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<BinaryData>::contains(BinaryData sd, bool case_sensitive)
+{
+    return binary_compare<BinaryData, Contains, ContainsIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<BinaryData>::contains(const Subexpr2<BinaryData>& col, bool case_sensitive)
+{
+    return binary_compare<Contains, ContainsIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<BinaryData>::like(BinaryData sd, bool case_sensitive)
+{
+    return binary_compare<BinaryData, Like, LikeIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<BinaryData>::like(const Subexpr2<BinaryData>& col, bool case_sensitive)
+{
+    return binary_compare<Like, LikeIns>(*this, col, case_sensitive);
+}
+
 }
