@@ -1,14 +1,10 @@
-# NEXT RELEASE
+# 5.2.0 Release notes
 
 ### Bugfixes
 
 * Fix a crash when distinct is applied on two or more properties where
   the properties contain a link and non-link column.
   PR [#2979](https://github.com/realm/realm-core/pull/2979).
-
-### Breaking changes
-
-* None.
 
 ### Enhancements
 
