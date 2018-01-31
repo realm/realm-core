@@ -32,6 +32,8 @@
     - Binary properties now support the full range of string operators
       (BEGINSWITH, ENDSWITH, CONTAINS, LIKE)
     PR [#2979](https://github.com/realm/realm-core/pull/2979).
+* Added `Table::get_link_type()` as a helper method for getting the link type from link columns. 
+  PR [#2987](https://github.com/realm/realm-core/pull/2987).
 
 -----------
 
