@@ -1568,6 +1568,7 @@ private:
     friend class ParentNode;
     template <class>
     friend class SequentialGetter;
+    friend struct util::serializer::SerialisationState;
     friend class RowBase;
     friend class LinksToNode;
     friend class LinkMap;

@@ -139,14 +139,29 @@ std::string SerialisationState::get_variable_name(ConstTableRef table) {
     }
 }
 
+std::string SerialisationState::get_column_name(ConstTableRef table, size_t col_ndx)
+{
+    ColumnType col_type = table->get_real_column_type(col_ndx);
+    if (col_type == col_type_BackLink) {
+        const BacklinkColumn& col = table->get_column_backlink(col_ndx);
+        std::string source_table_name = col.get_origin_table().get_name();
+        std::string source_col_name = col.get_origin_table().get_column_name(col.get_origin_column().get_column_index());
+        return "@links" + util::serializer::value_separator + source_table_name + util::serializer::value_separator + source_col_name;
+    }
+    else if (col_ndx < table->get_column_count()) {
+        return std::string(table->get_column_name(col_ndx));
+    }
+    return "";
+}
+
 std::string SerialisationState::describe_column(ConstTableRef table, size_t col_ndx)
 {
     if (table && col_ndx != npos) {
         std::string desc;
         if (!subquery_prefix_list.empty()) {
-            desc += subquery_prefix_list.back() + util::serializer::value_separator;
+            desc += subquery_prefix_list.back() + value_separator;
         }
-        desc += std::string(table->get_column_name(col_ndx));
+        desc += get_column_name(table, col_ndx);
         return desc;
     }
     return "";
@@ -162,14 +177,14 @@ std::string SerialisationState::describe_columns(const LinkMap& link_map, size_t
         if (!desc.empty()) {
             desc += util::serializer::value_separator;
         }
-        desc += link_map.description();
+        desc += link_map.description(*this);
     }
     const Table* target = link_map.target_table();
     if (target && target_col_ndx != npos) {
         if (!desc.empty()) {
             desc += util::serializer::value_separator;
         }
-        desc += target->get_column_name(target_col_ndx);
+        desc += get_column_name(target->get_table_ref(), target_col_ndx);
     }
     return desc;
 }

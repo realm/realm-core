@@ -1633,6 +1633,62 @@ TEST(Parser_SortAndDistinct)
 }
 
 
+TEST(Parser_BacklinkSerialisation)
+{
+    Group g;
+
+    TableRef items = g.add_table("class_Items");
+    size_t item_name_col = items->add_column(type_String, "name");
+    size_t item_price_col = items->add_column(type_Double, "price");
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    for (item_t i : item_info) {
+        size_t row_ndx = items->add_empty_row();
+        items->set_string(item_name_col, row_ndx, i.first);
+        items->set_double(item_price_col, row_ndx, i.second);
+    }
+
+    TableRef t = g.add_table("class_Person");
+    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
+    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
+    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
+    size_t fav_col_ndx = t->add_column_link(type_Link, "fav_item", *items);
+    t->add_empty_row(3);
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(id_col_ndx, i, i);
+        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
+        t->set_link(fav_col_ndx, i, i);
+    }
+
+    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
+    list_0->add(0);
+    list_0->add(1);
+    list_0->add(2);
+    list_0->add(3);
+
+    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1->add(0);
+    }
+
+    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
+    list_2->add(2);
+    list_2->add(2);
+    list_2->add(3);
+
+    Query q = items->backlink(*t, fav_col_ndx).column<Double>(account_col_ndx) > 20;
+    CHECK_EQUAL(q.count(), 1);
+    std::string desc = q.get_description();
+    CHECK(desc.find("@links.class_Person.fav_item.account_balance") != std::string::npos);
+
+    q = items->backlink(*t, items_col_ndx).column<Double>(account_col_ndx) > 20;
+    CHECK_EQUAL(q.count(), 2);
+    desc = q.get_description();
+    CHECK(desc.find("@links.class_Person.items.account_balance") != std::string::npos);
+
+}
+
+
 TEST(Parser_SubqueryVariableNames)
 {
     Group g;
@@ -1656,7 +1712,8 @@ TEST(Parser_SubqueryVariableNames)
     CHECK_EQUAL(unique_variable, "$xb");
 }
 
-TEST(Parsr_Subquery)
+
+TEST(Parser_Subquery)
 {
     Group g;
 

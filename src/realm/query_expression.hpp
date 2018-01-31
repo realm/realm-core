@@ -1855,17 +1855,12 @@ public:
         }
     }
 
-    virtual std::string description() const
+    virtual std::string description(util::serializer::SerialisationState& state) const
     {
         std::string s;
         for (size_t i = 0; i < m_link_column_indexes.size(); ++i) {
             if (i < m_tables.size() && m_tables[i]) {
-                if (m_link_types[i] == col_type_BackLink) {
-                    throw SerialisationError("Serialising a query which contains backlinks is currently unsupported.");
-                    //s += "backlink";
-                } else if (m_link_column_indexes[i] < m_tables[i]->get_column_count()) {
-                    s += std::string(m_tables[i]->get_column_name(m_link_column_indexes[i]));
-                }
+                s += state.get_column_name(m_tables[i]->get_table_ref(), m_link_column_indexes[i]);
                 if (i != m_link_column_indexes.size() - 1) {
                     s += util::serializer::value_separator;
                 }
