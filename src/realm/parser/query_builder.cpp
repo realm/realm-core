@@ -640,7 +640,7 @@ void apply_predicate(Query &query, const Predicate &predicate)
     apply_predicate(query, predicate, args);
 }
 
-void apply_ordering(DescriptorOrdering& ordering, TableRef target, const parser::DescriptorOrderingState& state, Arguments&)
+void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state, Arguments&)
 {
     for (const DescriptorOrderingState::SingleOrderingState& cur_ordering : state.orderings) {
         std::vector<std::vector<size_t>> property_indices;
@@ -648,7 +648,7 @@ void apply_ordering(DescriptorOrdering& ordering, TableRef target, const parser:
         for (const DescriptorOrderingState::PropertyState& cur_property : cur_ordering.properties) {
             KeyPath path = key_path_from_string(cur_property.key_path);
             std::vector<size_t> indices;
-            TableRef cur_table = target;
+            ConstTableRef cur_table = target;
             for (size_t ndx_in_path = 0; ndx_in_path < path.size(); ++ndx_in_path) {
                 size_t col_ndx = cur_table->get_column_index(path[ndx_in_path]);
                 if (col_ndx == realm::not_found) {
@@ -673,7 +673,7 @@ void apply_ordering(DescriptorOrdering& ordering, TableRef target, const parser:
     }
 }
 
-void apply_ordering(DescriptorOrdering& ordering, TableRef target, const parser::DescriptorOrderingState& state)
+void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state)
 {
     EmptyArgContext ctx;
     std::string empty_string;
