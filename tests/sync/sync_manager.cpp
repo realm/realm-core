@@ -46,7 +46,27 @@ bool validate_user_in_vector(std::vector<std::shared_ptr<SyncUser>> vector,
 
 }
 
-TEST_CASE("sync_config: basic functionality", "[sync") {
+TEST_CASE("sync_config: realm_url", "[sync]") {
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    reset_test_directory(base_path);
+    SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+
+    SECTION("realm url should contain user identity") {
+        const std::string identity = "useridentity";
+        const std::string auth_server_url = "https://realm.example.org";
+        auto user = SyncManager::shared().get_user({ identity, auth_server_url }, "dummy_token");
+        const std::string reference_realm_url = "realm:://example.org:9080/reference";
+        SyncConfig config {user, reference_realm_url};
+        config.is_partial = true;
+
+        const std::string realm_url = config.realm_url();
+        const std::string expected_prefix = reference_realm_url + "/__partial/" + identity + "/";
+        REQUIRE(realm_url.compare(0, expected_prefix.size(), expected_prefix) == 0);
+    }
+}
+
+
+TEST_CASE("sync_config: basic functionality", "[sync]") {
     SECTION("should reject URLs containing \"/__partial/\"") {
         auto make_bad_config = [] { SyncConfig{nullptr, "realm://example.org:9080/123456/__partial/realm"}; };
         REQUIRE_THROWS(make_bad_config());

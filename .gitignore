@@ -27,3 +27,6 @@ MinSizeRel/
 
 # Linters
 compile_commands.json
+
+# vim
+*.swp

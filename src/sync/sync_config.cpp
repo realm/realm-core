@@ -57,7 +57,7 @@ std::string SyncConfig::realm_url() const
     if (custom_partial_sync_identifier)
         return base_url + "/__partial/" + *custom_partial_sync_identifier;
 
-    return base_url + "/__partial/" + partial_sync_identifier(*user);
+    return base_url + "/__partial/" + user->identity() + "/" + partial_sync_identifier(*user);
 }
 
 } // namespace realm
