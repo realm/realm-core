@@ -2700,6 +2700,11 @@ public:
         m_list.set_cluster(cluster);
     }
 
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_list.collect_dependencies(tables);
+    }
+
     void evaluate(size_t index, ValueBase& destination) override
     {
         Allocator& alloc = get_base_table()->get_alloc();
@@ -2823,7 +2828,6 @@ inline Query operator!=(null, const Subexpr2<Link>& right)
 template <class T>
 class Columns : public Subexpr2<T> {
 public:
-    using ColType = typename ColumnTypeTraits<T>::column_type;
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
 
     Columns(ColKey column, const Table* table, std::vector<ColKey> links = {})
@@ -2965,7 +2969,7 @@ public:
     // Load values from Column into destination
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if (m_nullable && std::is_same<typename ColType::value_type, int64_t>::value) {
+        if (m_nullable && std::is_same<typename LeafType::value_type, int64_t>::value) {
             evaluate_internal<ArrayIntNull>(index, destination);
         }
         else {
@@ -2977,7 +2981,7 @@ public:
     {
         auto table = m_link_map.get_target_table();
         auto obj = table->get_object(key);
-        if (m_nullable && std::is_same<typename ColType::value_type, int64_t>::value) {
+        if (m_nullable && std::is_same<typename LeafType::value_type, int64_t>::value) {
             Value<int64_t> v(false, 1);
             v.m_storage.set(0, obj.template get<util::Optional<int64_t>>(m_column_key));
             destination.import(v);
@@ -3408,6 +3412,16 @@ public:
     void set_base_table(const Table* table) override
     {
         m_left->set_base_table(table);
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_left->set_cluster(cluster);
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_left->collect_dependencies(tables);
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression

@@ -222,9 +222,6 @@ void Query::set_table(TableRef tr)
 
 void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
 {
-    // Handover is to be done differently
-    REALM_ASSERT(false);
-
     if (m_source_table_view) {
         m_source_table_view->apply_and_consume_patch(patch.table_view_data, dest_group);
     }
@@ -1208,21 +1205,19 @@ Query& Query::Or()
 }
 
 // todo, add size_t end? could be useful
-ObjKey Query::find(size_t begin)
+ObjKey Query::find()
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Find);
 #endif
-
-    REALM_ASSERT_3(begin, <=, m_table->size());
 
     init();
 
     // User created query with no criteria; return first
     if (!has_conditions()) {
         if (m_view) {
-            if (begin < m_view->size()) {
-                return ObjKey(m_view->m_key_values.get(begin));
+            if (m_view->size() > 0) {
+                return ObjKey(m_view->m_key_values.get(0));
             }
             return null_key;
         }
@@ -1231,12 +1226,12 @@ ObjKey Query::find(size_t begin)
     }
 
     if (m_view) {
-        while (begin < m_view->size()) {
-            ConstObj obj = m_view->get(begin);
+        size_t sz = m_view->size();
+        for (size_t i = 0; i < sz; i++) {
+            ConstObj obj = m_view->get(i);
             if (eval_object(obj)) {
                 return obj.get_key();
             }
-            begin++;
         }
         return null_key;
     }
@@ -1291,14 +1286,25 @@ void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit)
             auto node = root_node();
             QueryState<int64_t> st(act_FindAll, &ret.m_key_values, limit);
 
-            m_table->traverse_clusters([&node, &st, this](const Cluster* cluster) {
+            m_table->traverse_clusters([&begin, &end, &node, &st, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
-                node->set_cluster(cluster);
-                st.m_key_offset = cluster->get_offset();
-                st.m_key_values = cluster->get_key_array();
-                aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, false, node, &st, 0, e, nullptr);
-                // Continue
-                return false;
+                if (begin < e) {
+                    if (e > end) {
+                        e = end;
+                    }
+                    node->set_cluster(cluster);
+                    st.m_key_offset = cluster->get_offset();
+                    st.m_key_values = cluster->get_key_array();
+                    DataType col_id = ColumnTypeTraits<int64_t>::id;
+                    aggregate_internal(act_FindAll, col_id, false, node, &st, begin, e, nullptr);
+                    begin = 0;
+                }
+                else {
+                    begin -= e;
+                }
+                end -= e;
+                // Stop if limit or end is reached
+                return end == 0 || st.m_match_count == st.m_limit;
             });
         }
     }
@@ -1664,10 +1670,15 @@ TableVersions Query::get_outside_versions() const
             if (ParentNode* root = root_node())
                 root->get_link_dependencies(m_table_keys);
         }
-        // update table versions
+        versions.emplace_back(m_table->get_key(), m_table->get_content_version());
+
         if (Group* g = m_table->get_parent_group()) {
-            for (auto k : m_table_keys) {
-                versions.emplace_back(k, g->get_table(k)->get_content_version());
+            // update table versions for linked tables - first entry is primary table - skip it
+            auto end = m_table_keys.end();
+            auto it = m_table_keys.begin() + 1;
+            while (it != end) {
+                versions.emplace_back(*it, g->get_table(*it)->get_content_version());
+                ++it;
             }
         }
     }

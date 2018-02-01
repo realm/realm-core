@@ -1,3 +1,25 @@
+# NEXT RELEASE
+
+### Bugfixes
+
+* None.
+
+### Breaking changes
+
+* 'begin' argument removed from Query::count();
+
+### Enhancements
+
+* None.
+
+-----------
+
+### Internals
+
+* None.
+
+----------------------------------------------
+
 # 6.0.0-rc1 Release notes
 
 ### Breaking changes

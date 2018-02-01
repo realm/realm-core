@@ -473,8 +473,8 @@ public:
         using AggregateLeafType = typename GetLeafType<TDataType, Nullable>::type;
         auto cb = std::bind(std::mem_fn(&ThisType::template match_callback<TAction, AggregateLeafType>), this,
                             std::placeholders::_1);
-        return this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>(
-            m_value, start_in_leaf, end_in_leaf, start_in_leaf, nullptr, cb);
+        return this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>(m_value, start_in_leaf,
+                                                                                    end_in_leaf, 0, nullptr, cb);
     }
 
 protected:
@@ -495,7 +495,7 @@ protected:
         bool fastmode = should_run_in_fastmode(source_column);
         if (fastmode) {
             bool cont;
-            cont = m_leaf_ptr->find(c, m_action, m_value, start, end, start, static_cast<QueryState<int64_t>*>(st));
+            cont = m_leaf_ptr->find(c, m_action, m_value, start, end, 0, static_cast<QueryState<int64_t>*>(st));
             if (!cont)
                 return not_found;
         }
@@ -1969,6 +1969,7 @@ private:
     LinksToNode(const LinksToNode& source)
         : ParentNode(source, nullptr)
         , m_target_key(source.m_target_key)
+        , m_column_type(source.m_column_type)
     {
     }
 };

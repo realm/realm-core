@@ -2334,8 +2334,8 @@ size_t Table::colkey2ndx(ColKey key) const
         throw InvalidKey("Nonexisting column key");
     // FIXME: Optimization! There are many scenarios where this test may be avoided.
     size_t ndx = m_colkey2ndx[idx];
-    if (ndx2colkey(ndx) != key)
-        throw InvalidKey("Nonexisting column key");
+    if (ndx == max_num_columns || ndx2colkey(ndx) != key)
+        throw LogicError(LogicError::column_does_not_exist);
     return ndx;
 }
 
