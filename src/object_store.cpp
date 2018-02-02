@@ -877,8 +877,8 @@ void ObjectStore::delete_data_for_object(Group& group, StringData object_type) {
 bool ObjectStore::is_empty(Group const& group) {
     for (size_t i = 0; i < group.size(); i++) {
         ConstTableRef table = group.get_table(i);
-        std::string object_type = object_type_for_table_name(table->get_name());
-        if (!object_type.length()) {
+        auto object_type = object_type_for_table_name(table->get_name());
+        if (object_type.size() == 0 || object_type.begins_with("__")) {
             continue;
         }
         if (!table->is_empty()) {
