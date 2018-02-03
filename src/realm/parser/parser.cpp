@@ -86,12 +86,13 @@ struct avg : TAOCPP_PEGTL_ISTRING(".@avg.") {};
 // these operators are normal strings (no proceeding string characters)
 struct count : string_token_t(".@count") {};
 struct size : string_token_t(".@size") {};
+struct backlinks : string_token_t("@links") {};
 
 struct single_collection_operators : sor< count, size > {};
 struct key_collection_operators : sor< min, max, sum, avg > {};
 
 // key paths
-struct key_path : list< seq< sor< alpha, one< '_' >, one< '$' > >, star< sor< alnum, one< '_', '-', '$' > > > >, one< '.' > > {};
+struct key_path : list< sor< backlinks, seq< sor< alpha, one< '_', '$' > >, star< sor< alnum, one< '_', '-', '$' > > > > >, one< '.' > > {};
 
 struct key_path_prefix : disable< key_path > {};
 struct key_path_suffix : disable< key_path > {};
@@ -104,7 +105,6 @@ struct argument : seq< one< '$' >, argument_index > {};
 
 struct pred;
 // subquery eg: SUBQUERY(items, $x, $x.name CONTAINS 'a' && $x.price > 5).@count
-//struct sub_conditions : disable< pred > {};
 struct subq_prefix : seq< string_token_t("subquery"), star< blank >, one< '(' > > {};
 struct subq_suffix : one< ')' > {};
 struct sub_path : disable < key_path > {};

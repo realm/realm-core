@@ -173,6 +173,8 @@ public:
     DataType get_column_type(size_t column_ndx) const noexcept;
     StringData get_column_name(size_t column_ndx) const noexcept;
     size_t get_column_index(StringData name) const noexcept;
+    typedef util::Optional<std::pair<ConstTableRef, size_t>> BacklinkOrigin;
+    BacklinkOrigin find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept;
     //@}
 
     //@{

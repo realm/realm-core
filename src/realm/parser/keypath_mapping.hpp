@@ -21,11 +21,23 @@
 
 #include <realm/table.hpp>
 
+#include "parser_utils.hpp"
+
 #include <map>
 #include <string>
 
 namespace realm {
 namespace parser {
+
+struct KeyPathElement
+{
+    ConstTableRef table;
+    size_t col_ndx;
+    DataType col_type;
+    bool is_backlink;
+};
+
+Table* table_getter(const std::vector<KeyPathElement>& links);
 
 // This class holds state which allows aliasing variable names in key paths used in queries.
 // It is currently used to allow variable naming in subqueries such as 'SUBQUERY(list, $obj, $obj.intCol = 5).@count'
@@ -34,11 +46,12 @@ class KeyPathMapping
 {
 public:
     KeyPathMapping();
-    void add_mapping(TableRef table, std::string name, std::string alias);
-    void remove_mapping(TableRef table, std::string name);
-    std::string process_keypath(TableRef table, std::string path);
+    void add_mapping(ConstTableRef table, std::string name, std::string alias);
+    void remove_mapping(ConstTableRef table, std::string name);
+    KeyPathElement process_next_path(ConstTableRef table, KeyPath& path, size_t& index);
+    static Table* table_getter(TableRef table, const std::vector<KeyPathElement>& links);
 protected:
-    std::map<std::pair<TableRef, std::string>, std::string> m_mapping;
+    std::map<std::pair<ConstTableRef, std::string>, std::string> m_mapping;
 };
 
 } // namespace parser

@@ -152,15 +152,20 @@ std::string key_path_to_string(const KeyPath& keypath)
     return path;
 }
 
-StringData get_printable_table_name(const Table& table)
+StringData get_printable_table_name(StringData name)
 {
-    StringData name = table.get_name();
     // the "class_" prefix is an implementation detail of the object store that shouldn't be exposed to users
     static const std::string prefix = "class_";
     if (name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
         name = StringData(name.data() + prefix.size(), name.size() - prefix.size());
     }
     return name;
+}
+
+StringData get_printable_table_name(const Table& table)
+{
+    StringData name = table.get_name();
+    return get_printable_table_name(name);
 }
 
 } // namespace utils

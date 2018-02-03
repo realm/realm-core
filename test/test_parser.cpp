@@ -201,6 +201,10 @@ static std::vector<std::string> valid_queries = {
     "SUBQUERY(items, $x, $x.name == 'Tom').@count > 0",
     "SUBQUERY(items, $x, $x.allergens.@min.population_affected < 0.10).@count > 0",
     "SUBQUERY(items, $x, $x.name == 'Tom').@count == SUBQUERY(items, $x, $x.price < 10).@count",
+
+    // backlinks
+    "p.@links.class.prop.@count > 2",
+    "p.@links.class.prop.@sum.prop2 > 2",
 };
 
 static std::vector<std::string> invalid_queries = {
@@ -285,6 +289,11 @@ static std::vector<std::string> invalid_queries = {
     "SUBQUERY(, $x, $x.name == 'Tom').@avg > 0", // a target keypath is required
     "SUBQUERY(items, , name == 'Tom').@avg > 0", // a variable name is required
     "SUBQUERY(items, $x, ).@avg > 0", // the subquery is required
+
+    // no @ allowed in keypaths except for keyword '@links'
+    "@prop > 2",
+    "@backlinks.@count > 2",
+    "prop@links > 2",
 };
 
 TEST(Parser_valid_queries) {
@@ -1632,8 +1641,18 @@ TEST(Parser_SortAndDistinct)
     CHECK_EQUAL(message, "No property 'name' found on object type 'account' specified in 'sort' clause");
 }
 
+struct EmptyArgContext
+{
+    template<typename T>
+    T unbox(std::string) {
+        return T{}; //dummy
+    }
+    bool is_null(std::string) {
+        return false;
+    }
+};
 
-TEST(Parser_BacklinkSerialisation)
+TEST(Parser_Backlinks)
 {
     Group g;
 
@@ -1641,7 +1660,7 @@ TEST(Parser_BacklinkSerialisation)
     size_t item_name_col = items->add_column(type_String, "name");
     size_t item_price_col = items->add_column(type_Double, "price");
     using item_t = std::pair<std::string, double>;
-    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}, {"bread", 3.5}};
     for (item_t i : item_info) {
         size_t row_ndx = items->add_empty_row();
         items->set_string(item_name_col, row_ndx, i.first);
@@ -1650,6 +1669,7 @@ TEST(Parser_BacklinkSerialisation)
 
     TableRef t = g.add_table("class_Person");
     size_t id_col_ndx = t->add_column(type_Int, "customer_id");
+    size_t name_col_ndx = t->add_column(type_String, "name");
     size_t account_col_ndx = t->add_column(type_Double, "account_balance");
     size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
     size_t fav_col_ndx = t->add_column_link(type_Link, "fav_item", *items);
@@ -1660,17 +1680,20 @@ TEST(Parser_BacklinkSerialisation)
         t->set_link(fav_col_ndx, i, i);
     }
 
+    t->set_string(name_col_ndx, 0, "Adam");
     LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
     list_0->add(0);
     list_0->add(1);
     list_0->add(2);
     list_0->add(3);
 
+    t->set_string(name_col_ndx, 1, "James");
     LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
     for (size_t i = 0; i < 10; ++i) {
         list_1->add(0);
     }
 
+    t->set_string(name_col_ndx, 2, "John");
     LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
     list_2->add(2);
     list_2->add(2);
@@ -1686,6 +1709,63 @@ TEST(Parser_BacklinkSerialisation)
     desc = q.get_description();
     CHECK(desc.find("@links.class_Person.items.account_balance") != std::string::npos);
 
+    // favourite items bought by people who have > 20 in their account
+    verify_query(test_context, items, "@links.class_Person.fav_item.account_balance > 20", 1);  // backlinks via link
+    // items bought by people who have > 20 in their account
+    verify_query(test_context, items, "@links.class_Person.items.account_balance > 20", 2);     // backlinks via list
+    // items bought by people who have 'J' as the first letter of their name
+    verify_query(test_context, items, "@links.class_Person.items.name LIKE[c] 'j*'", 3);
+    verify_query(test_context, items, "@links.class_Person.items.name BEGINSWITH 'J'", 3);
+
+    // items purchased more than twice
+    verify_query(test_context, items, "@links.class_Person.items.@count > 2", 2);
+    verify_query(test_context, items, "@LINKS.class_Person.items.@size > 2", 2);
+    // items bought by people with only $10 in their account
+    verify_query(test_context, items, "@links.class_Person.items.@min.account_balance <= 10", 4);
+    // items bought by people with more than $10 in their account
+    verify_query(test_context, items, "@links.class_Person.items.@max.account_balance > 10", 3);
+    // items bought where the sum of the account balance of purchasers is more than $20
+    verify_query(test_context, items, "@links.class_Person.items.@sum.account_balance > 20", 3);
+    verify_query(test_context, items, "@links.class_Person.items.@avg.account_balance > 20", 1);
+
+    // subquery over backlinks
+    verify_query(test_context, items, "SUBQUERY(@links.class_Person.items, $x, $x.account_balance >= 20).@count > 2", 1);
+
+    // backlinks over link
+    // people having a favourite item which is also the favourite item of another person
+    verify_query(test_context, t, "fav_item.@links.class_Person.fav_item.@count > 1", 0);
+    // people having a favourite item which is purchased more than once (by anyone)
+    verify_query(test_context, t, "fav_item.@links.class_Person.items.@count > 1 ", 2);
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.items == NULL", 1), message);
+    CHECK_EQUAL(message, "Comparing a list property to 'null' is not supported");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.fav_item == NULL", 1), message);
+    CHECK_EQUAL(message, "Comparing a list property to 'null' is not supported");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count > 0", 1), message);
+    CHECK_EQUAL(message, "'@links' must be proceeded by type name and a property name");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Factory.items > 0", 1), message);
+    CHECK_EQUAL(message, "No property 'items' found in type 'Factory' which links to type 'Items'");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.artifacts > 0", 1), message);
+    CHECK_EQUAL(message, "No property 'artifacts' found in type 'Person' which links to type 'Items'");
+
+    // check that arbitrary aliasing for named backlinks works
+    EmptyArgContext ctx;
+    std::string empty_string;
+    parser::KeyPathMapping mapping;
+    mapping.add_mapping(items, "purchasers", "@links.class_Person.items");
+    mapping.add_mapping(t, "money", "account_balance");
+    realm::query_builder::ArgumentConverter<std::string, EmptyArgContext> args(ctx, &empty_string, 0);
+
+    q = items->where();
+    realm::parser::Predicate p = realm::parser::parse("purchasers.@count > 2").predicate;
+    realm::query_builder::apply_predicate(q, p, args, mapping);
+    CHECK_EQUAL(q.count(), 2);
+
+    q = items->where();
+    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
+    realm::query_builder::apply_predicate(q, p, args, mapping);
+    CHECK_EQUAL(q.count(), 3);
 }
 
 

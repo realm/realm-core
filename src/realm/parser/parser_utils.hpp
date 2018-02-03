@@ -67,6 +67,7 @@ const char* collection_operator_to_str(parser::Expression::KeyPathOp op);
 using KeyPath = std::vector<std::string>;
 KeyPath key_path_from_string(const std::string &s);
 std::string key_path_to_string(const KeyPath& keypath);
+StringData get_printable_table_name(StringData name);
 StringData get_printable_table_name(const Table& table);
 
 template<typename T>

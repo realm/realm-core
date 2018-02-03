@@ -31,36 +31,36 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
         switch (e.collection_op) {
             case parser::Expression::KeyPathOp::Min:
                 type = ExpressionInternal::exp_OpMin;
-                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Min>(std::move(pe), e.op_suffix);
+                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Min>(std::move(pe), e.op_suffix, mapping);
                 break;
             case parser::Expression::KeyPathOp::Max:
                 type = ExpressionInternal::exp_OpMax;
-                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Max>(std::move(pe), e.op_suffix);
+                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Max>(std::move(pe), e.op_suffix, mapping);
                 break;
             case parser::Expression::KeyPathOp::Sum:
                 type = ExpressionInternal::exp_OpSum;
-                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum>(std::move(pe), e.op_suffix);
+                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum>(std::move(pe), e.op_suffix, mapping);
                 break;
             case parser::Expression::KeyPathOp::Avg:
                 type = ExpressionInternal::exp_OpAvg;
-                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>(std::move(pe), e.op_suffix);
+                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>(std::move(pe), e.op_suffix, mapping);
                 break;
             case parser::Expression::KeyPathOp::Count:
                 REALM_FALLTHROUGH;
             case parser::Expression::KeyPathOp::SizeString:
                 REALM_FALLTHROUGH;
             case parser::Expression::KeyPathOp::SizeBinary:
-                if (pe.col_type == type_LinkList || pe.col_type == type_Link) {
+                if (pe.get_dest_type() == type_LinkList || pe.get_dest_type() == type_Link) {
                     type = ExpressionInternal::exp_OpCount;
-                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>(std::move(pe), e.op_suffix);
+                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>(std::move(pe), e.op_suffix, mapping);
                 }
-                else if (pe.col_type == type_String) {
+                else if (pe.get_dest_type() == type_String) {
                     type = ExpressionInternal::exp_OpSizeString;
-                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>(std::move(pe), e.op_suffix);
+                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>(std::move(pe), e.op_suffix, mapping);
                 }
-                else if (pe.col_type == type_Binary) {
+                else if (pe.get_dest_type() == type_Binary) {
                     type = ExpressionInternal::exp_OpSizeBinary;
-                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>(std::move(pe), e.op_suffix);
+                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>(std::move(pe), e.op_suffix, mapping);
                 }
                 else {
                     throw std::runtime_error("Invalid query: @size and @count can only operate on types list, binary, or string");
@@ -152,7 +152,7 @@ DataType ExpressionContainer::check_type_compatibility(DataType other_type)
             self_type = other_type; // we'll try to parse the value as other_type and fail there if not possible
             break;
         case ExpressionInternal::exp_Property:
-            self_type = get_property().col_type; // must match
+            self_type = get_property().get_dest_type(); // must match
             break;
         case ExpressionInternal::exp_OpMin:
             self_type = get_min().post_link_col_type;
@@ -204,9 +204,9 @@ bool is_count_type(ExpressionContainer::ExpressionInternal exp_type)
 DataType ExpressionContainer::get_comparison_type(ExpressionContainer& rhs) {
     // check for strongly typed expressions first
     if (type == ExpressionInternal::exp_Property) {
-        return rhs.check_type_compatibility(get_property().col_type);
+        return rhs.check_type_compatibility(get_property().get_dest_type());
     } else if (rhs.type == ExpressionInternal::exp_Property) {
-        return check_type_compatibility(rhs.get_property().col_type);
+        return check_type_compatibility(rhs.get_property().get_dest_type());
     } else if (type == ExpressionInternal::exp_OpMin) {
         return rhs.check_type_compatibility(get_min().post_link_col_type);
     } else if (type == ExpressionInternal::exp_OpMax) {

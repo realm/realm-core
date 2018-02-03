@@ -29,38 +29,31 @@ namespace parser {
 PropertyExpression::PropertyExpression(Query &q, const std::string &key_path_string, parser::KeyPathMapping& mapping)
 : query(q)
 {
-    TableRef cur_table = query.get_table();
-    std::string mapped_keypath = mapping.process_keypath(cur_table, key_path_string);
-    KeyPath key_path = key_path_from_string(mapped_keypath);
-    for (size_t index = 0; index < key_path.size(); index++) {
-        size_t cur_col_ndx = cur_table->get_column_index(key_path[index]);
+    ConstTableRef cur_table = query.get_table();
+    KeyPath key_path = key_path_from_string(key_path_string);
+    size_t index = 0;
 
-        StringData object_name = get_printable_table_name(*cur_table);
-
-        precondition(cur_col_ndx != realm::not_found,
-                     util::format("No property '%1' on object of type '%2'", key_path[index], object_name));
-
-        DataType cur_col_type = cur_table->get_column_type(cur_col_ndx);
-        if (index != key_path.size() - 1) {
-            precondition(cur_col_type == type_Link || cur_col_type == type_LinkList,
-                         util::format("Property '%1' is not a link in object of type '%2'", key_path[index], object_name));
-            indexes.push_back(cur_col_ndx);
-            cur_table = cur_table->get_link_target(cur_col_ndx);
+    while (index < key_path.size()) {
+        KeyPathElement element = mapping.process_next_path(cur_table, key_path, index);
+        if (index != key_path.size()) {
+            precondition(element.col_type == type_Link || element.col_type == type_LinkList,
+                         util::format("Property '%1' is not a link in object of type '%2'",
+                                      element.table->get_column_name(element.col_ndx),
+                                      get_printable_table_name(*element.table)));
+            if (element.table == cur_table) {
+                cur_table = element.table->get_link_target(element.col_ndx); // advance through forward link
+            } else {
+                cur_table = element.table; // advance through backlink
+            }
         }
-        else {
-            col_ndx = cur_col_ndx;
-            col_type = cur_col_type;
-        }
+        link_chain.push_back(element);
     }
 }
 
 Table* PropertyExpression::table_getter() const
 {
     auto& tbl = query.get_table();
-    for (size_t col : indexes) {
-        tbl->link(col); // mutates m_link_chain on table
-    }
-    return tbl.get();
+    return KeyPathMapping::table_getter(tbl, link_chain);
 }
 
 } // namespace parser

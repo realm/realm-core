@@ -34,12 +34,15 @@ struct SubqueryGetter;
 
 struct SubqueryExpression
 {
-    std::vector<size_t> indexes;
     std::string var_name;
-    size_t col_ndx;
-    DataType col_type;
     Query &query;
     Query subquery;
+    std::vector<KeyPathElement> link_chain;
+    DataType get_dest_type() const;
+    size_t get_dest_ndx() const;
+    ConstTableRef get_dest_table() const;
+    bool dest_type_is_backlink() const;
+
 
     SubqueryExpression(Query &q, const std::string &key_path_string, const std::string &variable_name, parser::KeyPathMapping &mapping);
     Query& get_subquery();
@@ -53,6 +56,29 @@ struct SubqueryExpression
     }
 };
 
+inline DataType SubqueryExpression::get_dest_type() const
+{
+    REALM_ASSERT_DEBUG(link_chain.size() > 0);
+    return link_chain.back().col_type;
+}
+
+inline bool SubqueryExpression::dest_type_is_backlink() const
+{
+    REALM_ASSERT_DEBUG(link_chain.size() > 0);
+    return link_chain.back().is_backlink;
+}
+
+inline size_t SubqueryExpression::get_dest_ndx() const
+{
+    REALM_ASSERT_DEBUG(link_chain.size() > 0);
+    return link_chain.back().col_ndx;
+}
+
+inline ConstTableRef SubqueryExpression::get_dest_table() const
+{
+    REALM_ASSERT_DEBUG(link_chain.size() > 0);
+    return link_chain.back().table;
+}
 
 // Certain operations are disabled for some types (eg. a sum of timestamps is invalid).
 // The operations that are supported have a specialisation with std::enable_if for that type below
@@ -75,7 +101,11 @@ std::is_same<RetType, Double>::value
 > >{
     static SubQueryCount convert(const SubqueryExpression& expr)
     {
-        return expr.table_getter()->template column<LinkList>(expr.col_ndx, expr.subquery).count();
+        if (expr.dest_type_is_backlink()) {
+            return expr.table_getter()->template column<BackLink>(*expr.get_dest_table(), expr.get_dest_ndx(), expr.subquery).count();
+        } else {
+            return expr.table_getter()->template column<LinkList>(expr.get_dest_ndx(), expr.subquery).count();
+        }
     }
 };
 

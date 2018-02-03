@@ -51,7 +51,7 @@ void do_add_null_comparison_to_query(Query &, Predicate::Operator, const ValueEx
 template<typename T>
 void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
-    Columns<T> column = expr.table_getter()->template column<T>(expr.col_ndx);
+    Columns<T> column = expr.table_getter()->template column<T>(expr.get_dest_ndx());
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.and_query(column != realm::null());
@@ -67,13 +67,13 @@ void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const
 template<>
 void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
-    precondition(expr.indexes.empty(), "KeyPath queries not supported for object comparisons.");
+    precondition(expr.link_chain.size() == 1, "KeyPath queries not supported for object comparisons.");
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
             REALM_FALLTHROUGH;
         case Predicate::Operator::Equal:
-            query.and_query(query.get_table()->column<Link>(expr.col_ndx).is_null());
+            query.and_query(query.get_table()->column<Link>(expr.get_dest_ndx()).is_null());
             break;
         default:
             throw std::logic_error("Only 'equal' and 'not equal' operators supported for object comparison.");
@@ -288,13 +288,13 @@ void add_link_constraint_to_query(realm::Query &query,
                                   const PropertyExpression &prop_expr,
                                   const ValueExpression &value_expr) {
     size_t row_index = value_expr.arguments->object_index_for_argument(stot<int>(value_expr.value->s));
-    precondition(prop_expr.indexes.empty(), "KeyPath queries not supported for object comparisons.");
+    precondition(prop_expr.link_chain.size() == 1, "KeyPath queries not supported for object comparisons.");
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
             REALM_FALLTHROUGH;
         case Predicate::Operator::Equal: {
-            size_t col = prop_expr.col_ndx;
+            size_t col = prop_expr.get_dest_ndx();
             query.links_to(col, query.get_table()->get_link_target(col)->get(row_index));
             break;
         }
@@ -376,7 +376,7 @@ template <class T>
 void do_add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, const T &expr, DataType type, NullLocation location)
 {
     if (type == type_LinkList) { // when backlinks are supported, this should check those as well
-        throw std::logic_error("Comparing Lists to 'null' is not supported");
+        throw std::logic_error("Comparing a list property to 'null' is not supported");
     }
     switch (type) {
         case realm::type_Bool:
@@ -426,7 +426,7 @@ void add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, Expre
         case ExpressionContainer::ExpressionInternal::exp_Value:
             throw std::runtime_error("Unsupported query comparing 'null' and a literal. A comparison must include at least one keypath.");
         case ExpressionContainer::ExpressionInternal::exp_Property:
-            do_add_null_comparison_to_query(query, cmp, exp.get_property(), exp.get_property().col_type, location);
+            do_add_null_comparison_to_query(query, cmp, exp.get_property(), exp.get_property().get_dest_type(), location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpMin:
             do_add_null_comparison_to_query(query, cmp, exp.get_min(), exp.get_min().post_link_col_type, location);
