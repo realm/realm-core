@@ -10,7 +10,14 @@
 
 ### Enhancements
 
-* None.
+* Parser improvements:
+    - Support subquery count expressions, for example: "SUBQUERY(list, $x, $x.price > 5 && $x.colour == 'blue').@count > 1"
+        - Subqueries can be nested, but all properties must start with the closest variable (no parent scope properties)
+    - Support queries over unnamed backlinks, for example: "@links.class_Person.items.cost > 10"
+        - Backlinks can be used like lists in expressions including: min, max, sum, avg, count/size, and subqueries
+    - Keypath substitution is supported to allow querying over named backlinks and property aliases, see `KeyPathMapping`
+    - Parsing backlinks can be disabled at runtime by configuring `KeyPathMapping::set_allow_backlinks`
+    PR [#2989](https://github.com/realm/realm-core/pull/2989).
 
 -----------
 
