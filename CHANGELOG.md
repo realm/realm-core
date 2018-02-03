@@ -2,13 +2,31 @@
 
 ### Bugfixes
 
-* Fix a crash when distinct is applied on two or more properties where
-  the properties contain a link and non-link column.
-  PR [#2979](https://github.com/realm/realm-core/pull/2979).
+* None.
 
 ### Breaking changes
 
 * None.
+
+### Enhancements
+
+* None.
+
+-----------
+
+### Internals
+
+* None.
+
+----------------------------------------------
+
+# 5.2.0 Release notes
+
+### Bugfixes
+
+* Fix a crash when distinct is applied on two or more properties where
+  the properties contain a link and non-link column.
+  PR [#2979](https://github.com/realm/realm-core/pull/2979).
 
 ### Enhancements
 
@@ -37,7 +55,7 @@
 
 ### Internals
 
-* None.
+* The devel-dbg Linux packages now correctly include static libraries instead of shared ones.
 
 ----------------------------------------------
 
