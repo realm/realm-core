@@ -37,11 +37,15 @@ struct KeyPathElement
     bool is_backlink;
 };
 
-Table* table_getter(const std::vector<KeyPathElement>& links);
+class BacklinksRestrictedError : public std::runtime_error {
+public:
+    BacklinksRestrictedError(const std::string& msg) : std::runtime_error(msg) {}
+    /// runtime_error::what() returns the msg provided in the constructor.
+};
 
 // This class holds state which allows aliasing variable names in key paths used in queries.
-// It is currently used to allow variable naming in subqueries such as 'SUBQUERY(list, $obj, $obj.intCol = 5).@count'
-// It could also be concievably used to allow querying named backlinks if bindings provide the mappings themselves.
+// It is used to allow variable naming in subqueries such as 'SUBQUERY(list, $obj, $obj.intCol = 5).@count'
+// It can also be used to allow querying named backlinks if bindings provide the mappings themselves.
 class KeyPathMapping
 {
 public:
@@ -49,8 +53,10 @@ public:
     void add_mapping(ConstTableRef table, std::string name, std::string alias);
     void remove_mapping(ConstTableRef table, std::string name);
     KeyPathElement process_next_path(ConstTableRef table, KeyPath& path, size_t& index);
+    void set_allow_backlinks(bool allow);
     static Table* table_getter(TableRef table, const std::vector<KeyPathElement>& links);
 protected:
+    bool m_allow_backlinks;
     std::map<std::pair<ConstTableRef, std::string>, std::string> m_mapping;
 };
 

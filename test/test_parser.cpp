@@ -1766,6 +1766,13 @@ TEST(Parser_Backlinks)
     p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
     realm::query_builder::apply_predicate(q, p, args, mapping);
     CHECK_EQUAL(q.count(), 3);
+
+    // disable parsing backlink queries
+    mapping.set_allow_backlinks(false);
+    q = items->where();
+    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
+    CHECK_THROW_ANY_GET_MESSAGE(realm::query_builder::apply_predicate(q, p, args, mapping), message);
+    CHECK_EQUAL(message, "Querying over backlinks is disabled but backlinks were found in the inverse relationship of property 'items' on type 'Person'");
 }
 
 

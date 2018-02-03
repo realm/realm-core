@@ -22,6 +22,7 @@ namespace realm {
 namespace parser {
 
 KeyPathMapping::KeyPathMapping()
+: m_allow_backlinks(true)
 {
 }
 
@@ -68,7 +69,14 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
 
         Table::BacklinkOrigin info = table->find_backlink_origin(keypath[index + 1], keypath[index + 2]);
         precondition(bool(info), util::format("No property '%1' found in type '%2' which links to type '%3'",
-                    keypath[index + 2], get_printable_table_name(keypath[index + 1]), get_printable_table_name(*table)))
+                  keypath[index + 2], get_printable_table_name(keypath[index + 1]), get_printable_table_name(*table)));
+
+        if (!m_allow_backlinks) {
+            throw BacklinksRestrictedError(util::format(
+                "Querying over backlinks is disabled but backlinks were found in the inverse relationship of property '%1' on type '%2'",
+                keypath[index + 2], get_printable_table_name(keypath[index + 1])));
+       }
+
         index = index + 3;
         KeyPathElement element;
         element.table = info->first;
@@ -94,6 +102,10 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
     return element;
 }
 
+void KeyPathMapping::set_allow_backlinks(bool allow)
+{
+    m_allow_backlinks = allow;
+}
 
 Table* KeyPathMapping::table_getter(TableRef table, const std::vector<KeyPathElement>& links)
 {
