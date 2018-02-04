@@ -183,17 +183,18 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
     if (REALM_UNLIKELY(name.size() > Table::max_column_name_length)) {
         throw LogicError(LogicError::column_name_too_long);
     }
-    if (name.size() == 0) {
-        throw LogicError(LogicError::invalid_column_name);
-    }
     if (get_column_index(name) != npos) {
         throw LogicError(LogicError::column_name_in_use);
     }
 
     if (type != col_type_BackLink) {
+        if (name.size() == 0) {
+            throw LogicError(LogicError::invalid_column_name);
+        }
+        m_names.insert(column_ndx, name); // Throws
         m_num_public_columns++;
     }
-    m_names.insert(column_ndx, name);     // Throws
+
     m_types.insert(column_ndx, type);     // Throws
     // FIXME: So far, attributes are never reported to the replication system
     m_attr.insert(column_ndx, attr); // Throws
@@ -273,8 +274,8 @@ void Spec::erase_column(size_t column_ndx)
     // Delete the actual name and type entries
     if (type != col_type_BackLink) {
         m_num_public_columns--;
+        m_names.erase(column_ndx); // Throws
     }
-    m_names.erase(column_ndx);     // Throws
     m_types.erase(column_ndx);     // Throws
     m_attr.erase(column_ndx);      // Throws
     m_keys.erase(column_ndx);
@@ -535,7 +536,7 @@ ColKey Spec::get_key(size_t column_ndx)
 
 void Spec::verify() const
 {
-    REALM_ASSERT(m_names.size() == get_column_count());
+    REALM_ASSERT(m_names.size() == get_public_column_count());
     REALM_ASSERT(m_types.size() == get_column_count());
     REALM_ASSERT(m_attr.size() == get_column_count());
 

@@ -643,18 +643,8 @@ ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name,
 
     if (link_target.is_valid()) {
         auto origin_table_key = get_key();
-        std::string backlink_col_name = std::string(get_name()) + "_" + std::string(name);
-        // Make sure the new name does not violate the name length limit
-        if (backlink_col_name.size() > Table::max_column_name_length) {
-            // It does - replace the last 8 characters with a hash value
-            size_t hash_length = 8;
-            std::hash<std::string> str_hash;
-            auto hash = str_hash(backlink_col_name);
-            backlink_col_name.resize(Table::max_column_name_length - hash_length);
-            backlink_col_name += util::to_string(hash).substr(0, hash_length);
-        }
         link_target.m_backlink_col_key = link_target.m_target_table->insert_backlink_column(
-            origin_table_key, col_key, link_target.m_backlink_col_key, backlink_col_name); // Throws
+            origin_table_key, col_key, link_target.m_backlink_col_key); // Throws
     }
     return col_key;
 }
@@ -764,10 +754,9 @@ LinkType Table::get_link_type(ColKey col_key) const
     return m_spec->get_column_attr(col_ndx).test(col_attr_StrongLinks) ? link_Strong : link_Weak;
 }
 
-ColKey Table::insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key,
-                                     StringData name)
+ColKey Table::insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key)
 {
-    ColKey retval = do_insert_root_column(backlink_col_key, col_type_BackLink, name); // Throws
+    ColKey retval = do_insert_root_column(backlink_col_key, col_type_BackLink, ""); // Throws
     size_t backlink_col_ndx = colkey2ndx(retval);
     m_spec->set_opposite_link_table_key(backlink_col_ndx, origin_table_key); // Throws
     m_spec->set_backlink_origin_column(backlink_col_ndx, origin_col_key);    // Throws

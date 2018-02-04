@@ -661,8 +661,7 @@ private:
     ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, bool nullable = false,
                                  bool listtype = false);
     void do_erase_root_column(ColKey col_key);
-    ColKey insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key,
-                                  StringData name);
+    ColKey insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key);
     void erase_backlink_column(TableKey origin_table_key, ColKey origin_col_key);
 
     struct AccessorUpdater {
