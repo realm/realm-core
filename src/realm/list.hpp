@@ -363,6 +363,12 @@ public:
         this->set_obj(&m_obj);
     }
 
+    List& operator=(const BPlusTree<T>& other)
+    {
+        *m_tree = other;
+        return *this;
+    }
+
     void update_child_ref(size_t, ref_type new_ref) override
     {
         m_obj.set_int(ConstListBase::m_col_key, from_ref(new_ref));

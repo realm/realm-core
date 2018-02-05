@@ -179,6 +179,9 @@ private:
 
     void set_column_attr(size_t column_ndx, ColumnAttrMask attr);
 
+    // Convert columns to new list format
+    void convert_column(size_t column_ndx);
+
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
     static MemRef create_empty_spec(Allocator&);

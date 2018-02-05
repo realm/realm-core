@@ -1052,14 +1052,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                 case 0:
                     file_format_ok = (top_ref == 0);
                     break;
-                case 2:
-                case 3:
-                case 4:
-                case 5:
                 case 6:
                 case 7:
                 case 8:
                 case 9:
+                case 10:
                     file_format_ok = true;
                     break;
             }

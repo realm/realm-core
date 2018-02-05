@@ -393,6 +393,11 @@ public:
         REALM_ASSERT(column_ndx < m_index_accessors.size());
         return m_index_accessors[column_ndx];
     }
+    StringIndex* get_search_index(size_t column_ndx) const noexcept
+    {
+        REALM_ASSERT(column_ndx < m_index_accessors.size());
+        return m_index_accessors[column_ndx];
+    }
 
     template <class T>
     ObjKey find_first(ColKey col_key, T value) const;
@@ -622,7 +627,12 @@ private:
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
 
     void populate_search_index(ColKey column_ndx);
-    void rebuild_search_index(size_t current_file_format_version);
+    void create_columns_in_clusters();
+    void create_objects();
+    template <class U>
+    void copy_list_of_primitives(Obj& obj, ColKey col, ref_type ref);
+    void copy_content_from_columns();
+    ColumnBase* create_column_accessor(ColumnType col_type, size_t col_ndx, ref_type ref);
 
     /// Disable copying assignment.
     ///
@@ -653,6 +663,8 @@ private:
     Table(ref_count_tag, Allocator&);
 
     void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool skip_create_column_accessors = false);
+
+    void set_key(TableKey key);
 
     ColKey do_insert_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target_info,
                             bool nullable = false, bool listtype = false);

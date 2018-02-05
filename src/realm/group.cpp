@@ -185,8 +185,8 @@ int Group::get_committed_file_format_version() const noexcept
 }
 
 
-int Group::get_target_file_format_version_for_session(int current_file_format_version,
-                                                      int requested_history_type) noexcept
+int Group::get_target_file_format_version_for_session(int /* current_file_format_version */,
+                                                      int /* requested_history_type */) noexcept
 {
     // Note: This function is responsible for choosing the target file format
     // for a sessions. If it selects a file format that is different from
@@ -200,16 +200,7 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
 
-    if (requested_history_type == Replication::hist_None && current_file_format_version == 6)
-        return 6;
-
-    if (requested_history_type == Replication::hist_None && current_file_format_version == 7)
-        return 7;
-
-    if (requested_history_type == Replication::hist_None && current_file_format_version == 8)
-        return 8;
-
-    return 9;
+    return 10;
 }
 
 
@@ -220,7 +211,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 9, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 10, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -228,20 +219,9 @@ void Group::upgrade_file_format(int target_file_format_version)
     // SharedGroup::do_open() must ensure this. Be sure to revisit the
     // following upgrade logic when SharedGroup::do_open() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version >= 2 && current_file_format_version <= 8,
+    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 9,
                     current_file_format_version);
 
-    // Upgrade from version prior to 5 not supported
-    REALM_ASSERT(current_file_format_version >= 5);
-
-    // Upgrade from version prior to 6 (StringIndex format changed last time)
-    if (current_file_format_version < 6) {
-        auto keys = get_keys();
-        for (auto key : keys) {
-            TableRef table = get_table(key);
-            table->rebuild_search_index(current_file_format_version);
-        }
-    }
 
     // Upgrade from version prior to 7 (new history schema version in top array)
     if (current_file_format_version <= 6 && target_file_format_version >= 7) {
@@ -255,9 +235,20 @@ void Group::upgrade_file_format(int target_file_format_version)
         }
     }
 
-    // Upgrading to version 9 doesn't require changing anything.
-
     // NOTE: Additional future upgrade steps go here.
+    if (current_file_format_version <= 9 && target_file_format_version >= 10) {
+        for (size_t t = 0; t < m_table_names.size(); t++) {
+            StringData name = m_table_names.get(t);
+            auto table = get_table(name);
+            table->create_columns_in_clusters();
+        }
+        for (auto t : m_table_accessors) {
+            t->create_objects();
+        }
+        for (auto t : m_table_accessors) {
+            t->copy_content_from_columns();
+        }
+    }
 
     set_file_format_version(target_file_format_version);
 }
@@ -270,9 +261,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
     m_file_format_version = m_alloc.get_committed_file_format_version();
 
     bool file_format_ok = false;
-    // In non-shared mode (Realm file opened via a Group instance) this version
-    // of the core library is only able to open Realms using file format version
-    // 6, 7, 8 or 9. These versions can be read without an upgrade.
+    // It is not possible to open prior file format versions without an upgrade.
     // Since a Realm file cannot be upgraded when opened in this mode
     // (we may be unable to write to the file), no earlier versions can be opened.
     // Please see Group::get_file_format_version() for information about the
@@ -281,10 +270,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
         case 0:
             file_format_ok = (top_ref == 0);
             break;
-        case 6:
-        case 7:
-        case 8:
-        case 9:
+        case 10:
             file_format_ok = true;
             break;
     }
