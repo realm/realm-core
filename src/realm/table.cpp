@@ -404,19 +404,55 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
     // size_t columns_ndx_in_parent = 1;
     // columns no longer in use
-    if (m_top.size() > top_position_for_cluster_tree) {
-        m_clusters.set_parent(&m_top, top_position_for_cluster_tree);
-        m_clusters.init_from_parent();
+    while (m_top.size() <= top_position_for_column_key) {
+        m_top.add(0);
     }
-    if (m_top.size() > top_position_for_search_indexes) {
-        m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
+
+    m_clusters.set_parent(&m_top, top_position_for_cluster_tree);
+    if (m_top.get_as_ref(top_position_for_cluster_tree) == 0) {
+        MemRef mem = ClusterTree::create_empty_cluster(m_top.get_alloc()); // Throws
+        m_top.set_as_ref(top_position_for_cluster_tree, mem.get_ref());
+    }
+    m_clusters.init_from_parent();
+
+    RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_key);
+    if (!rot.is_tagged()) {
+        rot = RefOrTagged::make_tagged(ndx_in_parent);
+        m_top.set(top_position_for_key, rot);
+    }
+    m_key = TableKey(rot.get_as_int());
+
+    m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
+    if (m_top.get_as_ref(top_position_for_search_indexes) == 0) {
+        // This is an upgrade - create the necessary arrays
+        bool context_flag = false;
+        size_t nb_columns = m_spec->get_public_column_count();
+        MemRef mem = Array::create_array(Array::type_HasRefs, context_flag, nb_columns, 0, m_top.get_alloc());
+        m_index_refs.init_from_mem(mem);
+        m_index_refs.update_parent();
+        for (size_t ndx = 0; ndx < nb_columns; ndx++) {
+            if (m_spec->get_column_attr(ndx).test(col_attr_Indexed)) {
+                StringIndex* index =
+                    new StringIndex(ClusterColumn(&m_clusters, m_spec->get_key(ndx)), m_top.get_alloc());
+                m_index_accessors.push_back(index);
+
+                // Insert ref to index
+                index->set_parent(&m_index_refs, ndx);
+                m_index_refs.set(ndx, index->get_ref()); // Throws
+            }
+            else {
+                m_index_accessors.push_back(nullptr);
+            }
+        }
+    }
+    else {
         m_index_refs.init_from_parent();
         m_index_accessors.resize(m_index_refs.size());
     }
 
-    RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_key);
-    REALM_ASSERT(rot.is_tagged());
-    m_key = TableKey(rot.get_as_int());
+    if (!m_top.get_as_ref_or_tagged(top_position_for_column_key).is_tagged()) {
+        m_top.set(top_position_for_column_key, RefOrTagged::make_tagged(0));
+    }
 
     // update column mapping
     m_ndx2colkey.clear();
@@ -862,14 +898,7 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
         top.add(v); // Throws
         dg_2.release();
     }
-    {
-        bool context_flag = false;
-        MemRef mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
-        dg_2.reset(mem.get_ref());
-        int_fast64_t v(from_ref(mem.get_ref()));
-        top.add(v); // Throws
-        dg_2.release();
-    }
+    top.add(0); // Old position for columns
     {
         MemRef mem = ClusterTree::create_empty_cluster(alloc); // Throws
         dg_2.reset(mem.get_ref());
@@ -877,8 +906,12 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
         top.add(v); // Throws
         dg_2.release();
     }
+
+    // Table key value
     RefOrTagged rot = RefOrTagged::make_tagged(key.value);
     top.add(rot);
+
+    // Search indexes
     {
         bool context_flag = false;
         MemRef mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws

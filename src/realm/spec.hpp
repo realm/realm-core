@@ -358,12 +358,10 @@ inline size_t Spec::backlink_column_count() const noexcept
 }
 
 // Spec will have a subspec when it contains a column which is one of:
-// link, linklist, backlink, or subtable. It is possible for m_top.size()
-// to contain an entry for m_subspecs (at index 3) but this reference
-// may be empty if the spec contains enumkeys (at index 4) but no subspec types.
+// link, linklist, backlink.
 inline bool Spec::has_subspec() const noexcept
 {
-    return (m_top.size() >= 5) && (m_top.get_as_ref(4) != 0);
+    return (m_top.size() > 3) && (m_top.get_as_ref(3) != 0);
 }
 
 inline bool Spec::operator!=(const Spec& s) const noexcept

@@ -52,7 +52,7 @@ void Spec::init(MemRef mem) noexcept
 {
     m_top.init_from_mem(mem);
     size_t top_size = m_top.size();
-    REALM_ASSERT(top_size > 3 && top_size <= 5);
+    REALM_ASSERT(top_size > 2 && top_size <= 6);
 
     m_types.init_from_ref(m_top.get_as_ref(0));
     m_types.set_parent(&m_top, 0);
@@ -60,8 +60,6 @@ void Spec::init(MemRef mem) noexcept
     m_names.set_parent(&m_top, 1);
     m_attr.init_from_ref(m_top.get_as_ref(2));
     m_attr.set_parent(&m_top, 2);
-    m_keys.init_from_ref(m_top.get_as_ref(3));
-    m_keys.set_parent(&m_top, 3);
 
     // Reset optional subarrays in the case of moving
     // from initialized children to uninitialized
@@ -71,16 +69,36 @@ void Spec::init(MemRef mem) noexcept
     // Subspecs array is only there and valid when there are subtables
     // if there are enumkey, but no subtables yet it will be a zero-ref
     if (has_subspec()) {
-        ref_type ref = m_top.get_as_ref(4);
+        ref_type ref = m_top.get_as_ref(3);
         m_subspecs.init_from_ref(ref);
-        m_subspecs.set_parent(&m_top, 4);
+        m_subspecs.set_parent(&m_top, 3);
     }
 
     // Enumkeys array is only there when there are StringEnum columns
-    if (top_size > 5) {
-        m_enumkeys.init_from_ref(m_top.get_as_ref(5));
-        m_enumkeys.set_parent(&m_top, 5);
+    if ((m_top.size() > 4) && (m_top.get_as_ref(4) != 0)) {
+        m_enumkeys.init_from_ref(m_top.get_as_ref(4));
+        m_enumkeys.set_parent(&m_top, 4);
     }
+
+    while (m_top.size() < 6) {
+        m_top.add(0);
+    }
+
+    m_keys.set_parent(&m_top, 5);
+    if (m_top.get_as_ref(5) == 0) {
+        // This is an upgrade - create column key array
+        MemRef mem_ref = Array::create_empty_array(Array::type_Normal, false, m_top.get_alloc()); // Throws
+        m_keys.init_from_mem(mem_ref);
+        m_keys.update_parent();
+        size_t num_cols = m_types.size();
+        for (size_t i = 0; i < num_cols; i++) {
+            m_keys.add(i);
+        }
+    }
+    else {
+        m_keys.init_from_parent();
+    }
+
 
     update_internals();
 }
@@ -110,14 +128,15 @@ bool Spec::update_from_parent(size_t old_baseline) noexcept
     m_types.update_from_parent(old_baseline);
     m_names.update_from_parent(old_baseline);
     m_attr.update_from_parent(old_baseline);
-    m_keys.update_from_parent(old_baseline);
 
-    if (has_subspec()) {
+    if (m_top.get_as_ref(3) != 0) {
         m_subspecs.update_from_parent(old_baseline);
     }
 
-    if (m_top.size() > 5)
+    if (m_top.get_as_ref(4) != 0)
         m_enumkeys.update_from_parent(old_baseline);
+
+    m_keys.update_from_parent(old_baseline);
 
     update_internals();
 
@@ -161,6 +180,8 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
         spec_set.add(v); // Throws
         dg_2.release();
     }
+    spec_set.add(0); // Subspecs array
+    spec_set.add(0); // Enumkeys array
     {
         // One key for each column
         bool context_flag = false;
@@ -209,16 +230,16 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
             bool context_flag = false;
             MemRef subspecs_mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
             _impl::DeepArrayRefDestroyGuard dg(subspecs_mem.get_ref(), alloc);
-            if (m_top.size() == 4) {
+            if (m_top.size() == 3) {
                 int_fast64_t v(from_ref(subspecs_mem.get_ref()));
                 m_top.add(v); // Throws
             }
             else {
                 int_fast64_t v(from_ref(subspecs_mem.get_ref()));
-                m_top.set(4, v); // Throws
+                m_top.set(3, v); // Throws
             }
             m_subspecs.init_from_ref(subspecs_mem.get_ref());
-            m_subspecs.set_parent(&m_top, 4);
+            m_subspecs.set_parent(&m_top, 3);
             dg.release();
         }
 
