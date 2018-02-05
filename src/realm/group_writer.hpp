@@ -137,11 +137,6 @@ private:
     std::pair<size_t, size_t> search_free_space_in_part_of_freelist(size_t size, size_t begin, size_t end,
                                                                     bool& found);
 
-    /// WARNING: This method will not allocate space on disk, so future writes
-    /// to the file might fail.
-    ///
-    /// FIXME: Seems like this method is never used and can be deleted?
-    ///
     /// Extend the file to ensure that a chunk of free space of the
     /// specified size is available. The specified size does not need
     /// to be 8-byte aligned. This function guarantees that it will
