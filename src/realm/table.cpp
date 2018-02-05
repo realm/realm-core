@@ -614,34 +614,6 @@ struct Table::RenameSubtableColumns : SubtableUpdater {
     }
 };
 
-struct Table::MoveSubtableColumns : SubtableUpdater {
-    MoveSubtableColumns(size_t col_ndx_1, size_t col_ndx_2)
-        : m_col_ndx_1(col_ndx_1)
-        , m_col_ndx_2(col_ndx_2)
-    {
-    }
-
-    void update(const SubtableColumn&, Array& subcolumns) override
-    {
-        subcolumns.move_rotate(m_col_ndx_1, m_col_ndx_2);
-    }
-
-    void update_accessor(Table& table) override
-    {
-        table.adj_move_column(m_col_ndx_1, m_col_ndx_2);
-
-        // Refresh column accessors for all affected columns.
-        size_t lower_bound = std::min(m_col_ndx_1, m_col_ndx_2);
-        table.refresh_column_accessors(lower_bound);
-        bool bump_global = true;
-        table.bump_version(bump_global);
-    }
-
-private:
-    const size_t m_col_ndx_1;
-    const size_t m_col_ndx_2;
-};
-
 
 void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
                              bool nullable)
@@ -764,35 +736,6 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
             root_table.m_top.get_alloc().bump_global_version();
             EraseSubtableColumns updater(col_ndx);
             update_subtables(desc, &updater); // Throws
-        }
-    }
-}
-
-
-void Table::do_move_column(Descriptor& desc, size_t col_ndx_1, size_t col_ndx_2)
-{
-    REALM_ASSERT(desc.is_attached());
-
-    using df = _impl::DescriptorFriend;
-    Table& root_table = df::get_root_table(desc);
-    REALM_ASSERT(!root_table.has_shared_type());
-    REALM_ASSERT_3(col_ndx_1, <, desc.get_column_count());
-    REALM_ASSERT_3(col_ndx_2, <, desc.get_column_count());
-
-    if (Replication* repl = root_table.get_repl())
-        repl->move_column(desc, col_ndx_1, col_ndx_2);
-
-    if (desc.is_root()) {
-        root_table.bump_version();
-        root_table.move_root_column(col_ndx_1, col_ndx_2);
-    }
-    else {
-        Spec& spec = df::get_spec(desc);
-        spec.move_column(col_ndx_1, col_ndx_2); // Throws
-        if (!root_table.is_empty()) {
-            root_table.m_top.get_alloc().bump_global_version();
-            MoveSubtableColumns updater{col_ndx_1, col_ndx_2};
-            update_subtables(desc, &updater);
         }
     }
 }
@@ -993,24 +936,6 @@ void Table::erase_root_column(size_t col_ndx)
 }
 
 
-void Table::move_root_column(size_t from, size_t to)
-{
-    REALM_ASSERT_3(from, <, m_spec->get_public_column_count());
-    REALM_ASSERT_3(to, <, m_spec->get_public_column_count());
-
-    if (from == to)
-        return;
-
-    do_move_root_column(from, to);
-    adj_move_column(from, to);
-    update_link_target_tables_after_column_move(from, to);
-
-    size_t min_ndx = std::min(from, to);
-    refresh_column_accessors(min_ndx);
-    refresh_link_target_accessors(min_ndx);
-}
-
-
 void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, bool nullable)
 {
     m_spec->insert_column(ndx, type, name, nullable ? col_attr_Nullable : col_attr_None); // Throws
@@ -1039,30 +964,6 @@ void Table::do_erase_root_column(size_t ndx)
         ref_type index_ref = m_columns.get_as_ref(ndx_in_parent);
         Array::destroy_deep(index_ref, m_columns.get_alloc());
         m_columns.erase(ndx_in_parent);
-    }
-}
-
-
-void Table::do_move_root_column(size_t from_ndx, size_t to_ndx)
-{
-    Spec::ColumnInfo from_info = m_spec->get_column_info(from_ndx);
-    Spec::ColumnInfo to_info = m_spec->get_column_info(to_ndx);
-    m_spec->move_column(from_ndx, to_ndx);
-
-    size_t from = from_info.m_column_ref_ndx;
-    size_t to = to_info.m_column_ref_ndx;
-
-    size_t from_width = from_info.m_has_search_index ? 2 : 1;
-    if (to_ndx > from_ndx) {
-        to = to - from_width + 1;
-    }
-    m_columns.move_rotate(from, to, from_width);
-
-    // When moving upwards, we need to check if the displaced column
-    // has a search index, and if it does, move it down where it belongs.
-    if (to_ndx > from_ndx && to_info.m_has_search_index) {
-        // Move the search index down where it belongs (next to its owner).
-        m_columns.move_rotate(to + from_width, to);
     }
 }
 
@@ -3092,6 +2993,17 @@ BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
 }
 
 template <>
+BinaryIterator Table::get(size_t col_ndx, size_t ndx) const noexcept
+{
+    REALM_ASSERT_3(col_ndx, <, m_columns.size());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Binary);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    const BinaryColumn& col = get_column<BinaryColumn, col_type_Binary>(col_ndx);
+    return BinaryIterator{&col, ndx};
+}
+
+template <>
 Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
@@ -3268,6 +3180,15 @@ template <>
 void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
+
+    // FIXME: In our unit tests, OldDateTime is often passed as integer literal (such as `942`) which is caught by this
+    // method. Because we are currently rewriting the unit test suite for stable keys (nov. 2017) we don't want to
+    // update the test suite at those numerous places in this PR because it will create conflicts. Instead, remove all
+    // OldDateTime legacy test code after stable keys are merged, and remove the col_type_OldDateTime part of the 
+    // assert below.
+    REALM_ASSERT_EX(get_real_column_type(col_ndx) == col_type_Int || 
+                    get_real_column_type(col_ndx) == col_type_OldDateTime, get_real_column_type(col_ndx));
+
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
@@ -6117,33 +6038,6 @@ void Table::adj_erase_column(size_t col_ndx) noexcept
         if (ColumnBase* col = m_cols[col_ndx])
             delete col;
         m_cols.erase(m_cols.begin() + col_ndx);
-    }
-}
-
-void Table::adj_move_column(size_t from, size_t to) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    REALM_ASSERT(is_attached());
-    bool not_degenerate = m_columns.is_attached();
-    if (not_degenerate) {
-        REALM_ASSERT_3(from, <, m_cols.size());
-        REALM_ASSERT_3(to, <, m_cols.size());
-        using iter = decltype(m_cols.begin());
-        iter first, new_first, last;
-        if (from < to) {
-            first = m_cols.begin() + from;
-            new_first = first + 1;
-            last = m_cols.begin() + to + 1;
-        }
-        else {
-            first = m_cols.begin() + to;
-            new_first = m_cols.begin() + from;
-            last = new_first + 1;
-        }
-        std::rotate(first, new_first, last);
     }
 }
 

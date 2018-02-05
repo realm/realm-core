@@ -68,7 +68,6 @@ enum INS {
     ADD_COLUMN_LINK,
     ADD_COLUMN_LINK_LIST,
     CLEAR_TABLE,
-    MOVE_TABLE,
     INSERT_COLUMN_LINK,
     ADD_SEARCH_INDEX,
     REMOVE_SEARCH_INDEX,
@@ -83,7 +82,6 @@ enum INS {
     COMPACT,
     SWAP_ROWS,
     MOVE_ROWS,
-    MOVE_COLUMN,
     SET_UNIQUE,
     IS_NULL,
     OPTIMIZE_TABLE,
@@ -399,16 +397,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 g.get_table(table_ndx)->clear();
             }
-            else if (instr == MOVE_TABLE && g.size() >= 2) {
-                size_t from_ndx = get_next(s) % g.size();
-                size_t to_ndx = get_next(s) % g.size();
-                if (from_ndx != to_ndx) {
-                    if (log) {
-                        *log << "g.move_table(" << from_ndx << ", " << to_ndx << ");\n";
-                    }
-                    g.move_table(from_ndx, to_ndx);
-                }
-            }
             else if (instr == INSERT_ROW && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 if (g.get_table(table_ndx)->get_column_count() == 0) {
@@ -544,21 +532,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                              << col_ndx << ", \"" << name << "\");\n";
                     }
                     t->rename_column(col_ndx, name);
-                }
-            }
-            else if (instr == MOVE_COLUMN && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
-                TableRef t = g.get_table(table_ndx);
-                if (t->get_column_count() > 1) {
-                    // There's a chance that we randomly choose to move a column
-                    // index with itself, but that's ok lets test that case too
-                    size_t col_ndx1 = get_next(s) % t->get_column_count();
-                    size_t col_ndx2 = get_next(s) % t->get_column_count();
-                    if (log) {
-                        *log << "_impl::TableFriend::move_column(*(g.get_table(" << table_ndx
-                             << ")->get_descriptor()), " << col_ndx1 << ", " << col_ndx2 << ");\n";
-                    }
-                    _impl::TableFriend::move_column(*(t->get_descriptor()), col_ndx1, col_ndx2);
                 }
             }
             else if (instr == ADD_SEARCH_INDEX && g.size() > 0) {

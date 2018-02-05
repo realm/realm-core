@@ -46,8 +46,9 @@ for bt in "${BUILD_TYPES[@]}"; do
     [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
     for p in "${PLATFORMS[@]}"; do
         filename=$(find "build-android-${p}-${bt}" -maxdepth 1 -type f -name "realm-core-*-devel.tar.gz")
-        tar -C core-android -zxvf "${filename}" "lib/librealm${suffix}.a"
+        tar -C core-android -zxvf "${filename}" "lib/librealm${suffix}.a" "lib/librealm-parser${suffix}.a"
         mv "core-android/lib/librealm${suffix}.a" "core-android/librealm-android-${p}${suffix}.a"
+        mv "core-android/lib/librealm-parser${suffix}.a" "core-android/librealm-parser-android-${p}${suffix}.a"
         rm -rf core-android/lib
     done
 done

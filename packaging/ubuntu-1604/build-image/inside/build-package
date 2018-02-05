@@ -46,6 +46,7 @@ fpm \
     -d "libssl1.0.0" \
     -C "/prod" \
     lib/librealm.so=/usr/lib/librealm.so \
+    lib/librealm-parser.so=/usr/lib/librealm-parser.so \
     libexec=/usr
 
 fpm \
@@ -65,6 +66,7 @@ fpm \
     -C "/prod" \
     /include=/usr \
     /lib/librealm.a=/usr/lib/librealm.a \
+    /lib/librealm-parser.a=/usr/lib/librealm-parser.a \
     /bin/realm-config=/usr/bin/realm-config
 
 fpm \
@@ -112,6 +114,7 @@ fpm \
     -d "libssl1.0.0" \
     -C "/prod" \
     lib/librealm-dbg.so=/usr/lib/librealm-dbg.so \
+    lib/librealm-parser-dbg.so=/usr/lib/librealm-parser-dbg.so \
     libexec=/usr
 
 fpm \
@@ -129,4 +132,5 @@ fpm \
     -d "librealm-dev = ${VERSION}-${ITERATION}" \
     -d "libssl-dev" \
     -C "/prod" \
-    lib/librealm-dbg.so=/usr/lib/librealm-dbg.a
+    lib/librealm-dbg.a=/usr/lib/librealm-dbg.a \
+    lib/librealm-parser-dbg.a=/usr/lib/librealm-parser-dbg.a

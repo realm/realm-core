@@ -229,6 +229,9 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                             }
                             stash includes:"${buildDir}/realm-*.tar.gz", name:stashName
                             androidStashes << stashName
+                            if (gitTag) {
+                                publishingStashes << stashName
+                            }
                             try {
                                 sh '''
                                    cd $(find . -type d -maxdepth 1 -name build-android*)
@@ -605,7 +608,9 @@ def getSourceArchive() {
           $class           : 'GitSCM',
           branches         : scm.branches,
           gitTool          : 'native git',
-          extensions       : scm.extensions + [[$class: 'CleanCheckout'], [$class: 'CloneOption', depth: 0, noTags: false, reference: '', shallow: false]],
+          extensions       : scm.extensions + [[$class: 'CleanCheckout'], [$class: 'CloneOption', depth: 0, noTags: false, reference: '', shallow: false],
+                                               [$class: 'SubmoduleOption', disableSubmodules: false, parentCredentials: false, recursiveSubmodules: true,
+                                                         reference: '', trackingSubmodules: false]],
           userRemoteConfigs: scm.userRemoteConfigs
         ]
     )

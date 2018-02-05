@@ -2,15 +2,15 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* None.
 
 ### Breaking changes
 
-* Lorem ipsum.
+* None.
 
 ### Enhancements
 
-* Lorem ipsum.
+* None.
 
 -----------
 
@@ -18,6 +18,130 @@
 
 * Add support for libfuzzer.
   PR [#2922](https://github.com/realm/realm-core/pull/2922).
+
+----------------------------------------------
+
+# 5.2.0 Release notes
+
+### Bugfixes
+
+* Fix a crash when distinct is applied on two or more properties where
+  the properties contain a link and non-link column.
+  PR [#2979](https://github.com/realm/realm-core/pull/2979).
+
+### Enhancements
+
+* Parser improvements:
+    - Support for comparing two columns of the same type. For example:
+        - `wins > losses`
+        - `account_balance > purchases.@sum.price`
+        - `purchases.@count > max_allowed_items`
+        - `team_name CONTAINS[c] location.city_name`
+    - Support for sort and distinct clauses
+        - At least one query filter is required
+        - Columns are a comma separated value list
+        - Order of sorting can be `ASC, ASCENDING, DESC, DESCENDING` (case insensitive)
+        - `SORT(property1 ASC, property2 DESC)`
+        - `DISTINCT(property1, property2)`
+        - Any number of sort/distinct expressions can be indicated
+    - Better support for NULL synonym in binary and string expressions:
+        - `name == NULL` finds null strings
+        - `data == NULL` finds null binary data
+    - Binary properties can now be queried over links
+    - Binary properties now support the full range of string operators
+      (BEGINSWITH, ENDSWITH, CONTAINS, LIKE)
+    PR [#2979](https://github.com/realm/realm-core/pull/2979).
+
+-----------
+
+### Internals
+
+* The devel-dbg Linux packages now correctly include static libraries instead of shared ones.
+
+----------------------------------------------
+
+# 5.1.2 Release notes
+
+### Bugfixes
+
+* Include the parser libs in the published android packages.
+
+----------------------------------------------
+
+# 5.1.1 Release notes
+
+### Bugfixes
+
+* The `realm-parser` static library now correctly includes both simulator and device architectures on Apple platforms.
+
+----------------------------------------------
+
+# 5.1.0 Release notes
+
+### Enhancements
+
+* Change the allocation scheme to (hopefully) perform better in scenarios
+  with high fragmentation.
+  PR [#2963](https://github.com/realm/realm-core/pull/2963)
+* Avoid excessive bumping of counters in the version management machinery that is
+  responsible for supporting live queries. We now prune version bumping earlier if
+  when we have sequences of changes without queries in between.
+  PR [#2962](https://github.com/realm/realm-core/pull/2962)
+
+----------------------------------------------
+
+# 5.0.1 Release notes
+
+### Bugfixes
+
+* Add a CMake import target for the `realm-parser` library.
+
+----------------------------------------------
+
+# 5.0.0 Release notes
+
+### Bugfixes
+
+* Fix possible corruption or crashes when a `move_row` operates on a subtable.
+  PR [#2927](https://github.com/realm/realm-core/pull/2926).
+* Table::set_int() did not check if the target column was indeed type_Int. It
+  will now assert like the other set methods.
+
+### Breaking changes
+
+* Remove support for the (unused) instructions for moving columns and moving tables.
+  This is not a file format breaking change as the instructions are still recognised,
+  but now a parser error is thrown if either one is seen in the transaction logs.
+  PR [#2926](https://github.com/realm/realm-core/pull/2926).
+
+### Enhancements
+
+* Attempted to fix a false encryption security warning from IBM Bluemix. PR [#2911]
+* Utilities gain `Any` from object store and base64 encoding from sync.
+* Initial support for query serialisation.
+* The query parser from the object store was moved to core.
+  It also gained the following enhancements:
+    - Support @min, @max, @sum, @avg for types: int, double, float
+    - Support @count, @size interchangeably for types list, string, binary
+    - Support operator "LIKE" on strings
+    - Support operators: =>, =<, <>, which are synonymns for >=, <=, and != respectively
+    - Boolean types can now check against “0” or “1” in addition to false and true
+    - Fixed "not" and "or" not being applied to TRUEPREDICATE or FALSEPREDICATE
+    - Add support for comparing binary and string types using a (internal) base64 format: B64”…”
+    - Add support for Timestamps
+      - Internal format “Tseconds:nanoseconds”
+      - Readable format “YYYY-MM-DD@HH:MM:SS:NANOSECONDS”
+        - The nanoseconds part can be optionally omitted
+        - Conversion works for UTC from dates between ~1970-3000 on windows and ~1901-2038 on other platforms
+  PR [#2947](https://github.com/realm/realm-core/pull/2947).
+
+----------------------------------------------
+
+# 4.0.4 Release notes
+
+### Bugfixes
+
+* Publish the release version of Android-armeabi-v7a binary.
 
 ----------------------------------------------
 

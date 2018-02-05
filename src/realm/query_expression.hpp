@@ -136,6 +136,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/metrics/query_info.hpp>
 #include <realm/query_operators.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/util/serializer.hpp>
 
 #include <numeric>
 
@@ -180,14 +181,20 @@ inline int only_numeric(const BinaryData&)
 }
 
 template <class T>
-inline StringData only_string(T in)
+inline StringData only_string_op_types(T in)
 {
     REALM_ASSERT(false);
     static_cast<void>(in);
     return StringData();
 }
 
-inline StringData only_string(StringData in)
+inline BinaryData only_string_op_types(BinaryData in)
+{
+    return in;
+}
+
+template <>
+inline StringData only_string_op_types<StringData>(StringData in)
 {
     return in;
 }
@@ -217,7 +224,7 @@ struct Plus {
     }
     static std::string description()
     {
-        return "plus";
+        return "+";
     }
     typedef T type;
 };
@@ -230,7 +237,7 @@ struct Minus {
     }
     static std::string description()
     {
-        return "minus";
+        return "-";
     }
     typedef T type;
 };
@@ -243,7 +250,7 @@ struct Div {
     }
     static std::string description()
     {
-        return "divided by";
+        return "/";
     }
     typedef T type;
 };
@@ -256,7 +263,7 @@ struct Mul {
     }
     static std::string description()
     {
-        return "multiplied by";
+        return "*";
     }
     typedef T type;
 };
@@ -270,7 +277,7 @@ struct Pow {
     }
     static std::string description()
     {
-        return "to the power of";
+        return "^";
     }
     typedef T type;
 };
@@ -505,25 +512,25 @@ Query create(L left, const Subexpr2<R>& right)
         else if (std::is_same<Cond, GreaterEqual>::value)
             q.less_equal(column->column_ndx(), _impl::only_numeric<R>(left));
         else if (std::is_same<Cond, EqualIns>::value)
-            q.equal(column->column_ndx(), _impl::only_string(left), false);
+            q.equal(column->column_ndx(), _impl::only_string_op_types(left), false);
         else if (std::is_same<Cond, NotEqualIns>::value)
-            q.not_equal(column->column_ndx(), _impl::only_string(left), false);
+            q.not_equal(column->column_ndx(), _impl::only_string_op_types(left), false);
         else if (std::is_same<Cond, BeginsWith>::value)
-            q.begins_with(column->column_ndx(), _impl::only_string(left));
+            q.begins_with(column->column_ndx(), _impl::only_string_op_types(left));
         else if (std::is_same<Cond, BeginsWithIns>::value)
-            q.begins_with(column->column_ndx(), _impl::only_string(left), false);
+            q.begins_with(column->column_ndx(), _impl::only_string_op_types(left), false);
         else if (std::is_same<Cond, EndsWith>::value)
-            q.ends_with(column->column_ndx(), _impl::only_string(left));
+            q.ends_with(column->column_ndx(), _impl::only_string_op_types(left));
         else if (std::is_same<Cond, EndsWithIns>::value)
-            q.ends_with(column->column_ndx(), _impl::only_string(left), false);
+            q.ends_with(column->column_ndx(), _impl::only_string_op_types(left), false);
         else if (std::is_same<Cond, Contains>::value)
-            q.contains(column->column_ndx(), _impl::only_string(left));
+            q.contains(column->column_ndx(), _impl::only_string_op_types(left));
         else if (std::is_same<Cond, ContainsIns>::value)
-            q.contains(column->column_ndx(), _impl::only_string(left), false);
+            q.contains(column->column_ndx(), _impl::only_string_op_types(left), false);
         else if (std::is_same<Cond, Like>::value)
-            q.like(column->column_ndx(), _impl::only_string(left));
+            q.like(column->column_ndx(), _impl::only_string_op_types(left));
         else if (std::is_same<Cond, LikeIns>::value)
-            q.like(column->column_ndx(), _impl::only_string(left), false);
+            q.like(column->column_ndx(), _impl::only_string_op_types(left), false);
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
             // fallback to using use 'return new Compare<>' instead.
@@ -787,6 +794,24 @@ public:
     Query like(StringData sd, bool case_sensitive = true);
     Query like(const Subexpr2<StringData>& col, bool case_sensitive = true);
 };
+
+template <>
+class Subexpr2<BinaryData> : public Subexpr, public Overloads<BinaryData, BinaryData> {
+public:
+    Query equal(BinaryData sd, bool case_sensitive = true);
+    Query equal(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+    Query not_equal(BinaryData sd, bool case_sensitive = true);
+    Query not_equal(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+    Query begins_with(BinaryData sd, bool case_sensitive = true);
+    Query begins_with(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+    Query ends_with(BinaryData sd, bool case_sensitive = true);
+    Query ends_with(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+    Query contains(BinaryData sd, bool case_sensitive = true);
+    Query contains(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+    Query like(BinaryData sd, bool case_sensitive = true);
+    Query like(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+};
+
 
 /*
 This class is used to store N values of type T = {int64_t, bool, OldDateTime or StringData}, and allows an entry
@@ -1204,11 +1229,11 @@ public:
     virtual std::string description() const override
     {
         if (ValueBase::m_from_link_list) {
-            return metrics::print_value(util::to_string(ValueBase::m_values)
+            return util::serializer::print_value(util::to_string(ValueBase::m_values)
                                         + (ValueBase::m_values == 1 ? " value" : " values"));
         }
         if (m_storage.m_size > 0) {
-            return metrics::print_value(m_storage[0]);
+            return util::serializer::print_value(m_storage[0]);
         }
         return "";
     }
@@ -1835,16 +1860,14 @@ public:
         std::string s;
         for (size_t i = 0; i < m_link_column_indexes.size(); ++i) {
             if (i < m_tables.size() && m_tables[i]) {
-                if (i == 0) {
-                    s += std::string(m_tables[i]->get_name()) + metrics::value_separator;
-                }
                 if (m_link_types[i] == col_type_BackLink) {
-                    s += "backlink";
+                    throw SerialisationError("Serialising a query which contains backlinks is currently unsupported.");
+                    //s += "backlink";
                 } else if (m_link_column_indexes[i] < m_tables[i]->get_column_count()) {
                     s += std::string(m_tables[i]->get_column_name(m_link_column_indexes[i]));
                 }
                 if (i != m_link_column_indexes.size() - 1) {
-                    s += metrics::value_separator;
+                    s += util::serializer::value_separator;
                 }
             }
         }
@@ -2051,15 +2074,15 @@ public:
 
     virtual std::string description() const override
     {
+        std::string desc;
         if (links_exist()) {
-            return m_link_map.description();
+            desc = m_link_map.description() + util::serializer::value_separator;
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached()) {
-            return std::string(target_table->get_name()) + metrics::value_separator
-                + std::string(target_table->get_column_name(m_column_ndx));
+            desc += std::string(target_table->get_column_name(m_column_ndx));
         }
-        return "";
+        return desc;
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches = nullptr) const override
@@ -2144,6 +2167,26 @@ Query string_compare(const Subexpr2<StringData>& left, const Subexpr2<StringData
     else
         return make_expression<Compare<I, StringData>>(right.clone(), left.clone());
 }
+
+template <class T, class S, class I>
+Query binary_compare(const Subexpr2<BinaryData>& left, T right, bool case_sensitive)
+{
+    BinaryData data(right);
+    if (case_sensitive)
+        return create<S>(data, left);
+    else
+        return create<I>(data, left);
+}
+
+template <class S, class I>
+Query binary_compare(const Subexpr2<BinaryData>& left, const Subexpr2<BinaryData>& right, bool case_sensitive)
+{
+    if (case_sensitive)
+        return make_expression<Compare<S, BinaryData>>(right.clone(), left.clone());
+    else
+        return make_expression<Compare<I, BinaryData>>(right.clone(), left.clone());
+}
+
 
 // Columns<String> == Columns<String>
 inline Query operator==(const Columns<StringData>& left, const Columns<StringData>& right)
@@ -2253,7 +2296,7 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + metrics::value_separator + (has_links ? "is_not_null()" : "is_null()");
+        return m_link_map.description() + (has_links ? " != NULL" : " == NULL");
     }
 
     std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override
@@ -2311,7 +2354,7 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + metrics::value_separator + "count()";
+        return m_link_map.description() + util::serializer::value_separator + "@count";
     }
 
 private:
@@ -2371,9 +2414,9 @@ public:
     std::string description() const override
     {
         if (m_expr) {
-            return m_expr->description() + metrics::value_separator + "size()";
+            return m_expr->description() + util::serializer::value_separator + "@size";
         }
-        return "size()";
+        return "@size";
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -2434,10 +2477,12 @@ public:
 
     virtual std::string description() const override
     {
-        if (!m_row.is_attached()) {
-            return metrics::print_value("detached object");
-        }
-        return metrics::print_value(m_row.get_index());
+        throw SerialisationError("Serialising a query which links to an object is currently unsupported.");
+        // TODO: we can do something like the following when core gets stable keys:
+        //if (!m_row.is_attached()) {
+        //    return util::serializer::print_value("detached object");
+        //}
+        //return util::serializer::print_value(m_row.get_index());
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -2717,13 +2762,11 @@ public:
         const Table* table = get_base_table();
         if (table && table->is_attached()) {
             if (m_subtable_column.m_column) {
-                return std::string(table->get_name()) + metrics::value_separator
-                    + std::string(table->get_column_name(m_subtable_column.m_column_ndx));
+                return std::string(table->get_column_name(m_subtable_column.m_column_ndx));
 
             }
             else {
-                return std::string(table->get_name()) + metrics::value_separator
-                    + std::string(table->get_column_name(m_column_ndx));
+                return std::string(table->get_column_name(m_column_ndx));
             }
         }
         return "";
@@ -2850,8 +2893,7 @@ public:
     {
         const Table* table = get_base_table();
         if (table && table->is_attached()) {
-            return std::string(table->get_name()) + metrics::value_separator
-            + std::string(table->get_column_name(m_column_ndx)) + metrics::value_separator + Operation::description() + "()";
+            return std::string(table->get_column_name(m_column_ndx)) + util::serializer::value_separator + Operation::description() + "()";
         }
         return "";
     }
@@ -3095,13 +3137,14 @@ public:
 
     virtual std::string description() const override
     {
+        std::string desc = "";
         if (links_exist()) {
-            return m_link_map.description();
+            desc = m_link_map.description() + util::serializer::value_separator;
         }
         const Table* target_table = m_link_map.target_table();
         if (target_table && target_table->is_attached() && m_column_ndx != npos) {
-            return std::string(target_table->get_name()) + metrics::value_separator
-                + std::string(target_table->get_column_name(m_column_ndx));
+            desc += std::string(target_table->get_column_name(m_column_ndx));
+            return desc;
         }
         return "";
     }
@@ -3297,7 +3340,7 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + "(" + m_column.description() + ")" + metrics::value_separator + Operation::description() + "()";
+        return m_link_map.description() + util::serializer::value_separator + Operation::description() + util::serializer::value_separator + m_column.description();
     }
 
 private:
@@ -3346,8 +3389,9 @@ public:
 
     virtual std::string description() const override
     {
-        return m_link_map.description() + metrics::value_separator + "(where " + m_query.get_description() + ")"
-            + metrics::value_separator + "count()";
+        throw SerialisationError("Serialising a subquery expression is currently unsupported.");
+        //return m_link_map.description() + util::serializer::value_separator + "SUBQUERY(" + m_query.get_description() + ")"
+        //    + util::serializer::value_separator + "@count";
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -3446,7 +3490,7 @@ public:
     }
     static std::string description()
     {
-        return "minimum";
+        return "@min";
     }
 };
 
@@ -3463,7 +3507,7 @@ public:
     }
     static std::string description()
     {
-        return "maximum";
+        return "@max";
     }
 };
 
@@ -3484,7 +3528,7 @@ public:
     }
     static std::string description()
     {
-        return "sum";
+        return "@sum";
     }
 };
 
@@ -3507,7 +3551,7 @@ public:
     }
     static std::string description()
     {
-        return "average";
+        return "@avg";
     }
 
 };
@@ -3662,7 +3706,7 @@ public:
         if (m_left) {
             s += m_left->description();
         }
-        s += oper::description();
+        s += (" " + oper::description() + " ");
         if (m_right) {
             s += m_right->description();
         }
@@ -3748,8 +3792,21 @@ public:
 
     virtual std::string description() const override
     {
-        return metrics::print_value(m_left->description() + " " + TCond::description()
-                                    + " " + m_right->description());
+        if (std::is_same<TCond, BeginsWith>::value
+            || std::is_same<TCond, BeginsWithIns>::value
+            || std::is_same<TCond, EndsWith>::value
+            || std::is_same<TCond, EndsWithIns>::value
+            || std::is_same<TCond, Contains>::value
+            || std::is_same<TCond, ContainsIns>::value
+            || std::is_same<TCond, Like>::value
+            || std::is_same<TCond, LikeIns>::value) {
+            // these string conditions have the arguments reversed but the order is important
+            // operations ==, and != can be reversed because the produce the same results both ways
+            return util::serializer::print_value(m_right->description() + " " + TCond::description()
+                                                 + " " + m_left->description());
+        }
+        return util::serializer::print_value(m_left->description() + " " + TCond::description()
+                                             + " " + m_right->description());
     }
 
     std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override
