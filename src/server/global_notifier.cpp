@@ -179,6 +179,8 @@ void GlobalNotifier::Impl::release_version(std::string const& virtual_path, Vers
     auto it = m_realms.find(virtual_path);
     REALM_ASSERT(it != m_realms.end());
 
+    std::lock_guard<std::mutex> l(m_work_queue_mutex);
+
     auto& sg = it->second.shared_group;
     REALM_ASSERT(sg->get_version_of_current_transaction() == old_version);
 
