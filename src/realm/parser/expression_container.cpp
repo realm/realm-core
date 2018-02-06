@@ -80,7 +80,8 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
         // from all query keypaths. This only works because core does not support anything else (such as referencing
         // other properties of the parent table).
         // This means that every keypath must start with the variable, we require it to be there and remove it.
-        mapping.add_mapping(exp.get_subquery().get_table(), e.subquery_var, "");
+        bool did_add = mapping.add_mapping(exp.get_subquery().get_table(), e.subquery_var, "");
+        realm_precondition(did_add, util::format("Unable to create a subquery expression with variable '%1' since an identical variable already exists in this context", e.subquery_var));
         query_builder::apply_predicate(exp.get_subquery(), *e.subquery, args, mapping);
         mapping.remove_mapping(exp.get_subquery().get_table(), e.subquery_var);
         storage = std::move(exp);

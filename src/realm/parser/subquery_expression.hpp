@@ -94,11 +94,7 @@ struct SubqueryGetter {
 
 template <typename RetType>
 struct SubqueryGetter<RetType,
-typename std::enable_if_t<
-std::is_same<RetType, Int>::value ||
-std::is_same<RetType, Float>::value ||
-std::is_same<RetType, Double>::value
-> >{
+typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double>::value> >{
     static SubQueryCount convert(const SubqueryExpression& expr)
     {
         if (expr.dest_type_is_backlink()) {

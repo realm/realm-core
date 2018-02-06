@@ -112,7 +112,7 @@ std::string SerialisationState::get_variable_name(ConstTableRef table) {
     char add_char = start_char;
 
     auto next_guess = [&]() {
-        add_char = (((add_char + 1) - 'a') % 26) + 'a';
+        add_char = (((add_char + 1) - 'a') % ('z' - 'a' + 1)) + 'a';
         if (add_char == start_char) {
             guess_prefix += add_char;
         }
@@ -122,7 +122,7 @@ std::string SerialisationState::get_variable_name(ConstTableRef table) {
         std::string guess = guess_prefix + add_char;
         bool found_duplicate = false;
         for (size_t i = 0; i < subquery_prefix_list.size(); ++i) {
-            if (guess.compare(subquery_prefix_list[i]) == 0) {
+            if (guess == subquery_prefix_list[i]) {
                 found_duplicate = true;
                 break;
             }

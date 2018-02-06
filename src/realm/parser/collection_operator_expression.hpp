@@ -118,11 +118,7 @@ struct CollectionOperatorGetter {
 
 template <typename RetType>
 struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Min,
-typename std::enable_if_t<
-std::is_same<RetType, Int>::value ||
-std::is_same<RetType, Float>::value ||
-std::is_same<RetType, Double>::value
-> >{
+typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double>::value> >{
     static SubColumnAggregate<RetType, aggregate_operations::Minimum<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Min>& expr)
     {
         if (expr.pe.dest_type_is_backlink()) {
@@ -135,11 +131,7 @@ std::is_same<RetType, Double>::value
 
 template <typename RetType>
 struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Max,
-typename std::enable_if_t<
-std::is_same<RetType, Int>::value ||
-std::is_same<RetType, Float>::value ||
-std::is_same<RetType, Double>::value
-> >{
+typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double>::value> >{
     static SubColumnAggregate<RetType, aggregate_operations::Maximum<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Max>& expr)
     {
         if (expr.pe.dest_type_is_backlink()) {
@@ -152,11 +144,7 @@ std::is_same<RetType, Double>::value
 
 template <typename RetType>
 struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Sum,
-typename std::enable_if_t<
-std::is_same<RetType, Int>::value ||
-std::is_same<RetType, Float>::value ||
-std::is_same<RetType, Double>::value
-> >{
+typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double>::value> >{
     static SubColumnAggregate<RetType, aggregate_operations::Sum<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum>& expr)
     {
         if (expr.pe.dest_type_is_backlink()) {
@@ -169,11 +157,7 @@ std::is_same<RetType, Double>::value
 
 template <typename RetType>
 struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Avg,
-typename std::enable_if_t<
-std::is_same<RetType, Int>::value ||
-std::is_same<RetType, Float>::value ||
-std::is_same<RetType, Double>::value
-> >{
+typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double>::value> >{
     static SubColumnAggregate<RetType, aggregate_operations::Average<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>& expr)
     {
         if (expr.pe.dest_type_is_backlink()) {
@@ -186,11 +170,7 @@ std::is_same<RetType, Double>::value
 
 template <typename RetType>
 struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Count,
-    typename std::enable_if_t<
-    std::is_same<RetType, Int>::value ||
-    std::is_same<RetType, Float>::value ||
-    std::is_same<RetType, Double>::value
-    > >{
+    typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double>::value> >{
     static LinkCount convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>& expr)
     {
         if (expr.pe.dest_type_is_backlink()) {

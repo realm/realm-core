@@ -1937,8 +1937,12 @@ TEST(Parser_Subquery)
     verify_query(test_context, t, "SUBQUERY(fav_item.allergens, $x, $x.name CONTAINS[c] 'dairy').@count > 0", 2);
     // nested subquery
     verify_query(test_context, t, "SUBQUERY(items, $x, SUBQUERY($x.allergens, $allergy, $allergy.name CONTAINS[c] 'dairy').@count > 0).@count > 0", 3);
-    // target property must be a list
+    // nested subquery operating on the same table with same variable is not allowed
     std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(items, $x, SUBQUERY($x.discount.@links.class_Items.discount, $x, $x.price > 5).@count > 0).@count > 0", 2), message);
+    CHECK_EQUAL(message, "Unable to create a subquery expression with variable '$x' since an identical variable already exists in this context");
+
+    // target property must be a list
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(account_balance, $x, TRUEPREDICATE).@count > 0", 3), message);
     CHECK_EQUAL(message, "A subquery must operate on a list property, but 'account_balance' is type 'Double'");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(fav_item, $x, TRUEPREDICATE).@count > 0", 3), message);

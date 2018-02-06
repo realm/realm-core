@@ -18,17 +18,31 @@
 
 #include "keypath_mapping.hpp"
 
+#include <functional>
+
 namespace realm {
 namespace parser {
 
+std::size_t TableAndColHash::operator () (const std::pair<ConstTableRef, std::string> &p) const {
+    // in practice, table names are unique between tables and column names are unique within a table
+    std::string combined = std::string(p.first->get_name()) + p.second;
+    return std::hash<std::string>{}(combined);
+}
+
+
 KeyPathMapping::KeyPathMapping()
 : m_allow_backlinks(true)
+, m_mapping()
 {
 }
 
-void KeyPathMapping::add_mapping(ConstTableRef table, std::string name, std::string alias)
+bool KeyPathMapping::add_mapping(ConstTableRef table, std::string name, std::string alias)
 {
-    m_mapping[{table, name}] = alias;
+    if (m_mapping.find({table, name}) == m_mapping.end()) {
+        m_mapping[{table, name}] = alias;
+        return true;
+    }
+    return false;
 }
 
 void KeyPathMapping::remove_mapping(ConstTableRef table, std::string name)
@@ -40,7 +54,7 @@ void KeyPathMapping::remove_mapping(ConstTableRef table, std::string name)
 
 // This may be premature optimisation, but it'll be super fast and it doesn't
 // bother dragging in anything locale specific for case insensitive comparisons.
-bool is_backlinks_prefix(std::string s) {
+bool is_backlinks_prefix(std::string& s) {
     return s.size() == 6 && s[0] == '@'
         && (s[1] == 'l' || s[1] == 'L')
         && (s[2] == 'i' || s[2] == 'I')
