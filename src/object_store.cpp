@@ -708,9 +708,7 @@ static void create_default_permissions(Group& group, std::vector<SchemaChange> c
     sync::set_up_basic_permissions(group, true);
 
     // Ensure that this user exists so that local privileges checks work immediately
-    TableRef user_table = group.get_table("class___User");
-    if (user_table->find_first_string(1, sync_user_id) == npos)
-        sync::create_object_with_primary_key(group, *user_table, sync_user_id);
+    sync::add_user_to_role(group, sync_user_id, "everyone");
 
     // Mark all tables we just created as fully world-accessible
     // This has to be done after the first pass of schema init is done so that we can be
