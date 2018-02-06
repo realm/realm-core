@@ -59,7 +59,7 @@ struct CollectionOperatorExpression
             } else {
                 list_property_name = pre_link_table->get_column_name(pe.get_dest_ndx());
             }
-            precondition(pe.get_dest_type() == type_LinkList || pe.dest_type_is_backlink(),
+            realm_precondition(pe.get_dest_type() == type_LinkList || pe.dest_type_is_backlink(),
                          util::format("The '%1' operation must be used on a list property, but '%2' is not a list",
                                       util::collection_operator_to_str(OpType), list_property_name));
 
@@ -74,13 +74,13 @@ struct CollectionOperatorExpression
 
             KeyPath suffix_key_path = key_path_from_string(suffix_path);
 
-            precondition(suffix_path.size() > 0 && suffix_key_path.size() > 0,
+            realm_precondition(suffix_path.size() > 0 && suffix_key_path.size() > 0,
                          util::format("A property from object '%1' must be provided to perform operation '%2'",
                                       printable_post_link_table_name, util::collection_operator_to_str(OpType)));
             size_t index = 0;
             KeyPathElement element = mapping.process_next_path(post_link_table, suffix_key_path, index);
 
-            precondition(suffix_key_path.size() == 1,
+            realm_precondition(suffix_key_path.size() == 1,
                          util::format("Unable to use '%1' because collection aggreate operations are only supported "
                                       "for direct properties at this time", suffix_path));
 
@@ -90,7 +90,7 @@ struct CollectionOperatorExpression
         else {  // !requires_suffix_path
             post_link_col_type = pe.get_dest_type();
 
-            precondition(suffix_path.empty(),
+            realm_precondition(suffix_path.empty(),
                          util::format("An extraneous property '%1' was found for operation '%2'",
                                       suffix_path, util::collection_operator_to_str(OpType)));
         }

@@ -65,10 +65,10 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
 
     // Process backlinks which consumes 3 parts of the keypath
     if (is_backlinks_prefix(keypath[index])) {
-        precondition(index + 2 < keypath.size(), "'@links' must be proceeded by type name and a property name");
+        realm_precondition(index + 2 < keypath.size(), "'@links' must be proceeded by type name and a property name");
 
         Table::BacklinkOrigin info = table->find_backlink_origin(keypath[index + 1], keypath[index + 2]);
-        precondition(bool(info), util::format("No property '%1' found in type '%2' which links to type '%3'",
+        realm_precondition(bool(info), util::format("No property '%1' found in type '%2' which links to type '%3'",
                   keypath[index + 2], get_printable_table_name(keypath[index + 1]), get_printable_table_name(*table)));
 
         if (!m_allow_backlinks) {
@@ -88,7 +88,7 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
 
     // Process a single property
     size_t col_ndx = table->get_column_index(keypath[index]);
-    precondition(col_ndx != realm::not_found,
+    realm_precondition(col_ndx != realm::not_found,
                  util::format("No property '%1' on object of type '%2'", keypath[index], get_printable_table_name(*table)));
 
     DataType cur_col_type = table->get_column_type(col_ndx);

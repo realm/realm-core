@@ -36,7 +36,7 @@ PropertyExpression::PropertyExpression(Query &q, const std::string &key_path_str
     while (index < key_path.size()) {
         KeyPathElement element = mapping.process_next_path(cur_table, key_path, index);
         if (index != key_path.size()) {
-            precondition(element.col_type == type_Link || element.col_type == type_LinkList,
+            realm_precondition(element.col_type == type_Link || element.col_type == type_LinkList,
                          util::format("Property '%1' is not a link in object of type '%2'",
                                       element.table->get_column_name(element.col_ndx),
                                       get_printable_table_name(*element.table)));

@@ -67,7 +67,7 @@ void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const
 template<>
 void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
-    precondition(expr.link_chain.size() == 1, "KeyPath queries not supported for object comparisons.");
+    realm_precondition(expr.link_chain.size() == 1, "KeyPath queries not supported for object comparisons.");
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
@@ -288,7 +288,7 @@ void add_link_constraint_to_query(realm::Query &query,
                                   const PropertyExpression &prop_expr,
                                   const ValueExpression &value_expr) {
     size_t row_index = value_expr.arguments->object_index_for_argument(stot<int>(value_expr.value->s));
-    precondition(prop_expr.link_chain.size() == 1, "KeyPath queries not supported for object comparisons.");
+    realm_precondition(prop_expr.link_chain.size() == 1, "KeyPath queries not supported for object comparisons.");
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
@@ -617,7 +617,7 @@ void apply_predicate(Query &query, const Predicate &predicate, Arguments &argume
 
     // Test the constructed query in core
     std::string validateMessage = query.validate();
-    precondition(validateMessage.empty(), validateMessage.c_str());
+    realm_precondition(validateMessage.empty(), validateMessage.c_str());
 }
 
 struct EmptyArgContext
