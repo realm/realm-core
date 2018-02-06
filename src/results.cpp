@@ -618,11 +618,11 @@ Results Results::apply_ordering(DescriptorOrdering&& ordering)
     for (size_t i = 0; i < ordering.size(); ++i) {
         const CommonDescriptor* desc = ordering[i];
         if (const SortDescriptor* sort = dynamic_cast<const SortDescriptor*>(desc)) {
-            new_order.append_sort(*sort);
+            new_order.append_sort(std::move(*sort));
             continue;
         }
         if (const DistinctDescriptor* distinct = dynamic_cast<const DistinctDescriptor*>(desc)) {
-            new_order.append_distinct(*distinct);
+            new_order.append_distinct(std::move(*distinct));
             continue;
         }
         REALM_COMPILER_HINT_UNREACHABLE();
