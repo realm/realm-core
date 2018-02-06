@@ -120,6 +120,9 @@ public:
     Results distinct(DistinctDescriptor&& uniqueness) const;
     Results distinct(std::vector<std::string> const& keypaths) const;
 
+    // Create a new Results by adding sort and distinct combinations
+    Results apply_ordering(DescriptorOrdering&& ordering);
+
     // Return a snapshot of this Results that never updates to reflect changes in the underlying data.
     Results snapshot() const &;
     Results snapshot() &&;
