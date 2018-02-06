@@ -964,11 +964,15 @@ bool Realm::init_permission_cache()
     verify_thread();
 
     if (m_permissions_cache) {
+        // Rather than trying to track changes to permissions tables, just skip the caching
+        // entirely within write transactions for now
         if (is_in_transaction())
             m_permissions_cache->clear();
         return true;
     }
-    if (m_config.sync_config && m_config.sync_config->is_partial) {
+
+    // Admin users bypass permissions checks outside of the logic in PermissionsCache
+    if (m_config.sync_config && m_config.sync_config->is_partial && !m_config.sync_config->user->is_admin()) {
         m_permissions_cache = std::make_unique<sync::PermissionsCache>(read_group(), m_config.sync_config->user->identity());
         return true;
     }

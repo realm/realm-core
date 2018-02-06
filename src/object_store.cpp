@@ -165,9 +165,8 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
     }
 #else
     table = group.get_or_add_table(name);
-#endif // REALM_ENABLE_SYNC
-
     ObjectStore::set_primary_key_for_object(group, object_schema.name, object_schema.primary_key);
+#endif // REALM_ENABLE_SYNC
 
     return table;
 }
@@ -718,7 +717,8 @@ static void create_default_permissions(Group& group, std::vector<SchemaChange> c
         Group& group;
         void operator()(AddTable op)
         {
-            sync::set_up_basic_permissions_for_class(group, op.object->name, true);
+            sync::set_class_permissions_for_role(group, op.object->name, "everyone",
+                                                 static_cast<int>(ComputedPrivileges::All));
         }
 
         void operator()(AddInitialProperties) { }

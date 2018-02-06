@@ -144,7 +144,7 @@ enum class ComputedPrivileges : uint8_t {
     Query = (1 << 4),
     Create = (1 << 5),
     ModifySchema = (1 << 6),
-    All = 0xFF
+    All = (1 << 7) - 1
 };
 
 class Realm : public std::enable_shared_from_this<Realm> {

@@ -20,6 +20,7 @@
 #define REALM_TEST_UTIL_TEST_FILE_HPP
 
 #include "shared_realm.hpp"
+#include "util/tagged_bool.hpp"
 
 #include <realm/group_shared.hpp>
 #include <realm/util/logger.hpp>
@@ -85,9 +86,11 @@ struct TestLogger : realm::util::Logger::LevelThreshold, realm::util::Logger {
     static realm::sync::Server::Config server_config();
 };
 
+using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
+
 class SyncServer {
 public:
-    SyncServer(bool start_immediately=true);
+    SyncServer(StartImmediately start_immediately=true);
     ~SyncServer();
 
     void start();
