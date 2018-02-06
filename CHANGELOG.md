@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* None.
+* Fix an issue where adding zero rows would add the default value to the keys
+  of any string enum columns. Not affecting end users.
+  PR [#2956](https://github.com/realm/realm-core/pull/2956).
 
 ### Breaking changes
 
