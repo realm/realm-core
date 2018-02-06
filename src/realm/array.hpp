@@ -1051,6 +1051,16 @@ private:
     friend class StringColumn;
 };
 
+class ClusterKeyArray : public Array {
+public:
+    using Array::Array;
+
+    int64_t get(size_t ndx) const
+    {
+        return (m_data != nullptr) ? Array::get(ndx) : int64_t(ndx);
+    }
+};
+
 // Implementation:
 template <>
 class QueryState<int64_t> : public QueryStateBase {

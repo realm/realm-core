@@ -2193,9 +2193,9 @@ Obj Table::create_object(ObjKey key)
         key = ObjKey(m_next_key_value++);
     }
 
-    Obj obj = m_clusters.insert(key);
     bump_content_version();
     bump_storage_version();
+    Obj obj = m_clusters.insert(key);
 
     return obj;
 }

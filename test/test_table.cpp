@@ -3429,11 +3429,13 @@ TEST(Table_object_sequential)
 
     for (int i = 0; i < nb_rows; i++) {
         table.remove_object(ObjKey(i));
+#ifdef REALM_DEBUG
         for (int j = i + 1; j < nb_rows; j++) {
             Obj o = table.get_object(ObjKey(j));
             CHECK_EQUAL(j << 1, o.get<int64_t>(c0));
             CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(c1));
         }
+#endif
     }
 
     auto t4 = steady_clock::now();
@@ -3488,11 +3490,13 @@ TEST(Table_object_random)
 
     for (int i = 0; i < nb_rows; i++) {
         table.remove_object(ObjKey(key_values[i]));
+#ifdef REALM_DEBUG
         for (int j = i + 1; j < nb_rows; j++) {
             Obj o = table.get_object(ObjKey(key_values[j]));
             CHECK_EQUAL(j << 1, o.get<int64_t>(c0));
             CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(c1));
         }
+#endif
     }
 
     auto t4 = steady_clock::now();

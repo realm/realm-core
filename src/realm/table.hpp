@@ -1203,7 +1203,7 @@ inline size_t Table::colkey2ndx(ColKey key) const
     uint64_t ndx_and_tag = m_colkey2ndx[idx];
     size_t ndx = ndx_and_tag & max_num_columns;
     if ((ndx == max_num_columns) || ((ndx_and_tag ^ key.value) > max_num_columns))
-        throw InvalidKey("Nonexisting column key");
+        throw LogicError(LogicError::column_does_not_exist);
     return ndx;
 }
 

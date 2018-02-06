@@ -930,6 +930,7 @@ TEST(Group_Serialize1)
         table->create_object(ObjKey(2)).set_all("", 10, true, int(Wed));
         table->create_object(ObjKey(3)).set_all("", 20, true, int(Wed));
         table->create_object(ObjKey(4)).set_all("", 11, true, int(Wed));
+
         table->create_object(ObjKey(6)).set_all("", 45, true, int(Wed));
         table->create_object(ObjKey(7)).set_all("", 10, true, int(Wed));
         table->create_object(ObjKey(8)).set_all("", 0, true, int(Wed));

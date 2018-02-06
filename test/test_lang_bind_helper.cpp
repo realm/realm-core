@@ -1369,9 +1369,9 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     CHECK_NOT(table->has_search_index(col_str2));
     CHECK(table->has_search_index(col_int3));
     CHECK_NOT(table->has_search_index(col_int4));
-    CHECK_EQUAL(ObjKey(13), table->find_first_string(col_str1, "931"));
-    CHECK_EQUAL(ObjKey(5), table->find_first_int(col_int3, 315));
-    CHECK_EQUAL(ObjKey(14), table->find_first_int(col_int3, 508));
+    CHECK_EQUAL(ObjKey(12), table->find_first_string(col_str1, "931"));
+    CHECK_EQUAL(ObjKey(4), table->find_first_int(col_int3, 315));
+    CHECK_EQUAL(ObjKey(13), table->find_first_int(col_int3, 508));
 
     // Move the indexed columns by removal
     {
@@ -1386,8 +1386,8 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     CHECK(table->has_search_index(col_str1));
     CHECK(table->has_search_index(col_int3));
     CHECK_NOT(table->has_search_index(col_int4));
-    CHECK_EQUAL(ObjKey(4), table->find_first_string(col_str1, "738"));
-    CHECK_EQUAL(ObjKey(14), table->find_first_int(col_int3, 508));
+    CHECK_EQUAL(ObjKey(3), table->find_first_string(col_str1, "738"));
+    CHECK_EQUAL(ObjKey(13), table->find_first_int(col_int3, 508));
 }
 
 #ifdef LEGACY_TESTS

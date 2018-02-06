@@ -126,29 +126,29 @@ public:
         char* header = m_alloc.translate(ref);
         init(MemRef(header, ref, m_alloc));
     }
-    unsigned node_size() const
-    {
-        return is_attached() ? unsigned(m_keys.size()) : 0;
-    }
-
     int64_t get_key_value(size_t ndx) const
     {
         return m_keys.get(ndx);
     }
+
     void adjust_keys(int64_t offset)
     {
+        ensure_general_form();
         m_keys.adjust(0, m_keys.size(), offset);
     }
 
     virtual bool update_from_parent(size_t old_baseline) noexcept = 0;
     virtual bool is_leaf() const = 0;
+    virtual int64_t get_sub_tree_depth() const = 0;
+    virtual size_t node_size() const = 0;
     /// Number of elements in this subtree
     virtual size_t get_tree_size() const = 0;
     /// Last key in this subtree
     virtual int64_t get_last_key_value() const = 0;
+    virtual void ensure_general_form() = 0;
 
     /// Create an empty node
-    virtual void create() = 0;
+    virtual void create(int64_t sub_tree_depth) = 0;
     /// Initialize node from 'mem'
     virtual void init(MemRef mem) = 0;
     /// Descend the tree from the root and copy-on-write the leaf
@@ -166,7 +166,7 @@ public:
     virtual void get(ObjKey key, State& state) const = 0;
 
     /// Erase element identified by 'key'
-    virtual unsigned erase(ObjKey key, CascadeState& state) = 0;
+    virtual size_t erase(ObjKey key, CascadeState& state) = 0;
 
     /// Move elements from position 'ndx' to 'new_node'. The new node is supposed
     /// to be a sibling positioned right after this one. All key values must
@@ -177,7 +177,7 @@ public:
 
     ObjKey get_real_key(size_t ndx) const
     {
-        return ObjKey(m_keys.get(ndx) + m_offset);
+        return ObjKey(get_key_value(ndx) + m_offset);
     }
     void set_offset(int64_t offs)
     {
@@ -192,7 +192,7 @@ protected:
     friend class ArrayBacklink;
 
     const ClusterTree& m_tree_top;
-    Array m_keys;
+    ClusterKeyArray m_keys;
     int64_t m_offset;
 };
 
@@ -204,7 +204,7 @@ public:
     }
     ~Cluster() override;
 
-    void create() override;
+    void create(int64_t = 0) override;
     void init(MemRef mem) override;
     bool update_from_parent(size_t old_baseline) noexcept override;
     bool is_writeable() const
@@ -217,37 +217,67 @@ public:
     {
         return true;
     }
+    int64_t get_sub_tree_depth() const override
+    {
+        return 0;
+    }
+    size_t node_size() const override
+    {
+        if (!is_attached()) {
+            return 0;
+        }
+        return m_keys.is_attached() ? m_keys.size() : get_size_in_compact_form();
+    }
     size_t get_tree_size() const override
     {
         return node_size();
     }
     int64_t get_last_key_value() const override
     {
-        return m_keys.size() ? get_key_value(m_keys.size() - 1) : 0;
+        auto sz = node_size();
+        return sz ? get_key_value(sz - 1) : -1;
     }
-    size_t lower_bound_key(ObjKey key)
+    size_t lower_bound_key(ObjKey key) const
     {
-        return m_keys.lower_bound_int(key.value);
+        if (m_keys.is_attached()) {
+            return m_keys.lower_bound_int(key.value);
+        }
+        else {
+            int64_t sz = Array::get(0) >> 1;
+            if (key.value < 0)
+                return 0;
+            if (key.value > sz)
+                return sz;
+        }
+        return size_t(key.value);
     }
 
+    void ensure_general_form() override;
     void insert_column(size_t ndx) override;
     void remove_column(size_t ndx) override;
     ref_type insert(ObjKey k, State& state) override;
     void get(ObjKey k, State& state) const override;
-    unsigned erase(ObjKey k, CascadeState& state) override;
+    size_t erase(ObjKey k, CascadeState& state) override;
 
     void init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept
     {
         ref_type ref = to_ref(Array::get(col_ndx + 1));
         leaf->init_from_ref(ref);
     }
-    const Array* get_key_array() const
+    const ClusterKeyArray* get_key_array() const
     {
         return &m_keys;
     }
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
 private:
+    static constexpr size_t s_key_ref_or_size_index = 0;
+    static constexpr size_t s_first_col_index = 1;
+
+    size_t get_size_in_compact_form() const
+    {
+        return size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged value
+    }
     friend class ClusterTree;
     void insert_row(size_t ndx, ObjKey k);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;

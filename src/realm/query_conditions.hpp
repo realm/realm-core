@@ -43,7 +43,7 @@ enum Action {
     act_Average
 };
 
-class Array;
+class ClusterKeyArray;
 
 class QueryStateBase {
 public:
@@ -51,12 +51,12 @@ public:
     size_t m_limit;
     int64_t m_minmax_index; // used only for min/max, to save index of current min/max value
     int64_t m_key_offset;
-    const Array* m_key_values;
+    const ClusterKeyArray* m_key_values;
     QueryStateBase(size_t limit)
         : m_match_count(0)
         , m_limit(limit)
         , m_minmax_index(-1)
-        , m_key_offset(-1)
+        , m_key_offset(0)
         , m_key_values(nullptr)
     {
     }
