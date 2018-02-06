@@ -612,6 +612,24 @@ Results Results::filter(Query&& q) const
     return Results(m_realm, get_query().and_query(std::move(q)), m_descriptor_ordering);
 }
 
+Results Results::apply_ordering(DescriptorOrdering&& ordering)
+{
+    DescriptorOrdering new_order = m_descriptor_ordering;
+    for (size_t i = 0; i < ordering.size(); ++i) {
+        const CommonDescriptor* desc = ordering[i];
+        if (const SortDescriptor* sort = dynamic_cast<const SortDescriptor*>(desc)) {
+            new_order.append_sort(*sort);
+            continue;
+        }
+        if (const DistinctDescriptor* distinct = dynamic_cast<const DistinctDescriptor*>(desc)) {
+            new_order.append_distinct(*distinct);
+            continue;
+        }
+        REALM_COMPILER_HINT_UNREACHABLE();
+    }
+    return Results(m_realm, get_query(), std::move(new_order));
+}
+
 Results Results::distinct(DistinctDescriptor&& uniqueness) const
 {
     DescriptorOrdering new_order = m_descriptor_ordering;
