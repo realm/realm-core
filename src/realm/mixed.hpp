@@ -149,6 +149,51 @@ public:
     template <class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Mixed&);
 
+    inline int compare(const Mixed& b) {
+        if (get_type() == type_Bool) {
+            if (get_bool() > b.get_bool())
+                return 1;
+            else if (get_bool() < b.get_bool())
+                return -1;
+        }
+        else if (get_type() == type_Int) {
+            if (get_int() > b.get_int())
+                return 1;
+            else if (get_int() < b.get_int())
+                return -1;
+        }
+        else if (get_type() == type_String) {
+            if (get_string() > b.get_string())
+                return 1;
+            else if (get_string() < b.get_string())
+                return -1;
+        }
+        else if (get_type() == type_Double) {
+            if (get_double() > b.get_double())
+                return 1;
+            else if (get_double() < b.get_double())
+                return -1;
+        }
+        else if (get_type() == type_Float) {
+            if (get_float() > b.get_float())
+                return 1;
+            else if (get_float() < b.get_float())
+                return -1;
+        }
+        else if (get_type() == type_Timestamp) {
+            if (get_timestamp() > b.get_timestamp())
+                return 1;
+            else if (get_timestamp() < b.get_timestamp())
+                return -1;
+        }
+        else {
+            REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
+        }
+
+        return 0;        
+    }
+
+
 private:
     DataType m_type;
     union {
@@ -612,7 +657,6 @@ inline bool operator!=(Timestamp a, Wrap<Mixed> b) noexcept
 {
     return type_Timestamp != Mixed(b).get_type() || a != Timestamp(Mixed(b).get_timestamp());
 }
-
 
 } // namespace realm
 

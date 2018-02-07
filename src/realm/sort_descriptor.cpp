@@ -86,7 +86,7 @@ CommonDescriptor::Sorter::Sorter(std::vector<std::vector<ColumnId>> const& colum
 
     m_columns.reserve(columns.size());
     for (size_t i = 0; i < columns.size(); ++i) {
-        m_columns.push_back({{}, {}, columns[i].back().table, columns[i].back().col_key, ascending[i]});
+        m_columns.push_back({ {}, {}, columns[i].back().table, columns[i].back().col_key, ascending[i], {} });
         REALM_ASSERT_EX(!columns[i].empty(), i);
         if (columns[i].size() == 1) { // no link chain
             continue;
@@ -168,10 +168,28 @@ bool SortDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
             key_j = m_columns[t].translated_keys[j.index_in_view];
         }
 
-        ConstObj obj_i = m_columns[t].table->get_object(key_i);
-        ConstObj obj_j = m_columns[t].table->get_object(key_j);
-        if (int c = obj_i.cmp(obj_j, m_columns[t].col_key))
+        int c;
+
+        // Sorting can be specified by multiple columns, so that if two entries in the first column are
+        // identical, then the rows are ordered according to the second column, and so forth. For the
+        // first column, all the payload of the View is cached in a std::vector<Mixed>.
+        if (t == 0) {
+            Mixed mixed_i(m_columns[0].payload[i.index_in_view]);
+            Mixed mixed_j(m_columns[0].payload[j.index_in_view]);
+
+            c = mixed_j.compare(mixed_i);
+        }
+        else {
+            ConstObj obj_i = m_columns[t].table->get_object(key_i);
+            ConstObj obj_j = m_columns[t].table->get_object(key_j);
+
+            c = obj_i.cmp(obj_j, m_columns[t].col_key);
+        }
+
+        if (c) {
             return m_columns[t].ascending ? c > 0 : c < 0;
+        }
+
     }
     // make sort stable by using original index as final comparison
     return total_ordering ? i.index_in_view < j.index_in_view : 0;

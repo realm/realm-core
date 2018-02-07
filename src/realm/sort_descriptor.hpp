@@ -22,6 +22,7 @@
 #include <vector>
 #include <realm/cluster.hpp>
 #include <realm/handover_defs.hpp>
+#include <realm/mixed.hpp>
 
 namespace realm {
 
@@ -90,11 +91,16 @@ public:
         struct SortColumn {
             std::vector<bool> is_null;
             std::vector<ObjKey> translated_keys;
+
             const Table* table;
             ColKey col_key;
             bool ascending;
+
+            // This vector is only filled out for the *first* SortColumn in m_columns
+            std::vector<Mixed> payload;
         };
         std::vector<SortColumn> m_columns;
+        friend class ObjList;
     };
     virtual Sorter sorter(KeyColumn const& row_indexes) const;
 
