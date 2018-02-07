@@ -124,7 +124,7 @@ public:
     /// Convenience functions for manipulating the dynamic table type.
     ///
     static const size_t max_column_name_length = 63;
-    static const size_t max_num_columns = 65535;
+    static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
     ColKey add_column(DataType type, StringData name, bool nullable = false);
     ColKey add_column_list(DataType type, StringData name);
     ColKey add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
@@ -841,7 +841,9 @@ private:
     double average(ColKey col_key, size_t* resultcount) const;
 
     std::vector<ColKey> m_ndx2colkey;
-    std::vector<uint16_t> m_colkey2ndx;
+    // holds the ndx in the lower bits, the tag in the higher bit to save an indirection
+    // when validating colkeys.
+    std::vector<uint64_t> m_colkey2ndx;
 
     static constexpr int top_position_for_spec = 0;
     static constexpr int top_position_for_columns = 1;
@@ -1187,6 +1189,38 @@ inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept
 {
     REALM_ASSERT(m_top.is_attached());
     m_top.set_ndx_in_parent(ndx_in_parent);
+}
+
+inline size_t Table::colkey2ndx(ColKey key) const
+{
+    size_t idx = key.value & max_num_columns;
+    if (idx >= m_colkey2ndx.size())
+        throw InvalidKey("Nonexisting column key");
+    // FIXME: Optimization! There are many scenarios where this test may be avoided.
+    uint64_t ndx_and_tag = m_colkey2ndx[idx];
+    size_t ndx = ndx_and_tag & max_num_columns;
+    if ((ndx == max_num_columns) || ((ndx_and_tag ^ key.value) > max_num_columns))
+        throw InvalidKey("Nonexisting column key");
+    return ndx;
+}
+
+inline ColKey Table::ndx2colkey(size_t ndx) const
+{
+    REALM_ASSERT(ndx < m_ndx2colkey.size());
+    return m_ndx2colkey[ndx];
+}
+
+bool inline Table::valid_column(ColKey col_key) const
+{
+    size_t idx = col_key.value & max_num_columns;
+    if (idx >= m_colkey2ndx.size())
+        return false;
+    uint64_t ndx_and_tag = m_colkey2ndx[idx];
+    if ((ndx_and_tag ^ col_key.value) > max_num_columns)
+        return false;
+    if ((ndx_and_tag & max_num_columns) == max_num_columns)
+        return false;
+    return true;
 }
 
 
