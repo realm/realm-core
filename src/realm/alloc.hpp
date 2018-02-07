@@ -256,6 +256,11 @@ public:
         m_debug_watch = 0;
     }
 
+    void update_from_underlying_allocator()
+    {
+        switch_underlying_allocator(*m_alloc);
+    }
+
 private:
     Allocator* m_alloc;
     MemRef do_alloc(const size_t size) override
