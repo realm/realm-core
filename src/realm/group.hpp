@@ -612,6 +612,10 @@ private:
 
     void open(ref_type top_ref, const std::string& file_path);
 
+    // If the underlying memory mappings have been extended, this method is used
+    // to update all the tables' allocator wrappers.
+    void update_allocator_wrappers();
+
     /// If `top_ref` is not zero, attach this group accessor to the specified
     /// underlying node structure. If `top_ref` is zero and \a
     /// create_group_when_missing is true, create a new node structure that

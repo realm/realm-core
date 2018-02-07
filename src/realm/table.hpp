@@ -597,7 +597,10 @@ private:
 
     mutable WrappedAllocator m_alloc;
     Array m_top;
-
+    void update_allocator_wrapper()
+    {
+        m_alloc.update_from_underlying_allocator();
+    }
     using SpecPtr = std::unique_ptr<Spec>;
     SpecPtr m_spec;         // 1st slot in m_top
     ClusterTree m_clusters; // 3rd slot in m_top

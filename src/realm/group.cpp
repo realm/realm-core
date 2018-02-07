@@ -364,6 +364,7 @@ Group::~Group() noexcept
 void Group::remap(size_t new_file_size)
 {
     m_alloc.update_reader_view(new_file_size); // Throws
+    update_allocator_wrappers();
 }
 
 
@@ -372,6 +373,7 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size)
     size_t old_baseline = m_alloc.get_baseline();
 
     m_alloc.update_reader_view(new_file_size); // Throws
+    update_allocator_wrappers();
     update_refs(new_top_ref, old_baseline);
 }
 
@@ -461,6 +463,7 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writa
 
     // update readers view of memory
     m_alloc.update_reader_view(new_file_size); // Throws
+    update_allocator_wrappers();
 
     // When `new_top_ref` is null, ask attach() to create a new node structure
     // for an empty group, but only during the initiation of write
@@ -1047,6 +1050,7 @@ void Group::commit()
     // Update view of the file
     size_t new_file_size = out.get_file_size();
     m_alloc.update_reader_view(new_file_size); // Throws
+    update_allocator_wrappers();
 
     out.commit(top_ref); // Throws
 
@@ -1427,6 +1431,18 @@ private:
     bool& m_schema_changed;
 };
 
+
+void Group::update_allocator_wrappers()
+{
+    for (size_t i = 0; i < m_table_accessors.size(); ++i) {
+        auto table_accessor = m_table_accessors[i];
+        if (table_accessor) {
+            table_accessor->update_allocator_wrapper();
+        }
+    }
+}
+
+
 void Group::refresh_dirty_accessors()
 {
     // The array of Tables cannot have shrunk:
@@ -1526,6 +1542,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     // Update memory mapping if database file has grown
 
     m_alloc.update_reader_view(new_file_size); // Throws
+    update_allocator_wrappers();
 
     // This is no longer needed in Core, but we need to compute "schema_changed",
     // for the benefit of ObjectStore.
