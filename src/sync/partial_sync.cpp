@@ -267,7 +267,7 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
         }
 
         // Trigger processing of change notifications.
-        m_coordinator->on_change();
+        m_coordinator->wake_up_notifier_worker();
     }
 
     std::exception_ptr error() const
