@@ -43,11 +43,20 @@ using namespace std::chrono;
 #include "test.hpp"
 #include "test_table_helper.hpp"
 
+// #include <valgrind/callgrind.h>
+
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 using unit_test::TestContext;
 
+#ifndef CALLGRIND_START_INSTRUMENTATION
+#define CALLGRIND_START_INSTRUMENTATION
+#endif
+
+#ifndef CALLGRIND_STOP_INSTRUMENTATION
+#define CALLGRIND_STOP_INSTRUMENTATION
+#endif
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -3411,6 +3420,8 @@ TEST(Table_object_sequential)
     auto c0 = table.add_column(type_Int, "int1");
     auto c1 = table.add_column(type_Int, "int2", true);
 
+    CALLGRIND_START_INSTRUMENTATION;
+
     auto t1 = steady_clock::now();
 
     for (int i = 0; i < nb_rows; i++) {
@@ -3439,6 +3450,8 @@ TEST(Table_object_sequential)
     }
 
     auto t4 = steady_clock::now();
+
+    CALLGRIND_STOP_INSTRUMENTATION;
 
     std::cout << nb_rows << " rows" << std::endl;
     std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
@@ -3472,6 +3485,8 @@ TEST(Table_object_random)
     auto c0 = table.add_column(type_Int, "int1");
     auto c1 = table.add_column(type_Int, "int2", true);
 
+    CALLGRIND_START_INSTRUMENTATION;
+
     auto t1 = steady_clock::now();
 
     for (int i = 0; i < nb_rows; i++) {
@@ -3500,6 +3515,8 @@ TEST(Table_object_random)
     }
 
     auto t4 = steady_clock::now();
+
+    CALLGRIND_STOP_INSTRUMENTATION;
 
     std::cout << nb_rows << " rows" << std::endl;
     std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
