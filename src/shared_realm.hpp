@@ -53,6 +53,7 @@ namespace _impl {
     class CollectionNotifier;
     class RealmCoordinator;
     class RealmFriend;
+    struct RowHandover;
 }
 
 // How to handle update_schema() being called on a file which has
@@ -317,6 +318,7 @@ public:
         friend class ThreadSafeReferenceBase;
         friend class GlobalNotifier;
         friend class TestHelper;
+        friend struct _impl::RowHandover;
 
         // ResultsNotifier and ListNotifier need access to the SharedGroup
         // to be able to call the handover functions, which are not very wrappable

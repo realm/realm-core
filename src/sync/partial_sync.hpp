@@ -70,9 +70,11 @@ private:
     _impl::CollectionNotifier::Handle<Notifier> m_notifier;
 
     friend Subscription subscribe(Results const&, util::Optional<std::string>);
+    friend void unsubscribe(Subscription&);
 };
 
-Subscription subscribe(Results const& results, util::Optional<std::string> name);
+Subscription subscribe(Results const&, util::Optional<std::string> name);
+void unsubscribe(Subscription&);
 
 // Deprecated
 void register_query(std::shared_ptr<Realm>, const std::string &object_class, const std::string &query,

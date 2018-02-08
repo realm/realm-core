@@ -93,6 +93,25 @@ private:
     SharedGroup* m_shared_group;
 };
 
+struct RowHandover {
+    RowHandover(Realm& realm, Row row)
+    : source_shared_group(*Realm::Internal::get_shared_group(realm))
+    , row(source_shared_group.export_for_handover(std::move(row)))
+    , version(source_shared_group.pin_version())
+    {
+    }
+
+    ~RowHandover()
+    {
+        // If the row isn't already null we've not been imported and the version pin will leak.
+        REALM_ASSERT(!row);
+    }
+
+    SharedGroup& source_shared_group;
+    std::unique_ptr<SharedGroup::Handover<Row>> row;
+    VersionID version;
+};
+
 } // namespace _impl
 
 namespace partial_sync {
@@ -215,6 +234,35 @@ void async_register_query(Realm& realm, std::string object_type, std::string que
     });
 }
 
+void async_unregister_query(Object result_set, std::function<void()> callback)
+{
+    auto realm = result_set.realm();
+    auto config = realm->config();
+    auto& work_queue = _impl::RealmCoordinator::get_coordinator(config)->partial_sync_work_queue();
+
+    // Export a reference to the __ResultSets row so we can hand it to the worker thread.
+    // We store it in a shared_ptr as it would otherwise prevent the lambda from being copyable,
+    // which `std::function` requires.
+    auto handover = std::make_shared<_impl::RowHandover>(*realm, result_set.row());
+
+    work_queue.enqueue([handover=std::move(handover), callback=std::move(callback),
+                        config=std::move(config)] () {
+        with_open_shared_group(config, [&](SharedGroup& sg) {
+            // Import handed-over object.
+            sg.begin_read(handover->version);
+            Row row = *sg.import_from_handover(std::move(handover->row));
+            sg.unpin_version(handover->version);
+
+            _impl::WriteTransactionNotifyingSync write(config, sg);
+            if (row.is_attached())
+                row.move_last_over();
+
+            write.commit();
+        });
+        callback();
+    });
+}
+
 std::string default_name_for_query(const std::string& query, const std::string& object_type)
 {
     return util::format("[%1] %2", object_type, query);
@@ -295,6 +343,12 @@ void register_query(std::shared_ptr<Realm> realm, const std::string &object_clas
 }
 
 struct Subscription::Notifier : public _impl::CollectionNotifier {
+    enum State {
+        Creating,
+        Complete,
+        Removed,
+    };
+
     Notifier(std::shared_ptr<Realm> realm)
     : _impl::CollectionNotifier(std::move(realm))
     , m_coordinator(_impl::RealmCoordinator::get_coordinator(get_realm()->config()).get())
@@ -315,7 +369,7 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
         m_error = m_pending_error;
         m_pending_error = nullptr;
 
-        m_subscription_completed = true;
+        m_state = m_pending_state;
         m_has_results_to_deliver = false;
     }
 
@@ -324,6 +378,20 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
         {
             std::unique_lock<std::mutex> lock(m_mutex);
             m_pending_error = error;
+            m_pending_state = Complete;
+            m_has_results_to_deliver = true;
+        }
+
+        // Trigger processing of change notifications.
+        m_coordinator->wake_up_notifier_worker();
+    }
+
+    void finished_unsubscribing()
+    {
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+
+            m_pending_state = Removed;
             m_has_results_to_deliver = true;
         }
 
@@ -337,10 +405,10 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
         return m_error;
     }
 
-    bool subscription_completed() const
+    State state() const
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        return m_subscription_completed;
+        return m_state;
     }
 
 private:
@@ -362,7 +430,9 @@ private:
     std::exception_ptr m_pending_error = nullptr;
     std::exception_ptr m_error = nullptr;
     bool m_has_results_to_deliver = false;
-    bool m_subscription_completed = false;
+
+    State m_state = Creating;
+    State m_pending_state = Creating;
 };
 
 Subscription subscribe(Results const& results, util::Optional<std::string> user_provided_name)
@@ -380,11 +450,51 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
     std::weak_ptr<Subscription::Notifier> weak_notifier = subscription.m_notifier;
     async_register_query(*realm, results.get_object_type(), std::move(query), std::move(name),
                          [weak_notifier=std::move(weak_notifier)](std::exception_ptr error) {
-        if (auto notifier = weak_notifier.lock()) {
+        if (auto notifier = weak_notifier.lock())
             notifier->finished_subscribing(error);
-        }
     });
     return subscription;
+}
+
+void unsubscribe(Subscription& subscription)
+{
+    if (auto result_set_object = subscription.result_set_object()) {
+        // The subscription has its result set object, so we can queue up the unsubscription immediately.
+        std::weak_ptr<Subscription::Notifier> weak_notifier = subscription.m_notifier;
+        async_unregister_query(*result_set_object, [weak_notifier=std::move(weak_notifier)]() {
+            if (auto notifier = weak_notifier.lock())
+                notifier->finished_unsubscribing();
+        });
+        return;
+    }
+
+    switch (subscription.state()) {
+        case SubscriptionState::Creating: {
+            // The result set object is in the process of being created. Try unsubscribing again once it exists.
+            auto token = std::make_shared<SubscriptionNotificationToken>();
+            *token = subscription.add_notification_callback([token, &subscription] () {
+                if (subscription.state() == SubscriptionState::Creating)
+                    return;
+
+                unsubscribe(subscription);
+
+                // Invalidate the notification token so we do not receive further callbacks.
+                *token = SubscriptionNotificationToken();
+            });
+            return;
+        }
+
+        case SubscriptionState::Error:
+        case SubscriptionState::Invalidated:
+            // Nothing to do. We either failed to create the subscription, or have already removed it.
+            break;
+
+        case SubscriptionState::Pending:
+        case SubscriptionState::Complete:
+            // This should not be reachable as these states require the result set object to exist.
+            REALM_ASSERT(false);
+            break;
+    }
 }
 
 Subscription::Subscription(std::string name, std::string object_type, std::shared_ptr<Realm> realm)
@@ -400,7 +510,7 @@ Subscription::Subscription(std::string name, std::string object_type, std::share
     Query query = table->where();
     query.equal(m_object_schema.property_for_name("name")->table_column, name);
     query.equal(m_object_schema.property_for_name("matches_property")->table_column, matches_property);
-    m_result_sets = Results(realm, std::move(query));
+    m_result_sets = Results(std::move(realm), std::move(query));
 }
 
 Subscription::~Subscription() = default;
@@ -420,7 +530,7 @@ SubscriptionNotificationToken Subscription::add_notification_callback(std::funct
 
 util::Optional<Object> Subscription::result_set_object() const
 {
-    if (m_notifier->subscription_completed()) {
+    if (m_notifier->state() == Notifier::Complete) {
         if (auto row = m_result_sets.first())
             return Object(m_result_sets.get_realm(), m_object_schema, *row);
     }
@@ -430,8 +540,14 @@ util::Optional<Object> Subscription::result_set_object() const
 
 SubscriptionState Subscription::state() const
 {
-    if (!m_notifier->subscription_completed())
-        return SubscriptionState::Creating;
+    switch (m_notifier->state()) {
+        case Notifier::Creating:
+            return SubscriptionState::Creating;
+        case Notifier::Removed:
+            return SubscriptionState::Invalidated;
+        case Notifier::Complete:
+            break;
+    }
 
     if (m_notifier->error())
         return SubscriptionState::Error;
