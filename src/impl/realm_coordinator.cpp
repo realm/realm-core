@@ -233,7 +233,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
                 throw RealmFileException(RealmFileException::Kind::AccessError, get_path(), ex.code().message(), "");
             }
         }
-        m_weak_realm_notifiers.emplace_back(realm, m_config.cache);
+        m_weak_realm_notifiers.emplace_back(realm, realm->config().cache);
     }
 
     if (realm->config().sync_config)
