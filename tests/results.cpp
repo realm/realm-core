@@ -2318,6 +2318,21 @@ TEST_CASE("results: distinct") {
         REQUIRE(unique.get(2).get_int(2) == 8);
     }
 
+    SECTION("Single integer via apply_ordering") {
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        ordering.append_distinct(DistinctDescriptor(results.get_tableview().get_parent(), {{0}}));
+        Results unique = results.apply_ordering(std::move(ordering));
+        // unique:
+        //  0, Foo_0, 10
+        //  1, Foo_1,  9
+        //  2, Foo_2,  8
+        REQUIRE(unique.size() == 3);
+        REQUIRE(unique.get(0).get_int(2) == 10);
+        REQUIRE(unique.get(1).get_int(2) == 9);
+        REQUIRE(unique.get(2).get_int(2) == 8);
+    }
+
     SECTION("Single string property") {
         Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{1}}));
         // unique:
