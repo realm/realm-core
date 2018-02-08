@@ -128,8 +128,18 @@ void populate_realm(Realm::Config& config, std::vector<TypeA> a={}, std::vector<
     EventLoop::main().run_until([&] { return upload_done.load(); });
 }
 
-void run_query(Results results, util::Optional<std::string> name,
-               std::function<void(Results, std::exception_ptr)> check)
+auto results_for_query(std::string const& query_string, Realm::Config const& config, std::string const& object_type)
+{
+    auto realm = Realm::get_shared_realm(config);
+    auto table = ObjectStore::table_for_object_type(realm->read_group(), object_type);
+    Query query = table->where();
+    parser::Predicate predicate = realm::parser::parse(query_string);
+    query_builder::apply_predicate(query, predicate);
+    return Results(std::move(realm), std::move(query));
+}
+
+partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<std::string> name,
+                                              std::function<void(Results, std::exception_ptr)> check)
 {
     auto subscription = partial_sync::subscribe(results, name);
 
@@ -146,6 +156,7 @@ void run_query(Results results, util::Optional<std::string> name,
                 partial_sync_done = true;
                 break;
             case partial_sync::SubscriptionState::Complete:
+            case partial_sync::SubscriptionState::Invalidated:
                 partial_sync_done = true;
                 break;
             default:
@@ -154,21 +165,23 @@ void run_query(Results results, util::Optional<std::string> name,
     });
     EventLoop::main().run_until([&] { return partial_sync_done.load(); });
     check(std::move(results), std::move(exception));
+    return subscription;
 }
 
 /// Run a partial sync query, wait for the results, and then perform checks.
-void run_query(const std::string& query, const Realm::Config& partial_config,
-               std::string object_type, util::Optional<std::string> name,
-               std::function<void(Results, std::exception_ptr)> check)
+auto subscribe_and_wait(std::string const& query, Realm::Config const& partial_config,
+                        std::string const& object_type, util::Optional<std::string> name,
+                        std::function<void(Results, std::exception_ptr)> check)
 {
-    auto r = Realm::get_shared_realm(partial_config);
-    auto table = ObjectStore::table_for_object_type(r->read_group(), object_type);
-    Query q = table->where();
-    parser::Predicate p = realm::parser::parse(query);
-    query_builder::apply_predicate(q, p);
-    Results results(r, q);
+    auto results = results_for_query(query, partial_config, object_type);
+    return subscribe_and_wait(std::move(results), std::move(name), std::move(check));
+}
 
-    run_query(std::move(results), std::move(name), std::move(check));
+auto subscription_with_query(std::string const& query, Realm::Config const& partial_config,
+                             std::string const& object_type, util::Optional<std::string> name)
+{
+    auto results = results_for_query(query, partial_config, object_type);
+    return partial_sync::subscribe(std::move(results), name);
 }
 
 bool results_contains(Results& r, TypeA a)
@@ -222,7 +235,7 @@ TEST_CASE("Partial sync", "[sync]") {
 
     SECTION("works in the most basic case") {
         // Open the partially synced Realm and run a query.
-        run_query("string = \"partial\"", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
+        subscribe_and_wait("string = \"partial\"", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {1, 10, "partial"}));
             REQUIRE(results_contains(results, {2, 2, "partial"}));
@@ -230,39 +243,39 @@ TEST_CASE("Partial sync", "[sync]") {
     }
 
     SECTION("works when multiple queries are made on the same property") {
-        run_query("number > 1", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
+        subscribe_and_wait("number > 1", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {2, 2, "partial"}));
             REQUIRE(results_contains(results, {3, 8, "sync"}));
         });
 
-        run_query("number = 1", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
+        subscribe_and_wait("number = 1", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 1);
             REQUIRE(results_contains(results, {1, 10, "partial"}));
         });
     }
 
     SECTION("works when queries are made on different properties") {
-        run_query("string = \"jyaku\"", partial_config, "object_b", util::none, [](Results results, std::exception_ptr) {
+        subscribe_and_wait("string = \"jyaku\"", partial_config, "object_b", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {4, "jyaku", "kiwi"}));
             REQUIRE(results_contains(results, {7, "jyaku", "orange"}));
         });
 
-        run_query("second_string = \"cherry\"", partial_config, "object_b", util::none, [](Results results, std::exception_ptr) {
+        subscribe_and_wait("second_string = \"cherry\"", partial_config, "object_b", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 1);
             REQUIRE(results_contains(results, {5, "meela", "cherry"}));
         });
     }
 
     SECTION("works when queries are made on different object types") {
-        run_query("second_number < 9", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
+        subscribe_and_wait("second_number < 9", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {2, 2, "partial"}));
             REQUIRE(results_contains(results, {3, 8, "sync"}));
         });
 
-        run_query("string = \"meela\"", partial_config, "object_b", util::none, [](Results results, std::exception_ptr) {
+        subscribe_and_wait("string = \"meela\"", partial_config, "object_b", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 3);
             REQUIRE(results_contains(results, {3, "meela", "orange"}));
             REQUIRE(results_contains(results, {5, "meela", "cherry"}));
@@ -271,14 +284,14 @@ TEST_CASE("Partial sync", "[sync]") {
     }
 
     SECTION("re-registering the same query with no name on the same type should succeed") {
-        run_query("number > 1", partial_config, "object_a", util::none, [](Results results, std::exception_ptr error) {
+        subscribe_and_wait("number > 1", partial_config, "object_a", util::none, [](Results results, std::exception_ptr error) {
             REQUIRE(!error);
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {2, 2, "partial"}));
             REQUIRE(results_contains(results, {3, 8, "sync"}));
         });
 
-        run_query("number > 1", partial_config, "object_a", util::none, [](Results results, std::exception_ptr error) {
+        subscribe_and_wait("number > 1", partial_config, "object_a", util::none, [](Results results, std::exception_ptr error) {
             REQUIRE(!error);
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {2, 2, "partial"}));
@@ -287,19 +300,145 @@ TEST_CASE("Partial sync", "[sync]") {
     }
 
     SECTION("re-registering the same query with the same name on the same type should succeed") {
-        run_query("number > 1", partial_config, "object_a", "query"s, [](Results results, std::exception_ptr error) {
+        subscribe_and_wait("number > 1", partial_config, "object_a", "query"s, [](Results results, std::exception_ptr error) {
             REQUIRE(!error);
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {2, 2, "partial"}));
             REQUIRE(results_contains(results, {3, 8, "sync"}));
         });
 
-        run_query("number > 1", partial_config, "object_a", "query"s, [](Results results, std::exception_ptr error) {
+        subscribe_and_wait("number > 1", partial_config, "object_a", "query"s, [](Results results, std::exception_ptr error) {
             REQUIRE(!error);
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {2, 2, "partial"}));
             REQUIRE(results_contains(results, {3, 8, "sync"}));
         });
+    }
+
+    SECTION("unnamed query can be unsubscribed while in creating state") {
+        auto subscription = subscription_with_query("number > 1", partial_config, "object_a", util::none);
+
+        std::atomic<bool> partial_sync_done(false);
+        auto token = subscription.add_notification_callback([&] {
+            using SubscriptionState = partial_sync::SubscriptionState;
+
+            switch (subscription.state()) {
+                case SubscriptionState::Creating:
+                    partial_sync::unsubscribe(subscription);
+                    break;
+
+                case SubscriptionState::Pending:
+                case SubscriptionState::Error:
+                case SubscriptionState::Complete:
+                    break;
+
+                case SubscriptionState::Invalidated:
+                    partial_sync_done = true;
+                    break;
+            }
+        });
+        EventLoop::main().run_until([&] { return partial_sync_done.load(); });
+    }
+
+    SECTION("unnamed query can be unsubscribed while in pending state") {
+        auto subscription = subscription_with_query("number > 1", partial_config, "object_a", util::none);
+
+        std::atomic<bool> partial_sync_done(false);
+        auto token = subscription.add_notification_callback([&] {
+            using SubscriptionState = partial_sync::SubscriptionState;
+
+            switch (subscription.state()) {
+                case SubscriptionState::Pending:
+                    partial_sync::unsubscribe(subscription);
+                    break;
+
+                case SubscriptionState::Creating:
+                case SubscriptionState::Error:
+                case SubscriptionState::Complete:
+                    break;
+
+                case SubscriptionState::Invalidated:
+                    partial_sync_done = true;
+                    break;
+            }
+        });
+        EventLoop::main().run_until([&] { return partial_sync_done.load(); });
+    }
+
+    SECTION("unnamed query can be unsubscribed while in complete state") {
+        auto subscription = subscription_with_query("number > 1", partial_config, "object_a", util::none);
+
+        std::atomic<bool> partial_sync_done(false);
+        auto token = subscription.add_notification_callback([&] {
+            using SubscriptionState = partial_sync::SubscriptionState;
+
+            switch (subscription.state()) {
+                case SubscriptionState::Complete:
+                    partial_sync::unsubscribe(subscription);
+                    break;
+
+                case SubscriptionState::Creating:
+                case SubscriptionState::Pending:
+                case SubscriptionState::Error:
+                    break;
+
+                case SubscriptionState::Invalidated:
+                    partial_sync_done = true;
+                    break;
+            }
+        });
+        EventLoop::main().run_until([&] { return partial_sync_done.load(); });
+    }
+
+    SECTION("unnamed query can be unsubscribed while in invalidated state") {
+        auto subscription = subscription_with_query("number > 1", partial_config, "object_a", util::none);
+        partial_sync::unsubscribe(subscription);
+
+        std::atomic<bool> partial_sync_done(false);
+        auto token = subscription.add_notification_callback([&] {
+            using SubscriptionState = partial_sync::SubscriptionState;
+
+            switch (subscription.state()) {
+                case SubscriptionState::Creating:
+                case SubscriptionState::Pending:
+                case SubscriptionState::Complete:
+                case SubscriptionState::Error:
+                    break;
+
+                case SubscriptionState::Invalidated:
+                    // We're only testing that this doesn't blow up since it should have no effect.
+                    partial_sync::unsubscribe(subscription);
+                    partial_sync_done = true;
+                    break;
+            }
+        });
+        EventLoop::main().run_until([&] { return partial_sync_done.load(); });
+    }
+
+    SECTION("unnamed query can be unsubscribed while in error state") {
+        auto subscription_1 = subscription_with_query("number != 1", partial_config, "object_a", "query"s);
+        auto subscription_2 = subscription_with_query("number > 1", partial_config, "object_a", "query"s);
+
+        std::atomic<bool> partial_sync_done(false);
+        auto token = subscription_2.add_notification_callback([&] {
+            using SubscriptionState = partial_sync::SubscriptionState;
+
+            switch (subscription_2.state()) {
+                case SubscriptionState::Error:
+                    partial_sync::unsubscribe(subscription_2);
+                    break;
+
+                case SubscriptionState::Creating:
+                case SubscriptionState::Pending:
+                case SubscriptionState::Complete:
+                    break;
+
+                case SubscriptionState::Invalidated:
+                    partial_sync_done = true;
+                    break;
+            }
+        });
+        EventLoop::main().run_until([&] { return partial_sync_done.load(); });
     }
 }
 
@@ -312,7 +451,7 @@ TEST_CASE("Partial sync error checking", "[sync]") {
             config.schema = partial_sync_schema();
             auto realm = Realm::get_shared_realm(config);
             auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
-            CHECK_THROWS(run_query(Results(realm, *table), util::none, [](Results, std::exception_ptr) { }));
+            CHECK_THROWS(subscribe_and_wait(Results(realm, *table), util::none, [](Results, std::exception_ptr) { }));
         }
 
         SECTION("synced, non-partial Realm") {
@@ -320,7 +459,7 @@ TEST_CASE("Partial sync error checking", "[sync]") {
             SyncTestFile config(server, "test", partial_sync_schema());
             auto realm = Realm::get_shared_realm(config);
             auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
-            CHECK_THROWS(run_query(Results(realm, *table), util::none, [](Results, std::exception_ptr) { }));
+            CHECK_THROWS(subscribe_and_wait(Results(realm, *table), util::none, [](Results, std::exception_ptr) { }));
         }
     }
 
@@ -335,23 +474,23 @@ TEST_CASE("Partial sync error checking", "[sync]") {
             );
 
         SECTION("reusing the same name for different queries should raise an error") {
-            run_query("number > 0", partial_config, "object_a", "query"s, [](Results results, std::exception_ptr error) {
+            subscribe_and_wait("number > 0", partial_config, "object_a", "query"s, [](Results results, std::exception_ptr error) {
                 REQUIRE(!error);
                 REQUIRE(results.size() == 3);
             });
 
-            run_query("number <= 0", partial_config, "object_a", "query"s, [](Results, std::exception_ptr error) {
+            subscribe_and_wait("number <= 0", partial_config, "object_a", "query"s, [](Results, std::exception_ptr error) {
                 REQUIRE(error);
             });
         }
 
         SECTION("reusing the same name for identical queries on different types should raise an error") {
-            run_query("number > 0", partial_config, "object_a", "query"s, [](Results results, std::exception_ptr error) {
+            subscribe_and_wait("number > 0", partial_config, "object_a", "query"s, [](Results results, std::exception_ptr error) {
                 REQUIRE(!error);
                 REQUIRE(results.size() == 3);
             });
 
-            run_query("number > 0", partial_config, "object_b", "query"s, [](Results, std::exception_ptr error) {
+            subscribe_and_wait("number > 0", partial_config, "object_b", "query"s, [](Results, std::exception_ptr error) {
                 REQUIRE(error);
             });
         }
@@ -361,7 +500,7 @@ TEST_CASE("Partial sync error checking", "[sync]") {
             // queries as it cannot serialize an object reference until we have stable ID support.
 
             // Ensure that the placeholder object in `link_target` is available.
-            run_query("TRUEPREDICATE", partial_config, "link_target", util::none, [](Results results, std::exception_ptr error) {
+            subscribe_and_wait("TRUEPREDICATE", partial_config, "link_target", util::none, [](Results results, std::exception_ptr error) {
                 REQUIRE(!error);
                 REQUIRE(results.size() == 1);
             });
@@ -374,7 +513,7 @@ TEST_CASE("Partial sync error checking", "[sync]") {
             // Attempt to subscribe to a `links_to` query.
             Query q = source_table->where().links_to(object_schema->property_for_name("link")->table_column,
                                                      target_table->get(0));
-            run_query(Results(r, q), util::none, [](Results, std::exception_ptr error) {
+            subscribe_and_wait(Results(r, q), util::none, [](Results, std::exception_ptr error) {
                 REQUIRE(error);
             });
         }

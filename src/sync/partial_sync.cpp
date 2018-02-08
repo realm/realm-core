@@ -485,8 +485,13 @@ void unsubscribe(Subscription& subscription)
         }
 
         case SubscriptionState::Error:
+            // We encountered an error when creating the subscription. There's nothing to remove, so just
+            // mark the subscription as removed.
+            subscription.m_notifier->finished_unsubscribing();
+            break;
+
         case SubscriptionState::Invalidated:
-            // Nothing to do. We either failed to create the subscription, or have already removed it.
+            // Nothing to do. We have already removed the subscription.
             break;
 
         case SubscriptionState::Pending:
