@@ -71,6 +71,12 @@ public:
             m_shared_group->begin_write();
     }
 
+    ~WriteTransactionNotifyingSync()
+    {
+        if (m_shared_group)
+            m_shared_group->rollback();
+    }
+
     SharedGroup::version_type commit()
     {
         REALM_ASSERT(m_shared_group);
@@ -80,6 +86,13 @@ public:
         auto session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
         SyncSession::Internal::nonsync_transact_notify(*session, version);
         return version;
+    }
+
+    void rollback()
+    {
+        REALM_ASSERT(m_shared_group);
+        m_shared_group->rollback();
+        m_shared_group = nullptr;
     }
 
     Group& get_group() const noexcept
@@ -182,11 +195,15 @@ bool validate_existing_subscription(Table& table, ResultSetsColumns const& colum
 
     StringData existing_query = table.get_string(columns.query, existing_row_ndx);
     if (existing_query != query)
-        throw std::runtime_error("An existing subscription exists with the same name, but a different query.");
+        throw std::runtime_error(util::format("An existing subscription exists with the same name, "
+                                              "but a different query ('%1' vs '%2').",
+                                              existing_query, query));
 
     StringData existing_matches_property = table.get_string(columns.matches_property_name, existing_row_ndx);
     if (existing_matches_property != matches_property)
-        throw std::runtime_error("An existing subscription exists with the same name, but a different result type.");
+        throw std::runtime_error(util::format("An existing subscription exists with the same name, "
+                                              "but a different result type ('%1' vs '%2').",
+                                              existing_matches_property, matches_property));
 
     return true;
 }
@@ -254,10 +271,13 @@ void enqueue_unregistration(Object result_set, std::function<void()> callback)
             sg.unpin_version(handover->version);
 
             _impl::WriteTransactionNotifyingSync write(config, sg);
-            if (row.is_attached())
+            if (row.is_attached()) {
                 row.move_last_over();
-
-            write.commit();
+                write.commit();
+            }
+            else {
+                write.rollback();
+            }
         });
         callback();
     });
@@ -359,8 +379,11 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
     void run() override
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        if (m_has_results_to_deliver)
+        if (m_has_results_to_deliver) {
+            // Mark the object as being modified so that CollectionNotifier is aware
+            // that there are changes to deliver.
             m_changes.modify(0);
+        }
     }
 
     void deliver(SharedGroup&) override
@@ -444,7 +467,8 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
         throw std::logic_error("A partial sync query can only be registered in a partially synced Realm");
 
     auto query = results.get_query().get_description(); // Throws if the query cannot be serialized.
-    std::string name = user_provided_name ? std::move(*user_provided_name) : default_name_for_query(query,results.get_object_type());
+    std::string name = user_provided_name ? std::move(*user_provided_name)
+                                          : default_name_for_query(query, results.get_object_type());
 
     Subscription subscription(name, results.get_object_type(), realm);
     std::weak_ptr<Subscription::Notifier> weak_notifier = subscription.m_notifier;

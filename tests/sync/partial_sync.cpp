@@ -143,7 +143,7 @@ partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<st
 {
     auto subscription = partial_sync::subscribe(results, name);
 
-    std::atomic<bool> partial_sync_done(false);
+    bool partial_sync_done = false;
     std::exception_ptr exception;
     auto token = subscription.add_notification_callback([&] {
         switch (subscription.state()) {
@@ -163,7 +163,7 @@ partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<st
                 throw std::logic_error(util::format("Unexpected state: %1", static_cast<uint8_t>(subscription.state())));
         }
     });
-    EventLoop::main().run_until([&] { return partial_sync_done.load(); });
+    EventLoop::main().run_until([&] { return partial_sync_done; });
     check(std::move(results), std::move(exception));
     return subscription;
 }
@@ -318,7 +318,7 @@ TEST_CASE("Partial sync", "[sync]") {
     SECTION("unnamed query can be unsubscribed while in creating state") {
         auto subscription = subscription_with_query("number > 1", partial_config, "object_a", util::none);
 
-        std::atomic<bool> partial_sync_done(false);
+        bool partial_sync_done = false;
         auto token = subscription.add_notification_callback([&] {
             using SubscriptionState = partial_sync::SubscriptionState;
 
@@ -337,13 +337,13 @@ TEST_CASE("Partial sync", "[sync]") {
                     break;
             }
         });
-        EventLoop::main().run_until([&] { return partial_sync_done.load(); });
+        EventLoop::main().run_until([&] { return partial_sync_done; });
     }
 
     SECTION("unnamed query can be unsubscribed while in pending state") {
         auto subscription = subscription_with_query("number > 1", partial_config, "object_a", util::none);
 
-        std::atomic<bool> partial_sync_done(false);
+        bool partial_sync_done = false;
         auto token = subscription.add_notification_callback([&] {
             using SubscriptionState = partial_sync::SubscriptionState;
 
@@ -362,13 +362,13 @@ TEST_CASE("Partial sync", "[sync]") {
                     break;
             }
         });
-        EventLoop::main().run_until([&] { return partial_sync_done.load(); });
+        EventLoop::main().run_until([&] { return partial_sync_done; });
     }
 
     SECTION("unnamed query can be unsubscribed while in complete state") {
         auto subscription = subscription_with_query("number > 1", partial_config, "object_a", util::none);
 
-        std::atomic<bool> partial_sync_done(false);
+        bool partial_sync_done = false;
         auto token = subscription.add_notification_callback([&] {
             using SubscriptionState = partial_sync::SubscriptionState;
 
@@ -387,14 +387,14 @@ TEST_CASE("Partial sync", "[sync]") {
                     break;
             }
         });
-        EventLoop::main().run_until([&] { return partial_sync_done.load(); });
+        EventLoop::main().run_until([&] { return partial_sync_done; });
     }
 
     SECTION("unnamed query can be unsubscribed while in invalidated state") {
         auto subscription = subscription_with_query("number > 1", partial_config, "object_a", util::none);
         partial_sync::unsubscribe(subscription);
 
-        std::atomic<bool> partial_sync_done(false);
+        bool partial_sync_done = false;
         auto token = subscription.add_notification_callback([&] {
             using SubscriptionState = partial_sync::SubscriptionState;
 
@@ -412,14 +412,14 @@ TEST_CASE("Partial sync", "[sync]") {
                     break;
             }
         });
-        EventLoop::main().run_until([&] { return partial_sync_done.load(); });
+        EventLoop::main().run_until([&] { return partial_sync_done; });
     }
 
     SECTION("unnamed query can be unsubscribed while in error state") {
         auto subscription_1 = subscription_with_query("number != 1", partial_config, "object_a", "query"s);
         auto subscription_2 = subscription_with_query("number > 1", partial_config, "object_a", "query"s);
 
-        std::atomic<bool> partial_sync_done(false);
+        bool partial_sync_done = false;
         auto token = subscription_2.add_notification_callback([&] {
             using SubscriptionState = partial_sync::SubscriptionState;
 
@@ -438,7 +438,7 @@ TEST_CASE("Partial sync", "[sync]") {
                     break;
             }
         });
-        EventLoop::main().run_until([&] { return partial_sync_done.load(); });
+        EventLoop::main().run_until([&] { return partial_sync_done; });
     }
 }
 
