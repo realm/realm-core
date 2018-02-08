@@ -191,7 +191,7 @@ bool validate_existing_subscription(Table& table, ResultSetsColumns const& colum
     return true;
 }
 
-void async_register_query(Realm& realm, std::string object_type, std::string query, std::string name,
+void enqueue_registration(Realm& realm, std::string object_type, std::string query, std::string name,
                           std::function<void(std::exception_ptr)> callback)
 {
     auto config = realm.config();
@@ -234,7 +234,7 @@ void async_register_query(Realm& realm, std::string object_type, std::string que
     });
 }
 
-void async_unregister_query(Object result_set, std::function<void()> callback)
+void enqueue_unregistration(Object result_set, std::function<void()> callback)
 {
     auto realm = result_set.realm();
     auto config = realm->config();
@@ -448,7 +448,7 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
 
     Subscription subscription(name, results.get_object_type(), realm);
     std::weak_ptr<Subscription::Notifier> weak_notifier = subscription.m_notifier;
-    async_register_query(*realm, results.get_object_type(), std::move(query), std::move(name),
+    enqueue_registration(*realm, results.get_object_type(), std::move(query), std::move(name),
                          [weak_notifier=std::move(weak_notifier)](std::exception_ptr error) {
         if (auto notifier = weak_notifier.lock())
             notifier->finished_subscribing(error);
@@ -461,7 +461,7 @@ void unsubscribe(Subscription& subscription)
     if (auto result_set_object = subscription.result_set_object()) {
         // The subscription has its result set object, so we can queue up the unsubscription immediately.
         std::weak_ptr<Subscription::Notifier> weak_notifier = subscription.m_notifier;
-        async_unregister_query(*result_set_object, [weak_notifier=std::move(weak_notifier)]() {
+        enqueue_unregistration(*result_set_object, [weak_notifier=std::move(weak_notifier)]() {
             if (auto notifier = weak_notifier.lock())
                 notifier->finished_unsubscribing();
         });
