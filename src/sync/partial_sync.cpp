@@ -28,7 +28,9 @@
 #include "sync/impl/work_queue.hpp"
 #include "sync/subscription_state.hpp"
 #include "sync/sync_config.hpp"
+#include "sync/sync_session.hpp"
 
+#include <realm/lang_bind_helper.hpp>
 #include <realm/util/scope_exit.hpp>
 
 namespace {
@@ -55,12 +57,58 @@ void initialize_schema(Group& group)
     table->add_column(type_Int, "query_parse_counter");
 }
 
+// A stripped-down version of WriteTransaction that can promote an existing read transaction
+// and that notifies the sync session after committing a change.
+class WriteTransactionNotifyingSync {
+public:
+    WriteTransactionNotifyingSync(Realm::Config const& config, SharedGroup& sg)
+    : m_config(config)
+    , m_shared_group(&sg)
+    {
+        if (m_shared_group->get_transact_stage() == SharedGroup::transact_Reading)
+            LangBindHelper::promote_to_write(*m_shared_group);
+        else
+            m_shared_group->begin_write();
+    }
+
+    SharedGroup::version_type commit()
+    {
+        REALM_ASSERT(m_shared_group);
+        auto version = m_shared_group->commit();
+        m_shared_group = nullptr;
+
+        auto session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
+        SyncSession::Internal::nonsync_transact_notify(*session, version);
+        return version;
+    }
+
+    Group& get_group() const noexcept
+    {
+        REALM_ASSERT(m_shared_group);
+        return _impl::SharedGroupFriend::get_group(*m_shared_group);
+    }
+
+private:
+    Realm::Config const& m_config;
+    SharedGroup* m_shared_group;
+};
+
 } // namespace _impl
 
 namespace partial_sync {
 
 namespace {
 
+template<typename F>
+void with_open_shared_group(Realm::Config const& config, F&& function)
+{
+    std::unique_ptr<Replication> history;
+    std::unique_ptr<SharedGroup> sg;
+    std::unique_ptr<Group> read_only_group;
+    Realm::open_with_config(config, history, sg, read_only_group, nullptr);
+
+    function(*sg);
+}
 void update_schema(Group& group, Property matches_property)
 {
     Schema current_schema;
@@ -84,26 +132,40 @@ void update_schema(Group& group, Property matches_property)
         ObjectStore::apply_additive_changes(group, required_changes, true);
 }
 
-bool validate_existing_subscription(std::shared_ptr<Realm> realm,
-                                    std::string const& name,
-                                    std::string const& query,
-                                    std::string const& matches_property,
-                                    ObjectSchema const& result_sets_schema)
+struct ResultSetsColumns {
+    ResultSetsColumns(Table& table, std::string const& matches_property_name)
+    {
+        name = table.get_column_index("name");
+        REALM_ASSERT(name != npos);
+
+        query = table.get_column_index("query");
+        REALM_ASSERT(query != npos);
+
+        this->matches_property_name = table.get_column_index("matches_property");
+        REALM_ASSERT(this->matches_property_name != npos);
+
+        // This may be `npos` if the column does not yet exist.
+        matches_property = table.get_column_index(matches_property_name);
+    }
+
+    size_t name;
+    size_t query;
+    size_t matches_property_name;
+    size_t matches_property;
+};
+
+bool validate_existing_subscription(Table& table, ResultSetsColumns const& columns, std::string const& name,
+                                    std::string const& query, std::string const& matches_property)
 {
-    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), result_sets_type_name);
-    size_t name_idx = result_sets_schema.property_for_name("name")->table_column;
-    auto existing_row_ndx = table->find_first_string(name_idx, name);
+    auto existing_row_ndx = table.find_first_string(columns.name, name);
     if (existing_row_ndx == npos)
         return false;
 
-    Object existing_object(realm, result_sets_schema, table->get(existing_row_ndx));
-
-    CppContext context;
-    std::string existing_query = any_cast<std::string>(existing_object.get_property_value<util::Any>(context, "query"));
+    StringData existing_query = table.get_string(columns.query, existing_row_ndx);
     if (existing_query != query)
         throw std::runtime_error("An existing subscription exists with the same name, but a different query.");
 
-    std::string existing_matches_property = any_cast<std::string>(existing_object.get_property_value<util::Any>(context, "matches_property"));
+    StringData existing_matches_property = table.get_string(columns.matches_property_name, existing_row_ndx);
     if (existing_matches_property != matches_property)
         throw std::runtime_error("An existing subscription exists with the same name, but a different result type.");
 
@@ -113,44 +175,43 @@ bool validate_existing_subscription(std::shared_ptr<Realm> realm,
 void async_register_query(Realm& realm, std::string object_type, std::string query, std::string name,
                           std::function<void(std::exception_ptr)> callback)
 {
-    const auto& config = realm.config();
+    auto config = realm.config();
+
     auto& work_queue = _impl::RealmCoordinator::get_coordinator(config)->partial_sync_work_queue();
     work_queue.enqueue([object_type=std::move(object_type), query=std::move(query), name=std::move(name),
-                        callback=std::move(callback), config] {
-        auto realm = Realm::get_shared_realm(config);
-        realm->begin_transaction();
-        auto cleanup = util::make_scope_exit([&]() noexcept {
-            if (realm->is_in_transaction())
-                realm->cancel_transaction();
-        });
-
-        auto matches_property = std::string(object_type) + "_matches";
-
-        update_schema(realm->read_group(), Property(matches_property, PropertyType::Object|PropertyType::Array, object_type));
-        ObjectSchema result_sets_schema(realm->read_group(), result_sets_type_name);
-
+                        callback=std::move(callback), config=std::move(config)] {
         try {
-            if (!validate_existing_subscription(realm, name, query,
-                                                matches_property, result_sets_schema)) {
-                CppContext context;
-                auto object = Object::create<util::Any>(context, realm, result_sets_schema,
-                                                        AnyDict{
-                                                            {"matches_property", matches_property},
-                                                            {"name", name},
-                                                            {"query", query},
-                                                            {"status", int64_t(0)},
-                                                            {"error_message", std::string()},
-                                                            {"query_parse_counter", int64_t(0)},
-                                                        }, false);
-            }
+            with_open_shared_group(config, [&](SharedGroup& sg) {
+                _impl::WriteTransactionNotifyingSync write(config, sg);
+
+                auto matches_property = std::string(object_type) + "_matches";
+
+                auto table = ObjectStore::table_for_object_type(write.get_group(), result_sets_type_name);
+                ResultSetsColumns columns(*table, matches_property);
+
+                // Update schema if needed.
+                if (columns.matches_property == npos) {
+                    auto target_table = ObjectStore::table_for_object_type(write.get_group(), object_type);
+                    columns.matches_property = table->add_column_link(type_LinkList, matches_property, *target_table);
+                } else {
+                    // FIXME: Validate that the column type and link target are correct.
+                }
+
+                if (!validate_existing_subscription(*table, columns, name, query, matches_property)) {
+                    auto row_ndx = sync::create_object(write.get_group(), *table);
+                    table->set_string(columns.name, row_ndx, name);
+                    table->set_string(columns.query, row_ndx, query);
+                    table->set_string(columns.matches_property_name, row_ndx, matches_property);
+                }
+
+                write.commit();
+            });
         } catch (...) {
             callback(std::current_exception());
             return;
         }
 
         callback(nullptr);
-        realm->commit_transaction();
-        realm->close();
     });
 }
 

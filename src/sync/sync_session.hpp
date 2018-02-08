@@ -36,6 +36,7 @@ class SyncUser;
 namespace _impl {
 class RealmCoordinator;
 struct SyncClient;
+class WriteTransactionNotifyingSync;
 
 namespace sync_session_states {
 struct WaitingForAccessToken;
@@ -106,7 +107,8 @@ private:
 
     std::unordered_map<uint64_t, NotifierPackage> m_packages;
 };
-}
+
+} // namespace _impl
 
 class SyncSession : public std::enable_shared_from_this<SyncSession> {
 public:
@@ -242,6 +244,7 @@ public:
     // without making it public to everyone
     class Internal {
         friend class _impl::RealmCoordinator;
+        friend class _impl::WriteTransactionNotifyingSync;
 
         static void set_sync_transact_callback(SyncSession& session,
                                                std::function<SyncSessionTransactCallback> callback)
