@@ -17,6 +17,8 @@
         - Backlinks can be used like lists in expressions including: min, max, sum, avg, count/size, and subqueries
     - Keypath substitution is supported to allow querying over named backlinks and property aliases, see `KeyPathMapping`
     - Parsing backlinks can be disabled at runtime by configuring `KeyPathMapping::set_allow_backlinks`
+    - Support for ANY/SOME/ALL/NONE on list properties (parser only). For example: `ALL items.price > 10`
+    - Support for operator 'IN' on list properties (parser only). For example: `'milk' IN ingredients.name`
     PR [#2989](https://github.com/realm/realm-core/pull/2989).
 
 -----------
