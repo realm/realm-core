@@ -1026,7 +1026,6 @@ protected:
     int64_t m_ubound; // max number that can be stored with current m_width
 
     size_t m_size = 0;     // Number of elements currently stored.
-    size_t m_capacity = 0; // Number of elements that fit inside the allocated memory.
 
     Allocator& m_alloc;
 
@@ -1049,6 +1048,16 @@ private:
     friend class SlabAlloc;
     friend class GroupWriter;
     friend class StringColumn;
+};
+
+class ClusterKeyArray : public Array {
+public:
+    using Array::Array;
+
+    int64_t get(size_t ndx) const
+    {
+        return (m_data != nullptr) ? Array::get(ndx) : int64_t(ndx);
+    }
 };
 
 // Implementation:

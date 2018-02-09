@@ -233,7 +233,7 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
                 return not_found;
 
             // Now actual_key must be found in leaf keys
-            return m_cluster->get_key_array()->lower_bound_int(m_actual_key.value - m_cluster->get_offset());
+            return m_cluster->lower_bound_key(ObjKey(m_actual_key.value - m_cluster->get_offset()));
         }
         return not_found;
     }

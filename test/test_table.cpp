@@ -43,11 +43,20 @@ using namespace std::chrono;
 #include "test.hpp"
 #include "test_table_helper.hpp"
 
+// #include <valgrind/callgrind.h>
+
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 using unit_test::TestContext;
 
+#ifndef CALLGRIND_START_INSTRUMENTATION
+#define CALLGRIND_START_INSTRUMENTATION
+#endif
+
+#ifndef CALLGRIND_STOP_INSTRUMENTATION
+#define CALLGRIND_STOP_INSTRUMENTATION
+#endif
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -3362,12 +3371,12 @@ TEST(Table_object_forward_iterator)
         table.create_object(ObjKey(i));
     }
 
-    int tree_size = 0;
+    size_t tree_size = 0;
     table.traverse_clusters([&tree_size](const Cluster* cluster) {
         tree_size += cluster->node_size();
         return false;
     });
-    CHECK_EQUAL(tree_size, nb_rows);
+    CHECK_EQUAL(tree_size, size_t(nb_rows));
 
     for (Obj o : table) {
         int64_t key_value = o.get_key().value;
@@ -3411,6 +3420,8 @@ TEST(Table_object_sequential)
     auto c0 = table.add_column(type_Int, "int1");
     auto c1 = table.add_column(type_Int, "int2", true);
 
+    CALLGRIND_START_INSTRUMENTATION;
+
     auto t1 = steady_clock::now();
 
     for (int i = 0; i < nb_rows; i++) {
@@ -3429,14 +3440,18 @@ TEST(Table_object_sequential)
 
     for (int i = 0; i < nb_rows; i++) {
         table.remove_object(ObjKey(i));
+#ifdef REALM_DEBUG
         for (int j = i + 1; j < nb_rows; j++) {
             Obj o = table.get_object(ObjKey(j));
             CHECK_EQUAL(j << 1, o.get<int64_t>(c0));
             CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(c1));
         }
+#endif
     }
 
     auto t4 = steady_clock::now();
+
+    CALLGRIND_STOP_INSTRUMENTATION;
 
     std::cout << nb_rows << " rows" << std::endl;
     std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
@@ -3470,6 +3485,8 @@ TEST(Table_object_random)
     auto c0 = table.add_column(type_Int, "int1");
     auto c1 = table.add_column(type_Int, "int2", true);
 
+    CALLGRIND_START_INSTRUMENTATION;
+
     auto t1 = steady_clock::now();
 
     for (int i = 0; i < nb_rows; i++) {
@@ -3488,14 +3505,18 @@ TEST(Table_object_random)
 
     for (int i = 0; i < nb_rows; i++) {
         table.remove_object(ObjKey(key_values[i]));
+#ifdef REALM_DEBUG
         for (int j = i + 1; j < nb_rows; j++) {
             Obj o = table.get_object(ObjKey(key_values[j]));
             CHECK_EQUAL(j << 1, o.get<int64_t>(c0));
             CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(c1));
         }
+#endif
     }
 
     auto t4 = steady_clock::now();
+
+    CALLGRIND_STOP_INSTRUMENTATION;
 
     std::cout << nb_rows << " rows" << std::endl;
     std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"

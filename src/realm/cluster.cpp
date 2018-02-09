@@ -28,8 +28,19 @@
 #include "realm/column_type_traits.hpp"
 #include "realm/replication.hpp"
 #include <iostream>
+#include <cmath>
 
 using namespace realm;
+
+namespace {
+#if REALM_MAX_BPNODE_SIZE > 256
+constexpr int node_shift_factor = 8;
+#else
+constexpr int node_shift_factor = 2;
+#endif
+
+constexpr size_t cluster_node_size = 1 << node_shift_factor;
+}
 
 /*
  * Node-splitting is done in the way that if the new element comes after all the
@@ -46,12 +57,17 @@ using namespace realm;
 
 namespace realm {
 
+/*
+ * The inner nodes are organized in the way that the main array has a ref to the
+ * (optional) key array in position 0 and the subtree depth in position 1. After
+ * that follows refs to the subordinate nodes.
+ */
 class ClusterNodeInner : public ClusterNode {
 public:
     ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top);
     ~ClusterNodeInner() override;
 
-    void create() override;
+    void create(int sub_tree_depth) override;
     void init(MemRef mem) override;
     bool update_from_parent(size_t old_baseline) noexcept override;
     MemRef ensure_writeable(ObjKey k) override;
@@ -61,35 +77,40 @@ public:
         return false;
     }
 
+    int get_sub_tree_depth() const override
+    {
+        return m_sub_tree_depth;
+    }
+
     bool traverse(ClusterTree::TraverseFunction func, int64_t) const;
 
+    size_t node_size() const override
+    {
+        return Array::size() - s_first_node_index;
+    }
     size_t get_tree_size() const override;
     int64_t get_last_key_value() const override;
 
+    void ensure_general_form() override;
     void insert_column(size_t ndx) override;
     void remove_column(size_t ndx) override;
     ref_type insert(ObjKey k, State& state) override;
     void get(ObjKey k, State& state) const override;
-    unsigned erase(ObjKey k, CascadeState& state) override;
+    size_t erase(ObjKey k, CascadeState& state) override;
     void add(ref_type ref, int64_t key_value = 0);
-
-    ref_type get_child(size_t ndx) const
-    {
-        return m_children.get_as_ref(ndx);
-    }
 
     // Reset first (and only!) child ref and return the previous value
     ref_type clear_first_child_ref()
     {
-        REALM_ASSERT(m_children.size() == 1);
-        ref_type ret = m_children.get_as_ref(0);
-        m_children.set(0, 0);
+        REALM_ASSERT(node_size() == 1);
+        ref_type ret = Array::get_as_ref(2);
+        Array::set(2, 0);
         return ret;
     }
 
     int64_t get_first_key_value()
     {
-        return m_keys.get(0);
+        return m_keys.is_attached() ? m_keys.get(0) : 0;
     }
 
     bool get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept;
@@ -97,7 +118,12 @@ public:
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
 private:
-    Array m_children;
+    static constexpr size_t s_key_ref_index = 0;
+    static constexpr size_t s_sub_tree_depth_index = 1;
+    static constexpr size_t s_first_node_index = 2;
+
+    int m_sub_tree_depth = 0;
+    int m_shift_factor = 0;
 
     struct ChildInfo {
         size_t ndx;
@@ -107,16 +133,38 @@ private:
     ChildInfo find_child(ObjKey key) const
     {
         ChildInfo ret;
-        auto upper = m_keys.upper_bound_int(key.value);
-        // The first entry in m_keys will always be smaller than or equal
-        // to all keys in this subtree.
-        REALM_ASSERT_DEBUG(upper > 0);
-        ret.ndx = upper - 1;
-        ret.offset = m_keys.get(ret.ndx);
-        ret.key = ObjKey(key.value - ret.offset);
+        if (m_keys.is_attached()) {
+            auto upper = m_keys.upper_bound_int(key.value);
+            // The first entry in m_keys will always be smaller than or equal
+            // to all keys in this subtree.
+            REALM_ASSERT_DEBUG(upper > 0);
+            ret.ndx = upper - 1;
+            ret.offset = m_keys.get(ret.ndx);
+            ret.key = ObjKey(key.value - ret.offset);
+        }
+        else {
+            size_t sz = node_size();
+            REALM_ASSERT_DEBUG(sz > 0);
+            size_t max_ndx = sz - 1;
+            ret.ndx = std::min(size_t(key.value) >> m_shift_factor, max_ndx);
+            ret.offset = ret.ndx << m_shift_factor;
+            ret.key = ObjKey(key.value - ret.offset);
+        }
         return ret;
     }
 
+    ref_type _get_child_ref(size_t ndx) const
+    {
+        return Array::get_as_ref(ndx + s_first_node_index);
+    }
+    void _insert_child_ref(size_t ndx, ref_type ref)
+    {
+        Array::insert(ndx + s_first_node_index, from_ref(ref));
+    }
+    void _erase_child_ref(size_t ndx)
+    {
+        Array::erase(ndx + s_first_node_index);
+    }
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
 
     template <class T, class F>
@@ -135,39 +183,47 @@ void ClusterNode::IteratorState::clear()
 
 ClusterNodeInner::ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top)
     : ClusterNode(0, allocator, tree_top)
-    , m_children(allocator)
 {
-    m_children.set_parent(this, 1);
 }
 
 ClusterNodeInner::~ClusterNodeInner()
 {
 }
 
-void ClusterNodeInner::create()
+void ClusterNodeInner::create(int sub_tree_depth)
 {
-    Array::create(Array::type_InnerBptreeNode, false, 2);
+    Array::create(Array::type_InnerBptreeNode, false, s_first_node_index);
 
-    m_keys.create(Array::type_Normal);
-    m_children.create(Array::type_HasRefs);
-    m_keys.update_parent();
-    m_children.update_parent();
+    Array::set(s_key_ref_index, 0);
+
+    Array::set(s_sub_tree_depth_index, RefOrTagged::make_tagged(sub_tree_depth));
+    m_sub_tree_depth = sub_tree_depth;
+    m_shift_factor = m_sub_tree_depth * node_shift_factor;
 }
 
 void ClusterNodeInner::init(MemRef mem)
 {
     Array::init_from_mem(mem);
-    m_keys.set_parent(this, 0);
-    m_keys.init_from_parent();
-    m_children.set_parent(this, 1);
-    m_children.init_from_parent();
+    m_keys.set_parent(this, s_key_ref_index);
+    ref_type ref = Array::get_as_ref(s_key_ref_index);
+    if (ref) {
+        m_keys.init_from_ref(ref);
+    }
+    else {
+        m_keys.detach();
+    }
+    m_sub_tree_depth = int(Array::get(s_sub_tree_depth_index)) >> 1;
+    m_shift_factor = m_sub_tree_depth * node_shift_factor;
 }
 
 bool ClusterNodeInner::update_from_parent(size_t old_baseline) noexcept
 {
     if (Array::update_from_parent(old_baseline)) {
-        m_keys.update_from_parent(old_baseline);
-        m_children.update_from_parent(old_baseline);
+        ref_type ref = Array::get_as_ref(s_key_ref_index);
+        if (ref) {
+            m_keys.update_from_parent(old_baseline);
+        }
+        m_sub_tree_depth = int(Array::get(s_sub_tree_depth_index)) >> 1;
         return true;
     }
     return false;
@@ -178,18 +234,18 @@ T ClusterNodeInner::recurse(ObjKey key, F func)
 {
     ChildInfo child_info = find_child(key);
 
-    ref_type child_ref = m_children.get_as_ref(child_info.ndx);
+    ref_type child_ref = _get_child_ref(child_info.ndx);
     char* child_header = m_alloc.translate(child_ref);
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
         Cluster leaf(child_info.offset + m_offset, m_alloc, m_tree_top);
-        leaf.set_parent(&m_children, child_info.ndx);
+        leaf.set_parent(this, child_info.ndx + s_first_node_index);
         leaf.init(MemRef(child_header, child_ref, m_alloc));
         return func(&leaf, child_info);
     }
     else {
         ClusterNodeInner node(m_alloc, m_tree_top);
-        node.set_parent(&m_children, child_info.ndx);
+        node.set_parent(this, child_info.ndx + s_first_node_index);
         node.init(MemRef(child_header, child_ref, m_alloc));
         node.set_offset(child_info.offset + m_offset);
         return func(&node, child_info);
@@ -214,20 +270,30 @@ ref_type ClusterNodeInner::insert(ObjKey key, ClusterNode::State& state)
         size_t new_ref_ndx = child_info.ndx + 1;
 
         int64_t split_key_value = state.split_key + child_info.offset;
-        if (m_children.size() < REALM_MAX_BPNODE_SIZE) {
-            m_children.insert(new_ref_ndx, new_sibling_ref);
-            m_keys.insert(new_ref_ndx, split_key_value);
+        size_t sz = node_size();
+        if (sz < cluster_node_size) {
+            if (m_keys.is_attached()) {
+                m_keys.insert(new_ref_ndx, split_key_value);
+            }
+            else {
+                if (size_t(split_key_value) != sz << m_shift_factor) {
+                    ensure_general_form();
+                    m_keys.insert(new_ref_ndx, split_key_value);
+                }
+            }
+            _insert_child_ref(new_ref_ndx, new_sibling_ref);
             return ref_type(0);
         }
 
         ClusterNodeInner child(m_alloc, m_tree_top);
-        child.create();
-        if (new_ref_ndx == m_keys.size()) {
+        child.create(m_sub_tree_depth);
+        if (new_ref_ndx == sz) {
             child.add(new_sibling_ref);
             state.split_key = split_key_value;
         }
         else {
             int64_t first_key_value = m_keys.get(new_ref_ndx);
+            child.ensure_general_form();
             move(new_ref_ndx, &child, first_key_value);
             add(new_sibling_ref, split_key_value); // Throws
             state.split_key = first_key_value;
@@ -243,17 +309,19 @@ void ClusterNodeInner::get(ObjKey key, ClusterNode::State& state) const
         key, [&state](const ClusterNode* node, ChildInfo& child_info) { return node->get(child_info.key, state); });
 }
 
-unsigned ClusterNodeInner::erase(ObjKey key, CascadeState& state)
+size_t ClusterNodeInner::erase(ObjKey key, CascadeState& state)
 {
-    return recurse<unsigned>(key, [this, &state](ClusterNode* erase_node, ChildInfo& child_info) {
-        unsigned erase_node_size = erase_node->erase(child_info.key, state);
+    return recurse<size_t>(key, [this, &state](ClusterNode* erase_node, ChildInfo& child_info) {
+        size_t erase_node_size = erase_node->erase(child_info.key, state);
 
         if (erase_node_size == 0) {
             erase_node->destroy_deep();
-            m_children.erase(child_info.ndx);
+
+            ensure_general_form();
+            _erase_child_ref(child_info.ndx);
             m_keys.erase(child_info.ndx);
         }
-        else if (erase_node_size < REALM_MAX_BPNODE_SIZE / 2 && child_info.ndx < (node_size() - 1)) {
+        else if (erase_node_size < cluster_node_size / 2 && child_info.ndx < (node_size() - 1)) {
             // Candidate for merge. First calculate if the combined size of current and
             // next sibling is small enough.
             size_t sibling_ndx = child_info.ndx + 1;
@@ -261,21 +329,26 @@ unsigned ClusterNodeInner::erase(ObjKey key, CascadeState& state)
             ClusterNodeInner n2(m_alloc, m_tree_top);
             ClusterNode* sibling_node =
                 erase_node->is_leaf() ? static_cast<ClusterNode*>(&l2) : static_cast<ClusterNode*>(&n2);
-            sibling_node->set_parent(&m_children, sibling_ndx);
+            sibling_node->set_parent(this, sibling_ndx + s_first_node_index);
             sibling_node->init_from_parent();
 
-            unsigned combined_size = sibling_node->node_size() + erase_node_size;
+            size_t combined_size = sibling_node->node_size() + erase_node_size;
 
-            if (combined_size < REALM_MAX_BPNODE_SIZE * 3 / 4) {
+            if (combined_size < cluster_node_size * 3 / 4) {
                 // Calculate value that must be subtracted from the moved keys
                 // (will be negative as the sibling has bigger keys)
-                int64_t key_adj = m_keys.get(child_info.ndx) - m_keys.get(sibling_ndx);
+                int64_t key_adj = m_keys.is_attached() ? (m_keys.get(child_info.ndx) - m_keys.get(sibling_ndx))
+                                                       : 0 - (1 << m_shift_factor);
                 // And then move all elements into current node
+                sibling_node->ensure_general_form();
+                erase_node->ensure_general_form();
                 sibling_node->move(0, erase_node, key_adj);
 
                 // Destroy sibling
                 sibling_node->destroy_deep();
-                m_children.erase(sibling_ndx);
+
+                ensure_general_form();
+                _erase_child_ref(sibling_ndx);
                 m_keys.erase(sibling_ndx);
             }
         }
@@ -284,46 +357,80 @@ unsigned ClusterNodeInner::erase(ObjKey key, CascadeState& state)
     });
 }
 
+void ClusterNodeInner::ensure_general_form()
+{
+    if (!m_keys.is_attached()) {
+        size_t current_size = node_size();
+        m_keys.create(Array::type_Normal);
+        m_keys.update_parent();
+        for (size_t i = 0; i < current_size; i++) {
+            m_keys.add(i << m_shift_factor);
+        }
+    }
+}
+
 void ClusterNodeInner::insert_column(size_t ndx)
 {
-    for (size_t i = 0; i < m_children.size(); i++) {
-        ref_type child_ref = m_children.get_as_ref(i);
+    size_t sz = node_size();
+    for (size_t i = 0; i < sz; i++) {
+        ref_type child_ref = _get_child_ref(i);
         std::shared_ptr<ClusterNode> node = m_tree_top.get_node(child_ref);
-        node->set_parent(&m_children, i);
+        node->set_parent(this, i + s_first_node_index);
         node->insert_column(ndx);
     }
 }
 
 void ClusterNodeInner::remove_column(size_t ndx)
 {
-    for (size_t i = 0; i < m_children.size(); i++) {
-        ref_type child_ref = m_children.get_as_ref(i);
+    size_t sz = node_size();
+    for (size_t i = 0; i < sz; i++) {
+        ref_type child_ref = _get_child_ref(i);
         std::shared_ptr<ClusterNode> node = m_tree_top.get_node(child_ref);
-        node->set_parent(&m_children, i);
+        node->set_parent(this, i + s_first_node_index);
         node->remove_column(ndx);
     }
 }
 
 void ClusterNodeInner::add(ref_type ref, int64_t key_value)
 {
-    m_children.add(from_ref(ref));
-    m_keys.add(key_value);
+    if (m_keys.is_attached()) {
+        m_keys.add(key_value);
+    }
+    else {
+        if (size_t(key_value) != (node_size() << m_shift_factor)) {
+            ensure_general_form();
+            m_keys.add(key_value);
+        }
+    }
+    Array::add(from_ref(ref));
 }
 
 // Find leaf that contains the object identified by key. If this does not exist return the
 // leaf that contains the next object
 bool ClusterNodeInner::get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept
 {
-    size_t child_ndx = m_keys.upper_bound_int(key.value);
-    if (child_ndx > 0)
-        child_ndx--;
+    size_t child_ndx;
+    if (m_keys.is_attached()) {
+        child_ndx = m_keys.upper_bound_int(key.value);
+        if (child_ndx > 0)
+            child_ndx--;
+    }
+    else {
+        REALM_ASSERT_DEBUG(node_size() > 0);
+        size_t max_ndx = node_size() - 1;
+        if (key.value < 0)
+            child_ndx = 0;
+        else
+            child_ndx = std::min(size_t(key.value) >> m_shift_factor, max_ndx);
+    }
 
-    while (child_ndx < m_children.size()) {
-        int64_t key_offset = m_keys.get(child_ndx);
+    size_t sz = node_size();
+    while (child_ndx < sz) {
+        int64_t key_offset = m_keys.is_attached() ? m_keys.get(child_ndx) : (child_ndx << m_shift_factor);
         ObjKey new_key = ObjKey(key.value - key_offset);
         state.m_key_offset += key_offset;
 
-        ref_type child_ref = m_children.get_as_ref(child_ndx);
+        ref_type child_ref = _get_child_ref(child_ndx);
         char* child_header = m_alloc.translate(child_ref);
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
         if (child_is_leaf) {
@@ -348,24 +455,36 @@ bool ClusterNodeInner::get_leaf(ObjKey key, ClusterNode::IteratorState& state) c
 void ClusterNodeInner::dump_objects(int64_t key_offset, std::string lead) const
 {
     std::cout << lead << "node" << std::endl;
-    for (unsigned i = 0; i < m_keys.size(); i++) {
-        int64_t key_value = m_keys.get(i) + key_offset;
+    if (!m_keys.is_attached()) {
+        std::cout << lead << "compact form" << std::endl;
+    }
+    size_t sz = node_size();
+    for (unsigned i = 0; i < sz; i++) {
+        int64_t key_value;
+        if (m_keys.is_attached()) {
+            key_value = m_keys.get(i) + key_offset;
+        }
+        else {
+            key_value = (i << m_shift_factor) + key_offset;
+        }
         std::cout << lead << std::hex << "split: " << key_value << std::dec << std::endl;
-        m_tree_top.get_node(m_children.get_as_ref(i))->dump_objects(key_value, lead + "   ");
+        m_tree_top.get_node(_get_child_ref(i))->dump_objects(key_value, lead + "   ");
     }
 }
 
 void ClusterNodeInner::move(size_t ndx, ClusterNode* new_node, int64_t key_adj)
 {
     auto new_cluster_node_inner = static_cast<ClusterNodeInner*>(new_node);
-    for (size_t i = ndx; i < m_children.size(); i++) {
-        new_cluster_node_inner->m_children.add(m_children.get(i));
+    for (size_t i = ndx; i < node_size(); i++) {
+        new_cluster_node_inner->Array::add(_get_child_ref(i));
     }
     for (size_t i = ndx; i < m_keys.size(); i++) {
         new_cluster_node_inner->m_keys.add(m_keys.get(i) - key_adj);
     }
-    m_children.truncate(ndx);
-    m_keys.truncate(ndx);
+    truncate(ndx + s_first_node_index);
+    if (m_keys.is_attached()) {
+        m_keys.truncate(ndx);
+    }
 }
 
 size_t ClusterNodeInner::get_tree_size() const
@@ -382,14 +501,14 @@ size_t ClusterNodeInner::get_tree_size() const
 
 bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction func, int64_t key_offset) const
 {
-    unsigned sz = node_size();
+    auto sz = node_size();
 
     for (unsigned i = 0; i < sz; i++) {
-        ref_type ref = m_children.get_as_ref(i);
+        ref_type ref = _get_child_ref(i);
         char* header = m_alloc.translate(ref);
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
         MemRef mem(header, ref, m_alloc);
-        int64_t offs = key_offset + get_key_value(i);
+        int64_t offs = (m_keys.is_attached() ? m_keys.get(i) : i << m_shift_factor) + key_offset;
         if (child_is_leaf) {
             Cluster leaf(offs, m_alloc, m_tree_top);
             leaf.init(mem);
@@ -410,13 +529,13 @@ bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction func, int64_t key_
 
 int64_t ClusterNodeInner::get_last_key_value() const
 {
-    unsigned last_ndx = node_size() - 1;
+    auto last_ndx = node_size() - 1;
 
-    ref_type ref = m_children.get_as_ref(last_ndx);
+    ref_type ref = _get_child_ref(last_ndx);
     char* header = m_alloc.translate(ref);
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
     MemRef mem(header, ref, m_alloc);
-    int64_t offset = m_keys.get(last_ndx);
+    int64_t offset = m_keys.is_attached() ? m_keys.get(last_ndx) : last_ndx << m_shift_factor;
     if (child_is_leaf) {
         Cluster leaf(offset, m_alloc, m_tree_top);
         leaf.init(mem);
@@ -436,24 +555,23 @@ inline void Cluster::do_create(size_t col_ndx)
 {
     T arr(m_alloc);
     arr.create();
-    arr.set_parent(this, col_ndx + 1);
+    arr.set_parent(this, col_ndx + s_first_col_index);
     arr.update_parent();
 }
 
-void Cluster::create()
+void Cluster::create(int)
 {
     // Create array with the required size
     size_t nb_columns = m_tree_top.get_spec().get_column_count();
-    Array::create(type_HasRefs, false, nb_columns + 1);
-    m_keys.create(Array::type_Normal);
-    m_keys.update_parent();
+    Array::create(type_HasRefs, false, nb_columns + s_first_col_index);
+    Array::set(0, RefOrTagged::make_tagged(0));
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
         ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
 
         if (attr.test(col_attr_List)) {
             ArrayInteger arr(m_alloc);
             arr.create(type_HasRefs);
-            arr.set_parent(this, col_ndx + 1);
+            arr.set_parent(this, col_ndx + s_first_col_index);
             arr.update_parent();
 
             continue;
@@ -502,13 +620,22 @@ void Cluster::create()
 void Cluster::init(MemRef mem)
 {
     Array::init_from_mem(mem);
-    m_keys.init_from_ref(Array::get_as_ref(0));
+    auto rot = Array::get_as_ref_or_tagged(0);
+    if (rot.is_tagged()) {
+        m_keys.detach();
+    }
+    else {
+        m_keys.init_from_ref(rot.get_as_ref());
+    }
 }
 
 bool Cluster::update_from_parent(size_t old_baseline) noexcept
 {
     if (Array::update_from_parent(old_baseline)) {
-        m_keys.update_from_parent(old_baseline);
+        auto rot = Array::get_as_ref_or_tagged(0);
+        if (!rot.is_tagged()) {
+            m_keys.update_from_parent(old_baseline);
+        }
         return true;
     }
     return false;
@@ -525,13 +652,13 @@ inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, ColumnAttrMask at
 {
     if (attr.test(col_attr_List)) {
         ArrayInteger arr(m_alloc);
-        arr.set_parent(this, col_ndx + 1);
+        arr.set_parent(this, col_ndx + s_first_col_index);
         arr.init_from_parent();
         arr.insert(ndx, 0);
     }
     else {
         T arr(m_alloc);
-        arr.set_parent(this, col_ndx + 1);
+        arr.set_parent(this, col_ndx + s_first_col_index);
         arr.init_from_parent();
         arr.insert(ndx, T::default_value(attr.test(col_attr_Nullable)));
     }
@@ -539,7 +666,13 @@ inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, ColumnAttrMask at
 
 void Cluster::insert_row(size_t ndx, ObjKey k)
 {
-    m_keys.insert(ndx, k.value);
+    if (m_keys.is_attached()) {
+        m_keys.insert(ndx, k.value);
+    }
+    else {
+        Array::set(s_key_ref_or_size_index, Array::get(s_key_ref_or_size_index) + 2); // Increments size by 1
+    }
+
     size_t nb_columns = size() - 1;
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
         ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
@@ -595,11 +728,11 @@ inline void Cluster::do_move(size_t ndx, size_t col_ndx, Cluster* to)
 {
     size_t end = node_size();
     T src(m_alloc);
-    src.set_parent(this, col_ndx + 1);
+    src.set_parent(this, col_ndx + s_first_col_index);
     src.init_from_parent();
 
     T dst(m_alloc);
-    dst.set_parent(to, col_ndx + 1);
+    dst.set_parent(to, col_ndx + s_first_col_index);
     dst.init_from_parent();
 
     for (size_t j = ndx; j < end; j++) {
@@ -671,6 +804,18 @@ Cluster::~Cluster()
 {
 }
 
+void Cluster::ensure_general_form()
+{
+    if (!m_keys.is_attached()) {
+        int64_t current_size = get_size_in_compact_form();
+        m_keys.create(Array::type_Normal);
+        m_keys.update_parent();
+        for (int64_t i = 0; i < current_size; i++) {
+            m_keys.add(i);
+        }
+    }
+}
+
 template <class T>
 inline void Cluster::do_insert_column(size_t col_ndx, bool nullable)
 {
@@ -682,7 +827,7 @@ inline void Cluster::do_insert_column(size_t col_ndx, bool nullable)
     for (size_t i = 0; i < sz; i++) {
         arr.add(val);
     }
-    Array::insert(col_ndx + 1, from_ref(arr.get_ref()));
+    Array::insert(col_ndx + s_first_col_index, from_ref(arr.get_ref()));
 }
 
 void Cluster::insert_column(size_t col_ndx)
@@ -692,11 +837,8 @@ void Cluster::insert_column(size_t col_ndx)
         size_t sz = node_size();
 
         ArrayInteger arr(m_alloc);
-        arr.create(type_HasRefs);
-        for (size_t i = 0; i < sz; i++) {
-            arr.add(0);
-        }
-        Array::insert(col_ndx + 1, from_ref(arr.get_ref()));
+        arr.Array::create(type_HasRefs, false, sz, 0);
+        Array::insert(col_ndx + s_first_col_index, from_ref(arr.get_ref()));
         return;
     }
     bool nullable = attr.test(col_attr_Nullable);
@@ -754,19 +896,35 @@ void Cluster::remove_column(size_t col_ndx)
 ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
 {
     int64_t current_key_value = -1;
-    size_t ndx = m_keys.lower_bound_int(k.value);
-    size_t sz = node_size();
-    if (ndx < sz) {
-        current_key_value = m_keys.get(ndx);
-        if (k.value == current_key_value) {
+    size_t sz;
+    size_t ndx;
+
+    if (m_keys.is_attached()) {
+        sz = m_keys.size();
+        ndx = m_keys.lower_bound_int(k.value);
+        if (ndx < sz) {
+            current_key_value = m_keys.get(ndx);
+            if (k.value == current_key_value) {
+                throw InvalidKey("Key already used");
+            }
+        }
+    }
+    else {
+        sz = size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged integer
+        if (size_t(k.value) < sz) {
             throw InvalidKey("Key already used");
+        }
+        // Key value is bigger than all other values, should be put last
+        ndx = sz;
+        if (size_t(k.value) > sz) {
+            ensure_general_form();
         }
     }
 
     ref_type ret = 0;
 
-    REALM_ASSERT_DEBUG(sz <= REALM_MAX_BPNODE_SIZE);
-    if (REALM_LIKELY(sz < REALM_MAX_BPNODE_SIZE)) {
+    REALM_ASSERT_DEBUG(sz <= cluster_node_size);
+    if (REALM_LIKELY(sz < cluster_node_size)) {
         insert_row(ndx, k); // Throws
         state.ref = get_ref();
         state.index = ndx;
@@ -782,6 +940,9 @@ ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
             state.index = 0;
         }
         else {
+            // Current cluster must be in general form to get here
+            REALM_ASSERT_DEBUG(m_keys.is_attached());
+            new_leaf.ensure_general_form();
             move(ndx, &new_leaf, current_key_value);
             insert_row(ndx, k); // Throws
             state.ref = get_ref();
@@ -797,9 +958,17 @@ ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
 void Cluster::get(ObjKey k, ClusterNode::State& state) const
 {
     state.ref = get_ref();
-    state.index = m_keys.lower_bound_int(k.value);
-    if (state.index == m_keys.size() || m_keys.get(state.index) != k.value) {
-        throw InvalidKey("Key not found");
+    if (m_keys.is_attached()) {
+        state.index = m_keys.lower_bound_int(k.value);
+        if (state.index == m_keys.size() || m_keys.get(state.index) != k.value) {
+            throw InvalidKey("Key not found");
+        }
+    }
+    else {
+        state.index = size_t(k.value);
+        if (state.index >= get_as_ref_or_tagged(0).get_as_int()) {
+            throw InvalidKey("Key not found");
+        }
     }
 }
 
@@ -807,7 +976,7 @@ template <class T>
 inline void Cluster::do_erase(size_t ndx, size_t col_ndx)
 {
     T values(m_alloc);
-    values.set_parent(this, col_ndx + 1);
+    values.set_parent(this, col_ndx + s_first_col_index);
     values.init_from_parent();
     values.erase(ndx);
 }
@@ -815,7 +984,7 @@ inline void Cluster::do_erase(size_t ndx, size_t col_ndx)
 inline void Cluster::do_erase_key(size_t ndx, size_t col_ndx, CascadeState& state)
 {
     ArrayKey values(m_alloc);
-    values.set_parent(this, col_ndx + 1);
+    values.set_parent(this, col_ndx + s_first_col_index);
     values.init_from_parent();
 
     ObjKey key = values.get(ndx);
@@ -825,11 +994,20 @@ inline void Cluster::do_erase_key(size_t ndx, size_t col_ndx, CascadeState& stat
     values.erase(ndx);
 }
 
-unsigned Cluster::erase(ObjKey key, CascadeState& state)
+size_t Cluster::erase(ObjKey key, CascadeState& state)
 {
-    size_t ndx = m_keys.lower_bound_int(key.value);
-    if (ndx == m_keys.size() || m_keys.get(ndx) != key.value) {
-        throw InvalidKey("Key not found");
+    size_t ndx;
+    if (m_keys.is_attached()) {
+        ndx = m_keys.lower_bound_int(key.value);
+        if (ndx == m_keys.size() || m_keys.get(ndx) != key.value) {
+            throw InvalidKey("Key not found");
+        }
+    }
+    else {
+        ndx = size_t(key.value);
+        if (ndx >= get_as_ref_or_tagged(0).get_as_int()) {
+            throw InvalidKey("Key not found");
+        }
     }
 
     const Spec& spec = m_tree_top.get_spec();
@@ -848,7 +1026,7 @@ unsigned Cluster::erase(ObjKey key, CascadeState& state)
     for (size_t col_ndx = num_cols - 1; col_ndx >= num_public_cols; --col_ndx) {
         REALM_ASSERT(spec.get_column_type(col_ndx) == col_type_BackLink);
         ArrayBacklink values(m_alloc);
-        values.set_parent(this, col_ndx + 1);
+        values.set_parent(this, col_ndx + s_first_col_index);
         values.init_from_parent();
         values.nullify_fwd_links(ndx, state);
     }
@@ -858,7 +1036,7 @@ unsigned Cluster::erase(ObjKey key, CascadeState& state)
         ColumnAttrMask attr = spec.get_column_attr(col_ndx);
         if (attr.test(col_attr_List)) {
             ArrayInteger values(m_alloc);
-            values.set_parent(this, col_ndx + 1);
+            values.set_parent(this, col_ndx + s_first_col_index);
             values.init_from_parent();
             ref_type ref = values.get_as_ref(ndx);
 
@@ -918,7 +1096,20 @@ unsigned Cluster::erase(ObjKey key, CascadeState& state)
         }
     }
 
-    m_keys.erase(ndx);
+    if (m_keys.is_attached()) {
+        m_keys.erase(ndx);
+    }
+    else {
+        size_t current_size = get_size_in_compact_form();
+        if (ndx == current_size - 1) {
+            // When deleting last, we can still maintain compact form
+            set(0, RefOrTagged::make_tagged(current_size - 1));
+        }
+        else {
+            ensure_general_form();
+            m_keys.erase(ndx);
+        }
+    }
 
     return node_size();
 }
@@ -926,8 +1117,18 @@ unsigned Cluster::erase(ObjKey key, CascadeState& state)
 void Cluster::dump_objects(int64_t key_offset, std::string lead) const
 {
     std::cout << lead << "leaf - size: " << node_size() << std::endl;
+    if (!m_keys.is_attached()) {
+        std::cout << lead << "compact form" << std::endl;
+    }
     for (unsigned i = 0; i < node_size(); i++) {
-        std::cout << lead << "key: " << std::hex << m_keys.get(i) + key_offset << std::dec;
+        int64_t key_value;
+        if (m_keys.is_attached()) {
+            key_value = m_keys.get(i);
+        }
+        else {
+            key_value = int64_t(i);
+        }
+        std::cout << lead << "key: " << std::hex << key_value + key_offset << std::dec;
         for (size_t j = 1; j < size(); j++) {
             switch (m_tree_top.get_spec().get_column_type(j - 1)) {
                 case col_type_Int: {
@@ -1063,10 +1264,7 @@ MemRef ClusterTree::create_empty_cluster(Allocator& alloc)
     Array arr(alloc);
     arr.create(Array::type_HasRefs); // Throws
 
-    {
-        MemRef mem = Array::create_empty_array(Array::type_Normal, false, alloc); // Throws
-        arr.add(from_ref(mem.get_ref()));                                         // Throws
-    }
+    arr.add(RefOrTagged::make_tagged(0)); // Compact form
     return arr.get_mem();
 }
 
@@ -1174,7 +1372,7 @@ void ClusterTree::clear()
 
     m_root->destroy_deep();
 
-    std::unique_ptr<ClusterNode> leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
+    auto leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
     leaf->create();
     replace_root(std::move(leaf));
     m_size = 0;
@@ -1186,7 +1384,7 @@ Obj ClusterTree::insert(ObjKey k)
     ref_type new_sibling_ref = m_root->insert(k, state);
     if (REALM_UNLIKELY(new_sibling_ref)) {
         auto new_root = std::make_unique<ClusterNodeInner>(m_root->get_alloc(), *this);
-        new_root->create();
+        new_root->create(m_root->get_sub_tree_depth() + 1);
 
         new_root->add(m_root->get_ref());                // Throws
         new_root->add(new_sibling_ref, state.split_key); // Throws
@@ -1264,7 +1462,7 @@ void ClusterTree::erase(ObjKey k, CascadeState& state)
         }
     }
 
-    unsigned root_size = m_root->erase(k, state);
+    size_t root_size = m_root->erase(k, state);
 
     if (Replication* repl = get_alloc().get_replication()) {
         repl->remove_object(get_owner(), k);
@@ -1384,7 +1582,7 @@ void ClusterTree::remove_links()
             else if (col_type == col_type_BackLink) {
                 ArrayBacklink values(alloc);
                 cluster->init_leaf(col_ndx, &values);
-                values.set_parent(const_cast<Cluster*>(cluster), col_ndx + 1);
+                values.set_parent(const_cast<Cluster*>(cluster), col_ndx + Cluster::s_first_col_index);
                 size_t sz = values.size();
                 for (size_t i = 0; i < sz; i++) {
                     values.nullify_fwd_links(i, state);
