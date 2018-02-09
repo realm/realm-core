@@ -2093,6 +2093,16 @@ TEST(Parser_AggregateShortcuts)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "NONE fav_item.name == 'milk'", 1), message);
     CHECK_EQUAL(message, "The keypath following 'NONE' must contain a list");
 
+    // multiple lists in path should throw
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ANY items.allergens.name == 'dairy'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain only one list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SOME items.allergens.name == 'dairy'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain only one list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ALL items.allergens.name == 'dairy'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ALL' must contain only one list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "NONE items.allergens.name == 'dairy'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'NONE' must contain only one list");
+
     // the expression following ANY/SOME/ALL/NONE must be a keypath list
     // currently this is restricted by the parser syntax so it is a predicate error
     CHECK_THROW_ANY(verify_query(test_context, t, "ANY 'milk' == fav_item.name", 1));
@@ -2101,4 +2111,86 @@ TEST(Parser_AggregateShortcuts)
     CHECK_THROW_ANY(verify_query(test_context, t, "NONE 'milk' == fav_item.name", 1));
 }
 
+
+TEST(Parser_OperatorIN)
+{
+    Group g;
+
+    TableRef ingredients = g.add_table("class_Allergens");
+    size_t ingredient_name_col = ingredients->add_column(type_String, "name");
+    size_t population_col = ingredients->add_column(type_Double, "population_affected");
+    std::vector<std::pair<std::string, double>> ingredients_list = { {"dairy", 0.75}, {"nuts", 0.01}, {"wheat", 0.01}, {"soy", 0.005} };
+    for (size_t i = 0; i < ingredients_list.size(); ++i) {
+        size_t row_ndx = ingredients->add_empty_row();
+        ingredients->set_string(ingredient_name_col, row_ndx, ingredients_list[i].first);
+        ingredients->set_double(population_col, row_ndx, ingredients_list[i].second);
+    }
+
+    TableRef items = g.add_table("class_Items");
+    size_t item_name_col = items->add_column(type_String, "name");
+    size_t item_price_col = items->add_column(type_Double, "price", true);
+    size_t item_contains_col = items->add_column_link(type_LinkList, "allergens", *ingredients);
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    for (item_t i : item_info) {
+        size_t row_ndx = items->add_empty_row();
+        items->set_string(item_name_col, row_ndx, i.first);
+        items->set_double(item_price_col, row_ndx, i.second);
+    }
+    LinkViewRef milk_contains = items->get_linklist(item_contains_col, 0);
+    milk_contains->add(0);
+    LinkViewRef pizza_contains = items->get_linklist(item_contains_col, 2);
+    pizza_contains->add(0);
+    pizza_contains->add(2);
+    pizza_contains->add(3);
+    LinkViewRef cereal_contains = items->get_linklist(item_contains_col, 3);
+    cereal_contains->add(0);
+    cereal_contains->add(1);
+    cereal_contains->add(2);
+
+    TableRef t = g.add_table("class_Person");
+    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
+    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
+    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
+    size_t fav_col_ndx = t->add_column_link(type_Link, "fav_item", *items);
+    t->add_empty_row(3);
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(id_col_ndx, i, i);
+        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
+        t->set_link(fav_col_ndx, i, i);
+    }
+
+    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
+    list_0->add(0);
+    list_0->add(1);
+    list_0->add(2);
+    list_0->add(3);
+
+    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1->add(0);
+    }
+
+    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
+    list_2->add(2);
+    list_2->add(2);
+    list_2->add(3);
+
+    verify_query(test_context, t, "5.5 IN items.price", 2);
+    verify_query(test_context, t, "!(5.5 IN items.price)", 1);              // group not
+    verify_query(test_context, t, "'milk' IN items.name", 2);               // string compare
+    verify_query(test_context, t, "'MiLk' IN[c] items.name", 2);            // string compare with insensitivity
+    verify_query(test_context, t, "NULL IN items.price", 0);                // null
+    verify_query(test_context, t, "'dairy' IN fav_item.allergens.name", 2); // through link prefix
+    verify_query(test_context, items, "20 IN @links.class_Person.items.account_balance", 1);        // backlinks
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price IN 5.5", 1), message);
+    CHECK_EQUAL(message, "The expression following 'IN' must be a keypath to a list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "5.5 in fav_item.price", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'IN' must contain a list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "'dairy' in items.allergens.name", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'IN' must contain only one list");
+
+}
 #endif // TEST_PARSER

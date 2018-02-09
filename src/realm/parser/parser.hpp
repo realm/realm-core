@@ -66,7 +66,8 @@ struct Predicate
         BeginsWith,
         EndsWith,
         Contains,
-        Like
+        Like,
+        In
     };
 
     enum class OperatorOption

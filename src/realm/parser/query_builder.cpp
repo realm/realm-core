@@ -56,6 +56,8 @@ void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const
         case Predicate::Operator::NotEqual:
             query.and_query(column != realm::null());
             break;
+        case Predicate::Operator::In:
+            REALM_FALLTHROUGH;
         case Predicate::Operator::Equal:
             query.and_query(column == realm::null());
             break;
@@ -71,6 +73,8 @@ void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op,
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
+            REALM_FALLTHROUGH;
+        case Predicate::Operator::In:
             REALM_FALLTHROUGH;
         case Predicate::Operator::Equal:
             query.and_query(query.get_table()->column<Link>(expr.get_dest_ndx()).is_null());
@@ -100,6 +104,8 @@ void add_numeric_constraint_to_query(Query& query,
         case Predicate::Operator::GreaterThanOrEqual:
             query.and_query(lhs >= rhs);
             break;
+        case Predicate::Operator::In:
+            REALM_FALLTHROUGH;
         case Predicate::Operator::Equal:
             query.and_query(lhs == rhs);
             break;
@@ -114,6 +120,8 @@ void add_numeric_constraint_to_query(Query& query,
 template <typename A, typename B>
 void add_bool_constraint_to_query(Query &query, Predicate::Operator operatorType, A lhs, B rhs) {
     switch (operatorType) {
+        case Predicate::Operator::In:
+            REALM_FALLTHROUGH;
         case Predicate::Operator::Equal:
             query.and_query(lhs == rhs);
             break;
@@ -160,6 +168,8 @@ void add_string_constraint_to_query(realm::Query &query,
                                     Columns<String> &&column) {
     bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
     switch (cmp.op) {
+        case Predicate::Operator::In:
+            REALM_FALLTHROUGH;
         case Predicate::Operator::Equal:
             query.and_query(column.equal(value, case_sensitive));
             break;
@@ -236,6 +246,8 @@ void add_binary_constraint_to_query(realm::Query &query,
                                     BinaryData &&value,
                                     Columns<Binary> &&column) {
     switch (cmp.op) {
+        case Predicate::Operator::In:
+            REALM_FALLTHROUGH;
         case Predicate::Operator::Equal:
             query.and_query(column == value);
             break;
@@ -292,6 +304,8 @@ void add_link_constraint_to_query(realm::Query &query,
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
+            REALM_FALLTHROUGH;
+        case Predicate::Operator::In:
             REALM_FALLTHROUGH;
         case Predicate::Operator::Equal: {
             size_t col = prop_expr.get_dest_ndx();
@@ -574,15 +588,16 @@ void preprocess_for_comparison_types(Query &query, Predicate::Comparison &cmpr, 
         realm_precondition(lhs.type == ExpressionContainer::ExpressionInternal::exp_Property,
                            util::format("The expression after %1 must be a keypath containing a list",
                                         get_cmp_type_name()));
-        bool found_some_list = false;
+        size_t list_count = 0;
         for (KeyPathElement e : lhs.get_property().link_chain) {
             if (e.col_type == type_LinkList || e.is_backlink) {
-                found_some_list = true;
-                break;
+                list_count++;
             }
         }
-        realm_precondition(found_some_list, util::format("The keypath following %1 must contain a list",
+        realm_precondition(list_count > 0, util::format("The keypath following %1 must contain a list",
                                                          get_cmp_type_name()));
+        realm_precondition(list_count == 1, util::format("The keypath following %1 must contain only one list",
+                                                        get_cmp_type_name()));
     }
 
     if (cmpr.compare_type == Predicate::ComparisonType::All || cmpr.compare_type == Predicate::ComparisonType::None) {
@@ -622,6 +637,20 @@ void preprocess_for_comparison_types(Query &query, Predicate::Comparison &cmpr, 
         } else {
             REALM_UNREACHABLE();
         }
+    }
+
+    // Check that operator "IN" has a RHS keypath which is a list
+    if (cmpr.op == Predicate::Operator::In) {
+        realm_precondition(rhs.type == ExpressionContainer::ExpressionInternal::exp_Property,
+                           "The expression following 'IN' must be a keypath to a list");
+        size_t list_count = 0;
+        for (KeyPathElement e : rhs.get_property().link_chain) {
+            if (e.col_type == type_LinkList || e.is_backlink) {
+                list_count++;
+            }
+        }
+        realm_precondition(list_count > 0, "The keypath following 'IN' must contain a list");
+        realm_precondition(list_count == 1, "The keypath following 'IN' must contain only one list");
     }
 }
 

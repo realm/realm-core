@@ -130,8 +130,9 @@ struct agg_shortcut_pred : sor< agg_any, agg_all, agg_none > {};
 struct expr : sor< dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, base64, collection_operator_match, subquery, key_path > {};
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
 
-struct eq : seq< sor< two< '=' >, one< '=' >, string_token_t("in") >, star< blank >, opt< case_insensitive > >{};
+struct eq : seq< sor< two< '=' >, one< '=' > >, star< blank >, opt< case_insensitive > >{};
 struct noteq : seq< sor< tao::pegtl::string< '!', '=' >, tao::pegtl::string< '<', '>' > >, star< blank >, opt< case_insensitive > > {};
+struct in: seq< string_token_t("in"), star< blank >, opt< case_insensitive > >{};
 struct lteq : sor< tao::pegtl::string< '<', '=' >, tao::pegtl::string< '=', '<' > > {};
 struct lt : one< '<' > {};
 struct gteq : sor< tao::pegtl::string< '>', '=' >, tao::pegtl::string< '=', '>' > > {};
@@ -154,7 +155,7 @@ struct descriptor_ordering : sor< sort, distinct > {};
 
 struct string_oper : seq< sor< contains, begins, ends, like>, star< blank >, opt< case_insensitive > > {};
 // "=" is equality and since other operators can start with "=" we must check equal last
-struct symbolic_oper : sor< noteq, lteq, lt, gteq, gt, eq > {};
+struct symbolic_oper : sor< noteq, lteq, lt, gteq, gt, eq, in > {};
 
 // predicates
 struct comparison_pred : seq< expr, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
@@ -305,17 +306,11 @@ struct ParserState
 template< typename Rule >
 struct action : nothing< Rule > {};
 
-//#ifdef REALM_PARSER_PRINT_TOKENS
-//#if 1
-//    #define DEBUG_PRINT_TOKEN(string) do { std::cout << string << std::endl; } while (0)
-//#else
-//    #define DEBUG_PRINT_TOKEN(string) do { static_cast<void>(string); } while (0)
-//#endif
-
-void DEBUG_PRINT_TOKEN(std::string s)
-{
-    //std::cout << s << std::endl;
-}
+#ifdef REALM_PARSER_PRINT_TOKENS
+    #define DEBUG_PRINT_TOKEN(string) do { std::cout << string << std::endl; } while (0)
+#else
+    #define DEBUG_PRINT_TOKEN(string) do { static_cast<void>(string); } while (0)
+#endif
 
 template<> struct action< and_op >
 {
@@ -610,6 +605,7 @@ template<> struct action< rule > {                                  \
 
 OPERATOR_ACTION(eq, Predicate::Operator::Equal)
 OPERATOR_ACTION(noteq, Predicate::Operator::NotEqual)
+OPERATOR_ACTION(in, Predicate::Operator::In)
 OPERATOR_ACTION(gteq, Predicate::Operator::GreaterThanOrEqual)
 OPERATOR_ACTION(gt, Predicate::Operator::GreaterThan)
 OPERATOR_ACTION(lteq, Predicate::Operator::LessThanOrEqual)
