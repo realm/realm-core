@@ -3371,12 +3371,12 @@ TEST(Table_object_forward_iterator)
         table.create_object(ObjKey(i));
     }
 
-    int tree_size = 0;
+    size_t tree_size = 0;
     table.traverse_clusters([&tree_size](const Cluster* cluster) {
         tree_size += cluster->node_size();
         return false;
     });
-    CHECK_EQUAL(tree_size, nb_rows);
+    CHECK_EQUAL(tree_size, size_t(nb_rows));
 
     for (Obj o : table) {
         int64_t key_value = o.get_key().value;

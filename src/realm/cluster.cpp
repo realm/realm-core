@@ -77,7 +77,7 @@ public:
         return false;
     }
 
-    int64_t get_sub_tree_depth() const override
+    int get_sub_tree_depth() const override
     {
         return m_sub_tree_depth;
     }

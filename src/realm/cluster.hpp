@@ -139,7 +139,7 @@ public:
 
     virtual bool update_from_parent(size_t old_baseline) noexcept = 0;
     virtual bool is_leaf() const = 0;
-    virtual int64_t get_sub_tree_depth() const = 0;
+    virtual int get_sub_tree_depth() const = 0;
     virtual size_t node_size() const = 0;
     /// Number of elements in this subtree
     virtual size_t get_tree_size() const = 0;
@@ -217,7 +217,7 @@ public:
     {
         return true;
     }
-    int64_t get_sub_tree_depth() const override
+    int get_sub_tree_depth() const override
     {
         return 0;
     }
