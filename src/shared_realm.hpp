@@ -51,9 +51,9 @@ typedef std::weak_ptr<Realm> WeakRealm;
 namespace _impl {
     class AnyHandover;
     class CollectionNotifier;
+    class PartialSyncHelper;
     class RealmCoordinator;
     class RealmFriend;
-    struct RowHandover;
 }
 
 // How to handle update_schema() being called on a file which has
@@ -314,11 +314,11 @@ public:
     // without making it public to everyone
     class Internal {
         friend class _impl::CollectionNotifier;
+        friend class _impl::PartialSyncHelper;
         friend class _impl::RealmCoordinator;
         friend class ThreadSafeReferenceBase;
         friend class GlobalNotifier;
         friend class TestHelper;
-        friend struct _impl::RowHandover;
 
         // ResultsNotifier and ListNotifier need access to the SharedGroup
         // to be able to call the handover functions, which are not very wrappable

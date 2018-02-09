@@ -106,9 +106,24 @@ private:
     SharedGroup* m_shared_group;
 };
 
+// Provides a convenient way for code in this file to access private details of `Realm`
+// without having to add friend declarations for each individual use.
+class PartialSyncHelper {
+public:
+    static decltype(auto) get_shared_group(Realm& realm)
+    {
+        return Realm::Internal::get_shared_group(realm);
+    }
+
+    static decltype(auto) get_coordinator(Realm& realm)
+    {
+        return Realm::Internal::get_coordinator(realm);
+    }
+};
+
 struct RowHandover {
     RowHandover(Realm& realm, Row row)
-    : source_shared_group(*Realm::Internal::get_shared_group(realm))
+    : source_shared_group(*PartialSyncHelper::get_shared_group(realm))
     , row(source_shared_group.export_for_handover(std::move(row)))
     , version(source_shared_group.pin_version())
     {
@@ -213,7 +228,7 @@ void enqueue_registration(Realm& realm, std::string object_type, std::string que
 {
     auto config = realm.config();
 
-    auto& work_queue = _impl::RealmCoordinator::get_coordinator(config)->partial_sync_work_queue();
+    auto& work_queue = _impl::PartialSyncHelper::get_coordinator(realm).partial_sync_work_queue();
     work_queue.enqueue([object_type=std::move(object_type), query=std::move(query), name=std::move(name),
                         callback=std::move(callback), config=std::move(config)] {
         try {
@@ -255,7 +270,7 @@ void enqueue_unregistration(Object result_set, std::function<void()> callback)
 {
     auto realm = result_set.realm();
     auto config = realm->config();
-    auto& work_queue = _impl::RealmCoordinator::get_coordinator(config)->partial_sync_work_queue();
+    auto& work_queue = _impl::PartialSyncHelper::get_coordinator(*realm).partial_sync_work_queue();
 
     // Export a reference to the __ResultSets row so we can hand it to the worker thread.
     // We store it in a shared_ptr as it would otherwise prevent the lambda from being copyable,
@@ -371,7 +386,7 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
 
     Notifier(std::shared_ptr<Realm> realm)
     : _impl::CollectionNotifier(std::move(realm))
-    , m_coordinator(_impl::RealmCoordinator::get_coordinator(get_realm()->config()).get())
+    , m_coordinator(&_impl::PartialSyncHelper::get_coordinator(*get_realm()))
     {
     }
 
