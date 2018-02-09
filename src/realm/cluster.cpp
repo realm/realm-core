@@ -67,7 +67,7 @@ public:
     ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top);
     ~ClusterNodeInner() override;
 
-    void create(int64_t sub_tree_depth) override;
+    void create(int sub_tree_depth) override;
     void init(MemRef mem) override;
     bool update_from_parent(size_t old_baseline) noexcept override;
     MemRef ensure_writeable(ObjKey k) override;
@@ -122,8 +122,8 @@ private:
     static constexpr size_t s_sub_tree_depth_index = 1;
     static constexpr size_t s_first_node_index = 2;
 
-    int64_t m_sub_tree_depth = 0;
-    size_t m_shift_factor = 0;
+    int m_sub_tree_depth = 0;
+    int m_shift_factor = 0;
 
     struct ChildInfo {
         size_t ndx;
@@ -145,8 +145,8 @@ private:
         else {
             size_t sz = node_size();
             REALM_ASSERT_DEBUG(sz > 0);
-            int64_t max_ndx = sz - 1;
-            ret.ndx = std::min(key.value >> m_shift_factor, max_ndx);
+            size_t max_ndx = sz - 1;
+            ret.ndx = std::min(size_t(key.value) >> m_shift_factor, max_ndx);
             ret.offset = ret.ndx << m_shift_factor;
             ret.key = ObjKey(key.value - ret.offset);
         }
@@ -190,7 +190,7 @@ ClusterNodeInner::~ClusterNodeInner()
 {
 }
 
-void ClusterNodeInner::create(int64_t sub_tree_depth)
+void ClusterNodeInner::create(int sub_tree_depth)
 {
     Array::create(Array::type_InnerBptreeNode, false, s_first_node_index);
 
@@ -212,7 +212,7 @@ void ClusterNodeInner::init(MemRef mem)
     else {
         m_keys.detach();
     }
-    m_sub_tree_depth = Array::get(s_sub_tree_depth_index) >> 1;
+    m_sub_tree_depth = int(Array::get(s_sub_tree_depth_index)) >> 1;
     m_shift_factor = m_sub_tree_depth * node_shift_factor;
 }
 
@@ -223,7 +223,7 @@ bool ClusterNodeInner::update_from_parent(size_t old_baseline) noexcept
         if (ref) {
             m_keys.update_from_parent(old_baseline);
         }
-        m_sub_tree_depth = Array::get(s_sub_tree_depth_index) >> 1;
+        m_sub_tree_depth = int(Array::get(s_sub_tree_depth_index)) >> 1;
         return true;
     }
     return false;
@@ -417,11 +417,11 @@ bool ClusterNodeInner::get_leaf(ObjKey key, ClusterNode::IteratorState& state) c
     }
     else {
         REALM_ASSERT_DEBUG(node_size() > 0);
-        int64_t max_ndx = int64_t(node_size()) - 1;
+        size_t max_ndx = node_size() - 1;
         if (key.value < 0)
             child_ndx = 0;
         else
-            child_ndx = std::min(key.value >> m_shift_factor, max_ndx);
+            child_ndx = std::min(size_t(key.value) >> m_shift_factor, max_ndx);
     }
 
     size_t sz = node_size();
@@ -559,7 +559,7 @@ inline void Cluster::do_create(size_t col_ndx)
     arr.update_parent();
 }
 
-void Cluster::create(int64_t)
+void Cluster::create(int)
 {
     // Create array with the required size
     size_t nb_columns = m_tree_top.get_spec().get_column_count();
@@ -910,7 +910,7 @@ ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
         }
     }
     else {
-        sz = Array::get(s_key_ref_or_size_index) >> 1; // Size is stored as tagged integer
+        sz = size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged integer
         if (size_t(k.value) < sz) {
             throw InvalidKey("Key already used");
         }
@@ -965,7 +965,7 @@ void Cluster::get(ObjKey k, ClusterNode::State& state) const
         }
     }
     else {
-        state.index = k.value;
+        state.index = size_t(k.value);
         if (state.index >= get_as_ref_or_tagged(0).get_as_int()) {
             throw InvalidKey("Key not found");
         }
@@ -1004,7 +1004,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         }
     }
     else {
-        ndx = key.value;
+        ndx = size_t(key.value);
         if (ndx >= get_as_ref_or_tagged(0).get_as_int()) {
             throw InvalidKey("Key not found");
         }

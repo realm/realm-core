@@ -148,7 +148,7 @@ public:
     virtual void ensure_general_form() = 0;
 
     /// Create an empty node
-    virtual void create(int64_t sub_tree_depth) = 0;
+    virtual void create(int sub_tree_depth) = 0;
     /// Initialize node from 'mem'
     virtual void init(MemRef mem) = 0;
     /// Descend the tree from the root and copy-on-write the leaf
@@ -204,7 +204,7 @@ public:
     }
     ~Cluster() override;
 
-    void create(int64_t = 0) override;
+    void create(int = 0) override;
     void init(MemRef mem) override;
     bool update_from_parent(size_t old_baseline) noexcept override;
     bool is_writeable() const
@@ -243,10 +243,10 @@ public:
             return m_keys.lower_bound_int(key.value);
         }
         else {
-            int64_t sz = Array::get(0) >> 1;
+            size_t sz = size_t(Array::get(0)) >> 1;
             if (key.value < 0)
                 return 0;
-            if (key.value > sz)
+            if (size_t(key.value) > sz)
                 return sz;
         }
         return size_t(key.value);
