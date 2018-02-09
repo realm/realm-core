@@ -33,6 +33,12 @@ using namespace tao::pegtl;
 namespace realm {
 namespace parser {
 
+// forward declarations
+struct expr;
+struct string_oper;
+struct symbolic_oper;
+struct pred;
+
 // strings
 struct unicode : list< seq< one< 'u' >, rep< 4, must< xdigit > > >, one< '\\' > > {};
 struct escaped_char : one< '"', '\'', '\\', '/', 'b', 'f', 'n', 'r', 't', '0' > {};
@@ -103,7 +109,6 @@ struct collection_operator_match : sor< seq< key_path_prefix, key_collection_ope
 struct argument_index : plus< digit > {};
 struct argument : seq< one< '$' >, argument_index > {};
 
-struct pred;
 // subquery eg: SUBQUERY(items, $x, $x.name CONTAINS 'a' && $x.price > 5).@count
 struct subq_prefix : seq< string_token_t("subquery"), star< blank >, one< '(' > > {};
 struct subq_suffix : one< ')' > {};
@@ -113,11 +118,19 @@ struct sub_result_op : sor< count, size > {};
 struct sub_preamble : seq< subq_prefix, pad< sub_path, blank >, one< ',' >, pad< sub_var_name, blank >, one< ',' > > {};
 struct subquery :  seq< sub_preamble, pad< pred, blank >, pad< subq_suffix, blank >, sub_result_op > {};
 
+// list aggregate operations
+struct agg_target : seq< key_path > {};
+struct agg_any : seq< sor< string_token_t("any"), string_token_t("some") >, plus<blank>, agg_target, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
+struct agg_all : seq< string_token_t("all"), plus<blank>, agg_target, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
+struct agg_none : seq< string_token_t("none"), plus<blank>, agg_target, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
+//struct agg_in : seq< pad< expr, blank>, string_token_t("in"), plus< blank >, agg_target > {};
+struct agg_shortcut_pred : sor< agg_any, agg_all, agg_none > {};
+
 // expressions and operators
 struct expr : sor< dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, base64, collection_operator_match, subquery, key_path > {};
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
 
-struct eq : seq< sor< two< '=' >, one< '=' > >, star< blank >, opt< case_insensitive > >{};
+struct eq : seq< sor< two< '=' >, one< '=' >, string_token_t("in") >, star< blank >, opt< case_insensitive > >{};
 struct noteq : seq< sor< tao::pegtl::string< '!', '=' >, tao::pegtl::string< '<', '>' > >, star< blank >, opt< case_insensitive > > {};
 struct lteq : sor< tao::pegtl::string< '<', '=' >, tao::pegtl::string< '=', '<' > > {};
 struct lt : one< '<' > {};
@@ -156,7 +169,7 @@ struct true_pred : string_token_t("truepredicate") {};
 struct false_pred : string_token_t("falsepredicate") {};
 
 struct not_pre : seq< sor< one< '!' >, string_token_t("not") > > {};
-struct atom_pred : seq< opt< not_pre >, pad< sor< group_pred, true_pred, false_pred, comparison_pred >, blank >, star< pad< descriptor_ordering, blank > > > {};
+struct atom_pred : seq< opt< not_pre >, pad< sor<group_pred, true_pred, false_pred, agg_shortcut_pred, comparison_pred>, blank >, star< pad< descriptor_ordering, blank > > > {};
 
 struct and_op : pad< sor< two< '&' >, string_token_t("and") >, blank > {};
 struct or_op : pad< sor< two< '|' >, string_token_t("or") >, blank > {};
@@ -178,6 +191,7 @@ struct ParserState
     DescriptorOrderingState::SingleOrderingState temp_ordering;
     std::string subquery_path, subquery_var;
     std::vector<Predicate> subqueries;
+    Predicate::ComparisonType pending_comparison_type;
 
     Predicate *current_group()
     {
@@ -218,6 +232,12 @@ struct ParserState
         collection_key_path_prefix = "";
         collection_key_path_suffix = "";
         pending_op = Expression::KeyPathOp::None;
+    }
+
+    void apply_list_aggregate_operation()
+    {
+        last_predicate()->cmpr.compare_type = pending_comparison_type;
+        pending_comparison_type = Predicate::ComparisonType::Unspecified;
     }
 
     void add_expression(Expression && exp)
@@ -285,11 +305,17 @@ struct ParserState
 template< typename Rule >
 struct action : nothing< Rule > {};
 
-#ifdef REALM_PARSER_PRINT_TOKENS
-    #define DEBUG_PRINT_TOKEN(string) do { std::cout << string << std::endl; } while (0)
-#else
-    #define DEBUG_PRINT_TOKEN(string) do { static_cast<void>(string); } while (0)
-#endif
+//#ifdef REALM_PARSER_PRINT_TOKENS
+//#if 1
+//    #define DEBUG_PRINT_TOKEN(string) do { std::cout << string << std::endl; } while (0)
+//#else
+//    #define DEBUG_PRINT_TOKEN(string) do { static_cast<void>(string); } while (0)
+//#endif
+
+void DEBUG_PRINT_TOKEN(std::string s)
+{
+    //std::cout << s << std::endl;
+}
 
 template<> struct action< and_op >
 {
@@ -536,6 +562,25 @@ template<> struct action< collection_operator_match > {
     }
 };
 
+#define LIST_AGG_OP_TYPE_ACTION(rule, type)                         \
+template<> struct action< rule > {                                  \
+template< typename Input >                                          \
+    static void apply(const Input& in, ParserState& state) {        \
+        DEBUG_PRINT_TOKEN(in.string() + #rule);                     \
+        state.pending_comparison_type = type; }};
+
+LIST_AGG_OP_TYPE_ACTION(agg_any, Predicate::ComparisonType::Any)
+LIST_AGG_OP_TYPE_ACTION(agg_all, Predicate::ComparisonType::All)
+LIST_AGG_OP_TYPE_ACTION(agg_none, Predicate::ComparisonType::None)
+
+template<> struct action< agg_shortcut_pred > {
+    template< typename Input >
+    static void apply(const Input& in, ParserState& state) {
+        DEBUG_PRINT_TOKEN(in.string() + " Aggregate shortcut matched");
+        state.apply_list_aggregate_operation();
+    }
+};
+
 template<> struct action< true_pred >
 {
     template< typename Input >
@@ -560,7 +605,7 @@ template<> struct action< false_pred >
 template<> struct action< rule > {                                  \
     template< typename Input >                                      \
     static void apply(const Input& in, ParserState& state) {        \
-        DEBUG_PRINT_TOKEN(in.string());                             \
+        DEBUG_PRINT_TOKEN(in.string() + #oper);                     \
         state.last_predicate()->cmpr.op = oper; }};
 
 OPERATOR_ACTION(eq, Predicate::Operator::Equal)

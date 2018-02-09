@@ -61,8 +61,8 @@ template <>
 const char* type_to_str<Link>();
 
 const char* data_type_to_str(DataType type);
-
 const char* collection_operator_to_str(parser::Expression::KeyPathOp op);
+const char* comparison_type_to_str(parser::Predicate::ComparisonType type);
 
 using KeyPath = std::vector<std::string>;
 KeyPath key_path_from_string(const std::string &s);

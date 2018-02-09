@@ -75,11 +75,20 @@ struct Predicate
         CaseInsensitive,
     };
 
+    enum class ComparisonType
+    {
+        Unspecified,
+        Any,
+        All,
+        None,
+    };
+
     struct Comparison
     {
         Operator op = Operator::None;
         OperatorOption option = OperatorOption::None;
         Expression expr[2] = {{Expression::Type::None, ""}, {Expression::Type::None, ""}};
+        ComparisonType compare_type = ComparisonType::Unspecified;
     };
 
     struct Compound

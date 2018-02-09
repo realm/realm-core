@@ -52,6 +52,11 @@ void KeyPathMapping::remove_mapping(ConstTableRef table, std::string name)
     m_mapping.erase(it);
 }
 
+bool KeyPathMapping::has_mapping(ConstTableRef table, std::string name)
+{
+    return m_mapping.find({table, name}) != m_mapping.end();
+}
+
 // This may be premature optimisation, but it'll be super fast and it doesn't
 // bother dragging in anything locale specific for case insensitive comparisons.
 bool is_backlinks_prefix(std::string& s) {

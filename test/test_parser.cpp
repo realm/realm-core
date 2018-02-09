@@ -1949,4 +1949,156 @@ TEST(Parser_Subquery)
     CHECK_EQUAL(message, "A subquery must operate on a list property, but 'fav_item' is type 'Link'");
 }
 
+
+TEST(Parser_AggregateShortcuts)
+{
+    Group g;
+
+    TableRef ingredients = g.add_table("class_Allergens");
+    size_t ingredient_name_col = ingredients->add_column(type_String, "name");
+    size_t population_col = ingredients->add_column(type_Double, "population_affected");
+    std::vector<std::pair<std::string, double>> ingredients_list = { {"dairy", 0.75}, {"nuts", 0.01}, {"wheat", 0.01}, {"soy", 0.005} };
+    for (size_t i = 0; i < ingredients_list.size(); ++i) {
+        size_t row_ndx = ingredients->add_empty_row();
+        ingredients->set_string(ingredient_name_col, row_ndx, ingredients_list[i].first);
+        ingredients->set_double(population_col, row_ndx, ingredients_list[i].second);
+    }
+
+    TableRef items = g.add_table("class_Items");
+    size_t item_name_col = items->add_column(type_String, "name");
+    size_t item_price_col = items->add_column(type_Double, "price");
+    size_t item_contains_col = items->add_column_link(type_LinkList, "allergens", *ingredients);
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    for (item_t i : item_info) {
+        size_t row_ndx = items->add_empty_row();
+        items->set_string(item_name_col, row_ndx, i.first);
+        items->set_double(item_price_col, row_ndx, i.second);
+    }
+    LinkViewRef milk_contains = items->get_linklist(item_contains_col, 0);
+    milk_contains->add(0);
+    LinkViewRef pizza_contains = items->get_linklist(item_contains_col, 2);
+    pizza_contains->add(0);
+    pizza_contains->add(2);
+    pizza_contains->add(3);
+    LinkViewRef cereal_contains = items->get_linklist(item_contains_col, 3);
+    cereal_contains->add(0);
+    cereal_contains->add(1);
+    cereal_contains->add(2);
+
+    TableRef t = g.add_table("class_Person");
+    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
+    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
+    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
+    size_t fav_col_ndx = t->add_column_link(type_Link, "fav_item", *items);
+    t->add_empty_row(3);
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(id_col_ndx, i, i);
+        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
+        t->set_link(fav_col_ndx, i, i);
+    }
+
+    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
+    list_0->add(0);
+    list_0->add(1);
+    list_0->add(2);
+    list_0->add(3);
+
+    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1->add(0);
+    }
+
+    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
+    list_2->add(2);
+    list_2->add(2);
+    list_2->add(3);
+
+    // any is implied over list properties
+    verify_query(test_context, t, "items.price == 5.5", 2);
+
+    // check basic equality
+    verify_query(test_context, t, "ANY items.price == 5.5", 2);  // 0, 1
+    verify_query(test_context, t, "SOME items.price == 5.5", 2); // 0, 1
+    verify_query(test_context, t, "ALL items.price == 5.5", 1);  // 1
+    verify_query(test_context, t, "NONE items.price == 5.5", 1); // 2
+
+    // and
+    verify_query(test_context, t, "customer_id > 0 and ANY items.price == 5.5", 1);
+    verify_query(test_context, t, "customer_id > 0 and SOME items.price == 5.5", 1);
+    verify_query(test_context, t, "customer_id > 0 and ALL items.price == 5.5", 1);
+    verify_query(test_context, t, "customer_id > 0 and NONE items.price == 5.5", 1);
+    // or
+    verify_query(test_context, t, "customer_id > 1 or ANY items.price == 5.5", 3);
+    verify_query(test_context, t, "customer_id > 1 or SOME items.price == 5.5", 3);
+    verify_query(test_context, t, "customer_id > 1 or ALL items.price == 5.5", 2);
+    verify_query(test_context, t, "customer_id > 1 or NONE items.price == 5.5", 1);
+    // not
+    verify_query(test_context, t, "!(ANY items.price == 5.5)", 1);
+    verify_query(test_context, t, "!(SOME items.price == 5.5)", 1);
+    verify_query(test_context, t, "!(ALL items.price == 5.5)", 2);
+    verify_query(test_context, t, "!(NONE items.price == 5.5)", 2);
+
+    // inside subquery people with any items containing WHEAT
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.allergens.name CONTAINS[c] 'WHEAT').@count > 0", 2);
+    verify_query(test_context, t, "SUBQUERY(items, $x, ANY $x.allergens.name CONTAINS[c] 'WHEAT').@count > 0", 2);
+    verify_query(test_context, t, "SUBQUERY(items, $x, SOME $x.allergens.name CONTAINS[c] 'WHEAT').@count > 0", 2);
+    verify_query(test_context, t, "SUBQUERY(items, $x, ALL $x.allergens.name CONTAINS[c] 'WHEAT').@count > 0", 1);
+    verify_query(test_context, t, "SUBQUERY(items, $x, NONE $x.allergens.name CONTAINS[c] 'WHEAT').@count > 0", 2);
+
+    // backlinks
+    verify_query(test_context, items, "ANY @links.class_Person.items.account_balance > 15", 3);
+    verify_query(test_context, items, "SOME @links.class_Person.items.account_balance > 15", 3);
+    verify_query(test_context, items, "ALL @links.class_Person.items.account_balance > 15", 0);
+    verify_query(test_context, items, "NONE @links.class_Person.items.account_balance > 15", 1);
+
+    // links in prefix
+    verify_query(test_context, t, "ANY fav_item.allergens.name CONTAINS 'dairy'", 2);
+    verify_query(test_context, t, "SOME fav_item.allergens.name CONTAINS 'dairy'", 2);
+    verify_query(test_context, t, "ALL fav_item.allergens.name CONTAINS 'dairy'", 2);
+    verify_query(test_context, t, "NONE fav_item.allergens.name CONTAINS 'dairy'", 1);
+
+    // links in suffix
+    verify_query(test_context, items, "ANY @links.class_Person.items.fav_item.name CONTAINS 'milk'", 4);
+    verify_query(test_context, items, "SOME @links.class_Person.items.fav_item.name CONTAINS 'milk'", 4);
+    verify_query(test_context, items, "ALL @links.class_Person.items.fav_item.name CONTAINS 'milk'", 1);
+    verify_query(test_context, items, "NONE @links.class_Person.items.fav_item.name CONTAINS 'milk'", 0);
+
+    // compare with property
+    verify_query(test_context, t, "ANY items.name == fav_item.name", 2);
+    verify_query(test_context, t, "SOME items.name == fav_item.name", 2);
+    verify_query(test_context, t, "ANY items.price == items.@max.price", 3);
+    verify_query(test_context, t, "SOME items.price == items.@max.price", 3);
+    verify_query(test_context, t, "ANY items.price == items.@min.price", 3);
+    verify_query(test_context, t, "SOME items.price == items.@min.price", 3);
+    verify_query(test_context, t, "ANY items.price > items.@avg.price", 2);
+    verify_query(test_context, t, "SOME items.price > items.@avg.price", 2);
+
+    // ALL/NONE do not support testing against other columns currently because of how they are implemented in a subquery
+    // The restriction is because subqueries must operate on properties on the target table and cannot reference
+    // properties in the parent scope. This restriction may be lifted if we actually implement ALL/NONE in core.
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ALL items.name == fav_item.name", 1), message);
+    CHECK_EQUAL(message, "The comparison in an 'ALL' clause must be between a keypath and a value");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "NONE items.name == fav_item.name", 1), message);
+    CHECK_EQUAL(message, "The comparison in an 'NONE' clause must be between a keypath and a value");
+
+    // no list in path should throw
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ANY fav_item.name == 'milk'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain a list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SOME fav_item.name == 'milk'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain a list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ALL fav_item.name == 'milk'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ALL' must contain a list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "NONE fav_item.name == 'milk'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'NONE' must contain a list");
+
+    // the expression following ANY/SOME/ALL/NONE must be a keypath list
+    // currently this is restricted by the parser syntax so it is a predicate error
+    CHECK_THROW_ANY(verify_query(test_context, t, "ANY 'milk' == fav_item.name", 1));
+    CHECK_THROW_ANY(verify_query(test_context, t, "SOME 'milk' == fav_item.name", 1));
+    CHECK_THROW_ANY(verify_query(test_context, t, "ALL 'milk' == fav_item.name", 1));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NONE 'milk' == fav_item.name", 1));
+}
+
 #endif // TEST_PARSER

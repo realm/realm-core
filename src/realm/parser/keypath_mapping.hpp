@@ -58,6 +58,7 @@ public:
     // returns true if added, false if duplicate key already exists
     bool add_mapping(ConstTableRef table, std::string name, std::string alias);
     void remove_mapping(ConstTableRef table, std::string name);
+    bool has_mapping(ConstTableRef table, std::string name);
     KeyPathElement process_next_path(ConstTableRef table, KeyPath& path, size_t& index);
     void set_allow_backlinks(bool allow);
     static Table* table_getter(TableRef table, const std::vector<KeyPathElement>& links);

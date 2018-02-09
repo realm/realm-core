@@ -126,6 +126,21 @@ const char* collection_operator_to_str(parser::Expression::KeyPathOp op)
     return "";
 }
 
+const char* comparison_type_to_str(parser::Predicate::ComparisonType type)
+{
+    switch (type) {
+        case parser::Predicate::ComparisonType::Unspecified:
+            return "";
+        case parser::Predicate::ComparisonType::All:
+            return "ALL";
+        case parser::Predicate::ComparisonType::None:
+            return "NONE";
+        case parser::Predicate::ComparisonType::Any:
+            return "ANY";
+    }
+    return "";
+}
+
 using KeyPath = std::vector<std::string>;
 
 KeyPath key_path_from_string(const std::string &s) {

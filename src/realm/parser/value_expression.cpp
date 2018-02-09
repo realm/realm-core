@@ -100,7 +100,7 @@ StringData from_base64(const std::string& input, util::StringBuffer& decode_buff
 
 
 ValueExpression::ValueExpression(Query& query, query_builder::Arguments* args, const parser::Expression* v)
-: value(v)
+: value(*v)
 , arguments(args) {
     table_getter = [&] {
         auto& tbl = query.get_table();
@@ -110,11 +110,11 @@ ValueExpression::ValueExpression(Query& query, query_builder::Arguments* args, c
 
 bool ValueExpression::is_null()
 {
-    if (value->type == parser::Expression::Type::Null) {
+    if (value.type == parser::Expression::Type::Null) {
         return true;
     }
-    else if (value->type == parser::Expression::Type::Argument) {
-        return arguments->is_argument_null(stot<int>(value->s));
+    else if (value.type == parser::Expression::Type::Argument) {
+        return arguments->is_argument_null(stot<int>(value.s));
     }
     return false;
 }
@@ -122,11 +122,11 @@ bool ValueExpression::is_null()
 template <>
 Timestamp ValueExpression::value_of_type_for_query<Timestamp>()
 {
-    if (value->type == parser::Expression::Type::Argument) {
-        return arguments->timestamp_for_argument(stot<int>(value->s));
-    } else if (value->type == parser::Expression::Type::Timestamp) {
-        return from_timestamp_values(value->time_inputs);
-    } else if (value->type == parser::Expression::Type::Null) {
+    if (value.type == parser::Expression::Type::Argument) {
+        return arguments->timestamp_for_argument(stot<int>(value.s));
+    } else if (value.type == parser::Expression::Type::Timestamp) {
+        return from_timestamp_values(value.time_inputs);
+    } else if (value.type == parser::Expression::Type::Null) {
         return Timestamp(realm::null());
     }
     throw std::logic_error("Attempting to compare Timestamp property to a non-Timestamp value");
@@ -135,14 +135,14 @@ Timestamp ValueExpression::value_of_type_for_query<Timestamp>()
 template <>
 bool ValueExpression::value_of_type_for_query<bool>()
 {
-    if (value->type == parser::Expression::Type::Argument) {
-        return arguments->bool_for_argument(stot<int>(value->s));
+    if (value.type == parser::Expression::Type::Argument) {
+        return arguments->bool_for_argument(stot<int>(value.s));
     }
-    if (value->type != parser::Expression::Type::True && value->type != parser::Expression::Type::False) {
-        if (value->type == parser::Expression::Type::Number) {
+    if (value.type != parser::Expression::Type::True && value.type != parser::Expression::Type::False) {
+        if (value.type == parser::Expression::Type::Number) {
             // As a special exception we can handle 0 and 1.
             // Our bool values are actually stored as integers {0, 1}
-            int64_t number_value = stot<int64_t>(value->s);
+            int64_t number_value = stot<int64_t>(value.s);
             if (number_value == 0) {
                 return false;
             }
@@ -152,48 +152,48 @@ bool ValueExpression::value_of_type_for_query<bool>()
         }
         throw std::logic_error("Attempting to compare bool property to a non-bool value");
     }
-    return value->type == parser::Expression::Type::True;
+    return value.type == parser::Expression::Type::True;
 }
 
 template <>
 Double ValueExpression::value_of_type_for_query<Double>()
 {
-    if (value->type == parser::Expression::Type::Argument) {
-        return arguments->double_for_argument(stot<int>(value->s));
+    if (value.type == parser::Expression::Type::Argument) {
+        return arguments->double_for_argument(stot<int>(value.s));
     }
-    return stot<double>(value->s);
+    return stot<double>(value.s);
 }
 
 template <>
 Float ValueExpression::value_of_type_for_query<Float>()
 {
-    if (value->type == parser::Expression::Type::Argument) {
-        return arguments->float_for_argument(stot<int>(value->s));
+    if (value.type == parser::Expression::Type::Argument) {
+        return arguments->float_for_argument(stot<int>(value.s));
     }
-    return stot<float>(value->s);
+    return stot<float>(value.s);
 }
 
 template <>
 Int ValueExpression::value_of_type_for_query<Int>()
 {
-    if (value->type == parser::Expression::Type::Argument) {
-        return arguments->long_for_argument(stot<int>(value->s));
+    if (value.type == parser::Expression::Type::Argument) {
+        return arguments->long_for_argument(stot<int>(value.s));
     }
-    return stot<long long>(value->s);
+    return stot<long long>(value.s);
 }
 
 template <>
 StringData ValueExpression::value_of_type_for_query<StringData>()
 {
-    if (value->type == parser::Expression::Type::Argument) {
-        return arguments->string_for_argument(stot<int>(value->s));
+    if (value.type == parser::Expression::Type::Argument) {
+        return arguments->string_for_argument(stot<int>(value.s));
     }
-    else if (value->type == parser::Expression::Type::String) {
-        return value->s;
+    else if (value.type == parser::Expression::Type::String) {
+        return value.s;
     }
-    else if (value->type == parser::Expression::Type::Base64) {
+    else if (value.type == parser::Expression::Type::Base64) {
         // the return value points to data in the lifetime of args
-        return from_base64(value->s, arguments->buffer_space);
+        return from_base64(value.s, arguments->buffer_space);
     }
     throw std::logic_error("Attempting to compare String property to a non-String value");
 }
@@ -201,14 +201,14 @@ StringData ValueExpression::value_of_type_for_query<StringData>()
 template <>
 BinaryData ValueExpression::value_of_type_for_query<BinaryData>()
 {
-    if (value->type == parser::Expression::Type::Argument) {
-        return arguments->binary_for_argument(stot<int>(value->s));
+    if (value.type == parser::Expression::Type::Argument) {
+        return arguments->binary_for_argument(stot<int>(value.s));
     }
-    else if (value->type == parser::Expression::Type::String) {
-        return BinaryData(value->s);
+    else if (value.type == parser::Expression::Type::String) {
+        return BinaryData(value.s);
     }
-    else if (value->type == parser::Expression::Type::Base64) {
-        StringData converted = from_base64(value->s, arguments->buffer_space);
+    else if (value.type == parser::Expression::Type::Base64) {
+        StringData converted = from_base64(value.s, arguments->buffer_space);
         // returning a pointer to data in the lifetime of args
         return BinaryData(converted.data(), converted.size());
     }
