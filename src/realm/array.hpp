@@ -1026,7 +1026,6 @@ protected:
     int64_t m_ubound; // max number that can be stored with current m_width
 
     size_t m_size = 0;     // Number of elements currently stored.
-    size_t m_capacity = 0; // Number of elements that fit inside the allocated memory.
 
     Allocator& m_alloc;
 

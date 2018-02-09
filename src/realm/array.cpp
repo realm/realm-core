@@ -226,20 +226,6 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_context_flag = get_context_flag_from_header(header);
     m_width = get_width_from_header(header);
     m_size = get_size_from_header(header);
-
-    // Capacity is how many items there are room for
-    if (m_alloc.is_read_only(mem.get_ref())) {
-        m_capacity = m_size;
-    }
-    else {
-        size_t byte_capacity = get_capacity_from_header(header);
-        // FIXME: Avoid calling virtual method calc_item_count() here,
-        // instead calculate the capacity in a way similar to what is done
-        // in get_byte_size_from_header(). The virtual call makes "life"
-        // hard for constructors in derived array classes.
-        m_capacity = calc_item_count(byte_capacity, m_width);
-    }
-
     m_ref = mem.get_ref();
     m_data = get_data_from_header(header);
     set_width(m_width);
@@ -699,7 +685,6 @@ void Array::truncate(size_t new_size)
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (new_size == 0) {
-        m_capacity = calc_item_count(get_capacity_from_header(), 0);
         set_width(0);
         set_header_width(0);
     }
@@ -733,7 +718,6 @@ void Array::truncate_and_destroy_children(size_t new_size)
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (new_size == 0) {
-        m_capacity = calc_item_count(get_capacity_from_header(), 0);
         set_width(0);
         set_header_width(0);
     }
@@ -767,7 +751,6 @@ void Array::set_all_to_zero()
 
     copy_on_write(); // Throws
 
-    m_capacity = calc_item_count(get_capacity_from_header(), 0);
     set_width(0);
 
     // Update header
@@ -1644,8 +1627,6 @@ void Array::do_copy_on_write(size_t minimum_size)
     // Update internal data
     m_ref = mref.get_ref();
     m_data = get_data_from_header(new_begin);
-    m_capacity = calc_item_count(new_size, m_width);
-    REALM_ASSERT_DEBUG(m_capacity > 0);
 
     // Update capacity in header. Uses m_data to find header, so
     // m_data must be initialized correctly first.
@@ -1709,11 +1690,11 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     return mem;
 }
 
-void Array::alloc(size_t init_size, size_t width)
+void Array::alloc(size_t init_size, size_t new_width)
 {
     REALM_ASSERT(is_attached());
 
-    size_t needed_bytes = calc_byte_len(init_size, width);
+    size_t needed_bytes = calc_byte_len(init_size, new_width);
     // this method is not public and callers must (and currently do) ensure that
     // needed_bytes are never larger than max_array_payload.
     REALM_ASSERT_3(needed_bytes, <=, max_array_payload);
@@ -1722,55 +1703,46 @@ void Array::alloc(size_t init_size, size_t width)
         do_copy_on_write(needed_bytes);
 
     REALM_ASSERT(!m_alloc.is_read_only(m_ref));
-    REALM_ASSERT_3(m_capacity, >, 0);
-    if (m_capacity < init_size || width != m_width) {
-        size_t orig_capacity_bytes = get_capacity_from_header();
-        size_t capacity_bytes = orig_capacity_bytes;
+    char* header = get_header_from_data(m_data);
+    size_t orig_capacity_bytes = get_capacity_from_header(header);
 
-        if (capacity_bytes < needed_bytes) {
-            // Double to avoid too many reallocs (or initialize to initial size), but truncate if that exceeds the
-            // maximum allowed payload (measured in bytes) for arrays. This limitation is due to 24-bit capacity
-            // field in the header.
-            size_t new_capacity_bytes = capacity_bytes * 2;
-            if (new_capacity_bytes < capacity_bytes) // overflow detected, clamp to max
-                new_capacity_bytes = max_array_payload_aligned;
-            if (new_capacity_bytes > max_array_payload_aligned) // cap at max allowed allocation
-                new_capacity_bytes = max_array_payload_aligned;
-            capacity_bytes = new_capacity_bytes;
+    if (orig_capacity_bytes < needed_bytes) {
+        // Double to avoid too many reallocs (or initialize to initial size), but truncate if that exceeds the
+        // maximum allowed payload (measured in bytes) for arrays. This limitation is due to 24-bit capacity
+        // field in the header.
+        size_t new_capacity_bytes = orig_capacity_bytes * 2;
+        if (new_capacity_bytes < orig_capacity_bytes) // overflow detected, clamp to max
+            new_capacity_bytes = max_array_payload_aligned;
+        if (new_capacity_bytes > max_array_payload_aligned) // cap at max allowed allocation
+            new_capacity_bytes = max_array_payload_aligned;
 
-            // If doubling is not enough, expand enough to fit
-            if (capacity_bytes < needed_bytes) {
-                size_t rest = (~needed_bytes & 0x7) + 1;
-                capacity_bytes = needed_bytes;
-                if (rest < 8)
-                    capacity_bytes += rest; // 64bit align
-            }
-
-            // Allocate and update header
-            char* header = get_header_from_data(m_data);
-            MemRef mem_ref = m_alloc.realloc_(m_ref, header, orig_capacity_bytes, capacity_bytes); // Throws
-
-            header = mem_ref.get_addr();
-            set_header_width(int(width), header);
-            set_header_size(init_size, header);
-            set_header_capacity(capacity_bytes, header);
-
-            // Update this accessor and its ancestors
-            m_ref = mem_ref.get_ref();
-            m_data = get_data_from_header(header);
-            m_capacity = calc_item_count(capacity_bytes, width);
-            // FIXME: Trouble when this one throws. We will then leave
-            // this array instance in a corrupt state
-            update_parent(); // Throws
-            return;
+        // If doubling is not enough, expand enough to fit
+        if (new_capacity_bytes < needed_bytes) {
+            size_t rest = (~needed_bytes & 0x7) + 1;
+            new_capacity_bytes = needed_bytes;
+            if (rest < 8)
+                new_capacity_bytes += rest; // 64bit align
         }
 
-        m_capacity = calc_item_count(capacity_bytes, width);
-        set_header_width(int(width));
+        // Allocate and update header
+        MemRef mem_ref = m_alloc.realloc_(m_ref, header, orig_capacity_bytes, new_capacity_bytes); // Throws
+
+        header = mem_ref.get_addr();
+        set_header_capacity(new_capacity_bytes, header);
+
+        // Update this accessor and its ancestors
+        m_ref = mem_ref.get_ref();
+        m_data = get_data_from_header(header);
+        // FIXME: Trouble when this one throws. We will then leave
+        // this array instance in a corrupt state
+        update_parent(); // Throws
     }
 
     // Update header
-    set_header_size(init_size);
+    if (new_width != m_width) {
+        set_header_width(int(new_width), header);
+    }
+    set_header_size(init_size, header);
 }
 
 int_fast64_t Array::lbound_for_width(size_t width) noexcept

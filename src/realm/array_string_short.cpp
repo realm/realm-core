@@ -374,7 +374,7 @@ void ArrayStringShort::string_stats() const
     std::cout << "Size: " << m_size << "\n";
     std::cout << "Width: " << m_width << "\n";
     std::cout << "Total: " << array_size << "\n";
-    std::cout << "Capacity: " << m_capacity << "\n\n";
+    // std::cout << "Capacity: " << m_capacity << "\n\n";
     std::cout << "Bytes string: " << total << "\n";
     std::cout << "     longest: " << longest << "\n";
     std::cout << "Bytes zeroes: " << zeroes << "\n";
