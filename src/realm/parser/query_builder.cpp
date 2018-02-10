@@ -299,7 +299,7 @@ void add_link_constraint_to_query(realm::Query &query,
                                   Predicate::Operator op,
                                   const PropertyExpression &prop_expr,
                                   const ValueExpression &value_expr) {
-    size_t row_index = value_expr.arguments->object_index_for_argument(stot<int>(value_expr.value.s));
+    size_t row_index = value_expr.arguments->object_index_for_argument(stot<int>(value_expr.value->s));
     realm_precondition(prop_expr.link_chain.size() == 1, "KeyPath queries not supported for object comparisons.");
     switch (op) {
         case Predicate::Operator::NotEqual:
@@ -623,17 +623,18 @@ void preprocess_for_comparison_types(Query &query, Predicate::Comparison &cmpr, 
         exp.subquery->cmpr.op = cmpr.op;
         exp.subquery->cmpr.option = cmpr.option;
         exp.subquery->cmpr.expr[1] = cmpr.expr[1];
+        cmpr.expr[0] = exp;
 
-        lhs = ExpressionContainer(query, exp, args, mapping);
+        lhs = ExpressionContainer(query, cmpr.expr[0], args, mapping);
         cmpr.op = parser::Predicate::Operator::Equal;
         cmpr.option = parser::Predicate::OperatorOption::None;
 
         if (cmpr.compare_type == Predicate::ComparisonType::All) {
-            parser::Expression rhs_exp(path_parts.first, parser::Expression::KeyPathOp::Count, "");
-            rhs = ExpressionContainer(query, rhs_exp, args, mapping);
+            cmpr.expr[1] = parser::Expression(path_parts.first, parser::Expression::KeyPathOp::Count, "");
+            rhs = ExpressionContainer(query, cmpr.expr[1], args, mapping);
         } else if (cmpr.compare_type == Predicate::ComparisonType::None) {
-            parser::Expression rhs_exp(parser::Expression::Type::Number, "0");
-            rhs = ExpressionContainer(query, rhs_exp, args, mapping);
+            cmpr.expr[1] = parser::Expression(parser::Expression::Type::Number, "0");
+            rhs = ExpressionContainer(query, cmpr.expr[1], args, mapping);
         } else {
             REALM_UNREACHABLE();
         }
@@ -751,26 +752,6 @@ void apply_predicate(Query &query, const Predicate &predicate, Arguments &argume
     realm_precondition(validateMessage.empty(), validateMessage.c_str());
 }
 
-struct EmptyArgContext
-{
-    template<typename T>
-    T unbox(std::string) {
-        return T{}; //dummy
-    }
-    bool is_null(std::string) {
-        return false;
-    }
-};
-
-void apply_predicate(Query &query, const Predicate &predicate)
-{
-    EmptyArgContext ctx;
-    std::string empty_string;
-    realm::query_builder::ArgumentConverter<std::string, EmptyArgContext> args(ctx, &empty_string, 0);
-
-    apply_predicate(query, predicate, args);
-}
-
 void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state, Arguments&)
 {
     for (const DescriptorOrderingState::SingleOrderingState& cur_ordering : state.orderings) {
@@ -806,10 +787,7 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
 
 void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state)
 {
-    EmptyArgContext ctx;
-    std::string empty_string;
-    realm::query_builder::ArgumentConverter<std::string, EmptyArgContext> args(ctx, &empty_string, 0);
-
+    NoArguments args;
     apply_ordering(ordering, target, state, args);
 }
 

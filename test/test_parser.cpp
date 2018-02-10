@@ -317,17 +317,18 @@ TEST(Parser_grammar_analysis)
 
 Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, size_t num_results) {
     Query q = t->where();
+    realm::query_builder::NoArguments args;
 
-    realm::parser::Predicate p = realm::parser::parse(query_string).predicate;
-    realm::query_builder::apply_predicate(q, p);
+    parser::ParserResult res = realm::parser::parse(query_string);
+    realm::query_builder::apply_predicate(q, res.predicate, args);
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
     //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
-    realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
-    realm::query_builder::apply_predicate(q2, p2);
+    parser::ParserResult res2 = realm::parser::parse(description);
+    realm::query_builder::apply_predicate(q2, res2.predicate, args);
 
     CHECK_EQUAL(q2.count(), num_results);
     return q2;
@@ -350,7 +351,8 @@ TEST(Parser_empty_input)
     CHECK(!empty_description.empty());
     CHECK_EQUAL(0, empty_description.compare("TRUEPREDICATE"));
     realm::parser::Predicate p = realm::parser::parse(empty_description).predicate;
-    realm::query_builder::apply_predicate(q, p);
+    query_builder::NoArguments args;
+    realm::query_builder::apply_predicate(q, p, args);
     CHECK_EQUAL(q.count(), 5);
 
     verify_query(test_context, t, "TRUEPREDICATE", 5);
@@ -1030,7 +1032,7 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     Query q2 = t->where();
 
     realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
-    realm::query_builder::apply_predicate(q2, p2);
+    realm::query_builder::apply_predicate(q2, p2, args);
 
     CHECK_EQUAL(q2.count(), num_results);
 }
@@ -1310,14 +1312,15 @@ TEST(Parser_string_binary_encoding)
         std::string binary_description = qbin.get_description();
         //std::cerr << "original: " << buff << "\tdescribed: " << string_description << "\n";
 
+        query_builder::NoArguments args;
         Query qstr2 = t->where();
         realm::parser::Predicate pstr2 = realm::parser::parse(string_description).predicate;
-        realm::query_builder::apply_predicate(qstr2, pstr2);
+        realm::query_builder::apply_predicate(qstr2, pstr2, args);
         CHECK_EQUAL(qstr2.count(), num_results);
 
         Query qbin2 = t->where();
         realm::parser::Predicate pbin2 = realm::parser::parse(binary_description).predicate;
-        realm::query_builder::apply_predicate(qbin2, pbin2);
+        realm::query_builder::apply_predicate(qbin2, pbin2, args);
         CHECK_EQUAL(qbin2.count(), num_results);
     }
 }
@@ -1510,9 +1513,10 @@ TEST(Parser_SortAndDistinctSerialisation)
 TableView get_sorted_view(TableRef t, std::string query_string)
 {
     Query q = t->where();
+    query_builder::NoArguments args;
 
     parser::ParserResult result = realm::parser::parse(query_string);
-    realm::query_builder::apply_predicate(q, result.predicate);
+    realm::query_builder::apply_predicate(q, result.predicate, args);
     DescriptorOrdering ordering;
     realm::query_builder::apply_ordering(ordering, t, result.ordering);
 
@@ -1524,7 +1528,7 @@ TableView get_sorted_view(TableRef t, std::string query_string)
     Query q2 = t->where();
 
     parser::ParserResult result2 = realm::parser::parse(combined);
-    realm::query_builder::apply_predicate(q2, result2.predicate);
+    realm::query_builder::apply_predicate(q2, result2.predicate, args);
     DescriptorOrdering ordering2;
     realm::query_builder::apply_ordering(ordering2, t, result2.ordering);
 

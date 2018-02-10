@@ -27,7 +27,7 @@ namespace parser {
 
 struct ValueExpression
 {
-    const parser::Expression value;
+    const parser::Expression* value;
     query_builder::Arguments* arguments;
     std::function<Table *()> table_getter;
 
