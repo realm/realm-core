@@ -107,8 +107,6 @@ public:
 
     void set_string(size_t, StringData) override;
 
-    void adjust_keys_ndx_in_parent(int diff) noexcept;
-
     // Compare two string columns for equality
     bool compare_string(const StringColumn&) const;
     bool compare_string(const StringEnumColumn&) const;
