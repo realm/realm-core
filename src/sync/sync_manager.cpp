@@ -89,6 +89,8 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
         }
 
         REALM_ASSERT(m_metadata_manager);
+        m_client_uuid = m_metadata_manager->client_uuid();
+
         // Perform any necessary file actions.
         std::vector<SyncFileActionMetadata> completed_actions;
         SyncFileActionMetadataResults file_actions = m_metadata_manager->all_pending_actions();
@@ -196,6 +198,8 @@ void SyncManager::reset_for_testing()
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     m_file_manager = nullptr;
     m_metadata_manager = nullptr;
+    m_client_uuid = util::none;
+
     {
         // Destroy all the users.
         std::lock_guard<std::mutex> lock(m_user_mutex);
@@ -511,6 +515,6 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
 
 std::string SyncManager::client_uuid() const
 {
-    REALM_ASSERT(m_metadata_manager);
-    return m_metadata_manager->client_uuid();
+    REALM_ASSERT(m_client_uuid);
+    return *m_client_uuid;
 }

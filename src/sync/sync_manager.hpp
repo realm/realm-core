@@ -200,6 +200,9 @@ private:
     // Sessions remove themselves from this map by calling `unregister_session` once they're
     // inactive and have performed any necessary cleanup work.
     std::unordered_map<std::string, std::shared_ptr<SyncSession>> m_sessions;
+
+    // The unique identifier of this client.
+    util::Optional<std::string> m_client_uuid;
 };
 
 } // namespace realm
