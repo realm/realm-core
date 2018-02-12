@@ -144,7 +144,7 @@ private:
     {
         ChildInfo ret;
         if (m_keys.is_attached()) {
-            auto upper = m_keys.upper_bound_int(key.value);
+            auto upper = m_keys.upper_bound(uint64_t(key.value));
             // The first entry in m_keys will always be smaller than or equal
             // to all keys in this subtree.
             REALM_ASSERT_DEBUG(upper > 0);
@@ -418,10 +418,10 @@ void ClusterNodeInner::ensure_general_form()
 {
     if (!m_keys.is_attached()) {
         size_t current_size = node_size();
-        m_keys.create(Array::type_Normal);
+        m_keys.create(current_size, (current_size - 1) << m_shift_factor);
         m_keys.update_parent();
         for (size_t i = 0; i < current_size; i++) {
-            m_keys.add(i << m_shift_factor);
+            m_keys.set(i, i << m_shift_factor);
         }
     }
 }
@@ -468,7 +468,7 @@ bool ClusterNodeInner::get_leaf(ObjKey key, ClusterNode::IteratorState& state) c
 {
     size_t child_ndx;
     if (m_keys.is_attached()) {
-        child_ndx = m_keys.upper_bound_int(key.value);
+        child_ndx = m_keys.upper_bound(uint64_t(key.value));
         if (child_ndx > 0)
             child_ndx--;
     }
@@ -484,7 +484,7 @@ bool ClusterNodeInner::get_leaf(ObjKey key, ClusterNode::IteratorState& state) c
     size_t sz = node_size();
     while (child_ndx < sz) {
         int64_t key_offset = m_keys.is_attached() ? m_keys.get(child_ndx) : (child_ndx << m_shift_factor);
-        ObjKey new_key = ObjKey(key.value - key_offset);
+        ObjKey new_key(key_offset < key.value ? key.value - key_offset : 0);
         state.m_key_offset += key_offset;
 
         ref_type child_ref = _get_child_ref(child_ndx);
@@ -876,10 +876,10 @@ void Cluster::ensure_general_form()
 {
     if (!m_keys.is_attached()) {
         int64_t current_size = get_size_in_compact_form();
-        m_keys.create(Array::type_Normal);
+        m_keys.create(current_size, 255);
         m_keys.update_parent();
         for (int64_t i = 0; i < current_size; i++) {
-            m_keys.add(i);
+            m_keys.set(i, i);
         }
     }
 }
@@ -969,7 +969,7 @@ ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
 
     if (m_keys.is_attached()) {
         sz = m_keys.size();
-        ndx = m_keys.lower_bound_int(k.value);
+        ndx = m_keys.lower_bound(uint64_t(k.value));
         if (ndx < sz) {
             current_key_value = m_keys.get(ndx);
             if (k.value == current_key_value) {
@@ -1027,8 +1027,8 @@ void Cluster::get(ObjKey k, ClusterNode::State& state) const
 {
     state.ref = get_ref();
     if (m_keys.is_attached()) {
-        state.index = m_keys.lower_bound_int(k.value);
-        if (state.index == m_keys.size() || m_keys.get(state.index) != k.value) {
+        state.index = m_keys.lower_bound(uint64_t(k.value));
+        if (state.index == m_keys.size() || m_keys.get(state.index) != uint64_t(k.value)) {
             throw InvalidKey("Key not found");
         }
     }
@@ -1073,8 +1073,8 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
 {
     size_t ndx;
     if (m_keys.is_attached()) {
-        ndx = m_keys.lower_bound_int(key.value);
-        if (ndx == m_keys.size() || m_keys.get(ndx) != key.value) {
+        ndx = m_keys.lower_bound(uint64_t(key.value));
+        if (ndx == m_keys.size() || m_keys.get(ndx) != uint64_t(key.value)) {
             throw InvalidKey("Key not found");
         }
     }

@@ -57,6 +57,7 @@ Searching: The main finding function is:
 #include <realm/query_conditions.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/array_direct.hpp>
+#include <realm/array_unsigned.hpp>
 
 /*
     MMX: mmintrin.h
@@ -802,14 +803,11 @@ private:
     friend class StringColumn;
 };
 
-class ClusterKeyArray : public Array {
+class ClusterKeyArray : public ArrayUnsigned {
 public:
-    using Array::Array;
+    using ArrayUnsigned::ArrayUnsigned;
 
-    int64_t get(size_t ndx) const
-    {
-        return (m_data != nullptr) ? Array::get(ndx) : int64_t(ndx);
-    }
+    uint64_t get(size_t ndx) const { return (m_data != nullptr) ? ArrayUnsigned::get(ndx) : uint64_t(ndx); }
 };
 
 // Implementation:
