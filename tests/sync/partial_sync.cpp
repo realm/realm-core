@@ -133,9 +133,12 @@ auto results_for_query(std::string const& query_string, Realm::Config const& con
     auto realm = Realm::get_shared_realm(config);
     auto table = ObjectStore::table_for_object_type(realm->read_group(), object_type);
     Query query = table->where();
-    parser::Predicate predicate = realm::parser::parse(query_string);
-    query_builder::apply_predicate(query, predicate);
-    return Results(std::move(realm), std::move(query));
+    auto parser_result = realm::parser::parse(query_string);
+    query_builder::apply_predicate(query, parser_result.predicate);
+
+    DescriptorOrdering ordering;
+    query_builder::apply_ordering(ordering, table, parser_result.ordering);
+    return Results(std::move(realm), std::move(query), std::move(ordering));
 }
 
 partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<std::string> name,
@@ -513,9 +516,7 @@ TEST_CASE("Partial sync error checking", "[sync]") {
             // Attempt to subscribe to a `links_to` query.
             Query q = source_table->where().links_to(object_schema->property_for_name("link")->table_column,
                                                      target_table->get(0));
-            subscribe_and_wait(Results(r, q), util::none, [](Results, std::exception_ptr error) {
-                REQUIRE(error);
-            });
+            CHECK_THROWS(partial_sync::subscribe(Results(r, q), util::none));
         }
     }
 }
