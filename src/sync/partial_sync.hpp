@@ -73,7 +73,21 @@ private:
     friend void unsubscribe(Subscription&);
 };
 
+/// Create a partial sync subscription from the query associated with the `Results`.
+///
+/// The subscription is created asynchronously.
+///
+/// State changes, including runtime errors, are communicated via notifications
+/// registered on the resulting `Subscription` object.
+///
+/// Programming errors, such as attempting to create a subscription in that is not
+/// partially synced, or subscribing to an unsupported query, will throw an exception.
 Subscription subscribe(Results const&, util::Optional<std::string> name);
+
+/// Remove a partial sync subscription.
+///
+/// The operation is performed asynchronously. Completion will be indicated by the
+/// `Subscription` transitioning to the `Invalidated` state.
 void unsubscribe(Subscription&);
 
 // Deprecated
