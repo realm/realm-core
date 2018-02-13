@@ -828,7 +828,10 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, people, "fav_item.data == fav_item.nullable_data", 3);
     verify_query(test_context, people, "fav_item.data == fav_item.data", 5);
     verify_query(test_context, people, "fav_item.nullable_data == fav_item.nullable_data", 5);
+
+    verify_query(test_context, items, "data contains NULL && data contains 'fo' && !(data contains 'asdfasdfasdf') && data contains 'rk'", 1);
 }
+
 
 TEST(Parser_OverColumnIndexChanges)
 {
@@ -1645,16 +1648,6 @@ TEST(Parser_SortAndDistinct)
     CHECK_EQUAL(message, "No property 'name' found on object type 'account' specified in 'sort' clause");
 }
 
-struct EmptyArgContext
-{
-    template<typename T>
-    T unbox(std::string) {
-        return T{}; //dummy
-    }
-    bool is_null(std::string) {
-        return false;
-    }
-};
 
 TEST(Parser_Backlinks)
 {
@@ -1754,12 +1747,10 @@ TEST(Parser_Backlinks)
     CHECK_EQUAL(message, "No property 'artifacts' found in type 'Person' which links to type 'Items'");
 
     // check that arbitrary aliasing for named backlinks works
-    EmptyArgContext ctx;
-    std::string empty_string;
     parser::KeyPathMapping mapping;
     mapping.add_mapping(items, "purchasers", "@links.class_Person.items");
     mapping.add_mapping(t, "money", "account_balance");
-    realm::query_builder::ArgumentConverter<std::string, EmptyArgContext> args(ctx, &empty_string, 0);
+    query_builder::NoArguments args;
 
     q = items->where();
     realm::parser::Predicate p = realm::parser::parse("purchasers.@count > 2").predicate;
@@ -2187,6 +2178,13 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "NULL IN items.price", 0);                // null
     verify_query(test_context, t, "'dairy' IN fav_item.allergens.name", 2); // through link prefix
     verify_query(test_context, items, "20 IN @links.class_Person.items.account_balance", 1);        // backlinks
+    verify_query(test_context, t, "fav_item.price IN items.price", 2); // single property in list
+
+    // aggregate modifiers must operate on a list
+    CHECK_THROW_ANY(verify_query(test_context, t, "ANY 5.5 IN items.price", 2));
+    CHECK_THROW_ANY(verify_query(test_context, t, "SOME 5.5 IN items.price", 2));
+    CHECK_THROW_ANY(verify_query(test_context, t, "ALL 5.5 IN items.price", 1));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NONE 5.5 IN items.price", 1));
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price IN 5.5", 1), message);

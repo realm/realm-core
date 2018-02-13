@@ -123,7 +123,6 @@ struct agg_target : seq< key_path > {};
 struct agg_any : seq< sor< string_token_t("any"), string_token_t("some") >, plus<blank>, agg_target, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
 struct agg_all : seq< string_token_t("all"), plus<blank>, agg_target, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
 struct agg_none : seq< string_token_t("none"), plus<blank>, agg_target, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
-//struct agg_in : seq< pad< expr, blank>, string_token_t("in"), plus< blank >, agg_target > {};
 struct agg_shortcut_pred : sor< agg_any, agg_all, agg_none > {};
 
 // expressions and operators
@@ -161,7 +160,7 @@ struct symbolic_oper : sor< noteq, lteq, lt, gteq, gt, eq, in > {};
 struct comparison_pred : seq< expr, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
 
 // we need to alias the group tokens because these are also used in other expressions above and we have to match
-// the predicae group tokens without also matching () in other expressions.
+// the predicate group tokens without also matching () in other expressions.
 struct begin_pred_group : one< '(' > {};
 struct end_pred_group : one< ')' > {};
 

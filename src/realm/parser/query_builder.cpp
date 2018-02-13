@@ -389,7 +389,7 @@ enum class NullLocation {
 template <class T>
 void do_add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, const T &expr, DataType type, NullLocation location)
 {
-    if (type == type_LinkList) { // when backlinks are supported, this should check those as well
+    if (type == type_LinkList) { // this handles backlinks as well since they are set to type LinkList
         throw std::logic_error("Comparing a list property to 'null' is not supported");
     }
     switch (type) {
