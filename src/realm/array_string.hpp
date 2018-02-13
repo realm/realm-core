@@ -72,9 +72,23 @@ public:
 
     size_t find_first(StringData value, size_t begin, size_t end) const noexcept
     {
-        for (size_t t = begin; t < end; t++) {
-            if (get(t) == value)
-                return t;
+        if (m_type == Type::small_strings) {
+            return static_cast<ArrayStringShort*>(m_arr)->find_first(value, begin, end);
+        }
+        else if (m_type == Type::medium_strings) {
+            for (size_t t = begin; t < end; t++) {
+                if (static_cast<ArraySmallBlobs*>(m_arr)->get_string(t) == value)
+                    return t;
+            }
+        }
+        else if (m_type == Type::big_strings) {
+            for (size_t t = begin; t < end; t++) {
+                if (static_cast<ArrayBigBlobs*>(m_arr)->get_string(t) == value)
+                    return t;
+            }
+        }
+        else {
+            REALM_ASSERT_RELEASE(false && "Unexpected string array type");
         }
         return not_found;
     }

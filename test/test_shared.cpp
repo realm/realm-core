@@ -95,6 +95,29 @@ using unit_test::TestContext;
 // check-testcase` (or one of its friends) from the command line.
 
 
+
+#if 0
+// Sorting benchmark
+ONLY(Query_QuickSort2)
+{
+    Table ttt;
+    auto strings = ttt.add_column(type_String, "2");
+
+    for (size_t t = 0; t < 10000; t++) {
+        Obj o = ttt.create_object();
+        std::string s = util::to_string(t % 1000);
+        o.set<StringData>(strings, s);
+    }
+
+    Query q = ttt.where().equal(strings, "10");
+
+    for (size_t t = 0; t < 500000; t++) {
+        TableView tv = q.find_all();
+    }
+}
+#endif
+
+
 #if REALM_WINDOWS
 namespace {
 // NOTE: This does not work like on POSIX: The child will begin execution from
