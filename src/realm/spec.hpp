@@ -102,10 +102,10 @@ public:
     ref_type get_subspec_ref(size_t subspec_ndx) const noexcept;
 
     // Auto Enumerated string columns
-    void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref, ArrayParent*& keys_parent, size_t& keys_ndx);
-    size_t get_enumkeys_ndx(size_t column_ndx) const noexcept;
-    ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent = nullptr,
-                              size_t* keys_ndx = nullptr) noexcept;
+    void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref);
+    size_t _get_enumkeys_ndx(size_t column_ndx) const noexcept;
+    bool is_string_enum_type(size_t column_ndx) const noexcept;
+    ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) noexcept;
 
     // Links
     TableKey get_opposite_link_table_key(size_t column_ndx) const noexcept;
@@ -177,7 +177,6 @@ private:
 
     void set_parent(ArrayParent*, size_t ndx_in_parent) noexcept;
 
-    void set_column_type(size_t column_ndx, ColumnType type);
     void set_column_attr(size_t column_ndx, ColumnAttrMask attr);
 
     /// Construct an empty spec and return just the reference to the
@@ -283,19 +282,6 @@ inline ColumnType Spec::get_column_type(size_t ndx) const noexcept
     REALM_ASSERT(ndx < get_column_count());
     ColumnType type = ColumnType(m_types.get(ndx));
     return type;
-}
-
-inline void Spec::set_column_type(size_t column_ndx, ColumnType type)
-{
-    REALM_ASSERT(column_ndx < get_column_count());
-
-    // At this point we only support upgrading to string enum
-    REALM_ASSERT(ColumnType(m_types.get(column_ndx)) == col_type_String);
-    REALM_ASSERT(type == col_type_StringEnum);
-
-    m_types.set(column_ndx, type); // Throws
-
-    update_internals();
 }
 
 inline ColumnAttrMask Spec::get_column_attr(size_t ndx) const noexcept

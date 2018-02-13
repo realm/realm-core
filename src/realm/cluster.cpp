@@ -663,7 +663,6 @@ void Cluster::create(int)
                 do_create<ArrayDouble>(col_ndx);
                 break;
             case col_type_String:
-            case col_type_StringEnum:
                 do_create<ArrayString>(col_ndx);
                 break;
             case col_type_Binary:
@@ -727,6 +726,7 @@ inline void Cluster::do_insert_row(size_t ndx, size_t col_ndx, ColumnAttrMask at
     else {
         T arr(m_alloc);
         arr.set_parent(this, col_ndx + s_first_col_index);
+        arr.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), col_ndx);
         arr.init_from_parent();
         arr.insert(ndx, T::default_value(attr.test(col_attr_Nullable)));
     }
@@ -769,7 +769,6 @@ void Cluster::insert_row(size_t ndx, ObjKey k)
                 do_insert_row<ArrayDouble>(ndx, col_ndx, attr);
                 break;
             case col_type_String:
-            case col_type_StringEnum:
                 do_insert_row<ArrayString>(ndx, col_ndx, attr);
                 break;
             case col_type_Binary:
@@ -815,14 +814,15 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
 
     size_t nb_columns = size() - 1;
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        ColumnAttrMask attr = m_tree_top.get_spec().get_column_attr(col_ndx);
+        const Spec& spec = m_tree_top.get_spec();
+        ColumnAttrMask attr = spec.get_column_attr(col_ndx);
 
         if (attr.test(col_attr_List)) {
             do_move<ArrayInteger>(ndx, col_ndx, new_leaf);
             continue;
         }
 
-        switch (m_tree_top.get_spec().get_column_type(col_ndx)) {
+        switch (spec.get_column_type(col_ndx)) {
             case col_type_Int:
                 if (attr.test(col_attr_Nullable)) {
                     do_move<ArrayIntNull>(ndx, col_ndx, new_leaf);
@@ -841,8 +841,10 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 do_move<ArrayDouble>(ndx, col_ndx, new_leaf);
                 break;
             case col_type_String:
-            case col_type_StringEnum:
-                do_move<ArrayString>(ndx, col_ndx, new_leaf);
+                if (spec.is_string_enum_type(col_ndx))
+                    do_move<ArrayInteger>(ndx, col_ndx, new_leaf);
+                else
+                    do_move<ArrayString>(ndx, col_ndx, new_leaf);
                 break;
             case col_type_Binary:
                 do_move<ArrayBinary>(ndx, col_ndx, new_leaf);
@@ -930,7 +932,6 @@ void Cluster::insert_column(size_t col_ndx)
             do_insert_column<ArrayDouble>(col_ndx, nullable);
             break;
         case col_type_String:
-        case col_type_StringEnum:
             do_insert_column<ArrayString>(col_ndx, nullable);
             break;
         case col_type_Binary:
@@ -1052,6 +1053,7 @@ inline void Cluster::do_erase(size_t ndx, size_t col_ndx)
 {
     T values(m_alloc);
     values.set_parent(this, col_ndx + s_first_col_index);
+    values.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), col_ndx);
     values.init_from_parent();
     values.erase(ndx);
 }
@@ -1150,7 +1152,6 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 do_erase<ArrayDouble>(ndx, col_ndx);
                 break;
             case col_type_String:
-            case col_type_StringEnum:
                 do_erase<ArrayString>(ndx, col_ndx);
                 break;
             case col_type_Binary:
@@ -1187,6 +1188,31 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
     }
 
     return node_size();
+}
+
+void Cluster::upgrade_string_to_enum(size_t col_ndx, ArrayString& keys)
+{
+    ArrayInteger indexes(m_alloc);
+    indexes.create(Array::type_Normal, false);
+    ArrayString values(m_alloc);
+    ref_type ref = Array::get(col_ndx + s_first_col_index);
+    values.init_from_ref(ref);
+    size_t sz = values.size();
+    for (size_t i = 0; i < sz; i++) {
+        auto v = values.get(i);
+        size_t pos = keys.lower_bound(v);
+        REALM_ASSERT_3(pos, !=, keys.size());
+        indexes.add(pos);
+    }
+    Array::set(col_ndx + s_first_col_index, indexes.get_ref());
+    Array::destroy_deep(ref, m_alloc);
+}
+
+void Cluster::init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept
+{
+    ref_type ref = to_ref(Array::get(col_ndx + 1));
+    leaf->set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), col_ndx);
+    leaf->init_from_ref(ref);
 }
 
 void Cluster::dump_objects(int64_t key_offset, std::string lead) const
@@ -1248,7 +1274,6 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     std::cout << ", " << arr.get(i);
                     break;
                 }
-                case col_type_StringEnum:
                 case col_type_String: {
                     ArrayString arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);
@@ -1483,7 +1508,6 @@ Obj ClusterTree::insert(ObjKey k)
                     index->insert(k, ArrayBoolNull::default_value(nullable));
                     break;
                 case col_type_String:
-                case col_type_StringEnum:
                     index->insert(k, ArrayString::default_value(nullable));
                     break;
                 case col_type_Timestamp:
@@ -1608,6 +1632,53 @@ bool ClusterTree::traverse(TraverseFunction func) const
     }
     else {
         return static_cast<ClusterNodeInner*>(m_root.get())->traverse(func, 0);
+    }
+}
+
+void ClusterTree::optimize(bool enforce)
+{
+    size_t key_size_limit = enforce ? std::numeric_limits<size_t>::max() : size() / 2;
+    const Spec& spec = get_spec();
+    Allocator& alloc = get_alloc();
+    size_t num_cols = spec.get_public_column_count();
+
+    for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
+        ColumnType type = spec.get_column_type(col_ndx);
+        if (type == col_type_String && !spec.is_string_enum_type(col_ndx)) {
+            ArrayString keys(alloc);
+            ArrayString leaf(alloc);
+            keys.create();
+
+            bool ok = !traverse([key_size_limit, col_ndx, &alloc, &leaf, &keys](const Cluster* cluster) {
+                cluster->init_leaf(col_ndx, &leaf);
+                size_t sz = leaf.size();
+                size_t key_size = keys.size();
+                for (size_t i = 0; i < sz; i++) {
+                    auto v = leaf.get(i);
+                    size_t pos = keys.lower_bound(v);
+                    if (pos == key_size || keys.get(pos) != v) {
+                        keys.insert(pos, v); // Throws
+                        key_size++;
+                        // Don't bother auto enumerating if there are too few duplicates
+                        if (key_size > key_size_limit) {
+                            Array::destroy_deep(keys.get_ref(), alloc);
+                            return true;
+                        }
+                    }
+                }
+
+                return false; // Continue
+            });
+            if (ok) {
+                const_cast<Spec*>(&spec)->upgrade_string_to_enum(col_ndx, keys.get_ref());
+
+                // Replace column in all clusters
+                traverse([col_ndx, &keys](const Cluster* cluster) {
+                    const_cast<Cluster*>(cluster)->upgrade_string_to_enum(col_ndx, keys);
+                    return false; // Continue
+                });
+            }
+        }
     }
 }
 

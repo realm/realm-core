@@ -874,6 +874,11 @@ void Table::rebuild_search_index(size_t)
     }
 }
 
+bool Table::is_string_enum_type(ColKey col_key) const noexcept
+{
+    size_t col_ndx = colkey2ndx(col_key);
+    return m_spec->is_string_enum_type(col_ndx);
+}
 
 bool Table::is_nullable(ColKey col_key) const
 {
@@ -1433,13 +1438,14 @@ const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain)
 }
 
 
-void Table::optimize(bool)
+void Table::optimize(bool enforce)
 {
     // At the present time there is only one kind of optimization that
     // we can do, and that is to replace a string column with a string
     // enumeration column.
 
-    REALM_ASSERT(false); // FIXME: Unimplemented
+    m_clusters.optimize(enforce);
+
     if (Replication* repl = get_repl())
         repl->optimize_table(this); // Throws
 }
@@ -2040,9 +2046,6 @@ void Table::print() const
             case col_type_String:
                 std::cout << "String     ";
                 break;
-            case col_type_StringEnum:
-                std::cout << "String     ";
-                break;
             case col_type_Link: {
                 auto target_table_key = m_spec->get_opposite_link_table_key(k);
                 ConstTableRef target_table = get_parent_group()->get_table(target_table_key);
@@ -2112,7 +2115,6 @@ void Table::print() const
                     // std::cout << std::setw(10) << (value ? "true" : "false") << " ";
                     break;
                 }
-                case col_type_StringEnum:
                 case col_type_String: {
                     std::string value = obj.get<String>(n);
                     std::cout << std::setw(10) << value << " ";
@@ -2147,11 +2149,11 @@ void Table::print() const
                 }
 
                 // Not supported
+                case col_type_OldStringEnum:
                 case col_type_OldTable:
                 case col_type_OldMixed:
                 case col_type_OldDateTime:
                 case col_type_Reserved4:
-                default:
                     REALM_ASSERT(false);
             }
         }

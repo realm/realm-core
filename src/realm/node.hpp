@@ -275,11 +275,22 @@ private:
     void do_copy_on_write(size_t minimum_size = 0);
 };
 
+class Spec;
+
 /// Base class for all nodes holding user data
 class ArrayPayload {
 public:
     virtual ~ArrayPayload();
     virtual void init_from_ref(ref_type) noexcept = 0;
+    void set_spec(Spec* spec, size_t col_ndx) const
+    {
+        m_spec = spec;
+        m_col_ndx = col_ndx;
+    }
+
+protected:
+    mutable Spec* m_spec = nullptr;
+    mutable size_t m_col_ndx = realm::npos;
 };
 
 

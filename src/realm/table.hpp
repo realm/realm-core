@@ -221,6 +221,7 @@ public:
     bool has_search_index(ColKey col_key) const noexcept;
     void add_search_index(ColKey col_key);
     void remove_search_index(ColKey col_key);
+    bool is_string_enum_type(ColKey col_key) const noexcept;
 
     //@}
 

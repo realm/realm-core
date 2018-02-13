@@ -193,7 +193,7 @@ void StringNodeEqualBase::init()
     m_dD = 10.0;
     StringNodeBase::init();
 
-    if (m_column_type == col_type_StringEnum) {
+    if (m_is_string_enum) {
         m_dT = 1.0;
     }
     else if (m_has_search_index) {

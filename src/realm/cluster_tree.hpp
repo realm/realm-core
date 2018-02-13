@@ -107,6 +107,7 @@ public:
     Obj get(size_t ndx);
     bool get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept;
     bool traverse(TraverseFunction func) const;
+    void optimize(bool enforce);
     void dump_objects()
     {
         m_root->dump_objects(0, "");

@@ -182,6 +182,7 @@ public:
     {
         return ObjKey(get_key_value(ndx) + m_offset);
     }
+    const ClusterKeyArray* get_key_array() const { return &m_keys; }
     void set_offset(int64_t offs)
     {
         m_offset = offs;
@@ -262,16 +263,10 @@ public:
     void get(ObjKey k, State& state) const override;
     ObjKey get(size_t, State& state) const override;
     size_t erase(ObjKey k, CascadeState& state) override;
+    void upgrade_string_to_enum(size_t col_ndx, ArrayString& keys);
 
-    void init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept
-    {
-        ref_type ref = to_ref(Array::get(col_ndx + 1));
-        leaf->init_from_ref(ref);
-    }
-    const ClusterKeyArray* get_key_array() const
-    {
-        return &m_keys;
-    }
+    void init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept;
+
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
 private:

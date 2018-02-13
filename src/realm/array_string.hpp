@@ -25,6 +25,8 @@
 
 namespace realm {
 
+class Spec;
+
 class ArrayString : public ArrayPayload {
 public:
     using value_type = StringData;
@@ -70,28 +72,9 @@ public:
     void erase(size_t ndx);
     void truncate_and_destroy_children(size_t ndx);
 
-    size_t find_first(StringData value, size_t begin, size_t end) const noexcept
-    {
-        if (m_type == Type::small_strings) {
-            return static_cast<ArrayStringShort*>(m_arr)->find_first(value, begin, end);
-        }
-        else if (m_type == Type::medium_strings) {
-            for (size_t t = begin; t < end; t++) {
-                if (static_cast<ArraySmallBlobs*>(m_arr)->get_string(t) == value)
-                    return t;
-            }
-        }
-        else if (m_type == Type::big_strings) {
-            for (size_t t = begin; t < end; t++) {
-                if (static_cast<ArrayBigBlobs*>(m_arr)->get_string(t) == value)
-                    return t;
-            }
-        }
-        else {
-            REALM_ASSERT_RELEASE(false && "Unexpected string array type");
-        }
-        return not_found;
-    }
+    size_t find_first(StringData value, size_t begin, size_t end) const noexcept;
+
+    size_t lower_bound(StringData value);
 
 private:
     static constexpr size_t small_string_max_size = 15;  // ArrayStringShort
@@ -101,17 +84,15 @@ private:
         std::aligned_storage<sizeof(ArraySmallBlobs), alignof(ArraySmallBlobs)>::type m_string_long;
         std::aligned_storage<sizeof(ArrayBigBlobs), alignof(ArrayBigBlobs)>::type m_big_blobs;
     };
-    enum class Type {
-        small_strings,
-        medium_strings,
-        big_strings,
-    };
+    enum class Type { small_strings, medium_strings, big_strings, enum_strings };
 
     Type m_type = Type::small_strings;
 
     Allocator& m_alloc;
     Storage m_storage;
     Array* m_arr;
+
+    std::unique_ptr<ArrayString> m_string_enum_values;
 
     Type upgrade_leaf(size_t value_size);
 };

@@ -17,11 +17,12 @@
  **************************************************************************/
 
 #include <realm/array_string.hpp>
+#include <realm/array_integer.hpp>
+#include <realm/spec.hpp>
 
 using namespace realm;
 
-ArrayString::ArrayString(Allocator& a)
-    : m_alloc(a)
+ArrayString::ArrayString(Allocator& a) : m_alloc(a)
 {
     m_arr = new (&m_storage.m_string_short) ArrayStringShort(a, true);
 }
@@ -41,9 +42,24 @@ void ArrayString::init_from_ref(ref_type ref) noexcept
     bool long_strings = Array::get_hasrefs_from_header(header);
     if (!long_strings) {
         // Small strings
-        auto arr = new (&m_storage.m_string_short) ArrayStringShort(m_alloc, true);
-        arr->init_from_mem(MemRef(header, ref, m_alloc));
-        m_type = Type::small_strings;
+        bool is_small = Array::get_wtype_from_header(header) == Array::wtype_Multiply;
+        if (is_small) {
+            auto arr = new (&m_storage.m_string_short) ArrayStringShort(m_alloc, true);
+            arr->init_from_mem(MemRef(header, ref, m_alloc));
+            m_type = Type::small_strings;
+        }
+        else {
+            auto arr = new (&m_storage.m_string_short) ArrayInteger(m_alloc);
+            arr->init_from_mem(MemRef(header, ref, m_alloc));
+            m_string_enum_values = std::make_unique<ArrayString>(m_alloc);
+            ArrayParent* p;
+            REALM_ASSERT(m_spec != nullptr);
+            REALM_ASSERT(m_col_ndx != realm::npos);
+            ref_type r = m_spec->get_enumkeys_ref(m_col_ndx, p);
+            m_string_enum_values->init_from_ref(r);
+            m_string_enum_values->set_parent(p, m_col_ndx);
+            m_type = Type::enum_strings;
+        }
     }
     else {
         bool is_big = Array::get_context_flag_from_header(header);
@@ -76,6 +92,8 @@ size_t ArrayString::size() const
             return static_cast<ArraySmallBlobs*>(m_arr)->size();
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->size();
+        case Type::enum_strings:
+            return static_cast<ArrayInteger*>(m_arr)->size();
     }
     return {};
 }
@@ -92,6 +110,13 @@ void ArrayString::add(StringData value)
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->add_string(value);
             break;
+        case Type::enum_strings: {
+            auto a = static_cast<ArrayInteger*>(m_arr);
+            size_t ndx = a->size();
+            a->add(0);
+            set(ndx, value);
+            break;
+        }
     }
 }
 
@@ -107,6 +132,16 @@ void ArrayString::set(size_t ndx, StringData value)
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->set_string(ndx, value);
             break;
+        case Type::enum_strings: {
+            size_t sz = m_string_enum_values->size();
+            size_t res = m_string_enum_values->find_first(value, 0, sz);
+            if (res == realm::not_found) {
+                m_string_enum_values->add(value);
+                res = sz;
+            }
+            static_cast<ArrayInteger*>(m_arr)->set(ndx, res);
+            break;
+        }
     }
 }
 
@@ -122,6 +157,10 @@ void ArrayString::insert(size_t ndx, StringData value)
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->insert_string(ndx, value);
             break;
+        case Type::enum_strings: {
+            static_cast<ArrayInteger*>(m_arr)->insert(ndx, 0);
+            set(ndx, value);
+        }
     }
 }
 
@@ -134,6 +173,10 @@ StringData ArrayString::get(size_t ndx) const
             return static_cast<ArraySmallBlobs*>(m_arr)->get_string(ndx);
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->get_string(ndx);
+        case Type::enum_strings: {
+            size_t index = static_cast<ArrayInteger*>(m_arr)->get(ndx);
+            return m_string_enum_values->get(index);
+        }
     }
     return {};
 }
@@ -147,6 +190,10 @@ bool ArrayString::is_null(size_t ndx) const
             return static_cast<ArraySmallBlobs*>(m_arr)->is_null(ndx);
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->is_null(ndx);
+        case Type::enum_strings: {
+            size_t index = static_cast<ArrayInteger*>(m_arr)->get(ndx);
+            return m_string_enum_values->is_null(index);
+        }
     }
     return {};
 }
@@ -163,6 +210,9 @@ void ArrayString::erase(size_t ndx)
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->erase(ndx);
             break;
+        case Type::enum_strings:
+            static_cast<ArrayInteger*>(m_arr)->erase(ndx);
+            break;
     }
 }
 
@@ -178,13 +228,98 @@ void ArrayString::truncate_and_destroy_children(size_t ndx)
         case Type::big_strings:
             static_cast<ArrayBigBlobs*>(m_arr)->truncate(ndx);
             break;
+        case Type::enum_strings:
+            static_cast<ArrayInteger*>(m_arr)->truncate(ndx);
+            break;
     }
+}
+
+size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const noexcept
+{
+    switch (m_type) {
+        case Type::small_strings:
+            return static_cast<ArrayStringShort*>(m_arr)->find_first(value, begin, end);
+        case Type::medium_strings:
+            for (size_t t = begin; t < end; t++) {
+                if (static_cast<ArraySmallBlobs*>(m_arr)->get_string(t) == value)
+                    return t;
+            }
+            break;
+        case Type::big_strings:
+            for (size_t t = begin; t < end; t++) {
+                if (static_cast<ArrayBigBlobs*>(m_arr)->get_string(t) == value)
+                    return t;
+            }
+            break;
+        case Type::enum_strings: {
+            size_t sz = m_string_enum_values->size();
+            size_t res = m_string_enum_values->find_first(value, 0, sz);
+            if (res != realm::not_found) {
+                return static_cast<ArrayInteger*>(m_arr)->find_first(res, begin, end);
+            }
+            break;
+        }
+    }
+    return not_found;
+}
+
+namespace {
+
+template <class T>
+inline StringData get_string(const T* arr, size_t ndx)
+{
+    return arr->get_string(ndx);
+}
+
+template <>
+inline StringData get_string(const ArrayStringShort* arr, size_t ndx)
+{
+    return arr->get(ndx);
+}
+
+template <class T, class U>
+size_t lower_bound_string(const T* arr, U value)
+{
+    size_t i = 0;
+    size_t sz = arr->size();
+    while (0 < sz) {
+        size_t half = sz / 2;
+        size_t mid = i + half;
+        auto probe = get_string(arr, mid);
+        if (probe < value) {
+            i = mid + 1;
+            sz -= half + 1;
+        }
+        else {
+            sz = half;
+        }
+    }
+    return i;
+}
+}
+
+size_t ArrayString::lower_bound(StringData value)
+{
+    switch (m_type) {
+        case Type::small_strings:
+            return lower_bound_string(static_cast<ArrayStringShort*>(m_arr), value);
+        case Type::medium_strings:
+            return lower_bound_string(static_cast<ArraySmallBlobs*>(m_arr), value);
+        case Type::big_strings:
+            return lower_bound_string(static_cast<ArrayBigBlobs*>(m_arr), value);
+        case Type::enum_strings:
+            break;
+    }
+    return realm::npos;
 }
 
 ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
 {
     if (m_type == Type::big_strings)
         return Type::big_strings;
+
+    if (m_type == Type::enum_strings)
+        return Type::enum_strings;
 
     if (m_type == Type::medium_strings) {
         if (value_size <= medium_string_max_size)

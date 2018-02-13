@@ -282,9 +282,7 @@ TEST(Table_OptimizeCrash)
     Table ttt;
     ttt.add_column(type_Int, "first");
     auto col = ttt.add_column(type_String, "second");
-#ifdef LEGACY_TESTS
     ttt.optimize();
-#endif // LEGACY_TESTS
     ttt.add_search_index(col);
     ttt.clear();
     ttt.create_object().set_all(1, "AA");
@@ -958,24 +956,24 @@ void setup_multi_table(Table& table, size_t rows, std::vector<ObjKey>& keys, std
 {
     // Create table with all column types
     auto int_col = table.add_column(type_Int, "int");                        //  0
-    column_keys.push_back(int_col);
     auto bool_col = table.add_column(type_Bool, "bool");                     //  1
+    auto float_col = table.add_column(type_Float, "float");                  //  2
+    auto double_col = table.add_column(type_Double, "double");               //  3
+    auto string_col = table.add_column(type_String, "string");               //  4
+    auto string_long_col = table.add_column(type_String, "string_long");     //  5
+    auto string_big_col = table.add_column(type_String, "string_big_blobs"); //  6
+    auto string_enum_col = table.add_column(type_String, "string_enum");     //  7 - becomes StringEnumColumn
+    auto bin_col = table.add_column(type_Binary, "binary");                  //  8
+    auto int_null_col = table.add_column(type_Int, "int_null", true);        //  9, nullable = true
+    column_keys.push_back(int_col);
     column_keys.push_back(bool_col);
-    auto float_col = table.add_column(type_Float, "float");                  //  3
     column_keys.push_back(float_col);
-    auto double_col = table.add_column(type_Double, "double");               //  4
     column_keys.push_back(double_col);
-    auto string_col = table.add_column(type_String, "string");               //  5
     column_keys.push_back(string_col);
-    auto string_long_col = table.add_column(type_String, "string_long");     //  6
     column_keys.push_back(string_long_col);
-    auto string_big_col = table.add_column(type_String, "string_big_blobs"); //  7
     column_keys.push_back(string_big_col);
-    auto string_enum_col = table.add_column(type_String, "string_enum");     //  8 - becomes StringEnumColumn
     column_keys.push_back(string_enum_col);
-    auto bin_col = table.add_column(type_Binary, "binary");                  //  9
     column_keys.push_back(bin_col);
-    auto int_null_col = table.add_column(type_Int, "int_null", true);        // 12, nullable = true
     column_keys.push_back(int_null_col);
 
     std::vector<std::string> strings;
@@ -1038,10 +1036,8 @@ void setup_multi_table(Table& table, size_t rows, std::vector<ObjKey>& keys, std
         obj.set(bin_col, BinaryData("binary", 7));
     }
 
-#ifdef LEGACY_TESTS
     // We also want a StringEnumColumn
     table.optimize();
-#endif
 }
 
 } // anonymous namespace
@@ -1074,29 +1070,6 @@ TEST(Table_DeleteAllTypes)
 #endif
 }
 
-
-#ifdef LEGACY_TESTS
-// Triggers a bug that would make Realm crash if you run optimize() followed by add_search_index()
-TEST(Table_Optimize_SetIndex_Crash)
-{
-    Table table;
-    table.add_column(type_String, "first");
-    table.add_empty_row(3);
-    table.set_string(0, 0, "string0");
-    table.set_string(0, 1, "string1");
-    table.set_string(0, 2, "string1");
-
-    table.optimize();
-    CHECK_NOT_EQUAL(0, table.get_descriptor()->get_num_unique_values(0));
-
-    table.set_string(0, 2, "string2");
-
-    table.add_search_index(0);
-
-    table.move_last_over(1);
-    table.move_last_over(1);
-}
-#endif
 
 TEST(Table_MoveAllTypes)
 {
@@ -1762,147 +1735,108 @@ TEST(Table_IndexInt)
 #endif
 }
 
-#ifdef LEGACY_TESTS
-
-namespace {
-
-class TestTableAE : public TestTable {
-public:
-    TestTableAE()
-    {
-        add_column(type_Int, "first");
-        add_column(type_String, "second");
-        add_column(type_Bool, "third");
-        add_column(type_Int, "fourth");
-    }
-};
-
-} // anonymous namespace
-
 TEST(Table_AutoEnumeration)
 {
-    TestTableAE table;
+    Table table;
+
+    auto col_int = table.add_column(type_Int, "first");
+    auto col_str = table.add_column(type_String, "second");
 
     for (size_t i = 0; i < 5; ++i) {
-        add(table, 1, "abd", true, Mon);
-        add(table, 2, "eftg", true, Tue);
-        add(table, 5, "hijkl", true, Wed);
-        add(table, 8, "mnopqr", true, Thu);
-        add(table, 9, "stuvxyz", true, Fri);
+        table.create_object().set_all(1, "abd");
+        table.create_object().set_all(2, "eftg");
+        table.create_object().set_all(5, "hijkl");
+        table.create_object().set_all(8, "mnopqr");
+        table.create_object().set_all(9, "stuvxyz");
     }
 
-    table.optimize();
+    table.optimize(true);
 
     for (size_t i = 0; i < 5; ++i) {
         const size_t n = i * 5;
-        CHECK_EQUAL(1, table.get_int(0, 0 + n));
-        CHECK_EQUAL(2, table.get_int(0, 1 + n));
-        CHECK_EQUAL(5, table.get_int(0, 2 + n));
-        CHECK_EQUAL(8, table.get_int(0, 3 + n));
-        CHECK_EQUAL(9, table.get_int(0, 4 + n));
+        CHECK_EQUAL(1, table.get_object(ObjKey(0 + n)).get<Int>(col_int));
+        CHECK_EQUAL(2, table.get_object(ObjKey(1 + n)).get<Int>(col_int));
+        CHECK_EQUAL(5, table.get_object(ObjKey(2 + n)).get<Int>(col_int));
+        CHECK_EQUAL(8, table.get_object(ObjKey(3 + n)).get<Int>(col_int));
+        CHECK_EQUAL(9, table.get_object(ObjKey(4 + n)).get<Int>(col_int));
 
-        CHECK_EQUAL("abd", table.get_string(1, 0 + n));
-        CHECK_EQUAL("eftg", table.get_string(1, 1 + n));
-        CHECK_EQUAL("hijkl", table.get_string(1, 2 + n));
-        CHECK_EQUAL("mnopqr", table.get_string(1, 3 + n));
-        CHECK_EQUAL("stuvxyz", table.get_string(1, 4 + n));
-
-        CHECK_EQUAL(true, table.get_bool(2, 0 + n));
-        CHECK_EQUAL(true, table.get_bool(2, 1 + n));
-        CHECK_EQUAL(true, table.get_bool(2, 2 + n));
-        CHECK_EQUAL(true, table.get_bool(2, 3 + n));
-        CHECK_EQUAL(true, table.get_bool(2, 4 + n));
-
-        CHECK_EQUAL(Mon, table.get_int(3, 0 + n));
-        CHECK_EQUAL(Tue, table.get_int(3, 1 + n));
-        CHECK_EQUAL(Wed, table.get_int(3, 2 + n));
-        CHECK_EQUAL(Thu, table.get_int(3, 3 + n));
-        CHECK_EQUAL(Fri, table.get_int(3, 4 + n));
+        CHECK_EQUAL("abd", table.get_object(ObjKey(0 + n)).get<String>(col_str));
+        CHECK_EQUAL("eftg", table.get_object(ObjKey(1 + n)).get<String>(col_str));
+        CHECK_EQUAL("hijkl", table.get_object(ObjKey(2 + n)).get<String>(col_str));
+        CHECK_EQUAL("mnopqr", table.get_object(ObjKey(3 + n)).get<String>(col_str));
+        CHECK_EQUAL("stuvxyz", table.get_object(ObjKey(4 + n)).get<String>(col_str));
     }
 
     // Verify counts
-    const size_t count1 = table.count_string(1, "abd");
-    const size_t count2 = table.count_string(1, "eftg");
-    const size_t count3 = table.count_string(1, "hijkl");
-    const size_t count4 = table.count_string(1, "mnopqr");
-    const size_t count5 = table.count_string(1, "stuvxyz");
+    const size_t count1 = table.count_string(col_str, "abd");
+    const size_t count2 = table.count_string(col_str, "eftg");
+    const size_t count3 = table.count_string(col_str, "hijkl");
+    const size_t count4 = table.count_string(col_str, "mnopqr");
+    const size_t count5 = table.count_string(col_str, "stuvxyz");
     CHECK_EQUAL(5, count1);
     CHECK_EQUAL(5, count2);
     CHECK_EQUAL(5, count3);
     CHECK_EQUAL(5, count4);
     CHECK_EQUAL(5, count5);
-}
 
+    ObjKey t = table.find_first_string(col_str, "eftg");
+    CHECK_EQUAL(ObjKey(1), t);
 
-TEST(Table_AutoEnumerationFindFindAll)
-{
-    TestTableAE table;
-
-    for (size_t i = 0; i < 5; ++i) {
-        add(table, 1, "abd", true, Mon);
-        add(table, 2, "eftg", true, Tue);
-        add(table, 5, "hijkl", true, Wed);
-        add(table, 8, "mnopqr", true, Thu);
-        add(table, 9, "stuvxyz", true, Fri);
-    }
-
-    table.optimize();
-
-    size_t t = table.find_first_string(1, "eftg");
-    CHECK_EQUAL(1, t);
-
-    auto tv = table.find_all_string(1, "eftg");
+    auto tv = table.find_all_string(col_str, "eftg");
     CHECK_EQUAL(5, tv.size());
-    CHECK_EQUAL("eftg", tv.get_string(1, 0));
-    CHECK_EQUAL("eftg", tv.get_string(1, 1));
-    CHECK_EQUAL("eftg", tv.get_string(1, 2));
-    CHECK_EQUAL("eftg", tv.get_string(1, 3));
-    CHECK_EQUAL("eftg", tv.get_string(1, 4));
+    CHECK_EQUAL("eftg", tv.get(0).get<String>(col_str));
+    CHECK_EQUAL("eftg", tv.get(1).get<String>(col_str));
+    CHECK_EQUAL("eftg", tv.get(2).get<String>(col_str));
+    CHECK_EQUAL("eftg", tv.get(3).get<String>(col_str));
+    CHECK_EQUAL("eftg", tv.get(4).get<String>(col_str));
+
+    Obj obj = table.create_object();
+    CHECK_EQUAL(0, obj.get<Int>(col_int));
+    CHECK_EQUAL("", obj.get<String>(col_str));
 }
+
 
 TEST(Table_AutoEnumerationOptimize)
 {
     Table t;
-    t.add_column(type_String, "col1");
-    t.add_column(type_String, "col2");
-    t.add_column(type_String, "col3");
-    t.add_column(type_String, "col4");
+    auto col0 = t.add_column(type_String, "col1");
+    auto col1 = t.add_column(type_String, "col2");
+    auto col2 = t.add_column(type_String, "col3");
+    auto col3 = t.add_column(type_String, "col4");
 
-    // Insert non-optimzable strings
+    // Insert non-optimizable strings
     std::string s;
+    std::vector<ObjKey> keys;
+    t.create_objects(10, keys);
     for (size_t i = 0; i < 10; ++i) {
-        auto ndx = t.add_empty_row(1);
-        t.set_string(0, ndx, s.c_str());
-        t.set_string(1, ndx, s.c_str());
-        t.set_string(2, ndx, s.c_str());
-        t.set_string(3, ndx, s.c_str());
+        t.get_object(keys[i]).set_all(s.c_str(), s.c_str(), s.c_str(), s.c_str());
         s += "x";
     }
     t.optimize();
 
     // AutoEnumerate in reverse order
-    for (size_t i = 0; i < 10; ++i) {
-        t.set_string(3, i, "test");
+    for (Obj o : t) {
+        o.set(col3, "test");
     }
     t.optimize();
-    for (size_t i = 0; i < 10; ++i) {
-        t.set_string(2, i, "test");
+    for (Obj o : t) {
+        o.set(col2, "test");
     }
     t.optimize();
-    for (size_t i = 0; i < 10; ++i) {
-        t.set_string(1, i, "test");
+    for (Obj o : t) {
+        o.set(col1, "test");
     }
     t.optimize();
-    for (size_t i = 0; i < 10; ++i) {
-        t.set_string(0, i, "test");
+    for (Obj o : t) {
+        o.set(col0, "test");
     }
     t.optimize();
 
-    for (size_t i = 0; i < 10; ++i) {
-        CHECK_EQUAL("test", t.get_string(0, i));
-        CHECK_EQUAL("test", t.get_string(1, i));
-        CHECK_EQUAL("test", t.get_string(2, i));
-        CHECK_EQUAL("test", t.get_string(3, i));
+    for (Obj o : t) {
+        CHECK_EQUAL("test", o.get<String>(col0));
+        CHECK_EQUAL("test", o.get<String>(col1));
+        CHECK_EQUAL("test", o.get<String>(col2));
+        CHECK_EQUAL("test", o.get<String>(col3));
     }
 
 #ifdef REALM_DEBUG
@@ -1910,33 +1844,35 @@ TEST(Table_AutoEnumerationOptimize)
 #endif
 }
 
-
 TEST(Table_OptimizeCompare)
 {
     Table t1, t2;
-    t1.add_column(type_String, "str");
-    t2.add_column(type_String, "str");
+    auto col_t1 = t1.add_column(type_String, "str");
+    auto col_t2 = t2.add_column(type_String, "str");
 
-    t1.add_empty_row(100);
-    for (int i = 0; i < 100; ++i) {
-        t1.set_string(0, i, "foo");
+    std::vector<ObjKey> keys_t1;
+    std::vector<ObjKey> keys_t2;
+    t1.create_objects(100, keys_t1);
+    for (Obj o : t1) {
+        o.set(col_t1, "foo");
     }
-    t2.add_empty_row(100);
-    for (int i = 0; i < 100; ++i) {
-        t2.set_string(0, i, "foo");
+    t2.create_objects(100, keys_t2);
+    for (Obj o : t2) {
+        o.set(col_t2, "foo");
     }
     t1.optimize();
     CHECK(t1 == t2);
-    t1.set_string(0, 50, "bar");
+    Obj obj1 = t1.get_object(keys_t1[50]);
+    Obj obj2 = t2.get_object(keys_t2[50]);
+    obj1.set(col_t1, "bar");
     CHECK(t1 != t2);
-    t1.set_string(0, 50, "foo");
+    obj1.set(col_t1, "foo");
     CHECK(t1 == t2);
-    t2.set_string(0, 50, "bar");
+    obj2.set(col_t2, "bar");
     CHECK(t1 != t2);
-    t2.set_string(0, 50, "foo");
+    obj2.set(col_t2, "foo");
     CHECK(t1 == t2);
 }
-#endif // LEGACY_TESTS
 
 
 TEST(Table_SlabAlloc)
@@ -1992,9 +1928,7 @@ TEST(Table_NullInEnum)
     r = table->where().equal(col, "hello").count();
     CHECK_EQUAL(99, r);
 
-#ifdef LEGACY_TESTS
     table->optimize();
-#endif
 
     obj50.set<String>(col, realm::null());
     r = table->where().equal(col, "hello").count();
@@ -3417,6 +3351,38 @@ TEST(Table_object_forward_iterator)
     CHECK_EQUAL(val, it1->get<int64_t>(c0));
     table.remove_object(it1);
     CHECK_THROW_ANY(it1->get<int64_t>(c0));
+}
+
+// String query benchmark
+TEST(Table_QuickSort2)
+{
+    Table ttt;
+    auto strings = ttt.add_column(type_String, "2");
+
+    for (size_t t = 0; t < 1000; t++) {
+        Obj o = ttt.create_object();
+        std::string s = util::to_string(t % 100);
+        o.set<StringData>(strings, s);
+    }
+
+    Query q = ttt.where().equal(strings, "10");
+
+    auto t1 = steady_clock::now();
+
+    CALLGRIND_START_INSTRUMENTATION;
+
+    size_t nb_reps = 1000;
+    for (size_t t = 0; t < nb_reps; t++) {
+        TableView tv = q.find_all();
+        CHECK_EQUAL(tv.size(), 10);
+    }
+
+    CALLGRIND_STOP_INSTRUMENTATION;
+
+    auto t2 = steady_clock::now();
+
+    std::cout << nb_reps << " repetitions of find_all" << std::endl;
+    std::cout << "    time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_reps << " ns/rep" << std::endl;
 }
 
 TEST(Table_object_sequential)
