@@ -164,6 +164,8 @@ public:
     virtual ref_type insert(ObjKey k, State& state) = 0;
     /// Locate object identified by 'key' and update 'state' accordingly
     virtual void get(ObjKey key, State& state) const = 0;
+    /// Locate object identified by 'ndx' and update 'state' accordingly
+    virtual ObjKey get(size_t ndx, State& state) const = 0;
 
     /// Erase element identified by 'key'
     virtual size_t erase(ObjKey key, CascadeState& state) = 0;
@@ -257,6 +259,7 @@ public:
     void remove_column(size_t ndx) override;
     ref_type insert(ObjKey k, State& state) override;
     void get(ObjKey k, State& state) const override;
+    ObjKey get(size_t, State& state) const override;
     size_t erase(ObjKey k, CascadeState& state) override;
 
     void init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept

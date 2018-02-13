@@ -272,6 +272,14 @@ public:
     {
         return m_clusters.get(key);
     }
+    Obj get_object(size_t ndx)
+    {
+        return m_clusters.get(ndx);
+    }
+    ConstObj get_object(size_t ndx) const
+    {
+        return m_clusters.get(ndx);
+    }
     void dump_objects()
     {
         return m_clusters.dump_objects();
