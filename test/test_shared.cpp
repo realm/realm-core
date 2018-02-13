@@ -95,9 +95,8 @@ using unit_test::TestContext;
 // check-testcase` (or one of its friends) from the command line.
 
 
-
 #if 0
-// Sorting benchmark
+// String query benchmark
 ONLY(Query_QuickSort2)
 {
     Table ttt;
