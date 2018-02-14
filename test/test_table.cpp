@@ -3385,11 +3385,17 @@ TEST(Table_object_forward_iterator)
 
     // table.dump_objects();
 
+    size_t ndx = 0;
     for (Obj o : table) {
         int64_t key_value = o.get_key().value;
         // std::cout << "Key value: " << std::hex << key_value << std::dec << std::endl;
         CHECK_EQUAL(key_value << 1, o.get<int64_t>(c0));
         CHECK_EQUAL(key_value << 2, o.get<util::Optional<int64_t>>(c1));
+
+        Obj x = table.get_object(ndx);
+        CHECK_EQUAL(o.get_key(), x.get_key());
+        CHECK_EQUAL(o.get<int64_t>(c0), x.get<int64_t>(c0));
+        ndx++;
     }
 
     auto it = table.begin();
@@ -3439,11 +3445,11 @@ TEST(Table_object_sequential)
             table->create_object(ObjKey(i)).set_all(i << 1, i << 2);
         }
 
-
         auto t2 = steady_clock::now();
         std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
                   << std::endl;
 
+        CHECK_EQUAL(table->size(), nb_rows);
         wt.commit();
     }
 
@@ -3492,6 +3498,7 @@ TEST(Table_object_sequential)
         for (int i = 0; i < nb_rows; i++) {
             table->remove_object(ObjKey(i));
 #ifdef REALM_DEBUG
+            CHECK_EQUAL(table->size(), nb_rows - i - 1);
             for (int j = i + 1; j < nb_rows; j++) {
                 Obj o = table->get_object(ObjKey(j));
                 CHECK_EQUAL(j << 2, o.get<int64_t>(c0));
@@ -3556,6 +3563,7 @@ TEST(Table_object_random)
         std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
                   << std::endl;
 
+        CHECK_EQUAL(table->size(), nb_rows);
         wt.commit();
     }
 
@@ -3604,6 +3612,7 @@ TEST(Table_object_random)
         for (int i = 0; i < nb_rows; i++) {
             table->remove_object(ObjKey(key_values[i]));
 #ifdef REALM_DEBUG
+            CHECK_EQUAL(table->size(), nb_rows - i - 1);
             for (int j = i + 1; j < nb_rows; j++) {
                 Obj o = table->get_object(ObjKey(key_values[j]));
                 CHECK_EQUAL(j << 2, o.get<int64_t>(c0));

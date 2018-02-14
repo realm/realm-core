@@ -103,6 +103,8 @@ public:
     bool is_valid(ObjKey k) const;
     ConstObj get(ObjKey k) const;
     Obj get(ObjKey k);
+    ConstObj get(size_t ndx) const;
+    Obj get(size_t ndx);
     bool get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept;
     bool traverse(TraverseFunction func) const;
     void dump_objects()
