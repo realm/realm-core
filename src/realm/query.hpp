@@ -232,11 +232,12 @@ public:
     Query& not_equal(size_t column_ndx, const char* c_str, bool case_sensitive = true);
 
     // Conditions: binary data
-    Query& equal(size_t column_ndx, BinaryData value);
-    Query& not_equal(size_t column_ndx, BinaryData value);
-    Query& begins_with(size_t column_ndx, BinaryData value);
-    Query& ends_with(size_t column_ndx, BinaryData value);
-    Query& contains(size_t column_ndx, BinaryData value);
+    Query& equal(size_t column_ndx, BinaryData value, bool case_sensitive = true);
+    Query& not_equal(size_t column_ndx, BinaryData value, bool case_sensitive = true);
+    Query& begins_with(size_t column_ndx, BinaryData value, bool case_sensitive = true);
+    Query& ends_with(size_t column_ndx, BinaryData value, bool case_sensitive = true);
+    Query& contains(size_t column_ndx, BinaryData value, bool case_sensitive = true);
+    Query& like(size_t column_ndx, BinaryData b, bool case_sensitive = true);
 
     // Negation
     Query& Not();

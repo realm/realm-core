@@ -304,29 +304,19 @@ TEST(Metrics_QueryEqual)
     q4.find_all();
     q5.find_all();
     q6.find_all();
-    q7.find_all();
-    q8.find_all();
+    CHECK_THROW(q7.find_all(), SerialisationError);
+    CHECK_THROW(q8.find_all(), SerialisationError);
 
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
-    CHECK_EQUAL(queries->size(), 9);
+    CHECK_EQUAL(queries->size(), 7);
 
     for (size_t i = 0; i < 7; ++i) {
         std::string description = queries->at(i).get_description();
         CHECK_EQUAL(find_count(description, column_names[i]), 1);
         CHECK_GREATER_EQUAL(find_count(description, query_search_term), 1);
-    }
-    {
-        std::string description = queries->at(7).get_description();
-        CHECK_EQUAL(find_count(description, column_names[7]), 1);
-        CHECK_EQUAL(find_count(description, "links to"), 1);
-    }
-    {
-        std::string description = queries->at(8).get_description();
-        CHECK_EQUAL(find_count(description, "owner"), 1);
-        CHECK_EQUAL(find_count(description, "links to"), 1);
     }
 }
 
@@ -502,7 +492,7 @@ TEST(Metrics_LinkQueries)
     q0.find_all();
     q1.find_all();
     q2.find_all();
-    q3.find_all();
+    CHECK_THROW(q3.find_all(), SerialisationError);
 
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
@@ -512,7 +502,8 @@ TEST(Metrics_LinkQueries)
     // FIXME: q3 adds 6 queries: the find_all() + 1 sub query per row in person
     // that's how subqueries across links are executed currently so it is accurate
     // but not sure if this is acceptable for how we track queries
-    CHECK_EQUAL(queries->size(), 10);
+    // CHECK_EQUAL(queries->size(), 10);
+    CHECK_EQUAL(queries->size(), 3);
 
     std::string null_links_description = queries->at(0).get_description();
     CHECK_EQUAL(find_count(null_links_description, "NULL"), 1);
@@ -528,12 +519,13 @@ TEST(Metrics_LinkQueries)
     CHECK_EQUAL(find_count(count_link_description, pet_link_col_name), 1);
     CHECK_EQUAL(find_count(count_link_description, "=="), 1);
 
-    std::string link_subquery_description = queries->at(3).get_description();
-    CHECK_EQUAL(find_count(link_subquery_description, "@count"), 1);
-    CHECK_EQUAL(find_count(link_subquery_description, pet_link_col_name), 1);
-    CHECK_EQUAL(find_count(link_subquery_description, "=="), 1);
-    CHECK_EQUAL(find_count(link_subquery_description, column_names[0]), 1);
-    CHECK_EQUAL(find_count(link_subquery_description, ">"), 1);
+//    CHECK_THROW(queries->at(3), SerialisationError);
+//    std::string link_subquery_description = queries->at(3).get_description();
+//    CHECK_EQUAL(find_count(link_subquery_description, "@count"), 1);
+//    CHECK_EQUAL(find_count(link_subquery_description, pet_link_col_name), 1);
+//    CHECK_EQUAL(find_count(link_subquery_description, "=="), 1);
+//    CHECK_EQUAL(find_count(link_subquery_description, column_names[0]), 1);
+//    CHECK_EQUAL(find_count(link_subquery_description, ">"), 1);
 }
 
 
@@ -575,18 +567,16 @@ TEST(Metrics_LinkListQueries)
     q0.find_all();
     q1.find_all();
     q2.find_all();
-    q3.find_all();
+    CHECK_THROW(q3.find_all(), SerialisationError);
     q4.find_all();
-    q5.find_all();
+    CHECK_THROW(q5.find_all(), SerialisationError);
 
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
 
-    // q4 adds a subquery which is executed once per link in the linklist column
-    size_t num_total_links = 11;
-    CHECK_EQUAL(queries->size(), 6 + num_total_links);
+    CHECK_EQUAL(queries->size(), 4);
 
     std::string null_links_description = queries->at(0).get_description();
     CHECK_EQUAL(find_count(null_links_description, "NULL"), 1);
@@ -602,22 +592,20 @@ TEST(Metrics_LinkListQueries)
     CHECK_EQUAL(find_count(count_link_description, column_names[ll_col_ndx]), 1);
     CHECK_EQUAL(find_count(count_link_description, "=="), 1);
 
-    std::string equal_link_description = queries->at(3).get_description();
-    CHECK_EQUAL(find_count(equal_link_description, column_names[ll_col_ndx]), 1);
-    CHECK_EQUAL(find_count(equal_link_description, "links to"), 1);
+    //CHECK_THROW(queries->at(3), SerialisationError);
 
-    std::string sum_link_description = queries->at(4).get_description();
+    std::string sum_link_description = queries->at(3).get_description();
     CHECK_EQUAL(find_count(sum_link_description, "@sum"), 1);
     CHECK_EQUAL(find_count(sum_link_description, column_names[ll_col_ndx]), 1);
     CHECK_EQUAL(find_count(sum_link_description, column_names[double_col_ndx]), 1);
     // the query system can choose to flip the argument order and operators so that >= might be <=
     CHECK_EQUAL(find_count(sum_link_description, "<=") + find_count(sum_link_description, ">="), 1);
 
-    std::string link_subquery_description = queries->at(5).get_description();
-    CHECK_EQUAL(find_count(link_subquery_description, "@count"), 1);
-    CHECK_EQUAL(find_count(link_subquery_description, column_names[ll_col_ndx]), 1);
-    CHECK_EQUAL(find_count(link_subquery_description, "=="), 2);
-    CHECK_EQUAL(find_count(link_subquery_description, column_names[str_col_ndx]), 1);
+//    std::string link_subquery_description = queries->at(4).get_description();
+//    CHECK_EQUAL(find_count(link_subquery_description, "@count"), 1);
+//    CHECK_EQUAL(find_count(link_subquery_description, column_names[ll_col_ndx]), 1);
+//    CHECK_EQUAL(find_count(link_subquery_description, "=="), 2);
+//    CHECK_EQUAL(find_count(link_subquery_description, column_names[str_col_ndx]), 1);
 }
 
 

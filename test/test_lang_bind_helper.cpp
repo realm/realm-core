@@ -13313,6 +13313,35 @@ TEST(LangBindHelper_SubtableAccessorUpdatesOnMoveRow)
 }
 
 
+// Test case generated in [realm-core-4.0.4] on Mon Dec 18 13:33:24 2017.
+// Adding 0 rows to a StringEnumColumn would add the default value to the keys
+// but not the indexes creating an inconsistency.
+TEST(LangBindHelper_EnumColumnAddZeroRows)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = nullptr;
+    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(key));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = sg_w.begin_write();
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+
+    try { g.insert_table(0, ""); } catch (const TableNameInUse&) { }
+    g.get_table(0)->add_column(DataType(2), "table", false);
+    g.get_table(0)->optimize(true);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    g.get_table(0)->add_empty_row(0);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+    g.verify();
+}
+
+
 TEST(LangBindHelper_MoveSubtableAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);

@@ -28,7 +28,7 @@ namespace parser {
 struct Expression
 {
     enum class Type { None, Number, String, KeyPath, Argument, True, False, Null, Timestamp, Base64 } type;
-    enum class KeyPathOp { None, Min, Max, Avg, Sum, Count, Size } collection_op;
+    enum class KeyPathOp { None, Min, Max, Avg, Sum, Count, SizeString, SizeBinary } collection_op;
     std::string s;
     std::vector<std::string> time_inputs;
     std::string op_suffix;
@@ -89,7 +89,31 @@ struct Predicate
     Predicate(Type t, bool n = false) : type(t), negate(n) {}
 };
 
-Predicate parse(const std::string &query);
+struct DescriptorOrderingState
+{
+    struct PropertyState
+    {
+        std::string key_path;
+        bool ascending;
+    };
+    struct SingleOrderingState
+    {
+        std::vector<PropertyState> properties;
+        bool is_distinct;
+    };
+    std::vector<SingleOrderingState> orderings;
+};
+
+struct ParserResult
+{
+    ParserResult(Predicate p, DescriptorOrderingState o)
+    : predicate(p)
+    , ordering(o) {}
+    Predicate predicate;
+    DescriptorOrderingState ordering;
+};
+
+ParserResult parse(const std::string &query);
 
 // run the analysis tool to check for cycles in the grammar
 // returns the number of problems found and prints some info to std::cout

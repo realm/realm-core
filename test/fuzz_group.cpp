@@ -51,15 +51,6 @@ using namespace realm::util;
 struct EndOfFile {
 };
 
-std::string create_string(size_t length)
-{
-    REALM_ASSERT_3(length, <, 256);
-    char buf[256] = {0};
-    for (size_t i = 0; i < length; i++)
-        buf[i] = 'a' + (rand() % 20);
-    return std::string{buf, length};
-}
-
 enum INS {
     ADD_TABLE,
     INSERT_TABLE,
@@ -152,6 +143,14 @@ int32_t get_int32(State& s)
     return v;
 }
 
+std::string create_string(State& s, size_t length)
+{
+    std::string buf(length, '\0');
+    for (size_t i = 0; i < length; i++)
+        buf[i] = get_next(s);
+    return buf;
+}
+
 std::pair<int64_t, int32_t> get_timestamp_values(State& s) {
     int64_t seconds = get_int64(s);
     int32_t nanoseconds = get_int32(s) % 1000000000;
@@ -213,7 +212,7 @@ Mixed construct_mixed(State& s, util::Optional<std::ostream&> log, std::string& 
             return Mixed(value);
         }
         case 4: {
-            buffer = create_string(get_next(s));
+            buffer = create_string(s, get_next(s));
             if (log) {
                 *log << "Mixed mixed(StringData(\"" << buffer << "\"));\n";
             }
@@ -245,14 +244,14 @@ Mixed construct_mixed(State& s, util::Optional<std::ostream&> log, std::string& 
 
 std::string create_column_name(State& s)
 {
-    const size_t length = get_next(s) % (Descriptor::max_column_name_length + 1);
-    return create_string(length);
+    const unsigned char length = get_next(s) % (Descriptor::max_column_name_length + 1);
+    return create_string(s, length);
 }
 
 std::string create_table_name(State& s)
 {
-    const size_t length = get_next(s) % (Group::max_table_name_length + 1);
-    return create_string(length);
+    const unsigned char length = get_next(s) % (Group::max_table_name_length + 1);
+    return create_string(s, length);
 }
 
 std::string get_current_time_stamp()
@@ -651,7 +650,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     else {
                         if (type == type_String) {
-                            std::string str = create_string(get_next(s));
+                            std::string str = create_string(s, get_next(s));
                             if (log) {
                                 *log << "g.get_table(" << table_ndx << ")->set_string(" << col_ndx << ", " << row_ndx
                                      << ", \"" << str << "\");\n";
@@ -672,7 +671,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 t->set_binary_big(col_ndx, row_ndx, BinaryData(blob));
                             }
                             else {
-                                std::string str = create_string(get_next(s));
+                                std::string str = create_string(s, get_next(s));
                                 if (log) {
                                     *log << "g.get_table(" << table_ndx << ")->set_binary(" << col_ndx << ", " << row_ndx
                                     << ", BinaryData{\"" << str << "\", " << str.size() << "});\n";
@@ -1111,7 +1110,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 }
                             }
                             else {
-                                std::string str = create_string(get_next(s));
+                                std::string str = create_string(s, get_next(s));
                                 if (log) {
                                     *log << "try { g.get_table(" << table_ndx << ")->set_string_unique(" << col_ndx
                                          << ", " << row_ndx << ", \"" << str << "\"); } catch (const LogicError& le) "
