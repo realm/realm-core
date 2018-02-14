@@ -695,6 +695,9 @@ void File::prealloc(SizeType offset, size_t size)
     if (get_size() < offset)
         resize(offset);
 
+
+    THIS LINE MAKES IT UNABLE TO COMPILE ON PURPOSE
+
 #endif
 }
 
