@@ -1077,7 +1077,7 @@ public:
 
     void table_changed() override
     {
-        m_is_string_enum = m_table->is_string_enum_type(m_condition_column_key);
+        m_is_string_enum = m_table->is_enumerated(m_condition_column_key);
         m_has_search_index = m_table->has_search_index(m_condition_column_key);
     }
 

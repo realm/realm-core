@@ -1635,51 +1635,37 @@ bool ClusterTree::traverse(TraverseFunction func) const
     }
 }
 
-void ClusterTree::optimize(bool enforce)
+void ClusterTree::enumerate_string_column(size_t col_ndx)
 {
-    size_t key_size_limit = enforce ? std::numeric_limits<size_t>::max() : size() / 2;
-    const Spec& spec = get_spec();
     Allocator& alloc = get_alloc();
-    size_t num_cols = spec.get_public_column_count();
 
-    for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
-        ColumnType type = spec.get_column_type(col_ndx);
-        if (type == col_type_String && !spec.is_string_enum_type(col_ndx)) {
-            ArrayString keys(alloc);
-            ArrayString leaf(alloc);
-            keys.create();
+    ArrayString keys(alloc);
+    ArrayString leaf(alloc);
+    keys.create();
 
-            bool ok = !traverse([key_size_limit, col_ndx, &alloc, &leaf, &keys](const Cluster* cluster) {
-                cluster->init_leaf(col_ndx, &leaf);
-                size_t sz = leaf.size();
-                size_t key_size = keys.size();
-                for (size_t i = 0; i < sz; i++) {
-                    auto v = leaf.get(i);
-                    size_t pos = keys.lower_bound(v);
-                    if (pos == key_size || keys.get(pos) != v) {
-                        keys.insert(pos, v); // Throws
-                        key_size++;
-                        // Don't bother auto enumerating if there are too few duplicates
-                        if (key_size > key_size_limit) {
-                            Array::destroy_deep(keys.get_ref(), alloc);
-                            return true;
-                        }
-                    }
-                }
-
-                return false; // Continue
-            });
-            if (ok) {
-                const_cast<Spec*>(&spec)->upgrade_string_to_enum(col_ndx, keys.get_ref());
-
-                // Replace column in all clusters
-                traverse([col_ndx, &keys](const Cluster* cluster) {
-                    const_cast<Cluster*>(cluster)->upgrade_string_to_enum(col_ndx, keys);
-                    return false; // Continue
-                });
+    traverse([col_ndx, &alloc, &leaf, &keys](const Cluster* cluster) {
+        cluster->init_leaf(col_ndx, &leaf);
+        size_t sz = leaf.size();
+        size_t key_size = keys.size();
+        for (size_t i = 0; i < sz; i++) {
+            auto v = leaf.get(i);
+            size_t pos = keys.lower_bound(v);
+            if (pos == key_size || keys.get(pos) != v) {
+                keys.insert(pos, v); // Throws
+                key_size++;
             }
         }
-    }
+
+        return false; // Continue
+    });
+
+    const_cast<Spec*>(&get_spec())->upgrade_string_to_enum(col_ndx, keys.get_ref());
+
+    // Replace column in all clusters
+    traverse([col_ndx, &keys](const Cluster* cluster) {
+        const_cast<Cluster*>(cluster)->upgrade_string_to_enum(col_ndx, keys);
+        return false; // Continue
+    });
 }
 
 std::unique_ptr<ClusterNode> ClusterTree::get_node(ref_type ref) const

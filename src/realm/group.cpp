@@ -1318,7 +1318,7 @@ public:
         return true;
     }
 
-    bool optimize_table() noexcept
+    bool enumerate_string_column(ColKey)
     {
         return true; // No-op
     }

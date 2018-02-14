@@ -7,6 +7,8 @@
 ### Breaking changes
 
 * 'begin' argument removed from Query::count();
+* Table::optimize replaced with explicit Table::enumerate_string_column. It will enumerate
+  column unconditionally.
 
 ### Enhancements
 

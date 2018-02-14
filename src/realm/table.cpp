@@ -641,6 +641,26 @@ void Table::remove_search_index(ColKey col_key)
         repl->remove_search_index(this, col_key); // Throws
 }
 
+void Table::enumerate_string_column(ColKey col_key)
+{
+    if (REALM_UNLIKELY(!valid_column(col_key)))
+        throw InvalidKey("No such column");
+    size_t column_ndx = colkey2ndx(col_key);
+    ColumnType type = m_spec->get_column_type(column_ndx);
+    if (type == col_type_String && !m_spec->is_string_enum_type(column_ndx)) {
+        m_clusters.enumerate_string_column(column_ndx);
+
+        if (Replication* repl = get_repl())
+            repl->enumerate_string_column(this, col_key); // Throws
+    }
+}
+
+bool Table::is_enumerated(ColKey col_key) const noexcept
+{
+    size_t col_ndx = colkey2ndx(col_key);
+    return m_spec->is_string_enum_type(col_ndx);
+}
+
 size_t Table::get_num_unique_values(ColKey) const
 {
     // FIXME: not implemented
@@ -872,12 +892,6 @@ void Table::rebuild_search_index(size_t)
             add_search_index(ndx2colkey(col_ndx));
         }
     }
-}
-
-bool Table::is_string_enum_type(ColKey col_key) const noexcept
-{
-    size_t col_ndx = colkey2ndx(col_key);
-    return m_spec->is_string_enum_type(col_ndx);
 }
 
 bool Table::is_nullable(ColKey col_key) const
@@ -1437,18 +1451,6 @@ const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain)
     return table;
 }
 
-
-void Table::optimize(bool enforce)
-{
-    // At the present time there is only one kind of optimization that
-    // we can do, and that is to replace a string column with a string
-    // enumeration column.
-
-    m_clusters.optimize(enforce);
-
-    if (Replication* repl = get_repl())
-        repl->optimize_table(this); // Throws
-}
 
 void Table::update_from_parent(size_t old_baseline) noexcept
 {

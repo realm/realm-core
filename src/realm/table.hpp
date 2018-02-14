@@ -221,7 +221,9 @@ public:
     bool has_search_index(ColKey col_key) const noexcept;
     void add_search_index(ColKey col_key);
     void remove_search_index(ColKey col_key);
-    bool is_string_enum_type(ColKey col_key) const noexcept;
+
+    void enumerate_string_column(ColKey col_key);
+    bool is_enumerated(ColKey col_key) const noexcept;
 
     //@}
 
@@ -527,10 +529,6 @@ public:
 
     Table& link(ColKey link_column);
     Table& backlink(const Table& origin, ColKey origin_col_key);
-
-    // Optimizing. enforce == true will enforce enumeration of all string columns;
-    // enforce == false will auto-evaluate if they should be enumerated or not
-    void optimize(bool enforce = false);
 
     // Conversion
     void to_json(std::ostream& out, size_t link_depth = 0,

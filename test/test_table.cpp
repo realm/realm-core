@@ -282,7 +282,7 @@ TEST(Table_OptimizeCrash)
     Table ttt;
     ttt.add_column(type_Int, "first");
     auto col = ttt.add_column(type_String, "second");
-    ttt.optimize();
+    ttt.enumerate_string_column(col);
     ttt.add_search_index(col);
     ttt.clear();
     ttt.create_object().set_all(1, "AA");
@@ -1037,7 +1037,7 @@ void setup_multi_table(Table& table, size_t rows, std::vector<ObjKey>& keys, std
     }
 
     // We also want a StringEnumColumn
-    table.optimize();
+    table.enumerate_string_column(string_enum_col);
 }
 
 } // anonymous namespace
@@ -1750,7 +1750,7 @@ TEST(Table_AutoEnumeration)
         table.create_object().set_all(9, "stuvxyz");
     }
 
-    table.optimize(true);
+    table.enumerate_string_column(col_str);
 
     for (size_t i = 0; i < 5; ++i) {
         const size_t n = i * 5;
@@ -1808,29 +1808,28 @@ TEST(Table_AutoEnumerationOptimize)
     std::string s;
     std::vector<ObjKey> keys;
     t.create_objects(10, keys);
-    for (size_t i = 0; i < 10; ++i) {
-        t.get_object(keys[i]).set_all(s.c_str(), s.c_str(), s.c_str(), s.c_str());
+    for (Obj o : t) {
+        o.set_all(s.c_str(), s.c_str(), s.c_str(), s.c_str());
         s += "x";
     }
-    t.optimize();
 
     // AutoEnumerate in reverse order
     for (Obj o : t) {
         o.set(col3, "test");
     }
-    t.optimize();
+    t.enumerate_string_column(col3);
     for (Obj o : t) {
         o.set(col2, "test");
     }
-    t.optimize();
+    t.enumerate_string_column(col2);
     for (Obj o : t) {
         o.set(col1, "test");
     }
-    t.optimize();
+    t.enumerate_string_column(col1);
     for (Obj o : t) {
         o.set(col0, "test");
     }
-    t.optimize();
+    t.enumerate_string_column(col0);
 
     for (Obj o : t) {
         CHECK_EQUAL("test", o.get<String>(col0));
@@ -1860,7 +1859,7 @@ TEST(Table_OptimizeCompare)
     for (Obj o : t2) {
         o.set(col_t2, "foo");
     }
-    t1.optimize();
+    t1.enumerate_string_column(col_t1);
     CHECK(t1 == t2);
     Obj obj1 = t1.get_object(keys_t1[50]);
     Obj obj2 = t2.get_object(keys_t2[50]);
@@ -1928,7 +1927,7 @@ TEST(Table_NullInEnum)
     r = table->where().equal(col, "hello").count();
     CHECK_EQUAL(99, r);
 
-    table->optimize();
+    table->enumerate_string_column(col);
 
     obj50.set<String>(col, realm::null());
     r = table->where().equal(col, "hello").count();
