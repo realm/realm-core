@@ -2,6 +2,10 @@
 
 ### Bugfixes
 
+* Fixed handling of out-of-diskspace. With encryption in use it would ASSERT like
+  `group_writer.cpp:393: [realm-core-5.1.2] Assertion failed: ref + size <= ...`.
+  Without encryption it would give a SIGBUS error. It's unknown if it could corrupt
+  the .realm file.
 * Fix an issue where adding zero rows would add the default value to the keys
   of any string enum columns. Not affecting end users.
   PR [#2956](https://github.com/realm/realm-core/pull/2956).
