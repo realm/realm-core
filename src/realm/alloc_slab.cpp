@@ -785,7 +785,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 
         // Pre-alloc initial space
         size_t initial_size = m_initial_section_size;
-        m_file_mappings->m_file.prealloc(0, initial_size); // Throws
+        m_file_mappings->m_file.prealloc(initial_size); // Throws
 
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
@@ -903,7 +903,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
                 // free space management relies on the logical filesize and disregards the
                 // actual size of the file.
                 size = get_upper_section_boundary(size);
-                m_file_mappings->m_file.prealloc(0, size);
+                m_file_mappings->m_file.prealloc(size);
                 m_file_mappings->m_initial_mapping.remap(m_file_mappings->m_file, File::access_ReadOnly, size);
                 m_data = m_file_mappings->m_initial_mapping.get_addr();
                 m_baseline = size;
@@ -1188,24 +1188,26 @@ void SlabAlloc::resize_file(size_t new_file_size)
 {
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
     REALM_ASSERT(matches_section_boundary(new_file_size));
-    m_file_mappings->m_file.prealloc(0, new_file_size); // Throws
+    m_file_mappings->m_file.prealloc(new_file_size); // Throws
 
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         m_file_mappings->m_file.sync(); // Throws
 }
 
+#ifdef REALM_DEBUG
 void SlabAlloc::reserve_disk_space(size_t size)
 {
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
     if (!matches_section_boundary(size))
         size = get_upper_section_boundary(size);
-    m_file_mappings->m_file.prealloc_if_supported(0, size); // Throws
+    m_file_mappings->m_file.prealloc(size); // Throws
 
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         m_file_mappings->m_file.sync(); // Throws
 }
+#endif
 
 void SlabAlloc::verify() const
 {
