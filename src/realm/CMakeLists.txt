@@ -134,20 +134,24 @@ set(REALM_INSTALL_GENERAL_HEADERS
 
 set(REALM_PARSER_SOURCES
     parser/expression_container.cpp
+    parser/keypath_mapping.cpp
     parser/parser.cpp
     parser/parser_utils.cpp
     parser/property_expression.cpp
     parser/query_builder.cpp
+    parser/subquery_expression.cpp
     parser/value_expression.cpp
 ) # REALM_PARSER_SOURCES
 
 set(REALM_PARSER_HEADERS
     parser/collection_operator_expression.hpp
     parser/expression_container.hpp
+    parser/keypath_mapping.hpp
     parser/parser.hpp
     parser/parser_utils.hpp
     parser/property_expression.hpp
     parser/query_builder.hpp
+    parser/subquery_expression.hpp
     parser/value_expression.hpp
 ) # REALM_PARSER_HEADERS
 

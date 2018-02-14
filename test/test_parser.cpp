@@ -104,6 +104,11 @@ static std::vector<std::string> valid_queries = {
     "a09._br.z = __-__.Z-9",
     "$0 = $19",
     "$0=$0",
+    // properties can contain '$'
+    "a$a = a",
+    "$-1 = $0",
+    "$a = $0",
+    "$ = $",
 
     // operators
     "0=0",
@@ -190,6 +195,16 @@ static std::vector<std::string> valid_queries = {
     "a == b sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
     "a == b and c==d sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
     "a == b  sort(     a   ASC  ,  b DESC) and c==d   DISTINCT(   p )  sort(   c   ASC  ,  d   DESC  )  DISTINCT(   q.r ,   p)   ",
+
+    // subquery expression
+    "SUBQUERY(items, $x, $x.name == 'Tom').@size > 0",
+    "SUBQUERY(items, $x, $x.name == 'Tom').@count > 0",
+    "SUBQUERY(items, $x, $x.allergens.@min.population_affected < 0.10).@count > 0",
+    "SUBQUERY(items, $x, $x.name == 'Tom').@count == SUBQUERY(items, $x, $x.price < 10).@count",
+
+    // backlinks
+    "p.@links.class.prop.@count > 2",
+    "p.@links.class.prop.@sum.prop2 > 2",
 };
 
 static std::vector<std::string> invalid_queries = {
@@ -212,11 +227,7 @@ static std::vector<std::string> invalid_queries = {
     "0x = 1",
     "- = a",
     "a..b = a",
-    "a$a = a",
     "{} = $0",
-    "$-1 = $0",
-    "$a = $0",
-    "$ = $",
 
     // operators
     "0===>0",
@@ -267,6 +278,22 @@ static std::vector<std::string> invalid_queries = {
     "a=b DISTINCT(p", // no braces
     "a=b sort(p.q DESC a ASC)", // missing comma
     "a=b DISTINCT(p q)", // missing comma
+
+    // subquery
+    "SUBQUERY(items, $x, $x.name == 'Tom') > 0", // missing .@count
+    "SUBQUERY(items, $x, $x.name == 'Tom').@min > 0", // @min not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom').@max > 0", // @max not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom').@sum > 0", // @sum not yet supported
+    "SUBQUERY(items, $x, $x.name == 'Tom').@avg > 0", // @avg not yet supported
+    "SUBQUERY(items, var, var.name == 'Tom').@avg > 0", // variable must start with '$'
+    "SUBQUERY(, $x, $x.name == 'Tom').@avg > 0", // a target keypath is required
+    "SUBQUERY(items, , name == 'Tom').@avg > 0", // a variable name is required
+    "SUBQUERY(items, $x, ).@avg > 0", // the subquery is required
+
+    // no @ allowed in keypaths except for keyword '@links'
+    "@prop > 2",
+    "@backlinks.@count > 2",
+    "prop@links > 2",
 };
 
 TEST(Parser_valid_queries) {
@@ -290,17 +317,18 @@ TEST(Parser_grammar_analysis)
 
 Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, size_t num_results) {
     Query q = t->where();
+    realm::query_builder::NoArguments args;
 
-    realm::parser::Predicate p = realm::parser::parse(query_string).predicate;
-    realm::query_builder::apply_predicate(q, p);
+    parser::ParserResult res = realm::parser::parse(query_string);
+    realm::query_builder::apply_predicate(q, res.predicate, args);
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
     //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
-    realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
-    realm::query_builder::apply_predicate(q2, p2);
+    parser::ParserResult res2 = realm::parser::parse(description);
+    realm::query_builder::apply_predicate(q2, res2.predicate, args);
 
     CHECK_EQUAL(q2.count(), num_results);
     return q2;
@@ -323,7 +351,8 @@ TEST(Parser_empty_input)
     CHECK(!empty_description.empty());
     CHECK_EQUAL(0, empty_description.compare("TRUEPREDICATE"));
     realm::parser::Predicate p = realm::parser::parse(empty_description).predicate;
-    realm::query_builder::apply_predicate(q, p);
+    query_builder::NoArguments args;
+    realm::query_builder::apply_predicate(q, p, args);
     CHECK_EQUAL(q.count(), 5);
 
     verify_query(test_context, t, "TRUEPREDICATE", 5);
@@ -799,7 +828,10 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, people, "fav_item.data == fav_item.nullable_data", 3);
     verify_query(test_context, people, "fav_item.data == fav_item.data", 5);
     verify_query(test_context, people, "fav_item.nullable_data == fav_item.nullable_data", 5);
+
+    verify_query(test_context, items, "data contains NULL && data contains 'fo' && !(data contains 'asdfasdfasdf') && data contains 'rk'", 1);
 }
+
 
 TEST(Parser_OverColumnIndexChanges)
 {
@@ -1003,7 +1035,7 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     Query q2 = t->where();
 
     realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
-    realm::query_builder::apply_predicate(q2, p2);
+    realm::query_builder::apply_predicate(q2, p2, args);
 
     CHECK_EQUAL(q2.count(), num_results);
 }
@@ -1283,14 +1315,15 @@ TEST(Parser_string_binary_encoding)
         std::string binary_description = qbin.get_description();
         //std::cerr << "original: " << buff << "\tdescribed: " << string_description << "\n";
 
+        query_builder::NoArguments args;
         Query qstr2 = t->where();
         realm::parser::Predicate pstr2 = realm::parser::parse(string_description).predicate;
-        realm::query_builder::apply_predicate(qstr2, pstr2);
+        realm::query_builder::apply_predicate(qstr2, pstr2, args);
         CHECK_EQUAL(qstr2.count(), num_results);
 
         Query qbin2 = t->where();
         realm::parser::Predicate pbin2 = realm::parser::parse(binary_description).predicate;
-        realm::query_builder::apply_predicate(qbin2, pbin2);
+        realm::query_builder::apply_predicate(qbin2, pbin2, args);
         CHECK_EQUAL(qbin2.count(), num_results);
     }
 }
@@ -1483,9 +1516,10 @@ TEST(Parser_SortAndDistinctSerialisation)
 TableView get_sorted_view(TableRef t, std::string query_string)
 {
     Query q = t->where();
+    query_builder::NoArguments args;
 
     parser::ParserResult result = realm::parser::parse(query_string);
-    realm::query_builder::apply_predicate(q, result.predicate);
+    realm::query_builder::apply_predicate(q, result.predicate, args);
     DescriptorOrdering ordering;
     realm::query_builder::apply_ordering(ordering, t, result.ordering);
 
@@ -1497,7 +1531,7 @@ TableView get_sorted_view(TableRef t, std::string query_string)
     Query q2 = t->where();
 
     parser::ParserResult result2 = realm::parser::parse(combined);
-    realm::query_builder::apply_predicate(q2, result2.predicate);
+    realm::query_builder::apply_predicate(q2, result2.predicate, args);
     DescriptorOrdering ordering2;
     realm::query_builder::apply_ordering(ordering2, t, result2.ordering);
 
@@ -1614,4 +1648,551 @@ TEST(Parser_SortAndDistinct)
     CHECK_EQUAL(message, "No property 'name' found on object type 'account' specified in 'sort' clause");
 }
 
+
+TEST(Parser_Backlinks)
+{
+    Group g;
+
+    TableRef items = g.add_table("class_Items");
+    size_t item_name_col = items->add_column(type_String, "name");
+    size_t item_price_col = items->add_column(type_Double, "price");
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}, {"bread", 3.5}};
+    for (item_t i : item_info) {
+        size_t row_ndx = items->add_empty_row();
+        items->set_string(item_name_col, row_ndx, i.first);
+        items->set_double(item_price_col, row_ndx, i.second);
+    }
+
+    TableRef t = g.add_table("class_Person");
+    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
+    size_t name_col_ndx = t->add_column(type_String, "name");
+    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
+    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
+    size_t fav_col_ndx = t->add_column_link(type_Link, "fav_item", *items);
+    t->add_empty_row(3);
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(id_col_ndx, i, i);
+        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
+        t->set_link(fav_col_ndx, i, i);
+    }
+
+    t->set_string(name_col_ndx, 0, "Adam");
+    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
+    list_0->add(0);
+    list_0->add(1);
+    list_0->add(2);
+    list_0->add(3);
+
+    t->set_string(name_col_ndx, 1, "James");
+    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1->add(0);
+    }
+
+    t->set_string(name_col_ndx, 2, "John");
+    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
+    list_2->add(2);
+    list_2->add(2);
+    list_2->add(3);
+
+    Query q = items->backlink(*t, fav_col_ndx).column<Double>(account_col_ndx) > 20;
+    CHECK_EQUAL(q.count(), 1);
+    std::string desc = q.get_description();
+    CHECK(desc.find("@links.class_Person.fav_item.account_balance") != std::string::npos);
+
+    q = items->backlink(*t, items_col_ndx).column<Double>(account_col_ndx) > 20;
+    CHECK_EQUAL(q.count(), 2);
+    desc = q.get_description();
+    CHECK(desc.find("@links.class_Person.items.account_balance") != std::string::npos);
+
+    // favourite items bought by people who have > 20 in their account
+    verify_query(test_context, items, "@links.class_Person.fav_item.account_balance > 20", 1);  // backlinks via link
+    // items bought by people who have > 20 in their account
+    verify_query(test_context, items, "@links.class_Person.items.account_balance > 20", 2);     // backlinks via list
+    // items bought by people who have 'J' as the first letter of their name
+    verify_query(test_context, items, "@links.class_Person.items.name LIKE[c] 'j*'", 3);
+    verify_query(test_context, items, "@links.class_Person.items.name BEGINSWITH 'J'", 3);
+
+    // items purchased more than twice
+    verify_query(test_context, items, "@links.class_Person.items.@count > 2", 2);
+    verify_query(test_context, items, "@LINKS.class_Person.items.@size > 2", 2);
+    // items bought by people with only $10 in their account
+    verify_query(test_context, items, "@links.class_Person.items.@min.account_balance <= 10", 4);
+    // items bought by people with more than $10 in their account
+    verify_query(test_context, items, "@links.class_Person.items.@max.account_balance > 10", 3);
+    // items bought where the sum of the account balance of purchasers is more than $20
+    verify_query(test_context, items, "@links.class_Person.items.@sum.account_balance > 20", 3);
+    verify_query(test_context, items, "@links.class_Person.items.@avg.account_balance > 20", 1);
+
+    // subquery over backlinks
+    verify_query(test_context, items, "SUBQUERY(@links.class_Person.items, $x, $x.account_balance >= 20).@count > 2", 1);
+
+    // backlinks over link
+    // people having a favourite item which is also the favourite item of another person
+    verify_query(test_context, t, "fav_item.@links.class_Person.fav_item.@count > 1", 0);
+    // people having a favourite item which is purchased more than once (by anyone)
+    verify_query(test_context, t, "fav_item.@links.class_Person.items.@count > 1 ", 2);
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.items == NULL", 1), message);
+    CHECK_EQUAL(message, "Comparing a list property to 'null' is not supported");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.fav_item == NULL", 1), message);
+    CHECK_EQUAL(message, "Comparing a list property to 'null' is not supported");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count > 0", 1), message);
+    CHECK_EQUAL(message, "'@links' must be proceeded by type name and a property name");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Factory.items > 0", 1), message);
+    CHECK_EQUAL(message, "No property 'items' found in type 'Factory' which links to type 'Items'");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.artifacts > 0", 1), message);
+    CHECK_EQUAL(message, "No property 'artifacts' found in type 'Person' which links to type 'Items'");
+
+    // check that arbitrary aliasing for named backlinks works
+    parser::KeyPathMapping mapping;
+    mapping.add_mapping(items, "purchasers", "@links.class_Person.items");
+    mapping.add_mapping(t, "money", "account_balance");
+    query_builder::NoArguments args;
+
+    q = items->where();
+    realm::parser::Predicate p = realm::parser::parse("purchasers.@count > 2").predicate;
+    realm::query_builder::apply_predicate(q, p, args, mapping);
+    CHECK_EQUAL(q.count(), 2);
+
+    q = items->where();
+    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
+    realm::query_builder::apply_predicate(q, p, args, mapping);
+    CHECK_EQUAL(q.count(), 3);
+
+    // disable parsing backlink queries
+    mapping.set_allow_backlinks(false);
+    q = items->where();
+    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
+    CHECK_THROW_ANY_GET_MESSAGE(realm::query_builder::apply_predicate(q, p, args, mapping), message);
+    CHECK_EQUAL(message, "Querying over backlinks is disabled but backlinks were found in the inverse relationship of property 'items' on type 'Person'");
+}
+
+
+TEST(Parser_SubqueryVariableNames)
+{
+    Group g;
+    util::serializer::SerialisationState test_state;
+
+    TableRef test_table = g.add_table("test");
+
+    CHECK_EQUAL(test_state.get_variable_name(test_table), "$x");
+
+    for (char c = 'a'; c <= 'z'; ++c) {
+        std::string col_name = std::string("$") + c;
+        test_table->add_column(type_Int, col_name);
+    }
+    test_state.subquery_prefix_list.push_back("$xx");
+    test_state.subquery_prefix_list.push_back("$xy");
+    test_state.subquery_prefix_list.push_back("$xz");
+    test_state.subquery_prefix_list.push_back("$xa");
+
+    std::string unique_variable = test_state.get_variable_name(test_table);
+
+    CHECK_EQUAL(unique_variable, "$xb");
+}
+
+
+TEST(Parser_Subquery)
+{
+    Group g;
+
+    TableRef discounts = g.add_table("class_Discounts");
+    size_t discount_name_col = discounts->add_column(type_String, "promotion", true);
+    size_t discount_off_col = discounts->add_column(type_Double, "reduced_by");
+    size_t discount_active_col = discounts->add_column(type_Bool, "active");
+
+    using discount_t = std::pair<double, bool>;
+    std::vector<discount_t> discount_info = {{3.0, false}, {2.5, true}, {0.50, true}, {1.50, true}};
+    for (discount_t i : discount_info) {
+        size_t row_ndx = discounts->add_empty_row();
+        discounts->set_double(discount_off_col, row_ndx, i.first);
+        discounts->set_bool(discount_active_col, row_ndx, i.second);
+    }
+    discounts->set_string(discount_name_col, 0, "back to school");
+    discounts->set_string(discount_name_col, 1, "pizza lunch special");
+    discounts->set_string(discount_name_col, 2, "manager's special");
+
+    TableRef ingredients = g.add_table("class_Allergens");
+    size_t ingredient_name_col = ingredients->add_column(type_String, "name");
+    size_t population_col = ingredients->add_column(type_Double, "population_affected");
+    std::vector<std::pair<std::string, double>> ingredients_list = { {"dairy", 0.75}, {"nuts", 0.01}, {"wheat", 0.01}, {"soy", 0.005} };
+    for (size_t i = 0; i < ingredients_list.size(); ++i) {
+        size_t row_ndx = ingredients->add_empty_row();
+        ingredients->set_string(ingredient_name_col, row_ndx, ingredients_list[i].first);
+        ingredients->set_double(population_col, row_ndx, ingredients_list[i].second);
+    }
+
+    TableRef items = g.add_table("class_Items");
+    size_t item_name_col = items->add_column(type_String, "name");
+    size_t item_price_col = items->add_column(type_Double, "price");
+    size_t item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
+    size_t item_contains_col = items->add_column_link(type_LinkList, "allergens", *ingredients);
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    for (item_t i : item_info) {
+        size_t row_ndx = items->add_empty_row();
+        items->set_string(item_name_col, row_ndx, i.first);
+        items->set_double(item_price_col, row_ndx, i.second);
+    }
+    items->set_link(item_discount_col, 0, 2); // milk -0.50
+    items->set_link(item_discount_col, 2, 1); // pizza -2.5
+    items->set_link(item_discount_col, 3, 0); // cereal -3.0 inactive
+    LinkViewRef milk_contains = items->get_linklist(item_contains_col, 0);
+    milk_contains->add(0);
+    LinkViewRef pizza_contains = items->get_linklist(item_contains_col, 2);
+    pizza_contains->add(0);
+    pizza_contains->add(2);
+    pizza_contains->add(3);
+    LinkViewRef cereal_contains = items->get_linklist(item_contains_col, 3);
+    cereal_contains->add(0);
+    cereal_contains->add(1);
+    cereal_contains->add(2);
+
+    TableRef t = g.add_table("class_Person");
+    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
+    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
+    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
+    size_t fav_col_ndx = t->add_column_link(type_Link, "fav_item", *items);
+    t->add_empty_row(3);
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(id_col_ndx, i, i);
+        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
+        t->set_link(fav_col_ndx, i, i);
+    }
+
+    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
+    list_0->add(0);
+    list_0->add(1);
+    list_0->add(2);
+    list_0->add(3);
+
+    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1->add(0);
+    }
+
+    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
+    list_2->add(2);
+    list_2->add(2);
+    list_2->add(3);
+
+    Query q = t->column<LinkList>(items_col_ndx, items->column<String>(item_name_col).contains("a")
+                                  && items->column<Double>(item_price_col) > 5.0
+                                  && items->link(item_discount_col).column<Double>(discount_off_col) > 0.5
+                                  && items->column<Link>(item_contains_col).count() > 1).count() > 1;
+
+    std::string subquery_description = q.get_description();
+    CHECK(subquery_description.find("SUBQUERY(items, $x,") != std::string::npos);
+    CHECK(subquery_description.find(" $x.name ") != std::string::npos);
+    CHECK(subquery_description.find(" $x.price ") != std::string::npos);
+    CHECK(subquery_description.find(" $x.discount.reduced_by ") != std::string::npos);
+    CHECK(subquery_description.find(" $x.allergens.@count") != std::string::npos);
+    TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+
+    // not variations inside/outside subquery, no variable substitution
+    verify_query(test_context, t, "SUBQUERY(items, $x, TRUEPREDICATE).@count > 0", 3);
+    verify_query(test_context, t, "!SUBQUERY(items, $x, TRUEPREDICATE).@count > 0", 0);
+    verify_query(test_context, t, "SUBQUERY(items, $x, !TRUEPREDICATE).@count > 0", 0);
+    verify_query(test_context, t, "SUBQUERY(items, $x, FALSEPREDICATE).@count == 0", 3);
+    verify_query(test_context, t, "!SUBQUERY(items, $x, FALSEPREDICATE).@count == 0", 0);
+    verify_query(test_context, t, "SUBQUERY(items, $x, !FALSEPREDICATE).@count == 0", 0);
+
+    // simple variable substitution
+    verify_query(test_context, t, "SUBQUERY(items, $x, 5.5 == $x.price ).@count > 0", 2);
+    // string constraint subquery
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.name CONTAINS[c] 'MILK').@count >= 1", 2);
+    // compound subquery &&
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.name CONTAINS[c] 'MILK' && $x.price == 5.5).@count >= 1", 2);
+    // compound subquery ||
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.name CONTAINS[c] 'MILK' || $x.price >= 5.5).@count >= 1", 3);
+    // variable name change
+    verify_query(test_context, t, "SUBQUERY(items, $anyNAME_-0123456789, 5.5 == $anyNAME_-0123456789.price ).@count > 0", 2);
+    // variable names cannot contain '.'
+    CHECK_THROW_ANY(verify_query(test_context, t, "SUBQUERY(items, $x.y, 5.5 == $x.y.price ).@count > 0", 2));
+    // variable name must begin with '$'
+    CHECK_THROW_ANY(verify_query(test_context, t, "SUBQUERY(items, x, 5.5 == x.y.price ).@count > 0", 2));
+    // subquery with string size
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.name.@size == 4).@count > 0", 2);
+    // subquery with list count
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.allergens.@count > 1).@count > 0", 2);
+    // subquery with list aggregate operation
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.allergens.@min.population_affected < 0.10).@count > 0", 2);
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.allergens.@max.population_affected > 0.50).@count > 0", 3);
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.allergens.@sum.population_affected > 0.75).@count > 0", 2);
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.allergens.@avg.population_affected > 0.50).@count > 0", 2);
+    // two column subquery
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.discount.promotion CONTAINS[c] $x.name).@count > 0", 2);
+    // subquery count (int) vs double
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.discount.promotion CONTAINS[c] $x.name).@count < account_balance", 3);
+    // subquery over link
+    verify_query(test_context, t, "SUBQUERY(fav_item.allergens, $x, $x.name CONTAINS[c] 'dairy').@count > 0", 2);
+    // nested subquery
+    verify_query(test_context, t, "SUBQUERY(items, $x, SUBQUERY($x.allergens, $allergy, $allergy.name CONTAINS[c] 'dairy').@count > 0).@count > 0", 3);
+    // nested subquery operating on the same table with same variable is not allowed
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(items, $x, SUBQUERY($x.discount.@links.class_Items.discount, $x, $x.price > 5).@count > 0).@count > 0", 2), message);
+    CHECK_EQUAL(message, "Unable to create a subquery expression with variable '$x' since an identical variable already exists in this context");
+
+    // target property must be a list
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(account_balance, $x, TRUEPREDICATE).@count > 0", 3), message);
+    CHECK_EQUAL(message, "A subquery must operate on a list property, but 'account_balance' is type 'Double'");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(fav_item, $x, TRUEPREDICATE).@count > 0", 3), message);
+    CHECK_EQUAL(message, "A subquery must operate on a list property, but 'fav_item' is type 'Link'");
+}
+
+
+TEST(Parser_AggregateShortcuts)
+{
+    Group g;
+
+    TableRef ingredients = g.add_table("class_Allergens");
+    size_t ingredient_name_col = ingredients->add_column(type_String, "name");
+    size_t population_col = ingredients->add_column(type_Double, "population_affected");
+    std::vector<std::pair<std::string, double>> ingredients_list = { {"dairy", 0.75}, {"nuts", 0.01}, {"wheat", 0.01}, {"soy", 0.005} };
+    for (size_t i = 0; i < ingredients_list.size(); ++i) {
+        size_t row_ndx = ingredients->add_empty_row();
+        ingredients->set_string(ingredient_name_col, row_ndx, ingredients_list[i].first);
+        ingredients->set_double(population_col, row_ndx, ingredients_list[i].second);
+    }
+
+    TableRef items = g.add_table("class_Items");
+    size_t item_name_col = items->add_column(type_String, "name");
+    size_t item_price_col = items->add_column(type_Double, "price");
+    size_t item_contains_col = items->add_column_link(type_LinkList, "allergens", *ingredients);
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    for (item_t i : item_info) {
+        size_t row_ndx = items->add_empty_row();
+        items->set_string(item_name_col, row_ndx, i.first);
+        items->set_double(item_price_col, row_ndx, i.second);
+    }
+    LinkViewRef milk_contains = items->get_linklist(item_contains_col, 0);
+    milk_contains->add(0);
+    LinkViewRef pizza_contains = items->get_linklist(item_contains_col, 2);
+    pizza_contains->add(0);
+    pizza_contains->add(2);
+    pizza_contains->add(3);
+    LinkViewRef cereal_contains = items->get_linklist(item_contains_col, 3);
+    cereal_contains->add(0);
+    cereal_contains->add(1);
+    cereal_contains->add(2);
+
+    TableRef t = g.add_table("class_Person");
+    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
+    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
+    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
+    size_t fav_col_ndx = t->add_column_link(type_Link, "fav_item", *items);
+    t->add_empty_row(3);
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(id_col_ndx, i, i);
+        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
+        t->set_link(fav_col_ndx, i, i);
+    }
+
+    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
+    list_0->add(0);
+    list_0->add(1);
+    list_0->add(2);
+    list_0->add(3);
+
+    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1->add(0);
+    }
+
+    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
+    list_2->add(2);
+    list_2->add(2);
+    list_2->add(3);
+
+    // any is implied over list properties
+    verify_query(test_context, t, "items.price == 5.5", 2);
+
+    // check basic equality
+    verify_query(test_context, t, "ANY items.price == 5.5", 2);  // 0, 1
+    verify_query(test_context, t, "SOME items.price == 5.5", 2); // 0, 1
+    verify_query(test_context, t, "ALL items.price == 5.5", 1);  // 1
+    verify_query(test_context, t, "NONE items.price == 5.5", 1); // 2
+
+    // and
+    verify_query(test_context, t, "customer_id > 0 and ANY items.price == 5.5", 1);
+    verify_query(test_context, t, "customer_id > 0 and SOME items.price == 5.5", 1);
+    verify_query(test_context, t, "customer_id > 0 and ALL items.price == 5.5", 1);
+    verify_query(test_context, t, "customer_id > 0 and NONE items.price == 5.5", 1);
+    // or
+    verify_query(test_context, t, "customer_id > 1 or ANY items.price == 5.5", 3);
+    verify_query(test_context, t, "customer_id > 1 or SOME items.price == 5.5", 3);
+    verify_query(test_context, t, "customer_id > 1 or ALL items.price == 5.5", 2);
+    verify_query(test_context, t, "customer_id > 1 or NONE items.price == 5.5", 1);
+    // not
+    verify_query(test_context, t, "!(ANY items.price == 5.5)", 1);
+    verify_query(test_context, t, "!(SOME items.price == 5.5)", 1);
+    verify_query(test_context, t, "!(ALL items.price == 5.5)", 2);
+    verify_query(test_context, t, "!(NONE items.price == 5.5)", 2);
+
+    // inside subquery people with any items containing WHEAT
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.allergens.name CONTAINS[c] 'WHEAT').@count > 0", 2);
+    verify_query(test_context, t, "SUBQUERY(items, $x, ANY $x.allergens.name CONTAINS[c] 'WHEAT').@count > 0", 2);
+    verify_query(test_context, t, "SUBQUERY(items, $x, SOME $x.allergens.name CONTAINS[c] 'WHEAT').@count > 0", 2);
+    verify_query(test_context, t, "SUBQUERY(items, $x, ALL $x.allergens.name CONTAINS[c] 'WHEAT').@count > 0", 1);
+    verify_query(test_context, t, "SUBQUERY(items, $x, NONE $x.allergens.name CONTAINS[c] 'WHEAT').@count > 0", 2);
+
+    // backlinks
+    verify_query(test_context, items, "ANY @links.class_Person.items.account_balance > 15", 3);
+    verify_query(test_context, items, "SOME @links.class_Person.items.account_balance > 15", 3);
+    verify_query(test_context, items, "ALL @links.class_Person.items.account_balance > 15", 0);
+    verify_query(test_context, items, "NONE @links.class_Person.items.account_balance > 15", 1);
+
+    // links in prefix
+    verify_query(test_context, t, "ANY fav_item.allergens.name CONTAINS 'dairy'", 2);
+    verify_query(test_context, t, "SOME fav_item.allergens.name CONTAINS 'dairy'", 2);
+    verify_query(test_context, t, "ALL fav_item.allergens.name CONTAINS 'dairy'", 2);
+    verify_query(test_context, t, "NONE fav_item.allergens.name CONTAINS 'dairy'", 1);
+
+    // links in suffix
+    verify_query(test_context, items, "ANY @links.class_Person.items.fav_item.name CONTAINS 'milk'", 4);
+    verify_query(test_context, items, "SOME @links.class_Person.items.fav_item.name CONTAINS 'milk'", 4);
+    verify_query(test_context, items, "ALL @links.class_Person.items.fav_item.name CONTAINS 'milk'", 1);
+    verify_query(test_context, items, "NONE @links.class_Person.items.fav_item.name CONTAINS 'milk'", 0);
+
+    // compare with property
+    verify_query(test_context, t, "ANY items.name == fav_item.name", 2);
+    verify_query(test_context, t, "SOME items.name == fav_item.name", 2);
+    verify_query(test_context, t, "ANY items.price == items.@max.price", 3);
+    verify_query(test_context, t, "SOME items.price == items.@max.price", 3);
+    verify_query(test_context, t, "ANY items.price == items.@min.price", 3);
+    verify_query(test_context, t, "SOME items.price == items.@min.price", 3);
+    verify_query(test_context, t, "ANY items.price > items.@avg.price", 2);
+    verify_query(test_context, t, "SOME items.price > items.@avg.price", 2);
+
+    // ALL/NONE do not support testing against other columns currently because of how they are implemented in a subquery
+    // The restriction is because subqueries must operate on properties on the target table and cannot reference
+    // properties in the parent scope. This restriction may be lifted if we actually implement ALL/NONE in core.
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ALL items.name == fav_item.name", 1), message);
+    CHECK_EQUAL(message, "The comparison in an 'ALL' clause must be between a keypath and a value");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "NONE items.name == fav_item.name", 1), message);
+    CHECK_EQUAL(message, "The comparison in an 'NONE' clause must be between a keypath and a value");
+
+    // no list in path should throw
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ANY fav_item.name == 'milk'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain a list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SOME fav_item.name == 'milk'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain a list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ALL fav_item.name == 'milk'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ALL' must contain a list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "NONE fav_item.name == 'milk'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'NONE' must contain a list");
+
+    // multiple lists in path should throw
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ANY items.allergens.name == 'dairy'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain only one list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SOME items.allergens.name == 'dairy'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain only one list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ALL items.allergens.name == 'dairy'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ALL' must contain only one list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "NONE items.allergens.name == 'dairy'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'NONE' must contain only one list");
+
+    // the expression following ANY/SOME/ALL/NONE must be a keypath list
+    // currently this is restricted by the parser syntax so it is a predicate error
+    CHECK_THROW_ANY(verify_query(test_context, t, "ANY 'milk' == fav_item.name", 1));
+    CHECK_THROW_ANY(verify_query(test_context, t, "SOME 'milk' == fav_item.name", 1));
+    CHECK_THROW_ANY(verify_query(test_context, t, "ALL 'milk' == fav_item.name", 1));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NONE 'milk' == fav_item.name", 1));
+}
+
+
+TEST(Parser_OperatorIN)
+{
+    Group g;
+
+    TableRef ingredients = g.add_table("class_Allergens");
+    size_t ingredient_name_col = ingredients->add_column(type_String, "name");
+    size_t population_col = ingredients->add_column(type_Double, "population_affected");
+    std::vector<std::pair<std::string, double>> ingredients_list = { {"dairy", 0.75}, {"nuts", 0.01}, {"wheat", 0.01}, {"soy", 0.005} };
+    for (size_t i = 0; i < ingredients_list.size(); ++i) {
+        size_t row_ndx = ingredients->add_empty_row();
+        ingredients->set_string(ingredient_name_col, row_ndx, ingredients_list[i].first);
+        ingredients->set_double(population_col, row_ndx, ingredients_list[i].second);
+    }
+
+    TableRef items = g.add_table("class_Items");
+    size_t item_name_col = items->add_column(type_String, "name");
+    size_t item_price_col = items->add_column(type_Double, "price", true);
+    size_t item_contains_col = items->add_column_link(type_LinkList, "allergens", *ingredients);
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    for (item_t i : item_info) {
+        size_t row_ndx = items->add_empty_row();
+        items->set_string(item_name_col, row_ndx, i.first);
+        items->set_double(item_price_col, row_ndx, i.second);
+    }
+    LinkViewRef milk_contains = items->get_linklist(item_contains_col, 0);
+    milk_contains->add(0);
+    LinkViewRef pizza_contains = items->get_linklist(item_contains_col, 2);
+    pizza_contains->add(0);
+    pizza_contains->add(2);
+    pizza_contains->add(3);
+    LinkViewRef cereal_contains = items->get_linklist(item_contains_col, 3);
+    cereal_contains->add(0);
+    cereal_contains->add(1);
+    cereal_contains->add(2);
+
+    TableRef t = g.add_table("class_Person");
+    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
+    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
+    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
+    size_t fav_col_ndx = t->add_column_link(type_Link, "fav_item", *items);
+    t->add_empty_row(3);
+    for (size_t i = 0; i < t->size(); ++i) {
+        t->set_int(id_col_ndx, i, i);
+        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
+        t->set_link(fav_col_ndx, i, i);
+    }
+
+    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
+    list_0->add(0);
+    list_0->add(1);
+    list_0->add(2);
+    list_0->add(3);
+
+    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1->add(0);
+    }
+
+    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
+    list_2->add(2);
+    list_2->add(2);
+    list_2->add(3);
+
+    verify_query(test_context, t, "5.5 IN items.price", 2);
+    verify_query(test_context, t, "!(5.5 IN items.price)", 1);              // group not
+    verify_query(test_context, t, "'milk' IN items.name", 2);               // string compare
+    verify_query(test_context, t, "'MiLk' IN[c] items.name", 2);            // string compare with insensitivity
+    verify_query(test_context, t, "NULL IN items.price", 0);                // null
+    verify_query(test_context, t, "'dairy' IN fav_item.allergens.name", 2); // through link prefix
+    verify_query(test_context, items, "20 IN @links.class_Person.items.account_balance", 1);        // backlinks
+    verify_query(test_context, t, "fav_item.price IN items.price", 2); // single property in list
+
+    // aggregate modifiers must operate on a list
+    CHECK_THROW_ANY(verify_query(test_context, t, "ANY 5.5 IN items.price", 2));
+    CHECK_THROW_ANY(verify_query(test_context, t, "SOME 5.5 IN items.price", 2));
+    CHECK_THROW_ANY(verify_query(test_context, t, "ALL 5.5 IN items.price", 1));
+    CHECK_THROW_ANY(verify_query(test_context, t, "NONE 5.5 IN items.price", 1));
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price IN 5.5", 1), message);
+    CHECK_EQUAL(message, "The expression following 'IN' must be a keypath to a list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "5.5 in fav_item.price", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'IN' must contain a list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "'dairy' in items.allergens.name", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'IN' must contain only one list");
+
+}
 #endif // TEST_PARSER
