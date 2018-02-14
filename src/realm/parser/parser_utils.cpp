@@ -126,6 +126,21 @@ const char* collection_operator_to_str(parser::Expression::KeyPathOp op)
     return "";
 }
 
+const char* comparison_type_to_str(parser::Predicate::ComparisonType type)
+{
+    switch (type) {
+        case parser::Predicate::ComparisonType::Unspecified:
+            return "";
+        case parser::Predicate::ComparisonType::All:
+            return "ALL";
+        case parser::Predicate::ComparisonType::None:
+            return "NONE";
+        case parser::Predicate::ComparisonType::Any:
+            return "ANY";
+    }
+    return "";
+}
+
 using KeyPath = std::vector<std::string>;
 
 KeyPath key_path_from_string(const std::string &s) {
@@ -138,15 +153,34 @@ KeyPath key_path_from_string(const std::string &s) {
     return key_path;
 }
 
-StringData get_printable_table_name(const Table& table)
+std::string key_path_to_string(const KeyPath& keypath)
 {
-    StringData name = table.get_name();
+    std::string path = "";
+    for (size_t i = 0; i < keypath.size(); ++i) {
+        if (!keypath[i].empty()) {
+            path += keypath[i];
+            if (i < keypath.size() - 1) {
+                path += serializer::value_separator;
+            }
+        }
+    }
+    return path;
+}
+
+StringData get_printable_table_name(StringData name)
+{
     // the "class_" prefix is an implementation detail of the object store that shouldn't be exposed to users
     static const std::string prefix = "class_";
     if (name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
         name = StringData(name.data() + prefix.size(), name.size() - prefix.size());
     }
     return name;
+}
+
+StringData get_printable_table_name(const Table& table)
+{
+    StringData name = table.get_name();
+    return get_printable_table_name(name);
 }
 
 } // namespace utils

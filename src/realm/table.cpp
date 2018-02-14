@@ -2044,6 +2044,24 @@ size_t Table::get_size_from_ref(ref_type spec_ref, ref_type columns_ref, Allocat
     return size;
 }
 
+Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept
+{
+    size_t backlink_columns_begin = m_spec->first_backlink_column_index();
+    size_t backlink_columns_end = backlink_columns_begin + m_spec->backlink_column_count();
+
+    for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
+        const BacklinkColumn& backlink_col = get_column_backlink(i);
+        ConstTableRef origin_table = backlink_col.get_origin_table().get_table_ref();
+        const LinkColumnBase& link_col = backlink_col.get_origin_column();
+        size_t link_col_ndx = link_col.get_column_index();
+        if (origin_table->get_name() == origin_table_name
+            && origin_table->get_column_name(link_col_ndx) == origin_col_name) {
+            return BacklinkOrigin{{origin_table, link_col_ndx}};
+        }
+    }
+    return BacklinkOrigin{};
+}
+
 
 ref_type Table::create_empty_table(Allocator& alloc)
 {

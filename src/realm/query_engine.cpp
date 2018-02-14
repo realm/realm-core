@@ -544,10 +544,10 @@ void ExpressionNode::table_changed()
     m_expression->set_base_table(m_table.get());
 }
 
-std::string ExpressionNode::describe() const
+std::string ExpressionNode::describe(util::serializer::SerialisationState& state) const
 {
     if (m_expression) {
-        return m_expression->description();
+        return m_expression->description(state);
     }
     else {
         return "empty expression";
