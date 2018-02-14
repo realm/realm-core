@@ -91,6 +91,7 @@ set(INCLUDE_DIRS
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/partial_sync.hpp
+        sync/subscription_state.hpp
         sync/sync_config.hpp
         sync/sync_manager.hpp
         sync/sync_permission.hpp
@@ -98,7 +99,8 @@ if(REALM_ENABLE_SYNC)
         sync/sync_user.hpp
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
-        sync/impl/sync_metadata.hpp)
+        sync/impl/sync_metadata.hpp
+        sync/impl/work_queue.hpp)
     list(APPEND SOURCES
         sync/partial_sync.cpp
         sync/sync_config.cpp
@@ -107,7 +109,8 @@ if(REALM_ENABLE_SYNC)
         sync/sync_session.cpp
         sync/sync_user.cpp
         sync/impl/sync_file.cpp
-        sync/impl/sync_metadata.cpp)
+        sync/impl/sync_metadata.cpp
+        sync/impl/work_queue.cpp)
     if(APPLE)
         list(APPEND SOURCES
             sync/impl/apple/network_reachability_observer.cpp

@@ -28,6 +28,7 @@
 #include "schema.hpp"
 
 #if REALM_ENABLE_SYNC
+#include "sync/impl/work_queue.hpp"
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
@@ -232,7 +233,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
                 throw RealmFileException(RealmFileException::Kind::AccessError, get_path(), ex.code().message(), "");
             }
         }
-        m_weak_realm_notifiers.emplace_back(realm, m_config.cache);
+        m_weak_realm_notifiers.emplace_back(realm, realm->config().cache);
     }
 
     if (realm->config().sync_config)
@@ -298,7 +299,12 @@ void RealmCoordinator::advance_schema_cache(uint64_t previous, uint64_t next)
     m_schema_transaction_version_max = std::max(next, m_schema_transaction_version_max);
 }
 
-RealmCoordinator::RealmCoordinator() = default;
+RealmCoordinator::RealmCoordinator()
+#if REALM_ENABLE_SYNC
+: m_partial_sync_work_queue(std::make_unique<partial_sync::WorkQueue>())
+#endif
+{
+}
 
 RealmCoordinator::~RealmCoordinator()
 {
@@ -890,3 +896,10 @@ void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, Ve
     create_sync_session();
     m_transaction_callback = std::move(fn);
 }
+
+#if REALM_ENABLE_SYNC
+partial_sync::WorkQueue& RealmCoordinator::partial_sync_work_queue()
+{
+    return *m_partial_sync_work_queue;
+}
+#endif

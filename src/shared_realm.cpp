@@ -37,6 +37,7 @@
 
 #if REALM_ENABLE_SYNC
 #include "sync/impl/sync_file.hpp"
+#include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include <realm/sync/history.hpp>
 #endif
@@ -218,6 +219,15 @@ Realm::~Realm()
     if (m_coordinator) {
         m_coordinator->unregister_realm(this);
     }
+}
+
+bool Realm::is_partial() const noexcept
+{
+#if REALM_ENABLE_SYNC
+    return m_config.sync_config && m_config.sync_config->is_partial;
+#else
+    return false;
+#endif
 }
 
 Group& Realm::read_group()
@@ -472,11 +482,11 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         });
 
         ObjectStore::apply_schema_changes(read_group(), version, m_schema, m_schema_version,
-                                          m_config.schema_mode, required_changes, wrapper);
+                                          m_config.schema_mode, required_changes, wrapper, is_partial());
     }
     else {
         ObjectStore::apply_schema_changes(read_group(), m_schema_version, schema, version,
-                                          m_config.schema_mode, required_changes);
+                                          m_config.schema_mode, required_changes,{}, is_partial());
         REALM_ASSERT_DEBUG(additive || (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
 

@@ -22,6 +22,7 @@
 #include "object_schema.hpp"
 #include "schema.hpp"
 #include "shared_realm.hpp"
+#include "sync/partial_sync.hpp"
 
 #include <realm/descriptor.hpp>
 #include <realm/group.hpp>
@@ -54,15 +55,14 @@ const size_t c_zeroRowIndex = 0;
 
 const char c_object_table_prefix[] = "class_";
 
-void create_metadata_tables(Group& group) {
+void create_metadata_tables(Group& group, bool partial_realm) {
     // The tables 'pk' and 'metadata' are treated specially by Sync. The 'pk' table
     // is populated by `sync::create_table` and friends, while the 'metadata' table
     // is simply ignored.
     TableRef pk_table = group.get_or_add_table(c_primaryKeyTableName);
     TableRef metadata_table = group.get_or_add_table(c_metadataTableName);
-    const size_t empty_table_size = 0;
 
-    if (metadata_table->get_column_count() == empty_table_size) {
+    if (metadata_table->get_column_count() == 0) {
         metadata_table->insert_column(c_versionColumnIndex, type_Int, c_versionColumnName);
         metadata_table->add_empty_row();
         // set initial version
@@ -74,6 +74,14 @@ void create_metadata_tables(Group& group) {
         pk_table->insert_column(c_primaryKeyPropertyNameColumnIndex, type_String, c_primaryKeyPropertyNameColumnName);
     }
     pk_table->add_search_index(c_primaryKeyObjectClassColumnIndex);
+
+#if REALM_ENABLE_SYNC
+    // Only add __ResultSets if Realm is a partial Realm
+    if (partial_realm)
+        _impl::initialize_schema(group);
+#else
+    (void)partial_realm;
+#endif
 }
 
 void set_schema_version(Group& group, uint64_t version) {
@@ -248,8 +256,8 @@ void validate_primary_column_uniqueness(Group const& group)
 }
 } // anonymous namespace
 
-void ObjectStore::set_schema_version(Group& group, uint64_t version) {
-    ::create_metadata_tables(group);
+void ObjectStore::set_schema_version(Group& group, uint64_t version, bool partial_realm) {
+    ::create_metadata_tables(group, partial_realm);
     ::set_schema_version(group, version);
 }
 
@@ -690,9 +698,9 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
                                        Schema& target_schema, uint64_t target_schema_version,
                                        SchemaMode mode, std::vector<SchemaChange> const& changes,
-                                       std::function<void()> migration_function)
+                                       std::function<void()> migration_function, bool partial_realm)
 {
-    create_metadata_tables(group);
+    create_metadata_tables(group, partial_realm);
 
     if (mode == SchemaMode::Additive) {
         bool target_schema_is_newer = (schema_version < target_schema_version
@@ -703,7 +711,7 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
         apply_additive_changes(group, changes, update_indexes);
 
         if (target_schema_is_newer)
-            set_schema_version(group, target_schema_version);
+            set_schema_version(group, target_schema_version, partial_realm);
 
         set_schema_columns(group, target_schema);
         return;
@@ -711,7 +719,7 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
 
     if (schema_version == ObjectStore::NotVersioned) {
         create_initial_tables(group, changes);
-        set_schema_version(group, target_schema_version);
+        set_schema_version(group, target_schema_version, partial_realm);
         set_schema_columns(group, target_schema);
         return;
     }
@@ -725,7 +733,7 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
         verify_no_changes_required(schema_from_group(group).compare(target_schema));
         validate_primary_column_uniqueness(group);
         set_schema_columns(group, target_schema);
-        set_schema_version(group, target_schema_version);
+        set_schema_version(group, target_schema_version, partial_realm);
         return;
     }
 
@@ -750,7 +758,7 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
         apply_post_migration_changes(group, changes, {}, DidRereadSchema::No);
     }
 
-    set_schema_version(group, target_schema_version);
+    set_schema_version(group, target_schema_version, partial_realm);
     set_schema_columns(group, target_schema);
 }
 
