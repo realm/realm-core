@@ -118,33 +118,33 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
 // Searching
 
 template <typename T>
-size_t TableViewBase::find_first(ColKey column_key, T value) const
+ObjKey TableViewBase::find_first(ColKey column_key, T value) const
 {
     check_cookie();
     for (size_t i = 0, num_rows = m_key_values.size(); i < num_rows; ++i) {
         ObjKey key(m_key_values.get(i));
         try {
             if (m_table->get_object(key).get<T>(column_key) == value)
-                return i;
+                return key;
         }
         catch (const InvalidKey&) {
         }
     }
 
-    return npos;
+    return null_key;
 }
 
-template size_t TableViewBase::find_first(ColKey, int64_t) const;
-template size_t TableViewBase::find_first(ColKey, util::Optional<int64_t>) const;
-template size_t TableViewBase::find_first(ColKey, bool) const;
-template size_t TableViewBase::find_first(ColKey, Optional<bool>) const;
-template size_t TableViewBase::find_first(ColKey, float) const;
-template size_t TableViewBase::find_first(ColKey, util::Optional<float>) const;
-template size_t TableViewBase::find_first(ColKey, double) const;
-template size_t TableViewBase::find_first(ColKey, util::Optional<double>) const;
-template size_t TableViewBase::find_first(ColKey, Timestamp) const;
-template size_t TableViewBase::find_first(ColKey, StringData) const;
-template size_t TableViewBase::find_first(ColKey, BinaryData) const;
+template ObjKey TableViewBase::find_first(ColKey, int64_t) const;
+template ObjKey TableViewBase::find_first(ColKey, util::Optional<int64_t>) const;
+template ObjKey TableViewBase::find_first(ColKey, bool) const;
+template ObjKey TableViewBase::find_first(ColKey, Optional<bool>) const;
+template ObjKey TableViewBase::find_first(ColKey, float) const;
+template ObjKey TableViewBase::find_first(ColKey, util::Optional<float>) const;
+template ObjKey TableViewBase::find_first(ColKey, double) const;
+template ObjKey TableViewBase::find_first(ColKey, util::Optional<double>) const;
+template ObjKey TableViewBase::find_first(ColKey, Timestamp) const;
+template ObjKey TableViewBase::find_first(ColKey, StringData) const;
+template ObjKey TableViewBase::find_first(ColKey, BinaryData) const;
 
 
 // Aggregates ----------------------------------------------------

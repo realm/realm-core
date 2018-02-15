@@ -176,23 +176,17 @@ public:
     // a query
     const Query& get_query() const noexcept;
 
-    // Column information
-    size_t get_column_count() const noexcept;
-    StringData get_column_name(ColKey column_key) const noexcept;
-    ColKey get_column_key(StringData name) const;
-    DataType get_column_type(ColKey column_key) const noexcept;
-
     // Searching
     template <typename T>
-    size_t find_first(ColKey column_key, T value) const;
+    ObjKey find_first(ColKey column_key, T value) const;
 
-    size_t find_first_int(ColKey column_key, int64_t value) const;
-    size_t find_first_bool(ColKey column_key, bool value) const;
-    size_t find_first_float(ColKey column_key, float value) const;
-    size_t find_first_double(ColKey column_key, double value) const;
-    size_t find_first_string(ColKey column_key, StringData value) const;
-    size_t find_first_binary(ColKey column_key, BinaryData value) const;
-    size_t find_first_timestamp(ColKey column_key, Timestamp value) const;
+    ObjKey find_first_int(ColKey column_key, int64_t value) const;
+    ObjKey find_first_bool(ColKey column_key, bool value) const;
+    ObjKey find_first_float(ColKey column_key, float value) const;
+    ObjKey find_first_double(ColKey column_key, double value) const;
+    ObjKey find_first_string(ColKey column_key, StringData value) const;
+    ObjKey find_first_binary(ColKey column_key, BinaryData value) const;
+    ObjKey find_first_timestamp(ColKey column_key, Timestamp value) const;
 
     template <Action action, typename T, typename R>
     R aggregate(ColKey column_key, size_t* result_count = nullptr, ObjKey* return_key = nullptr) const;
@@ -380,7 +374,7 @@ protected:
 private:
     KeyColumn m_table_view_key_values; // We should generally not use this name
     void detach() const noexcept; // may have to remove const
-    size_t find_first_integer(ColKey column_key, int64_t value) const;
+    ObjKey find_first_integer(ColKey column_key, int64_t value) const;
     template <class oper>
     Timestamp minmax_timestamp(ColKey column_key, ObjKey* return_key) const;
 
@@ -419,11 +413,6 @@ public:
     Obj front() noexcept;
     Obj back() noexcept;
     Obj operator[](size_t row_ndx) noexcept;
-
-    // Links
-    TableRef get_link_target(ColKey column_key) noexcept;
-    ConstTableRef get_link_target(ColKey column_key) const noexcept;
-    void nullify_link(ColKey column_key, size_t row_ndx);
 
     /// \defgroup table_view_removes
     //@{
@@ -521,9 +510,6 @@ public:
     ConstTableView(TableView&&);
     ConstTableView& operator=(const TableView&);
     ConstTableView& operator=(TableView&&);
-
-    // Links
-    ConstTableRef get_link_target(ColKey column_key) const noexcept;
 
     // Searching (Int and String)
     ConstTableView find_all_int(ColKey column_key, int64_t value) const;
@@ -769,89 +755,46 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     REALM_DIAG_POP();                                                                                                \
     REALM_ASSERT(row_ndx < m_key_values.size())
 
-// Column information
-
-inline size_t TableViewBase::get_column_count() const noexcept
-{
-    REALM_ASSERT(m_table);
-    return m_table->get_column_count();
-}
-
-inline StringData TableViewBase::get_column_name(ColKey column_key) const noexcept
-{
-    REALM_ASSERT(m_table);
-    return m_table->get_column_name(column_key);
-}
-
-inline ColKey TableViewBase::get_column_key(StringData name) const
-{
-    REALM_ASSERT(m_table);
-    return m_table->get_column_key(name);
-}
-
-inline DataType TableViewBase::get_column_type(ColKey column_key) const noexcept
-{
-    REALM_ASSERT(m_table);
-    return m_table->get_column_type(column_key);
-}
-
-
-inline TableRef TableView::get_link_target(ColKey column_key) noexcept
-{
-    return m_table->get_link_target(column_key);
-}
-
-inline ConstTableRef TableView::get_link_target(ColKey column_key) const noexcept
-{
-    return m_table->get_link_target(column_key);
-}
-
-inline ConstTableRef ConstTableView::get_link_target(ColKey column_key) const noexcept
-{
-    return m_table->get_link_target(column_key);
-}
 
 // Searching
-
-
-inline size_t TableViewBase::find_first_int(ColKey column_key, int64_t value) const
+inline ObjKey TableViewBase::find_first_int(ColKey column_key, int64_t value) const
 {
     REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Int);
     return find_first_integer(column_key, value);
 }
 
-inline size_t TableViewBase::find_first_bool(ColKey column_key, bool value) const
+inline ObjKey TableViewBase::find_first_bool(ColKey column_key, bool value) const
 {
     REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Bool);
     return find_first_integer(column_key, value ? 1 : 0);
 }
 
-inline size_t TableViewBase::find_first_integer(ColKey column_key, int64_t value) const
+inline ObjKey TableViewBase::find_first_integer(ColKey column_key, int64_t value) const
 {
     return find_first<int64_t>(column_key, value);
 }
 
-inline size_t TableViewBase::find_first_float(ColKey column_key, float value) const
+inline ObjKey TableViewBase::find_first_float(ColKey column_key, float value) const
 {
     return find_first<float>(column_key, value);
 }
 
-inline size_t TableViewBase::find_first_double(ColKey column_key, double value) const
+inline ObjKey TableViewBase::find_first_double(ColKey column_key, double value) const
 {
     return find_first<double>(column_key, value);
 }
 
-inline size_t TableViewBase::find_first_string(ColKey column_key, StringData value) const
+inline ObjKey TableViewBase::find_first_string(ColKey column_key, StringData value) const
 {
     return find_first<StringData>(column_key, value);
 }
 
-inline size_t TableViewBase::find_first_binary(ColKey column_key, BinaryData value) const
+inline ObjKey TableViewBase::find_first_binary(ColKey column_key, BinaryData value) const
 {
     return find_first<BinaryData>(column_key, value);
 }
 
-inline size_t TableViewBase::find_first_timestamp(ColKey column_key, Timestamp value) const
+inline ObjKey TableViewBase::find_first_timestamp(ColKey column_key, Timestamp value) const
 {
     return find_first<Timestamp>(column_key, value);
 }

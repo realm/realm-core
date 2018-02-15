@@ -231,8 +231,10 @@ TEST(TableView_FloatsFindAndAggregations)
     // v_some =       ^^^^            ^^^^
     double sum_f = 0.0;
     double sum_d = 0.0;
+    std::vector<ObjKey> keys;
+    table.create_objects(6, keys);
     for (int i = 0; i < 6; ++i) {
-        table.create_object(ObjKey(i)).set_all(f_val[i], d_val[i], 1);
+        table.get_object(keys[i]).set_all(f_val[i], d_val[i], 1);
         sum_d += d_val[i];
         sum_f += f_val[i];
     }
@@ -247,13 +249,13 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(ObjKey(3), v_some.get_key(1));
 
     // Test find_first
-    CHECK_EQUAL(0, v_all.find_first_double(col_double, -1.2));
-    CHECK_EQUAL(5, v_all.find_first_double(col_double, 0.0));
-    CHECK_EQUAL(2, v_all.find_first_double(col_double, 3.2));
+    CHECK_EQUAL(keys[0], v_all.find_first_double(col_double, -1.2));
+    CHECK_EQUAL(keys[5], v_all.find_first_double(col_double, 0.0));
+    CHECK_EQUAL(keys[2], v_all.find_first_double(col_double, 3.2));
 
-    CHECK_EQUAL(1, v_all.find_first_float(col_float, 2.1f));
-    CHECK_EQUAL(5, v_all.find_first_float(col_float, 0.0f));
-    CHECK_EQUAL(2, v_all.find_first_float(col_float, 3.1f));
+    CHECK_EQUAL(keys[1], v_all.find_first_float(col_float, 2.1f));
+    CHECK_EQUAL(keys[5], v_all.find_first_float(col_float, 0.0f));
+    CHECK_EQUAL(keys[2], v_all.find_first_float(col_float, 3.1f));
 
     // TODO: add for float as well
 
