@@ -73,7 +73,7 @@ public:
 
     void insert_column(size_t column_ndx, ColKey column_key, ColumnType type, StringData name,
                        int attr = col_attr_None);
-    ColKey get_key(size_t column_ndx);
+    ColKey get_key(size_t column_ndx) const;
     void rename_column(size_t column_ndx, StringData new_name);
 
     /// Erase the column at the specified index, and move columns at

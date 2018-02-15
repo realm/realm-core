@@ -527,7 +527,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
 }
 
 
-ColKey Spec::get_key(size_t column_ndx)
+ColKey Spec::get_key(size_t column_ndx) const
 {
     return ColKey(m_keys.get(column_ndx));
 }
