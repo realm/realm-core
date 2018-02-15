@@ -1353,9 +1353,7 @@ void Cluster::remove_backlinks(ObjKey origin_key, size_t origin_col_ndx, const s
 
 /******************************** ClusterTree ********************************/
 
-ClusterTree::ClusterTree(Table* owner, Allocator& alloc)
-    : m_owner(owner)
-    , m_root(std::make_unique<Cluster>(0, alloc, *this))
+ClusterTree::ClusterTree(Table* owner, Allocator& alloc) : m_owner(owner), m_alloc(alloc)
 {
 }
 
@@ -1404,21 +1402,22 @@ void ClusterTree::replace_root(std::unique_ptr<ClusterNode> new_root)
     }
 }
 
+void ClusterTree::init_from_ref(ref_type ref)
+{
+    auto new_root = create_root_from_ref(m_alloc, ref);
+    if (m_root) {
+        ArrayParent* parent = m_root->get_parent();
+        size_t ndx_in_parent = m_root->get_ndx_in_parent();
+        new_root->set_parent(parent, ndx_in_parent);
+    }
+    m_root = std::move(new_root);
+    m_size = m_root->get_tree_size();
+}
+
 void ClusterTree::init_from_parent()
 {
     ref_type ref = m_root->get_ref_from_parent();
-    if (ref) {
-        ArrayParent* parent = m_root->get_parent();
-        size_t ndx_in_parent = m_root->get_ndx_in_parent();
-        auto new_root = create_root_from_ref(m_root->get_alloc(), ref);
-        new_root->set_parent(parent, ndx_in_parent);
-        m_root = std::move(new_root);
-        m_size = m_root->get_tree_size();
-    }
-    else {
-        m_root->detach();
-        m_size = 0;
-    }
+    init_from_ref(ref);
 }
 
 bool ClusterTree::update_from_parent(size_t old_baseline) noexcept
@@ -1428,34 +1427,6 @@ bool ClusterTree::update_from_parent(size_t old_baseline) noexcept
         m_size = m_root->get_tree_size();
     }
     return was_updated;
-}
-
-// FIXME: These functions are time critical, we need more direct access
-// without going through multiple indirections.
-uint64_t ClusterTree::bump_content_version()
-{
-    m_owner->bump_content_version();
-    return m_owner->get_content_version();
-}
-
-void ClusterTree::bump_storage_version()
-{
-    m_owner->bump_storage_version();
-}
-
-uint64_t ClusterTree::get_content_version() const
-{
-    return m_owner->get_content_version();
-}
-
-uint64_t ClusterTree::get_instance_version() const
-{
-    return m_owner->get_instance_version();
-}
-
-uint64_t ClusterTree::get_storage_version(uint64_t instance_version) const
-{
-    return m_owner->get_storage_version(instance_version);
 }
 
 void ClusterTree::clear()

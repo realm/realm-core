@@ -407,12 +407,12 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         m_top.add(0);
     }
 
-    m_clusters.set_parent(&m_top, top_position_for_cluster_tree);
     if (m_top.get_as_ref(top_position_for_cluster_tree) == 0) {
         MemRef mem = ClusterTree::create_empty_cluster(m_top.get_alloc()); // Throws
         m_top.set_as_ref(top_position_for_cluster_tree, mem.get_ref());
     }
-    m_clusters.init_from_parent();
+    m_clusters.init_from_ref(m_top.get_as_ref(top_position_for_cluster_tree));
+    m_clusters.set_parent(&m_top, top_position_for_cluster_tree);
 
     RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_key);
     if (!rot.is_tagged()) {
