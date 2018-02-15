@@ -249,13 +249,13 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(ObjKey(3), v_some.get_key(1));
 
     // Test find_first
-    CHECK_EQUAL(keys[0], v_all.find_first_double(col_double, -1.2));
-    CHECK_EQUAL(keys[5], v_all.find_first_double(col_double, 0.0));
-    CHECK_EQUAL(keys[2], v_all.find_first_double(col_double, 3.2));
+    CHECK_EQUAL(keys[0], v_all.find_first<Double>(col_double, -1.2));
+    CHECK_EQUAL(keys[5], v_all.find_first<Double>(col_double, 0.0));
+    CHECK_EQUAL(keys[2], v_all.find_first<Double>(col_double, 3.2));
 
-    CHECK_EQUAL(keys[1], v_all.find_first_float(col_float, 2.1f));
-    CHECK_EQUAL(keys[5], v_all.find_first_float(col_float, 0.0f));
-    CHECK_EQUAL(keys[2], v_all.find_first_float(col_float, 3.1f));
+    CHECK_EQUAL(keys[1], v_all.find_first<float>(col_float, 2.1f));
+    CHECK_EQUAL(keys[5], v_all.find_first<float>(col_float, 0.0f));
+    CHECK_EQUAL(keys[2], v_all.find_first<float>(col_float, 3.1f));
 
     // TODO: add for float as well
 
@@ -3476,5 +3476,30 @@ TEST(TableView_TimestampMaxRemoveRow)
     CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0));
 }
 #endif
+
+TEST(TableView_FindAll)
+{
+    Table t;
+    auto col_str = t.add_column(type_String, "strings");
+    auto col_int = t.add_column(type_Int, "integers");
+
+    ObjKey k0 = t.create_object().set_all("hello", 1).get_key();
+    ObjKey k1 = t.create_object().set_all("world", 2).get_key();
+    ObjKey k2 = t.create_object().set_all("hello", 3).get_key();
+    ObjKey k3 = t.create_object().set_all("world", 4).get_key();
+    ObjKey k4 = t.create_object().set_all("hello", 5).get_key();
+
+    ConstTableView tv = t.where().find_all();
+
+    ObjKey j = tv.find_first<Int>(col_int, 4);
+    CHECK_EQUAL(j, k3);
+    ObjKey k = tv.find_first<String>(col_str, "world");
+    CHECK_EQUAL(k, k1);
+    auto tv1 = tv.find_all<String>(col_str, "hello");
+    CHECK_EQUAL(tv1.size(), 3);
+    CHECK_EQUAL(tv1.get_key(0), k0);
+    CHECK_EQUAL(tv1.get_key(1), k2);
+    CHECK_EQUAL(tv1.get_key(2), k4);
+}
 
 #endif // TEST_TABLE_VIEW

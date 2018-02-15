@@ -176,17 +176,14 @@ public:
     // a query
     const Query& get_query() const noexcept;
 
-    // Searching
-    template <typename T>
-    ObjKey find_first(ColKey column_key, T value) const;
+    template <class F>
+    void for_each(F func);
 
-    ObjKey find_first_int(ColKey column_key, int64_t value) const;
-    ObjKey find_first_bool(ColKey column_key, bool value) const;
-    ObjKey find_first_float(ColKey column_key, float value) const;
-    ObjKey find_first_double(ColKey column_key, double value) const;
-    ObjKey find_first_string(ColKey column_key, StringData value) const;
-    ObjKey find_first_binary(ColKey column_key, BinaryData value) const;
-    ObjKey find_first_timestamp(ColKey column_key, Timestamp value) const;
+    template <class T>
+    TableView find_all(ColKey column_key, T value);
+
+    template <class T>
+    ObjKey find_first(ColKey column_key, T value);
 
     template <Action action, typename T, typename R>
     R aggregate(ColKey column_key, size_t* result_count = nullptr, ObjKey* return_key = nullptr) const;
@@ -338,18 +335,6 @@ protected:
     TableViewBase& operator=(const TableViewBase&);
     TableViewBase& operator=(TableViewBase&&) noexcept;
 
-    template <class R, class V>
-    static R find_all_integer(V*, ColKey, int64_t);
-
-    template <class R, class V>
-    static R find_all_float(V*, ColKey, float);
-
-    template <class R, class V>
-    static R find_all_double(V*, ColKey, double);
-
-    template <class R, class V>
-    static R find_all_string(V*, ColKey, StringData);
-
     using HandoverPatch = TableViewHandoverPatch;
 
     // handover machinery entry points based on dynamic type. These methods:
@@ -433,20 +418,6 @@ public:
     void clear();
     //@}
 
-    // Searching (Int and String)
-    TableView find_all_int(ColKey column_key, int64_t value);
-    ConstTableView find_all_int(ColKey column_key, int64_t value) const;
-    TableView find_all_bool(ColKey column_key, bool value);
-    ConstTableView find_all_bool(ColKey column_key, bool value) const;
-    TableView find_all_float(ColKey column_key, float value);
-    ConstTableView find_all_float(ColKey column_key, float value) const;
-    TableView find_all_double(ColKey column_key, double value);
-    ConstTableView find_all_double(ColKey column_key, double value) const;
-    TableView find_all_string(ColKey column_key, StringData value);
-    ConstTableView find_all_string(ColKey column_key, StringData value) const;
-    // FIXME: Need: TableView find_all_binary(ColKey column_key, BinaryData value);
-    // FIXME: Need: ConstTableView find_all_binary(ColKey column_key, BinaryData value) const;
-
     Table& get_parent() noexcept;
     const Table& get_parent() const noexcept;
 
@@ -478,9 +449,6 @@ private:
 
     TableView(DistinctViewTag, Table& parent, ColKey column_key);
 
-    TableView find_all_integer(ColKey column_key, int64_t value);
-    ConstTableView find_all_integer(ColKey column_key, int64_t value) const;
-
     friend class ConstTableView;
     friend class Table;
     friend class Query;
@@ -511,13 +479,6 @@ public:
     ConstTableView& operator=(const TableView&);
     ConstTableView& operator=(TableView&&);
 
-    // Searching (Int and String)
-    ConstTableView find_all_int(ColKey column_key, int64_t value) const;
-    ConstTableView find_all_bool(ColKey column_key, bool value) const;
-    ConstTableView find_all_float(ColKey column_key, float value) const;
-    ConstTableView find_all_double(ColKey column_key, double value) const;
-    ConstTableView find_all_string(ColKey column_key, StringData value) const;
-
     const Table& get_parent() const noexcept;
 
     std::unique_ptr<TableViewBase> clone() const override
@@ -543,8 +504,6 @@ public:
 
 private:
     ConstTableView(const Table& parent);
-
-    ConstTableView find_all_integer(ColKey column_key, int64_t value) const;
 
     friend class TableView;
     friend class Table;
@@ -757,77 +716,49 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
 
 
 // Searching
-inline ObjKey TableViewBase::find_first_int(ColKey column_key, int64_t value) const
+template <class F>
+void TableViewBase::for_each(F func)
 {
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Int);
-    return find_first_integer(column_key, value);
+    auto sz = size();
+    for (size_t i = 0; i < sz; i++) {
+        try {
+            ConstObj o = get(i);
+            if (func(o))
+                return;
+        }
+        catch (const InvalidKey&) {
+        }
+    }
 }
 
-inline ObjKey TableViewBase::find_first_bool(ColKey column_key, bool value) const
+template <class T>
+TableView TableViewBase::find_all(ColKey column_key, T value)
 {
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Bool);
-    return find_first_integer(column_key, value ? 1 : 0);
+    TableView tv(*m_table);
+    auto& keys = tv.m_key_values;
+    for_each([column_key, value, &keys](ConstObj& o) {
+        if (o.get<T>(column_key) == value) {
+            keys.add(o.get_key());
+        }
+        return false;
+    });
+    return tv;
 }
 
-inline ObjKey TableViewBase::find_first_integer(ColKey column_key, int64_t value) const
+template <class T>
+ObjKey TableViewBase::find_first(ColKey column_key, T value)
 {
-    return find_first<int64_t>(column_key, value);
+    ObjKey k;
+    for_each([column_key, value, &k](ConstObj& o) {
+        T v = o.get<T>(column_key);
+        if (v == value) {
+            k = o.get_key();
+            return true;
+        }
+        return false;
+    });
+    return k;
 }
-
-inline ObjKey TableViewBase::find_first_float(ColKey column_key, float value) const
-{
-    return find_first<float>(column_key, value);
-}
-
-inline ObjKey TableViewBase::find_first_double(ColKey column_key, double value) const
-{
-    return find_first<double>(column_key, value);
-}
-
-inline ObjKey TableViewBase::find_first_string(ColKey column_key, StringData value) const
-{
-    return find_first<StringData>(column_key, value);
-}
-
-inline ObjKey TableViewBase::find_first_binary(ColKey column_key, BinaryData value) const
-{
-    return find_first<BinaryData>(column_key, value);
-}
-
-inline ObjKey TableViewBase::find_first_timestamp(ColKey column_key, Timestamp value) const
-{
-    return find_first<Timestamp>(column_key, value);
-}
-
-
-template <class R, class V>
-R TableViewBase::find_all_integer(V* view, ColKey column_key, int64_t value)
-{
-    typedef typename std::remove_const<V>::type TNonConst;
-    return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_key, value).find_all();
-}
-
-template <class R, class V>
-R TableViewBase::find_all_float(V* view, ColKey column_key, float value)
-{
-    typedef typename std::remove_const<V>::type TNonConst;
-    return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_key, value).find_all();
-}
-
-template <class R, class V>
-R TableViewBase::find_all_double(V* view, ColKey column_key, double value)
-{
-    typedef typename std::remove_const<V>::type TNonConst;
-    return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_key, value).find_all();
-}
-
-template <class R, class V>
-R TableViewBase::find_all_string(V* view, ColKey column_key, StringData value)
-{
-    typedef typename std::remove_const<V>::type TNonConst;
-    return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_key, value).find_all();
-}
-
 
 //-------------------------- TableView, ConstTableView implementation:
 
@@ -897,111 +828,6 @@ inline ConstTableView& ConstTableView::operator=(TableView&& tv)
 {
     TableViewBase::operator=(std::move(tv));
     return *this;
-}
-
-
-// - string
-inline TableView TableView::find_all_string(ColKey column_key, StringData value)
-{
-    return TableViewBase::find_all_string<TableView>(this, column_key, value);
-}
-
-inline ConstTableView TableView::find_all_string(ColKey column_key, StringData value) const
-{
-    return TableViewBase::find_all_string<ConstTableView>(this, column_key, value);
-}
-
-inline ConstTableView ConstTableView::find_all_string(ColKey column_key, StringData value) const
-{
-    return TableViewBase::find_all_string<ConstTableView>(this, column_key, value);
-}
-
-// - float
-inline TableView TableView::find_all_float(ColKey column_key, float value)
-{
-    return TableViewBase::find_all_float<TableView>(this, column_key, value);
-}
-
-inline ConstTableView TableView::find_all_float(ColKey column_key, float value) const
-{
-    return TableViewBase::find_all_float<ConstTableView>(this, column_key, value);
-}
-
-inline ConstTableView ConstTableView::find_all_float(ColKey column_key, float value) const
-{
-    return TableViewBase::find_all_float<ConstTableView>(this, column_key, value);
-}
-
-
-// - double
-inline TableView TableView::find_all_double(ColKey column_key, double value)
-{
-    return TableViewBase::find_all_double<TableView>(this, column_key, value);
-}
-
-inline ConstTableView TableView::find_all_double(ColKey column_key, double value) const
-{
-    return TableViewBase::find_all_double<ConstTableView>(this, column_key, value);
-}
-
-inline ConstTableView ConstTableView::find_all_double(ColKey column_key, double value) const
-{
-    return TableViewBase::find_all_double<ConstTableView>(this, column_key, value);
-}
-
-
-// -- 3 variants of the 3 find_all_{int, bool, date} all based on integer
-
-inline TableView TableView::find_all_integer(ColKey column_key, int64_t value)
-{
-    return TableViewBase::find_all_integer<TableView>(this, column_key, value);
-}
-
-inline ConstTableView TableView::find_all_integer(ColKey column_key, int64_t value) const
-{
-    return TableViewBase::find_all_integer<ConstTableView>(this, column_key, value);
-}
-
-inline ConstTableView ConstTableView::find_all_integer(ColKey column_key, int64_t value) const
-{
-    return TableViewBase::find_all_integer<ConstTableView>(this, column_key, value);
-}
-
-
-inline TableView TableView::find_all_int(ColKey column_key, int64_t value)
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Int);
-    return find_all_integer(column_key, value);
-}
-
-inline TableView TableView::find_all_bool(ColKey column_key, bool value)
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Bool);
-    return find_all_integer(column_key, value ? 1 : 0);
-}
-
-inline ConstTableView TableView::find_all_int(ColKey column_key, int64_t value) const
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Int);
-    return find_all_integer(column_key, value);
-}
-
-inline ConstTableView TableView::find_all_bool(ColKey column_key, bool value) const
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Bool);
-    return find_all_integer(column_key, value ? 1 : 0);
-}
-
-inline ConstTableView ConstTableView::find_all_int(ColKey column_key, int64_t value) const
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Int);
-    return find_all_integer(column_key, value);
-}
-
-inline ConstTableView ConstTableView::find_all_bool(ColKey column_key, bool value) const
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Bool);
-    return find_all_integer(column_key, value ? 1 : 0);
 }
 
 // Rows

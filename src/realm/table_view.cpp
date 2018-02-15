@@ -115,38 +115,6 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
         m_last_seen_versions.clear();
 }
 
-// Searching
-
-template <typename T>
-ObjKey TableViewBase::find_first(ColKey column_key, T value) const
-{
-    check_cookie();
-    for (size_t i = 0, num_rows = m_key_values.size(); i < num_rows; ++i) {
-        ObjKey key(m_key_values.get(i));
-        try {
-            if (m_table->get_object(key).get<T>(column_key) == value)
-                return key;
-        }
-        catch (const InvalidKey&) {
-        }
-    }
-
-    return null_key;
-}
-
-template ObjKey TableViewBase::find_first(ColKey, int64_t) const;
-template ObjKey TableViewBase::find_first(ColKey, util::Optional<int64_t>) const;
-template ObjKey TableViewBase::find_first(ColKey, bool) const;
-template ObjKey TableViewBase::find_first(ColKey, Optional<bool>) const;
-template ObjKey TableViewBase::find_first(ColKey, float) const;
-template ObjKey TableViewBase::find_first(ColKey, util::Optional<float>) const;
-template ObjKey TableViewBase::find_first(ColKey, double) const;
-template ObjKey TableViewBase::find_first(ColKey, util::Optional<double>) const;
-template ObjKey TableViewBase::find_first(ColKey, Timestamp) const;
-template ObjKey TableViewBase::find_first(ColKey, StringData) const;
-template ObjKey TableViewBase::find_first(ColKey, BinaryData) const;
-
-
 // Aggregates ----------------------------------------------------
 
 template <Action action, typename T, typename R>
