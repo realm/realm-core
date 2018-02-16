@@ -105,8 +105,9 @@ SyncTestFile::SyncTestFile(SyncServer& server, std::string name,
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->bind_session_handler = [=](auto&, auto& config, auto session) {
         std::string token, encoded;
-        // Tokens without a path are considered admin tokens by the sync service, so for
-        // non-admin users we need to add a path
+        // FIXME: Tokens without a path are currently implicitly considered
+        // admin tokens by the sync service, so until that changes we need to
+        // add a path for non-admin users
         if (config.user->is_admin())
             token = "{\"identity\": \"test\", \"access\": [\"download\", \"upload\"]}";
         else {
