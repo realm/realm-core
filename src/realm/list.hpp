@@ -599,7 +599,7 @@ public:
 
 private:
     friend class SharedGroup;
-    friend class TableViewBase;
+    friend class ConstTableView;
     friend class Query;
 
     TableVersions sync_if_needed() const override;

@@ -37,7 +37,7 @@ Query::Query()
     create();
 }
 
-Query::Query(Table& table, TableViewBase* tv)
+Query::Query(Table& table, ConstTableView* tv)
     : m_table(table.get_table_ref())
     , m_view(tv)
     , m_source_table_view(tv)
@@ -75,7 +75,7 @@ Query::Query(const Table& table, LinkListPtr&& ll)
     create();
 }
 
-Query::Query(const Table& table, TableViewBase* tv)
+Query::Query(const Table& table, ConstTableView* tv)
     : m_table((const_cast<Table&>(table)).get_table_ref())
     , m_view(tv)
     , m_source_table_view(tv)
@@ -87,7 +87,7 @@ Query::Query(const Table& table, TableViewBase* tv)
     create();
 }
 
-Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
+Query::Query(const Table& table, std::unique_ptr<ConstTableView> tv)
     : m_table((const_cast<Table&>(table)).get_table_ref())
     , m_view(tv.get())
     , m_source_table_view(tv.get())
@@ -1254,7 +1254,7 @@ ObjKey Query::find()
     }
 }
 
-void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit) const
+void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit) const
 {
     if (limit == 0)
         return;

@@ -115,7 +115,7 @@ ObjList::ObjList(KeyColumn& key_values)
 {
 }
 
-ObjList::ObjList(KeyColumn& key_values, Table* parent)
+ObjList::ObjList(KeyColumn& key_values, const Table* parent)
     : m_table(parent->get_table_ref())
     , m_key_values(key_values)
 #ifdef REALM_COOKIE_CHECK

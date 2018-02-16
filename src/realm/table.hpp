@@ -48,7 +48,6 @@ class LinkView;
 class SortDescriptor;
 class StringIndex;
 class TableView;
-class TableViewBase;
 class TimestampColumn;
 template <class>
 class Columns;
@@ -510,13 +509,13 @@ public:
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
     // need to be sorted, and, resulting view retains its order.
-    Query where(TableViewBase* tv = nullptr)
+    Query where(ConstTableView* tv = nullptr)
     {
         return Query(*this, tv);
     }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
-    Query where(TableViewBase* tv = nullptr) const
+    Query where(ConstTableView* tv = nullptr) const
     {
         return Query(*this, tv);
     }
@@ -868,7 +867,7 @@ private:
     template <class>
     friend class SimpleQuerySupport;
     friend class LangBindHelper;
-    friend class TableViewBase;
+    friend class ConstTableView;
     template <class T>
     friend class Columns;
     friend class Columns<StringData>;

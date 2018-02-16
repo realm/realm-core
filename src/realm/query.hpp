@@ -47,7 +47,6 @@ namespace realm {
 class ParentNode;
 class Table;
 class TableView;
-class TableViewBase;
 class ConstTableView;
 class Array;
 class Expression;
@@ -83,8 +82,8 @@ struct QueryGroup {
 
 class Query final {
 public:
-    Query(const Table& table, TableViewBase* tv = nullptr);
-    Query(const Table& table, std::unique_ptr<TableViewBase>);
+    Query(const Table& table, ConstTableView* tv = nullptr);
+    Query(const Table& table, std::unique_ptr<ConstTableView>);
     Query(const Table& table, const LinkListPtr& list);
     Query(const Table& table, LinkListPtr&& list);
     Query();
@@ -277,7 +276,7 @@ public:
     bool eval_object(ConstObj& obj) const;
 
 private:
-    Query(Table& table, TableViewBase* tv = nullptr);
+    Query(Table& table, ConstTableView* tv = nullptr);
     void create();
 
     void init() const;
@@ -346,7 +345,7 @@ private:
     void aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable, ParentNode* pn, QueryStateBase* st,
                             size_t start, size_t end, ArrayPayload* source_column) const;
 
-    void find_all(TableViewBase& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
+    void find_all(ConstTableView& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
     void delete_nodes() noexcept;
 
     bool has_conditions() const
@@ -362,7 +361,7 @@ private:
     void add_node(std::unique_ptr<ParentNode>);
 
     friend class Table;
-    friend class TableViewBase;
+    friend class ConstTableView;
     friend class metrics::QueryInfo;
 
     std::string error_code;
@@ -379,8 +378,8 @@ private:
 
     // At most one of these can be non-zero, and if so the non-zero one indicates the restricting view.
     LinkListPtr m_source_link_list;               // link lists are owned by the query.
-    TableViewBase* m_source_table_view = nullptr; // table views are not refcounted, and not owned by the query.
-    std::unique_ptr<TableViewBase> m_owned_source_table_view; // <--- except when indicated here
+    ConstTableView* m_source_table_view = nullptr; // table views are not refcounted, and not owned by the query.
+    std::unique_ptr<ConstTableView> m_owned_source_table_view; // <--- except when indicated here
 };
 
 // Implementation:
