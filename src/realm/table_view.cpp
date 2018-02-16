@@ -263,26 +263,19 @@ size_t ConstTableView::aggregate_count(ColKey column_key, T count_target) const
 template <class C>
 Timestamp ConstTableView::minmax_timestamp(ColKey column_key, ObjKey* return_key) const
 {
-    C compare;
     Timestamp best_value;
     ObjKey best_key;
-    for (size_t t = 0; t < size(); t++) {
-        ObjKey key = ObjKey(m_key_values.get(t));
-
-        // skip detached references:
-        if (key == null_key)
-            continue;
-
-        ConstObj obj = m_table->get_object(key);
+    for_each([&best_key, &best_value, column_key](ConstObj& obj) {
+        C compare;
         auto ts = obj.get<Timestamp>(column_key);
         // Because realm::Greater(non-null, null) == false, we need to pick the initial 'best' manually when we see
         // the first non-null entry
         if ((best_key == null_key && !ts.is_null()) || compare(ts, best_value, ts.is_null(), best_value.is_null())) {
             best_value = ts;
-            best_key = key;
+            best_key = obj.get_key();
         }
-    }
-
+        return false;
+    });
     if (return_key)
         *return_key = best_key;
 

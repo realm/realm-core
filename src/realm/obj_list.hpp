@@ -58,7 +58,7 @@ public:
         return ObjKey(m_key_values.get(ndx));
     }
 
-    ConstObj get(size_t row_ndx) const noexcept;
+    ConstObj get(size_t row_ndx) const;
     ConstObj front() const noexcept
     {
         return get(0);
@@ -74,7 +74,7 @@ public:
     }
 
     template <class F>
-    void for_each(F func);
+    void for_each(F func) const;
 
     template <class T>
     ConstTableView find_all(ColKey column_key, T value);
@@ -109,7 +109,7 @@ protected:
 };
 
 template <class F>
-void ObjList::for_each(F func)
+void ObjList::for_each(F func) const
 {
     auto sz = size();
     for (size_t i = 0; i < sz; i++) {

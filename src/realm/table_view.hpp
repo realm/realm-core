@@ -413,10 +413,10 @@ public:
     }
 
     // Rows
-    Obj get(size_t row_ndx) noexcept;
-    Obj front() noexcept;
-    Obj back() noexcept;
-    Obj operator[](size_t row_ndx) noexcept;
+    Obj get(size_t row_ndx);
+    Obj front();
+    Obj back();
+    Obj operator[](size_t row_ndx);
 
     /// \defgroup table_view_removes
     //@{
@@ -538,9 +538,9 @@ inline ConstTableView::ConstTableView(const ConstTableView& tv)
     : ObjList(m_table_view_key_values, tv.m_table)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj(tv.m_linked_obj)
-    , m_linklist_source(tv.m_linklist_source->clone())
+    , m_linklist_source(tv.m_linklist_source ? tv.m_linklist_source->clone() : LinkListPtr{})
     , m_distinct_column_source(tv.m_distinct_column_source)
-    , m_descriptor_ordering(std::move(tv.m_descriptor_ordering))
+    , m_descriptor_ordering(tv.m_descriptor_ordering)
     , m_query(tv.m_query)
     , m_start(tv.m_start)
     , m_end(tv.m_end)
@@ -685,7 +685,7 @@ inline TableView::TableView(ConstTableView::DistinctViewTag, Table& parent, ColK
 }
 
 // Rows
-inline Obj TableView::get(size_t row_ndx) noexcept
+inline Obj TableView::get(size_t row_ndx)
 {
     REALM_ASSERT_ROW(row_ndx);
     ObjKey key(m_key_values.get(row_ndx));
@@ -693,18 +693,18 @@ inline Obj TableView::get(size_t row_ndx) noexcept
     return get_parent().get_object(key);
 }
 
-inline Obj TableView::front() noexcept
+inline Obj TableView::front()
 {
     return get(0);
 }
 
-inline Obj TableView::back() noexcept
+inline Obj TableView::back()
 {
     size_t last_row_ndx = size() - 1;
     return get(last_row_ndx);
 }
 
-inline Obj TableView::operator[](size_t row_ndx) noexcept
+inline Obj TableView::operator[](size_t row_ndx)
 {
     return get(row_ndx);
 }

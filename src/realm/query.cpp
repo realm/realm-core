@@ -1278,9 +1278,26 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
     else {
         if (!has_conditions()) {
             KeyColumn& refs = ret.m_key_values;
-            for (auto o : *m_table) {
-                refs.add(o.get_key());
-            }
+            m_table->traverse_clusters([&begin, &end, &refs, this](const Cluster* cluster) {
+                size_t e = cluster->node_size();
+                if (begin < e) {
+                    if (e > end) {
+                        e = end;
+                    }
+                    auto offset = cluster->get_offset();
+                    auto key_values = cluster->get_key_array();
+                    for (size_t i = begin; i < e; i++) {
+                        refs.add(ObjKey(key_values->get(i) + offset));
+                    }
+                    begin = 0;
+                }
+                else {
+                    begin -= e;
+                }
+                end -= e;
+                // Stop if end is reached
+                return end == 0;
+            });
         }
         else {
             auto node = root_node();
