@@ -21,8 +21,7 @@
 
 using namespace realm;
 
-MemRef Node::create_element(size_t size, Allocator& alloc, bool context_flag, Type type, WidthType width_type,
-                            int width)
+MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type type, WidthType width_type, int width)
 {
     size_t byte_size_0 = calc_byte_size(width_type, size, width);
     size_t byte_size = std::max(byte_size_0, size_t(initial_capacity));

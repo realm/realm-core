@@ -20,6 +20,7 @@
 #define REALM_CLUSTER_HPP
 
 #include <realm/array.hpp>
+#include <realm/array_unsigned.hpp>
 #include <realm/data_type.hpp>
 #include <realm/column_type_traits.hpp>
 
@@ -242,7 +243,7 @@ public:
     size_t lower_bound_key(ObjKey key) const
     {
         if (m_keys.is_attached()) {
-            return m_keys.lower_bound_int(key.value);
+            return m_keys.lower_bound(uint64_t(key.value));
         }
         else {
             size_t sz = size_t(Array::get(0)) >> 1;
