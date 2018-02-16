@@ -143,6 +143,9 @@ struct SyncConfig {
         if (this->reference_realm_url.find("/__partial/") != npos)
             throw std::invalid_argument("A Realm URL may not contain the reserved string \"/__partial/\".");
     }
+
+    // Construct an identifier for this partially synced Realm by combining client and user identifiers.
+    static std::string partial_sync_identifier(const SyncUser& user);
 };
 
 } // namespace realm
