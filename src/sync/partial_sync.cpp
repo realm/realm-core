@@ -482,7 +482,7 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
         throw std::logic_error("A partial sync query can only be registered in a partially synced Realm");
 
     auto query = results.get_query().get_description(); // Throws if the query cannot be serialized.
-    //query += " " + results.get_descriptor_ordering().get_description(results.get_query().get_table());
+    query += " " + results.get_descriptor_ordering().get_description(results.get_query().get_table());
 
     std::string name = user_provided_name ? std::move(*user_provided_name)
                                           : default_name_for_query(query, results.get_object_type());
