@@ -219,16 +219,34 @@ size_t Array::bit_width(int64_t v)
 
 void Array::init_from_mem(MemRef mem) noexcept
 {
-    char* header = mem.get_addr();
+    char* header = Node::init_from_mem(mem);
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
-    m_width = get_width_from_header(header);
-    m_size = get_size_from_header(header);
-    m_ref = mem.get_ref();
-    m_data = get_data_from_header(header);
+
     set_width(m_width);
+}
+
+bool Array::update_from_parent(size_t old_baseline) noexcept
+{
+    REALM_ASSERT_DEBUG(is_attached());
+    ArrayParent* parent = get_parent();
+    REALM_ASSERT_DEBUG(parent);
+
+    // Array nodes that are part of the previous version of the
+    // database will not be overwritten by Group::commit(). This is
+    // necessary for robustness in the face of abrupt termination of
+    // the process. It also means that we can be sure that an array
+    // remains unchanged across a commit if the new ref is equal to
+    // the old ref and the ref is below the previous baseline.
+
+    ref_type new_ref = get_ref_from_parent();
+    if (new_ref == m_ref && new_ref < old_baseline)
+        return false; // Has not changed
+
+    init_from_ref(new_ref);
+    return true; // Might have changed
 }
 
 void Array::set_type(Type type)
@@ -251,29 +269,10 @@ void Array::set_type(Type type)
     }
     m_is_inner_bptree_node = init_is_inner_bptree_node;
     m_has_refs = init_has_refs;
-    set_header_is_inner_bptree_node(init_is_inner_bptree_node);
-    set_header_hasrefs(init_has_refs);
-}
 
-
-bool Array::update_from_parent(size_t old_baseline) noexcept
-{
-    REALM_ASSERT_DEBUG(is_attached());
-    REALM_ASSERT_DEBUG(m_parent);
-
-    // Array nodes that are part of the previous version of the
-    // database will not be overwritten by Group::commit(). This is
-    // necessary for robustness in the face of abrupt termination of
-    // the process. It also means that we can be sure that an array
-    // remains unchanged across a commit if the new ref is equal to
-    // the old ref and the ref is below the previous baseline.
-
-    ref_type new_ref = m_parent->get_child_ref(m_ndx_in_parent);
-    if (new_ref == m_ref && new_ref < old_baseline)
-        return false; // Has not changed
-
-    init_from_ref(new_ref);
-    return true; // Might have changed
+    char* header = get_header();
+    set_header_is_inner_bptree_node(init_is_inner_bptree_node, header);
+    set_header_hasrefs(init_has_refs, header);
 }
 
 
@@ -686,7 +685,7 @@ void Array::truncate(size_t new_size)
     // drop the width back to zero.
     if (new_size == 0) {
         set_width(0);
-        set_header_width(0);
+        set_header_width(0, get_header());
     }
 }
 
@@ -719,7 +718,7 @@ void Array::truncate_and_destroy_children(size_t new_size)
     // drop the width back to zero.
     if (new_size == 0) {
         set_width(0);
-        set_header_width(0);
+        set_header_width(0, get_header());
     }
 }
 
@@ -752,9 +751,7 @@ void Array::set_all_to_zero()
     copy_on_write(); // Throws
 
     set_width(0);
-
-    // Update header
-    set_header_width(0);
+    set_header_width(0, get_header());
 }
 
 void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
@@ -1514,32 +1511,6 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
     return aligned_byte_size;
 }
 
-size_t Array::calc_byte_len(size_t num_items, size_t width) const
-{
-    REALM_ASSERT_3(get_wtype_from_header(get_header_from_data(m_data)), ==, wtype_Bits);
-
-    // FIXME: Consider calling `calc_aligned_byte_size(size)`
-    // instead. Note however, that calc_byte_len() is supposed to return
-    // the unaligned byte size. It is probably the case that no harm
-    // is done by returning the aligned version, and most callers of
-    // calc_byte_len() will actually benefit if calc_byte_len() was
-    // changed to always return the aligned byte size.
-
-    size_t bits = num_items * width;
-    size_t bytes = (bits + 7) / 8; // round up
-    return bytes + header_size;    // add room for 8 byte header
-}
-
-size_t Array::calc_item_count(size_t bytes, size_t width) const noexcept
-{
-    if (width == 0)
-        return std::numeric_limits<size_t>::max(); // Zero width gives "infinite" space
-
-    size_t bytes_data = bytes - header_size; // ignore 8 byte header
-    size_t total_bits = bytes_data * 8;
-    return total_bits / width;
-}
-
 MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 {
     const char* header = mem.get_addr();
@@ -1605,49 +1576,6 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
     return new_array.get_mem();
 }
 
-void Array::do_copy_on_write(size_t minimum_size)
-{
-    // Calculate size in bytes
-    size_t array_size = calc_byte_len(m_size, m_width);
-    size_t new_size = std::max(array_size, minimum_size);
-    new_size = (new_size + 0x7) & ~size_t(0x7); // 64bit blocks
-    // Plus a bit of matchcount room for expansion
-    if (new_size < max_array_payload - 64)
-        new_size += 64;
-
-    // Create new copy of array
-    MemRef mref = m_alloc.alloc(new_size); // Throws
-    const char* old_begin = get_header_from_data(m_data);
-    const char* old_end = get_header_from_data(m_data) + array_size;
-    char* new_begin = mref.get_addr();
-    realm::safe_copy_n(old_begin, old_end - old_begin, new_begin);
-
-    ref_type old_ref = m_ref;
-
-    // Update internal data
-    m_ref = mref.get_ref();
-    m_data = get_data_from_header(new_begin);
-
-    // Update capacity in header. Uses m_data to find header, so
-    // m_data must be initialized correctly first.
-    set_header_capacity(new_size);
-
-    update_parent();
-
-#if REALM_ENABLE_MEMDEBUG
-    if (!m_alloc.is_read_only(old_ref)) {
-        // Overwrite free'd array with 0x77. We cannot overwrite the header because free_() needs to know the size
-        // of the allocated block in order to free it. This size is computed from the width and size header
-        // fields.
-        memset(const_cast<char*>(old_begin) + header_size, 0x77, old_end - old_begin - header_size);
-    }
-#endif
-
-    // Mark original as deleted, so that the space can be reclaimed in
-    // future commits, when no versions are using it anymore
-    m_alloc.free_(old_ref, old_begin);
-}
-
 MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size, int_fast64_t value,
                      Allocator& alloc)
 {
@@ -1688,61 +1616,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     }
 
     return mem;
-}
-
-void Array::alloc(size_t init_size, size_t new_width)
-{
-    REALM_ASSERT(is_attached());
-
-    size_t needed_bytes = calc_byte_len(init_size, new_width);
-    // this method is not public and callers must (and currently do) ensure that
-    // needed_bytes are never larger than max_array_payload.
-    REALM_ASSERT_3(needed_bytes, <=, max_array_payload);
-
-    if (is_read_only())
-        do_copy_on_write(needed_bytes);
-
-    REALM_ASSERT(!m_alloc.is_read_only(m_ref));
-    char* header = get_header_from_data(m_data);
-    size_t orig_capacity_bytes = get_capacity_from_header(header);
-
-    if (orig_capacity_bytes < needed_bytes) {
-        // Double to avoid too many reallocs (or initialize to initial size), but truncate if that exceeds the
-        // maximum allowed payload (measured in bytes) for arrays. This limitation is due to 24-bit capacity
-        // field in the header.
-        size_t new_capacity_bytes = orig_capacity_bytes * 2;
-        if (new_capacity_bytes < orig_capacity_bytes) // overflow detected, clamp to max
-            new_capacity_bytes = max_array_payload_aligned;
-        if (new_capacity_bytes > max_array_payload_aligned) // cap at max allowed allocation
-            new_capacity_bytes = max_array_payload_aligned;
-
-        // If doubling is not enough, expand enough to fit
-        if (new_capacity_bytes < needed_bytes) {
-            size_t rest = (~needed_bytes & 0x7) + 1;
-            new_capacity_bytes = needed_bytes;
-            if (rest < 8)
-                new_capacity_bytes += rest; // 64bit align
-        }
-
-        // Allocate and update header
-        MemRef mem_ref = m_alloc.realloc_(m_ref, header, orig_capacity_bytes, new_capacity_bytes); // Throws
-
-        header = mem_ref.get_addr();
-        set_header_capacity(new_capacity_bytes, header);
-
-        // Update this accessor and its ancestors
-        m_ref = mem_ref.get_ref();
-        m_data = get_data_from_header(header);
-        // FIXME: Trouble when this one throws. We will then leave
-        // this array instance in a corrupt state
-        update_parent(); // Throws
-    }
-
-    // Update header
-    if (new_width != m_width) {
-        set_header_width(int(new_width), header);
-    }
-    set_header_size(init_size, header);
 }
 
 int_fast64_t Array::lbound_for_width(size_t width) noexcept
@@ -2079,11 +1952,11 @@ void Array::verify() const
     REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
                  m_width == 32 || m_width == 64);
 
-    if (!m_parent)
+    if (!get_parent())
         return;
 
     // Check that parent is set correctly
-    ref_type ref_in_parent = m_parent->get_child_ref(m_ndx_in_parent);
+    ref_type ref_in_parent = get_ref_from_parent();
     REALM_ASSERT_3(ref_in_parent, ==, m_ref);
 }
 

@@ -62,11 +62,6 @@ MemRef StringEnumColumn::clone_deep(Allocator& alloc) const
     return MemRef{new_col.get_ref(), alloc};
 }
 
-void StringEnumColumn::adjust_keys_ndx_in_parent(int diff) noexcept
-{
-    m_keys.get_root_array()->adjust_ndx_in_parent(diff);
-}
-
 void StringEnumColumn::update_from_parent(size_t old_baseline) noexcept
 {
     IntegerColumn::update_from_parent(old_baseline);

@@ -246,7 +246,7 @@ inline BinaryData BinaryColumn::get(size_t ndx) const noexcept
     const char* leaf_header = p.first.get_addr();
     size_t ndx_in_leaf = p.second;
     Allocator& alloc = m_array->get_alloc();
-    bool is_big = Array::get_context_flag_from_header(leaf_header);
+    bool is_big = Node::get_context_flag_from_header(leaf_header);
     if (!is_big) {
         // Small blobs
         return ArraySmallBlobs::get(leaf_header, ndx_in_leaf, alloc);
@@ -401,15 +401,15 @@ inline void BinaryColumn::insert_string(size_t row_ndx, StringData value)
 inline size_t BinaryColumn::get_size_from_ref(ref_type root_ref, Allocator& alloc) noexcept
 {
     const char* root_header = alloc.translate(root_ref);
-    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
+    bool root_is_leaf = !Node::get_is_inner_bptree_node_from_header(root_header);
     if (root_is_leaf) {
-        bool is_big = Array::get_context_flag_from_header(root_header);
+        bool is_big = Node::get_context_flag_from_header(root_header);
         if (!is_big) {
             // Small blobs leaf
             return ArraySmallBlobs::get_size_from_header(root_header, alloc);
         }
         // Big blobs leaf
-        return ArrayBigBlobs::get_size_from_header(root_header);
+        return Node::get_size_from_header(root_header);
     }
     return BpTreeNode::get_bptree_size_from_header(root_header);
 }

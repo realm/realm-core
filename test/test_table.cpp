@@ -3385,11 +3385,17 @@ TEST(Table_object_forward_iterator)
 
     // table.dump_objects();
 
+    size_t ndx = 0;
     for (Obj o : table) {
         int64_t key_value = o.get_key().value;
         // std::cout << "Key value: " << std::hex << key_value << std::dec << std::endl;
         CHECK_EQUAL(key_value << 1, o.get<int64_t>(c0));
         CHECK_EQUAL(key_value << 2, o.get<util::Optional<int64_t>>(c1));
+
+        Obj x = table.get_object(ndx);
+        CHECK_EQUAL(o.get_key(), x.get_key());
+        CHECK_EQUAL(o.get<int64_t>(c0), x.get<int64_t>(c0));
+        ndx++;
     }
 
     auto it = table.begin();
@@ -3416,56 +3422,109 @@ TEST(Table_object_forward_iterator)
 TEST(Table_object_sequential)
 {
     int nb_rows = 1024;
-    Table table;
-    auto c0 = table.add_column(type_Int, "int1");
-    auto c1 = table.add_column(type_Int, "int2", true);
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ColKey c0;
+    ColKey c1;
 
     CALLGRIND_START_INSTRUMENTATION;
 
-    auto t1 = steady_clock::now();
+    std::cout << nb_rows << " rows - sequential" << std::endl;
 
-    for (int i = 0; i < nb_rows; i++) {
-        table.create_object(ObjKey(i)).set_all(i << 1, i << 2);
-    }
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.add_table("test");
 
-    auto t2 = steady_clock::now();
+        c0 = table->add_column(type_Int, "int1");
+        c1 = table->add_column(type_Int, "int2", true);
 
-    for (int i = 0; i < nb_rows; i++) {
-        Obj o = table.get_object(ObjKey(i));
-        CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
-        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(c1));
-    }
 
-    auto t3 = steady_clock::now();
+        auto t1 = steady_clock::now();
 
-    for (int i = 0; i < nb_rows; i++) {
-        table.remove_object(ObjKey(i));
-#ifdef REALM_DEBUG
-        for (int j = i + 1; j < nb_rows; j++) {
-            Obj o = table.get_object(ObjKey(j));
-            CHECK_EQUAL(j << 1, o.get<int64_t>(c0));
-            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(c1));
+        for (int i = 0; i < nb_rows; i++) {
+            table->create_object(ObjKey(i)).set_all(i << 1, i << 2);
         }
-#endif
+
+        auto t2 = steady_clock::now();
+        std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+                  << std::endl;
+
+        CHECK_EQUAL(table->size(), nb_rows);
+        wt.commit();
     }
 
-    auto t4 = steady_clock::now();
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int i = 0; i < nb_rows; i++) {
+            ConstObj o = table->get_object(ObjKey(i));
+            CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+            CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(c1));
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   lookup time   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+                  << std::endl;
+    }
+
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int i = 0; i < nb_rows; i++) {
+            Obj o = table->get_object(ObjKey(i));
+            o.set(c0, i << 2).set(c1, i << 1);
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   update time   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+                  << std::endl;
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int i = 0; i < nb_rows; i++) {
+            table->remove_object(ObjKey(i));
+#ifdef REALM_DEBUG
+            CHECK_EQUAL(table->size(), nb_rows - i - 1);
+            for (int j = i + 1; j < nb_rows; j++) {
+                Obj o = table->get_object(ObjKey(j));
+                CHECK_EQUAL(j << 2, o.get<int64_t>(c0));
+                CHECK_EQUAL(j << 1, o.get<util::Optional<int64_t>>(c1));
+            }
+#endif
+        }
+        auto t2 = steady_clock::now();
+        std::cout << "   erase time    : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+                  << std::endl;
+
+        wt.commit();
+    }
 
     CALLGRIND_STOP_INSTRUMENTATION;
-
-    std::cout << nb_rows << " rows" << std::endl;
-    std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
-              << std::endl;
-    std::cout << "   lookup time   : " << duration_cast<nanoseconds>(t3 - t2).count() / nb_rows << " ns/key"
-              << std::endl;
-    std::cout << "   erase time    : " << duration_cast<nanoseconds>(t4 - t3).count() / nb_rows << " ns/key"
-              << std::endl;
 }
 
 TEST(Table_object_random)
 {
     int nb_rows = 1024;
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ColKey c0;
+    ColKey c1;
     std::vector<int64_t> key_values;
+
     {
         std::set<int64_t> key_set;
         for (int i = 0; i < nb_rows; i++) {
@@ -3481,50 +3540,94 @@ TEST(Table_object_random)
         }
     }
 
-    Table table;
-    auto c0 = table.add_column(type_Int, "int1");
-    auto c1 = table.add_column(type_Int, "int2", true);
-
     CALLGRIND_START_INSTRUMENTATION;
 
-    auto t1 = steady_clock::now();
+    std::cout << nb_rows << " rows - random" << std::endl;
 
-    for (int i = 0; i < nb_rows; i++) {
-        table.create_object(ObjKey(key_values[i])).set_all(i << 1, i << 2);
-    }
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.add_table("test");
 
-    auto t2 = steady_clock::now();
+        c0 = table->add_column(type_Int, "int1");
+        c1 = table->add_column(type_Int, "int2", true);
 
-    for (int i = 0; i < nb_rows; i++) {
-        Obj o = table.get_object(ObjKey(key_values[i]));
-        CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
-        CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(c1));
-    }
 
-    auto t3 = steady_clock::now();
+        auto t1 = steady_clock::now();
 
-    for (int i = 0; i < nb_rows; i++) {
-        table.remove_object(ObjKey(key_values[i]));
-#ifdef REALM_DEBUG
-        for (int j = i + 1; j < nb_rows; j++) {
-            Obj o = table.get_object(ObjKey(key_values[j]));
-            CHECK_EQUAL(j << 1, o.get<int64_t>(c0));
-            CHECK_EQUAL(j << 2, o.get<util::Optional<int64_t>>(c1));
+        for (int i = 0; i < nb_rows; i++) {
+            table->create_object(ObjKey(key_values[i])).set_all(i << 1, i << 2);
         }
-#endif
+
+
+        auto t2 = steady_clock::now();
+        std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+                  << std::endl;
+
+        CHECK_EQUAL(table->size(), nb_rows);
+        wt.commit();
     }
 
-    auto t4 = steady_clock::now();
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int i = 0; i < nb_rows; i++) {
+            ConstObj o = table->get_object(ObjKey(key_values[i]));
+            CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+            CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(c1));
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   lookup time   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+                  << std::endl;
+    }
+
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int i = 0; i < nb_rows; i++) {
+            Obj o = table->get_object(ObjKey(key_values[i]));
+            o.set(c0, i << 2).set(c1, i << 1);
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   update time   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+                  << std::endl;
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int i = 0; i < nb_rows; i++) {
+            table->remove_object(ObjKey(key_values[i]));
+#ifdef REALM_DEBUG
+            CHECK_EQUAL(table->size(), nb_rows - i - 1);
+            for (int j = i + 1; j < nb_rows; j++) {
+                Obj o = table->get_object(ObjKey(key_values[j]));
+                CHECK_EQUAL(j << 2, o.get<int64_t>(c0));
+                CHECK_EQUAL(j << 1, o.get<util::Optional<int64_t>>(c1));
+            }
+#endif
+        }
+        auto t2 = steady_clock::now();
+        std::cout << "   erase time    : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+                  << std::endl;
+
+        wt.commit();
+    }
 
     CALLGRIND_STOP_INSTRUMENTATION;
-
-    std::cout << nb_rows << " rows" << std::endl;
-    std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
-              << std::endl;
-    std::cout << "   lookup time   : " << duration_cast<nanoseconds>(t3 - t2).count() / nb_rows << " ns/key"
-              << std::endl;
-    std::cout << "   erase time    : " << duration_cast<nanoseconds>(t4 - t3).count() / nb_rows << " ns/key"
-              << std::endl;
 }
 
 

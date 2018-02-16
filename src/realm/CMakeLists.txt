@@ -35,6 +35,7 @@ set(REALM_SOURCES
     index_string.cpp
     lang_bind_helper.cpp
     list.cpp
+    node.cpp
     obj.cpp
     query.cpp
     query_engine.cpp
@@ -116,6 +117,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     mixed.hpp
     null.hpp
     list.hpp
+    node.hpp
     obj.hpp
     owned_data.hpp
     query.hpp

@@ -27,6 +27,7 @@
 #include <realm/util/terminate.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/exceptions.hpp>
+#include <realm/util/safe_int_ops.hpp>
 
 namespace realm {
 
