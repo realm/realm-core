@@ -180,10 +180,10 @@ TEST(DestroyGuard_General)
         bool destroyed_flag_1 = false;
         bool destroyed_flag_2 = false;
         {
-            DestroyGuard<Foo> dg;
             Foo foo_1(&destroyed_flag_1);
-            dg.reset(&foo_1);
             Foo foo_2(&destroyed_flag_2);
+            DestroyGuard<Foo> dg;
+            dg.reset(&foo_1);
             dg.reset(&foo_2);
             CHECK(destroyed_flag_1);
         }
