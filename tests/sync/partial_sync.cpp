@@ -258,6 +258,32 @@ TEST_CASE("Partial sync", "[sync]") {
         });
     }
 
+    SECTION("works when sort and distinct are applied") {
+        auto realm = Realm::get_shared_realm(partial_config);
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_b");
+        bool ascending = true;
+        bool descending = false;
+
+        {
+            Results partial_conditions(realm, *table);
+            partial_conditions = partial_conditions.sort({{"number", ascending}}).distinct({"string"});
+            subscribe_and_wait(partial_conditions, util::none, [](Results results, std::exception_ptr) {
+                REQUIRE(results.size() == 2);
+                REQUIRE(results_contains(results, {3, "meela", "orange"}));
+                REQUIRE(results_contains(results, {4, "jyaku", "kiwi"}));
+            });
+        }
+        {
+            Results partial_conditions(realm, *table);
+            partial_conditions = partial_conditions.sort({{"number", descending}}).distinct({"string"});
+            subscribe_and_wait(partial_conditions, util::none, [](Results results, std::exception_ptr) {
+                REQUIRE(results.size() == 2);
+                REQUIRE(results_contains(results, {6, "meela", "kiwi"}));
+                REQUIRE(results_contains(results, {7, "jyaku", "orange"}));
+            });
+        }
+    }
+
     SECTION("works when queries are made on different properties") {
         subscribe_and_wait("string = \"jyaku\"", partial_config, "object_b", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
