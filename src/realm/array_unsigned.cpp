@@ -23,8 +23,7 @@ namespace realm {
 
 void ArrayUnsigned::set_width(uint8_t width)
 {
-    // if 'width == 0' then 'uint64_t(-(width != 0))' is 0, so width will become 0
-    m_ubound = uint64_t(-(width != 0)) & (uint64_t(-1) >> (sizeof(uint64_t) * 8 - width));
+    m_ubound = (uint64_t(-1) >> (64 - width)) + (width == 0);
     m_width = width;
 }
 
@@ -204,7 +203,7 @@ void ArrayUnsigned::erase(size_t ndx)
 
     char* dst = m_data + ndx * w;
     const char* src = dst + w;
-    size_t num_bytes = (m_size - ndx) * w;
+    size_t num_bytes = (m_size - ndx - 1) * w;
 
     std::copy_n(src, num_bytes, dst);
 
