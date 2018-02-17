@@ -1174,7 +1174,7 @@ inline void Array::set_has_refs(bool value) noexcept
     if (m_has_refs != value) {
         REALM_ASSERT(!is_read_only());
         m_has_refs = value;
-        set_header_hasrefs(value, get_header());
+        set_hasrefs_in_header(value, get_header());
     }
 }
 
@@ -1188,7 +1188,7 @@ inline void Array::set_context_flag(bool value) noexcept
     if (m_context_flag != value) {
         REALM_ASSERT(!is_read_only());
         m_context_flag = value;
-        set_header_context_flag(value, get_header());
+        set_context_flag_in_header(value, get_header());
     }
 }
 

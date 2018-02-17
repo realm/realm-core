@@ -271,8 +271,8 @@ void Array::set_type(Type type)
     m_has_refs = init_has_refs;
 
     char* header = get_header();
-    set_header_is_inner_bptree_node(init_is_inner_bptree_node, header);
-    set_header_hasrefs(init_has_refs, header);
+    set_is_inner_bptree_node_in_header(init_is_inner_bptree_node, header);
+    set_hasrefs_in_header(init_has_refs, header);
 }
 
 
@@ -685,7 +685,7 @@ void Array::truncate(size_t new_size)
     // drop the width back to zero.
     if (new_size == 0) {
         set_width(0);
-        set_header_width(0, get_header());
+        set_width_in_header(0, get_header());
     }
 }
 
@@ -718,7 +718,7 @@ void Array::truncate_and_destroy_children(size_t new_size)
     // drop the width back to zero.
     if (new_size == 0) {
         set_width(0);
-        set_header_width(0, get_header());
+        set_width_in_header(0, get_header());
     }
 }
 
@@ -751,7 +751,7 @@ void Array::set_all_to_zero()
     copy_on_write(); // Throws
 
     set_width(0);
-    set_header_width(0, get_header());
+    set_width_in_header(0, get_header());
 }
 
 void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
@@ -1532,7 +1532,7 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
         realm::safe_copy_n(src_begin, src_end - src_begin, dst_begin);
 
         // Update with correct capacity
-        set_header_capacity(size, clone_header);
+        set_capacity_in_header(size, clone_header);
 
         return clone_mem;
     }

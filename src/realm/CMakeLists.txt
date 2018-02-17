@@ -120,6 +120,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     null.hpp
     list.hpp
     node.hpp
+    node_header.hpp
     obj.hpp
     owned_data.hpp
     query.hpp
