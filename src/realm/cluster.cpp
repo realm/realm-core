@@ -875,10 +875,10 @@ Cluster::~Cluster()
 void Cluster::ensure_general_form()
 {
     if (!m_keys.is_attached()) {
-        int64_t current_size = get_size_in_compact_form();
+        size_t current_size = get_size_in_compact_form();
         m_keys.create(current_size, 255);
         m_keys.update_parent();
-        for (int64_t i = 0; i < current_size; i++) {
+        for (size_t i = 0; i < current_size; i++) {
             m_keys.set(i, i);
         }
     }

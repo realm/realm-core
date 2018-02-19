@@ -23,15 +23,13 @@ namespace realm {
 
 void ArrayUnsigned::set_width(uint8_t width)
 {
-    m_ubound = (uint64_t(-1) >> (64 - width)) + (width == 0);
+    REALM_ASSERT_DEBUG(width > 0);
+    m_ubound = uint64_t(-1) >> (64 - width);
     m_width = width;
 }
 
 inline uint8_t ArrayUnsigned::bit_width(uint64_t value)
 {
-    if (value == 0) {
-        return 0;
-    }
     if (value < 0x100) {
         return 8;
     }
@@ -149,7 +147,7 @@ size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 {
     bool do_expand = value > m_ubound;
-    size_t new_width = do_expand ? bit_width(value) : m_width;
+    uint8_t new_width = do_expand ? bit_width(value) : m_width;
 
     REALM_ASSERT_DEBUG(!do_expand || new_width > m_width);
     REALM_ASSERT_DEBUG(ndx <= m_size);
@@ -222,7 +220,7 @@ void ArrayUnsigned::set(size_t ndx, uint64_t value)
     copy_on_write(); // Throws
 
     if (value > m_ubound) {
-        size_t new_width = bit_width(value);
+        uint8_t new_width = bit_width(value);
 
         alloc(m_size, new_width); // Throws
 
@@ -245,7 +243,7 @@ void ArrayUnsigned::truncate(size_t ndx)
     copy_on_write();
     set_header_size(m_size);
     if (ndx == 0) {
-        set_width(0);
+        set_width(8);
     }
 }
 

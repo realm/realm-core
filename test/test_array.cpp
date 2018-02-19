@@ -474,7 +474,7 @@ TEST(Array_Unsigned)
     c.add(0);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.size(), 1);
-    CHECK_EQUAL(0, c.get_width());
+    CHECK_EQUAL(8, c.get_width());
 
     // TEST(Array_Add1)
 
@@ -549,7 +549,7 @@ TEST(Array_Unsigned)
 
     c.truncate(0);
     CHECK_EQUAL(c.size(), 0);
-    CHECK_EQUAL(0, c.get_width());
+    CHECK_EQUAL(8, c.get_width());
     c.add(1);
     c.add(2);
     c.add(2);
