@@ -79,6 +79,18 @@ Schema::const_iterator Schema::find(ObjectSchema const& object) const noexcept
 void Schema::validate() const
 {
     std::vector<ObjectSchemaValidationException> exceptions;
+
+    auto find_next_duplicate = [&](const_iterator start) {
+        return std::adjacent_find(start, end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
+            return lft.name == rgt.name;
+        });
+    };
+
+    for (auto it = find_next_duplicate(begin()); it != end(); it = find_next_duplicate(++it)) {
+        exceptions.push_back(ObjectSchemaValidationException("Type '%1' appears more than once in the schema.",
+                                                             it->name));
+    }
+
     for (auto const& object : *this) {
         object.validate(*this, exceptions);
     }
