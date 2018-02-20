@@ -20,6 +20,7 @@
 #define REALM_OS_PARTIAL_SYNC_WORK_QUEUE
 
 #include <condition_variable>
+#include <functional>
 #include <mutex>
 #include <thread>
 #include <vector>
