@@ -192,6 +192,7 @@ public:
 
 protected:
     friend class ArrayBacklink;
+    friend class ObjList;
 
     const ClusterTree& m_tree_top;
     ClusterKeyArray m_keys;

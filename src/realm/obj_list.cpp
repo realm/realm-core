@@ -54,7 +54,42 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
 
         if (const auto* sort_descr = dynamic_cast<const SortDescriptor*>(common_descr)) {
 
-            SortDescriptor::Sorter sort_predicate = sort_descr->sorter(m_key_values);
+            SortDescriptor::Sorter sort_predicate = sort_descr->sorter(m_key_values);            
+            auto& col = sort_predicate.m_columns[0];
+            ColKey ck = col.col_key;
+
+            for (size_t i = 0; i < v.size(); i++) {
+                ObjKey key = v[i].key_for_object;
+
+                if (!col.translated_keys.empty()) {
+                    key = col.translated_keys[v[i].index_in_view];
+                }
+
+                // Sorting can be specified by multiple columns, so that if two entries in the first column are
+                // identical, then the rows are ordered according to the second column, and so forth. For the
+                // first column, we cache all the payload of fields of the view in a std::vector<Mixed>
+                ConstObj obj = col.table->get_object(key);
+                DataType dt = sort_predicate.m_columns[0].table->get_column_type(ck);
+                auto& vec = sort_predicate.m_columns[0].payload;
+                if (dt == type_Int) {
+                    vec.emplace_back(obj.get<Int>(ck));
+                }
+                else if (dt == type_String) {
+                    vec.emplace_back(obj.get<String>(ck));
+                }
+                else if (dt == type_Float) {
+                    vec.emplace_back(obj.get<Float>(ck));
+                }
+                else if (dt == type_Double) {
+                    vec.emplace_back(obj.get<Double>(ck));
+                }
+                else if (dt == type_Bool) {
+                    vec.emplace_back(obj.get<Bool>(ck));
+                }
+                else if (dt == type_Timestamp) {
+                    vec.emplace_back(obj.get<Timestamp>(ck));
+                }
+            }
 
             std::sort(v.begin(), v.end(), std::ref(sort_predicate));
 
