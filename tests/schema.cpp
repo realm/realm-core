@@ -506,6 +506,30 @@ TEST_CASE("Schema") {
             };
             REQUIRE_NOTHROW(schema.validate());
         }
+
+        SECTION("rejects duplicate types with the same name") {
+            Schema schema = {
+                {"object1", {
+                    {"int", PropertyType::Int},
+                }},
+                {"object2", {
+                    {"int", PropertyType::Int},
+                }},
+                {"object3", {
+                    {"int", PropertyType::Int},
+                }},
+                {"object2", {
+                    {"int", PropertyType::Int},
+                }},
+                {"object1", {
+                    {"int", PropertyType::Int},
+                }}
+            };
+
+            REQUIRE_THROWS_CONTAINING(schema.validate(),
+                "- Type 'object1' appears more than once in the schema.\n"
+                "- Type 'object2' appears more than once in the schema.");
+        }
     }
 
     SECTION("compare()") {
