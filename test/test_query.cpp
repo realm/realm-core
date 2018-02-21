@@ -10966,4 +10966,83 @@ TEST_TYPES(Query_Rover, std::true_type, std::false_type)
 }
 
 
+TEST(Query_Group_bug)
+{
+    // Tests for a bug in queries with OR nodes at different nesting levels
+
+    Group g;
+    TableRef service_table = g.add_table("service");
+    TableRef profile_table = g.add_table("profile");
+    TableRef person_table = g.add_table("person");
+
+    service_table->add_column(type_String, "id");
+    service_table->add_column_link(type_LinkList, "profiles", *profile_table);
+
+    profile_table->add_column(type_String, "role");
+    profile_table->add_column_link(type_Link, "services", *service_table);
+
+    person_table->add_column(type_String, "id");
+    person_table->add_column_link(type_LinkList, "services", *service_table);
+
+    service_table->add_empty_row(2);
+    service_table->set_string(0, 0, "service_1");
+    service_table->set_string(0, 1, "service_2");
+
+    profile_table->add_empty_row(5);
+    profile_table->set_string(0, 0, "profile_1");
+    profile_table->set_string(0, 1, "profile_2");
+    profile_table->set_string(0, 2, "profile_3");
+    profile_table->set_string(0, 3, "profile_4");
+    profile_table->set_string(0, 4, "profile_5");
+
+    service_table->get_linklist(1, 0)->add(0);
+    service_table->get_linklist(1, 0)->add(1);
+    service_table->get_linklist(1, 1)->add(2);
+    service_table->get_linklist(1, 0)->add(3);
+    service_table->get_linklist(1, 0)->add(4);
+
+    profile_table->set_link(1, 0, 0);
+    profile_table->set_link(1, 1, 0);
+    profile_table->set_link(1, 2, 1);
+    profile_table->set_link(1, 3, 0);
+    profile_table->set_link(1, 4, 0);
+
+    person_table->add_empty_row(5);
+    person_table->set_string(0, 0, "person_1");
+    person_table->set_string(0, 1, "person_2");
+    person_table->set_string(0, 2, "person_3");
+    person_table->set_string(0, 3, "person_4");
+    person_table->set_string(0, 4, "person_5");
+
+    person_table->get_linklist(1, 0)->add(0);
+    person_table->get_linklist(1, 1)->add(0);
+    person_table->get_linklist(1, 2)->add(1);
+    person_table->get_linklist(1, 3)->add(0);
+    person_table->get_linklist(1, 4)->add(0);
+
+    realm::Query q0 = person_table->where()
+        .group()
+
+        .group()
+        .and_query(person_table->link(1).link(1).column<String>(0).equal("profile_1"))
+        .Or()
+        .and_query(person_table->link(1).link(1).column<String>(0).equal("profile_2"))
+        .end_group()
+
+        .group()
+        .and_query(person_table->link(1).column<String>(0).equal("service_1"))
+        .end_group()
+
+        .end_group()
+
+        .Or()
+
+        .group()
+        .equal(0, "person_3")
+        .end_group()
+        ;
+
+    CHECK_EQUAL(5, q0.count());
+}
+
 #endif // TEST_QUERY
