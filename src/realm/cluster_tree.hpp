@@ -124,7 +124,7 @@ public:
     ConstObj get(size_t ndx) const;
     Obj get(size_t ndx);
     bool get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept;
-    bool traverse(TraverseFunction func) const;
+    bool traverse(TraverseFunction& func) const;
     void enumerate_string_column(size_t ndx);
     void dump_objects()
     {

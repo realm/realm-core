@@ -34,7 +34,7 @@ R Table::aggregate(ColKey column_key, T value, size_t* resultcount, ObjKey* retu
     LeafType leaf(get_alloc());
     size_t column_ndx = colkey2ndx(column_key);
 
-    traverse_clusters([value, &leaf, column_ndx, &st, nullable](const Cluster* cluster) {
+    ClusterTree::TraverseFunction f = [value, &leaf, column_ndx, &st, nullable](const Cluster* cluster) {
         // direct aggregate on the leaf
         cluster->init_leaf(column_ndx, &leaf);
         Aggregate<action, T> aggr(leaf, nullable);
@@ -44,7 +44,9 @@ R Table::aggregate(ColKey column_key, T value, size_t* resultcount, ObjKey* retu
         aggr(st, value);
         // We should continue
         return false;
-    });
+    };
+
+    traverse_clusters(f);
 
     if (resultcount) {
         *resultcount = st.m_match_count;

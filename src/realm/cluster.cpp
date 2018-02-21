@@ -82,7 +82,7 @@ public:
         return m_sub_tree_depth;
     }
 
-    bool traverse(ClusterTree::TraverseFunction func, int64_t) const;
+    bool traverse(ClusterTree::TraverseFunction& func, int64_t) const;
 
     size_t node_size() const override
     {
@@ -567,7 +567,7 @@ size_t ClusterNodeInner::update_sub_tree_size()
     return sub_tree_size;
 }
 
-bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction func, int64_t key_offset) const
+bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction& func, int64_t key_offset) const
 {
     auto sz = node_size();
 
@@ -1603,7 +1603,7 @@ bool ClusterTree::get_leaf(ObjKey key, ClusterNode::IteratorState& state) const 
     }
 }
 
-bool ClusterTree::traverse(TraverseFunction func) const
+bool ClusterTree::traverse(TraverseFunction& func) const
 {
     if (m_root->is_leaf()) {
         return func(static_cast<Cluster*>(m_root.get()));
@@ -1621,7 +1621,7 @@ void ClusterTree::enumerate_string_column(size_t col_ndx)
     ArrayString leaf(alloc);
     keys.create();
 
-    traverse([col_ndx, &alloc, &leaf, &keys](const Cluster* cluster) {
+    ClusterTree::TraverseFunction collect_strings = [col_ndx, &alloc, &leaf, &keys](const Cluster* cluster) {
         cluster->init_leaf(col_ndx, &leaf);
         size_t sz = leaf.size();
         size_t key_size = keys.size();
@@ -1635,15 +1635,21 @@ void ClusterTree::enumerate_string_column(size_t col_ndx)
         }
 
         return false; // Continue
-    });
+    };
 
+    ClusterTree::TraverseFunction upgrade = [col_ndx, &keys](const Cluster* cluster) {
+        const_cast<Cluster*>(cluster)->upgrade_string_to_enum(col_ndx, keys);
+        return false; // Continue
+    };
+
+    // Populate 'keys' array
+    traverse(collect_strings);
+
+    // Store key strings in spec
     const_cast<Spec*>(&get_spec())->upgrade_string_to_enum(col_ndx, keys.get_ref());
 
     // Replace column in all clusters
-    traverse([col_ndx, &keys](const Cluster* cluster) {
-        const_cast<Cluster*>(cluster)->upgrade_string_to_enum(col_ndx, keys);
-        return false; // Continue
-    });
+    traverse(upgrade);
 }
 
 std::unique_ptr<ClusterNode> ClusterTree::get_node(ref_type ref) const
@@ -1682,7 +1688,7 @@ void ClusterTree::remove_links()
     state.track_link_nullifications = true;
     Allocator& alloc = get_alloc();
     // This function will add objects that should be deleted to 'state'
-    auto func = [&spec, &state, &alloc](const Cluster* cluster) {
+    ClusterTree::TraverseFunction func = [&spec, &state, &alloc](const Cluster* cluster) {
         size_t num_cols = spec.get_column_count();
         for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
             auto col_type = spec.get_column_type(col_ndx);

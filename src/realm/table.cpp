@@ -1367,7 +1367,8 @@ ObjKey Table::find_first(ColKey col_key, T value) const
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType leaf(get_alloc());
     size_t col_ndx = colkey2ndx(col_key);
-    traverse_clusters([&key, &col_ndx, &value, &leaf](const Cluster* cluster) {
+
+    ClusterTree::TraverseFunction f = [&key, &col_ndx, &value, &leaf](const Cluster* cluster) {
         cluster->init_leaf(col_ndx, &leaf);
         size_t row = leaf.find_first(value, 0, cluster->node_size());
         if (row != realm::npos) {
@@ -1375,7 +1376,10 @@ ObjKey Table::find_first(ColKey col_key, T value) const
             return true;
         }
         return false;
-    });
+    };
+
+    traverse_clusters(f);
+
     return key;
 }
 

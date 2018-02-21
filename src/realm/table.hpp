@@ -282,7 +282,7 @@ public:
         return m_clusters.dump_objects();
     }
 
-    bool traverse_clusters(ClusterTree::TraverseFunction func) const
+    bool traverse_clusters(ClusterTree::TraverseFunction& func) const
     {
         return m_clusters.traverse(func);
     }

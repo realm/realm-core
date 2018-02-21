@@ -945,7 +945,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
             auto node = root_node();
             size_t column_ndx = m_table->colkey2ndx(column_key);
 
-            m_table->traverse_clusters([column_ndx, &leaf, &node, &st, this](const Cluster* cluster) {
+            ClusterTree::TraverseFunction f = [column_ndx, &leaf, &node, &st, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 node->set_cluster(cluster);
                 cluster->init_leaf(column_ndx, &leaf);
@@ -954,7 +954,9 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
                 aggregate_internal(action, ColumnTypeTraits<T>::id, false, node, &st, 0, e, &leaf);
                 // Continue
                 return false;
-            });
+            };
+
+            m_table->traverse_clusters(f);
         }
         else {
             for (size_t t = 0; t < m_view->size(); t++) {
@@ -1279,7 +1281,7 @@ ObjKey Query::find()
     else {
         auto node = root_node();
         ObjKey key;
-        m_table->traverse_clusters([&node, &key](const Cluster* cluster) {
+        ClusterTree::TraverseFunction f = [&node, &key](const Cluster* cluster) {
             size_t end = cluster->node_size();
             node->set_cluster(cluster);
             size_t res = node->find_first(0, end);
@@ -1290,7 +1292,9 @@ ObjKey Query::find()
             }
             // Continue
             return false;
-        });
+        };
+
+        m_table->traverse_clusters(f);
         return key;
     }
 }
@@ -1319,7 +1323,8 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
     else {
         if (!has_conditions()) {
             KeyColumn& refs = ret.m_key_values;
-            m_table->traverse_clusters([&begin, &end, &refs, this](const Cluster* cluster) {
+
+            ClusterTree::TraverseFunction f = [&begin, &end, &refs, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 if (begin < e) {
                     if (e > end) {
@@ -1338,13 +1343,15 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                 end -= e;
                 // Stop if end is reached
                 return end == 0;
-            });
+            };
+
+            m_table->traverse_clusters(f);
         }
         else {
             auto node = root_node();
             QueryState<int64_t> st(act_FindAll, &ret.m_key_values, limit);
 
-            m_table->traverse_clusters([&begin, &end, &node, &st, this](const Cluster* cluster) {
+            ClusterTree::TraverseFunction f = [&begin, &end, &node, &st, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 if (begin < e) {
                     if (e > end) {
@@ -1363,7 +1370,9 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                 end -= e;
                 // Stop if limit or end is reached
                 return end == 0 || st.m_match_count == st.m_limit;
-            });
+            };
+
+            m_table->traverse_clusters(f);
         }
     }
 }
@@ -1411,14 +1420,17 @@ size_t Query::count() const
         auto node = root_node();
         QueryState<int64_t> st(act_Count);
 
-        m_table->traverse_clusters([&node, &st, this](const Cluster* cluster) {
+        ClusterTree::TraverseFunction f = [&node, &st, this](const Cluster* cluster) {
             size_t e = cluster->node_size();
             node->set_cluster(cluster);
             st.m_key_offset = cluster->get_offset();
             st.m_key_values = cluster->get_key_array();
             aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, false, node, &st, 0, e, nullptr);
             return false;
-        });
+        };
+
+        m_table->traverse_clusters(f);
+
         cnt = size_t(st.m_state);
     }
 

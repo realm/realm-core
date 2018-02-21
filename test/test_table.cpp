@@ -2895,10 +2895,11 @@ TEST(Table_object_forward_iterator)
     }
 
     size_t tree_size = 0;
-    table.traverse_clusters([&tree_size](const Cluster* cluster) {
+    ClusterTree::TraverseFunction f = [&tree_size](const Cluster* cluster) {
         tree_size += cluster->node_size();
         return false;
-    });
+    };
+    table.traverse_clusters(f);
     CHECK_EQUAL(tree_size, size_t(nb_rows));
 
     for (Obj o : table) {
