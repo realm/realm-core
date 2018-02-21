@@ -1001,7 +1001,11 @@ inline DataType Table::get_column_type(ColKey column_key) const noexcept
 
 
 inline Table::Table(Allocator& alloc)
-    : m_alloc(alloc), m_top(m_alloc), m_spec(m_alloc), m_clusters(this, m_alloc), m_index_refs(m_alloc)
+    : m_alloc(alloc)
+    , m_top(m_alloc)
+    , m_spec(m_alloc)
+    , m_clusters(this, m_alloc)
+    , m_index_refs(m_alloc)
 {
     ref_type ref = create_empty_table(alloc); // Throws
     Parent* parent = nullptr;
@@ -1010,7 +1014,11 @@ inline Table::Table(Allocator& alloc)
 }
 
 inline Table::Table(ref_count_tag, Allocator& alloc)
-    : m_alloc(alloc), m_top(m_alloc), m_spec(m_alloc), m_clusters(this, m_alloc), m_index_refs(m_alloc)
+    : m_alloc(alloc)
+    , m_top(m_alloc)
+    , m_spec(m_alloc)
+    , m_clusters(this, m_alloc)
+    , m_index_refs(m_alloc)
 {
 }
 

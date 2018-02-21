@@ -47,7 +47,10 @@ public:
     {
         return m_root->is_attached();
     }
-    Allocator& get_alloc() const { return m_alloc; }
+    Allocator& get_alloc() const
+    {
+        return m_alloc;
+    }
     const Table* get_owner() const
     {
         return m_owner;
@@ -89,10 +92,22 @@ public:
         m_alloc.bump_content_version();
         return m_alloc.get_content_version();
     }
-    void bump_storage_version() { m_alloc.bump_storage_version(); }
-    uint64_t get_content_version() const { return m_alloc.get_content_version(); }
-    uint64_t get_instance_version() const { return m_alloc.get_instance_version(); }
-    uint64_t get_storage_version(uint64_t inst_ver) const { return m_alloc.get_storage_version(inst_ver); }
+    void bump_storage_version()
+    {
+        m_alloc.bump_storage_version();
+    }
+    uint64_t get_content_version() const
+    {
+        return m_alloc.get_content_version();
+    }
+    uint64_t get_instance_version() const
+    {
+        return m_alloc.get_instance_version();
+    }
+    uint64_t get_storage_version(uint64_t inst_ver) const
+    {
+        return m_alloc.get_storage_version(inst_ver);
+    }
     void insert_column(size_t ndx)
     {
         m_root->insert_column(ndx);

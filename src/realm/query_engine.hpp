@@ -1112,7 +1112,9 @@ public:
     }
 
     StringNodeBase(const StringNodeBase& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches), m_value(from.m_value), m_is_string_enum(from.m_is_string_enum)
+        : ParentNode(from, patches)
+        , m_value(from.m_value)
+        , m_is_string_enum(from.m_is_string_enum)
     {
     }
 

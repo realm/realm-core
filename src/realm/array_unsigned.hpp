@@ -27,7 +27,10 @@ namespace realm {
 class ArrayUnsigned : public Node {
 
 public:
-    ArrayUnsigned(Allocator& alloc) : Node(alloc) {}
+    ArrayUnsigned(Allocator& alloc)
+        : Node(alloc)
+    {
+    }
 
     // Will create an uninitialized array of size 'initial_size'
     // Has a width big enough to hold values smaller than 'ubound_value'
@@ -51,7 +54,10 @@ public:
     size_t lower_bound(uint64_t value) const noexcept;
     size_t upper_bound(uint64_t value) const noexcept;
 
-    void add(uint64_t value) { insert(m_size, value); }
+    void add(uint64_t value)
+    {
+        insert(m_size, value);
+    }
     //  insert  value at  index (moving successive  elements  1 position  forwards)
     void insert(size_t ndx, uint64_t value);
     // delete value at index

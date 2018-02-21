@@ -22,7 +22,8 @@
 
 using namespace realm;
 
-ArrayString::ArrayString(Allocator& a) : m_alloc(a)
+ArrayString::ArrayString(Allocator& a)
+    : m_alloc(a)
 {
     m_arr = new (&m_storage.m_string_short) ArrayStringShort(a, true);
 }

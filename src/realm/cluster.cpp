@@ -1353,7 +1353,9 @@ void Cluster::remove_backlinks(ObjKey origin_key, size_t origin_col_ndx, const s
 
 /******************************** ClusterTree ********************************/
 
-ClusterTree::ClusterTree(Table* owner, Allocator& alloc) : m_owner(owner), m_alloc(alloc)
+ClusterTree::ClusterTree(Table* owner, Allocator& alloc)
+    : m_owner(owner)
+    , m_alloc(alloc)
 {
 }
 

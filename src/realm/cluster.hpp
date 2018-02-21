@@ -182,7 +182,10 @@ public:
     {
         return ObjKey(get_key_value(ndx) + m_offset);
     }
-    const ClusterKeyArray* get_key_array() const { return &m_keys; }
+    const ClusterKeyArray* get_key_array() const
+    {
+        return &m_keys;
+    }
     void set_offset(int64_t offs)
     {
         m_offset = offs;

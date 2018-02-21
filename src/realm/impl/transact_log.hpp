@@ -247,7 +247,10 @@ public:
         return true;
     }
 
-    bool enumerate_string_column(ColKey) { return true; }
+    bool enumerate_string_column(ColKey)
+    {
+        return true;
+    }
 
     // Must have descriptor selected:
     bool insert_link_column(ColKey, DataType, StringData, TableKey, ColKey)

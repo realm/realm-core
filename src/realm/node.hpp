@@ -45,7 +45,9 @@ const size_t not_found = npos;
 /// modified.
 class ArrayParent {
 public:
-    virtual ~ArrayParent() noexcept {}
+    virtual ~ArrayParent() noexcept
+    {
+    }
 
 protected:
     virtual void update_child_ref(size_t child_ndx, ref_type new_ref) = 0;
@@ -115,9 +117,14 @@ public:
     /*********************** Constructor / destructor ************************/
 
     // The object will not be fully initialized when using this constructor
-    explicit Node(Allocator& alloc) noexcept : m_alloc(alloc) {}
+    explicit Node(Allocator& alloc) noexcept
+        : m_alloc(alloc)
+    {
+    }
 
-    virtual ~Node() {}
+    virtual ~Node()
+    {
+    }
 
     /**************************** Initializers *******************************/
 
@@ -136,7 +143,10 @@ public:
 
     /************************** access functions *****************************/
 
-    bool is_attached() const noexcept { return m_data != nullptr; }
+    bool is_attached() const noexcept
+    {
+        return m_data != nullptr;
+    }
 
     inline bool is_read_only() const noexcept
     {
@@ -150,17 +160,41 @@ public:
         return m_size;
     }
 
-    bool is_empty() const noexcept { return size() == 0; }
+    bool is_empty() const noexcept
+    {
+        return size() == 0;
+    }
 
-    ref_type get_ref() const noexcept { return m_ref; }
-    MemRef get_mem() const noexcept { return MemRef(get_header_from_data(m_data), m_ref, m_alloc); }
-    Allocator& get_alloc() const noexcept { return m_alloc; }
+    ref_type get_ref() const noexcept
+    {
+        return m_ref;
+    }
+    MemRef get_mem() const noexcept
+    {
+        return MemRef(get_header_from_data(m_data), m_ref, m_alloc);
+    }
+    Allocator& get_alloc() const noexcept
+    {
+        return m_alloc;
+    }
     /// Get the address of the header of this array.
-    char* get_header() const noexcept { return get_header_from_data(m_data); }
+    char* get_header() const noexcept
+    {
+        return get_header_from_data(m_data);
+    }
 
-    bool has_parent() const noexcept { return m_parent != nullptr; }
-    ArrayParent* get_parent() const noexcept { return m_parent; }
-    size_t get_ndx_in_parent() const noexcept { return m_ndx_in_parent; }
+    bool has_parent() const noexcept
+    {
+        return m_parent != nullptr;
+    }
+    ArrayParent* get_parent() const noexcept
+    {
+        return m_parent;
+    }
+    size_t get_ndx_in_parent() const noexcept
+    {
+        return m_ndx_in_parent;
+    }
     /// Get the ref of this array as known to the parent. The caller must ensure
     /// that the parent information ('pointer to parent' and 'index in parent')
     /// is correct before calling this function.
@@ -173,13 +207,19 @@ public:
 
     /// The meaning of 'width' depends on the context in which this
     /// array is used.
-    size_t get_width() const noexcept { return m_width; }
+    size_t get_width() const noexcept
+    {
+        return m_width;
+    }
 
     /***************************** modifiers *********************************/
 
     /// Detach from the underlying array node. This method has no effect if the
     /// accessor is currently unattached (idempotency).
-    void detach() noexcept { m_data = nullptr; }
+    void detach() noexcept
+    {
+        m_data = nullptr;
+    }
 
     /// Destroy only the array that this accessor is attached to, not the
     /// children of that array. See non-static destroy_deep() for an
@@ -195,11 +235,17 @@ public:
     }
 
     /// Shorthand for `destroy(MemRef(ref, alloc), alloc)`.
-    static void destroy(ref_type ref, Allocator& alloc) noexcept { destroy(MemRef(ref, alloc), alloc); }
+    static void destroy(ref_type ref, Allocator& alloc) noexcept
+    {
+        destroy(MemRef(ref, alloc), alloc);
+    }
 
     /// Destroy only the specified array node, not its children. See also
     /// destroy_deep(MemRef, Allocator&).
-    static void destroy(MemRef mem, Allocator& alloc) noexcept { alloc.free_(mem); }
+    static void destroy(MemRef mem, Allocator& alloc) noexcept
+    {
+        alloc.free_(mem);
+    }
 
 
     /// Setting a new parent affects ownership of the attached array node, if
@@ -212,7 +258,10 @@ public:
         m_parent = parent;
         m_ndx_in_parent = ndx_in_parent;
     }
-    void set_ndx_in_parent(size_t ndx) noexcept { m_ndx_in_parent = ndx; }
+    void set_ndx_in_parent(size_t ndx) noexcept
+    {
+        m_ndx_in_parent = ndx;
+    }
 
     /// Update the parents reference to this child. This requires, of course,
     /// that the parent information stored in this child is up to date. If the
@@ -259,7 +308,10 @@ protected:
     static MemRef create_node(size_t size, Allocator& alloc, bool context_flag = false, Type type = type_Normal,
                               WidthType width_type = wtype_Ignore, int width = 1);
 
-    void set_header_size(size_t value) noexcept { set_size_in_header(value, get_header()); }
+    void set_header_size(size_t value) noexcept
+    {
+        set_size_in_header(value, get_header());
+    }
 
     // Includes array header. Not necessarily 8-byte aligned.
     virtual size_t calc_byte_len(size_t num_items, size_t width) const;

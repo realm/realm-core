@@ -57,9 +57,15 @@ public:
     // The encryption layer relies on headers always fitting within a single page.
     static_assert(header_size == 8, "Header must always fit in entirely on a page");
 
-    static char* get_data_from_header(char* header) noexcept { return header + header_size; }
+    static char* get_data_from_header(char* header) noexcept
+    {
+        return header + header_size;
+    }
 
-    static char* get_header_from_data(char* data) noexcept { return data - header_size; }
+    static char* get_header_from_data(char* data) noexcept
+    {
+        return data - header_size;
+    }
 
     static const char* get_data_from_header(const char* header) noexcept
     {
