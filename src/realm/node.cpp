@@ -21,8 +21,7 @@
 
 using namespace realm;
 
-MemRef Node::create_element(size_t size, Allocator& alloc, bool context_flag, Type type, WidthType width_type,
-                            int width)
+MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type type, WidthType width_type, int width)
 {
     size_t byte_size_0 = calc_byte_size(width_type, size, width);
     size_t byte_size = std::max(byte_size_0, size_t(initial_capacity));
@@ -101,7 +100,7 @@ void Node::alloc(size_t init_size, size_t new_width)
         MemRef mem_ref = m_alloc.realloc_(m_ref, header, orig_capacity_bytes, new_capacity_bytes); // Throws
 
         header = mem_ref.get_addr();
-        set_header_capacity(new_capacity_bytes, header);
+        set_capacity_in_header(new_capacity_bytes, header);
 
         // Update this accessor and its ancestors
         m_ref = mem_ref.get_ref();
@@ -113,9 +112,9 @@ void Node::alloc(size_t init_size, size_t new_width)
 
     // Update header
     if (new_width != orig_width) {
-        set_header_width(int(new_width), header);
+        set_width_in_header(int(new_width), header);
     }
-    set_header_size(init_size, header);
+    set_size_in_header(init_size, header);
 }
 
 void Node::do_copy_on_write(size_t minimum_size)
@@ -145,7 +144,7 @@ void Node::do_copy_on_write(size_t minimum_size)
 
     // Update capacity in header. Uses m_data to find header, so
     // m_data must be initialized correctly first.
-    set_header_capacity(new_size, new_begin);
+    set_capacity_in_header(new_size, new_begin);
 
     update_parent();
 

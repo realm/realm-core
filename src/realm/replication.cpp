@@ -573,11 +573,11 @@ public:
         return true;
     }
 
-    bool optimize_table()
+    bool enumerate_string_column(ColKey col_key)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table))) {
-            log("table->optimize();"); // Throws
-            m_table->optimize();       // Throws
+            log("table->enumerate_string_column(%1);", col_key); // Throws
+            m_table->enumerate_string_column(col_key);           // Throws
             return true;
         }
         return false;

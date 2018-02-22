@@ -150,7 +150,7 @@ ObjList::ObjList(KeyColumn& key_values)
 {
 }
 
-ObjList::ObjList(KeyColumn& key_values, Table* parent)
+ObjList::ObjList(KeyColumn& key_values, const Table* parent)
     : m_table(parent->get_table_ref())
     , m_key_values(key_values)
 #ifdef REALM_COOKIE_CHECK
@@ -159,7 +159,7 @@ ObjList::ObjList(KeyColumn& key_values, Table* parent)
 {
 }
 
-ConstObj ObjList::get(size_t row_ndx) const noexcept
+ConstObj ObjList::get(size_t row_ndx) const
 {
     REALM_ASSERT(m_table);
     REALM_ASSERT(row_ndx < m_key_values.size());

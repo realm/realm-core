@@ -132,9 +132,16 @@ bool Spec::update_from_parent(size_t old_baseline) noexcept
     if (m_top.get_as_ref(3) != 0) {
         m_subspecs.update_from_parent(old_baseline);
     }
+    else {
+        m_subspecs.detach();
+    }
 
-    if (m_top.get_as_ref(4) != 0)
+    if (m_top.get_as_ref(4) != 0) {
         m_enumkeys.update_from_parent(old_baseline);
+    }
+    else {
+        m_enumkeys.detach();
+    }
 
     m_keys.update_from_parent(old_baseline);
 
@@ -261,6 +268,10 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
         }
     }
 
+    if (m_enumkeys.is_attached()) {
+        m_enumkeys.insert(column_ndx, 0);
+    }
+
     update_internals();
 }
 
@@ -281,15 +292,23 @@ void Spec::erase_column(size_t column_ndx)
         m_subspecs.erase(subspec_ndx); // origin table index  : Throws
         m_subspecs.erase(subspec_ndx); // origin column index : Throws
     }
-    else if (type == col_type_StringEnum) {
+    else if (is_string_enum_type(column_ndx)) {
         // Enum columns do also have a separate key list
-        size_t keys_ndx = get_enumkeys_ndx(column_ndx);
-        ref_type keys_ref = m_enumkeys.get_as_ref(keys_ndx);
+        ref_type keys_ref = m_enumkeys.get_as_ref(column_ndx);
 
-        Array keys_top(m_top.get_alloc());
-        keys_top.init_from_ref(keys_ref);
-        keys_top.destroy_deep();
-        m_enumkeys.erase(keys_ndx); // Throws
+        Array::destroy_deep(keys_ref, m_top.get_alloc());
+        m_enumkeys.erase(column_ndx); // Throws
+        bool all_empty = true;
+        for (size_t i = 0; i < m_enumkeys.size(); i++) {
+            if (m_enumkeys.get(i) != 0) {
+                all_empty = false;
+                break;
+            }
+        }
+        if (all_empty) {
+            m_enumkeys.destroy_deep();
+            m_top.set(4, 0);
+        }
     }
 
     // Delete the actual name and type entries
@@ -345,61 +364,32 @@ size_t Spec::get_subspec_entries_for_col_type(ColumnType type) const noexcept
 }
 
 
-void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref, ArrayParent*& keys_parent, size_t& keys_ndx)
+void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref)
 {
     REALM_ASSERT(get_column_type(column_ndx) == col_type_String);
 
-    REALM_ASSERT_EX(m_enumkeys.is_attached() == (m_top.size() > 5), m_enumkeys.is_attached(), m_top.size());
     // Create the enumkeys list if needed
     if (!m_enumkeys.is_attached()) {
-        m_enumkeys.create(Array::type_HasRefs);
-        if (m_top.size() == 4)
-            m_top.add(0); // no subtables
-        if (m_top.size() == 5) {
-            m_top.add(m_enumkeys.get_ref());
-        }
-        else {
-            m_top.set(5, m_enumkeys.get_ref());
-        }
-        m_enumkeys.set_parent(&m_top, 5);
+        m_enumkeys.create(Array::type_HasRefs, false, m_num_public_columns);
+        m_top.set(4, m_enumkeys.get_ref());
+        m_enumkeys.set_parent(&m_top, 4);
     }
 
     // Insert the new key list
-    size_t ins_pos = get_enumkeys_ndx(column_ndx);
-    m_enumkeys.insert(ins_pos, keys_ref);
+    m_enumkeys.set(column_ndx, keys_ref);
+}
 
-    set_column_type(column_ndx, col_type_StringEnum);
+bool Spec::is_string_enum_type(size_t column_ndx) const noexcept
+{
+    return m_enumkeys.is_attached() ? (m_enumkeys.get(column_ndx) != 0) : false;
+}
 
-    // Return parent info
+ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent*& keys_parent) noexcept
+{
+    // We also need to return parent info
     keys_parent = &m_enumkeys;
-    keys_ndx = ins_pos;
-}
 
-
-size_t Spec::get_enumkeys_ndx(size_t column_ndx) const noexcept
-{
-    // The enumkeys array only keep info for stringEnum columns
-    // so we need to count up to it's position
-    size_t enumkeys_ndx = 0;
-    for (size_t i = 0; i < column_ndx; ++i) {
-        if (ColumnType(m_types.get(i)) == col_type_StringEnum)
-            ++enumkeys_ndx;
-    }
-    return enumkeys_ndx;
-}
-
-
-ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent, size_t* keys_ndx) noexcept
-{
-    size_t enumkeys_ndx = get_enumkeys_ndx(column_ndx);
-
-    // We may also need to return parent info
-    if (keys_parent)
-        *keys_parent = &m_enumkeys;
-    if (keys_ndx)
-        *keys_ndx = enumkeys_ndx;
-
-    return m_enumkeys.get_as_ref(enumkeys_ndx);
+    return m_enumkeys.get_as_ref(column_ndx);
 }
 
 
@@ -488,10 +478,6 @@ DataType Spec::get_public_column_type(size_t ndx) const noexcept
 
     ColumnType type = get_column_type(ndx);
 
-    // Hide internal types
-    if (type == col_type_StringEnum)
-        return type_String;
-
     return DataType(type);
 }
 
@@ -508,14 +494,6 @@ bool Spec::operator==(const Spec& spec) const noexcept
     for (size_t col_ndx = 0; col_ndx < column_count; ++col_ndx) {
         ColumnType col_type = ColumnType(m_types.get(col_ndx));
         switch (col_type) {
-            case col_type_String:
-            case col_type_StringEnum: {
-                // These types are considered equal as col_type_StringEnum is used for an internal optimization only
-                const int64_t rhs_type = spec.m_types.get(col_ndx);
-                if (rhs_type != col_type_String && rhs_type != col_type_StringEnum)
-                    return false;
-                break;
-            }
             case col_type_Link:
             case col_type_LinkList: {
                 // In addition to name and attributes, the link target table must also be compared
@@ -528,6 +506,8 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_Int:
             case col_type_Bool:
             case col_type_Binary:
+            case col_type_String:
+            case col_type_OldStringEnum:
             case col_type_OldTable:
             case col_type_OldMixed:
             case col_type_OldDateTime:
@@ -547,7 +527,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
 }
 
 
-ColKey Spec::get_key(size_t column_ndx)
+ColKey Spec::get_key(size_t column_ndx) const
 {
     return ColKey(m_keys.get(column_ndx));
 }

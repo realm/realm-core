@@ -231,8 +231,10 @@ TEST(TableView_FloatsFindAndAggregations)
     // v_some =       ^^^^            ^^^^
     double sum_f = 0.0;
     double sum_d = 0.0;
+    std::vector<ObjKey> keys;
+    table.create_objects(6, keys);
     for (int i = 0; i < 6; ++i) {
-        table.create_object(ObjKey(i)).set_all(f_val[i], d_val[i], 1);
+        table.get_object(keys[i]).set_all(f_val[i], d_val[i], 1);
         sum_d += d_val[i];
         sum_f += f_val[i];
     }
@@ -247,13 +249,13 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(ObjKey(3), v_some.get_key(1));
 
     // Test find_first
-    CHECK_EQUAL(0, v_all.find_first_double(col_double, -1.2));
-    CHECK_EQUAL(5, v_all.find_first_double(col_double, 0.0));
-    CHECK_EQUAL(2, v_all.find_first_double(col_double, 3.2));
+    CHECK_EQUAL(keys[0], v_all.find_first<Double>(col_double, -1.2));
+    CHECK_EQUAL(keys[5], v_all.find_first<Double>(col_double, 0.0));
+    CHECK_EQUAL(keys[2], v_all.find_first<Double>(col_double, 3.2));
 
-    CHECK_EQUAL(1, v_all.find_first_float(col_float, 2.1f));
-    CHECK_EQUAL(5, v_all.find_first_float(col_float, 0.0f));
-    CHECK_EQUAL(2, v_all.find_first_float(col_float, 3.1f));
+    CHECK_EQUAL(keys[1], v_all.find_first<float>(col_float, 2.1f));
+    CHECK_EQUAL(keys[5], v_all.find_first<float>(col_float, 0.0f));
+    CHECK_EQUAL(keys[2], v_all.find_first<float>(col_float, 3.1f));
 
     // TODO: add for float as well
 
@@ -3391,15 +3393,17 @@ NONCONCURRENT_TEST(TableView_SortOrder_Core)
     // Set back to default in case other tests rely on this
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 }
-
+#endif
 
 // Verify that copy-constructed and copy-assigned TableViews work normally.
 TEST(TableView_Copy)
 {
     Table table;
-    size_t col_id = table.add_column(type_Int, "id");
-    for (size_t i = 0; i < 3; ++i)
-        table.set_int(col_id, table.add_empty_row(), i);
+    auto col_id = table.add_column(type_Int, "id");
+
+    table.create_object().set(col_id, -1).get_key();
+    ObjKey k1 = table.create_object().set(col_id, 1).get_key();
+    ObjKey k2 = table.create_object().set(col_id, 2).get_key();
 
     TableView tv = (table.column<Int>(col_id) > 0).find_all();
     CHECK_EQUAL(2, tv.size());
@@ -3409,70 +3413,95 @@ TEST(TableView_Copy)
     copy_2 = tv;
 
     CHECK_EQUAL(2, copy_1.size());
-    CHECK_EQUAL(1, copy_1.get_source_ndx(0));
-    CHECK_EQUAL(2, copy_1.get_source_ndx(1));
+    CHECK_EQUAL(k1, copy_1.get_key(0));
+    CHECK_EQUAL(k2, copy_1.get_key(1));
 
     CHECK_EQUAL(2, copy_2.size());
-    CHECK_EQUAL(1, copy_2.get_source_ndx(0));
-    CHECK_EQUAL(2, copy_2.get_source_ndx(1));
+    CHECK_EQUAL(k1, copy_2.get_key(0));
+    CHECK_EQUAL(k2, copy_2.get_key(1));
 
-    table.move_last_over(1);
+    table.remove_object(k1);
 
     CHECK(!copy_1.is_in_sync());
     CHECK(!copy_2.is_in_sync());
 
     copy_1.sync_if_needed();
     CHECK_EQUAL(1, copy_1.size());
-    CHECK_EQUAL(1, copy_1.get_source_ndx(0));
+    CHECK_EQUAL(k2, copy_1.get_key(0));
 
     copy_2.sync_if_needed();
     CHECK_EQUAL(1, copy_2.size());
-    CHECK_EQUAL(1, copy_2.get_source_ndx(0));
+    CHECK_EQUAL(k2, copy_2.get_key(0));
 }
 
-TEST(TableView_InsertColumnsAfterSort)
+TEST(TableView_RemoveColumnsAfterSort)
 {
     Table table;
-    table.add_column(type_Int, "value");
-    table.add_empty_row(10);
-    for (size_t i = 0; i < 10; ++i)
-        table.set_int(0, i, i);
+    auto col_str0 = table.add_column(type_String, "0");
+    auto col_str1 = table.add_column(type_String, "1");
+    auto col_int = table.add_column(type_Int, "value");
+    for (int i = 0; i < 10; ++i) {
+        table.create_object().set(col_int, i);
+    }
 
-    SortDescriptor desc(table, {{0}}, {false}); // sort by the one column in descending order
+    SortDescriptor desc(table, {{col_int}}, {false}); // sort by the one column in descending order
 
-    table.insert_column(0, type_String, "0");
+    table.remove_column(col_str0);
     auto tv = table.get_sorted_view(desc);
-    CHECK_EQUAL(tv.get_int(1, 0), 9);
-    CHECK_EQUAL(tv.get_int(1, 9), 0);
+    CHECK_EQUAL(tv.get(0).get<Int>(col_int), 9);
+    CHECK_EQUAL(tv.get(9).get<Int>(col_int), 0);
 
-    table.insert_column(0, type_String, "1");
-    table.add_empty_row();
+    table.remove_column(col_str1);
+    table.create_object();
     tv.sync_if_needed();
-    CHECK_EQUAL(tv.get_int(2, 0), 9);
-    CHECK_EQUAL(tv.get_int(2, 10), 0);
+    CHECK_EQUAL(tv.get(0).get<Int>(col_int), 9);
+    CHECK_EQUAL(tv.get(10).get<Int>(col_int), 0);
 }
 
 TEST(TableView_TimestampMaxRemoveRow)
 {
     Table table;
-    table.add_column(type_Timestamp, "time");
+    auto col_date = table.add_column(type_Timestamp, "time");
     for (size_t i = 0; i < 10; ++i) {
-        table.add_empty_row();
-        table.set_timestamp(0, i, Timestamp(i, 0));
+        table.create_object().set(col_date, Timestamp(i, 0));
     }
 
     TableView tv = table.where().find_all();
     CHECK_EQUAL(tv.size(), 10);
-    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(9, 0));
+    CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(9, 0));
 
-    table.move_last_over(9);
+    table.remove_object(ObjKey(9));
     CHECK_EQUAL(tv.size(), 10);                            // not changed since sync_if_needed hasn't been called
-    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0)); // but aggregate functions skip removed rows
+    CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(8, 0)); // but aggregate functions skip removed rows
 
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 9);
-    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0));
+    CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(8, 0));
 }
-#endif
+
+TEST(TableView_FindAll)
+{
+    Table t;
+    auto col_str = t.add_column(type_String, "strings");
+    auto col_int = t.add_column(type_Int, "integers");
+
+    ObjKey k0 = t.create_object().set_all("hello", 1).get_key();
+    ObjKey k1 = t.create_object().set_all("world", 2).get_key();
+    ObjKey k2 = t.create_object().set_all("hello", 3).get_key();
+    ObjKey k3 = t.create_object().set_all("world", 4).get_key();
+    ObjKey k4 = t.create_object().set_all("hello", 5).get_key();
+
+    ConstTableView tv = t.where().find_all();
+
+    ObjKey j = tv.find_first<Int>(col_int, 4);
+    CHECK_EQUAL(j, k3);
+    ObjKey k = tv.find_first<String>(col_str, "world");
+    CHECK_EQUAL(k, k1);
+    auto tv1 = tv.find_all<String>(col_str, "hello");
+    CHECK_EQUAL(tv1.size(), 3);
+    CHECK_EQUAL(tv1.get_key(0), k0);
+    CHECK_EQUAL(tv1.get_key(1), k2);
+    CHECK_EQUAL(tv1.get_key(2), k4);
+}
 
 #endif // TEST_TABLE_VIEW

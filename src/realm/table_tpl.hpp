@@ -23,6 +23,7 @@
 #include <realm/aggregate.hpp>
 
 namespace realm {
+
 template <Action action, typename T, typename R>
 R Table::aggregate(ColKey column_key, T value, size_t* resultcount, ObjKey* return_ndx) const
 {

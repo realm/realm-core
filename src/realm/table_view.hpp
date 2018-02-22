@@ -150,11 +150,57 @@ namespace realm {
 // transactions.
 
 
-/// Common base class for TableView and ConstTableView.
-
-class TableViewBase : public ObjList {
+/// A ConstTableView gives read access to the parent table, but no
+/// write access. The view itself, though, can be changed, for
+/// example, it can be sorted.
+///
+/// Note that methods are declared 'const' if, and only if they leave
+/// the view unmodified, and this is irrespective of whether they
+/// modify the parent table.
+///
+/// A ConstTableView has both copy and move semantics. See TableView
+/// for more on this.
+class ConstTableView : public ObjList {
 public:
-    ~TableViewBase()
+    using HandoverPatch = TableViewHandoverPatch;
+
+    /// Construct null view (no memory allocated).
+    ConstTableView()
+        : ObjList(m_table_view_key_values)
+        , m_table_view_key_values(Allocator::get_default())
+    {
+    }
+
+
+    /// Construct empty view, ready for addition of row indices.
+    ConstTableView(const Table* parent);
+    ConstTableView(const Table* parent, Query& query, size_t start, size_t end, size_t limit);
+    ConstTableView(const Table* parent, ColKey column, const ConstObj& obj);
+    ConstTableView(const Table* parent, ConstLinkListPtr link_list);
+
+    enum DistinctViewTag { DistinctView };
+    ConstTableView(DistinctViewTag, const Table* parent, ColKey column_key);
+
+    /// Copy constructor.
+    ConstTableView(const ConstTableView&);
+
+    /// Move constructor.
+    ConstTableView(ConstTableView&&) noexcept;
+
+    ConstTableView& operator=(const ConstTableView&);
+    ConstTableView& operator=(ConstTableView&&) noexcept;
+
+    void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
+    {
+        apply_patch(*patch, group);
+        patch.reset();
+    }
+    // handover machinery entry points based on static type
+    void apply_patch(HandoverPatch& patch, Group& group);
+    ConstTableView(const ConstTableView& source, HandoverPatch& patch, ConstSourcePayload mode);
+    ConstTableView(ConstTableView& source, HandoverPatch& patch, MutableSourcePayload mode);
+
+    ~ConstTableView()
     {
         m_key_values.destroy(); // Shallow
     }
@@ -163,36 +209,53 @@ public:
     //    enum mode { mode_Reflective, mode_Imperative };
     //    void set_operating_mode(mode);
     //    mode get_operating_mode();
-    bool is_empty() const noexcept;
+    bool is_empty() const noexcept
+    {
+        return m_key_values.size() == 0;
+    }
 
     // Tells if the table that this TableView points at still exists or has been deleted.
-    bool is_attached() const noexcept;
+    bool is_attached() const noexcept
+    {
+        return bool(m_table);
+    }
 
-    bool is_row_attached(size_t row_ndx) const noexcept;
-    size_t num_attached_rows() const noexcept;
+    bool is_row_attached(size_t row_ndx) const noexcept
+    {
+        return m_table->is_valid(ObjKey(m_key_values.get(row_ndx)));
+    }
 
     // Get the query used to create this TableView
     // The query will have a null source table if this tv was not created from
     // a query
-    const Query& get_query() const noexcept;
+    const Query& get_query() const noexcept
+    {
+        return m_query;
+    }
 
-    // Column information
-    size_t get_column_count() const noexcept;
-    StringData get_column_name(ColKey column_key) const noexcept;
-    ColKey get_column_key(StringData name) const;
-    DataType get_column_type(ColKey column_key) const noexcept;
+    virtual std::unique_ptr<ConstTableView> clone() const
+    {
+        return std::unique_ptr<ConstTableView>(new ConstTableView(*this));
+    }
 
-    // Searching
-    template <typename T>
-    size_t find_first(ColKey column_key, T value) const;
+    // handover machinery entry points based on dynamic type. These methods:
+    // a) forward their calls to the static type entry points.
+    // b) new/delete patch data structures.
+    virtual std::unique_ptr<ConstTableView> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
+                                                               ConstSourcePayload mode) const
+    {
+        patch.reset(new HandoverPatch);
+        std::unique_ptr<ConstTableView> retval(new ConstTableView(*this, *patch, mode));
+        return retval;
+    }
 
-    size_t find_first_int(ColKey column_key, int64_t value) const;
-    size_t find_first_bool(ColKey column_key, bool value) const;
-    size_t find_first_float(ColKey column_key, float value) const;
-    size_t find_first_double(ColKey column_key, double value) const;
-    size_t find_first_string(ColKey column_key, StringData value) const;
-    size_t find_first_binary(ColKey column_key, BinaryData value) const;
-    size_t find_first_timestamp(ColKey column_key, Timestamp value) const;
+    virtual std::unique_ptr<ConstTableView> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
+                                                               MutableSourcePayload mode)
+    {
+        patch.reset(new HandoverPatch);
+        std::unique_ptr<ConstTableView> retval(new ConstTableView(*this, *patch, mode));
+        return retval;
+    }
 
     template <Action action, typename T, typename R>
     R aggregate(ColKey column_key, size_t* result_count = nullptr, ObjKey* return_key = nullptr) const;
@@ -223,7 +286,10 @@ public:
 
     /// Search this view for the specified key. If found, the index of that row
     /// within this view is returned, otherwise `realm::not_found` is returned.
-    size_t find_by_source_ndx(ObjKey key) const noexcept;
+    size_t find_by_source_ndx(ObjKey key) const noexcept
+    {
+        return m_key_values.find_first(key, 0, m_key_values.size());
+    }
 
     // Conversion
     void to_json(std::ostream&) const;
@@ -279,8 +345,6 @@ public:
     // - Query::find_all() when the query is not restricted to a view.
     bool is_in_table_order() const;
 
-    virtual std::unique_ptr<TableViewBase> clone() const = 0;
-
 protected:
     // This TableView can be "born" from 4 different sources:
     // - LinkView
@@ -317,70 +381,9 @@ protected:
 
     mutable TableVersions m_last_seen_versions;
 
-    size_t m_num_detached_refs = 0;
-    /// Construct null view (no memory allocated).
-    TableViewBase()
-        : ObjList(m_table_view_key_values)
-        , m_table_view_key_values(Allocator::get_default())
-    {
-    }
-
-
-    /// Construct empty view, ready for addition of row indices.
-    TableViewBase(Table* parent);
-    TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
-    TableViewBase(Table* parent, ColKey column, const ConstObj& obj);
-    TableViewBase(Table* parent, ConstLinkListPtr link_list);
-
-    enum DistinctViewTag { DistinctView };
-    TableViewBase(DistinctViewTag, Table* parent, ColKey column_key);
-
-    /// Copy constructor.
-    TableViewBase(const TableViewBase&);
-
-    /// Move constructor.
-    TableViewBase(TableViewBase&&) noexcept;
-
-    TableViewBase& operator=(const TableViewBase&);
-    TableViewBase& operator=(TableViewBase&&) noexcept;
-
-    template <class R, class V>
-    static R find_all_integer(V*, ColKey, int64_t);
-
-    template <class R, class V>
-    static R find_all_float(V*, ColKey, float);
-
-    template <class R, class V>
-    static R find_all_double(V*, ColKey, double);
-
-    template <class R, class V>
-    static R find_all_string(V*, ColKey, StringData);
-
-    using HandoverPatch = TableViewHandoverPatch;
-
-    // handover machinery entry points based on dynamic type. These methods:
-    // a) forward their calls to the static type entry points.
-    // b) new/delete patch data structures.
-    virtual std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                              ConstSourcePayload mode) const = 0;
-
-    virtual std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                              MutableSourcePayload mode) = 0;
-
-    void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
-    {
-        apply_patch(*patch, group);
-        patch.reset();
-    }
-    // handover machinery entry points based on static type
-    void apply_patch(HandoverPatch& patch, Group& group);
-    TableViewBase(const TableViewBase& source, HandoverPatch& patch, ConstSourcePayload mode);
-    TableViewBase(TableViewBase& source, HandoverPatch& patch, MutableSourcePayload mode);
-
 private:
     KeyColumn m_table_view_key_values; // We should generally not use this name
-    void detach() const noexcept; // may have to remove const
-    size_t find_first_integer(ColKey column_key, int64_t value) const;
+    ObjKey find_first_integer(ColKey column_key, int64_t value) const;
     template <class oper>
     Timestamp minmax_timestamp(ColKey column_key, ObjKey* return_key) const;
 
@@ -388,16 +391,6 @@ private:
     friend class Query;
     friend class SharedGroup;
 };
-
-
-inline void TableViewBase::detach() const noexcept // may have to remove const
-{
-    m_table = TableRef();
-}
-
-
-class ConstTableView;
-
 
 enum class RemoveMode { ordered, unordered };
 
@@ -408,22 +401,22 @@ enum class RemoveMode { ordered, unordered };
 /// parent table be modified through it.
 ///
 /// A TableView is both copyable and movable.
-class TableView : public TableViewBase {
+class TableView : public ConstTableView {
 public:
-    using TableViewBase::TableViewBase;
+    using ConstTableView::ConstTableView;
 
     TableView() = default;
 
-    // Rows
-    Obj get(size_t row_ndx) noexcept;
-    Obj front() noexcept;
-    Obj back() noexcept;
-    Obj operator[](size_t row_ndx) noexcept;
+    Table& get_parent() noexcept
+    {
+        return const_cast<Table&>(*m_table);
+    }
 
-    // Links
-    TableRef get_link_target(ColKey column_key) noexcept;
-    ConstTableRef get_link_target(ColKey column_key) const noexcept;
-    void nullify_link(ColKey column_key, size_t row_ndx);
+    // Rows
+    Obj get(size_t row_ndx);
+    Obj front();
+    Obj back();
+    Obj operator[](size_t row_ndx);
 
     /// \defgroup table_view_removes
     //@{
@@ -444,41 +437,24 @@ public:
     void clear();
     //@}
 
-    // Searching (Int and String)
-    TableView find_all_int(ColKey column_key, int64_t value);
-    ConstTableView find_all_int(ColKey column_key, int64_t value) const;
-    TableView find_all_bool(ColKey column_key, bool value);
-    ConstTableView find_all_bool(ColKey column_key, bool value) const;
-    TableView find_all_float(ColKey column_key, float value);
-    ConstTableView find_all_float(ColKey column_key, float value) const;
-    TableView find_all_double(ColKey column_key, double value);
-    ConstTableView find_all_double(ColKey column_key, double value) const;
-    TableView find_all_string(ColKey column_key, StringData value);
-    ConstTableView find_all_string(ColKey column_key, StringData value) const;
-    // FIXME: Need: TableView find_all_binary(ColKey column_key, BinaryData value);
-    // FIXME: Need: ConstTableView find_all_binary(ColKey column_key, BinaryData value) const;
-
-    Table& get_parent() noexcept;
-    const Table& get_parent() const noexcept;
-
-    std::unique_ptr<TableViewBase> clone() const override
+    std::unique_ptr<ConstTableView> clone() const override
     {
-        return std::unique_ptr<TableViewBase>(new TableView(*this));
+        return std::unique_ptr<ConstTableView>(new TableView(*this));
     }
 
-    std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                      ConstSourcePayload mode) const override
+    std::unique_ptr<ConstTableView> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
+                                                       ConstSourcePayload mode) const override
     {
         patch.reset(new HandoverPatch);
-        std::unique_ptr<TableViewBase> retval(new TableView(*this, *patch, mode));
+        std::unique_ptr<ConstTableView> retval(new TableView(*this, *patch, mode));
         return retval;
     }
 
-    std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                      MutableSourcePayload mode) override
+    std::unique_ptr<ConstTableView> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
+                                                       MutableSourcePayload mode) override
     {
         patch.reset(new HandoverPatch);
-        std::unique_ptr<TableViewBase> retval(new TableView(*this, *patch, mode));
+        std::unique_ptr<ConstTableView> retval(new TableView(*this, *patch, mode));
         return retval;
     }
 
@@ -489,119 +465,19 @@ private:
 
     TableView(DistinctViewTag, Table& parent, ColKey column_key);
 
-    TableView find_all_integer(ColKey column_key, int64_t value);
-    ConstTableView find_all_integer(ColKey column_key, int64_t value) const;
-
     friend class ConstTableView;
     friend class Table;
     friend class Query;
-    friend class TableViewBase;
-    friend class LinkView;
     friend class LinkList;
 };
 
 
-/// A ConstTableView gives read access to the parent table, but no
-/// write access. The view itself, though, can be changed, for
-/// example, it can be sorted.
-///
-/// Note that methods are declared 'const' if, and only if they leave
-/// the view unmodified, and this is irrespective of whether they
-/// modify the parent table.
-///
-/// A ConstTableView has both copy and move semantics. See TableView
-/// for more on this.
-class ConstTableView : public TableViewBase {
-public:
-    using TableViewBase::TableViewBase;
-
-    ConstTableView() = default;
-
-    ConstTableView(const TableView&);
-    ConstTableView(TableView&&);
-    ConstTableView& operator=(const TableView&);
-    ConstTableView& operator=(TableView&&);
-
-    // Links
-    ConstTableRef get_link_target(ColKey column_key) const noexcept;
-
-    // Searching (Int and String)
-    ConstTableView find_all_int(ColKey column_key, int64_t value) const;
-    ConstTableView find_all_bool(ColKey column_key, bool value) const;
-    ConstTableView find_all_float(ColKey column_key, float value) const;
-    ConstTableView find_all_double(ColKey column_key, double value) const;
-    ConstTableView find_all_string(ColKey column_key, StringData value) const;
-
-    const Table& get_parent() const noexcept;
-
-    std::unique_ptr<TableViewBase> clone() const override
-    {
-        return std::unique_ptr<TableViewBase>(new ConstTableView(*this));
-    }
-
-    std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                      ConstSourcePayload mode) const override
-    {
-        patch.reset(new HandoverPatch);
-        std::unique_ptr<TableViewBase> retval(new ConstTableView(*this, *patch, mode));
-        return retval;
-    }
-
-    std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                      MutableSourcePayload mode) override
-    {
-        patch.reset(new HandoverPatch);
-        std::unique_ptr<TableViewBase> retval(new ConstTableView(*this, *patch, mode));
-        return retval;
-    }
-
-private:
-    ConstTableView(const Table& parent);
-
-    ConstTableView find_all_integer(ColKey column_key, int64_t value) const;
-
-    friend class TableView;
-    friend class Table;
-    friend class Query;
-    friend class TableViewBase;
-};
 
 
 // ================================================================================================
-// TableViewBase Implementation:
+// ConstTableView Implementation:
 
-inline const Query& TableViewBase::get_query() const noexcept
-{
-    return m_query;
-}
-
-inline bool TableViewBase::is_empty() const noexcept
-{
-    return m_key_values.size() == 0;
-}
-
-inline bool TableViewBase::is_attached() const noexcept
-{
-    return bool(m_table);
-}
-
-inline bool TableViewBase::is_row_attached(size_t row_ndx) const noexcept
-{
-    return m_table->is_valid(ObjKey(m_key_values.get(row_ndx)));
-}
-
-inline size_t TableViewBase::num_attached_rows() const noexcept
-{
-    return m_key_values.size() - m_num_detached_refs;
-}
-
-inline size_t TableViewBase::find_by_source_ndx(ObjKey key) const noexcept
-{
-    return m_key_values.find_first(key, 0, m_key_values.size());
-}
-
-
-inline TableViewBase::TableViewBase(Table* parent)
+inline ConstTableView::ConstTableView(const Table* parent)
     : ObjList(m_table_view_key_values, parent) // Throws
     , m_table_view_key_values(Allocator::get_default())
 {
@@ -611,7 +487,7 @@ inline TableViewBase::TableViewBase(Table* parent)
     }
 }
 
-inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit)
+inline ConstTableView::ConstTableView(const Table* parent, Query& query, size_t start, size_t end, size_t limit)
     : ObjList(m_table_view_key_values, parent)
     , m_query(query)
     , m_start(start)
@@ -622,7 +498,7 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     m_table_view_key_values.create();
 }
 
-inline TableViewBase::TableViewBase(Table* src_table, ColKey src_column_key, const ConstObj& obj)
+inline ConstTableView::ConstTableView(const Table* src_table, ColKey src_column_key, const ConstObj& obj)
     : ObjList(m_table_view_key_values, src_table) // Throws
     , m_source_column_key(src_column_key)
     , m_linked_obj(obj)
@@ -634,7 +510,7 @@ inline TableViewBase::TableViewBase(Table* src_table, ColKey src_column_key, con
     }
 }
 
-inline TableViewBase::TableViewBase(DistinctViewTag, Table* parent, ColKey column_key)
+inline ConstTableView::ConstTableView(DistinctViewTag, const Table* parent, ColKey column_key)
     : ObjList(m_table_view_key_values, parent) // Throws
     , m_distinct_column_source(column_key)
     , m_table_view_key_values(Allocator::get_default())
@@ -646,7 +522,7 @@ inline TableViewBase::TableViewBase(DistinctViewTag, Table* parent, ColKey colum
     }
 }
 
-inline TableViewBase::TableViewBase(Table* parent, ConstLinkListPtr link_list)
+inline ConstTableView::ConstTableView(const Table* parent, ConstLinkListPtr link_list)
     : ObjList(m_table_view_key_values, parent) // Throws
     , m_linklist_source(std::move(link_list))
     , m_table_view_key_values(Allocator::get_default())
@@ -658,24 +534,23 @@ inline TableViewBase::TableViewBase(Table* parent, ConstLinkListPtr link_list)
     }
 }
 
-inline TableViewBase::TableViewBase(const TableViewBase& tv)
+inline ConstTableView::ConstTableView(const ConstTableView& tv)
     : ObjList(m_table_view_key_values, tv.m_table)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj(tv.m_linked_obj)
-    , m_linklist_source(tv.m_linklist_source->clone())
+    , m_linklist_source(tv.m_linklist_source ? tv.m_linklist_source->clone() : LinkListPtr{})
     , m_distinct_column_source(tv.m_distinct_column_source)
-    , m_descriptor_ordering(std::move(tv.m_descriptor_ordering))
+    , m_descriptor_ordering(tv.m_descriptor_ordering)
     , m_query(tv.m_query)
     , m_start(tv.m_start)
     , m_end(tv.m_end)
     , m_limit(tv.m_limit)
     , m_last_seen_versions(tv.m_last_seen_versions)
-    , m_num_detached_refs(tv.m_num_detached_refs)
     , m_table_view_key_values(tv.m_table_view_key_values)
 {
 }
 
-inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
+inline ConstTableView::ConstTableView(ConstTableView&& tv) noexcept
     : ObjList(m_table_view_key_values, tv.m_table)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj(tv.m_linked_obj)
@@ -690,18 +565,16 @@ inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
     // if we are created from a table view which is outdated, take care to use the outdated
     // version number so that we can later trigger a sync if needed.
     m_last_seen_versions(std::move(tv.m_last_seen_versions))
-    , m_num_detached_refs(tv.m_num_detached_refs)
     , m_table_view_key_values(std::move(tv.m_table_view_key_values))
 {
 }
 
-inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
+inline ConstTableView& ConstTableView::operator=(ConstTableView&& tv) noexcept
 {
     m_table = std::move(tv.m_table);
 
     m_key_values = std::move(tv.m_key_values);
     m_query = std::move(tv.m_query);
-    m_num_detached_refs = tv.m_num_detached_refs;
     m_last_seen_versions = tv.m_last_seen_versions;
     m_start = tv.m_start;
     m_end = tv.m_end;
@@ -715,7 +588,7 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
     return *this;
 }
 
-inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
+inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
 {
     if (this == &tv)
         return *this;
@@ -723,7 +596,6 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     m_key_values = tv.m_key_values;
 
     m_query = tv.m_query;
-    m_num_detached_refs = tv.m_num_detached_refs;
     m_last_seen_versions = tv.m_last_seen_versions;
     m_start = tv.m_start;
     m_end = tv.m_end;
@@ -769,134 +641,22 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     REALM_DIAG_POP();                                                                                                \
     REALM_ASSERT(row_ndx < m_key_values.size())
 
-// Column information
-
-inline size_t TableViewBase::get_column_count() const noexcept
+template <class T>
+ConstTableView ObjList::find_all(ColKey column_key, T value)
 {
-    REALM_ASSERT(m_table);
-    return m_table->get_column_count();
+    ConstTableView tv(m_table);
+    auto& keys = tv.m_key_values;
+    for_each([column_key, value, &keys](ConstObj& o) {
+        if (o.get<T>(column_key) == value) {
+            keys.add(o.get_key());
+        }
+        return false;
+    });
+    return tv;
 }
-
-inline StringData TableViewBase::get_column_name(ColKey column_key) const noexcept
-{
-    REALM_ASSERT(m_table);
-    return m_table->get_column_name(column_key);
-}
-
-inline ColKey TableViewBase::get_column_key(StringData name) const
-{
-    REALM_ASSERT(m_table);
-    return m_table->get_column_key(name);
-}
-
-inline DataType TableViewBase::get_column_type(ColKey column_key) const noexcept
-{
-    REALM_ASSERT(m_table);
-    return m_table->get_column_type(column_key);
-}
-
-
-inline TableRef TableView::get_link_target(ColKey column_key) noexcept
-{
-    return m_table->get_link_target(column_key);
-}
-
-inline ConstTableRef TableView::get_link_target(ColKey column_key) const noexcept
-{
-    return m_table->get_link_target(column_key);
-}
-
-inline ConstTableRef ConstTableView::get_link_target(ColKey column_key) const noexcept
-{
-    return m_table->get_link_target(column_key);
-}
-
-// Searching
-
-
-inline size_t TableViewBase::find_first_int(ColKey column_key, int64_t value) const
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Int);
-    return find_first_integer(column_key, value);
-}
-
-inline size_t TableViewBase::find_first_bool(ColKey column_key, bool value) const
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Bool);
-    return find_first_integer(column_key, value ? 1 : 0);
-}
-
-inline size_t TableViewBase::find_first_integer(ColKey column_key, int64_t value) const
-{
-    return find_first<int64_t>(column_key, value);
-}
-
-inline size_t TableViewBase::find_first_float(ColKey column_key, float value) const
-{
-    return find_first<float>(column_key, value);
-}
-
-inline size_t TableViewBase::find_first_double(ColKey column_key, double value) const
-{
-    return find_first<double>(column_key, value);
-}
-
-inline size_t TableViewBase::find_first_string(ColKey column_key, StringData value) const
-{
-    return find_first<StringData>(column_key, value);
-}
-
-inline size_t TableViewBase::find_first_binary(ColKey column_key, BinaryData value) const
-{
-    return find_first<BinaryData>(column_key, value);
-}
-
-inline size_t TableViewBase::find_first_timestamp(ColKey column_key, Timestamp value) const
-{
-    return find_first<Timestamp>(column_key, value);
-}
-
-
-template <class R, class V>
-R TableViewBase::find_all_integer(V* view, ColKey column_key, int64_t value)
-{
-    typedef typename std::remove_const<V>::type TNonConst;
-    return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_key, value).find_all();
-}
-
-template <class R, class V>
-R TableViewBase::find_all_float(V* view, ColKey column_key, float value)
-{
-    typedef typename std::remove_const<V>::type TNonConst;
-    return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_key, value).find_all();
-}
-
-template <class R, class V>
-R TableViewBase::find_all_double(V* view, ColKey column_key, double value)
-{
-    typedef typename std::remove_const<V>::type TNonConst;
-    return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_key, value).find_all();
-}
-
-template <class R, class V>
-R TableViewBase::find_all_string(V* view, ColKey column_key, StringData value)
-{
-    typedef typename std::remove_const<V>::type TNonConst;
-    return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_key, value).find_all();
-}
-
 
 //-------------------------- TableView, ConstTableView implementation:
 
-inline ConstTableView::ConstTableView(const TableView& tv)
-    : TableViewBase(tv)
-{
-}
-
-inline ConstTableView::ConstTableView(TableView&& tv)
-    : TableViewBase(std::move(tv))
-{
-}
 
 inline void TableView::remove_last()
 {
@@ -904,187 +664,47 @@ inline void TableView::remove_last()
         remove(size() - 1);
 }
 
-inline Table& TableView::get_parent() noexcept
-{
-    return *m_table;
-}
-
-inline const Table& TableView::get_parent() const noexcept
-{
-    return *m_table;
-}
-
-inline const Table& ConstTableView::get_parent() const noexcept
-{
-    return *m_table;
-}
-
 inline TableView::TableView(Table& parent)
-    : TableViewBase(&parent)
+    : ConstTableView(&parent)
 {
 }
 
 inline TableView::TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit)
-    : TableViewBase(&parent, query, start, end, limit)
+    : ConstTableView(&parent, query, start, end, limit)
 {
 }
 
 inline TableView::TableView(Table& parent, ConstLinkListPtr link_list)
-    : TableViewBase(&parent, std::move(link_list))
+    : ConstTableView(&parent, std::move(link_list))
 {
 }
 
-inline TableView::TableView(TableViewBase::DistinctViewTag, Table& parent, ColKey column_key)
-    : TableViewBase(TableViewBase::DistinctView, &parent, column_key)
+inline TableView::TableView(ConstTableView::DistinctViewTag, Table& parent, ColKey column_key)
+    : ConstTableView(ConstTableView::DistinctView, &parent, column_key)
 {
-}
-
-inline ConstTableView::ConstTableView(const Table& parent)
-    : TableViewBase(const_cast<Table*>(&parent))
-{
-}
-
-inline ConstTableView& ConstTableView::operator=(const TableView& tv)
-{
-    TableViewBase::operator=(tv);
-    return *this;
-}
-
-inline ConstTableView& ConstTableView::operator=(TableView&& tv)
-{
-    TableViewBase::operator=(std::move(tv));
-    return *this;
-}
-
-
-// - string
-inline TableView TableView::find_all_string(ColKey column_key, StringData value)
-{
-    return TableViewBase::find_all_string<TableView>(this, column_key, value);
-}
-
-inline ConstTableView TableView::find_all_string(ColKey column_key, StringData value) const
-{
-    return TableViewBase::find_all_string<ConstTableView>(this, column_key, value);
-}
-
-inline ConstTableView ConstTableView::find_all_string(ColKey column_key, StringData value) const
-{
-    return TableViewBase::find_all_string<ConstTableView>(this, column_key, value);
-}
-
-// - float
-inline TableView TableView::find_all_float(ColKey column_key, float value)
-{
-    return TableViewBase::find_all_float<TableView>(this, column_key, value);
-}
-
-inline ConstTableView TableView::find_all_float(ColKey column_key, float value) const
-{
-    return TableViewBase::find_all_float<ConstTableView>(this, column_key, value);
-}
-
-inline ConstTableView ConstTableView::find_all_float(ColKey column_key, float value) const
-{
-    return TableViewBase::find_all_float<ConstTableView>(this, column_key, value);
-}
-
-
-// - double
-inline TableView TableView::find_all_double(ColKey column_key, double value)
-{
-    return TableViewBase::find_all_double<TableView>(this, column_key, value);
-}
-
-inline ConstTableView TableView::find_all_double(ColKey column_key, double value) const
-{
-    return TableViewBase::find_all_double<ConstTableView>(this, column_key, value);
-}
-
-inline ConstTableView ConstTableView::find_all_double(ColKey column_key, double value) const
-{
-    return TableViewBase::find_all_double<ConstTableView>(this, column_key, value);
-}
-
-
-// -- 3 variants of the 3 find_all_{int, bool, date} all based on integer
-
-inline TableView TableView::find_all_integer(ColKey column_key, int64_t value)
-{
-    return TableViewBase::find_all_integer<TableView>(this, column_key, value);
-}
-
-inline ConstTableView TableView::find_all_integer(ColKey column_key, int64_t value) const
-{
-    return TableViewBase::find_all_integer<ConstTableView>(this, column_key, value);
-}
-
-inline ConstTableView ConstTableView::find_all_integer(ColKey column_key, int64_t value) const
-{
-    return TableViewBase::find_all_integer<ConstTableView>(this, column_key, value);
-}
-
-
-inline TableView TableView::find_all_int(ColKey column_key, int64_t value)
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Int);
-    return find_all_integer(column_key, value);
-}
-
-inline TableView TableView::find_all_bool(ColKey column_key, bool value)
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Bool);
-    return find_all_integer(column_key, value ? 1 : 0);
-}
-
-inline ConstTableView TableView::find_all_int(ColKey column_key, int64_t value) const
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Int);
-    return find_all_integer(column_key, value);
-}
-
-inline ConstTableView TableView::find_all_bool(ColKey column_key, bool value) const
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Bool);
-    return find_all_integer(column_key, value ? 1 : 0);
-}
-
-inline ConstTableView ConstTableView::find_all_int(ColKey column_key, int64_t value) const
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Int);
-    return find_all_integer(column_key, value);
-}
-
-inline ConstTableView ConstTableView::find_all_bool(ColKey column_key, bool value) const
-{
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, type_Bool);
-    return find_all_integer(column_key, value ? 1 : 0);
 }
 
 // Rows
-
-
-inline Obj TableView::get(size_t row_ndx) noexcept
+inline Obj TableView::get(size_t row_ndx)
 {
     REALM_ASSERT_ROW(row_ndx);
     ObjKey key(m_key_values.get(row_ndx));
     REALM_ASSERT(key != realm::null_key);
-    return m_table->get_object(key);
+    return get_parent().get_object(key);
 }
 
-
-inline Obj TableView::front() noexcept
+inline Obj TableView::front()
 {
     return get(0);
 }
 
-inline Obj TableView::back() noexcept
+inline Obj TableView::back()
 {
     size_t last_row_ndx = size() - 1;
     return get(last_row_ndx);
 }
 
-inline Obj TableView::operator[](size_t row_ndx) noexcept
+inline Obj TableView::operator[](size_t row_ndx)
 {
     return get(row_ndx);
 }

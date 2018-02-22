@@ -196,6 +196,7 @@ T ConstObj::_get(size_t col_ndx) const
 
     typename ColumnTypeTraits<T>::cluster_leaf_type values(m_tree_top->get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
+    values.set_spec(const_cast<Spec*>(&spec), col_ndx);
     values.init_from_ref(ref);
 
     return values.get(m_row_ndx);
@@ -206,6 +207,7 @@ inline bool ConstObj::do_is_null(size_t col_ndx) const
 {
     T values(m_tree_top->get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
+    values.set_spec(const_cast<Spec*>(&m_tree_top->get_spec()), col_ndx);
     values.init_from_ref(ref);
     return values.is_null(m_row_ndx);
 }
@@ -555,6 +557,7 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     REALM_ASSERT(col_ndx + 1 < fields.size());
     typename ColumnTypeTraits<T>::cluster_leaf_type values(alloc);
     values.set_parent(&fields, col_ndx + 1);
+    values.set_spec(const_cast<Spec*>(&spec), col_ndx);
     values.init_from_parent();
     values.set(m_row_ndx, value);
 
@@ -720,6 +723,7 @@ inline void Obj::do_set_null(size_t col_ndx)
 
     T values(alloc);
     values.set_parent(&fields, col_ndx + 1);
+    values.set_spec(const_cast<Spec*>(&m_tree_top->get_spec()), col_ndx);
     values.init_from_parent();
     values.set_null(m_row_ndx);
 }

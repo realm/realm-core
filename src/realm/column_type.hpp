@@ -29,7 +29,7 @@ enum ColumnType {
     col_type_Int = 0,
     col_type_Bool = 1,
     col_type_String = 2,
-    col_type_StringEnum = 3, // double refs
+    col_type_OldStringEnum = 3, // double refs
     col_type_Binary = 4,
     col_type_OldTable = 5,
     col_type_OldMixed = 6,

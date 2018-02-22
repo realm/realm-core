@@ -147,9 +147,6 @@ void col_type_deleg(Op& op, ColumnType type, bool nullable)
         case col_type_String:
             op.template call<StringColumn>();
             return;
-        case col_type_StringEnum:
-            op.template call<StringEnumColumn>();
-            return;
         case col_type_Binary:
             op.template call<BinaryColumn>();
             return;
@@ -165,6 +162,7 @@ void col_type_deleg(Op& op, ColumnType type, bool nullable)
         case col_type_BackLink:
             op.template call<BacklinkColumn>();
             return;
+        case col_type_OldStringEnum:
         case col_type_OldTable:
         case col_type_OldMixed:
         case col_type_Reserved4:

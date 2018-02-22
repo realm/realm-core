@@ -7,6 +7,10 @@
 ### Breaking changes
 
 * 'begin' argument removed from Query::count();
+* Table::optimize replaced with explicit Table::enumerate_string_column. It will enumerate
+  column unconditionally.
+* TableView::nom_attached_rows() no longer available. get(), front, back()... and similar
+  functions will throw `InvalidKey` if the referenced object has been deleted.
 
 ### Enhancements
 

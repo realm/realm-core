@@ -56,7 +56,7 @@ enum Instruction {
     instr_MoveRow = 16,
     instr_MergeRows = 17,  // Replace links pointing to row A with links to row B
     instr_ClearTable = 18, // Remove all rows in selected table
-    instr_OptimizeTable = 19,
+    instr_EnumerateStringColumn = 19,
     instr_InsertColumn =
         21, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
     instr_InsertLinkColumn = 22,     // do, but for a link-type column
@@ -247,7 +247,7 @@ public:
         return true;
     }
 
-    bool optimize_table()
+    bool enumerate_string_column(ColKey)
     {
         return true;
     }
@@ -366,7 +366,7 @@ public:
     bool list_set_binary(size_t list_ndx, BinaryData value);
     bool list_set_timestamp(size_t list_ndx, Timestamp value);
 
-    bool optimize_table();
+    bool enumerate_string_column(ColKey col_key);
 
     // Must have descriptor selected:
     bool insert_link_column(ColKey col_key, DataType, StringData name, TableKey link_target_table_key,
@@ -520,7 +520,7 @@ public:
     virtual void remove_search_index(const Table*, ColKey col_key);
     virtual void set_link_type(const Table*, ColKey col_key, LinkType);
     virtual void clear_table(const Table*, size_t prior_num_rows);
-    virtual void optimize_table(const Table*);
+    virtual void enumerate_string_column(const Table*, ColKey col_key);
 
     virtual void list_insert_null(const ConstListBase&, size_t ndx);
     virtual void list_set_link(const List<ObjKey>&, size_t link_ndx, ObjKey value);
@@ -1512,16 +1512,16 @@ inline void TransactLogConvenientEncoder::clear_table(const Table* t, size_t pri
     m_encoder.clear_table(prior_num_rows); // Throws
 }
 
-inline bool TransactLogEncoder::optimize_table()
+inline bool TransactLogEncoder::enumerate_string_column(ColKey col_key)
 {
-    append_simple_instr(instr_OptimizeTable); // Throws
+    append_simple_instr(instr_EnumerateStringColumn, col_key); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::optimize_table(const Table* t)
+inline void TransactLogConvenientEncoder::enumerate_string_column(const Table* t, ColKey col_key)
 {
     select_table(t);            // Throws
-    m_encoder.optimize_table(); // Throws
+    m_encoder.enumerate_string_column(col_key); // Throws
 }
 
 inline bool TransactLogEncoder::list_insert_null(size_t list_ndx, size_t prior_size)
@@ -2073,8 +2073,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             parser_error();
             return;
         }
-        case instr_OptimizeTable: {
-            if (!handler.optimize_table()) // Throws
+        case instr_EnumerateStringColumn: {
+            ColKey col_key = ColKey(read_int<size_t>());   // Throws
+            if (!handler.enumerate_string_column(col_key)) // Throws
                 parser_error();
             return;
         }
@@ -2302,7 +2303,7 @@ public:
         return true;
     }
 
-    bool optimize_table()
+    bool enumerate_string_column(ColKey)
     {
         return true; // No-op
     }

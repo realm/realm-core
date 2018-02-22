@@ -1077,7 +1077,7 @@ public:
 
     void table_changed() override
     {
-        m_column_type = get_real_column_type(m_condition_column_key);
+        m_is_string_enum = m_table->is_enumerated(m_condition_column_key);
         m_has_search_index = m_table->has_search_index(m_condition_column_key);
     }
 
@@ -1114,7 +1114,7 @@ public:
     StringNodeBase(const StringNodeBase& from, QueryNodeHandoverPatches* patches)
         : ParentNode(from, patches)
         , m_value(from.m_value)
-        , m_column_type(from.m_column_type)
+        , m_is_string_enum(from.m_is_string_enum)
     {
     }
 
@@ -1136,7 +1136,7 @@ protected:
     LeafPtr m_array_ptr;
     const ArrayString* m_leaf_ptr = nullptr;
 
-    ColumnType m_column_type;
+    bool m_is_string_enum = false;
     bool m_has_search_index = false;
 
     size_t m_end_s = 0;

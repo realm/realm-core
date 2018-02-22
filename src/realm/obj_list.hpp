@@ -28,17 +28,23 @@ namespace realm {
 
 class DescriptorOrdering;
 class Table;
+class ConstTableView;
 
 class ObjList {
 public:
     ObjList(KeyColumn& key_values);
-    ObjList(KeyColumn& key_values, Table* parent);
+    ObjList(KeyColumn& key_values, const Table* parent);
 
     virtual ~ObjList()
     {
 #ifdef REALM_COOKIE_CHECK
         m_debug_cookie = 0x7765697633333333; // 0x77656976 = 'view'; 0x33333333 = '3333' = destructed
 #endif
+    }
+
+    const Table& get_parent() const noexcept
+    {
+        return *m_table;
     }
 
     virtual size_t size() const
@@ -52,7 +58,7 @@ public:
         return ObjKey(m_key_values.get(ndx));
     }
 
-    ConstObj get(size_t row_ndx) const noexcept;
+    ConstObj get(size_t row_ndx) const;
     ConstObj front() const noexcept
     {
         return get(0);
@@ -66,6 +72,15 @@ public:
     {
         return get(row_ndx);
     }
+
+    template <class F>
+    void for_each(F func) const;
+
+    template <class T>
+    ConstTableView find_all(ColKey column_key, T value);
+
+    template <class T>
+    ObjKey find_first(ColKey column_key, T value);
 
     // These two methods are overridden by TableView and LinkView.
     virtual TableVersions sync_if_needed() const = 0;
@@ -82,12 +97,46 @@ protected:
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive
 
     // Null if, and only if, the view is detached.
-    mutable TableRef m_table;
+    mutable ConstTableRef m_table;
     KeyColumn& m_key_values;
     uint64_t m_debug_cookie;
 
     void do_sort(const DescriptorOrdering&);
+    void detach() const noexcept // may have to remove const
+    {
+        m_table = TableRef();
+    }
 };
+
+template <class F>
+void ObjList::for_each(F func) const
+{
+    auto sz = size();
+    for (size_t i = 0; i < sz; i++) {
+        try {
+            ConstObj o = get(i);
+            if (func(o))
+                return;
+        }
+        catch (const InvalidKey&) {
+        }
+    }
+}
+
+template <class T>
+ObjKey ObjList::find_first(ColKey column_key, T value)
+{
+    ObjKey k;
+    for_each([column_key, value, &k](ConstObj& o) {
+        T v = o.get<T>(column_key);
+        if (v == value) {
+            k = o.get_key();
+            return true;
+        }
+        return false;
+    });
+    return k;
+}
 }
 
 #endif /* SRC_REALM_OBJ_LIST_HPP_ */

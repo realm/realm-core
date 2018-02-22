@@ -1804,8 +1804,7 @@ TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
     auto col_str = table->add_column(type_String, "first");
     table->add_search_index(col_str);
     if (TEST_TYPE::value == true) {
-        // bool force = true;
-        // FIXME table->optimize(force); // Make it a StringEnum column
+        table->enumerate_string_column(col_str);
     }
 
     auto test_prefix_find = [&](std::string prefix) {
@@ -2222,7 +2221,8 @@ TEST(Query_Huge)
         for (size_t t = 0; t < 4; t++) {
 
             if (t == 1) {
-                // FIXME tt.optimize();
+                tt.enumerate_string_column(col_str0);
+                tt.enumerate_string_column(col_str1);
             }
             else if (t == 2) {
                 tt.add_search_index(col_str0);
@@ -2418,7 +2418,7 @@ TEST(Query_StrIndex3)
         for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_key(t));
 
-        // FIXME ttt.optimize();
+        ttt.enumerate_string_column(col_str);
 
         // Linear scan over enum, plus linear integer column scan
         v = ttt.where().equal(col_str, "AA").equal(col_int, 0).find_all();
@@ -2471,13 +2471,12 @@ TEST(Query_StrIndex2)
     CHECK_EQUAL(0, s);
 }
 
-#ifdef LEGACY_TESTS
 TEST(Query_StrEnum)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    TestTable ttt;
+    Table ttt;
     ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    auto col_str = ttt.add_column(type_String, "2");
 
     int aa;
     int64_t s;
@@ -2487,19 +2486,18 @@ TEST(Query_StrEnum)
         aa = 0;
         for (size_t t = 0; t < REALM_MAX_BPNODE_SIZE * 2; ++t) {
             if (random.chance(1, 3)) {
-                add(ttt, 1, "AA");
+                ttt.create_object().set_all(1, "AA");
                 ++aa;
             }
             else {
-                add(ttt, 1, "BB");
+                ttt.create_object().set_all(1, "BB");
             }
         }
-        ttt.optimize();
-        s = ttt.where().equal(1, "AA").count();
+        ttt.enumerate_string_column(col_str);
+        s = ttt.where().equal(col_str, "AA").count();
         CHECK_EQUAL(aa, s);
     }
 }
-#endif // LEGACY_TESTS
 
 TEST(Query_StrIndex)
 {
@@ -2535,7 +2533,7 @@ TEST(Query_StrIndex)
         s = ttt.where().equal(str_col, "AA").count();
         CHECK_EQUAL(aa, s);
 
-        // FIXME ttt.optimize();
+        ttt.enumerate_string_column(str_col);
         s = ttt.where().equal(str_col, "AA").count();
         CHECK_EQUAL(aa, s);
 
@@ -2545,7 +2543,6 @@ TEST(Query_StrIndex)
     }
 }
 
-#ifdef LEGACY_TESTS
 TEST(Query_GA_Crash)
 {
     GROUP_TEST_PATH(path);
@@ -2553,30 +2550,33 @@ TEST(Query_GA_Crash)
     {
         Group g;
         TableRef t = g.add_table("firstevents");
-        t->add_column(type_String, "1");
-    	t->add_column(type_String, "2");
-	    t->add_column(type_String, "3");
-	    t->add_column(type_Int, "4");
-	    t->add_column(type_Int, "5");
+        auto col_str0 = t->add_column(type_String, "1");
+        auto col_str1 = t->add_column(type_String, "2");
+        auto col_str2 = t->add_column(type_String, "3");
+        t->add_column(type_Int, "4");
+        t->add_column(type_Int, "5");
 
         for (size_t i = 0; i < 100; ++i) {
             int64_t r1 = random.draw_int_mod(100);
             int64_t r2 = random.draw_int_mod(100);
 
-            add(t, "10", "US", "1.0", r1, r2);
+            t->create_object().set_all("10", "US", "1.0", r1, r2);
         }
-        t->optimize();
+        t->enumerate_string_column(col_str0);
+        t->enumerate_string_column(col_str1);
+        t->enumerate_string_column(col_str2);
         g.write(path);
     }
 
     Group g(path);
     TableRef t = g.get_table("firstevents");
+    auto col_str1 = t->get_column_key("2");
 
-    Query q = t->where().equal(1, "US");
+    Query q = t->where().equal(col_str1, "US");
 
     size_t c1 = 0;
     for (size_t i = 0; i < 100; ++i)
-        c1 += t.get()->count_string(1, "US");
+        c1 += t->count_string(col_str1, "US");
 
     size_t c2 = 0;
     for (size_t i = 0; i < 100; ++i)
@@ -2585,7 +2585,6 @@ TEST(Query_GA_Crash)
     CHECK_EQUAL(c1, t->size() * 100);
     CHECK_EQUAL(c1, c2);
 }
-#endif
 
 TEST(Query_Float3)
 {
@@ -2888,70 +2887,41 @@ TEST(Query_DoubleCoordinates)
 }
 
 
+TEST_TYPES(Query_StrIndexed, std::true_type, std::false_type)
+{
+    Table ttt;
+    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_str = ttt.add_column(type_String, "2");
+
+    for (size_t t = 0; t < 10; t++) {
+        ttt.create_object().set_all(1, "a");
+        ttt.create_object().set_all(4, "b");
+        ttt.create_object().set_all(7, "c");
+        ttt.create_object().set_all(10, "a");
+        ttt.create_object().set_all(1, "b");
+        ttt.create_object().set_all(4, "c");
+    }
+
+    if (TEST_TYPE::value == true) {
+        ttt.enumerate_string_column(col_str);
+    }
+
+    ttt.add_search_index(col_str);
+
+    int64_t s = ttt.where().equal(col_str, "a").sum_int(col_int);
+    CHECK_EQUAL(10 * 11, s);
+
+    s = ttt.where().equal(col_str, "a").equal(col_int, 10).sum_int(col_int);
+    CHECK_EQUAL(100, s);
+
+    s = ttt.where().equal(col_int, 10).equal(col_str, "a").sum_int(col_int);
+    CHECK_EQUAL(100, s);
+
+    TableView tv = ttt.where().equal(col_str, "a").find_all();
+    CHECK_EQUAL(10 * 2, tv.size());
+}
+
 #ifdef LEGACY_TESTS
-TEST(Query_StrIndexedEnum)
-{
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    for (size_t t = 0; t < 10; t++) {
-        add(ttt, 1, "a");
-        add(ttt, 4, "b");
-        add(ttt, 7, "c");
-        add(ttt, 10, "a");
-        add(ttt, 1, "b");
-        add(ttt, 4, "c");
-    }
-
-    ttt.optimize();
-
-    ttt.add_search_index(1);
-
-    int64_t s = ttt.where().equal(1, "a").sum_int(0);
-    CHECK_EQUAL(10 * 11, s);
-
-    s = ttt.where().equal(1, "a").equal(0, 10).sum_int(0);
-    CHECK_EQUAL(100, s);
-
-    s = ttt.where().equal(0, 10).equal(1, "a").sum_int(0);
-    CHECK_EQUAL(100, s);
-
-    TableView tv = ttt.where().equal(1, "a").find_all();
-    CHECK_EQUAL(10 * 2, tv.size());
-}
-
-
-TEST(Query_StrIndexedNonEnum)
-{
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    for (size_t t = 0; t < 10; t++) {
-        add(ttt, 1, "a");
-        add(ttt, 4, "b");
-        add(ttt, 7, "c");
-        add(ttt, 10, "a");
-        add(ttt, 1, "b");
-        add(ttt, 4, "c");
-    }
-
-    ttt.add_search_index(1);
-
-    int64_t s = ttt.where().equal(1, "a").sum_int(0);
-    CHECK_EQUAL(10 * 11, s);
-
-    s = ttt.where().equal(1, "a").equal(0, 10).sum_int(0);
-    CHECK_EQUAL(100, s);
-
-    s = ttt.where().equal(0, 10).equal(1, "a").sum_int(0);
-    CHECK_EQUAL(100, s);
-
-    TableView tv = ttt.where().equal(1, "a").find_all();
-    CHECK_EQUAL(10 * 2, tv.size());
-}
-
 TEST(Query_FindAllContains2_2)
 {
     TestTable ttt;
@@ -9384,12 +9354,12 @@ TEST(Query_MoveDoesntDoubleDelete)
     Table table;
 
     {
-        Query q1(table, std::unique_ptr<TableViewBase>(new TableView()));
+        Query q1(table, std::unique_ptr<ConstTableView>(new TableView()));
         Query q2 = std::move(q1);
     }
 
     {
-        Query q1(table, std::unique_ptr<TableViewBase>(new TableView()));
+        Query q1(table, std::unique_ptr<ConstTableView>(new TableView()));
         Query q2;
         q2 = std::move(q1);
     }
@@ -9540,7 +9510,7 @@ TEST(Query_CopyRestrictingTableViewWhenOwned)
     Table table;
 
     {
-        Query q1(table, std::unique_ptr<TableViewBase>(new TableView()));
+        Query q1(table, std::unique_ptr<ConstTableView>(new TableView()));
         Query q2(q1);
 
         // Reset the source query, destroying the original TableView.
@@ -9551,7 +9521,7 @@ TEST(Query_CopyRestrictingTableViewWhenOwned)
     }
 
     {
-        Query q1(table, std::unique_ptr<TableViewBase>(new TableView()));
+        Query q1(table, std::unique_ptr<ConstTableView>(new TableView()));
         Query q2;
         q2 = q1;
 

@@ -49,7 +49,7 @@ public:
     }
     Allocator& get_alloc() const
     {
-        return m_root->get_alloc();
+        return m_alloc;
     }
     const Table* get_owner() const
     {
@@ -57,6 +57,7 @@ public:
     }
     const Spec& get_spec() const;
 
+    void init_from_ref(ref_type ref);
     void init_from_parent();
     bool update_from_parent(size_t old_baseline) noexcept;
 
@@ -85,11 +86,28 @@ public:
         fallback.init_from_mem(mem);
         return fallback;
     }
-    uint64_t bump_content_version();
-    void bump_storage_version();
-    uint64_t get_content_version() const;
-    uint64_t get_storage_version(uint64_t instance_version) const;
-    uint64_t get_instance_version() const;
+
+    uint64_t bump_content_version()
+    {
+        m_alloc.bump_content_version();
+        return m_alloc.get_content_version();
+    }
+    void bump_storage_version()
+    {
+        m_alloc.bump_storage_version();
+    }
+    uint64_t get_content_version() const
+    {
+        return m_alloc.get_content_version();
+    }
+    uint64_t get_instance_version() const
+    {
+        return m_alloc.get_instance_version();
+    }
+    uint64_t get_storage_version(uint64_t inst_ver) const
+    {
+        return m_alloc.get_storage_version(inst_ver);
+    }
     void insert_column(size_t ndx)
     {
         m_root->insert_column(ndx);
@@ -107,6 +125,7 @@ public:
     Obj get(size_t ndx);
     bool get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept;
     bool traverse(TraverseFunction func) const;
+    void enumerate_string_column(size_t ndx);
     void dump_objects()
     {
         m_root->dump_objects(0, "");
@@ -122,6 +141,7 @@ private:
     friend class Cluster;
     friend class ClusterNodeInner;
     Table* m_owner;
+    Allocator& m_alloc;
     std::unique_ptr<ClusterNode> m_root;
     size_t m_size = 0;
 

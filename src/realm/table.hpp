@@ -48,7 +48,6 @@ class LinkView;
 class SortDescriptor;
 class StringIndex;
 class TableView;
-class TableViewBase;
 class TimestampColumn;
 template <class>
 class Columns;
@@ -221,6 +220,9 @@ public:
     bool has_search_index(ColKey col_key) const noexcept;
     void add_search_index(ColKey col_key);
     void remove_search_index(ColKey col_key);
+
+    void enumerate_string_column(ColKey col_key);
+    bool is_enumerated(ColKey col_key) const noexcept;
 
     //@}
 
@@ -507,13 +509,13 @@ public:
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
     // need to be sorted, and, resulting view retains its order.
-    Query where(TableViewBase* tv = nullptr)
+    Query where(ConstTableView* tv = nullptr)
     {
         return Query(*this, tv);
     }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
-    Query where(TableViewBase* tv = nullptr) const
+    Query where(ConstTableView* tv = nullptr) const
     {
         return Query(*this, tv);
     }
@@ -526,10 +528,6 @@ public:
 
     Table& link(ColKey link_column);
     Table& backlink(const Table& origin, ColKey origin_col_key);
-
-    // Optimizing. enforce == true will enforce enumeration of all string columns;
-    // enforce == false will auto-evaluate if they should be enumerated or not
-    void optimize(bool enforce = false);
 
     // Conversion
     void to_json(std::ostream& out, size_t link_depth = 0,
@@ -609,8 +607,7 @@ private:
     {
         m_alloc.update_from_underlying_allocator();
     }
-    using SpecPtr = std::unique_ptr<Spec>;
-    SpecPtr m_spec;         // 1st slot in m_top
+    Spec m_spec;            // 1st slot in m_top
     ClusterTree m_clusters; // 3rd slot in m_top
     int64_t m_next_key_value = -1;
     TableKey m_key;     // 4th slot in m_top
@@ -870,7 +867,7 @@ private:
     template <class>
     friend class SimpleQuerySupport;
     friend class LangBindHelper;
-    friend class TableViewBase;
+    friend class ConstTableView;
     template <class T>
     friend class Columns;
     friend class Columns<StringData>;
@@ -969,19 +966,19 @@ inline StringData Table::get_name() const noexcept
 
 inline size_t Table::get_column_count() const noexcept
 {
-    return m_spec->get_public_column_count();
+    return m_spec.get_public_column_count();
 }
 
 inline StringData Table::get_column_name(ColKey column_key) const noexcept
 {
     auto ndx = colkey2ndx(column_key);
     REALM_ASSERT_3(ndx, <, get_column_count());
-    return m_spec->get_column_name(ndx);
+    return m_spec.get_column_name(ndx);
 }
 
 inline ColKey Table::get_column_key(StringData name) const noexcept
 {
-    size_t ndx = m_spec->get_column_index(name);
+    size_t ndx = m_spec.get_column_index(name);
     if (ndx == npos)
         return ColKey();
     return ndx2colkey(ndx);
@@ -990,21 +987,22 @@ inline ColKey Table::get_column_key(StringData name) const noexcept
 inline ColumnType Table::get_real_column_type(ColKey col_key) const noexcept
 {
     size_t ndx = colkey2ndx(col_key);
-    REALM_ASSERT_3(ndx, <, m_spec->get_column_count());
-    return m_spec->get_column_type(ndx);
+    REALM_ASSERT_3(ndx, <, m_spec.get_column_count());
+    return m_spec.get_column_type(ndx);
 }
 
 inline DataType Table::get_column_type(ColKey column_key) const noexcept
 {
     auto ndx = colkey2ndx(column_key);
-    REALM_ASSERT_3(ndx, <, m_spec->get_column_count());
-    return m_spec->get_public_column_type(ndx);
+    REALM_ASSERT_3(ndx, <, m_spec.get_column_count());
+    return m_spec.get_public_column_type(ndx);
 }
 
 
 inline Table::Table(Allocator& alloc)
     : m_alloc(alloc)
     , m_top(m_alloc)
+    , m_spec(m_alloc)
     , m_clusters(this, m_alloc)
     , m_index_refs(m_alloc)
 {
@@ -1017,6 +1015,7 @@ inline Table::Table(Allocator& alloc)
 inline Table::Table(ref_count_tag, Allocator& alloc)
     : m_alloc(alloc)
     , m_top(m_alloc)
+    , m_spec(m_alloc)
     , m_clusters(this, m_alloc)
     , m_index_refs(m_alloc)
 {
@@ -1074,7 +1073,7 @@ inline Columns<T> Table::column(const Table& origin, ColKey origin_col_key)
 
     auto origin_table_key = origin.get_key();
     const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    size_t backlink_col_ndx = current_target_table.m_spec->find_backlink_column(origin_table_key, origin_col_key);
+    size_t backlink_col_ndx = current_target_table.m_spec.find_backlink_column(origin_table_key, origin_col_key);
     ColKey backlink_col_key = current_target_table.ndx2colkey(backlink_col_ndx);
 
     std::vector<ColKey> link_chain = std::move(m_link_chain);
@@ -1109,7 +1108,7 @@ inline Table& Table::backlink(const Table& origin, ColKey origin_col_key)
 {
     auto origin_table_key = origin.get_key();
     const Table& current_target_table = *get_link_chain_target(m_link_chain);
-    size_t backlink_col_ndx = current_target_table.m_spec->find_backlink_column(origin_table_key, origin_col_key);
+    size_t backlink_col_ndx = current_target_table.m_spec.find_backlink_column(origin_table_key, origin_col_key);
     ColKey backlink_col_key = current_target_table.ndx2colkey(backlink_col_ndx);
     return link(backlink_col_key);
 }
@@ -1147,7 +1146,7 @@ inline bool Table::is_group_level() const noexcept
 
 inline bool Table::operator==(const Table& t) const
 {
-    return *m_spec == *t.m_spec && compare_objects(t); // Throws
+    return m_spec == t.m_spec && compare_objects(t); // Throws
 }
 
 inline bool Table::operator!=(const Table& t) const
@@ -1330,12 +1329,12 @@ public:
 
     static Spec& get_spec(Table& table) noexcept
     {
-        return *table.m_spec;
+        return table.m_spec;
     }
 
     static const Spec& get_spec(const Table& table) noexcept
     {
-        return *table.m_spec;
+        return table.m_spec;
     }
 
     static TableRef get_opposite_link_table(const Table& table, ColKey col_key);

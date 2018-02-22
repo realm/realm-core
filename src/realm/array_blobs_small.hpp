@@ -87,7 +87,7 @@ public:
     size_t size() const noexcept;
 
     BinaryData get(size_t ndx) const noexcept;
-    StringData get_string(size_t ndx);
+    StringData get_string(size_t ndx) const;
     bool is_null(size_t ndx) const;
     size_t read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept;
 
@@ -224,7 +224,7 @@ inline bool ArraySmallBlobs::is_null(size_t ndx) const
     }
 }
 
-inline StringData ArraySmallBlobs::get_string(size_t ndx)
+inline StringData ArraySmallBlobs::get_string(size_t ndx) const
 {
     BinaryData bin = get(ndx);
     if (bin.is_null())

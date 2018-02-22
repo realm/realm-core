@@ -57,6 +57,7 @@ Searching: The main finding function is:
 #include <realm/query_conditions.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/array_direct.hpp>
+#include <realm/array_unsigned.hpp>
 
 /*
     MMX: mmintrin.h
@@ -651,13 +652,6 @@ public:
 
     static void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept;
 
-    /// The meaning of 'width' depends on the context in which this
-    /// array is used.
-    size_t get_width() const noexcept
-    {
-        return m_width;
-    }
-
     /// Get the number of bytes currently in use by this array. This
     /// includes the array header, but it does not include allocated
     /// bytes corresponding to excess capacity. The result is
@@ -809,13 +803,13 @@ private:
     friend class StringColumn;
 };
 
-class ClusterKeyArray : public Array {
+class ClusterKeyArray : public ArrayUnsigned {
 public:
-    using Array::Array;
+    using ArrayUnsigned::ArrayUnsigned;
 
-    int64_t get(size_t ndx) const
+    uint64_t get(size_t ndx) const
     {
-        return (m_data != nullptr) ? Array::get(ndx) : int64_t(ndx);
+        return (m_data != nullptr) ? ArrayUnsigned::get(ndx) : uint64_t(ndx);
     }
 };
 
@@ -1183,7 +1177,7 @@ inline void Array::set_has_refs(bool value) noexcept
     if (m_has_refs != value) {
         REALM_ASSERT(!is_read_only());
         m_has_refs = value;
-        set_header_hasrefs(value, get_header());
+        set_hasrefs_in_header(value, get_header());
     }
 }
 
@@ -1197,7 +1191,7 @@ inline void Array::set_context_flag(bool value) noexcept
     if (m_context_flag != value) {
         REALM_ASSERT(!is_read_only());
         m_context_flag = value;
-        set_header_context_flag(value, get_header());
+        set_context_flag_in_header(value, get_header());
     }
 }
 

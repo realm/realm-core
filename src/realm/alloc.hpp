@@ -229,6 +229,7 @@ protected:
     }
 
     friend class Table;
+    friend class ClusterTree;
     friend class Group;
     friend class WrappedAllocator;
     friend class Obj;

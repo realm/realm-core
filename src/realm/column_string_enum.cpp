@@ -232,14 +232,11 @@ bool StringEnumColumn::compare_string(const StringEnumColumn& c) const
     }
     return true;
 }
-void StringEnumColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
-{
-    IntegerColumn::refresh_accessor_tree(col_ndx, spec);
-    size_t ndx_is_spec_enumkeys = spec.get_enumkeys_ndx(col_ndx);
-    m_keys.get_root_array()->set_ndx_in_parent(ndx_is_spec_enumkeys);
-    m_keys.refresh_accessor_tree(0, spec);
-}
 
+void StringEnumColumn::refresh_accessor_tree(size_t, const Spec&)
+{
+    REALM_ASSERT(false);
+}
 
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
@@ -250,13 +247,9 @@ void StringEnumColumn::verify() const
 }
 
 
-void StringEnumColumn::verify(const Table& table, size_t col_ndx) const
+void StringEnumColumn::verify(const Table&, size_t) const
 {
-    typedef _impl::TableFriend tf;
-    const Spec& spec = tf::get_spec(table);
-    REALM_ASSERT_3(m_keys.get_root_array()->get_ndx_in_parent(), ==, spec.get_enumkeys_ndx(col_ndx));
-
-    IntegerColumn::verify(table, col_ndx);
+    REALM_ASSERT(false);
 }
 
 

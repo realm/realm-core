@@ -19,6 +19,7 @@
 #ifndef REALM_NODE_HPP
 #define REALM_NODE_HPP
 
+#include <realm/node_header.hpp>
 #include <realm/alloc.hpp>
 
 namespace realm {
@@ -27,10 +28,6 @@ namespace realm {
 /// context. It is returned by some search functions to indicate 'not
 /// found'. It is similar in function to std::string::npos.
 const size_t npos = size_t(-1);
-
-// Maximum number of bytes that the payload of a node can be
-const size_t max_array_payload = 0x00ffffffL;
-const size_t max_array_payload_aligned = 0x00fffff8L;
 
 /// Alias for realm::npos.
 const size_t not_found = npos;
@@ -48,7 +45,9 @@ const size_t not_found = npos;
 /// modified.
 class ArrayParent {
 public:
-    virtual ~ArrayParent() noexcept {}
+    virtual ~ArrayParent() noexcept
+    {
+    }
 
 protected:
     virtual void update_child_ref(size_t child_ndx, ref_type new_ref) = 0;
@@ -110,45 +109,22 @@ protected:
 /// have a parent. Even if the original was part of a database, the copy will be
 /// free-standing, that is, not be part of any database. For intra, or inter
 /// database copying, one would have to also specify the target allocator.
-class Node {
+class Node : public NodeHeader {
 public:
-    enum Type {
-        type_Normal,
-
-        /// This array is the main array of an innner node of a B+-tree as used
-        /// in table columns.
-        type_InnerBptreeNode,
-
-        /// This array may contain refs to subarrays. An element whose least
-        /// significant bit is zero, is a ref pointing to a subarray. An element
-        /// whose least significant bit is one, is just a value. It is the
-        /// responsibility of the application to ensure that non-ref values have
-        /// their least significant bit set. This will generally be done by
-        /// shifting the desired vlue to the left by one bit position, and then
-        /// setting the vacated bit to one.
-        type_HasRefs
-    };
-
-    enum WidthType {
-        wtype_Bits = 0,     // width indicates how many bits every element occupies
-        wtype_Multiply = 1, // width indicates how many bytes every element occupies
-        wtype_Ignore = 2,   // each element is 1 byte
-    };
-
-    static const int header_size = 8; // Number of bytes used by header
-
-    // The encryption layer relies on headers always fitting within a single page.
-    static_assert(header_size == 8, "Header must always fit in entirely on a page");
-
     // FIXME: Should not be public
     char* m_data = nullptr; // Points to first byte after header
 
     /*********************** Constructor / destructor ************************/
 
     // The object will not be fully initialized when using this constructor
-    explicit Node(Allocator& alloc) noexcept : m_alloc(alloc) {}
+    explicit Node(Allocator& alloc) noexcept
+        : m_alloc(alloc)
+    {
+    }
 
-    virtual ~Node() {}
+    virtual ~Node()
+    {
+    }
 
     /**************************** Initializers *******************************/
 
@@ -167,7 +143,10 @@ public:
 
     /************************** access functions *****************************/
 
-    bool is_attached() const noexcept { return m_data != nullptr; }
+    bool is_attached() const noexcept
+    {
+        return m_data != nullptr;
+    }
 
     inline bool is_read_only() const noexcept
     {
@@ -181,17 +160,41 @@ public:
         return m_size;
     }
 
-    bool is_empty() const noexcept { return size() == 0; }
+    bool is_empty() const noexcept
+    {
+        return size() == 0;
+    }
 
-    ref_type get_ref() const noexcept { return m_ref; }
-    MemRef get_mem() const noexcept { return MemRef(get_header_from_data(m_data), m_ref, m_alloc); }
-    Allocator& get_alloc() const noexcept { return m_alloc; }
+    ref_type get_ref() const noexcept
+    {
+        return m_ref;
+    }
+    MemRef get_mem() const noexcept
+    {
+        return MemRef(get_header_from_data(m_data), m_ref, m_alloc);
+    }
+    Allocator& get_alloc() const noexcept
+    {
+        return m_alloc;
+    }
     /// Get the address of the header of this array.
-    char* get_header() const noexcept { return get_header_from_data(m_data); }
+    char* get_header() const noexcept
+    {
+        return get_header_from_data(m_data);
+    }
 
-    bool has_parent() const noexcept { return m_parent != nullptr; }
-    ArrayParent* get_parent() const noexcept { return m_parent; }
-    size_t get_ndx_in_parent() const noexcept { return m_ndx_in_parent; }
+    bool has_parent() const noexcept
+    {
+        return m_parent != nullptr;
+    }
+    ArrayParent* get_parent() const noexcept
+    {
+        return m_parent;
+    }
+    size_t get_ndx_in_parent() const noexcept
+    {
+        return m_ndx_in_parent;
+    }
     /// Get the ref of this array as known to the parent. The caller must ensure
     /// that the parent information ('pointer to parent' and 'index in parent')
     /// is correct before calling this function.
@@ -202,11 +205,21 @@ public:
         return ref;
     }
 
+    /// The meaning of 'width' depends on the context in which this
+    /// array is used.
+    size_t get_width() const noexcept
+    {
+        return m_width;
+    }
+
     /***************************** modifiers *********************************/
 
     /// Detach from the underlying array node. This method has no effect if the
     /// accessor is currently unattached (idempotency).
-    void detach() noexcept { m_data = nullptr; }
+    void detach() noexcept
+    {
+        m_data = nullptr;
+    }
 
     /// Destroy only the array that this accessor is attached to, not the
     /// children of that array. See non-static destroy_deep() for an
@@ -222,11 +235,17 @@ public:
     }
 
     /// Shorthand for `destroy(MemRef(ref, alloc), alloc)`.
-    static void destroy(ref_type ref, Allocator& alloc) noexcept { destroy(MemRef(ref, alloc), alloc); }
+    static void destroy(ref_type ref, Allocator& alloc) noexcept
+    {
+        destroy(MemRef(ref, alloc), alloc);
+    }
 
     /// Destroy only the specified array node, not its children. See also
     /// destroy_deep(MemRef, Allocator&).
-    static void destroy(MemRef mem, Allocator& alloc) noexcept { alloc.free_(mem); }
+    static void destroy(MemRef mem, Allocator& alloc) noexcept
+    {
+        alloc.free_(mem);
+    }
 
 
     /// Setting a new parent affects ownership of the attached array node, if
@@ -239,7 +258,10 @@ public:
         m_parent = parent;
         m_ndx_in_parent = ndx_in_parent;
     }
-    void set_ndx_in_parent(size_t ndx) noexcept { m_ndx_in_parent = ndx; }
+    void set_ndx_in_parent(size_t ndx) noexcept
+    {
+        m_ndx_in_parent = ndx;
+    }
 
     /// Update the parents reference to this child. This requires, of course,
     /// that the parent information stored in this child is up to date. If the
@@ -249,24 +271,6 @@ public:
         if (m_parent)
             m_parent->update_child_ref(m_ndx_in_parent, m_ref);
     }
-
-    /*********************** header access functions *************************/
-
-    static char* get_data_from_header(char*) noexcept;
-    static char* get_header_from_data(char*) noexcept;
-    static const char* get_data_from_header(const char*) noexcept;
-
-    static bool get_is_inner_bptree_node_from_header(const char*) noexcept;
-    static bool get_hasrefs_from_header(const char*) noexcept;
-    static bool get_context_flag_from_header(const char*) noexcept;
-    static WidthType get_wtype_from_header(const char*) noexcept;
-    static uint_least8_t get_width_from_header(const char*) noexcept;
-    static size_t get_size_from_header(const char*) noexcept;
-    // Undefined behavior if array is in immutable memory
-    static size_t get_capacity_from_header(const char*) noexcept;
-
-
-    static Type get_type_from_header(const char*) noexcept;
 
 protected:
     /// The total size in bytes (including the header) of a new empty
@@ -301,18 +305,13 @@ protected:
         }
     }
 
-    static MemRef create_element(size_t size, Allocator& alloc, bool context_flag = false, Type type = type_Normal,
-                                 WidthType width_type = wtype_Ignore, int width = 1);
+    static MemRef create_node(size_t size, Allocator& alloc, bool context_flag = false, Type type = type_Normal,
+                              WidthType width_type = wtype_Ignore, int width = 1);
 
-    void set_header_size(size_t value) noexcept { set_header_size(value, get_header()); }
-
-    static void set_header_is_inner_bptree_node(bool value, char* header) noexcept;
-    static void set_header_hasrefs(bool value, char* header) noexcept;
-    static void set_header_context_flag(bool value, char* header) noexcept;
-    static void set_header_wtype(WidthType value, char* header) noexcept;
-    static void set_header_width(int value, char* header) noexcept;
-    static void set_header_size(size_t value, char* header) noexcept;
-    static void set_header_capacity(size_t value, char* header) noexcept;
+    void set_header_size(size_t value) noexcept
+    {
+        set_size_in_header(value, get_header());
+    }
 
     // Includes array header. Not necessarily 8-byte aligned.
     virtual size_t calc_byte_len(size_t num_items, size_t width) const;
@@ -328,153 +327,24 @@ private:
     void do_copy_on_write(size_t minimum_size = 0);
 };
 
+class Spec;
+
 /// Base class for all nodes holding user data
 class ArrayPayload {
 public:
     virtual ~ArrayPayload();
     virtual void init_from_ref(ref_type) noexcept = 0;
+    void set_spec(Spec* spec, size_t col_ndx) const
+    {
+        m_spec = spec;
+        m_col_ndx = col_ndx;
+    }
+
+protected:
+    mutable Spec* m_spec = nullptr;
+    mutable size_t m_col_ndx = realm::npos;
 };
 
-inline char* Node::get_data_from_header(char* header) noexcept
-{
-    return header + header_size;
-}
-
-inline char* Node::get_header_from_data(char* data) noexcept
-{
-    return data - header_size;
-}
-
-inline const char* Node::get_data_from_header(const char* header) noexcept
-{
-    return get_data_from_header(const_cast<char*>(header));
-}
-
-inline bool Node::get_is_inner_bptree_node_from_header(const char* header) noexcept
-{
-    typedef unsigned char uchar;
-    const uchar* h = reinterpret_cast<const uchar*>(header);
-    return (int(h[4]) & 0x80) != 0;
-}
-
-inline bool Node::get_hasrefs_from_header(const char* header) noexcept
-{
-    typedef unsigned char uchar;
-    const uchar* h = reinterpret_cast<const uchar*>(header);
-    return (int(h[4]) & 0x40) != 0;
-}
-
-inline bool Node::get_context_flag_from_header(const char* header) noexcept
-{
-    typedef unsigned char uchar;
-    const uchar* h = reinterpret_cast<const uchar*>(header);
-    return (int(h[4]) & 0x20) != 0;
-}
-
-inline Node::WidthType Node::get_wtype_from_header(const char* header) noexcept
-{
-    typedef unsigned char uchar;
-    const uchar* h = reinterpret_cast<const uchar*>(header);
-    return WidthType((int(h[4]) & 0x18) >> 3);
-}
-
-inline uint_least8_t Node::get_width_from_header(const char* header) noexcept
-{
-    typedef unsigned char uchar;
-    const uchar* h = reinterpret_cast<const uchar*>(header);
-    return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
-}
-
-inline size_t Node::get_size_from_header(const char* header) noexcept
-{
-    typedef unsigned char uchar;
-    const uchar* h = reinterpret_cast<const uchar*>(header);
-    return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];
-}
-
-inline size_t Node::get_capacity_from_header(const char* header) noexcept
-{
-    typedef unsigned char uchar;
-    const uchar* h = reinterpret_cast<const uchar*>(header);
-    return (size_t(h[0]) << 16) + (size_t(h[1]) << 8) + h[2];
-}
-
-inline Node::Type Node::get_type_from_header(const char* header) noexcept
-{
-    if (get_is_inner_bptree_node_from_header(header))
-        return type_InnerBptreeNode;
-    if (get_hasrefs_from_header(header))
-        return type_HasRefs;
-    return type_Normal;
-}
-
-inline void Node::set_header_is_inner_bptree_node(bool value, char* header) noexcept
-{
-    typedef unsigned char uchar;
-    uchar* h = reinterpret_cast<uchar*>(header);
-    h[4] = uchar((int(h[4]) & ~0x80) | int(value) << 7);
-}
-
-inline void Node::set_header_hasrefs(bool value, char* header) noexcept
-{
-    typedef unsigned char uchar;
-    uchar* h = reinterpret_cast<uchar*>(header);
-    h[4] = uchar((int(h[4]) & ~0x40) | int(value) << 6);
-}
-
-inline void Node::set_header_context_flag(bool value, char* header) noexcept
-{
-    typedef unsigned char uchar;
-    uchar* h = reinterpret_cast<uchar*>(header);
-    h[4] = uchar((int(h[4]) & ~0x20) | int(value) << 5);
-}
-
-inline void Node::set_header_wtype(WidthType value, char* header) noexcept
-{
-    // Indicates how to calculate size in bytes based on width
-    // 0: bits      (width/8) * size
-    // 1: multiply  width * size
-    // 2: ignore    1 * size
-    typedef unsigned char uchar;
-    uchar* h = reinterpret_cast<uchar*>(header);
-    h[4] = uchar((int(h[4]) & ~0x18) | int(value) << 3);
-}
-
-inline void Node::set_header_width(int value, char* header) noexcept
-{
-    // Pack width in 3 bits (log2)
-    int w = 0;
-    while (value) {
-        ++w;
-        value >>= 1;
-    }
-    REALM_ASSERT_3(w, <, 8);
-
-    typedef unsigned char uchar;
-    uchar* h = reinterpret_cast<uchar*>(header);
-    h[4] = uchar((int(h[4]) & ~0x7) | w);
-}
-
-inline void Node::set_header_size(size_t value, char* header) noexcept
-{
-    REALM_ASSERT_3(value, <=, max_array_payload);
-    typedef unsigned char uchar;
-    uchar* h = reinterpret_cast<uchar*>(header);
-    h[5] = uchar((value >> 16) & 0x000000FF);
-    h[6] = uchar((value >> 8) & 0x000000FF);
-    h[7] = uchar(value & 0x000000FF);
-}
-
-// Note: There is a copy of this function is test_alloc.cpp
-inline void Node::set_header_capacity(size_t value, char* header) noexcept
-{
-    REALM_ASSERT_3(value, <=, max_array_payload);
-    typedef unsigned char uchar;
-    uchar* h = reinterpret_cast<uchar*>(header);
-    h[0] = uchar((value >> 16) & 0x000000FF);
-    h[1] = uchar((value >> 8) & 0x000000FF);
-    h[2] = uchar(value & 0x000000FF);
-}
 
 inline size_t Node::calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
 {
@@ -512,13 +382,13 @@ inline void Node::init_header(char* header, bool is_inner_bptree_node, bool has_
     // bytes, it is important that we put the entire header into a
     // well defined state initially.
     std::fill(header, header + header_size, 0);
-    set_header_is_inner_bptree_node(is_inner_bptree_node, header);
-    set_header_hasrefs(has_refs, header);
-    set_header_context_flag(context_flag, header);
-    set_header_wtype(width_type, header);
-    set_header_width(width, header);
-    set_header_size(size, header);
-    set_header_capacity(capacity, header);
+    set_is_inner_bptree_node_in_header(is_inner_bptree_node, header);
+    set_hasrefs_in_header(has_refs, header);
+    set_context_flag_in_header(context_flag, header);
+    set_wtype_in_header(width_type, header);
+    set_width_in_header(width, header);
+    set_size_in_header(size, header);
+    set_capacity_in_header(capacity, header);
 }
 }
 

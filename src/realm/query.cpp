@@ -37,7 +37,7 @@ Query::Query()
     create();
 }
 
-Query::Query(Table& table, TableViewBase* tv)
+Query::Query(Table& table, ConstTableView* tv)
     : m_table(table.get_table_ref())
     , m_view(tv)
     , m_source_table_view(tv)
@@ -75,7 +75,7 @@ Query::Query(const Table& table, LinkListPtr&& ll)
     create();
 }
 
-Query::Query(const Table& table, TableViewBase* tv)
+Query::Query(const Table& table, ConstTableView* tv)
     : m_table((const_cast<Table&>(table)).get_table_ref())
     , m_view(tv)
     , m_source_table_view(tv)
@@ -87,7 +87,7 @@ Query::Query(const Table& table, TableViewBase* tv)
     create();
 }
 
-Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
+Query::Query(const Table& table, std::unique_ptr<ConstTableView> tv)
     : m_table((const_cast<Table&>(table)).get_table_ref())
     , m_view(tv.get())
     , m_source_table_view(tv.get())
@@ -1254,7 +1254,7 @@ ObjKey Query::find()
     }
 }
 
-void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit) const
+void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit) const
 {
     if (limit == 0)
         return;
@@ -1278,9 +1278,26 @@ void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit)
     else {
         if (!has_conditions()) {
             KeyColumn& refs = ret.m_key_values;
-            for (auto o : *m_table) {
-                refs.add(o.get_key());
-            }
+            m_table->traverse_clusters([&begin, &end, &refs, this](const Cluster* cluster) {
+                size_t e = cluster->node_size();
+                if (begin < e) {
+                    if (e > end) {
+                        e = end;
+                    }
+                    auto offset = cluster->get_offset();
+                    auto key_values = cluster->get_key_array();
+                    for (size_t i = begin; i < e; i++) {
+                        refs.add(ObjKey(key_values->get(i) + offset));
+                    }
+                    begin = 0;
+                }
+                else {
+                    begin -= e;
+                }
+                end -= e;
+                // Stop if end is reached
+                return end == 0;
+            });
         }
         else {
             auto node = root_node();

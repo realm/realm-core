@@ -118,7 +118,7 @@ protected:
     friend class ConstLinkListIf;
     friend class LinkList;
     friend class LinkMap;
-    friend class TableViewBase;
+    friend class ConstTableView;
 
     const ClusterTree* m_tree_top;
     ObjKey m_key;
