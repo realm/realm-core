@@ -25,6 +25,7 @@
 #include <sstream>
 #include <type_traits>
 #include <random>
+#include <thread>
 
 #include <realm/util/features.h>
 #include <realm/util/errno.hpp>
@@ -632,101 +633,31 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
 }
 
 
-namespace {
 
 #ifdef REALM_ASYNC_DAEMON
 
-void spawn_daemon(const std::string& file)
+void SharedGroup::daemon(std::string file, std::future<void>& signal)
 {
-    // determine maximum number of open descriptors
-    errno = 0;
-    int m = int(sysconf(_SC_OPEN_MAX));
-    if (m < 0) {
-        if (errno) {
-            int err = errno; // Eliminate any risk of clobbering
-            throw std::runtime_error(get_errno_msg("'sysconf(_SC_OPEN_MAX)' failed: ", err));
-        }
-        throw std::runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
-    }
+    SharedGroup async_committer((SharedGroup::unattached_tag()));
+    async_committer.m_daemon_future = std::move(signal);
+    using sgf = _impl::SharedGroupFriend;
 
-    int pid = fork();
-    if (0 == pid) { // child process:
-
-        // close all descriptors:
-        int i;
-        for (i = m - 1; i >= 0; --i)
-            close(i);
-#ifdef REALM_ENABLE_LOGFILE
-        // FIXME: Do we want to always open the log file? Should it be configurable?
-        i = ::open((file + ".log").c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
-#else
-        i = ::open("/dev/null", O_RDWR);
-#endif
-        if (i >= 0) {
-            int j = dup(i);
-            static_cast<void>(j);
-        }
-#ifdef REALM_ENABLE_LOGFILE
-        std::cerr << "Detaching" << std::endl;
-#endif
-        // detach from current session:
-        setsid();
-
-        // start commit daemon executable
-        // Note that getenv (which is not thread safe) is called in a
-        // single threaded context. This is ensured by the fork above.
-        const char* async_daemon = getenv("REALM_ASYNC_DAEMON");
-        if (!async_daemon) {
-#ifndef REALM_DEBUG
-            async_daemon = REALM_INSTALL_LIBEXECDIR "/realmd";
-#else
-            async_daemon = REALM_INSTALL_LIBEXECDIR "/realmd-dbg";
-#endif
-        }
-        execl(async_daemon, async_daemon, file.c_str(), static_cast<char*>(0));
-
-// if we continue here, exec has failed so return error
-// if exec succeeds, we don't come back here.
-#if REALM_ANDROID
-        _exit(1);
-#else
-        _Exit(1);
-#endif
-        // child process ends here
-    }
-    else if (pid > 0) { // parent process, fork succeeded:
-
-        // use childs exit code to catch and report any errors:
-        int status;
-        int pid_changed;
-        do {
-            pid_changed = waitpid(pid, &status, 0);
-        } while (pid_changed == -1 && errno == EINTR);
-        if (pid_changed != pid) {
-            std::cerr << "Waitpid returned pid = " << pid_changed << " and status = " << std::hex << status
-                      << std::endl;
-            throw std::runtime_error("call to waitpid failed");
-        }
-        if (!WIFEXITED(status))
-            throw std::runtime_error("failed starting async commit (exit)");
-        if (WEXITSTATUS(status) == 1) {
-            // FIXME: Or `ld` could not find a required shared library
-            throw std::runtime_error("async commit daemon not found");
-        }
-        if (WEXITSTATUS(status) == 2)
-            throw std::runtime_error("async commit daemon failed");
-        if (WEXITSTATUS(status) == 3)
-            throw std::runtime_error("wrong db given to async daemon");
-    }
-    else { // Parent process, fork failed!
-
-        throw std::runtime_error("Failed to spawn async commit");
-    }
+    // Exits when signalled
+    sgf::async_daemon_open(async_committer, file);
 }
+
+void SharedGroup::spawn_daemon(const std::string& file)
+{
+    // As far as I know, calling the destructor on a joinable thread results in a call to std::terminate.
+    // That's probably bad, because no futher destructors are then called and no cleanup is possible
+    // (puts you in OS process cleanup context, outside of C++).
+
+    // So we send a signal to the daemon in the SharedGroup::~SharedGroup destructor that makes terminate
+    // and which we wait for.
+    m_daemon = std::thread(daemon, file, m_daemon_promise.get_future());
+}
+
 #endif
-
-
-} // anonymous namespace
 
 #if REALM_HAVE_STD_FILESYSTEM
 std::string SharedGroupOptions::sys_tmp_dir = std::filesystem::temp_directory_path().u8string();
@@ -1402,6 +1333,14 @@ uint_fast64_t SharedGroup::get_number_of_versions()
 
 SharedGroup::~SharedGroup() noexcept
 {
+    m_daemon_promise.set_value();
+    try {
+        m_daemon.join();
+    }
+    catch (...) {
+        // Thread terminated by itself before the call to .join()
+    }
+
     close();
 }
 
@@ -1564,38 +1503,20 @@ void SharedGroup::do_async_commits()
     using gf = _impl::GroupFriend;
     gf::detach(m_group);
 
-    while (true) {
-        if (m_file.is_removed()) { // operator removed the lock file. take a hint!
-
-            shutdown = true;
-#ifdef REALM_ENABLE_LOGFILE
-            std::cerr << "Lock file removed, initiating shutdown" << std::endl;
-#endif
-        }
-
+    while (m_daemon_future.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout) {
         bool is_same;
         ReadLockInfo next_read_lock = m_read_lock;
         {
-            // detect if we're the last "client", and if so, shutdown (must be under lock):
             std::lock_guard<InterprocessMutex> lock2(m_writemutex);
             std::lock_guard<InterprocessMutex> lock(m_controlmutex);
             version_type old_version = next_read_lock.m_version;
             VersionID version_id = VersionID(); // Latest available snapshot
             grab_read_lock(next_read_lock, version_id);
             is_same = (next_read_lock.m_version == old_version);
-            if (is_same && (shutdown || info->num_participants == 1)) {
-#ifdef REALM_ENABLE_LOGFILE
-                std::cerr << "Daemon exiting nicely" << std::endl << std::endl;
-#endif
-                release_read_lock(next_read_lock);
-                release_read_lock(m_read_lock);
-                info->daemon_started = 0;
-                info->daemon_ready = 0;
-                return;
-            }
         }
 
         if (!is_same) {
+//        if (false) {
 
 #ifdef REALM_ENABLE_LOGFILE
             std::cerr << "Syncing from version " << m_read_lock.m_version << " to " << next_read_lock.m_version
@@ -1642,6 +1563,7 @@ void SharedGroup::do_async_commits()
         }
         m_balancemutex.unlock();
     }
+    
 }
 #endif // REALM_ASYNC_DAEMON
 

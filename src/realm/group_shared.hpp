@@ -21,6 +21,8 @@
 
 #include <functional>
 #include <limits>
+#include <future>
+
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/interprocess_condvar.hpp>
@@ -549,6 +551,9 @@ public:
     // It is safe to delete those returned files/directories in the call_with_lock's callback.
     static std::vector<std::pair<std::string, bool>> get_core_files(const std::string& realm_path);
 
+    static void daemon(std::string file, std::future<void>& signal);
+    void spawn_daemon(const std::string& file);
+
 private:
     struct SharedInfo;
     struct ReadCount;
@@ -585,6 +590,16 @@ private:
     util::InterprocessCondVar m_room_to_write;
     util::InterprocessCondVar m_work_to_do;
     util::InterprocessCondVar m_daemon_becomes_ready;
+
+    // Daemon thread. Should probably not be a member of SharedGroup; this is only for debugging
+    std::thread m_daemon;
+
+    // The user-created SharedGroup accesses only m_daemon_promise and then initializes the
+    // m_daemon_future member on the SharedGroup that it created which the daemon then reads
+    // to see if it must terminate
+    std::promise<void> m_daemon_promise;
+    std::future<void> m_daemon_future;
+
 #endif
     util::InterprocessCondVar m_new_commit_available;
     util::InterprocessCondVar m_pick_next_writer;

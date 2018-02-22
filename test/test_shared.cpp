@@ -397,7 +397,7 @@ TEST(Shared_CompactingOnTheFly)
     SHARED_GROUP_TEST_PATH(path);
     Thread writer_thread;
     {
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        SharedGroup sg(path, false, SharedGroupOptions(realm::SharedGroupOptions::Durability::Async, crypt_key()));
         // Create table entries
         {
             WriteTransaction wt(sg);
@@ -903,15 +903,16 @@ TEST(Shared_Rollback)
 }
 
 
-TEST(Shared_Writes)
+ONLY(Shared_Writes)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        SharedGroup sg(path, false, SharedGroupOptions(realm::SharedGroupOptions::Durability::Async, crypt_key()));
 
         // Create first table in group
         {
+            std::cerr << ".";
             WriteTransaction wt(sg);
             wt.get_group().verify();
             auto t1 = wt.add_table("test");
@@ -921,7 +922,8 @@ TEST(Shared_Writes)
         }
 
         // Do a lot of repeated write transactions
-        for (size_t i = 0; i < 100; ++i) {
+        for (size_t i = 0; i < 4; ++i) {
+            std::cerr << "B";
             WriteTransaction wt(sg);
             wt.get_group().verify();
             auto t1 = wt.get_table("test");
@@ -935,9 +937,13 @@ TEST(Shared_Writes)
             rt.get_group().verify();
             auto t = rt.get_table("test");
             const int64_t v = t->get_int(0, 0);
-            CHECK_EQUAL(100, v);
+            CHECK_EQUAL(4, v);
         }
+
     }
+
+
+
 }
 
 
