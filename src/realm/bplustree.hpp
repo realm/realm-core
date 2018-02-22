@@ -175,7 +175,8 @@ protected:
     size_t get_elems_per_child()
     {
         // Only relevant when in compact form
-        return !m_offsets.is_attached() ? size_t(Array::get(0)) >> 1 : 0;
+        REALM_ASSERT_DEBUG(!m_offsets.is_attached());
+        return size_t(Array::get(0)) >> 1;
     }
     void _add_child_ref(ref_type ref, int64_t offset = 0)
     {

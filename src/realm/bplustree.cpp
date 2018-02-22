@@ -175,33 +175,92 @@ size_t BPlusTreeInner::bptree_erase(size_t n, EraseFunc& func)
     size_t child_offset = get_child_offset(child_ndx);
     REALM_ASSERT_3(child_ndx, <, get_node_size());
 
-    size_t new_size;
+    // Call bptree_erase recursively and ultimately call 'func' on leaf
+    size_t erase_node_size;
     ref_type child_ref = _get_child_ref(child_ndx);
     char* child_header = m_alloc.translate(child_ref);
     MemRef mem(child_header, child_ref, m_alloc);
+    BPlusTreeLeaf* leaf = nullptr;
+    BPlusTreeInner node(m_tree);
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
-        auto leaf = cache_leaf(mem, child_ndx);
-        new_size = func(leaf, n - child_offset);
+        leaf = cache_leaf(mem, child_ndx);
+        erase_node_size = func(leaf, n - child_offset);
     }
     else {
-        BPlusTreeInner node(m_tree);
         node.set_parent(this, child_ndx);
         node.init_from_mem(mem);
-        new_size = node.bptree_erase(n - child_offset, func);
+        erase_node_size = node.bptree_erase(n - child_offset, func);
     }
-
-    size_t num_children = get_node_size();
-    if (new_size == 0) {
-        if (num_children == 1)
-            return 0; // Destroy this node too
-        erase_and_destroy_child(child_ndx);
-    }
-    m_offsets.adjust(child_ndx, m_offsets.size(), -1);
 
     adjust(size() - 1, -2);
+    m_offsets.adjust(child_ndx, m_offsets.size(), -1);
 
-    return get_node_size();
+    // Check if some nodes could be merged
+    size_t num_children = get_node_size();
+    if (erase_node_size == 0) {
+        if (num_children == 1) {
+            // Only child empty - delete this one too
+            return 0;
+        }
+        // Child leaf is empty - destroy it!
+        erase_and_destroy_child(child_ndx);
+    }
+    else if (erase_node_size < REALM_MAX_BPNODE_SIZE / 2 && child_ndx < (num_children - 1)) {
+        // Candidate for merge. First calculate if the combined size of current and
+        // next sibling is small enough.
+        size_t sibling_ndx = child_ndx + 1;
+        ref_type sibling_ref = _get_child_ref(sibling_ndx);
+        std::unique_ptr<BPlusTreeLeaf> sibling_leaf;
+        BPlusTreeInner node2(m_tree);
+        BPlusTreeNode* sibling_node;
+        if (child_is_leaf) {
+            sibling_leaf = m_tree->init_leaf_node(sibling_ref);
+            sibling_node = sibling_leaf.get();
+        }
+        else {
+            node2.init_from_ref(sibling_ref);
+            sibling_node = &node2;
+        }
+        sibling_node->set_parent(this, sibling_ndx + 1);
+
+        size_t combined_size = sibling_node->get_node_size() + erase_node_size;
+
+        if (combined_size < REALM_MAX_BPNODE_SIZE * 3 / 4) {
+            // Combined size is small enough for the nodes to be merged
+            // Move all content from the next sibling into current node
+            int64_t offs_adj = 0;
+            if (child_is_leaf) {
+                REALM_ASSERT(leaf);
+                if (sibling_ndx < m_offsets.size())
+                    m_offsets.set(sibling_ndx - 1, m_offsets.get(sibling_ndx));
+                sibling_node->move(leaf, 0, 0);
+            }
+            else {
+                node.ensure_offsets();
+                node2.ensure_offsets();
+                // Offset adjustment is negative as the sibling has bigger offsets
+                auto sibling_offs = m_offsets.get(sibling_ndx - 1);
+                auto erase_node_offs = get_child_offset(child_ndx);
+                offs_adj = erase_node_offs - sibling_offs;
+                if (sibling_ndx < m_offsets.size())
+                    m_offsets.set(sibling_ndx - 1, m_offsets.get(sibling_ndx));
+
+                size_t orig_size = node.get_tree_size();
+                size_t size_of_moved = node2.get_tree_size();
+                // Remove size field from node as the move operation will just add
+                node.erase(node.size() - 1);
+                node2.move(&node, 0, offs_adj);
+                node.append_tree_size(orig_size + size_of_moved);
+            }
+
+            // Destroy sibling
+            erase_and_destroy_child(sibling_ndx);
+            num_children--;
+        }
+    }
+
+    return num_children;
 }
 
 bool BPlusTreeInner::bptree_traverse(size_t n, TraverseFunc& func)

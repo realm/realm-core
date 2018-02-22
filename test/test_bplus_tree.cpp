@@ -62,11 +62,28 @@ TEST(BPlusTree_Integer)
 {
     BPlusTree<Int> tree(Allocator::get_default());
 
+    CHECK_EQUAL(tree.size(), 0);
+
     tree.create();
 
     tree.add(5);
     CHECK_EQUAL(tree.get(0), 5);
 
+    for (int i = 0; i < 16; i++) {
+        tree.add(i);
+    }
+    CHECK_EQUAL(tree.get(1), 0);
+    CHECK_EQUAL(tree.get(10), 9);
+    CHECK_EQUAL(tree.find_first(7), 8);
+    tree.erase(0);
+    CHECK_EQUAL(tree.find_first(7), 7);
+    CHECK_EQUAL(tree.find_first(100), realm::npos);
+
+    size_t sz = tree.size();
+    while (sz) {
+        sz--;
+        tree.erase(sz);
+    }
     tree.destroy();
 }
 
@@ -146,6 +163,7 @@ TEST(BPlusTree_Fuzz)
             CHECK_EQUAL(tree.get(i), ref_arr[i]);
         }
     }
+
     tree.destroy();
 }
 
