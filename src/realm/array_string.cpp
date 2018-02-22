@@ -175,7 +175,7 @@ StringData ArrayString::get(size_t ndx) const
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->get_string(ndx);
         case Type::enum_strings: {
-            size_t index = static_cast<ArrayInteger*>(m_arr)->get(ndx);
+            size_t index = size_t(static_cast<ArrayInteger*>(m_arr)->get(ndx));
             return m_string_enum_values->get(index);
         }
     }
@@ -192,7 +192,7 @@ bool ArrayString::is_null(size_t ndx) const
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->is_null(ndx);
         case Type::enum_strings: {
-            size_t index = static_cast<ArrayInteger*>(m_arr)->get(ndx);
+            size_t index = size_t(static_cast<ArrayInteger*>(m_arr)->get(ndx));
             return m_string_enum_values->is_null(index);
         }
     }

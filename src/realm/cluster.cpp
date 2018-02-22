@@ -1195,7 +1195,7 @@ void Cluster::upgrade_string_to_enum(size_t col_ndx, ArrayString& keys)
     ArrayInteger indexes(m_alloc);
     indexes.create(Array::type_Normal, false);
     ArrayString values(m_alloc);
-    ref_type ref = Array::get(col_ndx + s_first_col_index);
+    ref_type ref = Array::get_as_ref(col_ndx + s_first_col_index);
     values.init_from_ref(ref);
     size_t sz = values.size();
     for (size_t i = 0; i < sz; i++) {
