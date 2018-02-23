@@ -24,8 +24,20 @@
 
 #include "test.hpp"
 
+#include <chrono>
+// #include <valgrind/callgrind.h>
+
+#ifndef CALLGRIND_START_INSTRUMENTATION
+#define CALLGRIND_START_INSTRUMENTATION
+#endif
+
+#ifndef CALLGRIND_STOP_INSTRUMENTATION
+#define CALLGRIND_STOP_INSTRUMENTATION
+#endif
+
 using namespace realm;
 using namespace realm::test_util;
+using namespace std::chrono;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -212,9 +224,54 @@ TEST(BPlusTree_Initialization)
     another_tree.init_from_ref(ref);
 
     CHECK_EQUAL(another_tree.get(15), 15);
+    CHECK_EQUAL(another_tree.size(), 20);
 
     tree.destroy();
     parent_array.destroy();
+}
+
+TEST(BPlusTree_Performance)
+{
+    // We try to optimize for add and sequential lookup
+    int nb_rows = 5000;
+    BPlusTree<Int> tree(Allocator::get_default());
+
+    tree.create();
+
+    CALLGRIND_START_INSTRUMENTATION;
+
+    std::cout << nb_rows << " BPlusTree - sequential" << std::endl;
+
+    {
+        auto t1 = steady_clock::now();
+
+        for (int i = 0; i < nb_rows; i++) {
+            tree.add(i);
+        }
+
+        auto t2 = steady_clock::now();
+        std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/row"
+                  << std::endl;
+
+        CHECK_EQUAL(tree.size(), nb_rows);
+    }
+
+    {
+        auto t1 = steady_clock::now();
+
+        for (int i = 0; i < nb_rows; i++) {
+            CHECK_EQUAL(i, tree.get(i));
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   lookup time   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/row"
+                  << std::endl;
+    }
+
+    CALLGRIND_STOP_INSTRUMENTATION;
+
+    tree.destroy();
 }
 
 #endif // TEST_BPLUS_TREE

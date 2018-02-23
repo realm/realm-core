@@ -72,7 +72,7 @@ public:
     virtual ref_type bptree_insert(size_t n, State& state, InsertFunc&) = 0;
     virtual void bptree_access(size_t n, AccessFunc&) = 0;
     virtual size_t bptree_erase(size_t n, EraseFunc&) = 0;
-    virtual bool bptree_traverse(size_t n, TraverseFunc&) = 0;
+    virtual bool bptree_traverse(TraverseFunc&) = 0;
 
     // Move elements over in new node, starting with element at position 'ndx'.
     // If this is an inner node, the index offsets should be adjusted with 'adj'
@@ -102,7 +102,7 @@ public:
     ref_type bptree_insert(size_t n, State& state, InsertFunc&) override;
     void bptree_access(size_t n, AccessFunc&) override;
     size_t bptree_erase(size_t n, EraseFunc&) override;
-    bool bptree_traverse(size_t n, TraverseFunc&) override;
+    bool bptree_traverse(TraverseFunc&) override;
 };
 
 /*****************************************************************************/
@@ -157,13 +157,19 @@ public:
     ref_type bptree_insert(size_t n, State& state, InsertFunc&) override;
     void bptree_access(size_t n, AccessFunc&) override;
     size_t bptree_erase(size_t n, EraseFunc&) override;
-    bool bptree_traverse(size_t n, TraverseFunc&) override;
+    bool bptree_traverse(TraverseFunc&) override;
 
 protected:
     friend BPlusTreeBase;
     ArrayUnsigned m_offsets;
+    size_t m_my_offset;
+
     void move(BPlusTreeNode* new_node, size_t ndx, int64_t offset_adj) override;
     void ensure_offsets();
+    void set_offset(size_t offs)
+    {
+        m_my_offset = offs;
+    }
     void set_tree_size(size_t sz)
     {
         Array::set(m_size - 1, (sz << 1) + 1);
@@ -198,7 +204,7 @@ protected:
     {
         return Array::get_as_ref(ndx + 1);
     }
-    BPlusTreeLeaf* cache_leaf(MemRef mem, size_t ndx);
+    BPlusTreeLeaf* cache_leaf(MemRef mem, size_t ndx, size_t offset);
     void erase_and_destroy_child(size_t ndx);
     ref_type insert_child(size_t child_ndx, ref_type new_sibling_ref, State& state);
     size_t get_child_offset(size_t child_ndx)
@@ -216,6 +222,7 @@ public:
     BPlusTreeBase(Allocator& alloc)
         : m_alloc(alloc)
     {
+        invalidate_leaf_cache();
     }
     virtual ~BPlusTreeBase();
 
@@ -231,7 +238,8 @@ public:
 
     void init_from_ref(ref_type ref)
     {
-        this->replace_root(this->create_root_from_ref(ref));
+        replace_root(create_root_from_ref(ref));
+        m_size = m_root->get_tree_size();
     }
 
     void set_parent(ArrayParent* parent, size_t ndx_in_parent)
@@ -244,7 +252,7 @@ public:
 
     size_t size() const
     {
-        return m_root ? m_root->get_tree_size() : 0;
+        return m_size;
     }
 
     void create()
@@ -261,6 +269,23 @@ public:
         m_root = nullptr;
     }
 
+    void set_leaf_bounds(size_t b, size_t e)
+    {
+        m_cached_leaf_begin = b;
+        m_cached_leaf_end = e;
+    }
+
+    void invalidate_leaf_cache()
+    {
+        m_cached_leaf_begin = size_t(-1);
+        m_cached_leaf_end = size_t(-1);
+    }
+
+    void adjust_leaf_bounds(int incr)
+    {
+        m_cached_leaf_end += incr;
+    }
+
     void bptree_insert(size_t n, BPlusTreeNode::InsertFunc& func);
     void bptree_erase(size_t n, BPlusTreeNode::EraseFunc& func);
 
@@ -269,14 +294,17 @@ public:
     // Create a leaf node and initialize it with 'ref'
     virtual std::unique_ptr<BPlusTreeLeaf> init_leaf_node(ref_type ref) = 0;
 
-    // Initialize the leaf cache with 'mem' and set the proper parent
-    virtual BPlusTreeLeaf* cache_leaf(MemRef mem, ArrayParent* parent, size_t ndx_in_parent) = 0;
+    // Initialize the leaf cache with 'mem'
+    virtual BPlusTreeLeaf* cache_leaf(MemRef mem) = 0;
 
 protected:
     std::unique_ptr<BPlusTreeNode> m_root;
     Allocator& m_alloc;
     ArrayParent* m_parent = nullptr;
     size_t m_ndx_in_parent = 0;
+    size_t m_size = 0;
+    size_t m_cached_leaf_begin;
+    size_t m_cached_leaf_end;
 
     void replace_root(std::unique_ptr<BPlusTreeNode> new_root);
     std::unique_ptr<BPlusTreeNode> create_root_from_ref(ref_type ref);
@@ -365,10 +393,9 @@ public:
         leaf->init_from_ref(ref);
         return leaf;
     }
-    BPlusTreeLeaf* cache_leaf(MemRef mem, ArrayParent* parent, size_t ndx_in_parent) override
+    BPlusTreeLeaf* cache_leaf(MemRef mem) override
     {
         m_leaf_cache.init_from_mem(mem);
-        m_leaf_cache.set_parent(parent, ndx_in_parent);
         return &m_leaf_cache;
     }
 
@@ -387,18 +414,25 @@ public:
         };
 
         bptree_insert(n, func);
+        m_size++;
     }
     T get(size_t n)
     {
-        T value;
-        BPlusTreeNode::AccessFunc func = [&value](BPlusTreeNode* node, size_t ndx) {
-            LeafNode* leaf = static_cast<LeafNode*>(node);
-            value = leaf->get(ndx);
-        };
+        if (m_cached_leaf_begin <= n && n < m_cached_leaf_end) {
+            return m_leaf_cache.get(n - m_cached_leaf_begin);
+        }
+        else {
+            T value;
 
-        m_root->bptree_access(n, func);
+            BPlusTreeNode::AccessFunc func = [&value](BPlusTreeNode* node, size_t ndx) {
+                LeafNode* leaf = static_cast<LeafNode*>(node);
+                value = leaf->get(ndx);
+            };
 
-        return value;
+            m_root->bptree_access(n, func);
+
+            return value;
+        }
     }
     void set(size_t n, T value)
     {
@@ -418,6 +452,7 @@ public:
         };
 
         bptree_erase(n, func);
+        m_size--;
     }
     size_t find_first(T value) const noexcept
     {
@@ -434,7 +469,7 @@ public:
             return false;
         };
 
-        m_root->bptree_traverse(0, func);
+        m_root->bptree_traverse(func);
 
         return result;
     }
@@ -450,7 +485,7 @@ public:
             return false;
         };
 
-        m_root->bptree_traverse(0, func);
+        m_root->bptree_traverse(func);
     }
 
 private:
