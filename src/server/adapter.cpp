@@ -228,7 +228,7 @@ public:
         select(m_selected_object_type, m_selected_object_schema, m_selected_table, m_selected_primary);
     }
 
-    void operator()(const Instruction::SelectContainer& instr)
+    void operator()(const Instruction::SelectField& instr)
     {
         REALM_ASSERT(m_selected_object_schema);
 
@@ -426,7 +426,7 @@ public:
     }
 
     // Must have linklist selected:
-    void operator()(const Instruction::ContainerSet& instr)
+    void operator()(const Instruction::ArraySet& instr)
     {
         if (!m_list_property)
             return; // FIXME
@@ -441,7 +441,7 @@ public:
         });
     }
 
-    void operator()(const Instruction::ContainerInsert& instr)
+    void operator()(const Instruction::ArrayInsert& instr)
     {
         if (!m_list_property)
             return; // FIXME
@@ -457,23 +457,23 @@ public:
         });
     }
 
-    void operator()(const Instruction::ContainerMove&)
+    void operator()(const Instruction::ArrayMove&)
     {
         if (!m_list_property)
             return; // FIXME
 
-        REALM_TERMINATE("ContainerMove not supported by adapter.");
+        REALM_TERMINATE("ArrayMove not supported by adapter.");
     }
 
-    void operator()(const Instruction::ContainerSwap&)
+    void operator()(const Instruction::ArraySwap&)
     {
         if (!m_list_property)
             return; // FIXME
 
-        REALM_TERMINATE("ContainerSwap not supported by adapter.");
+        REALM_TERMINATE("ArraySwap not supported by adapter.");
     }
 
-    void operator()(const Instruction::ContainerErase& instr)
+    void operator()(const Instruction::ArrayErase& instr)
     {
         if (!m_list_property)
             return; // FIXME
@@ -485,7 +485,7 @@ public:
         });
     }
 
-    void operator()(const Instruction::ContainerClear&)
+    void operator()(const Instruction::ArrayClear&)
     {
         if (!m_list_property)
             return; // FIXME
