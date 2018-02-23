@@ -1014,7 +1014,7 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
     ref_type top_ref = m_read_lock.m_top_ref;
     size_t file_size = m_read_lock.m_file_size;
     _impl::ReversedNoCopyInputStream reversed_in(reverser);
-    gf::advance_transact(m_group, top_ref, file_size, reversed_in); // Throws
+    gf::advance_transact(m_group, top_ref, file_size, reversed_in, m_read_lock.m_version); // Throws
 
     do_end_write();
 
@@ -1045,7 +1045,7 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
 
         // Synchronize readers view of the file
         SlabAlloc& alloc = m_group.m_alloc;
-        alloc.update_reader_view(new_file_size);
+        alloc.update_reader_view(new_file_size, new_version);
 
         hist.update_early_from_top_ref(new_version, new_file_size, new_top_ref); // Throws
     }
@@ -1077,7 +1077,7 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
         ref_type new_top_ref = new_read_lock.m_top_ref;
         size_t new_file_size = new_read_lock.m_file_size;
         _impl::ChangesetInputStream in(hist, old_version, new_version);
-        m_group.advance_transact(new_top_ref, new_file_size, in); // Throws
+        m_group.advance_transact(new_top_ref, new_file_size, in, new_version); // Throws
     }
 
     g.release();

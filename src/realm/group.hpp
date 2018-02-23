@@ -631,7 +631,7 @@ private:
 
     /// \param writable Must be set to true when, and only when attaching for a
     /// write transaction.
-    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable);
+    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint64_t new_version);
 
     void create_empty_group();
     void remove_table(size_t table_ndx, TableKey key);
@@ -639,7 +639,7 @@ private:
     void reset_free_space_tracking();
 
     void remap(size_t new_file_size);
-    void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size);
+    void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, uint64_t new_version);
 
     /// Recursively update refs stored in all cached array
     /// accessors. This includes cached array accessors in any
@@ -696,7 +696,8 @@ private:
     void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
     void update_num_objects();
     class TransactAdvancer;
-    void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&);
+    void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&,
+                          uint64_t new_version);
     void refresh_dirty_accessors();
 
     /// \brief The version of the format of the node structure (in file or in
@@ -1239,9 +1240,10 @@ public:
         group.detach();
     }
 
-    static void attach_shared(Group& group, ref_type new_top_ref, size_t new_file_size, bool writable)
+    static void attach_shared(Group& group, ref_type new_top_ref, size_t new_file_size, bool writable,
+                              uint64_t new_version)
     {
-        group.attach_shared(new_top_ref, new_file_size, writable); // Throws
+        group.attach_shared(new_top_ref, new_file_size, writable, new_version); // Throws
     }
 
     static void reset_free_space_tracking(Group& group)
@@ -1254,15 +1256,15 @@ public:
         group.remap(new_file_size); // Throws
     }
 
-    static void remap_and_update_refs(Group& group, ref_type new_top_ref, size_t new_file_size)
+    static void remap_and_update_refs(Group& group, ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
     {
-        group.remap_and_update_refs(new_top_ref, new_file_size); // Throws
+        group.remap_and_update_refs(new_top_ref, new_file_size, new_version); // Throws
     }
 
     static void advance_transact(Group& group, ref_type new_top_ref, size_t new_file_size,
-                                 _impl::NoCopyInputStream& in)
+                                 _impl::NoCopyInputStream& in, uint64_t new_version)
     {
-        group.advance_transact(new_top_ref, new_file_size, in); // Throws
+        group.advance_transact(new_top_ref, new_file_size, in, new_version); // Throws
     }
 
     static void create_empty_group_when_missing(Group& group)

@@ -164,7 +164,9 @@ protected:
         util::EncryptedFileMapping* encrypted_mapping;
 #endif
     };
-    FastMap* m_fast_mapping_ptr = 0;
+    // This pointer may be changed concurrently with access, so make sure it is
+    // atomic!
+    std::atomic<FastMap*> m_fast_mapping_ptr;
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.
@@ -266,7 +268,7 @@ public:
         m_baseline = m_alloc->m_baseline;
         m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
-        m_fast_mapping_ptr = m_alloc->m_fast_mapping_ptr;
+        m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
     }
 
     ~WrappedAllocator()
@@ -279,7 +281,7 @@ public:
         m_baseline = m_alloc->m_baseline;
         m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
-        m_fast_mapping_ptr = m_alloc->m_fast_mapping_ptr;
+        m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
     }
 
     void update_from_underlying_allocator()
@@ -294,7 +296,7 @@ private:
         auto result = m_alloc->do_alloc(size);
         bump_storage_version();
         m_baseline = m_alloc->m_baseline;
-        m_fast_mapping_ptr = m_alloc->m_fast_mapping_ptr;
+        m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
         return result;
     }
     virtual MemRef do_realloc(ref_type ref, const char* addr, size_t old_size, size_t new_size) override
@@ -302,7 +304,7 @@ private:
         auto result = m_alloc->do_realloc(ref, addr, old_size, new_size);
         bump_storage_version();
         m_baseline = m_alloc->m_baseline;
-        m_fast_mapping_ptr = m_alloc->m_fast_mapping_ptr;
+        m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
         return result;
     }
 
@@ -472,6 +474,7 @@ inline Allocator::Allocator() noexcept
     m_content_versioning_counter = 0;
     m_storage_versioning_counter = 0;
     m_instance_versioning_counter = 0;
+    m_fast_mapping_ptr = nullptr;
 }
 
 inline Allocator::~Allocator() noexcept

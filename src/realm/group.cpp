@@ -354,11 +354,11 @@ void Group::remap(size_t new_file_size)
 }
 
 
-void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size)
+void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
 {
     size_t old_baseline = m_alloc.get_baseline();
 
-    m_alloc.update_reader_view(new_file_size); // Throws
+    m_alloc.update_reader_view(new_file_size, new_version); // Throws
     update_allocator_wrappers();
 
     // force update of all ref->ptr translations if the mapping has changed
@@ -446,7 +446,7 @@ void Group::update_num_objects()
 }
 
 
-void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable)
+void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint64_t new_version)
 {
     REALM_ASSERT_3(new_top_ref, <, new_file_size);
     REALM_ASSERT(!is_attached());
@@ -456,7 +456,7 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writa
     reset_free_space_tracking(); // Throws
 
     // update readers view of memory
-    m_alloc.update_reader_view(new_file_size); // Throws
+    m_alloc.update_reader_view(new_file_size, new_version); // Throws
     update_allocator_wrappers();
 
     // When `new_top_ref` is null, ask attach() to create a new node structure
@@ -1524,7 +1524,8 @@ void Group::refresh_dirty_accessors()
 }
 
 
-void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in)
+void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in,
+                             uint64_t new_version)
 {
     REALM_ASSERT(is_attached());
     // REALM_ASSERT(false); // FIXME: accessor updates need to be handled differently
@@ -1582,7 +1583,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     // transaction logs.
     // Update memory mapping if database file has grown
 
-    m_alloc.update_reader_view(new_file_size); // Throws
+    m_alloc.update_reader_view(new_file_size, new_version); // Throws
     update_allocator_wrappers();
 
     // This is no longer needed in Core, but we need to compute "schema_changed",

@@ -23,6 +23,7 @@
 #include <vector>
 #include <string>
 #include <atomic>
+#include <mutex>
 
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
@@ -273,9 +274,19 @@ public:
     /// of memory in the file must ensure that no allocation crosses the
     /// boundary between two sections.
     ///
-    /// Clears any allocator specicific caching of address translations
-    /// and force any later address translations to trigger decryption if required.
-    void update_reader_view(size_t file_size);
+    /// Updates the memory mappings to reflect a new size for the file.
+    /// Stale mappings are retained so that they remain valid for other threads,
+    /// which haven't yet seen the file size change. The stale mappings are
+    /// associated with a version count if one is provided.
+    /// They are later purged by calls to purge_old_mappings().
+    /// The version parameter is subtly different from the mapping_version obtained
+    /// by get_mapping_version() below. The mapping version changes whenever a
+    /// ref->ptr translation changes, and is used by Group to enforce re-translation.
+    /// The version parameter, on the other hand, builds an association between
+    /// database transaction numbers and the delayed deletion of mappings. It is
+    /// used to drive deletion of old translations and old mappings at safe points.
+    void update_reader_view(size_t file_size, uint64_t version = 0);
+    void purge_old_mappings(uint64_t oldest_live_version);
 
     /// Get an ID for the current mapping version. This ID changes whenever any part
     /// of an existing mapping is changed. Such a change requires all refs to be
@@ -375,6 +386,31 @@ private:
         uint64_t m_magic_cookie;
     };
 
+    // Description of to-be-deleted memory mapping
+    struct OldMapping {
+        OldMapping(uint64_t version, util::File::Map<char>& map)
+            : replaced_at_version(version)
+            , mapping()
+        {
+            mapping = std::move(map);
+        }
+        OldMapping(OldMapping&& other)
+            : replaced_at_version(other.replaced_at_version)
+            , mapping()
+        {
+            mapping = std::move(other.mapping);
+        }
+        void operator=(OldMapping&& other)
+        {
+            mapping = std::move(other.mapping);
+        }
+        uint64_t replaced_at_version;
+        util::File::Map<char> mapping;
+    };
+    struct OldFastMapping {
+        uint64_t replaced_at_version;
+        FastMap* mappings;
+    };
     static_assert(sizeof(Header) == 24, "Bad header size");
     static_assert(sizeof(StreamingFooter) == 16, "Bad footer size");
 
@@ -383,11 +419,28 @@ private:
 
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
-    std::vector<std::shared_ptr<util::File::Map<char>>> m_mappings;
-    std::vector<FastMap> m_fast_mapping;
-    uint64_t m_mapping_version = 1;
-    util::File m_file;
+    std::vector<util::File::Map<char>> m_mappings;
 
+    // FIXME: We'll have to switch away from std::vector to have absolute and
+    // transparent control of when/if members are copied, to ensure thread-safe
+    // operation:
+    uint64_t m_fast_mapping_size = 0;
+    uint64_t m_mapping_version = 1;
+    uint64_t m_current_transaction = 0;
+    std::mutex m_mapping_mutex;
+    util::File m_file;
+    // vectors where old mappings, are held from deletion to ensure mappings are
+    // kept open and ref->ptr translations work for other threads..
+    std::vector<OldMapping> m_old_mappings;
+    std::vector<OldFastMapping> m_old_fast_mappings;
+    // Rebuild the fast mapping in a thread-safe manner. Save the old one along with it's
+    // versioning information for later deletion - 'requires_new_fast_mapping' must be
+    // true if there are changes to entries among the existing mappings. Must be called
+    // with m_mapping_mutex locked.
+    void rebuild_fast_mapping(bool requires_new_fast_mapping);
+    // Add a translation covering a new section in the slab area. The translation is always
+    // added at the end.
+    void extend_fast_mapping_with_slab(char* address);
     const char* m_data = nullptr;
     size_t m_initial_section_size = 0;
     int m_section_shifts = 0;

@@ -155,6 +155,11 @@ void SlabAlloc::detach() noexcept
         case attach_UnsharedFile:
             m_data = 0;
             m_mappings.clear();
+            delete[] m_fast_mapping_ptr;
+            m_fast_mapping_ptr.store(nullptr);
+            m_fast_mapping_size = 0;
+            m_current_transaction = 0;
+            purge_old_mappings(static_cast<uint64_t>(-1));
             m_file.close();
             break;
         default:
@@ -328,14 +333,10 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     Slab slab;
     slab.addr = mem;
     slab.ref_end = ref_end;
+    std::lock_guard<std::mutex> lock(m_mapping_mutex);
     // FIXME: Leaks if push_back throws
     m_slabs.push_back(slab); // Throws
-#if REALM_ENABLE_ENCRYPTION
-    m_fast_mapping.push_back({mem, nullptr});
-#else
-    m_fast_mapping.push_back({mem});
-#endif
-    m_fast_mapping_ptr = &m_fast_mapping[0];
+    extend_fast_mapping_with_slab(mem);
     // Update free list
     size_t unused = new_size - size;
     if (0 < unused) {
@@ -528,7 +529,7 @@ int SlabAlloc::get_committed_file_format_version() const noexcept
         // if we have mapped a file, m_mappings will have at least one mapping and
         // the first will be to the start of the file. Don't come here, if we're
         // just attaching a buffer. They don't have mappings.
-        realm::util::encryption_read_barrier(*m_mappings[0], 0, sizeof(Header));
+        realm::util::encryption_read_barrier(m_mappings[0], 0, sizeof(Header));
     }
     const Header& header = *reinterpret_cast<const Header*>(m_data);
     int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
@@ -767,7 +768,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     reset_free_space_tracking();
     update_reader_view(size);
     REALM_ASSERT(m_mappings.size());
-    m_data = m_mappings[0]->get_addr();
+    m_data = m_mappings[0].get_addr();
     dg.release();  // Do not detach
     fcg.release(); // Do not close
     return top_ref;
@@ -791,14 +792,13 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
     m_baseline = size;
     m_attach_mode = attach_UsersBuffer;
 
-    m_fast_mapping.resize(1);
+    m_fast_mapping_size = 1;
+    m_fast_mapping_ptr = new FastMap[1];
 #if REALM_ENABLE_ENCRYPTION
-    m_fast_mapping[0] = {const_cast<char*>(m_data), nullptr};
+    m_fast_mapping_ptr[0] = {const_cast<char*>(m_data), nullptr};
 #else
-    m_fast_mapping[0] = {const_cast<char*>(m_data)};
+    m_fast_mapping_ptr[0] = {const_cast<char*>(m_data)};
 #endif
-    m_fast_mapping_ptr = &m_fast_mapping[0];
-
     // Below this point (assignment to `m_attach_mode`), nothing must throw.
 
     return top_ref;
@@ -821,13 +821,13 @@ void SlabAlloc::attach_empty()
     // baseline here.
     size_t size = align_size_to_section_boundary(sizeof(Header));
     m_baseline = size;
-    m_fast_mapping.resize(1);
+    m_fast_mapping_size = 1;
+    m_fast_mapping_ptr = new FastMap[1];
 #if REALM_ENABLE_ENCRYPTION
-    m_fast_mapping[0] = {nullptr, nullptr};
+    m_fast_mapping_ptr[0] = {nullptr, nullptr};
 #else
-    m_fast_mapping[0] = {nullptr};
+    m_fast_mapping_ptr[0] = {nullptr};
 #endif
-    m_fast_mapping_ptr = &m_fast_mapping[0];
 }
 
 
@@ -896,6 +896,16 @@ void SlabAlloc::reset_free_space_tracking()
 
     m_free_space_state = free_space_Clean;
 }
+
+inline bool randomly_false_in_debug(bool x)
+{
+#ifdef REALM_DEBUG
+    if (x)
+        return (std::rand() & 1);
+#endif
+    return x;
+}
+
 
 /*
   Memory mapping
@@ -972,19 +982,23 @@ void SlabAlloc::reset_free_space_tracking()
 
   (FIXME: This is not implemented yet, goes as part of threading related changes)
  */
-void SlabAlloc::update_reader_view(size_t file_size)
+void SlabAlloc::update_reader_view(size_t file_size, uint64_t version)
 {
+    std::lock_guard<std::mutex> lock(m_mapping_mutex);
     if (file_size <= m_baseline) {
         return;
     }
+    REALM_ASSERT(version >= m_current_transaction);
+    m_current_transaction = version;
     REALM_ASSERT(file_size % 8 == 0); // 8-byte alignment required
     REALM_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     REALM_ASSERT_DEBUG(is_free_space_clean());
+    bool requires_new_fast_mapping = false;
 
     // Extend mapping by adding sections, or by extending sections
     auto old_baseline = m_baseline;
     auto old_slab_base = align_size_to_section_boundary(m_baseline);
-    auto old_num_sections = get_section_index(old_slab_base);
+    size_t old_num_sections = get_section_index(old_slab_base);
     REALM_ASSERT(m_mappings.size() == old_num_sections);
     m_baseline = file_size;
     {
@@ -992,16 +1006,19 @@ void SlabAlloc::update_reader_view(size_t file_size)
         // existing mapping. This is the case if the new baseline (which must be larger
         // then the old baseline) is still below the old base of the slab area.
         if (m_baseline < old_slab_base) {
-            auto ok = m_mappings[old_num_sections - 1]->extend(m_file, File::access_ReadOnly, m_baseline);
+            auto ok = m_mappings[old_num_sections - 1].extend(m_file, File::access_ReadOnly, m_baseline);
+            ok = randomly_false_in_debug(ok);
             if (!ok) {
+                requires_new_fast_mapping = true;
                 size_t section_start_offset = get_section_base(old_num_sections - 1);
                 size_t section_reservation = get_section_base(old_num_sections) - section_start_offset;
                 size_t section_size = m_baseline - section_start_offset;
-                // FIXME: Needs different solution when we serve multiple versions from one allocator - see above
-                m_mappings[old_num_sections - 1]->unmap();
-                m_mappings[old_num_sections - 1]->reserve(m_file, File::access_ReadOnly, section_start_offset,
-                                                          section_reservation);
-                ok = m_mappings[old_num_sections - 1]->extend(m_file, File::access_ReadOnly, section_size);
+                // save the old mapping/keep it open
+                OldMapping oldie(version, m_mappings[old_num_sections - 1]);
+                m_old_mappings.emplace_back(std::move(oldie));
+                m_mappings[old_num_sections - 1].reserve(m_file, File::access_ReadOnly, section_start_offset,
+                                                         section_reservation);
+                ok = m_mappings[old_num_sections - 1].extend(m_file, File::access_ReadOnly, section_size);
                 m_mapping_version++;
             }
             REALM_ASSERT(ok);
@@ -1011,20 +1028,21 @@ void SlabAlloc::update_reader_view(size_t file_size)
             // 1. figure out if there is a partially completed mapping, that we need to extend
             // to cover a full mapping section
             if (old_baseline < old_slab_base) {
-                auto ok = m_mappings[old_num_sections - 1]->extend(m_file, File::access_ReadOnly, old_slab_base);
+                auto ok = m_mappings[old_num_sections - 1].extend(m_file, File::access_ReadOnly, old_slab_base);
+                ok = randomly_false_in_debug(ok);
                 if (!ok) {
+                    // we could not extend the old mapping, so replace it with a full, new one
+                    requires_new_fast_mapping = true;
                     size_t section_start_offset = get_section_base(old_num_sections - 1);
                     size_t section_reservation = get_section_base(old_num_sections) - section_start_offset;
-                    size_t section_size = m_baseline - section_start_offset;
-                    // FIXME: Needs different solution when we serve multiple versions from one allocator - see above
-                    m_mappings[old_num_sections - 1]->unmap();
-                    m_mappings[old_num_sections - 1]->reserve(m_file, File::access_ReadOnly, section_start_offset,
-                                                              section_reservation);
-                    ok = m_mappings[old_num_sections - 1]->extend(m_file, File::access_ReadOnly, section_size);
+                    size_t section_size = old_slab_base - section_start_offset;
+                    REALM_ASSERT(section_size == section_reservation);
+                    // save the old mapping/keep it open
+                    OldMapping oldie(version, m_mappings[old_num_sections - 1]);
+                    m_old_mappings.emplace_back(std::move(oldie));
+                    m_mappings[old_num_sections - 1].map(m_file, File::access_ReadOnly, section_size);
                     m_mapping_version++;
                 }
-                REALM_ASSERT(ok);
-                // FIXME: If extend fails? - todo for windows
             }
 
             // 2. add any full mappings
@@ -1033,14 +1051,20 @@ void SlabAlloc::update_reader_view(size_t file_size)
             size_t num_full_mappings = get_section_index(m_baseline);
             size_t num_mappings = get_section_index(new_slab_base);
             if (num_mappings > old_num_sections) {
-                m_mappings.resize(num_mappings);
+                // we can't just resize the vector since Maps do not support copy constructionn:
+                // m_mappings.resize(num_mappings);
+                std::vector<util::File::Map<char>> next_mapping(num_mappings);
+                for (size_t i = 0; i < old_num_sections; ++i) {
+                    next_mapping[i] = std::move(m_mappings[i]);
+                }
+                m_mappings = std::move(next_mapping);
             }
 
             for (size_t k = old_num_sections; k < num_full_mappings; ++k) {
                 size_t section_start_offset = get_section_base(k);
                 size_t section_size = get_section_base(1 + k) - section_start_offset;
-                m_mappings[k] = std::make_shared<util::File::Map<char>>(m_file, section_start_offset,
-                                                                        File::access_ReadOnly, section_size);
+                m_mappings[k] =
+                    util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
             }
 
             // 3. add a final partial mapping if needed
@@ -1049,11 +1073,11 @@ void SlabAlloc::update_reader_view(size_t file_size)
                 size_t section_start_offset = get_section_base(num_full_mappings);
                 size_t section_reservation = get_section_base(num_full_mappings + 1) - section_start_offset;
                 size_t section_size = m_baseline - section_start_offset;
-                auto mapping = std::make_shared<util::File::Map<char>>();
-                mapping->reserve(m_file, File::access_ReadOnly, section_start_offset, section_reservation);
-                auto ok = mapping->extend(m_file, File::access_ReadOnly, section_size);
+                util::File::Map<char> mapping;
+                mapping.reserve(m_file, File::access_ReadOnly, section_start_offset, section_reservation);
+                auto ok = mapping.extend(m_file, File::access_ReadOnly, section_size);
                 REALM_ASSERT(ok); // should allways succeed, as this is the first extend()
-                m_mappings[num_full_mappings] = mapping;
+                m_mappings[num_full_mappings] = std::move(mapping);
             }
         }
     }
@@ -1086,27 +1110,94 @@ void SlabAlloc::update_reader_view(size_t file_size)
     // that is achieved by being single threaded, interlocked or run from a sequential
     // scheduling queue.
     //
-    // FIXME: once we switch to more gradual extension of the
-    // free space, the exact correspondance between m_free_space.size()
-    // and the number of mappings for slab, will no longer hold....
-    auto num_mappings = m_mappings.size();
-    m_fast_mapping.resize(num_mappings + n);
-    for (size_t k = 0; k < num_mappings; ++k) {
-        m_fast_mapping[k].mapping_addr = m_mappings[k]->get_addr();
+    rebuild_fast_mapping(requires_new_fast_mapping);
+}
+
+void SlabAlloc::extend_fast_mapping_with_slab(char* address)
+{
+    ++m_fast_mapping_size;
+    auto new_fast_mapping = new FastMap[m_fast_mapping_size];
+    for (size_t i = 0; i < m_fast_mapping_size - 1; ++i) {
+        new_fast_mapping[i] = m_fast_mapping_ptr[i];
+    }
+    OldFastMapping oldie;
+    oldie.replaced_at_version = m_current_transaction;
+    oldie.mappings = m_fast_mapping_ptr.load();
+    m_old_fast_mappings.push_back(oldie);
 #if REALM_ENABLE_ENCRYPTION
-        m_fast_mapping[k].encrypted_mapping = m_mappings[k]->get_encrypted_mapping();
+    new_fast_mapping[m_fast_mapping_size - 1] = {address, nullptr};
+#else
+    new_fast_mapping[m_fast_mapping_size - 1] = {address};
+#endif
+    m_fast_mapping_ptr = new_fast_mapping;
+}
+void SlabAlloc::rebuild_fast_mapping(bool requires_new_fast_mapping)
+{
+    // FIXME: once/if we switch to more gradual extension of the
+    // free space, the exact correspondence between m_free_space.size()
+    // and the number of mappings for slab, will no longer hold....
+    size_t free_space_size = m_free_space.size();
+    auto num_mappings = m_mappings.size();
+    if (m_fast_mapping_size < num_mappings + free_space_size) {
+        requires_new_fast_mapping = true;
+    }
+    FastMap* new_fast_mapping = m_fast_mapping_ptr;
+    if (requires_new_fast_mapping) {
+        // we need a new mapping, but must preserve old, as translations using it
+        // may be in progress concurrently
+        OldFastMapping oldie;
+        oldie.replaced_at_version = m_current_transaction;
+        oldie.mappings = m_fast_mapping_ptr;
+        m_old_fast_mappings.push_back(oldie);
+        m_fast_mapping_size = num_mappings + free_space_size;
+        new_fast_mapping = new FastMap[m_fast_mapping_size];
+    }
+    for (size_t k = 0; k < num_mappings; ++k) {
+        new_fast_mapping[k].mapping_addr = m_mappings[k].get_addr();
+#if REALM_ENABLE_ENCRYPTION
+        new_fast_mapping[k].encrypted_mapping = m_mappings[k].get_encrypted_mapping();
 #endif
     }
-    for (size_t k = 0; k < n; ++k) {
+    for (size_t k = 0; k < free_space_size; ++k) {
         char* base = m_slabs[k].addr;
 #if REALM_ENABLE_ENCRYPTION
-        m_fast_mapping[num_mappings + k] = {base, nullptr};
+        new_fast_mapping[num_mappings + k] = {base, nullptr};
 #else
-        m_fast_mapping[num_mappings + k] = {base};
+        new_fast_mapping[num_mappings + k] = {base};
 #endif
     }
-    m_fast_mapping_ptr = &m_fast_mapping[0];
+    // FIXME: must be atomic:
+    m_fast_mapping_ptr = new_fast_mapping;
 }
+
+void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version)
+{
+    std::lock_guard<std::mutex> lock(m_mapping_mutex);
+    for (size_t i = 0; i < m_old_mappings.size();) {
+        if (m_old_mappings[i].replaced_at_version >= oldest_live_version) {
+            ++i;
+            continue;
+        }
+        // move last over:
+        auto oldie = std::move(m_old_mappings[i]);
+        m_old_mappings[i] = std::move(m_old_mappings.back());
+        m_old_mappings.pop_back();
+        oldie.mapping.unmap();
+    }
+
+    for (size_t i = 0; i < m_old_fast_mappings.size();) {
+        if (m_old_fast_mappings[i].replaced_at_version >= oldest_live_version) {
+            ++i;
+            continue;
+        }
+        // move last over:
+        auto oldie = std::move(m_old_fast_mappings[i]);
+        m_old_fast_mappings[i] = std::move(m_old_fast_mappings.back());
+        m_old_fast_mappings.pop_back();
+        delete[] oldie.mappings;
+    }
+}
+
 
 const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
 {
