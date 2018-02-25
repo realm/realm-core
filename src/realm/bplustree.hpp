@@ -53,6 +53,11 @@ public:
     {
     }
 
+    void change_owner(BPlusTreeBase* tree)
+    {
+        m_tree = tree;
+    }
+
     virtual ~BPlusTreeNode();
 
     virtual bool is_leaf() const = 0;
@@ -226,19 +231,31 @@ public:
     }
     virtual ~BPlusTreeBase();
 
-    Allocator& get_alloc()
+    BPlusTreeBase& operator=(const BPlusTreeBase& rhs);
+    BPlusTreeBase& operator=(BPlusTreeBase&& rhs);
+
+    Allocator& get_alloc() const
     {
         return m_alloc;
     }
-
+    bool is_attached() const
+    {
+        return bool(m_root);
+    }
+    size_t size() const
+    {
+        return m_size;
+    }
     ref_type get_ref() const
     {
+        REALM_ASSERT(is_attached());
         return m_root->get_ref();
     }
 
     void init_from_ref(ref_type ref)
     {
         replace_root(create_root_from_ref(ref));
+        invalidate_leaf_cache();
         m_size = m_root->get_tree_size();
     }
 
@@ -246,27 +263,24 @@ public:
     {
         m_parent = parent;
         m_ndx_in_parent = ndx_in_parent;
-        if (m_root)
+        if (is_attached())
             m_root->set_parent(parent, ndx_in_parent);
-    }
-
-    size_t size() const
-    {
-        return m_size;
     }
 
     void create()
     {
-        REALM_ASSERT(!m_root);
+        REALM_ASSERT(!is_attached());
         m_root = create_leaf_node();
         m_root->set_parent(m_parent, m_ndx_in_parent);
     }
 
     void destroy()
     {
-        ref_type ref = m_root->get_ref();
-        Array::destroy_deep(ref, m_alloc);
-        m_root = nullptr;
+        if (is_attached()) {
+            ref_type ref = m_root->get_ref();
+            Array::destroy_deep(ref, m_alloc);
+            m_root = nullptr;
+        }
     }
 
     void set_leaf_bounds(size_t b, size_t e)
@@ -371,12 +385,36 @@ public:
         }
     };
 
-    /******************** Constructor ********************/
+    /******************** Constructors *******************/
 
     BPlusTree(Allocator& alloc)
         : BPlusTreeBase(alloc)
         , m_leaf_cache(this)
     {
+    }
+
+    BPlusTree(const BPlusTree& other)
+        : BPlusTree(other.get_alloc())
+    {
+        *this = other;
+    }
+    BPlusTree(BPlusTree&& other)
+        : BPlusTree(other.get_alloc())
+    {
+        *this = std::move(other);
+    }
+
+    /********************* Assignment ********************/
+
+    BPlusTree& operator=(const BPlusTree& rhs)
+    {
+        this->BPlusTreeBase::operator=(rhs);
+        return *this;
+    }
+    BPlusTree& operator=(BPlusTree&& rhs)
+    {
+        this->BPlusTreeBase::operator=(std::move(rhs));
+        return *this;
     }
 
     /******** Implementation of abstract interface *******/

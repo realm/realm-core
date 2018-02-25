@@ -20,9 +20,13 @@
 
 using namespace realm;
 
+/****************************** BPlusTreeNode ********************************/
+
 BPlusTreeNode::~BPlusTreeNode()
 {
 }
+
+/****************************** BPlusTreeLeaf ********************************/
 
 ref_type BPlusTreeLeaf::bptree_insert(size_t ndx, State& state, InsertFunc& func)
 {
@@ -68,6 +72,8 @@ bool BPlusTreeLeaf::bptree_traverse(TraverseFunc& func)
 {
     return func(this, 0);
 }
+
+/****************************** BPlusTreeInner *******************************/
 
 BPlusTreeInner::BPlusTreeInner(BPlusTreeBase* tree)
     : BPlusTreeNode(tree)
@@ -444,8 +450,39 @@ ref_type BPlusTreeInner::insert_child(size_t child_ndx, ref_type new_sibling_ref
     return new_sibling.get_ref();
 }
 
+/****************************** BPlusTreeBase ********************************/
+
 BPlusTreeBase::~BPlusTreeBase()
 {
+}
+
+BPlusTreeBase& BPlusTreeBase::operator=(const BPlusTreeBase& rhs)
+{
+    Allocator& rhs_alloc = rhs.get_alloc();
+
+    // Take copy of other tree
+    MemRef mem(rhs.get_ref(), rhs_alloc);
+    MemRef copy_mem = Array::clone(mem, rhs_alloc, m_alloc); // Throws
+
+    // Destroy current tree
+    destroy();
+
+    init_from_ref(copy_mem.get_ref());
+
+    return *this;
+}
+
+BPlusTreeBase& BPlusTreeBase::operator=(BPlusTreeBase&& rhs)
+{
+    // Destroy current tree
+    destroy();
+
+    m_root = std::move(rhs.m_root);
+    m_root->change_owner(this);
+    m_size = rhs.m_size;
+    invalidate_leaf_cache();
+
+    return *this;
 }
 
 void BPlusTreeBase::replace_root(std::unique_ptr<BPlusTreeNode> new_root)

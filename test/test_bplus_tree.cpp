@@ -230,6 +230,51 @@ TEST(BPlusTree_Initialization)
     parent_array.destroy();
 }
 
+namespace {
+BPlusTree<Int> create_bplustree_int()
+{
+    BPlusTree<Int> tree(Allocator::get_default());
+    tree.create();
+
+    for (int i = 0; i < 10; i++) {
+        tree.add(i);
+    }
+
+    return tree;
+}
+}
+
+TEST(BPlusTree_Copy)
+{
+    BPlusTree<Int> tree(Allocator::get_default());
+
+    tree.create();
+
+    tree.add(5);
+    CHECK_EQUAL(tree.get(0), 5);
+
+    tree = create_bplustree_int();
+    CHECK_EQUAL(tree.size(), 10);
+    CHECK_EQUAL(tree.get(0), 0);
+
+    BPlusTree<Int> another_tree(Allocator::get_default());
+    another_tree.create();
+
+    for (int i = 0; i < 20; i++) {
+        another_tree.add(i << 1);
+    }
+
+    CHECK_EQUAL(another_tree.get(10), 20);
+
+    tree = another_tree;
+
+    CHECK_EQUAL(tree.get(10), 20);
+    CHECK_EQUAL(another_tree.get(10), 20);
+
+    tree.destroy();
+    another_tree.destroy();
+}
+
 TEST(BPlusTree_Performance)
 {
     // We try to optimize for add and sequential lookup

@@ -454,6 +454,9 @@ public:
     /// destroy_deep() for every contained 'ref' element.
     static void destroy_deep(MemRef, Allocator&) noexcept;
 
+    // Clone deep
+    static MemRef clone(MemRef, Allocator& from_alloc, Allocator& target_alloc);
+
     // Serialization
 
     /// Returns the ref (position in the target stream) of the written copy of
@@ -742,8 +745,6 @@ protected:
     /// type is wtype_Bits. It is also an error to specify a non-zero
     /// size if the width type is wtype_Ignore.
     static MemRef create(Type, bool context_flag, WidthType, size_t size, int_fast64_t value, Allocator&);
-
-    static MemRef clone(MemRef header, Allocator& alloc, Allocator& target_alloc);
 
     /// Same as get_byte_size().
     static size_t get_byte_size_from_header(const char*) noexcept;
