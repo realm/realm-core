@@ -47,16 +47,10 @@ public:
         return *m_table;
     }
 
-    virtual size_t size() const
-    {
-        return m_key_values.size();
-    }
+    virtual size_t size() const;
 
     // Get key for object this view is "looking" at.
-    ObjKey get_key(size_t ndx) const
-    {
-        return ObjKey(m_key_values.get(ndx));
-    }
+    ObjKey get_key(size_t ndx) const;
 
     ConstObj get(size_t row_ndx) const;
     ConstObj front() const noexcept

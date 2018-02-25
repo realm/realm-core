@@ -174,6 +174,11 @@ public:
     void destroy();
 
 protected:
+    template <class U>
+    struct LeafTypeTrait {
+        using type = typename ColumnTypeTraits<U>::cluster_leaf_type;
+    };
+
     friend class BPlusTreeInner;
     friend class BPlusTreeLeaf;
 
@@ -216,6 +221,11 @@ protected:
     std::unique_ptr<BPlusTreeNode> create_root_from_ref(ref_type ref);
 };
 
+template <>
+struct BPlusTreeBase::LeafTypeTrait<ObjKey> {
+    using type = ArrayKeyNonNullable;
+};
+
 /*****************************************************************************/
 /* BPlusTree                                                                 */
 /* Actual implementation of the BPlusTree to hold elements of type T.        */
@@ -223,64 +233,6 @@ protected:
 template <class T>
 class BPlusTree : public BPlusTreeBase {
 public:
-    using LeafArray = typename ColumnTypeTraits<T>::cluster_leaf_type;
-
-    /**
-     * Actual class for the leaves. Maps the abstract interface defined
-     * in BPlusTreeNode onto the specific array class
-     **/
-    class LeafNode : public BPlusTreeLeaf, public LeafArray {
-    public:
-        LeafNode(BPlusTreeBase* tree)
-            : BPlusTreeLeaf(tree)
-            , LeafArray(tree->get_alloc())
-        {
-        }
-
-        void init_from_ref(ref_type ref) noexcept override
-        {
-            LeafArray::init_from_ref(ref);
-        }
-
-        ref_type get_ref() const override
-        {
-            return LeafArray::get_ref();
-        }
-
-        void set_parent(realm::ArrayParent* p, size_t n) override
-        {
-            LeafArray::set_parent(p, n);
-        }
-
-        void update_parent() override
-        {
-            LeafArray::update_parent();
-        }
-
-        size_t get_node_size() const override
-        {
-            return LeafArray::size();
-        }
-
-        size_t get_tree_size() const override
-        {
-            return LeafArray::size();
-        }
-
-        void move(BPlusTreeNode* new_node, size_t ndx, int64_t) override
-        {
-            LeafNode* dst(static_cast<LeafNode*>(new_node));
-            size_t end = get_node_size();
-
-            for (size_t j = ndx; j < end; j++) {
-                dst->add(LeafArray::get(j));
-            }
-            LeafArray::truncate_and_destroy_children(ndx);
-        }
-    };
-
-    /******************** Constructors *******************/
-
     BPlusTree(Allocator& alloc)
         : BPlusTreeBase(alloc)
         , m_leaf_cache(this)
@@ -325,6 +277,19 @@ public:
         BPlusTreeNode::InsertFunc func = [value](BPlusTreeNode* node, size_t ndx) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
             leaf->LeafArray::insert(ndx, value);
+            return leaf->size();
+        };
+
+        bptree_insert(n, func);
+        m_size++;
+    }
+
+    // FIXME this function should eventually be removed
+    void insert_null(size_t n)
+    {
+        BPlusTreeNode::InsertFunc func = [](BPlusTreeNode* node, size_t ndx) {
+            LeafNode* leaf = static_cast<LeafNode*>(node);
+            leaf->LeafArray::insert(ndx, LeafArray::default_value(false));
             return leaf->size();
         };
 
@@ -444,6 +409,62 @@ public:
     }
 
 private:
+    using LeafArray = typename LeafTypeTrait<T>::type;
+
+    /**
+     * Actual class for the leaves. Maps the abstract interface defined
+     * in BPlusTreeNode onto the specific array class
+     **/
+    class LeafNode : public BPlusTreeLeaf, public LeafArray {
+    public:
+        LeafNode(BPlusTreeBase* tree)
+            : BPlusTreeLeaf(tree)
+            , LeafArray(tree->get_alloc())
+        {
+        }
+
+        void init_from_ref(ref_type ref) noexcept override
+        {
+            LeafArray::init_from_ref(ref);
+        }
+
+        ref_type get_ref() const override
+        {
+            return LeafArray::get_ref();
+        }
+
+        void set_parent(realm::ArrayParent* p, size_t n) override
+        {
+            LeafArray::set_parent(p, n);
+        }
+
+        void update_parent() override
+        {
+            LeafArray::update_parent();
+        }
+
+        size_t get_node_size() const override
+        {
+            return LeafArray::size();
+        }
+
+        size_t get_tree_size() const override
+        {
+            return LeafArray::size();
+        }
+
+        void move(BPlusTreeNode* new_node, size_t ndx, int64_t) override
+        {
+            LeafNode* dst(static_cast<LeafNode*>(new_node));
+            size_t end = get_node_size();
+
+            for (size_t j = ndx; j < end; j++) {
+                dst->add(LeafArray::get(j));
+            }
+            LeafArray::truncate_and_destroy_children(ndx);
+        }
+    };
+
     LeafNode m_leaf_cache;
 
     /******** Implementation of abstract interface *******/

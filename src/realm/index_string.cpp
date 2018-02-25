@@ -1171,7 +1171,7 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
 }
 
 
-void StringIndex::distinct(ArrayKey& result) const
+void StringIndex::distinct(BPlusTree<ObjKey>& result) const
 {
     Allocator& alloc = m_array->get_alloc();
     const size_t array_size = m_array->size();

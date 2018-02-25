@@ -135,7 +135,7 @@ List<T>::List(const Obj& obj, ColKey col_key)
     this->init_from_parent();
     if (!ConstListIf<T>::m_valid && m_obj.is_valid()) {
         create();
-        ref_type ref = m_leaf->get_ref();
+        ref_type ref = m_tree->get_ref();
         m_obj.set_int(col_key, from_ref(ref));
     }
 }
@@ -181,7 +181,7 @@ void List<ObjKey>::do_set(size_t ndx, ObjKey target_key)
     ObjKey old_key = get(ndx);
     bool recurse = m_obj.update_backlinks(m_col_key, old_key, target_key, state);
 
-    m_leaf->set(ndx, target_key);
+    m_tree->set(ndx, target_key);
 
     if (recurse) {
         auto table = const_cast<Table*>(m_obj.get_table());
@@ -198,7 +198,7 @@ ObjKey List<ObjKey>::remove(size_t ndx)
         ConstListBase::erase_repl(repl, ndx);
     }
     ObjKey old = get(ndx);
-    m_leaf->erase(ndx);
+    m_tree->erase(ndx);
     m_obj.bump_both_versions();
     ConstListBase::adj_remove(ndx);
 
@@ -218,7 +218,7 @@ void List<ObjKey>::clear()
         size_t ndx = size();
         while (ndx--) {
             do_set(ndx, null_key);
-            m_leaf->erase(ndx);
+            m_tree->erase(ndx);
             ConstListBase::adj_remove(ndx);
         }
         return;
@@ -235,7 +235,7 @@ void List<ObjKey>::clear()
     typedef _impl::TableFriend tf;
     size_t num_links = size();
     for (size_t ndx = 0; ndx < num_links; ++ndx) {
-        ObjKey target_key = m_leaf->get(ndx);
+        ObjKey target_key = m_tree->get(ndx);
         Obj target_obj = target_table->get_object(target_key);
         target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
         size_t num_remaining = target_obj.get_backlink_count(*origin_table, m_col_key);
@@ -244,7 +244,7 @@ void List<ObjKey>::clear()
         }
     }
 
-    m_leaf->truncate_and_destroy_children(0);
+    m_tree->clear();
     m_obj.bump_both_versions();
 
     tf::remove_recursive(*origin_table, state); // Throws
@@ -269,7 +269,7 @@ void LinkList::sort(SortDescriptor&& order)
     /*  TODO: implement
     if (Replication* repl = m_obj.get_alloc().get_replication()) {
         // todo, write to the replication log that we're doing a sort
-        repl->set_link_list(*this, *this->m_leaf); // Throws
+        repl->set_link_list(*this, *this->m_tree); // Throws
     }
     */
     DescriptorOrdering ordering;
@@ -295,7 +295,7 @@ void LinkList::remove_all_target_rows()
 {
     if (is_attached()) {
         auto table = const_cast<Table*>(get_table());
-        _impl::TableFriend::batch_erase_rows(*table, *this->m_leaf);
+        _impl::TableFriend::batch_erase_rows(*table, *this->m_tree);
     }
 }
 

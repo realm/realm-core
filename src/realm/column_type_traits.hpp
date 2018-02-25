@@ -39,6 +39,7 @@ class ArrayIntNull;
 class ArrayBool;
 class ArrayBoolNull;
 class ArrayKey;
+class ArrayKeyNonNullable;
 template <class>
 class BasicArray;
 

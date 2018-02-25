@@ -83,14 +83,18 @@ inline T no0(T v)
 }
 
 // Pre-definitions
+struct ObjKey;
 class Array;
 class StringColumn;
 class GroupWriter;
 namespace _impl {
 class ArrayWriterBase;
 }
-class ArrayKey;
-using KeyColumn = ArrayKey;
+
+template <class T>
+class BPlusTree;
+
+using KeyColumn = BPlusTree<ObjKey>;
 
 
 struct MemStats {

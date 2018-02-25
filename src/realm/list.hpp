@@ -20,6 +20,7 @@
 #define REALM_LIST_HPP
 
 #include <realm/obj.hpp>
+#include <realm/bplustree.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/array_key.hpp>
 #include <realm/array_bool.hpp>
@@ -247,8 +248,6 @@ private:
 template <class T>
 class ConstListIf : public ConstListBase {
 public:
-    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
-
     /**
      * Only member functions not referring to an index in the list will check if
      * the object is up-to-date. The logic is that the user must always check the
@@ -261,7 +260,7 @@ public:
 
         update_if_needed();
 
-        return is_null() ? 0 : m_leaf->size();
+        return is_null() ? 0 : m_tree->size();
     }
     bool is_null() const override
     {
@@ -269,10 +268,10 @@ public:
     }
     T get(size_t ndx) const
     {
-        if (ndx >= m_leaf->size()) {
+        if (ndx >= m_tree->size()) {
             throw std::out_of_range("Index out of range");
         }
-        return m_leaf->get(ndx);
+        return m_tree->get(ndx);
     }
     T operator[](size_t ndx) const
     {
@@ -288,30 +287,30 @@ public:
     }
 
 protected:
-    mutable std::unique_ptr<LeafType> m_leaf;
+    mutable std::unique_ptr<BPlusTree<T>> m_tree;
     mutable bool m_valid = false;
 
     ConstListIf(ColKey col_key, Allocator& alloc)
         : ConstListBase(col_key)
-        , m_leaf(new LeafType(alloc))
+        , m_tree(new BPlusTree<T>(alloc))
     {
-        m_leaf->set_parent(this, 0); // ndx not used, implicit in m_owner
+        m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
     }
 
     ConstListIf(const ConstListIf&) = delete;
     ConstListIf(ConstListIf&& other)
         : ConstListBase(std::move(other))
-        , m_leaf(std::move(other.m_leaf))
+        , m_tree(std::move(other.m_tree))
         , m_valid(other.m_valid)
     {
-        m_leaf->set_parent(this, 0);
+        m_tree->set_parent(this, 0);
     }
 
     void init_from_parent() const override
     {
         ref_type ref = get_child_ref(0);
         if (ref) {
-            m_leaf->init_from_ref(ref);
+            m_tree->init_from_ref(ref);
             m_valid = true;
         }
     }
@@ -354,7 +353,7 @@ public:
 template <class T>
 class List : public ConstListIf<T>, public ListBase {
 public:
-    using ConstListIf<T>::m_leaf;
+    using ConstListIf<T>::m_tree;
     using ConstListIf<T>::get;
 
     List(const Obj& owner, ColKey col_key);
@@ -372,7 +371,7 @@ public:
 
     void create()
     {
-        m_leaf->create();
+        m_tree->create();
         ConstListIf<T>::m_valid = true;
     }
     size_t size() const override
@@ -381,19 +380,19 @@ public:
     }
     void insert_null(size_t ndx) override
     {
-        if (ndx > m_leaf->size()) {
+        if (ndx > m_tree->size()) {
             throw std::out_of_range("Index out of range");
         }
         ensure_writeable();
         if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
             ConstListBase::insert_null_repl(repl, ndx);
         }
-        m_leaf->insert(ndx, ConstListIf<T>::LeafType::default_value(false));
+        m_tree->insert_null(ndx);
     }
     void resize(size_t new_size) override
     {
         update_if_needed();
-        size_t current_size = m_leaf->size();
+        size_t current_size = m_tree->size();
         while (new_size > current_size) {
             insert_null(current_size++);
         }
@@ -402,7 +401,7 @@ public:
     }
     void add(T value)
     {
-        insert(m_leaf->size(), value);
+        insert(m_tree->size(), value);
     }
     T set(size_t ndx, T value)
     {
@@ -435,7 +434,7 @@ public:
             ConstListBase::erase_repl(repl, ndx);
         }
         T old = get(ndx);
-        m_leaf->erase(ndx);
+        m_tree->erase(ndx);
         ConstListBase::adj_remove(ndx);
         m_obj.bump_both_versions();
 
@@ -482,7 +481,7 @@ public:
         if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
             ConstListBase::clear_repl(repl);
         }
-        m_leaf->truncate_and_destroy_children(0);
+        m_tree->clear();
         m_obj.bump_both_versions();
     }
 
@@ -491,7 +490,7 @@ protected:
     bool update_if_needed()
     {
         if (m_obj.update_if_needed()) {
-            m_leaf->init_from_parent();
+            m_tree->init_from_parent();
             return true;
         }
         return false;
@@ -500,12 +499,12 @@ protected:
     {
         if (!m_obj.is_writeable()) {
             m_obj.ensure_writeable();
-            m_leaf->init_from_parent();
+            m_tree->init_from_parent();
         }
     }
     void do_set(size_t ndx, T value)
     {
-        m_leaf->set(ndx, value);
+        m_tree->set(ndx, value);
     }
     void set_repl(Replication* repl, size_t ndx, T value);
 };
@@ -564,7 +563,7 @@ public:
 
     LinkList(const Obj& owner, ColKey col_key)
         : List<ObjKey>(owner, col_key)
-        , ObjList(*this->m_leaf, &get_target_table())
+        , ObjList(*this->m_tree, &get_target_table())
     {
     }
     LinkListPtr clone() const

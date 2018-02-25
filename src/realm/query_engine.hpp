@@ -912,7 +912,7 @@ public:
 
 private:
     // Leaf cache
-    using ListType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    using ListType = BPlusTree<T>;
     using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayList), alignof(ArrayList)>::type;
     using LeafPtr = std::unique_ptr<ArrayList, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;

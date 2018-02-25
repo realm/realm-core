@@ -37,6 +37,7 @@
 #include <realm/array_basic.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/column.hpp>
+#include <realm/bplustree.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/column_string.hpp>
 #include <realm/index_string.hpp>

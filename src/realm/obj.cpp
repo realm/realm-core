@@ -636,10 +636,13 @@ void Obj::nullify_link(ColKey origin_col_key, ObjKey target_key)
         linklists.set_parent(&fields, origin_col_ndx + 1);
         linklists.init_from_parent();
 
-        ArrayKey links(alloc);
+        BPlusTree<ObjKey> links(alloc);
         links.set_parent(&linklists, m_row_ndx);
         links.init_from_parent();
-        links.nullify(target_key);
+        size_t ndx = links.find_first(target_key);
+        // There must be one
+        REALM_ASSERT(ndx != realm::npos);
+        links.erase(ndx);
 
         alloc.bump_storage_version();
     }

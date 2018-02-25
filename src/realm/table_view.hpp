@@ -288,7 +288,7 @@ public:
     /// within this view is returned, otherwise `realm::not_found` is returned.
     size_t find_by_source_ndx(ObjKey key) const noexcept
     {
-        return m_key_values.find_first(key, 0, m_key_values.size());
+        return m_key_values.find_first(key);
     }
 
     // Conversion

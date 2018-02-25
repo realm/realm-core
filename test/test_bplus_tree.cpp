@@ -21,6 +21,7 @@
 #include "realm/bplustree.hpp"
 #include "realm/array_string.hpp"
 #include "realm/array_timestamp.hpp"
+#include "realm/array_key.hpp"
 
 #include "test.hpp"
 
