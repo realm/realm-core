@@ -134,7 +134,8 @@ auto results_for_query(std::string const& query_string, Realm::Config const& con
     auto table = ObjectStore::table_for_object_type(realm->read_group(), object_type);
     Query query = table->where();
     auto parser_result = realm::parser::parse(query_string);
-    query_builder::apply_predicate(query, parser_result.predicate);
+    query_builder::NoArguments no_args;
+    query_builder::apply_predicate(query, parser_result.predicate, no_args);
 
     DescriptorOrdering ordering;
     query_builder::apply_ordering(ordering, table, parser_result.ordering);
@@ -484,6 +485,38 @@ TEST_CASE("Partial sync", "[sync]") {
             }
         });
         EventLoop::main().run_until([&] { return partial_sync_done; });
+    }
+
+    SECTION("clearing a `Results` backed by a table works with partial sync") {
+        // The `ClearTable` instruction emitted by `Table::clear` won't be supported on partially-synced Realms
+        // going forwards. Currently it gives incorrect results. Verify that `Results::clear` backed by a table
+        // uses something other than `Table::clear` and gives the results we expect.
+
+        // Subscribe to a subset of `object_a` objects.
+        auto subscription = subscribe_and_wait("number > 1", partial_config, "object_a", util::none, [&](Results results, std::exception_ptr error) {
+            REQUIRE(!error);
+            REQUIRE(results.size() == 2);
+
+            // Remove all objects that matched our subscription.
+            auto realm = results.get_realm();
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+            realm->begin_transaction();
+            Results(realm, *table).clear();
+            realm->commit_transaction();
+
+            std::atomic<bool> upload_done(false);
+            auto session = SyncManager::shared().get_existing_active_session(partial_config.path);
+            session->wait_for_upload_completion([&](auto) { upload_done = true; });
+            EventLoop::main().run_until([&] { return upload_done.load(); });
+        });
+        partial_sync::unsubscribe(subscription);
+
+        // Ensure that all objects that matched our subscription above were removed, and that
+        // the non-matching objects remain.
+        subscribe_and_wait("TRUEPREDICATE", partial_config, "object_a", util::none, [](Results results, std::exception_ptr error) {
+            REQUIRE(!error);
+            REQUIRE(results.size() == 1);
+        });
     }
 }
 

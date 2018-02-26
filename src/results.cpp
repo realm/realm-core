@@ -436,7 +436,10 @@ void Results::clear()
             return;
         case Mode::Table:
             validate_write();
-            m_table->clear();
+            if (m_realm->is_partial())
+                Results(m_realm, m_table->where()).clear();
+            else
+                m_table->clear();
             break;
         case Mode::Query:
             // Not using Query:remove() because building the tableview and
