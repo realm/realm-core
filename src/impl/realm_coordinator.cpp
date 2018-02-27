@@ -795,8 +795,12 @@ void RealmCoordinator::advance_to_ready(Realm& realm)
             // While there is a newer version, notifications are for the current
             // version so just deliver them without advancing
             if (*version == current_version) {
+                if (realm.m_binding_context)
+                    realm.m_binding_context->will_send_notifications();
                 notifiers.deliver(*sg);
                 notifiers.after_advance();
+                if (realm.m_binding_context)
+                    realm.m_binding_context->did_send_notifications();
                 return;
             }
         }
@@ -860,10 +864,15 @@ void RealmCoordinator::process_available_async(Realm& realm)
     if (notifiers.empty())
         return;
 
+    if (realm.m_binding_context)
+        realm.m_binding_context->will_send_notifications();
+
     if (auto error = m_async_error) {
         lock.unlock();
         for (auto& notifier : notifiers)
             notifier->deliver_error(m_async_error);
+        if (realm.m_binding_context)
+            realm.m_binding_context->did_send_notifications();
         return;
     }
 
@@ -889,6 +898,9 @@ void RealmCoordinator::process_available_async(Realm& realm)
     // but still call the change callbacks
     for (auto& notifier : notifiers)
         notifier->after_advance();
+
+    if (realm.m_binding_context)
+        realm.m_binding_context->did_send_notifications();
 }
 
 void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)

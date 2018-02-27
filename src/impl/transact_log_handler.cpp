@@ -782,18 +782,27 @@ void advance_with_notifications(BindingContext* context, const std::unique_ptr<S
         // did_change() could close the Realm. Just return if it does.
         if (!sg)
             return;
+
+        if (context)
+            context->will_send_notifications();
         // did_change() can change the read version, and if it does we can't
         // deliver notifiers
         if (new_version == sg->get_version_of_current_transaction())
             notifiers.deliver(*sg);
         notifiers.after_advance();
+        if (context)
+            context->did_send_notifications();
         return;
     }
 
+    if (context)
+        context->will_send_notifications();
     func(KVOTransactLogObserver(observers, context, notifiers, *sg));
     notifiers.package_and_wait(sg->get_version_of_current_transaction().version); // is a no-op if parse_complete() was called
     notifiers.deliver(*sg);
     notifiers.after_advance();
+    if (context)
+        context->did_send_notifications();
 }
 
 } // anonymous namespace

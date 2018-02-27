@@ -1367,3 +1367,201 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function",
         }
     }
 }
+
+TEST_CASE("BindingContext is notified about delivery of change notifications") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {
+            {"value", PropertyType::Int}
+        }},
+    });
+
+    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+    auto table = r->read_group().get_table("class_object");
+
+    SECTION("BindingContext notified even if no callbacks are registered") {
+        static int binding_context_start_notify_calls = 0;
+        static int binding_context_end_notify_calls = 0;
+        struct Context : BindingContext {
+            void will_send_notifications() override
+            {
+                ++binding_context_start_notify_calls;
+            }
+
+            void did_send_notifications() override
+            {
+                ++binding_context_end_notify_calls;
+            }
+        };
+        r->m_binding_context.reset(new Context());
+
+        SECTION("local commit") {
+            binding_context_start_notify_calls = 0;
+            binding_context_end_notify_calls = 0;
+            coordinator->on_change();
+            r->begin_transaction();
+            REQUIRE(binding_context_start_notify_calls == 1);
+            REQUIRE(binding_context_end_notify_calls == 1);
+            r->cancel_transaction();
+        }
+
+        SECTION("remote commit") {
+            binding_context_start_notify_calls = 0;
+            binding_context_end_notify_calls = 0;
+            JoiningThread thread([&] {
+                auto r2 = coordinator->get_realm();
+                r2->begin_transaction();
+                auto table2 = r2->read_group().get_table("class_object");
+                table2->add_empty_row();
+                r2->commit_transaction();
+            });
+            thread.join();
+            advance_and_notify(*r);
+            REQUIRE(binding_context_start_notify_calls == 1);
+            REQUIRE(binding_context_end_notify_calls == 1);
+        }
+    }
+
+    SECTION("notify BindingContext before and after sending notifications") {
+        static int binding_context_start_notify_calls = 0;
+        static int binding_context_end_notify_calls = 0;
+        static int notification_calls = 0;
+
+        Results results1(r, table->where().greater_equal(0, 0));
+        Results results2(r, table->where().less(0, 10));
+
+        auto token1 = results1.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            ++notification_calls;
+        });
+
+        auto token2 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            ++notification_calls;
+        });
+
+        struct Context : BindingContext {
+            void will_send_notifications() override
+            {
+                REQUIRE(notification_calls == 0);
+                REQUIRE(binding_context_end_notify_calls == 0);
+                ++binding_context_start_notify_calls;
+            }
+
+            void did_send_notifications() override
+            {
+                REQUIRE(notification_calls == 2);
+                REQUIRE(binding_context_start_notify_calls == 1);
+                ++binding_context_end_notify_calls;
+            }
+        };
+        r->m_binding_context.reset(new Context());
+
+        SECTION("local commit") {
+            binding_context_start_notify_calls = 0;
+            binding_context_end_notify_calls = 0;
+            notification_calls = 0;
+            coordinator->on_change();
+            r->begin_transaction();
+            table->add_empty_row();
+            r->commit_transaction();
+            REQUIRE(binding_context_start_notify_calls == 1);
+            REQUIRE(binding_context_end_notify_calls == 1);
+        }
+
+        SECTION("remote commit") {
+            binding_context_start_notify_calls = 0;
+            binding_context_end_notify_calls = 0;
+            notification_calls = 0;
+            JoiningThread thread([&] {
+                auto r2 = coordinator->get_realm();
+                r2->begin_transaction();
+                auto table2 = r2->read_group().get_table("class_object");
+                table2->add_empty_row();
+                r2->commit_transaction();
+            });
+            thread.join();
+            advance_and_notify(*r);
+            REQUIRE(binding_context_start_notify_calls == 1);
+            REQUIRE(binding_context_end_notify_calls == 1);
+        }
+    }
+}
+
+#if REALM_PLATFORM_APPLE
+TEST_CASE("BindingContext is notified in case of notifier errors") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
+    class OpenFileLimiter {
+    public:
+        OpenFileLimiter()
+        {
+            // Set the max open files to zero so that opening new files will fail
+            getrlimit(RLIMIT_NOFILE, &m_old);
+            rlimit rl = m_old;
+            rl.rlim_cur = 0;
+            setrlimit(RLIMIT_NOFILE, &rl);
+        }
+
+        ~OpenFileLimiter()
+        {
+            setrlimit(RLIMIT_NOFILE, &m_old);
+        }
+
+    private:
+        rlimit m_old;
+    };
+
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+      {"object", {
+        {"value", PropertyType::Int}
+      }},
+    });
+
+    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+    auto table = r->read_group().get_table("class_object");
+    Results results(r, *r->read_group().get_table("class_object"));
+    static int binding_context_start_notify_calls = 0;
+    static int binding_context_end_notify_calls = 0;
+    static bool error_called = false;
+    struct Context : BindingContext {
+        void will_send_notifications() override
+        {
+            REQUIRE_FALSE(error_called);
+            ++binding_context_start_notify_calls;
+        }
+
+        void did_send_notifications() override
+        {
+            REQUIRE(error_called);
+            ++binding_context_end_notify_calls;
+        }
+    };
+    r->m_binding_context.reset(new Context());
+
+    SECTION("realm on background thread could not be opened") {
+        OpenFileLimiter limiter;
+
+        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+            REQUIRE(err);
+            REQUIRE_FALSE(error_called);
+            error_called = true;
+        });
+        advance_and_notify(*r);
+        REQUIRE(error_called);
+        REQUIRE(binding_context_start_notify_calls == 1);
+        REQUIRE(binding_context_end_notify_calls == 1);
+    }
+}
+#endif
