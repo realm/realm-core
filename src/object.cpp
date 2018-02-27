@@ -91,3 +91,20 @@ Property const& Object::property_for_name(StringData prop_name) const
     }
     return *prop;
 }
+
+#if REALM_ENABLE_SYNC
+void Object::ensure_user_in_everyone_role()
+{
+    auto role_table = m_realm->read_group().get_table("class___Role");
+    if (!role_table)
+        return;
+    size_t ndx = role_table->find_first_string(role_table->get_column_index("name"), "everyone");
+    if (ndx == npos)
+        return;
+    auto users = role_table->get_linklist(role_table->get_column_index("members"), ndx);
+    if (users->find(m_row.get_index()) != not_found)
+        return;
+
+    users->add(m_row.get_index());
+}
+#endif

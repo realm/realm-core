@@ -218,5 +218,29 @@ TEST_CASE("Object-level Permissions") {
             CHECK(r->get_privileges() == ComputedPrivileges::AllRealm);
             CHECK(r->get_privileges("object") == ComputedPrivileges::None);
         }
+
+        SECTION("automatically add newly created users to 'everyone'") {
+            using namespace std::string_literals;
+
+            config.schema = Schema{
+                {"__User", {
+                    {"name", PropertyType::String, Property::IsPrimary{true}}
+                }},
+            };
+            config.sync_config->is_partial = true;
+            auto r = Realm::get_shared_realm(config);
+            r->begin_transaction();
+
+            CppContext c;
+            auto user = Object::create<util::Any>(c, r, *r->schema().find("__User"), AnyDict{{"name", "test user"s}});
+
+            auto role_table = r->read_group().get_table("class___Role");
+            REQUIRE(role_table);
+            size_t ndx = role_table->find_first_string(role_table->get_column_index("name"), "everyone");
+            REQUIRE(ndx != npos);
+            REQUIRE(role_table->get_linklist(role_table->get_column_index("members"), ndx)->find(user.row().get_index()) != npos);
+
+            r->commit_transaction();
+        }
     }
 }
