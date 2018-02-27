@@ -137,6 +137,7 @@ enum class SchemaMode : uint8_t {
 
 enum class ComputedPrivileges : uint8_t {
     None = 0,
+
     Read = (1 << 0),
     Update = (1 << 1),
     Delete = (1 << 2),
@@ -144,6 +145,10 @@ enum class ComputedPrivileges : uint8_t {
     Query = (1 << 4),
     Create = (1 << 5),
     ModifySchema = (1 << 6),
+
+    AllRealm = Read | Update | SetPermissions | ModifySchema,
+    AllClass = Read | Update | Create | Query | SetPermissions,
+    AllObject = Read | Update | Delete | SetPermissions,
     All = (1 << 7) - 1
 };
 

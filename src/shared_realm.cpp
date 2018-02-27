@@ -959,6 +959,20 @@ static_assert(static_cast<int>(ComputedPrivileges::Query) == static_cast<int>(sy
 static_assert(static_cast<int>(ComputedPrivileges::Create) == static_cast<int>(sync::Privilege::Create), "");
 static_assert(static_cast<int>(ComputedPrivileges::ModifySchema) == static_cast<int>(sync::Privilege::ModifySchema), "");
 
+static constexpr const uint8_t s_allRealmPrivileges = sync::Privilege::Read
+                                                    | sync::Privilege::Update
+                                                    | sync::Privilege::SetPermissions
+                                                    | sync::Privilege::ModifySchema;
+static constexpr const uint8_t s_allClassPrivileges = sync::Privilege::Read
+                                                    | sync::Privilege::Update
+                                                    | sync::Privilege::Create
+                                                    | sync::Privilege::Query
+                                                    | sync::Privilege::SetPermissions;
+static constexpr const uint8_t s_allObjectPrivileges = sync::Privilege::Read
+                                                     | sync::Privilege::Update
+                                                     | sync::Privilege::Delete
+                                                     | sync::Privilege::SetPermissions;
+
 bool Realm::init_permission_cache()
 {
     verify_thread();
@@ -988,8 +1002,8 @@ void Realm::invalidate_permission_cache()
 ComputedPrivileges Realm::get_privileges()
 {
     if (!init_permission_cache())
-        return ComputedPrivileges::All;
-    return static_cast<ComputedPrivileges>(m_permissions_cache->get_realm_privileges());
+        return static_cast<ComputedPrivileges>(s_allRealmPrivileges);
+    return static_cast<ComputedPrivileges>(m_permissions_cache->get_realm_privileges() & s_allRealmPrivileges);
 }
 
 static uint8_t inherited_mask(uint32_t privileges)
@@ -1005,16 +1019,16 @@ static uint8_t inherited_mask(uint32_t privileges)
 ComputedPrivileges Realm::get_privileges(StringData object_type)
 {
     if (!init_permission_cache())
-        return ComputedPrivileges::All;
+        return static_cast<ComputedPrivileges>(s_allClassPrivileges);
     auto privileges = inherited_mask(m_permissions_cache->get_realm_privileges())
                     & m_permissions_cache->get_class_privileges(object_type);
-    return static_cast<ComputedPrivileges>(privileges);
+    return static_cast<ComputedPrivileges>(privileges & s_allClassPrivileges);
 }
 
 ComputedPrivileges Realm::get_privileges(RowExpr row)
 {
     if (!init_permission_cache())
-        return ComputedPrivileges::All;
+        return static_cast<ComputedPrivileges>(s_allObjectPrivileges);
 
     auto& table = *row.get_table();
     auto object_type = ObjectStore::object_type_for_table_name(table.get_name());
@@ -1022,7 +1036,7 @@ ComputedPrivileges Realm::get_privileges(RowExpr row)
     auto privileges = inherited_mask(m_permissions_cache->get_realm_privileges())
                     & inherited_mask(m_permissions_cache->get_class_privileges(object_type))
                     & m_permissions_cache->get_object_privileges(global_id);
-    return static_cast<ComputedPrivileges>(privileges);
+    return static_cast<ComputedPrivileges>(privileges & s_allObjectPrivileges);
 }
 #else
 void Realm::invalidate_permission_cache() { }

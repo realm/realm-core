@@ -134,9 +134,9 @@ TEST_CASE("Object-level Permissions") {
             auto r = Realm::get_shared_realm(config);
             auto& table = create_object(r);
 
-            CHECK(r->get_privileges() == ComputedPrivileges::All);
-            CHECK(r->get_privileges("object") == ComputedPrivileges::All);
-            CHECK(r->get_privileges(table[0]) == ComputedPrivileges::All);
+            CHECK(r->get_privileges() == ComputedPrivileges::AllRealm);
+            CHECK(r->get_privileges("object") == ComputedPrivileges::AllClass);
+            CHECK(r->get_privileges(table[0]) == ComputedPrivileges::AllObject);
         }
     }
 
@@ -145,9 +145,9 @@ TEST_CASE("Object-level Permissions") {
             auto r = Realm::get_shared_realm(config);
             auto& table = create_object(r);
 
-            CHECK(r->get_privileges() == ComputedPrivileges::All);
-            CHECK(r->get_privileges("object") == ComputedPrivileges::All);
-            CHECK(r->get_privileges(table[0]) == ComputedPrivileges::All);
+            CHECK(r->get_privileges() == ComputedPrivileges::AllRealm);
+            CHECK(r->get_privileges("object") == ComputedPrivileges::AllClass);
+            CHECK(r->get_privileges(table[0]) == ComputedPrivileges::AllObject);
         }
     }
 
@@ -158,9 +158,9 @@ TEST_CASE("Object-level Permissions") {
             auto r = Realm::get_shared_realm(config);
             auto& table = create_object(r);
 
-            CHECK(r->get_privileges() == ComputedPrivileges::All);
-            CHECK(r->get_privileges("object") == ComputedPrivileges::All);
-            CHECK(r->get_privileges(table[0]) == ComputedPrivileges::All);
+            CHECK(r->get_privileges() == ComputedPrivileges::AllRealm);
+            CHECK(r->get_privileges("object") == ComputedPrivileges::AllClass);
+            CHECK(r->get_privileges(table[0]) == ComputedPrivileges::AllObject);
         }
 
         SECTION("continue to permit all operations after syncing locally-created data") {
@@ -173,9 +173,9 @@ TEST_CASE("Object-level Permissions") {
             wait_for_upload(*r);
             wait_for_download(*r);
 
-            CHECK(r->get_privileges() == ComputedPrivileges::All);
-            CHECK(r->get_privileges("object") == ComputedPrivileges::All);
-            CHECK(r->get_privileges(table[0]) == ComputedPrivileges::All);
+            CHECK(r->get_privileges() == ComputedPrivileges::AllRealm);
+            CHECK(r->get_privileges("object") == ComputedPrivileges::AllClass);
+            CHECK(r->get_privileges(table[0]) == ComputedPrivileges::AllObject);
         }
 
         SECTION("permit all operations on a downloaded Realm created as a non-partial Realm when logged in as an admin") {
@@ -192,9 +192,9 @@ TEST_CASE("Object-level Permissions") {
             wait_for_download(*r);
             subscribe_to_all(r);
 
-            CHECK(r->get_privileges() == ComputedPrivileges::All);
-            CHECK(r->get_privileges("object") == ComputedPrivileges::All);
-            CHECK(r->get_privileges(r->read_group().get_table("class_object")->get(0)) == ComputedPrivileges::All);
+            CHECK(r->get_privileges() == ComputedPrivileges::AllRealm);
+            CHECK(r->get_privileges("object") == ComputedPrivileges::AllClass);
+            CHECK(r->get_privileges(r->read_group().get_table("class_object")->get(0)) == ComputedPrivileges::AllObject);
         }
 
         SECTION("permit nothing on pre-existing types in a downloaded Realm created as a non-partial Realm") {
@@ -215,7 +215,7 @@ TEST_CASE("Object-level Permissions") {
             // should have no objects as we don't have read permission
             CHECK(r->read_group().get_table("class_object")->size() == 0);
 
-            CHECK(r->get_privileges() == ComputedPrivileges::All);
+            CHECK(r->get_privileges() == ComputedPrivileges::AllRealm);
             CHECK(r->get_privileges("object") == ComputedPrivileges::None);
         }
     }
