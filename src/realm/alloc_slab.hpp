@@ -27,6 +27,7 @@
 
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
+#include <realm/util/thread.hpp>
 #include <realm/alloc.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 
@@ -419,6 +420,7 @@ private:
 
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
+    util::RaceDetector changes;
     std::vector<util::File::Map<char>> m_mappings;
 
     // FIXME: We'll have to switch away from std::vector to have absolute and

@@ -223,7 +223,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
         memstat_requested += size;
     }
 #endif
-
+    CriticalSection cs(changes);
     REALM_ASSERT(0 < size);
     REALM_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
     REALM_ASSERT(is_attached());
@@ -369,6 +369,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 {
     REALM_ASSERT_3(translate(ref), ==, addr);
+    CriticalSection cs(changes);
 
     // Free space in read only segment is tracked separately
     bool read_only = is_read_only(ref);
@@ -458,6 +459,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 
 void SlabAlloc::consolidate_free_read_only()
 {
+    CriticalSection cs(changes);
     if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         throw InvalidFreeSpace();
     if (m_free_read_only.empty())
@@ -872,6 +874,7 @@ size_t SlabAlloc::get_total_size() const noexcept
 
 void SlabAlloc::reset_free_space_tracking()
 {
+    CriticalSection cs(changes);
     if (is_free_space_clean())
         return;
 
