@@ -307,7 +307,7 @@ bool BPlusTreeInner::bptree_traverse(TraverseFunc& func)
         MemRef mem(child_header, child_ref, m_alloc);
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
         if (child_is_leaf) {
-            auto leaf = cache_leaf(mem, i, child_offset);
+            auto leaf = cache_leaf(mem, i, child_offset + m_my_offset);
             done = func(leaf, child_offset + m_my_offset);
         }
         else {

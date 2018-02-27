@@ -259,6 +259,12 @@ public:
         m_size = m_root->get_tree_size();
     }
 
+    void init_from_parent()
+    {
+        ref_type ref = m_parent->get_child_ref(m_ndx_in_parent);
+        init_from_ref(ref);
+    }
+
     void set_parent(ArrayParent* parent, size_t ndx_in_parent)
     {
         m_parent = parent;
@@ -272,6 +278,9 @@ public:
         REALM_ASSERT(!is_attached());
         m_root = create_leaf_node();
         m_root->set_parent(m_parent, m_ndx_in_parent);
+        if (m_parent) {
+            m_parent->update_child_ref(m_ndx_in_parent, get_ref());
+        }
     }
 
     void destroy()
@@ -359,6 +368,7 @@ public:
         {
             LeafArray::set_parent(p, n);
         }
+
         void update_parent() override
         {
             LeafArray::update_parent();
@@ -368,6 +378,7 @@ public:
         {
             return LeafArray::size();
         }
+
         size_t get_tree_size() const override
         {
             return LeafArray::size();
@@ -398,6 +409,7 @@ public:
     {
         *this = other;
     }
+
     BPlusTree(BPlusTree&& other)
         : BPlusTree(other.get_alloc())
     {
@@ -411,6 +423,7 @@ public:
         this->BPlusTreeBase::operator=(rhs);
         return *this;
     }
+
     BPlusTree& operator=(BPlusTree&& rhs)
     {
         this->BPlusTreeBase::operator=(std::move(rhs));
@@ -425,12 +438,14 @@ public:
         static_cast<LeafNode*>(leaf.get())->create();
         return leaf;
     }
+
     std::unique_ptr<BPlusTreeLeaf> init_leaf_node(ref_type ref) override
     {
         std::unique_ptr<BPlusTreeLeaf> leaf = std::make_unique<LeafNode>(this);
         leaf->init_from_ref(ref);
         return leaf;
     }
+
     BPlusTreeLeaf* cache_leaf(MemRef mem) override
     {
         m_leaf_cache.init_from_mem(mem);
@@ -443,6 +458,7 @@ public:
     {
         insert(npos, value);
     }
+
     void insert(size_t n, T value)
     {
         BPlusTreeNode::InsertFunc func = [value](BPlusTreeNode* node, size_t ndx) {
@@ -454,7 +470,8 @@ public:
         bptree_insert(n, func);
         m_size++;
     }
-    T get(size_t n)
+
+    T get(size_t n) const
     {
         if (m_cached_leaf_begin <= n && n < m_cached_leaf_end) {
             return m_leaf_cache.get(n - m_cached_leaf_begin);
@@ -472,6 +489,26 @@ public:
             return value;
         }
     }
+
+    std::vector<T> get_all() const
+    {
+        std::vector<T> all_values;
+        all_values.reserve(m_size);
+
+        BPlusTreeNode::TraverseFunc func = [&all_values](BPlusTreeNode* node, size_t) {
+            LeafNode* leaf = static_cast<LeafNode*>(node);
+            size_t sz = leaf->size();
+            for (size_t i = 0; i < sz; i++) {
+                all_values.push_back(leaf->get(i));
+            }
+            return false;
+        };
+
+        m_root->bptree_traverse(func);
+
+        return all_values;
+    }
+
     void set(size_t n, T value)
     {
         BPlusTreeNode::AccessFunc func = [value](BPlusTreeNode* node, size_t ndx) {
@@ -481,6 +518,7 @@ public:
 
         m_root->bptree_access(n, func);
     }
+
     void erase(size_t n)
     {
         BPlusTreeNode::EraseFunc func = [](BPlusTreeNode* node, size_t ndx) {
@@ -492,6 +530,23 @@ public:
         bptree_erase(n, func);
         m_size--;
     }
+
+    void clear()
+    {
+        if (m_root->is_leaf()) {
+            LeafNode* leaf = static_cast<LeafNode*>(m_root.get());
+            leaf->truncate_and_destroy_children(0);
+        }
+        else {
+            destroy();
+            create();
+            if (m_parent) {
+                m_parent->update_child_ref(m_ndx_in_parent, get_ref());
+            }
+        }
+        m_size = 0;
+    }
+
     size_t find_first(T value) const noexcept
     {
         size_t result = realm::npos;
@@ -511,6 +566,7 @@ public:
 
         return result;
     }
+
     void dump_values() const
     {
         BPlusTreeNode::TraverseFunc func = [](BPlusTreeNode* node, size_t offset) {

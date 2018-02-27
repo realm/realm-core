@@ -49,16 +49,10 @@ public:
     {
     }
 
-protected:
-    virtual void update_child_ref(size_t child_ndx, ref_type new_ref) = 0;
-
     virtual ref_type get_child_ref(size_t child_ndx) const noexcept = 0;
-
+    virtual void update_child_ref(size_t child_ndx, ref_type new_ref) = 0;
     // Used only by Array::to_dot().
     virtual std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const = 0;
-
-    friend class Node;
-    friend class Array;
 };
 
 /// Provides access to individual array nodes of the database.

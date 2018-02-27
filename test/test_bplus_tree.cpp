@@ -91,7 +91,13 @@ TEST(BPlusTree_Integer)
     CHECK_EQUAL(tree.find_first(7), 7);
     CHECK_EQUAL(tree.find_first(100), realm::npos);
 
+    std::vector<Int> all = tree.get_all();
     size_t sz = tree.size();
+    CHECK_EQUAL(all.size(), sz);
+    for (size_t i = 0; i < sz; i++) {
+        CHECK_EQUAL(tree.get(i), all[i]);
+    }
+
     while (sz) {
         sz--;
         tree.erase(sz);
@@ -110,6 +116,9 @@ TEST(BPlusTree_Timestamp)
     tree.add(Timestamp(7, 3));
     CHECK_EQUAL(tree.get(0), Timestamp(5, 2));
     CHECK_EQUAL(tree.find_first(Timestamp(7, 3)), 2);
+
+    tree.clear();
+    CHECK_EQUAL(tree.size(), 0);
 
     tree.destroy();
 }
@@ -182,25 +191,25 @@ TEST(BPlusTree_Fuzz)
 // This test is designed to work with a node size of 4
 TEST(BPlusTree_Initialization)
 {
-    BPlusTree<Int> tree(Allocator::get_default());
     Array parent_array(Allocator::get_default());
-
-    tree.create();
     parent_array.create(NodeHeader::type_HasRefs);
+    parent_array.add(0);
+
+    BPlusTree<Int> tree(Allocator::get_default());
+    tree.set_parent(&parent_array, 0);
+    tree.create();
+    CHECK_EQUAL(tree.get_ref(), parent_array.get_as_ref(0));
 
     tree.add(5);
     CHECK_EQUAL(tree.get(0), 5);
 
     BPlusTree<Int> another_tree(Allocator::get_default());
-    parent_array.add(0);
     another_tree.set_parent(&parent_array, 0);
 
     // another_tree initialized from scratch with a single leaf
-    ref_type ref = tree.get_ref();
-    another_tree.init_from_ref(ref);
+    another_tree.init_from_parent();
 
     CHECK_EQUAL(another_tree.get(0), 5);
-    CHECK_EQUAL(parent_array.get(0), ref);
 
     tree.erase(0);
     // expand tree
@@ -209,9 +218,7 @@ TEST(BPlusTree_Initialization)
     }
 
     // another_tree re-initialized with an inner node - replace accessor
-    ref = tree.get_ref();
-    another_tree.init_from_ref(ref);
-
+    another_tree.init_from_parent();
     CHECK_EQUAL(another_tree.get(5), 5);
 
     // expand tree further
@@ -220,11 +227,14 @@ TEST(BPlusTree_Initialization)
     }
 
     // another_tree re-initialized with an inner node - reuse accessor
-    ref = tree.get_ref();
-    another_tree.init_from_ref(ref);
-
+    another_tree.init_from_parent();
     CHECK_EQUAL(another_tree.get(15), 15);
     CHECK_EQUAL(another_tree.size(), 20);
+
+    tree.clear();
+
+    another_tree.init_from_parent();
+    CHECK_EQUAL(another_tree.size(), 0);
 
     tree.destroy();
     parent_array.destroy();
