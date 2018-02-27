@@ -23,6 +23,7 @@
 #include <algorithm>
 
 #include <realm/column.hpp>
+#include <realm/bplustree.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/column_tpl.hpp>
 
@@ -1279,6 +1280,40 @@ TEST(Column_Iterators)
     CHECK(realm_next >= realm_it);
     CHECK(realm_next >= realm_next);
     CHECK(!(realm_it >= realm_next));
+
+    c.destroy();
+}
+
+// This test confirms that we can read columns produced by Column<T>
+// with a BPlusTree<T> accessor
+TEST(BPlusTree_ColumnIntCompatibility)
+{
+    ref_type ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn c(Allocator::get_default(), ref);
+
+    for (int i = 0; i < 500; i++) {
+        c.add(i);
+    }
+
+    BPlusTree<Int> tree(Allocator::get_default());
+    tree.init_from_ref(c.get_ref());
+
+    CHECK_EQUAL(c.size(), tree.size());
+    size_t sz = c.size();
+    for (size_t i = 0; i < sz; i++) {
+        CHECK_EQUAL(c.get(i), tree.get(i));
+    }
+
+    c.insert(17, 1234);
+    c.insert(177, 5678);
+    c.erase(321);
+    tree.init_from_ref(c.get_ref());
+
+    CHECK_EQUAL(c.size(), tree.size());
+    sz = c.size();
+    for (size_t i = 0; i < sz; i++) {
+        CHECK_EQUAL(c.get(i), tree.get(i));
+    }
 
     c.destroy();
 }
