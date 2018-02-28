@@ -25,6 +25,7 @@
 namespace realm {
 
 class BPlusTreeBase;
+class BPlusTreeInner;
 
 /*****************************************************************************/
 /* BPlusTreeNode                                                             */
@@ -99,6 +100,7 @@ public:
     {
         return true;
     }
+
     bool is_compact() const override
     {
         return true;
@@ -108,114 +110,6 @@ public:
     void bptree_access(size_t n, AccessFunc&) override;
     size_t bptree_erase(size_t n, EraseFunc&) override;
     bool bptree_traverse(TraverseFunc&) override;
-};
-
-/*****************************************************************************/
-/* BPlusTreeInner                                                            */
-/* All interior nodes is of this class                                       */
-/*****************************************************************************/
-class BPlusTreeInner : public BPlusTreeNode, private Array {
-public:
-    BPlusTreeInner(BPlusTreeBase* tree);
-    ~BPlusTreeInner() override;
-
-    void init_from_mem(MemRef mem);
-    void create(size_t elems_per_child);
-
-    void init_from_ref(ref_type ref) noexcept override
-    {
-        char* header = m_alloc.translate(ref);
-        init_from_mem(MemRef(header, ref, m_alloc));
-    }
-
-    bool is_leaf() const override
-    {
-        return false;
-    }
-    bool is_compact() const override
-    {
-        return (Array::get(0) & 1) != 0;
-    }
-    ref_type get_ref() const override
-    {
-        return Array::get_ref();
-    }
-
-    void set_parent(ArrayParent* p, size_t n) override
-    {
-        Array::set_parent(p, n);
-    }
-    void update_parent() override
-    {
-        Array::update_parent();
-    }
-
-    size_t get_node_size() const override
-    {
-        return Array::size() - 2;
-    }
-    size_t get_tree_size() const override
-    {
-        return size_t(back()) >> 1;
-    }
-
-    ref_type bptree_insert(size_t n, State& state, InsertFunc&) override;
-    void bptree_access(size_t n, AccessFunc&) override;
-    size_t bptree_erase(size_t n, EraseFunc&) override;
-    bool bptree_traverse(TraverseFunc&) override;
-
-protected:
-    friend BPlusTreeBase;
-    ArrayUnsigned m_offsets;
-    size_t m_my_offset;
-
-    void move(BPlusTreeNode* new_node, size_t ndx, int64_t offset_adj) override;
-    void ensure_offsets();
-    void set_offset(size_t offs)
-    {
-        m_my_offset = offs;
-    }
-    void set_tree_size(size_t sz)
-    {
-        Array::set(m_size - 1, (sz << 1) + 1);
-    }
-    void append_tree_size(size_t sz)
-    {
-        Array::add((sz << 1) + 1);
-    }
-    size_t get_elems_per_child()
-    {
-        // Only relevant when in compact form
-        REALM_ASSERT_DEBUG(!m_offsets.is_attached());
-        return size_t(Array::get(0)) >> 1;
-    }
-    void _add_child_ref(ref_type ref, int64_t offset = 0)
-    {
-        Array::add(from_ref(ref));
-        REALM_ASSERT_DEBUG(offset >= 0);
-        if (offset && m_offsets.is_attached()) {
-            m_offsets.add(offset);
-        }
-    }
-    void _insert_child_ref(size_t ndx, ref_type ref)
-    {
-        Array::insert(ndx + 1, from_ref(ref));
-    }
-    void _clear_child_ref(size_t ndx)
-    {
-        Array::set(ndx + 1, 0);
-    }
-    ref_type _get_child_ref(size_t ndx) const
-    {
-        return Array::get_as_ref(ndx + 1);
-    }
-    BPlusTreeLeaf* cache_leaf(MemRef mem, size_t ndx, size_t offset);
-    void erase_and_destroy_child(size_t ndx);
-    ref_type insert_child(size_t child_ndx, ref_type new_sibling_ref, State& state);
-    size_t get_child_offset(size_t child_ndx)
-    {
-        return (child_ndx) > 0 ? size_t(m_offsets.get(child_ndx - 1)) : 0;
-    }
 };
 
 /*****************************************************************************/
@@ -238,14 +132,17 @@ public:
     {
         return m_alloc;
     }
+
     bool is_attached() const
     {
         return bool(m_root);
     }
+
     size_t size() const
     {
         return m_size;
     }
+
     ref_type get_ref() const
     {
         REALM_ASSERT(is_attached());
@@ -273,24 +170,20 @@ public:
             m_root->set_parent(parent, ndx_in_parent);
     }
 
-    void create()
-    {
-        REALM_ASSERT(!is_attached());
-        m_root = create_leaf_node();
-        m_root->set_parent(m_parent, m_ndx_in_parent);
-        if (m_parent) {
-            m_parent->update_child_ref(m_ndx_in_parent, get_ref());
-        }
-    }
+    void create();
+    void destroy();
 
-    void destroy()
-    {
-        if (is_attached()) {
-            ref_type ref = m_root->get_ref();
-            Array::destroy_deep(ref, m_alloc);
-            m_root = nullptr;
-        }
-    }
+protected:
+    friend class BPlusTreeInner;
+    friend class BPlusTreeLeaf;
+
+    std::unique_ptr<BPlusTreeNode> m_root;
+    Allocator& m_alloc;
+    ArrayParent* m_parent = nullptr;
+    size_t m_ndx_in_parent = 0;
+    size_t m_size = 0;
+    size_t m_cached_leaf_begin;
+    size_t m_cached_leaf_end;
 
     void set_leaf_bounds(size_t b, size_t e)
     {
@@ -319,16 +212,6 @@ public:
 
     // Initialize the leaf cache with 'mem'
     virtual BPlusTreeLeaf* cache_leaf(MemRef mem) = 0;
-
-protected:
-    std::unique_ptr<BPlusTreeNode> m_root;
-    Allocator& m_alloc;
-    ArrayParent* m_parent = nullptr;
-    size_t m_ndx_in_parent = 0;
-    size_t m_size = 0;
-    size_t m_cached_leaf_begin;
-    size_t m_cached_leaf_end;
-
     void replace_root(std::unique_ptr<BPlusTreeNode> new_root);
     std::unique_ptr<BPlusTreeNode> create_root_from_ref(ref_type ref);
 };
@@ -428,28 +311,6 @@ public:
     {
         this->BPlusTreeBase::operator=(std::move(rhs));
         return *this;
-    }
-
-    /******** Implementation of abstract interface *******/
-
-    std::unique_ptr<BPlusTreeLeaf> create_leaf_node() override
-    {
-        std::unique_ptr<BPlusTreeLeaf> leaf = std::make_unique<LeafNode>(this);
-        static_cast<LeafNode*>(leaf.get())->create();
-        return leaf;
-    }
-
-    std::unique_ptr<BPlusTreeLeaf> init_leaf_node(ref_type ref) override
-    {
-        std::unique_ptr<BPlusTreeLeaf> leaf = std::make_unique<LeafNode>(this);
-        leaf->init_from_ref(ref);
-        return leaf;
-    }
-
-    BPlusTreeLeaf* cache_leaf(MemRef mem) override
-    {
-        m_leaf_cache.init_from_mem(mem);
-        return &m_leaf_cache;
     }
 
     /************ Tree manipulation functions ************/
@@ -584,6 +445,26 @@ public:
 
 private:
     LeafNode m_leaf_cache;
+
+    /******** Implementation of abstract interface *******/
+
+    std::unique_ptr<BPlusTreeLeaf> create_leaf_node() override
+    {
+        std::unique_ptr<BPlusTreeLeaf> leaf = std::make_unique<LeafNode>(this);
+        static_cast<LeafNode*>(leaf.get())->create();
+        return leaf;
+    }
+    std::unique_ptr<BPlusTreeLeaf> init_leaf_node(ref_type ref) override
+    {
+        std::unique_ptr<BPlusTreeLeaf> leaf = std::make_unique<LeafNode>(this);
+        leaf->init_from_ref(ref);
+        return leaf;
+    }
+    BPlusTreeLeaf* cache_leaf(MemRef mem) override
+    {
+        m_leaf_cache.init_from_mem(mem);
+        return &m_leaf_cache;
+    }
 };
 }
 

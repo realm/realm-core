@@ -20,6 +20,126 @@
 
 using namespace realm;
 
+namespace realm {
+/*****************************************************************************/
+/* BPlusTreeInner                                                            */
+/* All interior nodes is of this class                                       */
+/*****************************************************************************/
+class BPlusTreeInner : public BPlusTreeNode, private Array {
+public:
+    using Array::destroy_deep;
+
+    BPlusTreeInner(BPlusTreeBase* tree);
+    ~BPlusTreeInner() override;
+
+    void init_from_mem(MemRef mem);
+    void create(size_t elems_per_child);
+
+    /******** Implementation of abstract interface *******/
+    bool is_leaf() const override
+    {
+        return false;
+    }
+    bool is_compact() const override
+    {
+        return (Array::get(0) & 1) != 0;
+    }
+    ref_type get_ref() const override
+    {
+        return Array::get_ref();
+    }
+
+    void init_from_ref(ref_type ref) noexcept override
+    {
+        char* header = m_alloc.translate(ref);
+        init_from_mem(MemRef(header, ref, m_alloc));
+    }
+
+    void set_parent(ArrayParent* p, size_t n) override
+    {
+        Array::set_parent(p, n);
+    }
+    void update_parent() override
+    {
+        Array::update_parent();
+    }
+
+    size_t get_node_size() const override
+    {
+        return Array::size() - 2;
+    }
+    size_t get_tree_size() const override
+    {
+        return size_t(back()) >> 1;
+    }
+
+    ref_type bptree_insert(size_t n, State& state, InsertFunc&) override;
+    void bptree_access(size_t n, AccessFunc&) override;
+    size_t bptree_erase(size_t n, EraseFunc&) override;
+    bool bptree_traverse(TraverseFunc&) override;
+
+    // Other modifiers
+
+    void append_tree_size(size_t sz)
+    {
+        Array::add((sz << 1) + 1);
+    }
+    void add_child_ref(ref_type ref, int64_t offset = 0)
+    {
+        Array::add(from_ref(ref));
+        REALM_ASSERT_DEBUG(offset >= 0);
+        if (offset && m_offsets.is_attached()) {
+            m_offsets.add(offset);
+        }
+    }
+    // Reset first (and only!) child ref and return the previous value
+    ref_type clear_first_child_ref()
+    {
+        REALM_ASSERT(get_node_size() == 1);
+        ref_type old_ref = Array::get_as_ref(1);
+        Array::set(1, 0);
+
+        return old_ref;
+    }
+    void ensure_offsets();
+
+private:
+    ArrayUnsigned m_offsets;
+    size_t m_my_offset;
+
+    void move(BPlusTreeNode* new_node, size_t ndx, int64_t offset_adj) override;
+    void set_offset(size_t offs)
+    {
+        m_my_offset = offs;
+    }
+    void set_tree_size(size_t sz)
+    {
+        Array::set(m_size - 1, (sz << 1) + 1);
+    }
+    size_t get_elems_per_child()
+    {
+        // Only relevant when in compact form
+        REALM_ASSERT_DEBUG(!m_offsets.is_attached());
+        return size_t(Array::get(0)) >> 1;
+    }
+    ref_type get_child_ref(size_t ndx) const noexcept override
+    {
+        return Array::get_as_ref(ndx + 1);
+    }
+    void insert_child_ref(size_t ndx, ref_type ref)
+    {
+        Array::insert(ndx + 1, from_ref(ref));
+    }
+    BPlusTreeLeaf* cache_leaf(MemRef mem, size_t ndx, size_t offset);
+    void erase_and_destroy_child(size_t ndx);
+    ref_type insert_child(size_t child_ndx, ref_type new_sibling_ref, State& state);
+    size_t get_child_offset(size_t child_ndx)
+    {
+        return (child_ndx) > 0 ? size_t(m_offsets.get(child_ndx - 1)) : 0;
+    }
+};
+}
+
 /****************************** BPlusTreeNode ********************************/
 
 BPlusTreeNode::~BPlusTreeNode()
@@ -120,7 +240,7 @@ void BPlusTreeInner::bptree_access(size_t n, AccessFunc& func)
         child_offset = child_ndx * elems_per_child;
     }
 
-    ref_type child_ref = _get_child_ref(child_ndx);
+    ref_type child_ref = get_child_ref(child_ndx);
     char* child_header = m_alloc.translate(child_ref);
     MemRef mem(child_header, child_ref, m_alloc);
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
@@ -160,7 +280,7 @@ ref_type BPlusTreeInner::bptree_insert(size_t ndx, State& state, InsertFunc& fun
         }
     }
 
-    ref_type child_ref = _get_child_ref(child_ndx);
+    ref_type child_ref = get_child_ref(child_ndx);
     char* child_header = m_alloc.translate(child_ref);
     MemRef mem(child_header, child_ref, m_alloc);
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
@@ -198,7 +318,7 @@ size_t BPlusTreeInner::bptree_erase(size_t n, EraseFunc& func)
 
     // Call bptree_erase recursively and ultimately call 'func' on leaf
     size_t erase_node_size;
-    ref_type child_ref = _get_child_ref(child_ndx);
+    ref_type child_ref = get_child_ref(child_ndx);
     char* child_header = m_alloc.translate(child_ref);
     MemRef mem(child_header, child_ref, m_alloc);
     BPlusTreeLeaf* leaf = nullptr;
@@ -233,7 +353,7 @@ size_t BPlusTreeInner::bptree_erase(size_t n, EraseFunc& func)
         // Candidate for merge. First calculate if the combined size of current and
         // next sibling is small enough.
         size_t sibling_ndx = child_ndx + 1;
-        ref_type sibling_ref = _get_child_ref(sibling_ndx);
+        ref_type sibling_ref = get_child_ref(sibling_ndx);
         std::unique_ptr<BPlusTreeLeaf> sibling_leaf;
         BPlusTreeInner node2(m_tree);
         BPlusTreeNode* sibling_node;
@@ -302,7 +422,7 @@ bool BPlusTreeInner::bptree_traverse(TraverseFunc& func)
         }
 
         bool done;
-        ref_type child_ref = _get_child_ref(i);
+        ref_type child_ref = get_child_ref(i);
         char* child_header = m_alloc.translate(child_ref);
         MemRef mem(child_header, child_ref, m_alloc);
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
@@ -333,7 +453,7 @@ void BPlusTreeInner::move(BPlusTreeNode* new_node, size_t ndx, int64_t adj)
     // Copy refs
     for (size_t i = ndx; i < sz; i++) {
         size_t offs = get_child_offset(i);
-        dst->_add_child_ref(_get_child_ref(i), offs - adj);
+        dst->add_child_ref(get_child_ref(i), offs - adj);
     }
     truncate(ndx + 1);
     if (ndx > 0)
@@ -369,7 +489,7 @@ inline BPlusTreeLeaf* BPlusTreeInner::cache_leaf(MemRef mem, size_t ndx, size_t 
 
 void BPlusTreeInner::erase_and_destroy_child(size_t ndx)
 {
-    ref_type ref = _get_child_ref(ndx);
+    ref_type ref = get_child_ref(ndx);
     erase(ndx + 1);
     Array::destroy_deep(ref, m_tree->get_alloc());
     REALM_ASSERT_DEBUG(m_offsets.is_attached());
@@ -399,7 +519,7 @@ ref_type BPlusTreeInner::insert_child(size_t child_ndx, ref_type new_sibling_ref
             m_offsets.insert(child_ndx, elem_ndx_offset + state.split_offset); // Throws
             m_offsets.adjust(child_ndx + 1, m_offsets.size(), +1);             // Throws
         }
-        _insert_child_ref(new_ref_ndx, new_sibling_ref);
+        insert_child_ref(new_ref_ndx, new_sibling_ref);
         return ref_type(0);
     }
 
@@ -426,7 +546,7 @@ ref_type BPlusTreeInner::insert_child(size_t child_ndx, ref_type new_sibling_ref
         // the compact form.
         new_split_offset = size_t(elem_ndx_offset + state.split_offset);
         new_split_size = elem_ndx_offset + state.split_size;
-        new_sibling._add_child_ref(new_sibling_ref); // Throws
+        new_sibling.add_child_ref(new_sibling_ref);  // Throws
         set_tree_size(new_split_offset);             // Throws
     }
     else {
@@ -438,7 +558,7 @@ ref_type BPlusTreeInner::insert_child(size_t child_ndx, ref_type new_sibling_ref
         new_split_size = get_tree_size() + 1;
 
         move(&new_sibling, new_ref_ndx, (new_split_offset - 1));               // Strips off tree size
-        _add_child_ref(new_sibling_ref, elem_ndx_offset + state.split_offset); // Throws
+        add_child_ref(new_sibling_ref, elem_ndx_offset + state.split_offset);  // Throws
         append_tree_size(new_split_offset);                                    // Throws
     }
 
@@ -485,6 +605,25 @@ BPlusTreeBase& BPlusTreeBase::operator=(BPlusTreeBase&& rhs)
     return *this;
 }
 
+void BPlusTreeBase::create()
+{
+    REALM_ASSERT(!is_attached());
+    m_root = create_leaf_node();
+    m_root->set_parent(m_parent, m_ndx_in_parent);
+    if (m_parent) {
+        m_parent->update_child_ref(m_ndx_in_parent, get_ref());
+    }
+}
+
+void BPlusTreeBase::destroy()
+{
+    if (is_attached()) {
+        ref_type ref = m_root->get_ref();
+        Array::destroy_deep(ref, m_alloc);
+        m_root = nullptr;
+    }
+}
+
 void BPlusTreeBase::replace_root(std::unique_ptr<BPlusTreeNode> new_root)
 {
     // Maintain parent.
@@ -513,8 +652,8 @@ void BPlusTreeBase::bptree_insert(size_t n, BPlusTreeNode::InsertFunc& func)
             new_root->create(size_t(state.split_offset));
         }
 
-        new_root->_add_child_ref(m_root->get_ref());                   // Throws
-        new_root->_add_child_ref(new_sibling_ref, state.split_offset); // Throws
+        new_root->add_child_ref(m_root->get_ref());                   // Throws
+        new_root->add_child_ref(new_sibling_ref, state.split_offset); // Throws
         new_root->append_tree_size(state.split_size);
         replace_root(std::move(new_root));
     }
@@ -526,8 +665,7 @@ void BPlusTreeBase::bptree_erase(size_t n, BPlusTreeNode::EraseFunc& func)
     while (!m_root->is_leaf() && root_size == 1) {
         BPlusTreeInner* node = static_cast<BPlusTreeInner*>(m_root.get());
 
-        ref_type new_root_ref = node->_get_child_ref(0);
-        node->_clear_child_ref(0);
+        ref_type new_root_ref = node->clear_first_child_ref();
         node->destroy_deep();
 
         auto new_root = create_root_from_ref(new_root_ref);
