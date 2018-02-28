@@ -26,8 +26,11 @@
 #include <realm/util/features.h>
 #include <realm/util/terminate.hpp>
 #include <realm/util/assert.hpp>
+#include <realm/util/file.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/util/safe_int_ops.hpp>
+#include <realm/node_header.hpp>
+#include <realm/util/file_mapper.hpp>
 
 namespace realm {
 
@@ -139,13 +142,29 @@ public:
 #endif
 
     Replication* get_replication() noexcept;
+    struct MappedFile;
 
 protected:
+    constexpr static int section_shift = 26;
+
     size_t m_baseline = 0; // Separation line between immutable and mutable refs.
 
     Replication* m_replication = nullptr;
 
     ref_type m_debug_watch = 0;
+
+    // The following logically belongs in the slab allocator, but is placed
+    // here to optimize a critical path:
+
+    // The fast_mapping splits the full ref-space (both below and above baseline)
+    // into equal chunks.
+    struct FastMap {
+        char* mapping_addr;
+#if REALM_ENABLE_ENCRYPTION
+        util::EncryptedFileMapping* encrypted_mapping;
+#endif
+    };
+    FastMap* m_fast_mapping_ptr = 0;
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.
@@ -174,6 +193,9 @@ protected:
     virtual char* do_translate(ref_type ref) const noexcept = 0;
 
     Allocator() noexcept;
+    size_t get_section_index(size_t pos) const noexcept;
+    inline size_t get_section_base(size_t index) const noexcept;
+
 
     // The following counters are used to ensure accessor refresh,
     // and allows us to report many errors related to attempts to
@@ -244,6 +266,7 @@ public:
         m_baseline = m_alloc->m_baseline;
         m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
+        m_fast_mapping_ptr = m_alloc->m_fast_mapping_ptr;
     }
 
     ~WrappedAllocator()
@@ -256,6 +279,7 @@ public:
         m_baseline = m_alloc->m_baseline;
         m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
+        m_fast_mapping_ptr = m_alloc->m_fast_mapping_ptr;
     }
 
     void update_from_underlying_allocator()
@@ -270,6 +294,7 @@ private:
         auto result = m_alloc->do_alloc(size);
         bump_storage_version();
         m_baseline = m_alloc->m_baseline;
+        m_fast_mapping_ptr = m_alloc->m_fast_mapping_ptr;
         return result;
     }
     virtual MemRef do_realloc(ref_type ref, const char* addr, size_t old_size, size_t new_size) override
@@ -277,6 +302,7 @@ private:
         auto result = m_alloc->do_realloc(ref, addr, old_size, new_size);
         bump_storage_version();
         m_baseline = m_alloc->m_baseline;
+        m_fast_mapping_ptr = m_alloc->m_fast_mapping_ptr;
         return result;
     }
 
@@ -287,7 +313,7 @@ private:
 
     virtual char* do_translate(ref_type ref) const noexcept override
     {
-        return m_alloc->do_translate(ref);
+        return m_alloc->translate(ref);
     }
 
     virtual void verify() const override
@@ -424,15 +450,20 @@ inline void Allocator::free_(MemRef mem) noexcept
     free_(mem.get_ref(), mem.get_addr());
 }
 
-inline char* Allocator::translate(ref_type ref) const noexcept
+inline size_t Allocator::get_section_base(size_t index) const noexcept
 {
-    return do_translate(ref);
+    return index << section_shift; // 64MB chunks
+}
+
+inline size_t Allocator::get_section_index(size_t pos) const noexcept
+{
+    return pos >> section_shift; // 64Mb chunks
 }
 
 inline bool Allocator::is_read_only(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(ref != 0);
-    REALM_ASSERT_DEBUG(m_baseline != 0); // Attached SlabAlloc
+    // REALM_ASSERT_DEBUG(m_baseline != 0); // Attached SlabAlloc
     return ref < m_baseline;
 }
 
@@ -450,6 +481,24 @@ inline Allocator::~Allocator() noexcept
 inline Replication* Allocator::get_replication() noexcept
 {
     return m_replication;
+}
+
+inline char* Allocator::translate(ref_type ref) const noexcept
+{
+    if (m_fast_mapping_ptr) {
+        char* base_addr;
+        size_t idx = get_section_index(ref);
+        base_addr = m_fast_mapping_ptr[idx].mapping_addr;
+        size_t offset = ref - get_section_base(idx);
+        auto addr = base_addr + offset;
+#if REALM_ENABLE_ENCRYPTION
+        realm::util::encryption_read_barrier(addr, NodeHeader::header_size, m_fast_mapping_ptr[idx].encrypted_mapping,
+                                             NodeHeader::get_byte_size_from_header);
+#endif
+        return addr;
+    }
+    else
+        return do_translate(ref);
 }
 
 } // namespace realm

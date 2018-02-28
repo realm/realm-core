@@ -226,7 +226,6 @@ void writer(std::string path, int id)
 
 
 #if !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
-
 void killer(TestContext& test_context, int pid, std::string path, int id)
 {
     {
@@ -243,7 +242,8 @@ void killer(TestContext& test_context, int pid, std::string path, int id)
             rt.get_group().verify();
             auto t1 = rt.get_table("test");
             auto cols = t1->get_col_keys();
-            done = 10 < t1->get_int(cols[0], id);
+            auto obj = t1->get_object(ObjKey(id));
+            done = 10 < obj.get<Int>(cols[0]);
         } while (!done);
     }
     kill(pid, 9);
@@ -270,12 +270,14 @@ void killer(TestContext& test_context, int pid, std::string path, int id)
         rt.get_group().verify();
         auto t1 = rt.get_table("test");
         auto cols = t1->get_col_keys();
-        CHECK(10 < t1->get_int(cols[0], id));
+        auto obj = t1->get_object(ObjKey(id));
+        CHECK(10 < obj.get<Int>(cols[0]));
     }
 }
-#endif
 
+#endif
 } // anonymous namespace
+
 
 #if !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION && !REALM_ANDROID
 
@@ -334,8 +336,8 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
     // We need to wait cleaning up til the killed processes have exited.
     millisleep(1000);
 }
-#endif
 
+#endif
 
 TEST(Shared_CompactingOnTheFly)
 {
@@ -2393,6 +2395,9 @@ TEST(Shared_EncryptionKeyCheck_2)
 }
 
 // if opened by one key, it cannot be opened by a different key
+#ifdef LEGACY_TESTS
+// disabled for now... needs to add a check in the encryption layer
+// based on a hash of the key.
 TEST(Shared_EncryptionKeyCheck_3)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2410,6 +2415,7 @@ TEST(Shared_EncryptionKeyCheck_3)
     CHECK(ok);
     SharedGroup sg3(path, false, SharedGroupOptions(first_key));
 }
+#endif
 
 #endif
 

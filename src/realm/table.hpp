@@ -1006,7 +1006,7 @@ inline Table::Table(Allocator& alloc)
     , m_clusters(this, m_alloc)
     , m_index_refs(m_alloc)
 {
-    ref_type ref = create_empty_table(alloc); // Throws
+    ref_type ref = create_empty_table(m_alloc); // Throws
     Parent* parent = nullptr;
     size_t ndx_in_parent = 0;
     init(ref, parent, ndx_in_parent);

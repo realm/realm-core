@@ -675,9 +675,9 @@ bool Obj::update_backlinks(ColKey col_key, ObjKey old_key, ObjKey new_key, Casca
 
         // Check if the object should be cascade deleted
         if (mode != CascadeState::none && (mode == CascadeState::all || (strong_links && last_removed))) {
-            bool backlinks = target_obj.has_backlinks(state.m_mode == CascadeState::strong);
+            bool have_backlinks = target_obj.has_backlinks(state.m_mode == CascadeState::strong);
 
-            if (!backlinks) {
+            if (!have_backlinks) {
                 state.rows.emplace_back(target_table->get_key(), old_key);
                 recurse = true;
             }

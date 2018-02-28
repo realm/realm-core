@@ -26,6 +26,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -930,11 +931,67 @@ void* File::map(AccessMode a, size_t size, int /*map_flags*/, size_t offset) con
     return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get());
 }
 
+void* File::map_fixed(AccessMode a, void* address, size_t size, int /* map_flags */, size_t offset) const
+{
+    if (m_encryption_key.get()) {
+        // encryption enabled - this is not supported - see explanation in alloc_slab.cpp
+        REALM_ASSERT(false);
+    }
+#ifdef _WIN32
+    // windows, no encryption - this is not supported, see explanation in alloc_slab.cpp,
+    // above the method 'update_reader_view()'
+    REALM_ASSERT(false);
+    return nullptr;
+#else
+    // unencrypted - mmap part of already reserved space
+    return realm::util::mmap_fixed(m_fd, address, size, a, offset, m_encryption_key.get());
+#endif
+}
+
+void* File::map_reserve(AccessMode a, size_t size, size_t offset) const
+{
+    static_cast<void>(a); // FIXME: Consider removing this argument
+    return realm::util::mmap_reserve(m_fd, size, offset);
+}
+
 #if REALM_ENABLE_ENCRYPTION
 void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping, int /*map_flags*/, size_t offset) const
 {
     return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
 }
+
+void* File::map_fixed(AccessMode a, void* address, size_t size, EncryptedFileMapping* mapping, int /* map_flags */,
+                      size_t offset) const
+{
+    if (m_encryption_key.get()) {
+        // encryption enabled - we shouldn't be here, all memory was allocated by reserve
+        REALM_ASSERT(false);
+    }
+#ifndef _WIN32
+    // no encryption. On Unixes, map relevant part of reserved virtual address range
+    return realm::util::mmap_fixed(m_fd, address, size, a, offset, nullptr, mapping);
+#else
+    // no encryption - unsupported on windows
+    REALM_ASSERT(false);
+    return nullptr;
+#endif
+}
+
+void* File::map_reserve(AccessMode a, size_t size, size_t offset, EncryptedFileMapping*& mapping) const
+{
+    if (m_encryption_key.get()) {
+        // encrypted file - just mmap it, the encryption layer handles if the mapping extends beyond eof
+        return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
+    }
+#ifndef _WIN32
+    // not encrypted, do a proper reservation on Unixes'
+    return realm::util::mmap_reserve(m_fd, size, a, offset, nullptr, mapping);
+#else
+    // on windows, this is a no-op
+    return nullptr;
+#endif
+}
+
 #endif
 
 void File::unmap(void* addr, size_t size) noexcept
@@ -1269,9 +1326,114 @@ void File::set_encryption_key(const char* key)
 #endif
 }
 
-const char* File::get_encryption_key()
+const char* File::get_encryption_key() const
 {
     return m_encryption_key.get();
+}
+
+void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset)
+{
+    REALM_ASSERT(!m_addr);
+#if REALM_ENABLE_ENCRYPTION
+    m_addr = f.map(a, size, m_encrypted_mapping, map_flags, offset);
+#else
+    m_addr = f.map(a, size, map_flags, offset);
+#endif
+    m_size = size;
+    m_reservation_size = size;
+    m_fd = f.m_fd;
+    m_offset = offset;
+}
+
+
+void File::MapBase::unmap() noexcept
+{
+    if (!m_addr || !m_reservation_size)
+        return;
+    File::unmap(m_addr, m_reservation_size);
+    m_addr = nullptr;
+    m_size = m_reservation_size = 0;
+#if REALM_ENABLE_ENCRYPTION
+    m_encrypted_mapping = nullptr;
+#endif
+    m_fd = 0;
+}
+
+void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flags)
+{
+    REALM_ASSERT(m_addr);
+    m_addr = f.remap(m_addr, m_size, a, size, map_flags);
+    m_size = size;
+    m_reservation_size = size;
+    m_fd = f.m_fd;
+}
+
+void File::MapBase::sync()
+{
+    REALM_ASSERT(m_addr);
+
+    File::sync_map(m_fd, m_addr, m_size);
+}
+
+
+void File::MapBase::reserve(const File& f, AccessMode a, size_t offset_in_file, size_t reservation_size)
+{
+    REALM_ASSERT(!m_addr);
+    // Reserve virtual memory
+    bool is_encrypted = false;
+#if REALM_ENABLE_ENCRYPTION
+    m_encrypted_mapping = nullptr;
+    if (f.get_encryption_key()) {
+        is_encrypted = true;
+        m_size = reservation_size;
+        m_addr = f.map(a, reservation_size, m_encrypted_mapping, 0, offset_in_file);
+    }
+#endif
+    if (!is_encrypted) {
+#ifdef _WIN32
+        m_addr = nullptr; // no-op on windows
+#else
+        m_addr = f.map_reserve(a, reservation_size, offset_in_file);
+#endif
+    }
+    m_offset = offset_in_file;
+    m_reservation_size = reservation_size;
+    m_fd = f.m_fd;
+}
+
+
+bool File::MapBase::extend(const File& f, AccessMode a, size_t new_size)
+{
+    if (new_size <= m_size) // trivially OK
+        return true;
+    REALM_ASSERT((new_size % page_size()) == 0);
+    REALM_ASSERT(new_size <= m_reservation_size);
+
+#if REALM_ENABLE_ENCRYPTION
+    // This is a nop when encryption is in use
+    if (f.get_encryption_key())
+        return true;
+#endif
+
+// no encryption. Windows and Unixes are handled differently:
+#ifdef _WIN32
+    // on windows, we cannot extend if we've already mapped some of it
+    if (m_size)
+        return false;
+    // otherwise we just mmap it normally
+    m_size = new_size;
+    m_addr = f.map(a, m_size, 0, m_offset);
+    return true;
+#else
+    static_cast<void>(a);
+    auto desired_address = reinterpret_cast<char*>(m_addr) + m_size;
+    auto desired_offset = m_offset + m_size;
+    auto request_size = new_size - m_size;
+    auto addr = f.map_fixed(access_ReadOnly, desired_address, request_size, 0, desired_offset);
+    REALM_ASSERT(addr == desired_address);
+    m_size = new_size;
+    return true;
+#endif
 }
 
 

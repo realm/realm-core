@@ -374,6 +374,14 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size)
 
     m_alloc.update_reader_view(new_file_size); // Throws
     update_allocator_wrappers();
+
+    // force update of all ref->ptr translations if the mapping has changed
+    auto mapping_version = m_alloc.get_mapping_version();
+    if (mapping_version != m_last_seen_mapping_version) {
+        // force re-translation of all refs
+        old_baseline = 0;
+        m_last_seen_mapping_version = mapping_version;
+    }
     update_refs(new_top_ref, old_baseline);
 }
 
@@ -1055,12 +1063,19 @@ void Group::commit()
     out.commit(top_ref); // Throws
 
     // Recursively update refs in all active tables (columns, arrays..)
+    auto mapping_version = m_alloc.get_mapping_version();
+    if (mapping_version != m_last_seen_mapping_version) {
+        // force re-translation of all refs
+        old_baseline = 0;
+        m_last_seen_mapping_version = mapping_version;
+    }
     update_refs(top_ref, old_baseline);
 }
 
 
 void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
 {
+    old_baseline = 0; // force update of all accessors
     // After Group::commit() we will always have free space tracking
     // info.
     REALM_ASSERT_3(m_top.size(), >=, 5);
@@ -1733,9 +1748,13 @@ void Group::verify() const
 
     size_t logical_file_size = to_size_t(m_top.get_as_ref_or_tagged(2).get_as_int());
     size_t ref_begin = sizeof(SlabAlloc::Header);
-    ref_type immutable_ref_end = logical_file_size;
-    ref_type mutable_ref_end = m_alloc.get_total_size();
-    ref_type baseline = m_alloc.get_baseline();
+    ref_type real_immutable_ref_end = logical_file_size;
+    ref_type real_mutable_ref_end = m_alloc.get_total_size();
+    ref_type real_baseline = m_alloc.get_baseline();
+    // Fake that any empty area between the file and slab is part of the file (immutable):
+    ref_type immutable_ref_end = m_alloc.align_size_to_section_boundary(real_immutable_ref_end);
+    ref_type mutable_ref_end = m_alloc.align_size_to_section_boundary(real_mutable_ref_end);
+    ref_type baseline = m_alloc.align_size_to_section_boundary(real_baseline);
 
     // Check the consistency of the allocation of used memory
     MemUsageVerifier mem_usage_1(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
@@ -1805,15 +1824,14 @@ void Group::verify() const
     mem_usage_1.canonicalize();
     mem_usage_2.clear();
 
-    // Due to a current problem with the baseline not reflecting the logical
-    // file size, but the physical file size, there is a potential gap of
-    // unusable ref-space between the logical file size and the baseline. We
-    // need to take that into account here.
-    REALM_ASSERT_3(immutable_ref_end, <=, baseline);
-    if (immutable_ref_end < baseline) {
-        ref_type ref = immutable_ref_end;
-        size_t corrected_size = baseline - immutable_ref_end;
-        mem_usage_1.add_mutable(ref, corrected_size);
+    // There may be a hole between the end of file and the beginning of the slab area.
+    // We need to take that into account here.
+    REALM_ASSERT_3(real_immutable_ref_end, <=, real_baseline);
+    auto slab_start = immutable_ref_end;
+    if (real_immutable_ref_end < slab_start) {
+        ref_type ref = real_immutable_ref_end;
+        size_t corrected_size = slab_start - real_immutable_ref_end;
+        mem_usage_1.add_immutable(ref, corrected_size);
         mem_usage_1.canonicalize();
     }
 

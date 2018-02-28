@@ -1136,7 +1136,6 @@ int benchmark_common_tasks_main()
     BenchmarkResults results(40, results_file_stem.c_str());
 
 #define BENCH(B) run_benchmark<B>(results)
-
     BENCH(BenchmarkUnorderedTableViewClear);
     BENCH(BenchmarkEmptyCommit);
     BENCH(AddTable);
@@ -1145,14 +1144,17 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkSize);
     BENCH(BenchmarkSort);
     BENCH(BenchmarkSortInt);
+
     BENCH(BenchmarkDistinctIntFewDupes);
     BENCH(BenchmarkDistinctIntManyDupes);
     BENCH(BenchmarkDistinctStringFewDupes);
     BENCH(BenchmarkDistinctStringManyDupes);
+
     BENCH(BenchmarkFindAllStringFewDupes);
     BENCH(BenchmarkFindAllStringManyDupes);
     BENCH(BenchmarkFindFirstStringFewDupes);
     BENCH(BenchmarkFindFirstStringManyDupes);
+
     BENCH(BenchmarkInsert);
     BENCH(BenchmarkGetString);
     BENCH(BenchmarkSetString);
