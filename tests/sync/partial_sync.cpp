@@ -523,7 +523,7 @@ TEST_CASE("Partial sync", "[sync]") {
         // Perform an asynchronous open like bindings do by first opening the Realm without any schema,
         // waiting for the initial download to complete, and then re-opening the Realm with the correct schema.
         {
-            SyncTestFile async_partial_config(partial_config);
+            Realm::Config async_partial_config(partial_config);
             async_partial_config.schema = {};
             async_partial_config.cache = false;
 
