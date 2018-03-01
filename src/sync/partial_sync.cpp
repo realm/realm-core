@@ -44,17 +44,30 @@ namespace _impl {
 void initialize_schema(Group& group)
 {
     std::string result_sets_table_name = ObjectStore::table_name_for_object_type(result_sets_type_name);
-    if (group.has_table(result_sets_table_name))
-        return;
+    TableRef table = group.get_table(result_sets_table_name);
+    if (!table) {
+        table = sync::create_table(group, result_sets_table_name);
+        table->add_column(type_String, "query");
+        table->add_column(type_String, "matches_property");
+        table->add_column(type_Int, "status");
+        table->add_column(type_String, "error_message");
+        table->add_column(type_Int, "query_parse_counter");
+    }
+    else {
+        // The table already existed, so it should have all of the columns that are in the shared schema.
+        REALM_ASSERT(table->get_column_index("query") != npos);
+        REALM_ASSERT(table->get_column_index("matches_property") != npos);
+        REALM_ASSERT(table->get_column_index("status") != npos);
+        REALM_ASSERT(table->get_column_index("error_message") != npos);
+        REALM_ASSERT(table->get_column_index("query_parse_counter") != npos);
+    }
 
-    TableRef table = sync::create_table(group, result_sets_table_name);
-    size_t indexable_column_idx = table->add_column(type_String, "name"); // Custom property
-    table->add_search_index(indexable_column_idx);
-    table->add_column(type_String, "query");
-    table->add_column(type_String, "matches_property");
-    table->add_column(type_Int, "status");
-    table->add_column(type_String, "error_message");
-    table->add_column(type_Int, "query_parse_counter");
+    // We may need to add the "name" column even if the __ResultSets table already existed
+    // as it's not added by the server when it creates the table.
+    if (table->get_column_index("name") == npos) {
+        size_t idx = table->add_column(type_String, "name");
+        table->add_search_index(idx);
+    }
 }
 
 // A stripped-down version of WriteTransaction that can promote an existing read transaction
