@@ -518,6 +518,30 @@ TEST_CASE("Partial sync", "[sync]") {
             REQUIRE(results.size() == 1);
         });
     }
+
+    SECTION("works with Realm opened using `asyncOpen`") {
+        // Perform an asynchronous open like bindings do by first opening the Realm without any schema,
+        // waiting for the initial download to complete, and then re-opening the Realm with the correct schema.
+        {
+            Realm::Config async_partial_config(partial_config);
+            async_partial_config.schema = {};
+            async_partial_config.cache = false;
+
+            auto async_realm = Realm::get_shared_realm(async_partial_config);
+            std::atomic<bool> download_done(false);
+            auto session = SyncManager::shared().get_existing_active_session(partial_config.path);
+            session->wait_for_download_completion([&](auto) {
+                download_done = true;
+            });
+            EventLoop::main().run_until([&] { return download_done.load(); });
+        }
+
+        subscribe_and_wait("string = \"partial\"", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
+            REQUIRE(results.size() == 2);
+            REQUIRE(results_contains(results, {1, 10, "partial"}));
+            REQUIRE(results_contains(results, {2, 2, "partial"}));
+        });
+    }
 }
 
 TEST_CASE("Partial sync error checking", "[sync]") {
