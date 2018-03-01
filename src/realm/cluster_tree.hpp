@@ -28,6 +28,7 @@ public:
     class ConstIterator;
     class Iterator;
     using TraverseFunction = std::function<bool(const Cluster*)>;
+    using UpdateFunction = std::function<void(Cluster*)>;
 
     ClusterTree(Table* owner, Allocator& alloc);
     static MemRef create_empty_cluster(Allocator& alloc);
@@ -116,15 +117,31 @@ public:
     {
         m_root->remove_column(ndx);
     }
+
+    // Insert entry for object, but do not create and return the object
+    void insert_fast(ObjKey k, ClusterNode::State& state);
+    // Create and return object
     Obj insert(ObjKey k);
+    // Delete object with given key
     void erase(ObjKey k, CascadeState& state);
+    // Check if an object with given key exists
     bool is_valid(ObjKey k) const;
+    // Lookup and return read-only object
     ConstObj get(ObjKey k) const;
+    // Lookup and return object
     Obj get(ObjKey k);
+    // Lookup ContObj by index
     ConstObj get(size_t ndx) const;
+    // Lookup Obj by index
     Obj get(size_t ndx);
+    // Find the leaf containing the requested object
     bool get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept;
+    // Visit all leaves and call the supplied function. Stop when function returns true.
+    // Not allowed to modify the tree
     bool traverse(TraverseFunction& func) const;
+    // Visit all leaves and call the supplied function. The function can modify the leaf.
+    void update(UpdateFunction& func);
+
     void enumerate_string_column(size_t ndx);
     void dump_objects()
     {

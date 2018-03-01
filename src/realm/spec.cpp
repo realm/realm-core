@@ -203,17 +203,20 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
     return spec_set.get_mem();
 }
 
-void Spec::convert_column(size_t column_ndx)
+bool Spec::convert_column(size_t column_ndx)
 {
+    bool changes = false;
     if (column_ndx < m_num_public_columns) {
         StringData name = m_names.get(column_ndx);
         if (name.size() == 0) {
             auto new_name = std::string("col_") + util::to_string(column_ndx);
             m_names.set(column_ndx, new_name);
+            changes = true;
         }
         else if (m_names.find_first(name) != column_ndx) {
             auto new_name = std::string(name.data()) + '_' + util::to_string(column_ndx);
             m_names.set(column_ndx, new_name);
+            changes = true;
         }
     }
     ColumnType type = ColumnType(m_types.get(column_ndx));
@@ -227,14 +230,17 @@ void Spec::convert_column(size_t column_ndx)
             m_attr.set(column_ndx, m_attr.get(column_ndx) | col_attr_List);
             sub_spec.destroy();
             m_subspecs.erase(subspec_ndx);
+            changes = true;
             break;
         }
         case col_type_LinkList:
             m_attr.set(column_ndx, m_attr.get(column_ndx) | col_attr_List);
+            changes = true;
             break;
         default:
             break;
     }
+    return changes;
 }
 
 

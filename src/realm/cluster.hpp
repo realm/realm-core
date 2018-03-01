@@ -148,8 +148,6 @@ public:
     virtual int64_t get_last_key_value() const = 0;
     virtual void ensure_general_form() = 0;
 
-    /// Create an empty node
-    virtual void create(int sub_tree_depth) = 0;
     /// Initialize node from 'mem'
     virtual void init(MemRef mem) = 0;
     /// Descend the tree from the root and copy-on-write the leaf
@@ -212,7 +210,7 @@ public:
     }
     ~Cluster() override;
 
-    void create(int = 0) override;
+    void create(size_t nb_columns);
     void init(MemRef mem) override;
     bool update_from_parent(size_t old_baseline) noexcept override;
     bool is_writeable() const
@@ -270,6 +268,7 @@ public:
     void upgrade_string_to_enum(size_t col_ndx, ArrayString& keys);
 
     void init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept;
+    void add_leaf(size_t col_ndx, ref_type ref);
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 

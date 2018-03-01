@@ -1692,7 +1692,7 @@ void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade,
         if (need_file_format_upgrade) {
             if (!allow_file_format_upgrade)
                 throw FileFormatUpgradeRequired();
-            gf::upgrade_file_format(m_group, target_file_format_version); // Throws
+            gf::upgrade_file_format(m_group, target_file_format_version, *this); // Throws
             // Note: The file format version stored in the Realm file will be
             // updated to the new file format version as part of the following
             // commit operation. This happens in GroupWriter::commit().

@@ -36,7 +36,7 @@
 #include <realm/column_linkbase.hpp>
 #include <realm/column_backlink.hpp>
 #include <realm/group_writer.hpp>
-#include <realm/group.hpp>
+#include <realm/group_shared.hpp>
 #include <realm/replication.hpp>
 
 using namespace realm;
@@ -205,7 +205,7 @@ int Group::get_target_file_format_version_for_session(int /* current_file_format
 }
 
 
-void Group::upgrade_file_format(int target_file_format_version)
+void Group::upgrade_file_format(int target_file_format_version, SharedGroup& sg)
 {
     REALM_ASSERT(is_attached());
 
@@ -238,16 +238,39 @@ void Group::upgrade_file_format(int target_file_format_version)
 
     // NOTE: Additional future upgrade steps go here.
     if (current_file_format_version <= 9 && target_file_format_version >= 10) {
+        bool changes = false;
+        std::vector<TableKey> table_keys;
         for (size_t t = 0; t < m_table_names.size(); t++) {
             StringData name = m_table_names.get(t);
             auto table = get_table(name);
-            table->create_columns_in_clusters();
+            table_keys.push_back(table->get_key());
+            changes |= table->convert_columns();
         }
-        for (auto t : m_table_accessors) {
-            t->create_objects();
+
+        if (changes) {
+            sg.commit();
+            sg.begin_write();
         }
-        for (auto t : m_table_accessors) {
-            t->copy_content_from_columns();
+
+        for (auto k : table_keys) {
+            auto table = get_table(k);
+            if (table->create_objects()) {
+                sg.commit();
+                sg.begin_write();
+            }
+        }
+
+        for (auto k : table_keys) {
+            auto table = get_table(k);
+            const Spec& spec = _impl::TableFriend::get_spec(*table);
+            size_t nb_cols = spec.get_column_count();
+            for (size_t col_ndx = 0; col_ndx < nb_cols; col_ndx++) {
+                if (table->copy_content_from_columns(col_ndx)) {
+                    sg.commit();
+                    sg.begin_write();
+                    table = get_table(k);
+                }
+            }
         }
     }
 

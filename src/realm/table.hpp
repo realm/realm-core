@@ -595,12 +595,9 @@ private:
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
 
     void populate_search_index(ColKey column_ndx);
-    void create_columns_in_clusters();
-    void create_objects();
-    template <class U>
-    void copy_list_of_primitives(Obj& obj, ColKey col, ref_type ref);
-    void copy_content_from_columns();
-    ColumnBase* create_column_accessor(ColumnType col_type, size_t col_ndx, ref_type ref);
+    bool convert_columns();
+    bool create_objects();
+    bool copy_content_from_columns(size_t col_ndx);
 
     /// Disable copying assignment.
     ///

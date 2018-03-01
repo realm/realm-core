@@ -1264,131 +1264,140 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     // original file intact and unmodified
     File::copy(path, temp_copy);
 
-    for (int iter = 0; iter < 2; iter++) {
-        // Constructing this SharedGroup will trigger an upgrade first time around
-        auto hist = make_in_realm_history(temp_copy);
-        SharedGroup sg(*hist);
+    int iter = 2;
+    while (iter) {
+        try {
+            // Constructing this SharedGroup will trigger an upgrade first time around
+            auto hist = make_in_realm_history(temp_copy);
+            SharedGroup sg(*hist);
 
-        ReadTransaction rt(sg);
+            ReadTransaction rt(sg);
 
-        ConstTableRef t = rt.get_table("table");
-        ConstTableRef o = rt.get_table("other");
-        rt.get_group().verify();
+            ConstTableRef t = rt.get_table("table");
+            ConstTableRef o = rt.get_table("other");
+            rt.get_group().verify();
 
-        CHECK(t);
-        CHECK(o);
-        CHECK_EQUAL(t->size(), nb_rows + 1);
-        CHECK_EQUAL(o->size(), 25);
+            CHECK(t);
+            CHECK(o);
+            CHECK_EQUAL(t->size(), nb_rows + 1);
+            CHECK_EQUAL(o->size(), 25);
 
-        auto col_keys = t->get_col_keys();
-        CHECK_EQUAL(col_keys.size(), 13);
-        ColKey col_o = o->get_col_keys()[0];
+            auto col_keys = t->get_col_keys();
+            CHECK_EQUAL(col_keys.size(), 13);
+            ColKey col_o = o->get_col_keys()[0];
 
-        auto col_int = col_keys[0];
-        auto col_int_null = col_keys[1];
-        auto col_bool = col_keys[2];
-        auto col_bool_null = col_keys[3];
-        auto col_float = col_keys[4];
-        auto col_double = col_keys[5];
-        auto col_string = col_keys[6];
-        auto col_string_i = col_keys[7];
-        auto col_binary = col_keys[8];
-        auto col_date = col_keys[9];
-        auto col_link = col_keys[10];
-        auto col_linklist = col_keys[11];
-        auto col_int_list = col_keys[12];
+            auto col_int = col_keys[0];
+            auto col_int_null = col_keys[1];
+            auto col_bool = col_keys[2];
+            auto col_bool_null = col_keys[3];
+            auto col_float = col_keys[4];
+            auto col_double = col_keys[5];
+            auto col_string = col_keys[6];
+            auto col_string_i = col_keys[7];
+            auto col_binary = col_keys[8];
+            auto col_date = col_keys[9];
+            auto col_link = col_keys[10];
+            auto col_linklist = col_keys[11];
+            auto col_int_list = col_keys[12];
 
-        CHECK_EQUAL(t->get_column_name(col_int), "int");
-        CHECK_EQUAL(t->get_column_name(col_int_null), "int_1");
-        CHECK_EQUAL(t->get_column_name(col_bool), "col_2");
-        CHECK_EQUAL(t->get_column_name(col_bool_null), "bool_null");
-        CHECK_EQUAL(t->get_column_name(col_float), "float");
-        CHECK_EQUAL(t->get_column_name(col_double), "double");
-        CHECK_EQUAL(t->get_column_name(col_string), "string");
-        CHECK_EQUAL(t->get_column_name(col_string_i), "string_i");
-        CHECK_EQUAL(t->get_column_name(col_binary), "binary");
-        CHECK_EQUAL(t->get_column_name(col_date), "date");
-        CHECK_EQUAL(t->get_column_name(col_link), "link");
-        CHECK_EQUAL(t->get_column_name(col_linklist), "linklist");
-        CHECK_EQUAL(t->get_column_name(col_int_list), "integers");
-        CHECK_EQUAL(o->get_column_name(col_o), "int");
+            CHECK_EQUAL(t->get_column_name(col_int), "int");
+            CHECK_EQUAL(t->get_column_name(col_int_null), "int_1");
+            CHECK_EQUAL(t->get_column_name(col_bool), "col_2");
+            CHECK_EQUAL(t->get_column_name(col_bool_null), "bool_null");
+            CHECK_EQUAL(t->get_column_name(col_float), "float");
+            CHECK_EQUAL(t->get_column_name(col_double), "double");
+            CHECK_EQUAL(t->get_column_name(col_string), "string");
+            CHECK_EQUAL(t->get_column_name(col_string_i), "string_i");
+            CHECK_EQUAL(t->get_column_name(col_binary), "binary");
+            CHECK_EQUAL(t->get_column_name(col_date), "date");
+            CHECK_EQUAL(t->get_column_name(col_link), "link");
+            CHECK_EQUAL(t->get_column_name(col_linklist), "linklist");
+            CHECK_EQUAL(t->get_column_name(col_int_list), "integers");
+            CHECK_EQUAL(o->get_column_name(col_o), "int");
 
-        CHECK_EQUAL(t->get_column_type(col_int_null), type_Int);
-        CHECK_EQUAL(t->get_column_type(col_bool), type_Bool);
-        CHECK_EQUAL(t->get_column_type(col_bool_null), type_Bool);
-        CHECK_EQUAL(t->get_column_type(col_float), type_Float);
-        CHECK_EQUAL(t->get_column_type(col_double), type_Double);
-        CHECK_EQUAL(t->get_column_type(col_string), type_String);
-        CHECK_EQUAL(t->get_column_type(col_string_i), type_String);
-        CHECK_EQUAL(t->get_column_type(col_binary), type_Binary);
-        CHECK_EQUAL(t->get_column_type(col_date), type_Timestamp);
-        CHECK_EQUAL(t->get_column_type(col_link), type_Link);
-        CHECK_EQUAL(t->get_column_type(col_linklist), type_LinkList);
-        CHECK_EQUAL(t->get_column_type(col_int_list), type_Int);
-        CHECK(t->get_column_attr(col_int_list).test(col_attr_List));
-        CHECK_EQUAL(o->get_column_type(col_o), type_Int);
+            CHECK_EQUAL(t->get_column_type(col_int_null), type_Int);
+            CHECK_EQUAL(t->get_column_type(col_bool), type_Bool);
+            CHECK_EQUAL(t->get_column_type(col_bool_null), type_Bool);
+            CHECK_EQUAL(t->get_column_type(col_float), type_Float);
+            CHECK_EQUAL(t->get_column_type(col_double), type_Double);
+            CHECK_EQUAL(t->get_column_type(col_string), type_String);
+            CHECK_EQUAL(t->get_column_type(col_string_i), type_String);
+            CHECK_EQUAL(t->get_column_type(col_binary), type_Binary);
+            CHECK_EQUAL(t->get_column_type(col_date), type_Timestamp);
+            CHECK_EQUAL(t->get_column_type(col_link), type_Link);
+            CHECK_EQUAL(t->get_column_type(col_linklist), type_LinkList);
+            CHECK_EQUAL(t->get_column_type(col_int_list), type_Int);
+            CHECK(t->get_column_attr(col_int_list).test(col_attr_List));
+            CHECK_EQUAL(o->get_column_type(col_o), type_Int);
 
-        CHECK_EQUAL(t->is_nullable(col_int), false);
-        CHECK_EQUAL(t->is_nullable(col_int_null), true);
-        CHECK_EQUAL(t->is_nullable(col_bool), false);
-        CHECK_EQUAL(t->is_nullable(col_bool_null), true);
-        CHECK_EQUAL(t->is_nullable(col_float), false);
-        CHECK_EQUAL(t->is_nullable(col_double), false);
-        CHECK_EQUAL(t->is_nullable(col_string), false);
-        CHECK_EQUAL(t->is_nullable(col_string_i), true);
-        CHECK_EQUAL(t->is_nullable(col_binary), false);
-        CHECK_EQUAL(t->is_nullable(col_date), false);
-        CHECK_EQUAL(t->is_nullable(col_link), true);
-        CHECK_EQUAL(t->is_nullable(col_linklist), false);
-        CHECK_EQUAL(t->is_nullable(col_int_list), false);
+            CHECK_EQUAL(t->is_nullable(col_int), false);
+            CHECK_EQUAL(t->is_nullable(col_int_null), true);
+            CHECK_EQUAL(t->is_nullable(col_bool), false);
+            CHECK_EQUAL(t->is_nullable(col_bool_null), true);
+            CHECK_EQUAL(t->is_nullable(col_float), false);
+            CHECK_EQUAL(t->is_nullable(col_double), false);
+            CHECK_EQUAL(t->is_nullable(col_string), false);
+            CHECK_EQUAL(t->is_nullable(col_string_i), true);
+            CHECK_EQUAL(t->is_nullable(col_binary), false);
+            CHECK_EQUAL(t->is_nullable(col_date), false);
+            CHECK_EQUAL(t->is_nullable(col_link), true);
+            CHECK_EQUAL(t->is_nullable(col_linklist), false);
+            CHECK_EQUAL(t->is_nullable(col_int_list), false);
 
-        CHECK_EQUAL(t->has_search_index(col_string), false);
-        CHECK_EQUAL(t->has_search_index(col_string_i), true);
+            CHECK_EQUAL(t->has_search_index(col_string), false);
+            CHECK_EQUAL(t->has_search_index(col_string_i), true);
 
-        ConstObj obj0 = t->get_object(ObjKey(0));
-        CHECK(obj0.is_null(col_int_null));
-        CHECK(obj0.is_null(col_bool_null));
+            ConstObj obj0 = t->get_object(ObjKey(0));
+            CHECK(obj0.is_null(col_int_null));
+            CHECK(obj0.is_null(col_bool_null));
 
-        ConstObj obj17 = t->get_object(ObjKey(17));
-        ConstObj obj23 = t->get_object(ObjKey(23));
-        ConstObj obj27 = t->get_object(ObjKey(27));
-        ConstObj obj = t->get_object(ObjKey(insert_pos));
+            ConstObj obj17 = t->get_object(ObjKey(17));
+            ConstObj obj23 = t->get_object(ObjKey(23));
+            ConstObj obj27 = t->get_object(ObjKey(27));
+            ConstObj obj = t->get_object(ObjKey(insert_pos));
 
-        CHECK_EQUAL(obj17.get<Int>(col_int), 17);
-        CHECK_EQUAL(obj17.get<util::Optional<Int>>(col_int_null), 17);
-        CHECK_EQUAL(obj17.get<Bool>(col_bool), false);
-        CHECK_EQUAL(obj17.get<util::Optional<Bool>>(col_bool_null), false);
-        CHECK_EQUAL(obj17.get<Float>(col_float), 17 * 1.5f);
-        CHECK_EQUAL(obj17.get<Double>(col_double), 17 * 2.5);
-        CHECK_EQUAL(obj17.get<String>(col_string), "This is a medium long string");
-        CHECK_EQUAL(t->find_first(col_string_i, StringData("foo 17")), obj17.get_key());
-        std::string bigbin(1000, 'x');
-        CHECK_EQUAL(obj17.get<Binary>(col_binary), BinaryData(bigbin));
-        CHECK_EQUAL(obj17.get<Timestamp>(col_date), Timestamp(1700, 17));
-        CHECK_EQUAL(obj17.get<ObjKey>(col_link), obj27.get_key());
-        auto int_list_null = obj17.get_list<Int>(col_int_list);
-        CHECK(int_list_null.is_null());
+            CHECK_EQUAL(obj17.get<Int>(col_int), 17);
+            CHECK_EQUAL(obj17.get<util::Optional<Int>>(col_int_null), 17);
+            CHECK_EQUAL(obj17.get<Bool>(col_bool), false);
+            CHECK_EQUAL(obj17.get<util::Optional<Bool>>(col_bool_null), false);
+            CHECK_EQUAL(obj17.get<Float>(col_float), 17 * 1.5f);
+            CHECK_EQUAL(obj17.get<Double>(col_double), 17 * 2.5);
+            CHECK_EQUAL(obj17.get<String>(col_string), "This is a medium long string");
+            CHECK_EQUAL(t->find_first(col_string_i, StringData("foo 17")), obj17.get_key());
+            std::string bigbin(1000, 'x');
+            CHECK_EQUAL(obj17.get<Binary>(col_binary), BinaryData(bigbin));
+            CHECK_EQUAL(obj17.get<Timestamp>(col_date), Timestamp(1700, 17));
+            CHECK_EQUAL(obj17.get<ObjKey>(col_link), obj27.get_key());
+            auto int_list_null = obj17.get_list<Int>(col_int_list);
+            CHECK(int_list_null.is_null());
 
-        auto int_list = obj23.get_list<Int>(col_int_list);
-        CHECK(!int_list.is_null());
-        CHECK_EQUAL(int_list.size(), 18);
-        CHECK_EQUAL(int_list.get(0), 24);
-        CHECK_EQUAL(int_list.get(17), 41);
+            auto int_list = obj23.get_list<Int>(col_int_list);
+            CHECK(!int_list.is_null());
+            CHECK_EQUAL(int_list.size(), 18);
+            CHECK_EQUAL(int_list.get(0), 24);
+            CHECK_EQUAL(int_list.get(17), 41);
 
-        std::string bin("abcdefghijklmnopqrstuvwxyz");
-        CHECK_EQUAL(obj27.get<Binary>(col_binary), BinaryData(bin));
-        CHECK_EQUAL(obj27.get_backlink_count(*t, col_link), 1);
-        CHECK_EQUAL(obj27.get_backlink(*t, col_link, 0), obj17.get_key());
-        auto ll = obj27.get_linklist(col_linklist);
-        CHECK_EQUAL(ll.size(), 7);
-        ConstObj linked_obj = ll.get(0);
-        CHECK_EQUAL(linked_obj.get_key(), ObjKey(12));
-        size_t expected_back_link_count = (REALM_MAX_BPNODE_SIZE == 4) ? 1 : 4;
-        CHECK_EQUAL(linked_obj.get_backlink_count(*t, col_linklist), expected_back_link_count);
+            CHECK_EQUAL(obj27.get<Bool>(col_bool), true);
+            std::string bin("abcdefghijklmnopqrstuvwxyz");
+            CHECK_EQUAL(obj27.get<Binary>(col_binary), BinaryData(bin));
+            CHECK_EQUAL(obj27.get_backlink_count(*t, col_link), 1);
+            CHECK_EQUAL(obj27.get_backlink(*t, col_link, 0), obj17.get_key());
+            auto ll = obj27.get_linklist(col_linklist);
+            CHECK_EQUAL(ll.size(), 7);
+            ConstObj linked_obj = ll.get(0);
+            CHECK_EQUAL(linked_obj.get_key(), ObjKey(12));
+            size_t expected_back_link_count = (REALM_MAX_BPNODE_SIZE == 4) ? 1 : 4;
+            CHECK_EQUAL(linked_obj.get_backlink_count(*t, col_linklist), expected_back_link_count);
 
-        CHECK_EQUAL(obj.get<String>(col_string),
-                    "This is a rather long string, that should not be very much shorter");
-        CHECK_EQUAL(obj.get<Binary>(col_binary), BinaryData("", 0));
+            CHECK_EQUAL(obj.get<String>(col_string),
+                        "This is a rather long string, that should not be very much shorter");
+            CHECK_EQUAL(obj.get<Binary>(col_binary), BinaryData("", 0));
+
+            --iter;
+        }
+        catch (...) {
+            // Upgrade failed - try again
+        }
     }
 
 #else

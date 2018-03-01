@@ -67,7 +67,7 @@ public:
     ClusterNodeInner(Allocator& allocator, const ClusterTree& tree_top);
     ~ClusterNodeInner() override;
 
-    void create(int sub_tree_depth) override;
+    void create(int sub_tree_depth);
     void init(MemRef mem) override;
     bool update_from_parent(size_t old_baseline) noexcept override;
     MemRef ensure_writeable(ObjKey k) override;
@@ -83,6 +83,7 @@ public:
     }
 
     bool traverse(ClusterTree::TraverseFunction& func, int64_t) const;
+    void update(ClusterTree::UpdateFunction& func, int64_t);
 
     size_t node_size() const override
     {
@@ -595,6 +596,31 @@ bool ClusterNodeInner::traverse(ClusterTree::TraverseFunction& func, int64_t key
     return false;
 }
 
+void ClusterNodeInner::update(ClusterTree::UpdateFunction& func, int64_t key_offset)
+{
+    auto sz = node_size();
+
+    for (unsigned i = 0; i < sz; i++) {
+        ref_type ref = _get_child_ref(i);
+        char* header = m_alloc.translate(ref);
+        bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
+        MemRef mem(header, ref, m_alloc);
+        int64_t offs = (m_keys.is_attached() ? m_keys.get(i) : i << m_shift_factor) + key_offset;
+        if (child_is_leaf) {
+            Cluster leaf(offs, m_alloc, m_tree_top);
+            leaf.init(mem);
+            leaf.set_parent(this, i + s_first_node_index);
+            func(&leaf);
+        }
+        else {
+            ClusterNodeInner node(m_alloc, m_tree_top);
+            node.init(mem);
+            node.set_parent(this, i + s_first_node_index);
+            node.update(func, offs);
+        }
+    }
+}
+
 int64_t ClusterNodeInner::get_last_key_value() const
 {
     auto last_ndx = node_size() - 1;
@@ -627,10 +653,9 @@ inline void Cluster::do_create(size_t col_ndx)
     arr.update_parent();
 }
 
-void Cluster::create(int)
+void Cluster::create(size_t nb_columns)
 {
     // Create array with the required size
-    size_t nb_columns = m_tree_top.get_spec().get_column_count();
     Array::create(type_HasRefs, false, nb_columns + s_first_col_index);
     Array::set(0, RefOrTagged::make_tagged(0));
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
@@ -1006,7 +1031,7 @@ ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
     else {
         // Split leaf node
         Cluster new_leaf(0, m_alloc, m_tree_top);
-        new_leaf.create();
+        new_leaf.create(size() - 1);
         if (ndx == sz) {
             new_leaf.insert_row(0, ObjKey(0)); // Throws
             state.split_key = k.value;
@@ -1218,6 +1243,12 @@ void Cluster::init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept
     ref_type ref = to_ref(Array::get(col_ndx + 1));
     leaf->set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), col_ndx);
     leaf->init_from_ref(ref);
+}
+
+void Cluster::add_leaf(size_t col_ndx, ref_type ref)
+{
+    REALM_ASSERT((col_ndx + 1) == size());
+    Array::insert(col_ndx + 1, from_ref(ref));
 }
 
 void Cluster::dump_objects(int64_t key_offset, std::string lead) const
@@ -1451,14 +1482,13 @@ void ClusterTree::clear()
     m_root->destroy_deep();
 
     auto leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
-    leaf->create();
+    leaf->create(get_spec().get_column_count());
     replace_root(std::move(leaf));
     m_size = 0;
 }
 
-Obj ClusterTree::insert(ObjKey k)
+void ClusterTree::insert_fast(ObjKey k, ClusterNode::State& state)
 {
-    ClusterNode::State state;
     ref_type new_sibling_ref = m_root->insert(k, state);
     if (REALM_UNLIKELY(new_sibling_ref)) {
         auto new_root = std::make_unique<ClusterNodeInner>(m_root->get_alloc(), *this);
@@ -1470,6 +1500,13 @@ Obj ClusterTree::insert(ObjKey k)
 
         replace_root(std::move(new_root));
     }
+    m_size++;
+}
+
+Obj ClusterTree::insert(ObjKey k)
+{
+    ClusterNode::State state;
+    insert_fast(k, state);
 
     // Update index
     const Spec& spec = get_spec();
@@ -1500,7 +1537,7 @@ Obj ClusterTree::insert(ObjKey k)
     if (Replication* repl = get_alloc().get_replication()) {
         repl->create_object(get_owner(), k);
     }
-    m_size++;
+
     return Obj(this, state.ref, k, state.index);
 }
 
@@ -1613,6 +1650,16 @@ bool ClusterTree::traverse(TraverseFunction& func) const
     }
 }
 
+void ClusterTree::update(UpdateFunction& func)
+{
+    if (m_root->is_leaf()) {
+        func(static_cast<Cluster*>(m_root.get()));
+    }
+    else {
+        static_cast<ClusterNodeInner*>(m_root.get())->update(func, 0);
+    }
+}
+
 void ClusterTree::enumerate_string_column(size_t col_ndx)
 {
     Allocator& alloc = get_alloc();
@@ -1637,9 +1684,8 @@ void ClusterTree::enumerate_string_column(size_t col_ndx)
         return false; // Continue
     };
 
-    ClusterTree::TraverseFunction upgrade = [col_ndx, &keys](const Cluster* cluster) {
-        const_cast<Cluster*>(cluster)->upgrade_string_to_enum(col_ndx, keys);
-        return false; // Continue
+    ClusterTree::UpdateFunction upgrade = [col_ndx, &keys](Cluster* cluster) {
+        cluster->upgrade_string_to_enum(col_ndx, keys);
     };
 
     // Populate 'keys' array
@@ -1649,7 +1695,7 @@ void ClusterTree::enumerate_string_column(size_t col_ndx)
     const_cast<Spec*>(&get_spec())->upgrade_string_to_enum(col_ndx, keys.get_ref());
 
     // Replace column in all clusters
-    traverse(upgrade);
+    update(upgrade);
 }
 
 std::unique_ptr<ClusterNode> ClusterTree::get_node(ref_type ref) const

@@ -434,20 +434,6 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         MemRef mem = Array::create_array(Array::type_HasRefs, context_flag, nb_columns, 0, m_top.get_alloc());
         m_index_refs.init_from_mem(mem);
         m_index_refs.update_parent();
-        for (size_t ndx = 0; ndx < nb_columns; ndx++) {
-            if (m_spec.get_column_attr(ndx).test(col_attr_Indexed)) {
-                StringIndex* index =
-                    new StringIndex(ClusterColumn(&m_clusters, m_spec.get_key(ndx)), m_top.get_alloc());
-                m_index_accessors.push_back(index);
-
-                // Insert ref to index
-                index->set_parent(&m_index_refs, ndx);
-                m_index_refs.set(ndx, index->get_ref()); // Throws
-            }
-            else {
-                m_index_accessors.push_back(nullptr);
-            }
-        }
     }
     else {
         m_index_refs.init_from_parent();
@@ -877,217 +863,293 @@ bool Table::has_search_index(ColKey col_key) const noexcept
 }
 
 
-void Table::create_columns_in_clusters()
+bool Table::convert_columns()
 {
+    bool changes = false;
     size_t nb_columns = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        m_spec.convert_column(col_ndx);
-        m_clusters.insert_column(col_ndx);
+        changes |= m_spec.convert_column(col_ndx);
     }
+    return changes;
 }
 
-void Table::create_objects()
+bool Table::create_objects()
 {
-    Array col_refs(m_alloc);
-    col_refs.init_from_ref(m_top.get_as_ref(1));
-    ref_type first_col_ref = col_refs.get_as_ref(0);
-    ColumnType col_type = m_spec.get_column_type(0);
-    auto attr = m_spec.get_column_attr(0);
+    ref_type ref = m_top.get_as_ref(top_position_for_columns);
+    // If this ref is zero, then all columns have been copied.
+    if (ref) {
+        Array col_refs(m_alloc);
+        col_refs.init_from_ref(ref);
+        ref_type first_col_ref = col_refs.get_as_ref(0);
+        if (first_col_ref) {
+            ColumnType col_type = m_spec.get_column_type(0);
+            auto attr = m_spec.get_column_attr(0);
 
-    // Determine the size of the table based on the size of the first column
-    size_t sz;
+            // Determine the size of the table based on the size of the first column
+            size_t sz;
+            if (attr.test(col_attr_List)) {
+                sz = ColumnBase::get_size_from_type_and_ref(col_type_Int, first_col_ref, m_alloc, false);
+            }
+            else {
+                bool nullable = attr.test(col_attr_Nullable);
+                sz = ColumnBase::get_size_from_type_and_ref(col_type, first_col_ref, m_alloc, nullable);
+            }
+            if (m_clusters.size() != sz) {
+                // Create all objects
+                ClusterNode::State state;
+                for (size_t i = 0; i < sz; i++) {
+                    m_clusters.insert_fast(ObjKey(i), state);
+                }
+                return true;
+            }
+        }
+    }
+    // Objects must have been created
+    return false;
+}
+
+namespace {
+template <class T>
+void copy_column(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, Allocator& allocator)
+{
+    BPlusTree<T> from_column(allocator);
+    from_column.init_from_ref(col_ref);
+
+    ClusterTree::UpdateFunction func = [col_ndx, &from_column, &allocator](Cluster* cluster) {
+        size_t sz = cluster->node_size();
+        int64_t offset = cluster->get_offset();
+        typename ColumnTypeTraits<T>::cluster_leaf_type arr(allocator);
+        arr.create();
+        for (size_t i = 0; i < sz; i++) {
+            auto v = from_column.get(i + offset);
+            arr.add(v);
+        }
+        cluster->add_leaf(col_ndx, arr.get_ref());
+    };
+
+    clusters.update(func);
+}
+
+template <>
+void copy_column<util::Optional<bool>>(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, Allocator& allocator)
+{
+    BPlusTree<util::Optional<int64_t>> from_column(allocator);
+    from_column.init_from_ref(col_ref);
+
+    ClusterTree::UpdateFunction func = [col_ndx, &from_column, &allocator](Cluster* cluster) {
+        size_t sz = cluster->node_size();
+        int64_t offset = cluster->get_offset();
+        ArrayBoolNull arr(allocator);
+        arr.create();
+        for (size_t i = 0; i < sz; i++) {
+            util::Optional<bool> val;
+            auto opt = from_column.get(i + offset);
+            if (opt)
+                val = opt.value();
+            arr.add(val);
+        }
+        cluster->add_leaf(col_ndx, arr.get_ref());
+    };
+
+    clusters.update(func);
+}
+
+template <>
+void copy_column<Timestamp>(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, Allocator& allocator)
+{
+    Array top(allocator);
+    top.init_from_ref(col_ref);
+    BPlusTree<util::Optional<int64_t>> seconds(allocator);
+    BPlusTree<int64_t> nano_seconds(allocator);
+    seconds.init_from_ref(top.get_as_ref(0));
+    nano_seconds.init_from_ref(top.get_as_ref(1));
+
+    ClusterTree::UpdateFunction func = [col_ndx, &seconds, &nano_seconds, &allocator](Cluster* cluster) {
+        size_t sz = cluster->node_size();
+        int64_t offset = cluster->get_offset();
+        ArrayTimestamp arr(allocator);
+        arr.create();
+        for (size_t i = 0; i < sz; i++) {
+            auto s = seconds.get(i + offset);
+            if (s) {
+                int32_t n = int32_t(nano_seconds.get(i + offset));
+                arr.add(Timestamp(s.value(), n));
+            }
+            else {
+                arr.add(Timestamp());
+            }
+        }
+        cluster->add_leaf(col_ndx, arr.get_ref());
+    };
+
+    clusters.update(func);
+}
+
+void copy_column_backlink(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, Allocator& allocator)
+{
+    BPlusTree<Int> list_refs(allocator);
+    list_refs.init_from_ref(col_ref);
+
+    ClusterTree::UpdateFunction func = [col_ndx, &list_refs, &allocator](Cluster* cluster) {
+        size_t sz = cluster->node_size();
+        int64_t offset = cluster->get_offset();
+        ArrayInteger arr(allocator);
+        arr.Array::create(NodeHeader::type_HasRefs, false, sz, 0);
+        for (size_t i = 0; i < sz; i++) {
+            auto v = list_refs.get(i + offset);
+            if (v) {
+                if (v & 1) {
+                    // This is a single link
+                    arr.set(i, v);
+                }
+                else {
+                    // This is a list - just clone the list
+                    MemRef mem(v, allocator);
+                    MemRef copy_mem = Array::clone(mem, allocator, allocator); // Throws
+                    arr.set_as_ref(i, copy_mem.get_ref());
+                }
+            }
+        }
+        cluster->add_leaf(col_ndx, arr.get_ref());
+    };
+
+    clusters.update(func);
+}
+
+void copy_column_list(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, ColumnType col_type,
+                      Allocator& allocator)
+{
+    BPlusTree<Int> list_refs(allocator);
+    list_refs.init_from_ref(col_ref);
+
+    ClusterTree::UpdateFunction func = [col_ndx, col_type, &list_refs, &allocator](Cluster* cluster) {
+        size_t sz = cluster->node_size();
+        int64_t offset = cluster->get_offset();
+        ArrayInteger arr(allocator);
+        arr.Array::create(NodeHeader::type_HasRefs, false, sz, 0);
+        for (size_t i = 0; i < sz; i++) {
+            ref_type ref = list_refs.get(i + offset);
+            if (ref) {
+                // List is not null - just clone the list
+                if (col_type != col_type_LinkList) {
+                    // This is list-of-primitives encoded in subtables
+                    // Actual list is in the columns array position 0
+                    Array cols(allocator);
+                    cols.init_from_ref(ref);
+                    ref = cols.get_as_ref(0);
+                }
+                MemRef mem(ref, allocator);
+                MemRef copy_mem = Array::clone(mem, allocator, allocator); // Throws
+                arr.set_as_ref(i, copy_mem.get_ref());
+            }
+        }
+        cluster->add_leaf(col_ndx, arr.get_ref());
+    };
+
+    clusters.update(func);
+}
+}
+
+bool Table::copy_content_from_columns(size_t col_ndx)
+{
+    ref_type ref = m_top.get_as_ref(top_position_for_columns);
+    if (!ref) {
+        // All columns have already been converted
+        return false;
+    }
+    ColKey col_key(col_ndx);
+    Array col_refs(m_alloc);
+    col_refs.init_from_ref(ref);
+    col_refs.set_parent(&m_top, top_position_for_columns);
+
+    // Calculate index in columns list
+    size_t ndx_in_parent = 0;
+    for (size_t i = 0; i < col_ndx; i++) {
+        ndx_in_parent += m_spec.get_column_attr(i).test(col_attr_Indexed) ? 2 : 1;
+    }
+    ref_type col_ref = col_refs.get_as_ref(ndx_in_parent);
+    if (!col_ref) {
+        // Column has already been converted
+        return false;
+    }
+
+    ColumnAttrMask attr = m_spec.get_column_attr(col_ndx);
+    ColumnType col_type = m_spec.get_column_type(col_ndx);
+
     if (attr.test(col_attr_List)) {
-        sz = ColumnBase::get_size_from_type_and_ref(col_type_Int, first_col_ref, m_alloc, false);
+        copy_column_list(m_clusters, col_ndx, col_ref, col_type, m_alloc);
     }
     else {
-        bool nullable = attr.test(col_attr_Nullable);
-        sz = ColumnBase::get_size_from_type_and_ref(col_type, first_col_ref, m_alloc, nullable);
-    }
-
-    for (size_t i = 0; i < sz; i++) {
-        Obj obj = create_object(ObjKey(i));
-    }
-}
-
-ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, ref_type ref)
-{
-    ColumnBase* col = nullptr;
-    auto attr = m_spec.get_column_attr(col_ndx);
-    bool nullable = attr.test(col_attr_Nullable);
-
-    switch (col_type) {
-        case col_type_Int:
-        case col_type_Bool:
-            if (nullable) {
-                col = new IntNullColumn(m_alloc, ref, col_ndx); // Throws
-            }
-            else {
-                col = new IntegerColumn(m_alloc, ref, col_ndx); // Throws
-            }
-            break;
-        case col_type_Float:
-            col = new FloatColumn(m_alloc, ref, col_ndx); // Throws
-            break;
-        case col_type_Double:
-            col = new DoubleColumn(m_alloc, ref, col_ndx); // Throws
-            break;
-        case col_type_String:
-            col = new StringColumn(m_alloc, ref, nullable, col_ndx); // Throws
-            break;
-        case col_type_Binary:
-            col = new BinaryColumn(m_alloc, ref, nullable, col_ndx); // Throws
-            break;
-        case col_type_Link:
-            // Target table will be set by group after entire table has been created
-            col = new LinkColumn(m_alloc, ref, this, col_ndx); // Throws
-            break;
-        case col_type_Timestamp:
-            // Origin table will be set by group after entire table has been created
-            col = new TimestampColumn(nullable, m_alloc, ref, col_ndx); // Throws
-            break;
-        default:
-            // These have no function yet and are therefore unexpected.
-            break;
-    }
-    REALM_ASSERT(col);
-    return col;
-}
-
-template <class U>
-void Table::copy_list_of_primitives(Obj& obj, ColKey col, ref_type ref)
-{
-    auto ll = obj.get_list<U>(col);
-    BPlusTree<U> values(m_alloc);
-    values.init_from_ref(ref);
-    ll = values;
-}
-
-void Table::copy_content_from_columns()
-{
-    size_t nb_columns = m_spec.get_public_column_count();
-    std::vector<std::unique_ptr<ColumnBase>> columns;
-    std::vector<ColumnType> types;
-    std::vector<ColumnAttrMask> attrs;
-    Array col_refs(m_alloc);
-    col_refs.init_from_ref(m_top.get_as_ref(1));
-    size_t ndx_in_parent = 0;
-    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-        ColumnAttrMask attr = m_spec.get_column_attr(col_ndx);
-        ColumnType col_type = m_spec.get_column_type(col_ndx);
-        types.push_back(col_type);
-        attrs.push_back(attr);
-        if (attr.test(col_attr_List)) {
-            col_type = col_type_Int;
-        }
-        columns.emplace_back(create_column_accessor(col_type, col_ndx, col_refs.get_as_ref(ndx_in_parent)));
-        ndx_in_parent += attr.test(col_attr_Indexed) ? 2 : 1;
-    }
-    for (auto& it : *this) {
-        size_t ndx = size_t(it.get_key().value);
-        for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-            ColKey col_key(col_ndx);
-            if (attrs[col_ndx].test(col_attr_List)) {
-                ref_type ref = static_cast<IntegerColumn*>(columns[col_ndx].get())->get_as_ref(ndx);
-                if (ref) {
-                    // List is not null
-                    if (types[col_ndx] == col_type_LinkList) {
-                        auto ll = it.get_linklist(col_key);
-                        IntegerColumn links(IntegerColumn::unattached_root_tag(), m_alloc);
-                        links.init_from_ref(m_alloc, ref);
-                        size_t sz = links.size();
-                        for (size_t i = 0; i < sz; i++) {
-                            int64_t link = links.get(i);
-                            ll.add(ObjKey(link));
-                        }
-                    }
-                    else {
-                        // list of primitives
-                        char* header = m_alloc.translate(ref);
-                        REALM_ASSERT(Array::get_size_from_header(header) ==
-                                     1); // List of primitives has only one column
-                        ref_type list_ref = to_ref(Array::get(header, 0));
-                        switch (types[col_ndx]) {
-                            case col_type_Int:
-                                copy_list_of_primitives<int64_t>(it, col_key, list_ref);
-                                break;
-                            case col_type_Bool:
-                                copy_list_of_primitives<bool>(it, col_key, list_ref);
-                                break;
-                            case col_type_Float:
-                                copy_list_of_primitives<float>(it, col_key, list_ref);
-                                break;
-                            case col_type_Double:
-                                copy_list_of_primitives<double>(it, col_key, list_ref);
-                                break;
-                            case col_type_String:
-                                copy_list_of_primitives<StringData>(it, col_key, list_ref);
-                                break;
-                            case col_type_Binary:
-                                copy_list_of_primitives<BinaryData>(it, col_key, list_ref);
-                                break;
-                            case col_type_Timestamp:
-                                copy_list_of_primitives<Timestamp>(it, col_key, list_ref);
-                                break;
-                            default:
-                                break;
-                        }
-                    }
+        switch (col_type) {
+            case col_type_Int:
+                if (attr.test(col_attr_Nullable)) {
+                    copy_column<util::Optional<int64_t>>(m_clusters, col_ndx, col_ref, m_alloc);
                 }
-            }
-            else {
-                switch (types[col_ndx]) {
-                    case col_type_Int:
-                        if (attrs[col_ndx].test(col_attr_Nullable)) {
-                            auto val = static_cast<IntNullColumn*>(columns[col_ndx].get())->get(ndx);
-                            if (val) {
-                                it.set(col_key, *val);
-                            }
-                        }
-                        else {
-                            auto val = static_cast<IntegerColumn*>(columns[col_ndx].get())->get(ndx);
-                            it.set(col_key, val);
-                        }
-                        break;
-                    case col_type_Bool:
-                        if (attrs[col_ndx].test(col_attr_Nullable)) {
-                            auto val = static_cast<IntNullColumn*>(columns[col_ndx].get())->get(ndx);
-                            if (val) {
-                                it.set(col_key, *val ? true : false);
-                            }
-                        }
-                        else {
-                            auto val = static_cast<IntegerColumn*>(columns[col_ndx].get())->get(ndx);
-                            it.set(col_key, val ? true : false);
-                        }
-                        break;
-                    case col_type_Float:
-                        it.set(col_key, static_cast<FloatColumn*>(columns[col_ndx].get())->get(ndx));
-                        break;
-                    case col_type_Double:
-                        it.set(col_key, static_cast<DoubleColumn*>(columns[col_ndx].get())->get(ndx));
-                        break;
-                    case col_type_String:
-                        it.set(col_key, static_cast<StringColumn*>(columns[col_ndx].get())->get(ndx));
-                        break;
-                    case col_type_Binary:
-                        it.set(col_key, static_cast<BinaryColumn*>(columns[col_ndx].get())->get(ndx));
-                        break;
-                    case col_type_Link: {
-                        int64_t val = static_cast<IntegerColumn*>(columns[col_ndx].get())->get(ndx);
-                        it.set(col_key, ObjKey(val - 1));
-                        break;
-                    }
-                    case col_type_Timestamp:
-                        it.set(col_key, static_cast<TimestampColumn*>(columns[col_ndx].get())->get(ndx));
-                        break;
-                    default:
-                        break;
+                else {
+                    copy_column<int64_t>(m_clusters, col_ndx, col_ref, m_alloc);
                 }
-            }
+                break;
+            case col_type_Bool:
+                if (attr.test(col_attr_Nullable)) {
+                    copy_column<util::Optional<bool>>(m_clusters, col_ndx, col_ref, m_alloc);
+                }
+                else {
+                    copy_column<bool>(m_clusters, col_ndx, col_ref, m_alloc);
+                }
+                break;
+            case col_type_Float:
+                copy_column<float>(m_clusters, col_ndx, col_ref, m_alloc);
+                break;
+            case col_type_Double:
+                copy_column<double>(m_clusters, col_ndx, col_ref, m_alloc);
+                break;
+            case col_type_String:
+                copy_column<String>(m_clusters, col_ndx, col_ref, m_alloc);
+                break;
+            case col_type_Binary:
+                copy_column<Binary>(m_clusters, col_ndx, col_ref, m_alloc);
+                break;
+            case col_type_Timestamp:
+                copy_column<Timestamp>(m_clusters, col_ndx, col_ref, m_alloc);
+                break;
+            case col_type_Link:
+                // Just copy links as integers
+                copy_column<int64_t>(m_clusters, col_ndx, col_ref, m_alloc);
+                break;
+            case col_type_BackLink:
+                copy_column_backlink(m_clusters, col_ndx, col_ref, m_alloc);
+                break;
+            default:
+                REALM_UNREACHABLE();
+                break;
         }
     }
-    col_refs.destroy_deep();
-    m_top.set(1, 0);
+
+    if (attr.test(col_attr_Indexed)) {
+        // Move index over to new position in table
+        ref_type index_ref = col_refs.get(ndx_in_parent + 1);
+        m_index_refs.set(col_ndx, index_ref);
+        col_refs.set(ndx_in_parent + 1, 0);
+    }
+
+    if (col_ndx == (m_spec.get_column_count() - 1)) {
+        // Last column - destroy column ref array
+        col_refs.destroy_deep();
+        m_top.set(top_position_for_columns, 0);
+    }
+    else {
+        // Just destroy single column
+        Array::destroy_deep(col_ref, m_alloc);
+        col_refs.set(ndx_in_parent, 0);
+    }
+
+#ifdef REALM_DEBUG
+    if (fastrand(100) < 20) {
+        throw std::runtime_error("Upgrade interrupted");
+    }
+#endif
+
+    return true;
 }
 
 StringData Table::get_name() const noexcept
@@ -2087,8 +2149,7 @@ void Table::refresh_index_accessors()
                 index->set_parent(&m_index_refs, col_ndx);
                 index->refresh_accessor_tree();
             }
-            else {
-                ref_type ref = m_index_refs.get_as_ref(col_ndx);
+            else if (ref_type ref = m_index_refs.get_as_ref(col_ndx)) {
                 ClusterColumn virtual_col(&m_clusters, col_key);
                 index.reset(new StringIndex(ref, &m_index_refs, col_ndx, virtual_col, get_alloc()));
             }
