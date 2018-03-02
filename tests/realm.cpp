@@ -1414,14 +1414,13 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
         SECTION("remote commit") {
             binding_context_start_notify_calls = 0;
             binding_context_end_notify_calls = 0;
-            JoiningThread thread([&] {
+            JoiningThread([&] {
                 auto r2 = coordinator->get_realm();
                 r2->begin_transaction();
                 auto table2 = r2->read_group().get_table("class_object");
                 table2->add_empty_row();
                 r2->commit_transaction();
             });
-            thread.join();
             advance_and_notify(*r);
             REQUIRE(binding_context_start_notify_calls == 1);
             REQUIRE(binding_context_end_notify_calls == 1);
@@ -1479,17 +1478,89 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             binding_context_start_notify_calls = 0;
             binding_context_end_notify_calls = 0;
             notification_calls = 0;
-            JoiningThread thread([&] {
+            JoiningThread([&] {
                 auto r2 = coordinator->get_realm();
                 r2->begin_transaction();
                 auto table2 = r2->read_group().get_table("class_object");
                 table2->add_empty_row();
                 r2->commit_transaction();
             });
-            thread.join();
             advance_and_notify(*r);
             REQUIRE(binding_context_start_notify_calls == 1);
             REQUIRE(binding_context_end_notify_calls == 1);
+        }
+    }
+
+    SECTION("did_send() is skipped if the Realm is closed first") {
+        Results results(r, table->where());
+        bool do_close = true;
+        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            if (do_close)
+                r->close();
+        });
+
+        struct FailOnDidSend : BindingContext {
+            void did_send_notifications() override
+            {
+                FAIL("did_send_notifications() should not have been called");
+            }
+        };
+        struct CloseOnWillChange : FailOnDidSend {
+            Realm& realm;
+            CloseOnWillChange(Realm& realm) : realm(realm) {}
+
+            void will_send_notifications() override
+            {
+                realm.close();
+            }
+        };
+
+        SECTION("closed in notification callback for notify()") {
+            r->m_binding_context.reset(new FailOnDidSend);
+            coordinator->on_change();
+            r->notify();
+        }
+
+        SECTION("closed in notification callback for refresh()") {
+            do_close = false;
+            coordinator->on_change();
+            r->notify();
+            do_close = true;
+
+            JoiningThread([&] {
+                auto r = coordinator->get_realm();
+                r->begin_transaction();
+                r->read_group().get_table("class_object")->add_empty_row();
+                r->commit_transaction();
+            });
+
+            r->m_binding_context.reset(new FailOnDidSend);
+            coordinator->on_change();
+            r->refresh();
+        }
+
+        SECTION("closed in will_send() for notify()") {
+            r->m_binding_context.reset(new CloseOnWillChange(*r));
+            coordinator->on_change();
+            r->notify();
+        }
+
+        SECTION("closed in will_send() for refresh()") {
+            do_close = false;
+            coordinator->on_change();
+            r->notify();
+            do_close = true;
+
+            JoiningThread([&] {
+                auto r = coordinator->get_realm();
+                r->begin_transaction();
+                r->read_group().get_table("class_object")->add_empty_row();
+                r->commit_transaction();
+            });
+
+            r->m_binding_context.reset(new CloseOnWillChange(*r));
+            coordinator->on_change();
+            r->refresh();
         }
     }
 }

@@ -878,6 +878,8 @@ void RealmCoordinator::process_available_async(Realm& realm)
 
     bool in_read = realm.is_in_read_transaction();
     auto& sg = Realm::Internal::get_shared_group(realm);
+    if (!sg) // i.e. the Realm was closed in a callback above
+        return;
     auto version = sg->get_version_of_current_transaction();
     auto package = [&](auto& notifier) {
         return !(notifier->has_run() && (!in_read || notifier->version() == version) && notifier->package_for_delivery());

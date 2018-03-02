@@ -779,18 +779,18 @@ void advance_with_notifications(BindingContext* context, const std::unique_ptr<S
         auto new_version = sg->get_version_of_current_transaction();
         if (context && old_version != new_version)
             context->did_change({}, {});
-        // did_change() could close the Realm. Just return if it does.
-        if (!sg)
+        if (!sg) // did_change() could close the Realm. Just return if it does.
             return;
-
         if (context)
             context->will_send_notifications();
+        if (!sg) // will_send_notifications() could close the Realm. Just return if it does.
+            return;
         // did_change() can change the read version, and if it does we can't
         // deliver notifiers
         if (new_version == sg->get_version_of_current_transaction())
             notifiers.deliver(*sg);
         notifiers.after_advance();
-        if (context)
+        if (sg && context)
             context->did_send_notifications();
         return;
     }
