@@ -223,7 +223,12 @@ private:
     void add_backlink(ColKey backlink_col, ObjKey origin_key);
     bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
     void nullify_link(ColKey origin_col, ObjKey target_key);
-    bool update_backlinks(ColKey col_key, ObjKey old_key, ObjKey new_key, CascadeState& state);
+    // Used when inserting a new link. You will not remove existing links in this process
+    void set_backlink(ColKey col_key, ObjKey new_key);
+    // Used when replacing a link, return true if CascadeState contains objects to remove
+    bool replace_backlink(ColKey col_key, ObjKey old_key, ObjKey new_key, CascadeState& state);
+    // Used when removing a backlink, return true if CascadeState contains objects to remove
+    bool remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state);
 };
 
 

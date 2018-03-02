@@ -42,9 +42,9 @@ public:
     using Array::erase;
     using Array::truncate_and_destroy_children;
 
-    static util::Optional<bool> default_value(bool nullable)
+    static bool default_value(bool)
     {
-        return nullable ? util::none : util::some<bool>(false);
+        return false;
     }
     void create()
     {
@@ -105,6 +105,10 @@ public:
     using value_type = util::Optional<bool>;
     using ArrayBool::ArrayBool;
 
+    static util::Optional<bool> default_value(bool nullable)
+    {
+        return nullable ? util::none : util::some<bool>(false);
+    }
     void set_null(size_t ndx)
     {
         Array::set(ndx, null_value);

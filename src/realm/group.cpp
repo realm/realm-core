@@ -1333,6 +1333,41 @@ public:
         return true;
     }
 
+    bool list_insert_int(size_t, int64_t, size_t)
+    {
+        return true;
+    }
+
+    bool list_insert_bool(size_t, bool, size_t)
+    {
+        return true;
+    }
+
+    bool list_insert_float(size_t, float, size_t)
+    {
+        return true;
+    }
+
+    bool list_insert_double(size_t, double, size_t)
+    {
+        return true;
+    }
+
+    bool list_insert_string(size_t, StringData, size_t)
+    {
+        return true;
+    }
+
+    bool list_insert_binary(size_t, BinaryData, size_t)
+    {
+        return true;
+    }
+
+    bool list_insert_timestamp(size_t, Timestamp, size_t)
+    {
+        return true;
+    }
+
     bool enumerate_string_column(ColKey)
     {
         return true; // No-op
@@ -1403,6 +1438,11 @@ public:
     }
 
     bool list_set_link(size_t, ObjKey) noexcept
+    {
+        return true; // No-op
+    }
+
+    bool list_insert_link(size_t, ObjKey, size_t) noexcept
     {
         return true; // No-op
     }

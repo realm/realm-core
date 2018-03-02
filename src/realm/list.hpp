@@ -171,7 +171,6 @@ protected:
         }
         m_deleted.insert(it, ndx);
     }
-    void insert_null_repl(Replication* repl, size_t ndx) const;
     void erase_repl(Replication* repl, size_t ndx) const;
     void move_repl(Replication* repl, size_t from, size_t to) const;
     void swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const;
@@ -374,21 +373,17 @@ public:
         m_tree->create();
         ConstListIf<T>::m_valid = true;
     }
+
     size_t size() const override
     {
         return ConstListIf<T>::size();
     }
+
     void insert_null(size_t ndx) override
     {
-        if (ndx > m_tree->size()) {
-            throw std::out_of_range("Index out of range");
-        }
-        ensure_writeable();
-        if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
-            ConstListBase::insert_null_repl(repl, ndx);
-        }
-        m_tree->insert_null(ndx);
+        insert(ndx, BPlusTree<T>::default_value());
     }
+
     void resize(size_t new_size) override
     {
         update_if_needed();
@@ -399,10 +394,12 @@ public:
         remove(new_size, current_size);
         m_obj.bump_both_versions();
     }
+
     void add(T value)
     {
         insert(m_tree->size(), value);
     }
+
     T set(size_t ndx, T value)
     {
         // get will check for ndx out of bounds
@@ -417,16 +414,25 @@ public:
         }
         return old;
     }
+
     void insert(size_t ndx, T value)
     {
-        insert_null(ndx);
-        set(ndx, value);
+        if (ndx > m_tree->size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        ensure_writeable();
+        if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+            insert_repl(repl, ndx, value);
+        }
+        do_insert(ndx, value);
         m_obj.bump_both_versions();
     }
+
     T remove(ListIterator<T>& it)
     {
         return remove(ConstListBase::adjust(it.m_ndx));
     }
+
     T remove(size_t ndx)
     {
         ensure_writeable();
@@ -434,18 +440,20 @@ public:
             ConstListBase::erase_repl(repl, ndx);
         }
         T old = get(ndx);
-        m_tree->erase(ndx);
+        do_remove(ndx);
         ConstListBase::adj_remove(ndx);
         m_obj.bump_both_versions();
 
         return old;
     }
+
     void remove(size_t from, size_t to) override
     {
         while (from < to) {
             remove(--to);
         }
     }
+
     void move(size_t from, size_t to) override
     {
         if (from != to) {
@@ -457,23 +465,26 @@ public:
             int adj = (from < to) ? 1 : -1;
             while (from != to) {
                 size_t neighbour = from + adj;
-                do_set(from, get(neighbour));
+                T val = m_tree->get(neighbour);
+                m_tree->set(from, val);
                 from = neighbour;
             }
-            do_set(to, tmp);
+            m_tree->set(to, tmp);
         }
     }
+
     void swap(size_t ndx1, size_t ndx2) override
     {
         if (ndx1 != ndx2) {
             if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
                 ConstListBase::swap_repl(repl, ndx1, ndx2);
             }
-            T tmp = get(ndx1);
-            do_set(ndx1, get(ndx2));
-            do_set(ndx2, tmp);
+            T tmp = m_tree->get(ndx1);
+            m_tree->set(ndx1, get(ndx2));
+            m_tree->set(ndx2, tmp);
         }
     }
+
     void clear() override
     {
         update_if_needed();
@@ -506,14 +517,26 @@ protected:
     {
         m_tree->set(ndx, value);
     }
+    void do_insert(size_t ndx, T value)
+    {
+        m_tree->insert(ndx, value);
+    }
+    void do_remove(size_t ndx)
+    {
+        m_tree->erase(ndx);
+    }
     void set_repl(Replication* repl, size_t ndx, T value);
+    void insert_repl(Replication* repl, size_t ndx, T value);
 };
 
 template <>
 void List<ObjKey>::do_set(size_t ndx, ObjKey target_key);
 
 template <>
-ObjKey List<ObjKey>::remove(size_t ndx);
+void List<ObjKey>::do_insert(size_t ndx, ObjKey target_key);
+
+template <>
+void List<ObjKey>::do_remove(size_t ndx);
 
 template <>
 void List<ObjKey>::clear();

@@ -267,6 +267,11 @@ public:
 
     /************ Tree manipulation functions ************/
 
+    static T default_value()
+    {
+        return LeafArray::default_value(false);
+    }
+
     void add(T value)
     {
         insert(npos, value);
@@ -277,19 +282,6 @@ public:
         BPlusTreeNode::InsertFunc func = [value](BPlusTreeNode* node, size_t ndx) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
             leaf->LeafArray::insert(ndx, value);
-            return leaf->size();
-        };
-
-        bptree_insert(n, func);
-        m_size++;
-    }
-
-    // FIXME this function should eventually be removed
-    void insert_null(size_t n)
-    {
-        BPlusTreeNode::InsertFunc func = [](BPlusTreeNode* node, size_t ndx) {
-            LeafNode* leaf = static_cast<LeafNode*>(node);
-            leaf->LeafArray::insert(ndx, LeafArray::default_value(false));
             return leaf->size();
         };
 

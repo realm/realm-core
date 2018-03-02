@@ -70,7 +70,7 @@ enum Instruction {
     instr_SetLinkType = 30,          // Strong/weak
     instr_SelectList = 31,
     instr_ListSet = 32,         // Assign to list entry
-    instr_ListInsertNull = 33,  // Insert null entry into list, will always be followed by set
+    instr_ListInsertNull = 33,  // Insert null entry into list, only used to revert deletion
     instr_ListMove = 34,        // Move an entry within a link list
     instr_ListSwap = 35,        // Swap two entries within a list
     instr_ListErase = 36,       // Remove an entry from a list
@@ -81,6 +81,7 @@ enum Instruction {
     instr_CreateObject = 41,
     instr_RemoveObject = 42,
     instr_InsertListColumn = 43, // Insert list column
+    instr_ListInsert = 44,       // Insert list entry
 };
 
 class TransactLogStream {
@@ -246,6 +247,34 @@ public:
     {
         return true;
     }
+    bool list_insert_int(size_t, int64_t, size_t)
+    {
+        return true;
+    }
+    bool list_insert_bool(size_t, bool, size_t)
+    {
+        return true;
+    }
+    bool list_insert_float(size_t, float, size_t)
+    {
+        return true;
+    }
+    bool list_insert_double(size_t, double, size_t)
+    {
+        return true;
+    }
+    bool list_insert_string(size_t, StringData, size_t)
+    {
+        return true;
+    }
+    bool list_insert_binary(size_t, BinaryData, size_t)
+    {
+        return true;
+    }
+    bool list_insert_timestamp(size_t, Timestamp, size_t)
+    {
+        return true;
+    }
 
     bool enumerate_string_column(ColKey)
     {
@@ -292,6 +321,10 @@ public:
         return true;
     }
     bool list_set_link(size_t, ObjKey)
+    {
+        return true;
+    }
+    bool list_insert_link(size_t, ObjKey, size_t)
     {
         return true;
     }
@@ -366,6 +399,14 @@ public:
     bool list_set_binary(size_t list_ndx, BinaryData value);
     bool list_set_timestamp(size_t list_ndx, Timestamp value);
 
+    bool list_insert_int(size_t list_ndx, int64_t value, size_t prior_size);
+    bool list_insert_bool(size_t list_ndx, bool value, size_t prior_size);
+    bool list_insert_float(size_t list_ndx, float value, size_t prior_size);
+    bool list_insert_double(size_t list_ndx, double value, size_t prior_size);
+    bool list_insert_string(size_t list_ndx, StringData value, size_t prior_size);
+    bool list_insert_binary(size_t list_ndx, BinaryData value, size_t prior_size);
+    bool list_insert_timestamp(size_t list_ndx, Timestamp value, size_t prior_size);
+
     bool enumerate_string_column(ColKey col_key);
 
     // Must have descriptor selected:
@@ -382,6 +423,7 @@ public:
     // Must have linklist selected:
     bool list_insert_null(size_t ndx, size_t prior_size);
     bool list_set_link(size_t link_ndx, ObjKey value);
+    bool list_insert_link(size_t link_ndx, ObjKey value, size_t prior_size);
     bool link_list_set_all(const IntegerColumn& values);
     bool list_move(size_t from_link_ndx, size_t to_link_ndx);
     bool list_swap(size_t link1_ndx, size_t link2_ndx);
@@ -512,6 +554,14 @@ public:
     virtual void list_set_binary(const List<Binary>& list, size_t list_ndx, BinaryData value);
     virtual void list_set_timestamp(const List<Timestamp>& list, size_t list_ndx, Timestamp value);
 
+    virtual void list_insert_int(const List<Int>& list, size_t list_ndx, int64_t value);
+    virtual void list_insert_bool(const List<Bool>& list, size_t list_ndx, bool value);
+    virtual void list_insert_float(const List<Float>& list, size_t list_ndx, float value);
+    virtual void list_insert_double(const List<Double>& list, size_t list_ndx, double value);
+    virtual void list_insert_string(const List<String>& list, size_t list_ndx, StringData value);
+    virtual void list_insert_binary(const List<Binary>& list, size_t list_ndx, BinaryData value);
+    virtual void list_insert_timestamp(const List<Timestamp>& list, size_t list_ndx, Timestamp value);
+
     virtual void create_object(const Table*, ObjKey);
     virtual void remove_object(const Table*, ObjKey);
     /// \param prior_num_rows The number of rows in the table prior to the
@@ -524,6 +574,7 @@ public:
 
     virtual void list_insert_null(const ConstListBase&, size_t ndx);
     virtual void list_set_link(const List<ObjKey>&, size_t link_ndx, ObjKey value);
+    virtual void list_insert_link(const List<ObjKey>&, size_t link_ndx, ObjKey value);
     virtual void list_move(const ConstListBase&, size_t from_link_ndx, size_t to_link_ndx);
     virtual void list_swap(const ConstListBase&, size_t link_ndx_1, size_t link_ndx_2);
     virtual void list_erase(const ConstListBase&, size_t link_ndx);
@@ -1437,6 +1488,95 @@ inline void TransactLogConvenientEncoder::list_set_timestamp(const List<Timestam
     m_encoder.list_set_timestamp(list_ndx, value); // Throws
 }
 
+inline bool TransactLogEncoder::list_insert_int(size_t list_ndx, int64_t value, size_t prior_size)
+{
+    append_simple_instr(instr_ListInsert, type_Int, list_ndx, prior_size, value); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_insert_int(const List<Int>& list, size_t list_ndx, int64_t value)
+{
+    select_list(list);                                       // Throws
+    m_encoder.list_insert_int(list_ndx, value, list.size()); // Throws
+}
+
+inline bool TransactLogEncoder::list_insert_bool(size_t list_ndx, bool value, size_t prior_size)
+{
+    append_simple_instr(instr_ListInsert, type_Bool, list_ndx, prior_size, value); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_insert_bool(const List<Bool>& list, size_t list_ndx, bool value)
+{
+    select_list(list);                                        // Throws
+    m_encoder.list_insert_bool(list_ndx, value, list.size()); // Throws
+}
+
+inline bool TransactLogEncoder::list_insert_float(size_t list_ndx, float value, size_t prior_size)
+{
+    append_simple_instr(instr_ListInsert, type_Float, list_ndx, prior_size, value); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_insert_float(const List<Float>& list, size_t list_ndx, float value)
+{
+    select_list(list);                                         // Throws
+    m_encoder.list_insert_float(list_ndx, value, list.size()); // Throws
+}
+
+inline bool TransactLogEncoder::list_insert_double(size_t list_ndx, double value, size_t prior_size)
+{
+    append_simple_instr(instr_ListInsert, type_Double, list_ndx, prior_size, value); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_insert_double(const List<Double>& list, size_t list_ndx, double value)
+{
+    select_list(list);                                          // Throws
+    m_encoder.list_insert_double(list_ndx, value, list.size()); // Throws
+}
+
+inline bool TransactLogEncoder::list_insert_string(size_t list_ndx, StringData value, size_t prior_size)
+{
+    append_simple_instr(instr_ListInsert, type_String, list_ndx, prior_size, value); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_insert_string(const List<String>& list, size_t list_ndx,
+                                                             StringData value)
+{
+    select_list(list);                                          // Throws
+    m_encoder.list_insert_string(list_ndx, value, list.size()); // Throws
+}
+
+inline bool TransactLogEncoder::list_insert_binary(size_t list_ndx, BinaryData value, size_t prior_size)
+{
+    StringData value_2(value.data(), value.size());
+    append_simple_instr(instr_ListInsert, type_Binary, list_ndx, prior_size, value_2); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_insert_binary(const List<Binary>& list, size_t list_ndx,
+                                                             BinaryData value)
+{
+    select_list(list);                                          // Throws
+    m_encoder.list_insert_binary(list_ndx, value, list.size()); // Throws
+}
+
+inline bool TransactLogEncoder::list_insert_timestamp(size_t list_ndx, Timestamp value, size_t prior_size)
+{
+    append_simple_instr(instr_ListInsert, type_Timestamp, list_ndx, prior_size, value.get_seconds(),
+                        value.get_nanoseconds()); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_insert_timestamp(const List<Timestamp>& list, size_t list_ndx,
+                                                                Timestamp value)
+{
+    select_list(list);                                             // Throws
+    m_encoder.list_insert_timestamp(list_ndx, value, list.size()); // Throws
+}
+
 inline bool TransactLogEncoder::create_object(ObjKey key)
 {
     append_simple_instr(instr_CreateObject, key.value); // Throws
@@ -1546,6 +1686,18 @@ inline void TransactLogConvenientEncoder::list_set_link(const List<ObjKey>& list
 {
     select_list(list);                      // Throws
     m_encoder.list_set_link(link_ndx, key); // Throws
+}
+
+inline bool TransactLogEncoder::list_insert_link(size_t link_ndx, ObjKey key, size_t prior_size)
+{
+    append_simple_instr(instr_ListInsert, type_Link, link_ndx, prior_size, key.value); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_insert_link(const List<ObjKey>& list, size_t link_ndx, ObjKey key)
+{
+    select_list(list);                                      // Throws
+    m_encoder.list_insert_link(link_ndx, key, list.size()); // Throws
 }
 
 inline bool TransactLogEncoder::link_list_nullify(size_t link_ndx, size_t prior_size)
@@ -1901,6 +2053,67 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t prior_size = read_int<size_t>();                  // Throws
             if (!handler.list_insert_null(list_ndx, prior_size))     // Throws
                 parser_error();
+            return;
+        }
+        case instr_ListInsert: {
+            int type = read_int<int>(); // Throws
+            size_t list_ndx = read_int<size_t>();
+            size_t prior_size = read_int<size_t>(); // Throws
+            switch (DataType(type)) {
+                case type_Int: {
+                    int_fast64_t value = read_int<int64_t>();                  // Throws
+                    if (!handler.list_insert_int(list_ndx, value, prior_size)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Bool: {
+                    bool value = read_bool();                                   // Throws
+                    if (!handler.list_insert_bool(list_ndx, value, prior_size)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Float: {
+                    float value = read_float();                                  // Throws
+                    if (!handler.list_insert_float(list_ndx, value, prior_size)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Double: {
+                    double value = read_double();                                 // Throws
+                    if (!handler.list_insert_double(list_ndx, value, prior_size)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_String: {
+                    StringData value = read_string(m_string_buffer);              // Throws
+                    if (!handler.list_insert_string(list_ndx, value, prior_size)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Binary: {
+                    BinaryData value = read_binary(m_string_buffer);              // Throws
+                    if (!handler.list_insert_binary(list_ndx, value, prior_size)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Timestamp: {
+                    int64_t seconds = read_int<int64_t>();     // Throws
+                    int32_t nanoseconds = read_int<int32_t>(); // Throws
+                    Timestamp value = Timestamp(seconds, nanoseconds);
+                    if (!handler.list_insert_timestamp(list_ndx, value, prior_size)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Link: {
+                    ObjKey key = ObjKey(read_int<int64_t>());                 // Throws
+                    if (!handler.list_insert_link(list_ndx, key, prior_size)) // Throws
+                        parser_error();
+                    return;
+                }
+                default:
+                    parser_error();
+                    break;
+            }
             return;
         }
         case instr_LinkListSetAll: {
@@ -2451,6 +2664,55 @@ public:
         return true;
     }
 
+    bool list_insert_int(size_t ndx, int64_t, size_t prior_size)
+    {
+        m_encoder.list_erase(ndx, prior_size);
+        append_instruction();
+        return true;
+    }
+
+    bool list_insert_bool(size_t ndx, bool, size_t prior_size)
+    {
+        m_encoder.list_erase(ndx, prior_size);
+        append_instruction();
+        return true;
+    }
+
+    bool list_insert_float(size_t ndx, float, size_t prior_size)
+    {
+        m_encoder.list_erase(ndx, prior_size);
+        append_instruction();
+        return true;
+    }
+
+    bool list_insert_double(size_t ndx, double, size_t prior_size)
+    {
+        m_encoder.list_erase(ndx, prior_size);
+        append_instruction();
+        return true;
+    }
+
+    bool list_insert_string(size_t ndx, StringData, size_t prior_size)
+    {
+        m_encoder.list_erase(ndx, prior_size);
+        append_instruction();
+        return true;
+    }
+
+    bool list_insert_binary(size_t ndx, BinaryData, size_t prior_size)
+    {
+        m_encoder.list_erase(ndx, prior_size);
+        append_instruction();
+        return true;
+    }
+
+    bool list_insert_timestamp(size_t ndx, Timestamp, size_t prior_size)
+    {
+        m_encoder.list_erase(ndx, prior_size);
+        append_instruction();
+        return true;
+    }
+
     bool clear_table(size_t old_size)
     {
         while (old_size--) {
@@ -2520,6 +2782,13 @@ public:
     bool list_set_link(size_t list_ndx, ObjKey key)
     {
         m_encoder.list_set_link(list_ndx, key);
+        append_instruction();
+        return true;
+    }
+
+    bool list_insert_link(size_t list_ndx, ObjKey, size_t prior_size)
+    {
+        m_encoder.list_erase(list_ndx, prior_size);
         append_instruction();
         return true;
     }
