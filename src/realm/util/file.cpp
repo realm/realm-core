@@ -705,22 +705,27 @@ void File::prealloc(size_t size)
     // posix_fallocate() is not supported on MacOS or iOS
     fstore_t store = { F_ALLOCATEALL, F_PEOFPOSMODE, 0, static_cast<off_t>(new_size), 0 };
     int ret = fcntl(m_fd, F_PREALLOCATE, &store);
-    if (ret == -1) {
-        int err = errno;
-        std::string msg = get_errno_msg("fcntl() inside prealloc() failed: ", err);
-        throw OutOfDiskSpace(msg);
-    }
+    // On recent filesystems preallocation may fail.
+    if (ret != -1) {
+        // happy path! preallocation succesfull, so we'll use ftruncate to grow
+        // the file, since that is the fastest approach
+        do {
+            ret = ftruncate(m_fd, new_size);
+        } while (ret == -1 && errno == EINTR);
 
-    do {
-        ret = ftruncate(m_fd, new_size);
-    } while (ret == -1 && errno == EINTR);
-
-    if (ret != 0) {
-        int err = errno;
-        std::string msg = get_errno_msg("ftruncate() inside prealloc() failed: ", err);
-        throw OutOfDiskSpace(msg);
+        if (ret != 0) {
+            int err = errno;
+            std::string msg = get_errno_msg("ftruncate() inside prealloc() failed: ", err);
+            throw OutOfDiskSpace(msg);
+        }
+        return;
     }
-#elif REALM_ANDROID || defined(_WIN32)
+    // preallocation failed! fall through to slower, safe expansion of file
+    // by using writes. Preallocation failure is a "feature" in APFS, Apples
+    // new filesystem, as discussed here:
+    // https://www.mail-archive.com/filesystem-dev@lists.apple.com/msg00226.html
+#endif
+#if REALM_PLATFORM_APPLE || REALM_ANDROID || defined(_WIN32)
     constexpr size_t chunk_size = 4096;
     int64_t original_size = get_size_static(m_fd);
     seek(original_size);
