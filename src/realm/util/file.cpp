@@ -712,7 +712,10 @@ void File::prealloc(size_t size)
         throw std::runtime_error(get_errno_msg("fstat() inside prealloc() failed: ", err));
     }
 
-    size_t allocated_size = statbuf.st_blocks;
+    size_t allocated_size;
+    if (int_cast_with_overflow_detect(statbuf.st_blocks, allocated_size)) {
+        throw std::runtime_error("Overflow on block conversion to size_t " + realm::util::to_string(statbuf.st_blocks));
+    }
     if (int_multiply_with_overflow_detect(allocated_size, S_BLKSIZE)) {
         throw std::runtime_error("Overflow computing existing file space allocation blocks: "
                                  + realm::util::to_string(allocated_size)
