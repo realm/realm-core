@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* None.
+* Fixed usage of disk space preallocation which would occasionally fail on recent MacOS
+  running with the APFS filesystem. PR [#3013](https://github.com/realm/realm-core/pull/3013)
+  Issue [#3005](https://github.com/realm/realm-core/issues/3005)
 
 ### Breaking changes
 
