@@ -690,27 +690,7 @@ void File::prealloc(size_t size)
 
 #else // Non-atomic fallback
 
-#if REALM_PLATFORM_APPLE
-    // posix_fallocate() is not supported on MacOS or iOS, so use a combination of fcntl(F_PREALLOCATE) and ftruncate().
-
-    // the following block is equivilent to this->get_size() but done manually so we can reuse the fstat call
-    // for querying the st_blocks later on.
-    SizeType cur_file_size;
-    struct stat statbuf;
-    { // get_size()
-        if (::fstat(m_fd, &statbuf) == 0) {
-            if (int_cast_with_overflow_detect(statbuf.st_size, cur_file_size))
-                throw std::runtime_error("File size overflow");
-        } else {
-            int err = errno;
-            throw std::runtime_error(get_errno_msg("fstat() inside prealloc() failed: ", err));
-        }
-        if (m_encryption_key) {
-            cur_file_size = encrypted_size_to_data_size(cur_file_size);
-        }
-    }
-
-    if (size <= to_size_t(cur_file_size)) {
+    if (size <= to_size_t(get_size())) {
         return;
     }
 
@@ -721,6 +701,15 @@ void File::prealloc(size_t size)
             throw std::runtime_error("File size overflow: data_size_to_encrypted_size("
                                      + realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
         }
+    }
+
+#if REALM_PLATFORM_APPLE
+    // posix_fallocate() is not supported on MacOS or iOS, so use a combination of fcntl(F_PREALLOCATE) and ftruncate().
+
+    struct stat statbuf;
+    if (::fstat(m_fd, &statbuf) != 0) {
+        int err = errno;
+        throw std::runtime_error(get_errno_msg("fstat() inside prealloc() failed: ", err));
     }
 
     size_t allocated_size = statbuf.st_blocks;
@@ -755,19 +744,6 @@ void File::prealloc(size_t size)
         throw std::runtime_error(get_errno_msg("ftruncate() inside prealloc() failed: ", err));
     }
 #elif REALM_ANDROID || defined(_WIN32)
-    if (size <= to_size_t(get_size())) {
-        return;
-    }
-
-    size_t new_size = size;
-    if (m_encryption_key) {
-        new_size = static_cast<size_t>(data_size_to_encrypted_size(size));
-        if (new_size < size) {
-            throw std::runtime_error("File size overflow: data_size_to_encrypted_size("
-                                     + realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
-        }
-    }
-
 
     constexpr size_t chunk_size = 4096;
     int64_t original_size = get_size_static(m_fd);
@@ -801,6 +777,12 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
         throw std::runtime_error("File size overflow");
+
+    if (size2 == 0) {
+        // calling posix_fallocate with a size of 0 will cause a return of EINVAL
+        // since this is a meaningless operation anyway, we just return early here
+        return;
+    }
 
     // posix_fallocate() does not set errno, it returns the error (if any) or zero.
     // It is also possible for it to be interrupted by EINTR according to some man pages (ex fedora 24)

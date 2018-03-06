@@ -30,6 +30,7 @@
 #if REALM_PLATFORM_APPLE
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 
@@ -425,6 +426,9 @@ TEST(File_PreallocResizing)
     file.prealloc(50);
     CHECK_EQUAL(file.get_size(), 100); // prealloc does not reduce size
 
+    // To expose the preallocation bug, we need to iterate over a large numbers, less than 4096.
+    // If the bug is present, we will allocate additional space to the file on every call, but if it is
+    // not present, the OS will preallocate 4096 only on the first call.
     constexpr size_t init_size = 2048;
     constexpr size_t dest_size = 3000;
     for (size_t prealloc_space = init_size; prealloc_space <= dest_size; ++prealloc_space) {
@@ -449,6 +453,8 @@ TEST(File_PreallocResizing)
     // To give flexibility for file system prealloc implementations we check that the preallocated space is within
     // at least 16 times the nominal requested size.
     CHECK_LESS(allocated_size, 4096 * 16);
+
+    CHECK(::close(fd) == 0);
 #endif
 
 }
