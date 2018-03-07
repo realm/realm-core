@@ -19,13 +19,20 @@
 #include "testsettings.hpp"
 #ifdef TEST_FILE
 
-#include <sstream>
 #include <ostream>
+#include <sstream>
 
 #include <realm/util/file.hpp>
 #include <realm/util/file_mapper.hpp>
 
 #include "test.hpp"
+
+#if REALM_PLATFORM_APPLE
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 
 using namespace realm::util;
 using namespace realm::test_util;
@@ -404,6 +411,54 @@ TEST(File_Move)
     CHECK(file_1.is_attached());
     CHECK_NOT(file_2.is_attached());
 }
+
+
+TEST(File_PreallocResizing)
+{
+    TEST_PATH(path);
+    File file(path, File::mode_Write);
+    CHECK(file.is_attached());
+    file.set_encryption_key(crypt_key());
+    file.prealloc(0); // this is allowed
+    CHECK_EQUAL(file.get_size(), 0);
+    file.prealloc(100);
+    CHECK_EQUAL(file.get_size(), 100);
+    file.prealloc(50);
+    CHECK_EQUAL(file.get_size(), 100); // prealloc does not reduce size
+
+    // To expose the preallocation bug, we need to iterate over a large numbers, less than 4096.
+    // If the bug is present, we will allocate additional space to the file on every call, but if it is
+    // not present, the OS will preallocate 4096 only on the first call.
+    constexpr size_t init_size = 2048;
+    constexpr size_t dest_size = 3000;
+    for (size_t prealloc_space = init_size; prealloc_space <= dest_size; ++prealloc_space) {
+        file.prealloc(prealloc_space);
+        CHECK_EQUAL(file.get_size(), prealloc_space);
+    }
+
+#if REALM_PLATFORM_APPLE
+    int fd = ::open(path.c_str(), O_RDONLY);
+    CHECK(fd >= 0);
+    struct stat statbuf;
+    CHECK(fstat(fd, &statbuf) == 0);
+    size_t allocated_size = statbuf.st_blocks;
+    CHECK_EQUAL(statbuf.st_size, dest_size);
+    CHECK(!int_multiply_with_overflow_detect(allocated_size, S_BLKSIZE));
+
+    // When performing prealloc, the OS has the option to preallocate more than the requeted space
+    // but we need to check that the preallocated space is within a reasonable bound.
+    // If space is being incorrectly preallocated (growing on each call) then we will have more than 3000KB
+    // of preallocated space, but if it is being allocated correctly (only when we need to expand) then we'll have
+    // a multiple of the optimal file system I/O operation (`stat -f %k .`) which is 4096 on HSF+.
+    // To give flexibility for file system prealloc implementations we check that the preallocated space is within
+    // at least 16 times the nominal requested size.
+    CHECK_LESS(allocated_size, 4096 * 16);
+
+    CHECK(::close(fd) == 0);
+#endif
+
+}
+
 
 #ifndef _WIN32
 TEST(File_GetUniqueID)
