@@ -1846,7 +1846,8 @@ LinkType Table::get_link_type(size_t col_ndx) const
     if (!is_attached()) {
         throw LogicError{LogicError::detached_accessor};
     }
-    if (!(m_spec->get_column_type(col_ndx) == col_type_Link) && !(m_spec->get_column_type(col_ndx) == col_type_LinkList)) {
+    if (!(m_spec->get_column_type(col_ndx) == col_type_Link) &&
+        !(m_spec->get_column_type(col_ndx) == col_type_LinkList)) {
         throw LogicError{LogicError::illegal_type};
     }
     REALM_ASSERT_DEBUG(col_ndx < m_spec->get_column_count());

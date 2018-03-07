@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* None.
+* Added `Table::get_link_type()` as a helper method for getting the link type from link columns. PR [#2987](https://github.com/realm/realm-core/pull/2987).
 
 -----------
 
