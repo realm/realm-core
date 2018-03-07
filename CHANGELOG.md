@@ -1,10 +1,12 @@
-# NEXT RELEASE
+# 5.4.0 Release notes
 
 ### Bugfixes
 
 * Fixed usage of disk space preallocation which would occasionally fail on recent MacOS
-  running with the APFS filesystem. PR [#3013](https://github.com/realm/realm-core/pull/3013)
-  Issue [#3005](https://github.com/realm/realm-core/issues/3005)
+  running with the APFS filesystem. PR [#3013](https://github.com/realm/realm-core/pull/3013).
+  Issue [#3005](https://github.com/realm/realm-core/issues/3005).
+* Fixed a bug in queries containing 'or' at different nesting levels.
+  PR [#3006](https://github.com/realm/realm-core/pull/3006).
 
 ### Breaking changes
 
@@ -12,13 +14,17 @@
 
 ### Enhancements
 
-* Added `Table::get_link_type()` as a helper method for getting the link type from link columns. PR [#2987](https://github.com/realm/realm-core/pull/2987).
+* Added `Table::get_link_type()` as a helper method for getting the link type from link columns.
+  PR [#2987](https://github.com/realm/realm-core/pull/2987).
 
 -----------
 
 ### Internals
 
-* None.
+* Silenced a false positive strict aliasing warning.
+  PR [#3002](https://github.com/realm/realm-core/pull/3002).
+* Assertions will print more information in relase mode.
+  PR [#2982](https://github.com/realm/realm-core/pull/2982).
 
 ----------------------------------------------
 
