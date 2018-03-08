@@ -176,10 +176,10 @@ void GlobalNotifier::Impl::register_realm(StringData path) {
 
 void GlobalNotifier::Impl::release_version(std::string const& virtual_path, VersionID old_version, VersionID new_version)
 {
+    std::lock_guard<std::mutex> l(m_work_queue_mutex);
+
     auto it = m_realms.find(virtual_path);
     REALM_ASSERT(it != m_realms.end());
-
-    std::lock_guard<std::mutex> l(m_work_queue_mutex);
 
     auto& sg = it->second.shared_group;
     REALM_ASSERT(sg->get_version_of_current_transaction() == old_version);
@@ -194,8 +194,10 @@ void GlobalNotifier::Impl::release_version(std::string const& virtual_path, Vers
     else {
         LangBindHelper::advance_read(*sg, new_version);
         m_work_queue.push(&it->second);
-        m_signal->notify();
     }
+
+    if (!m_work_queue.empty())
+        m_signal->notify();
 }
 
 GlobalNotifier::GlobalNotifier(std::unique_ptr<Callback> async_target,
