@@ -158,6 +158,7 @@ GroupWriter::GroupWriter(Group& group)
     , m_free_lengths(m_alloc)
     , m_free_versions(m_alloc)
     , m_current_version(0)
+    , m_alloc_position(0)
 {
     m_map_windows.reserve(num_map_windows);
 
@@ -647,33 +648,23 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
     typedef std::pair<size_t, size_t> Chunk;
     Chunk chunk;
     bool found;
-    // Since we do a first-fit search for small chunks, the top pieces are
-    // likely to get smaller and smaller. So when we are looking for bigger
-    // chunks we are likely to find them faster by skipping the first half of
-    // the list.
     size_t end = m_free_lengths.size();
-    if (size < 1024) {
-        chunk = search_free_space_in_part_of_freelist(size, 0, end, found);
-        if (found)
-            return chunk;
-    }
-    else {
-        chunk = search_free_space_in_part_of_freelist(size, end / 2, end, found);
-        if (found)
-            return chunk;
-        chunk = search_free_space_in_part_of_freelist(size, 0, end / 2, found);
-        if (found)
-            return chunk;
-    }
+    if (m_alloc_position >= end)
+        m_alloc_position = 0;
 
-    // No free space, so we have to extend the file.
-    do {
+    chunk = search_free_space_in_part_of_freelist(size, m_alloc_position, end, found);
+    if (!found) {
+        chunk = search_free_space_in_part_of_freelist(size, 0, m_alloc_position, found);
+    }
+    while (!found) {
+        // No free space, so we have to extend the file.
         extend_free_space(size);
         // extending the file will add a new entry at the end of the freelist,
         // so search that particular entry
         end = m_free_lengths.size();
         chunk = search_free_space_in_part_of_freelist(size, end - 1, end, found);
-    } while (!found);
+    }
+    m_alloc_position = chunk.first;
     return chunk;
 }
 
@@ -707,11 +698,11 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     REALM_ASSERT_3(new_file_size % 8, ==, 0);
     REALM_ASSERT_3(logical_file_size, <, new_file_size);
 
-    // Note: File::prealloc() may misbehave under race conditions (see
-    // documentation of File::prealloc()). Fortunately, no race conditions can
-    // occur, because in transactional mode we hold a write lock at this time,
-    // and in non-transactional mode it is the responsibility of the user to
-    // ensure non-concurrent file mutation.
+    // Note: resize_file() will call File::prealloc() which may misbehave under
+    // race conditions (see documentation of File::prealloc()). Fortunately, no
+    // race conditions can occur, because in transactional mode we hold a write
+    // lock at this time, and in non-transactional mode it is the responsibility
+    // of the user to ensure non-concurrent file mutation.
     m_alloc.resize_file(new_file_size); // Throws
 
     //    m_file_map.remap(m_alloc.get_file(), File::access_ReadWrite, new_file_size); // Throws

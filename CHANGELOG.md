@@ -2,8 +2,173 @@
 
 ### Bugfixes
 
+* None.
+
+### Breaking changes
+
+* None.
+
+### Enhancements
+
+* None.
+
+-----------
+
+### Internals
+
+* None.
+
+----------------------------------------------
+
+# 5.4.0 Release notes
+
+### Bugfixes
+
+* Fixed usage of disk space preallocation which would occasionally fail on recent MacOS
+  running with the APFS filesystem. PR [#3013](https://github.com/realm/realm-core/pull/3013).
+  Issue [#3005](https://github.com/realm/realm-core/issues/3005).
+* Fixed a bug in queries containing 'or' at different nesting levels.
+  PR [#3006](https://github.com/realm/realm-core/pull/3006).
+
+### Breaking changes
+
+* None.
+
+### Enhancements
+
+* Added `Table::get_link_type()` as a helper method for getting the link type from link columns.
+  PR [#2987](https://github.com/realm/realm-core/pull/2987).
+
+-----------
+
+### Internals
+
+* Silenced a false positive strict aliasing warning.
+  PR [#3002](https://github.com/realm/realm-core/pull/3002).
+* Assertions will print more information in relase mode.
+  PR [#2982](https://github.com/realm/realm-core/pull/2982).
+
+----------------------------------------------
+
+# 5.3.0 Release notes
+
+### Bugfixes
+
+* Fixed handling of out-of-diskspace. With encryption in use it would ASSERT like
+  `group_writer.cpp:393: [realm-core-5.1.2] Assertion failed: ref + size <= ...`.
+  Without encryption it would give a SIGBUS error. It's unknown if it could corrupt
+  the .realm file.
+* Fix an issue where adding zero rows would add the default value to the keys
+  of any string enum columns. Not affecting end users.
+  PR [#2956](https://github.com/realm/realm-core/pull/2956).
+
+### Enhancements
+
+* Parser improvements:
+    - Support subquery count expressions, for example: "SUBQUERY(list, $x, $x.price > 5 && $x.colour == 'blue').@count > 1"
+        - Subqueries can be nested, but all properties must start with the closest variable (no parent scope properties)
+    - Support queries over unnamed backlinks, for example: "@links.class_Person.items.cost > 10"
+        - Backlinks can be used like lists in expressions including: min, max, sum, avg, count/size, and subqueries
+    - Keypath substitution is supported to allow querying over named backlinks and property aliases, see `KeyPathMapping`
+    - Parsing backlinks can be disabled at runtime by configuring `KeyPathMapping::set_allow_backlinks`
+    - Support for ANY/SOME/ALL/NONE on list properties (parser only). For example: `ALL items.price > 10`
+    - Support for operator 'IN' on list properties (parser only). For example: `'milk' IN ingredients.name`
+    PR [#2989](https://github.com/realm/realm-core/pull/2989).
+
+-----------
+
+### Internals
+
+* Add support for libfuzzer.
+  PR [#2922](https://github.com/realm/realm-core/pull/2922).
+
+----------------------------------------------
+
+# 5.2.0 Release notes
+
+### Bugfixes
+
+* Fix a crash when distinct is applied on two or more properties where
+  the properties contain a link and non-link column.
+  PR [#2979](https://github.com/realm/realm-core/pull/2979).
+
+### Enhancements
+
+* Parser improvements:
+    - Support for comparing two columns of the same type. For example:
+        - `wins > losses`
+        - `account_balance > purchases.@sum.price`
+        - `purchases.@count > max_allowed_items`
+        - `team_name CONTAINS[c] location.city_name`
+    - Support for sort and distinct clauses
+        - At least one query filter is required
+        - Columns are a comma separated value list
+        - Order of sorting can be `ASC, ASCENDING, DESC, DESCENDING` (case insensitive)
+        - `SORT(property1 ASC, property2 DESC)`
+        - `DISTINCT(property1, property2)`
+        - Any number of sort/distinct expressions can be indicated
+    - Better support for NULL synonym in binary and string expressions:
+        - `name == NULL` finds null strings
+        - `data == NULL` finds null binary data
+    - Binary properties can now be queried over links
+    - Binary properties now support the full range of string operators
+      (BEGINSWITH, ENDSWITH, CONTAINS, LIKE)
+    PR [#2979](https://github.com/realm/realm-core/pull/2979).
+
+-----------
+
+### Internals
+
+* The devel-dbg Linux packages now correctly include static libraries instead of shared ones.
+
+----------------------------------------------
+
+# 5.1.2 Release notes
+
+### Bugfixes
+
+* Include the parser libs in the published android packages.
+
+----------------------------------------------
+
+# 5.1.1 Release notes
+
+### Bugfixes
+
+* The `realm-parser` static library now correctly includes both simulator and device architectures on Apple platforms.
+
+----------------------------------------------
+
+# 5.1.0 Release notes
+
+### Enhancements
+
+* Change the allocation scheme to (hopefully) perform better in scenarios
+  with high fragmentation.
+  PR [#2963](https://github.com/realm/realm-core/pull/2963)
+* Avoid excessive bumping of counters in the version management machinery that is
+  responsible for supporting live queries. We now prune version bumping earlier if
+  when we have sequences of changes without queries in between.
+  PR [#2962](https://github.com/realm/realm-core/pull/2962)
+
+----------------------------------------------
+
+# 5.0.1 Release notes
+
+### Bugfixes
+
+* Add a CMake import target for the `realm-parser` library.
+
+----------------------------------------------
+
+# 5.0.0 Release notes
+
+### Bugfixes
+
 * Fix possible corruption or crashes when a `move_row` operates on a subtable.
   PR [#2927](https://github.com/realm/realm-core/pull/2926).
+* Table::set_int() did not check if the target column was indeed type_Int. It
+  will now assert like the other set methods.
 
 ### Breaking changes
 
@@ -14,13 +179,24 @@
 
 ### Enhancements
 
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
+* Attempted to fix a false encryption security warning from IBM Bluemix. PR [#2911]
+* Utilities gain `Any` from object store and base64 encoding from sync.
+* Initial support for query serialisation.
+* The query parser from the object store was moved to core.
+  It also gained the following enhancements:
+    - Support @min, @max, @sum, @avg for types: int, double, float
+    - Support @count, @size interchangeably for types list, string, binary
+    - Support operator "LIKE" on strings
+    - Support operators: =>, =<, <>, which are synonymns for >=, <=, and != respectively
+    - Boolean types can now check against “0” or “1” in addition to false and true
+    - Fixed "not" and "or" not being applied to TRUEPREDICATE or FALSEPREDICATE
+    - Add support for comparing binary and string types using a (internal) base64 format: B64”…”
+    - Add support for Timestamps
+      - Internal format “Tseconds:nanoseconds”
+      - Readable format “YYYY-MM-DD@HH:MM:SS:NANOSECONDS”
+        - The nanoseconds part can be optionally omitted
+        - Conversion works for UTC from dates between ~1970-3000 on windows and ~1901-2038 on other platforms
+  PR [#2947](https://github.com/realm/realm-core/pull/2947).
 
 ----------------------------------------------
 

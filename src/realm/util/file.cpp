@@ -680,22 +680,89 @@ void File::resize(SizeType size)
 }
 
 
-void File::prealloc(SizeType offset, size_t size)
+void File::prealloc(size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
 #if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
-
-    prealloc_if_supported(offset, size);
+    // Mostly Linux only
+    prealloc_if_supported(0, size);
 
 #else // Non-atomic fallback
 
-    if (int_add_with_overflow_detect(offset, size))
-        throw std::runtime_error("File size overflow");
-    if (get_size() < offset)
-        resize(offset);
+    if (size <= to_size_t(get_size())) {
+        return;
+    }
 
+    size_t new_size = size;
+    if (m_encryption_key) {
+        new_size = static_cast<size_t>(data_size_to_encrypted_size(size));
+        if (new_size < size) {
+            throw std::runtime_error("File size overflow: data_size_to_encrypted_size("
+                                     + realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
+        }
+    }
+
+#if REALM_PLATFORM_APPLE
+    // posix_fallocate() is not supported on MacOS or iOS, so use a combination of fcntl(F_PREALLOCATE) and ftruncate().
+
+    struct stat statbuf;
+    if (::fstat(m_fd, &statbuf) != 0) {
+        int err = errno;
+        throw std::runtime_error(get_errno_msg("fstat() inside prealloc() failed: ", err));
+    }
+
+    size_t allocated_size;
+    if (int_cast_with_overflow_detect(statbuf.st_blocks, allocated_size)) {
+        throw std::runtime_error("Overflow on block conversion to size_t " + realm::util::to_string(statbuf.st_blocks));
+    }
+    if (int_multiply_with_overflow_detect(allocated_size, S_BLKSIZE)) {
+        throw std::runtime_error("Overflow computing existing file space allocation blocks: "
+                                 + realm::util::to_string(allocated_size)
+                                 + " block size: " + realm::util::to_string(S_BLKSIZE));
+    }
+
+    // Only attempt to preallocate space if there's not already sufficient free space in the file.
+    // APFS would fail with EINVAL if we attempted it, and HFS+ would preallocate extra space unnecessarily.
+    // See <https://github.com/realm/realm-core/issues/3005> for details.
+    if (new_size > allocated_size) {
+        fstore_t store = { F_ALLOCATEALL, F_PEOFPOSMODE, 0, static_cast<off_t>(new_size - statbuf.st_size), 0 };
+        int ret = fcntl(m_fd, F_PREALLOCATE, &store);
+        if (ret == -1) {
+            int err = errno;
+            throw OutOfDiskSpace(get_errno_msg("fcntl() inside prealloc() failed: ", err));
+        }
+    }
+
+    int ret = 0;
+
+    do {
+        ret = ftruncate(m_fd, new_size);
+    } while (ret == -1 && errno == EINTR);
+
+    if (ret != 0) {
+        int err = errno;
+        // by the definition of F_PREALLOCATE, a proceeding ftruncate will not fail due to out of disk space
+        // so this is some other runtime error and not OutOfDiskSpace
+        throw std::runtime_error(get_errno_msg("ftruncate() inside prealloc() failed: ", err));
+    }
+#elif REALM_ANDROID || defined(_WIN32)
+
+    constexpr size_t chunk_size = 4096;
+    int64_t original_size = get_size_static(m_fd);
+    seek(original_size);
+    size_t num_bytes = size_t(new_size - original_size);
+    std::string zeros(chunk_size, '\0');
+    while (num_bytes > 0) {
+        size_t t = num_bytes > chunk_size ? chunk_size : num_bytes;
+        write_static(m_fd, zeros.c_str(), t);
+        num_bytes -= t;
+    }
+#else
+    #error Please check if/how your OS supports file preallocation
 #endif
+
+#endif // !(_POSIX_C_SOURCE >= 200112L)
 }
 
 
@@ -713,6 +780,12 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
         throw std::runtime_error("File size overflow");
+
+    if (size2 == 0) {
+        // calling posix_fallocate with a size of 0 will cause a return of EINVAL
+        // since this is a meaningless operation anyway, we just return early here
+        return;
+    }
 
     // posix_fallocate() does not set errno, it returns the error (if any) or zero.
     // It is also possible for it to be interrupted by EINTR according to some man pages (ex fedora 24)

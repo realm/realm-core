@@ -113,7 +113,7 @@ public:
     bool any_is_null(IndexPair i) const
     {
         return std::any_of(m_columns.begin(), m_columns.end(),
-                           [=](auto&& col) { return col.is_null[i.index_in_view]; });
+                           [=](auto&& col) { return col.is_null.empty() ? false : col.is_null[i.index_in_view]; });
     }
 
 private:
@@ -179,6 +179,62 @@ std::vector<std::vector<size_t>> CommonDescriptor::export_column_indices() const
 std::vector<bool> SortDescriptor::export_order() const
 {
     return m_ascending;
+}
+
+std::string SortDescriptor::get_description(TableRef attached_table) const
+{
+    std::string description = "SORT(";
+    for (size_t i = 0; i < m_columns.size(); ++i) {
+        const size_t chain_size = m_columns[i].size();
+        TableRef cur_link_table = attached_table;
+        for (size_t j = 0; j < chain_size; ++j) {
+            size_t col_ndx = m_columns[i][j]->get_column_index();
+            REALM_ASSERT_DEBUG(col_ndx < cur_link_table->get_column_count());
+            StringData col_name = cur_link_table->get_column_name(col_ndx);
+            description += std::string(col_name);
+            if (j < chain_size - 1) {
+                description += ".";
+                cur_link_table = cur_link_table->get_link_target(col_ndx);
+            }
+        }
+        description += " ";
+        if (i < m_ascending.size()) {
+            if (m_ascending[i]) {
+                description += "ASC";
+            } else {
+                description += "DESC";
+            }
+        }
+        if (i < m_columns.size() - 1) {
+            description += ", ";
+        }
+    }
+    description += ")";
+    return description;
+}
+
+std::string CommonDescriptor::get_description(TableRef attached_table) const
+{
+    std::string description = "DISTINCT(";
+    for (size_t i = 0; i < m_columns.size(); ++i) {
+        const size_t chain_size = m_columns[i].size();
+        TableRef cur_link_table = attached_table;
+        for (size_t j = 0; j < chain_size; ++j) {
+            size_t col_ndx = m_columns[i][j]->get_column_index();
+            REALM_ASSERT_DEBUG(col_ndx < cur_link_table->get_column_count());
+            StringData col_name = cur_link_table->get_column_name(col_ndx);
+            description += std::string(col_name);
+            if (j < chain_size - 1) {
+                description += ".";
+                cur_link_table = cur_link_table->get_link_target(col_ndx);
+            }
+        }
+        if (i < m_columns.size() - 1) {
+            description += ", ";
+        }
+    }
+    description += ")";
+    return description;
 }
 
 CommonDescriptor::Sorter CommonDescriptor::sorter(IntegerColumn const& row_indexes) const
@@ -294,6 +350,19 @@ bool DescriptorOrdering::will_apply_distinct() const
         REALM_ASSERT(desc.get()->is_valid());
         return dynamic_cast<SortDescriptor*>(desc.get()) == nullptr;
     });
+}
+
+std::string DescriptorOrdering::get_description(TableRef target_table) const
+{
+    std::string description = "";
+    for (auto it = m_descriptors.begin(); it != m_descriptors.end(); ++it) {
+        REALM_ASSERT_DEBUG(bool(*it));
+        description += (*it)->get_description(target_table);
+        if (it != m_descriptors.end() - 1) {
+            description += " ";
+        }
+    }
+    return description;
 }
 
 void DescriptorOrdering::generate_patch(DescriptorOrdering const& descriptors, HandoverPatch& patch)

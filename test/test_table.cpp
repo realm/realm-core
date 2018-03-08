@@ -8240,6 +8240,7 @@ TEST(Table_addRowsToTableWithNoColumns)
     CHECK(u->is_null_link(0, 0));
 }
 
+
 TEST(Table_getVersionCounterAfterRowAccessor)
 {
     Table t;
@@ -8360,6 +8361,28 @@ TEST(Table_KeyRow)
     CHECK_EQUAL(i, 0);
     i = table.find_first_int(0, 456);
     CHECK_EQUAL(i, 1);
+}
+
+TEST(Table_getLinkType)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+
+    table->add_column(type_Int, "int");
+    table->add_column_link(type_Link, "weak_link", *table);
+    table->add_column_link(type_Link, "strong_link", *table, link_Strong);
+    table->add_column_link(type_LinkList, "weak_list", *table);
+    table->add_column_link(type_LinkList, "strong_list", *table, link_Strong);
+
+    CHECK(link_Weak == table->get_link_type(1));
+    CHECK(link_Strong == table->get_link_type(2));
+    CHECK(link_Weak == table->get_link_type(3));
+    CHECK(link_Strong == table->get_link_type(4));
+
+    CHECK_THROW(table->get_link_type(0), LogicError);
+
+    g.remove_table("table");
+    CHECK_THROW(table->get_link_type(1), LogicError);
 }
 
 #endif // TEST_TABLE

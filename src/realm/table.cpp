@@ -1841,6 +1841,19 @@ bool Table::is_nullable(size_t col_ndx) const
            m_spec->get_column_type(col_ndx) == col_type_Link;
 }
 
+LinkType Table::get_link_type(size_t col_ndx) const
+{
+    if (!is_attached()) {
+        throw LogicError{LogicError::detached_accessor};
+    }
+    if (!(m_spec->get_column_type(col_ndx) == col_type_Link) &&
+        !(m_spec->get_column_type(col_ndx) == col_type_LinkList)) {
+        throw LogicError{LogicError::illegal_type};
+    }
+    REALM_ASSERT_DEBUG(col_ndx < m_spec->get_column_count());
+    return (m_spec->get_column_attr(col_ndx) & col_attr_StrongLinks) ? LinkType::link_Strong : LinkType::link_Weak;
+}
+
 const ColumnBase& Table::get_column_base(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(ndx < m_spec->get_column_count());
@@ -2030,6 +2043,24 @@ size_t Table::get_size_from_ref(ref_type spec_ref, ref_type columns_ref, Allocat
     bool nullable = (spec.get_column_attr(0) & col_attr_Nullable) == col_attr_Nullable;
     size_t size = ColumnBase::get_size_from_type_and_ref(first_col_type, first_col_ref, alloc, nullable);
     return size;
+}
+
+Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept
+{
+    size_t backlink_columns_begin = m_spec->first_backlink_column_index();
+    size_t backlink_columns_end = backlink_columns_begin + m_spec->backlink_column_count();
+
+    for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
+        const BacklinkColumn& backlink_col = get_column_backlink(i);
+        ConstTableRef origin_table = backlink_col.get_origin_table().get_table_ref();
+        const LinkColumnBase& link_col = backlink_col.get_origin_column();
+        size_t link_col_ndx = link_col.get_column_index();
+        if (origin_table->get_name() == origin_table_name
+            && origin_table->get_column_name(link_col_ndx) == origin_col_name) {
+            return BacklinkOrigin{{origin_table, link_col_ndx}};
+        }
+    }
+    return BacklinkOrigin{};
 }
 
 
@@ -2993,6 +3024,17 @@ BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
 }
 
 template <>
+BinaryIterator Table::get(size_t col_ndx, size_t ndx) const noexcept
+{
+    REALM_ASSERT_3(col_ndx, <, m_columns.size());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Binary);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    const BinaryColumn& col = get_column<BinaryColumn, col_type_Binary>(col_ndx);
+    return BinaryIterator{&col, ndx};
+}
+
+template <>
 Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
@@ -3169,6 +3211,15 @@ template <>
 void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
+
+    // FIXME: In our unit tests, OldDateTime is often passed as integer literal (such as `942`) which is caught by this
+    // method. Because we are currently rewriting the unit test suite for stable keys (nov. 2017) we don't want to
+    // update the test suite at those numerous places in this PR because it will create conflicts. Instead, remove all
+    // OldDateTime legacy test code after stable keys are merged, and remove the col_type_OldDateTime part of the 
+    // assert below.
+    REALM_ASSERT_EX(get_real_column_type(col_ndx) == col_type_Int || 
+                    get_real_column_type(col_ndx) == col_type_OldDateTime, get_real_column_type(col_ndx));
+
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 

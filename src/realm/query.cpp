@@ -252,29 +252,58 @@ void Query::add_expression_node(std::unique_ptr<Expression> expression)
 }
 
 // Binary
-Query& Query::equal(size_t column_ndx, BinaryData b)
+Query& Query::equal(size_t column_ndx, BinaryData b, bool case_sensitive)
 {
-    add_condition<Equal>(column_ndx, b);
+    if (case_sensitive) {
+        add_condition<Equal>(column_ndx, b);
+    } else {
+        add_condition<EqualIns>(column_ndx, b);
+    }
     return *this;
 }
-Query& Query::not_equal(size_t column_ndx, BinaryData b)
+Query& Query::not_equal(size_t column_ndx, BinaryData b, bool case_sensitive)
 {
-    add_condition<NotEqual>(column_ndx, b);
+    if (case_sensitive) {
+        add_condition<NotEqual>(column_ndx, b);
+    } else {
+        add_condition<NotEqualIns>(column_ndx, b);
+    }
     return *this;
 }
-Query& Query::begins_with(size_t column_ndx, BinaryData b)
+Query& Query::begins_with(size_t column_ndx, BinaryData b, bool case_sensitive)
 {
-    add_condition<BeginsWith>(column_ndx, b);
+    if (case_sensitive) {
+        add_condition<BeginsWith>(column_ndx, b);
+    } else {
+        add_condition<BeginsWithIns>(column_ndx, b);
+    }
     return *this;
 }
-Query& Query::ends_with(size_t column_ndx, BinaryData b)
+Query& Query::ends_with(size_t column_ndx, BinaryData b, bool case_sensitive)
 {
-    add_condition<EndsWith>(column_ndx, b);
+    if (case_sensitive) {
+        add_condition<EndsWith>(column_ndx, b);
+    } else {
+        add_condition<EndsWithIns>(column_ndx, b);
+    }
     return *this;
 }
-Query& Query::contains(size_t column_ndx, BinaryData b)
+Query& Query::contains(size_t column_ndx, BinaryData b, bool case_sensitive)
 {
-    add_condition<Contains>(column_ndx, b);
+    if (case_sensitive) {
+        add_condition<Contains>(column_ndx, b);
+    } else {
+        add_condition<ContainsIns>(column_ndx, b);
+    }
+    return *this;
+}
+Query& Query::like(size_t column_ndx, BinaryData b, bool case_sensitive)
+{
+    if (case_sensitive) {
+        add_condition<Like>(column_ndx, b);
+    } else {
+        add_condition<LikeIns>(column_ndx, b);
+    }
     return *this;
 }
 
@@ -1242,8 +1271,7 @@ void Query::handle_pending_not()
 Query& Query::Or()
 {
     auto& current_group = m_groups.back();
-    OrNode* or_node = dynamic_cast<OrNode*>(current_group.m_root_node.get());
-    if (!or_node) {
+    if (current_group.m_state != QueryGroup::State::OrConditionChildren) {
         // Reparent the current group's nodes within an OrNode.
         add_node(std::unique_ptr<ParentNode>(new OrNode(std::move(current_group.m_root_node))));
     }
@@ -1570,12 +1598,23 @@ std::string Query::validate()
     return root_node()->validate(); // errors detected by QueryEngine
 }
 
-std::string Query::get_description() const
+std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
     if (root_node()) {
-        return root_node()->describe_expression();
+        if (m_view) {
+            throw SerialisationError("Serialisation of a query constrianed by a view is not currently supported");
+        }
+        return root_node()->describe_expression(state);
     }
-    return "";
+    // An empty query returns all results and one way to indicate this
+    // is to serialise TRUEPREDICATE which is functionally equivilent
+    return "TRUEPREDICATE";
+}
+
+std::string Query::get_description() const
+{
+    util::serializer::SerialisationState state;
+    return get_description(state);
 }
 
 void Query::init() const
