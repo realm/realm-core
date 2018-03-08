@@ -116,8 +116,7 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
     free(strs);
 #endif
 
-    ss << "IMPORTANT: if you see this error, please send this log to help@realm.io.";
-
+    ss << "!!! IMPORTANT: Please send this log and info about Realm SDK version and other relevant reproduction info to help@realm.io.";
     if (termination_notification_callback) {
         termination_notification_callback(ss.str().c_str());
     }
