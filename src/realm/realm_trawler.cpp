@@ -604,7 +604,7 @@ void File::write(const char*, size_t)
 {
     REALM_ASSERT(false);
 }
-void File::seek(long)
+void File::seek(SizeType)
 {
     REALM_ASSERT(false);
 }

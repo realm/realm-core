@@ -318,7 +318,7 @@ protected:
     uint64_t get_lower_section_boundary(uint64_t start_pos) const noexcept;
 
     /// Returns true if the given position is at a section boundary
-    bool matches_section_boundary(size_t pos) const noexcept;
+    bool matches_section_boundary(uint64_t pos) const noexcept;
 
     /// Actually compute the starting offset of a section. Only used to initialize
     /// a table of predefined results, which are then used by get_section_base().
