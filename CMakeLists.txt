@@ -157,7 +157,7 @@ endif()
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
 # Make the project importable from the build directory
-export(TARGETS realm realm-parser FILE realm-config.cmake)
+export(TARGETS Core QueryParser NAMESPACE Realm:: FILE realm-config.cmake)
 
 # Make the project importable from the install directory
 install(EXPORT realm
