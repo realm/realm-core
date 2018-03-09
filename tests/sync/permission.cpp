@@ -26,6 +26,7 @@
 
 #include "sync_test_utils.hpp"
 #include "util/test_file.hpp"
+#include <unistd.h>
 
 using namespace realm;
 
@@ -241,6 +242,99 @@ TEST_CASE("Object-level Permissions") {
             REQUIRE(role_table->get_linklist(role_table->get_column_index("members"), ndx)->find(user.row().get_index()) != npos);
 
             r->commit_transaction();
+        }
+    }
+
+    SECTION("schema change error reporting") {
+        config.sync_config->is_partial = true;
+        // Create the Realm with an admin user
+        server.start();
+        {
+            auto r = Realm::get_shared_realm(config);
+            create_object(r);
+
+            // FIXME: required due to https://github.com/realm/realm-sync/issues/2071
+            wait_for_upload(*r);
+            wait_for_download(*r);
+
+            // Revoke modifySchema permission for all users
+            r->begin_transaction();
+            TableRef permission_table = r->read_group().get_table("class___Permission");
+            size_t col = permission_table->get_column_index("canModifySchema");
+            for (size_t i = 0; i < permission_table->size(); ++i)
+                permission_table->set_bool(col, i, false);
+            r->commit_transaction();
+            wait_for_upload(*r);
+        }
+        auto user = config.sync_config->user;
+        user->log_out();
+
+        SyncTestFile nonadmin{server, "default", util::none, true};
+        nonadmin.automatic_change_notifications = false;
+        nonadmin.sync_config->user->set_is_admin(false);
+        auto log_in = [&] {
+            auto session = SyncManager::shared().get_session(nonadmin.path, *nonadmin.sync_config);
+            nonadmin.sync_config->bind_session_handler("", *nonadmin.sync_config, session);
+        };
+
+        SECTION("reverted column insertion") {
+            nonadmin.schema = Schema{
+                {"object", {
+                    {"value", PropertyType::Int},
+                    {"value 2", PropertyType::Int}
+                }},
+            };
+            auto r = Realm::get_shared_realm(nonadmin);
+            r->invalidate();
+
+            SECTION("no active read transaction") {
+                log_in();
+                wait_for_upload(*r);
+                wait_for_download(*r);
+                REQUIRE_THROWS_WITH(r->read_group(),
+                                    Catch::Matchers::Contains("Property 'object.value 2' has been removed."));
+            }
+
+            SECTION("notify()") {
+                r->read_group();
+                log_in();
+                wait_for_download(*r);
+                REQUIRE_THROWS_WITH(r->notify(),
+                                    Catch::Matchers::Contains("Property 'object.value 2' has been removed."));
+            }
+
+            SECTION("refresh()") {
+                r->read_group();
+                log_in();
+                wait_for_download(*r);
+                REQUIRE_THROWS_WITH(r->refresh(),
+                                    Catch::Matchers::Contains("Property 'object.value 2' has been removed."));
+            }
+
+            SECTION("begin_transaction()") {
+                r->read_group();
+                log_in();
+                wait_for_download(*r);
+                REQUIRE_THROWS_WITH(r->begin_transaction(),
+                                    Catch::Matchers::Contains("Property 'object.value 2' has been removed."));
+            }
+        }
+
+        SECTION("reverted table insertion") {
+            nonadmin.schema = Schema{
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+                {"object 2", {
+                    {"value", PropertyType::Int},
+                }},
+            };
+            auto r = Realm::get_shared_realm(nonadmin);
+            r->read_group();
+            log_in();
+            wait_for_download(*r);
+            REQUIRE_THROWS_WITH(r->notify(),
+                                Catch::Matchers::Contains("Class 'object 2' has been removed."));
         }
     }
 }

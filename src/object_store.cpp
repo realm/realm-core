@@ -347,6 +347,11 @@ struct SchemaDifferenceExplainer {
         errors.emplace_back("Class '%1' has been added.", op.object->name);
     }
 
+    void operator()(schema_change::RemoveTable)
+    {
+        // We never do anything for RemoveTable
+    }
+
     void operator()(schema_change::AddInitialProperties)
     {
         // Nothing. Always preceded by AddTable.
@@ -446,6 +451,7 @@ bool ObjectStore::needs_migration(std::vector<SchemaChange> const& changes)
         bool operator()(AddInitialProperties) { return false; }
         bool operator()(AddProperty) { return true; }
         bool operator()(AddTable) { return false; }
+        bool operator()(RemoveTable) { return false; }
         bool operator()(ChangePrimaryKey) { return true; }
         bool operator()(ChangePropertyType) { return true; }
         bool operator()(MakePropertyNullable) { return true; }
@@ -512,8 +518,13 @@ void ObjectStore::verify_valid_external_changes(std::vector<SchemaChange> const&
         void operator()(AddProperty) { }
         void operator()(AddIndex) { }
         void operator()(RemoveIndex) { }
+
+        // Deleting tables is not okay
+        void operator()(RemoveTable op) {
+            errors.emplace_back("Class '%1' has been removed.", op.object->name);
+        }
     } verifier;
-    verify_no_errors<InvalidSchemaChangeException>(verifier, changes);
+    verify_no_errors<InvalidExternalSchemaChangeException>(verifier, changes);
 }
 
 void ObjectStore::verify_compatible_for_immutable_and_readonly(std::vector<SchemaChange> const& changes)
@@ -560,6 +571,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         TableHelper table;
 
         void operator()(AddTable op) { create_table(group, *op.object); }
+        void operator()(RemoveTable) { }
         void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
 
         // Note that in normal operation none of these will be hit, as if we're
@@ -597,6 +609,7 @@ void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange>
         bool update_indexes;
 
         void operator()(AddTable op) { create_table(group, *op.object); }
+        void operator()(RemoveTable) { }
         void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
         void operator()(AddIndex op) { if (update_indexes) table(op.object).add_search_index(op.property->table_column); }
@@ -624,6 +637,7 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         TableHelper table;
 
         void operator()(AddTable op) { create_table(group, *op.object); }
+        void operator()(RemoveTable) { }
         void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
         void operator()(RemoveProperty) { /* delayed until after the migration */ }
@@ -685,6 +699,7 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
         void operator()(AddIndex op) { table(op.object).add_search_index(op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
 
+        void operator()(RemoveTable) { }
         void operator()(ChangePropertyType) { }
         void operator()(MakePropertyNullable) { }
         void operator()(MakePropertyRequired) { }
@@ -721,6 +736,7 @@ static void create_default_permissions(Group& group, std::vector<SchemaChange> c
                                                  static_cast<int>(ComputedPrivileges::All));
         }
 
+        void operator()(RemoveTable) { }
         void operator()(AddInitialProperties) { }
         void operator()(AddProperty) { }
         void operator()(RemoveProperty) { }
@@ -986,6 +1002,20 @@ SchemaMismatchException::SchemaMismatchException(std::vector<ObjectSchemaValidat
 InvalidSchemaChangeException::InvalidSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors)
 : std::logic_error([&] {
     std::string message = "The following changes cannot be made in additive-only schema mode:";
+    for (auto const& error : errors) {
+        message += std::string("\n- ") + error.what();
+    }
+    return message;
+}())
+{
+}
+
+InvalidExternalSchemaChangeException::InvalidExternalSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors)
+: std::logic_error([&] {
+    std::string message =
+        "Unsupported schema changes were made by another client or process. For a "
+        "synchronized Realm, this may be due to the server reverting schema changes which "
+        "the local user did not have permission to make.";
     for (auto const& error : errors) {
         message += std::string("\n- ") + error.what();
     }

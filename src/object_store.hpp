@@ -166,6 +166,10 @@ struct SchemaMismatchException : public std::logic_error {
 struct InvalidSchemaChangeException : public std::logic_error {
     InvalidSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors);
 };
+
+struct InvalidExternalSchemaChangeException : public std::logic_error {
+    InvalidExternalSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors);
+};
 } // namespace realm
 
 #endif /* defined(REALM_OBJECT_STORE_HPP) */

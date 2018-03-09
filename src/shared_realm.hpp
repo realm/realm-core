@@ -415,6 +415,7 @@ private:
 
     void add_schema_change_handler();
     void cache_new_schema();
+    void translate_schema_error();
     void notify_schema_changed();
 
     bool init_permission_cache();
