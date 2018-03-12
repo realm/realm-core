@@ -559,7 +559,6 @@ public:
     void dump_node_structure(std::ostream&, int level) const;
 #endif
 
-    class Parent;
     using HandoverPatch = TableHandoverPatch;
     static void generate_patch(const Table* ref, std::unique_ptr<HandoverPatch>& patch);
     static TableRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
@@ -849,33 +848,6 @@ private:
     friend class ArrayBacklink;
 };
 
-class Table::Parent : public ArrayParent {
-public:
-    ~Parent() noexcept override
-    {
-    }
-
-protected:
-    virtual StringData get_child_name(size_t child_ndx) const noexcept;
-
-    /// If children are group-level tables, then this function returns the
-    /// group. Otherwise it returns null.
-    virtual Group* get_parent_group() noexcept;
-
-    /// Must be called whenever a child table accessor is about to be destroyed.
-    ///
-    /// Note that the argument is a pointer to the child Table rather than its
-    /// `ndx_in_parent` property. This is because only minimal accessor
-    /// consistency can be assumed by this function.
-    virtual void child_accessor_destroyed(Table* child) noexcept = 0;
-
-
-    virtual std::recursive_mutex* get_accessor_management_lock() noexcept = 0;
-
-    friend class Table;
-};
-
-
 // Implementation:
 
 
@@ -907,17 +879,6 @@ inline void Table::bump_content_version() const noexcept
 }
 
 
-
-inline StringData Table::get_name() const noexcept
-{
-    const Array& real_top = m_top;
-    ArrayParent* parent = real_top.get_parent();
-    if (!parent)
-        return StringData("");
-    size_t index_in_parent = real_top.get_ndx_in_parent();
-    REALM_ASSERT(dynamic_cast<Parent*>(parent));
-    return static_cast<Parent*>(parent)->get_child_name(index_in_parent);
-}
 
 inline size_t Table::get_column_count() const noexcept
 {
@@ -962,7 +923,7 @@ inline Table::Table(Allocator& alloc)
     , m_index_refs(m_alloc)
 {
     ref_type ref = create_empty_table(m_alloc); // Throws
-    Parent* parent = nullptr;
+    ArrayParent* parent = nullptr;
     size_t ndx_in_parent = 0;
     init(ref, parent, ndx_in_parent);
 }
@@ -1181,7 +1142,7 @@ public:
         return Table::create_empty_table(alloc, key); // Throws
     }
 
-    static Table* create_accessor(Allocator& alloc, ref_type top_ref, Table::Parent* parent, size_t ndx_in_parent)
+    static Table* create_accessor(Allocator& alloc, ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent)
     {
         std::unique_ptr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
         table->init(top_ref, parent, ndx_in_parent);                            // Throws
@@ -1189,7 +1150,7 @@ public:
     }
 
     // Intended to be used only by Group::create_table_accessor()
-    static Table* create_incomplete_accessor(Allocator& alloc, ref_type top_ref, Table::Parent* parent,
+    static Table* create_incomplete_accessor(Allocator& alloc, ref_type top_ref, ArrayParent* parent,
                                              size_t ndx_in_parent)
     {
         std::unique_ptr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
