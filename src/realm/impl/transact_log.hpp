@@ -125,7 +125,7 @@ public:
     /// to find on the `InstructionHandler`.
 
     // No selection needed:
-    bool select_table(size_t, size_t, const size_t*)
+    bool select_table(TableKey)
     {
         return true;
     }
@@ -364,7 +364,7 @@ public:
     /// to find on the `InstructionHandler`.
 
     // No selection needed:
-    bool select_table(size_t group_level_ndx, size_t levels, const size_t* path);
+    bool select_table(TableKey key);
     bool select_descriptor(size_t levels, const size_t* path);
     bool select_list(ColKey col_key, ObjKey key);
     bool select_link_list(ColKey col_key, ObjKey key);
@@ -645,7 +645,6 @@ private:
     void select_table(const Table*); // unselects link list
     void select_list(const ConstListBase&);
 
-    void record_subtable_path(const Table&, size_t*& out_begin, size_t*& out_end);
     void do_select_table(const Table*);
     void do_select_list(const ConstListBase&);
 
@@ -685,8 +684,6 @@ private:
     // that all of the instructions are in memory.
     const char* m_input_end;
     util::StringBuffer m_string_buffer;
-    static const int m_max_levels = 1024;
-    util::Buffer<size_t> m_path;
 
     REALM_NORETURN void parser_error() const;
 
@@ -2035,10 +2032,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SelectTable: {
             int levels = read_int<int>(); // Throws
             REALM_ASSERT(levels == 0);
-            m_path.reserve(0, 2 * levels); // Throws
-            size_t* path = m_path.data();
-            size_t group_level_ndx = read_int<size_t>(); // Throws
-            if (!handler.select_table(group_level_ndx, levels, path)) // Throws
+            TableKey key = TableKey(read_int<int64_t>());
+            if (!handler.select_table(key)) // Throws
                 parser_error();
             return;
         }
@@ -2478,10 +2473,10 @@ inline bool TransactLogParser::is_valid_link_type(int type)
 
 class TransactReverser {
 public:
-    bool select_table(size_t group_level_ndx, size_t levels, const size_t* path)
+    bool select_table(TableKey key)
     {
         sync_table();
-        m_encoder.select_table(group_level_ndx, levels, path);
+        m_encoder.select_table(key);
         m_pending_ts_instr = get_inst();
         return true;
     }
