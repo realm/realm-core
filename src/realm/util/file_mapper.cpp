@@ -367,10 +367,11 @@ void* mmap_reserve(FileDesc fd, size_t reservation_size, size_t offset_in_file)
     static_cast<void>(offset_in_file);
 #ifdef _WIN32
     REALM_ASSERT(false); // unsupported on windows
+    return nullptr;
 #else
     auto addr = ::mmap(0, reservation_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-#endif
     return addr;
+#endif
 }
 
 

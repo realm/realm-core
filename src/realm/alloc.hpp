@@ -193,7 +193,7 @@ protected:
     virtual char* do_translate(ref_type ref) const noexcept = 0;
 
     Allocator() noexcept;
-    size_t get_section_index(size_t pos) const noexcept;
+    size_t get_section_index(uint64_t pos) const noexcept;
     inline size_t get_section_base(size_t index) const noexcept;
 
 
@@ -455,9 +455,9 @@ inline size_t Allocator::get_section_base(size_t index) const noexcept
     return index << section_shift; // 64MB chunks
 }
 
-inline size_t Allocator::get_section_index(size_t pos) const noexcept
+inline size_t Allocator::get_section_index(uint64_t pos) const noexcept
 {
-    return pos >> section_shift; // 64Mb chunks
+    return size_t(pos >> section_shift); // 64Mb chunks
 }
 
 inline bool Allocator::is_read_only(ref_type ref) const noexcept

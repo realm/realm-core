@@ -251,6 +251,16 @@ void List<ObjKey>::clear()
     tf::remove_recursive(*origin_table, state); // Throws
 }
 
+#ifdef _WIN32
+namespace realm {
+// Explicit instantiation required on some windows builds
+template void List<ObjKey>::do_insert(size_t ndx, ObjKey target_key);
+template void List<ObjKey>::do_set(size_t ndx, ObjKey target_key);
+template void List<ObjKey>::do_remove(size_t ndx);
+template void List<ObjKey>::clear();
+}
+#endif
+
 TableView LinkList::get_sorted_view(SortDescriptor order) const
 {
     TableView tv(get_target_table(), clone());
