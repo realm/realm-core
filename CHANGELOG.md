@@ -16,7 +16,8 @@
 
 ### Internals
 
-* None.
+* Exported CMake targets have been renamed to "modern" conventions, e.g.
+  `Realm::Core` and `Realm::QueryParser`.
 
 ----------------------------------------------
 
