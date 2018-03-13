@@ -309,16 +309,16 @@ protected:
     char* do_translate(ref_type) const noexcept override;
 
     /// Returns the first section boundary *above* the given position.
-    uint64_t get_upper_section_boundary(uint64_t start_pos) const noexcept;
+    size_t get_upper_section_boundary(size_t start_pos) const noexcept;
 
     /// Returns the section boundary at or above the given size
-    uint64_t align_size_to_section_boundary(uint64_t size) const noexcept;
+    size_t align_size_to_section_boundary(size_t size) const noexcept;
 
     /// Returns the first section boundary *at or below* the given position.
-    uint64_t get_lower_section_boundary(uint64_t start_pos) const noexcept;
+    size_t get_lower_section_boundary(size_t start_pos) const noexcept;
 
     /// Returns true if the given position is at a section boundary
-    bool matches_section_boundary(uint64_t pos) const noexcept;
+    bool matches_section_boundary(size_t pos) const noexcept;
 
     /// Actually compute the starting offset of a section. Only used to initialize
     /// a table of predefined results, which are then used by get_section_base().
@@ -520,12 +520,12 @@ inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab
     return ref < slab.ref_end;
 }
 
-inline uint64_t SlabAlloc::get_upper_section_boundary(uint64_t start_pos) const noexcept
+inline size_t SlabAlloc::get_upper_section_boundary(size_t start_pos) const noexcept
 {
     return get_section_base(1 + get_section_index(start_pos));
 }
 
-inline uint64_t SlabAlloc::align_size_to_section_boundary(uint64_t size) const noexcept
+inline size_t SlabAlloc::align_size_to_section_boundary(size_t size) const noexcept
 {
     if (matches_section_boundary(size))
         return size;
@@ -533,12 +533,12 @@ inline uint64_t SlabAlloc::align_size_to_section_boundary(uint64_t size) const n
         return get_upper_section_boundary(size);
 }
 
-inline uint64_t SlabAlloc::get_lower_section_boundary(uint64_t start_pos) const noexcept
+inline size_t SlabAlloc::get_lower_section_boundary(size_t start_pos) const noexcept
 {
     return get_section_base(get_section_index(start_pos));
 }
 
-inline bool SlabAlloc::matches_section_boundary(uint64_t pos) const noexcept
+inline bool SlabAlloc::matches_section_boundary(size_t pos) const noexcept
 {
     return pos == get_lower_section_boundary(pos);
 }

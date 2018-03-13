@@ -77,7 +77,7 @@ using namespace realm::util;
 namespace realm {
 namespace util {
 
-uint64_t round_up_to_page_size(uint64_t size) noexcept
+size_t round_up_to_page_size(size_t size) noexcept
 {
     return (size + page_size() - 1) & ~(page_size() - 1);
 }
