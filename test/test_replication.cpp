@@ -162,10 +162,10 @@ public:
         if (!m_arr) {
             using gf = _impl::GroupFriend;
             Allocator& alloc = gf::get_alloc(*m_group);
-            m_arr = std::make_unique<Array>(alloc);
-            m_arr->create(Array::type_Normal);
+            m_arr = std::make_unique<BinaryColumn>(alloc);
+            m_arr->create();
             gf::prepare_history_parent(*m_group, *m_arr, hist_SyncClient, m_history_schema_version);
-            m_arr->update_parent(); // Throws
+            // m_arr->update_parent(); // Throws
         }
         return 1;
     }
@@ -199,7 +199,7 @@ private:
     int m_history_schema_version;
     bool m_upgraded = false;
     Group* m_group = nullptr;
-    std::unique_ptr<Array> m_arr;
+    std::unique_ptr<BinaryColumn> m_arr;
 };
 
 #ifdef LEGACY_TESTS

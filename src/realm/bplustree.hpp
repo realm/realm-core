@@ -172,6 +172,9 @@ public:
 
     void create();
     void destroy();
+    void verify()
+    {
+    }
 
 protected:
     template <class U>
@@ -400,7 +403,7 @@ public:
         m_root->bptree_traverse(func);
     }
 
-private:
+protected:
     using LeafArray = typename LeafTypeTrait<T>::type;
 
     /**

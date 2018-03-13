@@ -781,8 +781,8 @@ private:
     static ref_type get_history_ref(const Array& top) noexcept;
     static int get_history_schema_version(const Array& top) noexcept;
     void set_history_schema_version(int version);
-    void set_history_parent(Array& history_root) noexcept;
-    void prepare_history_parent(Array& history_root, int history_type, int history_schema_version);
+    void set_history_parent(BPlusTreeBase& history_root) noexcept;
+    void prepare_history_parent(BPlusTreeBase& history_root, int history_type, int history_schema_version);
 
     size_t find_table_index(StringData name) const noexcept;
     TableKey ndx2key(size_t ndx) const;
@@ -1103,7 +1103,7 @@ inline void Group::set_history_schema_version(int version)
     m_top.set(9, RefOrTagged::make_tagged(unsigned(version))); // Throws
 }
 
-inline void Group::set_history_parent(Array& history_root) noexcept
+inline void Group::set_history_parent(BPlusTreeBase& history_root) noexcept
 {
     history_root.set_parent(&m_top, 8);
 }
@@ -1316,12 +1316,12 @@ public:
         group.set_history_schema_version(version); // Throws
     }
 
-    static void set_history_parent(Group& group, Array& history_root) noexcept
+    static void set_history_parent(Group& group, BPlusTreeBase& history_root) noexcept
     {
         group.set_history_parent(history_root);
     }
 
-    static void prepare_history_parent(Group& group, Array& history_root, int history_type,
+    static void prepare_history_parent(Group& group, BPlusTreeBase& history_root, int history_type,
                                        int history_schema_version)
     {
         group.prepare_history_parent(history_root, history_type, history_schema_version); // Throws

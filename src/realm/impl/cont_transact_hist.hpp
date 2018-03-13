@@ -28,6 +28,7 @@
 namespace realm {
 
 class Group;
+class BinaryIterator;
 
 namespace _impl {
 

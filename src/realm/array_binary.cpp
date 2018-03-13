@@ -111,6 +111,17 @@ BinaryData ArrayBinary::get(size_t ndx) const
     }
 }
 
+BinaryData ArrayBinary::get_at(size_t ndx, size_t& pos) const
+{
+    if (!m_is_big) {
+        pos = 0;
+        return static_cast<ArraySmallBlobs*>(m_arr)->get(ndx);
+    }
+    else {
+        return static_cast<ArrayBigBlobs*>(m_arr)->get_at(ndx, pos);
+    }
+}
+
 bool ArrayBinary::is_null(size_t ndx) const
 {
     if (!m_is_big) {

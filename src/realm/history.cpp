@@ -100,18 +100,12 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
     if (!m_changesets) {
         using gf = _impl::GroupFriend;
         Allocator& alloc = gf::get_alloc(*m_group);
-        size_t size = 0;
-        bool nullable = false;
-        ref_type hist_ref = BinaryColumn::create(alloc, size, nullable); // Throws
-        _impl::DeepArrayRefDestroyGuard dg(hist_ref, alloc);
-        m_changesets = std::make_unique<BinaryColumn>(alloc, hist_ref, nullable); // Throws
-        gf::prepare_history_parent(*m_group, *m_changesets->get_root_array(),
-                                   Replication::hist_InRealm,
+        m_changesets = std::make_unique<BinaryColumn>(alloc); // Throws
+        gf::prepare_history_parent(*m_group, *m_changesets, Replication::hist_InRealm,
                                    g_history_schema_version); // Throws
+        m_changesets->create();
         // Note: gf::prepare_history_parent() also ensures the the root array
         // has a slot for the history ref.
-        m_changesets->get_root_array()->update_parent(); // Throws
-        dg.release();
     }
     // FIXME: BinaryColumn::set() currently interprets BinaryData{} as
     // null. It should probably be changed such that BinaryData{} is always
@@ -203,14 +197,15 @@ void InRealmHistory::update_from_ref(ref_type ref, version_type version)
     }
     else {
         if (REALM_LIKELY(m_changesets)) {
-            m_changesets->update_from_ref(ref); // Throws
+            m_changesets->set_parent(nullptr, 0);
+            m_changesets->init_from_ref(ref); // Throws
         }
         else {
             Allocator& alloc = gf::get_alloc(*m_group);
-            bool nullable = false;
-            m_changesets = std::make_unique<BinaryColumn>(alloc, ref, nullable); // Throws
-            gf::set_history_parent(*m_group, *m_changesets->get_root_array());
+            m_changesets = std::make_unique<BinaryColumn>(alloc); // Throws
+            m_changesets->init_from_ref(ref);
         }
+        gf::set_history_parent(*m_group, *m_changesets);
         m_size = m_changesets->size();
         m_base_version = version - m_size;
     }

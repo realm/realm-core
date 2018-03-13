@@ -27,6 +27,7 @@
 #include "realm/array_key.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/column_type_traits.hpp"
+#include "realm/index_string.hpp"
 #include "realm/cluster_tree.hpp"
 #include "realm/spec.hpp"
 #include "realm/replication.hpp"

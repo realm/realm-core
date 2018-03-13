@@ -22,6 +22,7 @@
 #include "realm/array_string.hpp"
 #include "realm/array_timestamp.hpp"
 #include "realm/array_key.hpp"
+#include "realm/column_binary.hpp"
 
 #include "test.hpp"
 
@@ -328,6 +329,69 @@ TEST(BPlusTree_Performance)
     CALLGRIND_STOP_INSTRUMENTATION;
 
     tree.destroy();
+}
+
+TEST(BinaryColumn_get_at)
+{
+    BinaryData read;
+    size_t get_pos;
+
+    std::string hello = "Hello, world";
+    std::string very_lazy_fox =
+        "The lazy fox jumped over the quick brown dog. The quick fox jumped over the lazy brown dog. ";
+
+    BinaryColumn c(Allocator::get_default());
+    c.create();
+
+    c.add(BinaryData());
+    c.add(BinaryData(hello));
+
+    // First one should be NULL
+    CHECK(c.get(0).is_null());
+    get_pos = 0;
+    read = c.get_at(0, get_pos);
+    CHECK(read.is_null());
+
+    get_pos = 0;
+    read = c.get_at(1, get_pos);
+    CHECK_EQUAL(read.size(), hello.size());
+    CHECK_EQUAL(std::string(read.data(), read.size()), hello);
+
+    BinaryIterator it0;
+    read = it0.get_next();
+    CHECK(read.is_null());
+
+    BinaryIterator it1(&c, 1);
+    read = it1.get_next();
+    CHECK_EQUAL(std::string(read.data(), read.size()), hello);
+    read = it1.get_next();
+    CHECK(read.is_null());
+
+    BinaryIterator it2(c.get(1));
+    read = it2.get_next();
+    CHECK_EQUAL(std::string(read.data(), read.size()), hello);
+    read = it2.get_next();
+    CHECK(read.is_null());
+
+    // Check BigBlob
+    c.add(BinaryData(very_lazy_fox));
+
+    get_pos = 0;
+    read = c.get_at(2, get_pos);
+    CHECK_EQUAL(read.size(), very_lazy_fox.size());
+    CHECK_EQUAL(std::string(read.data(), read.size()), very_lazy_fox);
+
+    // Split root
+    for (unsigned i = 0; i < REALM_MAX_BPNODE_SIZE; i++) {
+        c.add(BinaryData());
+    }
+
+    get_pos = 0;
+    read = c.get_at(1, get_pos);
+    CHECK_EQUAL(read.size(), hello.size());
+    CHECK_EQUAL(std::string(read.data(), read.size()), hello);
+
+    c.destroy();
 }
 
 #endif // TEST_BPLUS_TREE

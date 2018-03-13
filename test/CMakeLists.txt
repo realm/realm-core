@@ -24,7 +24,6 @@ set(NORMAL_TESTS
     test_binary_data.cpp
     test_bplus_tree.cpp
     test_column.cpp
-    test_column_binary.cpp
     test_column_float.cpp
     test_column_string.cpp
     test_column_timestamp.cpp

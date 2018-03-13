@@ -148,7 +148,7 @@ void col_type_deleg(Op& op, ColumnType type, bool nullable)
             op.template call<StringColumn>();
             return;
         case col_type_Binary:
-            op.template call<BinaryColumn>();
+            op.template call<StringColumn>();
             return;
         case col_type_Float:
             op.template call<FloatColumn>();

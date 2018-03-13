@@ -1637,8 +1637,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
 }
 
 
-void Group::prepare_history_parent(Array& history_root, int history_type,
-                                   int history_schema_version)
+void Group::prepare_history_parent(BPlusTreeBase& history_root, int history_type, int history_schema_version)
 {
     REALM_ASSERT(m_file_format_version >= 7);
     if (m_top.size() < 10) {
