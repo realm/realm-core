@@ -123,7 +123,7 @@ void encryption_write_barrier(const File::Map<T>& map, size_t index, size_t num_
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;
 File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept;
 
-uint64_t round_up_to_page_size(uint64_t size) noexcept;
+size_t round_up_to_page_size(size_t size) noexcept;
 }
 }
 #endif

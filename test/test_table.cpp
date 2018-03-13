@@ -3569,7 +3569,7 @@ TEST(Table_object_seq_rnd)
         wt.commit();
     }
     // scenario established!
-    int nb_rows = key_values.size();
+    int nb_rows = int(key_values.size());
 #ifdef REALM_DEBUG
     int num_runs = 1; // runs for timing access
 #else

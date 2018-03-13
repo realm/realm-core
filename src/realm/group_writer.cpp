@@ -682,7 +682,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // write_group() fails before writing the new top-ref, but after having
     // extended the file size. It can also happen as part of initial file expansion
     // during attach_file().
-    uint64_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
+    size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
     // find minimal new size according to the following growth ratios:
     // at least 100% (doubling) until we reach 1MB, then just grow with 1MB at a time
     uint64_t minimal_new_size = logical_file_size;
@@ -698,22 +698,24 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     if (required_new_size > minimal_new_size) {
         minimal_new_size = required_new_size;
     }
-    // align to page size, but do not cross a section boundary
-    uint64_t next_boundary = m_alloc.align_size_to_section_boundary(minimal_new_size);
-    minimal_new_size = util::round_up_to_page_size(minimal_new_size);
-    if (minimal_new_size > next_boundary) {
-        // we cannot cross a section boundary. In this case the allocation will
-        // likely fail, then retry and we'll allocate anew from the next section
-        minimal_new_size = next_boundary;
-    }
-    // check for overflow of size computation - require that the size can be represented
-    // as a *signed* value within a size_t (msb must be zero):
-    if ((size_t(minimal_new_size << 1) != (minimal_new_size << 1))) {
-        throw MaximumFileSizeExceeded("GroupWriter cannot extend free space: " + util::to_string(minimal_new_size) +
+    // Ensure that minimal_new_size is less than 3 GB on a 32 bit device
+    if (minimal_new_size > (std::numeric_limits<size_t>::max() / 4 * 3)) {
+        throw MaximumFileSizeExceeded("GroupWriter cannot extend free space: " + util::to_string(logical_file_size) +
                                       " + " + util::to_string(requested_size));
     }
+
     // We now know that it is safe to assign size to something of size_t
+    // and we know that the following adjustments are safe to perform
     size_t new_file_size = static_cast<size_t>(minimal_new_size);
+
+    // align to page size, but do not cross a section boundary
+    size_t next_boundary = m_alloc.align_size_to_section_boundary(new_file_size);
+    new_file_size = util::round_up_to_page_size(new_file_size);
+    if (new_file_size > next_boundary) {
+        // we cannot cross a section boundary. In this case the allocation will
+        // likely fail, then retry and we'll allocate anew from the next section
+        new_file_size = next_boundary;
+    }
     // The size must be a multiple of 8. This is guaranteed as long as
     // the initial size is a multiple of 8.
     REALM_ASSERT_3(new_file_size % 8, ==, 0);
