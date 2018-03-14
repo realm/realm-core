@@ -724,6 +724,9 @@ static void create_default_permissions(Group& group, std::vector<SchemaChange> c
     // Ensure that this user exists so that local privileges checks work immediately
     sync::add_user_to_role(group, sync_user_id, "everyone");
 
+    // Ensure that the user's private role exists so that local privilege checks work immediately.
+    ObjectStore::ensure_private_role_exists_for_user(group, sync_user_id);
+
     // Mark all tables we just created as fully world-accessible
     // This has to be done after the first pass of schema init is done so that we can be
     // sure that the permissions tables actually exist.
@@ -753,6 +756,29 @@ static void create_default_permissions(Group& group, std::vector<SchemaChange> c
     }
 #endif
 }
+
+#if REALM_ENABLE_SYNC
+void ObjectStore::ensure_private_role_exists_for_user(Group& group, StringData sync_user_id)
+{
+    std::string private_role_name = util::format("__User:%1", sync_user_id);
+
+    TableRef roles = ObjectStore::table_for_object_type(group, "__Role");
+    size_t private_role_ndx = roles->find_first_string(roles->get_column_index("name"), private_role_name);
+    if (private_role_ndx != npos) {
+        // The private role already exists, so there's nothing for us to do.
+        return;
+    }
+
+    // Add the user to the private role, creating the private role in the process.
+    sync::add_user_to_role(group, sync_user_id, private_role_name);
+
+    // Set the private role on the user.
+    private_role_ndx = roles->find_first_string(roles->get_column_index("name"), private_role_name);
+    TableRef users = ObjectStore::table_for_object_type(group, "__User");
+    size_t user_ndx = users->find_first_string(users->get_column_index("id"), sync_user_id);
+    users->set_link(users->get_column_index("role"), user_ndx, private_role_ndx);
+}
+#endif
 
 void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
                                        Schema& target_schema, uint64_t target_schema_version,

@@ -107,4 +107,10 @@ void Object::ensure_user_in_everyone_role()
 
     users->add(m_row.get_index());
 }
+
+void Object::ensure_private_role_exists_for_user()
+{
+    auto user_id = m_row.get<StringData>(m_row.get_table()->get_column_index("id"));
+    ObjectStore::ensure_private_role_exists_for_user(m_realm->read_group(), user_id);
+}
 #endif

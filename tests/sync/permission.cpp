@@ -225,7 +225,7 @@ TEST_CASE("Object-level Permissions") {
 
             config.schema = Schema{
                 {"__User", {
-                    {"name", PropertyType::String, Property::IsPrimary{true}}
+                    {"id", PropertyType::String, Property::IsPrimary{true}}
                 }},
             };
             config.sync_config->is_partial = true;
@@ -233,7 +233,7 @@ TEST_CASE("Object-level Permissions") {
             r->begin_transaction();
 
             CppContext c;
-            auto user = Object::create<util::Any>(c, r, *r->schema().find("__User"), AnyDict{{"name", "test user"s}});
+            auto user = Object::create<util::Any>(c, r, *r->schema().find("__User"), AnyDict{{"id", "test user"s}});
 
             auto role_table = r->read_group().get_table("class___Role");
             REQUIRE(role_table);
@@ -241,6 +241,46 @@ TEST_CASE("Object-level Permissions") {
             REQUIRE(ndx != npos);
             REQUIRE(role_table->get_linklist(role_table->get_column_index("members"), ndx)->find(user.row().get_index()) != npos);
 
+            r->commit_transaction();
+        }
+
+        SECTION("automatically create private roles for newly-created users") {
+            using namespace std::string_literals;
+
+            config.schema = Schema{
+                {"__User", {
+                    {"id", PropertyType::String, Property::IsPrimary{true}}
+                }},
+            };
+            config.sync_config->is_partial = true;
+            auto r = Realm::get_shared_realm(config);
+            r->begin_transaction();
+
+            auto validate_user_role = [](const Object& user) {
+                auto user_table = user.row().get_table();
+                REQUIRE(user_table);
+                size_t ndx = user.row().get_link(user_table->get_column_index("role"));
+                REQUIRE(ndx != npos);
+
+                auto role_table = user.realm()->read_group().get_table("class___Role");
+                REQUIRE(role_table);
+                auto members = role_table->get_linklist(role_table->get_column_index("members"), ndx);
+                REQUIRE(members->size() == 1);
+                REQUIRE(members->find(user.row().get_index()) != npos);
+            };
+
+            SECTION("logged-in user") {
+                auto user_table = r->read_group().get_table("class___User");
+                REQUIRE(user_table);
+                REQUIRE(user_table->size() == 1);
+                validate_user_role(Object(r, "__User", 0));
+            }
+
+            SECTION("manually created user") {
+                CppContext c;
+                auto user = Object::create<util::Any>(c, r, *r->schema().find("__User"), AnyDict{{"id", "test user"s}});
+                validate_user_role(user);
+            }
             r->commit_transaction();
         }
     }
