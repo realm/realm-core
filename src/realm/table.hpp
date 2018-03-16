@@ -232,11 +232,6 @@ public:
     /// debugging purposes.
     size_t get_num_unique_values(ColKey col_key) const;
 
-    bool has_clusters() const
-    {
-        return m_clusters.is_attached();
-    }
-
     template <class T>
     Columns<T> column(ColKey col_key); // FIXME: Should this one have been declared noexcept?
     template <class T>
@@ -327,32 +322,6 @@ public:
     // not guaranteed by the standard.
     static constexpr int_fast64_t max_integer = std::numeric_limits<int64_t>::max();
     static constexpr int_fast64_t min_integer = std::numeric_limits<int64_t>::min();
-
-    //@{
-
-    /// Deprecated:
-
-    /// If this accessor is attached to a subtable, then that subtable has a
-    /// parent table, and the subtable either resides in a column of type
-    /// `table` or of type `mixed` in that parent. In that case
-    /// get_parent_table() returns a reference to the accessor associated with
-    /// the parent, and get_parent_row_index() returns the index of the row in
-    /// which the subtable resides. In all other cases (free-standing and
-    /// group-level tables), get_parent_table() returns null and
-    /// get_parent_row_index() returns realm::npos.
-    ///
-    /// If this accessor is attached to a subtable, and \a col_key_out is
-    /// specified, then `*col_key_out` is set to the index of the column of
-    /// the parent table in which the subtable resides. If this accessor is not
-    /// attached to a subtable, then `*col_key_out` will retain its original
-    /// value upon return.
-
-    TableRef get_parent_table(size_t* col_key_out = nullptr) noexcept;
-    ConstTableRef get_parent_table(size_t* col_key_out = nullptr) const noexcept;
-    size_t get_parent_row_index() const noexcept;
-
-    //@}
-
 
     /// Only group-level unordered tables can be used as origins or targets of
     /// links.
@@ -684,15 +653,6 @@ private:
     ColKey insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key);
     void erase_backlink_column(TableKey origin_table_key, ColKey origin_col_key);
 
-    struct AccessorUpdater {
-        virtual void update(Table&) = 0;
-        virtual void update_parent(Table&) = 0;
-        virtual ~AccessorUpdater()
-        {
-        }
-    };
-    void update_accessors(AccessorUpdater&);
-
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
     /// note that this works only for non-transactional commits. Table
@@ -729,9 +689,6 @@ private:
 
     static size_t get_size_from_ref(ref_type top_ref, Allocator&) noexcept;
     static size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref, Allocator&) noexcept;
-
-    const Table* get_parent_table_ptr(size_t* col_key_out = nullptr) const noexcept;
-    Table* get_parent_table_ptr(size_t* col_key_out = nullptr) noexcept;
 
     /// Create an empty table with independent spec and return just
     /// the reference to the underlying memory.
@@ -838,9 +795,6 @@ private:
     /// Used by query. Follows chain of link columns and returns final target table
     const Table* get_link_chain_target(const std::vector<ColKey>&) const;
 
-    // Precondition: 1 <= end - begin
-    size_t* record_subtable_path(size_t* begin, size_t* end) const noexcept;
-
     Replication* get_repl() noexcept;
 
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
@@ -908,16 +862,6 @@ protected:
     /// group. Otherwise it returns null.
     virtual Group* get_parent_group() noexcept;
 
-    /// If children are subtables, then this function returns the
-    /// parent table. Otherwise it returns null.
-    ///
-    /// If \a col_key_out is not null, this function must assign the index of
-    /// the column within the parent table to `*col_key_out` when , and only
-    /// when this table parent is a column in a parent table.
-    virtual Table* get_parent_table(size_t* col_key_out = nullptr) noexcept;
-
-    virtual Spec* get_subtable_spec() noexcept;
-
     /// Must be called whenever a child table accessor is about to be destroyed.
     ///
     /// Note that the argument is a pointer to the child Table rather than its
@@ -926,7 +870,6 @@ protected:
     virtual void child_accessor_destroyed(Table* child) noexcept = 0;
 
 
-    virtual size_t* record_subtable_path(size_t* begin, size_t* end) noexcept;
     virtual std::recursive_mutex* get_accessor_management_lock() noexcept = 0;
 
     friend class Table;
@@ -1141,16 +1084,6 @@ inline ConstTableRef Table::get_link_target(ColKey col_key) const noexcept
     return const_cast<Table*>(this)->get_link_target(col_key);
 }
 
-inline ConstTableRef Table::get_parent_table(size_t* col_key_out) const noexcept
-{
-    return ConstTableRef(get_parent_table_ptr(col_key_out));
-}
-
-inline TableRef Table::get_parent_table(size_t* col_key_out) noexcept
-{
-    return TableRef(get_parent_table_ptr(col_key_out));
-}
-
 inline bool Table::is_group_level() const noexcept
 {
     return bool(get_parent_group());
@@ -1174,32 +1107,9 @@ inline size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) noexc
     return get_size_from_ref(spec_ref, columns_ref, alloc);
 }
 
-inline Table* Table::get_parent_table_ptr(size_t* col_key_out) noexcept
-{
-    const Table* parent = const_cast<const Table*>(this)->get_parent_table_ptr(col_key_out);
-    return const_cast<Table*>(parent);
-}
-
 inline bool Table::is_link_type(ColumnType col_type) noexcept
 {
     return col_type == col_type_Link || col_type == col_type_LinkList;
-}
-
-inline size_t* Table::record_subtable_path(size_t* b, size_t* e) const noexcept
-{
-    const Array& real_top = m_top;
-    size_t index_in_parent = real_top.get_ndx_in_parent();
-    REALM_ASSERT_3(b, <, e);
-    *b++ = index_in_parent;
-    ArrayParent* parent = real_top.get_parent();
-    REALM_ASSERT(parent);
-    REALM_ASSERT(dynamic_cast<Parent*>(parent));
-    return static_cast<Parent*>(parent)->record_subtable_path(b, e);
-}
-
-inline size_t* Table::Parent::record_subtable_path(size_t* b, size_t*) noexcept
-{
-    return b;
 }
 
 inline Replication* Table::get_repl() noexcept
@@ -1366,10 +1276,6 @@ public:
         table.remove_recursive(rows); // Throws
     }
 
-    static size_t* record_subtable_path(const Table& table, size_t* b, size_t* e) noexcept
-    {
-        return table.record_subtable_path(b, e);
-    }
     static void insert_column_unless_exists(Table& table, ColKey column_key, DataType type, StringData name,
                                             LinkTargetInfo link, bool nullable = false, bool listtype = false,
                                             bool* was_inserted = nullptr)
@@ -1396,12 +1302,6 @@ public:
     static void batch_erase_rows(Table& table, const KeyColumn& keys)
     {
         table.batch_erase_rows(keys); // Throws
-    }
-
-    typedef Table::AccessorUpdater AccessorUpdater;
-    static void update_accessors(Table& table, AccessorUpdater& updater)
-    {
-        table.update_accessors(updater); // Throws
     }
 
     static void refresh_accessor_tree(Table& table)

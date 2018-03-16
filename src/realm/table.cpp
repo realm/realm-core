@@ -835,17 +835,6 @@ void Table::erase_backlink_column(TableKey origin_table_key, ColKey origin_col_k
 }
 
 
-
-void Table::update_accessors(AccessorUpdater& updater)
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    updater.update(*this); // Throws
-}
-
-
 void Table::detach() noexcept
 {
     if (Replication* repl = get_repl())
@@ -1191,31 +1180,6 @@ void Table::clear()
 
     if (Replication* repl = get_repl())
         repl->clear_table(this, old_size); // Throws
-}
-
-
-const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const noexcept
-{
-    const Array& real_top = m_top;
-    if (ArrayParent* array_parent = real_top.get_parent()) {
-        REALM_ASSERT_DEBUG(dynamic_cast<Parent*>(array_parent));
-        Parent* table_parent = static_cast<Parent*>(array_parent);
-        return table_parent->get_parent_table(column_ndx_out);
-    }
-    return 0;
-}
-
-
-size_t Table::get_parent_row_index() const noexcept
-{
-    const Array& real_top = m_top;
-    Parent* parent = static_cast<Parent*>(real_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
-    if (!parent)
-        return npos; // Free-standing table
-    if (parent->get_parent_group())
-        return realm::npos; // Group-level table
-    size_t index_in_parent = real_top.get_ndx_in_parent();
-    return index_in_parent;
 }
 
 
@@ -2063,17 +2027,6 @@ StringData Table::Parent::get_child_name(size_t) const noexcept
 
 
 Group* Table::Parent::get_parent_group() noexcept
-{
-    return nullptr;
-}
-
-
-Table* Table::Parent::get_parent_table(size_t*) noexcept
-{
-    return nullptr;
-}
-
-Spec* Table::Parent::get_subtable_spec() noexcept
 {
     return nullptr;
 }

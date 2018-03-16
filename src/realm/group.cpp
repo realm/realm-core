@@ -1204,7 +1204,7 @@ public:
         return true;
     }
 
-    bool select_table(size_t, int, const size_t*) noexcept
+    bool select_table(TableKey) noexcept
     {
         return true;
     }

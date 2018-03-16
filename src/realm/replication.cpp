@@ -480,41 +480,16 @@ public:
         }
     }
 
-    bool select_table(size_t group_level_ndx, int levels, const size_t*)
+    bool select_table(TableKey key)
     {
-        log("table = group->get_table(%1);", group_level_ndx); // Throws
+        log("table = group->get_table(%1);", key.value); // Throws
         m_list.reset();
         try {
-            m_table = m_group.get_table(TableKey(group_level_ndx)); // Throws
+            m_table = m_group.get_table(key); // Throws
         }
         catch (...) {
             return false;
         }
-        REALM_ASSERT(levels == 0);
-        /*
-        for (int i = 0; i < levels; ++i) {
-            ColKey col_key = path[2 * i + 0];
-            size_t row_ndx = path[2 * i + 1];
-            if (REALM_UNLIKELY(REALM_COVER_NEVER(col_key >= m_table->get_column_count())))
-                return false;
-            if (REALM_UNLIKELY(REALM_COVER_NEVER(row_ndx >= m_table->size())))
-                return false;
-            log("table = table->get_subtable(%1, %2);", col_key, row_ndx); // Throws
-            DataType type = m_table->get_column_type(col_key);
-            switch (type) {
-                case type_Table:
-                    m_table = m_table->get_subtable(col_key, row_ndx); // Throws
-                    break;
-                case type_Mixed:
-                    m_table = m_table->get_subtable(col_key, row_ndx); // Throws
-                    if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
-                        return false;
-                    break;
-                default:
-                    return false;
-            }
-        }
-        */
         return true;
     }
 

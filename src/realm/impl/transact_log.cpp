@@ -34,38 +34,16 @@ TransactLogConvenientEncoder::TransactLogConvenientEncoder(TransactLogStream& st
     m_subtab_path_buf.set_size(init_subtab_path_buf_size); // Throws
 }
 
-bool TransactLogEncoder::select_table(size_t group_level_ndx, size_t levels, const size_t* path)
+bool TransactLogEncoder::select_table(TableKey key)
 {
-    const size_t* path_end = path + (levels * 2);
-    append_simple_instr(instr_SelectTable, levels, group_level_ndx, std::make_tuple(path, path_end)); // Throws
+    size_t levels = 0;
+    append_simple_instr(instr_SelectTable, levels, key.value); // Throws
     return true;
-}
-
-void TransactLogConvenientEncoder::record_subtable_path(const Table& table, size_t*& begin, size_t*& end)
-{
-    for (;;) {
-        begin = m_subtab_path_buf.data();
-        end = begin + m_subtab_path_buf.size();
-        typedef _impl::TableFriend tf;
-        end = tf::record_subtable_path(table, begin, end);
-        if (end)
-            break;
-        size_t new_size = m_subtab_path_buf.size();
-        if (util::int_multiply_with_overflow_detect(new_size, 2))
-            throw std::runtime_error("Too many subtable nesting levels");
-        m_subtab_path_buf.set_size(new_size); // Throws
-    }
-    std::reverse(begin, end);
 }
 
 void TransactLogConvenientEncoder::do_select_table(const Table* table)
 {
-    size_t* begin;
-    size_t* end;
-    record_subtable_path(*table, begin, end);
-
-    size_t levels = (end - begin) / 2;
-    m_encoder.select_table(*begin, levels, begin + 1); // Throws
+    m_encoder.select_table(table->get_key()); // Throws
     m_selected_table = table;
 }
 
