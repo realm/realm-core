@@ -7,6 +7,7 @@ set(REALM_SOURCES
     array_blob.cpp
     array_blobs_small.cpp
     array_blobs_big.cpp
+    array_dictionary.cpp
     array_integer.cpp
     array_mixed.cpp
     array_unsigned.cpp
@@ -15,6 +16,7 @@ set(REALM_SOURCES
     array_timestamp.cpp
     bplustree.cpp
     cluster.cpp
+    dictionary.cpp
     column_binary.cpp
     disable_sync_to_disk.cpp
     exceptions.cpp
@@ -75,6 +77,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_blobs_big.hpp
     array_blobs_small.hpp
     array_bool.hpp
+    array_dictionary.hpp
     array_direct.hpp
     array_integer.hpp
     array_mixed.hpp
@@ -94,6 +97,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     column_type.hpp
     column_type_traits.hpp
     data_type.hpp
+    dictionary.hpp
     disable_sync_to_disk.hpp
     exceptions.hpp
     group.hpp
