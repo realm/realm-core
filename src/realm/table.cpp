@@ -1088,6 +1088,16 @@ void Table::copy_content_from_columns()
     m_top.set(1, 0);
 }
 
+StringData Table::get_name() const noexcept
+{
+    const Array& real_top = m_top;
+    ArrayParent* parent = real_top.get_parent();
+    if (!parent)
+        return StringData("");
+    REALM_ASSERT(dynamic_cast<Group*>(parent));
+    return static_cast<Group*>(parent)->get_table_name(get_key());
+}
+
 bool Table::is_nullable(ColKey col_key) const
 {
     REALM_ASSERT_DEBUG(valid_column(col_key));
@@ -1187,13 +1197,11 @@ Group* Table::get_parent_group() const noexcept
 {
     if (!m_top.is_attached())
         return 0;                                              // Subtable with shared descriptor
-    Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
+    ArrayParent* parent = m_top.get_parent();                  // ArrayParent guaranteed to be Table::Parent
     if (!parent)
         return 0; // Free-standing table
-    Group* group = parent->get_parent_group();
-    if (!group)
-        return 0; // Subtable with independent descriptor
-    return group;
+
+    return static_cast<Group*>(parent);
 }
 
 
@@ -1201,13 +1209,10 @@ size_t Table::get_index_in_group() const noexcept
 {
     if (!m_top.is_attached())
         return realm::npos;                                    // Subtable with shared descriptor
-    Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
+    ArrayParent* parent = m_top.get_parent();                  // ArrayParent guaranteed to be Table::Parent
     if (!parent)
         return realm::npos; // Free-standing table
-    if (!parent->get_parent_group())
-        return realm::npos; // Subtable with independent descriptor
-    size_t index_in_parent = m_top.get_ndx_in_parent();
-    return index_in_parent;
+    return m_top.get_ndx_in_parent();
 }
 
 TableKey Table::get_key() const noexcept
@@ -2017,18 +2022,6 @@ void Table::check_lists_are_empty(size_t) const
     // primary key (by way of set_int_unique() or set_string_unique() or set_null_unique()).
 
     REALM_ASSERT(false); // FIXME: Unimplemented
-}
-
-
-StringData Table::Parent::get_child_name(size_t) const noexcept
-{
-    return StringData("");
-}
-
-
-Group* Table::Parent::get_parent_group() noexcept
-{
-    return nullptr;
 }
 
 void Table::refresh_accessor_tree()

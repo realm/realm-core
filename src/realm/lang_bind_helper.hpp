@@ -177,7 +177,7 @@ inline Table* LangBindHelper::new_table()
     typedef _impl::TableFriend tf;
     Allocator& alloc = Allocator::get_default();
     size_t ref = tf::create_empty_table(alloc); // Throws
-    Table::Parent* parent = nullptr;
+    ArrayParent* parent = nullptr;
     size_t ndx_in_parent = 0;
     Table* table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
     bind_table_ptr(table);

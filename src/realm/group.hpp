@@ -62,7 +62,7 @@ class TransactLogParser;
 ///
 /// \endcode
 ///
-class Group : private Table::Parent {
+class Group : public ArrayParent {
 public:
     /// Construct a free-standing group. This group instance will be
     /// in the attached state, but neither associated with a file, nor
@@ -656,22 +656,6 @@ private:
     // Overriding method in ArrayParent
     ref_type get_child_ref(size_t) const noexcept override;
 
-    // Overriding method in Table::Parent
-    StringData get_child_name(size_t) const noexcept override;
-
-    // Overriding method in Table::Parent
-    void child_accessor_destroyed(Table*) noexcept override;
-
-    // Overriding method in Table::Parent
-    std::recursive_mutex* get_accessor_management_lock() noexcept override
-    {
-        // we don't need locking for group!
-        return nullptr;
-    }
-
-    // Overriding method in Table::Parent
-    Group* get_parent_group() noexcept override;
-
     class TableWriter;
     class DefaultTableWriter;
 
@@ -862,11 +846,6 @@ inline Group::Group(unattached_tag) noexcept
     init_array_parents();
 }
 
-inline Group* Group::get_parent_group() noexcept
-{
-    return this;
-}
-
 inline Group::Group(shared_tag) noexcept
     : m_alloc()
     , // Throws
@@ -1030,16 +1009,6 @@ inline void Group::update_child_ref(size_t child_ndx, ref_type new_ref)
 inline ref_type Group::get_child_ref(size_t child_ndx) const noexcept
 {
     return m_tables.get_as_ref(child_ndx);
-}
-
-inline StringData Group::get_child_name(size_t child_ndx) const noexcept
-{
-    return m_table_names.get(child_ndx);
-}
-
-inline void Group::child_accessor_destroyed(Table*) noexcept
-{
-    // Ignore
 }
 
 inline bool Group::has_cascade_notification_handler() const noexcept
