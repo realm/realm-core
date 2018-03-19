@@ -20,7 +20,7 @@
 #ifdef TEST_ARRAY_FLOAT
 
 #include <realm/array_basic.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 
 #include "test.hpp"
 
@@ -425,8 +425,8 @@ void BasicArray_Find(TestContext& test_context)
     CHECK_EQUAL(4, f.find_first(T(1.1), 1, 5));          // skip first match, end at last match
 
     // Find all
-    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn results(Allocator::get_default(), results_ref);
+    IntegerColumn results(Allocator::get_default());
+    results.create();
     f.find_all(&results, T(1.1), 0);
     CHECK_EQUAL(2, results.size());
     CHECK_EQUAL(0, results.get(0));

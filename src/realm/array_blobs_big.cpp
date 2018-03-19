@@ -19,7 +19,7 @@
 #include <algorithm>
 
 #include <realm/array_blobs_big.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 
 
 using namespace realm;

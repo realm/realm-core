@@ -19,9 +19,6 @@
 #include "testsettings.hpp"
 #ifdef TEST_COLUMN
 
-// TO BE REMOVED
-#define USE_NEW_INTEGER_COLUMN_CLASS
-
 #include <vector>
 #include <algorithm>
 

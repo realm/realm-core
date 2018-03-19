@@ -16,7 +16,6 @@ set(REALM_SOURCES
     bptree.cpp
     bplustree.cpp
     cluster.cpp
-    column.cpp
     column_binary.cpp
     disable_sync_to_disk.cpp
     exceptions.cpp
@@ -84,11 +83,9 @@ set(REALM_INSTALL_GENERAL_HEADERS
     bptree.hpp
     cluster.hpp
     cluster_tree.hpp
-    column.hpp
     column_binary.hpp
     column_integer.hpp
     column_fwd.hpp
-    column_tpl.hpp
     column_type.hpp
     column_type_traits.hpp
     data_type.hpp

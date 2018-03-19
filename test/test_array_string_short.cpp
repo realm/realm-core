@@ -20,7 +20,7 @@
 #ifdef TEST_ARRAY_STRING
 
 #include <realm/array_string_short.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 
 #include "test.hpp"
 
@@ -456,8 +456,8 @@ TEST(ArrayString_Basic)
 
     c.clear();
 
-    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn results(Allocator::get_default(), results_ref);
+    IntegerColumn results(Allocator::get_default());
+    results.create();
 
     // first, middle and end
     c.add("foobar");

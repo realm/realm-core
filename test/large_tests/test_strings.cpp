@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 #include <realm/array_key.hpp>
 
 #include "../util/number_names.hpp"
@@ -85,8 +85,8 @@ TEST_IF(Strings_Monkey2, TEST_DURATION >= 1)
     int seed = 123;
 
     VerifiedString a;
-    ref_type res_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn res(Allocator::get_default(), res_ref);
+    IntegerColumn res(Allocator::get_default());
+    res.create();
 
     Random random(seed);
     int trend = 5;

@@ -159,36 +159,6 @@ size_t VerifiedInteger::size()
     return v.size();
 }
 
-// todo/fixme, end ignored
-void VerifiedInteger::find_all(IntegerColumn& c, int64_t value, size_t start, size_t end)
-{
-    std::vector<int64_t>::iterator ita = v.begin() + start;
-    std::vector<int64_t>::iterator itb =
-        end == size_t(-1) ? v.end() : v.begin() + (end == size_t(-1) ? v.size() : end);
-    ;
-    std::vector<size_t> result;
-    while (ita != itb) {
-        ita = std::find(ita, itb, value);
-        size_t ndx = std::distance(v.begin(), ita);
-        if (ndx < v.size()) {
-            result.push_back(ndx);
-            ita++;
-        }
-    }
-
-    c.clear();
-
-    u.find_all(c, value);
-    if (c.size() != result.size())
-        REALM_ASSERT(false);
-    for (size_t t = 0; t < result.size(); ++t) {
-        if (result[t] != size_t(c.get(t)))
-            REALM_ASSERT(false);
-    }
-
-    return;
-}
-
 bool VerifiedInteger::verify()
 {
     REALM_ASSERT(u.size() == v.size());

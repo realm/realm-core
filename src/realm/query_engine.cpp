@@ -19,6 +19,7 @@
 #include <realm/query_engine.hpp>
 
 #include <realm/query_expression.hpp>
+#include <realm/index_string.hpp>
 #include <realm/db.hpp>
 
 using namespace realm;
