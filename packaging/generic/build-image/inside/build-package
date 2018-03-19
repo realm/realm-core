@@ -38,5 +38,4 @@ ninja
 ninja install
 
 cd /dest
-mv "${name}/lib64" "${name}/lib"
 tar -zcf "/out/${name}.tgz" "${name}"
