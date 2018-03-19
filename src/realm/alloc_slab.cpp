@@ -144,8 +144,13 @@ private:
 
 void SlabAlloc::detach() noexcept
 {
+    delete[] m_fast_mapping_ptr;
+    m_fast_mapping_ptr.store(nullptr);
+    m_fast_mapping_size = 0;
+    purge_old_mappings(static_cast<uint64_t>(-1));
     switch (m_attach_mode) {
         case attach_None:
+            break;
         case attach_UsersBuffer:
             break;
         case attach_OwnedBuffer:
@@ -155,11 +160,7 @@ void SlabAlloc::detach() noexcept
         case attach_UnsharedFile:
             m_data = 0;
             m_mappings.clear();
-            delete[] m_fast_mapping_ptr;
-            m_fast_mapping_ptr.store(nullptr);
-            m_fast_mapping_size = 0;
             m_current_transaction = 0;
-            purge_old_mappings(static_cast<uint64_t>(-1));
             m_file.close();
             break;
         default:
@@ -732,10 +733,6 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             // This assumption obviously will not hold, if the file is shared by multiple
             // processes or threads with different opening modes.
             // Currently, there is no way to detect if this assumption is violated.
-            // We cheat - setting a larger size for the mappings. This means that the mappings
-            // will extend beyond the end of file. But since the file is read-only we will
-            // never try to extend it, and the wrong size won't matter
-            size = round_up_to_page_size(size);
             m_baseline = 0;
             ;
         }

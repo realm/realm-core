@@ -423,10 +423,7 @@ private:
     util::RaceDetector changes;
     std::vector<util::File::Map<char>> m_mappings;
 
-    // FIXME: We'll have to switch away from std::vector to have absolute and
-    // transparent control of when/if members are copied, to ensure thread-safe
-    // operation:
-    uint64_t m_fast_mapping_size = 0;
+    size_t m_fast_mapping_size = 0;
     uint64_t m_mapping_version = 1;
     uint64_t m_current_transaction = 0;
     std::mutex m_mapping_mutex;

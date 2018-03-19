@@ -221,7 +221,7 @@ void Spec::convert_column(size_t column_ndx)
         case type_OldTable: {
             Spec sub_spec(get_alloc());
             size_t subspec_ndx = get_subspec_ndx(column_ndx);
-            ref_type ref = m_subspecs.get(subspec_ndx); // Throws
+            ref_type ref = to_ref(m_subspecs.get(subspec_ndx)); // Throws
             sub_spec.init(ref);
             m_types.set(column_ndx, sub_spec.get_column_type(0));
             m_attr.set(column_ndx, m_attr.get(column_ndx) | col_attr_List);

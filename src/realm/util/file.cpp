@@ -1406,7 +1406,6 @@ bool File::MapBase::extend(const File& f, AccessMode a, size_t new_size)
 {
     if (new_size <= m_size) // trivially OK
         return true;
-    REALM_ASSERT((new_size % page_size()) == 0);
     REALM_ASSERT(new_size <= m_reservation_size);
 
 #if REALM_ENABLE_ENCRYPTION

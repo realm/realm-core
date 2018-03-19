@@ -95,6 +95,7 @@ TEST(Transactions_LargeMappingChange)
                 CHECK_EQUAL((p[k] & 0xFF), (k & 0xFF));
             }
         }
+        delete[] data;
         wt.commit();
     }
     {
