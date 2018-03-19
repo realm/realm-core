@@ -479,8 +479,8 @@ TableVersions ConstTableView::outside_version() const
     if (m_linklist_source) {
         // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
         if (m_linklist_source->is_attached()) {
-            auto table = m_linklist_source->get_table();
-            return {table->get_key(), table->get_content_version()};
+            Table& table = m_linklist_source->get_target_table();
+            return {table.get_key(), table.get_content_version()};
         }
         else {
             return {};

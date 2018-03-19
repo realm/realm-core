@@ -75,13 +75,12 @@ enum Instruction {
     instr_ListSwap = 35,        // Swap two entries within a list
     instr_ListErase = 36,       // Remove an entry from a list
     instr_LinkListNullify = 37, // Remove an entry from a link list due to linked row being erased
-    instr_ListClear = 38,       // Ramove all entries from a list
-    instr_LinkListSetAll = 39,  // Assign to link list entry
-    instr_AddRowWithKey = 40,   // Insert a row with a given key
-    instr_CreateObject = 41,
-    instr_RemoveObject = 42,
-    instr_InsertListColumn = 43, // Insert list column
-    instr_ListInsert = 44,       // Insert list entry
+    instr_ListClear = 38,       // Remove all entries from a list
+    instr_AddRowWithKey = 39,   // Insert a row with a given key
+    instr_CreateObject = 40,
+    instr_RemoveObject = 41,
+    instr_InsertListColumn = 42, // Insert list column
+    instr_ListInsert = 43,       // Insert list entry
 };
 
 class TransactLogStream {
@@ -424,7 +423,6 @@ public:
     bool list_insert_null(size_t ndx, size_t prior_size);
     bool list_set_link(size_t link_ndx, ObjKey value);
     bool list_insert_link(size_t link_ndx, ObjKey value, size_t prior_size);
-    bool link_list_set_all(const IntegerColumn& values);
     bool list_move(size_t from_link_ndx, size_t to_link_ndx);
     bool list_swap(size_t link1_ndx, size_t link2_ndx);
     bool list_erase(size_t list_ndx, size_t prior_size);
@@ -442,9 +440,6 @@ public:
     }
 
 private:
-    using IntegerList = std::tuple<IntegerColumnIterator, IntegerColumnIterator>;
-    using UnsignedList = std::tuple<const size_t*, const size_t*>;
-
     // Make sure this is in agreement with the actual integer encoding
     // scheme (see encode_int()).
     static constexpr int max_enc_bytes_per_int = 10;
@@ -542,7 +537,6 @@ public:
                                Instruction variant = instr_Set);
     virtual void set_link(const Table*, ColKey col_key, ObjKey key, ObjKey value, Instruction variant = instr_Set);
     virtual void set_null(const Table*, ColKey col_key, ObjKey key, Instruction variant = instr_Set);
-    virtual void set_link_list(const LinkList&, const IntegerColumn& values);
     virtual void insert_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, StringData);
     virtual void erase_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, size_t size);
 
@@ -936,40 +930,6 @@ inline char* TransactLogEncoder::encode<StringData>(char* ptr, StringData s)
     return std::copy_n(s.data(), s.size(), ptr);
 }
 
-template <>
-inline char* TransactLogEncoder::encode<TransactLogEncoder::IntegerList>(char* ptr,
-                                                                         TransactLogEncoder::IntegerList list)
-{
-    IntegerColumnIterator i = std::get<0>(list);
-    IntegerColumnIterator end = std::get<1>(list);
-
-    while (end - i > max_numbers_per_chunk) {
-        for (int j = 0; j < max_numbers_per_chunk; ++j)
-            ptr = encode_int(ptr, *i++);
-        advance(ptr);
-        size_t max_required_bytes_2 = max_enc_bytes_per_num * max_numbers_per_chunk;
-        ptr = reserve(max_required_bytes_2); // Throws
-    }
-
-    while (i != end)
-        ptr = encode_int(ptr, *i++);
-
-    return ptr;
-}
-
-template <>
-inline char* TransactLogEncoder::encode<TransactLogEncoder::UnsignedList>(char* ptr,
-                                                                          TransactLogEncoder::UnsignedList list)
-{
-    const size_t* i = std::get<0>(list);
-    const size_t* end = std::get<1>(list);
-
-    while (i != end)
-        ptr = encode_int(ptr, *i++);
-
-    return ptr;
-}
-
 template <class T>
 size_t TransactLogEncoder::max_size(T)
 {
@@ -1004,22 +964,6 @@ template <>
 inline size_t TransactLogEncoder::max_size(StringData s)
 {
     return max_enc_bytes_per_num + s.size();
-}
-
-template <>
-inline size_t TransactLogEncoder::max_size<TransactLogEncoder::IntegerList>(IntegerList)
-{
-    // We only allocate space for 'max_numbers_per_chunk' at a time
-    return max_enc_bytes_per_num * max_numbers_per_chunk;
-}
-
-template <>
-inline size_t TransactLogEncoder::max_size<TransactLogEncoder::UnsignedList>(UnsignedList list)
-{
-    const size_t* begin = std::get<0>(list);
-    const size_t* end = std::get<1>(list);
-    // list contains (end - begin) elements
-    return max_enc_bytes_per_num * (end - begin);
 }
 
 template <class... L>
@@ -1710,21 +1654,6 @@ inline void TransactLogConvenientEncoder::link_list_nullify(const LinkList& list
     m_encoder.link_list_nullify(link_ndx, prior_size); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_set_all(const IntegerColumn& values)
-{
-    size_t num_values = values.size();
-    append_simple_instr(
-        instr_LinkListSetAll, num_values,
-        std::make_tuple(IntegerColumnIterator(&values, 0), IntegerColumnIterator(&values, num_values))); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::set_link_list(const LinkList& list, const IntegerColumn& values)
-{
-    select_list(list);                   // Throws
-    m_encoder.link_list_set_all(values); // Throws
-}
-
 inline bool TransactLogEncoder::list_move(size_t from_link_ndx, size_t to_link_ndx)
 {
     REALM_ASSERT(from_link_ndx != to_link_ndx);
@@ -2108,16 +2037,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 default:
                     parser_error();
                     break;
-            }
-            return;
-        }
-        case instr_LinkListSetAll: {
-            // todo, log that it's a SetAll we're doing
-            size_t size = read_int<size_t>(); // Throws
-            for (size_t i = 0; i < size; i++) {
-                ObjKey key = ObjKey(read_int<int64_t>()); // Throws
-                if (!handler.list_set_link(i, key))       // Throws
-                    parser_error();
             }
             return;
         }
