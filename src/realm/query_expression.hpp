@@ -1735,11 +1735,6 @@ public:
         m_only_unary_links = other.m_only_unary_links;
     }
 
-    LinkMap(LinkMap const& other, QueryNodeHandoverPatches*)
-        : LinkMap(other)
-    {
-    }
-
     size_t get_nb_hops() const
     {
         return m_link_column_keys.size();
@@ -1965,20 +1960,15 @@ public:
         return desc;
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches = nullptr) const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const override
     {
-        return make_subexpr<Columns<T>>(static_cast<const Columns<T>&>(*this), patches);
-    }
-
-    SimpleQuerySupport(SimpleQuerySupport const& other, QueryNodeHandoverPatches* patches)
-        : Subexpr2<T>(other)
-        , m_link_map(other.m_link_map, patches)
-        , m_column_key(other.m_column_key)
-    {
+        return make_subexpr<Columns<T>>(static_cast<const Columns<T>&>(*this));
     }
 
     SimpleQuerySupport(SimpleQuerySupport const& other)
-        : SimpleQuerySupport(other, nullptr)
+        : Subexpr2<T>(other)
+        , m_link_map(other.m_link_map)
+        , m_column_key(other.m_column_key)
     {
     }
 
@@ -2026,8 +2016,8 @@ public:
     {
     }
 
-    Columns(Columns const& other, QueryNodeHandoverPatches* patches = nullptr)
-        : SimpleQuerySupport(other, patches)
+    Columns(Columns const& other)
+        : SimpleQuerySupport(other)
     {
     }
 
@@ -2172,15 +2162,15 @@ public:
         return m_link_map.description() + (has_links ? " != NULL" : " == NULL");
     }
 
-    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const override
     {
-        return std::unique_ptr<Expression>(new UnaryLinkCompare(*this, patches));
+        return std::unique_ptr<Expression>(new UnaryLinkCompare(*this));
     }
 
 private:
-    UnaryLinkCompare(const UnaryLinkCompare& other, QueryNodeHandoverPatches* patches = nullptr)
+    UnaryLinkCompare(const UnaryLinkCompare& other)
         : Expression(other)
-        , m_link_map(other.m_link_map, patches)
+        , m_link_map(other.m_link_map)
     {
     }
 
@@ -2193,15 +2183,15 @@ public:
         : m_link_map(std::move(link_map))
     {
     }
-    LinkCount(LinkCount const& other, QueryNodeHandoverPatches* patches)
+    LinkCount(LinkCount const& other)
         : Subexpr2<Int>(other)
-        , m_link_map(other.m_link_map, patches)
+        , m_link_map(other.m_link_map)
     {
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
-        return make_subexpr<LinkCount>(*this, patches);
+        return make_subexpr<LinkCount>(*this);
     }
 
     const Table* get_base_table() const override
@@ -2367,6 +2357,12 @@ class SubColumns;
 template <>
 class Columns<Link> : public Subexpr2<Link> {
 public:
+    Columns(const Columns& other)
+        : Subexpr2<Link>(other)
+        , m_link_map(other.m_link_map)
+    {
+    }
+
     Query is_null()
     {
         if (m_link_map.get_nb_hops() > 1)
@@ -2425,9 +2421,9 @@ public:
         return m_link_map.description();
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
-        return std::unique_ptr<Subexpr>(new Columns<Link>(*this, patches));
+        return std::unique_ptr<Subexpr>(new Columns<Link>(*this));
     }
 
     void evaluate(size_t index, ValueBase& destination) override;
@@ -2441,11 +2437,6 @@ private:
         : m_link_map(table, links)
     {
         static_cast<void>(column_key);
-    }
-    Columns(const Columns& other, QueryNodeHandoverPatches* patches)
-        : Subexpr2<Link>(other)
-        , m_link_map(other.m_link_map, patches)
-    {
     }
 };
 
@@ -2472,14 +2463,9 @@ public:
     {
     }
 
-    ColumnListBase(const ColumnListBase& other, QueryNodeHandoverPatches* patches)
-        : m_column_key(other.m_column_key)
-        , m_link_map(other.m_link_map, patches)
-    {
-    }
-
     ColumnListBase(const ColumnListBase& other)
-        : ColumnListBase(other, nullptr)
+        : m_column_key(other.m_column_key)
+        , m_link_map(other.m_link_map)
     {
     }
 
@@ -2508,21 +2494,15 @@ class ColumnListSize;
 template <typename T>
 class Columns<List<T>> : public Subexpr2<T>, public ColumnListBase {
 public:
-    Columns(const Columns<List<T>>& other, QueryNodeHandoverPatches* patches)
-        : Subexpr2<T>(other)
-        , ColumnListBase(other, patches)
-    {
-    }
-
     Columns(const Columns<List<T>>& other)
         : Subexpr2<T>(other)
         , ColumnListBase(other)
     {
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
-        return make_subexpr<Columns<List<T>>>(*this, patches);
+        return make_subexpr<Columns<List<T>>>(*this);
     }
 
     const Table* get_base_table() const override
@@ -2672,15 +2652,15 @@ public:
     {
     }
 
-    ListColumnAggregate(const ListColumnAggregate& other, QueryNodeHandoverPatches* patches)
+    ListColumnAggregate(const ListColumnAggregate& other)
         : m_column_key(other.m_column_key)
-        , m_list(other.m_list, patches)
+        , m_list(other.m_list)
     {
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
-        return make_subexpr<ListColumnAggregate>(*this, patches);
+        return make_subexpr<ListColumnAggregate>(*this);
     }
 
     const Table* get_base_table() const override
@@ -2835,8 +2815,8 @@ public:
     {
     }
 
-    Columns(const Columns& other, QueryNodeHandoverPatches* patches = nullptr)
-        : m_link_map(other.m_link_map, patches)
+    Columns(const Columns& other)
+        : m_link_map(other.m_link_map)
         , m_column_key(other.m_column_key)
         , m_nullable(other.m_nullable)
     {
@@ -2852,9 +2832,9 @@ public:
         return *this;
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
-        return make_subexpr<Columns<T>>(*this, patches);
+        return make_subexpr<Columns<T>>(*this);
     }
 
     // See comment in base class
@@ -3102,15 +3082,15 @@ public:
         , m_link_map(std::move(link_map))
     {
     }
-    SubColumnAggregate(SubColumnAggregate const& other, QueryNodeHandoverPatches* patches)
-        : m_column(other.m_column, patches)
-        , m_link_map(other.m_link_map, patches)
+    SubColumnAggregate(SubColumnAggregate const& other)
+        : m_column(other.m_column)
+        , m_link_map(other.m_link_map)
     {
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
-        return make_subexpr<SubColumnAggregate>(*this, patches);
+        return make_subexpr<SubColumnAggregate>(*this);
     }
 
     const Table* get_base_table() const override
@@ -3242,7 +3222,7 @@ public:
 
 private:
     SubQueryCount(const SubQueryCount& other, QueryNodeHandoverPatches* patches)
-        : m_link_map(other.m_link_map, patches)
+        : m_link_map(other.m_link_map)
     {
         std::unique_ptr<SubQueryCountHandoverPatch> patch(new SubQueryCountHandoverPatch);
         m_query = Query(other.m_query, patch->m_query, ConstSourcePayload::Copy);
