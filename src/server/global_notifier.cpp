@@ -316,6 +316,7 @@ std::unordered_map<std::string, CollectionChangeSet> const& GlobalNotifier::Chan
     config.path = m_config.path;
     config.cache = false;
     config.force_sync_history = true;
+    config.automatic_change_notifications = false;
 
     auto realm = Realm::get_shared_realm(config);
 
