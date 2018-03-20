@@ -10,7 +10,8 @@
 
 ### Enhancements
 
-* None.
+* Reduced the number of files opened when the async commit daemon is not used.
+  PR [#3022](https://github.com/realm/realm-core/pull/3022).
 
 -----------
 
