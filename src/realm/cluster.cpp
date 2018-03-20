@@ -663,7 +663,12 @@ void Cluster::create(int)
                 do_create<ArrayDouble>(col_ndx);
                 break;
             case col_type_String:
-                do_create<ArrayString>(col_ndx);
+                if (m_tree_top.get_spec().is_string_enum_type(col_ndx)) {
+                    do_create<ArrayInteger>(col_ndx);
+                }
+                else {
+                    do_create<ArrayString>(col_ndx);
+                }
                 break;
             case col_type_Binary:
                 do_create<ArrayBinary>(col_ndx);

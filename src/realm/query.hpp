@@ -182,6 +182,7 @@ public:
 
     // Conditions: bool
     Query& equal(ColKey column_key, bool value);
+    Query& not_equal(ColKey column_key, bool value);
 
     // Conditions: strings
     Query& equal(ColKey column_key, StringData value, bool case_sensitive = true);

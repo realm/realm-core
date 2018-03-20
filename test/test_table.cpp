@@ -87,29 +87,6 @@ using unit_test::TestContext;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-namespace {
-
-class TestTable01 : public realm::Table {
-public:
-    TestTable01(Allocator& a)
-        : Table(a)
-    {
-        init();
-    }
-    TestTable01()
-    {
-        init();
-    }
-    void init()
-    {
-        add_column(type_Int, "first");
-        add_column(type_Int, "second");
-        add_column(type_Bool, "third");
-        add_column(type_Int, "fourth");
-    }
-};
-
-} // anonymous namespace
 
 #ifdef JAVA_MANY_COLUMNS_CRASH
 
@@ -510,7 +487,6 @@ TEST(TableView_AggregateBugs)
 }
 
 
-#ifdef LEGACY_TESTS
 TEST(Table_AggregateFuzz)
 {
     // Tests sum, avg, min, max on Table, TableView, Query, for types float, Timestamp, int
@@ -568,38 +544,38 @@ TEST(Table_AggregateFuzz)
         {
             // Table::max
             key = 123;
-            f = table->maximum_float(2, &key);
+            f = table->maximum_float(float_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(largest_pos).get<float>(float_col));
 
             key = 123;
-            i = table->maximum_int(1, &key);
+            i = table->maximum_int(int_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
 
             key = 123;
-            ts = table->maximum_timestamp(0, &key);
+            ts = table->maximum_timestamp(date_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(largest_pos).get<Timestamp>(date_col));
 
             // Table::min
             key = 123;
-            f = table->minimum_float(2, &key);
+            f = table->minimum_float(float_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(smallest_pos).get<float>(float_col));
 
             key = 123;
-            i = table->minimum_int(1, &key);
+            i = table->minimum_int(int_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
 
             key = 123;
-            ts = table->minimum_timestamp(0, &key);
+            ts = table->minimum_timestamp(date_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(smallest_pos).get<Timestamp>(date_col));
@@ -611,22 +587,22 @@ TEST(Table_AggregateFuzz)
             cnt = 123;
 
             // Table::avg
-            d = table->average_float(2, &cnt);
+            d = table->average_float(float_col, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
                 CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
 
             cnt = 123;
-            d = table->average_int(1, &cnt);
+            d = table->average_int(int_col, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
                 CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
 
             // Table::sum
-            d = table->sum_float(2);
+            d = table->sum_float(float_col);
             CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
 
-            i = table->sum_int(1);
+            i = table->sum_int(int_col);
             CHECK_EQUAL(i, sum);
         }
 
@@ -634,38 +610,38 @@ TEST(Table_AggregateFuzz)
         {
             // TableView::max
             key = 123;
-            f = table->where().find_all().maximum_float(2, &key);
+            f = table->where().find_all().maximum_float(float_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(largest_pos).get<float>(float_col));
 
             key = 123;
-            i = table->where().find_all().maximum_int(1, &key);
+            i = table->where().find_all().maximum_int(int_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
 
             key = 123;
-            ts = table->where().find_all().maximum_timestamp(0, &key);
+            ts = table->where().find_all().maximum_timestamp(date_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(largest_pos).get<Timestamp>(date_col));
 
             // TableView::min
             key = 123;
-            f = table->where().find_all().minimum_float(2, &key);
+            f = table->where().find_all().minimum_float(float_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(smallest_pos).get<float>(float_col));
 
             key = 123;
-            i = table->where().find_all().minimum_int(1, &key);
+            i = table->where().find_all().minimum_int(int_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
 
             key = 123;
-            ts = table->where().find_all().minimum_timestamp(0, &key);
+            ts = table->where().find_all().minimum_timestamp(date_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(smallest_pos).get<Timestamp>(date_col));
@@ -677,22 +653,22 @@ TEST(Table_AggregateFuzz)
             key = 123;
 
             // TableView::avg
-            d = table->where().find_all().average_float(2, &cnt);
+            d = table->where().find_all().average_float(float_col, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
                 CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
 
             cnt = 123;
-            d = table->where().find_all().average_int(1, &cnt);
+            d = table->where().find_all().average_int(int_col, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
                 CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
 
             // TableView::sum
-            d = table->where().find_all().sum_float(2);
+            d = table->where().find_all().sum_float(float_col);
             CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
 
-            i = table->where().find_all().sum_int(1);
+            i = table->where().find_all().sum_int(int_col);
             CHECK_EQUAL(i, sum);
 
         }
@@ -701,40 +677,40 @@ TEST(Table_AggregateFuzz)
         {
             // TableView::max
             key = 123;
-            f = table->where().maximum_float(2, &key);
+            f = table->where().maximum_float(float_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(largest_pos).get<float>(float_col));
 
             key = 123;
-            i = table->where().maximum_int(1, &key);
+            i = table->where().maximum_int(int_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
 
             key = 123;
             // Note: Method arguments different from metholds on other column types
-            ts = table->where().maximum_timestamp(0, &key);
+            ts = table->where().maximum_timestamp(date_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(largest_pos).get<Timestamp>(date_col));
 
             // TableView::min
             key = 123;
-            f = table->where().minimum_float(2, &key);
+            f = table->where().minimum_float(float_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(smallest_pos).get<float>(float_col));
 
             key = 123;
-            i = table->where().minimum_int(1, &key);
+            i = table->where().minimum_int(int_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
 
             key = 123;
             // Note: Method arguments different from metholds on other column types
-            ts = table->where().minimum_timestamp(0, &key);
+            ts = table->where().minimum_timestamp(date_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(smallest_pos).get<Timestamp>(date_col));
@@ -746,27 +722,26 @@ TEST(Table_AggregateFuzz)
             cnt = 123;
 
             // TableView::avg
-            d = table->where().average_float(2, &cnt);
+            d = table->where().average_float(float_col, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
                 CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
 
             cnt = 123;
-            d = table->where().average_int(1, &cnt);
+            d = table->where().average_int(int_col, &cnt);
             CHECK_EQUAL(cnt, (rows - nulls));
             if (cnt != 0)
                 CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
 
             // TableView::sum
-            d = table->where().sum_float(2);
+            d = table->where().sum_float(float_col);
             CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
 
-            i = table->where().sum_int(1);
+            i = table->where().sum_int(int_col);
             CHECK_EQUAL(i, sum);
         }
     }
 }
-#endif
 
 TEST(Table_ColumnNameTooLong)
 {
@@ -787,64 +762,24 @@ TEST(Table_ColumnNameTooLong)
     table->add_column_link(type_Link, StringData(buf, buf_size - 1), *table);
 }
 
-#ifdef LEGACY_TESTS
 TEST(Table_StringOrBinaryTooBig)
 {
     Table table;
-    table.add_column(type_String, "s");
-    table.add_column(type_Binary, "b");
-    table.add_column(type_Mixed, "m1");
-    table.add_column(type_Mixed, "m2");
-    table.add_empty_row();
+    auto col_string = table.add_column(type_String, "s");
+    auto col_binary = table.add_column(type_Binary, "b");
+    Obj obj = table.create_object();
 
-    table.set_string(0, 0, "01234567");
+    obj.set(col_string, "01234567");
 
     size_t large_bin_size = 0xFFFFF1;
     size_t large_str_size = 0xFFFFF0; // null-terminate reduces max size by 1
     std::unique_ptr<char[]> large_buf(new char[large_bin_size]);
-    CHECK_LOGIC_ERROR(table.set_string(0, 0, StringData(large_buf.get(), large_str_size)),
-                      LogicError::string_too_big);
-    CHECK_LOGIC_ERROR(table.set_binary(1, 0, BinaryData(large_buf.get(), large_bin_size)),
-                      LogicError::binary_too_big);
-    CHECK_LOGIC_ERROR(table.set_mixed(2, 0, Mixed(StringData(large_buf.get(), large_str_size))),
-                      LogicError::string_too_big);
-    CHECK_LOGIC_ERROR(table.set_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_bin_size))),
-                      LogicError::binary_too_big);
-    table.set_string(0, 0, StringData(large_buf.get(), large_str_size - 1));
-    table.set_binary(1, 0, BinaryData(large_buf.get(), large_bin_size - 1));
-    table.set_mixed(2, 0, Mixed(StringData(large_buf.get(), large_str_size - 1)));
-    table.set_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_bin_size - 1)));
-    table.set_binary_big(1, 0, BinaryData(large_buf.get(), large_bin_size));
-    size_t pos = 0;
-    table.get_binary_at(1, 0, pos);
-    CHECK_EQUAL(pos, 0xFFFFF0);
-    table.get_binary_at(1, 0, pos);
-    CHECK_EQUAL(pos, 0);
+    CHECK_LOGIC_ERROR(obj.set(col_string, StringData(large_buf.get(), large_str_size)), LogicError::string_too_big);
+    CHECK_LOGIC_ERROR(obj.set(col_binary, BinaryData(large_buf.get(), large_bin_size)), LogicError::binary_too_big);
+    obj.set(col_string, StringData(large_buf.get(), large_str_size - 1));
+    obj.set(col_binary, BinaryData(large_buf.get(), large_bin_size - 1));
 }
 
-
-TEST(Table_SetBinaryLogicErrors)
-{
-    Group group;
-    TableRef table = group.add_table("table");
-    table->add_column(type_Binary, "a");
-    table->add_column(type_Int, "b");
-    table->add_empty_row();
-
-    BinaryData bd;
-    CHECK_LOGIC_ERROR(table->set_binary(2, 0, bd), LogicError::column_index_out_of_range);
-    CHECK_LOGIC_ERROR(table->set_binary(0, 1, bd), LogicError::row_index_out_of_range);
-    CHECK_LOGIC_ERROR(table->set_null(0, 0), LogicError::column_not_nullable);
-
-    // FIXME: Must also check that Logic::type_mismatch is thrown on column type mismatch, but Table::set_binary()
-    // does not properly check it yet.
-
-    group.remove_table("table");
-    CHECK_LOGIC_ERROR(table->set_binary(0, 0, bd), LogicError::detached_accessor);
-
-    // Logic error LogicError::binary_too_big checked in Table_StringOrBinaryTooBig
-}
-#endif
 
 TEST(Table_Floats)
 {
@@ -1089,118 +1024,6 @@ TEST(Table_MoveAllTypes)
     }
 }
 
-
-#ifdef LEGACY_TESTS
-
-// enable to generate testfiles for to_string below
-#define GENERATE 0
-
-TEST(Table_ToString)
-{
-    Table table;
-    setup_multi_table(table, 15, 6);
-
-    std::stringstream ss;
-    table.to_string(ss);
-    const std::string result = ss.str();
-    std::string file_name = get_test_resource_path();
-    file_name += "expect_string.txt";
-#if GENERATE // enable to generate testfile - check it manually
-    std::ofstream test_file(file_name.c_str(), std::ios::out);
-    test_file << result;
-    std::cerr << "to_string() test:\n" << result << std::endl;
-#else
-    std::ifstream test_file(file_name.c_str(), std::ios::in);
-    CHECK(!test_file.fail());
-    std::string expected;
-    expected.assign(std::istreambuf_iterator<char>(test_file), std::istreambuf_iterator<char>());
-    bool test_ok = test_util::equal_without_cr(result, expected);
-    CHECK_EQUAL(true, test_ok);
-    if (!test_ok) {
-        TEST_PATH(path);
-        File out(path, File::mode_Write);
-        out.write(result);
-        std::cerr << "\n error result in '" << std::string(path) << "'\n";
-    }
-#endif
-}
-
-/* DISABLED BECAUSE IT FAILS - A PULL REQUEST WILL BE MADE WHERE IT IS REENABLED!
-TEST(Table_RowToString)
-{
-    // Create table with all column types
-    Table table;
-    setup_multi_table(table, 2, 2);
-
-    std::stringstream ss;
-    table.row_to_string(1, ss);
-    const std::string row_str = ss.str();
-#if 0
-    std::ofstream test_file("row_to_string.txt", ios::out);
-    test_file << row_str;
-#endif
-
-    std::string expected = "    int   bool                 date           float          double   string
-string_long  string_enum     binary  mixed  tables\n"
-                      "1:   -1   true  1970-01-01 03:25:45  -1.234560e+002  -9.876543e+003  string1  string1 very long
-st...  enum2          7 bytes     -1     [3]\n";
-    bool test_ok = test_util::equal_without_cr(row_str, expected);
-    CHECK_EQUAL(true, test_ok);
-    if (!test_ok) {
-        std::cerr << "row_to_string() failed\n"
-             << "Expected: " << expected << "\n"
-             << "Got     : " << row_str << std::endl;
-    }
-}
-
-
-TEST(Table_FindInt)
-{
-    TestTable01 table;
-
-    for (int i = 1000; i >= 0; --i) {
-        add(table, 0, i, true, Wed);
-    }
-
-    CHECK_EQUAL(size_t(0),    table.column().second.find_first(1000));
-    CHECK_EQUAL(size_t(1000), table.column().second.find_first(0));
-    CHECK_EQUAL(size_t(-1),   table.column().second.find_first(1001));
-
-#ifdef REALM_DEBUG
-    table.verify();
-#endif
-}
-*/
-
-
-/*
-TEST(Table_6)
-{
-    TestTableEnum table;
-
-    RLM_QUERY(TestQuery, TestTableEnum) {
-    //  first.between(Mon, Thu);
-        second == "Hello" || (second == "Hey" && first == Mon);
-    }};
-
-    RLM_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
-        static_cast<void>(b);
-        static_cast<void>(a);
-        //first.between(a, b);
-        second == str || second.MatchRegEx(".*");
-    }};
-
-    //TestTableEnum result = table.find_all(TestQuery2(Mon, Tue, "Hello")).sort().Limit(10);
-    //size_t result2 = table.Range(10, 200).find_first(TestQuery());
-    //CHECK_EQUAL((size_t)-1, result2);
-
-#ifdef REALM_DEBUG
-    table.verify();
-#endif
-}
-*/
-#endif
-
 TEST(Table_FindAllInt)
 {
     Table table;
@@ -1310,12 +1133,11 @@ TEST(Table_Sorted_Query_where)
 #endif
 }
 
-#ifdef LEGACY_TESTS
 TEST(Table_Multi_Sort)
 {
     Table table;
-    table.add_column(type_Int, "first");
-    table.add_column(type_Int, "second");
+    auto col_int0 = table.add_column(type_Int, "first");
+    auto col_int1 = table.add_column(type_Int, "second");
 
     table.create_object(ObjKey(0)).set_all(1, 10);
     table.create_object(ObjKey(1)).set_all(2, 10);
@@ -1323,7 +1145,7 @@ TEST(Table_Multi_Sort)
     table.create_object(ObjKey(3)).set_all(2, 14);
     table.create_object(ObjKey(4)).set_all(1, 14);
 
-    std::vector<std::vector<size_t>> col_ndx1 = {{0}, {1}};
+    std::vector<std::vector<ColKey>> col_ndx1 = {{col_int0}, {col_int1}};
     std::vector<bool> asc = {true, true};
 
     // (0, 10); (1, 10); (1, 14); (2, 10); (2; 14)
@@ -1335,7 +1157,7 @@ TEST(Table_Multi_Sort)
     CHECK_EQUAL(ObjKey(1), v_sorted1.get_key(3));
     CHECK_EQUAL(ObjKey(3), v_sorted1.get_key(4));
 
-    std::vector<std::vector<size_t>> col_ndx2 = {{1}, {0}};
+    std::vector<std::vector<ColKey>> col_ndx2 = {{col_int1}, {col_int0}};
 
     // (0, 10); (1, 10); (2, 10); (1, 14); (2, 14)
     TableView v_sorted2 = table.get_sorted_view(SortDescriptor{table, col_ndx2, asc});
@@ -1346,7 +1168,6 @@ TEST(Table_Multi_Sort)
     CHECK_EQUAL(ObjKey(4), v_sorted2.get_key(3));
     CHECK_EQUAL(ObjKey(3), v_sorted2.get_key(4));
 }
-#endif
 
 TEST(Table_IndexString)
 {
@@ -2232,23 +2053,21 @@ TEST(Table_EmptyMinmax)
     CHECK(max_ts.is_null());
 }
 
-#ifdef LEGACY_TESTS
 TEST(Table_EnumStringInsertEmptyRow)
 {
     Table table;
-    table.add_column(type_String, "");
-    table.add_empty_row(128);
+    auto col_str = table.add_column(type_String, "strings");
     for (int i = 0; i < 128; ++i)
-        table.set_string(0, i, "foo");
-    DescriptorRef desc = table.get_descriptor();
-    CHECK_EQUAL(0, desc->get_num_unique_values(0));
-    table.optimize();
+        table.create_object().set(col_str, "foo");
+
+    CHECK_EQUAL(0, table.get_num_unique_values(col_str));
+    table.enumerate_string_column(col_str);
     // Make sure we now have an enumerated strings column
-    CHECK_EQUAL(1, desc->get_num_unique_values(0));
-    table.add_empty_row();
-    CHECK_EQUAL("", table.get_string(0, 128));
+    CHECK_EQUAL(1, table.get_num_unique_values(col_str));
+    Obj obj = table.create_object();
+    CHECK_EQUAL("", obj.get<String>(col_str));
+    CHECK_EQUAL(2, table.get_num_unique_values(col_str));
 }
-#endif // LEGACY_TESTS
 
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
@@ -2342,297 +2161,190 @@ TEST(Table_NullableChecks)
 }
 
 
-#ifdef LEGACY_TESTS
 TEST(Table_Nulls)
 {
     // 'round' lets us run this entire test both with and without index and with/without optimize/enum
     for (size_t round = 0; round < 5; round++) {
         Table t;
         TableView tv;
-        t.add_column(type_String, "str", true /*nullable*/);
+        auto col_str = t.add_column(type_String, "str", true /*nullable*/);
 
         if (round == 1)
-            t.add_search_index(0);
+            t.add_search_index(col_str);
         else if (round == 2)
-            t.optimize(true);
+            t.enumerate_string_column(col_str);
         else if (round == 3) {
-            t.add_search_index(0);
-            t.optimize(true);
+            t.add_search_index(col_str);
+            t.enumerate_string_column(col_str);
         }
         else if (round == 4) {
-            t.optimize(true);
-            t.add_search_index(0);
+            t.enumerate_string_column(col_str);
+            t.add_search_index(col_str);
         }
 
-        t.add_empty_row(3);
-        t.set_string(0, 0, "foo"); // short strings
-        t.set_string(0, 1, "");
-        t.set_string(0, 2, realm::null());
+        std::vector<ObjKey> keys;
+        t.create_objects(3, keys);
+        t.get_object(keys[0]).set(col_str, "foo"); // short strings
+        t.get_object(keys[1]).set(col_str, "");
+        t.get_object(keys[2]).set(col_str, StringData()); // null
 
-        CHECK_EQUAL(1, t.count_string(0, "foo"));
-        CHECK_EQUAL(1, t.count_string(0, ""));
-        CHECK_EQUAL(1, t.count_string(0, realm::null()));
+        CHECK_EQUAL(1, t.count_string(col_str, "foo"));
+        CHECK_EQUAL(1, t.count_string(col_str, ""));
+        CHECK_EQUAL(1, t.count_string(col_str, realm::null()));
 
-        CHECK_EQUAL(0, t.find_first_string(0, "foo"));
-        CHECK_EQUAL(1, t.find_first_string(0, ""));
-        CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
+        CHECK_EQUAL(keys[0], t.find_first_string(col_str, "foo"));
+        CHECK_EQUAL(keys[1], t.find_first_string(col_str, ""));
+        CHECK_EQUAL(keys[2], t.find_first_string(col_str, realm::null()));
 
-        tv = t.find_all_string(0, "foo");
+        tv = t.find_all_string(col_str, "foo");
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(0, tv.get_source_ndx(0));
-        tv = t.find_all_string(0, "");
+        CHECK_EQUAL(keys[0], tv.get_key(0));
+        tv = t.find_all_string(col_str, "");
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(1, tv.get_source_ndx(0));
-        tv = t.find_all_string(0, realm::null());
+        CHECK_EQUAL(keys[1], tv.get_key(0));
+        tv = t.find_all_string(col_str, realm::null());
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(2, tv.get_source_ndx(0));
+        CHECK_EQUAL(keys[2], tv.get_key(0));
 
-        t.set_string(0, 0, "xxxxxxxxxxYYYYYYYYYY"); // medium strings (< 64)
+        const char* string_medium = "xxxxxxxxxxYYYYYYYYYY";
+        t.get_object(keys[0]).set(col_str, string_medium); // medium strings (< 64)
 
-        CHECK_EQUAL(1, t.count_string(0, "xxxxxxxxxxYYYYYYYYYY"));
-        CHECK_EQUAL(1, t.count_string(0, ""));
-        CHECK_EQUAL(1, t.count_string(0, realm::null()));
+        CHECK_EQUAL(1, t.count_string(col_str, string_medium));
+        CHECK_EQUAL(1, t.count_string(col_str, ""));
+        CHECK_EQUAL(1, t.count_string(col_str, realm::null()));
 
-        CHECK_EQUAL(0, t.find_first_string(0, "xxxxxxxxxxYYYYYYYYYY"));
-        CHECK_EQUAL(1, t.find_first_string(0, ""));
-        CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
+        CHECK_EQUAL(keys[0], t.find_first_string(col_str, string_medium));
+        CHECK_EQUAL(keys[1], t.find_first_string(col_str, ""));
+        CHECK_EQUAL(keys[2], t.find_first_string(col_str, realm::null()));
 
-        tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYY");
+        tv = t.find_all_string(col_str, string_medium);
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(0, tv.get_source_ndx(0));
-        tv = t.find_all_string(0, "");
+        CHECK_EQUAL(keys[0], tv.get_key(0));
+        tv = t.find_all_string(col_str, "");
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(1, tv.get_source_ndx(0));
-        tv = t.find_all_string(0, realm::null());
+        CHECK_EQUAL(keys[1], tv.get_key(0));
+        tv = t.find_all_string(col_str, realm::null());
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(2, tv.get_source_ndx(0));
+        CHECK_EQUAL(keys[2], tv.get_key(0));
 
 
         // long strings (>= 64)
-        t.set_string(0, 0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx");
+        const char* string_long = "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx";
+        t.get_object(keys[0]).set(col_str, string_long);
 
-        CHECK_EQUAL(1, t.count_string(0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
-        CHECK_EQUAL(1, t.count_string(0, ""));
-        CHECK_EQUAL(1, t.count_string(0, realm::null()));
+        CHECK_EQUAL(1, t.count_string(col_str, string_long));
+        CHECK_EQUAL(1, t.count_string(col_str, ""));
+        CHECK_EQUAL(1, t.count_string(col_str, realm::null()));
 
-        CHECK_EQUAL(0,
-                    t.find_first_string(0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
-        CHECK_EQUAL(1, t.find_first_string(0, ""));
-        CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
+        CHECK_EQUAL(keys[0], t.find_first_string(col_str, string_long));
+        CHECK_EQUAL(keys[1], t.find_first_string(col_str, ""));
+        CHECK_EQUAL(keys[2], t.find_first_string(col_str, realm::null()));
 
-        tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx");
+        tv = t.find_all_string(col_str, string_long);
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(0, tv.get_source_ndx(0));
-        tv = t.find_all_string(0, "");
+        CHECK_EQUAL(keys[0], tv.get_key(0));
+        tv = t.find_all_string(col_str, "");
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(1, tv.get_source_ndx(0));
-        tv = t.find_all_string(0, realm::null());
+        CHECK_EQUAL(keys[1], tv.get_key(0));
+        tv = t.find_all_string(col_str, realm::null());
         CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(2, tv.get_source_ndx(0));
+        CHECK_EQUAL(keys[2], tv.get_key(0));
     }
 
     {
         Table t;
-        t.add_column(type_Int, "int", true);          // nullable = true
-        t.add_column(type_Bool, "bool", true);        // nullable = true
-        t.add_column(type_OldDateTime, "bool", true); // nullable = true
+        auto col_int = t.add_column(type_Int, "int", true);         // nullable = true
+        auto col_bool = t.add_column(type_Bool, "bool", true);      // nullable = true
+        auto col_date = t.add_column(type_Timestamp, "date", true); // nullable = true
 
-        t.add_empty_row(2);
+        Obj obj0 = t.create_object();
+        Obj obj1 = t.create_object();
+        ObjKey k0 = obj0.get_key();
+        ObjKey k1 = obj1.get_key();
 
-        t.set_int(0, 0, 65);
-        t.set_bool(1, 0, false);
-        t.set_olddatetime(2, 0, OldDateTime(3));
+        obj0.set(col_int, 65);
+        obj0.set(col_bool, false);
+        obj0.set(col_date, Timestamp(3, 0));
 
-        CHECK_EQUAL(65, t.get_int(0, 0));
-        CHECK_EQUAL(false, t.get_bool(1, 0));
-        CHECK_EQUAL(OldDateTime(3), t.get_olddatetime(2, 0));
+        CHECK_EQUAL(65, obj0.get<util::Optional<Int>>(col_int));
+        CHECK_EQUAL(false, obj0.get<Bool>(col_bool));
+        CHECK_EQUAL(Timestamp(3, 0), obj0.get<Timestamp>(col_date));
 
-        CHECK_EQUAL(65, t.maximum_int(0));
-        CHECK_EQUAL(65, t.minimum_int(0));
-        CHECK_EQUAL(OldDateTime(3), t.maximum_olddatetime(2));
-        CHECK_EQUAL(OldDateTime(3), t.minimum_olddatetime(2));
+        CHECK_EQUAL(65, t.maximum_int(col_int));
+        CHECK_EQUAL(65, t.minimum_int(col_int));
+        CHECK_EQUAL(Timestamp(3, 0), t.maximum_timestamp(col_date));
+        CHECK_EQUAL(Timestamp(3, 0), t.minimum_timestamp(col_date));
 
-        CHECK(!t.is_null(0, 0));
-        CHECK(!t.is_null(1, 0));
-        CHECK(!t.is_null(2, 0));
+        CHECK_NOT(obj0.is_null(col_int));
+        CHECK_NOT(obj0.is_null(col_bool));
+        CHECK_NOT(obj0.is_null(col_date));
 
-        CHECK(t.is_null(0, 1));
-        CHECK(t.is_null(1, 1));
-        CHECK(t.is_null(2, 1));
+        CHECK(obj1.is_null(col_int));
+        CHECK(obj1.is_null(col_bool));
+        CHECK(obj1.is_null(col_date));
 
-        CHECK_EQUAL(1, t.find_first_null(0));
-        CHECK_EQUAL(1, t.find_first_null(1));
-        CHECK_EQUAL(1, t.find_first_null(2));
+        CHECK_EQUAL(k1, t.find_first_null(col_int));
+        CHECK_EQUAL(k1, t.find_first_null(col_bool));
+        CHECK_EQUAL(k1, t.find_first_null(col_date));
 
-        CHECK_EQUAL(not_found, t.find_first_int(0, -1));
-        CHECK_EQUAL(not_found, t.find_first_bool(1, true));
-        CHECK_EQUAL(not_found, t.find_first_olddatetime(2, OldDateTime(5)));
+        CHECK_EQUAL(null_key, t.find_first_int(col_int, -1));
+        CHECK_EQUAL(null_key, t.find_first_bool(col_bool, true));
+        CHECK_EQUAL(null_key, t.find_first_timestamp(col_date, Timestamp(5, 0)));
 
-        CHECK_EQUAL(0, t.find_first_int(0, 65));
-        CHECK_EQUAL(0, t.find_first_bool(1, false));
-        CHECK_EQUAL(0, t.find_first_olddatetime(2, OldDateTime(3)));
+        CHECK_EQUAL(k0, t.find_first_int(col_int, 65));
+        CHECK_EQUAL(k0, t.find_first_bool(col_bool, false));
+        CHECK_EQUAL(k0, t.find_first_timestamp(col_date, Timestamp(3, 0)));
 
-        t.set_null(0, 0);
-        t.set_null(1, 0);
-        t.set_null(2, 0);
+        obj0.set_null(col_int);
+        obj0.set_null(col_bool);
+        obj0.set_null(col_date);
 
-        CHECK(t.is_null(0, 0));
-        CHECK(t.is_null(1, 0));
-        CHECK(t.is_null(2, 0));
+        CHECK(obj0.is_null(col_int));
+        CHECK(obj0.is_null(col_bool));
+        CHECK(obj0.is_null(col_date));
     }
     {
         Table t;
-        t.add_column(type_Float, "float", true);   // nullable = true
-        t.add_column(type_Double, "double", true); // nullable = true
+        auto col_float = t.add_column(type_Float, "float", true);    // nullable = true
+        auto col_double = t.add_column(type_Double, "double", true); // nullable = true
 
-        t.add_empty_row(2);
+        Obj obj0 = t.create_object();
+        Obj obj1 = t.create_object();
+        ObjKey k0 = obj0.get_key();
+        ObjKey k1 = obj1.get_key();
 
-        t.set_float(0, 0, 1.23f);
-        t.set_double(1, 0, 12.3);
+        obj0.set_all(1.23f, 12.3);
 
-        CHECK_EQUAL(1.23f, t.get_float(0, 0));
-        CHECK_EQUAL(12.3, t.get_double(1, 0));
+        CHECK_EQUAL(1.23f, obj0.get<float>(col_float));
+        CHECK_EQUAL(12.3, obj0.get<double>(col_double));
 
-        CHECK_EQUAL(1.23f, t.maximum_float(0));
-        CHECK_EQUAL(1.23f, t.minimum_float(0));
-        CHECK_EQUAL(12.3, t.maximum_double(1));
-        CHECK_EQUAL(12.3, t.minimum_double(1));
+        CHECK_EQUAL(1.23f, t.maximum_float(col_float));
+        CHECK_EQUAL(1.23f, t.minimum_float(col_float));
+        CHECK_EQUAL(12.3, t.maximum_double(col_double));
+        CHECK_EQUAL(12.3, t.minimum_double(col_double));
 
-        CHECK(!t.is_null(0, 0));
-        CHECK(!t.is_null(1, 0));
+        CHECK_NOT(obj0.is_null(col_float));
+        CHECK_NOT(obj0.is_null(col_double));
 
-        CHECK(t.is_null(0, 1));
-        CHECK(t.is_null(1, 1));
+        CHECK(obj1.is_null(col_float));
+        CHECK(obj1.is_null(col_double));
 
-        CHECK_EQUAL(1, t.find_first_null(0));
-        CHECK_EQUAL(1, t.find_first_null(1));
+        CHECK_EQUAL(k1, t.find_first_null(col_float));
+        CHECK_EQUAL(k1, t.find_first_null(col_double));
 
-        CHECK_EQUAL(not_found, t.find_first_float(0, 2.22f));
-        CHECK_EQUAL(not_found, t.find_first_double(1, 2.22));
+        CHECK_EQUAL(null_key, t.find_first_float(col_float, 2.22f));
+        CHECK_EQUAL(null_key, t.find_first_double(col_double, 2.22));
 
-        CHECK_EQUAL(0, t.find_first_float(0, 1.23f));
-        CHECK_EQUAL(0, t.find_first_double(1, 12.3));
+        CHECK_EQUAL(k0, t.find_first_float(col_float, 1.23f));
+        CHECK_EQUAL(k0, t.find_first_double(col_double, 12.3));
 
-        t.set_null(0, 0);
-        t.set_null(1, 0);
+        obj0.set_null(col_float);
+        obj0.set_null(col_double);
 
-        CHECK(t.is_null(0, 0));
-        CHECK(t.is_null(1, 0));
+        CHECK(obj0.is_null(col_float));
+        CHECK(obj0.is_null(col_double));
     }
 }
-
-
-TEST(Table_InsertSubstring)
-{
-    struct Fixture {
-        Table table;
-        Fixture()
-        {
-            table.add_column(type_String, "");
-            table.add_empty_row();
-            table.set_string(0, 0, "0123456789");
-        }
-    };
-    {
-        Fixture f;
-        f.table.insert_substring(0, 0, 0, "x");
-        CHECK_EQUAL("x0123456789", f.table.get_string(0, 0));
-    }
-    {
-        Fixture f;
-        f.table.insert_substring(0, 0, 5, "x");
-        CHECK_EQUAL("01234x56789", f.table.get_string(0, 0));
-    }
-    {
-        Fixture f;
-        f.table.insert_substring(0, 0, 10, "x");
-        CHECK_EQUAL("0123456789x", f.table.get_string(0, 0));
-    }
-    {
-        Fixture f;
-        f.table.insert_substring(0, 0, 5, "");
-        CHECK_EQUAL("0123456789", f.table.get_string(0, 0));
-    }
-    {
-        Fixture f;
-        CHECK_LOGIC_ERROR(f.table.insert_substring(1, 0, 5, "x"), LogicError::column_index_out_of_range);
-    }
-    {
-        Fixture f;
-        CHECK_LOGIC_ERROR(f.table.insert_substring(0, 1, 5, "x"), LogicError::row_index_out_of_range);
-    }
-    {
-        Fixture f;
-        CHECK_LOGIC_ERROR(f.table.insert_substring(0, 0, 11, "x"), LogicError::string_position_out_of_range);
-    }
-}
-
-
-TEST(Table_RemoveSubstring)
-{
-    struct Fixture {
-        Table table;
-        Fixture()
-        {
-            table.add_column(type_String, "");
-            table.add_empty_row();
-            table.set_string(0, 0, "0123456789");
-        }
-    };
-    {
-        Fixture f;
-        f.table.remove_substring(0, 0, 0, 1);
-        CHECK_EQUAL("123456789", f.table.get_string(0, 0));
-    }
-    {
-        Fixture f;
-        f.table.remove_substring(0, 0, 9, 1);
-        CHECK_EQUAL("012345678", f.table.get_string(0, 0));
-    }
-    {
-        Fixture f;
-        f.table.remove_substring(0, 0, 0);
-        CHECK_EQUAL("", f.table.get_string(0, 0));
-    }
-    {
-        Fixture f;
-        f.table.remove_substring(0, 0, 5);
-        CHECK_EQUAL("01234", f.table.get_string(0, 0));
-    }
-    {
-        Fixture f;
-        f.table.remove_substring(0, 0, 10);
-        CHECK_EQUAL("0123456789", f.table.get_string(0, 0));
-    }
-    {
-        Fixture f;
-        f.table.remove_substring(0, 0, 5, 1000);
-        CHECK_EQUAL("01234", f.table.get_string(0, 0));
-    }
-    {
-        Fixture f;
-        f.table.remove_substring(0, 0, 10, 0);
-        CHECK_EQUAL("0123456789", f.table.get_string(0, 0));
-    }
-    {
-        Fixture f;
-        f.table.remove_substring(0, 0, 10, 1);
-        CHECK_EQUAL("0123456789", f.table.get_string(0, 0));
-    }
-    {
-        Fixture f;
-        CHECK_LOGIC_ERROR(f.table.remove_substring(1, 0, 5, 1), LogicError::column_index_out_of_range);
-    }
-    {
-        Fixture f;
-        CHECK_LOGIC_ERROR(f.table.remove_substring(0, 1, 5, 1), LogicError::row_index_out_of_range);
-    }
-    {
-        Fixture f;
-        CHECK_LOGIC_ERROR(f.table.remove_substring(0, 0, 11, 1), LogicError::string_position_out_of_range);
-    }
-}
-
 
 // This triggers a severe bug in the Array::alloc() allocator in which its capacity-doubling
 // scheme forgets to test of the doubling has overflowed the maximum allowed size of an
@@ -2643,8 +2355,8 @@ TEST(Table_AllocatorCapacityBug)
 
     // First a simple trigger of `Assertion failed: value <= 0xFFFFFFL [26000016, 16777215]`
     {
-        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
-        BinaryColumn c(Allocator::get_default(), ref, true);
+        BPlusTree<BinaryData> c(Allocator::get_default());
+        c.create();
 
         c.add(BinaryData(buf.get(), 13000000));
         c.set(0, BinaryData(buf.get(), 14000000));
@@ -2655,12 +2367,13 @@ TEST(Table_AllocatorCapacityBug)
     // Now a small fuzzy test to catch other such bugs
     {
         Table t;
-        t.add_column(type_Binary, "", true);
+        std::vector<ObjKey> keys;
+        auto col_bin = t.add_column(type_Binary, "Binaries", true);
 
         for (size_t j = 0; j < 100; j++) {
             size_t r = (j * 123456789 + 123456789) % 100;
             if (r < 20) {
-                t.add_empty_row();
+                keys.push_back(t.create_object().get_key());
             }
             else if (t.size() > 0 && t.size() < 5) {
                 // Set only if there are no more than 4 rows, else it takes up too much space on devices (4 * 16 MB
@@ -2669,38 +2382,14 @@ TEST(Table_AllocatorCapacityBug)
                 size_t len = (j * 123456789 + 123456789) % 16000000;
                 BinaryData bd;
                 bd = BinaryData(buf.get(), len);
-                t.set_binary(0, row, bd);
+                t.get_object(keys[row]).set(col_bin, bd);
             }
             else if (t.size() >= 4) {
                 t.clear();
+                keys.clear();
             }
         }
     }
-}
-
-// Minimal test case causing an assertion error because
-// backlink columns are storing stale values referencing
-// their respective link column index. If a link column
-// index changes, the backlink column accessors must also
-// be updated.
-TEST(Table_MinimalStaleLinkColumnIndex)
-{
-    Group g;
-    TableRef t = g.add_table("table");
-    t->add_column(type_Int, "int1");
-    t->add_search_index(0);
-    t->add_empty_row(2);
-    t->set_int(0, 1, 4444);
-
-    TableRef t2 = g.add_table("table2");
-    t2->add_column(type_Int, "int_col");
-    t2->add_column_link(type_Link, "link", *t);
-    t2->remove_column(0);
-
-    t->set_int_unique(0, 0, 4444); // crashed here
-
-    CHECK_EQUAL(t->get_int(0, 0), 4444);
-    CHECK_EQUAL(t->size(), 1);
 }
 
 
@@ -2708,119 +2397,20 @@ TEST(Table_DetachedAccessor)
 {
     Group group;
     TableRef table = group.add_table("table");
-    table->add_column(type_Int, "i");
-    table->add_column(type_String, "s");
+    auto col_int = table->add_column(type_Int, "i");
+    auto col_str = table->add_column(type_String, "s");
     table->add_column(type_Binary, "b");
     table->add_column_link(type_Link, "l", *table);
-    table->add_empty_row(2);
+    ObjKey key0 = table->create_object().get_key();
+    Obj obj1 = table->create_object();
     group.remove_table("table");
 
-    CHECK_LOGIC_ERROR(table->clear(), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->add_search_index(0), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->remove_search_index(0), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->swap_rows(0, 1), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->move_row(0, 1), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->set_string(1, 0, ""), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->set_string_unique(1, 0, ""), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->insert_substring(1, 0, 0, "x"), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->remove_substring(1, 0, 0), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->set_binary(2, 0, BinaryData()), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->set_link(3, 0, 0), LogicError::detached_accessor);
+    CHECK_THROW(table->clear(), NoSuchTable);
+    CHECK_THROW(table->add_search_index(col_int), NoSuchTable);
+    CHECK_THROW(table->remove_search_index(col_int), NoSuchTable);
+    CHECK_THROW(table->get_object(key0), NoSuchTable);
+    CHECK_THROW_ANY(obj1.set(col_str, "hello"));
 }
-
-// This test reproduces a user reported assertion failure. The problem was
-// due to BacklinkColumn::m_origin_column_ndx not being updated when the
-// linked table removed/inserted columns (this happened on a migration)
-TEST(Table_StaleLinkIndexOnTableRemove)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
-    SharedGroup sg_w(*hist, SharedGroupOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
-    LangBindHelper::promote_to_write(sg_w);
-    TableRef t = group_w.add_table("table1");
-    t->add_column(type_Int, "int1");
-    t->add_empty_row(2);
-
-    TableRef t2 = group_w.add_table("table2");
-    t2->add_column(type_Int, "int_col");
-    t2->add_column_link(type_Link, "link", *t);
-    t2->add_empty_row();
-    t2->set_link(1, 0, 1);
-    t2->remove_column(0); // after this call LinkColumnBase::m_column_ndx was incorrect
-    t2->add_column(type_Int, "int_col2");
-
-    // The stale backlink index would still be "1" which is now an integer column in t2
-    // so the assertion in Spec::get_opposite_link_table() would fail when removing a link
-    t->remove(1);
-
-    CHECK_EQUAL(t->size(), 1);
-    CHECK_EQUAL(t2->get_link(0, 0), realm::npos); // no link
-}
-
-TEST(Table_ColumnsSupportStringIndex)
-{
-    std::vector<DataType> all_types{type_Int,    type_Bool,        type_Float,     type_Double, type_String,
-                                    type_Binary, type_OldDateTime, type_Timestamp, type_Table,  type_Mixed};
-
-    std::vector<DataType> supports_index{type_Int, type_Bool, type_String, type_OldDateTime, type_Timestamp};
-
-    Group g; // type_Link must be part of a group
-    TableRef t = g.add_table("t1");
-    for (auto it = all_types.begin(); it != all_types.end(); ++it) {
-        t->add_column(*it, "");
-        ColumnBase& col = _impl::TableFriend::get_column(*t, 0);
-        bool does_support_index = col.supports_search_index();
-        auto found_pos = std::find(supports_index.begin(), supports_index.end(), *it);
-        CHECK_EQUAL(does_support_index, (found_pos != supports_index.end()));
-        CHECK_EQUAL(does_support_index, (col.create_search_index() != nullptr));
-        CHECK_EQUAL(does_support_index, col.has_search_index());
-        col.destroy_search_index();
-        CHECK(!col.has_search_index());
-        if (does_support_index) {
-            t->add_search_index(0);
-        }
-        else {
-            CHECK_LOGIC_ERROR(t->add_search_index(0), LogicError::illegal_combination);
-        }
-        CHECK_EQUAL(does_support_index, t->has_search_index(0));
-        t->remove_column(0);
-    }
-
-    // Check type_Link
-    t->add_column_link(type_Link, "", *t);
-    ColumnBase& link_col = _impl::TableFriend::get_column(*t, 0);
-    CHECK(!link_col.supports_search_index());
-    CHECK(link_col.create_search_index() == nullptr);
-    CHECK(!link_col.has_search_index());
-    CHECK_LOGIC_ERROR(t->add_search_index(0), LogicError::illegal_combination);
-    t->remove_column(0);
-
-    // Check type_LinkList
-    t->add_column_link(type_LinkList, "", *t);
-    ColumnBase& linklist_col = _impl::TableFriend::get_column(*t, 0);
-    CHECK(!linklist_col.supports_search_index());
-    CHECK(linklist_col.create_search_index() == nullptr);
-    CHECK(!linklist_col.has_search_index());
-    CHECK_LOGIC_ERROR(t->add_search_index(0), LogicError::illegal_combination);
-    t->remove_column(0);
-
-    // Check StringEnum
-    t->add_column(type_String, "");
-    bool force = true;
-    t->optimize(force);
-    ColumnBase& enum_col = _impl::TableFriend::get_column(*t, 0);
-    CHECK(enum_col.supports_search_index());
-    CHECK(enum_col.create_search_index() != nullptr);
-    CHECK(enum_col.has_search_index());
-    enum_col.destroy_search_index();
-    CHECK(!enum_col.has_search_index());
-    t->add_search_index(0);
-    CHECK(enum_col.has_search_index());
-    t->remove_column(0);
-}
-#endif // LEGACY_TESTS
 
 TEST(Table_addRowsToTableWithNoColumns)
 {
@@ -3795,32 +3385,34 @@ TEST(Table_object_random)
 }
 
 
-#ifdef LEGACY_TESTS
 TEST(Table_3)
 {
-    TestTable01 table;
+    Table table;
+
+    auto col_int0 = table.add_column(type_Int, "first");
+    auto col_int1 = table.add_column(type_Int, "second");
+    auto col_bool2 = table.add_column(type_Bool, "third");
+    auto col_int3 = table.add_column(type_Int, "fourth");
 
     for (int64_t i = 0; i < 100; ++i) {
         table.create_object(ObjKey(i)).set_all(i, 10, true, int(Wed));
     }
-    auto cols = table.get_key_cols();
 
     // Test column searching
-    CHECK_EQUAL(ObjKey(0), table.find_first_int(cols[0], 0));
-    CHECK_EQUAL(ObjKey(50), table.find_first_int(cols[0], 50));
-    CHECK_EQUAL(null_key, table.find_first_int(cols[0], 500));
-    CHECK_EQUAL(ObjKey(0), table.find_first_int(cols[1], 10));
-    CHECK_EQUAL(null_key, table.find_first_int(cols[1], 100));
-    CHECK_EQUAL(ObjKey(0), table.find_first_bool(cols[2], true));
-    CHECK_EQUAL(null_key, table.find_first_bool(cols[2], false));
-    CHECK_EQUAL(ObjKey(0), table.find_first_int(cols[3], Wed));
-    CHECK_EQUAL(null_key, table.find_first_int(cols[3], Mon));
+    CHECK_EQUAL(ObjKey(0), table.find_first_int(col_int0, 0));
+    CHECK_EQUAL(ObjKey(50), table.find_first_int(col_int0, 50));
+    CHECK_EQUAL(null_key, table.find_first_int(col_int0, 500));
+    CHECK_EQUAL(ObjKey(0), table.find_first_int(col_int1, 10));
+    CHECK_EQUAL(null_key, table.find_first_int(col_int1, 100));
+    CHECK_EQUAL(ObjKey(0), table.find_first_bool(col_bool2, true));
+    CHECK_EQUAL(null_key, table.find_first_bool(col_bool2, false));
+    CHECK_EQUAL(ObjKey(0), table.find_first_int(col_int3, Wed));
+    CHECK_EQUAL(null_key, table.find_first_int(col_int3, Mon));
 
 #ifdef REALM_DEBUG
     table.verify();
 #endif
 }
-#endif
 
 
 TEST(Table_4)

@@ -10107,10 +10107,20 @@ TEST(Query_TableInitialization)
             test_operator(std::equal_to<>(), get_null_column, null{});
             test_operator(std::not_equal_to<>(), get_null_column, null{});
         };
+        auto test_bool = [&](auto value, ColKey col, ColKey null_col) {
+            using Type = decltype(value);
+            auto get_column = [&] { return get_table().template column<Type>(col); };
+            test_operator(std::equal_to<>(), get_column, value);
+            test_operator(std::not_equal_to<>(), get_column, value);
+
+            auto get_null_column = [&] { return get_table().template column<Type>(null_col); };
+            test_operator(std::equal_to<>(), get_null_column, null{});
+            test_operator(std::not_equal_to<>(), get_null_column, null{});
+        };
 
         test_numeric(Int(), col_int, col_int_null);
         test_numeric(Float(), col_float, col_float_null);
-        test_numeric(Bool(), col_bool, col_bool_null);
+        test_bool(Bool(), col_bool, col_bool_null);
         test_numeric(Double(), col_double, col_double_null);
         test_numeric(Timestamp(), col_timestamp, col_timestamp_null);
 

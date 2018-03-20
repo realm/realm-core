@@ -993,6 +993,69 @@ private:
     const ArrayBinary* m_leaf_ptr = nullptr;
 };
 
+template <class TConditionFunction>
+class BoolNode : public ParentNode {
+public:
+    using TConditionValue = bool;
+
+    BoolNode(util::Optional<bool> v, ColKey column)
+        : m_value(v)
+    {
+        m_condition_column_key = column;
+    }
+
+    BoolNode(const BoolNode& from, QueryNodeHandoverPatches* patches)
+        : ParentNode(from, patches)
+        , m_value(from.m_value)
+    {
+    }
+
+    void cluster_changed() override
+    {
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayBoolNull(m_table->get_alloc()));
+        m_cluster->init_leaf(m_table->colkey2ndx(this->m_condition_column_key), m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
+    }
+
+    void init() override
+    {
+        ParentNode::init();
+
+        m_dD = 100.0;
+    }
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        TConditionFunction condition;
+        bool m_value_is_null = !m_value;
+        for (size_t s = start; s < end; ++s) {
+            util::Optional<bool> value = m_leaf_ptr->get(s);
+            if (condition(value, m_value, !value, m_value_is_null))
+                return s;
+        }
+        return not_found;
+    }
+
+    virtual std::string describe() const override
+    {
+        return this->describe_column() + " " + TConditionFunction::description() + " " +
+               util::serializer::print_value(m_value);
+    }
+
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        return std::unique_ptr<ParentNode>(new BoolNode(*this, patches));
+    }
+
+private:
+    util::Optional<bool> m_value;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayBoolNull), alignof(ArrayBoolNull)>::type;
+    using LeafPtr = std::unique_ptr<ArrayBoolNull, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const ArrayBoolNull* m_leaf_ptr = nullptr;
+};
 
 template <class TConditionFunction>
 class TimestampNode : public ParentNode {

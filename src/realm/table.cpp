@@ -665,20 +665,17 @@ bool Table::is_enumerated(ColKey col_key) const noexcept
     return m_spec.is_string_enum_type(col_ndx);
 }
 
-size_t Table::get_num_unique_values(ColKey) const
+size_t Table::get_num_unique_values(ColKey col_key) const
 {
-    // FIXME: not implemented
-    REALM_ASSERT(false);
-    /*
-    size_t column_ndx = colkey2ndx(column_key);
-    ColumnType col_type = m_spec.get_column_type(column_ndx);
-    if (col_type != col_type_StringEnum)
-     return 0;
-    ref_type ref = m_spec.get_enumkeys_ref(column_ndx);
-    StringColumn col(m_spec.get_alloc(), ref); // Throws
+    if (!is_enumerated(col_key))
+        return 0;
+
+    ArrayParent* parent;
+    ref_type ref = const_cast<Spec&>(m_spec).get_enumkeys_ref(colkey2ndx(col_key), parent);
+    BPlusTree<StringData> col(get_alloc());
+    col.init_from_ref(ref);
+
     return col.size();
-    */
-    return 0;
 }
 
 ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target,
@@ -1461,10 +1458,9 @@ ObjKey Table::find_first_binary(ColKey col_key, BinaryData value) const
     return find_first<BinaryData>(col_key, value);
 }
 
-ObjKey Table::find_first_null(ColKey) const
+ObjKey Table::find_first_null(ColKey col_key) const
 {
-    // return where().equal(column_ndx, null{}).find();
-    // TODO
+    return where().equal(col_key, null{}).find();
     return null_key;
 }
 

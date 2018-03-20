@@ -93,6 +93,8 @@ public:
     {
         while (begin < end) {
             auto res = m_seconds.find_first(value.get_seconds(), begin, end);
+            if (res == npos)
+                return not_found;
             if (m_nanoseconds.get(res) == value.get_nanoseconds())
                 return res;
             begin = res + 1;
