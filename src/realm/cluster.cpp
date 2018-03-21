@@ -1804,3 +1804,30 @@ ClusterTree::ConstIterator& Table::ConstIterator::operator++()
     }
     return *this;
 }
+
+ClusterTree::ConstIterator& Table::ConstIterator::operator+=(ptrdiff_t adj)
+{
+    // If you have to jump far away and thus have to load many leaves,
+    // this function will be slow
+
+    REALM_ASSERT(adj >= 0);
+    size_t n = size_t(adj);
+    if (m_storage_version != m_tree.get_storage_version(m_instance_version)) {
+        load_leaf(m_key);
+    }
+    while (n != 0 && m_key != null_key) {
+        size_t left_in_leaf = m_leaf.node_size() - m_state.m_current_index;
+        if (n < left_in_leaf) {
+            m_state.m_current_index += n;
+            m_key = m_leaf.get_real_key(m_state.m_current_index);
+            n = 0;
+        }
+        else {
+            // load next leaf
+            n -= left_in_leaf;
+            m_key = m_leaf.get_real_key(m_state.m_current_index + left_in_leaf - 1);
+            m_key = load_leaf(ObjKey(m_key.value + 1));
+        }
+    }
+    return *this;
+}
