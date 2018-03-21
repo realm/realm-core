@@ -66,13 +66,20 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
 
             SortDescriptor::Sorter sort_predicate = sort_descr->sorter(m_key_values);            
             auto& col = sort_predicate.m_columns[0];
+            auto& vec = sort_predicate.m_columns[0].payload;
             ColKey ck = col.col_key;
 
             for (size_t i = 0; i < v.size(); i++) {
                 ObjKey key = v[i].key_for_object;
 
                 if (!col.translated_keys.empty()) {
-                    key = col.translated_keys[v[i].index_in_view];
+                    if (col.is_null[i]) {
+                        vec.emplace_back();
+                        continue;
+                    }
+                    else {
+                        key = col.translated_keys[v[i].index_in_view];
+                    }
                 }
 
                 // Sorting can be specified by multiple columns, so that if two entries in the first column are
@@ -80,24 +87,44 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
                 // first column, we cache all the payload of fields of the view in a std::vector<Mixed>
                 ConstObj obj = col.table->get_object(key);
                 DataType dt = sort_predicate.m_columns[0].table->get_column_type(ck);
-                auto& vec = sort_predicate.m_columns[0].payload;
-                if (dt == type_Int) {
-                    vec.emplace_back(obj.get<Int>(ck));
-                }
-                else if (dt == type_String) {
-                    vec.emplace_back(obj.get<String>(ck));
-                }
-                else if (dt == type_Float) {
-                    vec.emplace_back(obj.get<Float>(ck));
-                }
-                else if (dt == type_Double) {
-                    vec.emplace_back(obj.get<Double>(ck));
-                }
-                else if (dt == type_Bool) {
-                    vec.emplace_back(obj.get<Bool>(ck));
-                }
-                else if (dt == type_Timestamp) {
-                    vec.emplace_back(obj.get<Timestamp>(ck));
+                switch (dt) {
+                    case type_Int:
+                        if (col.table->is_nullable(ck)) {
+                            auto val = obj.get<util::Optional<int64_t>>(ck);
+                            if (val) {
+                                vec.emplace_back(val.value());
+                            }
+                            else {
+                                // FIXME: This is kind of a hack as Mixed type does not support null value.
+                                // It will just be encoded as an integer with value 0
+                                vec.emplace_back();
+                            }
+                        }
+                        else {
+                            vec.emplace_back(obj.get<Int>(ck));
+                        }
+                        break;
+                    case type_Timestamp:
+                        vec.emplace_back(obj.get<Timestamp>(ck));
+                        break;
+                    case type_String:
+                        vec.emplace_back(obj.get<String>(ck));
+                        break;
+                    case type_Float:
+                        vec.emplace_back(obj.get<Float>(ck));
+                        break;
+                    case type_Double:
+                        vec.emplace_back(obj.get<Double>(ck));
+                        break;
+                    case type_Bool:
+                        vec.emplace_back(obj.get<Bool>(ck));
+                        break;
+                    case type_Link:
+                        vec.emplace_back(obj.get<ObjKey>(ck).value);
+                        break;
+                    default:
+                        REALM_UNREACHABLE();
+                        break;
                 }
             }
 

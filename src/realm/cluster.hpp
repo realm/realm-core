@@ -78,6 +78,17 @@ private:
     }
 };
 
+class ObjKeyVector : public std::vector<ObjKey> {
+public:
+    ObjKeyVector(const std::vector<int64_t>& init)
+    {
+        reserve(init.size());
+        for (auto i : init) {
+            emplace_back(i);
+        }
+    }
+};
+
 inline std::ostream& operator<<(std::ostream& ostr, ObjKey key)
 {
     ostr << "Key(" << key.value << ")";

@@ -202,6 +202,14 @@ T ConstObj::_get(size_t col_ndx) const
     return values.get(m_row_ndx);
 }
 
+ConstObj ConstObj::get_linked_object(ColKey link_col_key) const
+{
+    TableRef target_table = get_target_table(link_col_key);
+    ObjKey key = get<ObjKey>(link_col_key);
+
+    return target_table->get_object(key);
+}
+
 template <class T>
 inline bool ConstObj::do_is_null(size_t col_ndx) const
 {

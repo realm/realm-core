@@ -85,6 +85,7 @@ public:
     {
         return get<U>(get_column_key(col_name));
     }
+    ConstObj get_linked_object(ColKey link_col_key) const;
     int cmp(const ConstObj& other, ColKey col_key) const;
 
     template <typename U>

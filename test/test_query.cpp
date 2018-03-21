@@ -3175,126 +3175,99 @@ TEST(Query_Simple)
     CHECK_EQUAL(k2, tv2.get_key(0));
 }
 
-#ifdef LEGACY_TESTS
-
 TEST(Query_Sort1)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
+    Table ttt;
+    auto col_int = ttt.add_column(type_Int, "1");
     ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a"); // 0
-    add(ttt, 2, "a"); // 1
-    add(ttt, 3, "X"); // 2
-    add(ttt, 1, "a"); // 3
-    add(ttt, 2, "a"); // 4
-    add(ttt, 3, "X"); // 5
-    add(ttt, 9, "a"); // 6
-    add(ttt, 8, "a"); // 7
-    add(ttt, 7, "X"); // 8
+    ttt.create_object().set_all(1, "a"); // 0
+    ttt.create_object().set_all(2, "a"); // 1
+    ttt.create_object().set_all(3, "X"); // 2
+    ttt.create_object().set_all(1, "a"); // 3
+    ttt.create_object().set_all(2, "a"); // 4
+    ttt.create_object().set_all(3, "X"); // 5
+    ttt.create_object().set_all(9, "a"); // 6
+    ttt.create_object().set_all(8, "a"); // 7
+    ttt.create_object().set_all(7, "X"); // 8
 
     // tv.get_key()  = 0, 2, 3, 5, 6, 7, 8
     // Vals         = 1, 3, 1, 3, 9, 8, 7
     // result       = 3, 0, 5, 2, 8, 7, 6
 
-    Query q = ttt.where().not_equal(0, 2);
+    Query q = ttt.where().not_equal(col_int, 2);
     TableView tv = q.find_all();
-    tv.sort(0);
+    tv.sort(col_int);
 
     CHECK_EQUAL(tv.size(), 7);
-    CHECK_EQUAL(tv[0].get_int(0), 1);
-    CHECK_EQUAL(tv[1].get_int(0), 1);
-    CHECK_EQUAL(tv[2].get_int(0), 3);
-    CHECK_EQUAL(tv[3].get_int(0), 3);
-    CHECK_EQUAL(tv[4].get_int(0), 7);
-    CHECK_EQUAL(tv[5].get_int(0), 8);
-    CHECK_EQUAL(tv[6].get_int(0), 9);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 1);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 1);
+    CHECK_EQUAL(tv[2].get<Int>(col_int), 3);
+    CHECK_EQUAL(tv[3].get<Int>(col_int), 3);
+    CHECK_EQUAL(tv[4].get<Int>(col_int), 7);
+    CHECK_EQUAL(tv[5].get<Int>(col_int), 8);
+    CHECK_EQUAL(tv[6].get<Int>(col_int), 9);
 
-    CHECK_EQUAL(tv[0].get_index(), 0);
-    CHECK_EQUAL(tv[1].get_index(), 3);
-    CHECK_EQUAL(tv[2].get_index(), 2);
-    CHECK_EQUAL(tv[3].get_index(), 5);
-    CHECK_EQUAL(tv[4].get_index(), 8);
-    CHECK_EQUAL(tv[5].get_index(), 7);
-    CHECK_EQUAL(tv[6].get_index(), 6);
+    CHECK_EQUAL(tv[0].get_key(), ObjKey(0));
+    CHECK_EQUAL(tv[1].get_key(), ObjKey(3));
+    CHECK_EQUAL(tv[2].get_key(), ObjKey(2));
+    CHECK_EQUAL(tv[3].get_key(), ObjKey(5));
+    CHECK_EQUAL(tv[4].get_key(), ObjKey(8));
+    CHECK_EQUAL(tv[5].get_key(), ObjKey(7));
+    CHECK_EQUAL(tv[6].get_key(), ObjKey(6));
 
     tv = q.find_all();
-    tv.sort(0, false);
+    tv.sort(col_int, false);
 
     CHECK_EQUAL(tv.size(), 7);
-    CHECK_EQUAL(tv[0].get_index(), 6);
-    CHECK_EQUAL(tv[1].get_index(), 7);
-    CHECK_EQUAL(tv[2].get_index(), 8);
-    CHECK_EQUAL(tv[3].get_index(), 2);
-    CHECK_EQUAL(tv[4].get_index(), 5);
-    CHECK_EQUAL(tv[5].get_index(), 0);
-    CHECK_EQUAL(tv[6].get_index(), 3);
+    CHECK_EQUAL(tv[0].get_key(), ObjKey(6));
+    CHECK_EQUAL(tv[1].get_key(), ObjKey(7));
+    CHECK_EQUAL(tv[2].get_key(), ObjKey(8));
+    CHECK_EQUAL(tv[3].get_key(), ObjKey(2));
+    CHECK_EQUAL(tv[4].get_key(), ObjKey(5));
+    CHECK_EQUAL(tv[5].get_key(), ObjKey(0));
+    CHECK_EQUAL(tv[6].get_key(), ObjKey(3));
 }
 
-
-TEST(Query_QuickSort)
+TEST(Query_SortAscending)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-    // Triggers QuickSort because range > len
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
+    Table ttt;
+    auto col_int = ttt.add_column(type_Int, "1");
     ttt.add_column(type_String, "2");
 
     for (size_t t = 0; t < 1000; t++)
-        add(ttt, random.draw_int_mod(1100), "a"); // 0
+        ttt.create_object().set_all(random.draw_int_mod(1100), "a"); // 0
 
     Query q = ttt.where();
     TableView tv = q.find_all();
-    tv.sort(0);
+    tv.sort(col_int);
 
     CHECK(tv.size() == 1000);
     for (size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t].get_int(0) >= tv[t - 1].get_int(0));
+        CHECK(tv[t].get<Int>(col_int) >= tv[t - 1].get<Int>(col_int));
     }
 }
-
-TEST(Query_CountSort)
-{
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-
-    // Triggers CountSort because range <= len
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    for (size_t t = 0; t < 1000; t++)
-        add(ttt, random.draw_int_mod(900), "a"); // 0
-
-    Query q = ttt.where();
-    TableView tv = q.find_all();
-    tv.sort(0);
-
-    CHECK(tv.size() == 1000);
-    for (size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t].get_int(0) >= tv[t - 1].get_int(0));
-    }
-}
-
 
 TEST(Query_SortDescending)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
+    Table ttt;
+    auto col_int = ttt.add_column(type_Int, "1");
     ttt.add_column(type_String, "2");
 
     for (size_t t = 0; t < 1000; t++)
-        add(ttt, random.draw_int_mod(1100), "a"); // 0
+        ttt.create_object().set_all(random.draw_int_mod(1100), "a"); // 0
 
     Query q = ttt.where();
     TableView tv = q.find_all();
-    tv.sort(0, false);
+    tv.sort(col_int, false);
 
     CHECK(tv.size() == 1000);
     for (size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t].get_int(0) <= tv[t - 1].get_int(0));
+        CHECK(tv[t].get<Int>(col_int) <= tv[t - 1].get<Int>(col_int));
     }
 }
 
@@ -3302,49 +3275,38 @@ TEST(Query_SortDescending)
 TEST(Query_SortDates)
 {
     Table table;
-    table.add_column(type_OldDateTime, "first");
+    auto col_date = table.add_column(type_Timestamp, "first");
 
-    table.insert_empty_row(0);
-    table.set_olddatetime(0, 0, 1000);
-    table.insert_empty_row(1);
-    table.set_olddatetime(0, 1, 3000);
-    table.insert_empty_row(2);
-    table.set_olddatetime(0, 2, 2000);
+    table.create_object().set(col_date, Timestamp(1000, 0));
+    table.create_object().set(col_date, Timestamp(3000, 0));
+    table.create_object().set(col_date, Timestamp(2000, 0));
 
     TableView tv = table.where().find_all();
     CHECK(tv.size() == 3);
-    CHECK(tv.get_key(0) == 0);
-    CHECK(tv.get_key(1) == 1);
-    CHECK(tv.get_key(2) == 2);
 
-    tv.sort(0);
-
-    CHECK(tv.size() == 3);
-    CHECK(tv.get_olddatetime(0, 0) == OldDateTime(1000));
-    CHECK(tv.get_olddatetime(0, 1) == OldDateTime(2000));
-    CHECK(tv.get_olddatetime(0, 2) == OldDateTime(3000));
+    tv.sort(col_date);
+    CHECK_EQUAL(tv[0].get<Timestamp>(col_date), Timestamp(1000, 0));
+    CHECK_EQUAL(tv[1].get<Timestamp>(col_date), Timestamp(2000, 0));
+    CHECK_EQUAL(tv[2].get<Timestamp>(col_date), Timestamp(3000, 0));
 }
 
 
 TEST(Query_SortBools)
 {
     Table table;
-    table.add_column(type_Bool, "first");
+    auto col = table.add_column(type_Bool, "first");
 
-    table.insert_empty_row(0);
-    table.set_bool(0, 0, true);
-    table.insert_empty_row(0);
-    table.set_bool(0, 0, false);
-    table.insert_empty_row(0);
-    table.set_bool(0, 0, true);
+    table.create_object().set(col, true);
+    table.create_object().set(col, false);
+    table.create_object().set(col, true);
 
     TableView tv = table.where().find_all();
-    tv.sort(0);
-
     CHECK(tv.size() == 3);
-    CHECK(tv.get_bool(0, 0) == false);
-    CHECK(tv.get_bool(0, 1) == true);
-    CHECK(tv.get_bool(0, 2) == true);
+
+    tv.sort(col);
+    CHECK_EQUAL(tv[0].get<Bool>(col), false);
+    CHECK_EQUAL(tv[1].get<Bool>(col), true);
+    CHECK_EQUAL(tv[2].get<Bool>(col), true);
 }
 
 TEST(Query_SortLinks)
@@ -3354,26 +3316,23 @@ TEST(Query_SortLinks)
     TableRef t1 = g.add_table("t1");
     TableRef t2 = g.add_table("t2");
 
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_str_col = t1->add_column(type_String, "t1_string");
-    size_t t1_link_t2_col = t1->add_column_link(type_Link, "t1_link_to_t2", *t2);
-    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
-    size_t t2_str_col = t2->add_column(type_String, "t2_string");
-    size_t t2_link_t1_col = t2->add_column_link(type_Link, "t2_link_to_t1", *t1);
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(type_String, "t1_string");
+    auto t1_link_t2_col = t1->add_column_link(type_Link, "t1_link_to_t2", *t2);
+    t2->add_column(type_Int, "t2_int");
+    t2->add_column(type_String, "t2_string");
+    t2->add_column_link(type_Link, "t2_link_to_t1", *t1);
 
-    t1->add_empty_row(num_rows);
-    t2->add_empty_row(num_rows);
+    std::vector<ObjKey> t1_keys;
+    std::vector<ObjKey> t2_keys;
+    t1->create_objects(num_rows, t1_keys);
+    t2->create_objects(num_rows, t2_keys);
     std::vector<std::string> ordered_strings;
 
     for (size_t i = 0; i < num_rows; ++i) {
         ordered_strings.push_back(std::string("a string") + util::to_string(i));
-        t1->set_int(t1_int_col, i, i);
-        t1->set_string(t1_str_col, i, ordered_strings[i]);
-        t1->set_link(t1_link_t2_col, i, num_rows - i - 1);
-
-        t2->set_int(t2_int_col, i, i);
-        t2->set_string(t2_str_col, i, ordered_strings[i]);
-        t2->set_link(t2_link_t1_col, i, i);
+        t1->get_object(t1_keys[i]).set_all(int64_t(i), StringData(ordered_strings[i]), t2_keys[num_rows - i - 1]);
+        t2->get_object(t1_keys[i]).set_all(int64_t(i), StringData(ordered_strings[i]), t1_keys[i]);
     }
 
     TableView tv = t1->where().find_all();
@@ -3381,16 +3340,16 @@ TEST(Query_SortLinks)
     // Check natural order
     CHECK_EQUAL(tv.size(), num_rows);
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), i);
-        CHECK_EQUAL(tv.get_string(t1_str_col, i), ordered_strings[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), i);
+        CHECK_EQUAL(tv[i].get<String>(t1_str_col), ordered_strings[i]);
     }
 
     // Check sorted order by ints
     tv.sort(t1_int_col);
     CHECK_EQUAL(tv.size(), num_rows);
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), i);
-        CHECK_EQUAL(tv.get_string(t1_str_col, i), ordered_strings[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), i);
+        CHECK_EQUAL(tv[i].get<String>(t1_str_col), ordered_strings[i]);
     }
 
     // Check that you can sort on a regular link column
@@ -3398,11 +3357,10 @@ TEST(Query_SortLinks)
     tv.sort(t1_link_t2_col);
     CHECK_EQUAL(tv.size(), num_rows);
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), num_rows - i - 1);
-        CHECK_EQUAL(tv.get_string(t1_str_col, i), ordered_strings[num_rows - i - 1]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), num_rows - i - 1);
+        CHECK_EQUAL(tv[i].get<String>(t1_str_col), ordered_strings[num_rows - i - 1]);
     }
 }
-
 
 TEST(Query_SortLinkChains)
 {
@@ -3411,71 +3369,73 @@ TEST(Query_SortLinkChains)
     TableRef t2 = g.add_table("t2");
     TableRef t3 = g.add_table("t3");
 
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
-    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
-    size_t t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
-    size_t t3_int_col = t3->add_column(type_Int, "t3_int", true);
-    size_t t3_str_col = t3->add_column(type_String, "t3_str");
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
 
-    t1->add_empty_row(7);
-    t2->add_empty_row(6);
-    t3->add_empty_row(4);
+    auto t2_int_col = t2->add_column(type_Int, "t2_int");
+    auto t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
 
-    t1->set_int(t1_int_col, 0, 99);
+    auto t3_int_col = t3->add_column(type_Int, "t3_int", true);
+    auto t3_str_col = t3->add_column(type_String, "t3_str");
+
+    ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5, 6});
+    ObjKeyVector t2_keys({10, 11, 12, 13, 14, 15});
+    ObjKeyVector t3_keys({20, 21, 22, 23});
+    t1->create_objects(t1_keys);
+    t2->create_objects(t2_keys);
+    t3->create_objects(t3_keys);
+
+    t1->get_object(t1_keys[0]).set(t1_int_col, 99);
     for (size_t i = 0; i < t2->size(); i++) {
-        t1->set_int(t1_int_col, i + 1, i);
-        t2->set_int(t2_int_col, i, t1->size() - i);
+        t1->get_object(t1_keys[i + 1]).set(t1_int_col, int64_t(i));
+        t2->get_object(t2_keys[i]).set(t2_int_col, int64_t(t1->size() - i));
     }
 
-    t1->set_link(t1_link_col, 0, 1);
-    t1->set_link(t1_link_col, 1, 0);
-    t1->set_link(t1_link_col, 2, 2);
-    t1->set_link(t1_link_col, 3, 3);
-    t1->set_link(t1_link_col, 4, 5);
-    t1->set_link(t1_link_col, 5, 4);
-    t1->set_link(t1_link_col, 6, 1);
+    t1->get_object(t1_keys[0]).set(t1_link_col, t2_keys[1]);
+    t1->get_object(t1_keys[1]).set(t1_link_col, t2_keys[0]);
+    t1->get_object(t1_keys[2]).set(t1_link_col, t2_keys[2]);
+    t1->get_object(t1_keys[3]).set(t1_link_col, t2_keys[3]);
+    t1->get_object(t1_keys[4]).set(t1_link_col, t2_keys[5]);
+    t1->get_object(t1_keys[5]).set(t1_link_col, t2_keys[4]);
+    t1->get_object(t1_keys[6]).set(t1_link_col, t2_keys[1]);
 
-    t2->set_link(t2_link_col, 0, 3);
-    t2->set_link(t2_link_col, 1, 2);
-    t2->set_link(t2_link_col, 2, 0);
-    t2->set_link(t2_link_col, 3, 1);
-    t2->nullify_link(t2_link_col, 4);
-    t2->nullify_link(t2_link_col, 5);
+    t2->get_object(t2_keys[0]).set(t2_link_col, t3_keys[3]);
+    t2->get_object(t2_keys[1]).set(t2_link_col, t3_keys[2]);
+    t2->get_object(t2_keys[2]).set(t2_link_col, t3_keys[0]);
+    t2->get_object(t2_keys[3]).set(t2_link_col, t3_keys[1]);
 
-    t3->set_null(t3_int_col, 0);
-    t3->set_int(t3_int_col, 1, 4);
-    t3->set_int(t3_int_col, 2, 7);
-    t3->set_int(t3_int_col, 3, 3);
-    t3->set_string(t3_str_col, 0, "b");
-    t3->set_string(t3_str_col, 1, "a");
-    t3->set_string(t3_str_col, 2, "c");
-    t3->set_string(t3_str_col, 3, "k");
+    t3->get_object(t3_keys[1]).set(t3_int_col, 4);
+    t3->get_object(t3_keys[2]).set(t3_int_col, 7);
+    t3->get_object(t3_keys[3]).set(t3_int_col, 3);
+    t3->get_object(t3_keys[0]).set(t3_str_col, "b");
+    t3->get_object(t3_keys[1]).set(t3_str_col, "a");
+    t3->get_object(t3_keys[2]).set(t3_str_col, "c");
+    t3->get_object(t3_keys[3]).set(t3_str_col, "k");
 
     //  T1                       T2                     T3
     //  t1_int   t1_link_t2  |   t2_int  t2_link_t3 |   t3_int  t3_str
     //  ==============================================================
-    //  99       1           |   5       3          |   null    "b"
-    //  0        0           |   4       2          |   4       "a"
-    //  1        2           |   3       0          |   7       "c"
-    //  2        3           |   2       1          |   3       "k"
-    //  3        5           |   1       null       |
-    //  4        4           |   0       null       |
-    //  5        1           |                      |
+    //  99       11          |   5       23         |   null    "b"
+    //  0        10          |   4       22         |   4       "a"
+    //  1        12          |   3       20         |   7       "c"
+    //  2        13          |   2       21         |   3       "k"
+    //  3        15          |   1       null       |
+    //  4        14          |   0       null       |
+    //  5        11          |                      |
 
     TableView tv = t1->where().less(t1_int_col, 6).find_all();
 
-    // Test original funcionality through chain class
+    // Test original functionality through chain class
     std::vector<size_t> results1 = {0, 1, 2, 3, 4, 5};
     tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
     CHECK_EQUAL(tv.size(), results1.size());
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results1[i]);
     }
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results1[results1.size() - 1 - i]);
     }
 
     // Test basic one link chain
@@ -3484,12 +3444,12 @@ TEST(Query_SortLinkChains)
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
     CHECK_EQUAL(tv.size(), results2.size());
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results2[i]);
     }
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[results2.size() - 1 - i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results2[results2.size() - 1 - i]);
     }
 
     // Test link chain through two links with nulls
@@ -3498,15 +3458,22 @@ TEST(Query_SortLinkChains)
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {true}));
     // No guarantees about nullified links except they are at the end.
     CHECK(tv.size() >= results3.size());
+    util::Optional<int64_t> last;
     for (size_t i = 0; i < results3.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+        util::Optional<int64_t> current = tv[i]
+                                              .get_linked_object(t1_link_col)
+                                              .get_linked_object(t2_link_col)
+                                              .get<util::Optional<int64_t>>(t3_int_col);
+        CHECK(!last || current.value() >= last.value());
+        last = current;
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[i]);
     }
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
     // No guarantees about nullified links except they are at the beginning.
     size_t num_nulls = tv.size() - results3.size();
     for (size_t i = num_nulls; i < results3.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[results2.size() - 1 - i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[results2.size() - 1 - i]);
     }
 
     // Test link chain with nulls and a single local column
@@ -3515,29 +3482,29 @@ TEST(Query_SortLinkChains)
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}));
     CHECK_EQUAL(tv.size(), results4.size());
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results4[i]);
     }
     std::vector<size_t> results4_rev = {1, 0, 2, 5, 4, 3};
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {true, false}));
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results4_rev[i]);
     }
     std::vector<size_t> results4_rev2 = {3, 4, 5, 2, 0, 1};
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, true}));
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev2[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results4_rev2[i]);
     }
     std::vector<size_t> results4_rev3 = {4, 3, 5, 2, 0, 1};
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, false}));
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev3[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results4_rev3[i]);
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Query_LinkChainSortErrors)
 {
     Group g;
