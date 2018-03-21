@@ -674,11 +674,7 @@ private:
     // Detach accessor. This recycles the Table accessor and all subordinate
     // accessors become invalid.
     void detach() noexcept;
-
-    /// Detach and remove all attached row, link list, and subtable
-    /// accessors. This function does not discard the descriptor accessor, if
-    /// any, and it does not discard column accessors either.
-    void discard_child_accessors() noexcept;
+    void fully_detach() noexcept;
 
     ColumnType get_real_column_type(ColKey col_key) const noexcept;
 
@@ -1188,11 +1184,6 @@ public:
     static TableKey get_opposite_link_table_key(const Table& table, ColKey col_key)
     {
         return get_spec(table).get_opposite_link_table_key(table.colkey2ndx(col_key));
-    }
-
-    static void discard_child_accessors(Table& table) noexcept
-    {
-        table.discard_child_accessors();
     }
 
     static bool compare_objects(const Table& a, const Table& b)

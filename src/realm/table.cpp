@@ -840,6 +840,10 @@ void Table::detach() noexcept
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
     m_alloc.bump_instance_version();
+}
+
+void Table::fully_detach() noexcept
+{
     m_next_key_value = -1; // trigger recomputation on next use
     m_spec.detach();
     m_top.detach();
@@ -857,8 +861,9 @@ Table::~Table() noexcept
         m_top.destroy_deep();
     }
 
-    if (m_top.is_attached())
-        detach();
+    if (m_top.is_attached()) {
+        fully_detach();
+    }
 
     for (auto& index : m_index_accessors) {
         delete index;

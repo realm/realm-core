@@ -587,7 +587,16 @@ private:
         }
     };
 
-    static TableRecycler g_table_recycler;
+    // We use the classic approach to construct a FIFO from two LIFO's,
+    // insertion is done into recycler_1, removal is done from recycler_2,
+    // and when recycler_2 is empty, recycler_1 is reversed into recycler_2.
+    // this i O(1) for each entry.
+    static TableRecycler g_table_recycler_1;
+    static TableRecycler g_table_recycler_2;
+    // number of tables held back before being recycled. We hold back recycling
+    // the latest to increase the probability of detecting race conditions
+    // without crashing.
+    const static int g_table_recycling_delay = 100;
     static std::mutex g_table_recycler_mutex;
 
     struct shared_tag {
