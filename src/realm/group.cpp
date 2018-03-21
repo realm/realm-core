@@ -73,7 +73,8 @@ Group::Group()
 }
 
 
-Group::TableRecycler Group::g_table_recycler;
+Group::TableRecycler Group::g_table_recycler_1;
+Group::TableRecycler Group::g_table_recycler_2;
 std::mutex Group::g_table_recycler_mutex;
 
 
@@ -692,9 +693,17 @@ Table* Group::create_table_accessor(size_t table_ndx)
     Table* table = 0;
     {
         std::lock_guard<std::mutex> lg(g_table_recycler_mutex);
-        if (!g_table_recycler.empty()) {
-            table = g_table_recycler.back();
-            g_table_recycler.pop_back();
+        if (g_table_recycler_2.empty()) {
+            while (!g_table_recycler_1.empty()) {
+                auto t = g_table_recycler_1.back();
+                g_table_recycler_1.pop_back();
+                g_table_recycler_2.push_back(t);
+            }
+        }
+        if (g_table_recycler_2.size() + g_table_recycler_1.size() > g_table_recycling_delay) {
+            table = g_table_recycler_2.back();
+            table->fully_detach();
+            g_table_recycler_2.pop_back();
         }
     }
     if (table) {
@@ -713,7 +722,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
 void Group::recycle_table_accessor(Table* to_be_recycled)
 {
     std::lock_guard<std::mutex> lg(g_table_recycler_mutex);
-    g_table_recycler.push_back(to_be_recycled);
+    g_table_recycler_1.push_back(to_be_recycled);
 }
 
 void Group::remove_table(StringData name)
