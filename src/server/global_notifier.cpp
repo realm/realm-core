@@ -61,6 +61,20 @@ void from_json(nlohmann::json const& j, VersionID& v)
 }
 }
 
+namespace {
+static SyncLoggerFactory* s_logger_factory;
+std::unique_ptr<util::Logger> make_logger()
+{
+    auto log_level = SyncManager::shared().log_level();
+    if (s_logger_factory) {
+        return s_logger_factory->make_logger(log_level); // Throws
+    }
+    auto logger = std::make_unique<util::StderrLogger>(); // Throws
+    logger->set_level_threshold(log_level);
+    return std::unique_ptr<util::Logger>(logger.release());
+}
+}
+
 class GlobalNotifier::Impl : public AdminRealmListener {
 public:
     Impl(std::unique_ptr<Callback>, std::string local_root_dir,
@@ -76,6 +90,7 @@ public:
     void error(std::exception_ptr err) override { m_target->error(err); }
     void download_complete() override { m_target->download_complete(); }
 
+    const std::unique_ptr<util::Logger> m_logger;
     const std::unique_ptr<Callback> m_target;
     const std::string m_server_base_url;
     std::shared_ptr<SyncUser> m_user;
@@ -111,6 +126,7 @@ GlobalNotifier::Impl::Impl(std::unique_ptr<Callback> async_target,
                            std::string local_root_dir, std::string server_base_url,
                            std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback)
 : AdminRealmListener(local_root_dir, server_base_url, user, bind_callback)
+, m_logger(make_logger())
 , m_target(std::move(async_target))
 , m_server_base_url(std::move(server_base_url))
 , m_user(std::move(user))
@@ -144,8 +160,11 @@ Realm::Config GlobalNotifier::Impl::get_config(StringData virtual_path, util::Op
 }
 
 void GlobalNotifier::Impl::register_realm(StringData path) {
-    if (!m_target->realm_available(path))
+    if (!m_target->realm_available(path)) {
+        m_logger->trace("Global notifier: not watching %1", path);
         return;
+    }
+    m_logger->trace("Global notifier: watching %1", path);
 
     auto config = get_config(path, util::none);
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config);
@@ -158,7 +177,11 @@ void GlobalNotifier::Impl::register_realm(StringData path) {
             return;
 
         std::lock_guard<std::mutex> l(m_work_queue_mutex);
-        if (!info->shared_group) {
+        if (info->shared_group) {
+            m_logger->trace("Global notifier: sync transaction on (%1): Realm already open", info->virtual_path);
+        }
+        else {
+            m_logger->trace("Global notifier: sync transaction on (%1): opening Realm", info->virtual_path);
             std::unique_ptr<Group> read_only_group;
             auto config = info->coordinator->get_config();
             config.force_sync_history = true; // FIXME: needed?
@@ -168,6 +191,7 @@ void GlobalNotifier::Impl::register_realm(StringData path) {
         }
         info->versions.push(new_version);
         if (info->versions.size() == 1) {
+            m_logger->trace("Global notifier: Signaling main thread");
             m_work_queue.push(info);
             m_signal->notify();
         }
@@ -180,24 +204,29 @@ void GlobalNotifier::Impl::release_version(std::string const& virtual_path, Vers
 
     auto it = m_realms.find(virtual_path);
     REALM_ASSERT(it != m_realms.end());
+    auto& info = it->second;
 
-    auto& sg = it->second.shared_group;
+    auto& sg = info.shared_group;
     REALM_ASSERT(sg->get_version_of_current_transaction() == old_version);
 
-    REALM_ASSERT(!it->second.versions.empty() && it->second.versions.front() == new_version);
-    it->second.versions.pop();
+    REALM_ASSERT(!info.versions.empty() && info.versions.front() == new_version);
+    info.versions.pop();
 
-    if (it->second.versions.empty()) {
-        it->second.shared_group = nullptr;
-        it->second.history = nullptr;
+    if (info.versions.empty()) {
+        info.shared_group = nullptr;
+        info.history = nullptr;
+        m_logger->trace("Global notifier: release version on (%1): no pending versions", info.virtual_path);
     }
     else {
         LangBindHelper::advance_read(*sg, new_version);
-        m_work_queue.push(&it->second);
+        m_work_queue.push(&info);
+        m_logger->trace("Global notifier: release version on (%1): enqueuing next version", info.virtual_path);
     }
 
-    if (!m_work_queue.empty())
+    if (!m_work_queue.empty()) {
+        m_logger->trace("Global notifier: Signaling main thread");
         m_signal->notify();
+    }
 }
 
 GlobalNotifier::GlobalNotifier(std::unique_ptr<Callback> async_target,
@@ -215,6 +244,7 @@ GlobalNotifier::GlobalNotifier(std::unique_ptr<Callback> async_target,
 
 void GlobalNotifier::start()
 {
+    m_impl->m_logger->trace("Global notifier: start()");
     m_impl->start();
 }
 
@@ -223,11 +253,14 @@ GlobalNotifier::~GlobalNotifier() = default;
 util::Optional<GlobalNotifier::ChangeNotification> GlobalNotifier::next_changed_realm()
 {
     std::lock_guard<std::mutex> l(m_impl->m_work_queue_mutex);
-    if (m_impl->m_work_queue.empty())
+    if (m_impl->m_work_queue.empty()) {
+        m_impl->m_logger->trace("Global notifier: next_changed_realm(): no realms pending");
         return util::none;
+    }
 
     auto next = m_impl->m_work_queue.front();
     m_impl->m_work_queue.pop();
+    m_impl->m_logger->trace("Global notifier: notifying for realm at %1", next->virtual_path);
 
     auto old_version = next->shared_group->get_version_of_current_transaction();
     return ChangeNotification(m_impl, next->virtual_path, next->coordinator->get_config(),
@@ -237,6 +270,11 @@ util::Optional<GlobalNotifier::ChangeNotification> GlobalNotifier::next_changed_
 GlobalNotifier::Callback& GlobalNotifier::target()
 {
     return *m_impl->m_target;
+}
+
+void GlobalNotifier::set_logger_factory(SyncLoggerFactory* factory)
+{
+    s_logger_factory = factory;
 }
 
 GlobalNotifier::ChangeNotification::ChangeNotification(std::shared_ptr<GlobalNotifier::Impl> notifier,

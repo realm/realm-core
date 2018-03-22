@@ -25,6 +25,7 @@
 
 namespace realm {
 class SyncUser;
+class SyncLoggerFactory;
 
 /// Used to listen for changes across all, or a subset of all Realms on a
 /// particular sync server.
@@ -45,6 +46,8 @@ public:
 
     class ChangeNotification;
     util::Optional<ChangeNotification> next_changed_realm();
+
+    static void set_logger_factory(SyncLoggerFactory* factory);
 
 private:
     class Impl;
