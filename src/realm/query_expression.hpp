@@ -2116,8 +2116,8 @@ inline Query operator!=(BinaryData left, const Columns<BinaryData>& right)
 template <bool has_links>
 class UnaryLinkCompare : public Expression {
 public:
-    UnaryLinkCompare(LinkMap lm)
-        : m_link_map(std::move(lm))
+    UnaryLinkCompare(const LinkMap& lm)
+        : m_link_map(lm)
     {
     }
 
@@ -2179,8 +2179,8 @@ private:
 
 class LinkCount : public Subexpr2<Int> {
 public:
-    LinkCount(LinkMap link_map)
-        : m_link_map(std::move(link_map))
+    LinkCount(const LinkMap& link_map)
+        : m_link_map(link_map)
     {
     }
     LinkCount(LinkCount const& other)
@@ -2326,8 +2326,8 @@ public:
     {
         // Destination must be of Key type. It only makes sense to
         // compare keys with keys
-        auto d = dynamic_cast<Value<ObjKey>*>(&destination);
-        REALM_ASSERT(d != nullptr);
+        REALM_ASSERT_DEBUG(dynamic_cast<Value<ObjKey>*>(&destination));
+        auto d = static_cast<Value<ObjKey>*>(&destination);
         d->init(false, 1, m_key);
     }
 

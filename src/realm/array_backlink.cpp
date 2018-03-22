@@ -34,7 +34,8 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
         // The table which holds the corresponding fwd links is the source.
 
         // determine target table, column and key.
-        auto cluster = dynamic_cast<Cluster*>(get_parent());
+        REALM_ASSERT_DEBUG(dynamic_cast<Cluster*>(get_parent()));
+        auto cluster = static_cast<Cluster*>(get_parent());
         const Table* target_table = cluster->m_tree_top.get_owner();
         size_t target_col_ndx = get_ndx_in_parent() - 1;
         auto target_col_key = target_table->ndx2colkey(target_col_ndx);

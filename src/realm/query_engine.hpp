@@ -1899,15 +1899,12 @@ public:
 
     TwoColumnsNode(const TwoColumnsNode& from, QueryNodeHandoverPatches* patches)
         : ParentNode(from, patches)
-        , m_column_type(from.m_column_type)
         , m_condition_column_key1(from.m_condition_column_key1)
         , m_condition_column_key2(from.m_condition_column_key2)
     {
     }
 
 private:
-    ColumnType m_column_type;
-
     mutable ColKey m_condition_column_key1;
     mutable ColKey m_condition_column_key2;
 

@@ -143,7 +143,10 @@ public:
     //    bool match(int action, size_t index, int64_t value, QueryState *state);
 
     /// Create an array accessor in the unattached state.
-    using Node::Node;
+    explicit Array(Allocator& allocator) noexcept
+        : Node(allocator)
+    {
+    }
 
     ~Array() noexcept override
     {

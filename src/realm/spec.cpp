@@ -218,7 +218,7 @@ void Spec::convert_column(size_t column_ndx)
     }
     ColumnType type = ColumnType(m_types.get(column_ndx));
     switch (type) {
-        case type_OldTable: {
+        case col_type_OldTable: {
             Spec sub_spec(get_alloc());
             size_t subspec_ndx = get_subspec_ndx(column_ndx);
             ref_type ref = to_ref(m_subspecs.get(subspec_ndx)); // Throws
@@ -229,7 +229,7 @@ void Spec::convert_column(size_t column_ndx)
             m_subspecs.erase(subspec_ndx);
             break;
         }
-        case type_LinkList:
+        case col_type_LinkList:
             m_attr.set(column_ndx, m_attr.get(column_ndx) | col_attr_List);
             break;
         default:

@@ -209,7 +209,15 @@ public:
     typedef Obj* pointer;
     typedef Obj& reference;
 
-    using ConstIterator::ConstIterator;
+    Iterator(const ClusterTree& t, size_t ndx)
+        : ConstIterator(t, ndx)
+    {
+    }
+    Iterator(const ClusterTree& t, ObjKey key)
+        : ConstIterator(t, key)
+    {
+    }
+
     reference operator*() const
     {
         return *operator->();

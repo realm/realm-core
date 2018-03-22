@@ -1466,7 +1466,6 @@ ObjKey Table::find_first_binary(ColKey col_key, BinaryData value) const
 ObjKey Table::find_first_null(ColKey col_key) const
 {
     return where().equal(col_key, null{}).find();
-    return null_key;
 }
 
 template <class T>
@@ -1854,7 +1853,7 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                 //     size_t len = chars_in_int(get_binary(col, row).size()) + 2;
                 //     width = std::max(width, len);
                 // }
-                width += 6; // space for " bytes"
+                // width += 6; // space for " bytes"
                 break;
             case type_String: {
                 // Find max length of the strings
@@ -1863,8 +1862,8 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                 //     size_t len = get_string(col, row).size();
                 //     width = std::max(width, len);
                 // }
-                if (width > 20)
-                    width = 23; // cut strings longer than 20 chars
+                // if (width > 20)
+                //     width = 23; // cut strings longer than 20 chars
                 break;
             }
             case type_LinkList:
@@ -1923,6 +1922,7 @@ void Table::to_string_row(ObjKey key, std::ostream& out, const std::vector<size_
     size_t column_count = get_column_count();
     size_t row_ndx_width = widths[0];
 
+    auto f = out.flags();
     out << std::scientific; // for float/double
     out.width(row_ndx_width);
     out << key.value << ":";
@@ -1976,6 +1976,7 @@ void Table::to_string_row(ObjKey key, std::ostream& out, const std::vector<size_
     }
 
     out << "\n";
+    out.flags(f);
 }
 
 
