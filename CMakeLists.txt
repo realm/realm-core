@@ -173,6 +173,7 @@ export(TARGETS Core QueryParser NAMESPACE Realm:: FILE realm-config.cmake)
 
 # Make the project importable from the install directory
 install(EXPORT realm
+        NAMESPACE Realm::
         FILE realm-config.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
         COMPONENT devel)
