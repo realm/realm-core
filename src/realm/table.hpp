@@ -112,8 +112,8 @@ public:
     /// Conventience functions for inspecting the dynamic table type.
     ///
     size_t get_column_count() const noexcept;
-    DataType get_column_type(ColKey column_key) const noexcept;
-    StringData get_column_name(ColKey column_key) const noexcept;
+    DataType get_column_type(ColKey column_key) const;
+    StringData get_column_name(ColKey column_key) const;
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
     ColKey find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept;
@@ -878,7 +878,7 @@ inline size_t Table::get_column_count() const noexcept
     return m_spec.get_public_column_count();
 }
 
-inline StringData Table::get_column_name(ColKey column_key) const noexcept
+inline StringData Table::get_column_name(ColKey column_key) const
 {
     auto ndx = colkey2ndx(column_key);
     REALM_ASSERT_3(ndx, <, get_column_count());
@@ -900,7 +900,7 @@ inline ColumnType Table::get_real_column_type(ColKey col_key) const noexcept
     return m_spec.get_column_type(ndx);
 }
 
-inline DataType Table::get_column_type(ColKey column_key) const noexcept
+inline DataType Table::get_column_type(ColKey column_key) const
 {
     auto ndx = colkey2ndx(column_key);
     REALM_ASSERT_3(ndx, <, m_spec.get_column_count());

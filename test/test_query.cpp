@@ -3460,13 +3460,13 @@ TEST(Query_SortLinkChains)
     CHECK(tv.size() >= results3.size());
     util::Optional<int64_t> last;
     for (size_t i = 0; i < results3.size(); ++i) {
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[i]);
         util::Optional<int64_t> current = tv[i]
                                               .get_linked_object(t1_link_col)
                                               .get_linked_object(t2_link_col)
                                               .get<util::Optional<int64_t>>(t3_int_col);
         CHECK(!last || current.value() >= last.value());
         last = current;
-        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[i]);
     }
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
@@ -3504,22 +3504,21 @@ TEST(Query_SortLinkChains)
     }
 }
 
-#ifdef LEGACY_TESTS
 TEST(Query_LinkChainSortErrors)
 {
     Group g;
     TableRef t1 = g.add_table("t1");
     TableRef t2 = g.add_table("t2");
 
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_linklist_col = t1->add_column_link(type_LinkList, "t1_linklist", *t2);
-    size_t t2_string_col = t2->add_column(type_String, "t2_string");
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_linklist_col = t1->add_column_link(type_LinkList, "t1_linklist", *t2);
+    auto t2_string_col = t2->add_column(type_String, "t2_string");
     t2->add_column_link(type_Link, "t2_link_t1", *t1); // add a backlink to t1
 
-    // Disallow backlinks, linklists, other non-link column types.
-    size_t backlink_ndx = 2;
+    // Disallow invalid column ids, linklists, other non-link column types.
+    ColKey backlink_ndx(2);
     CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{t1_linklist_col, t2_string_col}}), LogicError::type_mismatch);
-    CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{backlink_ndx, t2_string_col}}), LogicError::type_mismatch);
+    CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{backlink_ndx, t2_string_col}}), LogicError::column_does_not_exist);
     CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{t1_int_col, t2_string_col}}), LogicError::type_mismatch);
 }
 
@@ -3529,13 +3528,12 @@ TEST(Query_EmptyDescriptors)
     Group g;
     TableRef t1 = g.add_table("t1");
 
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
 
-    t1->add_empty_row(4);
-    t1->set_int(t1_int_col, 0, 4);
-    t1->set_int(t1_int_col, 1, 3);
-    t1->set_int(t1_int_col, 2, 2);
-    t1->set_int(t1_int_col, 3, 3);
+    t1->create_object().set(t1_int_col, 4);
+    t1->create_object().set(t1_int_col, 3);
+    t1->create_object().set(t1_int_col, 2);
+    t1->create_object().set(t1_int_col, 3);
 
     std::vector<size_t> results = {4, 3, 2, 3}; // original order
 
@@ -3543,14 +3541,14 @@ TEST(Query_EmptyDescriptors)
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor(*t1, {}));
         for (size_t i = 0; i < results.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
     {   // Distinct with an empty descriptor is a no-op
         TableView tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor(*t1, {}));
         for (size_t i = 0; i < results.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
     {   // Empty sort, empty distinct is still a no-op
@@ -3558,7 +3556,7 @@ TEST(Query_EmptyDescriptors)
         tv.sort(SortDescriptor(*t1, {}));
         tv.distinct(DistinctDescriptor(*t1, {}));
         for (size_t i = 0; i < results.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
     {   // Arbitrary compounded empty sort and distinct is still a no-op
@@ -3571,7 +3569,7 @@ TEST(Query_EmptyDescriptors)
         tv.distinct(DistinctDescriptor(*t1, {}));
         tv.distinct(DistinctDescriptor(*t1, {}));
         for (size_t i = 0; i < results.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
     {   // Empty distinct compounded on a valid distinct is a no-op
@@ -3581,7 +3579,7 @@ TEST(Query_EmptyDescriptors)
         tv.distinct(DistinctDescriptor(*t1, {}));
         results = {4, 3, 2};
         for (size_t i = 0; i < results.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
     {   // Empty sort compounded on a valid sort is a no-op
@@ -3591,19 +3589,19 @@ TEST(Query_EmptyDescriptors)
         tv.sort(SortDescriptor(*t1, {}));
         results = {2, 3, 3, 4};
         for (size_t i = 0; i < results.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
 }
-
 
 TEST(Query_DescriptorsWillApply)
 {
     Group g;
     TableRef t1 = g.add_table("t1");
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_str_col = t1->add_column(type_String, "t1_str");
-    t1->add_empty_row(1);
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(type_String, "t1_str");
+
+    t1->create_object();
 
     DescriptorOrdering ordering;
 
@@ -3641,32 +3639,34 @@ TEST(Query_DescriptorsWillApply)
     CHECK(ordering_copy.will_apply_distinct());
 }
 
-
 TEST(Query_DistinctAndSort)
 {
     Group g;
     TableRef t1 = g.add_table("t1");
     TableRef t2 = g.add_table("t2");
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_str_col = t1->add_column(type_String, "t1_str");
-    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
-    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
-    t1->add_empty_row(6);
-    t2->add_empty_row(6);
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(type_String, "t1_str");
+    auto t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    auto t2_int_col = t2->add_column(type_Int, "t2_int");
 
-    t1->set_int(0, 0, 1); t1->set_string(1, 0, "A"); t1->set_link(2, 0, 1);
-    t1->set_int(0, 1, 1); t1->set_string(1, 1, "A"); t1->set_link(2, 1, 0);
-    t1->set_int(0, 2, 1); t1->set_string(1, 2, "B"); t1->set_link(2, 2, 2);
-    t1->set_int(0, 3, 2); t1->set_string(1, 3, "B"); t1->set_link(2, 3, 3);
-    t1->set_int(0, 4, 2); t1->set_string(1, 4, "A"); t1->set_link(2, 4, 5);
-    t1->set_int(0, 5, 2); t1->set_string(1, 5, "A"); t1->set_link(2, 5, 4);
+    ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5});
+    ObjKeyVector t2_keys({10, 11, 12, 13, 14, 15});
+    t1->create_objects(t1_keys);
+    t2->create_objects(t2_keys);
 
-    t2->set_int(0, 0, 0);
-    t2->set_int(0, 1, 0);
-    t2->set_int(0, 2, 1);
-    t2->set_int(0, 3, 1);
-    t2->set_int(0, 4, 2);
-    t2->set_int(0, 5, 2);
+    t1->get_object(t1_keys[0]).set_all(1, "A", t2_keys[1]);
+    t1->get_object(t1_keys[1]).set_all(1, "A", t2_keys[0]);
+    t1->get_object(t1_keys[2]).set_all(1, "B", t2_keys[2]);
+    t1->get_object(t1_keys[3]).set_all(2, "B", t2_keys[3]);
+    t1->get_object(t1_keys[4]).set_all(2, "A", t2_keys[5]);
+    t1->get_object(t1_keys[5]).set_all(2, "A", t2_keys[4]);
+
+    t2->get_object(t2_keys[0]).set(t2_int_col, 0);
+    t2->get_object(t2_keys[1]).set(t2_int_col, 0);
+    t2->get_object(t2_keys[2]).set(t2_int_col, 1);
+    t2->get_object(t2_keys[3]).set(t2_int_col, 1);
+    t2->get_object(t2_keys[4]).set(t2_int_col, 2);
+    t2->get_object(t2_keys[5]).set(t2_int_col, 2);
 
     //     T1                              T2
     //   | t1_int   t1_str   t1_link_t2  | t2_int  |
@@ -3678,86 +3678,86 @@ TEST(Query_DistinctAndSort)
     // 4 | 2        "A"      5           | 2       |
     // 5 | 2        "A"      4           | 2       |
 
-    using ResultList = std::vector<std::pair<size_t, size_t>>; // value, index
+    using ResultList = std::vector<std::pair<size_t, ObjKey>>; // value, key
     {   // distinct with no sort keeps original order
         TableView tv = t1->where().find_all();
-        ResultList expected = {{1, 0}, {2, 3}};
+        ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[3]}};
         tv.distinct(t1_int_col);
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
     {   // distinct on a sorted view retains sorted order
         TableView tv = t1->where().find_all();
-        ResultList expected = {{1, 0}, {2, 4}};
+        ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[4]}};
         tv.sort(SortDescriptor(*t1, {{t1_str_col}, {t1_int_col}}));
         tv.distinct(t1_int_col);
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
     {   // distinct on a view sorted descending retains sorted order
         TableView tv = t1->where().find_all();
-        ResultList expected = {{2, 3}, {1, 2}};
+        ResultList expected = {{2, t1_keys[3]}, {1, t1_keys[2]}};
         tv.sort(SortDescriptor(*t1, {{t1_str_col}, {t1_int_col}},
                             {false /* descending */, false /* descending */}));
         tv.distinct(t1_int_col);
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
     {   // distinct on a sorted view (different from table order) retains sorted order
         TableView tv = t1->where().find_all();
-        ResultList expected = {{2, 3}, {1, 0}};
+        ResultList expected = {{2, t1_keys[3]}, {1, t1_keys[0]}};
         tv.sort(t1_int_col, false /* descending */);
         tv.distinct(t1_int_col);
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
     {   // distinct across links on an unsorted view retains original order
         TableView tv = t1->where().find_all();
-        ResultList expected = {{1, 0}, {1, 2}, {2, 4}};
+        ResultList expected = {{1, t1_keys[0]}, {1, t1_keys[2]}, {2, t1_keys[4]}};
         tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
     {   // distinct on a view sorted across links retains sorted order
         TableView tv = t1->where().find_all();
-        ResultList expected = {{1, 0}, {2, 3}};
+        ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[3]}};
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         tv.distinct(t1_int_col);
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
     {   // distinct across links and sort across links
         TableView tv = t1->where().find_all();
-        ResultList expected = {{1, 0}, {1, 2}, {2, 4}};
+        ResultList expected = {{1, t1_keys[0]}, {1, t1_keys[2]}, {2, t1_keys[4]}};
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Query_SortDistinctOrderThroughHandover) {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
@@ -3986,7 +3986,7 @@ TEST(Query_CompoundDescriptors) {
         check_across_handover(results, std::move(hp));
     }
 }
-
+#endif
 
 TEST(Query_DistinctThroughLinks)
 {
@@ -3995,48 +3995,50 @@ TEST(Query_DistinctThroughLinks)
     TableRef t2 = g.add_table("t2");
     TableRef t3 = g.add_table("t3");
 
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
-    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
-    size_t t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
-    size_t t3_int_col = t3->add_column(type_Int, "t3_int", true);
-    size_t t3_str_col = t3->add_column(type_String, "t3_str");
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
 
-    t1->add_empty_row(7);
-    t2->add_empty_row(6);
-    t3->add_empty_row(4);
+    auto t2_int_col = t2->add_column(type_Int, "t2_int");
+    auto t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
 
-    t1->set_int(t1_int_col, 0, 99);
+    auto t3_int_col = t3->add_column(type_Int, "t3_int", true);
+    auto t3_str_col = t3->add_column(type_String, "t3_str");
+
+    ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5, 6});
+    ObjKeyVector t2_keys({10, 11, 12, 13, 14, 15});
+    ObjKeyVector t3_keys({20, 21, 22, 23});
+    t1->create_objects(t1_keys);
+    t2->create_objects(t2_keys);
+    t3->create_objects(t3_keys);
+
+    t1->get_object(t1_keys[0]).set(t1_int_col, 99);
     for (size_t i = 0; i < t2->size(); i++) {
-        t1->set_int(t1_int_col, i + 1, i);
-        t2->set_int(t2_int_col, i, t2->size() - i - 1);
+        t1->get_object(t1_keys[i + 1]).set(t1_int_col, int64_t(i));
+        t2->get_object(t2_keys[i]).set(t2_int_col, int64_t(t2->size() - i - 1));
     }
-    t2->set_int(t2_int_col, 0, 0);
-    t2->set_int(t2_int_col, 1, 0);
+    t2->get_object(t2_keys[0]).set(t2_int_col, 0);
+    t2->get_object(t2_keys[1]).set(t2_int_col, 0);
 
-    t1->set_link(t1_link_col, 0, 1);
-    t1->set_link(t1_link_col, 1, 0);
-    t1->set_link(t1_link_col, 2, 2);
-    t1->set_link(t1_link_col, 3, 3);
-    t1->set_link(t1_link_col, 4, 5);
-    t1->set_link(t1_link_col, 5, 4);
-    t1->set_link(t1_link_col, 6, 1);
+    t1->get_object(t1_keys[0]).set(t1_link_col, t2_keys[1]);
+    t1->get_object(t1_keys[1]).set(t1_link_col, t2_keys[0]);
+    t1->get_object(t1_keys[2]).set(t1_link_col, t2_keys[2]);
+    t1->get_object(t1_keys[3]).set(t1_link_col, t2_keys[3]);
+    t1->get_object(t1_keys[4]).set(t1_link_col, t2_keys[5]);
+    t1->get_object(t1_keys[5]).set(t1_link_col, t2_keys[4]);
+    t1->get_object(t1_keys[6]).set(t1_link_col, t2_keys[1]);
 
-    t2->set_link(t2_link_col, 0, 3);
-    t2->set_link(t2_link_col, 1, 2);
-    t2->set_link(t2_link_col, 2, 0);
-    t2->set_link(t2_link_col, 3, 1);
-    t2->nullify_link(t2_link_col, 4);
-    t2->nullify_link(t2_link_col, 5);
+    t2->get_object(t2_keys[0]).set(t2_link_col, t3_keys[3]);
+    t2->get_object(t2_keys[1]).set(t2_link_col, t3_keys[2]);
+    t2->get_object(t2_keys[2]).set(t2_link_col, t3_keys[0]);
+    t2->get_object(t2_keys[3]).set(t2_link_col, t3_keys[1]);
 
-    t3->set_null(t3_int_col, 0);
-    t3->set_int(t3_int_col, 1, 4);
-    t3->set_int(t3_int_col, 2, 7);
-    t3->set_int(t3_int_col, 3, 3);
-    t3->set_string(t3_str_col, 0, "b");
-    t3->set_string(t3_str_col, 1, "a");
-    t3->set_string(t3_str_col, 2, "c");
-    t3->set_string(t3_str_col, 3, "k");
+    t3->get_object(t3_keys[1]).set(t3_int_col, 4);
+    t3->get_object(t3_keys[2]).set(t3_int_col, 7);
+    t3->get_object(t3_keys[3]).set(t3_int_col, 3);
+    t3->get_object(t3_keys[0]).set(t3_str_col, "b");
+    t3->get_object(t3_keys[1]).set(t3_str_col, "a");
+    t3->get_object(t3_keys[2]).set(t3_str_col, "c");
+    t3->get_object(t3_keys[3]).set(t3_str_col, "k");
 
     //  T1                       T2                     T3
     //  t1_int   t1_link_t2  |   t2_int  t2_link_t3 |   t3_int  t3_str
@@ -4057,22 +4059,22 @@ TEST(Query_DistinctThroughLinks)
         tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
         CHECK_EQUAL(tv.size(), results1.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results1[i]);
         }
         tv = t1->where().less(t1_int_col, 6).find_all();
         tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // results haven't been sorted
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results1[i]); // results haven't been sorted
         }
         tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // still same order here by conincidence
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results1[i]); // still same order here by conincidence
         }
         tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]); // now its reversed
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results1[results1.size() - 1 - i]); // now its reversed
         }
     }
 
@@ -4084,7 +4086,7 @@ TEST(Query_DistinctThroughLinks)
         tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         CHECK_EQUAL(tv.size(), results2.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results2[i]);
         }
 
         std::vector<size_t> results2_sorted_link = {0, 4, 2, 1};
@@ -4093,13 +4095,13 @@ TEST(Query_DistinctThroughLinks)
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
         CHECK_EQUAL(tv.size(), results2_sorted_link.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2_sorted_link[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results2_sorted_link[i]);
         }
         tv = t1->where().less(t1_int_col, 6).find_all();
         tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2_sorted_link[results2_sorted_link.size() - 1 - i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results2_sorted_link[results2_sorted_link.size() - 1 - i]);
         }
     }
 
@@ -4113,7 +4115,7 @@ TEST(Query_DistinctThroughLinks)
         // Nullified links are excluded from distinct.
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[i]);
         }
 
         results3 = {1, 0, 2, 5}; // sorted order on t3_col_int { null, 3, 4, 7 }
@@ -4122,19 +4124,19 @@ TEST(Query_DistinctThroughLinks)
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[i]);
         }
         tv = t1->where().less(t1_int_col, 6).find_all();
         tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[results3.size() - 1 - i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[results3.size() - 1 - i]);
         }
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Query_Sort_And_Requery_Typed1)
 {
     TestTable ttt;

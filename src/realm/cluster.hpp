@@ -19,6 +19,7 @@
 #ifndef REALM_CLUSTER_HPP
 #define REALM_CLUSTER_HPP
 
+#include <realm/keys.hpp>
 #include <realm/array.hpp>
 #include <realm/array_unsigned.hpp>
 #include <realm/data_type.hpp>
@@ -33,69 +34,6 @@ class ClusterNodeInner;
 class ClusterTree;
 class ColumnAttrMask;
 struct CascadeState;
-
-struct ObjKey {
-    constexpr ObjKey()
-        : value(-1)
-    {
-    }
-    explicit ObjKey(int64_t val)
-        : value(val)
-    {
-    }
-    ObjKey& operator=(int64_t val)
-    {
-        value = val;
-        return *this;
-    }
-    bool operator==(const ObjKey& rhs) const
-    {
-        return value == rhs.value;
-    }
-    bool operator!=(const ObjKey& rhs) const
-    {
-        return value != rhs.value;
-    }
-    bool operator<(const ObjKey& rhs) const
-    {
-        return value < rhs.value;
-    }
-    bool operator>(const ObjKey& rhs) const
-    {
-        return value > rhs.value;
-    }
-    operator bool() const
-    {
-        return value != -1;
-    }
-    int64_t value;
-
-private:
-    // operator bool will enable casting to integer. Prevent this.
-    operator int64_t() const
-    {
-        return 0;
-    }
-};
-
-class ObjKeyVector : public std::vector<ObjKey> {
-public:
-    ObjKeyVector(const std::vector<int64_t>& init)
-    {
-        reserve(init.size());
-        for (auto i : init) {
-            emplace_back(i);
-        }
-    }
-};
-
-inline std::ostream& operator<<(std::ostream& ostr, ObjKey key)
-{
-    ostr << "Key(" << key.value << ")";
-    return ostr;
-}
-
-constexpr ObjKey null_key;
 
 class ClusterNode : public Array {
 public:

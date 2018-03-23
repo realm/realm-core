@@ -24,7 +24,6 @@
 #include <realm/string_data.hpp>
 #include <realm/data_type.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/mixed.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/impl/input_stream.hpp>
@@ -504,9 +503,6 @@ private:
 
     template <class... L>
     void append_simple_instr(L... numbers);
-
-    template <class... L>
-    void append_mixed_instr(Instruction instr, const Mixed& value, L... numbers);
 
     template <class T>
     static char* encode_int(char*, T value);
