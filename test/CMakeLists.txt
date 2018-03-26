@@ -116,7 +116,7 @@ else()
 endif()
 
 if (MSVC)
-    set_source_files_properties(test_query.cpp PROPERTIES COMPILE_FLAGS /bigobj)
+    set_source_files_properties(test_query.cpp test_query_big.cpp PROPERTIES COMPILE_FLAGS /bigobj)
 endif()
 
 add_executable(realm-tests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
