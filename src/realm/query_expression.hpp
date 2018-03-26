@@ -2563,13 +2563,11 @@ public:
         for (size_t i = 0; i < list_refs.m_values; i++) {
             ref_type list_ref = list_refs.m_storage[i];
             if (list_ref) {
-                typename ColumnTypeTraits<T>::cluster_leaf_type leaf(alloc);
-                leaf.init_from_ref(list_ref);
-                size_t s = leaf.size();
+                BPlusTree<T> list(alloc);
+                list.init_from_ref(list_ref);
+                size_t s = list.size();
                 for (size_t j = 0; j < s; j++) {
-                    if (!leaf.is_null(j)) {
-                        v.m_storage.set(k++, leaf.get(j));
-                    }
+                    v.m_storage.set(k++, list.get(j));
                 }
             }
         }
@@ -2640,9 +2638,9 @@ public:
         for (size_t i = 0; i < list_refs.m_values; i++) {
             ref_type list_ref = list_refs.m_storage[i];
             if (list_ref) {
-                typename ColumnTypeTraits<T>::cluster_leaf_type leaf(alloc);
-                leaf.init_from_ref(list_ref);
-                size_t s = leaf.size();
+                BPlusTree<T> list(alloc);
+                list.init_from_ref(list_ref);
+                size_t s = list.size();
                 d->m_storage.set(i, SizeOfList(s));
             }
             else {
@@ -2718,11 +2716,11 @@ public:
             auto list_ref = list_refs.m_storage[i];
             Operation op;
             if (list_ref) {
-                typename ColumnTypeTraits<T>::cluster_leaf_type leaf(alloc);
-                leaf.init_from_ref(list_ref);
-                size_t s = leaf.size();
+                BPlusTree<T> list(alloc);
+                list.init_from_ref(list_ref);
+                size_t s = list.size();
                 for (unsigned j = 0; j < s; j++) {
-                    op.accumulate(leaf.get(j));
+                    op.accumulate(list.get(j));
                 }
             }
             if (op.is_null()) {

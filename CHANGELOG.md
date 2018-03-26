@@ -44,7 +44,10 @@
 * Table::merge_rows() not supported. Not needed anymore.
 * Ref-counted freestanding tables can no longer be created (by Table::create)
 * OldDateTime is no longer supported
-
+* An old database cannot be opened without being updated to the new file version.
+  This implies that an old database cannot be opened in read-only, as read-only
+  prevents updating.
+* Only file format versions from 6 and onwards can be opened (realm core v2.0.0)
 
 ----------------------------------------------
 

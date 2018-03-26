@@ -675,7 +675,6 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 {
     bool is_shared = m_group.m_is_shared;
-    SlabAlloc& alloc = m_group.m_alloc;
 
     // We need to consider the "logical" size of the file here, and not the real
     // size. The real size may have changed without the free space information
@@ -684,14 +683,38 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // extended the file size. It can also happen as part of initial file expansion
     // during attach_file().
     size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
-    size_t new_file_size = logical_file_size;
-    if (REALM_UNLIKELY(int_add_with_overflow_detect(new_file_size, requested_size))) {
-        throw MaximumFileSizeExceeded("GroupWriter cannot extend free space: " + util::to_string(logical_file_size)
-                                      + " + " + util::to_string(requested_size));
+    // find minimal new size according to the following growth ratios:
+    // at least 100% (doubling) until we reach 1MB, then just grow with 1MB at a time
+    uint64_t minimal_new_size = logical_file_size;
+    constexpr uint64_t growth_boundary = 1024 * 1024; // 1MB
+    if (minimal_new_size < growth_boundary) {
+        minimal_new_size *= 2;
+    }
+    else {
+        minimal_new_size += growth_boundary;
+    }
+    // grow with at least the growth ratio, but if more is required, grow more
+    uint64_t required_new_size = logical_file_size + requested_size;
+    if (required_new_size > minimal_new_size) {
+        minimal_new_size = required_new_size;
+    }
+    // Ensure that minimal_new_size is less than 3 GB on a 32 bit device
+    if (minimal_new_size > (std::numeric_limits<size_t>::max() / 4 * 3)) {
+        throw MaximumFileSizeExceeded("GroupWriter cannot extend free space: " + util::to_string(logical_file_size) +
+                                      " + " + util::to_string(requested_size));
     }
 
-    if (!alloc.matches_section_boundary(new_file_size)) {
-        new_file_size = alloc.get_upper_section_boundary(new_file_size);
+    // We now know that it is safe to assign size to something of size_t
+    // and we know that the following adjustments are safe to perform
+    size_t new_file_size = static_cast<size_t>(minimal_new_size);
+
+    // align to page size, but do not cross a section boundary
+    size_t next_boundary = m_alloc.align_size_to_section_boundary(new_file_size);
+    new_file_size = util::round_up_to_page_size(new_file_size);
+    if (new_file_size > next_boundary) {
+        // we cannot cross a section boundary. In this case the allocation will
+        // likely fail, then retry and we'll allocate anew from the next section
+        new_file_size = next_boundary;
     }
     // The size must be a multiple of 8. This is guaranteed as long as
     // the initial size is a multiple of 8.
@@ -705,10 +728,10 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // ensure non-concurrent file mutation.
     m_alloc.resize_file(new_file_size); // Throws
 
-    //    m_file_map.remap(m_alloc.get_file(), File::access_ReadWrite, new_file_size); // Throws
-
     size_t chunk_ndx = m_free_positions.size();
-    size_t chunk_size = new_file_size - logical_file_size;
+    // as new_file_size is larger than logical_file_size, but known to
+    // be representable in a size_t, so is the result:
+    size_t chunk_size = new_file_size - static_cast<size_t>(logical_file_size);
     REALM_ASSERT_3(chunk_size % 8, ==, 0); // 8-byte alignment
     m_free_positions.add(logical_file_size);
     m_free_lengths.add(chunk_size);

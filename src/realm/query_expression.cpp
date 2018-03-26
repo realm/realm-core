@@ -145,11 +145,11 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm)
     }
     else if (type == col_type_LinkList) {
         if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(row)) {
-            ArrayKey arr(get_base_table()->get_alloc());
-            arr.init_from_ref(ref);
-            size_t sz = arr.size();
+            BPlusTree<ObjKey> links(get_base_table()->get_alloc());
+            links.init_from_ref(ref);
+            size_t sz = links.size();
             for (size_t t = 0; t < sz; t++) {
-                ObjKey k = arr.get(t);
+                ObjKey k = links.get(t);
                 if (last) {
                     bool continue2 = lm.consume(k);
                     if (!continue2)

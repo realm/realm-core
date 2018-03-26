@@ -20,6 +20,7 @@
 #define REALM_LIST_HPP
 
 #include <realm/obj.hpp>
+#include <realm/bplustree.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/array_key.hpp>
 #include <realm/array_bool.hpp>
@@ -170,7 +171,6 @@ protected:
         }
         m_deleted.insert(it, ndx);
     }
-    void insert_null_repl(Replication* repl, size_t ndx) const;
     void erase_repl(Replication* repl, size_t ndx) const;
     void move_repl(Replication* repl, size_t from, size_t to) const;
     void swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const;
@@ -247,8 +247,6 @@ private:
 template <class T>
 class ConstListIf : public ConstListBase {
 public:
-    using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
-
     /**
      * Only member functions not referring to an index in the list will check if
      * the object is up-to-date. The logic is that the user must always check the
@@ -261,7 +259,7 @@ public:
 
         update_if_needed();
 
-        return is_null() ? 0 : m_leaf->size();
+        return is_null() ? 0 : m_tree->size();
     }
     bool is_null() const override
     {
@@ -269,10 +267,10 @@ public:
     }
     T get(size_t ndx) const
     {
-        if (ndx >= m_leaf->size()) {
+        if (ndx >= m_tree->size()) {
             throw std::out_of_range("Index out of range");
         }
-        return m_leaf->get(ndx);
+        return m_tree->get(ndx);
     }
     T operator[](size_t ndx) const
     {
@@ -288,30 +286,30 @@ public:
     }
 
 protected:
-    mutable std::unique_ptr<LeafType> m_leaf;
+    mutable std::unique_ptr<BPlusTree<T>> m_tree;
     mutable bool m_valid = false;
 
     ConstListIf(ColKey col_key, Allocator& alloc)
         : ConstListBase(col_key)
-        , m_leaf(new LeafType(alloc))
+        , m_tree(new BPlusTree<T>(alloc))
     {
-        m_leaf->set_parent(this, 0); // ndx not used, implicit in m_owner
+        m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
     }
 
     ConstListIf(const ConstListIf&) = delete;
     ConstListIf(ConstListIf&& other)
         : ConstListBase(std::move(other))
-        , m_leaf(std::move(other.m_leaf))
+        , m_tree(std::move(other.m_tree))
         , m_valid(other.m_valid)
     {
-        m_leaf->set_parent(this, 0);
+        m_tree->set_parent(this, 0);
     }
 
     void init_from_parent() const override
     {
         ref_type ref = get_child_ref(0);
         if (ref) {
-            m_leaf->init_from_ref(ref);
+            m_tree->init_from_ref(ref);
             m_valid = true;
         }
     }
@@ -354,7 +352,7 @@ public:
 template <class T>
 class List : public ConstListIf<T>, public ListBase {
 public:
-    using ConstListIf<T>::m_leaf;
+    using ConstListIf<T>::m_tree;
     using ConstListIf<T>::get;
 
     List(const Obj& owner, ColKey col_key);
@@ -365,6 +363,12 @@ public:
         this->set_obj(&m_obj);
     }
 
+    List& operator=(const BPlusTree<T>& other)
+    {
+        *m_tree = other;
+        return *this;
+    }
+
     void update_child_ref(size_t, ref_type new_ref) override
     {
         m_obj.set_int(ConstListBase::m_col_key, from_ref(new_ref));
@@ -372,38 +376,36 @@ public:
 
     void create()
     {
-        m_leaf->create();
+        m_tree->create();
         ConstListIf<T>::m_valid = true;
     }
+
     size_t size() const override
     {
         return ConstListIf<T>::size();
     }
+
     void insert_null(size_t ndx) override
     {
-        if (ndx > m_leaf->size()) {
-            throw std::out_of_range("Index out of range");
-        }
-        ensure_writeable();
-        if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
-            ConstListBase::insert_null_repl(repl, ndx);
-        }
-        m_leaf->insert(ndx, ConstListIf<T>::LeafType::default_value(false));
+        insert(ndx, BPlusTree<T>::default_value());
     }
+
     void resize(size_t new_size) override
     {
         update_if_needed();
-        size_t current_size = m_leaf->size();
+        size_t current_size = m_tree->size();
         while (new_size > current_size) {
             insert_null(current_size++);
         }
         remove(new_size, current_size);
         m_obj.bump_both_versions();
     }
+
     void add(T value)
     {
-        insert(m_leaf->size(), value);
+        insert(m_tree->size(), value);
     }
+
     T set(size_t ndx, T value)
     {
         // get will check for ndx out of bounds
@@ -418,16 +420,25 @@ public:
         }
         return old;
     }
+
     void insert(size_t ndx, T value)
     {
-        insert_null(ndx);
-        set(ndx, value);
+        if (ndx > m_tree->size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        ensure_writeable();
+        if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+            insert_repl(repl, ndx, value);
+        }
+        do_insert(ndx, value);
         m_obj.bump_both_versions();
     }
+
     T remove(ListIterator<T>& it)
     {
         return remove(ConstListBase::adjust(it.m_ndx));
     }
+
     T remove(size_t ndx)
     {
         ensure_writeable();
@@ -435,18 +446,20 @@ public:
             ConstListBase::erase_repl(repl, ndx);
         }
         T old = get(ndx);
-        m_leaf->erase(ndx);
+        do_remove(ndx);
         ConstListBase::adj_remove(ndx);
         m_obj.bump_both_versions();
 
         return old;
     }
+
     void remove(size_t from, size_t to) override
     {
         while (from < to) {
             remove(--to);
         }
     }
+
     void move(size_t from, size_t to) override
     {
         if (from != to) {
@@ -458,23 +471,26 @@ public:
             int adj = (from < to) ? 1 : -1;
             while (from != to) {
                 size_t neighbour = from + adj;
-                do_set(from, get(neighbour));
+                T val = m_tree->get(neighbour);
+                m_tree->set(from, val);
                 from = neighbour;
             }
-            do_set(to, tmp);
+            m_tree->set(to, tmp);
         }
     }
+
     void swap(size_t ndx1, size_t ndx2) override
     {
         if (ndx1 != ndx2) {
             if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
                 ConstListBase::swap_repl(repl, ndx1, ndx2);
             }
-            T tmp = get(ndx1);
-            do_set(ndx1, get(ndx2));
-            do_set(ndx2, tmp);
+            T tmp = m_tree->get(ndx1);
+            m_tree->set(ndx1, get(ndx2));
+            m_tree->set(ndx2, tmp);
         }
     }
+
     void clear() override
     {
         update_if_needed();
@@ -482,7 +498,7 @@ public:
         if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
             ConstListBase::clear_repl(repl);
         }
-        m_leaf->truncate_and_destroy_children(0);
+        m_tree->clear();
         m_obj.bump_both_versions();
     }
 
@@ -491,7 +507,7 @@ protected:
     bool update_if_needed()
     {
         if (m_obj.update_if_needed()) {
-            m_leaf->init_from_parent();
+            m_tree->init_from_parent();
             return true;
         }
         return false;
@@ -500,21 +516,33 @@ protected:
     {
         if (!m_obj.is_writeable()) {
             m_obj.ensure_writeable();
-            m_leaf->init_from_parent();
+            m_tree->init_from_parent();
         }
     }
     void do_set(size_t ndx, T value)
     {
-        m_leaf->set(ndx, value);
+        m_tree->set(ndx, value);
+    }
+    void do_insert(size_t ndx, T value)
+    {
+        m_tree->insert(ndx, value);
+    }
+    void do_remove(size_t ndx)
+    {
+        m_tree->erase(ndx);
     }
     void set_repl(Replication* repl, size_t ndx, T value);
+    void insert_repl(Replication* repl, size_t ndx, T value);
 };
 
 template <>
 void List<ObjKey>::do_set(size_t ndx, ObjKey target_key);
 
 template <>
-ObjKey List<ObjKey>::remove(size_t ndx);
+void List<ObjKey>::do_insert(size_t ndx, ObjKey target_key);
+
+template <>
+void List<ObjKey>::do_remove(size_t ndx);
 
 template <>
 void List<ObjKey>::clear();
@@ -564,7 +592,7 @@ public:
 
     LinkList(const Obj& owner, ColKey col_key)
         : List<ObjKey>(owner, col_key)
-        , ObjList(*this->m_leaf, &get_target_table())
+        , ObjList(*this->m_tree, &get_target_table())
     {
     }
     LinkListPtr clone() const

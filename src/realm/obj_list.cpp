@@ -22,6 +22,16 @@
 
 using namespace realm;
 
+size_t ObjList::size() const
+{
+    return m_key_values.size();
+}
+
+// Get key for object this view is "looking" at.
+ObjKey ObjList::get_key(size_t ndx) const
+{
+    return ObjKey(m_key_values.get(ndx));
+}
 
 void ObjList::do_sort(const DescriptorOrdering& ordering)
 {

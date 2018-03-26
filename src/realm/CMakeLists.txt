@@ -14,6 +14,7 @@ set(REALM_SOURCES
     array_string_long.cpp
     array_timestamp.cpp
     bptree.cpp
+    bplustree.cpp
     cluster.cpp
     column.cpp
     column_backlink.cpp

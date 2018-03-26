@@ -31,9 +31,9 @@ void ArrayBinary::create()
     static_cast<ArraySmallBlobs*>(m_arr)->create();
 }
 
-void ArrayBinary::init_from_ref(ref_type ref) noexcept
+void ArrayBinary::init_from_mem(MemRef mem) noexcept
 {
-    char* header = m_alloc.translate(ref);
+    char* header = mem.get_addr();
 
     ArrayParent* parent = m_arr->get_parent();
     size_t ndx_in_parent = m_arr->get_ndx_in_parent();
@@ -41,11 +41,11 @@ void ArrayBinary::init_from_ref(ref_type ref) noexcept
     m_is_big = Array::get_context_flag_from_header(header);
     if (!m_is_big) {
         auto arr = new (&m_storage.m_small_blobs) ArraySmallBlobs(m_alloc);
-        arr->init_from_mem(MemRef(header, ref, m_alloc));
+        arr->init_from_mem(mem);
     }
     else {
         auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
-        arr->init_from_mem(MemRef(header, ref, m_alloc));
+        arr->init_from_mem(mem);
     }
 
     m_arr->set_parent(parent, ndx_in_parent);

@@ -853,14 +853,12 @@ TEST(Group_Invalid1)
     CHECK_THROW(Group(path, crypt_key()), File::NotFound);
 }
 
-
 TEST(Group_Invalid2)
 {
     // Try to open buffer with invalid data
     const char* const str = "invalid data";
     CHECK_THROW(Group(BinaryData(str, strlen(str))), InvalidDatabase);
 }
-
 
 TEST(Group_Overwrite)
 {

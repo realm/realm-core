@@ -52,7 +52,11 @@ public:
         m_arr->update_parent();
     }
 
-    void init_from_ref(ref_type ref) noexcept override;
+    void init_from_mem(MemRef mem) noexcept;
+    void init_from_ref(ref_type ref) noexcept override
+    {
+        init_from_mem(MemRef(m_alloc.translate(ref), ref, m_alloc));
+    }
     void init_from_parent();
 
     size_t size() const;

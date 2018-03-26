@@ -203,6 +203,40 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
     return spec_set.get_mem();
 }
 
+void Spec::convert_column(size_t column_ndx)
+{
+    if (column_ndx < m_num_public_columns) {
+        StringData name = m_names.get(column_ndx);
+        if (name.size() == 0) {
+            auto new_name = std::string("col_") + util::to_string(column_ndx);
+            m_names.set(column_ndx, new_name);
+        }
+        else if (m_names.find_first(name) != column_ndx) {
+            auto new_name = std::string(name.data()) + '_' + util::to_string(column_ndx);
+            m_names.set(column_ndx, new_name);
+        }
+    }
+    ColumnType type = ColumnType(m_types.get(column_ndx));
+    switch (type) {
+        case type_OldTable: {
+            Spec sub_spec(get_alloc());
+            size_t subspec_ndx = get_subspec_ndx(column_ndx);
+            ref_type ref = to_ref(m_subspecs.get(subspec_ndx)); // Throws
+            sub_spec.init(ref);
+            m_types.set(column_ndx, sub_spec.get_column_type(0));
+            m_attr.set(column_ndx, m_attr.get(column_ndx) | col_attr_List);
+            sub_spec.destroy();
+            m_subspecs.erase(subspec_ndx);
+            break;
+        }
+        case type_LinkList:
+            m_attr.set(column_ndx, m_attr.get(column_ndx) | col_attr_List);
+            break;
+        default:
+            break;
+    }
+}
+
 
 void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, StringData name, int attr)
 {
@@ -328,7 +362,8 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx == get_column_count() || get_column_type(column_ndx) == col_type_Link ||
                  get_column_type(column_ndx) == col_type_LinkList ||
-                 get_column_type(column_ndx) == col_type_BackLink);
+                 get_column_type(column_ndx) == col_type_BackLink ||
+                 get_column_type(column_ndx) == col_type_OldTable);
 
     return get_subspec_ndx_after(column_ndx, column_ndx);
 }

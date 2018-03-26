@@ -476,7 +476,7 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
 
     if (target_key != old_key) {
         CascadeState state;
-        bool recurse = update_backlinks(col_key, old_key, target_key, state);
+        bool recurse = replace_backlink(col_key, old_key, target_key, state);
 
         values.set(m_row_ndx, target_key);
 
@@ -636,10 +636,13 @@ void Obj::nullify_link(ColKey origin_col_key, ObjKey target_key)
         linklists.set_parent(&fields, origin_col_ndx + 1);
         linklists.init_from_parent();
 
-        ArrayKey links(alloc);
+        BPlusTree<ObjKey> links(alloc);
         links.set_parent(&linklists, m_row_ndx);
         links.init_from_parent();
-        links.nullify(target_key);
+        size_t ndx = links.find_first(target_key);
+        // There must be one
+        REALM_ASSERT(ndx != realm::npos);
+        links.erase(ndx);
 
         alloc.bump_storage_version();
     }
@@ -657,7 +660,26 @@ void Obj::nullify_link(ColKey origin_col_key, ObjKey target_key)
     }
 }
 
-bool Obj::update_backlinks(ColKey col_key, ObjKey old_key, ObjKey new_key, CascadeState& state)
+void Obj::set_backlink(ColKey col_key, ObjKey new_key)
+{
+    if (new_key != realm::null_key) {
+        TableRef target_table = get_target_table(col_key);
+        ColKey backlink_col_key = target_table->find_backlink_column(get_table_key(), col_key);
+
+        Obj target_obj = target_table->get_object(new_key);
+        target_obj.add_backlink(backlink_col_key, m_key); // Throws
+    }
+}
+
+bool Obj::replace_backlink(ColKey col_key, ObjKey old_key, ObjKey new_key, CascadeState& state)
+{
+    bool recurse = remove_backlink(col_key, old_key, state);
+    set_backlink(col_key, new_key);
+
+    return recurse;
+}
+
+bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
 {
     bool recurse = false;
 
@@ -675,18 +697,13 @@ bool Obj::update_backlinks(ColKey col_key, ObjKey old_key, ObjKey new_key, Casca
 
         // Check if the object should be cascade deleted
         if (mode != CascadeState::none && (mode == CascadeState::all || (strong_links && last_removed))) {
-            bool backlinks = target_obj.has_backlinks(state.m_mode == CascadeState::strong);
+            bool have_backlinks = target_obj.has_backlinks(state.m_mode == CascadeState::strong);
 
-            if (!backlinks) {
+            if (!have_backlinks) {
                 state.rows.emplace_back(target_table->get_key(), old_key);
                 recurse = true;
             }
         }
-    }
-
-    if (new_key != realm::null_key) {
-        Obj target_obj = target_table->get_object(new_key);
-        target_obj.add_backlink(backlink_col_key, m_key); // Throws
     }
 
     return recurse;

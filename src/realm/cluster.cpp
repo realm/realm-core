@@ -1119,7 +1119,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
 
             if (ref) {
                 if (col_type == col_type_LinkList) {
-                    ArrayKey links(m_alloc);
+                    BPlusTree<ObjKey> links(m_alloc);
                     links.init_from_ref(ref);
                     if (links.size() > 0) {
                         remove_backlinks(ObjKey(key.value + m_offset), col_ndx, links.get_all(), state);
@@ -1697,7 +1697,7 @@ void ClusterTree::remove_links()
                 size_t sz = values.size();
                 for (size_t i = 0; i < sz; i++) {
                     if (ref_type ref = values.get_as_ref(i)) {
-                        ArrayKey links(alloc);
+                        BPlusTree<ObjKey> links(alloc);
                         links.init_from_ref(ref);
                         if (links.size() > 0) {
                             cluster->remove_backlinks(cluster->get_real_key(i), col_ndx, links.get_all(), state);

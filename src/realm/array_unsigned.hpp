@@ -27,8 +27,8 @@ namespace realm {
 class ArrayUnsigned : public Node {
 
 public:
-    ArrayUnsigned(Allocator& alloc)
-        : Node(alloc)
+    ArrayUnsigned(Allocator& allocator)
+        : Node(allocator)
     {
     }
 
@@ -79,7 +79,7 @@ public:
     {
         if (diff != 0) {
             // FIXME: Should be optimized
-            for (size_t i = begin; i != end; ++i)
+            for (size_t i = begin; i < end; ++i)
                 adjust(i, diff); // Throws
         }
     }

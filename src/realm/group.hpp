@@ -62,7 +62,7 @@ class TransactLogParser;
 ///
 /// \endcode
 ///
-class Group : private Table::Parent {
+class Group : public ArrayParent {
 public:
     /// Construct a free-standing group. This group instance will be
     /// in the attached state, but neither associated with a file, nor
@@ -579,6 +579,7 @@ private:
     Array m_top;
     Array m_tables;
     ArrayStringShort m_table_names;
+    uint64_t m_last_seen_mapping_version = 0;
 
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
@@ -630,7 +631,7 @@ private:
 
     /// \param writable Must be set to true when, and only when attaching for a
     /// write transaction.
-    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable);
+    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint64_t new_version);
 
     void create_empty_group();
     void remove_table(size_t table_ndx, TableKey key);
@@ -638,7 +639,7 @@ private:
     void reset_free_space_tracking();
 
     void remap(size_t new_file_size);
-    void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size);
+    void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, uint64_t new_version);
 
     /// Recursively update refs stored in all cached array
     /// accessors. This includes cached array accessors in any
@@ -654,22 +655,6 @@ private:
 
     // Overriding method in ArrayParent
     ref_type get_child_ref(size_t) const noexcept override;
-
-    // Overriding method in Table::Parent
-    StringData get_child_name(size_t) const noexcept override;
-
-    // Overriding method in Table::Parent
-    void child_accessor_destroyed(Table*) noexcept override;
-
-    // Overriding method in Table::Parent
-    std::recursive_mutex* get_accessor_management_lock() noexcept override
-    {
-        // we don't need locking for group!
-        return nullptr;
-    }
-
-    // Overriding method in Table::Parent
-    Group* get_parent_group() noexcept override;
 
     class TableWriter;
     class DefaultTableWriter;
@@ -711,7 +696,8 @@ private:
     void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
     void update_num_objects();
     class TransactAdvancer;
-    void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&);
+    void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&,
+                          uint64_t new_version);
     void refresh_dirty_accessors();
 
     /// \brief The version of the format of the node structure (in file or in
@@ -836,6 +822,7 @@ inline Group::Group(const std::string& file, const char* key, OpenMode mode)
     open(file, key, mode); // Throws
 }
 
+
 inline Group::Group(BinaryData buffer, bool take_ownership)
     : m_alloc() // Throws
     , m_top(m_alloc)
@@ -858,11 +845,6 @@ inline Group::Group(unattached_tag) noexcept
     , m_total_rows(0)
 {
     init_array_parents();
-}
-
-inline Group* Group::get_parent_group() noexcept
-{
-    return this;
 }
 
 inline Group::Group(shared_tag) noexcept
@@ -1028,16 +1010,6 @@ inline void Group::update_child_ref(size_t child_ndx, ref_type new_ref)
 inline ref_type Group::get_child_ref(size_t child_ndx) const noexcept
 {
     return m_tables.get_as_ref(child_ndx);
-}
-
-inline StringData Group::get_child_name(size_t child_ndx) const noexcept
-{
-    return m_table_names.get(child_ndx);
-}
-
-inline void Group::child_accessor_destroyed(Table*) noexcept
-{
-    // Ignore
 }
 
 inline bool Group::has_cascade_notification_handler() const noexcept
@@ -1268,9 +1240,10 @@ public:
         group.detach();
     }
 
-    static void attach_shared(Group& group, ref_type new_top_ref, size_t new_file_size, bool writable)
+    static void attach_shared(Group& group, ref_type new_top_ref, size_t new_file_size, bool writable,
+                              uint64_t new_version)
     {
-        group.attach_shared(new_top_ref, new_file_size, writable); // Throws
+        group.attach_shared(new_top_ref, new_file_size, writable, new_version); // Throws
     }
 
     static void reset_free_space_tracking(Group& group)
@@ -1283,15 +1256,15 @@ public:
         group.remap(new_file_size); // Throws
     }
 
-    static void remap_and_update_refs(Group& group, ref_type new_top_ref, size_t new_file_size)
+    static void remap_and_update_refs(Group& group, ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
     {
-        group.remap_and_update_refs(new_top_ref, new_file_size); // Throws
+        group.remap_and_update_refs(new_top_ref, new_file_size, new_version); // Throws
     }
 
     static void advance_transact(Group& group, ref_type new_top_ref, size_t new_file_size,
-                                 _impl::NoCopyInputStream& in)
+                                 _impl::NoCopyInputStream& in, uint64_t new_version)
     {
-        group.advance_transact(new_top_ref, new_file_size, in); // Throws
+        group.advance_transact(new_top_ref, new_file_size, in, new_version); // Throws
     }
 
     static void create_empty_group_when_missing(Group& group)

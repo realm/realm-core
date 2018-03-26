@@ -25,12 +25,17 @@
 
 namespace realm {
 
-class ArrayKey : public ArrayPayload, private Array {
+// If this class is used directly in a cluster leaf, the links are stored as the
+// link value +1 in order to represent the null_key (-1) as 0. If the class is used
+// in BPlusTree<ObjKey> class, the values should not be adjusted.
+template <int adj>
+class ArrayKeyBase : public ArrayPayload, private Array {
 public:
     using value_type = ObjKey;
 
     using Array::set_parent;
     using Array::is_attached;
+    using Array::init_from_mem;
     using Array::init_from_parent;
     using Array::update_parent;
     using Array::get_ref;
@@ -39,47 +44,9 @@ public:
     using Array::clear;
     using Array::destroy;
 
-    ArrayKey(Allocator& allocator)
+    ArrayKeyBase(Allocator& allocator)
         : Array(allocator)
     {
-    }
-
-    ArrayKey(const ArrayKey& other)
-        : Array(other.get_alloc())
-    {
-        *this = other;
-    }
-
-    ArrayKey(ArrayKey&& other)
-        : Array(other.get_alloc())
-    {
-        *this = std::move(other);
-    }
-
-    ArrayKey& operator=(ArrayKey&& other)
-    {
-        // Moving elements is only allowed between freestanding arrays
-        REALM_ASSERT(&other.get_alloc() == &Allocator::get_default());
-        REALM_ASSERT(&other.get_alloc() == &get_alloc());
-        destroy();
-        init_from_mem(other.get_mem());
-        other.detach();
-        return *this;
-    }
-
-    ArrayKey& operator=(const ArrayKey& other)
-    {
-        // Copying elements is only allowed between freestanding arrays
-        REALM_ASSERT(&other.get_alloc() == &Allocator::get_default());
-        REALM_ASSERT(&other.get_alloc() == &get_alloc());
-        Allocator& allocator = get_alloc();
-        MemRef mem = other.clone_deep(allocator); // Throws
-        _impl::DeepArrayRefDestroyGuard ref_guard(mem.get_ref(), allocator);
-        destroy();
-        init_from_mem(mem);
-        ref_guard.release();
-
-        return *this;
     }
 
     static ObjKey default_value(bool)
@@ -99,11 +66,11 @@ public:
 
     void add(ObjKey value)
     {
-        Array::add(value.value + 1);
+        Array::add(value.value + adj);
     }
     void set(size_t ndx, ObjKey value)
     {
-        Array::set(ndx, value.value + 1);
+        Array::set(ndx, value.value + adj);
     }
 
     void set_null(size_t ndx)
@@ -112,21 +79,11 @@ public:
     }
     void insert(size_t ndx, ObjKey value)
     {
-        Array::insert(ndx, value.value + 1);
+        Array::insert(ndx, value.value + adj);
     }
     ObjKey get(size_t ndx) const
     {
-        return ObjKey{Array::get(ndx) - 1};
-    }
-    std::vector<ObjKey> get_all() const
-    {
-        size_t sz = size();
-        std::vector<ObjKey> keys;
-        keys.reserve(sz);
-        for (size_t i = 0; i < sz; i++) {
-            keys.push_back(get(i));
-        }
-        return keys;
+        return ObjKey{Array::get(ndx) - adj};
     }
     bool is_null(size_t ndx) const
     {
@@ -139,7 +96,7 @@ public:
 
     size_t find_first(ObjKey value, size_t begin, size_t end) const noexcept
     {
-        return Array::find_first(value.value + 1, begin, end);
+        return Array::find_first(value.value + adj, begin, end);
     }
 
     void nullify(ObjKey key)
@@ -149,6 +106,16 @@ public:
         REALM_ASSERT(begin != realm::npos);
         Array::erase(begin);
     }
+};
+
+class ArrayKey : public ArrayKeyBase<1> {
+public:
+    using ArrayKeyBase::ArrayKeyBase;
+};
+
+class ArrayKeyNonNullable : public ArrayKeyBase<0> {
+public:
+    using ArrayKeyBase::ArrayKeyBase;
 };
 }
 

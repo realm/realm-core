@@ -17,13 +17,14 @@
  **************************************************************************/
 
 #include <realm/array_unsigned.hpp>
+#include <realm/array_direct.hpp>
 #include <algorithm>
 
 namespace realm {
 
 void ArrayUnsigned::set_width(uint8_t width)
 {
-    REALM_ASSERT_DEBUG(width > 0);
+    REALM_ASSERT_DEBUG(width > 0 || m_size == 0);
     m_ubound = uint64_t(-1) >> (64 - width);
     m_width = width;
 }
@@ -69,7 +70,7 @@ inline uint64_t ArrayUnsigned::_get(size_t ndx, uint8_t width) const
     if (width == 32) {
         return reinterpret_cast<uint32_t*>(m_data)[ndx];
     }
-    return reinterpret_cast<uint64_t*>(m_data)[ndx];
+    return get_direct(m_data, width, ndx);
 }
 
 void ArrayUnsigned::create(size_t initial_size, uint64_t ubound_value)
@@ -117,6 +118,22 @@ size_t ArrayUnsigned::lower_bound(uint64_t value) const noexcept
         uint32_t* pos = std::lower_bound(arr, arr + m_size, value);
         return pos - arr;
     }
+    else if (m_width < 8) {
+        switch (m_width) {
+            case 0:
+                return realm::lower_bound<0>(m_data, m_size, value);
+            case 1:
+                return realm::lower_bound<1>(m_data, m_size, value);
+            case 2:
+                return realm::lower_bound<2>(m_data, m_size, value);
+            case 4:
+                return realm::lower_bound<4>(m_data, m_size, value);
+            default:
+                REALM_UNREACHABLE();
+                break;
+        }
+        return npos;
+    }
     uint64_t* arr = reinterpret_cast<uint64_t*>(m_data);
     uint64_t* pos = std::lower_bound(arr, arr + m_size, value);
     return pos - arr;
@@ -139,6 +156,22 @@ size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
         uint32_t* pos = std::upper_bound(arr, arr + m_size, value);
         return pos - arr;
     }
+    else if (m_width < 8) {
+        switch (m_width) {
+            case 0:
+                return realm::upper_bound<0>(m_data, m_size, value);
+            case 1:
+                return realm::upper_bound<1>(m_data, m_size, value);
+            case 2:
+                return realm::upper_bound<2>(m_data, m_size, value);
+            case 4:
+                return realm::upper_bound<4>(m_data, m_size, value);
+            default:
+                REALM_UNREACHABLE();
+                break;
+        }
+        return npos;
+    }
     uint64_t* arr = reinterpret_cast<uint64_t*>(m_data);
     uint64_t* pos = std::upper_bound(arr, arr + m_size, value);
     return pos - arr;
@@ -146,6 +179,7 @@ size_t ArrayUnsigned::upper_bound(uint64_t value) const noexcept
 
 void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 {
+    REALM_ASSERT_DEBUG(m_width >= 8);
     bool do_expand = value > m_ubound;
     uint8_t new_width = do_expand ? bit_width(value) : m_width;
 
@@ -195,6 +229,7 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 
 void ArrayUnsigned::erase(size_t ndx)
 {
+    REALM_ASSERT_DEBUG(m_width >= 8);
     copy_on_write(); // Throws
 
     size_t w = m_width >> 3;
@@ -217,6 +252,7 @@ uint64_t ArrayUnsigned::get(size_t index) const
 
 void ArrayUnsigned::set(size_t ndx, uint64_t value)
 {
+    REALM_ASSERT_DEBUG(m_width >= 8);
     copy_on_write(); // Throws
 
     if (value > m_ubound) {

@@ -40,6 +40,11 @@
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/table_tpl.hpp>
+#include <realm/column.hpp>
+#include <realm/column_string.hpp>
+#include <realm/column_timestamp.hpp>
+#include <realm/column_linklist.hpp>
+#include <realm/column_link.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
@@ -830,17 +835,6 @@ void Table::erase_backlink_column(TableKey origin_table_key, ColKey origin_col_k
 }
 
 
-
-void Table::update_accessors(AccessorUpdater& updater)
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    updater.update(*this); // Throws
-}
-
-
 void Table::detach() noexcept
 {
     if (Replication* repl = get_repl())
@@ -881,16 +875,227 @@ bool Table::has_search_index(ColKey col_key) const noexcept
 }
 
 
-void Table::rebuild_search_index(size_t)
+void Table::create_columns_in_clusters()
 {
-    for (size_t col_ndx = 0; col_ndx < get_column_count(); col_ndx++) {
+    size_t nb_columns = m_spec.get_column_count();
+    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
+        m_spec.convert_column(col_ndx);
+        m_clusters.insert_column(col_ndx);
+    }
+}
+
+void Table::create_objects()
+{
+    Array col_refs(m_alloc);
+    col_refs.init_from_ref(m_top.get_as_ref(1));
+    ref_type first_col_ref = col_refs.get_as_ref(0);
+    ColumnType col_type = m_spec.get_column_type(0);
+    auto attr = m_spec.get_column_attr(0);
+
+    // Determine the size of the table based on the size of the first column
+    size_t sz;
+    if (attr.test(col_attr_List)) {
+        sz = ColumnBase::get_size_from_type_and_ref(col_type_Int, first_col_ref, m_alloc, false);
+    }
+    else {
+        bool nullable = attr.test(col_attr_Nullable);
+        sz = ColumnBase::get_size_from_type_and_ref(col_type, first_col_ref, m_alloc, nullable);
+    }
+
+    for (size_t i = 0; i < sz; i++) {
+        Obj obj = create_object(ObjKey(i));
+    }
+}
+
+ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, ref_type ref)
+{
+    ColumnBase* col = nullptr;
+    auto attr = m_spec.get_column_attr(col_ndx);
+    bool nullable = attr.test(col_attr_Nullable);
+
+    switch (col_type) {
+        case col_type_Int:
+        case col_type_Bool:
+            if (nullable) {
+                col = new IntNullColumn(m_alloc, ref, col_ndx); // Throws
+            }
+            else {
+                col = new IntegerColumn(m_alloc, ref, col_ndx); // Throws
+            }
+            break;
+        case col_type_Float:
+            col = new FloatColumn(m_alloc, ref, col_ndx); // Throws
+            break;
+        case col_type_Double:
+            col = new DoubleColumn(m_alloc, ref, col_ndx); // Throws
+            break;
+        case col_type_String:
+            col = new StringColumn(m_alloc, ref, nullable, col_ndx); // Throws
+            break;
+        case col_type_Binary:
+            col = new BinaryColumn(m_alloc, ref, nullable, col_ndx); // Throws
+            break;
+        case col_type_Link:
+            // Target table will be set by group after entire table has been created
+            col = new LinkColumn(m_alloc, ref, this, col_ndx); // Throws
+            break;
+        case col_type_Timestamp:
+            // Origin table will be set by group after entire table has been created
+            col = new TimestampColumn(nullable, m_alloc, ref, col_ndx); // Throws
+            break;
+        default:
+            // These have no function yet and are therefore unexpected.
+            break;
+    }
+    REALM_ASSERT(col);
+    return col;
+}
+
+template <class U>
+void Table::copy_list_of_primitives(Obj& obj, ColKey col, ref_type ref)
+{
+    auto ll = obj.get_list<U>(col);
+    BPlusTree<U> values(m_alloc);
+    values.init_from_ref(ref);
+    ll = values;
+}
+
+void Table::copy_content_from_columns()
+{
+    size_t nb_columns = m_spec.get_public_column_count();
+    std::vector<std::unique_ptr<ColumnBase>> columns;
+    std::vector<ColumnType> types;
+    std::vector<ColumnAttrMask> attrs;
+    Array col_refs(m_alloc);
+    col_refs.init_from_ref(m_top.get_as_ref(1));
+    size_t ndx_in_parent = 0;
+    for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
         ColumnAttrMask attr = m_spec.get_column_attr(col_ndx);
-        if (attr.test(col_attr_Indexed)) {
-            attr.reset(col_attr_Indexed);
-            m_spec.set_column_attr(col_ndx, attr);
-            add_search_index(ndx2colkey(col_ndx));
+        ColumnType col_type = m_spec.get_column_type(col_ndx);
+        types.push_back(col_type);
+        attrs.push_back(attr);
+        if (attr.test(col_attr_List)) {
+            col_type = col_type_Int;
+        }
+        columns.emplace_back(create_column_accessor(col_type, col_ndx, col_refs.get_as_ref(ndx_in_parent)));
+        ndx_in_parent += attr.test(col_attr_Indexed) ? 2 : 1;
+    }
+    for (auto& it : *this) {
+        size_t ndx = size_t(it.get_key().value);
+        for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
+            ColKey col_key(col_ndx);
+            if (attrs[col_ndx].test(col_attr_List)) {
+                ref_type ref = static_cast<IntegerColumn*>(columns[col_ndx].get())->get_as_ref(ndx);
+                if (ref) {
+                    // List is not null
+                    if (types[col_ndx] == col_type_LinkList) {
+                        auto ll = it.get_linklist(col_key);
+                        IntegerColumn links(IntegerColumn::unattached_root_tag(), m_alloc);
+                        links.init_from_ref(m_alloc, ref);
+                        size_t sz = links.size();
+                        for (size_t i = 0; i < sz; i++) {
+                            int64_t link = links.get(i);
+                            ll.add(ObjKey(link));
+                        }
+                    }
+                    else {
+                        // list of primitives
+                        char* header = m_alloc.translate(ref);
+                        REALM_ASSERT(Array::get_size_from_header(header) ==
+                                     1); // List of primitives has only one column
+                        ref_type list_ref = to_ref(Array::get(header, 0));
+                        switch (types[col_ndx]) {
+                            case col_type_Int:
+                                copy_list_of_primitives<int64_t>(it, col_key, list_ref);
+                                break;
+                            case col_type_Bool:
+                                copy_list_of_primitives<bool>(it, col_key, list_ref);
+                                break;
+                            case col_type_Float:
+                                copy_list_of_primitives<float>(it, col_key, list_ref);
+                                break;
+                            case col_type_Double:
+                                copy_list_of_primitives<double>(it, col_key, list_ref);
+                                break;
+                            case col_type_String:
+                                copy_list_of_primitives<StringData>(it, col_key, list_ref);
+                                break;
+                            case col_type_Binary:
+                                copy_list_of_primitives<BinaryData>(it, col_key, list_ref);
+                                break;
+                            case col_type_Timestamp:
+                                copy_list_of_primitives<Timestamp>(it, col_key, list_ref);
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+            }
+            else {
+                switch (types[col_ndx]) {
+                    case col_type_Int:
+                        if (attrs[col_ndx].test(col_attr_Nullable)) {
+                            auto val = static_cast<IntNullColumn*>(columns[col_ndx].get())->get(ndx);
+                            if (val) {
+                                it.set(col_key, *val);
+                            }
+                        }
+                        else {
+                            auto val = static_cast<IntegerColumn*>(columns[col_ndx].get())->get(ndx);
+                            it.set(col_key, val);
+                        }
+                        break;
+                    case col_type_Bool:
+                        if (attrs[col_ndx].test(col_attr_Nullable)) {
+                            auto val = static_cast<IntNullColumn*>(columns[col_ndx].get())->get(ndx);
+                            if (val) {
+                                it.set(col_key, *val ? true : false);
+                            }
+                        }
+                        else {
+                            auto val = static_cast<IntegerColumn*>(columns[col_ndx].get())->get(ndx);
+                            it.set(col_key, val ? true : false);
+                        }
+                        break;
+                    case col_type_Float:
+                        it.set(col_key, static_cast<FloatColumn*>(columns[col_ndx].get())->get(ndx));
+                        break;
+                    case col_type_Double:
+                        it.set(col_key, static_cast<DoubleColumn*>(columns[col_ndx].get())->get(ndx));
+                        break;
+                    case col_type_String:
+                        it.set(col_key, static_cast<StringColumn*>(columns[col_ndx].get())->get(ndx));
+                        break;
+                    case col_type_Binary:
+                        it.set(col_key, static_cast<BinaryColumn*>(columns[col_ndx].get())->get(ndx));
+                        break;
+                    case col_type_Link: {
+                        int64_t val = static_cast<IntegerColumn*>(columns[col_ndx].get())->get(ndx);
+                        it.set(col_key, ObjKey(val - 1));
+                        break;
+                    }
+                    case col_type_Timestamp:
+                        it.set(col_key, static_cast<TimestampColumn*>(columns[col_ndx].get())->get(ndx));
+                        break;
+                    default:
+                        break;
+                }
+            }
         }
     }
+    col_refs.destroy_deep();
+    m_top.set(1, 0);
+}
+
+StringData Table::get_name() const noexcept
+{
+    const Array& real_top = m_top;
+    ArrayParent* parent = real_top.get_parent();
+    if (!parent)
+        return StringData("");
+    REALM_ASSERT(dynamic_cast<Group*>(parent));
+    return static_cast<Group*>(parent)->get_table_name(get_key());
 }
 
 bool Table::is_nullable(ColKey col_key) const
@@ -988,42 +1193,15 @@ void Table::clear()
 }
 
 
-const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const noexcept
-{
-    const Array& real_top = m_top;
-    if (ArrayParent* array_parent = real_top.get_parent()) {
-        REALM_ASSERT_DEBUG(dynamic_cast<Parent*>(array_parent));
-        Parent* table_parent = static_cast<Parent*>(array_parent);
-        return table_parent->get_parent_table(column_ndx_out);
-    }
-    return 0;
-}
-
-
-size_t Table::get_parent_row_index() const noexcept
-{
-    const Array& real_top = m_top;
-    Parent* parent = static_cast<Parent*>(real_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
-    if (!parent)
-        return npos; // Free-standing table
-    if (parent->get_parent_group())
-        return realm::npos; // Group-level table
-    size_t index_in_parent = real_top.get_ndx_in_parent();
-    return index_in_parent;
-}
-
-
 Group* Table::get_parent_group() const noexcept
 {
     if (!m_top.is_attached())
         return 0;                                              // Subtable with shared descriptor
-    Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
+    ArrayParent* parent = m_top.get_parent();                  // ArrayParent guaranteed to be Table::Parent
     if (!parent)
         return 0; // Free-standing table
-    Group* group = parent->get_parent_group();
-    if (!group)
-        return 0; // Subtable with independent descriptor
-    return group;
+
+    return static_cast<Group*>(parent);
 }
 
 
@@ -1031,13 +1209,10 @@ size_t Table::get_index_in_group() const noexcept
 {
     if (!m_top.is_attached())
         return realm::npos;                                    // Subtable with shared descriptor
-    Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
+    ArrayParent* parent = m_top.get_parent();                  // ArrayParent guaranteed to be Table::Parent
     if (!parent)
         return realm::npos; // Free-standing table
-    if (!parent->get_parent_group())
-        return realm::npos; // Subtable with independent descriptor
-    size_t index_in_parent = m_top.get_ndx_in_parent();
-    return index_in_parent;
+    return m_top.get_ndx_in_parent();
 }
 
 TableKey Table::get_key() const noexcept
@@ -1847,29 +2022,6 @@ void Table::check_lists_are_empty(size_t) const
     // primary key (by way of set_int_unique() or set_string_unique() or set_null_unique()).
 
     REALM_ASSERT(false); // FIXME: Unimplemented
-}
-
-
-StringData Table::Parent::get_child_name(size_t) const noexcept
-{
-    return StringData("");
-}
-
-
-Group* Table::Parent::get_parent_group() noexcept
-{
-    return nullptr;
-}
-
-
-Table* Table::Parent::get_parent_table(size_t*) noexcept
-{
-    return nullptr;
-}
-
-Spec* Table::Parent::get_subtable_spec() noexcept
-{
-    return nullptr;
 }
 
 void Table::refresh_accessor_tree()

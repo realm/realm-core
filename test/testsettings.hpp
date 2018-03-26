@@ -35,6 +35,7 @@
 //#define REALM_PTHREADS_TEST
 
 #define TEST_BASIC_UTILS
+#define TEST_BPLUS_TREE
 #define TEST_COLUMN_MIXED
 #define TEST_ALLOC
 #define TEST_ARRAY
@@ -53,6 +54,7 @@
 #define TEST_FILE
 #define TEST_FILE_LOCKS
 #define TEST_GROUP
+#define TEST_UPGRADE
 #define TEST_INDEX_STRING
 #define TEST_LANG_BIND_HELPER
 #define TEST_METRICS

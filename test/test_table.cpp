@@ -3284,7 +3284,7 @@ TEST(Table_object_merge_nodes)
 
         table.remove_object(ObjKey(*it));
         key_set.erase(it);
-        for (unsigned j = 0; j < key_set.size(); j++) {
+        for (unsigned j = 0; j < key_set.size(); j += 23) {
             int64_t key_val = key_set[j];
             Obj o = table.get_object(ObjKey(key_val));
             CHECK_EQUAL(key_val << 1, o.get<int64_t>(c0));
@@ -3386,7 +3386,13 @@ TEST(Table_QuickSort2)
 
 TEST(Table_object_sequential)
 {
-    int nb_rows = 1024;
+#ifdef REALM_DEBUG
+    int nb_rows = 10000;
+    int num_runs = 10;
+#else
+    int nb_rows = 100000;
+    int num_runs = 100;
+#endif
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path);
     ColKey c0;
@@ -3424,16 +3430,55 @@ TEST(Table_object_sequential)
 
         auto t1 = steady_clock::now();
 
-        for (int i = 0; i < nb_rows; i++) {
-            ConstObj o = table->get_object(ObjKey(i));
-            CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
-            CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(c1));
+        for (int j = 0; j < num_runs; ++j) {
+            for (int i = 0; i < nb_rows; i++) {
+                ConstObj o = table->get_object(ObjKey(i));
+            }
         }
 
         auto t2 = steady_clock::now();
 
-        std::cout << "   lookup time   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
-                  << std::endl;
+        std::cout << "   lookup obj    : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
+                  << " ns/key" << std::endl;
+    }
+
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int j = 0; j < num_runs; ++j) {
+            for (int i = 0; i < nb_rows; i++) {
+                ConstObj o = table->get_object(ObjKey(i));
+                CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+            }
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   lookup field  : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
+                  << " ns/key" << std::endl;
+    }
+
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int j = 0; j < num_runs; ++j) {
+            for (int i = 0; i < nb_rows; i++) {
+                ConstObj o = table->get_object(ObjKey(i));
+                CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+                CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+            }
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   lookup same   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
+                  << " ns/key" << std::endl;
     }
 
     {
@@ -3464,7 +3509,7 @@ TEST(Table_object_sequential)
             table->remove_object(ObjKey(i));
 #ifdef REALM_DEBUG
             CHECK_EQUAL(table->size(), nb_rows - i - 1);
-            for (int j = i + 1; j < nb_rows; j++) {
+            for (int j = i + 1; j < nb_rows; j += nb_rows / 100) {
                 Obj o = table->get_object(ObjKey(j));
                 CHECK_EQUAL(j << 2, o.get<int64_t>(c0));
                 CHECK_EQUAL(j << 1, o.get<util::Optional<int64_t>>(c1));
@@ -3481,9 +3526,124 @@ TEST(Table_object_sequential)
     CALLGRIND_STOP_INSTRUMENTATION;
 }
 
+TEST(Table_object_seq_rnd)
+{
+#ifdef REALM_DEBUG
+    size_t rows = 50000;
+    int runs = 20;
+#else
+    size_t rows = 100000;
+    int runs = 100;     // runs for building scenario
+#endif
+    int64_t next_key = 0;
+    std::vector<int64_t> key_values;
+    std::set<int64_t> key_set;
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ColKey c0;
+    {
+        std::cout << "Establishing scenario seq ins/rnd erase " << std::endl;
+        WriteTransaction wt(sg);
+        auto table = wt.add_table("test");
+        c0 = table->add_column(type_Int, "int1");
+
+        for (int run = 0; run < runs; ++run) {
+            if (key_values.size() < rows) { // expanding by 2%!
+                for (size_t n = 0; n < rows / 50; ++n) {
+                    auto key_val = next_key++;
+                    key_values.push_back(key_val);
+                    key_set.insert(key_val);
+                    table->create_object(ObjKey(key_val)).set_all(key_val << 1);
+                }
+            }
+            // do 1% random deletions
+            for (size_t n = 0; n < rows / 100; ++n) {
+                auto index = test_util::random_int<size_t>(0, key_values.size() - 1);
+                auto key_val = key_values[index];
+                if (index < key_values.size() - 1)
+                    key_values[index] = key_values.back();
+                key_values.pop_back();
+                table->remove_object(ObjKey(key_val));
+            }
+        }
+        wt.commit();
+    }
+    // scenario established!
+    int nb_rows = int(key_values.size());
+#ifdef REALM_DEBUG
+    int num_runs = 1; // runs for timing access
+#else
+    int num_runs = 100; // runs for timing access
+#endif
+    std::cout << "Scenario has " << nb_rows << " rows. Timing...." << std::endl;
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int j = 0; j < num_runs; ++j) {
+            for (int i = 0; i < nb_rows; i++) {
+                ConstObj o = table->get_object(ObjKey(key_values[i]));
+            }
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   lookup obj    : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
+                  << " ns/key" << std::endl;
+    }
+
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int j = 0; j < num_runs; ++j) {
+            for (int i = 0; i < nb_rows; i++) {
+                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                CHECK_EQUAL(key_values[i] << 1, o.get<int64_t>(c0));
+            }
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   lookup field  : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
+                  << " ns/key" << std::endl;
+    }
+
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int j = 0; j < num_runs; ++j) {
+            for (int i = 0; i < nb_rows; i++) {
+                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                CHECK_EQUAL(key_values[i] << 1, o.get<int64_t>(c0));
+                CHECK_EQUAL(key_values[i] << 1, o.get<int64_t>(c0));
+            }
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   lookup same   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
+                  << " ns/key" << std::endl;
+    }
+}
+
+
 TEST(Table_object_random)
 {
-    int nb_rows = 1024;
+#ifdef REALM_DEBUG
+    int nb_rows = 10000;
+    int num_runs = 10;
+#else
+    int nb_rows = 100000;
+    int num_runs = 100;
+#endif
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path);
     ColKey c0;
@@ -3538,16 +3698,55 @@ TEST(Table_object_random)
 
         auto t1 = steady_clock::now();
 
-        for (int i = 0; i < nb_rows; i++) {
-            ConstObj o = table->get_object(ObjKey(key_values[i]));
-            CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
-            CHECK_EQUAL(i << 2, o.get<util::Optional<int64_t>>(c1));
+        for (int j = 0; j < num_runs; ++j) {
+            for (int i = 0; i < nb_rows; i++) {
+                ConstObj o = table->get_object(ObjKey(key_values[i]));
+            }
         }
 
         auto t2 = steady_clock::now();
 
-        std::cout << "   lookup time   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
-                  << std::endl;
+        std::cout << "   lookup obj    : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
+                  << " ns/key" << std::endl;
+    }
+
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int j = 0; j < num_runs; ++j) {
+            for (int i = 0; i < nb_rows; i++) {
+                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+            }
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   lookup field  : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
+                  << " ns/key" << std::endl;
+    }
+
+    {
+        ReadTransaction rt(sg);
+        auto table = rt.get_table("test");
+
+        auto t1 = steady_clock::now();
+
+        for (int j = 0; j < num_runs; ++j) {
+            for (int i = 0; i < nb_rows; i++) {
+                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+                CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
+            }
+        }
+
+        auto t2 = steady_clock::now();
+
+        std::cout << "   lookup same   : " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows / num_runs
+                  << " ns/key" << std::endl;
     }
 
     {
@@ -3578,7 +3777,7 @@ TEST(Table_object_random)
             table->remove_object(ObjKey(key_values[i]));
 #ifdef REALM_DEBUG
             CHECK_EQUAL(table->size(), nb_rows - i - 1);
-            for (int j = i + 1; j < nb_rows; j++) {
+            for (int j = i + 1; j < nb_rows; j += nb_rows / 100) {
                 Obj o = table->get_object(ObjKey(key_values[j]));
                 CHECK_EQUAL(j << 2, o.get<int64_t>(c0));
                 CHECK_EQUAL(j << 1, o.get<util::Optional<int64_t>>(c1));

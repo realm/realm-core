@@ -23,6 +23,9 @@
 #include <realm/column_string.hpp>
 #include <realm/column_string_enum.hpp>
 #include <realm/index_string.hpp>
+#include <realm/bplustree.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_key.hpp>
 
 #include "test.hpp"
 #include "test_string_types.hpp"
@@ -1540,6 +1543,42 @@ TEST(ColumnString_NonLeafRoot)
 
         c.destroy();
     }
+}
+
+// This test confirms that we can read columns produced by Column<T>
+// with a BPlusTree<T> accessor
+TEST(BPlusTree_ColumnStringCompatibility)
+{
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn c(Allocator::get_default(), ref);
+
+    for (int i = 0; i < 500; i++) {
+        std::string str = "foo ";
+        str += util::to_string(i);
+        c.add(str);
+    }
+
+    BPlusTree<String> tree(Allocator::get_default());
+    tree.init_from_ref(c.get_ref());
+
+    CHECK_EQUAL(c.size(), tree.size());
+    size_t sz = c.size();
+    for (size_t i = 0; i < sz; i++) {
+        CHECK_EQUAL(c.get(i), tree.get(i));
+    }
+
+    c.insert(17, "This is a medium long string");
+    c.insert(177, "This is a rather long string, that should not be very much shorter");
+    c.erase(321);
+    tree.init_from_ref(c.get_ref());
+
+    CHECK_EQUAL(c.size(), tree.size());
+    sz = c.size();
+    for (size_t i = 0; i < sz; i++) {
+        CHECK_EQUAL(c.get(i), tree.get(i));
+    }
+
+    c.destroy();
 }
 
 #endif // TEST_COLUMN_STRING

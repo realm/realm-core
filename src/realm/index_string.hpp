@@ -68,6 +68,9 @@ class Spec;
 class Timestamp;
 class ClusterColumn;
 
+template <class T>
+class BPlusTree;
+
 /// Each StringIndex node contains an array of this type
 class IndexArray : public Array {
 public:
@@ -219,7 +222,7 @@ public:
 
     void clear();
 
-    void distinct(ArrayKey& result) const;
+    void distinct(BPlusTree<ObjKey>& result) const;
     bool has_duplicate_values() const noexcept;
 
     void verify() const;

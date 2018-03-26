@@ -23,9 +23,11 @@
 #include <vector>
 #include <string>
 #include <atomic>
+#include <mutex>
 
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
+#include <realm/util/thread.hpp>
 #include <realm/alloc.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 
@@ -273,9 +275,28 @@ public:
     /// of memory in the file must ensure that no allocation crosses the
     /// boundary between two sections.
     ///
-    /// Clears any allocator specicific caching of address translations
-    /// and force any later address translations to trigger decryption if required.
-    void update_reader_view(size_t file_size);
+    /// Updates the memory mappings to reflect a new size for the file.
+    /// Stale mappings are retained so that they remain valid for other threads,
+    /// which haven't yet seen the file size change. The stale mappings are
+    /// associated with a version count if one is provided.
+    /// They are later purged by calls to purge_old_mappings().
+    /// The version parameter is subtly different from the mapping_version obtained
+    /// by get_mapping_version() below. The mapping version changes whenever a
+    /// ref->ptr translation changes, and is used by Group to enforce re-translation.
+    /// The version parameter, on the other hand, builds an association between
+    /// database transaction numbers and the delayed deletion of mappings. It is
+    /// used to drive deletion of old translations and old mappings at safe points.
+    void update_reader_view(size_t file_size, uint64_t version = 0);
+    void purge_old_mappings(uint64_t oldest_live_version);
+
+    /// Get an ID for the current mapping version. This ID changes whenever any part
+    /// of an existing mapping is changed. Such a change requires all refs to be
+    /// retranslated to new pointers. The allocator tries to avoid this, and we
+    /// believe it will only ever occur on Windows based platforms.
+    uint64_t get_mapping_version()
+    {
+        return m_mapping_version;
+    }
 
     /// Returns true initially, and after a call to reset_free_space_tracking()
     /// up until the point of the first call to SlabAlloc::alloc(). Note that a
@@ -291,7 +312,6 @@ public:
     bool is_all_free() const;
     void print() const;
 #endif
-    struct MappedFile;
 
 protected:
     MemRef do_alloc(const size_t size) override;
@@ -303,23 +323,14 @@ protected:
     /// Returns the first section boundary *above* the given position.
     size_t get_upper_section_boundary(size_t start_pos) const noexcept;
 
+    /// Returns the section boundary at or above the given size
+    size_t align_size_to_section_boundary(size_t size) const noexcept;
+
     /// Returns the first section boundary *at or below* the given position.
     size_t get_lower_section_boundary(size_t start_pos) const noexcept;
 
     /// Returns true if the given position is at a section boundary
     bool matches_section_boundary(size_t pos) const noexcept;
-
-    /// Returns the index of the section holding a given address.
-    /// The section index is determined solely by the minimal section size,
-    /// and does not necessarily reflect the mapping. A mapping may
-    /// cover multiple sections - the initial mapping often does.
-    size_t get_section_index(size_t pos) const noexcept;
-
-    /// Reverse: get the base offset of a section at a given index. Since the
-    /// computation is very time critical, this method just looks it up in
-    /// a table. The actual computation and setup of that table is done
-    /// during initialization with the help of compute_section_base() below.
-    inline size_t get_section_base(size_t index) const noexcept;
 
     /// Actually compute the starting offset of a section. Only used to initialize
     /// a table of predefined results, which are then used by get_section_base().
@@ -331,7 +342,6 @@ protected:
     size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
 
 private:
-    void internal_invalidate_cache() noexcept;
     enum AttachMode {
         attach_None,        // Nothing is attached
         attach_OwnedBuffer, // We own the buffer (m_data = nullptr for empty buffer)
@@ -377,6 +387,31 @@ private:
         uint64_t m_magic_cookie;
     };
 
+    // Description of to-be-deleted memory mapping
+    struct OldMapping {
+        OldMapping(uint64_t version, util::File::Map<char>& map)
+            : replaced_at_version(version)
+            , mapping()
+        {
+            mapping = std::move(map);
+        }
+        OldMapping(OldMapping&& other)
+            : replaced_at_version(other.replaced_at_version)
+            , mapping()
+        {
+            mapping = std::move(other.mapping);
+        }
+        void operator=(OldMapping&& other)
+        {
+            mapping = std::move(other.mapping);
+        }
+        uint64_t replaced_at_version;
+        util::File::Map<char> mapping;
+    };
+    struct OldFastMapping {
+        uint64_t replaced_at_version;
+        FastMap* mappings;
+    };
     static_assert(sizeof(Header) == 24, "Bad header size");
     static_assert(sizeof(StreamingFooter) == 16, "Bad footer size");
 
@@ -385,23 +420,29 @@ private:
 
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
-    // The mappings are shared, if they are from a file
-    std::shared_ptr<MappedFile> m_file_mappings;
+    util::RaceDetector changes;
+    std::vector<util::File::Map<char>> m_mappings;
 
-    // We are caching local copies of all the additional mappings to allow
-    // for lock-free lookup during ref->address translation (we do not need
-    // to cache the first mapping, because it is immutable) (well, all the
-    // mappings are immutable, but the array holding them is not - it may
-    // have to be relocated)
-    std::unique_ptr<std::shared_ptr<const util::File::Map<char>>[]> m_local_mappings;
-    size_t m_num_local_mappings = 0;
-
+    size_t m_fast_mapping_size = 0;
+    uint64_t m_mapping_version = 1;
+    uint64_t m_current_transaction = 0;
+    std::mutex m_mapping_mutex;
+    util::File m_file;
+    // vectors where old mappings, are held from deletion to ensure mappings are
+    // kept open and ref->ptr translations work for other threads..
+    std::vector<OldMapping> m_old_mappings;
+    std::vector<OldFastMapping> m_old_fast_mappings;
+    // Rebuild the fast mapping in a thread-safe manner. Save the old one along with it's
+    // versioning information for later deletion - 'requires_new_fast_mapping' must be
+    // true if there are changes to entries among the existing mappings. Must be called
+    // with m_mapping_mutex locked.
+    void rebuild_fast_mapping(bool requires_new_fast_mapping);
+    // Add a translation covering a new section in the slab area. The translation is always
+    // added at the end.
+    void extend_fast_mapping_with_slab(char* address);
     const char* m_data = nullptr;
-    size_t m_initial_chunk_size = 0;
     size_t m_initial_section_size = 0;
     int m_section_shifts = 0;
-    std::unique_ptr<size_t[]> m_section_bases;
-    size_t m_num_section_bases = 0;
     AttachMode m_attach_mode = attach_None;
     enum FeeeSpaceState {
         free_space_Clean,
@@ -426,13 +467,6 @@ private:
     chunks m_free_read_only;
 
     bool m_debug_out = false;
-    struct hash_entry {
-        ref_type ref = 0;
-        const char* addr = nullptr;
-        size_t version = 0;
-    };
-    mutable hash_entry cache[256];
-    mutable size_t version = 1;
 
     /// Throws if free-lists are no longer valid.
     void consolidate_free_read_only();
@@ -468,10 +502,6 @@ private:
     friend class GroupWriter;
 };
 
-inline void SlabAlloc::internal_invalidate_cache() noexcept
-{
-    ++version;
-}
 
 class SlabAlloc::DetachGuard {
 public:
@@ -500,7 +530,6 @@ inline void SlabAlloc::own_buffer() noexcept
 {
     REALM_ASSERT_3(m_attach_mode, ==, attach_UsersBuffer);
     REALM_ASSERT(m_data);
-    REALM_ASSERT(m_file_mappings == nullptr);
     m_attach_mode = attach_OwnedBuffer;
 }
 
@@ -548,6 +577,14 @@ inline size_t SlabAlloc::get_upper_section_boundary(size_t start_pos) const noex
     return get_section_base(1 + get_section_index(start_pos));
 }
 
+inline size_t SlabAlloc::align_size_to_section_boundary(size_t size) const noexcept
+{
+    if (matches_section_boundary(size))
+        return size;
+    else
+        return get_upper_section_boundary(size);
+}
+
 inline size_t SlabAlloc::get_lower_section_boundary(size_t start_pos) const noexcept
 {
     return get_section_base(get_section_index(start_pos));
@@ -556,11 +593,6 @@ inline size_t SlabAlloc::get_lower_section_boundary(size_t start_pos) const noex
 inline bool SlabAlloc::matches_section_boundary(size_t pos) const noexcept
 {
     return pos == get_lower_section_boundary(pos);
-}
-
-inline size_t SlabAlloc::get_section_base(size_t index) const noexcept
-{
-    return m_section_bases[index];
 }
 
 } // namespace realm

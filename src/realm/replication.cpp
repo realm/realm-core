@@ -271,7 +271,7 @@ public:
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
         log("list->set_int(%1, %2);", list_ndx, value); // Throws
         REALM_ASSERT_DEBUG(dynamic_cast<List<Int>*>(m_list.get()));
@@ -283,9 +283,9 @@ public:
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
-        log("list->set_int(%1, %2);", list_ndx, value); // Throws
+        log("list->set_bool(%1, %2);", list_ndx, value); // Throws
         REALM_ASSERT_DEBUG(dynamic_cast<List<Bool>*>(m_list.get()));
         static_cast<List<Bool>*>(m_list.get())->set(list_ndx, value);
         return true;
@@ -295,9 +295,9 @@ public:
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
-        log("list->set_int(%1, %2);", list_ndx, value); // Throws
+        log("list->set_float(%1, %2);", list_ndx, value); // Throws
         REALM_ASSERT_DEBUG(dynamic_cast<List<Float>*>(m_list.get()));
         static_cast<List<Float>*>(m_list.get())->set(list_ndx, value);
         return true;
@@ -307,9 +307,9 @@ public:
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
-        log("list->set_int(%1, %2);", list_ndx, value); // Throws
+        log("list->set_double(%1, %2);", list_ndx, value); // Throws
         REALM_ASSERT_DEBUG(dynamic_cast<List<Double>*>(m_list.get()));
         static_cast<List<Double>*>(m_list.get())->set(list_ndx, value);
         return true;
@@ -319,9 +319,9 @@ public:
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
-        log("list->set_int(%1, %2);", list_ndx, value); // Throws
+        log("list->set_string(%1, %2);", list_ndx, value); // Throws
         REALM_ASSERT_DEBUG(dynamic_cast<List<String>*>(m_list.get()));
         static_cast<List<String>*>(m_list.get())->set(list_ndx, value);
         return true;
@@ -331,9 +331,9 @@ public:
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
-        log("list->set_int(%1, %2);", list_ndx, value); // Throws
+        log("list->set_binary(%1, %2);", list_ndx, value); // Throws
         REALM_ASSERT_DEBUG(dynamic_cast<List<Binary>*>(m_list.get()));
         static_cast<List<Binary>*>(m_list.get())->set(list_ndx, value);
         return true;
@@ -343,11 +343,116 @@ public:
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
             return false;
-        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
         log("list->set_timestamp(%1, %2);", list_ndx, value); // Throws
         REALM_ASSERT_DEBUG(dynamic_cast<List<Timestamp>*>(m_list.get()));
         static_cast<List<Timestamp>*>(m_list.get())->set(list_ndx, value);
+        return true;
+    }
+
+    bool list_insert_int(size_t list_ndx, int64_t value, size_t prior_size)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_list->size())))
+            return false;
+        static_cast<void>(prior_size);
+        log("list->insert_int(%1, %2);", list_ndx, value); // Throws
+        REALM_ASSERT_DEBUG(dynamic_cast<List<Int>*>(m_list.get()));
+        static_cast<List<Int>*>(m_list.get())->insert(list_ndx, value);
+        return true;
+    }
+
+    bool list_insert_bool(size_t list_ndx, bool value, size_t prior_size)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_list->size())))
+            return false;
+        static_cast<void>(prior_size);
+        log("list->insert_bool(%1, %2);", list_ndx, value); // Throws
+        REALM_ASSERT_DEBUG(dynamic_cast<List<Bool>*>(m_list.get()));
+        static_cast<List<Bool>*>(m_list.get())->insert(list_ndx, value);
+        return true;
+    }
+
+    bool list_insert_float(size_t list_ndx, float value, size_t prior_size)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_list->size())))
+            return false;
+        static_cast<void>(prior_size);
+        log("list->insert_int(%1, %2);", list_ndx, value); // Throws
+        REALM_ASSERT_DEBUG(dynamic_cast<List<Float>*>(m_list.get()));
+        static_cast<List<Float>*>(m_list.get())->insert(list_ndx, value);
+        return true;
+    }
+
+    bool list_insert_double(size_t list_ndx, double value, size_t prior_size)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_list->size())))
+            return false;
+        static_cast<void>(prior_size);
+        log("list->insert_int(%1, %2);", list_ndx, value); // Throws
+        REALM_ASSERT_DEBUG(dynamic_cast<List<Double>*>(m_list.get()));
+        static_cast<List<Double>*>(m_list.get())->insert(list_ndx, value);
+        return true;
+    }
+
+    bool list_insert_string(size_t list_ndx, StringData value, size_t prior_size)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_list->size())))
+            return false;
+        static_cast<void>(prior_size);
+        log("list->insert_string(%1, %2);", list_ndx, value); // Throws
+        REALM_ASSERT_DEBUG(dynamic_cast<List<String>*>(m_list.get()));
+        static_cast<List<String>*>(m_list.get())->insert(list_ndx, value);
+        return true;
+    }
+
+    bool list_insert_binary(size_t list_ndx, BinaryData value, size_t prior_size)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_list->size())))
+            return false;
+        static_cast<void>(prior_size);
+        log("list->insert_binary(%1, %2);", list_ndx, value); // Throws
+        REALM_ASSERT_DEBUG(dynamic_cast<List<Binary>*>(m_list.get()));
+        static_cast<List<Binary>*>(m_list.get())->insert(list_ndx, value);
+        return true;
+    }
+
+    bool list_insert_timestamp(size_t list_ndx, Timestamp value, size_t prior_size)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_list->size())))
+            return false;
+        static_cast<void>(prior_size);
+        log("list->insert_timestamp(%1, %2);", list_ndx, value); // Throws
+        REALM_ASSERT_DEBUG(dynamic_cast<List<Timestamp>*>(m_list.get()));
+        static_cast<List<Timestamp>*>(m_list.get())->insert(list_ndx, value);
         return true;
     }
 
@@ -375,41 +480,16 @@ public:
         }
     }
 
-    bool select_table(size_t group_level_ndx, int levels, const size_t*)
+    bool select_table(TableKey key)
     {
-        log("table = group->get_table(%1);", group_level_ndx); // Throws
+        log("table = group->get_table(%1);", key.value); // Throws
         m_list.reset();
         try {
-            m_table = m_group.get_table(TableKey(group_level_ndx)); // Throws
+            m_table = m_group.get_table(key); // Throws
         }
         catch (...) {
             return false;
         }
-        REALM_ASSERT(levels == 0);
-        /*
-        for (int i = 0; i < levels; ++i) {
-            ColKey col_key = path[2 * i + 0];
-            size_t row_ndx = path[2 * i + 1];
-            if (REALM_UNLIKELY(REALM_COVER_NEVER(col_key >= m_table->get_column_count())))
-                return false;
-            if (REALM_UNLIKELY(REALM_COVER_NEVER(row_ndx >= m_table->size())))
-                return false;
-            log("table = table->get_subtable(%1, %2);", col_key, row_ndx); // Throws
-            DataType type = m_table->get_column_type(col_key);
-            switch (type) {
-                case type_Table:
-                    m_table = m_table->get_subtable(col_key, row_ndx); // Throws
-                    break;
-                case type_Mixed:
-                    m_table = m_table->get_subtable(col_key, row_ndx); // Throws
-                    if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
-                        return false;
-                    break;
-                default:
-                    return false;
-            }
-        }
-        */
         return true;
     }
 
@@ -619,6 +699,21 @@ public:
         log("link_list->set(%1, %2);", link_ndx, value); // Throws
         REALM_ASSERT_DEBUG(dynamic_cast<LinkList*>(m_list.get()));
         static_cast<LinkList*>(m_list.get())->set(link_ndx, value);
+        return true;
+    }
+
+    bool list_insert_link(size_t link_ndx, ObjKey value, size_t prior_size)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(link_ndx > m_list->size())))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_list->size())))
+            return false;
+        static_cast<void>(prior_size);
+        log("link_list->insert_link(%1, %2);", link_ndx, value); // Throws
+        REALM_ASSERT_DEBUG(dynamic_cast<LinkList*>(m_list.get()));
+        static_cast<LinkList*>(m_list.get())->insert(link_ndx, value);
         return true;
     }
 

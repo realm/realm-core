@@ -185,8 +185,8 @@ int Group::get_committed_file_format_version() const noexcept
 }
 
 
-int Group::get_target_file_format_version_for_session(int current_file_format_version,
-                                                      int requested_history_type) noexcept
+int Group::get_target_file_format_version_for_session(int /* current_file_format_version */,
+                                                      int /* requested_history_type */) noexcept
 {
     // Note: This function is responsible for choosing the target file format
     // for a sessions. If it selects a file format that is different from
@@ -200,16 +200,7 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
 
-    if (requested_history_type == Replication::hist_None && current_file_format_version == 6)
-        return 6;
-
-    if (requested_history_type == Replication::hist_None && current_file_format_version == 7)
-        return 7;
-
-    if (requested_history_type == Replication::hist_None && current_file_format_version == 8)
-        return 8;
-
-    return 9;
+    return 10;
 }
 
 
@@ -220,7 +211,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 9, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 10, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -228,20 +219,9 @@ void Group::upgrade_file_format(int target_file_format_version)
     // SharedGroup::do_open() must ensure this. Be sure to revisit the
     // following upgrade logic when SharedGroup::do_open() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version >= 2 && current_file_format_version <= 8,
+    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 9,
                     current_file_format_version);
 
-    // Upgrade from version prior to 5 not supported
-    REALM_ASSERT(current_file_format_version >= 5);
-
-    // Upgrade from version prior to 6 (StringIndex format changed last time)
-    if (current_file_format_version < 6) {
-        auto keys = get_keys();
-        for (auto key : keys) {
-            TableRef table = get_table(key);
-            table->rebuild_search_index(current_file_format_version);
-        }
-    }
 
     // Upgrade from version prior to 7 (new history schema version in top array)
     if (current_file_format_version <= 6 && target_file_format_version >= 7) {
@@ -255,9 +235,20 @@ void Group::upgrade_file_format(int target_file_format_version)
         }
     }
 
-    // Upgrading to version 9 doesn't require changing anything.
-
     // NOTE: Additional future upgrade steps go here.
+    if (current_file_format_version <= 9 && target_file_format_version >= 10) {
+        for (size_t t = 0; t < m_table_names.size(); t++) {
+            StringData name = m_table_names.get(t);
+            auto table = get_table(name);
+            table->create_columns_in_clusters();
+        }
+        for (auto t : m_table_accessors) {
+            t->create_objects();
+        }
+        for (auto t : m_table_accessors) {
+            t->copy_content_from_columns();
+        }
+    }
 
     set_file_format_version(target_file_format_version);
 }
@@ -270,9 +261,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
     m_file_format_version = m_alloc.get_committed_file_format_version();
 
     bool file_format_ok = false;
-    // In non-shared mode (Realm file opened via a Group instance) this version
-    // of the core library is only able to open Realms using file format version
-    // 6, 7, 8 or 9. These versions can be read without an upgrade.
+    // It is not possible to open prior file format versions without an upgrade.
     // Since a Realm file cannot be upgraded when opened in this mode
     // (we may be unable to write to the file), no earlier versions can be opened.
     // Please see Group::get_file_format_version() for information about the
@@ -281,10 +270,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
         case 0:
             file_format_ok = (top_ref == 0);
             break;
-        case 6:
-        case 7:
-        case 8:
-        case 9:
+        case 10:
             file_format_ok = true;
             break;
     }
@@ -368,12 +354,20 @@ void Group::remap(size_t new_file_size)
 }
 
 
-void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size)
+void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
 {
     size_t old_baseline = m_alloc.get_baseline();
 
-    m_alloc.update_reader_view(new_file_size); // Throws
+    m_alloc.update_reader_view(new_file_size, new_version); // Throws
     update_allocator_wrappers();
+
+    // force update of all ref->ptr translations if the mapping has changed
+    auto mapping_version = m_alloc.get_mapping_version();
+    if (mapping_version != m_last_seen_mapping_version) {
+        // force re-translation of all refs
+        old_baseline = 0;
+        m_last_seen_mapping_version = mapping_version;
+    }
     update_refs(new_top_ref, old_baseline);
 }
 
@@ -452,7 +446,7 @@ void Group::update_num_objects()
 }
 
 
-void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable)
+void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint64_t new_version)
 {
     REALM_ASSERT_3(new_top_ref, <, new_file_size);
     REALM_ASSERT(!is_attached());
@@ -462,7 +456,7 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writa
     reset_free_space_tracking(); // Throws
 
     // update readers view of memory
-    m_alloc.update_reader_view(new_file_size); // Throws
+    m_alloc.update_reader_view(new_file_size, new_version); // Throws
     update_allocator_wrappers();
 
     // When `new_top_ref` is null, ask attach() to create a new node structure
@@ -1055,12 +1049,19 @@ void Group::commit()
     out.commit(top_ref); // Throws
 
     // Recursively update refs in all active tables (columns, arrays..)
+    auto mapping_version = m_alloc.get_mapping_version();
+    if (mapping_version != m_last_seen_mapping_version) {
+        // force re-translation of all refs
+        old_baseline = 0;
+        m_last_seen_mapping_version = mapping_version;
+    }
     update_refs(top_ref, old_baseline);
 }
 
 
 void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
 {
+    old_baseline = 0; // force update of all accessors
     // After Group::commit() we will always have free space tracking
     // info.
     REALM_ASSERT_3(m_top.size(), >=, 5);
@@ -1203,7 +1204,7 @@ public:
         return true;
     }
 
-    bool select_table(size_t, int, const size_t*) noexcept
+    bool select_table(TableKey) noexcept
     {
         return true;
     }
@@ -1318,6 +1319,41 @@ public:
         return true;
     }
 
+    bool list_insert_int(size_t, int64_t, size_t)
+    {
+        return true;
+    }
+
+    bool list_insert_bool(size_t, bool, size_t)
+    {
+        return true;
+    }
+
+    bool list_insert_float(size_t, float, size_t)
+    {
+        return true;
+    }
+
+    bool list_insert_double(size_t, double, size_t)
+    {
+        return true;
+    }
+
+    bool list_insert_string(size_t, StringData, size_t)
+    {
+        return true;
+    }
+
+    bool list_insert_binary(size_t, BinaryData, size_t)
+    {
+        return true;
+    }
+
+    bool list_insert_timestamp(size_t, Timestamp, size_t)
+    {
+        return true;
+    }
+
     bool enumerate_string_column(ColKey)
     {
         return true; // No-op
@@ -1388,6 +1424,11 @@ public:
     }
 
     bool list_set_link(size_t, ObjKey) noexcept
+    {
+        return true; // No-op
+    }
+
+    bool list_insert_link(size_t, ObjKey, size_t) noexcept
     {
         return true; // No-op
     }
@@ -1483,7 +1524,8 @@ void Group::refresh_dirty_accessors()
 }
 
 
-void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in)
+void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in,
+                             uint64_t new_version)
 {
     REALM_ASSERT(is_attached());
     // REALM_ASSERT(false); // FIXME: accessor updates need to be handled differently
@@ -1541,7 +1583,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     // transaction logs.
     // Update memory mapping if database file has grown
 
-    m_alloc.update_reader_view(new_file_size); // Throws
+    m_alloc.update_reader_view(new_file_size, new_version); // Throws
     update_allocator_wrappers();
 
     // This is no longer needed in Core, but we need to compute "schema_changed",
@@ -1733,9 +1775,13 @@ void Group::verify() const
 
     size_t logical_file_size = to_size_t(m_top.get_as_ref_or_tagged(2).get_as_int());
     size_t ref_begin = sizeof(SlabAlloc::Header);
-    ref_type immutable_ref_end = logical_file_size;
-    ref_type mutable_ref_end = m_alloc.get_total_size();
-    ref_type baseline = m_alloc.get_baseline();
+    ref_type real_immutable_ref_end = logical_file_size;
+    ref_type real_mutable_ref_end = m_alloc.get_total_size();
+    ref_type real_baseline = m_alloc.get_baseline();
+    // Fake that any empty area between the file and slab is part of the file (immutable):
+    ref_type immutable_ref_end = m_alloc.align_size_to_section_boundary(real_immutable_ref_end);
+    ref_type mutable_ref_end = m_alloc.align_size_to_section_boundary(real_mutable_ref_end);
+    ref_type baseline = m_alloc.align_size_to_section_boundary(real_baseline);
 
     // Check the consistency of the allocation of used memory
     MemUsageVerifier mem_usage_1(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
@@ -1805,15 +1851,14 @@ void Group::verify() const
     mem_usage_1.canonicalize();
     mem_usage_2.clear();
 
-    // Due to a current problem with the baseline not reflecting the logical
-    // file size, but the physical file size, there is a potential gap of
-    // unusable ref-space between the logical file size and the baseline. We
-    // need to take that into account here.
-    REALM_ASSERT_3(immutable_ref_end, <=, baseline);
-    if (immutable_ref_end < baseline) {
-        ref_type ref = immutable_ref_end;
-        size_t corrected_size = baseline - immutable_ref_end;
-        mem_usage_1.add_mutable(ref, corrected_size);
+    // There may be a hole between the end of file and the beginning of the slab area.
+    // We need to take that into account here.
+    REALM_ASSERT_3(real_immutable_ref_end, <=, real_baseline);
+    auto slab_start = immutable_ref_end;
+    if (real_immutable_ref_end < slab_start) {
+        ref_type ref = real_immutable_ref_end;
+        size_t corrected_size = slab_start - real_immutable_ref_end;
+        mem_usage_1.add_immutable(ref, corrected_size);
         mem_usage_1.canonicalize();
     }
 

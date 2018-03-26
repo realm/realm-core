@@ -1052,14 +1052,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                 case 0:
                     file_format_ok = (top_ref == 0);
                     break;
-                case 2:
-                case 3:
-                case 4:
-                case 5:
                 case 6:
                 case 7:
                 case 8:
                 case 9:
+                case 10:
                     file_format_ok = true;
                     break;
             }
@@ -1994,7 +1991,8 @@ void SharedGroup::do_begin_read(VersionID version_id, bool writable)
     ReadLockUnlockGuard g(*this, m_read_lock);
 
     using gf = _impl::GroupFriend;
-    gf::attach_shared(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
+    gf::attach_shared(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size, writable,
+                      m_read_lock.m_version); // Throws
 
     g.release();
 }
@@ -2176,7 +2174,8 @@ SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
     gf::reset_free_space_tracking(m_group); // Throws
 
     // Remap file if it has grown, and update refs in underlying node structure
-    gf::remap_and_update_refs(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size); // Throws
+    gf::remap_and_update_refs(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size,
+                              m_read_lock.m_version); // Throws
 
     set_transact_stage(transact_Reading);
 
@@ -2260,6 +2259,9 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         // need store changesets prior to the oldest bound snapshot.
         if (_impl::History* hist = get_history())
             hist->set_oldest_bound_version(oldest_version); // Throws
+
+        // Cleanup any stale mappings
+        m_group.m_alloc.purge_old_mappings(oldest_version);
     }
 
     // Do the actual commit
