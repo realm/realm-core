@@ -117,7 +117,7 @@ public:
     {
         return Array::get(ndx) == null_value;
     }
-    util::Optional<bool> get(size_t ndx)
+    util::Optional<bool> get(size_t ndx) const
     {
         int64_t val = Array::get(ndx);
         return (val == null_value) ? util::none : util::make_optional(val != 0);

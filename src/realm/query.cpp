@@ -347,15 +347,16 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
     DataType type = table.get_column_type(column_key);
     bool is_nullable = table.is_nullable(column_key);
     switch (type) {
-        case type_Int:
-        case type_Bool:
-        case type_OldDateTime: {
+        case type_Int: {
             if (is_nullable) {
                 return MakeConditionNode<IntegerNode<ArrayIntNull, Cond>>::make(column_key, value);
             }
             else {
                 return MakeConditionNode<IntegerNode<ArrayInteger, Cond>>::make(column_key, value);
             }
+        }
+        case type_Bool: {
+            return MakeConditionNode<BoolNode<Cond>>::make(column_key, value);
         }
         case type_Float: {
             return MakeConditionNode<FloatDoubleNode<ArrayFloat, Cond>>::make(column_key, value);
@@ -680,7 +681,12 @@ Query& Query::between(ColKey column_key, int64_t from, int64_t to)
 }
 Query& Query::equal(ColKey column_key, bool value)
 {
-    add_condition<Equal>(column_key, int64_t(value));
+    add_condition<Equal>(column_key, value);
+    return *this;
+}
+Query& Query::not_equal(ColKey column_key, bool value)
+{
+    add_condition<NotEqual>(column_key, value);
     return *this;
 }
 

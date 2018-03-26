@@ -275,26 +275,6 @@ TableView LinkList::get_sorted_view(ColKey column_key, bool ascending) const
     return v;
 }
 
-void LinkList::sort(SortDescriptor&& order)
-{
-    /*  TODO: implement
-    if (Replication* repl = m_obj.get_alloc().get_replication()) {
-        // todo, write to the replication log that we're doing a sort
-        repl->set_link_list(*this, *this->m_tree); // Throws
-    }
-    */
-    DescriptorOrdering ordering;
-    ordering.append_sort(std::move(order));
-    update_if_needed();
-    do_sort(ordering);
-    m_obj.bump_content_version();
-}
-
-void LinkList::sort(ColKey column_key, bool ascending)
-{
-    sort(SortDescriptor(get_target_table(), {{column_key}}, {ascending}));
-}
-
 void LinkList::remove_target_row(size_t link_ndx)
 {
     // Deleting the object will automatically remove all links

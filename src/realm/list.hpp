@@ -620,8 +620,6 @@ public:
 
     TableView get_sorted_view(SortDescriptor order) const;
     TableView get_sorted_view(ColKey column_key, bool ascending = true) const;
-    void sort(SortDescriptor&& order);
-    void sort(ColKey column, bool ascending = true);
     void remove_target_row(size_t link_ndx);
     void remove_all_target_rows();
 

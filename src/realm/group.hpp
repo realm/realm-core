@@ -46,22 +46,6 @@ class TransactLogParser;
 
 /// A group is a collection of named tables.
 ///
-/// Tables occur in the group in an unspecified order, but an order that
-/// generally remains fixed. The order is guaranteed to remain fixed between two
-/// points in time if no tables are added to, or removed from the group during
-/// that time. When tables are added to, or removed from the group, the order
-/// may change arbitrarily.
-///
-/// If `table` is a table accessor attached to a group-level table, and `group`
-/// is a group accessor attached to the group, then the following is guaranteed,
-/// even after a change in the table order:
-///
-/// \code{.cpp}
-///
-///     table == group.get_table(table.get_index_in_group())
-///
-/// \endcode
-///
 class Group : public ArrayParent {
 public:
     /// Construct a free-standing group. This group instance will be
@@ -583,6 +567,7 @@ private:
 
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
+    mutable std::mutex m_accessor_mutex;
     mutable int m_num_tables = 0;
     bool m_attached = false;
     const bool m_is_shared;
@@ -602,7 +587,16 @@ private:
         }
     };
 
-    static TableRecycler g_table_recycler;
+    // We use the classic approach to construct a FIFO from two LIFO's,
+    // insertion is done into recycler_1, removal is done from recycler_2,
+    // and when recycler_2 is empty, recycler_1 is reversed into recycler_2.
+    // this i O(1) for each entry.
+    static TableRecycler g_table_recycler_1;
+    static TableRecycler g_table_recycler_2;
+    // number of tables held back before being recycled. We hold back recycling
+    // the latest to increase the probability of detecting race conditions
+    // without crashing.
+    const static int g_table_recycling_delay = 100;
     static std::mutex g_table_recycler_mutex;
 
     struct shared_tag {
@@ -903,6 +897,7 @@ inline TableRef Group::get_table(TableKey key)
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = nullptr;                   // Do not check descriptor
+    std::lock_guard<std::mutex> lock(m_accessor_mutex);
     auto ndx = key2ndx_checked(key);
     Table* table = do_get_table(ndx, desc_matcher); // Throws
     return TableRef(table);
@@ -913,6 +908,7 @@ inline ConstTableRef Group::get_table(TableKey key) const
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = nullptr;                         // Do not check descriptor
+    std::lock_guard<std::mutex> lock(m_accessor_mutex);
     auto ndx = key2ndx_checked(key);
     const Table* table = do_get_table(ndx, desc_matcher); // Throws
     return ConstTableRef(table);
@@ -923,6 +919,7 @@ inline TableRef Group::get_table(StringData name)
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = nullptr;              // Do not check descriptor
+    std::lock_guard<std::mutex> lock(m_accessor_mutex);
     Table* table = do_get_table(name, desc_matcher); // Throws
     return TableRef(table);
 }
@@ -932,6 +929,7 @@ inline ConstTableRef Group::get_table(StringData name) const
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = nullptr;                    // Do not check descriptor
+    std::lock_guard<std::mutex> lock(m_accessor_mutex);
     const Table* table = do_get_table(name, desc_matcher); // Throws
     return ConstTableRef(table);
 }

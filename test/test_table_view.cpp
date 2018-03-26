@@ -3401,7 +3401,7 @@ TEST(TableView_Copy)
     Table table;
     auto col_id = table.add_column(type_Int, "id");
 
-    table.create_object().set(col_id, -1).get_key();
+    table.create_object().set(col_id, -1);
     ObjKey k1 = table.create_object().set(col_id, 1).get_key();
     ObjKey k2 = table.create_object().set(col_id, 2).get_key();
 

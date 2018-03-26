@@ -183,8 +183,8 @@ void Columns<Link>::evaluate(size_t index, ValueBase& destination)
 {
     // Destination must be of Key type. It only makes sense to
     // compare keys with keys
-    auto d = dynamic_cast<Value<ObjKey>*>(&destination);
-    REALM_ASSERT(d != nullptr);
+    REALM_ASSERT_DEBUG(dynamic_cast<Value<ObjKey>*>(&destination));
+    auto d = static_cast<Value<ObjKey>*>(&destination);
     std::vector<ObjKey> links = m_link_map.get_links(index);
 
     if (m_link_map.only_unary_links()) {

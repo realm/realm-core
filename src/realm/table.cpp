@@ -665,20 +665,17 @@ bool Table::is_enumerated(ColKey col_key) const noexcept
     return m_spec.is_string_enum_type(col_ndx);
 }
 
-size_t Table::get_num_unique_values(ColKey) const
+size_t Table::get_num_unique_values(ColKey col_key) const
 {
-    // FIXME: not implemented
-    REALM_ASSERT(false);
-    /*
-    size_t column_ndx = colkey2ndx(column_key);
-    ColumnType col_type = m_spec.get_column_type(column_ndx);
-    if (col_type != col_type_StringEnum)
-     return 0;
-    ref_type ref = m_spec.get_enumkeys_ref(column_ndx);
-    StringColumn col(m_spec.get_alloc(), ref); // Throws
+    if (!is_enumerated(col_key))
+        return 0;
+
+    ArrayParent* parent;
+    ref_type ref = const_cast<Spec&>(m_spec).get_enumkeys_ref(colkey2ndx(col_key), parent);
+    BPlusTree<StringData> col(get_alloc());
+    col.init_from_ref(ref);
+
     return col.size();
-    */
-    return 0;
 }
 
 ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target,
@@ -840,6 +837,10 @@ void Table::detach() noexcept
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
     m_alloc.bump_instance_version();
+}
+
+void Table::fully_detach() noexcept
+{
     m_next_key_value = -1; // trigger recomputation on next use
     m_spec.detach();
     m_top.detach();
@@ -857,8 +858,9 @@ Table::~Table() noexcept
         m_top.destroy_deep();
     }
 
-    if (m_top.is_attached())
-        detach();
+    if (m_top.is_attached()) {
+        fully_detach();
+    }
 
     for (auto& index : m_index_accessors) {
         delete index;
@@ -1461,11 +1463,9 @@ ObjKey Table::find_first_binary(ColKey col_key, BinaryData value) const
     return find_first<BinaryData>(col_key, value);
 }
 
-ObjKey Table::find_first_null(ColKey) const
+ObjKey Table::find_first_null(ColKey col_key) const
 {
-    // return where().equal(column_ndx, null{}).find();
-    // TODO
-    return null_key;
+    return where().equal(col_key, null{}).find();
 }
 
 template <class T>
@@ -1853,7 +1853,7 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                 //     size_t len = chars_in_int(get_binary(col, row).size()) + 2;
                 //     width = std::max(width, len);
                 // }
-                width += 6; // space for " bytes"
+                // width += 6; // space for " bytes"
                 break;
             case type_String: {
                 // Find max length of the strings
@@ -1862,8 +1862,8 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                 //     size_t len = get_string(col, row).size();
                 //     width = std::max(width, len);
                 // }
-                if (width > 20)
-                    width = 23; // cut strings longer than 20 chars
+                // if (width > 20)
+                //     width = 23; // cut strings longer than 20 chars
                 break;
             }
             case type_LinkList:
@@ -1922,6 +1922,7 @@ void Table::to_string_row(ObjKey key, std::ostream& out, const std::vector<size_
     size_t column_count = get_column_count();
     size_t row_ndx_width = widths[0];
 
+    auto f = out.flags();
     out << std::scientific; // for float/double
     out.width(row_ndx_width);
     out << key.value << ":";
@@ -1975,6 +1976,7 @@ void Table::to_string_row(ObjKey key, std::ostream& out, const std::vector<size_
     }
 
     out << "\n";
+    out.flags(f);
 }
 
 

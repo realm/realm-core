@@ -785,6 +785,13 @@ struct LessEqual : public HackClass {
 
         return (!v1null && !v2null && v1 <= v2);
     }
+    bool operator()(const util::Optional<bool>& v1, const util::Optional<bool>& v2, bool v1null, bool v2null) const
+    {
+        if (v1null && v2null)
+            return false;
+
+        return (!v1null && !v2null && v1.value() <= v2.value());
+    }
     template <class A, class B, class C, class D>
     bool operator()(A, B, C, D) const
     {
@@ -807,6 +814,13 @@ struct GreaterEqual : public HackClass {
             return true;
 
         return (!v1null && !v2null && v1 >= v2);
+    }
+    bool operator()(const util::Optional<bool>& v1, const util::Optional<bool>& v2, bool v1null, bool v2null) const
+    {
+        if (v1null && v2null)
+            return false;
+
+        return (!v1null && !v2null && v1.value() >= v2.value());
     }
     template <class A, class B, class C, class D>
     bool operator()(A, B, C, D) const

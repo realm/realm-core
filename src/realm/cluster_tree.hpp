@@ -185,6 +185,13 @@ public:
     }
     pointer operator->() const;
     ConstIterator& operator++();
+    ConstIterator& operator+=(ptrdiff_t adj);
+    ConstIterator operator+(ptrdiff_t adj)
+    {
+        ConstIterator tmp(*this);
+        tmp += adj;
+        return tmp;
+    }
     bool operator!=(const ConstIterator& rhs) const
     {
         return m_key != rhs.m_key;
@@ -209,7 +216,15 @@ public:
     typedef Obj* pointer;
     typedef Obj& reference;
 
-    using ConstIterator::ConstIterator;
+    Iterator(const ClusterTree& t, size_t ndx)
+        : ConstIterator(t, ndx)
+    {
+    }
+    Iterator(const ClusterTree& t, ObjKey key)
+        : ConstIterator(t, key)
+    {
+    }
+
     reference operator*() const
     {
         return *operator->();
@@ -221,6 +236,16 @@ public:
     Iterator& operator++()
     {
         return static_cast<Iterator&>(ConstIterator::operator++());
+    }
+    Iterator& operator+=(ptrdiff_t adj)
+    {
+        return static_cast<Iterator&>(ConstIterator::operator+=(adj));
+    }
+    Iterator operator+(ptrdiff_t adj)
+    {
+        Iterator tmp(*this);
+        tmp.ConstIterator::operator+=(adj);
+        return tmp;
     }
 };
 }
