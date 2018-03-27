@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     ninja-build \
     pandoc \
+    # cheetah is required to build core < v1.0.0 benchmarks
+    python-cheetah \
     python-matplotlib \
     python-pip \
     pkg-config \

@@ -132,5 +132,5 @@ fpm \
     -d "librealm-dev = ${VERSION}-${ITERATION}" \
     -d "libssl-dev" \
     -C "/prod" \
-    lib/librealm-dbg.so=/usr/lib/librealm-dbg.a \
-    lib/librealm-parser-dbg.so=/usr/lib/librealm-parser-dbg.a
+    lib/librealm-dbg.a=/usr/lib/librealm-dbg.a \
+    lib/librealm-parser-dbg.a=/usr/lib/librealm-parser-dbg.a

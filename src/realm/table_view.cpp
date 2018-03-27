@@ -587,6 +587,11 @@ void ConstTableView::apply_descriptor_ordering(DescriptorOrdering new_ordering)
     do_sync();
 }
 
+std::string ConstTableView::get_descriptor_ordering_description() const
+{
+    return m_descriptor_ordering.get_description(m_table);
+}
+
 // Sort according to one column
 void ConstTableView::sort(ColKey column, bool ascending)
 {

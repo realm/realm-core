@@ -143,5 +143,5 @@ fpm \
     -d "realm-devel = ${VERSION}-${ITERATION}.el7" \
     -d "openssl-devel" \
     -C "/prod" \
-    lib64/librealm-dbg.so=/usr/lib64/librealm-dbg.a \
-    lib64/librealm-parser-dbg.so=/usr/lib64/librealm-parser-dbg.a
+    lib64/librealm-dbg.a=/usr/lib64/librealm-dbg.a \
+    lib64/librealm-parser-dbg.a=/usr/lib64/librealm-parser-dbg.a

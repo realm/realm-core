@@ -1,0 +1,193 @@
+////////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2015 Realm Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+////////////////////////////////////////////////////////////////////////////
+
+#ifndef REALM_COLLECTION_OPERATOR_EXPRESSION_HPP
+#define REALM_COLLECTION_OPERATOR_EXPRESSION_HPP
+
+#include "property_expression.hpp"
+#include "parser.hpp"
+#include "parser_utils.hpp"
+
+#include <realm/query_expression.hpp>
+
+namespace realm {
+namespace parser {
+
+template <typename RetType, parser::Expression::KeyPathOp AggOpType, class Enable = void>
+struct CollectionOperatorGetter;
+
+template <parser::Expression::KeyPathOp OpType>
+struct CollectionOperatorExpression
+{
+    static constexpr parser::Expression::KeyPathOp operation_type = OpType;
+    std::function<Table *()> table_getter;
+    PropertyExpression pe;
+    ColKey post_link_col_key;
+    DataType post_link_col_type;
+
+    CollectionOperatorExpression(PropertyExpression&& exp, std::string suffix_path)
+    : pe(std::move(exp))
+    {
+        table_getter = std::bind(&PropertyExpression::table_getter, pe);
+
+        const bool requires_suffix_path = !(OpType == parser::Expression::KeyPathOp::SizeString
+                                            || OpType == parser::Expression::KeyPathOp::SizeBinary
+                                            || OpType == parser::Expression::KeyPathOp::Count);
+
+        if (requires_suffix_path) {
+            Table* pre_link_table = pe.table_getter();
+            REALM_ASSERT(pre_link_table);
+            StringData list_property_name = pre_link_table->get_column_name(pe.col_key);
+            precondition(pe.col_type == type_LinkList,
+                         util::format("The '%1' operation must be used on a list property, but '%2' is not a list",
+                                      util::collection_operator_to_str(OpType), list_property_name));
+
+            TableRef post_link_table = pe.table_getter()->get_link_target(pe.col_key);
+            REALM_ASSERT(post_link_table);
+            StringData printable_post_link_table_name = get_printable_table_name(*post_link_table);
+
+            KeyPath suffix_key_path = key_path_from_string(suffix_path);
+            precondition(suffix_path.size() > 0 && suffix_key_path.size() > 0,
+                         util::format("A property from object '%1' must be provided to perform operation '%2'",
+                                      printable_post_link_table_name, util::collection_operator_to_str(OpType)));
+
+            precondition(suffix_key_path.size() == 1,
+                         util::format("Unable to use '%1' because collection aggreate operations are only supported "
+                                      "for direct properties at this time", suffix_path));
+
+            post_link_col_key = pe.table_getter()->get_link_target(pe.col_key)->get_column_key(suffix_key_path[0]);
+
+            precondition(post_link_col_key,
+                         util::format("No property '%1' on object of type '%2'",
+                                      suffix_path, printable_post_link_table_name));
+            post_link_col_type = pe.table_getter()->get_link_target(pe.col_key)->get_column_type(post_link_col_key);
+        }
+        else {  // !requires_suffix_path
+            post_link_col_type = pe.col_type;
+
+            precondition(suffix_path.empty(),
+                         util::format("An extraneous property '%1' was found for operation '%2'",
+                                      suffix_path, util::collection_operator_to_str(OpType)));
+        }
+    }
+    template <typename T>
+    auto value_of_type_for_query() const
+    {
+        return CollectionOperatorGetter<T, OpType>::convert(*this);
+    }
+};
+
+
+// Certain operations are disabled for some types (eg. a sum of timestamps is invalid).
+// The operations that are supported have a specialisation with std::enable_if for that type below
+// any type/operation combination that is not specialised will get the runtime error from the following
+// default implementation. The return type is just a dummy to make things compile.
+template <typename RetType, parser::Expression::KeyPathOp AggOpType, class Enable>
+struct CollectionOperatorGetter {
+    static Columns<RetType> convert(const CollectionOperatorExpression<AggOpType>& op) {
+        throw std::runtime_error(util::format("Predicate error: comparison of type '%1' with result of '%2' is not supported.",
+                                              type_to_str<RetType>(),
+                                              collection_operator_to_str(op.operation_type)));
+    }
+};
+
+template <typename RetType>
+struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Min,
+typename std::enable_if_t<
+std::is_same<RetType, Int>::value ||
+std::is_same<RetType, Float>::value ||
+std::is_same<RetType, Double>::value
+> >{
+    static SubColumnAggregate<RetType, aggregate_operations::Minimum<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Min>& expr)
+    {
+        return expr.table_getter()->template column<Link>(expr.pe.col_key).template column<RetType>(expr.post_link_col_key).min();
+    }
+};
+
+template <typename RetType>
+struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Max,
+typename std::enable_if_t<
+std::is_same<RetType, Int>::value ||
+std::is_same<RetType, Float>::value ||
+std::is_same<RetType, Double>::value
+> >{
+    static SubColumnAggregate<RetType, aggregate_operations::Maximum<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Max>& expr)
+    {
+        return expr.table_getter()->template column<Link>(expr.pe.col_key).template column<RetType>(expr.post_link_col_key).max();
+    }
+};
+
+template <typename RetType>
+struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Sum,
+typename std::enable_if_t<
+std::is_same<RetType, Int>::value ||
+std::is_same<RetType, Float>::value ||
+std::is_same<RetType, Double>::value
+> >{
+    static SubColumnAggregate<RetType, aggregate_operations::Sum<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum>& expr)
+    {
+        return expr.table_getter()->template column<Link>(expr.pe.col_key).template column<RetType>(expr.post_link_col_key).sum();
+    }
+};
+
+template <typename RetType>
+struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Avg,
+typename std::enable_if_t<
+std::is_same<RetType, Int>::value ||
+std::is_same<RetType, Float>::value ||
+std::is_same<RetType, Double>::value
+> >{
+    static SubColumnAggregate<RetType, aggregate_operations::Average<RetType> > convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>& expr)
+    {
+        return expr.table_getter()->template column<Link>(expr.pe.col_key).template column<RetType>(expr.post_link_col_key).average();
+    }
+};
+
+template <typename RetType>
+struct CollectionOperatorGetter<RetType, parser::Expression::KeyPathOp::Count,
+    typename std::enable_if_t<
+    std::is_same<RetType, Int>::value ||
+    std::is_same<RetType, Float>::value ||
+    std::is_same<RetType, Double>::value
+    > >{
+    static LinkCount convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>& expr)
+    {
+        return expr.table_getter()->template column<Link>(expr.pe.col_key).count();
+    }
+};
+
+template <>
+struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::SizeString>{
+    static SizeOperator<String> convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>& expr)
+    {
+        return expr.table_getter()->template column<String>(expr.pe.col_key).size();
+    }
+};
+
+template <>
+struct CollectionOperatorGetter<Int, parser::Expression::KeyPathOp::SizeBinary>{
+    static SizeOperator<Binary> convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>& expr)
+    {
+        return expr.table_getter()->template column<Binary>(expr.pe.col_key).size();
+    }
+};
+
+} // namespace parser
+} // namespace realm
+
+#endif // REALM_COLLECTION_OPERATOR_EXPRESSION_HPP
