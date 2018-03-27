@@ -199,11 +199,12 @@ public:
     Query& not_equal(ColKey column_key, const char* c_str, bool case_sensitive = true);
 
     // Conditions: binary data
-    Query& equal(ColKey column_key, BinaryData value);
-    Query& not_equal(ColKey column_key, BinaryData value);
-    Query& begins_with(ColKey column_key, BinaryData value);
-    Query& ends_with(ColKey column_key, BinaryData value);
-    Query& contains(ColKey column_key, BinaryData value);
+    Query& equal(ColKey column_key, BinaryData value, bool case_sensitive = true);
+    Query& not_equal(ColKey column_key, BinaryData value, bool case_sensitive = true);
+    Query& begins_with(ColKey column_key, BinaryData value, bool case_sensitive = true);
+    Query& ends_with(ColKey column_key, BinaryData value, bool case_sensitive = true);
+    Query& contains(ColKey column_key, BinaryData value, bool case_sensitive = true);
+    Query& like(ColKey column_key, BinaryData b, bool case_sensitive = true);
 
     // Negation
     Query& Not();

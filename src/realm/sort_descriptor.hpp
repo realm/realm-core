@@ -26,8 +26,8 @@
 
 namespace realm {
 
-// Forward declaration needed for deleted CommonDescriptor constructor
 class SortDescriptor;
+class ConstTableRef;
 
 // CommonDescriptor encapsulates a reference to a set of columns (possibly over
 // links), which is used to indicate the criteria columns for sort and distinct.
@@ -83,8 +83,9 @@ public:
 
         bool any_is_null(IndexPair i) const
         {
-            return std::any_of(m_columns.begin(), m_columns.end(),
-                               [=](auto&& col) { return col.is_null[i.index_in_view]; });
+            return std::any_of(m_columns.begin(), m_columns.end(), [=](auto&& col) {
+                return col.is_null.empty() ? false : col.is_null[i.index_in_view];
+            });
         }
 
     private:
@@ -110,6 +111,7 @@ public:
     {
         return {};
     }
+    virtual std::string get_description(ConstTableRef attached_table) const;
 
 protected:
     std::vector<std::vector<ColumnId>> m_column_ids;
@@ -133,6 +135,7 @@ public:
 
     // handover support
     std::vector<bool> export_order() const override;
+    std::string get_description(ConstTableRef attached_table) const override;
 
 private:
     std::vector<bool> m_ascending;
@@ -164,6 +167,7 @@ public:
     const CommonDescriptor* operator[](size_t ndx) const;
     bool will_apply_sort() const;
     bool will_apply_distinct() const;
+    std::string get_description(ConstTableRef target_table) const;
 
     // handover support
     using HandoverPatch = std::unique_ptr<DescriptorOrderingHandoverPatch>;
