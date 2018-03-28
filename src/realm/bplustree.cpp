@@ -580,14 +580,16 @@ BPlusTreeBase& BPlusTreeBase::operator=(const BPlusTreeBase& rhs)
 {
     Allocator& rhs_alloc = rhs.get_alloc();
 
-    // Take copy of other tree
-    MemRef mem(rhs.get_ref(), rhs_alloc);
-    MemRef copy_mem = Array::clone(mem, rhs_alloc, m_alloc); // Throws
-
     // Destroy current tree
     destroy();
 
-    init_from_ref(copy_mem.get_ref());
+    if (rhs.is_attached()) {
+        // Take copy of other tree
+        MemRef mem(rhs.get_ref(), rhs_alloc);
+        MemRef copy_mem = Array::clone(mem, rhs_alloc, m_alloc); // Throws
+
+        init_from_ref(copy_mem.get_ref());
+    }
 
     return *this;
 }
