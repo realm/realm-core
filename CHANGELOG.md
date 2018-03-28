@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* None.
+* Fix sporadic failures of disk preallocation on APFS.
+  PR [#3028](https://github.com/realm/realm-core/pull/3028).
 
 ### Breaking changes
 

@@ -703,6 +703,19 @@ void File::prealloc(size_t size)
         }
     }
 
+    auto manually_consume_space = [&]() {
+        constexpr size_t chunk_size = 4096;
+        int64_t original_size = get_size_static(m_fd);
+        seek(original_size);
+        size_t num_bytes = size_t(new_size - original_size);
+        std::string zeros(chunk_size, '\0');
+        while (num_bytes > 0) {
+            size_t t = num_bytes > chunk_size ? chunk_size : num_bytes;
+            write_static(m_fd, zeros.c_str(), t);
+            num_bytes -= t;
+        }
+    };
+
 #if REALM_PLATFORM_APPLE
     // posix_fallocate() is not supported on MacOS or iOS, so use a combination of fcntl(F_PREALLOCATE) and ftruncate().
 
@@ -726,11 +739,26 @@ void File::prealloc(size_t size)
     // APFS would fail with EINVAL if we attempted it, and HFS+ would preallocate extra space unnecessarily.
     // See <https://github.com/realm/realm-core/issues/3005> for details.
     if (new_size > allocated_size) {
-        fstore_t store = { F_ALLOCATEALL, F_PEOFPOSMODE, 0, static_cast<off_t>(new_size - statbuf.st_size), 0 };
+
+        off_t to_allocate = static_cast<off_t>(new_size - statbuf.st_size);
+        fstore_t store = { F_ALLOCATEALL, F_PEOFPOSMODE, 0, to_allocate, 0 };
         int ret = fcntl(m_fd, F_PREALLOCATE, &store);
         if (ret == -1) {
             int err = errno;
-            throw OutOfDiskSpace(get_errno_msg("fcntl() inside prealloc() failed: ", err));
+
+            if (err == EINVAL) {
+                // There's a timing sensitive bug on APFS which causes fcntl to sometimes throw EINVAL.
+                // This might not be the case, but we'll fall back and attempt to manually allocate all the requested
+                // space. Worst case, this might also fail, but there is also a chance it will succeed. We don't
+                // call this in the first place because using fcntl(F_PREALLOCATE) will be faster if it works (it has
+                // been reliable on HSF+).
+                manually_consume_space();
+            } else {
+                std::string msg = util::format("fcntl() inside prealloc() failed allocating %1 bytes, new_size=%2, cur_size=%3, allocated_size=%4, event: ",
+                                               to_allocate, new_size, statbuf.st_size, allocated_size);
+                msg += util::make_basic_system_error_code(err).message();
+                throw OutOfDiskSpace(msg);
+            }
         }
     }
 
@@ -748,16 +776,8 @@ void File::prealloc(size_t size)
     }
 #elif REALM_ANDROID || defined(_WIN32)
 
-    constexpr size_t chunk_size = 4096;
-    int64_t original_size = get_size_static(m_fd);
-    seek(original_size);
-    size_t num_bytes = size_t(new_size - original_size);
-    std::string zeros(chunk_size, '\0');
-    while (num_bytes > 0) {
-        size_t t = num_bytes > chunk_size ? chunk_size : num_bytes;
-        write_static(m_fd, zeros.c_str(), t);
-        num_bytes -= t;
-    }
+    manually_consume_space();
+
 #else
     #error Please check if/how your OS supports file preallocation
 #endif
