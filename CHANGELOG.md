@@ -1,23 +1,9 @@
-# NEXT RELEASE
+# 5.4.2 Release notes
 
 ### Bugfixes
 
 * Fix sporadic failures of disk preallocation on APFS.
   PR [#3028](https://github.com/realm/realm-core/pull/3028).
-
-### Breaking changes
-
-* None.
-
-### Enhancements
-
-* None.
-
------------
-
-### Internals
-
-* None.
 
 ----------------------------------------------
 
