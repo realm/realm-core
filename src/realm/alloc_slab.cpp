@@ -633,7 +633,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 
         // Pre-alloc initial space
         size_t initial_size = page_size(); // m_initial_section_size;
-        m_file.prealloc(0, initial_size);  // Throws
+        m_file.prealloc(initial_size);     // Throws
 
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
@@ -749,7 +749,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
                 // actual size of the file.
                 // FIXME: ^This needs a better explanation
                 size = round_up_to_page_size(size);
-                m_file.prealloc(0, size);
+                m_file.prealloc(size);
                 m_baseline = 0;
             }
             else {
@@ -1225,23 +1225,25 @@ size_t SlabAlloc::find_section_in_range(size_t start_pos, size_t free_chunk_size
 void SlabAlloc::resize_file(size_t new_file_size)
 {
     REALM_ASSERT(new_file_size == round_up_to_page_size(new_file_size));
-    m_file.prealloc(0, new_file_size); // Throws
+    m_file.prealloc(new_file_size); // Throws
 
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         m_file.sync(); // Throws
 }
 
+#ifdef REALM_DEBUG
 void SlabAlloc::reserve_disk_space(size_t size)
 {
     if (size != round_up_to_page_size(size))
         size = round_up_to_page_size(size);
-    m_file.prealloc_if_supported(0, size); // Throws
+    m_file.prealloc(size); // Throws
 
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         m_file.sync(); // Throws
 }
+#endif
 
 void SlabAlloc::verify() const
 {

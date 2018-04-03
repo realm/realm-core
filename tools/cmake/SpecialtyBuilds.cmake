@@ -35,6 +35,20 @@ if(REALM_AFL)
 endif()
 
 # -------------
+# libfuzzer
+# -------------
+option(REALM_LIBFUZZER "Compile with llvm libfuzzer" OFF)
+if(REALM_LIBFUZZER)
+    if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
+        # todo: add the undefined sanitizer here after blacklisting false positives
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=fuzzer,address -fsanitize-coverage=trace-pc-guard")
+    else()
+        message(FATAL_ERROR
+                "Compiling for libfuzzer is only supported with clang")
+    endif()
+endif()
+
+# -------------
 # Address Sanitizer
 # -------------
 option(REALM_ASAN "Compile with address sanitizer support" OFF)

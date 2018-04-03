@@ -52,15 +52,6 @@ using namespace realm::util;
 struct EndOfFile {
 };
 
-std::string create_string(size_t length)
-{
-    REALM_ASSERT_3(length, <, 256);
-    char buf[256] = {0};
-    for (size_t i = 0; i < length; i++)
-        buf[i] = 'a' + (rand() % 20);
-    return std::string{buf, length};
-}
-
 enum INS {
     ADD_TABLE,
     REMOVE_TABLE,
@@ -86,12 +77,6 @@ enum INS {
     GET_ALL_COLUMN_NAMES,
     CREATE_TABLE_VIEW,
     COMPACT,
-<<<<<<< HEAD
-=======
-    SWAP_ROWS,
-    MOVE_ROWS,
-    SET_UNIQUE,
->>>>>>> v5.0.1
     IS_NULL,
     OPTIMIZE_TABLE,
 
@@ -151,6 +136,14 @@ int32_t get_int32(State& s)
     return v;
 }
 
+std::string create_string(State& s, size_t length)
+{
+    std::string buf(length, '\0');
+    for (size_t i = 0; i < length; i++)
+        buf[i] = get_next(s);
+    return buf;
+}
+
 std::pair<int64_t, int32_t> get_timestamp_values(State& s) {
     int64_t seconds = get_int64(s);
     int32_t nanoseconds = get_int32(s) % 1000000000;
@@ -178,6 +171,7 @@ std::string construct_binary_payload(State& s, util::Optional<std::ostream&> log
 
 std::string create_column_name(State& s, DataType t)
 {
+<<<<<<< HEAD
     std::string str;
     switch (t) {
         case type_Int:
@@ -214,12 +208,82 @@ std::string create_column_name(State& s, DataType t)
     }
     const size_t length = get_next(s) % 20 + 1;
     return str + create_string(length);
+=======
+    // Mixed type has 8 constructors supporting different types.
+    unsigned char type = get_next(s) % 8;
+
+    switch (type) {
+        default:
+        case 0: {
+            bool b = get_next(s) % 2;
+            if (log) {
+                *log << "Mixed mixed(" << (b ? "true" : "false") << ");\n";
+            }
+            return Mixed(b);
+        }
+        case 1: {
+            int64_t value = get_int64(s);
+            if (log) {
+                *log << "Mixed mixed((int64_t)(" << value << "));\n";
+            }
+            return Mixed(value);
+        }
+        case 2: {
+            float value = get_next(s);
+            if (log) {
+                *log << "Mixed mixed((float)(" << value << "));\n";
+            }
+            return Mixed(value);
+        }
+        case 3: {
+            double value = get_next(s);
+            if (log) {
+                *log << "Mixed mixed((double)(" << value << "));\n";
+            }
+            return Mixed(value);
+        }
+        case 4: {
+            buffer = create_string(s, get_next(s));
+            if (log) {
+                *log << "Mixed mixed(StringData(\"" << buffer << "\"));\n";
+            }
+            return Mixed(StringData(buffer));
+        }
+        case 5: {
+            buffer = construct_binary_payload(s, log);
+            if (log) {
+                *log << "Mixed mixed(BinaryData(blob));\n";
+            }
+            return Mixed(BinaryData(buffer));
+        }
+        case 6: {
+            int64_t time = get_int64(s);
+            if (log) {
+                *log << "Mixed mixed(OldDateTime(" << time << "));\n";
+            }
+            return Mixed(OldDateTime(time));
+        }
+        case 7: {
+            std::pair<int64_t, int32_t> values = get_timestamp_values(s);
+            if (log) {
+                *log << "Mixed mixed(Timestamp{" << values.first << ", " << values.second << "});\n";
+            }
+            return Mixed(Timestamp{values.first, values.second});
+        }
+    }
+}
+
+std::string create_column_name(State& s)
+{
+    const unsigned char length = get_next(s) % (Descriptor::max_column_name_length + 1);
+    return create_string(s, length);
+>>>>>>> 82cb7c4c0b2a
 }
 
 std::string create_table_name(State& s)
 {
-    const size_t length = get_next(s) % (Group::max_table_name_length + 1);
-    return create_string(length);
+    const unsigned char length = get_next(s) % (Group::max_table_name_length + 1);
+    return create_string(s, length);
 }
 
 std::string get_current_time_stamp()
@@ -538,7 +602,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     else {
                         if (type == type_String) {
-                            std::string str = create_string(get_next(s));
+                            std::string str = create_string(s, get_next(s));
                             if (log) {
                                 *log << "obj.set(" << col_ndx << ", \"" << str << "\");\n";
                             }
@@ -559,6 +623,15 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 t->set_binary_big(col_ndx, row_ndx, BinaryData(blob));
                             }
                             else {
+<<<<<<< HEAD
+=======
+                                std::string str = create_string(s, get_next(s));
+                                if (log) {
+                                    *log << "g.get_table(" << table_ndx << ")->set_binary(" << col_ndx << ", " << row_ndx
+                                    << ", BinaryData{\"" << str << "\", " << str.size() << "});\n";
+                                }
+                                t->set_binary(col_ndx, row_ndx, BinaryData(str));
+>>>>>>> 82cb7c4c0b2a
                             }
                             */
                             std::string str = create_string(get_next(s));
@@ -804,6 +877,111 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 sg_r.begin_read();
                 REALM_DO_IF_VERIFY(log, g_r.verify());
             }
+<<<<<<< HEAD
+=======
+            else if (instr == SET_UNIQUE && g.size() > 0) {
+                std::pair<size_t, size_t> target = get_target_for_set_unique(g, s);
+                if (target.first < g.size()) {
+                    size_t table_ndx = target.first;
+                    size_t col_ndx = target.second;
+                    TableRef t = g.get_table(table_ndx);
+
+                    // Only integer and string columns are supported. We let the fuzzer choose to set either
+                    // null or a value (depending also on the nullability of the column).
+                    //
+                    // for integer columns, that means we call either of
+                    //  - set_null_unique
+                    //  - set_int_unique
+                    // while for string columns, both null and values are handled by
+                    //  - set_string_unique
+                    //
+                    // Due to an additional limitation involving non-empty lists, a specific kind of LogicError
+                    // may be thrown. This is handled for each case below and encoded as a CHECK in the generated
+                    // C++ unit tests when logging is enabled. Other kinds / types of exception are not handled,
+                    // but simply rethrown.
+
+                    DataType type = t->get_column_type(col_ndx);
+                    switch (type) {
+                        case type_Int: {
+                            size_t row_ndx = get_int32(s) % t->size();
+                            bool set_null = t->is_nullable(col_ndx) ? get_next(s) % 2 == 0 : false;
+                            if (set_null) {
+                                if (log) {
+                                    *log << "try { g.get_table(" << table_ndx << ")->set_null_unique(" << col_ndx
+                                         << ", " << row_ndx
+                                         << "); } catch (const LogicError& le) "
+                                            "{ CHECK(le.kind() == LogicError::illegal_combination); }\n";
+                                }
+                                try {
+                                    t->set_null_unique(col_ndx, row_ndx);
+                                }
+                                catch (const LogicError& le) {
+                                    if (le.kind() != LogicError::illegal_combination) {
+                                        throw;
+                                    }
+                                }
+                            }
+                            else {
+                                int64_t value = get_int64(s);
+                                if (log) {
+                                    *log << "try { g.get_table(" << table_ndx << ")->set_int_unique(" << col_ndx
+                                         << ", " << row_ndx << ", " << value
+                                         << "); } catch (const LogicError& le) "
+                                            "{ CHECK(le.kind() == LogicError::illegal_combination); }\n";
+                                }
+                                try {
+                                    t->set_int_unique(col_ndx, row_ndx, value);
+                                }
+                                catch (const LogicError& le) {
+                                    if (le.kind() != LogicError::illegal_combination) {
+                                        throw;
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                        case type_String: {
+                            size_t row_ndx = get_int32(s) % t->size();
+                            bool set_null = t->is_nullable(col_ndx) ? get_next(s) % 2 == 0 : false;
+                            if (set_null) {
+                                if (log) {
+                                    *log << "try { g.get_table(" << table_ndx << ")->set_string_unique(" << col_ndx
+                                         << ", " << row_ndx << ", null{}); } catch (const LogicError& le) "
+                                            "{ CHECK(le.kind() == LogicError::illegal_combination); }\n";
+                                }
+                                try {
+                                    t->set_string_unique(col_ndx, row_ndx, null{});
+                                }
+                                catch (const LogicError& le) {
+                                    if (le.kind() != LogicError::illegal_combination) {
+                                        throw;
+                                    }
+                                }
+                            }
+                            else {
+                                std::string str = create_string(s, get_next(s));
+                                if (log) {
+                                    *log << "try { g.get_table(" << table_ndx << ")->set_string_unique(" << col_ndx
+                                         << ", " << row_ndx << ", \"" << str << "\"); } catch (const LogicError& le) "
+                                            "{ CHECK(le.kind() == LogicError::illegal_combination); }\n";
+                                }
+                                try {
+                                    t->set_string_unique(col_ndx, row_ndx, str);
+                                }
+                                catch (const LogicError& le) {
+                                    if (le.kind() != LogicError::illegal_combination) {
+                                        throw;
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                }
+            }
+>>>>>>> 82cb7c4c0b2a
             else if (instr == IS_NULL && g_r.size() > 0) {
                 size_t table_ndx = get_next(s) % g_r.size();
                 TableRef t = g_r.get_table(table_ndx);
