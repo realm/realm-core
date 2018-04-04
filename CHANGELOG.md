@@ -13,6 +13,8 @@
   functions will throw `InvalidKey` if the referenced object has been deleted.
 * Removed the ability to sort a linklist according to some property of the target table. This
   operation is not supported by the sync protocol and allegedly not used in the bindings.
+* Moved `get_uncommitted_changes()` from `History` class to `Replication` class. This removes the
+  need to call TrivialReplication::get_uncommitted_changes from a decendant of History.
 
 ### Enhancements
 

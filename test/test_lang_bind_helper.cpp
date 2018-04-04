@@ -175,12 +175,6 @@ public:
         // No-op
     }
 
-    BinaryData get_uncommitted_changes() noexcept override
-    {
-        REALM_ASSERT(false);
-        return BinaryData(); // FIXME: Not yet implemented
-    }
-
     void verify() const override
     {
         // No-op

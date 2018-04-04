@@ -129,18 +129,6 @@ public:
     /// of histories are stored inside the Realm file.
     virtual void set_oldest_bound_version(version_type version) = 0;
 
-    /// Get the list of uncommited changes accumulated so far in the current
-    /// write transaction.
-    ///
-    /// The callee retains ownership of the referenced memory. The ownership is
-    /// not handed over the the caller.
-    ///
-    /// This function may be called only during a write transaction (prior to
-    /// initiation of commit operation). In that case, the caller may assume that the
-    /// returned memory reference stays valid for the remainder of the transaction (up
-    /// until initiation of the commit operation).
-    virtual BinaryData get_uncommitted_changes() noexcept = 0;
-
     virtual void verify() const = 0;
 
     virtual ~History() noexcept
