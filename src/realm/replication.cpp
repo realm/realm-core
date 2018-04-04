@@ -933,15 +933,15 @@ void TrivialReplication::initialize(DB&)
 
 void TrivialReplication::do_initiate_transact(version_type, bool history_updated)
 {
-    char* data = m_transact_log_buffer.data();
-    size_t size = m_transact_log_buffer.size();
+    char* data = m_stream.get_data();
+    size_t size = m_stream.get_size();
     set_buffer(data, data + size);
     m_history_updated = history_updated;
 }
 
 Replication::version_type TrivialReplication::do_prepare_commit(version_type orig_version)
 {
-    char* data = m_transact_log_buffer.data();
+    char* data = m_stream.get_data();
     size_t size = write_position() - data;
     version_type new_version = prepare_changeset(data, size, orig_version); // Throws
     return new_version;
@@ -964,8 +964,3 @@ void TrivialReplication::do_clear_interrupt() noexcept
 {
 }
 
-void TrivialReplication::transact_log_append(const char* data, size_t size, char** new_begin, char** new_end)
-{
-    internal_transact_log_reserve(size, new_begin, new_end);
-    *new_begin = realm::safe_copy_n(data, size, *new_begin);
-}
