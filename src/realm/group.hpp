@@ -572,6 +572,7 @@ private:
     mutable std::mutex m_accessor_mutex;
     mutable int m_num_tables = 0;
     bool m_attached = false;
+    bool m_is_writable = true;
     const bool m_is_shared;
 
     std::function<void(const CascadeNotification&)> m_notify_handler;
@@ -611,7 +612,7 @@ private:
 
     // If the underlying memory mappings have been extended, this method is used
     // to update all the tables' allocator wrappers.
-    void update_allocator_wrappers();
+    void update_allocator_wrappers(bool writeable);
 
     /// If `top_ref` is not zero, attach this group accessor to the specified
     /// underlying node structure. If `top_ref` is zero and \a
@@ -635,7 +636,7 @@ private:
     void reset_free_space_tracking();
 
     void remap(size_t new_file_size);
-    void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, uint64_t new_version);
+    void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, uint64_t new_version, bool writable);
 
     /// Recursively update refs stored in all cached array
     /// accessors. This includes cached array accessors in any
@@ -692,8 +693,8 @@ private:
     void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
     void update_num_objects();
     class TransactAdvancer;
-    void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&,
-                          uint64_t new_version);
+    void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&, uint64_t new_version,
+                          bool writable);
     void refresh_dirty_accessors();
 
     /// \brief The version of the format of the node structure (in file or in
@@ -1256,15 +1257,16 @@ public:
         group.remap(new_file_size); // Throws
     }
 
-    static void remap_and_update_refs(Group& group, ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
+    static void remap_and_update_refs(Group& group, ref_type new_top_ref, size_t new_file_size, uint64_t new_version,
+                                      bool writable)
     {
-        group.remap_and_update_refs(new_top_ref, new_file_size, new_version); // Throws
+        group.remap_and_update_refs(new_top_ref, new_file_size, new_version, writable); // Throws
     }
 
     static void advance_transact(Group& group, ref_type new_top_ref, size_t new_file_size,
-                                 _impl::NoCopyInputStream& in, uint64_t new_version)
+                                 _impl::NoCopyInputStream& in, uint64_t new_version, bool writable)
     {
-        group.advance_transact(new_top_ref, new_file_size, in, new_version); // Throws
+        group.advance_transact(new_top_ref, new_file_size, in, new_version, writable); // Throws
     }
 
     static void create_empty_group_when_missing(Group& group)

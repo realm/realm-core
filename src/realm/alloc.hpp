@@ -115,6 +115,10 @@ public:
     /// this interface.
     bool is_read_only(ref_type) const noexcept;
 
+    void set_read_only(bool is_read_only)
+    {
+        m_is_read_only = is_read_only;
+    }
     /// Returns a simple allocator that can be used with free-standing
     /// Realm objects (such as a free-standing table). A
     /// free-standing object is one that is not part of a Group, and
@@ -150,7 +154,6 @@ protected:
     size_t m_baseline = 0; // Separation line between immutable and mutable refs.
 
     Replication* m_replication = nullptr;
-
     ref_type m_debug_watch = 0;
 
     // The following logically belongs in the slab allocator, but is placed
@@ -252,6 +255,9 @@ protected:
         m_instance_versioning_counter.fetch_add(1, std::memory_order_acq_rel);
     }
 
+private:
+    bool m_is_read_only = false; // prevent any alloc or free operations
+
     friend class Table;
     friend class ClusterTree;
     friend class Group;
@@ -284,9 +290,10 @@ public:
         m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
     }
 
-    void update_from_underlying_allocator()
+    void update_from_underlying_allocator(bool writable)
     {
         switch_underlying_allocator(*m_alloc);
+        set_read_only(!writable);
     }
 
 private:
@@ -426,6 +433,8 @@ inline void MemRef::set_addr(char* addr)
 
 inline MemRef Allocator::alloc(size_t size)
 {
+    if (m_is_read_only)
+        throw realm::LogicError(realm::LogicError::wrong_transact_state);
     return do_alloc(size);
 }
 

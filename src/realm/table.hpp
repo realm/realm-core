@@ -90,7 +90,7 @@ public:
     /// ConstTableRef that refer to it, or to any of its subtables,
     /// when it goes out of scope.
     Table(const Table&, Allocator& = Allocator::get_default());
-    void revive(Allocator& new_allocator);
+    void revive(Allocator& new_allocator, bool writable);
 
     ~Table() noexcept;
 
@@ -576,9 +576,9 @@ private:
 
     mutable WrappedAllocator m_alloc;
     Array m_top;
-    void update_allocator_wrapper()
+    void update_allocator_wrapper(bool writable)
     {
-        m_alloc.update_from_underlying_allocator();
+        m_alloc.update_from_underlying_allocator(writable);
     }
     Spec m_spec;            // 1st slot in m_top
     ClusterTree m_clusters; // 3rd slot in m_top
@@ -930,9 +930,10 @@ inline Table::Table(ref_count_tag, Allocator& alloc)
 {
 }
 
-inline void Table::revive(Allocator& alloc)
+inline void Table::revive(Allocator& alloc, bool writable)
 {
     m_alloc.switch_underlying_allocator(alloc);
+    m_alloc.update_from_underlying_allocator(writable);
     // since we're rebinding to a new table, we'll bump version counters
     // FIXME
     // this can be optimized if version counters are saved along with the

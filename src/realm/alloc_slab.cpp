@@ -147,6 +147,7 @@ void SlabAlloc::detach() noexcept
     delete[] m_fast_mapping_ptr;
     m_fast_mapping_ptr.store(nullptr);
     m_fast_mapping_size = 0;
+    set_read_only(true);
     purge_old_mappings(static_cast<uint64_t>(-1));
     switch (m_attach_mode) {
         case attach_None:
@@ -590,6 +591,10 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     using namespace realm::util;
     File::AccessMode access = cfg.read_only ? File::access_ReadOnly : File::access_ReadWrite;
     File::CreateMode create = cfg.read_only || cfg.no_create ? File::create_Never : File::create_Auto;
+    // FIXME: Currently we cannot enforce read-only mode on every allocation
+    // in the shared slab allocator, because we always create a minimal group
+    // representation in memory, even in a read-transaction, if the file is empty.
+    // m_is_read_only = cfg.read_only;
     // Even though we're the first to map the file, we cannot assume that we're
     // the session initiator. Another process may have the session initiator.
 

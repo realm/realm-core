@@ -374,16 +374,16 @@ Group::~Group() noexcept
 void Group::remap(size_t new_file_size)
 {
     m_alloc.update_reader_view(new_file_size); // Throws
-    update_allocator_wrappers();
+    update_allocator_wrappers(m_is_writable);
 }
 
 
-void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
+void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, uint64_t new_version, bool writable)
 {
     size_t old_baseline = m_alloc.get_baseline();
 
     m_alloc.update_reader_view(new_file_size, new_version); // Throws
-    update_allocator_wrappers();
+    update_allocator_wrappers(writable);
 
     // force update of all ref->ptr translations if the mapping has changed
     auto mapping_version = m_alloc.get_mapping_version();
@@ -481,7 +481,7 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writa
 
     // update readers view of memory
     m_alloc.update_reader_view(new_file_size, new_version); // Throws
-    update_allocator_wrappers();
+    update_allocator_wrappers(writable);
 
     // When `new_top_ref` is null, ask attach() to create a new node structure
     // for an empty group, but only during the initiation of write
@@ -730,7 +730,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
         }
     }
     if (table) {
-        table->revive(m_alloc);
+        table->revive(m_alloc, m_is_writable);
         table->init(ref, this, table_ndx);
     }
     else {
@@ -1076,7 +1076,7 @@ void Group::commit()
     // Update view of the file
     size_t new_file_size = out.get_file_size();
     m_alloc.update_reader_view(new_file_size); // Throws
-    update_allocator_wrappers();
+    update_allocator_wrappers(true);
 
     out.commit(top_ref); // Throws
 
@@ -1505,12 +1505,14 @@ private:
 };
 
 
-void Group::update_allocator_wrappers()
+void Group::update_allocator_wrappers(bool writable)
 {
+    m_is_writable = writable;
+    m_alloc.set_read_only(!writable);
     for (size_t i = 0; i < m_table_accessors.size(); ++i) {
         auto table_accessor = m_table_accessors[i];
         if (table_accessor) {
-            table_accessor->update_allocator_wrapper();
+            table_accessor->update_allocator_wrapper(writable);
         }
     }
 }
@@ -1557,7 +1559,7 @@ void Group::refresh_dirty_accessors()
 
 
 void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in,
-                             uint64_t new_version)
+                             uint64_t new_version, bool writable)
 {
     REALM_ASSERT(is_attached());
     // REALM_ASSERT(false); // FIXME: accessor updates need to be handled differently
@@ -1616,7 +1618,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     // Update memory mapping if database file has grown
 
     m_alloc.update_reader_view(new_file_size, new_version); // Throws
-    update_allocator_wrappers();
+    update_allocator_wrappers(writable);
 
     // This is no longer needed in Core, but we need to compute "schema_changed",
     // for the benefit of ObjectStore.

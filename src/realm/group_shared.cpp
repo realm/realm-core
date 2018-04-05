@@ -2176,8 +2176,8 @@ SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
     gf::reset_free_space_tracking(m_group); // Throws
 
     // Remap file if it has grown, and update refs in underlying node structure
-    gf::remap_and_update_refs(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size,
-                              m_read_lock.m_version); // Throws
+    gf::remap_and_update_refs(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size, m_read_lock.m_version,
+                              false); // Throws
 
     set_transact_stage(transact_Reading);
 

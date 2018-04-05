@@ -668,7 +668,7 @@ private:
     /// Returns true if, and only if _impl::History::update_early_from_top_ref()
     /// was called during the execution of this function.
     template <class O>
-    bool do_advance_read(O* observer, VersionID, _impl::History&);
+    bool do_advance_read(O* observer, VersionID, _impl::History&, bool writable);
 
     /// If there is an associated \ref Replication object, then this function
     /// returns `repl->get_history()` where `repl` is that Replication object,
@@ -945,7 +945,7 @@ inline void SharedGroup::advance_read(O* observer, VersionID version_id)
     if (!hist)
         throw LogicError(LogicError::no_history);
 
-    do_advance_read(observer, version_id, *hist); // Throws
+    do_advance_read(observer, version_id, *hist, false); // Throws
 }
 
 template <class O>
@@ -961,7 +961,7 @@ inline void SharedGroup::promote_to_write(O* observer)
     do_begin_write(); // Throws
     try {
         VersionID version = VersionID();                                  // Latest
-        bool history_updated = do_advance_read(observer, version, *hist); // Throws
+        bool history_updated = do_advance_read(observer, version, *hist, true); // Throws
 
         Replication* repl = m_group.get_replication();
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
@@ -1015,7 +1015,7 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
     ref_type top_ref = m_read_lock.m_top_ref;
     size_t file_size = m_read_lock.m_file_size;
     _impl::ReversedNoCopyInputStream reversed_in(reverser);
-    gf::advance_transact(m_group, top_ref, file_size, reversed_in, m_read_lock.m_version); // Throws
+    gf::advance_transact(m_group, top_ref, file_size, reversed_in, m_read_lock.m_version, false); // Throws
 
     do_end_write();
 
@@ -1027,7 +1027,7 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
 }
 
 template <class O>
-inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _impl::History& hist)
+inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _impl::History& hist, bool writable)
 {
     ReadLockInfo new_read_lock;
     grab_read_lock(new_read_lock, version_id); // Throws
@@ -1035,6 +1035,7 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
     if (new_read_lock.m_version == m_read_lock.m_version) {
         release_read_lock(new_read_lock);
         // _impl::History::update_early_from_top_ref() was not called
+        m_group.update_allocator_wrappers(writable);
         return false;
     }
 
@@ -1078,7 +1079,7 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
         ref_type new_top_ref = new_read_lock.m_top_ref;
         size_t new_file_size = new_read_lock.m_file_size;
         _impl::ChangesetInputStream in(hist, old_version, new_version);
-        m_group.advance_transact(new_top_ref, new_file_size, in, new_version); // Throws
+        m_group.advance_transact(new_top_ref, new_file_size, in, new_version, writable); // Throws
     }
 
     g.release();
