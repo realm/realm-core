@@ -405,7 +405,7 @@ private:
 /// alignment as part of the mutex state. We're copying the SharedInfo (including
 /// embedded but alway unlocked mutexes) and it must retain the same alignment
 /// throughout.
-struct alignas(8) SharedGroup::SharedInfo {
+struct alignas(8) DB::SharedInfo {
     /// Indicates that initialization of the lock file was completed
     /// sucessfully.
     ///
@@ -542,7 +542,7 @@ struct alignas(8) SharedGroup::SharedInfo {
 };
 
 
-SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv)
+DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv)
     : size_of_mutex(sizeof(shared_writemutex))
     , size_of_condvar(sizeof(room_to_write))
     , shared_writemutex() // Throws
@@ -751,8 +751,7 @@ std::string SharedGroupOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR"
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
-void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_backend,
-                          const SharedGroupOptions options)
+void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, const SharedGroupOptions options)
 {
     // Exception safety: Since do_open() is called from constructors, if it
     // throws, it must leave the file closed.
@@ -1312,7 +1311,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 
 // WARNING / FIXME: compact() should NOT be exposed publicly on Windows because it's not crash safe! It may
 // corrupt your database if something fails
-bool SharedGroup::compact()
+bool DB::compact()
 {
     // Verify that the database file is attached
     if (is_attached() == false) {
@@ -1387,24 +1386,24 @@ bool SharedGroup::compact()
     return true;
 }
 
-uint_fast64_t SharedGroup::get_number_of_versions()
+uint_fast64_t DB::get_number_of_versions()
 {
     SharedInfo* info = m_file_map.get_addr();
     std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
     return info->number_of_versions;
 }
 
-SharedGroup::~SharedGroup() noexcept
+DB::~DB() noexcept
 {
     close();
 }
 
-void SharedGroup::close() noexcept
+void DB::close() noexcept
 {
     close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock));
 }
 
-void SharedGroup::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
+void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
 {
     if (!is_attached())
         return;
@@ -1475,13 +1474,13 @@ void SharedGroup::close_internal(std::unique_lock<InterprocessMutex> lock) noexc
     m_file.close();
 }
 
-bool SharedGroup::has_changed()
+bool DB::has_changed()
 {
     bool changed = m_read_lock.m_version != get_version_of_latest_snapshot();
     return changed;
 }
 
-bool SharedGroup::wait_for_change()
+bool DB::wait_for_change()
 {
     SharedInfo* info = m_file_map.get_addr();
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
@@ -1492,7 +1491,7 @@ bool SharedGroup::wait_for_change()
 }
 
 
-void SharedGroup::wait_for_change_release()
+void DB::wait_for_change_release()
 {
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = false;
@@ -1500,13 +1499,13 @@ void SharedGroup::wait_for_change_release()
 }
 
 
-void SharedGroup::enable_wait_for_change()
+void DB::enable_wait_for_change()
 {
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = true;
 }
 
-void SharedGroup::set_transact_stage(SharedGroup::TransactStage stage) noexcept
+void DB::set_transact_stage(DB::TransactStage stage) noexcept
 {
 #if REALM_METRICS
     if (m_metrics) { // null if metrics are disabled
@@ -1538,7 +1537,7 @@ void SharedGroup::set_transact_stage(SharedGroup::TransactStage stage) noexcept
 }
 
 #ifdef REALM_ASYNC_DAEMON
-void SharedGroup::do_async_commits()
+void DB::do_async_commits()
 {
     bool shutdown = false;
     SharedInfo* info = m_file_map.get_addr();
@@ -1642,10 +1641,8 @@ void SharedGroup::do_async_commits()
 #endif // REALM_ASYNC_DAEMON
 
 
-void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade,
-                                      int target_file_format_version,
-                                      int current_hist_schema_version,
-                                      int target_hist_schema_version)
+void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version,
+                             int current_hist_schema_version, int target_hist_schema_version)
 {
     // In a multithreaded scenario multiple threads may initially see a need to
     // upgrade (maybe_upgrade == true) even though one onw thread is supposed to
@@ -1730,13 +1727,13 @@ void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade,
 }
 
 
-SharedGroup::VersionID SharedGroup::get_version_of_current_transaction()
+DB::VersionID DB::get_version_of_current_transaction()
 {
     return VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
 }
 
 
-void SharedGroup::release_read_lock(ReadLockInfo& read_lock) noexcept
+void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 {
     // The release may be tried on a version imported from a different thread,
     // hence generated on a different shared group, which may have memory mapped
@@ -1749,7 +1746,7 @@ void SharedGroup::release_read_lock(ReadLockInfo& read_lock) noexcept
 }
 
 
-void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
+void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
 {
     if (version_id.version == std::numeric_limits<version_type>::max()) {
         for (;;) {
@@ -1807,7 +1804,7 @@ void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
 }
 
 
-const Group& SharedGroup::begin_read(VersionID version_id)
+const Group& DB::begin_read(VersionID version_id)
 {
     if (m_transact_stage != transact_Ready)
         throw LogicError(LogicError::wrong_transact_state);
@@ -1822,7 +1819,7 @@ const Group& SharedGroup::begin_read(VersionID version_id)
 #ifdef _MSC_VER
 #pragma warning (disable: 4297) // throw in noexcept
 #endif
-void SharedGroup::end_read() noexcept
+void DB::end_read() noexcept
 {
     if (m_transact_stage == transact_Ready)
         return; // Idempotency
@@ -1839,7 +1836,7 @@ void SharedGroup::end_read() noexcept
 #endif
 
 
-Group& SharedGroup::begin_write()
+Group& DB::begin_write()
 {
     if (m_transact_stage != transact_Ready)
         throw LogicError(LogicError::wrong_transact_state);
@@ -1868,7 +1865,7 @@ Group& SharedGroup::begin_write()
     return m_group;
 }
 
-bool SharedGroup::try_begin_write(Group* &group)
+bool DB::try_begin_write(Group*& group)
 {
     if (m_transact_stage != transact_Ready)
         throw LogicError(LogicError::wrong_transact_state);
@@ -1900,7 +1897,7 @@ bool SharedGroup::try_begin_write(Group* &group)
 }
 
 
-SharedGroup::version_type SharedGroup::commit()
+DB::version_type DB::commit()
 {
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
@@ -1932,7 +1929,7 @@ SharedGroup::version_type SharedGroup::commit()
 #ifdef _MSC_VER
 #pragma warning (disable: 4297) // throw in noexcept
 #endif
-void SharedGroup::rollback() noexcept
+void DB::rollback() noexcept
 {
     if (m_transact_stage == transact_Ready)
         return; // Idempotency
@@ -1954,7 +1951,7 @@ void SharedGroup::rollback() noexcept
 #pragma warning (default: 4297)
 #endif
 
-SharedGroup::VersionID SharedGroup::pin_version()
+DB::VersionID DB::pin_version()
 {
     REALM_ASSERT(m_transact_stage != transact_Ready);
 
@@ -1967,7 +1964,7 @@ SharedGroup::VersionID SharedGroup::pin_version()
     return version_id;
 }
 
-void SharedGroup::unpin_version(VersionID token)
+void DB::unpin_version(VersionID token)
 {
     ReadLockInfo read_lock;
     read_lock.m_reader_idx = token.index;
@@ -1976,13 +1973,13 @@ void SharedGroup::unpin_version(VersionID token)
 }
 
 #if REALM_METRICS
-std::shared_ptr<Metrics> SharedGroup::get_metrics()
+std::shared_ptr<Metrics> DB::get_metrics()
 {
     return m_metrics;
 }
 #endif // REALM_METRICS
 
-void SharedGroup::do_begin_read(VersionID version_id, bool writable)
+void DB::do_begin_read(VersionID version_id, bool writable)
 {
     // FIXME: BadVersion must be thrown in every case where the specified
     // version is not tethered in accordance with the documentation of
@@ -2000,7 +1997,7 @@ void SharedGroup::do_begin_read(VersionID version_id, bool writable)
 }
 
 
-void SharedGroup::do_end_read() noexcept
+void DB::do_end_read() noexcept
 {
     REALM_ASSERT(m_read_lock.m_version != std::numeric_limits<version_type>::max());
     release_read_lock(m_read_lock);
@@ -2009,8 +2006,7 @@ void SharedGroup::do_end_read() noexcept
 }
 
 
-
-bool SharedGroup::do_try_begin_write()
+bool DB::do_try_begin_write()
 {
     // In the non-blocking case, we will only succeed if there is no contention for
     // the write mutex. For this case we are trivially fair and can ignore the
@@ -2023,7 +2019,7 @@ bool SharedGroup::do_try_begin_write()
 }
 
 
-void SharedGroup::do_begin_write()
+void DB::do_begin_write()
 {
     SharedInfo* info = m_file_map.get_addr();
 
@@ -2085,7 +2081,7 @@ void SharedGroup::do_begin_write()
     finish_begin_write();
 }
 
-void SharedGroup::finish_begin_write()
+void DB::finish_begin_write()
 {
     SharedInfo* info = m_file_map.get_addr();
     if (info->commit_in_critical_phase) {
@@ -2113,7 +2109,7 @@ void SharedGroup::finish_begin_write()
 }
 
 
-void SharedGroup::do_end_write() noexcept
+void DB::do_end_write() noexcept
 {
     SharedInfo* info = m_file_map.get_addr();
     info->next_served++;
@@ -2123,7 +2119,7 @@ void SharedGroup::do_end_write() noexcept
 }
 
 
-Replication::version_type SharedGroup::do_commit()
+Replication::version_type DB::do_commit()
 {
     REALM_ASSERT(m_transact_stage == transact_Writing);
 
@@ -2153,7 +2149,7 @@ Replication::version_type SharedGroup::do_commit()
 }
 
 
-SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
+DB::version_type DB::commit_and_continue_as_read()
 {
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
@@ -2185,7 +2181,7 @@ SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
 }
 
 
-bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
+bool DB::grow_reader_mapping(uint_fast32_t index)
 {
     using _impl::SimulatedFailure;
     SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
@@ -2203,7 +2199,7 @@ bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
 }
 
 
-SharedGroup::version_type SharedGroup::get_version_of_latest_snapshot()
+DB::version_type DB::get_version_of_latest_snapshot()
 {
     // As get_version_of_latest_snapshot() may be called outside of the write
     // mutex, another thread may be performing changes to the ringbuffer
@@ -2237,7 +2233,7 @@ SharedGroup::version_type SharedGroup::get_version_of_latest_snapshot()
 }
 
 
-void SharedGroup::low_level_commit(uint_fast64_t new_version)
+void DB::low_level_commit(uint_fast64_t new_version)
 {
     SharedInfo* info = m_file_map.get_addr();
 
@@ -2333,7 +2329,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
 }
 
 #ifdef REALM_DEBUG
-void SharedGroup::reserve(size_t size)
+void DB::reserve(size_t size)
 {
     REALM_ASSERT(is_attached());
     // FIXME: There is currently no synchronization between this and
@@ -2346,8 +2342,7 @@ void SharedGroup::reserve(size_t size)
 }
 #endif
 
-std::unique_ptr<SharedGroup::Handover<LinkList>>
-SharedGroup::export_linkview_for_handover(const LinkListPtr& accessor)
+std::unique_ptr<DB::Handover<LinkList>> DB::export_linkview_for_handover(const LinkListPtr& accessor)
 {
     if (m_transact_stage != transact_Reading) {
         throw LogicError(LogicError::wrong_transact_state);
@@ -2360,7 +2355,7 @@ SharedGroup::export_linkview_for_handover(const LinkListPtr& accessor)
 }
 
 
-LinkListPtr SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<LinkList>> handover)
+LinkListPtr DB::import_linkview_from_handover(std::unique_ptr<Handover<LinkList>> handover)
 {
     if (handover->version != get_version_of_current_transaction()) {
         throw BadVersion();
@@ -2370,7 +2365,7 @@ LinkListPtr SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<
 }
 
 
-std::unique_ptr<SharedGroup::Handover<Table>> SharedGroup::export_table_for_handover(const TableRef& accessor)
+std::unique_ptr<DB::Handover<Table>> DB::export_table_for_handover(const TableRef& accessor)
 {
     if (m_transact_stage != transact_Reading) {
         throw LogicError(LogicError::wrong_transact_state);
@@ -2383,7 +2378,7 @@ std::unique_ptr<SharedGroup::Handover<Table>> SharedGroup::export_table_for_hand
 }
 
 
-TableRef SharedGroup::import_table_from_handover(std::unique_ptr<Handover<Table>> handover)
+TableRef DB::import_table_from_handover(std::unique_ptr<Handover<Table>> handover)
 {
     if (handover->version != get_version_of_current_transaction()) {
         throw BadVersion();
@@ -2392,7 +2387,7 @@ TableRef SharedGroup::import_table_from_handover(std::unique_ptr<Handover<Table>
     return result;
 }
 
-bool SharedGroup::call_with_lock(const std::string& realm_path, CallbackWithLock callback)
+bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback)
 {
     auto lockfile_path(realm_path + ".lock");
 
@@ -2407,7 +2402,7 @@ bool SharedGroup::call_with_lock(const std::string& realm_path, CallbackWithLock
     return false;
 }
 
-std::vector<std::pair<std::string, bool>> SharedGroup::get_core_files(const std::string& realm_path)
+std::vector<std::pair<std::string, bool>> DB::get_core_files(const std::string& realm_path)
 {
     std::vector<std::pair<std::string, bool>> files;
     files.emplace_back(std::make_pair(realm_path, false));

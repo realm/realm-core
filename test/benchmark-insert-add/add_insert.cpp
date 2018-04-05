@@ -163,7 +163,7 @@ int main(int argc, char* argv[])
     File::try_remove("test.realm");
     File::try_remove("gtest.realm");
 
-    SharedGroup sg = SharedGroup("test.realm", false, dlevel);
+    DB sg = DB("test.realm", false, dlevel);
     Group g("gtest.realm", nullptr, Group::mode_ReadWrite);
 
     switch (m) {

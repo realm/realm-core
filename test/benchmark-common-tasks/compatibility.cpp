@@ -18,7 +18,7 @@
 
 #include "compatibility.hpp"
 
-using realm::SharedGroup;
+using realm::DB;
 using realm::SharedGroupOptions;
 
 namespace compatibility {
@@ -37,9 +37,9 @@ SharedGroupOptions::Durability durability(RealmDurability level)
     return SharedGroupOptions::Durability::Full;
 }
 
-SharedGroup* create_new_shared_group(std::string path, RealmDurability level, const char* key)
+DB* create_new_shared_group(std::string path, RealmDurability level, const char* key)
 {
-    return new SharedGroup(path, false, SharedGroupOptions(durability(level), key));
+    return new DB(path, false, SharedGroupOptions(durability(level), key));
 }
 
 } // end namespace compatibility

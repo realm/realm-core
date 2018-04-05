@@ -624,7 +624,7 @@ public:
     void remove_all_target_rows();
 
 private:
-    friend class SharedGroup;
+    friend class DB;
     friend class ConstTableView;
     friend class Query;
 

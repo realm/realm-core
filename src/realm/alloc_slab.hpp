@@ -503,7 +503,7 @@ private:
     }
 
     friend class Group;
-    friend class SharedGroup;
+    friend class DB;
     friend class GroupWriter;
 };
 

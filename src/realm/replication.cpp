@@ -913,7 +913,7 @@ public:
 
 } // anonymous namespace
 
-void TrivialReplication::apply_changeset(const char* data, size_t size, SharedGroup& target, util::Logger* logger)
+void TrivialReplication::apply_changeset(const char* data, size_t size, DB& target, util::Logger* logger)
 {
     InputStreamImpl in(data, size);
     WriteTransaction wt(target);                              // Throws
@@ -926,7 +926,7 @@ std::string TrivialReplication::get_database_path()
     return m_database_file;
 }
 
-void TrivialReplication::initialize(SharedGroup&)
+void TrivialReplication::initialize(DB&)
 {
     // Nothing needs to be done here
 }

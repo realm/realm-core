@@ -167,7 +167,7 @@ DWORD winfork(std::string unit_test_name)
 
 TEST(Shared_Unattached)
 {
-    SharedGroup sg((SharedGroup::unattached_tag()));
+    DB sg((DB::unattached_tag()));
 }
 
 
@@ -202,7 +202,7 @@ void writer(std::string path, int id)
     // std::cerr << "Started writer " << std::endl;
     try {
         bool done = false;
-        SharedGroup sg(path, true, SharedGroupOptions(crypt_key()));
+        DB sg(path, true, SharedGroupOptions(crypt_key()));
         // std::cerr << "Opened sg " << std::endl;
         for (int i = 0; !done; ++i) {
             // std::cerr << "       - " << getpid() << std::endl;
@@ -230,7 +230,7 @@ void writer(std::string path, int id)
 void killer(TestContext& test_context, int pid, std::string path, int id)
 {
     {
-        SharedGroup sg(path, true, SharedGroupOptions(crypt_key()));
+        DB sg(path, true, SharedGroupOptions(crypt_key()));
         bool done = false;
         do {
             sched_yield();
@@ -266,7 +266,7 @@ void killer(TestContext& test_context, int pid, std::string path, int id)
     CHECK_EQUAL(0, child_exit_status);
     {
         // Verify that we surely did kill the process before it could do all it's commits.
-        SharedGroup sg(path, true);
+        DB sg(path, true);
         ReadTransaction rt(sg);
         rt.get_group().verify();
         auto t1 = rt.get_table("test");
@@ -298,7 +298,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
     const int num_processes = 50;
     SHARED_GROUP_TEST_PATH(path);
     {
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         // Create table entries
         WriteTransaction wt(sg);
         auto t1 = wt.add_table("test");
@@ -432,7 +432,7 @@ TEST(Shared_CompactingOnTheFly)
     SHARED_GROUP_TEST_PATH(path);
     Thread writer_thread;
     {
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         // Create table entries
         std::vector<ColKey> cols;
         {
@@ -472,7 +472,7 @@ TEST(Shared_CompactingOnTheFly)
     }
     writer_thread.join();
     {
-        SharedGroup sg2(path, true, SharedGroupOptions(crypt_key()));
+        DB sg2(path, true, SharedGroupOptions(crypt_key()));
         {
             sg2.begin_write();
             sg2.commit();
@@ -487,7 +487,7 @@ TEST(Shared_CompactingOnTheFly)
         sg2.close();
     }
     {
-        SharedGroup sg2(path, true, SharedGroupOptions(crypt_key()));
+        DB sg2(path, true, SharedGroupOptions(crypt_key()));
         ReadTransaction rt2(sg2);
         auto table = rt2.get_table("test");
         CHECK(table);
@@ -505,7 +505,7 @@ TEST(Shared_EncryptedRemap)
     const int64_t rows = 12;
     SHARED_GROUP_TEST_PATH(path);
     {
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         // Create table entries
 
         WriteTransaction wt(sg);
@@ -518,7 +518,7 @@ TEST(Shared_EncryptedRemap)
         wt.commit();
     }
 
-    SharedGroup sg2(path, true, SharedGroupOptions(crypt_key()));
+    DB sg2(path, true, SharedGroupOptions(crypt_key()));
 
     CHECK_EQUAL(true, sg2.compact());
     ReadTransaction rt2(sg2);
@@ -534,7 +534,7 @@ TEST(Shared_Initial)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
 
         // Verify that new group is empty
         {
@@ -551,7 +551,7 @@ TEST(Shared_InitialMem)
     {
         // Create a new shared db
         bool no_create = false;
-        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+        DB sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
 
         // Verify that new group is empty
         {
@@ -578,7 +578,7 @@ TEST(Shared_InitialMem_StaleFile)
     // Create a MemOnly realm at the path so that a lock file gets initialized
     {
         bool no_create = false;
-        SharedGroup(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+        DB(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
     }
     CHECK(!File::exists(path));
     CHECK(File::exists(path.get_lock_path()));
@@ -596,7 +596,7 @@ TEST(Shared_InitialMem_StaleFile)
     // it's cleaned up afterwards
     {
         bool no_create = false;
-        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+        DB sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
         CHECK(File::exists(path));
     }
     CHECK(!File::exists(path));
@@ -609,11 +609,11 @@ TEST(Shared_Initial2)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
 
         {
             // Open the same db again (in empty state)
-            SharedGroup sg2(path, false, SharedGroupOptions(crypt_key()));
+            DB sg2(path, false, SharedGroupOptions(crypt_key()));
 
             // Verify that new group is empty
             {
@@ -655,11 +655,11 @@ TEST(Shared_Initial2_Mem)
     {
         // Create a new shared db
         bool no_create = false;
-        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+        DB sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
 
         {
             // Open the same db again (in empty state)
-            SharedGroup sg2(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+            DB sg2(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
 
             // Verify that new group is empty
             {
@@ -700,7 +700,7 @@ TEST(Shared_1)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         Timestamp first_timestamp_value{1, 1};
 
         // Create first table in group
@@ -714,7 +714,7 @@ TEST(Shared_1)
         }
 
         // Open same db again
-        SharedGroup sg2(path, false, SharedGroupOptions(crypt_key()));
+        DB sg2(path, false, SharedGroupOptions(crypt_key()));
         {
             ReadTransaction rt(sg2);
             rt.get_group().verify();
@@ -805,14 +805,14 @@ TEST(Shared_try_begin_write)
 {
     SHARED_GROUP_TEST_PATH(path);
     // Create a new shared db
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
     std::mutex thread_obtains_write_lock;
     std::condition_variable cv;
     std::mutex cv_lock;
     bool init_complete = false;
 
     auto do_async = [&]() {
-        SharedGroup sg2(path, false, SharedGroupOptions(crypt_key()));
+        DB sg2(path, false, SharedGroupOptions(crypt_key()));
         Group* gw = nullptr;
         bool success = sg2.try_begin_write(gw);
         CHECK(success);
@@ -895,7 +895,7 @@ TEST(Shared_Rollback)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
 
         // Create first table in group (but rollback)
         {
@@ -968,7 +968,7 @@ TEST(Shared_Writes)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
 
         // Create first table in group
         {
@@ -1038,7 +1038,7 @@ TEST(Shared_ManyReaders)
 
     const int max_N = 64;
     CHECK(max_N >= rounds[num_rounds - 1]);
-    std::unique_ptr<SharedGroup> shared_groups[8 * max_N];
+    std::unique_ptr<DB> shared_groups[8 * max_N];
     std::unique_ptr<ReadTransaction> read_transactions[8 * max_N];
 
     for (int round = 0; round < num_rounds; ++round) {
@@ -1047,7 +1047,7 @@ TEST(Shared_ManyReaders)
         SHARED_GROUP_TEST_PATH(path);
 
         bool no_create = false;
-        SharedGroup root_sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+        DB root_sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
 
         // Add two tables
         {
@@ -1070,7 +1070,7 @@ TEST(Shared_ManyReaders)
         // Create 8*N shared group accessors
         for (int i = 0; i < 8 * N; ++i)
             shared_groups[i].reset(
-                new SharedGroup(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly)));
+                new DB(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly)));
 
         // Initiate 2*N read transactions with progressive changes
         for (int i = 0; i < 2 * N; ++i) {
@@ -1252,7 +1252,7 @@ TEST(Shared_ManyReaders)
 
         // Check final state via new shared group
         {
-            SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+            DB sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
             ReadTransaction rt(sg);
 #if !defined(_WIN32) || TEST_DURATION > 0
             rt.get_group().verify();
@@ -1280,7 +1280,7 @@ TEST(Many_ConcurrentReaders)
     const std::string path_str = path;
 
     // setup
-    SharedGroup sg_w(path_str);
+    DB sg_w(path_str);
     WriteTransaction wt(sg_w);
     TableRef t = wt.add_table("table");
     auto col_ndx = t->add_column(type_String, "column");
@@ -1291,7 +1291,7 @@ TEST(Many_ConcurrentReaders)
     auto reader = [path_str]() {
         try {
             for (int i = 0; i < 1000; ++i) {
-                SharedGroup sg_r(path_str);
+                DB sg_r(path_str);
                 ReadTransaction rt(sg_r);
                 rt.get_group().verify();
             }
@@ -1316,7 +1316,7 @@ TEST(Many_ConcurrentReaders)
 TEST(Shared_WritesSpecialOrder)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
 
     const int num_rows =
         5; // FIXME: Should be strictly greater than REALM_MAX_BPNODE_SIZE, but that takes too long time.
@@ -1364,7 +1364,7 @@ namespace {
 void writer_threads_thread(TestContext& test_context, std::string path, ObjKey key)
 {
     // Open shared db
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
 
     for (size_t i = 0; i < 100; ++i) {
         // Increment cell
@@ -1404,7 +1404,7 @@ TEST(Shared_WriterThreads)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
 
         const int thread_count = 10;
         // Create first table in group
@@ -1469,7 +1469,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             REALM_TERMINATE("fork() failed");
         if (pid == 0) {
             // Child
-            SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+            DB sg(path, false, SharedGroupOptions(crypt_key()));
             WriteTransaction wt(sg);
             wt.get_group().verify();
             TableRef table = wt.get_or_add_table("alpha");
@@ -1490,7 +1490,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 
         // Check that we can continue without dead-locking
         {
-            SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+            DB sg(path, false, SharedGroupOptions(crypt_key()));
             WriteTransaction wt(sg);
             wt.get_group().verify();
             TableRef table = wt.get_or_add_table("beta");
@@ -1505,7 +1505,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     }
 
     {
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         ReadTransaction rt(sg);
         rt.get_group().verify();
         CHECK(!rt.has_table("alpha"));
@@ -1534,7 +1534,7 @@ TEST(Shared_SpaceOveruse)
 
     // Many transactions
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
 
     // Do a lot of sequential transactions
     for (int i = 0; i != n_outer; ++i) {
@@ -1577,14 +1577,14 @@ TEST(Shared_Notifications)
 {
     // Create a new shared db
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
 
     // No other instance have changed db since last transaction
     CHECK(!sg.has_changed());
 
     {
         // Open the same db again (in empty state)
-        SharedGroup sg2(path, false, SharedGroupOptions(crypt_key()));
+        DB sg2(path, false, SharedGroupOptions(crypt_key()));
 
         // Verify that new group is empty
         {
@@ -1642,7 +1642,7 @@ TEST(Shared_FromSerialized)
     }
 
     // Open same file as shared group
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
 
     // Verify that contents is there when shared
     {
@@ -1663,7 +1663,7 @@ TEST(Shared_FromSerialized)
 TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 1)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup db(path, false, SharedGroupOptions(crypt_key()));
+    DB db(path, false, SharedGroupOptions(crypt_key()));
 
     {
         Group& group = db.begin_write();
@@ -1689,7 +1689,7 @@ TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 1)
 TEST(Shared_StringIndexBug2)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
 
     {
         WriteTransaction wt(sg);
@@ -1721,7 +1721,7 @@ void rand_str(Random& random, char* res, size_t len)
 TEST(Shared_StringIndexBug3)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup db(path, false, SharedGroupOptions(crypt_key()));
+    DB db(path, false, SharedGroupOptions(crypt_key()));
 
     {
         Group& group = db.begin_write();
@@ -1772,7 +1772,7 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg);
         TableRef test = wt.add_table("Test");
         auto col = test->add_column(type_Double, "foo");
@@ -1781,7 +1781,7 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
         wt.commit();
     }
     {
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         ReadTransaction rt(sg);
         ConstTableRef test = rt.get_table("Test");
         auto col = test->get_column_key("foo");
@@ -1800,7 +1800,7 @@ TEST_IF(Shared_Async, allow_async)
     // Do some changes in a async db
     {
         bool no_create = false;
-        SharedGroup db(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
+        DB db(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
 
         for (int i = 0; i < 100; ++i) {
             //            std::cout << "t "<<n<<"\n";
@@ -1822,7 +1822,7 @@ TEST_IF(Shared_Async, allow_async)
 
     // Read the db again in normal mode to verify
     {
-        SharedGroup db(path);
+        DB db(path);
 
         ReadTransaction rt(db);
         rt.get_group().verify();
@@ -1840,7 +1840,7 @@ void multiprocess_thread(TestContext& test_context, std::string path, ObjKey key
 {
     // Open shared db
     bool no_create = false;
-    SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
+    DB sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
 
     for (size_t i = 0; i != multiprocess_increments; ++i) {
         // Increment cell
@@ -1882,8 +1882,8 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
     static_cast<void>(alone_path);
 #if 0
     {
-        SharedGroup sgr(path);
-        SharedGroup sgw(path);
+        DB sgr(path);
+        DB sgw(path);
         {
             ReadTransaction rt0(sgr);
             WriteTransaction wt0(sgw);
@@ -1908,7 +1908,7 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
 #else
 #if 0
     {
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg);
         auto t1 = wt.get_table("test");
         for (size_t i = 0; i < rows; ++i) {
@@ -1919,7 +1919,7 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
 #else
     {
         bool no_create = false;
-        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
+        DB sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
         WriteTransaction wt(sg);
         auto t1 = wt.get_or_add_table("test");
         if (t1->is_empty()) {
@@ -1973,7 +1973,7 @@ void multiprocess_threaded(TestContext& test_context, std::string path, int64_t 
     // Verify that the changes were made
     {
         bool no_create = false;
-        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
+        DB sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
         ReadTransaction rt(sg);
         rt.get_group().verify();
         auto t = rt.get_table("test");
@@ -1995,7 +1995,7 @@ void multiprocess_validate_and_clear(TestContext& test_context, std::string path
 
     // Verify - once more, in sync mode - that the changes were made
     {
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.get_group().verify();
         auto t = wt.get_table("test");
@@ -2070,7 +2070,7 @@ TEST(Shared_WaitForChangeAfterOwnCommit)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    SharedGroup* sg = new SharedGroup(path);
+    DB* sg = new DB(path);
     sg->begin_write();
     sg->commit();
     bool b = sg->wait_for_change();
@@ -2093,7 +2093,7 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
         return;
     }
 
-    std::unique_ptr<SharedGroup> sg(new SharedGroup(path));
+    std::unique_ptr<DB> sg(new DB(path));
 
     // An old .realm file with random contents can exist (such as a leftover from earlier crash) with random
     // data, so we always initialize the database
@@ -2161,10 +2161,10 @@ TEST_IF(Shared_WaitForChange, !running_with_valgrind)
     const int num_threads = 3;
     Mutex mutex;
     int shared_state[num_threads];
-    SharedGroup* sgs[num_threads];
+    DB* sgs[num_threads];
 
     auto waiter = [&](std::string path, int i) {
-        SharedGroup* sg = new SharedGroup(path, true);
+        DB* sg = new DB(path, true);
         {
             LockGuard l(mutex);
             shared_state[i] = 1;
@@ -2209,7 +2209,7 @@ TEST_IF(Shared_WaitForChange, !running_with_valgrind)
     SHARED_GROUP_TEST_PATH(path);
     for (int j = 0; j < num_threads; j++)
         shared_state[j] = 0;
-    SharedGroup sg(path, false);
+    DB sg(path, false);
     Thread threads[num_threads];
     for (int j = 0; j < num_threads; j++)
         threads[j].start([waiter, &path, j] { waiter(path, j); });
@@ -2292,8 +2292,8 @@ TEST(Shared_MultipleSharersOfStreamingFormat)
     }
     {
         // See if we can handle overlapped accesses through multiple shared groups
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
-        SharedGroup sg2(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg2(path, false, SharedGroupOptions(crypt_key()));
         {
             ReadTransaction rt(sg);
             rt.get_group().verify();
@@ -2353,7 +2353,7 @@ TEST(Shared_MixedWithNonShared)
     }
     {
         // See if we can read and modify with shared group
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         {
             ReadTransaction rt(sg);
             rt.get_group().verify();
@@ -2378,7 +2378,7 @@ TEST(Shared_MixedWithNonShared)
     }
     {
         // See if we can read and modify with shared group
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         {
             ReadTransaction rt(sg);
             rt.get_group().verify();
@@ -2393,7 +2393,7 @@ TEST(Shared_MixedWithNonShared)
         }
     }
     {
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         {
             ReadTransaction rt(sg);
             rt.get_group().verify();
@@ -2417,7 +2417,7 @@ TEST(Shared_MixedWithNonShared)
         g.verify();
     }
     {
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         {
             ReadTransaction rt(sg);
             rt.get_group().verify();
@@ -2433,7 +2433,7 @@ TEST(Shared_MixedWithNonShared)
     File::try_remove(path);
     {
         {
-            SharedGroup sg(path, false, SharedGroupOptions(crypt_key())); // Create the very empty group
+            DB sg(path, false, SharedGroupOptions(crypt_key())); // Create the very empty group
         }
         std::ifstream in(path.c_str());
         std::string buffer((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
@@ -2455,15 +2455,15 @@ TEST(Shared_MixedWithNonShared)
 TEST(Shared_EncryptionKeyCheck)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key(true)));
+    DB sg(path, false, SharedGroupOptions(crypt_key(true)));
     bool ok = false;
     try {
-        SharedGroup sg_2(path, false, SharedGroupOptions());
+        DB sg_2(path, false, SharedGroupOptions());
     } catch (std::runtime_error&) {
         ok = true;
     }
     CHECK(ok);
-    SharedGroup sg3(path, false, SharedGroupOptions(crypt_key(true)));
+    DB sg3(path, false, SharedGroupOptions(crypt_key(true)));
 }
 
 // opposite - if opened unencrypted, attempt to share it encrypted
@@ -2471,15 +2471,15 @@ TEST(Shared_EncryptionKeyCheck)
 TEST(Shared_EncryptionKeyCheck_2)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroupOptions());
+    DB sg(path, false, SharedGroupOptions());
     bool ok = false;
     try {
-        SharedGroup sg_2(path, false, SharedGroupOptions(crypt_key(true)));
+        DB sg_2(path, false, SharedGroupOptions(crypt_key(true)));
     } catch (std::runtime_error&) {
         ok = true;
     }
     CHECK(ok);
-    SharedGroup sg3(path, false, SharedGroupOptions());
+    DB sg3(path, false, SharedGroupOptions());
 }
 
 // if opened by one key, it cannot be opened by a different key
@@ -2493,15 +2493,15 @@ TEST(Shared_EncryptionKeyCheck_3)
     char second_key[64];
     memcpy(second_key, first_key, 64);
     second_key[3] = ~second_key[3];
-    SharedGroup sg(path, false, SharedGroupOptions(first_key));
+    DB sg(path, false, SharedGroupOptions(first_key));
     bool ok = false;
     try {
-        SharedGroup sg_2(path, false, SharedGroupOptions(second_key));
+        DB sg_2(path, false, SharedGroupOptions(second_key));
     } catch (std::runtime_error&) {
         ok = true;
     }
     CHECK(ok);
-    SharedGroup sg3(path, false, SharedGroupOptions(first_key));
+    DB sg3(path, false, SharedGroupOptions(first_key));
 }
 #endif
 
@@ -2510,8 +2510,8 @@ TEST(Shared_EncryptionKeyCheck_3)
 TEST(Shared_VersionCount)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg_w(path);
-    SharedGroup sg_r(path);
+    DB sg_w(path);
+    DB sg_r(path);
     CHECK_EQUAL(1, sg_r.get_number_of_versions());
     sg_r.begin_read();
     sg_w.begin_write();
@@ -2534,7 +2534,7 @@ TEST(Shared_VersionCount)
 TEST(Shared_MultipleRollbacks)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
     sg.begin_write();
     sg.rollback();
     sg.rollback();
@@ -2544,7 +2544,7 @@ TEST(Shared_MultipleRollbacks)
 TEST(Shared_MultipleEndReads)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
     sg.begin_read();
     sg.end_read();
     sg.end_read();
@@ -2557,7 +2557,7 @@ TEST(Shared_ReserveDiskSpace)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        DB sg(path, false, SharedGroupOptions(crypt_key()));
         size_t orig_file_size = size_t(File(path).get_size());
 
         // Check that reserve() does not change the file size if the
@@ -2642,7 +2642,7 @@ TEST(Shared_MovingEnumStringColumn)
     // node in the Spec class.
 
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
 
     {
         WriteTransaction wt(sg);
@@ -2744,7 +2744,7 @@ TEST(Shared_MovingSearchIndex)
     // adjusted when columns are inserted or removed at a lower column_index.
 
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
 
     // Create a regular string column and an enumeration strings column, and
     // equip both with search indexes.
@@ -2917,7 +2917,7 @@ TEST(Shared_MovingSearchIndex)
 TEST_IF(Shared_BeginReadFailure, _impl::SimulatedFailure::is_enabled())
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    DB sg(path);
     using sf = _impl::SimulatedFailure;
     sf::OneShotPrimeGuard pg(sf::shared_group__grow_reader_mapping);
     CHECK_THROW(sg.begin_read(), sf);
@@ -2936,11 +2936,10 @@ TEST(Shared_SessionDurabilityConsistency)
     {
         bool no_create = false;
         SharedGroupOptions::Durability durability_1 = SharedGroupOptions::Durability::Full;
-        SharedGroup sg(path, no_create, SharedGroupOptions(durability_1));
+        DB sg(path, no_create, SharedGroupOptions(durability_1));
 
         SharedGroupOptions::Durability durability_2 = SharedGroupOptions::Durability::MemOnly;
-        CHECK_LOGIC_ERROR(SharedGroup(path, no_create, SharedGroupOptions(durability_2)),
-                          LogicError::mixed_durability);
+        CHECK_LOGIC_ERROR(DB(path, no_create, SharedGroupOptions(durability_2)), LogicError::mixed_durability);
     }
 }
 
@@ -2950,7 +2949,7 @@ TEST(Shared_WriteEmpty)
     SHARED_GROUP_TEST_PATH(path_1);
     GROUP_TEST_PATH(path_2);
     {
-        SharedGroup sg(path_1);
+        DB sg(path_1);
         ReadTransaction rt(sg);
         rt.get_group().write(path_2);
     }
@@ -2961,7 +2960,7 @@ TEST(Shared_CompactEmpty)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
-        SharedGroup sg(path);
+        DB sg(path);
         CHECK(sg.compact());
     }
 }
@@ -2970,8 +2969,8 @@ TEST(Shared_CompactEmpty)
 TEST(Shared_VersionOfBoundSnapshot)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup::version_type version;
-    SharedGroup sg(path);
+    DB::version_type version;
+    DB sg(path);
     {
         ReadTransaction rt(sg);
         version = rt.get_version();
@@ -3145,7 +3144,7 @@ TEST_IF(Shared_encrypted_pin_and_write, false)
     SHARED_GROUP_TEST_PATH(path);
 
     { // initial table structure setup on main thread
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key(true)));
+        DB sg(path, false, SharedGroupOptions(crypt_key(true)));
         WriteTransaction wt(sg);
         Group& group = wt.get_group();
         TableRef t = group.add_table("table");
@@ -3154,11 +3153,11 @@ TEST_IF(Shared_encrypted_pin_and_write, false)
         wt.commit();
     }
 
-    SharedGroup sg_reader(path, false, SharedGroupOptions(crypt_key(true)));
+    DB sg_reader(path, false, SharedGroupOptions(crypt_key(true)));
     ReadTransaction rt(sg_reader); // hold first version
 
     auto do_many_writes = [&]() {
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key(true)));
+        DB sg(path, false, SharedGroupOptions(crypt_key(true)));
         const size_t base_size = 100000;
         std::string base(base_size, 'a');
         // write many transactions to grow the file
@@ -3198,7 +3197,7 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
 {
     size_t string_length = 64 * 1024;
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
     std::string long_string(string_length, 'a');
     {
         WriteTransaction wt(sg);
@@ -3238,7 +3237,7 @@ NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
     size_t string_length = 4 * 1024;
     SHARED_GROUP_TEST_PATH(path);
     std::string long_string(string_length, 'a');
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
     {
         {
             WriteTransaction wt(sg);
@@ -3275,7 +3274,7 @@ NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
 NONCONCURRENT_TEST(Shared_TopSizeNotEqualNine)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    DB sg(path, false, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg.begin_write());
 
     TableRef t = g.add_table("foo");
@@ -3284,11 +3283,11 @@ NONCONCURRENT_TEST(Shared_TopSizeNotEqualNine)
     t->create_objects(241, keys);
     sg.commit();
     REALM_ASSERT_RELEASE(sg.compact());
-    SharedGroup sg2(path, false, SharedGroupOptions(crypt_key()));
+    DB sg2(path, false, SharedGroupOptions(crypt_key()));
     sg2.begin_write();
     sg2.commit();
     sg2.begin_read(); // <- does not fail
-    SharedGroup sg3(path, false, SharedGroupOptions(crypt_key()));
+    DB sg3(path, false, SharedGroupOptions(crypt_key()));
     sg3.begin_read(); // <- does not fail
     sg.begin_read();  // <- does fail
 }
@@ -3299,7 +3298,7 @@ NONCONCURRENT_TEST(Shared_TopSizeNotEqualNine)
 TEST(Shared_Bptree_insert_failure)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg_w(path, false, SharedGroupOptions(crypt_key()));
+    DB sg_w(path, false, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
 
     auto tk = g.add_table("")->get_key();
@@ -3312,7 +3311,7 @@ TEST(Shared_Bptree_insert_failure)
     {
         // This intervening sg can do the same operation as the one doing compact,
         // but without failing:
-        SharedGroup sg2(path, false, SharedGroupOptions(crypt_key()));
+        DB sg2(path, false, SharedGroupOptions(crypt_key()));
         Group& g2 = const_cast<Group&>(sg2.begin_write());
         g2.get_table(tk)->add_empty_row(396);
     }
@@ -3365,7 +3364,7 @@ TEST(Shared_LockFileInitSpinsOnZeroSize)
     bool no_create = false;
     SharedGroupOptions options;
     options.encryption_key = crypt_key();
-    SharedGroup sg((SharedGroup::unattached_tag()));
+    DB sg((DB::unattached_tag()));
 
     sg.open(path, no_create, options);
     sg.close();
@@ -3414,7 +3413,7 @@ TEST(Shared_LockFileSpinsOnInitComplete)
     bool no_create = false;
     SharedGroupOptions options;
     options.encryption_key = crypt_key();
-    SharedGroup sg((SharedGroup::unattached_tag()));
+    DB sg((DB::unattached_tag()));
 
     sg.open(path, no_create, options);
     sg.close();
@@ -3467,7 +3466,7 @@ TEST(Shared_LockFileOfWrongSizeThrows)
     bool no_create = false;
     SharedGroupOptions options;
     options.encryption_key = crypt_key();
-    SharedGroup sg((SharedGroup::unattached_tag()));
+    DB sg((DB::unattached_tag()));
 
     sg.open(path, no_create, options);
     sg.close();
@@ -3531,7 +3530,7 @@ TEST(Shared_LockFileOfWrongVersionThrows)
     bool no_create = false;
     SharedGroupOptions options;
     options.encryption_key = crypt_key();
-    SharedGroup sg((SharedGroup::unattached_tag()));
+    DB sg((DB::unattached_tag()));
 
     sg.open(path, no_create, options);
 
@@ -3587,7 +3586,7 @@ TEST(Shared_LockFileOfWrongMutexSizeThrows)
     bool no_create = false;
     SharedGroupOptions options;
     options.encryption_key = crypt_key();
-    SharedGroup sg((SharedGroup::unattached_tag()));
+    DB sg((DB::unattached_tag()));
 
     sg.open(path, no_create, options);
 
@@ -3642,7 +3641,7 @@ TEST(Shared_LockFileOfWrongCondvarSizeThrows)
     bool no_create = false;
     SharedGroupOptions options;
     options.encryption_key = crypt_key();
-    SharedGroup sg((SharedGroup::unattached_tag()));
+    DB sg((DB::unattached_tag()));
 
     sg.open(path, no_create, options);
 
@@ -3691,7 +3690,7 @@ TEST(Shared_LockFileOfWrongCondvarSizeThrows)
 TEST(Shared_ConstObject)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg_w(path);
+    DB sg_w(path);
     Group& g = sg_w.begin_write();
 
     TableRef t = g.add_table("Foo");
@@ -3699,7 +3698,7 @@ TEST(Shared_ConstObject)
     t->create_object(ObjKey(47)).set(c, 5);
     sg_w.commit();
 
-    SharedGroup sg_r(path);
+    DB sg_r(path);
     const Group& g2 = sg_r.begin_read();
     ConstTableRef t2 = g2.get_table("Foo");
     ConstObj obj = t2->get_object(ObjKey(47));
@@ -3709,7 +3708,7 @@ TEST(Shared_ConstObject)
 TEST(Shared_ConstObjectIterator)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    DB sg(path);
     Group& g = sg.begin_write();
 
     TableRef t = g.add_table("Foo");
@@ -3718,7 +3717,7 @@ TEST(Shared_ConstObjectIterator)
     t->create_object(ObjKey(99)).set(col, 8);
     sg.commit();
 
-    SharedGroup sg2(path);
+    DB sg2(path);
     Group& g2 = sg2.begin_write();
     TableRef t2 = g2.get_or_add_table("Foo");
     auto i1 = t2->begin();
@@ -3732,7 +3731,7 @@ TEST(Shared_ConstObjectIterator)
     sg2.commit();
 
     // Now ensure that we can create a ConstIterator
-    SharedGroup sg_r(path);
+    DB sg_r(path);
     const Group& g3 = sg_r.begin_read();
     ConstTableRef t3 = g3.get_table("Foo");
     auto i3 = t3->begin();
@@ -3744,7 +3743,7 @@ TEST(Shared_ConstObjectIterator)
 TEST(Shared_ConstList)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg_w(path);
+    DB sg_w(path);
     Group& g = sg_w.begin_write();
 
     TableRef t = g.add_table("Foo");
@@ -3752,7 +3751,7 @@ TEST(Shared_ConstList)
     t->create_object(ObjKey(47)).get_list<int64_t>(list_col).add(47);
     sg_w.commit();
 
-    SharedGroup sg_r(path);
+    DB sg_r(path);
     const Group& g2 = sg_r.begin_read();
     ConstTableRef t2 = g2.get_table("Foo");
     ConstObj obj = t2->get_object(ObjKey(47));
@@ -3773,7 +3772,7 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
 #if 0 // set to 1 to generate the .realm file
     {
         File::try_remove(path);
-        SharedGroup db(path, false, SharedGroupOptions(crypt_key(true)));
+        DB db(path, false, SharedGroupOptions(crypt_key(true)));
         Group& group = db.begin_write();
 		TableRef table = group.add_table("table");
 		table->add_column(type_String, "string");
@@ -3786,7 +3785,7 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
     {
         SHARED_GROUP_TEST_PATH(temp_copy);
         File::copy(path, temp_copy);
-        SharedGroup sg(temp_copy, true, SharedGroupOptions(crypt_key(true)));
+        DB sg(temp_copy, true, SharedGroupOptions(crypt_key(true)));
         const Group& group = sg.begin_read();
 		ConstTableRef table = group.get_table("table");
 		std::string s1 = table->get_string(0, 0);

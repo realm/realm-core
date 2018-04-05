@@ -200,7 +200,7 @@ GroupWriter::GroupWriter(Group& group)
     }
 
     if (is_shared) {
-        SharedGroup::version_type initial_version = 0;
+        DB::version_type initial_version = 0;
 
         // Expand top array from 5 to 7 elements. Only nonshared Realms are
         // allowed to have less than 7 elements.

@@ -64,7 +64,7 @@ public:
     /// Called during construction of the associated SharedGroup object.
     ///
     /// \param shared_group The assocoated SharedGroup object.
-    virtual void initialize(SharedGroup& shared_group) = 0;
+    virtual void initialize(DB& shared_group) = 0;
 
     /// Called by the associated SharedGroup object when a session is
     /// initiated. A *session* is a sequence of of temporally overlapping
@@ -404,14 +404,14 @@ protected:
     virtual version_type prepare_changeset(const char* data, size_t size, version_type orig_version) = 0;
     virtual void finalize_changeset() noexcept = 0;
 
-    static void apply_changeset(const char* data, size_t size, SharedGroup& target, util::Logger* logger = nullptr);
+    static void apply_changeset(const char* data, size_t size, DB& target, util::Logger* logger = nullptr);
 
     bool is_history_updated() const noexcept;
 
     BinaryData get_uncommitted_changes() const noexcept;
 
     std::string get_database_path() override;
-    void initialize(SharedGroup&) override;
+    void initialize(DB&) override;
     void do_initiate_transact(version_type, bool) override;
     version_type do_prepare_commit(version_type orig_version) override;
     void do_finalize_commit() noexcept override;

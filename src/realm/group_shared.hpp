@@ -144,20 +144,20 @@ struct IncompatibleHistories : util::File::AccessError {
 ///    are destruction of the shared group, and SharedGroup::rollback(). If
 ///    SharedGroup::end_write() is called, the new state becomes "no transaction
 ///    in progress"
-class SharedGroup {
+class DB {
 public:
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and the
     /// upgrade will be aborted.
-    explicit SharedGroup(const std::string& file, bool no_create = false,
-                         const SharedGroupOptions options = SharedGroupOptions());
+    explicit DB(const std::string& file, bool no_create = false,
+                const SharedGroupOptions options = SharedGroupOptions());
 
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and
     /// the upgrade will be aborted.
-    explicit SharedGroup(Replication& repl, const SharedGroupOptions options = SharedGroupOptions());
+    explicit DB(Replication& repl, const SharedGroupOptions options = SharedGroupOptions());
 
     struct unattached_tag {
     };
@@ -168,14 +168,14 @@ public:
     /// attached state by calling is_attached(). Calling any other
     /// function (except the destructor) while in the unattached state
     /// has undefined behavior.
-    SharedGroup(unattached_tag) noexcept;
+    DB(unattached_tag) noexcept;
 
-    ~SharedGroup() noexcept;
+    ~DB() noexcept;
 
     // Disable copying to prevent accessor errors. If you really want another
     // instance, open another SharedGroup object on the same file.
-    SharedGroup(const SharedGroup&) = delete;
-    SharedGroup& operator=(const SharedGroup&) = delete;
+    DB(const DB&) = delete;
+    DB& operator=(const DB&) = delete;
 
     /// Attach this SharedGroup instance to the specified database file.
     ///
@@ -685,7 +685,8 @@ private:
 };
 
 
-inline void SharedGroup::get_stats(size_t& free_space, size_t& used_space) {
+inline void DB::get_stats(size_t& free_space, size_t& used_space)
+{
     free_space = m_free_space;
     used_space = m_used_space;
 }
@@ -693,7 +694,7 @@ inline void SharedGroup::get_stats(size_t& free_space, size_t& used_space) {
 
 class ReadTransaction {
 public:
-    ReadTransaction(SharedGroup& sg)
+    ReadTransaction(DB& sg)
         : m_shared_group(sg)
     {
         m_shared_group.begin_read(); // Throws
@@ -722,16 +723,16 @@ public:
     const Group& get_group() const noexcept;
 
     /// Get the version of the snapshot to which this read transaction is bound.
-    SharedGroup::version_type get_version() const noexcept;
+    DB::version_type get_version() const noexcept;
 
 private:
-    SharedGroup& m_shared_group;
+    DB& m_shared_group;
 };
 
 
 class WriteTransaction {
 public:
-    WriteTransaction(SharedGroup& sg)
+    WriteTransaction(DB& sg)
         : m_shared_group(&sg)
     {
         m_shared_group->begin_write(); // Throws
@@ -772,12 +773,12 @@ public:
 
     /// Get the version of the snapshot on which this write transaction is
     /// based.
-    SharedGroup::version_type get_version() const noexcept;
+    DB::version_type get_version() const noexcept;
 
-    SharedGroup::version_type commit()
+    DB::version_type commit()
     {
         REALM_ASSERT(m_shared_group);
-        SharedGroup::version_type new_version = m_shared_group->commit();
+        DB::version_type new_version = m_shared_group->commit();
         m_shared_group = nullptr;
         return new_version;
     }
@@ -790,35 +791,35 @@ public:
     }
 
 private:
-    SharedGroup* m_shared_group;
+    DB* m_shared_group;
 };
 
 
 // Implementation:
 
-struct SharedGroup::BadVersion : std::exception {
+struct DB::BadVersion : std::exception {
 };
 
-inline SharedGroup::SharedGroup(const std::string& file, bool no_create, const SharedGroupOptions options)
+inline DB::DB(const std::string& file, bool no_create, const SharedGroupOptions options)
     : m_group(Group::shared_tag())
     , m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(file, no_create, options); // Throws
 }
 
-inline SharedGroup::SharedGroup(unattached_tag) noexcept
+inline DB::DB(unattached_tag) noexcept
     : m_group(Group::shared_tag())
 {
 }
 
-inline SharedGroup::SharedGroup(Replication& repl, const SharedGroupOptions options)
+inline DB::DB(Replication& repl, const SharedGroupOptions options)
     : m_group(Group::shared_tag())
     , m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(repl, options); // Throws
 }
 
-inline void SharedGroup::open(const std::string& path, bool no_create_file, const SharedGroupOptions options)
+inline void DB::open(const std::string& path, bool no_create_file, const SharedGroupOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -827,7 +828,7 @@ inline void SharedGroup::open(const std::string& path, bool no_create_file, cons
     do_open(path, no_create_file, is_backend, options); // Throws
 }
 
-inline void SharedGroup::open(Replication& repl, const SharedGroupOptions options)
+inline void DB::open(Replication& repl, const SharedGroupOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -845,24 +846,24 @@ inline void SharedGroup::open(Replication& repl, const SharedGroupOptions option
     do_open(file, no_create, is_backend, options); // Throws
 }
 
-inline bool SharedGroup::is_attached() const noexcept
+inline bool DB::is_attached() const noexcept
 {
     return m_file_map.is_attached();
 }
 
-inline SharedGroup::TransactStage SharedGroup::get_transact_stage() const noexcept
+inline DB::TransactStage DB::get_transact_stage() const noexcept
 {
     return m_transact_stage;
 }
 
-inline SharedGroup::version_type SharedGroup::get_version_of_bound_snapshot() const noexcept
+inline DB::version_type DB::get_version_of_bound_snapshot() const noexcept
 {
     return m_read_lock.m_version;
 }
 
-class SharedGroup::ReadLockUnlockGuard {
+class DB::ReadLockUnlockGuard {
 public:
-    ReadLockUnlockGuard(SharedGroup& shared_group, ReadLockInfo& read_lock) noexcept
+    ReadLockUnlockGuard(DB& shared_group, ReadLockInfo& read_lock) noexcept
         : m_shared_group(shared_group)
         , m_read_lock(&read_lock)
     {
@@ -878,20 +879,20 @@ public:
     }
 
 private:
-    SharedGroup& m_shared_group;
+    DB& m_shared_group;
     ReadLockInfo* m_read_lock;
 };
 
 
 template <typename T>
-struct SharedGroup::Handover {
+struct DB::Handover {
     std::unique_ptr<typename T::HandoverPatch> patch;
     std::unique_ptr<T> clone;
     VersionID version;
 };
 
 template <typename T>
-std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const T& accessor, ConstSourcePayload mode)
+std::unique_ptr<DB::Handover<T>> DB::export_for_handover(const T& accessor, ConstSourcePayload mode)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
@@ -908,7 +909,7 @@ std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const
 
 
 template <typename T>
-std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(T& accessor, MutableSourcePayload mode)
+std::unique_ptr<DB::Handover<T>> DB::export_for_handover(T& accessor, MutableSourcePayload mode)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
@@ -921,7 +922,7 @@ std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(T& ac
 
 
 template <typename T>
-std::unique_ptr<T> SharedGroup::import_from_handover(std::unique_ptr<SharedGroup::Handover<T>> handover)
+std::unique_ptr<T> DB::import_from_handover(std::unique_ptr<DB::Handover<T>> handover)
 {
     if (handover->version != get_version_of_current_transaction()) {
         throw BadVersion();
@@ -932,7 +933,7 @@ std::unique_ptr<T> SharedGroup::import_from_handover(std::unique_ptr<SharedGroup
 }
 
 template <class O>
-inline void SharedGroup::advance_read(O* observer, VersionID version_id)
+inline void DB::advance_read(O* observer, VersionID version_id)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
@@ -949,7 +950,7 @@ inline void SharedGroup::advance_read(O* observer, VersionID version_id)
 }
 
 template <class O>
-inline void SharedGroup::promote_to_write(O* observer)
+inline void DB::promote_to_write(O* observer)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
@@ -983,7 +984,7 @@ inline void SharedGroup::promote_to_write(O* observer)
 }
 
 template <class O>
-inline void SharedGroup::rollback_and_continue_as_read(O* observer)
+inline void DB::rollback_and_continue_as_read(O* observer)
 {
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
@@ -1027,7 +1028,7 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
 }
 
 template <class O>
-inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _impl::History& hist, bool writable)
+inline bool DB::do_advance_read(O* observer, VersionID version_id, _impl::History& hist, bool writable)
 {
     ReadLockInfo new_read_lock;
     grab_read_lock(new_read_lock, version_id); // Throws
@@ -1089,7 +1090,7 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
     return true; // _impl::History::update_early_from_top_ref() was called
 }
 
-inline _impl::History* SharedGroup::get_history()
+inline _impl::History* DB::get_history()
 {
     using gf = _impl::GroupFriend;
     if (Replication* repl = gf::get_replication(m_group))
@@ -1097,7 +1098,7 @@ inline _impl::History* SharedGroup::get_history()
     return 0;
 }
 
-inline int SharedGroup::get_file_format_version() const noexcept
+inline int DB::get_file_format_version() const noexcept
 {
     using gf = _impl::GroupFriend;
     return gf::get_file_format_version(m_group);
@@ -1108,35 +1109,35 @@ inline int SharedGroup::get_file_format_version() const noexcept
 // not all of the non-public parts of the SharedGroup class.
 class _impl::SharedGroupFriend {
 public:
-    static Group& get_group(SharedGroup& sg) noexcept
+    static Group& get_group(DB& sg) noexcept
     {
         return sg.m_group;
     }
 
     template <class O>
-    static void advance_read(SharedGroup& sg, O* obs, SharedGroup::VersionID ver)
+    static void advance_read(DB& sg, O* obs, DB::VersionID ver)
     {
         sg.advance_read(obs, ver); // Throws
     }
 
     template <class O>
-    static void promote_to_write(SharedGroup& sg, O* obs)
+    static void promote_to_write(DB& sg, O* obs)
     {
         sg.promote_to_write(obs); // Throws
     }
 
-    static SharedGroup::version_type commit_and_continue_as_read(SharedGroup& sg)
+    static DB::version_type commit_and_continue_as_read(DB& sg)
     {
         return sg.commit_and_continue_as_read(); // Throws
     }
 
     template <class O>
-    static void rollback_and_continue_as_read(SharedGroup& sg, O* obs)
+    static void rollback_and_continue_as_read(DB& sg, O* obs)
     {
         sg.rollback_and_continue_as_read(obs); // Throws
     }
 
-    static void async_daemon_open(SharedGroup& sg, const std::string& file)
+    static void async_daemon_open(DB& sg, const std::string& file)
     {
         bool no_create = true;
         bool is_backend = true;
@@ -1147,17 +1148,17 @@ public:
         sg.do_open(file, no_create, is_backend, options); // Throws
     }
 
-    static int get_file_format_version(const SharedGroup& sg) noexcept
+    static int get_file_format_version(const DB& sg) noexcept
     {
         return sg.get_file_format_version();
     }
 
-    static SharedGroup::version_type get_version_of_latest_snapshot(SharedGroup& sg)
+    static DB::version_type get_version_of_latest_snapshot(DB& sg)
     {
         return sg.get_version_of_latest_snapshot();
     }
 
-    static SharedGroup::version_type get_version_of_bound_snapshot(const SharedGroup& sg) noexcept
+    static DB::version_type get_version_of_bound_snapshot(const DB& sg) noexcept
     {
         return sg.get_version_of_bound_snapshot();
     }
@@ -1169,7 +1170,7 @@ inline const Group& ReadTransaction::get_group() const noexcept
     return sgf::get_group(m_shared_group);
 }
 
-inline SharedGroup::version_type ReadTransaction::get_version() const noexcept
+inline DB::version_type ReadTransaction::get_version() const noexcept
 {
     using sgf = _impl::SharedGroupFriend;
     return sgf::get_version_of_bound_snapshot(m_shared_group);
@@ -1182,7 +1183,7 @@ inline Group& WriteTransaction::get_group() const noexcept
     return sgf::get_group(*m_shared_group);
 }
 
-inline SharedGroup::version_type WriteTransaction::get_version() const noexcept
+inline DB::version_type WriteTransaction::get_version() const noexcept
 {
     using sgf = _impl::SharedGroupFriend;
     return sgf::get_version_of_bound_snapshot(*m_shared_group);

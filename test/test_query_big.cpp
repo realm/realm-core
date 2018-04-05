@@ -155,9 +155,9 @@ struct Compose<Func> {
 
 struct QueryInitHelper {
     test_util::unit_test::TestContext& test_context;
-    SharedGroup* sg;
-    SharedGroup* sg2;
-    SharedGroup::VersionID initial_version, extra_col_version;
+    DB* sg;
+    DB* sg2;
+    DB::VersionID initial_version, extra_col_version;
     Table* table;
 
     template <typename Func>
@@ -230,12 +230,12 @@ TEST(Query_TableInitialization)
 
     auto repl = make_in_realm_history(path);
     auto repl2 = make_in_realm_history(path);
-    SharedGroup sg(*repl, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
-    SharedGroup sg2(*repl2, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+    DB sg(*repl, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+    DB sg2(*repl2, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
     Group& g = const_cast<Group&>(sg.begin_read());
     LangBindHelper::promote_to_write(sg);
 
-    SharedGroup::VersionID initial_version, extra_col_version;
+    DB::VersionID initial_version, extra_col_version;
 
     Table& table = *g.add_table("table");
     // The columns are ordered to avoid having types which are backed by the

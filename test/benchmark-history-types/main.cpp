@@ -56,10 +56,10 @@ public:
         util::File::try_remove(path);
 
         reader_history = make_history(path);
-        reader_shared_group.reset(new SharedGroup(*reader_history));
+        reader_shared_group.reset(new DB(*reader_history));
 
         writer_history = make_history(path);
-        writer_shared_group.reset(new SharedGroup(*writer_history));
+        writer_shared_group.reset(new DB(*writer_history));
 
         WriteTransaction wt(*writer_shared_group);
         TableRef table = wt.add_table("table");
@@ -101,10 +101,10 @@ private:
     const size_t max_num_locked_snapshots = 8;
 
     std::unique_ptr<Replication> reader_history;
-    std::unique_ptr<SharedGroup> reader_shared_group;
+    std::unique_ptr<DB> reader_shared_group;
 
     std::unique_ptr<Replication> writer_history;
-    std::unique_ptr<SharedGroup> writer_shared_group;
+    std::unique_ptr<DB> writer_shared_group;
 };
 
 
@@ -118,15 +118,15 @@ public:
         util::File::try_remove(path);
 
         reader_histories.reset(new std::unique_ptr<Replication>[ num_readers ]);
-        reader_shared_groups.reset(new std::unique_ptr<SharedGroup>[ num_readers ]);
+        reader_shared_groups.reset(new std::unique_ptr<DB>[ num_readers ]);
 
         for (int i = 0; i < num_readers; ++i) {
             reader_histories[i] = make_history(path);
-            reader_shared_groups[i].reset(new SharedGroup(*reader_histories[i]));
+            reader_shared_groups[i].reset(new DB(*reader_histories[i]));
         }
 
         writer_history = make_history(path);
-        writer_shared_group.reset(new SharedGroup(*writer_history));
+        writer_shared_group.reset(new DB(*writer_history));
 
         WriteTransaction wt(*writer_shared_group);
         TableRef table = wt.add_table("table");
@@ -162,10 +162,10 @@ private:
     const bool m_grow;
 
     std::unique_ptr<std::unique_ptr<Replication>[]> reader_histories;
-    std::unique_ptr<std::unique_ptr<SharedGroup>[]> reader_shared_groups;
+    std::unique_ptr<std::unique_ptr<DB>[]> reader_shared_groups;
 
     std::unique_ptr<Replication> writer_history;
-    std::unique_ptr<SharedGroup> writer_shared_group;
+    std::unique_ptr<DB> writer_shared_group;
 };
 
 } // unnamed namespace

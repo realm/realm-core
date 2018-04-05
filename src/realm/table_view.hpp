@@ -393,7 +393,7 @@ private:
 
     friend class Table;
     friend class Query;
-    friend class SharedGroup;
+    friend class DB;
 };
 
 enum class RemoveMode { ordered, unordered };

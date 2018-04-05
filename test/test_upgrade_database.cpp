@@ -133,7 +133,7 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         const char* encryption_key = nullptr;
         bool allow_upgrade = false;
 
-        CHECK_THROW(SharedGroup(temp_copy, no_create, SharedGroupOptions(durability, encryption_key, allow_upgrade)),
+        CHECK_THROW(DB(temp_copy, no_create, SharedGroupOptions(durability, encryption_key, allow_upgrade)),
                     FileFormatUpgradeRequired);
     }
 
@@ -142,7 +142,7 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
         File::copy(path, temp_copy);
 
-        SharedGroup sg(temp_copy);
+        DB sg(temp_copy);
         ReadTransaction rt(sg);
         ConstTableRef t = rt.get_table("table");
 
@@ -164,7 +164,7 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
     // Now see if we can open the upgraded file and also commit to it
     {
-        SharedGroup sg(temp_copy);
+        DB sg(temp_copy);
         WriteTransaction rt(sg);
         TableRef t = rt.get_table("table");
 
@@ -192,7 +192,7 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
         File::copy(path, temp_copy);
 
-        SharedGroup sg(temp_copy);
+        DB sg(temp_copy);
         WriteTransaction rt(sg);
         TableRef t = rt.get_table("table");
 
@@ -237,7 +237,7 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         File::copy(path, temp_copy);
 
         std::unique_ptr<Replication> hist = make_in_realm_history(temp_copy);
-        SharedGroup sg(*hist);
+        DB sg(*hist);
         ReadTransaction rt(sg);
         ConstTableRef t = rt.get_table("table");
 
@@ -294,7 +294,7 @@ TEST_IF(Upgrade_Database_2_Backwards_Compatible, REALM_MAX_BPNODE_SIZE == 4 || R
     SHARED_GROUP_TEST_PATH(temp_copy);
 
     File::copy(path, temp_copy);
-    SharedGroup g(temp_copy, 0);
+    DB g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
     CHECK_EQUAL(9, sgf::get_file_format_version(g));
@@ -391,7 +391,7 @@ TEST_IF(Upgrade_Database_2_Backwards_Compatible_WriteTransaction, REALM_MAX_BPNO
     SHARED_GROUP_TEST_PATH(temp_copy);
 
     File::copy(path, temp_copy);
-    SharedGroup g(temp_copy, 0);
+    DB g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
     CHECK_EQUAL(9, sgf::get_file_format_version(g));
@@ -488,7 +488,7 @@ TEST_IF(Upgrade_Database_Binary, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_
     SHARED_GROUP_TEST_PATH(temp_copy);
 
     File::copy(path, temp_copy);
-    SharedGroup g(temp_copy, 0);
+    DB g(temp_copy, 0);
 
     WriteTransaction wt(g);
     TableRef t = wt.get_table(0);
@@ -580,7 +580,7 @@ TEST_IF(Upgrade_Database_Strings_With_NUL, REALM_MAX_BPNODE_SIZE == 4 || REALM_M
     SHARED_GROUP_TEST_PATH(temp_copy);
 
     File::copy(path, temp_copy);
-    SharedGroup g(temp_copy, 0);
+    DB g(temp_copy, 0);
 
     WriteTransaction wt(g);
     TableRef t = wt.get_table("table");
@@ -643,8 +643,8 @@ TEST_IF(Upgrade_Database_2_3_Writes_New_File_Format, REALM_MAX_BPNODE_SIZE == 4 
     CHECK_OR_RETURN(File::exists(path));
     SHARED_GROUP_TEST_PATH(temp_copy);
     File::copy(path, temp_copy);
-    SharedGroup sg1(temp_copy);
-    SharedGroup sg2(temp_copy); // verify that the we can open another shared group, and it won't deadlock
+    DB sg1(temp_copy);
+    DB sg2(temp_copy); // verify that the we can open another shared group, and it won't deadlock
     using sgf = _impl::SharedGroupFriend;
     CHECK_EQUAL(sgf::get_file_format_version(sg1), sgf::get_file_format_version(sg2));
 }
@@ -667,7 +667,7 @@ TEST_IF(Upgrade_Database_2_3_Writes_New_File_Format_new, REALM_MAX_BPNODE_SIZE =
     util::Thread t[10];
 
     for (auto& tt : t) {
-        tt.start([&]() { SharedGroup sg(temp_copy); });
+        tt.start([&]() { DB sg(temp_copy); });
     }
 
     for (auto& tt : t)
@@ -692,7 +692,7 @@ TEST_IF(Upgrade_InRealmHistory, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
     {
         File::copy(path, temp_path);
         std::unique_ptr<Replication> hist = make_in_realm_history(temp_path);
-        SharedGroup sg(*hist);
+        DB sg(*hist);
         using sgf = _impl::SharedGroupFriend;
         CHECK_LESS_EQUAL(4, sgf::get_file_format_version(sg));
     }
@@ -703,13 +703,13 @@ TEST_IF(Upgrade_InRealmHistory, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
         File::copy(path, temp_path);
         bool no_create = true;
         {
-            SharedGroup sg(temp_path, no_create);
+            DB sg(temp_path, no_create);
             using sgf = _impl::SharedGroupFriend;
             CHECK_EQUAL(9, sgf::get_file_format_version(sg));
         }
         {
             std::unique_ptr<Replication> hist = make_in_realm_history(temp_path);
-            SharedGroup sg(*hist);
+            DB sg(*hist);
             using sgf = _impl::SharedGroupFriend;
             CHECK_LESS_EQUAL(4, sgf::get_file_format_version(sg));
         }
@@ -745,8 +745,8 @@ TEST_IF(Upgrade_DatabaseWithCallback, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BP
 
     upgrade_callback = callback;
 
-    SharedGroup sg(temp_copy, no_create,
-                   SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
+    DB sg(temp_copy, no_create,
+          SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
 
     CHECK(did_upgrade);
     CHECK_EQUAL(old_version, 3);
@@ -785,8 +785,8 @@ TEST_IF(Upgrade_DatabaseWithCallbackWithException, REALM_MAX_BPNODE_SIZE == 4 ||
     upgrade_callback = exception_callback;
     bool exception_thrown = false;
     try {
-        SharedGroup sg1(temp_copy, no_create,
-                        SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
+        DB sg1(temp_copy, no_create,
+               SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
     }
     catch (...) {
         exception_thrown = true;
@@ -796,16 +796,16 @@ TEST_IF(Upgrade_DatabaseWithCallbackWithException, REALM_MAX_BPNODE_SIZE == 4 ||
 
     // Callback should be triggered here because the file still needs to be upgraded
     upgrade_callback = successful_callback;
-    SharedGroup sg2(temp_copy, no_create,
-                    SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
+    DB sg2(temp_copy, no_create,
+           SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
     CHECK(did_upgrade);
     CHECK_EQUAL(old_version, 3);
     CHECK(new_version >= 5);
 
     // Callback should not be triggered here because the file is already upgraded
     did_upgrade = false;
-    SharedGroup sg3(temp_copy, no_create,
-                    SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
+    DB sg3(temp_copy, no_create,
+           SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
     CHECK(!did_upgrade);
 }
 
@@ -828,7 +828,7 @@ TEST_IF(Upgrade_Database_4_5_DateTime1, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_
 
         // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
         // in version 4
-        SharedGroup sg(temp_copy);
+        DB sg(temp_copy);
 
         WriteTransaction rt(sg);
         TableRef t = rt.get_table("table");
@@ -943,7 +943,7 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
 
         // Constructing this SharedGroup will trigger an upgrade
         // for all tables because the file is in version 4
-        SharedGroup sg(temp_copy);
+        DB sg(temp_copy);
 
         WriteTransaction wt(sg);
         TableRef t = wt.get_table("t1");
@@ -1084,7 +1084,7 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
         // Constructing this SharedGroup will trigger an upgrade
         auto hist = make_in_realm_history(temp_copy);
-        SharedGroup sg(*hist);
+        DB sg(*hist);
 
         ReadTransaction rt(sg);
         CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(rt.get_group()),
@@ -1142,7 +1142,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
         // Constructing this SharedGroup will trigger an upgrade
         auto hist = make_in_realm_history(temp_copy);
-        SharedGroup sg(*hist);
+        DB sg(*hist);
 
         ReadTransaction rt(sg);
         CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(rt.get_group()),
@@ -1201,7 +1201,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
         // Constructing this SharedGroup will trigger an upgrade
         auto hist = make_in_realm_history(temp_copy);
-        SharedGroup sg(*hist);
+        DB sg(*hist);
 
         ReadTransaction rt(sg);
         CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(rt.get_group()),
@@ -1269,7 +1269,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         try {
             // Constructing this SharedGroup will trigger an upgrade first time around
             auto hist = make_in_realm_history(temp_copy);
-            SharedGroup sg(*hist);
+            DB sg(*hist);
 
             ReadTransaction rt(sg);
 

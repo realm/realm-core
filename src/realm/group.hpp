@@ -36,8 +36,7 @@
 
 namespace realm {
 
-class SharedGroup;
-class WriteTransaction;
+class DB;
 
 namespace _impl {
 class GroupFriend;
@@ -770,7 +769,7 @@ private:
     static int get_target_file_format_version_for_session(int current_file_format_version, int history_type) noexcept;
 
     /// Must be called from within a write transaction
-    void upgrade_file_format(int target_file_format_version, SharedGroup& sg);
+    void upgrade_file_format(int target_file_format_version, DB& sg);
 
     std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override;
 
@@ -793,7 +792,7 @@ private:
 
     friend class Table;
     friend class GroupWriter;
-    friend class SharedGroup;
+    friend class DB;
     friend class _impl::GroupFriend;
     friend class _impl::TransactLogConvenientEncoder;
     friend class _impl::TransactLogParser;
@@ -1348,7 +1347,7 @@ public:
         return Group::get_target_file_format_version_for_session(current_file_format_version, history_type);
     }
 
-    static void upgrade_file_format(Group& group, int target_file_format_version, SharedGroup& sg)
+    static void upgrade_file_format(Group& group, int target_file_format_version, DB& sg)
     {
         group.upgrade_file_format(target_file_format_version, sg); // Throws
     }

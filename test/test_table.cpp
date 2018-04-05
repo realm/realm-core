@@ -2985,7 +2985,7 @@ TEST(Table_object_sequential)
     int num_runs = 100;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    DB sg(path);
     ColKey c0;
     ColKey c1;
 
@@ -3130,7 +3130,7 @@ TEST(Table_object_seq_rnd)
     std::vector<int64_t> key_values;
     std::set<int64_t> key_set;
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    DB sg(path);
     ColKey c0;
     {
         std::cout << "Establishing scenario seq ins/rnd erase " << std::endl;
@@ -3236,7 +3236,7 @@ TEST(Table_object_random)
     int num_runs = 100;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    DB sg(path);
     ColKey c0;
     ColKey c1;
     std::vector<int64_t> key_values;

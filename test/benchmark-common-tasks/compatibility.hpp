@@ -30,7 +30,7 @@ enum class RealmDurability {
     Async
 };
 
-realm::SharedGroup* create_new_shared_group(std::string path, RealmDurability level, const char* key);
+realm::DB* create_new_shared_group(std::string path, RealmDurability level, const char* key);
 
 } // end namespace compatibility
 

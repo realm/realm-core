@@ -226,7 +226,7 @@ public:
     {
     }
 
-    void initialize(SharedGroup& sg) override
+    void initialize(DB& sg) override
     {
         TrivialReplication::initialize(sg); // Throws
         using sgf = _impl::SharedGroupFriend;

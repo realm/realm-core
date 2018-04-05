@@ -205,7 +205,7 @@ int Group::get_target_file_format_version_for_session(int /* current_file_format
 }
 
 
-void Group::upgrade_file_format(int target_file_format_version, SharedGroup& sg)
+void Group::upgrade_file_format(int target_file_format_version, DB& sg)
 {
     REALM_ASSERT(is_attached());
 

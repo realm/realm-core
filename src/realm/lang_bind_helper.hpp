@@ -80,7 +80,7 @@ public:
 
     //@}
 
-    using VersionID = SharedGroup::VersionID;
+    using VersionID = DB::VersionID;
 
     /// \defgroup lang_bind_helper_transactions Continuous Transactions
     ///
@@ -141,16 +141,16 @@ public:
     ///
     //@{
 
-    static void advance_read(SharedGroup&, VersionID = VersionID());
+    static void advance_read(DB&, VersionID = VersionID());
     template <class O>
-    static void advance_read(SharedGroup&, O&& observer, VersionID = VersionID());
-    static void promote_to_write(SharedGroup&);
+    static void advance_read(DB&, O&& observer, VersionID = VersionID());
+    static void promote_to_write(DB&);
     template <class O>
-    static void promote_to_write(SharedGroup&, O&& observer);
-    static SharedGroup::version_type commit_and_continue_as_read(SharedGroup&);
-    static void rollback_and_continue_as_read(SharedGroup&);
+    static void promote_to_write(DB&, O&& observer);
+    static DB::version_type commit_and_continue_as_read(DB&);
+    static void rollback_and_continue_as_read(DB&);
     template <class O>
-    static void rollback_and_continue_as_read(SharedGroup&, O&& observer);
+    static void rollback_and_continue_as_read(DB&, O&& observer);
 
     //@}
 
@@ -166,7 +166,7 @@ public:
     /// </pre>
     static const char* get_data_type_name(DataType) noexcept;
 
-    static SharedGroup::version_type get_version_of_latest_snapshot(SharedGroup&);
+    static DB::version_type get_version_of_latest_snapshot(DB&);
 };
 
 
@@ -235,7 +235,7 @@ inline void LangBindHelper::bind_table_ptr(const Table*) noexcept
 {
 }
 
-inline void LangBindHelper::advance_read(SharedGroup& sg, VersionID version)
+inline void LangBindHelper::advance_read(DB& sg, VersionID version)
 {
     using sgf = _impl::SharedGroupFriend;
     _impl::NullInstructionObserver* observer = nullptr;
@@ -243,13 +243,13 @@ inline void LangBindHelper::advance_read(SharedGroup& sg, VersionID version)
 }
 
 template <class O>
-inline void LangBindHelper::advance_read(SharedGroup& sg, O&& observer, VersionID version)
+inline void LangBindHelper::advance_read(DB& sg, O&& observer, VersionID version)
 {
     using sgf = _impl::SharedGroupFriend;
     sgf::advance_read(sg, &observer, version); // Throws
 }
 
-inline void LangBindHelper::promote_to_write(SharedGroup& sg)
+inline void LangBindHelper::promote_to_write(DB& sg)
 {
     using sgf = _impl::SharedGroupFriend;
     _impl::NullInstructionObserver* observer = nullptr;
@@ -257,19 +257,19 @@ inline void LangBindHelper::promote_to_write(SharedGroup& sg)
 }
 
 template <class O>
-inline void LangBindHelper::promote_to_write(SharedGroup& sg, O&& observer)
+inline void LangBindHelper::promote_to_write(DB& sg, O&& observer)
 {
     using sgf = _impl::SharedGroupFriend;
     sgf::promote_to_write(sg, &observer); // Throws
 }
 
-inline SharedGroup::version_type LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
+inline DB::version_type LangBindHelper::commit_and_continue_as_read(DB& sg)
 {
     using sgf = _impl::SharedGroupFriend;
     return sgf::commit_and_continue_as_read(sg); // Throws
 }
 
-inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg)
+inline void LangBindHelper::rollback_and_continue_as_read(DB& sg)
 {
     using sgf = _impl::SharedGroupFriend;
     _impl::NullInstructionObserver* observer = nullptr;
@@ -277,13 +277,13 @@ inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg)
 }
 
 template <class O>
-inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, O&& observer)
+inline void LangBindHelper::rollback_and_continue_as_read(DB& sg, O&& observer)
 {
     using sgf = _impl::SharedGroupFriend;
     sgf::rollback_and_continue_as_read(sg, &observer); // Throws
 }
 
-inline SharedGroup::version_type LangBindHelper::get_version_of_latest_snapshot(SharedGroup& sg)
+inline DB::version_type LangBindHelper::get_version_of_latest_snapshot(DB& sg)
 {
     using sgf = _impl::SharedGroupFriend;
     return sgf::get_version_of_latest_snapshot(sg); // Throws

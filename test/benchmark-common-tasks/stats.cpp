@@ -50,7 +50,7 @@ void delete_file_if_exists(std::string file_name)
 void create_realm_with_data(std::string file_name, size_t data_size)
 {
     delete_file_if_exists(file_name);
-    SharedGroup sg(file_name);
+    DB sg(file_name);
     Group& g = sg.begin_write();
     TableRef table = g.add_table("t0");
     auto c0 = table->add_column(type_Binary, "bin_col_0");
@@ -71,7 +71,7 @@ void create_realm_with_transactions(std::string file_name,
                                     size_t num_rows)
 {
     delete_file_if_exists(file_name);
-    SharedGroup sg(file_name);
+    DB sg(file_name);
     const std::string table_name = "table";
     ColKey int_col;
     {

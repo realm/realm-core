@@ -75,7 +75,7 @@ using realm::test_util::crypt_key;
 TEST(Transactions_LargeMappingChange)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    DB sg(path);
     int data_size = 12 * 1024 * 1024;
     {
         WriteTransaction wt(sg);
@@ -179,7 +179,7 @@ void my_table_add_columns(T table)
     subtable_add_columns(subdesc);
 }
 
-void round(TestContext& test_context, SharedGroup& db, int index)
+void round(TestContext& test_context, DB& db, int index)
 {
     // Testing all value types
     {
@@ -505,7 +505,7 @@ void round(TestContext& test_context, SharedGroup& db, int index)
 void thread(TestContext& test_context, int index, std::string path)
 {
     for (int i = 0; i < num_rounds; ++i) {
-        SharedGroup db(path);
+        DB db(path);
         round(test_context, db, index);
     }
 }
@@ -544,7 +544,7 @@ TEST(Transactions_General)
     table1_theta_size *= num_rounds;
     table1_theta_size += 2;
 
-    SharedGroup db(path);
+    DB db(path);
     ReadTransaction rt(db);
     ConstTableRef table = rt.get_table("my_table");
     CHECK(2 <= table->size());
@@ -649,7 +649,7 @@ TEST(Transactions_RollbackCreateObject)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
 
@@ -683,7 +683,7 @@ TEST(Transactions_RollbackMoveTableColumns)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
 
@@ -713,7 +713,7 @@ TEST(Transactions_RollbackMoveTableReferences)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
 
@@ -743,8 +743,8 @@ TEST(LangBindHelper_RollbackStringEnumInsert)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     std::unique_ptr<Replication> hist_2(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w);
-    SharedGroup sg_2(*hist_2);
+    DB sg_w(*hist_w);
+    DB sg_2(*hist_2);
     Group& g = const_cast<Group&>(sg_w.begin_read());
     Group& g2 = const_cast<Group&>(sg_2.begin_read());
     LangBindHelper::promote_to_write(sg_w);
@@ -793,7 +793,7 @@ TEST(LangBindHelper_RollbackLinkInsert)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
 
-    SharedGroup sg_w(*hist_w);
+    DB sg_w(*hist_w);
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
