@@ -51,8 +51,8 @@ void create_realm_with_data(std::string file_name, size_t data_size)
 {
     delete_file_if_exists(file_name);
     DB sg(file_name);
-    Group& g = sg.begin_write();
-    TableRef table = g.add_table("t0");
+    TransactionRef tr = sg.start_write();
+    TableRef table = tr->add_table("t0");
     auto c0 = table->add_column(type_Binary, "bin_col_0");
     std::string blob(data_size, 'a');
     BinaryData binary(blob.data(), data_size);
@@ -62,7 +62,7 @@ void create_realm_with_data(std::string file_name, size_t data_size)
     table->add_empty_row(1);
     table->set_binary(c0, 0, binary); // copies data into realm
 #endif
-    sg.commit();
+    tr->commit();
     sg.close();
 }
 
@@ -75,8 +75,8 @@ void create_realm_with_transactions(std::string file_name,
     const std::string table_name = "table";
     ColKey int_col;
     {
-        Group& g = sg.begin_write();
-        TableRef table = g.add_table(table_name);
+        TransactionRef tr = sg.start_write();
+        TableRef table = tr->add_table(table_name);
         int_col = table->add_column(type_Int, "int_col_0");
 #ifdef REALM_CLUSTER_IF
         std::vector<ObjKey> keys;
@@ -84,11 +84,11 @@ void create_realm_with_transactions(std::string file_name,
 #else
         table->add_empty_row(num_rows);
 #endif
-        sg.commit();
+        tr->commit();
     }
     for (size_t i = 0; i < num_transactions; ++i) {
-        Group& g = sg.begin_write();
-        TableRef table = g.get_table(table_name);
+        TransactionRef tr = sg.start_write();
+        TableRef table = tr->get_table(table_name);
 #ifdef REALM_CLUSTER_IF
         size_t row = 0;
         for (auto obj : *table) {
@@ -100,7 +100,7 @@ void create_realm_with_transactions(std::string file_name,
             table->set_int(int_col, row, (i * num_rows) + row);
         }
 #endif
-        sg.commit();
+        tr->commit();
     }
 }
 

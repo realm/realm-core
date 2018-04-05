@@ -27,7 +27,6 @@
 #include <iomanip>
 
 #include <realm/history.hpp>
-#include <realm/lang_bind_helper.hpp>
 #include <realm/util/file.hpp>
 #include <realm/group_shared.hpp>
 
@@ -78,9 +77,8 @@ TEST(Transactions_LargeMappingChange)
     DB sg(path);
     int data_size = 12 * 1024 * 1024;
     {
-        WriteTransaction wt(sg);
-        Group& g = wt.get_group();
-        TableRef tr = g.add_table("test");
+        TransactionRef g = sg.start_write();
+        TableRef tr = g->add_table("test");
         auto col = tr->add_column(type_Binary, "binary");
         char* data = new char[data_size];
         for (int i = 0; i < data_size; i += 721) {
@@ -96,12 +94,11 @@ TEST(Transactions_LargeMappingChange)
             }
         }
         delete[] data;
-        wt.commit();
+        g->commit();
     }
     {
-        ReadTransaction rt(sg);
-        const Group& g = rt.get_group();
-        ConstTableRef tr = g.get_table("test");
+        TransactionRef g = sg.start_read();
+        ConstTableRef tr = g->get_table("test");
         auto col = tr->get_column_key("binary");
         for (auto it = tr->begin(); it != tr->end(); ++it) {
             auto data = it->get<BinaryData>(col);
@@ -111,6 +108,38 @@ TEST(Transactions_LargeMappingChange)
             }
         }
     }
+}
+
+TEST(Transactions_StateChanges)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DB db(path);
+    TransactionRef writer = db.start_write();
+    TableRef tr = writer->add_table("hygge");
+    auto col = tr->add_column(type_Int, "hejsa");
+    auto obj = tr->create_object().set_all(45);
+    // verify that we cannot freeze a write transaction
+    CHECK_THROW(writer->freeze(), realm::LogicError);
+    writer->commit_and_continue_as_read();
+    // verify that we cannot modify data in a read transaction
+    CHECK_THROW(obj.set(col, 100), realm::LogicError);
+    // verify that we can freeze a read transaction
+    TransactionRef frozen = writer->freeze();
+    // verify that we can handover an accessor directly to the frozen transaction.
+    auto frozen_obj = frozen->copy_of(obj);
+    // verify that we can read the correct value
+    int val = frozen_obj.get<int64_t>(col);
+    CHECK_EQUAL(45, val);
+    // verify that a fresh read transaction is read only
+    TransactionRef reader = db.start_read();
+    tr = reader->get_table("hygge");
+    CHECK_THROW(tr->create_object(), realm::LogicError);
+#ifdef LEGACY_TESTS
+    // FIXME: enable when history support is back
+    // ..but if promoted, becomes writable
+    reader->promote_to_write();
+    tr->create_object();
+#endif
 }
 #ifdef LEGACY_TESTS
 
@@ -641,38 +670,43 @@ TEST(Transactions_General)
     }
     // End of read transaction
 }
-#endif
 
-#ifdef LEGACY_TESTS
 
 TEST(Transactions_RollbackCreateObject)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    WriteTransaction wt(sg_w);
-    Group& g = wt.get_group();
+    TransactionRef tr = sg_w.start_write();
+    // WriteTransaction wt(sg_w);
+    // Group& g = wt.get_group();
 
-    auto tk = g.add_table("t0")->get_key();
-    g.get_table(tk)->add_column(type_Int, "integers");
+    auto tk = tr->add_table("t0")->get_key();
+    auto col = tr->get_table(tk)->add_column(type_Int, "integers");
 
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    LangBindHelper::promote_to_write(sg_w);
+    // LangBindHelper::commit_and_continue_as_read(sg_w);'
+    tr->commit_and_continue_as_read();
+    // LangBindHelper::promote_to_write(sg_w);
+    tr->promote_to_write();
 
-    g.get_table(tk)->create_object(Key(0)).set(0, 5);
-    auto o = g.get_table(tk)->get_object(Key(0));
-    CHECK_EQUAL(o.get<int64_t>(0), 5);
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    tr->get_table(tk)->create_object(ObjKey(0)).set(col, 5);
+    auto o = tr->get_table(tk)->get_object(ObjKey(0));
+    CHECK_EQUAL(o.get<int64_t>(col), 5);
 
+    // LangBindHelper::rollback_and_continue_as_read(sg_w);
+    tr->rollback_and_continue_as_read();
 
-    CHECK_THROW(o.get<int64_t>(0), InvalidKey);
-    g.verify();
+    CHECK_THROW(o.get<int64_t>(col), InvalidKey);
+    tr->verify();
 
-    LangBindHelper::promote_to_write(sg_w);
+    // LangBindHelper::promote_to_write(sg_w);
+    tr->promote_to_write();
 
-    CHECK_EQUAL(g.get_table(tk)->size(), 0);
+    CHECK_EQUAL(tr->get_table(tk)->size(), 0);
 }
+#endif
 
+#ifdef LEGACY_TESTS
 
 <<<<<<< HEAD
 // Rollback a table move operation and check accessors.

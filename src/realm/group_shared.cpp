@@ -429,11 +429,6 @@ struct alignas(8) DB::SharedInfo {
     /// with further write transactions. When beginning a write transaction,
     /// this must be checked and an exception thrown if set.
     ///
-    /// FIXME: This is a temporary approach until we get the commitlog data
-    /// moved into the realm file. After that it should be feasible to either
-    /// handle the error condition properly or preclude it by using a non-robust
-    /// mutex for the remaining and much smaller critical section.
-    ///
     /// Note that std::atomic<uint8_t> is guaranteed to have standard layout.
     std::atomic<uint8_t> commit_in_critical_phase = {0}; // Offset 3
 
@@ -771,19 +766,18 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
     try_make_dir(m_coordination_dir);
     m_key = options.encryption_key;
     m_lockfile_prefix = m_coordination_dir + "/access_control";
-    SlabAlloc& alloc = m_group.m_alloc;
+    SlabAlloc& alloc = m_alloc;
 
 #if REALM_METRICS
     if (options.enable_metrics) {
         m_metrics = std::make_shared<Metrics>();
-        m_group.set_metrics(m_metrics);
     }
 #endif // REALM_METRICS
 
     Replication::HistoryType openers_hist_type = Replication::hist_None;
     int openers_hist_schema_version = 0;
     bool opener_is_sync_agent = false;
-    if (Replication* repl = m_group.get_replication()) {
+    if (Replication* repl = m_alloc.get_replication()) {
         openers_hist_type = repl->get_history_type();
         openers_hist_schema_version = repl->get_history_schema_version();
         opener_is_sync_agent = repl->is_sync_agent();
@@ -1116,12 +1110,12 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 bool need_hist_schema_upgrade =
                     (stored_hist_schema_version < openers_hist_schema_version && top_ref != 0);
                 if (need_hist_schema_upgrade) {
-                    Replication* repl = gf::get_replication(m_group);
+                    Replication* repl = m_alloc.get_replication();
                     if (!repl->is_upgradable_history_schema(stored_hist_schema_version))
                         throw IncompatibleHistories("Nonupgradable history schema", path);
                 }
 
-                if (Replication* repl = gf::get_replication(m_group))
+                if (Replication* repl = m_alloc.get_replication())
                     repl->initiate_session(version); // Throws
 
                 if (options.encryption_key) {
@@ -1265,7 +1259,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         break;
     }
 
-    set_transact_stage(transact_Ready);
 // std::cerr << "open completed" << std::endl;
 
 #ifdef REALM_ASYNC_DAEMON
@@ -1283,8 +1276,8 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         using gf = _impl::GroupFriend;
         if (stored_hist_schema_version == -1) {
             // current_hist_schema_version has not been read. Read it now
-            ReadTransaction rt(*this);
-            stored_hist_schema_version = gf::get_history_schema_version(m_group.m_alloc, m_read_lock.m_top_ref);
+            auto trans = start_read(); // <-- is this necessary? FIXME
+            stored_hist_schema_version = gf::get_history_schema_version(m_alloc, m_read_lock.m_top_ref);
         }
         if (current_file_format_version == 0) {
             // If the current file format is still undecided, no upgrade is
@@ -1295,10 +1288,10 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             // participants must adopt the chosen target Realm file format when
             // the stored file format version is zero regardless of the version
             // of the core library used.
-            gf::set_file_format_version(m_group, target_file_format_version);
+            m_file_format_version = target_file_format_version;
         }
         else {
-            gf::set_file_format_version(m_group, current_file_format_version);
+            m_file_format_version = current_file_format_version;
             upgrade_file_format(options.allow_file_format_upgrade, target_file_format_version,
                                 stored_hist_schema_version, openers_hist_schema_version); // Throws
         }
@@ -1313,6 +1306,9 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 // corrupt your database if something fails
 bool DB::compact()
 {
+    // FIXME: Make compact great again!
+    REALM_ASSERT(false);
+#if 0
     // Verify that the database file is attached
     if (is_attached() == false) {
         throw std::runtime_error(m_db_path + ": compact must be done on an open/attached SharedGroup");
@@ -1337,7 +1333,7 @@ bool DB::compact()
         // Using begin_read here ensures that we have access to the latest entry
         // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
         // This is also needed to attach the group (get the proper top pointer, etc)
-        begin_read(); // Throws
+        TransactionRef tr = start_read();
 
         // Compact by writing a new file holding only live data, then renaming the new file
         // so it becomes the database file, replacing the old one in the process.
@@ -1364,7 +1360,7 @@ bool DB::compact()
             REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
             static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
         }
-        end_read();
+        tr->close();
         dura = Durability(info->durability);
         // We need to release any shared mapping *before* releasing the control mutex.
         // When someone attaches to the new database file, they *must* *not* see and
@@ -1383,6 +1379,7 @@ bool DB::compact()
     new_options.encryption_key = m_key;
     new_options.allow_file_format_upgrade = false;
     do_open(m_db_path, true, false, new_options);
+#endif
     return true;
 }
 
@@ -1408,29 +1405,17 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
     if (!is_attached())
         return;
 
-    switch (m_transact_stage) {
-        case transact_Ready:
-            break;
-        case transact_Reading:
-            end_read();
-            break;
-        case transact_Writing:
-            rollback();
-            break;
-    }
-    m_group.detach();
-    set_transact_stage(transact_Ready);
     SharedInfo* info = m_file_map.get_addr();
     {
         bool is_sync_agent = false;
-        if (Replication* repl = m_group.get_replication())
+        if (Replication* repl = m_alloc.get_replication())
             is_sync_agent = repl->is_sync_agent();
 
         if (!lock.owns_lock())
             lock.lock();
 
-        if (m_group.m_alloc.is_attached())
-            m_group.m_alloc.detach();
+        if (m_alloc.is_attached())
+            m_alloc.detach();
 
         if (is_sync_agent) {
             REALM_ASSERT(info->sync_agent_present);
@@ -1451,8 +1436,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
                 catch (...) {
                 } // ignored on purpose.
             }
-            using gf = _impl::GroupFriend;
-            if (Replication* repl = gf::get_replication(m_group))
+            if (Replication* repl = m_alloc.get_replication())
                 repl->terminate_session();
         }
         lock.unlock();
@@ -1474,20 +1458,20 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
     m_file.close();
 }
 
-bool DB::has_changed()
+bool DB::has_changed(TransactionRef tr)
 {
-    bool changed = m_read_lock.m_version != get_version_of_latest_snapshot();
+    bool changed = tr->m_read_lock.m_version != get_version_of_latest_snapshot();
     return changed;
 }
 
-bool DB::wait_for_change()
+bool DB::wait_for_change(TransactionRef tr)
 {
     SharedInfo* info = m_file_map.get_addr();
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
-    while (m_read_lock.m_version == info->latest_version_number && m_wait_for_change_enabled) {
+    while (tr->m_read_lock.m_version == info->latest_version_number && m_wait_for_change_enabled) {
         m_new_commit_available.wait(m_controlmutex, 0);
     }
-    return m_read_lock.m_version != info->latest_version_number;
+    return tr->m_read_lock.m_version != info->latest_version_number;
 }
 
 
@@ -1505,28 +1489,28 @@ void DB::enable_wait_for_change()
     m_wait_for_change_enabled = true;
 }
 
-void DB::set_transact_stage(DB::TransactStage stage) noexcept
+void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 {
 #if REALM_METRICS
     if (m_metrics) { // null if metrics are disabled
-        size_t total_size = m_used_space + m_free_space;
-        size_t free_space = m_free_space;
-        size_t num_objects = m_group.m_total_rows;
-        size_t num_available_versions = static_cast<size_t>(get_number_of_versions());
+        size_t total_size = db->m_used_space + db->m_free_space;
+        size_t free_space = db->m_free_space;
+        size_t num_objects = m_total_rows;
+        size_t num_available_versions = static_cast<size_t>(db->get_number_of_versions());
 
-        if (stage == transact_Reading) {
-            if (m_transact_stage == transact_Writing) {
+        if (stage == DB::transact_Reading) {
+            if (m_transact_stage == DB::transact_Writing) {
                 m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions);
             }
             m_metrics->start_read_transaction();
         }
-        else if (stage == transact_Writing) {
-            if (m_transact_stage == transact_Reading) {
+        else if (stage == DB::transact_Writing) {
+            if (m_transact_stage == DB::transact_Reading) {
                 m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions);
             }
             m_metrics->start_write_transaction();
         }
-        else if (stage == transact_Ready) {
+        else if (stage == DB::transact_Ready) {
             m_metrics->end_read_transaction(total_size, free_space, num_objects, num_available_versions);
             m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions);
         }
@@ -1556,8 +1540,6 @@ void DB::do_async_commits()
         info->daemon_ready = 1;
         m_daemon_becomes_ready.notify_all();
     }
-    using gf = _impl::GroupFriend;
-    gf::detach(m_group);
 
     while (true) {
         if (m_file.is_removed()) { // operator removed the lock file. take a hint!
@@ -1596,8 +1578,10 @@ void DB::do_async_commits()
             std::cerr << "Syncing from version " << m_read_lock.m_version << " to " << next_read_lock.m_version
                       << std::endl;
 #endif
+/* FIXME
             GroupWriter writer(m_group);
             writer.commit(next_read_lock.m_top_ref);
+            */
 #ifdef REALM_ENABLE_LOGFILE
             std::cerr << "..and Done" << std::endl;
 #endif
@@ -1651,7 +1635,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
 
     // First a non-threadsafe but fast check
     using gf = _impl::GroupFriend;
-    int current_file_format_version = gf::get_file_format_version(m_group);
+    int current_file_format_version = m_file_format_version;
     REALM_ASSERT(current_file_format_version <= target_file_format_version);
     REALM_ASSERT(current_hist_schema_version <= target_hist_schema_version);
     bool maybe_upgrade_file_format = (current_file_format_version < target_file_format_version);
@@ -1675,11 +1659,12 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         // millisleep(200);
 #endif
 
-        WriteTransaction wt(*this);
+        // WriteTransaction wt(*this);
+        auto wt = start_write();
         bool dirty = false;
 
         // File format upgrade
-        int current_file_format_version_2 = gf::get_committed_file_format_version(m_group);
+        int current_file_format_version_2 = gf::get_committed_file_format_version(*wt);
         // The file must either still be using its initial file_format or have
         // been upgraded already to the chosen target file format via a
         // concurrent SharedGroup object.
@@ -1689,7 +1674,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         if (need_file_format_upgrade) {
             if (!allow_file_format_upgrade)
                 throw FileFormatUpgradeRequired();
-            gf::upgrade_file_format(m_group, target_file_format_version, *this); // Throws
+            wt->upgrade_file_format(target_file_format_version); // Throws
             // Note: The file format version stored in the Realm file will be
             // updated to the new file format version as part of the following
             // commit operation. This happens in GroupWriter::commit().
@@ -1701,11 +1686,11 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
             // If somebody else has already performed the upgrade, we still need
             // to inform the rest of the core library about the new file format
             // of the attached file.
-            gf::set_file_format_version(m_group, target_file_format_version);
+            gf::set_file_format_version(*wt, target_file_format_version);
         }
 
         // History schema upgrade
-        int current_hist_schema_version_2 = gf::get_history_schema_version(m_group);
+        int current_hist_schema_version_2 = gf::get_history_schema_version(*wt);
         // The history must either still be using its initial schema or have
         // been upgraded already to the chosen target schema version via a
         // concurrent SharedGroup object.
@@ -1715,21 +1700,15 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         if (need_hist_schema_upgrade) {
             if (!allow_file_format_upgrade)
                 throw FileFormatUpgradeRequired();
-            Replication* repl = m_group.get_replication();
+            Replication* repl = wt->get_replication();
             repl->upgrade_history_schema(current_hist_schema_version_2); // Throws
-            gf::set_history_schema_version(m_group, target_hist_schema_version); // Throws
+            gf::set_history_schema_version(*wt, target_hist_schema_version); // Throws
             dirty = true;
         }
 
         if (dirty)
-            commit(); // Throws
+            wt->commit(); // Throws
     }
-}
-
-
-DB::VersionID DB::get_version_of_current_transaction()
-{
-    return VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
 }
 
 
@@ -1802,209 +1781,6 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
         return;
     }
 }
-
-
-const Group& DB::begin_read(VersionID version_id)
-{
-    if (m_transact_stage != transact_Ready)
-        throw LogicError(LogicError::wrong_transact_state);
-
-    bool writable = false;
-    do_begin_read(version_id, writable); // Throws
-
-    set_transact_stage(transact_Reading);
-    return m_group;
-}
-
-#ifdef _MSC_VER
-#pragma warning (disable: 4297) // throw in noexcept
-#endif
-void DB::end_read() noexcept
-{
-    if (m_transact_stage == transact_Ready)
-        return; // Idempotency
-
-    if (m_transact_stage != transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
-
-    do_end_read();
-
-    set_transact_stage(transact_Ready);
-}
-#ifdef _MSC_VER
-#pragma warning (default: 4297)
-#endif
-
-
-Group& DB::begin_write()
-{
-    if (m_transact_stage != transact_Ready)
-        throw LogicError(LogicError::wrong_transact_state);
-
-    do_begin_write(); // Throws
-    try {
-        // We can be sure that do_begin_read() will bind to the latest snapshot,
-        // since no other write transaction can be initated while we hold the
-        // write mutex.
-        VersionID version_id = VersionID(); // Latest available snapshot
-        bool writable = true;
-        do_begin_read(version_id, writable); // Throws
-
-        if (Replication* repl = m_group.get_replication()) {
-            version_type current_version = m_read_lock.m_version;
-            bool history_updated = false;
-            repl->initiate_transact(current_version, history_updated); // Throws
-        }
-    }
-    catch (...) {
-        do_end_write();
-        throw;
-    }
-
-    set_transact_stage(transact_Writing);
-    return m_group;
-}
-
-bool DB::try_begin_write(Group*& group)
-{
-    if (m_transact_stage != transact_Ready)
-        throw LogicError(LogicError::wrong_transact_state);
-
-    bool success = do_try_begin_write(); // Throws
-    if (!success) return false;
-    try {
-        // We can be sure that do_begin_read() will bind to the latest snapshot,
-        // since no other write transaction can be initated while we hold the
-        // write mutex.
-        VersionID version_id = VersionID(); // Latest available snapshot
-        bool writable = true;
-        do_begin_read(version_id, writable); // Throws
-
-        if (Replication* repl = m_group.get_replication()) {
-            version_type current_version = m_read_lock.m_version;
-            bool history_updated = false;
-            repl->initiate_transact(current_version, history_updated); // Throws
-        }
-    }
-    catch (...) {
-        do_end_write();
-        throw;
-    }
-
-    set_transact_stage(transact_Writing);
-    group = &m_group;
-    return true;
-}
-
-
-DB::version_type DB::commit()
-{
-    if (m_transact_stage != transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
-
-    REALM_ASSERT(m_group.is_attached());
-
-    version_type new_version = do_commit(); // Throws
-
-    // We need to set m_read_lock in order for wait_for_change to work.
-    // To set it, we grab a readlock on the latest available snapshot
-    // and release it again.
-    VersionID version_id = VersionID(); // Latest available snapshot
-    ReadLockInfo lock_after_commit;
-    grab_read_lock(lock_after_commit, version_id);
-    release_read_lock(lock_after_commit);
-
-    do_end_write();
-
-    // Free memory that was allocated during the write transaction.
-    using gf = _impl::GroupFriend;
-    gf::reset_free_space_tracking(m_group); // Throws
-
-    do_end_read();
-    m_read_lock = lock_after_commit;
-    set_transact_stage(transact_Ready);
-    return new_version;
-}
-
-#ifdef _MSC_VER
-#pragma warning (disable: 4297) // throw in noexcept
-#endif
-void DB::rollback() noexcept
-{
-    if (m_transact_stage == transact_Ready)
-        return; // Idempotency
-
-    // FIXME: Find common/better method for error handling (throw from noexcept, and 
-    // pin_version() asserts instead).
-    if (m_transact_stage != transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
-
-    do_end_write();
-    do_end_read();
-
-    if (Replication* repl = m_group.get_replication())
-        repl->abort_transact();
-
-    set_transact_stage(transact_Ready);
-}
-#ifdef _MSC_VER
-#pragma warning (default: 4297)
-#endif
-
-DB::VersionID DB::pin_version()
-{
-    REALM_ASSERT(m_transact_stage != transact_Ready);
-
-    // Get current version
-    VersionID version_id(m_read_lock.m_version, m_read_lock.m_reader_idx);
-
-    ReadLockInfo read_lock;
-    grab_read_lock(read_lock, version_id); // Throws
-
-    return version_id;
-}
-
-void DB::unpin_version(VersionID token)
-{
-    ReadLockInfo read_lock;
-    read_lock.m_reader_idx = token.index;
-
-    release_read_lock(read_lock);
-}
-
-#if REALM_METRICS
-std::shared_ptr<Metrics> DB::get_metrics()
-{
-    return m_metrics;
-}
-#endif // REALM_METRICS
-
-void DB::do_begin_read(VersionID version_id, bool writable)
-{
-    // FIXME: BadVersion must be thrown in every case where the specified
-    // version is not tethered in accordance with the documentation of
-    // begin_read().
-
-    grab_read_lock(m_read_lock, version_id); // Throws
-
-    ReadLockUnlockGuard g(*this, m_read_lock);
-
-    using gf = _impl::GroupFriend;
-    gf::attach_shared(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size, writable,
-                      m_read_lock.m_version); // Throws
-
-    g.release();
-}
-
-
-void DB::do_end_read() noexcept
-{
-    REALM_ASSERT(m_read_lock.m_version != std::numeric_limits<version_type>::max());
-    release_read_lock(m_read_lock);
-    using gf = _impl::GroupFriend;
-    gf::detach(m_group);
-}
-
 
 bool DB::do_try_begin_write()
 {
@@ -2119,22 +1895,20 @@ void DB::do_end_write() noexcept
 }
 
 
-Replication::version_type DB::do_commit()
+Replication::version_type DB::do_commit(Group& group)
 {
-    REALM_ASSERT(m_transact_stage == transact_Writing);
-
     SharedInfo* r_info = m_reader_map.get_addr();
 
     version_type current_version = r_info->get_current_version_unchecked();
     version_type new_version = current_version + 1;
-    if (Replication* repl = m_group.get_replication()) {
+    if (Replication* repl = m_alloc.get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
         // fails. The application then has the option of terminating the
         // transaction with a call to SharedGroup::rollback(), which in turn
         // must call Replication::abort_transact().
-        new_version = repl->prepare_commit(m_group, current_version); // Throws
+        new_version = repl->prepare_commit(group, current_version); // Throws
         try {
-            low_level_commit(new_version); // Throws
+            low_level_commit(new_version, group); // Throws
         }
         catch (...) {
             repl->abort_transact();
@@ -2143,39 +1917,37 @@ Replication::version_type DB::do_commit()
         repl->finalize_commit();
     }
     else {
-        low_level_commit(new_version); // Throws
+        low_level_commit(new_version, group); // Throws
     }
     return new_version;
 }
 
 
-DB::version_type DB::commit_and_continue_as_read()
+DB::version_type Transaction::commit_and_continue_as_read()
 {
-    if (m_transact_stage != transact_Writing)
+    if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
-    version_type version = do_commit(); // Throws
+    DB::version_type version = db->do_commit(*this); // Throws
 
     // advance read lock but dont update accessors:
     // As this is done under lock, along with the addition above of the newest commit,
     // we know for certain that the read lock we will grab WILL refer to our own newly
     // completed commit.
-    release_read_lock(m_read_lock);
+    db->release_read_lock(m_read_lock);
 
     VersionID version_id = VersionID();      // Latest available snapshot
-    grab_read_lock(m_read_lock, version_id); // Throws
+    db->grab_read_lock(m_read_lock, version_id); // Throws
 
-    do_end_write();
+    db->do_end_write();
 
     // Free memory that was allocated during the write transaction.
-    using gf = _impl::GroupFriend;
-    gf::reset_free_space_tracking(m_group); // Throws
+    reset_free_space_tracking(); // Throws
 
     // Remap file if it has grown, and update refs in underlying node structure
-    gf::remap_and_update_refs(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size, m_read_lock.m_version,
-                              false); // Throws
+    remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, m_read_lock.m_version, false); // Throws
 
-    set_transact_stage(transact_Reading);
+    set_transact_stage(DB::transact_Reading);
 
     return version;
 }
@@ -2233,7 +2005,7 @@ DB::version_type DB::get_version_of_latest_snapshot()
 }
 
 
-void DB::low_level_commit(uint_fast64_t new_version)
+void DB::low_level_commit(uint_fast64_t new_version, Group& group)
 {
     SharedInfo* info = m_file_map.get_addr();
 
@@ -2259,18 +2031,17 @@ void DB::low_level_commit(uint_fast64_t new_version)
             hist->set_oldest_bound_version(oldest_version); // Throws
 
         // Cleanup any stale mappings
-        m_group.m_alloc.purge_old_mappings(oldest_version);
+        m_alloc.purge_old_mappings(oldest_version);
     }
 
     // Do the actual commit
-    REALM_ASSERT(m_group.m_top.is_attached());
     REALM_ASSERT(oldest_version <= new_version);
 
 #if REALM_METRICS
-    m_group.update_num_objects();
+    group.update_num_objects();
 #endif // REALM_METRICS
     // info->readers.dump();
-    GroupWriter out(m_group); // Throws
+    GroupWriter out(group); // Throws
     out.set_versions(new_version, oldest_version);
     // Recursively write all changed arrays to end of file
     ref_type new_top_ref = out.write_group(); // Throws
@@ -2338,10 +2109,13 @@ void DB::reserve(size_t size)
     // util::File::prealloc_if_supported() (posix_fallocate() on
     // Linux) runs concurrently with modfications via a memory map of
     // the file. This assumption must be verified though.
-    m_group.m_alloc.reserve_disk_space(size); // Throws
+    m_alloc.reserve_disk_space(size); // Throws
 }
 #endif
 
+
+#if 0
+// old handover interface - to be removed
 std::unique_ptr<DB::Handover<LinkList>> DB::export_linkview_for_handover(const LinkListPtr& accessor)
 {
     if (m_transact_stage != transact_Reading) {
@@ -2386,6 +2160,7 @@ TableRef DB::import_table_from_handover(std::unique_ptr<Handover<Table>> handove
     TableRef result = Table::create_from_and_consume_patch(handover->patch, m_group);
     return result;
 }
+#endif
 
 bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback)
 {
@@ -2408,4 +2183,150 @@ std::vector<std::pair<std::string, bool>> DB::get_core_files(const std::string& 
     files.emplace_back(std::make_pair(realm_path, false));
     files.emplace_back(std::make_pair(realm_path + ".management", true));
     return files;
+}
+
+// FIXME: Extend to provide recycling of transaction objects?
+void TransactionDeleter(Transaction* t)
+{
+    t->close();
+    delete t;
+}
+
+TransactionRef DB::start_read(VersionID version_id)
+{
+    ReadLockInfo read_lock;
+    grab_read_lock(read_lock, version_id);
+    ReadLockUnlockGuard g(*this, read_lock);
+    Transaction* tr = new Transaction(this, &m_alloc, read_lock, DB::transact_Reading);
+    tr->set_file_format_version(get_file_format_version());
+    g.release();
+    return TransactionRef(tr, TransactionDeleter);
+}
+
+TransactionRef DB::start_frozen(VersionID version_id)
+{
+    ReadLockInfo read_lock;
+    grab_read_lock(read_lock, version_id);
+    ReadLockUnlockGuard g(*this, read_lock);
+    Transaction* tr = new Transaction(this, &m_alloc, read_lock, DB::transact_Frozen);
+    tr->set_file_format_version(get_file_format_version());
+    g.release();
+    return TransactionRef(tr, TransactionDeleter);
+}
+
+Transaction::Transaction(DB* _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage)
+    : Group(alloc)
+    , db(_db)
+    , m_read_lock(rli)
+{
+    bool writable = stage == DB::transact_Writing;
+    m_transact_stage = DB::transact_Ready;
+    set_metrics(db->m_metrics);
+    set_transact_stage(stage);
+    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable, m_read_lock.m_version);
+}
+
+void Transaction::close()
+{
+    if (m_transact_stage == DB::transact_Writing) {
+        rollback();
+    }
+    if (m_transact_stage == DB::transact_Reading || m_transact_stage == DB::transact_Frozen) {
+        end_read();
+    }
+}
+
+void Transaction::end_read()
+{
+    detach();
+    db->release_read_lock(m_read_lock);
+    set_transact_stage(DB::transact_Ready);
+}
+
+TransactionRef Transaction::freeze()
+{
+    if (m_transact_stage != DB::transact_Reading)
+        throw LogicError(LogicError::wrong_transact_state);
+    auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
+    return db->start_frozen(version);
+}
+
+void Transaction::rollback()
+{
+    if (m_transact_stage == DB::transact_Ready)
+        return; // Idempotency
+
+    if (m_transact_stage != DB::transact_Writing)
+        throw LogicError(LogicError::wrong_transact_state);
+
+    db->do_end_write();
+
+    if (Replication* repl = get_replication())
+        repl->abort_transact();
+
+    end_read();
+}
+
+DB::version_type Transaction::commit()
+{
+    if (m_transact_stage != DB::transact_Writing)
+        throw LogicError(LogicError::wrong_transact_state);
+
+    REALM_ASSERT(is_attached());
+
+    DB::version_type new_version = db->do_commit(*this); // Throws
+
+    // We need to set m_read_lock in order for wait_for_change to work.
+    // To set it, we grab a readlock on the latest available snapshot
+    // and release it again.
+    VersionID version_id = VersionID(); // Latest available snapshot
+    DB::ReadLockInfo lock_after_commit;
+    db->grab_read_lock(lock_after_commit, version_id);
+    db->release_read_lock(lock_after_commit);
+
+    db->do_end_write();
+
+    // Free memory that was allocated during the write transaction.
+    reset_free_space_tracking(); // Throws
+
+    end_read();
+    m_read_lock = lock_after_commit;
+
+    return new_version;
+}
+
+Transaction::~Transaction()
+{
+}
+
+
+DB::VersionID Transaction::get_version_of_current_transaction()
+{
+    return VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
+}
+
+
+TransactionRef DB::start_write()
+{
+    do_begin_write();
+    ReadLockInfo read_lock;
+    Transaction* tr;
+    try {
+        grab_read_lock(read_lock, VersionID());
+        ReadLockUnlockGuard g(*this, read_lock);
+        tr = new Transaction(this, &m_alloc, read_lock, DB::transact_Writing);
+        tr->set_file_format_version(get_file_format_version());
+        if (Replication* repl = m_alloc.get_replication()) {
+            version_type current_version = m_read_lock.m_version;
+            bool history_updated = false;
+            repl->initiate_transact(current_version, history_updated); // Throws
+        }
+        g.release();
+    }
+    catch (...) {
+        do_end_write();
+        throw;
+    }
+
+    return TransactionRef(tr, TransactionDeleter);
 }

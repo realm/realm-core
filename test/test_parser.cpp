@@ -52,11 +52,11 @@
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+#include <realm.hpp>
 #include <realm/history.hpp>
-#include <realm/lang_bind_helper.hpp>
+#include <realm/group_shared.hpp>
 #include <realm/parser/parser.hpp>
 #include <realm/parser/query_builder.hpp>
-#include <realm/query_expression.hpp>
 #include <realm/replication.hpp>
 #include <realm/util/any.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>

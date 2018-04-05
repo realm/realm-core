@@ -516,7 +516,11 @@ public:
 #endif
 
 private:
-    SlabAlloc m_alloc;
+    // nullptr, if we're sharing an allocator provided during initialization
+    std::unique_ptr<SlabAlloc> m_local_alloc;
+    // in-use allocator. If local, then equal to m_local_alloc.
+    SlabAlloc& m_alloc;
+
 
     int m_file_format_version;
     /// `m_top` is the root node (or top array) of the Realm, and has the
@@ -605,13 +609,15 @@ private:
     };
     Group(shared_tag) noexcept;
 
+    Group(SlabAlloc* alloc) noexcept;
     void init_array_parents() noexcept;
 
     void open(ref_type top_ref, const std::string& file_path);
 
     // If the underlying memory mappings have been extended, this method is used
-    // to update all the tables' allocator wrappers.
-    void update_allocator_wrappers(bool writeable);
+    // to update all the tables' allocator wrappers. The allocator wrappers are
+    // configure to either allow or deny changes.
+    void update_allocator_wrappers(bool writable);
 
     /// If `top_ref` is not zero, attach this group accessor to the specified
     /// underlying node structure. If `top_ref` is zero and \a
@@ -768,9 +774,6 @@ private:
     /// The specified history type must be a value of Replication::HistoryType.
     static int get_target_file_format_version_for_session(int current_file_format_version, int history_type) noexcept;
 
-    /// Must be called from within a write transaction
-    void upgrade_file_format(int target_file_format_version, DB& sg);
-
     std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override;
 
     void send_cascade_notification(const CascadeNotification& notification) const;
@@ -800,60 +803,11 @@ private:
     friend class TrivialReplication;
     friend class metrics::QueryInfo;
     friend class metrics::Metrics;
+    friend class Transaction;
 };
 
 
 // Implementation
-
-inline Group::Group(const std::string& file, const char* key, OpenMode mode)
-    : m_alloc() // Throws
-    , m_top(m_alloc)
-    , m_tables(m_alloc)
-    , m_table_names(m_alloc)
-    , m_is_shared(false)
-    , m_total_rows(0)
-{
-    init_array_parents();
-
-    open(file, key, mode); // Throws
-}
-
-
-inline Group::Group(BinaryData buffer, bool take_ownership)
-    : m_alloc() // Throws
-    , m_top(m_alloc)
-    , m_tables(m_alloc)
-    , m_table_names(m_alloc)
-    , m_is_shared(false)
-    , m_total_rows(0)
-{
-    init_array_parents();
-    open(buffer, take_ownership); // Throws
-}
-
-inline Group::Group(unattached_tag) noexcept
-    : m_alloc()
-    , // Throws
-    m_top(m_alloc)
-    , m_tables(m_alloc)
-    , m_table_names(m_alloc)
-    , m_is_shared(false)
-    , m_total_rows(0)
-{
-    init_array_parents();
-}
-
-inline Group::Group(shared_tag) noexcept
-    : m_alloc()
-    , // Throws
-    m_top(m_alloc)
-    , m_tables(m_alloc)
-    , m_table_names(m_alloc)
-    , m_is_shared(true)
-    , m_total_rows(0)
-{
-    init_array_parents();
-}
 
 inline bool Group::is_attached() const noexcept
 {
@@ -1345,11 +1299,6 @@ public:
     static int get_target_file_format_version_for_session(int current_file_format_version, int history_type) noexcept
     {
         return Group::get_target_file_format_version_for_session(current_file_format_version, history_type);
-    }
-
-    static void upgrade_file_format(Group& group, int target_file_format_version, DB& sg)
-    {
-        group.upgrade_file_format(target_file_format_version, sg); // Throws
     }
 };
 

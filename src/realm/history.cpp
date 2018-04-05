@@ -220,12 +220,10 @@ public:
     {
     }
 
-    void initialize(DB& sg) override
+    void initialize(DB& db) override
     {
-        TrivialReplication::initialize(sg); // Throws
-        using sgf = _impl::SharedGroupFriend;
-        using gf = _impl::GroupFriend;
-        Allocator& alloc = gf::get_alloc(sgf::get_group(sg));
+        TrivialReplication::initialize(db); // Throws
+        Allocator& alloc = db.get_alloc();
         m_history.initialize(&alloc); // Throws
     }
 

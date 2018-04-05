@@ -25,7 +25,7 @@
 #include <vector>
 
 #include <realm.hpp>
-#include <realm/lang_bind_helper.hpp>
+#include <realm/group_shared.hpp>
 #include <realm/column.hpp>
 #include <realm/array_bool.hpp>
 #include <realm/history.hpp>

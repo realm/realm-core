@@ -20,6 +20,7 @@
 #define REALM_GROUP_SHARED_HPP
 
 #include <functional>
+#include <cstdint>
 #include <limits>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
@@ -36,9 +37,11 @@
 namespace realm {
 
 namespace _impl {
-class SharedGroupFriend;
 class WriteLogCollector;
 }
+
+class Transaction;
+using TransactionRef = std::shared_ptr<Transaction>;
 
 /// Thrown by SharedGroup::open() if the lock file is already open in another
 /// process which can't share mutexes with this process
@@ -65,85 +68,25 @@ struct IncompatibleHistories : util::File::AccessError {
     }
 };
 
-/// A SharedGroup facilitates transactions.
+/// A DB facilitates transactions.
 ///
-/// When multiple threads or processes need to access a database
-/// concurrently, they must do so using transactions. By design,
-/// Realm does not allow for multiple threads (or processes) to
-/// share a single instance of SharedGroup. Instead, each concurrently
-/// executing thread or process must use a separate instance of
-/// SharedGroup.
+/// Access to a database is done through transactions. Transactions
+/// are managed by a DB object. No matter how many transactions you
+/// use, you only need a single DB object per file. Methods on the DB
+/// object is thread-safe.
 ///
-/// Each instance of SharedGroup manages a single transaction at a
-/// time. That transaction can be either a read transaction, or a
-/// write transaction.
+/// Realm has 3 types of Transactions:
+/// * A frozen transaction allows read only access
+/// * A read transaction allows read only access but can be promoted
+///   to a write transaction.
+/// * A write transaction allows write access. A write transaction can
+///   be demoted to a read transaction.
 ///
-/// Utility classes ReadTransaction and WriteTransaction are provided
-/// to make it safe and easy to work with transactions in a scoped
-/// manner (by means of the RAII idiom). However, transactions can
-/// also be explicitly started (begin_read(), begin_write()) and
-/// stopped (end_read(), commit(), rollback()).
-///
-/// If a transaction is active when the SharedGroup is destroyed, that
-/// transaction is implicitly terminated, either by a call to
-/// end_read() or rollback().
+/// Frozen transactions are thread safe. Read and write transactions are not.
 ///
 /// Two processes that want to share a database file must reside on
 /// the same host.
 ///
-///
-/// Desired exception behavior (not yet fully implemented)
-/// ------------------------------------------------------
-///
-///  - If any data access API function throws an unexpected exception during a
-///    read transaction, the shared group accessor is left in state "error
-///    during read".
-///
-///  - If any data access API function throws an unexpected exception during a
-///    write transaction, the shared group accessor is left in state "error
-///    during write".
-///
-///  - If SharedGroup::begin_write() or SharedGroup::begin_read() throws an
-///    unexpected exception, the shared group accessor is left in state "no
-///    transaction in progress".
-///
-///  - SharedGroup::end_read() and SharedGroup::rollback() do not throw.
-///
-///  - If SharedGroup::commit() throws an unexpected exception, the shared group
-///    accessor is left in state "error during write" and the transaction was
-///    not committed.
-///
-///  - If SharedGroup::advance_read() or SharedGroup::promote_to_write() throws
-///    an unexpected exception, the shared group accessor is left in state
-///    "error during read".
-///
-///  - If SharedGroup::commit_and_continue_as_read() or
-///    SharedGroup::rollback_and_continue_as_read() throws an unexpected
-///    exception, the shared group accessor is left in state "error during
-///    write".
-///
-/// It has not yet been decided exactly what an "unexpected exception" is, but
-/// `std::bad_alloc` is surely one example. On the other hand, an expected
-/// exception is one that is mentioned in the function specific documentation,
-/// and is used to abort an operation due to a special, but expected condition.
-///
-/// States
-/// ------
-///
-///  - A newly created shared group accessor is in state "no transaction in
-///    progress".
-///
-///  - In state "error during read", almost all Realm API functions are
-///    illegal on the connected group of accessors. The only valid operations
-///    are destruction of the shared group, and SharedGroup::end_read(). If
-///    SharedGroup::end_read() is called, the new state becomes "no transaction
-///    in progress".
-///
-///  - In state "error during write", almost all Realm API functions are
-///    illegal on the connected group of accessors. The only valid operations
-///    are destruction of the shared group, and SharedGroup::rollback(). If
-///    SharedGroup::end_write() is called, the new state becomes "no transaction
-///    in progress"
 class DB {
 public:
     /// \brief Same as calling the corresponding version of open() on a instance
@@ -177,14 +120,14 @@ public:
     DB(const DB&) = delete;
     DB& operator=(const DB&) = delete;
 
-    /// Attach this SharedGroup instance to the specified database file.
+    /// Attach this DB instance to the specified database file.
     ///
-    /// While at least one instance of SharedGroup exists for a specific
+    /// While at least one instance of DB exists for a specific
     /// database file, a "lock" file will be present too. The lock file will be
     /// placed in the same directory as the database file, and its name will be
     /// derived by appending ".lock" to the name of the database file.
     ///
-    /// When multiple SharedGroup instances refer to the same file, they must
+    /// When multiple DB instances refer to the same file, they must
     /// specify the same durability level, otherwise an exception will be
     /// thrown.
     ///
@@ -197,7 +140,7 @@ public:
     /// \param options See SharedGroupOptions for details of each option.
     /// Sensible defaults are provided if this parameter is left out.
     ///
-    /// Calling open() on a SharedGroup instance that is already in the attached
+    /// Calling open() on a DB instance that is already in the attached
     /// state has undefined behavior.
     ///
     /// \throw util::File::AccessError If the file could not be opened. If the
@@ -211,17 +154,22 @@ public:
               const SharedGroupOptions options = SharedGroupOptions());
 
     /// Open this group in replication mode. The specified Replication instance
-    /// must remain in existence for as long as the SharedGroup.
+    /// must remain in existence for as long as the DB.
     void open(Replication&, const SharedGroupOptions options = SharedGroupOptions());
 
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
 
-    /// A SharedGroup may be created in the unattached state, and then
+    /// A DB may be created in the unattached state, and then
     /// later attached to a file with a call to open(). Calling any
-    /// function other than open(), is_attached(), and ~SharedGroup()
+    /// function other than open(), is_attached(), and ~DB()
     /// on an unattached instance results in undefined behavior.
     bool is_attached() const noexcept;
+
+    Allocator& get_alloc()
+    {
+        return m_alloc;
+    }
 
 #ifdef REALM_DEBUG
     /// Deprecated method, only called from a unit test
@@ -249,15 +197,13 @@ public:
     ///
     /// NOTE:
     /// "changed" means that one or more commits has been made to the database
-    /// since the SharedGroup (on which wait_for_change() is called) last
-    /// started, committed, promoted or advanced a transaction. If the
-    /// SharedGroup has not yet begun a transaction, "changed" is undefined.
+    /// since the presented transaction was made.
     ///
     /// No distinction is made between changes done by another process
     /// and changes done by another thread in the same process as the caller.
     ///
     /// Has db been changed ?
-    bool has_changed();
+    bool has_changed(TransactionRef);
 
     /// The calling thread goes to sleep until the database is changed, or
     /// until wait_for_change_release() is called. After a call to
@@ -265,9 +211,9 @@ public:
     /// immediately. To restore the ability to wait for a change, a call to
     /// enable_wait_for_change() is required. Return true if the database has
     /// changed, false if it might have.
-    bool wait_for_change();
+    bool wait_for_change(TransactionRef);
 
-    /// release any thread waiting in wait_for_change() on *this* SharedGroup.
+    /// release any thread waiting in wait_for_change().
     void wait_for_change_release();
 
     /// re-enable waiting for change
@@ -277,93 +223,17 @@ public:
     using version_type = _impl::History::version_type;
     using VersionID = realm::VersionID;
 
-    /// Thrown by begin_read() if the specified version does not correspond to a
+    /// Thrown by start_read() if the specified version does not correspond to a
     /// bound (or tethered) snapshot.
     struct BadVersion;
 
-    /// \defgroup group_shared_transactions
-    //@{
 
-    /// begin_read() initiates a new read transaction. A read transaction is
-    /// bound to, and provides access to a particular snapshot of the underlying
-    /// Realm (in general the latest snapshot, but see \a version). It cannot be
-    /// used to modify the Realm, and in that sense, a read transaction is not a
-    /// real transaction.
-    ///
-    /// begin_write() initiates a new write transaction. A write transaction
-    /// allows the application to both read and modify the underlying Realm
-    /// file. At most one write transaction can be in progress at any given time
-    /// for a particular underlying Realm file. If another write transaction is
-    /// already in progress, begin_write() will block the caller until the other
-    /// write transaction terminates. No guarantees are made about the order in
-    /// which multiple concurrent requests will be served.
-    ///
-    /// It is an error to call begin_read() or begin_write() on a SharedGroup
-    /// object with an active read or write transaction.
-    ///
-    /// If begin_read() or begin_write() throws, no transaction is initiated,
-    /// and the application may try to initiate a new read or write transaction
-    /// later.
-    ///
-    /// end_read() terminates the active read transaction. If no read
-    /// transaction is active, end_read() does nothing. It is an error to call
-    /// this function on a SharedGroup object with an active write
-    /// transaction. end_read() does not throw.
-    ///
-    /// commit() commits all changes performed in the context of the active
-    /// write transaction, and thereby terminates that transaction. This
-    /// produces a new snapshot in the underlying Realm. commit() returns the
-    /// version associated with the new snapshot. It is an error to call
-    /// commit() when there is no active write transaction. If commit() throws,
-    /// no changes will have been committed, and the transaction will still be
-    /// active, but in a bad state. In that case, the application must either
-    /// call rollback() to terminate the bad transaction (in which case a new
-    /// transaction can be initiated), call close() which also terminates the
-    /// bad transaction, or destroy the SharedGroup object entirely. When the
-    /// transaction is in a bad state, the application is not allowed to call
-    /// any method on the Group accessor or on any of its subordinate accessors
-    /// (Table, Row, Descriptor). Note that the transaction is also left in a
-    /// bad state when a modifying operation on any subordinate accessor throws.
-    ///
-    /// rollback() terminates the active write transaction and discards any
-    /// changes performed in the context of it. If no write transaction is
-    /// active, rollback() does nothing. It is an error to call this function in
-    /// a SharedGroup object with an active read transaction. rollback() does
-    /// not throw.
-    ///
-    /// the Group accessor and all subordinate accessors (Table, Row,
-    /// Descriptor) that are obtained in the context of a particular read or
-    /// write transaction will become detached upon termination of that
-    /// transaction, which means that they can no longer be used to access the
-    /// underlying objects.
-    ///
-    /// Subordinate accessors that were detached at the end of the previous
-    /// read or write transaction will not be automatically reattached when a
-    /// new transaction is initiated. The application must reobtain new
-    /// accessors during a new transaction to regain access to the underlying
-    /// objects.
-    ///
-    /// \param version If specified, this must be the version associated with a
-    /// *bound* snapshot. A snapshot is said to be bound (or tethered) if there
-    /// is at least one active read or write transaction bound to it. A read
-    /// transaction is bound to the snapshot that it provides access to. A write
-    /// transaction is bound to the latest snapshot available at the time of
-    /// initiation of the write transaction. If the specified version is not
-    /// associated with a bound snapshot, this function throws BadVersion.
-    ///
-    /// \throw BadVersion Thrown by begin_read() if the specified version does
-    /// not correspond to a bound (or tethered) snapshot.
+    /// Transactions are obtained from one of the following 3 methods:
+    TransactionRef start_read(VersionID = VersionID());
+    TransactionRef start_frozen(VersionID = VersionID());
+    TransactionRef start_write();
 
-    const Group& begin_read(VersionID version = VersionID());
-    void end_read() noexcept;
-    Group& begin_write();
-    // Return true (and take the write lock) if there is no other write
-    // in progress. In case of contention return false immediately.
-    // If the write lock is obtained, also provide the Group associated
-    // with the SharedGroup for further operations.
-    bool try_begin_write(Group*& group);
-    version_type commit();
-    void rollback() noexcept;
+
     // report statistics of last commit done on THIS shared group.
     // The free space reported is what can be expected to be freed
     // by compact(). This may not correspond to the space which is free
@@ -377,14 +247,8 @@ public:
         transact_Ready,
         transact_Reading,
         transact_Writing,
+        transact_Frozen,
     };
-
-    /// Get the current transaction type
-    TransactStage get_transact_stage() const noexcept;
-
-    /// Get a version id which may be used to request a different SharedGroup
-    /// to start transaction at a specific version.
-    VersionID get_version_of_current_transaction();
 
     /// Report the number of distinct versions currently stored in the database.
     /// Note: the database only cleans up versions as part of commit, so ending
@@ -504,26 +368,6 @@ public:
     std::unique_ptr<Handover<Table>> export_table_for_handover(const TableRef& accessor);
     TableRef import_table_from_handover(std::unique_ptr<Handover<Table>> handover);
 
-    /// When doing handover to background tasks that may be run later, we
-    /// may want to momentarily pin the current version until the other thread
-    /// has retrieved it.
-    ///
-    /// Pinning can be done in both read- and write-transactions, but with different
-    /// semantics. When pinning during a read-transaction, the version pinned is the
-    /// one accessible during the read-transaction. When pinning during a write-transaction,
-    /// the version pinned will be the last version that was succesfully committed to the
-    /// realm file at the point in time, when the write-transaction was started.
-    ///
-    /// The release is not thread-safe, so it has to be done on the SharedGroup
-    /// associated with the thread calling unpin_version(), and the SharedGroup
-    /// must be attached to the realm file at the point of unpinning.
-
-    // Pin version for handover (not thread safe)
-    VersionID pin_version();
-
-    // Release pinned version (not thread safe)
-    void unpin_version(VersionID version);
-
 #if REALM_METRICS
     std::shared_ptr<metrics::Metrics> get_metrics();
 #endif // REALM_METRICS
@@ -545,7 +389,10 @@ public:
     // It is safe to delete those returned files/directories in the call_with_lock's callback.
     static std::vector<std::pair<std::string, bool>> get_core_files(const std::string& realm_path);
 
+
 private:
+    std::mutex m_mutex;
+    SlabAlloc m_alloc;
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
@@ -559,7 +406,6 @@ private:
     // Member variables
     size_t m_free_space = 0;
     size_t m_used_space = 0;
-    Group m_group;
     ReadLockInfo m_read_lock;
     uint_fast32_t m_local_max_entry;
     util::File m_file;
@@ -571,7 +417,8 @@ private:
     std::string m_db_path;
     std::string m_coordination_dir;
     const char* m_key;
-    TransactStage m_transact_stage;
+    //    TransactStage m_transact_stage;
+    int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
 #ifdef REALM_ASYNC_DAEMON
     util::InterprocessMutex m_balancemutex;
@@ -628,9 +475,8 @@ private:
     /// return true if write transaction can commence, false otherwise.
     bool do_try_begin_write();
     void do_begin_write();
-    version_type do_commit();
+    version_type do_commit(Group&);
     void do_end_write() noexcept;
-    void set_transact_stage(TransactStage stage) noexcept;
 
     /// Returns the version of the latest snapshot.
     version_type get_version_of_latest_snapshot();
@@ -646,29 +492,13 @@ private:
 
     // Must be called only by someone that has a lock on the write
     // mutex.
-    void low_level_commit(uint_fast64_t new_version);
+    void low_level_commit(uint_fast64_t new_version, Group& group);
 
     void do_async_commits();
 
     /// Upgrade file format and/or history schema
     void upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version,
                              int current_hist_schema_version, int target_hist_schema_version);
-
-    //@{
-    /// See LangBindHelper.
-    template <class O>
-    void advance_read(O* observer, VersionID);
-    template <class O>
-    void promote_to_write(O* observer);
-    version_type commit_and_continue_as_read();
-    template <class O>
-    void rollback_and_continue_as_read(O* observer);
-    //@}
-
-    /// Returns true if, and only if _impl::History::update_early_from_top_ref()
-    /// was called during the execution of this function.
-    template <class O>
-    bool do_advance_read(O* observer, VersionID, _impl::History&, bool writable);
 
     /// If there is an associated \ref Replication object, then this function
     /// returns `repl->get_history()` where `repl` is that Replication object,
@@ -681,7 +511,7 @@ private:
     void finish_begin_write();
 
     void close_internal(std::unique_lock<InterprocessMutex>) noexcept;
-    friend class _impl::SharedGroupFriend;
+    friend class Transaction;
 };
 
 
@@ -692,106 +522,176 @@ inline void DB::get_stats(size_t& free_space, size_t& used_space)
 }
 
 
+class Transaction : public Group {
+public:
+    Transaction(DB* _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage);
+    // convenience, so you don't need to carry a reference to the DB around
+    ~Transaction();
+    DB* get_db();
+    DB::version_type get_version() const noexcept
+    {
+        return m_read_lock.m_version;
+    }
+    void close();
+    DB::version_type commit();
+    void rollback();
+    void end_read();
+    // Live transactions state changes, often taking an observer functor:
+    DB::version_type commit_and_continue_as_read();
+    template <class O>
+    void rollback_and_continue_as_read(O* observer);
+    void rollback_and_continue_as_read()
+    {
+        _impl::NullInstructionObserver o;
+        rollback_and_continue_as_read(&o);
+    }
+    template <class O>
+    void advance_read(O* observer, VersionID target_version = VersionID());
+    void advance_read(VersionID target_version = VersionID())
+    {
+        _impl::NullInstructionObserver o;
+        advance_read(&o, target_version);
+    }
+    template <class O>
+    void promote_to_write(O* observer);
+    void promote_to_write()
+    {
+        _impl::NullInstructionObserver o;
+        promote_to_write(&o);
+    }
+    TransactionRef freeze();
+    // direct handover of accessor instances
+    ConstObj copy_of(const ConstObj& original);
+
+    /// Get the current transaction type
+    DB::TransactStage get_transact_stage() const noexcept;
+
+    /// Get a version id which may be used to request a different SharedGroup
+    /// to start transaction at a specific version.
+    VersionID get_version_of_current_transaction();
+
+    void upgrade_file_format(int target_file_format_version);
+
+private:
+    template <class O>
+    bool internal_advance_read(O* observer, VersionID target_version, _impl::History&, bool);
+    void set_transact_stage(DB::TransactStage stage) noexcept;
+
+    DB* db = nullptr;
+    DB::ReadLockInfo m_read_lock;
+    DB::TransactStage m_transact_stage = DB::transact_Ready;
+
+    friend class DB;
+};
+
+
+/*
+ * classes providing backward Compatibility with the older
+ * ReadTransaction and WriteTransaction types.
+ */
+
 class ReadTransaction {
 public:
     ReadTransaction(DB& sg)
-        : m_shared_group(sg)
+        : trans(sg.start_read())
     {
-        m_shared_group.begin_read(); // Throws
     }
 
     ~ReadTransaction() noexcept
     {
-        m_shared_group.end_read();
     }
 
     bool has_table(StringData name) const noexcept
     {
-        return get_group().has_table(name);
+        return trans->has_table(name);
     }
 
     ConstTableRef get_table(TableKey key) const
     {
-        return get_group().get_table(key); // Throws
+        return trans->get_table(key); // Throws
     }
 
     ConstTableRef get_table(StringData name) const
     {
-        return get_group().get_table(name); // Throws
+        return trans->get_table(name); // Throws
     }
 
-    const Group& get_group() const noexcept;
+    const Group& get_group() const noexcept
+    {
+        return *trans.get();
+    }
 
     /// Get the version of the snapshot to which this read transaction is bound.
-    DB::version_type get_version() const noexcept;
+    DB::version_type get_version() const noexcept
+    {
+        return trans->get_version();
+    }
 
 private:
-    DB& m_shared_group;
+    TransactionRef trans;
 };
 
 
 class WriteTransaction {
 public:
     WriteTransaction(DB& sg)
-        : m_shared_group(&sg)
+        : trans(sg.start_write())
     {
-        m_shared_group->begin_write(); // Throws
     }
 
     ~WriteTransaction() noexcept
     {
-        if (m_shared_group)
-            m_shared_group->rollback();
     }
 
     bool has_table(StringData name) const noexcept
     {
-        return get_group().has_table(name);
+        return trans->has_table(name);
     }
 
     TableRef get_table(TableKey key) const
     {
-        return get_group().get_table(key); // Throws
+        return trans->get_table(key); // Throws
     }
 
     TableRef get_table(StringData name) const
     {
-        return get_group().get_table(name); // Throws
+        return trans->get_table(name); // Throws
     }
 
     TableRef add_table(StringData name, bool require_unique_name = true) const
     {
-        return get_group().add_table(name, require_unique_name); // Throws
+        return trans->add_table(name, require_unique_name); // Throws
     }
 
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
-        return get_group().get_or_add_table(name, was_added); // Throws
+        return trans->get_or_add_table(name, was_added); // Throws
     }
 
-    Group& get_group() const noexcept;
+    Group& get_group() const noexcept
+    {
+        return *trans.get();
+    }
 
     /// Get the version of the snapshot on which this write transaction is
     /// based.
-    DB::version_type get_version() const noexcept;
+    DB::version_type get_version() const noexcept
+    {
+        return trans->get_version();
+    }
 
     DB::version_type commit()
     {
-        REALM_ASSERT(m_shared_group);
-        DB::version_type new_version = m_shared_group->commit();
-        m_shared_group = nullptr;
-        return new_version;
+        return trans->commit();
     }
 
     void rollback() noexcept
     {
-        REALM_ASSERT(m_shared_group);
-        m_shared_group->rollback();
-        m_shared_group = nullptr;
+        trans->rollback();
     }
 
 private:
-    DB* m_shared_group;
+    TransactionRef trans;
 };
 
 
@@ -801,20 +701,17 @@ struct DB::BadVersion : std::exception {
 };
 
 inline DB::DB(const std::string& file, bool no_create, const SharedGroupOptions options)
-    : m_group(Group::shared_tag())
-    , m_upgrade_callback(std::move(options.upgrade_callback))
+    : m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(file, no_create, options); // Throws
 }
 
 inline DB::DB(unattached_tag) noexcept
-    : m_group(Group::shared_tag())
 {
 }
 
 inline DB::DB(Replication& repl, const SharedGroupOptions options)
-    : m_group(Group::shared_tag())
-    , m_upgrade_callback(std::move(options.upgrade_callback))
+    : m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(repl, options); // Throws
 }
@@ -837,8 +734,7 @@ inline void DB::open(Replication& repl, const SharedGroupOptions options)
 
     repl.initialize(*this); // Throws
 
-    typedef _impl::GroupFriend gf;
-    gf::set_replication(m_group, &repl);
+    m_alloc.set_replication(&repl);
 
     std::string file = repl.get_database_path();
     bool no_create = false;
@@ -851,7 +747,7 @@ inline bool DB::is_attached() const noexcept
     return m_file_map.is_attached();
 }
 
-inline DB::TransactStage DB::get_transact_stage() const noexcept
+inline DB::TransactStage Transaction::get_transact_stage() const noexcept
 {
     return m_transact_stage;
 }
@@ -883,7 +779,15 @@ private:
     ReadLockInfo* m_read_lock;
 };
 
+inline ConstObj Transaction::copy_of(const ConstObj& original)
+{
+    TableKey tk = original.get_table_key();
+    ObjKey rk = original.get_key();
+    return get_table(tk)->get_object(rk);
+}
 
+#if 0
+// Old handover interface - to be removed
 template <typename T>
 struct DB::Handover {
     std::unique_ptr<typename T::HandoverPatch> patch;
@@ -931,72 +835,70 @@ std::unique_ptr<T> DB::import_from_handover(std::unique_ptr<DB::Handover<T>> han
     result->apply_and_consume_patch(handover->patch, m_group);
     return result;
 }
+#endif
 
 template <class O>
-inline void DB::advance_read(O* observer, VersionID version_id)
+inline void Transaction::advance_read(O* observer, VersionID version_id)
 {
-    if (m_transact_stage != transact_Reading)
+    if (m_transact_stage != DB::transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
     // It is an error if the new version precedes the currently bound one.
     if (version_id.version < m_read_lock.m_version)
         throw LogicError(LogicError::bad_version);
 
-    _impl::History* hist = get_history(); // Throws
+    _impl::History* hist = db->get_history(); // Throws
     if (!hist)
         throw LogicError(LogicError::no_history);
 
-    do_advance_read(observer, version_id, *hist, false); // Throws
+    internal_advance_read(observer, version_id, *hist, false); // Throws
 }
 
 template <class O>
-inline void DB::promote_to_write(O* observer)
+inline void Transaction::promote_to_write(O* observer)
 {
-    if (m_transact_stage != transact_Reading)
+    if (m_transact_stage != DB::transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
-    _impl::History* hist = get_history(); // Throws
+    _impl::History* hist = db->get_history(); // Throws
     if (!hist)
         throw LogicError(LogicError::no_history);
 
-    do_begin_write(); // Throws
+    db->do_begin_write(); // Throws
     try {
         VersionID version = VersionID();                                  // Latest
-        bool history_updated = do_advance_read(observer, version, *hist, true); // Throws
+        bool history_updated = internal_advance_read(observer, version, *hist, true); // Throws
 
-        Replication* repl = m_group.get_replication();
+        Replication* repl = get_replication();
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
-        version_type current_version = m_read_lock.m_version;
+        DB::version_type current_version = m_read_lock.m_version;
         repl->initiate_transact(current_version, history_updated); // Throws
 
         // If the group has no top array (top_ref == 0), create a new node
         // structure for an empty group now, to be ready for modifications. See
         // also Group::attach_shared().
-        using gf = _impl::GroupFriend;
-        gf::create_empty_group_when_missing(m_group); // Throws
+        _impl::GroupFriend::create_empty_group_when_missing(*this); // Throws
     }
     catch (...) {
-        do_end_write();
+        db->do_end_write();
         throw;
     }
 
-    set_transact_stage(transact_Writing);
+    set_transact_stage(DB::transact_Writing);
 }
 
 template <class O>
-inline void DB::rollback_and_continue_as_read(O* observer)
+inline void Transaction::rollback_and_continue_as_read(O* observer)
 {
-    if (m_transact_stage != transact_Writing)
+    if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
-    using gf = _impl::GroupFriend;
-    Replication* repl = gf::get_replication(m_group);
+    Replication* repl = get_replication();
     if (!repl)
         throw LogicError(LogicError::no_history);
 
     // Mark all managed space (beyond the attached file) as free.
-    using gf = _impl::GroupFriend;
-    gf::reset_free_space_tracking(m_group); // Throws
+    reset_free_space_tracking(); // Throws
 
     BinaryData uncommitted_changes = repl->get_uncommitted_changes();
 
@@ -1017,40 +919,40 @@ inline void DB::rollback_and_continue_as_read(O* observer)
     ref_type top_ref = m_read_lock.m_top_ref;
     size_t file_size = m_read_lock.m_file_size;
     _impl::ReversedNoCopyInputStream reversed_in(reverser);
-    gf::advance_transact(m_group, top_ref, file_size, reversed_in, m_read_lock.m_version, false); // Throws
+    advance_transact(top_ref, file_size, reversed_in, m_read_lock.m_version, false); // Throws
 
-    do_end_write();
+    db->do_end_write();
 
     repl->abort_transact();
 
-    set_transact_stage(transact_Reading);
+    set_transact_stage(DB::transact_Reading);
 }
 
 template <class O>
-inline bool DB::do_advance_read(O* observer, VersionID version_id, _impl::History& hist, bool writable)
+inline bool Transaction::internal_advance_read(O* observer, VersionID version_id, _impl::History& hist, bool writable)
 {
-    ReadLockInfo new_read_lock;
-    grab_read_lock(new_read_lock, version_id); // Throws
+    DB::ReadLockInfo new_read_lock;
+    db->grab_read_lock(new_read_lock, version_id); // Throws
     REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
     if (new_read_lock.m_version == m_read_lock.m_version) {
-        release_read_lock(new_read_lock);
+        db->release_read_lock(new_read_lock);
         // _impl::History::update_early_from_top_ref() was not called
-        m_group.update_allocator_wrappers(writable);
+        update_allocator_wrappers(writable);
         return false;
     }
 
-    ReadLockUnlockGuard g(*this, new_read_lock);
+    DB::ReadLockUnlockGuard g(*db, new_read_lock);
     {
-        version_type new_version = new_read_lock.m_version;
+        DB::version_type new_version = new_read_lock.m_version;
         size_t new_file_size = new_read_lock.m_file_size;
         ref_type new_top_ref = new_read_lock.m_top_ref;
 
         // Synchronize readers view of the file
-        SlabAlloc& alloc = m_group.m_alloc;
+        SlabAlloc& alloc = m_alloc;
         alloc.update_reader_view(new_file_size, new_version);
 
         using gf = _impl::GroupFriend;
-        gf::remap(m_group, new_file_size); // Throws
+        remap(new_file_size); // Throws
         ref_type hist_ref = gf::get_history_ref(alloc, new_top_ref);
 
         hist.update_from_ref(hist_ref, new_version);
@@ -1060,8 +962,8 @@ inline bool DB::do_advance_read(O* observer, VersionID version_id, _impl::Histor
         // This has to happen in the context of the originally bound snapshot
         // and while the read transaction is still in a fully functional state.
         _impl::TransactLogParser parser;
-        version_type old_version = m_read_lock.m_version;
-        version_type new_version = new_read_lock.m_version;
+        DB::version_type old_version = m_read_lock.m_version;
+        DB::version_type new_version = new_read_lock.m_version;
         _impl::ChangesetInputStream in(hist, old_version, new_version);
         parser.parse(in, *observer); // Throws
         observer->parse_complete();  // Throws
@@ -1078,16 +980,16 @@ inline bool DB::do_advance_read(O* observer, VersionID version_id, _impl::Histor
     // the old read lock beyond this point.
 
     {
-        version_type old_version = m_read_lock.m_version;
-        version_type new_version = new_read_lock.m_version;
+        DB::version_type old_version = m_read_lock.m_version;
+        DB::version_type new_version = new_read_lock.m_version;
         ref_type new_top_ref = new_read_lock.m_top_ref;
         size_t new_file_size = new_read_lock.m_file_size;
         _impl::ChangesetInputStream in(hist, old_version, new_version);
-        m_group.advance_transact(new_top_ref, new_file_size, in, new_version, writable); // Throws
+        advance_transact(new_top_ref, new_file_size, in, new_version, writable); // Throws
     }
 
     g.release();
-    release_read_lock(m_read_lock);
+    db->release_read_lock(m_read_lock);
     m_read_lock = new_read_lock;
 
     return true; // _impl::History::update_early_from_top_ref() was called
@@ -1095,101 +997,14 @@ inline bool DB::do_advance_read(O* observer, VersionID version_id, _impl::Histor
 
 inline _impl::History* DB::get_history()
 {
-    using gf = _impl::GroupFriend;
-    if (Replication* repl = gf::get_replication(m_group))
+    if (Replication* repl = m_alloc.get_replication())
         return repl->get_history();
-    return 0;
+    return nullptr;
 }
 
 inline int DB::get_file_format_version() const noexcept
 {
-    using gf = _impl::GroupFriend;
-    return gf::get_file_format_version(m_group);
-}
-
-
-// The purpose of this class is to give internal access to some, but
-// not all of the non-public parts of the SharedGroup class.
-class _impl::SharedGroupFriend {
-public:
-    static Group& get_group(DB& sg) noexcept
-    {
-        return sg.m_group;
-    }
-
-    template <class O>
-    static void advance_read(DB& sg, O* obs, DB::VersionID ver)
-    {
-        sg.advance_read(obs, ver); // Throws
-    }
-
-    template <class O>
-    static void promote_to_write(DB& sg, O* obs)
-    {
-        sg.promote_to_write(obs); // Throws
-    }
-
-    static DB::version_type commit_and_continue_as_read(DB& sg)
-    {
-        return sg.commit_and_continue_as_read(); // Throws
-    }
-
-    template <class O>
-    static void rollback_and_continue_as_read(DB& sg, O* obs)
-    {
-        sg.rollback_and_continue_as_read(obs); // Throws
-    }
-
-    static void async_daemon_open(DB& sg, const std::string& file)
-    {
-        bool no_create = true;
-        bool is_backend = true;
-        SharedGroupOptions options;
-        options.durability = SharedGroupOptions::Durability::Async;
-        options.encryption_key = nullptr;
-        options.allow_file_format_upgrade = false;
-        sg.do_open(file, no_create, is_backend, options); // Throws
-    }
-
-    static int get_file_format_version(const DB& sg) noexcept
-    {
-        return sg.get_file_format_version();
-    }
-
-    static DB::version_type get_version_of_latest_snapshot(DB& sg)
-    {
-        return sg.get_version_of_latest_snapshot();
-    }
-
-    static DB::version_type get_version_of_bound_snapshot(const DB& sg) noexcept
-    {
-        return sg.get_version_of_bound_snapshot();
-    }
-};
-
-inline const Group& ReadTransaction::get_group() const noexcept
-{
-    using sgf = _impl::SharedGroupFriend;
-    return sgf::get_group(m_shared_group);
-}
-
-inline DB::version_type ReadTransaction::get_version() const noexcept
-{
-    using sgf = _impl::SharedGroupFriend;
-    return sgf::get_version_of_bound_snapshot(m_shared_group);
-}
-
-inline Group& WriteTransaction::get_group() const noexcept
-{
-    REALM_ASSERT(m_shared_group);
-    using sgf = _impl::SharedGroupFriend;
-    return sgf::get_group(*m_shared_group);
-}
-
-inline DB::version_type WriteTransaction::get_version() const noexcept
-{
-    using sgf = _impl::SharedGroupFriend;
-    return sgf::get_version_of_bound_snapshot(*m_shared_group);
+    return m_file_format_version;
 }
 
 } // namespace realm

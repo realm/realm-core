@@ -41,7 +41,7 @@
 #endif
 
 #include <realm/history.hpp>
-#include <realm/lang_bind_helper.hpp>
+#include <realm/group_shared.hpp>
 #include <realm.hpp>
 #include <realm/util/features.h>
 #include <realm/util/safe_int_ops.hpp>
@@ -196,7 +196,8 @@ void test_table_add_columns(TableRef t)
 }
 }
 
-
+#ifdef LEGACY_TESTS
+// FIXME: Enable once tests using compact() is enabled
 void writer(std::string path, int id)
 {
     // std::cerr << "Started writer " << std::endl;
@@ -224,7 +225,7 @@ void writer(std::string path, int id)
         REALM_ASSERT(false);
     }
 }
-
+#endif
 
 #if !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
 void killer(TestContext& test_context, int pid, std::string path, int id)
@@ -427,6 +428,8 @@ ONLY(Shared_DiskSpace)
 
 #endif // Only disables above special unit test
 
+#ifdef LEGACY_TESTS
+// FIXME: Port to new API once compact() is great again
 TEST(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -474,8 +477,8 @@ TEST(Shared_CompactingOnTheFly)
     {
         DB sg2(path, true, SharedGroupOptions(crypt_key()));
         {
-            sg2.begin_write();
-            sg2.commit();
+            WriteTransaction wt(sg2);
+            wt.commit();
         }
         CHECK_EQUAL(true, sg2.compact());
 
@@ -527,6 +530,7 @@ TEST(Shared_EncryptedRemap)
     CHECK_EQUAL(table->size(), rows);
     rt2.get_group().verify();
 }
+#endif
 
 
 TEST(Shared_Initial)
@@ -1578,9 +1582,10 @@ TEST(Shared_Notifications)
     // Create a new shared db
     SHARED_GROUP_TEST_PATH(path);
     DB sg(path, false, SharedGroupOptions(crypt_key()));
+    TransactionRef tr1 = sg.start_read();
 
     // No other instance have changed db since last transaction
-    CHECK(!sg.has_changed());
+    CHECK(!sg.has_changed(tr1));
 
     {
         // Open the same db again (in empty state)
@@ -1588,12 +1593,12 @@ TEST(Shared_Notifications)
 
         // Verify that new group is empty
         {
-            ReadTransaction rt(sg2);
-            CHECK(rt.get_group().is_empty());
+            TransactionRef reader = sg2.start_read();
+            CHECK(reader->is_empty());
+            CHECK(!sg2.has_changed(reader));
         }
 
         // No other instance have changed db since last transaction
-        CHECK(!sg2.has_changed());
 
         // Add a new table
         {
@@ -1607,8 +1612,8 @@ TEST(Shared_Notifications)
     }
 
     // Db has been changed by other instance
-    CHECK(sg.has_changed());
-
+    CHECK(sg.has_changed(tr1));
+    tr1 = sg.start_read();
     // Verify that the new table has been added
     {
         ReadTransaction rt(sg);
@@ -1624,7 +1629,7 @@ TEST(Shared_Notifications)
     }
 
     // No other instance have changed db since last transaction
-    CHECK(!sg.has_changed());
+    CHECK(!sg.has_changed(tr1));
 }
 
 
@@ -2154,6 +2159,9 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
 
 #endif
 
+#ifdef LEGACY_TESTS
+// FIXME: Reenable once wait_for_change has been reimplemented
+
 // This test does not work with valgrind
 // This test will hang infinitely instead of failing!!!
 TEST_IF(Shared_WaitForChange, !running_with_valgrind)
@@ -2170,8 +2178,10 @@ TEST_IF(Shared_WaitForChange, !running_with_valgrind)
             shared_state[i] = 1;
             sgs[i] = sg;
         }
-        sg->begin_read(); // open a transaction at least once to make "changed" well defined
-        sg->end_read();
+        {
+            // open a transaction at least once to make "changed" well defined
+            ReadTransaction rt(*sg);
+        }
         sg->wait_for_change();
         {
             LockGuard l(mutex);
@@ -2182,23 +2192,26 @@ TEST_IF(Shared_WaitForChange, !running_with_valgrind)
             LockGuard l(mutex);
             shared_state[i] = 3;
         }
-        sg->begin_read();
-        sg->end_read();
+        {
+            ReadTransaction rt(*sg);
+        }
         sg->wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
         {
             LockGuard l(mutex);
             shared_state[i] = 4;
         }
         // works within a read transaction as well
-        sg->begin_read();
-        sg->wait_for_change();
-        sg->end_read();
+        {
+            ReadTransaction rt(*sg);
+            sg->wait_for_change();
+        }
         {
             LockGuard l(mutex);
             shared_state[i] = 5;
         }
-        sg->begin_read();
-        sg->end_read();
+        {
+            ReadTransaction rt(*sg);
+        }
         sg->wait_for_change(); // wait until wait_for_change is released
         {
             LockGuard l(mutex);
@@ -2224,8 +2237,10 @@ TEST_IF(Shared_WaitForChange, !running_with_valgrind)
     }
 
     // This write transaction should allow all readers to run again
-    sg.begin_write();
-    sg.commit();
+    {
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
 
     // All readers should pass through state 2 to state 3, so wait
     // for all to reach state 3:
@@ -2239,8 +2254,10 @@ TEST_IF(Shared_WaitForChange, !running_with_valgrind)
         }
     }
 
-    sg.begin_write();
-    sg.commit();
+    {
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
     try_again = true;
     while (try_again) {
         try_again = false;
@@ -2249,8 +2266,10 @@ TEST_IF(Shared_WaitForChange, !running_with_valgrind)
             if (4 != shared_state[j]) try_again = true;
         }
     }
-    sg.begin_write();
-    sg.commit();
+    {
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
     try_again = true;
     while (try_again) {
         try_again = false;
@@ -2279,7 +2298,7 @@ TEST_IF(Shared_WaitForChange, !running_with_valgrind)
         sgs[j] = 0;
     }
 }
-
+#endif
 
 TEST(Shared_MultipleSharersOfStreamingFormat)
 {
@@ -2510,34 +2529,39 @@ TEST(Shared_EncryptionKeyCheck_3)
 TEST(Shared_VersionCount)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DB sg_w(path);
-    DB sg_r(path);
-    CHECK_EQUAL(1, sg_r.get_number_of_versions());
-    sg_r.begin_read();
-    sg_w.begin_write();
-    CHECK_EQUAL(1, sg_r.get_number_of_versions());
-    sg_w.commit();
-    CHECK_EQUAL(2, sg_r.get_number_of_versions());
-    sg_w.begin_write();
-    sg_w.commit();
-    CHECK_EQUAL(3, sg_r.get_number_of_versions());
-    sg_r.end_read();
-    CHECK_EQUAL(3, sg_r.get_number_of_versions());
-    sg_w.begin_write();
-    sg_w.commit();
+    DB sg(path);
+    CHECK_EQUAL(1, sg.get_number_of_versions());
+    TransactionRef reader = sg.start_read();
+    {
+        WriteTransaction wt(sg);
+        CHECK_EQUAL(1, sg.get_number_of_versions());
+        wt.commit();
+    }
+    CHECK_EQUAL(2, sg.get_number_of_versions());
+    {
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    CHECK_EQUAL(3, sg.get_number_of_versions());
+    reader->close();
+    CHECK_EQUAL(3, sg.get_number_of_versions());
+    {
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
     // both the last and the second-last commit is kept, so once
     // you've committed anything, you will never get back to having
     // just a single version.
-    CHECK_EQUAL(2, sg_r.get_number_of_versions());
+    CHECK_EQUAL(2, sg.get_number_of_versions());
 }
 
 TEST(Shared_MultipleRollbacks)
 {
     SHARED_GROUP_TEST_PATH(path);
     DB sg(path, false, SharedGroupOptions(crypt_key()));
-    sg.begin_write();
-    sg.rollback();
-    sg.rollback();
+    TransactionRef wt = sg.start_write();
+    wt->rollback();
+    wt->rollback();
 }
 
 
@@ -2545,9 +2569,9 @@ TEST(Shared_MultipleEndReads)
 {
     SHARED_GROUP_TEST_PATH(path);
     DB sg(path, false, SharedGroupOptions(crypt_key()));
-    sg.begin_read();
-    sg.end_read();
-    sg.end_read();
+    TransactionRef reader = sg.start_read();
+    reader->end_read();
+    reader->end_read();
 }
 
 #ifdef LEGACY_TESTS
@@ -2920,7 +2944,7 @@ TEST_IF(Shared_BeginReadFailure, _impl::SimulatedFailure::is_enabled())
     DB sg(path);
     using sf = _impl::SimulatedFailure;
     sf::OneShotPrimeGuard pg(sf::shared_group__grow_reader_mapping);
-    CHECK_THROW(sg.begin_read(), sf);
+    CHECK_THROW(sg.start_read(), sf);
 }
 
 
@@ -2955,7 +2979,7 @@ TEST(Shared_WriteEmpty)
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Shared_CompactEmpty)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2964,7 +2988,7 @@ TEST(Shared_CompactEmpty)
         CHECK(sg.compact());
     }
 }
-
+#endif
 
 TEST(Shared_VersionOfBoundSnapshot)
 {
@@ -3230,6 +3254,8 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
 }
 
 // Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
+#ifdef LEGACY_TESTS
+// FIXME: Enable once compact() is great again
 NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
 {
     // String length at 2K will not trigger the error.
@@ -3275,21 +3301,25 @@ NONCONCURRENT_TEST(Shared_TopSizeNotEqualNine)
 {
     SHARED_GROUP_TEST_PATH(path);
     DB sg(path, false, SharedGroupOptions(crypt_key()));
-    Group& g = const_cast<Group&>(sg.begin_write());
+    {
+        TransactionRef writer = sg.start_write();
 
-    TableRef t = g.add_table("foo");
-    t->add_column(type_Double, "doubles");
-    std::vector<ObjKey> keys;
-    t->create_objects(241, keys);
-    sg.commit();
+        TableRef t = writer->add_table("foo");
+        t->add_column(type_Double, "doubles");
+        std::vector<ObjKey> keys;
+        t->create_objects(241, keys);
+        writer->commit();
+    }
     REALM_ASSERT_RELEASE(sg.compact());
     DB sg2(path, false, SharedGroupOptions(crypt_key()));
-    sg2.begin_write();
-    sg2.commit();
-    sg2.begin_read(); // <- does not fail
+    {
+        TransactionRef writer = sg2.start_write();
+        writer->commit();
+    }
+    TransactionRef reader2 = sg2.start_read();
     DB sg3(path, false, SharedGroupOptions(crypt_key()));
-    sg3.begin_read(); // <- does not fail
-    sg.begin_read();  // <- does fail
+    TransactionRef reader3 = sg3.start_read();
+    TransactionRef reader = sg.start_read();
 }
 
 // Found by AFL after adding the compact instruction
@@ -3299,13 +3329,13 @@ TEST(Shared_Bptree_insert_failure)
 {
     SHARED_GROUP_TEST_PATH(path);
     DB sg_w(path, false, SharedGroupOptions(crypt_key()));
-    Group& g = const_cast<Group&>(sg_w.begin_write());
+    TransactionRef writer = sg_w.start_write();
 
-    auto tk = g.add_table("")->get_key();
-    g.get_table(tk)->add_column(type_Double, "dgrpn", true);
+    auto tk = writer->add_table("")->get_key();
+    writer->get_table(tk)->add_column(type_Double, "dgrpn", true);
     std::vector<ObjKey> keys;
-    g.get_table(tk)->create_objects(246, keys);
-    sg_w.commit();
+    writer->get_table(tk)->create_objects(246, keys);
+    writer->commit();
     REALM_ASSERT_RELEASE(sg_w.compact());
 #if 0
     {
@@ -3316,9 +3346,12 @@ TEST(Shared_Bptree_insert_failure)
         g2.get_table(tk)->add_empty_row(396);
     }
 #endif
-    sg_w.begin_write();
-    g.get_table(tk)->create_objects(396, keys);
+    {
+        TransactionRef writer2 = sg_w.start_write();
+        writer2->get_table(tk)->create_objects(396, keys);
+    }
 }
+#endif
 
 NONCONCURRENT_TEST(SharedGroupOptions_tmp_dir)
 {
@@ -3691,16 +3724,14 @@ TEST(Shared_ConstObject)
 {
     SHARED_GROUP_TEST_PATH(path);
     DB sg_w(path);
-    Group& g = sg_w.begin_write();
-
-    TableRef t = g.add_table("Foo");
+    TransactionRef writer = sg_w.start_write();
+    TableRef t = writer->add_table("Foo");
     auto c = t->add_column(type_Int, "integers");
     t->create_object(ObjKey(47)).set(c, 5);
-    sg_w.commit();
+    writer->commit();
 
-    DB sg_r(path);
-    const Group& g2 = sg_r.begin_read();
-    ConstTableRef t2 = g2.get_table("Foo");
+    TransactionRef reader = sg_w.start_read();
+    ConstTableRef t2 = reader->get_table("Foo");
     ConstObj obj = t2->get_object(ObjKey(47));
     CHECK_EQUAL(obj.get<int64_t>(c), 5);
 }
@@ -3709,31 +3740,32 @@ TEST(Shared_ConstObjectIterator)
 {
     SHARED_GROUP_TEST_PATH(path);
     DB sg(path);
-    Group& g = sg.begin_write();
-
-    TableRef t = g.add_table("Foo");
-    auto col = t->add_column(type_Int, "integers");
-    t->create_object(ObjKey(47)).set(col, 5);
-    t->create_object(ObjKey(99)).set(col, 8);
-    sg.commit();
-
-    DB sg2(path);
-    Group& g2 = sg2.begin_write();
-    TableRef t2 = g2.get_or_add_table("Foo");
-    auto i1 = t2->begin();
-    auto i2 = t2->begin();
-    CHECK_EQUAL(i1->get<int64_t>(col), 5);
-    CHECK_EQUAL(i2->get<int64_t>(col), 5);
-    i1->set(col, 7);
-    CHECK_EQUAL(i2->get<int64_t>(col), 7);
-    ++i1;
-    CHECK_EQUAL(i1->get<int64_t>(col), 8);
-    sg2.commit();
+    ColKey col;
+    {
+        TransactionRef writer = sg.start_write();
+        TableRef t = writer->add_table("Foo");
+        col = t->add_column(type_Int, "integers");
+        t->create_object(ObjKey(47)).set(col, 5);
+        t->create_object(ObjKey(99)).set(col, 8);
+        writer->commit();
+    }
+    {
+        TransactionRef writer = sg.start_write();
+        TableRef t2 = writer->get_or_add_table("Foo");
+        auto i1 = t2->begin();
+        auto i2 = t2->begin();
+        CHECK_EQUAL(i1->get<int64_t>(col), 5);
+        CHECK_EQUAL(i2->get<int64_t>(col), 5);
+        i1->set(col, 7);
+        CHECK_EQUAL(i2->get<int64_t>(col), 7);
+        ++i1;
+        CHECK_EQUAL(i1->get<int64_t>(col), 8);
+        writer->commit();
+    }
 
     // Now ensure that we can create a ConstIterator
-    DB sg_r(path);
-    const Group& g3 = sg_r.begin_read();
-    ConstTableRef t3 = g3.get_table("Foo");
+    TransactionRef reader = sg.start_read();
+    ConstTableRef t3 = reader->get_table("Foo");
     auto i3 = t3->begin();
     CHECK_EQUAL(i3->get<int64_t>(col), 7);
     ++i3;
@@ -3743,17 +3775,16 @@ TEST(Shared_ConstObjectIterator)
 TEST(Shared_ConstList)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DB sg_w(path);
-    Group& g = sg_w.begin_write();
+    DB sg(path);
+    TransactionRef writer = sg.start_write();
 
-    TableRef t = g.add_table("Foo");
+    TableRef t = writer->add_table("Foo");
     auto list_col = t->add_column_list(type_Int, "int_list");
     t->create_object(ObjKey(47)).get_list<int64_t>(list_col).add(47);
-    sg_w.commit();
+    writer->commit();
 
-    DB sg_r(path);
-    const Group& g2 = sg_r.begin_read();
-    ConstTableRef t2 = g2.get_table("Foo");
+    TransactionRef reader = sg.start_read();
+    ConstTableRef t2 = reader->get_table("Foo");
     ConstObj obj = t2->get_object(ObjKey(47));
     auto list1 = obj.get_list<int64_t>(list_col);
 

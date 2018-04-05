@@ -1681,6 +1681,7 @@ TEST(Replication_HistorySchemaVersionNormal)
     DB sg_2(repl);
 }
 
+#ifdef LEGACY_TESTS
 TEST(Replication_HistorySchemaVersionDuringWT)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1723,6 +1724,7 @@ TEST(Replication_HistorySchemaVersionUpgrade)
     // and the test would hang
     DB sg_2(repl);
 }
+#endif
 
 TEST(Replication_CreateAndRemoveObject)
 {

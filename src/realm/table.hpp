@@ -830,13 +830,11 @@ private:
     friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
-    template <class>
-    friend class SequentialGetter;
-    friend class RowBase;
     friend class LinksToNode;
     friend class LinkMap;
     friend class LinkView;
     friend class Group;
+    friend class Transaction;
     friend class ClusterTree;
     friend class ArrayBacklink;
 };

@@ -916,9 +916,9 @@ public:
 void TrivialReplication::apply_changeset(const char* data, size_t size, DB& target, util::Logger* logger)
 {
     InputStreamImpl in(data, size);
-    WriteTransaction wt(target);                              // Throws
-    Replication::apply_changeset(in, wt.get_group(), logger); // Throws
-    wt.commit();                                              // Throws
+    TransactionRef trans = target.start_write();
+    Replication::apply_changeset(in, *trans.get(), logger);
+    trans->commit();
 }
 
 std::string TrivialReplication::get_database_path()

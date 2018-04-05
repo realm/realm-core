@@ -26,7 +26,7 @@
 #include <ostream>
 
 #include <realm.hpp>
-#include <realm/lang_bind_helper.hpp>
+#include <realm/group_shared.hpp>
 
 #include "util/misc.hpp"
 #include "util/jsmn.hpp"

@@ -58,7 +58,8 @@ Initialization initialization;
 
 
 Group::Group()
-    : m_alloc() // Throws
+    : m_local_alloc(new SlabAlloc)
+    , m_alloc(*m_local_alloc) // Throws
     , m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
@@ -70,6 +71,73 @@ Group::Group()
     ref_type top_ref = 0; // Instantiate a new empty group
     bool create_group_when_missing = true;
     attach(top_ref, create_group_when_missing); // Throws
+}
+
+
+Group::Group(const std::string& file, const char* key, OpenMode mode)
+    : m_local_alloc(new SlabAlloc) // Throws
+    , m_alloc(*m_local_alloc)
+    , m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(false)
+    , m_total_rows(0)
+{
+    init_array_parents();
+
+    open(file, key, mode); // Throws
+}
+
+
+Group::Group(BinaryData buffer, bool take_ownership)
+    : m_local_alloc(new SlabAlloc) // Throws
+    , m_alloc(*m_local_alloc)
+    , m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(false)
+    , m_total_rows(0)
+{
+    init_array_parents();
+    open(buffer, take_ownership); // Throws
+}
+
+Group::Group(unattached_tag) noexcept
+    : m_local_alloc(new SlabAlloc) // Throws
+    , m_alloc(*m_local_alloc)
+    , // Throws
+    m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(false)
+    , m_total_rows(0)
+{
+    init_array_parents();
+}
+
+Group::Group(shared_tag) noexcept
+    : m_local_alloc(new SlabAlloc) // Throws
+    , m_alloc(*m_local_alloc)
+    , // Throws
+    m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(true)
+    , m_total_rows(0)
+{
+    init_array_parents();
+}
+
+Group::Group(SlabAlloc* alloc) noexcept
+    : m_alloc(*alloc)
+    , // Throws
+    m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(true)
+    , m_total_rows(0)
+{
+    init_array_parents();
 }
 
 
@@ -205,7 +273,7 @@ int Group::get_target_file_format_version_for_session(int /* current_file_format
 }
 
 
-void Group::upgrade_file_format(int target_file_format_version, DB& sg)
+void Transaction::upgrade_file_format(int target_file_format_version)
 {
     REALM_ASSERT(is_attached());
 
@@ -248,15 +316,15 @@ void Group::upgrade_file_format(int target_file_format_version, DB& sg)
         }
 
         if (changes) {
-            sg.commit();
-            sg.begin_write();
+            commit_and_continue_as_read();
+            promote_to_write();
         }
 
         for (auto k : table_keys) {
             auto table = get_table(k);
             if (table->create_objects()) {
-                sg.commit();
-                sg.begin_write();
+                commit_and_continue_as_read();
+                promote_to_write();
             }
         }
 
@@ -266,8 +334,8 @@ void Group::upgrade_file_format(int target_file_format_version, DB& sg)
             size_t nb_cols = spec.get_column_count();
             for (size_t col_ndx = 0; col_ndx < nb_cols; col_ndx++) {
                 if (table->copy_content_from_columns(col_ndx)) {
-                    sg.commit();
-                    sg.begin_write();
+                    commit_and_continue_as_read();
+                    promote_to_write();
                     table = get_table(k);
                 }
             }
@@ -362,12 +430,13 @@ Group::~Group() noexcept
         return;
 
     // Free-standing group accessor
+    detach();
 
-    detach_table_accessors();
-
-    // Just allow the allocator to release all memory in one chunk without
-    // having to traverse the entire tree first
-    m_alloc.detach();
+    // if a local allocator is set in m_local_alloc, then the destruction
+    // of m_local_alloc will trigger destruction of the allocator, which will
+    // verify that the allocator has been detached, so....
+    if (m_local_alloc)
+        m_local_alloc->detach();
 }
 
 
@@ -405,6 +474,7 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
 
     m_tables.detach();
     m_table_names.detach();
+    m_is_writable = create_group_when_missing;
 
     if (top_ref != 0) {
         m_top.init_from_ref(top_ref);

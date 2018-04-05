@@ -35,7 +35,6 @@ set(REALM_SOURCES
     impl/simulated_failure.cpp
     impl/transact_log.cpp
     index_string.cpp
-    lang_bind_helper.cpp
     list.cpp
     node.cpp
     obj.cpp
@@ -116,7 +115,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     history.hpp
     index_string.hpp
     keys.hpp
-    lang_bind_helper.hpp
     mixed.hpp
     null.hpp
     list.hpp

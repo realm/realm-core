@@ -157,9 +157,9 @@ struct AddTable : Benchmark {
 
     void after_each(DB& group)
     {
-        Group& g = group.begin_write();
-        g.remove_table(name());
-        group.commit();
+        TransactionRef tr = group.start_write();
+        tr->remove_table(name());
+        tr->commit();
     }
 };
 
@@ -174,9 +174,9 @@ struct BenchmarkWithStringsTable : Benchmark {
 
     void after_all(DB& group)
     {
-        Group& g = group.begin_write();
-        g.remove_table("StringOnly");
-        group.commit();
+        TransactionRef tr = group.start_write();
+        tr->remove_table("StringOnly");
+        tr->commit();
     }
     ColKey m_col;
 };
@@ -386,9 +386,9 @@ struct BenchmarkWithIntsTable : Benchmark {
 
     void after_all(DB& group)
     {
-        Group& g = group.begin_write();
-        g.remove_table("IntOnly");
-        group.commit();
+        TransactionRef tr = group.start_write();
+        tr->remove_table("IntOnly");
+        tr->commit();
     }
     ColKey m_col;
 };
@@ -880,9 +880,9 @@ struct BenchmarkQueryNot : Benchmark {
 
     void after_all(DB& group)
     {
-        Group& g = group.begin_write();
-        g.remove_table(name());
-        group.commit();
+        TransactionRef tr = group.start_write();
+        tr->remove_table(name());
+        tr->commit();
     }
 
     ColKey m_col;
@@ -943,11 +943,11 @@ struct BenchmarkGetLinkList : Benchmark {
 
     void after_all(DB& group)
     {
-        Group& g = group.begin_write();
-        g.remove_table(name());
+        TransactionRef tr = group.start_write();
+        tr->remove_table(name());
         auto n = std::string(name()) + "_Destination";
-        g.remove_table(n);
-        group.commit();
+        tr->remove_table(n);
+        tr->commit();
     }
 
     ColKey m_col_link;

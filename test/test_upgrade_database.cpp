@@ -1247,7 +1247,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 }
 #endif
 
-// ONLY(Upgrade_Database_9_10)
+#ifdef LEGACY_TESTS
 TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     size_t nb_rows = (REALM_MAX_BPNODE_SIZE == 4) ? 50 : 500;
@@ -1484,6 +1484,6 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
-
+#endif
 
 #endif // TEST_GROUP
