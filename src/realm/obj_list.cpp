@@ -43,8 +43,8 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
 
     // Gather the current rows into a container we can use std algorithms on
     size_t detached_ref_count = 0;
-    std::vector<CommonDescriptor::IndexPair> v;
-    v.reserve(sz);
+    CommonDescriptor::IndexPairs index_pairs;
+    index_pairs.reserve(sz);
     // always put any detached refs at the end of the sort
     // FIXME: reconsider if this is the right thing to do
     // FIXME: consider specialized implementations in derived classes
@@ -52,7 +52,7 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
     for (size_t t = 0; t < sz; t++) {
         ObjKey key = get_key(t);
         if (m_table->is_valid(key)) {
-            v.push_back({key, t});
+            index_pairs.emplace_back(key, t);
         }
         else
             ++detached_ref_count;
@@ -61,118 +61,19 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
     const int num_descriptors = int(ordering.size());
     for (int desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
         const CommonDescriptor* common_descr = ordering[desc_ndx];
+        const CommonDescriptor* next = ((desc_ndx + 1) < num_descriptors) ? ordering[desc_ndx + 1] : nullptr;
+        SortDescriptor::Sorter predicate = common_descr->sorter(m_key_values);
 
-        if (const auto* sort_descr = dynamic_cast<const SortDescriptor*>(common_descr)) {
+        // Sorting can be specified by multiple columns, so that if two entries in the first column are
+        // identical, then the rows are ordered according to the second column, and so forth. For the
+        // first column, we cache all the payload of fields of the view in a std::vector<Mixed>
+        predicate.cache_first_column(index_pairs);
 
-            SortDescriptor::Sorter sort_predicate = sort_descr->sorter(m_key_values);            
-            auto& col = sort_predicate.m_columns[0];
-            auto& vec = sort_predicate.m_columns[0].payload;
-            ColKey ck = col.col_key;
-
-            for (size_t i = 0; i < v.size(); i++) {
-                ObjKey key = v[i].key_for_object;
-
-                if (!col.translated_keys.empty()) {
-                    if (col.is_null[i]) {
-                        vec.emplace_back();
-                        continue;
-                    }
-                    else {
-                        key = col.translated_keys[v[i].index_in_view];
-                    }
-                }
-
-                // Sorting can be specified by multiple columns, so that if two entries in the first column are
-                // identical, then the rows are ordered according to the second column, and so forth. For the
-                // first column, we cache all the payload of fields of the view in a std::vector<Mixed>
-                ConstObj obj = col.table->get_object(key);
-                DataType dt = sort_predicate.m_columns[0].table->get_column_type(ck);
-                switch (dt) {
-                    case type_Int:
-                        if (col.table->is_nullable(ck)) {
-                            auto val = obj.get<util::Optional<int64_t>>(ck);
-                            if (val) {
-                                vec.emplace_back(val.value());
-                            }
-                            else {
-                                // FIXME: This is kind of a hack as Mixed type does not support null value.
-                                // It will just be encoded as an integer with value 0
-                                vec.emplace_back();
-                            }
-                        }
-                        else {
-                            vec.emplace_back(obj.get<Int>(ck));
-                        }
-                        break;
-                    case type_Timestamp:
-                        vec.emplace_back(obj.get<Timestamp>(ck));
-                        break;
-                    case type_String:
-                        vec.emplace_back(obj.get<String>(ck));
-                        break;
-                    case type_Float:
-                        vec.emplace_back(obj.get<Float>(ck));
-                        break;
-                    case type_Double:
-                        vec.emplace_back(obj.get<Double>(ck));
-                        break;
-                    case type_Bool:
-                        vec.emplace_back(obj.get<Bool>(ck));
-                        break;
-                    case type_Link:
-                        vec.emplace_back(obj.get<ObjKey>(ck).value);
-                        break;
-                    default:
-                        REALM_UNREACHABLE();
-                        break;
-                }
-            }
-
-            std::sort(v.begin(), v.end(), std::ref(sort_predicate));
-
-            bool is_last_ordering = desc_ndx == num_descriptors - 1;
-            // not doing this on the last step is an optimisation
-            if (!is_last_ordering) {
-                const size_t v_size = v.size();
-                // Distinct must choose the winning unique elements by sorted
-                // order not by the previous tableview order, the lowest
-                // "index_in_view" wins.
-                for (size_t i = 0; i < v_size; ++i) {
-                    v[i].index_in_view = i;
-                }
-            }
-        }
-        else { // distinct descriptor
-            auto distinct_predicate = common_descr->sorter(m_key_values);
-
-            // Remove all rows which have a null link along the way to the distinct columns
-            if (distinct_predicate.has_links()) {
-                v.erase(std::remove_if(v.begin(), v.end(),
-                                       [&](auto&& index) { return distinct_predicate.any_is_null(index); }),
-                        v.end());
-            }
-
-            // Sort by the columns to distinct on
-            std::sort(v.begin(), v.end(), std::ref(distinct_predicate));
-
-            // Remove all duplicates
-            v.erase(std::unique(v.begin(), v.end(),
-                                [&](auto&& a, auto&& b) {
-                                    // "not less than" is "equal" since they're sorted
-                                    return !distinct_predicate(a, b, false);
-                                }),
-                    v.end());
-            bool will_be_sorted_next = desc_ndx < num_descriptors - 1 && ordering.descriptor_is_sort(desc_ndx + 1);
-            if (!will_be_sorted_next) {
-                // Restore the original order, this is either the original
-                // tableview order or the order of the previous sort
-                std::sort(v.begin(), v.end(), [](auto a, auto b) { return a.index_in_view < b.index_in_view; });
-            }
-        }
+        common_descr->execute(index_pairs, predicate, next);
     }
     // Apply the results
     m_key_values.clear();
-    for (auto& pair : v) {
+    for (auto& pair : index_pairs) {
         m_key_values.add(pair.key_for_object);
     }
     for (size_t t = 0; t < detached_ref_count; ++t)

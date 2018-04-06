@@ -20,6 +20,8 @@
 #define REALM_KEYS_HPP
 
 #include <realm/util/to_string.hpp>
+#include <ostream>
+#include <vector>
 
 namespace realm {
 
@@ -117,6 +119,58 @@ inline std::ostream& operator<<(std::ostream& os, ColKey ck)
     os << ck.value;
     return os;
 }
+
+struct ObjKey {
+    constexpr ObjKey()
+        : value(-1)
+    {
+    }
+    explicit ObjKey(int64_t val)
+        : value(val)
+    {
+    }
+    ObjKey& operator=(int64_t val)
+    {
+        value = val;
+        return *this;
+    }
+    bool operator==(const ObjKey& rhs) const
+    {
+        return value == rhs.value;
+    }
+    bool operator!=(const ObjKey& rhs) const
+    {
+        return value != rhs.value;
+    }
+    bool operator<(const ObjKey& rhs) const
+    {
+        return value < rhs.value;
+    }
+    bool operator>(const ObjKey& rhs) const
+    {
+        return value > rhs.value;
+    }
+    operator bool() const
+    {
+        return value != -1;
+    }
+    int64_t value;
+
+private:
+    // operator bool will enable casting to integer. Prevent this.
+    operator int64_t() const
+    {
+        return 0;
+    }
+};
+
+inline std::ostream& operator<<(std::ostream& ostr, ObjKey key)
+{
+    ostr << "Key(" << key.value << ")";
+    return ostr;
+}
+
+constexpr ObjKey null_key;
 
 namespace util {
 

@@ -36,13 +36,20 @@ class ConstTableRef;
 class CommonDescriptor {
 public:
     struct IndexPair {
+        IndexPair(ObjKey k, size_t i)
+            : key_for_object(k)
+            , index_in_view(i)
+        {
+        }
         ObjKey key_for_object;
         size_t index_in_view;
+        Mixed cached_value;
     };
     struct ColumnId {
         const Table* table;
         ColKey col_key;
     };
+    using IndexPairs = std::vector<CommonDescriptor::IndexPair>;
 
     CommonDescriptor() = default;
     // Enforce type saftey to prevent automatic conversion of derived class
@@ -87,23 +94,33 @@ public:
                 return col.is_null.empty() ? false : col.is_null[i.index_in_view];
             });
         }
+        void cache_first_column(IndexPairs& v);
 
     private:
         struct SortColumn {
+            SortColumn(const Table* t, ColKey c, bool a)
+                : table(t)
+                , col_key(c)
+                , ascending(a)
+            {
+            }
             std::vector<bool> is_null;
             std::vector<ObjKey> translated_keys;
 
             const Table* table;
             ColKey col_key;
             bool ascending;
-
-            // This vector is only filled out for the *first* SortColumn in m_columns
-            std::vector<Mixed> payload;
         };
         std::vector<SortColumn> m_columns;
         friend class ObjList;
     };
+    virtual bool is_sort() const
+    {
+        return false;
+    }
     virtual Sorter sorter(KeyColumn const& row_indexes) const;
+    // Do what you have to do
+    virtual void execute(IndexPairs& v, const Sorter& predicate, const CommonDescriptor* next) const;
 
     // handover support
     std::vector<std::vector<ColKey>> export_column_indices() const;
@@ -131,7 +148,13 @@ public:
 
     void merge_with(SortDescriptor&& other);
 
+    bool is_sort() const override
+    {
+        return true;
+    }
     Sorter sorter(KeyColumn const& row_indexes) const override;
+
+    void execute(IndexPairs& v, const Sorter& predicate, const CommonDescriptor* next) const override;
 
     // handover support
     std::vector<bool> export_order() const override;
@@ -154,8 +177,6 @@ public:
 
     void append_sort(SortDescriptor sort);
     void append_distinct(DistinctDescriptor distinct);
-    bool descriptor_is_sort(size_t index) const;
-    bool descriptor_is_distinct(size_t index) const;
     bool is_empty() const
     {
         return m_descriptors.empty();

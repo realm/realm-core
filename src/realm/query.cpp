@@ -1324,7 +1324,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         if (!has_conditions()) {
             KeyColumn& refs = ret.m_key_values;
 
-            ClusterTree::TraverseFunction f = [&begin, &end, &refs, this](const Cluster* cluster) {
+            ClusterTree::TraverseFunction f = [&begin, &end, &limit, &refs, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 if (begin < e) {
                     if (e > end) {
@@ -1332,8 +1332,9 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                     }
                     auto offset = cluster->get_offset();
                     auto key_values = cluster->get_key_array();
-                    for (size_t i = begin; i < e; i++) {
+                    for (size_t i = begin; (i < e) && limit; i++) {
                         refs.add(ObjKey(key_values->get(i) + offset));
+                        --limit;
                     }
                     begin = 0;
                 }
@@ -1342,7 +1343,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                 }
                 end -= e;
                 // Stop if end is reached
-                return end == 0;
+                return (end == 0) || (limit == 0);
             };
 
             m_table->traverse_clusters(f);
