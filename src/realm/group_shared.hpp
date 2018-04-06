@@ -337,7 +337,7 @@ public:
     /// On the importing side, the top-level accessor being created during
     /// import takes ownership of all other accessors (if any) being created as
     /// part of the import.
-
+#if 0
     /// Type used to support handover of accessors between shared groups.
     template <typename T>
     struct Handover;
@@ -367,7 +367,7 @@ public:
     // likewise for Tables.
     std::unique_ptr<Handover<Table>> export_table_for_handover(const TableRef& accessor);
     TableRef import_table_from_handover(std::unique_ptr<Handover<Table>> handover);
-
+#endif
 #if REALM_METRICS
     std::shared_ptr<metrics::Metrics> get_metrics();
 #endif // REALM_METRICS
@@ -560,8 +560,16 @@ public:
         promote_to_write(&o);
     }
     TransactionRef freeze();
+    TransactionRef duplicate();
+
     // direct handover of accessor instances
-    ConstObj copy_of(const ConstObj& original);
+    Obj copy_of(const ConstObj& original); // slicing is OK for Obj/ConstObj
+    TableRef copy_of(const TableRef original);
+    ConstTableRef copy_of(const ConstTableRef original);
+    template <typename T>
+    List<T> copy_of(const List<T>& original);
+    LinkList copy_of(const LinkList& original);
+    LinkListPtr copy_of(const LinkListPtr& original);
 
     /// Get the current transaction type
     DB::TransactStage get_transact_stage() const noexcept;
@@ -779,11 +787,45 @@ private:
     ReadLockInfo* m_read_lock;
 };
 
-inline ConstObj Transaction::copy_of(const ConstObj& original)
+inline Obj Transaction::copy_of(const ConstObj& original)
 {
     TableKey tk = original.get_table_key();
     ObjKey rk = original.get_key();
     return get_table(tk)->get_object(rk);
+}
+
+inline ConstTableRef Transaction::copy_of(ConstTableRef original)
+{
+    TableKey tk = original->get_key();
+    return get_table(tk);
+}
+
+inline TableRef Transaction::copy_of(TableRef original)
+{
+    TableKey tk = original->get_key();
+    return get_table(tk);
+}
+
+template <typename T>
+inline List<T> Transaction::copy_of(const List<T>& original)
+{
+    Obj obj = copy_of(original.m_obj);
+    ColKey ck = original.m_col_key;
+    return obj.get_list<T>(ck);
+}
+
+inline LinkList Transaction::copy_of(const LinkList& original)
+{
+    Obj obj = copy_of(original.m_obj);
+    ColKey ck = original.m_col_key;
+    return obj.get_linklist(ck);
+}
+
+inline LinkListPtr Transaction::copy_of(const LinkListPtr& original)
+{
+    Obj obj = copy_of(original->m_obj);
+    ColKey ck = original->m_col_key;
+    return obj.get_linklist_ptr(ck);
 }
 
 #if 0

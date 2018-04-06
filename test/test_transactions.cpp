@@ -113,34 +113,54 @@ TEST(Transactions_LargeMappingChange)
 TEST(Transactions_StateChanges)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DB db(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db(*hist_w);
     TransactionRef writer = db.start_write();
     TableRef tr = writer->add_table("hygge");
     auto col = tr->add_column(type_Int, "hejsa");
+    auto lcol = tr->add_column_list(type_Int, "gurgle");
     auto obj = tr->create_object().set_all(45);
+    List<int64_t> list = obj.get_list<int64_t>(lcol);
+    list.add(5);
+    list.add(7);
     // verify that we cannot freeze a write transaction
     CHECK_THROW(writer->freeze(), realm::LogicError);
     writer->commit_and_continue_as_read();
     // verify that we cannot modify data in a read transaction
+    // FIXME: Checks are not applied at group level yet.
+    // CHECK_THROW(writer->add_table("gylle"), realm::LogicError);
     CHECK_THROW(obj.set(col, 100), realm::LogicError);
     // verify that we can freeze a read transaction
     TransactionRef frozen = writer->freeze();
     // verify that we can handover an accessor directly to the frozen transaction.
     auto frozen_obj = frozen->copy_of(obj);
-    // verify that we can read the correct value
+    // verify that we can read the correct value(s)
     int val = frozen_obj.get<int64_t>(col);
     CHECK_EQUAL(45, val);
+    // FIXME: Why does  this cause a write?
+    auto list2 = frozen_obj.get_list<int64_t>(lcol);
+    CHECK_EQUAL(list2.get(0), 5);
+    CHECK_EQUAL(list2.get(1), 7);
+    // verify that we can't change it
+    CHECK_THROW(frozen_obj.set<int64_t>(col, 47), realm::LogicError);
+    // verify handover of a list
+    // FIXME: no change should be needed here
+    auto frozen_list = frozen->copy_of(list);
+    CHECK_EQUAL(frozen_list.get(0), 5);
+    CHECK_EQUAL(frozen_list.get(1), 7);
+
     // verify that a fresh read transaction is read only
     TransactionRef reader = db.start_read();
     tr = reader->get_table("hygge");
     CHECK_THROW(tr->create_object(), realm::LogicError);
-#ifdef LEGACY_TESTS
-    // FIXME: enable when history support is back
     // ..but if promoted, becomes writable
     reader->promote_to_write();
     tr->create_object();
-#endif
+    // ..and if rolled back, becomes read-only again
+    reader->rollback_and_continue_as_read();
+    CHECK_THROW(tr->create_object(), realm::LogicError);
 }
+
 #ifdef LEGACY_TESTS
 
 enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi, kumi_na_moja, kumi_na_mbili, kumi_na_tatu };

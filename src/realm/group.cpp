@@ -801,10 +801,10 @@ Table* Group::create_table_accessor(size_t table_ndx)
     }
     if (table) {
         table->revive(m_alloc, m_is_writable);
-        table->init(ref, this, table_ndx);
+        table->init(ref, this, table_ndx, m_is_writable);
     }
     else {
-        table = tf::create_accessor(m_alloc, ref, this, table_ndx); // Throws
+        table = tf::create_accessor(m_alloc, ref, this, table_ndx, m_is_writable); // Throws
     }
     m_table_accessors[table_ndx] = table;
     tf::complete_accessor(*table);

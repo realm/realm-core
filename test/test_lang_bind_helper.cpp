@@ -27,6 +27,7 @@
 
 #include <realm/query_expression.hpp>
 #include <realm/group_shared.hpp>
+#include <realm/table_view.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/replication.hpp>
@@ -9374,19 +9375,15 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
     rt->verify();
 }
 
-
+#endif
 TEST(LangBindHelper_HandoverQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, SharedGroupOptions(crypt_key()));
-    TransactionRef rt = sg.start_read() Group& group = const_cast<Group&>(rt.get_group());
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-
+    TransactionRef rt = sg.start_read();
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         Group& group_w = wt.get_group();
         TableRef t = group_w.add_table("table2");
         t->add_column(type_String, "first");
@@ -9398,16 +9395,16 @@ TEST(LangBindHelper_HandoverQuery)
     }
     rt->advance_read();
     auto table = rt->get_table("table2");
-    auto int_col = table->get_column_index("second");
+    auto int_col = table->get_column_key("second");
     Query query = table->column<Int>(int_col) < 50;
     size_t count = query.count();
     CHECK_EQUAL(count, 50);
     {
         // Delete first column. This alters the index of 'second' column
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         Group& group_w = wt.get_group();
         TableRef t = group_w.get_table("table2");
-        auto str_col = table->get_column_index("first");
+        auto str_col = table->get_column_key("first");
         t->remove_column(str_col);
         wt.commit();
     }
@@ -9416,7 +9413,7 @@ TEST(LangBindHelper_HandoverQuery)
     CHECK_EQUAL(count, 50);
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -10408,139 +10405,99 @@ TEST(Query_ListOfPrimitivesHandover)
     CHECK_LOGIC_ERROR(sum = query.sum_int(0), LogicError::detached_accessor);
     CHECK_EQUAL(sum, 0);
 }
+#endif
 
 TEST(LangBindHelper_HandoverTableRef)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, SharedGroupOptions(crypt_key()));
-    sg.begin_read();
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
-    std::unique_ptr<DB::Handover<Table>> handover;
-    DB::VersionID vid;
+    TransactionRef reader;
+    TableRef table;
     {
-        LangBindHelper::promote_to_write(sg_w);
-        TableRef table1 = group_w.add_table("table1");
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-        vid = sg_w.get_version_of_current_transaction();
-        handover = sg_w.export_table_for_handover(table1);
+        auto writer = sg.start_write();
+        TableRef table1 = writer->add_table("table1");
+        writer->commit_and_continue_as_read();
+        auto vid = writer->get_version_of_current_transaction();
+        reader = sg.start_read(vid);
+        table = reader->copy_of(table1);
     }
-    {
-        LangBindHelper::advance_read(sg, vid);
-        TableRef table2 = sg.import_table_from_handover(move(handover));
-        CHECK(table2->is_attached());
-        CHECK(table2->size() == 0);
-    }
+    CHECK(bool(table));
+    CHECK(table->size() == 0);
 }
-
 
 TEST(LangBindHelper_HandoverLinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, SharedGroupOptions(crypt_key()));
-    Group& group = const_cast<Group&>(sg.begin_read());
+    TransactionRef reader;
+    ColKey col1;
 
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+    auto writer = sg.start_write();
 
-    std::unique_ptr<DB::Handover<LinkView>> handover;
-    std::unique_ptr<DB::Handover<LinkView>> handover2;
-    DB::VersionID vid;
+    TableRef table1 = writer->add_table("table1");
+    TableRef table2 = writer->add_table("table2");
+
+    // add some more columns to table1 and table2
+    col1 = table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    // add some rows
+    auto to1 = table1->create_object().set_all(300, "delta");
+    auto to2 = table1->create_object().set_all(100, "alfa");
+    auto to3 = table1->create_object().set_all(200, "beta");
+
+    ColKey col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+    auto o1 = table2->create_object();
+    auto o2 = table2->create_object();
+    LinkListPtr lvr = o1.get_linklist_ptr(col_link2);
+    lvr->clear();
+    lvr->add(to1.get_key());
+    lvr->add(to2.get_key());
+    lvr->add(to3.get_key());
+    writer->commit_and_continue_as_read();
+    reader = writer->duplicate();
+    auto ll = reader->copy_of(lvr);
     {
-
-        LangBindHelper::promote_to_write(sg_w);
-
-        TableRef table1 = group_w.add_table("table1");
-        TableRef table2 = group_w.add_table("table2");
-
-        // add some more columns to table1 and table2
-        table1->add_column(type_Int, "col1");
-        table1->add_column(type_String, "str1");
-
-        // add some rows
-        table1->add_empty_row();
-        table1->set_int(0, 0, 300);
-        table1->set_string(1, 0, "delta");
-
-        table1->add_empty_row();
-        table1->set_int(0, 1, 100);
-        table1->set_string(1, 1, "alfa");
-
-        table1->add_empty_row();
-        table1->set_int(0, 2, 200);
-        table1->set_string(1, 2, "beta");
-
-        size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
-
-        table2->add_empty_row();
-        table2->add_empty_row();
-
-        LinkViewRef lvr;
-
-        lvr = table2->get_linklist(col_link2, 0);
-        lvr->clear();
-        lvr->add(0);
-        lvr->add(1);
-        lvr->add(2);
-
-        // TableView tv2 = lvr->get_sorted_view(0);
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-        vid = sg_w.get_version_of_current_transaction();
-        handover = sg_w.export_linkview_for_handover(lvr);
-        handover2 = sg_w.export_linkview_for_handover(lvr);
-    }
-    {
-        LangBindHelper::advance_read(sg, vid);
-        LinkViewRef lvr = sg.import_linkview_from_handover(move(handover)); // <-- import lvr
+        // validate inside reader transaction
         // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
 
         // q.m_table = table1
         // q.m_view = lvr
-        TableRef table1 = rt->get_table("table1");
-        Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
+        TableRef table1b = reader->get_table("table1");
+        Query q = table1b->where(ll).and_query(table1b->column<Int>(col1) > 100);
 
         // tv.m_table == table1
-        TableView tv;
-        tv = q.find_all(); // tv = { 0, 2 }
+        TableView tv = q.find_all(); // tv = { 0, 2 }
 
 
         CHECK_EQUAL(2, tv.size());
-        CHECK_EQUAL(0, tv.get_source_ndx(0));
-        CHECK_EQUAL(2, tv.get_source_ndx(1));
+        CHECK_EQUAL(to1.get_key(), tv.get_key(0));
+        CHECK_EQUAL(to3.get_key(), tv.get_key(1));
     }
     {
-        LangBindHelper::promote_to_write(sg_w);
         // Change table1 and verify that the change does not propagate through the handed-over linkview
-        TableRef table1 = group_w.get_table("table1");
-        table1->set_int(0, 0, 50);
-        LangBindHelper::commit_and_continue_as_read(sg_w);
+        writer->promote_to_write();
+        to1.set<int64_t>(col1, 50);
+        writer->commit_and_continue_as_read();
     }
     {
-        LinkViewRef lvr = sg.import_linkview_from_handover(move(handover2)); // <-- import lvr
-        // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
-
-        // q.m_table = table1
-        // q.m_view = lvr
-        TableRef table1 = rt->get_table("table1");
-        Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
+        TableRef table1b = reader->get_table("table1");
+        Query q = table1b->where(ll).and_query(table1b->column<Int>(col1) > 100);
 
         // tv.m_table == table1
-        TableView tv;
-        tv = q.find_all(); // tv = { 0, 2 }
+        TableView tv = q.find_all(); // tv = { 0, 2 }
+
 
         CHECK_EQUAL(2, tv.size());
-        CHECK_EQUAL(0, tv.get_source_ndx(0));
-        CHECK_EQUAL(2, tv.get_source_ndx(1));
+        CHECK_EQUAL(to1.get_key(), tv.get_key(0));
+        CHECK_EQUAL(to3.get_key(), tv.get_key(1));
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_HandoverDistinctView)
 {
     SHARED_GROUP_TEST_PATH(path);

@@ -2250,6 +2250,17 @@ TransactionRef Transaction::freeze()
     return db->start_frozen(version);
 }
 
+TransactionRef Transaction::duplicate()
+{
+    auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
+    if (m_transact_stage == DB::transact_Reading)
+        return db->start_read(version);
+    if (m_transact_stage == DB::transact_Frozen)
+        return db->start_frozen(version);
+
+    throw LogicError(LogicError::wrong_transact_state);
+}
+
 void Transaction::rollback()
 {
     if (m_transact_stage == DB::transact_Ready)

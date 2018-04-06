@@ -530,6 +530,8 @@ protected:
     }
     void set_repl(Replication* repl, size_t ndx, T value);
     void insert_repl(Replication* repl, size_t ndx, T value);
+
+    friend class Transaction;
 };
 
 template <>

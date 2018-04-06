@@ -627,7 +627,7 @@ private:
     /// Create an uninitialized accessor whose lifetime is managed by Group
     Table(ref_count_tag, Allocator&);
 
-    void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool skip_create_column_accessors = false);
+    void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool is_writable);
 
     void set_key(TableKey key);
 
@@ -916,7 +916,7 @@ inline Table::Table(Allocator& alloc)
     ref_type ref = create_empty_table(m_alloc); // Throws
     ArrayParent* parent = nullptr;
     size_t ndx_in_parent = 0;
-    init(ref, parent, ndx_in_parent);
+    init(ref, parent, ndx_in_parent, true);
 }
 
 inline Table::Table(ref_count_tag, Allocator& alloc)
@@ -1134,10 +1134,11 @@ public:
         return Table::create_empty_table(alloc, key); // Throws
     }
 
-    static Table* create_accessor(Allocator& alloc, ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent)
+    static Table* create_accessor(Allocator& alloc, ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent,
+                                  bool is_writable)
     {
         std::unique_ptr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
-        table->init(top_ref, parent, ndx_in_parent);                            // Throws
+        table->init(top_ref, parent, ndx_in_parent, is_writable);               // Throws
         return table.release();
     }
 
