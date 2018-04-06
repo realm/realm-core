@@ -53,11 +53,11 @@ using ConstLinkListPtr = std::unique_ptr<const LinkList>;
 class ConstObj {
 public:
     ConstObj()
-        : m_tree_top(nullptr)
-        , m_valid(false)
+        : m_table(nullptr)
         , m_row_ndx(size_t(-1))
         , m_storage_version(-1)
         , m_instance_version(-1)
+        , m_valid(false)
     {
     }
     ConstObj(const ClusterTree* tree_top, ref_type ref, ObjKey key, size_t row_ndx);
@@ -70,12 +70,16 @@ public:
     {
         return m_key;
     }
-    const Table* get_table() const;
+
+    const Table* get_table() const
+    {
+        return m_table;
+    }
 
     // Check if this object is default constructed
     explicit operator bool()
     {
-        return m_tree_top != nullptr;
+        return m_table != nullptr;
     }
 
     // Check if the object is still alive
@@ -116,7 +120,7 @@ public:
     template <class T>
     bool evaluate(T func) const
     {
-        Cluster cluster(0, get_alloc(), *m_tree_top);
+        Cluster cluster(0, get_alloc(), *get_tree_top());
         cluster.init_from_mem(m_mem);
         return func(&cluster, m_row_ndx);
     }
@@ -129,14 +133,15 @@ protected:
     friend class ConstTableView;
     friend class Transaction;
 
-    const ClusterTree* m_tree_top;
+    const Table* m_table;
     ObjKey m_key;
-    mutable bool m_valid;
     mutable MemRef m_mem;
     mutable size_t m_row_ndx;
     mutable uint64_t m_storage_version;
     mutable uint64_t m_instance_version;
+    mutable bool m_valid;
     bool is_in_sync() const;
+    void do_update() const;
     bool update_if_needed() const;
     void update(ConstObj& other) const
     {
@@ -148,9 +153,11 @@ protected:
     template <class T>
     bool do_is_null(size_t col_ndx) const;
 
+    const ClusterTree* get_tree_top() const;
     ColKey get_column_key(StringData col_name) const;
     TableKey get_table_key() const;
     TableRef get_target_table(ColKey col_key) const;
+    const Spec& get_spec() const;
 
     template <typename U>
     U _get(size_t col_ndx) const;
