@@ -10,7 +10,8 @@
 
 ### Enhancements
 
-* None.
+* Allow an arbitrary prefix on backlink class names of @links queries.
+  This will allow users to query unnamed backlinks using the `@links.Class.property` syntax.
 
 -----------
 
