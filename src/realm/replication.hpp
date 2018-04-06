@@ -174,7 +174,7 @@ public:
     /// a blocking operation was interrupted.
 
     void initiate_transact(version_type current_version, bool history_updated);
-    version_type prepare_commit(version_type current_version);
+    version_type prepare_commit(Group& group, version_type current_version);
     void finalize_commit() noexcept;
     void abort_transact() noexcept;
 
@@ -377,7 +377,7 @@ protected:
     /// `current_version` indicates that the previous transaction failed.
 
     virtual void do_initiate_transact(version_type current_version, bool history_updated) = 0;
-    virtual version_type do_prepare_commit(version_type orig_version) = 0;
+    virtual version_type do_prepare_commit(Group& group, version_type orig_version) = 0;
     virtual void do_finalize_commit() noexcept = 0;
     virtual void do_abort_transact() noexcept = 0;
 
@@ -411,7 +411,8 @@ protected:
 
     TrivialReplication(const std::string& database_file);
 
-    virtual version_type prepare_changeset(const char* data, size_t size, version_type orig_version) = 0;
+    virtual version_type prepare_changeset(Group& group, const char* data, size_t size,
+                                           version_type orig_version) = 0;
     virtual void finalize_changeset() noexcept = 0;
 
     static void apply_changeset(const char* data, size_t size, DB& target, util::Logger* logger = nullptr);
@@ -423,7 +424,7 @@ protected:
     std::string get_database_path() override;
     void initialize(DB&) override;
     void do_initiate_transact(version_type, bool) override;
-    version_type do_prepare_commit(version_type orig_version) override;
+    version_type do_prepare_commit(Group& group, version_type orig_version) override;
     void do_finalize_commit() noexcept override;
     void do_abort_transact() noexcept override;
     void do_interrupt() noexcept override;
@@ -451,9 +452,9 @@ inline void Replication::initiate_transact(version_type current_version, bool hi
     reset_selection_caches();
 }
 
-inline Replication::version_type Replication::prepare_commit(version_type orig_version)
+inline Replication::version_type Replication::prepare_commit(Group& group, version_type orig_version)
 {
-    return do_prepare_commit(orig_version);
+    return do_prepare_commit(group, orig_version);
 }
 
 inline void Replication::finalize_commit() noexcept

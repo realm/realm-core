@@ -120,7 +120,7 @@ public:
     }
 
 private:
-    version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
+    version_type prepare_changeset(Group&, const char* data, size_t size, version_type orig_version) override
     {
         m_incoming_changeset = Buffer<char>(size); // Throws
         std::copy(data, data + size, m_incoming_changeset.data());
@@ -153,18 +153,16 @@ public:
     void initialize(DB& sg) override
     {
         TrivialReplication::initialize(sg);
-        using sgf = _impl::SharedGroupFriend;
-        m_group = &sgf::get_group(sg);
     }
 
-    version_type prepare_changeset(const char*, size_t, version_type) override
+    version_type prepare_changeset(Group& group, const char*, size_t, version_type) override
     {
         if (!m_arr) {
             using gf = _impl::GroupFriend;
-            Allocator& alloc = gf::get_alloc(*m_group);
+            Allocator& alloc = gf::get_alloc(group);
             m_arr = std::make_unique<BinaryColumn>(alloc);
             m_arr->create();
-            gf::prepare_history_parent(*m_group, *m_arr, hist_SyncClient, m_history_schema_version);
+            gf::prepare_history_parent(group, *m_arr, hist_SyncClient, m_history_schema_version);
             // m_arr->update_parent(); // Throws
         }
         return 1;
@@ -198,7 +196,6 @@ public:
 private:
     int m_history_schema_version;
     bool m_upgraded = false;
-    Group* m_group = nullptr;
     std::unique_ptr<BinaryColumn> m_arr;
 };
 

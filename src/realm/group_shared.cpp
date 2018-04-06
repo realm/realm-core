@@ -2132,7 +2132,7 @@ Replication::version_type DB::do_commit()
         // fails. The application then has the option of terminating the
         // transaction with a call to SharedGroup::rollback(), which in turn
         // must call Replication::abort_transact().
-        new_version = repl->prepare_commit(current_version); // Throws
+        new_version = repl->prepare_commit(m_group, current_version); // Throws
         try {
             low_level_commit(new_version); // Throws
         }

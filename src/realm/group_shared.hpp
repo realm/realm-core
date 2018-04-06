@@ -1049,7 +1049,11 @@ inline bool DB::do_advance_read(O* observer, VersionID version_id, _impl::Histor
         SlabAlloc& alloc = m_group.m_alloc;
         alloc.update_reader_view(new_file_size, new_version);
 
-        hist.update_early_from_top_ref(new_version, new_file_size, new_top_ref); // Throws
+        using gf = _impl::GroupFriend;
+        gf::remap(m_group, new_file_size); // Throws
+        ref_type hist_ref = gf::get_history_ref(alloc, new_top_ref);
+
+        hist.update_from_ref(hist_ref, new_version);
     }
 
     if (observer) {

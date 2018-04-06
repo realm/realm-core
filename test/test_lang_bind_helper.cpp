@@ -100,7 +100,7 @@ public:
         // No-op
     }
 
-    version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
+    version_type prepare_changeset(Group&, const char* data, size_t size, version_type orig_version) override
     {
         m_incoming_changeset = Buffer<char>(size); // Throws
         std::copy(data, data + size, m_incoming_changeset.data());
@@ -146,12 +146,7 @@ public:
         REALM_ASSERT(false);
     }
 
-    void update_early_from_top_ref(version_type, size_t, ref_type) override
-    {
-        // No-op
-    }
-
-    void update_from_parent(version_type) override
+    void update_from_ref(ref_type, version_type) override
     {
         // No-op
     }

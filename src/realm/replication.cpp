@@ -939,11 +939,11 @@ void TrivialReplication::do_initiate_transact(version_type, bool history_updated
     m_history_updated = history_updated;
 }
 
-Replication::version_type TrivialReplication::do_prepare_commit(version_type orig_version)
+Replication::version_type TrivialReplication::do_prepare_commit(Group& group, version_type orig_version)
 {
     char* data = m_stream.get_data();
     size_t size = write_position() - data;
-    version_type new_version = prepare_changeset(data, size, orig_version); // Throws
+    version_type new_version = prepare_changeset(group, data, size, orig_version); // Throws
     return new_version;
 }
 
