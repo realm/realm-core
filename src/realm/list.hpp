@@ -308,11 +308,7 @@ protected:
 
     void init_from_parent() const override
     {
-        ref_type ref = get_child_ref(0);
-        if (ref) {
-            m_tree->init_from_ref(ref);
-            m_valid = true;
-        }
+        m_valid = m_tree->init_from_parent();
     }
 };
 
