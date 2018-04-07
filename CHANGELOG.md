@@ -10,8 +10,10 @@
 
 ### Enhancements
 
-* Allow an arbitrary prefix on backlink class names of @links queries.
-  This will allow users to query unnamed backlinks using the `@links.Class.property` syntax.
+* Parser improvements:
+    - Allow an arbitrary prefix on backlink class names of @links queries.
+      This will allow users to query unnamed backlinks using the `@links.Class.property` syntax.
+    - Case insensitive `nil` is now recognised as a synonym to `NULL`.
 
 -----------
 

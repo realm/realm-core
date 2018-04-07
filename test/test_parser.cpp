@@ -99,6 +99,7 @@ static std::vector<std::string> valid_queries = {
     "truelove = false",
     "true = falsey",
     "nullified = null",
+    "nullified = nil",
     "_ = a",
     "_a = _.aZ",
     "a09._br.z = __-__.Z-9",
@@ -421,12 +422,14 @@ TEST(Parser_basic_serialisation)
     Query q = t->where();
 
     verify_query(test_context, t, "time == NULL", 1);
+    verify_query(test_context, t, "time == NIL", 1);
     verify_query(test_context, t, "time != NULL", 4);
     verify_query(test_context, t, "time > T0:0", 3);
     verify_query(test_context, t, "time == T1:2", 1);
     verify_query(test_context, t, "time > 2017-12-1@12:07:53", 1);
     verify_query(test_context, t, "time == 2017-12-01@12:07:53:505", 1);
     verify_query(test_context, t, "buddy == NULL", 4);
+    verify_query(test_context, t, "buddy == nil", 4);
     verify_query(test_context, t, "buddy != NULL", 1);
     verify_query(test_context, t, "buddy <> NULL", 1);
     verify_query(test_context, t, "age > 2", 2);
@@ -626,6 +629,7 @@ TEST(Parser_StringOperations)
     verify_query(test_context, t, "father.name like[c] \"?O?\"", 2);
 
     verify_query(test_context, t, "name == NULL", 1);
+    verify_query(test_context, t, "name == nil", 1);
     verify_query(test_context, t, "NULL == name", 1);
     verify_query(test_context, t, "name != NULL", 5);
     verify_query(test_context, t, "NULL != name", 5);
@@ -694,6 +698,7 @@ TEST(Parser_Timestamps)
 
     verify_query(test_context, t, "T2017-12-04 == NULL", 3);
     verify_query(test_context, t, "T2017-12-04 != NULL", 2);
+    verify_query(test_context, t, "T2017-12-04 != NIL", 2);
     verify_query(test_context, t, "linked.T2017-12-04 == NULL", 3); // null links count as a match for null here
     verify_query(test_context, t, "linked != NULL && linked.T2017-12-04 == NULL", 0);
     verify_query(test_context, t, "linked.T2017-12-04 != NULL", 2);
@@ -703,7 +708,9 @@ TEST(Parser_Timestamps)
     verify_query(test_context, t, "T2017-12-04 == 2017-12-04@0:0:0", 0);
 
     verify_query(test_context, t, "birthday == NULL", 0);
+    verify_query(test_context, t, "birthday == NIL", 0);
     verify_query(test_context, t, "birthday != NULL", 5);
+    verify_query(test_context, t, "birthday != NIL", 5);
     verify_query(test_context, t, "birthday == T0:0", 3);
     verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:0", 3); // epoch is default non-null Timestamp
 
@@ -773,6 +780,10 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, items, "data != NULL", 5);
     verify_query(test_context, items, "nullable_data == NULL", 2);
     verify_query(test_context, items, "nullable_data != NULL", 3);
+    verify_query(test_context, items, "data == NIL", 0);
+    verify_query(test_context, items, "data != NIL", 5);
+    verify_query(test_context, items, "nullable_data == NIL", 2);
+    verify_query(test_context, items, "nullable_data != NIL", 3);
 
     verify_query(test_context, items, "nullable_data CONTAINS 'f'", 2);
     verify_query(test_context, items, "nullable_data BEGINSWITH 'f'", 1);

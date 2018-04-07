@@ -82,7 +82,7 @@ struct timestamp : sor< internal_timestamp, readable_timestamp > {};
 
 struct true_value : string_token_t("true") {};
 struct false_value : string_token_t("false") {};
-struct null_value : string_token_t("null") {};
+struct null_value : seq< sor< string_token_t("null"), string_token_t("nil") > > {};
 
 // following operators must allow proceeding string characters
 struct min : TAOCPP_PEGTL_ISTRING(".@min.") {};
