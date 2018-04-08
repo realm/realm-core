@@ -469,10 +469,9 @@ private:
     // call to grab_read_lock().
     void release_read_lock(ReadLockInfo&) noexcept;
 
-    void do_begin_read(VersionID, bool writable);
-    void do_end_read() noexcept;
     /// return true if write transaction can commence, false otherwise.
-    bool do_try_begin_write();
+    // FIXME unsupported: bool do_try_begin_write();
+
     void do_begin_write();
     version_type do_commit(Group&);
     void do_end_write() noexcept;

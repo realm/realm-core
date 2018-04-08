@@ -629,7 +629,7 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
 namespace {
 
 #ifdef REALM_ASYNC_DAEMON
-
+// FIXME: Async commits unsupported
 void spawn_daemon(const std::string& file)
 {
     // determine maximum number of open descriptors
@@ -1487,6 +1487,7 @@ void DB::enable_wait_for_change()
 void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 {
 #if REALM_METRICS
+    REALM_ASSERT(m_metrics == db->m_metrics);
     if (m_metrics) { // null if metrics are disabled
         size_t total_size = db->m_used_space + db->m_free_space;
         size_t free_space = db->m_free_space;
@@ -1709,11 +1710,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
 
 void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 {
-    // The release may be tried on a version imported from a different thread,
-    // hence generated on a different shared group, which may have memory mapped
-    // a larger ringbuffer than we - so make sure we've mapped enough of the
-    // ringbuffer to access the chosen ringbuffer entry.
-    grow_reader_mapping(read_lock.m_reader_idx);
+    std::lock_guard<std::mutex> lock(m_mutex);
     SharedInfo* r_info = m_reader_map.get_addr();
     const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
     atomic_double_dec(r.count); // <-- most of the exec time spent here
@@ -1722,6 +1719,7 @@ void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 
 void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
     if (version_id.version == std::numeric_limits<version_type>::max()) {
         for (;;) {
             SharedInfo* r_info = m_reader_map.get_addr();
@@ -1777,6 +1775,9 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
     }
 }
 
+/*
+ * FIXME: Currently unsupported
+ *
 bool DB::do_try_begin_write()
 {
     // In the non-blocking case, we will only succeed if there is no contention for
@@ -1788,7 +1789,7 @@ bool DB::do_try_begin_write()
     }
     return got_the_lock;
 }
-
+*/
 
 void DB::do_begin_write()
 {
@@ -1892,10 +1893,14 @@ void DB::do_end_write() noexcept
 
 Replication::version_type DB::do_commit(Group& group)
 {
-    SharedInfo* r_info = m_reader_map.get_addr();
-
-    version_type current_version = r_info->get_current_version_unchecked();
+    version_type current_version;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        SharedInfo* r_info = m_reader_map.get_addr();
+        current_version = r_info->get_current_version_unchecked();
+    }
     version_type new_version = current_version + 1;
+
     if (Replication* repl = m_alloc.get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
         // fails. The application then has the option of terminating the
@@ -1947,7 +1952,7 @@ DB::version_type Transaction::commit_and_continue_as_read()
     return version;
 }
 
-
+// Caller must lock m_mutex.
 bool DB::grow_reader_mapping(uint_fast32_t index)
 {
     using _impl::SimulatedFailure;
@@ -1968,6 +1973,7 @@ bool DB::grow_reader_mapping(uint_fast32_t index)
 
 DB::version_type DB::get_version_of_latest_snapshot()
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
     // As get_version_of_latest_snapshot() may be called outside of the write
     // mutex, another thread may be performing changes to the ringbuffer
     // concurrently. It may even cleanup and recycle the current entry from
@@ -2008,6 +2014,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Group& group)
     // of the current session.
     uint_fast64_t oldest_version;
     {
+        std::lock_guard<std::mutex> lock(m_mutex);
         SharedInfo* r_info = m_reader_map.get_addr();
 
         // the cleanup process may access the entire ring buffer, so make sure it is mapped.
@@ -2031,15 +2038,18 @@ void DB::low_level_commit(uint_fast64_t new_version, Group& group)
 
     // Do the actual commit
     REALM_ASSERT(oldest_version <= new_version);
-
 #if REALM_METRICS
     group.update_num_objects();
 #endif // REALM_METRICS
+
     // info->readers.dump();
     GroupWriter out(group); // Throws
     out.set_versions(new_version, oldest_version);
     // Recursively write all changed arrays to end of file
     ref_type new_top_ref = out.write_group(); // Throws
+
+    // protect access to shared variables and m_reader_mapping from here
+    std::lock_guard<std::mutex> lock_guard(m_mutex);
     m_free_space = out.get_free_space();
     m_used_space = out.get_file_size() - m_free_space;
     // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
