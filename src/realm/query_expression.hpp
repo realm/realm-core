@@ -348,10 +348,7 @@ public:
     virtual const Table* get_base_table() const = 0;
     virtual std::string description(util::serializer::SerialisationState& state) const = 0;
 
-    virtual std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const = 0;
-    virtual void apply_handover_patch(QueryNodeHandoverPatches&, Group&)
-    {
-    }
+    virtual std::unique_ptr<Expression> clone(Transaction*) const = 0;
 };
 
 template <typename T, typename... Args>
@@ -366,10 +363,7 @@ public:
     {
     }
 
-    virtual std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const = 0;
-    virtual void apply_handover_patch(QueryNodeHandoverPatches&, Group&)
-    {
-    }
+    virtual std::unique_ptr<Subexpr> clone(Transaction* = nullptr) const = 0;
 
     // When the user constructs a query, it always "belongs" to one single base/parent table (regardless of
     // any links or not and regardless of any queries assembled with || or &&). When you do a Query::find(),
@@ -1113,7 +1107,7 @@ struct TrueExpression : Expression {
     {
         return "TRUEPREDICATE";
     }
-    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Expression> clone(Transaction*) const override
     {
         return std::unique_ptr<Expression>(new TrueExpression(*this));
     }
@@ -1139,7 +1133,7 @@ struct FalseExpression : Expression {
     {
         return nullptr;
     }
-    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Expression> clone(Transaction*) const override
     {
         return std::unique_ptr<Expression>(new FalseExpression(*this));
     }
@@ -1397,7 +1391,7 @@ public:
         return not_found; // no match
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Subexpr> clone(Transaction*) const override
     {
         return make_subexpr<Value<T>>(*this);
     }
@@ -1414,7 +1408,7 @@ public:
         init(false, ValueBase::default_size, m_string);
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Subexpr> clone(Transaction*) const override
     {
         return std::unique_ptr<Subexpr>(new ConstantStringValue(*this));
     }
@@ -1981,7 +1975,7 @@ public:
         return state.describe_columns(m_link_map, m_column_key);
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const override
+    std::unique_ptr<Subexpr> clone(Transaction* = nullptr) const override
     {
         return make_subexpr<Columns<T>>(static_cast<const Columns<T>&>(*this));
     }
@@ -2204,7 +2198,7 @@ public:
         return state.describe_columns(m_link_map, ColKey()) + (has_links ? " != NULL" : " == NULL");
     }
 
-    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Expression> clone(Transaction*) const override
     {
         return std::unique_ptr<Expression>(new UnaryLinkCompare(*this));
     }
@@ -2231,7 +2225,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Subexpr> clone(Transaction*) const override
     {
         return make_subexpr<LinkCount>(*this);
     }
@@ -2329,19 +2323,14 @@ public:
         return "@size";
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Subexpr> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<Subexpr>(new SizeOperator(*this, patches));
-    }
-
-    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
-    {
-        m_expr->apply_handover_patch(patches, group);
+        return std::unique_ptr<Subexpr>(new SizeOperator(*this, tr));
     }
 
 private:
-    SizeOperator(const SizeOperator& other, QueryNodeHandoverPatches* patches)
-        : m_expr(other.m_expr->clone(patches))
+    SizeOperator(const SizeOperator& other, Transaction* tr)
+        : m_expr(other.m_expr->clone(tr))
     {
     }
 
@@ -2378,7 +2367,7 @@ public:
         return util::serializer::print_value(m_key);
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Subexpr> clone(Transaction*) const override
     {
         return std::unique_ptr<Subexpr>(new KeyValue(*this));
     }
@@ -2463,7 +2452,7 @@ public:
         return state.describe_columns(m_link_map, ColKey());
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Subexpr> clone(Transaction*) const override
     {
         return std::unique_ptr<Subexpr>(new Columns<Link>(*this));
     }
@@ -2547,7 +2536,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Subexpr> clone(Transaction*) const override
     {
         return make_subexpr<Columns<List<T>>>(*this);
     }
@@ -2668,7 +2657,7 @@ public:
             }
         }
     }
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Subexpr> clone(Transaction*) const override
     {
         return std::unique_ptr<Subexpr>(new ColumnListSize<T>(*this));
     }
@@ -2698,7 +2687,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Subexpr> clone(Transaction*) const override
     {
         return make_subexpr<ListColumnAggregate>(*this);
     }
@@ -2867,7 +2856,7 @@ public:
         return *this;
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Subexpr> clone(Transaction*) const override
     {
         return make_subexpr<Columns<T>>(*this);
     }
@@ -3051,7 +3040,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Subexpr> clone(Transaction*) const override
     {
         return make_subexpr<SubColumns<T>>(*this);
     }
@@ -3122,7 +3111,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Subexpr> clone(Transaction*) const override
     {
         return make_subexpr<SubColumnAggregate>(*this);
     }
@@ -3184,10 +3173,6 @@ private:
     LinkMap m_link_map;
 };
 
-struct SubQueryCountHandoverPatch : QueryNodeHandoverPatch {
-    QueryHandoverPatch m_query;
-};
-
 class SubQueryCount : public Subexpr2<Int> {
 public:
     SubQueryCount(Query q, LinkMap link_map)
@@ -3241,33 +3226,19 @@ public:
         return desc;
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Subexpr> clone(Transaction* tr) const override
     {
-        if (patches)
-            return std::unique_ptr<Subexpr>(new SubQueryCount(*this, patches));
+        if (tr)
+            return std::unique_ptr<Subexpr>(new SubQueryCount(*this, tr));
 
         return make_subexpr<SubQueryCount>(*this);
     }
 
-    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
-    {
-        REALM_ASSERT(patches.size());
-        std::unique_ptr<QueryNodeHandoverPatch> abstract_patch = std::move(patches.back());
-        patches.pop_back();
-
-        auto patch = dynamic_cast<SubQueryCountHandoverPatch*>(abstract_patch.get());
-        REALM_ASSERT(patch);
-
-        m_query.apply_patch(patch->m_query, group);
-    }
-
 private:
-    SubQueryCount(const SubQueryCount& other, QueryNodeHandoverPatches* patches)
+    SubQueryCount(const SubQueryCount& other, Transaction* tr)
         : m_link_map(other.m_link_map)
     {
-        std::unique_ptr<SubQueryCountHandoverPatch> patch(new SubQueryCountHandoverPatch);
-        m_query = Query(other.m_query, patch->m_query, ConstSourcePayload::Copy);
-        patches->emplace_back(patch.release());
+        m_query = Query(other.m_query, tr, PayloadPolicy::Copy);
     }
 
     Query m_query;
@@ -3411,8 +3382,8 @@ public:
     {
     }
 
-    UnaryOperator(const UnaryOperator& other, QueryNodeHandoverPatches* patches)
-        : m_left(other.m_left->clone(patches))
+    UnaryOperator(const UnaryOperator& other, Transaction* tr)
+        : m_left(other.m_left->clone(tr))
     {
     }
 
@@ -3468,14 +3439,9 @@ public:
         return "";
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Subexpr> clone(Transaction* tr) const override
     {
-        return make_subexpr<UnaryOperator>(*this, patches);
-    }
-
-    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
-    {
-        m_left->apply_handover_patch(patches, group);
+        return make_subexpr<UnaryOperator>(*this, tr);
     }
 
 private:
@@ -3493,9 +3459,9 @@ public:
     {
     }
 
-    Operator(const Operator& other, QueryNodeHandoverPatches* patches)
-        : m_left(other.m_left->clone(patches))
-        , m_right(other.m_right->clone(patches))
+    Operator(const Operator& other, Transaction* tr)
+        : m_left(other.m_left->clone(tr))
+        , m_right(other.m_right->clone(tr))
     {
     }
 
@@ -3564,15 +3530,9 @@ public:
         return s;
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Subexpr> clone(Transaction* tr) const override
     {
-        return make_subexpr<Operator>(*this, patches);
-    }
-
-    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
-    {
-        m_right->apply_handover_patch(patches, group);
-        m_left->apply_handover_patch(patches, group);
+        return make_subexpr<Operator>(*this, tr);
     }
 
 private:
@@ -3662,21 +3622,15 @@ public:
                                              m_right->description(state));
     }
 
-    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<Expression> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<Expression>(new Compare(*this, patches));
-    }
-
-    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
-    {
-        m_right->apply_handover_patch(patches, group);
-        m_left->apply_handover_patch(patches, group);
+        return std::unique_ptr<Expression>(new Compare(*this, tr));
     }
 
 private:
-    Compare(const Compare& other, QueryNodeHandoverPatches* patches)
-        : m_left(other.m_left->clone(patches))
-        , m_right(other.m_right->clone(patches))
+    Compare(const Compare& other, Transaction* tr)
+        : m_left(other.m_left->clone(tr))
+        , m_right(other.m_right->clone(tr))
     {
     }
 

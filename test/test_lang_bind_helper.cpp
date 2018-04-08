@@ -9398,6 +9398,9 @@ TEST(LangBindHelper_HandoverQuery)
     auto int_col = table->get_column_key("second");
     Query query = table->column<Int>(int_col) < 50;
     size_t count = query.count();
+    // CHECK(query.is_in_sync());
+    auto vtrans = rt->duplicate();
+    std::unique_ptr<Query> q2 = vtrans->copy_of(query, PayloadPolicy::Move);
     CHECK_EQUAL(count, 50);
     {
         // Delete first column. This alters the index of 'second' column
@@ -9410,6 +9413,8 @@ TEST(LangBindHelper_HandoverQuery)
     }
     rt->advance_read();
     count = query.count();
+    CHECK_EQUAL(count, 50);
+    count = q2->count();
     CHECK_EQUAL(count, 50);
 }
 
@@ -9468,49 +9473,39 @@ TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
         }
     }
 }
+#endif
 
 TEST(LangBindHelper_SubqueryHandoverDependentViews)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, SharedGroupOptions(crypt_key()));
-    sg.begin_read();
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
-    DB::VersionID vid;
+    std::unique_ptr<Query> qq2;
+    TransactionRef reader;
+    ColKey col1;
     {
-        // Untyped interface
-        std::unique_ptr<DB::Handover<TableView>> handover1;
-        std::unique_ptr<DB::Handover<Query>> handoverQuery;
         {
             TableView tv1;
-            LangBindHelper::promote_to_write(sg_w);
-            TableRef table = group_w.add_table("table2");
-            table->add_column(type_Int, "first");
-            table->add_column(type_Bool, "even");
+            auto writer = sg.start_write();
+            TableRef table = writer->add_table("table2");
+            auto col0 = table->add_column(type_Int, "first");
+            col1 = table->add_column(type_Bool, "even");
             for (int i = 0; i < 100; ++i) {
-                table->add_empty_row();
-                table->set_int(0, i, i);
+                auto obj = table->create_object();
+                obj.set<int>(col0, i);
                 bool isEven = ((i % 2) == 0);
-                table->set_bool(1, i, isEven);
+                obj.set<bool>(col1, isEven);
             }
-            LangBindHelper::commit_and_continue_as_read(sg_w);
-            vid = sg_w.get_version_of_current_transaction();
-            tv1 = table->where().less_equal(0, 50).find_all();
+            writer->commit_and_continue_as_read();
+            tv1 = table->where().less_equal(col0, 50).find_all();
             Query qq = tv1.get_parent().where(&tv1);
-            handoverQuery = sg_w.export_for_handover(qq, ConstSourcePayload::Copy);
+            reader = writer->duplicate();
+            qq2 = reader->copy_of(qq, PayloadPolicy::Copy);
             CHECK(tv1.is_attached());
             CHECK_EQUAL(51, tv1.size());
         }
         {
-            LangBindHelper::advance_read(sg, vid);
-            sg_w.close();
-
-            std::unique_ptr<Query> q(sg.import_from_handover(move(handoverQuery)));
-            realm::TableView tv = q->equal(1, true).find_all();
+            realm::TableView tv = qq2->equal(col1, true).find_all();
 
             CHECK(tv.is_in_sync());
             CHECK(tv.is_attached());
@@ -9519,122 +9514,49 @@ TEST(LangBindHelper_SubqueryHandoverDependentViews)
     }
 }
 
-
 TEST(LangBindHelper_HandoverPartialQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, SharedGroupOptions(crypt_key()));
-    sg.begin_read();
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
-    DB::VersionID vid;
+    std::unique_ptr<Query> qq2;
+    TransactionRef reader;
+    ColKey col0;
     {
-        // Untyped interface
-        std::unique_ptr<DB::Handover<Query>> handover;
         {
-            LangBindHelper::promote_to_write(sg_w);
-            TableRef table = group_w.add_table("table2");
-            table->add_column(type_Int, "first");
+            TableView tv1;
+            auto writer = sg.start_write();
+            TableRef table = writer->add_table("table2");
+            col0 = table->add_column(type_Int, "first");
+            auto col1 = table->add_column(type_Bool, "even");
             for (int i = 0; i < 100; ++i) {
-                table->add_empty_row();
-                table->set_int(0, i, i);
+                auto obj = table->create_object();
+                obj.set<int>(col0, i);
+                bool isEven = ((i % 2) == 0);
+                obj.set<bool>(col1, isEven);
             }
-            CHECK_EQUAL(100, table->size());
-            LangBindHelper::commit_and_continue_as_read(sg_w);
-            vid = sg_w.get_version_of_current_transaction();
-            TableView view = table->where().less(0, 50).find_all();
-            TableView* tv = &view;
-            Query query(view.get_parent().where(tv));
-            handover = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
+            writer->commit_and_continue_as_read();
+            tv1 = table->where().less_equal(col0, 50).find_all();
+            Query qq = tv1.get_parent().where(&tv1);
+            reader = writer->duplicate();
+            qq2 = reader->copy_of(qq, PayloadPolicy::Copy);
+            CHECK(tv1.is_attached());
+            CHECK_EQUAL(51, tv1.size());
         }
         {
-            LangBindHelper::advance_read(sg, vid);
-            sg_w.close();
-            // importing query
-            std::unique_ptr<Query> q(sg.import_from_handover(move(handover)));
-            TableView tv = q->greater(0, 48).find_all();
+            TableView tv = qq2->greater(col0, 48).find_all();
             CHECK(tv.is_attached());
-            CHECK_EQUAL(1, tv.size());
-            CHECK_EQUAL(49, tv.get_int(0, 0));
+            CHECK_EQUAL(2, tv.size());
+            auto obj = tv.get(0);
+            CHECK_EQUAL(49, obj.get<int64_t>(col0));
+            obj = tv.get(1);
+            CHECK_EQUAL(50, obj.get<int64_t>(col0));
         }
     }
 }
 
 
-TEST(LangBindHelper_HandoverWithPinning)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, SharedGroupOptions(crypt_key()));
-    sg.begin_read();
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
-    DB::VersionID vid;
-    {
-        DB::VersionID token;
-
-        // Untyped interface
-        std::unique_ptr<DB::Handover<Query>> handover;
-        {
-            LangBindHelper::promote_to_write(sg_w);
-            TableRef table = group_w.add_table("table2");
-            table->add_column(type_Int, "first");
-            for (int i = 0; i < 100; ++i) {
-                table->add_empty_row();
-                table->set_int(0, i, i);
-            }
-            CHECK_EQUAL(100, table->size());
-            LangBindHelper::commit_and_continue_as_read(sg_w);
-            vid = sg_w.get_version_of_current_transaction();
-            TableView view = table->where().less(0, 50).find_all();
-            TableView* tv = &view;
-            Query query(view.get_parent().where(tv));
-            handover = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
-            token = sg_w.pin_version();
-        }
-
-        // Advance the SharedGroup past the handover version
-        // also check that pinning during a write transaction actually
-        // refers to pinning of the most recent commit.
-        {
-            auto token_a = sg_w.pin_version();
-            LangBindHelper::promote_to_write(sg_w);
-            auto token_b = sg_w.pin_version();
-            bool token_eq = token_a == token_b;
-            CHECK(token_eq);
-            sg_w.unpin_version(token_a);
-            sg_w.unpin_version(token_b);
-
-            TableRef table = group_w.get_table("table2");
-            table->add_empty_row();
-
-            LangBindHelper::commit_and_continue_as_read(sg_w);
-        }
-        {
-            // Now move to the pinned version
-            LangBindHelper::advance_read(sg, token);
-
-            sg_w.unpin_version(token);
-            sg_w.close();
-
-            // importing query
-            std::unique_ptr<Query> q(sg.import_from_handover(move(handover)));
-            TableView tv = q->greater(0, 48).find_all();
-            CHECK(tv.is_attached());
-            CHECK_EQUAL(1, tv.size());
-            CHECK_EQUAL(49, tv.get_int(0, 0));
-        }
-    }
-}
-
-
+#ifdef LEGACY_TESTS
 // Verify that an in-sync TableView backed by a Query that is restricted to a TableView
 // remains in sync when handed-over using a mutable payload.
 TEST(LangBindHelper_HandoverNestedTableViews)
@@ -9680,66 +9602,60 @@ TEST(LangBindHelper_HandoverNestedTableViews)
         }
     }
 }
-
+#endif
 
 TEST(LangBindHelper_HandoverAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, SharedGroupOptions(crypt_key()));
-    sg.begin_read();
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
-    DB::VersionID vid;
-    std::unique_ptr<DB::Handover<TableView>> handover2;
-    std::unique_ptr<DB::Handover<TableView>> handover3;
-    std::unique_ptr<DB::Handover<TableView>> handover4;
-    std::unique_ptr<DB::Handover<TableView>> handover5;
-    std::unique_ptr<DB::Handover<TableView>> handover6;
-    std::unique_ptr<DB::Handover<TableView>> handover7;
-    std::unique_ptr<DB::Handover<Row>> handover_row;
+    TransactionRef reader;
+    ColKey col;
+    std::unique_ptr<ConstTableView> tv2;
+    std::unique_ptr<ConstTableView> tv3;
+    std::unique_ptr<ConstTableView> tv4;
+    std::unique_ptr<ConstTableView> tv5;
+    std::unique_ptr<ConstTableView> tv6;
+    std::unique_ptr<ConstTableView> tv7;
     {
         TableView tv;
-        Row row;
-        LangBindHelper::promote_to_write(sg_w);
-        TableRef table = group_w.add_table("table2");
-        table->add_column(type_Int, "first");
+        auto writer = sg.start_write();
+        TableRef table = writer->add_table("table2");
+        col = table->add_column(type_Int, "first");
         for (int i = 0; i < 100; ++i) {
-            table->add_empty_row();
-            table->set_int(0, i, i);
+            table->create_object().set_all(i);
         }
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-        vid = sg_w.get_version_of_current_transaction();
+        writer->commit_and_continue_as_read();
+
         tv = table->where().find_all();
         CHECK(tv.is_attached());
         CHECK_EQUAL(100, tv.size());
         for (int i = 0; i < 100; ++i)
-            CHECK_EQUAL(i, tv.get_int(0, i));
+            CHECK_EQUAL(i, tv.get(i).get<Int>(col));
 
-        handover2 = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
-        CHECK(tv.is_attached());
-        CHECK(tv.is_in_sync());
-        handover3 = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        reader = writer->duplicate();
+        tv2 = reader->copy_of(tv, PayloadPolicy::Copy);
         CHECK(tv.is_attached());
         CHECK(tv.is_in_sync());
 
-        handover4 = sg_w.export_for_handover(tv, MutableSourcePayload::Move);
+        tv3 = reader->copy_of(tv, PayloadPolicy::Stay);
+        CHECK(tv.is_attached());
+        CHECK(tv.is_in_sync());
+
+        tv4 = reader->copy_of(tv, PayloadPolicy::Move);
         CHECK(tv.is_attached());
         CHECK(!tv.is_in_sync());
 
         // and again, but this time with the source out of sync:
-        handover5 = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
+        tv5 = reader->copy_of(tv, PayloadPolicy::Copy);
         CHECK(tv.is_attached());
         CHECK(!tv.is_in_sync());
 
-        handover6 = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        tv6 = reader->copy_of(tv, PayloadPolicy::Stay);
         CHECK(tv.is_attached());
         CHECK(!tv.is_in_sync());
 
-        handover7 = sg_w.export_for_handover(tv, MutableSourcePayload::Move);
+        tv7 = reader->copy_of(tv, PayloadPolicy::Move);
         CHECK(tv.is_attached());
         CHECK(!tv.is_in_sync());
 
@@ -9747,59 +9663,45 @@ TEST(LangBindHelper_HandoverAccessors)
         tv.sync_if_needed();
         CHECK(tv.is_in_sync());
 
-        // Aaaaand rows!
-        row = (*table)[7];
-        CHECK_EQUAL(7, row.get_int(0));
-        handover_row = sg_w.export_for_handover(row);
-        CHECK(row.is_attached());
+        // Obj handover tested elsewhere
     }
     {
-        LangBindHelper::advance_read(sg, vid);
-        sg_w.close();
-        // importing tv:
-        std::unique_ptr<TableView> tv(sg.import_from_handover(move(handover2)));
-        CHECK(tv->is_attached());
-        CHECK(tv->is_in_sync());
-        CHECK_EQUAL(100, tv->size());
+        // now examining stuff handed over to other transaction
+        // with payload:
+        CHECK(tv2->is_attached());
+        CHECK(tv2->is_in_sync());
+        CHECK_EQUAL(100, tv2->size());
         for (int i = 0; i < 100; ++i)
-            CHECK_EQUAL(i, tv->get_int(0, i));
+            CHECK_EQUAL(i, tv2->get(i).get<Int>(col));
         // importing one without payload:
-        std::unique_ptr<TableView> tv3(sg.import_from_handover(move(handover3)));
         CHECK(tv3->is_attached());
         CHECK(!tv3->is_in_sync());
         tv3->sync_if_needed();
         CHECK_EQUAL(100, tv3->size());
         for (int i = 0; i < 100; ++i)
-            CHECK_EQUAL(i, tv3->get_int(0, i));
+            CHECK_EQUAL(i, tv3->get(i).get<Int>(col));
 
         // one with payload:
-        std::unique_ptr<TableView> tv4(sg.import_from_handover(move(handover4)));
         CHECK(tv4->is_attached());
         CHECK(tv4->is_in_sync());
         CHECK_EQUAL(100, tv4->size());
         for (int i = 0; i < 100; ++i)
-            CHECK_EQUAL(i, tv4->get_int(0, i));
+            CHECK_EQUAL(i, tv4->get(i).get<Int>(col));
 
         // verify that subsequent imports are all without payload:
-        std::unique_ptr<TableView> tv5(sg.import_from_handover(move(handover5)));
         CHECK(tv5->is_attached());
         CHECK(!tv5->is_in_sync());
 
-        std::unique_ptr<TableView> tv6(sg.import_from_handover(move(handover6)));
         CHECK(tv6->is_attached());
         CHECK(!tv6->is_in_sync());
 
-        std::unique_ptr<TableView> tv7(sg.import_from_handover(move(handover7)));
         CHECK(tv7->is_attached());
         CHECK(!tv7->is_in_sync());
-
-        // importing row:
-        std::unique_ptr<Row> row(sg.import_from_handover(move(handover_row)));
-        CHECK(row->is_attached());
-        CHECK_EQUAL(7, row->get_int(0));
     }
 }
 
+
+#ifdef LEGACY_TESTS
 namespace {
 // support threads for handover test. The setup is as follows:
 // thread A writes a stream of updates to the database,
@@ -10497,65 +10399,54 @@ TEST(LangBindHelper_HandoverLinkView)
     }
 }
 
-#ifdef LEGACY_TESTS
 TEST(LangBindHelper_HandoverDistinctView)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, SharedGroupOptions(crypt_key()));
-    sg.begin_read();
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
-    DB::VersionID vid;
+    TransactionRef reader;
+    std::unique_ptr<ConstTableView> tv2;
+    ConstObj obj2b;
     {
-        // Untyped interface
-        std::unique_ptr<DB::Handover<TableView>> handover1;
-        std::unique_ptr<DB::Handover<TableView>> handover2;
         {
             TableView tv1;
-            TableView tv2;
-            LangBindHelper::promote_to_write(sg_w);
-            TableRef table = group_w.add_table("table2");
-            table->add_column(type_Int, "first");
-            table->add_empty_row(2);
-            table->set_int(0, 0, 100);
-            table->set_int(0, 1, 100);
+            auto writer = sg.start_write();
+            TableRef table = writer->add_table("table2");
+            auto col = table->add_column(type_Int, "first");
+            auto obj1 = table->create_object().set_all(100);
+            auto obj2 = table->create_object().set_all(100);
 
-            LangBindHelper::commit_and_continue_as_read(sg_w);
-            vid = sg_w.get_version_of_current_transaction();
+            writer->commit_and_continue_as_read();
             tv1 = table->where().find_all();
-            tv1.distinct(0);
+            tv1.distinct(col);
             CHECK(tv1.size() == 1);
-            CHECK(tv1.get_source_ndx(0) == 0);
+            CHECK(tv1.get_key(0) == obj1.get_key());
             CHECK(tv1.is_attached());
 
-            handover2 = sg_w.export_for_handover(tv1, ConstSourcePayload::Copy);
+            reader = writer->duplicate();
+            tv2 = reader->copy_of(tv1, PayloadPolicy::Copy);
+            obj2b = reader->copy_of(obj1);
             CHECK(tv1.is_attached());
         }
         {
-            LangBindHelper::advance_read(sg, vid);
-            sg_w.close();
-            // importing tv1:
-            std::unique_ptr<TableView> tv2(sg.import_from_handover(move(handover2)));
+            // importing side: working in the context of "reader"
             CHECK(tv2->is_in_sync());
             CHECK(tv2->is_attached());
 
             CHECK_EQUAL(tv2->size(), 1);
-            CHECK_EQUAL(tv2->get_source_ndx(0), 0);
+            CHECK_EQUAL(tv2->get_key(0), obj2b.get_key());
 
             // distinct property must remain through handover such that second row is kept being omitted
             // after sync_if_needed()
             tv2->sync_if_needed();
             CHECK_EQUAL(tv2->size(), 1);
-            CHECK_EQUAL(tv2->get_source_ndx(0), 0);
+            CHECK_EQUAL(tv2->get_key(0), obj2b.get_key());
         }
     }
 }
 
 
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_HandoverWithReverseDependency)
 {
     // FIXME: This testcase is wrong!

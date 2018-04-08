@@ -190,11 +190,6 @@ public:
     bool will_apply_distinct() const;
     std::string get_description(ConstTableRef target_table) const;
 
-    // handover support
-    using HandoverPatch = std::unique_ptr<DescriptorOrderingHandoverPatch>;
-    static void generate_patch(DescriptorOrdering const&, HandoverPatch&);
-    static DescriptorOrdering create_from_and_consume_patch(HandoverPatch&, Table const&);
-
 private:
     std::vector<std::unique_ptr<CommonDescriptor>> m_descriptors;
 };

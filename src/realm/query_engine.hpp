@@ -253,17 +253,7 @@ public:
     {
     }
 
-    ParentNode(const ParentNode& from, QueryNodeHandoverPatches* patches)
-        : m_child(from.m_child ? from.m_child->clone(patches) : nullptr)
-        , m_condition_column_name(from.m_condition_column_name)
-        , m_condition_column_key(from.m_condition_column_key)
-        , m_dD(from.m_dD)
-        , m_dT(from.m_dT)
-        , m_probes(from.m_probes)
-        , m_matches(from.m_matches)
-        , m_table(patches ? ConstTableRef{} : from.m_table)
-    {
-    }
+    ParentNode(const ParentNode& from, Transaction* tr);
 
     void add_child(std::unique_ptr<ParentNode> child)
     {
@@ -273,13 +263,7 @@ public:
             m_child = std::move(child);
     }
 
-    virtual std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* = nullptr) const = 0;
-
-    virtual void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group)
-    {
-        if (m_child)
-            m_child->apply_handover_patch(patches, group);
-    }
+    virtual std::unique_ptr<ParentNode> clone(Transaction* = nullptr) const = 0;
 
     ColKey get_column_key(StringData column_name) const
     {
@@ -388,8 +372,8 @@ protected:
         m_condition_column_key = column_key;
     }
 
-    ColumnNodeBase(const ColumnNodeBase& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches)
+    ColumnNodeBase(const ColumnNodeBase& from, Transaction* tr)
+        : ParentNode(from, tr)
         , m_last_local_match(from.m_last_local_match)
         , m_local_matches(from.m_local_matches)
         , m_local_limit(from.m_local_limit)
@@ -512,8 +496,8 @@ protected:
     {
     }
 
-    IntegerNodeBase(const ThisType& from, QueryNodeHandoverPatches* patches)
-        : ColumnNodeBase(from, patches)
+    IntegerNodeBase(const ThisType& from, Transaction* tr)
+        : ColumnNodeBase(from, tr)
         , m_value(from.m_value)
         , m_find_callback_specialized(from.m_find_callback_specialized)
     {
@@ -581,8 +565,8 @@ public:
         : BaseType(value, column_key)
     {
     }
-    IntegerNode(const IntegerNode& from, QueryNodeHandoverPatches* patches)
-        : BaseType(from, patches)
+    IntegerNode(const IntegerNode& from, Transaction* tr)
+        : BaseType(from, tr)
     {
     }
 
@@ -616,9 +600,9 @@ public:
         return TConditionFunction::description();
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new ThisType(*this, patches));
+        return std::unique_ptr<ParentNode>(new ThisType(*this, tr));
     }
 
 protected:
@@ -760,13 +744,13 @@ public:
         return TConditionFunction::description();
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new FloatDoubleNode(*this, patches));
+        return std::unique_ptr<ParentNode>(new FloatDoubleNode(*this, tr));
     }
 
-    FloatDoubleNode(const FloatDoubleNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches)
+    FloatDoubleNode(const FloatDoubleNode& from, Transaction* tr)
+        : ParentNode(from, tr)
         , m_value(from.m_value)
     {
     }
@@ -821,13 +805,13 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new SizeNode(*this, patches));
+        return std::unique_ptr<ParentNode>(new SizeNode(*this, tr));
     }
 
-    SizeNode(const SizeNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches)
+    SizeNode(const SizeNode& from, Transaction* tr)
+        : ParentNode(from, tr)
         , m_value(from.m_value)
     {
     }
@@ -887,13 +871,13 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new SizeListNode(*this, patches));
+        return std::unique_ptr<ParentNode>(new SizeListNode(*this, tr));
     }
 
-    SizeListNode(const SizeListNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches)
+    SizeListNode(const SizeListNode& from, Transaction* tr)
+        : ParentNode(from, tr)
         , m_value(from.m_value)
     {
     }
@@ -962,13 +946,13 @@ public:
                TConditionFunction::description() + " " + util::serializer::print_value(BinaryNode::m_value.get());
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new BinaryNode(*this, patches));
+        return std::unique_ptr<ParentNode>(new BinaryNode(*this, tr));
     }
 
-    BinaryNode(const BinaryNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches)
+    BinaryNode(const BinaryNode& from, Transaction* tr)
+        : ParentNode(from, tr)
         , m_value(from.m_value)
     {
     }
@@ -993,8 +977,8 @@ public:
         m_condition_column_key = column;
     }
 
-    BoolNode(const BoolNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches)
+    BoolNode(const BoolNode& from, Transaction* tr)
+        : ParentNode(from, tr)
         , m_value(from.m_value)
     {
     }
@@ -1032,9 +1016,9 @@ public:
                TConditionFunction::description() + " " + util::serializer::print_value(m_value);
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new BoolNode(*this, patches));
+        return std::unique_ptr<ParentNode>(new BoolNode(*this, tr));
     }
 
 private:
@@ -1097,13 +1081,13 @@ public:
                TConditionFunction::description() + " " + util::serializer::print_value(TimestampNode::m_value);
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new TimestampNode(*this, patches));
+        return std::unique_ptr<ParentNode>(new TimestampNode(*this, tr));
     }
 
-    TimestampNode(const TimestampNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches)
+    TimestampNode(const TimestampNode& from, Transaction* tr)
+        : ParentNode(from, tr)
         , m_value(from.m_value)
     {
     }
@@ -1164,8 +1148,8 @@ public:
         m_array_ptr = nullptr;
     }
 
-    StringNodeBase(const StringNodeBase& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches)
+    StringNodeBase(const StringNodeBase& from, Transaction* tr)
+        : ParentNode(from, tr)
         , m_value(from.m_value)
         , m_is_string_enum(from.m_is_string_enum)
     {
@@ -1250,13 +1234,13 @@ public:
         return TConditionFunction::description();
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new StringNode<TConditionFunction>(*this, patches));
+        return std::unique_ptr<ParentNode>(new StringNode<TConditionFunction>(*this, tr));
     }
 
-    StringNode(const StringNode& from, QueryNodeHandoverPatches* patches)
-        : StringNodeBase(from, patches)
+    StringNode(const StringNode& from, Transaction* tr)
+        : StringNodeBase(from, tr)
         , m_ucase(from.m_ucase)
         , m_lcase(from.m_lcase)
     {
@@ -1319,13 +1303,13 @@ public:
     }
 
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new StringNode<Contains>(*this, patches));
+        return std::unique_ptr<ParentNode>(new StringNode<Contains>(*this, tr));
     }
 
-    StringNode(const StringNode& from, QueryNodeHandoverPatches* patches)
-        : StringNodeBase(from, patches)
+    StringNode(const StringNode& from, Transaction* tr)
+        : StringNodeBase(from, tr)
         , m_charmap(from.m_charmap)
     {
     }
@@ -1401,13 +1385,13 @@ public:
         return ContainsIns::description();
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new StringNode<ContainsIns>(*this, patches));
+        return std::unique_ptr<ParentNode>(new StringNode<ContainsIns>(*this, tr));
     }
 
-    StringNode(const StringNode& from, QueryNodeHandoverPatches* patches)
-        : StringNodeBase(from, patches)
+    StringNode(const StringNode& from, Transaction* tr)
+        : StringNodeBase(from, tr)
         , m_charmap(from.m_charmap)
         , m_ucase(from.m_ucase)
         , m_lcase(from.m_lcase)
@@ -1426,8 +1410,8 @@ public:
         : StringNodeBase(v, column)
     {
     }
-    StringNodeEqualBase(const StringNodeEqualBase& from, QueryNodeHandoverPatches* patches)
-        : StringNodeBase(from, patches)
+    StringNodeEqualBase(const StringNodeEqualBase& from, Transaction* tr)
+        : StringNodeBase(from, tr)
     {
     }
 
@@ -1466,9 +1450,9 @@ public:
 
     void _search_index_init() override;
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this, patches));
+        return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this, tr));
     }
 
 private:
@@ -1514,13 +1498,13 @@ public:
         return EqualIns::description();
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new StringNode(*this, patches));
+        return std::unique_ptr<ParentNode>(new StringNode(*this, tr));
     }
 
-    StringNode(const StringNode& from, QueryNodeHandoverPatches* patches)
-        : StringNodeEqualBase(from, patches)
+    StringNode(const StringNode& from, Transaction* tr)
+        : StringNodeEqualBase(from, tr)
         , m_ucase(from.m_ucase)
         , m_lcase(from.m_lcase)
     {
@@ -1556,11 +1540,11 @@ public:
             m_conditions.emplace_back(std::move(condition));
     }
 
-    OrNode(const OrNode& other, QueryNodeHandoverPatches* patches)
-        : ParentNode(other, patches)
+    OrNode(const OrNode& other, Transaction* tr)
+        : ParentNode(other, tr)
     {
         for (const auto& condition : other.m_conditions) {
-            m_conditions.emplace_back(condition->clone(patches));
+            m_conditions.emplace_back(condition->clone(tr));
         }
     }
 
@@ -1677,17 +1661,9 @@ public:
         return "";
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new OrNode(*this, patches));
-    }
-
-    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
-    {
-        for (auto it = m_conditions.rbegin(); it != m_conditions.rend(); ++it)
-            (*it)->apply_handover_patch(patches, group);
-
-        ParentNode::apply_handover_patch(patches, group);
+        return std::unique_ptr<ParentNode>(new OrNode(*this, tr));
     }
 
     std::vector<std::unique_ptr<ParentNode>> m_conditions;
@@ -1765,24 +1741,18 @@ public:
     }
 
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new NotNode(*this, patches));
+        return std::unique_ptr<ParentNode>(new NotNode(*this, tr));
     }
 
-    NotNode(const NotNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches)
-        , m_condition(from.m_condition ? from.m_condition->clone(patches) : nullptr)
+    NotNode(const NotNode& from, Transaction* tr)
+        : ParentNode(from, tr)
+        , m_condition(from.m_condition ? from.m_condition->clone(tr) : nullptr)
         , m_known_range_start(from.m_known_range_start)
         , m_known_range_end(from.m_known_range_end)
         , m_first_in_known_range(from.m_first_in_known_range)
     {
-    }
-
-    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
-    {
-        m_condition->apply_handover_patch(patches, group);
-        ParentNode::apply_handover_patch(patches, group);
     }
 
     std::unique_ptr<ParentNode> m_condition;
@@ -1896,13 +1866,13 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
     {
-        return std::unique_ptr<ParentNode>(new TwoColumnsNode<LeafType, TConditionFunction>(*this, patches));
+        return std::unique_ptr<ParentNode>(new TwoColumnsNode<LeafType, TConditionFunction>(*this, tr));
     }
 
-    TwoColumnsNode(const TwoColumnsNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches)
+    TwoColumnsNode(const TwoColumnsNode& from, Transaction* tr)
+        : ParentNode(from, tr)
         , m_condition_column_key1(from.m_condition_column_key1)
         , m_condition_column_key2(from.m_condition_column_key2)
     {
@@ -1938,20 +1908,14 @@ public:
 
     virtual std::string describe(util::serializer::SerialisationState& state) const override;
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override;
-    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override;
+    std::unique_ptr<ParentNode> clone(Transaction* tr) const override;
 
 private:
-    ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatches* patches);
+    ExpressionNode(const ExpressionNode& from, Transaction* tr);
 
     std::unique_ptr<Expression> m_expression;
 };
 
-
-struct LinksToNodeHandoverPatch : public QueryNodeHandoverPatch {
-    std::unique_ptr<RowBaseHandoverPatch> m_target_row;
-    size_t m_origin_column;
-};
 
 class LinksToNode : public ParentNode {
 public:
@@ -2014,7 +1978,7 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<ParentNode> clone(Transaction*) const override
     {
         return std::unique_ptr<ParentNode>(new LinksToNode(*this));
     }
