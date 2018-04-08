@@ -1273,11 +1273,10 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
     // Upgrade file format and/or history schema
     try {
-        using gf = _impl::GroupFriend;
         if (stored_hist_schema_version == -1) {
             // current_hist_schema_version has not been read. Read it now
-            auto trans = start_read(); // <-- is this necessary? FIXME
-            stored_hist_schema_version = gf::get_history_schema_version(m_alloc, m_read_lock.m_top_ref);
+            auto trans = start_read();
+            stored_hist_schema_version = trans->get_history_schema_version();
         }
         if (current_file_format_version == 0) {
             // If the current file format is still undecided, no upgrade is
@@ -1690,7 +1689,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         }
 
         // History schema upgrade
-        int current_hist_schema_version_2 = gf::get_history_schema_version(*wt);
+        int current_hist_schema_version_2 = wt->get_history_schema_version();
         // The history must either still be using its initial schema or have
         // been upgraded already to the chosen target schema version via a
         // concurrent SharedGroup object.

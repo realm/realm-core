@@ -224,6 +224,8 @@ public:
 
     size_t size() const noexcept;
 
+    int get_history_schema_version() noexcept;
+
     /// Returns the keys for all tables in this group.
     std::vector<TableKey> get_keys() const;
 
@@ -782,7 +784,6 @@ private:
     static void get_version_and_history_info(const Array& top, _impl::History::version_type& version,
                                              int& history_type, int& history_schema_version) noexcept;
     static ref_type get_history_ref(const Array& top) noexcept;
-    static int get_history_schema_version(const Array& top) noexcept;
     void set_history_schema_version(int version);
     void set_history_parent(BPlusTreeBase& history_root) noexcept;
     void prepare_history_parent(BPlusTreeBase& history_root, int history_type, int history_schema_version);
@@ -1039,13 +1040,13 @@ inline ref_type Group::get_history_ref(const Array& top) noexcept
     return 0;
 }
 
-inline int Group::get_history_schema_version(const Array& top) noexcept
+inline int Group::get_history_schema_version() noexcept
 {
-    bool has_history = (top.is_attached() && top.size() >= 8);
+    bool has_history = (m_top.is_attached() && m_top.size() >= 8);
     if (has_history) {
         // This function is only used is shared mode (from SharedGroup)
-        REALM_ASSERT(top.size() >= 10);
-        return int(top.get_as_ref_or_tagged(9).get_as_int());
+        REALM_ASSERT(m_top.size() >= 10);
+        return int(m_top.get_as_ref_or_tagged(9).get_as_int());
     }
     return 0;
 }
@@ -1250,19 +1251,6 @@ public:
         if (top_ref != 0)
             top.init_from_ref(top_ref);
         return Group::get_history_ref(top);
-    }
-
-    static int get_history_schema_version(const Group& group) noexcept
-    {
-        return Group::get_history_schema_version(group.m_top);
-    }
-
-    static int get_history_schema_version(Allocator& alloc, ref_type top_ref) noexcept
-    {
-        Array top{alloc};
-        if (top_ref != 0)
-            top.init_from_ref(top_ref);
-        return Group::get_history_schema_version(top);
     }
 
     static void set_history_schema_version(Group& group, int version)
