@@ -93,14 +93,13 @@ public:
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and the
     /// upgrade will be aborted.
-    explicit DB(const std::string& file, bool no_create = false,
-                const SharedGroupOptions options = SharedGroupOptions());
+    explicit DB(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
 
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and
     /// the upgrade will be aborted.
-    explicit DB(Replication& repl, const SharedGroupOptions options = SharedGroupOptions());
+    explicit DB(Replication& repl, const DBOptions options = DBOptions());
 
     struct unattached_tag {
     };
@@ -150,12 +149,11 @@ public:
     ///
     /// \throw FileFormatUpgradeRequired only if \a SharedGroupOptions::allow_upgrade
     /// is `false` and an upgrade is required.
-    void open(const std::string& file, bool no_create = false,
-              const SharedGroupOptions options = SharedGroupOptions());
+    void open(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
 
     /// Open this group in replication mode. The specified Replication instance
     /// must remain in existence for as long as the DB.
-    void open(Replication&, const SharedGroupOptions options = SharedGroupOptions());
+    void open(Replication&, const DBOptions options = DBOptions());
 
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
@@ -399,7 +397,7 @@ private:
     std::shared_ptr<metrics::Metrics> m_metrics;
 #endif // REALM_METRICS
 
-    void do_open(const std::string& file, bool no_create, bool is_backend, const SharedGroupOptions options);
+    void do_open(const std::string& file, bool no_create, bool is_backend, const DBOptions options);
 
     // Ring buffer management
     bool ringbuf_is_empty() const noexcept;
@@ -671,7 +669,7 @@ private:
 struct DB::BadVersion : std::exception {
 };
 
-inline DB::DB(const std::string& file, bool no_create, const SharedGroupOptions options)
+inline DB::DB(const std::string& file, bool no_create, const DBOptions options)
     : m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(file, no_create, options); // Throws
@@ -681,13 +679,13 @@ inline DB::DB(unattached_tag) noexcept
 {
 }
 
-inline DB::DB(Replication& repl, const SharedGroupOptions options)
+inline DB::DB(Replication& repl, const DBOptions options)
     : m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(repl, options); // Throws
 }
 
-inline void DB::open(const std::string& path, bool no_create_file, const SharedGroupOptions options)
+inline void DB::open(const std::string& path, bool no_create_file, const DBOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -696,7 +694,7 @@ inline void DB::open(const std::string& path, bool no_create_file, const SharedG
     do_open(path, no_create_file, is_backend, options); // Throws
 }
 
-inline void DB::open(Replication& repl, const SharedGroupOptions options)
+inline void DB::open(Replication& repl, const DBOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
