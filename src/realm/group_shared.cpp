@@ -1235,10 +1235,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 // std::cerr << "daemon should be ready" << std::endl;
 #endif // REALM_ASYNC_DAEMON
 
-            // Set initial version so we can track if other instances
-            // change the db
-            m_read_lock.m_version = get_version_of_latest_snapshot();
-
             // make our presence noted:
             ++info->num_participants;
 
@@ -2195,7 +2191,7 @@ TransactionRef DB::start_read(VersionID version_id)
 {
     ReadLockInfo read_lock;
     grab_read_lock(read_lock, version_id);
-    ReadLockUnlockGuard g(*this, read_lock);
+    ReadLockGuard g(*this, read_lock);
     Transaction* tr = new Transaction(this, &m_alloc, read_lock, DB::transact_Reading);
     tr->set_file_format_version(get_file_format_version());
     g.release();
@@ -2206,7 +2202,7 @@ TransactionRef DB::start_frozen(VersionID version_id)
 {
     ReadLockInfo read_lock;
     grab_read_lock(read_lock, version_id);
-    ReadLockUnlockGuard g(*this, read_lock);
+    ReadLockGuard g(*this, read_lock);
     Transaction* tr = new Transaction(this, &m_alloc, read_lock, DB::transact_Frozen);
     tr->set_file_format_version(get_file_format_version());
     g.release();
@@ -2323,11 +2319,11 @@ TransactionRef DB::start_write()
     Transaction* tr;
     try {
         grab_read_lock(read_lock, VersionID());
-        ReadLockUnlockGuard g(*this, read_lock);
+        ReadLockGuard g(*this, read_lock);
         tr = new Transaction(this, &m_alloc, read_lock, DB::transact_Writing);
         tr->set_file_format_version(get_file_format_version());
         if (Replication* repl = m_alloc.get_replication()) {
-            version_type current_version = m_read_lock.m_version;
+            version_type current_version = read_lock.m_version;
             bool history_updated = false;
             repl->initiate_transact(current_version, history_updated); // Throws
         }

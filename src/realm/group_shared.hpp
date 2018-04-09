@@ -401,12 +401,11 @@ private:
         ref_type m_top_ref = 0;
         size_t m_file_size = 0;
     };
-    class ReadLockUnlockGuard;
+    class ReadLockGuard;
 
     // Member variables
     size_t m_free_space = 0;
     size_t m_used_space = 0;
-    ReadLockInfo m_read_lock;
     uint_fast32_t m_local_max_entry;
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
@@ -480,11 +479,6 @@ private:
 
     /// Returns the version of the latest snapshot.
     version_type get_version_of_latest_snapshot();
-
-    /// Returns the version of the snapshot bound in the current read or write
-    /// transaction. It is an error to call this function when no transaction is
-    /// in progress.
-    version_type get_version_of_bound_snapshot() const noexcept;
 
     // make sure the given index is within the currently mapped area.
     // if not, expand the mapped area. Returns true if the area is expanded.
@@ -760,19 +754,14 @@ inline DB::TransactStage Transaction::get_transact_stage() const noexcept
     return m_transact_stage;
 }
 
-inline DB::version_type DB::get_version_of_bound_snapshot() const noexcept
-{
-    return m_read_lock.m_version;
-}
-
-class DB::ReadLockUnlockGuard {
+class DB::ReadLockGuard {
 public:
-    ReadLockUnlockGuard(DB& shared_group, ReadLockInfo& read_lock) noexcept
+    ReadLockGuard(DB& shared_group, ReadLockInfo& read_lock) noexcept
         : m_shared_group(shared_group)
         , m_read_lock(&read_lock)
     {
     }
-    ~ReadLockUnlockGuard() noexcept
+    ~ReadLockGuard() noexcept
     {
         if (m_read_lock)
             m_shared_group.release_read_lock(*m_read_lock);
@@ -983,7 +972,7 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
         return false;
     }
 
-    DB::ReadLockUnlockGuard g(*db, new_read_lock);
+    DB::ReadLockGuard g(*db, new_read_lock);
     {
         DB::version_type new_version = new_read_lock.m_version;
         size_t new_file_size = new_read_lock.m_file_size;
