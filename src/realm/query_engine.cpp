@@ -456,10 +456,10 @@ void ExpressionNode::cluster_changed()
     m_expression->set_cluster(m_cluster);
 }
 
-std::string ExpressionNode::describe() const
+std::string ExpressionNode::describe(util::serializer::SerialisationState& state) const
 {
     if (m_expression) {
-        return m_expression->description();
+        return m_expression->description(state);
     }
     else {
         return "empty expression";

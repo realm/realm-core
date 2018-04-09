@@ -19,8 +19,11 @@
 #include <realm/util/serializer.hpp>
 
 #include <realm/binary_data.hpp>
+#include <realm/keys.hpp>
 #include <realm/null.hpp>
+#include <realm/query_expression.hpp>
 #include <realm/string_data.hpp>
+#include <realm/table.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/string_buffer.hpp>
@@ -97,6 +100,98 @@ std::string print_value<>(realm::Timestamp t)
     std::stringstream ss;
     ss << "T" << t.get_seconds() << ":" << t.get_nanoseconds();
     return ss.str();
+}
+
+
+// The variable name must be unique with respect to the already chosen variables at
+// this level of subquery nesting and with respect to the names of the columns in the table.
+// This assumes that columns can start with '$' and that we might one day want to support
+// referencing the parent table columns in the subquery. This is currently disabled by an assertion in the
+// core SubQuery constructor.
+std::string SerialisationState::get_variable_name(ConstTableRef table)
+{
+    std::string guess_prefix = "$";
+    const char start_char = 'x';
+    char add_char = start_char;
+
+    auto next_guess = [&]() {
+        add_char = (((add_char + 1) - 'a') % ('z' - 'a' + 1)) + 'a';
+        if (add_char == start_char) {
+            guess_prefix += add_char;
+        }
+    };
+
+    while (true) {
+        std::string guess = guess_prefix + add_char;
+        bool found_duplicate = false;
+        for (size_t i = 0; i < subquery_prefix_list.size(); ++i) {
+            if (guess == subquery_prefix_list[i]) {
+                found_duplicate = true;
+                break;
+            }
+        }
+        if (found_duplicate) {
+            next_guess();
+            continue;
+        }
+        if (table->get_column_key(guess) != ColKey()) {
+            next_guess();
+            continue;
+        }
+        return guess;
+    }
+}
+
+std::string SerialisationState::get_column_name(ConstTableRef table, ColKey col_key)
+{
+    ColumnType col_type = table->get_real_column_type(col_key);
+    if (col_type == col_type_BackLink) {
+        const Table::BacklinkOrigin origin = table->find_backlink_origin(col_key);
+        REALM_ASSERT(origin);
+        std::string source_table_name = origin->first->get_name();
+        std::string source_col_name = origin->first->get_column_name(origin->second);
+        return "@links" + util::serializer::value_separator + source_table_name + util::serializer::value_separator +
+               source_col_name;
+    }
+    else if (col_key != ColKey()) {
+        return std::string(table->get_column_name(col_key));
+    }
+    return "";
+}
+
+std::string SerialisationState::describe_column(ConstTableRef table, ColKey col_key)
+{
+    if (table && col_key) {
+        std::string desc;
+        if (!subquery_prefix_list.empty()) {
+            desc += subquery_prefix_list.back() + value_separator;
+        }
+        desc += get_column_name(table, col_key);
+        return desc;
+    }
+    return "";
+}
+
+std::string SerialisationState::describe_columns(const LinkMap& link_map, ColKey target_col_key)
+{
+    std::string desc;
+    if (!subquery_prefix_list.empty()) {
+        desc += subquery_prefix_list.back();
+    }
+    if (link_map.links_exist()) {
+        if (!desc.empty()) {
+            desc += util::serializer::value_separator;
+        }
+        desc += link_map.description(*this);
+    }
+    const Table* target = link_map.get_target_table();
+    if (target && target_col_key) {
+        if (!desc.empty()) {
+            desc += util::serializer::value_separator;
+        }
+        desc += get_column_name(target->get_table_ref(), target_col_key);
+    }
+    return desc;
 }
 
 } // namespace serializer

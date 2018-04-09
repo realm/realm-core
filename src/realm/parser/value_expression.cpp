@@ -189,11 +189,14 @@ StringData ValueExpression::value_of_type_for_query<StringData>()
         return arguments->string_for_argument(stot<int>(value->s));
     }
     else if (value->type == parser::Expression::Type::String) {
-        return value->s;
+        arguments->buffer_space.push_back({});
+        arguments->buffer_space.back().append(value->s);
+        return StringData(arguments->buffer_space.back().data(), arguments->buffer_space.back().size());
     }
     else if (value->type == parser::Expression::Type::Base64) {
         // the return value points to data in the lifetime of args
-        return from_base64(value->s, arguments->buffer_space);
+        arguments->buffer_space.push_back({});
+        return from_base64(value->s, arguments->buffer_space.back());
     }
     throw std::logic_error("Attempting to compare String property to a non-String value");
 }
@@ -205,10 +208,14 @@ BinaryData ValueExpression::value_of_type_for_query<BinaryData>()
         return arguments->binary_for_argument(stot<int>(value->s));
     }
     else if (value->type == parser::Expression::Type::String) {
-        return BinaryData(value->s);
+        arguments->buffer_space.push_back({});
+        arguments->buffer_space.back().append(value->s);
+        return BinaryData(arguments->buffer_space.back().data(), arguments->buffer_space.back().size());
     }
     else if (value->type == parser::Expression::Type::Base64) {
-        StringData converted = from_base64(value->s, arguments->buffer_space);
+        // the return value points to data in the lifetime of args
+        arguments->buffer_space.push_back({});
+        StringData converted = from_base64(value->s, arguments->buffer_space[arguments->buffer_space.size() - 1]);
         // returning a pointer to data in the lifetime of args
         return BinaryData(converted.data(), converted.size());
     }

@@ -37,7 +37,10 @@ namespace util {
 // check a precondition and throw an exception if it is not met
 // this should be used iff the condition being false indicates a bug in the caller
 // of the function checking its preconditions
-#define precondition(condition, message) if (!REALM_LIKELY(condition)) { throw std::logic_error(message); }
+#define realm_precondition(condition, message)                                                                       \
+    if (!REALM_LIKELY(condition)) {                                                                                  \
+        throw std::logic_error(message);                                                                             \
+    }
 
 
 template <typename T>
@@ -61,11 +64,13 @@ template <>
 const char* type_to_str<Link>();
 
 const char* data_type_to_str(DataType type);
-
 const char* collection_operator_to_str(parser::Expression::KeyPathOp op);
+const char* comparison_type_to_str(parser::Predicate::ComparisonType type);
 
 using KeyPath = std::vector<std::string>;
 KeyPath key_path_from_string(const std::string &s);
+std::string key_path_to_string(const KeyPath& keypath);
+StringData get_printable_table_name(StringData name);
 StringData get_printable_table_name(const Table& table);
 
 template<typename T>

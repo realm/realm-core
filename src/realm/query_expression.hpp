@@ -346,7 +346,7 @@ public:
     {
     }
     virtual const Table* get_base_table() const = 0;
-    virtual std::string description() const = 0;
+    virtual std::string description(util::serializer::SerialisationState& state) const = 0;
 
     virtual std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const = 0;
     virtual void apply_handover_patch(QueryNodeHandoverPatches&, Group&)
@@ -382,7 +382,7 @@ public:
     {
     }
 
-    virtual std::string description() const = 0;
+    virtual std::string description(util::serializer::SerialisationState& state) const = 0;
 
     virtual void set_cluster(const Cluster*)
     {
@@ -1109,7 +1109,7 @@ struct TrueExpression : Expression {
     {
         return nullptr;
     }
-    std::string description() const override
+    std::string description(util::serializer::SerialisationState&) const override
     {
         return "TRUEPREDICATE";
     }
@@ -1131,7 +1131,7 @@ struct FalseExpression : Expression {
     void set_cluster(const Cluster*) override
     {
     }
-    std::string description() const override
+    std::string description(util::serializer::SerialisationState&) const override
     {
         return "FALSEPREDICATE";
     }
@@ -1193,7 +1193,7 @@ public:
         ValueBase::m_values = values.size();
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState&) const override
     {
         if (ValueBase::m_from_link_list) {
             return util::serializer::print_value(util::to_string(ValueBase::m_values) +
@@ -1795,7 +1795,7 @@ public:
 
     void collect_dependencies(std::vector<TableKey>& tables) const;
 
-    std::string description() const;
+    virtual std::string description(util::serializer::SerialisationState& state) const;
 
     std::vector<ObjKey> get_links(size_t index)
     {
@@ -1830,6 +1830,11 @@ public:
     {
         REALM_ASSERT(!m_tables.empty());
         return m_tables.back();
+    }
+
+    bool links_exist() const
+    {
+        return !m_link_column_keys.empty();
     }
 
 private:
@@ -1971,17 +1976,9 @@ public:
         return m_link_map.has_links();
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        std::string desc;
-        if (links_exist()) {
-            desc = m_link_map.description() + util::serializer::value_separator;
-        }
-        auto target_table = m_link_map.get_target_table();
-        if (target_table) {
-            desc += std::string(target_table->get_column_name(m_column_key));
-        }
-        return desc;
+        return state.describe_columns(m_link_map, m_column_key);
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const override
@@ -2202,9 +2199,9 @@ public:
         return not_found;
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        return m_link_map.description() + (has_links ? " != NULL" : " == NULL");
+        return state.describe_columns(m_link_map, ColKey()) + (has_links ? " != NULL" : " == NULL");
     }
 
     std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const override
@@ -2265,9 +2262,9 @@ public:
         destination.import(Value<Int>(false, 1, count));
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        return m_link_map.description() + util::serializer::value_separator + "@count";
+        return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator + "@count";
     }
 
 private:
@@ -2324,10 +2321,10 @@ public:
         }
     }
 
-    std::string description() const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         if (m_expr) {
-            return m_expr->description() + util::serializer::value_separator + "@size";
+            return m_expr->description(state) + util::serializer::value_separator + "@size";
         }
         return "@size";
     }
@@ -2376,7 +2373,7 @@ public:
         d->init(false, 1, m_key);
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState&) const override
     {
         return util::serializer::print_value(m_key);
     }
@@ -2461,9 +2458,9 @@ public:
         m_link_map.collect_dependencies(tables);
     }
 
-    std::string description() const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
-        return m_link_map.description();
+        return state.describe_columns(m_link_map, ColKey());
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
@@ -2517,6 +2514,11 @@ public:
     void set_cluster(const Cluster* cluster);
 
     void get_lists(size_t index, Value<ref_type>& destination, size_t nb_elements);
+
+    std::string description(util::serializer::SerialisationState&) const
+    {
+        throw SerialisationError("Serialisation of query expressions involving subtables is not yet supported.");
+    }
 
     bool links_exist() const
     {
@@ -2599,16 +2601,9 @@ public:
         destination.import(v);
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState&) const override
     {
-        if (links_exist()) {
-            return m_link_map.description();
-        }
-        auto target_table = m_link_map.get_target_table();
-        if (target_table) {
-            return std::string(target_table->get_column_name(m_column_key));
-        }
-        return "";
+        throw SerialisationError("Serialisation of subtable expressions is not yet supported.");
     }
 
     SizeOperator<SizeOfList> size();
@@ -2758,14 +2753,9 @@ public:
         destination.import(v);
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState&) const override
     {
-        auto table = get_base_table();
-        if (table) {
-            return std::string(table->get_column_name(m_column_key)) + util::serializer::value_separator +
-                   Operation::description() + "()";
-        }
-        return "";
+        throw SerialisationError("Serialisation of queries involving subtable expressions is not yet supported.");
     }
 
 private:
@@ -2975,18 +2965,9 @@ public:
         }
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        std::string desc = "";
-        if (links_exist()) {
-            desc = m_link_map.description() + util::serializer::value_separator;
-        }
-        auto target_table = m_link_map.get_target_table();
-        if (target_table && m_column_key != ColKey()) {
-            desc += std::string(target_table->get_column_name(m_column_key));
-            return desc;
-        }
-        return "";
+        return state.describe_columns(m_link_map, m_column_key);
     }
 
     // Load values from Column into destination
@@ -2994,6 +2975,9 @@ public:
     {
         if (m_nullable && std::is_same<typename LeafType::value_type, int64_t>::value) {
             evaluate_internal<ArrayIntNull>(index, destination);
+        }
+        else if (m_nullable && std::is_same<typename LeafType::value_type, bool>::value) {
+            evaluate_internal<ArrayBoolNull>(index, destination);
         }
         else {
             evaluate_internal<LeafType>(index, destination);
@@ -3007,6 +2991,11 @@ public:
         if (m_nullable && std::is_same<typename LeafType::value_type, int64_t>::value) {
             Value<int64_t> v(false, 1);
             v.m_storage.set(0, obj.template get<util::Optional<int64_t>>(m_column_key));
+            destination.import(v);
+        }
+        else if (m_nullable && std::is_same<typename LeafType::value_type, bool>::value) {
+            Value<bool> v(false, 1);
+            v.m_storage.set(0, obj.template get<util::Optional<bool>>(m_column_key));
             destination.import(v);
         }
         else {
@@ -3089,7 +3078,7 @@ public:
         REALM_ASSERT(false);
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState&) const override
     {
         return ""; // by itself there are no conditions, see SubColumnAggregate
     }
@@ -3183,10 +3172,11 @@ public:
         }
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        return m_link_map.description() + util::serializer::value_separator + Operation::description() +
-               util::serializer::value_separator + m_column.description();
+        util::serializer::SerialisationState empty_state;
+        return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator +
+               Operation::description() + util::serializer::value_separator + m_column.description(empty_state);
     }
 
 private:
@@ -3239,12 +3229,16 @@ public:
         destination.import(Value<Int>(false, 1, size_t(count)));
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        throw SerialisationError("Serialising a subquery expression is currently unsupported.");
-        // return m_link_map.description() + util::serializer::value_separator + "SUBQUERY(" +
-        // m_query.get_description() + ")"
-        //    + util::serializer::value_separator + "@count";
+        REALM_ASSERT(m_link_map.get_base_table() != nullptr);
+        std::string target = state.describe_columns(m_link_map, ColKey());
+        std::string var_name = state.get_variable_name(m_link_map.get_base_table()->get_table_ref());
+        state.subquery_prefix_list.push_back(var_name);
+        std::string desc = "SUBQUERY(" + target + ", " + var_name + ", " + m_query.get_description(state) + ")" +
+                           util::serializer::value_separator + "@count";
+        state.subquery_prefix_list.pop_back();
+        return desc;
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
@@ -3466,10 +3460,10 @@ public:
         destination.import(result);
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState& state) const override
     {
         if (m_left) {
-            return m_left->description();
+            return m_left->description(state);
         }
         return "";
     }
@@ -3557,15 +3551,15 @@ public:
         destination.import(result);
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState& state) const override
     {
         std::string s;
         if (m_left) {
-            s += m_left->description();
+            s += m_left->description(state);
         }
         s += (" " + oper::description() + " ");
         if (m_right) {
-            s += m_right->description();
+            s += m_right->description(state);
         }
         return s;
     }
@@ -3653,7 +3647,7 @@ public:
         return not_found; // no match
     }
 
-    virtual std::string description() const override
+    virtual std::string description(util::serializer::SerialisationState& state) const override
     {
         if (std::is_same<TCond, BeginsWith>::value || std::is_same<TCond, BeginsWithIns>::value ||
             std::is_same<TCond, EndsWith>::value || std::is_same<TCond, EndsWithIns>::value ||
@@ -3661,11 +3655,11 @@ public:
             std::is_same<TCond, Like>::value || std::is_same<TCond, LikeIns>::value) {
             // these string conditions have the arguments reversed but the order is important
             // operations ==, and != can be reversed because the produce the same results both ways
-            return util::serializer::print_value(m_right->description() + " " + TCond::description() + " " +
-                                                 m_left->description());
+            return util::serializer::print_value(m_right->description(state) + " " + TCond::description() + " " +
+                                                 m_left->description(state));
         }
-        return util::serializer::print_value(m_left->description() + " " + TCond::description() + " " +
-                                             m_right->description());
+        return util::serializer::print_value(m_left->description(state) + " " + TCond::description() + " " +
+                                             m_right->description(state));
     }
 
     std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override

@@ -293,20 +293,7 @@ public:
         return column_key;
     }
 
-    virtual std::string describe_column() const
-    {
-        return describe_column(m_condition_column_key);
-    }
-
-    virtual std::string describe_column(ColKey col_key) const
-    {
-        if (m_table && col_key != ColKey()) {
-            return std::string(m_table->get_column_name(col_key));
-        }
-        return "";
-    }
-
-    virtual std::string describe() const
+    virtual std::string describe(util::serializer::SerialisationState&) const
     {
         return "";
     }
@@ -316,12 +303,12 @@ public:
         return "matches";
     }
 
-    virtual std::string describe_expression() const
+    virtual std::string describe_expression(util::serializer::SerialisationState& state) const
     {
         std::string s;
-        s = describe();
+        s = describe(state);
         if (m_child) {
-            s = s + " and " + m_child->describe_expression();
+            s = s + " and " + m_child->describe_expression(state);
         }
         return s;
     }
@@ -545,12 +532,6 @@ protected:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    virtual std::string describe_column() const override
-    {
-        REALM_ASSERT(m_condition_column_key);
-        return ParentNode::describe_column(m_condition_column_key);
-    }
-
     void init() override
     {
         ColumnNodeBase::init();
@@ -624,10 +605,10 @@ public:
         return this->m_leaf_ptr->template find_first<TConditionFunction>(this->m_value, start, end);
     }
 
-    virtual std::string describe() const override
+    virtual std::string describe(util::serializer::SerialisationState& state) const override
     {
-        return this->describe_column() + " " + describe_condition() + " " +
-               util::serializer::print_value(IntegerNodeBase<LeafType>::m_value);
+        return state.describe_column(ParentNode::m_table, ColumnNodeBase::m_condition_column_key) + " " +
+               describe_condition() + " " + util::serializer::print_value(this->m_value);
     }
 
     virtual std::string describe_condition() const override
@@ -768,15 +749,10 @@ public:
             return find(false);
     }
 
-    std::string describe_column() const override
+    virtual std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key);
-        return ParentNode::describe_column(m_condition_column_key);
-    }
-
-    virtual std::string describe() const override
-    {
-        return describe_column() + " " + describe_condition() + " " +
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
                util::serializer::print_value(FloatDoubleNode::m_value);
     }
     virtual std::string describe_condition() const override
@@ -979,16 +955,11 @@ public:
         return not_found;
     }
 
-    virtual std::string describe_column() const override
+    virtual std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key);
-        return ParentNode::describe_column(m_condition_column_key);
-    }
-
-    virtual std::string describe() const override
-    {
-        return describe_column() + " " + TConditionFunction::description() + " " +
-               util::serializer::print_value(BinaryNode::m_value.get());
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
+               TConditionFunction::description() + " " + util::serializer::print_value(BinaryNode::m_value.get());
     }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
@@ -1055,10 +1026,10 @@ public:
         return not_found;
     }
 
-    virtual std::string describe() const override
+    virtual std::string describe(util::serializer::SerialisationState& state) const override
     {
-        return this->describe_column() + " " + TConditionFunction::description() + " " +
-               util::serializer::print_value(m_value);
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
+               TConditionFunction::description() + " " + util::serializer::print_value(m_value);
     }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
@@ -1119,16 +1090,11 @@ public:
         return not_found;
     }
 
-    virtual std::string describe_column() const override
+    virtual std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key);
-        return ParentNode::describe_column(m_condition_column_key);
-    }
-
-    virtual std::string describe() const override
-    {
-        return describe_column() + " " + TConditionFunction::description() + " " +
-               util::serializer::print_value(TimestampNode::m_value);
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
+               TConditionFunction::description() + " " + util::serializer::print_value(TimestampNode::m_value);
     }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
@@ -1205,19 +1171,15 @@ public:
     {
     }
 
-    virtual std::string describe_column() const override
+    virtual std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key);
-        return ParentNode::describe_column(m_condition_column_key);
-    }
-
-    virtual std::string describe() const override
-    {
         StringData sd;
         if (bool(StringNodeBase::m_value)) {
             sd = StringData(StringNodeBase::m_value.value());
         }
-        return this->describe_column() + " " + describe_condition() + " " + util::serializer::print_value(sd);
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
+               util::serializer::print_value(sd);
     }
 
 protected:
@@ -1625,14 +1587,14 @@ public:
         m_was_match.resize(m_conditions.size(), false);
     }
 
-    std::string describe() const override
+    std::string describe(util::serializer::SerialisationState& state) const override
     {
         if (m_conditions.size() >= 2) {
         }
         std::string s;
         for (size_t i = 0; i < m_conditions.size(); ++i) {
             if (m_conditions[i]) {
-                s += m_conditions[i]->describe_expression();
+                s += m_conditions[i]->describe_expression(state);
                 if (i != m_conditions.size() - 1) {
                     s += " or ";
                 }
@@ -1794,10 +1756,10 @@ public:
         return "";
     }
 
-    virtual std::string describe() const override
+    virtual std::string describe(util::serializer::SerialisationState& state) const override
     {
         if (m_condition) {
-            return "!(" + m_condition->describe_expression() + ")";
+            return "!(" + m_condition->describe_expression(state) + ")";
         }
         return "!()";
     }
@@ -1872,17 +1834,11 @@ public:
         m_leaf_ptr2 = m_array_ptr2.get();
     }
 
-    virtual std::string describe_column() const override
-    {
-        REALM_ASSERT(m_condition_column_key);
-        return ParentNode::describe_column(m_condition_column_key);
-    }
-
-    virtual std::string describe() const override
+    virtual std::string describe(util::serializer::SerialisationState& state) const override
     {
         REALM_ASSERT(m_condition_column_key1 && m_condition_column_key2);
-        return ParentNode::describe_column(m_condition_column_key1) + " " + describe_condition() + " " +
-               ParentNode::describe_column(m_condition_column_key2);
+        return state.describe_column(ParentNode::m_table, m_condition_column_key1) + " " + describe_condition() +
+               " " + state.describe_column(ParentNode::m_table, m_condition_column_key2);
     }
 
     virtual std::string describe_condition() const override
@@ -1980,7 +1936,7 @@ public:
     void cluster_changed() override;
     void collect_dependencies(std::vector<TableKey>&) const override;
 
-    virtual std::string describe() const override;
+    virtual std::string describe(util::serializer::SerialisationState& state) const override;
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override;
     void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override;
@@ -2026,16 +1982,12 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    virtual std::string describe_column() const override
+    virtual std::string describe(util::serializer::SerialisationState&) const override
     {
-        REALM_ASSERT(m_condition_column_key);
-        return ParentNode::describe_column(m_condition_column_key);
-    }
-
-    virtual std::string describe() const override
-    {
-        return describe_column() + " " + describe_condition() + " " +
-               util::serializer::print_value(m_target_key.value);
+        throw SerialisationError("Serialising a query which links to an object is currently unsupported.");
+        // We can do something like the following when core gets stable keys
+        // return describe_column() + " " + describe_condition() + " " +
+        // util::serializer::print_value(m_target_row.get_index());
     }
 
     virtual std::string describe_condition() const override

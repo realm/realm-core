@@ -39,6 +39,7 @@
 #include <realm/binary_data.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/handover_defs.hpp>
+#include <realm/util/serializer.hpp>
 
 namespace realm {
 
@@ -274,6 +275,7 @@ public:
     std::string validate();
 
     std::string get_description() const;
+    std::string get_description(util::serializer::SerialisationState& state) const;
 
     bool eval_object(ConstObj& obj) const;
 

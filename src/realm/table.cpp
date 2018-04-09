@@ -2590,6 +2590,58 @@ ColKey Table::find_backlink_column(TableKey origin_table_key, ColKey origin_col_
     return ndx2colkey(ndx);
 }
 
+Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const
+    noexcept
+{
+    try {
+        if (get_name() == origin_table_name) {
+            ColKey linked_col_key = get_column_key(origin_col_name);
+            if (linked_col_key != ColKey()) {
+                return {{get_table_ref(), linked_col_key}};
+            }
+        }
+        else {
+            Group* current_group = get_parent_group();
+            if (current_group) {
+                ConstTableRef linked_table = current_group->get_table(origin_table_name);
+                if (linked_table) {
+                    ColKey linked_col_key = linked_table->get_column_key(origin_col_name);
+                    if (linked_col_key != ColKey()) {
+                        return {{linked_table, linked_col_key}};
+                    }
+                }
+            }
+        }
+    }
+    catch (...) {
+        // not found, returning empty optional
+    }
+    return {};
+}
+
+Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noexcept
+{
+    try {
+        size_t backlink_col_ndx = colkey2ndx(backlink_col);
+        TableKey linked_table_key = m_spec.get_opposite_link_table_key(backlink_col_ndx);
+        ColKey linked_column_key = m_spec.get_origin_column_key(backlink_col_ndx);
+        if (linked_table_key == m_key) {
+            return {{get_table_ref(), linked_column_key}};
+        }
+        else {
+            Group* current_group = get_parent_group();
+            if (current_group) {
+                ConstTableRef linked_table_ref = current_group->get_table(linked_table_key);
+                return {{linked_table_ref, linked_column_key}};
+            }
+        }
+    }
+    catch (...) {
+        // backlink column not found, returning empty optional
+    }
+    return {};
+}
+
 std::vector<ColKey> Table::get_col_keys() const
 {
     std::vector<ColKey> retval;

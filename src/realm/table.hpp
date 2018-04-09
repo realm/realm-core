@@ -117,6 +117,9 @@ public:
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
     ColKey find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept;
+    typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
+    BacklinkOrigin find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept;
+    BacklinkOrigin find_backlink_origin(ColKey backlink_col) const noexcept;
     //@}
 
     //@{
@@ -830,6 +833,7 @@ private:
     friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
+    friend struct util::serializer::SerialisationState;
     friend class LinksToNode;
     friend class LinkMap;
     friend class LinkView;

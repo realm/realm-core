@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "property_expression.hpp"
+#include "subquery_expression.hpp"
 #include "parser_utils.hpp"
 
 #include <realm/table.hpp>
@@ -26,8 +26,10 @@
 namespace realm {
 namespace parser {
 
-PropertyExpression::PropertyExpression(Query& q, const std::string& key_path_string, parser::KeyPathMapping& mapping)
-    : query(q)
+SubqueryExpression::SubqueryExpression(Query& q, const std::string& key_path_string, const std::string& variable_name,
+                                       parser::KeyPathMapping& mapping)
+    : var_name(variable_name)
+    , query(q)
 {
     ConstTableRef cur_table = query.get_table();
     KeyPath key_path = key_path_from_string(key_path_string);
@@ -40,18 +42,44 @@ PropertyExpression::PropertyExpression(Query& q, const std::string& key_path_str
                                util::format("Property '%1' is not a link in object of type '%2'",
                                             element.table->get_column_name(element.col_key),
                                             get_printable_table_name(*element.table)));
-            if (element.table == cur_table) {
-                cur_table = element.table->get_link_target(element.col_key); // advance through forward link
-            }
-            else {
+            if (element.is_backlink) {
                 cur_table = element.table; // advance through backlink
             }
+            else {
+                cur_table = cur_table->get_link_target(element.col_key); // advance through forward link
+            }
+        }
+        else {
+            StringData dest_type;
+            if (element.is_backlink) {
+                dest_type = "linking object";
+            }
+            else {
+                dest_type = data_type_to_str(element.col_type);
+            }
+            realm_precondition(element.col_type == type_LinkList,
+                               util::format("A subquery must operate on a list property, but '%1' is type '%2'",
+                                            element.table->get_column_name(element.col_key), dest_type));
+            ConstTableRef subquery_table;
+            if (element.is_backlink) {
+                subquery_table = element.table; // advance through backlink
+            }
+            else {
+                subquery_table = cur_table->get_link_target(element.col_key); // advance through forward link
+            }
+
+            subquery = subquery_table->where();
         }
         link_chain.push_back(element);
     }
 }
 
-Table* PropertyExpression::table_getter() const
+Query& SubqueryExpression::get_subquery()
+{
+    return subquery;
+}
+
+Table* SubqueryExpression::table_getter() const
 {
     auto& tbl = query.get_table();
     return KeyPathMapping::table_getter(tbl, link_chain);

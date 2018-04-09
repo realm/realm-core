@@ -689,9 +689,23 @@ void File::prealloc(size_t size)
     // Mostly Linux only
     prealloc_if_supported(0, size);
 
-#elif REALM_PLATFORM_APPLE // Non-atomic fallback
+#else // Non-atomic fallback
+    if (size <= to_size_t(get_size())) {
+        return;
+    }
+
+    size_t new_size = size;
+    if (m_encryption_key) {
+        new_size = static_cast<size_t>(data_size_to_encrypted_size(size));
+        if (new_size < size) {
+            throw std::runtime_error("File size overflow: data_size_to_encrypted_size(" +
+                                     realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
+        }
+    }
+
+#if REALM_PLATFORM_APPLE
     // posix_fallocate() is not supported on MacOS or iOS
-    fstore_t store = {F_ALLOCATEALL, F_PEOFPOSMODE, 0, static_cast<off_t>(size), 0};
+    fstore_t store = {F_ALLOCATEALL, F_PEOFPOSMODE, 0, static_cast<off_t>(new_size), 0};
     int ret = fcntl(m_fd, F_PREALLOCATE, &store);
     if (ret == -1) {
         int err = errno;
@@ -700,7 +714,7 @@ void File::prealloc(size_t size)
     }
 
     do {
-        ret = ftruncate(m_fd, size);
+        ret = ftruncate(m_fd, new_size);
     } while (ret == -1 && errno == EINTR);
 
     if (ret != 0) {
@@ -709,30 +723,21 @@ void File::prealloc(size_t size)
         throw OutOfDiskSpace(msg);
     }
 #elif REALM_ANDROID || defined(_WIN32)
-    if (size > to_size_t(get_size())) {
-        size_t new_size = size;
-        if (m_encryption_key) {
-            new_size = static_cast<size_t>(data_size_to_encrypted_size(size));
-            if (new_size < size) {
-                throw std::runtime_error("File size overflow: data_size_to_encrypted_size(" +
-                                         realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
-            }
-        }
-
-        constexpr size_t chunk_size = 4096;
-        int64_t original_size = get_size_static(m_fd);
-        seek(original_size);
-        size_t num_bytes = size_t(new_size - original_size);
-        std::string zeros(chunk_size, '\0');
-        while (num_bytes > 0) {
-            size_t t = num_bytes > chunk_size ? chunk_size : num_bytes;
-            write_static(m_fd, zeros.c_str(), t);
-            num_bytes -= t;
-        }
+    constexpr size_t chunk_size = 4096;
+    int64_t original_size = get_size_static(m_fd);
+    seek(original_size);
+    size_t num_bytes = size_t(new_size - original_size);
+    std::string zeros(chunk_size, '\0');
+    while (num_bytes > 0) {
+        size_t t = num_bytes > chunk_size ? chunk_size : num_bytes;
+        write_static(m_fd, zeros.c_str(), t);
+        num_bytes -= t;
     }
 #else
 #error Please check if/how your OS supports file preallocation
 #endif
+
+#endif // !(_POSIX_C_SOURCE >= 200112L)
 }
 
 
