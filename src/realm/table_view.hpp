@@ -220,7 +220,7 @@ public:
         return bool(m_table);
     }
 
-    bool is_row_attached(size_t row_ndx) const noexcept
+    bool is_obj_valid(size_t row_ndx) const noexcept
     {
         return m_table->is_valid(ObjKey(m_key_values.get(row_ndx)));
     }

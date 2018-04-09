@@ -81,7 +81,10 @@ int ConstObj::cmp(const ConstObj& other, size_t col_ndx) const
 
     switch (spec.get_public_column_type(col_ndx)) {
         case type_Int:
-            return cmp<Int>(other, col_ndx);
+            if (attr.test(col_attr_Nullable))
+                return cmp<util::Optional<Int>>(other, col_ndx);
+            else
+                return cmp<Int>(other, col_ndx);
         case type_Bool:
             return cmp<Bool>(other, col_ndx);
         case type_Float:

@@ -137,7 +137,20 @@ public:
 
     bool is_null() const
     {
-        return m_type == null_type;
+        if (m_type == null_type)
+            return true;
+
+        switch (get_type()) {
+            case type_String:
+                return get_string().is_null();
+            case type_Timestamp:
+                return get_timestamp().is_null();
+            case type_Link:
+                return get_link() == null_key;
+            default:
+                break;
+        }
+        return false;
     }
 
     int64_t get_int() const noexcept;
