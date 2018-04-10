@@ -16,8 +16,9 @@
  *
  **************************************************************************/
 
-#include <realm/db.hpp>
+#include <realm.hpp>
 #include <realm/history.hpp>
+#include <realm/index_string.hpp>
 
 #include <ctime>
 #include <cstdio>
@@ -30,7 +31,8 @@ using namespace realm;
 using namespace realm::util;
 
 // DISABLE until it can handle stable keys for Tables.
-#if 0
+#define TEST_FUZZ
+#ifdef TEST_FUZZ
 // Determines whether or not to run the shared group verify function
 // after each transaction. This will find errors earlier but is expensive.
 #define REALM_VERIFY true
@@ -55,7 +57,6 @@ enum INS {
     ADD_TABLE,
     REMOVE_TABLE,
     CREATE_OBJECT,
-    INSERT_COLUMN,
     RENAME_COLUMN,
     ADD_COLUMN,
     REMOVE_COLUMN,
@@ -65,7 +66,6 @@ enum INS {
     ADD_COLUMN_LINK,
     ADD_COLUMN_LINK_LIST,
     CLEAR_TABLE,
-    INSERT_COLUMN_LINK,
     ADD_SEARCH_INDEX,
     REMOVE_SEARCH_INDEX,
     COMMIT,
@@ -77,7 +77,7 @@ enum INS {
     CREATE_TABLE_VIEW,
     COMPACT,
     IS_NULL,
-    OPTIMIZE_TABLE,
+    ENUMERATE_COLUMN,
 
     COUNT
 };
@@ -135,12 +135,13 @@ int32_t get_int32(State& s)
     return v;
 }
 
-std::string create_string(State& s, size_t length)
+std::string create_string(size_t length)
 {
-    std::string buf(length, '\0');
+    REALM_ASSERT_3(length, <, 256);
+    char buf[256] = {0};
     for (size_t i = 0; i < length; i++)
-        buf[i] = get_next(s);
-    return buf;
+        buf[i] = 'a' + (rand() % 20);
+    return std::string{buf, length};
 }
 
 std::pair<int64_t, int32_t> get_timestamp_values(State& s) {
@@ -168,9 +169,13 @@ std::string construct_binary_payload(State& s, util::Optional<std::ostream&> log
     return buffer;
 }
 
-std::string create_column_name(State& s, DataType t)
+namespace {
+int table_index = 0;
+int column_index = 0;
+}
+
+std::string create_column_name(DataType t)
 {
-<<<<<<< HEAD
     std::string str;
     switch (t) {
         case type_Int:
@@ -205,84 +210,13 @@ std::string create_column_name(State& s, DataType t)
         case type_OldMixed:
             break;
     }
-    const size_t length = get_next(s) % 20 + 1;
-    return str + create_string(length);
-=======
-    // Mixed type has 8 constructors supporting different types.
-    unsigned char type = get_next(s) % 8;
-
-    switch (type) {
-        default:
-        case 0: {
-            bool b = get_next(s) % 2;
-            if (log) {
-                *log << "Mixed mixed(" << (b ? "true" : "false") << ");\n";
-            }
-            return Mixed(b);
-        }
-        case 1: {
-            int64_t value = get_int64(s);
-            if (log) {
-                *log << "Mixed mixed((int64_t)(" << value << "));\n";
-            }
-            return Mixed(value);
-        }
-        case 2: {
-            float value = get_next(s);
-            if (log) {
-                *log << "Mixed mixed((float)(" << value << "));\n";
-            }
-            return Mixed(value);
-        }
-        case 3: {
-            double value = get_next(s);
-            if (log) {
-                *log << "Mixed mixed((double)(" << value << "));\n";
-            }
-            return Mixed(value);
-        }
-        case 4: {
-            buffer = create_string(s, get_next(s));
-            if (log) {
-                *log << "Mixed mixed(StringData(\"" << buffer << "\"));\n";
-            }
-            return Mixed(StringData(buffer));
-        }
-        case 5: {
-            buffer = construct_binary_payload(s, log);
-            if (log) {
-                *log << "Mixed mixed(BinaryData(blob));\n";
-            }
-            return Mixed(BinaryData(buffer));
-        }
-        case 6: {
-            int64_t time = get_int64(s);
-            if (log) {
-                *log << "Mixed mixed(OldDateTime(" << time << "));\n";
-            }
-            return Mixed(OldDateTime(time));
-        }
-        case 7: {
-            std::pair<int64_t, int32_t> values = get_timestamp_values(s);
-            if (log) {
-                *log << "Mixed mixed(Timestamp{" << values.first << ", " << values.second << "});\n";
-            }
-            return Mixed(Timestamp{values.first, values.second});
-        }
-    }
+    return str + util::to_string(column_index++);
 }
 
-std::string create_column_name(State& s)
+std::string create_table_name()
 {
-    const unsigned char length = get_next(s) % (Descriptor::max_column_name_length + 1);
-    return create_string(s, length);
->>>>>>> 82cb7c4c0b2a
-}
-
-std::string create_table_name(State& s)
-{
-    const unsigned char length = get_next(s) % (Group::max_table_name_length + 1);
-    return create_string(s, length);
+    std::string str = "Table_";
+    return str + util::to_string(table_index++);
 }
 
 std::string get_current_time_stamp()
@@ -294,39 +228,6 @@ std::string get_current_time_stamp()
     return str_buffer;
 }
 
-// randomly choose a table and column which meets the requirements for set_unique.
-std::pair<size_t, size_t> get_target_for_set_unique(const Group& g, State &s) {
-    std::vector<std::pair<size_t, size_t>> candidates;
-    for (size_t table_ndx = 0; table_ndx < g.size(); ++table_ndx) {
-
-        // We are looking for a non-empty table
-        ConstTableRef t = g.get_table(table_ndx);
-        if (t->size() == 0) {
-            continue;
-        }
-
-        for (size_t col_ndx = 0; col_ndx < t->get_column_count(); ++col_ndx) {
-            // The column we want to set a unique value on must a have a search index
-            if (!t->has_search_index(col_ndx)) {
-                continue;
-            }
-            DataType type = t->get_column_type(col_ndx);
-            if (type == type_String || type == type_Int) {
-                candidates.push_back({table_ndx, col_ndx});
-            }
-        }
-    }
-
-    if (candidates.empty()) {
-        return {g.size(), -1}; // not found
-    } else if (candidates.size() == 1) {
-        return candidates[0]; // don't bother consuming another input
-    }
-
-    unsigned char r = get_next(s) % candidates.size();
-    return candidates[r];
-}
-
 void parse_and_apply_instructions(std::string& in, const std::string& path, util::Optional<std::ostream&> log)
 {
     const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1000;
@@ -335,6 +236,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
     // Max number of rows in a table. Overridden only by create_object() and only in the case where
     // max_rows is not exceeded *prior* to executing add_empty_row.
     const size_t max_rows = 100000;
+    column_index = table_index = 0;
 
     try {
         State s;
@@ -362,11 +264,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "std::unique_ptr<Replication> hist_r(make_in_realm_history(path));\n";
             *log << "std::unique_ptr<Replication> hist_w(make_in_realm_history(path));\n";
 
-            *log << "SharedGroup sg_r(*hist_r, SharedGroupOptions(key));\n";
-            *log << "SharedGroup sg_w(*hist_w, SharedGroupOptions(key));\n";
-
-            *log << "Group& g = const_cast<Group&>(sg_w.begin_write());\n";
-            *log << "Group& g_r = const_cast<Group&>(sg_r.begin_read());\n";
+            *log << "DB db_w(*hist_w, DBOptions(key));\n";
+            *log << "DB db_r(*hist_r, DBOptions(key));\n";
+            *log << "auto wt = db_w.start_write();\n";
+            *log << "auto rt = db_r.start_read();\n";
             *log << "std::vector<TableView> table_views;\n";
             *log << "std::vector<TableRef> subtable_refs;\n";
 
@@ -376,281 +277,212 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
         std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
 
-        SharedGroup sg_r(*hist_r, SharedGroupOptions(encryption_key));
-        SharedGroup sg_w(*hist_w, SharedGroupOptions(encryption_key));
-        Group& g = const_cast<Group&>(sg_w.begin_write());
-        Group& g_r = const_cast<Group&>(sg_r.begin_read());
+        DB db_r(*hist_r, DBOptions(encryption_key));
+        DB db_w(*hist_w, DBOptions(encryption_key));
+        auto wt = db_w.start_write();
+        auto rt = db_r.start_read();
         std::vector<TableView> table_views;
         std::vector<TableRef> subtable_refs;
-        std::vector<std::vector<Key>> keys;
-
-        g.set_cascade_notification_handler([&keys](const Group::CascadeNotification& notification) {
-            size_t sz = notification.rows.size();
-            for (size_t i = 0; i < sz; i++) {
-                std::vector<Key>& vec(keys[notification.rows[i].table_ndx]);
-                auto it = find(vec.begin(), vec.end(), notification.rows[i].key);
-                vec.erase(it);
-            }
-        });
 
         for (;;) {
             char instr = get_next(s) % COUNT;
 
-            if (instr == ADD_TABLE && g.size() < max_tables) {
-                std::string name = create_table_name(s);
+            if (instr == ADD_TABLE && wt->size() < max_tables) {
+                std::string name = create_table_name();
                 if (log) {
-                    *log << "try { g.add_table(\"" << name << "\"); }"
-                                                              " catch (const TableNameInUse&) { }\n";
+                    *log << "wt->add_table(\"" << name << "\");\n";
                 }
-                try {
-                    g.add_table(name);
-                    keys.push_back({});
-                    REALM_ASSERT(keys.size() == g.size());
-                }
-                catch (const TableNameInUse&) {
-                }
+                wt->add_table(name);
             }
-            else if (instr == REMOVE_TABLE && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
+            else if (instr == REMOVE_TABLE && wt->size() > 0) {
+                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
                 if (log) {
-                    *log << "try { g.remove_table(" << table_ndx << "); }"
-                                                                    " catch (const CrossTableLinkTarget&) { }\n";
+                    *log << "try { wt->remove_table(" << table_key << "); }"
+                                                                      " catch (const CrossTableLinkTarget&) { }\n";
                 }
                 try {
-                    g.remove_table(table_ndx);
-                    keys.erase(keys.begin() + table_ndx);
-                    REALM_ASSERT(keys.size() == g.size());
+                    wt->remove_table(table_key);
                 }
                 catch (const CrossTableLinkTarget&) {
-                    REALM_ASSERT(keys.size() == g.size());
                     if (log) {
                         *log << "// Exception\n";
                     }
                 }
             }
-            else if (instr == CLEAR_TABLE && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
+            else if (instr == CLEAR_TABLE && wt->size() > 0) {
+                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
                 if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->clear();\n";
+                    *log << "wt->get_table(" << table_key << ")->clear();\n";
                 }
-                g.get_table(table_ndx)->clear();
-                keys[table_ndx].clear();
+                wt->get_table(table_key)->clear();
             }
-<<<<<<< HEAD
-            else if (instr == CREATE_OBJECT && g.size() > 0) {
-=======
-            else if (instr == INSERT_ROW && g.size() > 0) {
->>>>>>> v5.0.1
-                size_t table_ndx = get_next(s) % g.size();
-                if (g.get_table(table_ndx)->get_column_count() == 0) {
+            else if (instr == CREATE_OBJECT && wt->size() > 0) {
+                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                if (wt->get_table(table_key)->get_column_count() == 0) {
                     continue; // do not insert rows if there are no columns
                 }
                 size_t num_rows = get_next(s);
-                if (g.get_table(table_ndx)->size() + num_rows < max_rows) {
+                if (wt->get_table(table_key)->size() + num_rows < max_rows) {
                     typedef _impl::TableFriend tf;
-                    if (g.get_table(table_ndx)->get_column_count() > 0 ||
-                        tf::is_cross_table_link_target(*g.get_table(table_ndx))) {
+                    if (wt->get_table(table_key)->get_column_count() > 0 ||
+                        tf::is_cross_table_link_target(*wt->get_table(table_key))) {
                         if (log) {
-                            *log << "{ std::vector<Key> keys; g.get_table(" << table_ndx << ")->create_objects("
+                            *log << "{ std::vector<ObjKey> keys; wt->get_table(" << table_key << ")->create_objects("
                                  << num_rows % add_empty_row_max << ", keys); }\n";
                         }
-                        g.get_table(table_ndx)->create_objects(num_rows % add_empty_row_max, keys[table_ndx]);
+                        std::vector<ObjKey> keys;
+                        wt->get_table(table_key)->create_objects(num_rows % add_empty_row_max, keys);
                     }
                 }
             }
-            else if (instr == ADD_COLUMN && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
+            else if (instr == ADD_COLUMN && wt->size() > 0) {
+                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
                 DataType type = get_type(get_next(s));
-                std::string name = create_column_name(s, type);
+                std::string name = create_column_name(type);
                 // Mixed cannot be nullable. For other types, chose nullability randomly
                 bool nullable = (get_next(s) % 2 == 0);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \"" << name
+                    *log << "wt->get_table(" << table_key << ")->add_column(DataType(" << int(type) << "), \"" << name
                          << "\", " << (nullable ? "true" : "false") << ");\n";
                 }
-                g.get_table(table_ndx)->add_column(type, name, nullable);
+                wt->get_table(table_key)->add_column(type, name, nullable);
             }
-            else if (instr == INSERT_COLUMN && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
-                size_t col_ndx = get_next(s) % (g.get_table(table_ndx)->get_column_count() + 1);
-                DataType type = get_type(get_next(s));
-                std::string name = create_column_name(s, type);
-                bool nullable = (get_next(s) % 2 == 0);
-                if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType("
-                         << int(type) << "), \"" << name << "\", " << (nullable ? "true" : "false") << ");\n";
-                }
-                g.get_table(table_ndx)->insert_column(col_ndx, type, name, nullable);
-            }
-            else if (instr == REMOVE_COLUMN && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
-                TableRef t = g.get_table(table_ndx);
-                if (t->get_column_count() > 0) {
-                    size_t col_ndx = get_next(s) % t->get_column_count();
+            else if (instr == REMOVE_COLUMN && wt->size() > 0) {
+                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableRef t = wt->get_table(table_key);
+                auto all_col_keys = t->get_col_keys();
+                if (!all_col_keys.empty()) {
+                    ColKey col = all_col_keys[get_next(s) % all_col_keys.size()];
                     if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->remove_column(" << col_ndx << ");\n";
+                        *log << "wt->get_table(" << table_key << ")->remove_column(" << col << ");\n";
                     }
-                    t->remove_column(col_ndx);
+                    t->remove_column(col);
                 }
             }
-            else if (instr == RENAME_COLUMN && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
-                TableRef t = g.get_table(table_ndx);
-                if (t->get_column_count() > 0) {
-                    size_t col_ndx = get_next(s) % t->get_column_count();
-                    std::string name = create_column_name(s, t->get_column_type(col_ndx));
+            else if (instr == RENAME_COLUMN && wt->size() > 0) {
+                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableRef t = wt->get_table(table_key);
+                auto all_col_keys = t->get_col_keys();
+                if (!all_col_keys.empty()) {
+                    ColKey col = all_col_keys[get_next(s) % all_col_keys.size()];
+                    std::string name = create_column_name(t->get_column_type(col));
                     if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->rename_column("
-                             << col_ndx << ", \"" << name << "\");\n";
+                        *log << "wt->get_table(" << table_key << ")->rename_column(" << col << ", \"" << name
+                             << "\");\n";
                     }
-                    t->rename_column(col_ndx, name);
+                    t->rename_column(col, name);
                 }
             }
-            else if (instr == ADD_SEARCH_INDEX && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
-                TableRef t = g.get_table(table_ndx);
-                if (t->get_column_count() > 0) {
-                    size_t col_ndx = get_next(s) % t->get_column_count();
-                    bool supports_search_index = _impl::TableFriend::get_column(*t, col_ndx).supports_search_index();
+            else if (instr == ADD_SEARCH_INDEX && wt->size() > 0) {
+                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableRef t = wt->get_table(table_key);
+                auto all_col_keys = t->get_col_keys();
+                if (!all_col_keys.empty()) {
+                    ColKey col = all_col_keys[get_next(s) % all_col_keys.size()];
+                    bool supports_search_index = StringIndex::type_supported(t->get_column_type(col));
 
                     if (supports_search_index) {
                         if (log) {
-                            *log << "g.get_table(" << table_ndx << ")->add_search_index(" << col_ndx << ");\n";
+                            *log << "wt->get_table(" << table_key << ")->add_search_index(" << col << ");\n";
                         }
-                        t->add_search_index(col_ndx);
+                        t->add_search_index(col);
                     }
                 }
             }
-            else if (instr == REMOVE_SEARCH_INDEX && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
-                TableRef t = g.get_table(table_ndx);
-                if (t->get_column_count() > 0) {
-                    size_t col_ndx = get_next(s) % t->get_column_count();
+            else if (instr == REMOVE_SEARCH_INDEX && wt->size() > 0) {
+                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableRef t = wt->get_table(table_key);
+                auto all_col_keys = t->get_col_keys();
+                if (!all_col_keys.empty()) {
+                    ColKey col = all_col_keys[get_next(s) % all_col_keys.size()];
                     // We don't need to check if the column is of a type that is indexable or if it has index on or
                     // off
                     // because Realm will just do a no-op at worst (no exception or assert).
                     if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->remove_search_index(" << col_ndx << ");\n";
+                        *log << "wt->get_table(" << table_key << ")->remove_search_index(" << col << ");\n";
                     }
-                    t->remove_search_index(col_ndx);
+                    t->remove_search_index(col);
                 }
             }
-            else if (instr == ADD_COLUMN_LINK && g.size() >= 1) {
-                size_t table_ndx_1 = get_next(s) % g.size();
-                size_t table_ndx_2 = get_next(s) % g.size();
-                TableRef t1 = g.get_table(table_ndx_1);
-                TableRef t2 = g.get_table(table_ndx_2);
-                std::string name = create_column_name(s, type_Link);
+            else if (instr == ADD_COLUMN_LINK && wt->size() >= 1) {
+                TableKey table_key_1 = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key_2 = wt->get_keys()[get_next(s) % wt->size()];
+                TableRef t1 = wt->get_table(table_key_1);
+                TableRef t2 = wt->get_table(table_key_2);
+                std::string name = create_column_name(type_Link);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_Link, \"" << name
-                         << "\", *g.get_table(" << table_ndx_2 << "));\n";
+                    *log << "wt->get_table(" << table_key_1 << ")->add_column_link(type_Link, \"" << name
+                         << "\", *wt->get_table(" << table_key_2 << "));\n";
                 }
                 t1->add_column_link(type_Link, name, *t2);
             }
-            else if (instr == INSERT_COLUMN_LINK && g.size() >= 1) {
-                size_t table_ndx_1 = get_next(s) % g.size();
-                size_t table_ndx_2 = get_next(s) % g.size();
-                size_t col_ndx = get_next(s) % (g.get_table(table_ndx_1)->get_column_count() + 1);
-                TableRef t1 = g.get_table(table_ndx_1);
-                TableRef t2 = g.get_table(table_ndx_2);
-                std::string name = create_column_name(s, type_Link);
+            else if (instr == ADD_COLUMN_LINK_LIST && wt->size() >= 2) {
+                TableKey table_key_1 = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key_2 = wt->get_keys()[get_next(s) % wt->size()];
+                TableRef t1 = wt->get_table(table_key_1);
+                TableRef t2 = wt->get_table(table_key_2);
+                std::string name = create_column_name(type_LinkList);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx_1 << ")->insert_column_link(" << col_ndx << ", type_Link, \""
-                         << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
-                }
-                t1->insert_column_link(col_ndx, type_Link, name, *t2);
-            }
-            else if (instr == ADD_COLUMN_LINK_LIST && g.size() >= 2) {
-                size_t table_ndx_1 = get_next(s) % g.size();
-                size_t table_ndx_2 = get_next(s) % g.size();
-                TableRef t1 = g.get_table(table_ndx_1);
-                TableRef t2 = g.get_table(table_ndx_2);
-                std::string name = create_column_name(s, type_LinkList);
-                if (log) {
-                    *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_LinkList, \"" << name
-                         << "\", *g.get_table(" << table_ndx_2 << "));\n";
+                    *log << "wt->get_table(" << table_key_1 << ")->add_column_link(type_LinkList, \"" << name
+                         << "\", *wt->get_table(" << table_key_2 << "));\n";
                 }
                 t1->add_column_link(type_LinkList, name, *t2);
             }
-            else if (instr == SET && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
-                TableRef t = g.get_table(table_ndx);
-                if (t->get_column_count() > 0 && t->size() > 0) {
-                    size_t col_ndx = get_next(s) % t->get_column_count();
-                    Key key = keys[table_ndx][get_next(s) % t->size()];
-                    DataType type = t->get_column_type(col_ndx);
-                    Obj obj = t->get_object(key);
+            else if (instr == SET && wt->size() > 0) {
+                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableRef t = wt->get_table(table_key);
+                auto all_col_keys = t->get_col_keys();
+                if (!all_col_keys.empty() > 0 && t->size() > 0) {
+                    ColKey col = all_col_keys[get_next(s) % all_col_keys.size()];
+                    size_t row = get_next(s) % t->size();
+                    DataType type = t->get_column_type(col);
+                    Obj obj = t->get_object(row);
                     if (log) {
-                        *log << "{\nObj obj = g.get_table(" << table_ndx << ")->get_object(" << key << ");\n";
+                        *log << "{\nObj obj = wt->get_table(" << table_key << ")->get_object(" << row << ");\n";
                     }
 
                     // With equal probability, either set to null or to a value
-                    if (get_next(s) % 2 == 0 && t->is_nullable(col_ndx)) {
+                    if (get_next(s) % 2 == 0 && t->is_nullable(col)) {
                         if (type == type_Link) {
                             if (log) {
-                                *log << "obj.set(" << col_ndx << ", null_key);\n";
+                                *log << "obj.set(" << col << ", null_key);\n";
                             }
-                            obj.set(col_ndx, null_key);
+                            obj.set(col, null_key);
                         }
                         else {
                             if (log) {
-                                *log << "obj.set_null(" << col_ndx << ");\n";
+                                *log << "obj.set_null(" << col << ");\n";
                             }
-                            obj.set_null(col_ndx);
+                            obj.set_null(col);
                         }
                     }
                     else {
                         if (type == type_String) {
-                            std::string str = create_string(s, get_next(s));
-                            if (log) {
-                                *log << "obj.set(" << col_ndx << ", \"" << str << "\");\n";
-                            }
-                            obj.set(col_ndx, StringData(str));
-                        }
-                        else if (type == type_Binary) {
-                            /* FIXME
-                            bool insert_big_blob = get_next(s) % 2 == 0;
-                            if (insert_big_blob) {
-                                if (log) {
-                                    *log << "{\n\t";
-                                }
-                                std::string blob = construct_binary_payload(s, log);
-                                if (log) {
-                                    *log << "\tg.get_table(" << table_ndx << ")->set_binary_big(" << col_ndx << ", "
-                                         << row_ndx << ", BinaryData(blob));\n}\n";
-                                }
-                                t->set_binary_big(col_ndx, row_ndx, BinaryData(blob));
-                            }
-                            else {
-<<<<<<< HEAD
-=======
-                                std::string str = create_string(s, get_next(s));
-                                if (log) {
-                                    *log << "g.get_table(" << table_ndx << ")->set_binary(" << col_ndx << ", " << row_ndx
-                                    << ", BinaryData{\"" << str << "\", " << str.size() << "});\n";
-                                }
-                                t->set_binary(col_ndx, row_ndx, BinaryData(str));
->>>>>>> 82cb7c4c0b2a
-                            }
-                            */
                             std::string str = create_string(get_next(s));
                             if (log) {
-                                *log << "obj.set<Binary>(" << col_ndx << ", BinaryData{\"" << str << "\", "
-                                     << str.size() << "});\n";
+                                *log << "obj.set(" << col << ", \"" << str << "\");\n";
                             }
-                            obj.set<Binary>(col_ndx, BinaryData(str));
+                            obj.set(col, StringData(str));
+                        }
+                        else if (type == type_Binary) {
+                            std::string str = create_string(get_next(s));
+                            if (log) {
+                                *log << "obj.set<Binary>(" << col << ", BinaryData{\"" << str << "\", " << str.size()
+                                     << "});\n";
+                            }
+                            obj.set<Binary>(col, BinaryData(str));
                         }
                         else if (type == type_Int) {
                             bool add_int = get_next(s) % 2 == 0;
                             int64_t value = get_int64(s);
                             if (add_int) {
                                 if (log) {
-                                    *log << "try { obj.add_int(" << col_ndx << ", " << value
+                                    *log << "try { obj.add_int(" << col << ", " << value
                                          << "); } catch (const LogicError& le) { CHECK(le.kind() == "
                                             "LogicError::illegal_combination); }\n";
                                 }
                                 try {
-                                    obj.add_int(col_ndx, value);
+                                    obj.add_int(col, value);
                                 }
                                 catch (const LogicError& le) {
                                     if (le.kind() != LogicError::illegal_combination) {
@@ -660,60 +492,60 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             }
                             else {
                                 if (log) {
-                                    *log << "obj.set<Int>(" << col_ndx << ", " << value << ");\n";
+                                    *log << "obj.set<Int>(" << col << ", " << value << ");\n";
                                 }
-                                obj.set<Int>(col_ndx, value);
+                                obj.set<Int>(col, value);
                             }
 
                         }
                         else if (type == type_Bool) {
                             bool value = get_next(s) % 2 == 0;
                             if (log) {
-                                *log << "obj.set<Bool>(" << col_ndx << ", " << (value ? "true" : "false") << ");\n";
+                                *log << "obj.set<Bool>(" << col << ", " << (value ? "true" : "false") << ");\n";
                             }
-                            obj.set<Bool>(col_ndx, value);
+                            obj.set<Bool>(col, value);
                         }
                         else if (type == type_Float) {
                             float value = get_next(s);
                             if (log) {
-                                *log << "obj.set<Float>(" << col_ndx << ", " << value << ");\n";
+                                *log << "obj.set<Float>(" << col << ", " << value << ");\n";
                             }
-                            obj.set<Float>(col_ndx, value);
+                            obj.set<Float>(col, value);
                         }
                         else if (type == type_Double) {
                             double value = get_next(s);
                             if (log) {
-                                *log << "obj.set<double>(" << col_ndx << ", " << value << ");\n";
+                                *log << "obj.set<double>(" << col << ", " << value << ");\n";
                             }
-                            obj.set<double>(col_ndx, value);
+                            obj.set<double>(col, value);
                         }
                         else if (type == type_Link) {
-                            TableRef target = t->get_link_target(col_ndx);
+                            TableRef target = t->get_link_target(col);
                             if (target->size() > 0) {
-                                Key target_key = keys[target->get_index_in_group()][get_next(s) % target->size()];
+                                ObjKey target_key = target->get_object(get_next(s) % target->size()).get_key();
                                 if (log) {
-                                    *log << "obj.set<Key>(" << col_ndx << ", " << target_key << ");\n";
+                                    *log << "obj.set<Key>(" << col << ", " << target_key << ");\n";
                                 }
-                                obj.set<Key>(col_ndx, target_key);
+                                obj.set(col, target_key);
                             }
                         }
                         else if (type == type_LinkList) {
-                            TableRef target = t->get_link_target(col_ndx);
+                            TableRef target = t->get_link_target(col);
                             if (target->size() > 0) {
-                                LinkList links = obj.get_linklist(col_ndx);
-                                Key target_key = keys[target->get_index_in_group()][get_next(s) % target->size()];
+                                LinkList links = obj.get_linklist(col);
+                                ObjKey target_key = target->get_object(get_next(s) % target->size()).get_key();
                                 // either add or set, 50/50 probability
                                 if (links.size() > 0 && get_next(s) > 128) {
                                     size_t linklist_row = get_next(s) % links.size();
                                     if (log) {
-                                        *log << "obj.get_linklist(" << col_ndx << ")->set(" << linklist_row << ", "
+                                        *log << "obj.get_linklist(" << col << ")->set(" << linklist_row << ", "
                                              << target_key << ");\n";
                                     }
                                     links.set(linklist_row, target_key);
                                 }
                                 else {
                                     if (log) {
-                                        *log << "obj.get_linklist(" << col_ndx << ")->add(" << target_key << ");\n";
+                                        *log << "obj.get_linklist(" << col << ")->add(" << target_key << ");\n";
                                     }
                                     links.add(target_key);
                                 }
@@ -723,9 +555,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             std::pair<int64_t, int32_t> values = get_timestamp_values(s);
                             Timestamp value{values.first, values.second};
                             if (log) {
-                                *log << "obj.set(" << col_ndx << ", " << value << ");\n";
+                                *log << "obj.set(" << col << ", " << value << ");\n";
                             }
-                            obj.set(col_ndx, value);
+                            obj.set(col, value);
                         }
                     }
                     if (log) {
@@ -733,265 +565,171 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                 }
             }
-            else if (instr == REMOVE_OBJECT && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
-                TableRef t = g.get_table(table_ndx);
+            else if (instr == REMOVE_OBJECT && wt->size() > 0) {
+                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableRef t = wt->get_table(table_key);
                 if (t->size() > 0) {
-                    Key key = keys[table_ndx][get_next(s) % t->size()];
+                    ObjKey key = t->get_object(get_next(s) % t->size()).get_key();
                     if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->remove_object(" << key << ");\n";
+                        *log << "wt->get_table(" << table_key << ")->remove_object(" << key << ");\n";
                     }
                     t->remove_object(key);
                 }
             }
-            else if (instr == REMOVE_RECURSIVE && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
-                TableRef t = g.get_table(table_ndx);
+            else if (instr == REMOVE_RECURSIVE && wt->size() > 0) {
+                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableRef t = wt->get_table(table_key);
                 if (t->size() > 0) {
-                    Key key = keys[table_ndx][get_next(s) % t->size()];
+                    ObjKey key = t->get_object(get_next(s) % t->size()).get_key();
                     if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->remove_object_recursive(" << key << ");\n";
+                        *log << "wt->get_table(" << table_key << ")->remove_object_recursive(" << key << ");\n";
                     }
                     t->remove_object_recursive(key);
                 }
             }
-            else if (instr == OPTIMIZE_TABLE && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
-                TableRef t = g.get_table(table_ndx);
-                // Force creation of a string enum column
-                if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->optimize(true);\n";
+            else if (instr == ENUMERATE_COLUMN && wt->size() > 0) {
+                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableRef t = wt->get_table(table_key);
+                auto all_col_keys = t->get_col_keys();
+                if (!all_col_keys.empty()) {
+                    size_t ndx = get_next(s) % all_col_keys.size();
+                    ColKey col = all_col_keys[ndx];
+                    if (log) {
+                        *log << "wt->get_table(" << table_key << ")->enumerate_string_column(" << col << ");\n";
+                    }
+                    wt->get_table(table_key)->enumerate_string_column(col);
                 }
-                g.get_table(table_ndx)->optimize(true);
             }
             else if (instr == COMMIT) {
                 if (log) {
-                    *log << "LangBindHelper::commit_and_continue_as_read(sg_w);\n";
+                    *log << "wt->commit_and_continue_as_read();\n";
                 }
-                LangBindHelper::commit_and_continue_as_read(sg_w);
-                REALM_DO_IF_VERIFY(log, g.verify());
+                wt->commit_and_continue_as_read();
+                REALM_DO_IF_VERIFY(log, wt->verify());
                 if (log) {
-                    *log << "LangBindHelper::promote_to_write(sg_w);\n";
+                    *log << "wt->promote_to_write();\n";
                 }
-                LangBindHelper::promote_to_write(sg_w);
-                REALM_DO_IF_VERIFY(log, g.verify());
+                wt->promote_to_write();
+                REALM_DO_IF_VERIFY(log, wt->verify());
             }
             else if (instr == ROLLBACK) {
                 if (log) {
-                    *log << "LangBindHelper::rollback_and_continue_as_read(sg_w);\n";
+                    *log << "wt->rollback_and_continue_as_read();\n";
                 }
-                LangBindHelper::rollback_and_continue_as_read(sg_w);
-                REALM_DO_IF_VERIFY(log, g.verify());
+                wt->rollback_and_continue_as_read();
+                REALM_DO_IF_VERIFY(log, wt->verify());
                 if (log) {
-                    *log << "LangBindHelper::promote_to_write(sg_w);\n";
+                    *log << "wt->promote_to_write();\n";
                 }
-                LangBindHelper::promote_to_write(sg_w);
-                REALM_DO_IF_VERIFY(log, g.verify());
+                wt->promote_to_write();
+                REALM_DO_IF_VERIFY(log, wt->verify());
             }
             else if (instr == ADVANCE) {
                 if (log) {
-                    *log << "LangBindHelper::advance_read(sg_r);\n";
+                    *log << "rt->advance_read();\n";
                 }
-                LangBindHelper::advance_read(sg_r);
-                REALM_DO_IF_VERIFY(log, g_r.verify());
+                rt->advance_read();
+                REALM_DO_IF_VERIFY(log, rt->verify());
             }
             else if (instr == CLOSE_AND_REOPEN) {
                 bool read_group = get_next(s) % 2 == 0;
                 if (read_group) {
                     if (log) {
-                        *log << "sg_r.close();\n";
+                        *log << "db_r.close();\n";
                     }
-                    sg_r.close();
+                    db_r.close();
                     if (log) {
-                        *log << "sg_r.open(path, true, SharedGroupOptions(key));\n";
+                        *log << "db_r.open(path, true, DBOptions(key));\n";
                     }
-                    sg_r.open(path, true, SharedGroupOptions(encryption_key));
+                    db_r.open(path, true, DBOptions(encryption_key));
                     if (log) {
-                        *log << "sg_r.begin_read();\n";
+                        *log << "rt = db_r.start_read();\n";
                     }
-                    sg_r.begin_read();
-                    REALM_DO_IF_VERIFY(log, g_r.verify());
+                    rt = db_r.start_read();
+                    REALM_DO_IF_VERIFY(log, rt->verify());
                 }
                 else {
                     if (log) {
-                        *log << "sg_w.close();\n";
+                        *log << "wt = nullptr;\n";
+                        *log << "db_w.close();\n";
                     }
-                    sg_w.close();
+                    wt = nullptr;
+                    db_w.close();
                     if (log) {
-                        *log << "sg_w.open(path, true, SharedGroupOptions(key));\n";
+                        *log << "db_w.open(path, true, DBOptions(key));\n";
                     }
-                    sg_w.open(path, true, SharedGroupOptions(encryption_key));
+                    db_w.open(path, true, DBOptions(encryption_key));
                     if (log) {
-                        *log << "sg_w.begin_write();\n";
+                        *log << "wt = db_w.start_write();\n";
                     }
-                    sg_w.begin_write();
-                    REALM_DO_IF_VERIFY(log, g.verify());
+                    wt = db_w.start_write();
+                    REALM_DO_IF_VERIFY(log, wt->verify());
                 }
             }
-            else if (instr == GET_ALL_COLUMN_NAMES && g.size() > 0) {
+            else if (instr == GET_ALL_COLUMN_NAMES && wt->size() > 0) {
                 // try to fuzz find this: https://github.com/realm/realm-core/issues/1769
-                for (size_t table_ndx = 0; table_ndx < g.size(); ++table_ndx) {
-                    TableRef t = g.get_table(table_ndx);
-                    for (size_t col_ndx = 0; col_ndx < t->get_column_count(); ++col_ndx) {
-                        StringData col_name = t->get_column_name(col_ndx);
+                for (auto table_key : wt->get_keys()) {
+                    TableRef t = wt->get_table(table_key);
+                    auto all_col_keys = t->get_col_keys();
+                    for (auto col : all_col_keys) {
+                        StringData col_name = t->get_column_name(col);
                         static_cast<void>(col_name);
                     }
                 }
             }
-            else if (instr == CREATE_TABLE_VIEW && g.size() > 0) {
-                size_t table_ndx = get_next(s) % g.size();
-                TableRef t = g.get_table(table_ndx);
+            else if (instr == CREATE_TABLE_VIEW && wt->size() > 0) {
+                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableRef t = wt->get_table(table_key);
                 if (log) {
-                    *log << "table_views.push_back(g.get_table(" << table_ndx << ")->where().find_all());\n";
+                    *log << "table_views.push_back(wt->get_table(" << table_key << ")->where().find_all());\n";
                 }
                 TableView tv = t->where().find_all();
                 table_views.push_back(tv);
             }
             else if (instr == COMPACT) {
+                /*
                 if (log) {
-                    *log << "sg_r.close();\n";
+                    *log << "db_r.close();\n";
                 }
-                sg_r.close();
+                db_r.close();
                 if (log) {
-                    *log << "sg_w.commit();\n";
+                    *log << "wt->commit();\n";
                 }
-                sg_w.commit();
+                wt->commit();
 
                 if (log) {
-                    *log << "REALM_ASSERT_RELEASE(sg_w.compact());\n";
+                    *log << "REALM_ASSERT_RELEASE(db_w.compact());\n";
                 }
-                REALM_ASSERT_RELEASE(sg_w.compact());
+                REALM_ASSERT_RELEASE(db_w.compact());
 
                 if (log) {
-                    *log << "sg_w.begin_write();\n";
+                    *log << "wt = db_w.start_write();\n";
                 }
-                sg_w.begin_write();
+                wt = db_w.start_write();
                 if (log) {
-                    *log << "sg_r.open(path, true, SharedGroupOptions(key));\n";
+                    *log << "db_r.open(path, true, DBOptions(key));\n";
                 }
-                sg_r.open(path, true, SharedGroupOptions(encryption_key));
+                db_r.open(path, true, DBOptions(encryption_key));
                 if (log) {
-                    *log << "sg_r.begin_read();\n";
+                    *log << "rt = db_r.start_read();\n";
                 }
-                sg_r.begin_read();
-                REALM_DO_IF_VERIFY(log, g_r.verify());
+                rt = db_r.start_read();
+                REALM_DO_IF_VERIFY(log, rt->verify());
+                */
             }
-<<<<<<< HEAD
-=======
-            else if (instr == SET_UNIQUE && g.size() > 0) {
-                std::pair<size_t, size_t> target = get_target_for_set_unique(g, s);
-                if (target.first < g.size()) {
-                    size_t table_ndx = target.first;
-                    size_t col_ndx = target.second;
-                    TableRef t = g.get_table(table_ndx);
-
-                    // Only integer and string columns are supported. We let the fuzzer choose to set either
-                    // null or a value (depending also on the nullability of the column).
-                    //
-                    // for integer columns, that means we call either of
-                    //  - set_null_unique
-                    //  - set_int_unique
-                    // while for string columns, both null and values are handled by
-                    //  - set_string_unique
-                    //
-                    // Due to an additional limitation involving non-empty lists, a specific kind of LogicError
-                    // may be thrown. This is handled for each case below and encoded as a CHECK in the generated
-                    // C++ unit tests when logging is enabled. Other kinds / types of exception are not handled,
-                    // but simply rethrown.
-
-                    DataType type = t->get_column_type(col_ndx);
-                    switch (type) {
-                        case type_Int: {
-                            size_t row_ndx = get_int32(s) % t->size();
-                            bool set_null = t->is_nullable(col_ndx) ? get_next(s) % 2 == 0 : false;
-                            if (set_null) {
-                                if (log) {
-                                    *log << "try { g.get_table(" << table_ndx << ")->set_null_unique(" << col_ndx
-                                         << ", " << row_ndx
-                                         << "); } catch (const LogicError& le) "
-                                            "{ CHECK(le.kind() == LogicError::illegal_combination); }\n";
-                                }
-                                try {
-                                    t->set_null_unique(col_ndx, row_ndx);
-                                }
-                                catch (const LogicError& le) {
-                                    if (le.kind() != LogicError::illegal_combination) {
-                                        throw;
-                                    }
-                                }
-                            }
-                            else {
-                                int64_t value = get_int64(s);
-                                if (log) {
-                                    *log << "try { g.get_table(" << table_ndx << ")->set_int_unique(" << col_ndx
-                                         << ", " << row_ndx << ", " << value
-                                         << "); } catch (const LogicError& le) "
-                                            "{ CHECK(le.kind() == LogicError::illegal_combination); }\n";
-                                }
-                                try {
-                                    t->set_int_unique(col_ndx, row_ndx, value);
-                                }
-                                catch (const LogicError& le) {
-                                    if (le.kind() != LogicError::illegal_combination) {
-                                        throw;
-                                    }
-                                }
-                            }
-                            break;
-                        }
-                        case type_String: {
-                            size_t row_ndx = get_int32(s) % t->size();
-                            bool set_null = t->is_nullable(col_ndx) ? get_next(s) % 2 == 0 : false;
-                            if (set_null) {
-                                if (log) {
-                                    *log << "try { g.get_table(" << table_ndx << ")->set_string_unique(" << col_ndx
-                                         << ", " << row_ndx << ", null{}); } catch (const LogicError& le) "
-                                            "{ CHECK(le.kind() == LogicError::illegal_combination); }\n";
-                                }
-                                try {
-                                    t->set_string_unique(col_ndx, row_ndx, null{});
-                                }
-                                catch (const LogicError& le) {
-                                    if (le.kind() != LogicError::illegal_combination) {
-                                        throw;
-                                    }
-                                }
-                            }
-                            else {
-                                std::string str = create_string(s, get_next(s));
-                                if (log) {
-                                    *log << "try { g.get_table(" << table_ndx << ")->set_string_unique(" << col_ndx
-                                         << ", " << row_ndx << ", \"" << str << "\"); } catch (const LogicError& le) "
-                                            "{ CHECK(le.kind() == LogicError::illegal_combination); }\n";
-                                }
-                                try {
-                                    t->set_string_unique(col_ndx, row_ndx, str);
-                                }
-                                catch (const LogicError& le) {
-                                    if (le.kind() != LogicError::illegal_combination) {
-                                        throw;
-                                    }
-                                }
-                            }
-                            break;
-                        }
-                        default:
-                            break;
-                    }
-                }
-            }
->>>>>>> 82cb7c4c0b2a
-            else if (instr == IS_NULL && g_r.size() > 0) {
-                size_t table_ndx = get_next(s) % g_r.size();
-                TableRef t = g_r.get_table(table_ndx);
+            else if (instr == IS_NULL && rt->size() > 0) {
+                TableKey table_key = rt->get_keys()[get_next(s) % rt->size()];
+                TableRef t = rt->get_table(table_key);
                 if (t->get_column_count() > 0 && t->size() > 0) {
-                    size_t col_ndx = get_int32(s) % t->get_column_count();
-                    Key key = keys[table_ndx][get_int32(s) % t->size()];
+                    auto all_col_keys = t->get_col_keys();
+                    size_t ndx = get_next(s) % all_col_keys.size();
+                    ColKey col = all_col_keys[ndx];
+                    ObjKey key = t->get_object(get_int32(s) % t->size()).get_key();
                     if (log) {
-                        *log << "g_r.get_table(" << table_ndx << ")->get_object(Key(" << key.value << ")).is_null("
-                             << col_ndx << ");\n";
+                        *log << "g_r.get_table(" << table_key << ")->get_object(" << key << ").is_null(" << col
+                             << ");\n";
                     }
-                    bool res = t->get_object(key).is_null(col_ndx);
+                    bool res = t->get_object(key).is_null(col);
                     static_cast<void>(res);
                 }
             }

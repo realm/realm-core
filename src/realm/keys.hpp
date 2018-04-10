@@ -54,21 +54,10 @@ struct TableKey {
     int64_t value;
 };
 
-class TableVersions : public std::vector<std::pair<TableKey, uint64_t>> {
-public:
-    TableVersions()
-    {
-    }
-    TableVersions(TableKey key, uint64_t version)
-    {
-        emplace_back(key, version);
-    }
-    bool operator==(const TableVersions& other) const;
-};
 
 inline std::ostream& operator<<(std::ostream& os, TableKey tk)
 {
-    os << tk.value;
+    os << "TableKey(" << tk.value << ")";
     return os;
 }
 
@@ -80,6 +69,17 @@ inline std::string to_string(TableKey tk)
 }
 }
 
+class TableVersions : public std::vector<std::pair<TableKey, uint64_t>> {
+public:
+    TableVersions()
+    {
+    }
+    TableVersions(TableKey key, uint64_t version)
+    {
+        emplace_back(key, version);
+    }
+    bool operator==(const TableVersions& other) const;
+};
 
 struct ColKey {
     constexpr ColKey()
@@ -116,7 +116,7 @@ struct ColKey {
 
 inline std::ostream& operator<<(std::ostream& os, ColKey ck)
 {
-    os << ck.value;
+    os << "ObjKey(" << ck.value << ")";
     return os;
 }
 
