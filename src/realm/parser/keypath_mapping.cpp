@@ -84,6 +84,17 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
 
     // Process backlinks which consumes 3 parts of the keypath
     if (is_backlinks_prefix(keypath[index])) {
+        if (index + 1 == keypath.size()) {
+            // we do support @links.@count and @links.@size so if @links is the end, that's what we are doing
+            // any other operation on @links would have thrown a predicate error from the parser level
+            index = index + 1;
+            KeyPathElement element;
+            element.table = table;
+            element.col_ndx = realm::npos; // unused
+            element.col_type = type_LinkList;
+            element.is_backlink = false;
+            return element;
+        }
         realm_precondition(index + 2 < keypath.size(), "'@links' must be proceeded by type name and a property name");
         std::string origin_table_name = m_backlink_class_prefix + keypath[index + 1];
         Table::BacklinkOrigin info = table->find_backlink_origin(origin_table_name, keypath[index + 2]);

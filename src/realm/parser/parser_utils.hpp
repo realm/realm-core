@@ -48,6 +48,8 @@ const char* type_to_str<bool>();
 template <>
 const char* type_to_str<Int>();
 template <>
+const char* type_to_str<int>();
+template <>
 const char* type_to_str<Float>();
 template <>
 const char* type_to_str<Double>();
@@ -76,7 +78,7 @@ T stot(std::string const& s) {
     T value;
     iss >> value;
     if (iss.fail()) {
-        throw std::invalid_argument(util::format("Cannot convert string '%1'", s));
+        throw std::invalid_argument(util::format("Cannot convert string '%1' to type '%2'", s, type_to_str<T>()));
     }
     return value;
 }

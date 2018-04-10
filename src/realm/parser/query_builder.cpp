@@ -458,6 +458,8 @@ void add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, Expre
             REALM_FALLTHROUGH;
         case ExpressionContainer::ExpressionInternal::exp_OpCount:
             REALM_FALLTHROUGH;
+        case ExpressionContainer::ExpressionInternal::exp_OpBacklinkCount:
+            REALM_FALLTHROUGH;
         case ExpressionContainer::ExpressionInternal::exp_OpSizeString:
             REALM_FALLTHROUGH;
         case ExpressionContainer::ExpressionInternal::exp_OpSizeBinary:
@@ -489,6 +491,9 @@ void internal_add_comparison_to_query(Query& query, LHS_T& lhs, Predicate::Compa
             return;
         case ExpressionContainer::ExpressionInternal::exp_OpCount:
             do_add_comparison_to_query(query, cmp, lhs, rhs.get_count(), comparison_type);
+            return;
+        case ExpressionContainer::ExpressionInternal::exp_OpBacklinkCount:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_backlink_count(), comparison_type);
             return;
         case ExpressionContainer::ExpressionInternal::exp_OpSizeString:
             do_add_comparison_to_query(query, cmp, lhs, rhs.get_size_string(), comparison_type);
@@ -526,6 +531,9 @@ void add_comparison_to_query(Query &query, ExpressionContainer& lhs, Predicate::
             return;
         case ExpressionContainer::ExpressionInternal::exp_OpCount:
             internal_add_comparison_to_query(query, lhs.get_count(), cmp, rhs, comparison_type);
+            return;
+        case ExpressionContainer::ExpressionInternal::exp_OpBacklinkCount:
+            internal_add_comparison_to_query(query, lhs.get_backlink_count(), cmp, rhs, comparison_type);
             return;
         case ExpressionContainer::ExpressionInternal::exp_OpSizeString:
             internal_add_comparison_to_query(query, lhs.get_size_string(), cmp, rhs, comparison_type);

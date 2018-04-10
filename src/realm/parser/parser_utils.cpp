@@ -42,6 +42,11 @@ const char* type_to_str<Int>()
     return "Int";
 }
 template <>
+const char* type_to_str<int>()
+{
+    return "Int";
+}
+template <>
 const char* type_to_str<Float>()
 {
     return "Float";
@@ -120,6 +125,8 @@ const char* collection_operator_to_str(parser::Expression::KeyPathOp op)
             return "@size";
         case parser::Expression::KeyPathOp::SizeBinary:
             return "@size";
+        case parser::Expression::KeyPathOp::BacklinkCount:
+            return "@links.@count";
         case parser::Expression::KeyPathOp::Count:
             return "@count";
     }
