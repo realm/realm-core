@@ -49,26 +49,29 @@ public:
         m_changesets = nullptr;
     }
 
+    void set_group(Group* group)
+    {
+        m_group = group;
+        if (m_changesets)
+            _impl::GroupFriend::set_history_parent(*m_group, *m_changesets);
+    }
+
     /// Must never be called more than once per transaction. Returns the version
     /// produced by the added changeset.
     version_type add_changeset(BinaryData);
 
-    void init_from_parent(Group& group, version_type);
+    void init_from_parent(version_type);
     void update_from_ref(ref_type, version_type) override;
     // void update_early_from_top_ref(version_type, size_t, ref_type) override;
     // void update_from_parent(version_type) override;
     void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override;
     void set_oldest_bound_version(version_type) override;
 
-    void set_parent(ArrayParent* parent, size_t ndx_in_parent)
-    {
-        m_changesets->set_parent(parent, ndx_in_parent);
-    }
-
     void verify() const override;
 
 private:
-    Allocator* m_alloc;
+    Allocator* m_alloc = nullptr;
+    Group* m_group = nullptr;
     /// Version on which the first changeset in the history is based, or if the
     /// history is empty, the version associatede with currently bound
     /// snapshot. In general, the version associatede with currently bound
@@ -159,30 +162,20 @@ void InRealmHistory::verify() const
 #endif
 }
 
-void InRealmHistory::init_from_parent(Group& group, version_type version)
+void InRealmHistory::init_from_parent(version_type version)
 {
-    using gf = _impl::GroupFriend;
-    ref_type ref = gf::get_history_ref(group);
-    if (ref == 0) {
-        // No history
-        Allocator& alloc = gf::get_alloc(group);
+    if (!m_changesets) {
+        using gf = _impl::GroupFriend;
+        REALM_ASSERT(m_group);
+        Allocator& alloc = gf::get_alloc(*m_group);
         m_changesets = std::make_unique<BinaryColumn>(alloc); // Throws
         // Note: gf::prepare_history_parent() also ensures the the root array
         // has a slot for the history ref.
-        gf::prepare_history_parent(group, *m_changesets, Replication::hist_InRealm,
+        gf::prepare_history_parent(*m_group, *m_changesets, Replication::hist_InRealm,
                                    g_history_schema_version); // Throws
-        m_changesets->create();
-        gf::set_history_parent(group, *m_changesets);
     }
-    else {
-        if (REALM_LIKELY(m_changesets)) {
-            m_changesets->init_from_ref(ref); // Throws
-        }
-        else {
-            m_changesets = std::make_unique<BinaryColumn>(*m_alloc); // Throws
-            m_changesets->init_from_ref(ref);
-            gf::set_history_parent(group, *m_changesets);
-        }
+    if (!m_changesets->init_from_parent()) {
+        m_changesets->create();
     }
     m_size = m_changesets->size();
     m_base_version = version - m_size;
@@ -197,10 +190,7 @@ void InRealmHistory::update_from_ref(ref_type ref, version_type version)
         m_changesets = nullptr;
     }
     else {
-        if (REALM_LIKELY(m_changesets)) {
-            m_changesets->set_parent(nullptr, 0);
-        }
-        else {
+        if (REALM_UNLIKELY(!m_changesets)) {
             m_changesets = std::make_unique<BinaryColumn>(*m_alloc); // Throws
         }
         m_changesets->init_from_ref(ref); // Throws
@@ -236,11 +226,16 @@ public:
     {
         // No-op
     }
+    void do_initiate_transact(Group& group, version_type version, bool history_updated) override
+    {
+        TrivialReplication::do_initiate_transact(group, version, history_updated);
+        m_history.set_group(&group);
+    }
 
-    version_type prepare_changeset(Group& group, const char* data, size_t size, version_type orig_version) override
+    version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
     {
         if (!is_history_updated()) {
-            m_history.init_from_parent(group, orig_version); // Throws
+            m_history.init_from_parent(orig_version); // Throws
         }
         BinaryData changeset(data, size);
         version_type new_version = m_history.add_changeset(changeset); // Throws

@@ -3828,4 +3828,27 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
 }
 #endif
 
+TEST(Shared_SimpleTransaction)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+
+    {
+        DB db_w(*hist_w);
+        auto wt = db_w.start_write();
+        wt->verify();
+        wt->commit();
+        wt = nullptr;
+        wt = db_w.start_write();
+        wt->verify();
+        wt->commit();
+    }
+    DB db_r(*hist_r);
+    {
+        auto rt = db_r.start_read();
+        rt->verify();
+    }
+}
+
 #endif // TEST_SHARED

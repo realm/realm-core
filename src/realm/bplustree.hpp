@@ -151,7 +151,11 @@ public:
 
     void init_from_ref(ref_type ref)
     {
-        replace_root(create_root_from_ref(ref));
+        auto new_root = create_root_from_ref(ref);
+        new_root->set_parent(m_parent, m_ndx_in_parent);
+
+        m_root = std::move(new_root);
+
         invalidate_leaf_cache();
         m_size = m_root->get_tree_size();
     }

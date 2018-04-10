@@ -106,7 +106,7 @@ public:
         // No-op
     }
 
-    version_type prepare_changeset(Group&, const char* data, size_t size, version_type orig_version) override
+    version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
     {
         m_incoming_changeset = Buffer<char>(size); // Throws
         std::copy(data, data + size, m_incoming_changeset.data());

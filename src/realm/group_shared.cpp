@@ -1901,7 +1901,7 @@ Replication::version_type DB::do_commit(Group& group)
         // fails. The application then has the option of terminating the
         // transaction with a call to SharedGroup::rollback(), which in turn
         // must call Replication::abort_transact().
-        new_version = repl->prepare_commit(group, current_version); // Throws
+        new_version = repl->prepare_commit(current_version); // Throws
         try {
             low_level_commit(new_version, group); // Throws
         }
@@ -2325,7 +2325,7 @@ TransactionRef DB::start_write()
         if (Replication* repl = m_alloc.get_replication()) {
             version_type current_version = read_lock.m_version;
             bool history_updated = false;
-            repl->initiate_transact(current_version, history_updated); // Throws
+            repl->initiate_transact(*tr, current_version, history_updated); // Throws
         }
         g.release();
     }

@@ -903,7 +903,7 @@ inline void Transaction::promote_to_write(O* observer)
         Replication* repl = get_replication();
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
         DB::version_type current_version = m_read_lock.m_version;
-        repl->initiate_transact(current_version, history_updated); // Throws
+        repl->initiate_transact(*this, current_version, history_updated); // Throws
 
         // If the group has no top array (top_ref == 0), create a new node
         // structure for an empty group now, to be ready for modifications. See
