@@ -545,10 +545,6 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writa
     REALM_ASSERT_3(new_top_ref, <, new_file_size);
     REALM_ASSERT(!is_attached());
 
-    // Make all dynamically allocated memory (space beyond the attached file) as
-    // available free-space.
-    reset_free_space_tracking(); // Throws
-
     // update readers view of memory
     m_alloc.update_reader_view(new_file_size, new_version); // Throws
     update_allocator_wrappers(writable);
@@ -648,6 +644,8 @@ Table* Group::do_get_table(TableKey key, DescMatcher desc_matcher)
 
 Table* Group::do_add_table(StringData name, DescSetter desc_setter, bool require_unique_name)
 {
+    if (!m_is_writable)
+        throw LogicError(LogicError::wrong_transact_state);
     // get new key and index
     if (!m_table_names.is_attached())
         return 0;
@@ -842,6 +840,8 @@ void Group::remove_table(TableKey key)
 
 void Group::remove_table(size_t table_ndx, TableKey key)
 {
+    if (!m_is_writable)
+        throw LogicError(LogicError::wrong_transact_state);
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
@@ -907,6 +907,8 @@ void Group::rename_table(TableKey key, StringData new_name, bool require_unique_
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
+    if (!m_is_writable)
+        throw LogicError(LogicError::wrong_transact_state);
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (require_unique_name && has_table(new_name))
         throw TableNameInUse();
@@ -1578,7 +1580,7 @@ private:
 void Group::update_allocator_wrappers(bool writable)
 {
     m_is_writable = writable;
-    m_alloc.set_read_only(!writable);
+    // FIXME: We can't write protect at group level as the allocator is shared: m_alloc.set_read_only(!writable);
     for (size_t i = 0; i < m_table_accessors.size(); ++i) {
         auto table_accessor = m_table_accessors[i];
         if (table_accessor) {
