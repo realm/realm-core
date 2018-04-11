@@ -562,10 +562,6 @@ public:
     void dump_node_structure(std::ostream&, int level) const;
 #endif
 
-    using HandoverPatch = TableHandoverPatch;
-    static void generate_patch(const Table* ref, std::unique_ptr<HandoverPatch>& patch);
-    static TableRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
-
 protected:
     /// Compare the objects of two tables under the assumption that the two tables
     /// have the same number of columns, and the same data type at each column

@@ -19,27 +19,27 @@
 #include "compatibility.hpp"
 
 using realm::DB;
-using realm::SharedGroupOptions;
+using realm::DBOptions;
 
 namespace compatibility {
 
-SharedGroupOptions::Durability durability(RealmDurability level)
+DBOptions::Durability durability(RealmDurability level)
 {
     switch (level) {
     case RealmDurability::Full:
-        return SharedGroupOptions::Durability::Full;
+        return DBOptions::Durability::Full;
     case RealmDurability::MemOnly:
-        return SharedGroupOptions::Durability::MemOnly;
+        return DBOptions::Durability::MemOnly;
     case RealmDurability::Async:
-        return SharedGroupOptions::Durability::Async;
+        return DBOptions::Durability::Async;
     }
     REALM_ASSERT(false); // unhandled case
-    return SharedGroupOptions::Durability::Full;
+    return DBOptions::Durability::Full;
 }
 
 DB* create_new_shared_group(std::string path, RealmDurability level, const char* key)
 {
-    return new DB(path, false, SharedGroupOptions(durability(level), key));
+    return new DB(path, false, DBOptions(durability(level), key));
 }
 
 } // end namespace compatibility

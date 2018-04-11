@@ -34,7 +34,6 @@ namespace realm {
 class TableView;
 class SortDescriptor;
 class Group;
-struct LinkListHandoverPatch;
 
 // To be used in query for size. Adds nullability to size so that
 // it can be put in a NullableVector
@@ -582,13 +581,13 @@ public:
     }
 
 private:
+    friend class Transaction;
+
     ConstObj m_obj;
 };
 
 class LinkList : public List<ObjKey>, public ObjList {
 public:
-    using HandoverPatch = LinkListHandoverPatch;
-
     LinkList(const Obj& owner, ColKey col_key)
         : List<ObjKey>(owner, col_key)
         , ObjList(*this->m_tree, &get_target_table())
@@ -628,9 +627,6 @@ private:
     friend class Query;
 
     TableVersions sync_if_needed() const override;
-
-    static void generate_patch(const LinkList* ref, std::unique_ptr<LinkListHandoverPatch>& patch);
-    static LinkListPtr create_from_and_consume_patch(std::unique_ptr<LinkListHandoverPatch>& patch, Group& group);
 };
 
 template <typename U>

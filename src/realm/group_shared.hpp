@@ -93,19 +93,18 @@ public:
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and the
     /// upgrade will be aborted.
-    explicit DB(const std::string& file, bool no_create = false,
-                const SharedGroupOptions options = SharedGroupOptions());
+    explicit DB(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
 
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and
     /// the upgrade will be aborted.
-    explicit DB(Replication& repl, const SharedGroupOptions options = SharedGroupOptions());
+    explicit DB(Replication& repl, const DBOptions options = DBOptions());
 
     struct unattached_tag {
     };
 
-    /// Create a SharedGroup instance in its unattached state. It may
+    /// Create a DB instance in its unattached state. It may
     /// then be attached to a database file later by calling
     /// open(). You may test whether this instance is currently in its
     /// attached state by calling is_attached(). Calling any other
@@ -116,7 +115,7 @@ public:
     ~DB() noexcept;
 
     // Disable copying to prevent accessor errors. If you really want another
-    // instance, open another SharedGroup object on the same file.
+    // instance, open another DB object on the same file. But you don't.
     DB(const DB&) = delete;
     DB& operator=(const DB&) = delete;
 
@@ -150,12 +149,11 @@ public:
     ///
     /// \throw FileFormatUpgradeRequired only if \a SharedGroupOptions::allow_upgrade
     /// is `false` and an upgrade is required.
-    void open(const std::string& file, bool no_create = false,
-              const SharedGroupOptions options = SharedGroupOptions());
+    void open(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
 
     /// Open this group in replication mode. The specified Replication instance
     /// must remain in existence for as long as the DB.
-    void open(Replication&, const SharedGroupOptions options = SharedGroupOptions());
+    void open(Replication&, const DBOptions options = DBOptions());
 
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
@@ -283,91 +281,54 @@ public:
     void test_ringbuf();
 #endif
 
-    /// To handover a table view, query, List<T> or Obj accessor of type T, you
-    /// must wrap it into a Handover<T> for the transfer. Wrapping and
-    /// unwrapping of a handover object is done by the methods
-    /// 'export_for_handover()' and 'import_from_handover()' declared below.
-    /// 'export_for_handover()' returns a Handover object, and
-    /// 'import_for_handover()' consumes that object, producing a new accessor
-    /// which is ready for use in the context of the importing SharedGroup.
-    ///
-    /// The Handover always creates a new accessor object at the importing side.
-    /// For TableViews, there are 3 forms of handover.
-    ///
-    /// - with payload move: the payload is handed over and ends up as a payload
-    ///   held by the accessor at the importing side. The accessor on the
-    ///   exporting side will rerun its query and generate a new payload, if
-    ///   TableView::sync_if_needed() is called. If the original payload was in
-    ///   sync at the exporting side, it will also be in sync at the importing
-    ///   side. This is indicated to handover_export() by the argument
-    ///   MutableSourcePayload::Move
-    ///
-    /// - with payload copy: a copy of the payload is handed over, so both the
-    ///   accessors on the exporting side *and* the accessors created at the
-    ///   importing side has their own payload. This is indicated to
-    ///   handover_export() by the argument ConstSourcePayload::Copy
-    ///
-    /// - without payload: the payload stays with the accessor on the exporting
-    ///   side. On the importing side, the new accessor is created without
-    ///   payload. A call to TableView::sync_if_needed() will trigger generation
-    ///   of a new payload. This form of handover is indicated to
-    ///   handover_export() by the argument ConstSourcePayload::Stay.
-    ///
-    /// For all other (non-TableView) accessors, handover is done with payload
-    /// copy, since the payload is trivial.
-    ///
-    /// Handover *without* payload is useful when you want to ship a tableview
-    /// with its query for execution in a background thread. Handover with
-    /// *payload move* is useful when you want to transfer the result back.
-    ///
-    /// Handover *without* payload or with payload copy is guaranteed *not* to
-    /// change the accessors on the exporting side.
-    ///
-    /// Handover is *not* thread safe and should be carried out
-    /// by the thread that "owns" the involved accessors.
-    ///
-    /// Handover is transitive:
-    /// If the object being handed over depends on other views
-    /// (table- or link- ), those objects will be handed over as well. The mode
-    /// of handover (payload copy, payload move, without payload) is applied
-    /// recursively. Note: If you are handing over a tableview dependent upon
-    /// another tableview and using MutableSourcePayload::Move,
-    /// you are on thin ice!
-    ///
-    /// On the importing side, the top-level accessor being created during
-    /// import takes ownership of all other accessors (if any) being created as
-    /// part of the import.
-#if 0
-    /// Type used to support handover of accessors between shared groups.
-    template <typename T>
-    struct Handover;
-
-    /// thread-safe/const export (mode is Stay or Copy)
-    /// during export, the following operations on the shared group is locked:
-    /// - advance_read(), promote_to_write(), commit_and_continue_as_read(),
-    ///   rollback_and_continue_as_read(), close()
-    template <typename T>
-    std::unique_ptr<Handover<T>> export_for_handover(const T& accessor, ConstSourcePayload mode);
-
-    // destructive export (mode is Move)
-    template <typename T>
-    std::unique_ptr<Handover<T>> export_for_handover(T& accessor, MutableSourcePayload mode);
-
-    /// Import an accessor wrapped in a handover object. The import will fail
-    /// if the importing SharedGroup is viewing a version of the database that
-    /// is different from the exporting SharedGroup. The call to
-    /// import_from_handover is not thread-safe.
-    template <typename T>
-    std::unique_ptr<T> import_from_handover(std::unique_ptr<Handover<T>> handover);
-
-    // We need two cases for handling of LinkViews, because they are ref counted.
-    std::unique_ptr<Handover<LinkList>> export_linkview_for_handover(const LinkListPtr& accessor);
-    LinkListPtr import_linkview_from_handover(std::unique_ptr<Handover<LinkList>> handover);
-
-    // likewise for Tables.
-    std::unique_ptr<Handover<Table>> export_table_for_handover(const TableRef& accessor);
-    TableRef import_table_from_handover(std::unique_ptr<Handover<Table>> handover);
-#endif
+/// Once created, accessors belong to a transaction and can only be used for
+/// access as long as that transaction is still active.
+///
+/// For TableViews, there are 3 forms of handover determined by the PayloadPolicy.
+///
+/// - with payload move: the payload is handed over and ends up as a payload
+///   held by the accessor at the importing side. The accessor on the
+///   exporting side will rerun its query and generate a new payload, if
+///   TableView::sync_if_needed() is called. If the original payload was in
+///   sync at the exporting side, it will also be in sync at the importing
+///   side. This is indicated to handover_export() by the argument
+///   MutableSourcePayload::Move
+///
+/// - with payload copy: a copy of the payload is handed over, so both the
+///   accessors on the exporting side *and* the accessors created at the
+///   importing side has their own payload. This is indicated to
+///   handover_export() by the argument ConstSourcePayload::Copy
+///
+/// - without payload: the payload stays with the accessor on the exporting
+///   side. On the importing side, the new accessor is created without
+///   payload. A call to TableView::sync_if_needed() will trigger generation
+///   of a new payload. This form of handover is indicated to
+///   handover_export() by the argument ConstSourcePayload::Stay.
+///
+/// For all other (non-TableView) accessors, handover is done with payload
+/// copy, since the payload is trivial.
+///
+/// Handover *without* payload is useful when you want to ship a tableview
+/// with its query for execution in a background thread. Handover with
+/// *payload move* is useful when you want to transfer the result back.
+///
+/// Handover *without* payload or with payload copy is guaranteed *not* to
+/// change the accessors on the exporting side.
+///
+/// Handover is *not* thread safe and should be carried out
+/// by the thread that "owns" the involved accessors.
+///
+/// Handover is transitive:
+/// If the object being handed over depends on other views
+/// (table- or link- ), those objects will be handed over as well. The mode
+/// of handover (payload copy, payload move, without payload) is applied
+/// recursively. Note: If you are handing over a tableview dependent upon
+/// another tableview and using MutableSourcePayload::Move,
+/// you are on thin ice!
+///
+/// On the importing side, the top-level accessor being created during
+/// import takes ownership of all other accessors (if any) being created as
+/// part of the import.
 #if REALM_METRICS
     std::shared_ptr<metrics::Metrics> get_metrics();
 #endif // REALM_METRICS
@@ -436,7 +397,7 @@ private:
     std::shared_ptr<metrics::Metrics> m_metrics;
 #endif // REALM_METRICS
 
-    void do_open(const std::string& file, bool no_create, bool is_backend, const SharedGroupOptions options);
+    void do_open(const std::string& file, bool no_create, bool is_backend, const DBOptions options);
 
     // Ring buffer management
     bool ringbuf_is_empty() const noexcept;
@@ -563,6 +524,13 @@ public:
     List<T> copy_of(const List<T>& original);
     LinkList copy_of(const LinkList& original);
     LinkListPtr copy_of(const LinkListPtr& original);
+    ConstLinkList copy_of(const ConstLinkList& original);
+    ConstLinkListPtr copy_of(const ConstLinkListPtr& original);
+
+    // handover of the heavier Query and TableView
+    std::unique_ptr<Query> copy_of(Query&, PayloadPolicy);
+    std::unique_ptr<ConstTableView> copy_of(TableView&, PayloadPolicy);
+    std::unique_ptr<ConstTableView> copy_of(ConstTableView&, PayloadPolicy);
 
     /// Get the current transaction type
     DB::TransactStage get_transact_stage() const noexcept;
@@ -701,7 +669,7 @@ private:
 struct DB::BadVersion : std::exception {
 };
 
-inline DB::DB(const std::string& file, bool no_create, const SharedGroupOptions options)
+inline DB::DB(const std::string& file, bool no_create, const DBOptions options)
     : m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(file, no_create, options); // Throws
@@ -711,13 +679,13 @@ inline DB::DB(unattached_tag) noexcept
 {
 }
 
-inline DB::DB(Replication& repl, const SharedGroupOptions options)
+inline DB::DB(Replication& repl, const DBOptions options)
     : m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(repl, options); // Throws
 }
 
-inline void DB::open(const std::string& path, bool no_create_file, const SharedGroupOptions options)
+inline void DB::open(const std::string& path, bool no_create_file, const DBOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -726,7 +694,7 @@ inline void DB::open(const std::string& path, bool no_create_file, const SharedG
     do_open(path, no_create_file, is_backend, options); // Throws
 }
 
-inline void DB::open(Replication& repl, const SharedGroupOptions options)
+inline void DB::open(Replication& repl, const DBOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -775,25 +743,6 @@ private:
     ReadLockInfo* m_read_lock;
 };
 
-inline Obj Transaction::copy_of(const ConstObj& original)
-{
-    TableKey tk = original.get_table_key();
-    ObjKey rk = original.get_key();
-    return get_table(tk)->get_object(rk);
-}
-
-inline ConstTableRef Transaction::copy_of(ConstTableRef original)
-{
-    TableKey tk = original->get_key();
-    return get_table(tk);
-}
-
-inline TableRef Transaction::copy_of(TableRef original)
-{
-    TableKey tk = original->get_key();
-    return get_table(tk);
-}
-
 template <typename T>
 inline List<T> Transaction::copy_of(const List<T>& original)
 {
@@ -802,70 +751,6 @@ inline List<T> Transaction::copy_of(const List<T>& original)
     return obj.get_list<T>(ck);
 }
 
-inline LinkList Transaction::copy_of(const LinkList& original)
-{
-    Obj obj = copy_of(original.m_obj);
-    ColKey ck = original.m_col_key;
-    return obj.get_linklist(ck);
-}
-
-inline LinkListPtr Transaction::copy_of(const LinkListPtr& original)
-{
-    Obj obj = copy_of(original->m_obj);
-    ColKey ck = original->m_col_key;
-    return obj.get_linklist_ptr(ck);
-}
-
-#if 0
-// Old handover interface - to be removed
-template <typename T>
-struct DB::Handover {
-    std::unique_ptr<typename T::HandoverPatch> patch;
-    std::unique_ptr<T> clone;
-    VersionID version;
-};
-
-template <typename T>
-std::unique_ptr<DB::Handover<T>> DB::export_for_handover(const T& accessor, ConstSourcePayload mode)
-{
-    if (m_transact_stage != transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
-    std::unique_ptr<Handover<T>> result(new Handover<T>());
-    // Implementation note:
-    // often, the return value from clone will be T*, BUT it may be ptr to some
-    // base of T instead, so we must cast it to T*. This is always safe, because
-    // no matter the type, clone() will clone the actual accessor instance, and
-    // hence return an instance of the same type.
-    result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
-    result->version = get_version_of_current_transaction();
-    return move(result);
-}
-
-
-template <typename T>
-std::unique_ptr<DB::Handover<T>> DB::export_for_handover(T& accessor, MutableSourcePayload mode)
-{
-    if (m_transact_stage != transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
-    std::unique_ptr<Handover<T>> result(new Handover<T>());
-    // see implementation note above.
-    result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
-    result->version = get_version_of_current_transaction();
-    return move(result);
-}
-
-
-template <typename T>
-std::unique_ptr<T> DB::import_from_handover(std::unique_ptr<DB::Handover<T>> handover)
-{
-    if (handover->version != get_version_of_current_transaction()) {
-        throw BadVersion();
-    }
-    std::unique_ptr<T> result = move(handover->clone);
-    result->apply_and_consume_patch(handover->patch, m_group);
-    return result;
-}
-#endif
 
 template <class O>
 inline void Transaction::advance_read(O* observer, VersionID version_id)

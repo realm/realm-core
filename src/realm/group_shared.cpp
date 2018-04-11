@@ -34,6 +34,7 @@
 #include <realm/group_shared.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/replication.hpp>
+#include <realm/table_view.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 
@@ -52,7 +53,7 @@
 using namespace realm;
 using namespace realm::metrics;
 using namespace realm::util;
-using Durability = SharedGroupOptions::Durability;
+using Durability = DBOptions::Durability;
 
 namespace {
 
@@ -723,9 +724,9 @@ void spawn_daemon(const std::string& file)
 } // anonymous namespace
 
 #if REALM_HAVE_STD_FILESYSTEM
-std::string SharedGroupOptions::sys_tmp_dir = std::filesystem::temp_directory_path().u8string();
+std::string DBOptions::sys_tmp_dir = std::filesystem::temp_directory_path().u8string();
 #else
-std::string SharedGroupOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
+std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 #endif
 
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
@@ -746,7 +747,7 @@ std::string SharedGroupOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR"
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
-void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, const SharedGroupOptions options)
+void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, const DBOptions options)
 {
     // Exception safety: Since do_open() is called from constructors, if it
     // throws, it must leave the file closed.
@@ -1369,7 +1370,7 @@ bool DB::compact()
 #endif
         close_internal(/* with lock held: */ std::move(lock));
     }
-    SharedGroupOptions new_options;
+    DBOptions new_options;
     new_options.durability = dura;
     new_options.encryption_key = m_key;
     new_options.allow_file_format_upgrade = false;
@@ -2345,4 +2346,71 @@ TransactionRef DB::start_write()
     }
 
     return TransactionRef(tr, TransactionDeleter);
+}
+
+Obj Transaction::copy_of(const ConstObj& original)
+{
+    TableKey tk = original.get_table_key();
+    ObjKey rk = original.get_key();
+    return get_table(tk)->get_object(rk);
+}
+
+ConstTableRef Transaction::copy_of(ConstTableRef original)
+{
+    TableKey tk = original->get_key();
+    return get_table(tk);
+}
+
+TableRef Transaction::copy_of(TableRef original)
+{
+    TableKey tk = original->get_key();
+    return get_table(tk);
+}
+
+LinkList Transaction::copy_of(const LinkList& original)
+{
+    Obj obj = copy_of(original.m_obj);
+    ColKey ck = original.m_col_key;
+    return obj.get_linklist(ck);
+}
+
+LinkListPtr Transaction::copy_of(const LinkListPtr& original)
+{
+    if (!bool(original))
+        return nullptr;
+    Obj obj = copy_of(original->m_obj);
+    ColKey ck = original->m_col_key;
+    return obj.get_linklist_ptr(ck);
+}
+
+ConstLinkList Transaction::copy_of(const ConstLinkList& original)
+{
+    ConstObj obj = copy_of(original.m_obj);
+    ColKey ck = original.m_col_key;
+    return obj.get_linklist(ck);
+}
+
+ConstLinkListPtr Transaction::copy_of(const ConstLinkListPtr& original)
+{
+    if (!bool(original))
+        return nullptr;
+    Obj obj = copy_of(original->m_obj);
+    ColKey ck = original->m_col_key;
+    return obj.get_linklist_ptr(ck);
+}
+
+
+std::unique_ptr<Query> Transaction::copy_of(Query& query, PayloadPolicy policy)
+{
+    return query.clone_for_handover(this, policy);
+}
+
+std::unique_ptr<ConstTableView> Transaction::copy_of(TableView& tv, PayloadPolicy policy)
+{
+    return tv.clone_for_handover(this, policy);
+}
+
+std::unique_ptr<ConstTableView> Transaction::copy_of(ConstTableView& tv, PayloadPolicy policy)
+{
+    return tv.clone_for_handover(this, policy);
 }

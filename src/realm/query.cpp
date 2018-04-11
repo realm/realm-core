@@ -163,39 +163,22 @@ Query& Query::operator=(Query&&) = default;
 
 Query::~Query() noexcept = default;
 
-Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
+Query::Query(const Query* source, Transaction* tr, PayloadPolicy policy)
 {
-    Table::generate_patch(source.m_table, patch.m_table);
-    if (source.m_source_table_view) {
-        m_owned_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
+    m_table = tr->copy_of(source->m_table);
+    if (source->m_source_table_view) {
+        m_owned_source_table_view = tr->copy_of(*source->m_source_table_view, policy);
         m_source_table_view = m_owned_source_table_view.get();
     }
     else {
-        patch.table_view_data = nullptr;
+        // nothing?
     }
-    LinkList::generate_patch(source.m_source_link_list.get(), patch.link_list_data);
-
-    m_groups.reserve(source.m_groups.size());
-    for (const auto& cur_group : source.m_groups) {
-        m_groups.emplace_back(cur_group, patch.m_node_data);
+    if (source->m_source_link_list.get()) {
+        m_source_link_list = tr->copy_of(source->m_source_link_list);
     }
-}
-
-Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
-{
-    Table::generate_patch(source.m_table, patch.m_table);
-    if (source.m_source_table_view) {
-        m_owned_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
-        m_source_table_view = m_owned_source_table_view.get();
-    }
-    else {
-        patch.table_view_data = nullptr;
-    }
-    LinkList::generate_patch(source.m_source_link_list.get(), patch.link_list_data);
-
-    m_groups.reserve(source.m_groups.size());
-    for (const auto& cur_group : source.m_groups) {
-        m_groups.emplace_back(cur_group, patch.m_node_data);
+    m_groups.reserve(source->m_groups.size());
+    for (const auto& cur_group : source->m_groups) {
+        m_groups.emplace_back(cur_group, tr);
     }
 }
 
@@ -219,32 +202,6 @@ void Query::set_table(TableRef tr)
     }
 }
 
-
-void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
-{
-    if (m_source_table_view) {
-        m_source_table_view->apply_and_consume_patch(patch.table_view_data, dest_group);
-    }
-    m_source_link_list = LinkList::create_from_and_consume_patch(patch.link_list_data, dest_group);
-    if (m_source_link_list) {
-        m_view = m_source_link_list.get();
-    }
-    else if (m_source_table_view)
-        m_view = m_source_table_view;
-    else
-        m_view = nullptr;
-
-    for (auto it = m_groups.rbegin(); it != m_groups.rend(); ++it) {
-        if (auto& cur_root_node = it->m_root_node)
-            cur_root_node->apply_handover_patch(patch.m_node_data, dest_group);
-    }
-    // not going through Table::create_from_and_consume_patch because we need to use
-    // set_table() to update all table references
-    if (patch.m_table) {
-        set_table(dest_group.get_table(patch.m_table->m_table_key));
-    }
-    REALM_ASSERT(patch.m_node_data.empty());
-}
 
 void Query::add_expression_node(std::unique_ptr<Expression> expression)
 {
@@ -1794,8 +1751,8 @@ QueryGroup& QueryGroup::operator=(const QueryGroup& other)
     return *this;
 }
 
-QueryGroup::QueryGroup(const QueryGroup& other, QueryNodeHandoverPatches& patches)
-    : m_root_node(other.m_root_node ? other.m_root_node->clone(&patches) : nullptr)
+QueryGroup::QueryGroup(const QueryGroup& other, Transaction* tr)
+    : m_root_node(other.m_root_node ? other.m_root_node->clone(tr) : nullptr)
     , m_pending_not(other.m_pending_not)
     , m_subtable_column(other.m_subtable_column)
     , m_state(other.m_state)

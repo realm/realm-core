@@ -2173,30 +2173,6 @@ bool Table::is_cross_table_link_target() const noexcept
     return false;
 }
 
-
-void Table::generate_patch(const Table* table, std::unique_ptr<HandoverPatch>& patch)
-{
-    if (table) {
-        patch.reset(new Table::HandoverPatch);
-        patch->m_table_key = table->get_key();
-    }
-    else {
-        patch.reset();
-    }
-}
-
-
-TableRef Table::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
-{
-    if (patch) {
-        TableRef result;
-        result = group.get_table(patch->m_table_key);
-        patch.reset();
-        return result;
-    }
-    return TableRef();
-}
-
 // LCOV_EXCL_START ignore debug functions
 
 void Table::verify() const
