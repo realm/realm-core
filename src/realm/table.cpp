@@ -40,11 +40,6 @@
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/table_tpl.hpp>
-#include <realm/column.hpp>
-#include <realm/column_string.hpp>
-#include <realm/column_timestamp.hpp>
-#include <realm/column_linklist.hpp>
-#include <realm/column_link.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
@@ -875,6 +870,61 @@ bool Table::convert_columns()
     return changes;
 }
 
+namespace {
+template <class T>
+size_t get_size_from_ref(ref_type ref, Allocator& alloc)
+{
+    T arr(alloc);
+    arr.init_from_ref(ref);
+    return arr.size();
+}
+
+// Get size from old columns in file format 9 files
+size_t get_size_from_ref_and_type(ColumnType col_type, ColumnAttrMask attr, ref_type col_ref, Allocator& alloc)
+{
+    // Determine the size of the table based on the size of the first column
+    size_t sz;
+    if (attr.test(col_attr_List)) {
+        sz = ::get_size_from_ref<BPlusTree<int64_t>>(col_ref, alloc);
+    }
+    else {
+        switch (col_type) {
+            case col_type_Int:
+            case col_type_Bool:
+                if (attr.test(col_attr_Nullable)) {
+                    sz = ::get_size_from_ref<BPlusTree<util::Optional<int64_t>>>(col_ref, alloc);
+                }
+                else {
+                    sz = ::get_size_from_ref<BPlusTree<int64_t>>(col_ref, alloc);
+                }
+                break;
+            case col_type_Float:
+            case col_type_Double:
+            case col_type_Link:
+                // These types are implemented using a standard array
+                sz = ::get_size_from_ref<BPlusTree<int64_t>>(col_ref, alloc);
+                break;
+            case col_type_String:
+            case col_type_Binary:
+                // These two types are similar in design
+                sz = ::get_size_from_ref<BPlusTree<StringData>>(col_ref, alloc);
+                break;
+            case col_type_Timestamp: {
+                Array arr(alloc);
+                arr.init_from_ref(col_ref);
+                ref_type ref = arr.get_as_ref(0);
+                sz = ::get_size_from_ref<BPlusTree<util::Optional<int64_t>>>(ref, alloc);
+                break;
+            }
+            default:
+                REALM_UNREACHABLE();
+                break;
+        }
+    }
+    return sz;
+}
+}
+
 bool Table::create_objects()
 {
     ref_type ref = m_top.get_as_ref(top_position_for_columns);
@@ -884,18 +934,26 @@ bool Table::create_objects()
         col_refs.init_from_ref(ref);
         ref_type first_col_ref = col_refs.get_as_ref(0);
         if (first_col_ref) {
-            ColumnType col_type = m_spec.get_column_type(0);
-            auto attr = m_spec.get_column_attr(0);
+            ColumnType first_col_type = m_spec.get_column_type(0);
+            auto first_col_attr = m_spec.get_column_attr(0);
 
-            // Determine the size of the table based on the size of the first column
-            size_t sz;
-            if (attr.test(col_attr_List)) {
-                sz = ColumnBase::get_size_from_type_and_ref(col_type_Int, first_col_ref, m_alloc, false);
+            size_t sz = get_size_from_ref_and_type(first_col_type, first_col_attr, first_col_ref, m_alloc);
+
+#ifdef REALM_DEBUG
+            // Check that we get the same size for all columns
+            size_t nb_cols = m_spec.get_public_column_count();
+            size_t ndx_in_parent = 0;
+            for (size_t i = 0; i < nb_cols; i++) {
+                ref_type col_ref = col_refs.get_as_ref(ndx_in_parent);
+                ColumnType col_type = m_spec.get_column_type(i);
+                auto col_attr = m_spec.get_column_attr(i);
+                size_t val = get_size_from_ref_and_type(col_type, col_attr, col_ref, m_alloc);
+                REALM_ASSERT_DEBUG(val == sz);
+
+                ndx_in_parent += m_spec.get_column_attr(i).test(col_attr_Indexed) ? 2 : 1;
             }
-            else {
-                bool nullable = attr.test(col_attr_Nullable);
-                sz = ColumnBase::get_size_from_type_and_ref(col_type, first_col_ref, m_alloc, nullable);
-            }
+#endif
+
             if (m_clusters.size() != sz) {
                 // Create all objects
                 ClusterNode::State state;
