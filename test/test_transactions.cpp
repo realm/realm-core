@@ -207,8 +207,8 @@ void verifier_thread(TestContext& test_context, int limit, DB* db, TableKey tk, 
 TEST(Transactions_Threaded)
 {
     SHARED_GROUP_TEST_PATH(path);
-    // std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB db(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db(*hist_w);
     TableKey tk;
     ObjKey ok;
     ColKey ck1;
@@ -229,7 +229,7 @@ TEST(Transactions_Threaded)
     std::thread writers[num_threads];
     std::thread verifiers[num_threads];
     for (int i = 0; i < num_threads; ++i) {
-        verifiers[i] = std::thread([&] { verifier_thread(test_context, 10000, &db, tk, ck1, ck2, ok); });
+        verifiers[i] = std::thread([&] { verifier_thread(test_context, num_threads * 100, &db, tk, ck1, ck2, ok); });
         writers[i] = std::thread([&] { writer_thread(test_context, 100, &db, tk, ck1, ck2, ok); });
     }
     for (int i = 0; i < num_threads; ++i) {
@@ -238,6 +238,37 @@ TEST(Transactions_Threaded)
     }
 }
 
+TEST(Transactions_ListOfBinary)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DB db(path);
+    {
+        auto wt = db.start_write();
+        auto table = wt->add_table("my_table");
+        table->add_column_list(type_Binary, "list");
+        table->create_object();
+        wt->commit();
+    }
+    for (int iter = 0; iter < 1000; iter++) {
+        auto wt = db.start_write();
+        wt->verify();
+        auto table = wt->get_table("my_table");
+        auto col1 = table->get_column_key("list");
+        Obj obj = table->get_object(0);
+        auto list = obj.get_list<Binary>(col1);
+        std::string bin(15, 'z');
+        list.add(BinaryData(bin.data(), 15));
+        if (fastrand(100) < 5) {
+            size_t sz = list.size();
+            for (size_t i = 0; i < sz - 1; i++) {
+                list.remove(0);
+            }
+        }
+        wt->commit();
+        auto rt = db.start_read();
+        rt->verify();
+    }
+}
 
 #ifdef LEGACY_TESTS
 

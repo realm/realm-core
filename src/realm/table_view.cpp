@@ -24,60 +24,24 @@
 
 using namespace realm;
 
-ConstTableView::ConstTableView(ConstTableView& src, Transaction* tr, PayloadPolicy mode)
+ConstTableView::ConstTableView(ConstTableView& src, Transaction*, PayloadPolicy)
     : ObjList(m_table_view_key_values)
     , m_source_column_key(src.m_source_column_key)
     , m_table_view_key_values(Allocator::get_default())
 {
-    // move the data payload, but make sure to leave the source array intact or
-    // attempts to reuse it for a query rerun will crash (or assert, if lucky)
-    // There really *has* to be a way where we don't need to first create an empty
-    // array, and then destroy it
-    if (src.m_key_values.is_attached()) {
-        m_key_values = std::move(src.m_key_values); // Will leave src.m_key_values detached
-        src.m_key_values.create();
-    }
-    else {
-        m_key_values.create();
-    }
-    REALM_ASSERT(false); // in_sync handling.....
-    /*
-    patch.was_in_sync = src.is_in_sync();
-    // m_query must be exported after patch.was_in_sync is updated
-    // as exporting m_query will bring src out of sync.
-     */
-    m_query = Query(src.m_query, tr, mode);
-    /*
-        Table::generate_patch(src.m_table, patch.m_table);
-        LinkList::generate_patch(src.m_linklist_source.get(), patch.linklist_patch);
-        DescriptorOrdering::generate_patch(src.m_descriptor_ordering, patch.descriptors_patch);
-
-        if (src.m_source_column_key) {
-            patch.linked_obj.reset(new ObjectHandoverPatch);
-            Table::generate_patch(src.m_linked_obj.get_table(), patch.m_table);
-            patch.linked_obj->key_value = src.m_linked_obj.get_key().value;
-            patch.linked_col = src.m_source_column_key;
-        }
-    */
-    src.m_last_seen_versions.clear(); // bring source out-of-sync, now that it has lost its data
-    m_last_seen_versions.clear();
-    m_start = src.m_start;
-    m_end = src.m_end;
-    m_limit = src.m_limit;
+    REALM_ASSERT(false); // unimplemented
 }
 
 ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, PayloadPolicy mode)
     : ObjList(m_table_view_key_values)
     , m_source_column_key(src.m_source_column_key)
-    , m_query(src.m_query, tr, mode)
     , m_table_view_key_values(Allocator::get_default())
 {
+    bool was_in_sync = src.is_in_sync();
+    m_query = Query(src.m_query, tr, mode);
     m_table = tr->import_copy_of(src.m_table);
-    bool was_in_sync;
     if (mode == PayloadPolicy::Stay)
         was_in_sync = false;
-    else
-        was_in_sync = src.is_in_sync();
     VersionID src_version =
         dynamic_cast<Transaction*>(src.m_table->get_parent_group())->get_version_of_current_transaction();
     if (src_version != tr->get_version_of_current_transaction())

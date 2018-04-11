@@ -250,7 +250,7 @@ void BPlusTreeInner::bptree_access(size_t n, AccessFunc& func)
     }
     else {
         BPlusTreeInner node(m_tree);
-        node.set_parent(this, child_ndx);
+        node.set_parent(this, child_ndx + 1);
         node.init_from_mem(mem);
         node.set_offset(child_offset + m_my_offset);
         node.bptree_access(n - child_offset, func);
@@ -291,7 +291,7 @@ ref_type BPlusTreeInner::bptree_insert(size_t ndx, State& state, InsertFunc& fun
     }
     else {
         BPlusTreeInner node(m_tree);
-        node.set_parent(this, child_ndx);
+        node.set_parent(this, child_ndx + 1);
         node.init_from_mem(mem);
         node.set_offset(child_offset + m_my_offset);
         new_sibling_ref = node.bptree_insert(ndx, state, func);
@@ -330,7 +330,7 @@ size_t BPlusTreeInner::bptree_erase(size_t n, EraseFunc& func)
         m_tree->adjust_leaf_bounds(-1);
     }
     else {
-        node.set_parent(this, child_ndx);
+        node.set_parent(this, child_ndx + 1);
         node.init_from_mem(mem);
         node.set_offset(child_offset + m_my_offset);
         erase_node_size = node.bptree_erase(n - child_offset, func);
@@ -432,7 +432,7 @@ bool BPlusTreeInner::bptree_traverse(TraverseFunc& func)
         }
         else {
             BPlusTreeInner node(m_tree);
-            node.set_parent(this, i);
+            node.set_parent(this, i + 1);
             node.init_from_mem(mem);
             node.set_offset(child_offset + m_my_offset);
             // std::cout << "BPlusTreeInner offset: " << child_offset << std::endl;
