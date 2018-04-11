@@ -464,6 +464,11 @@ private:
     /// finish up the process of starting a write transaction. Internal use only.
     void finish_begin_write();
 
+    void reset_free_space_tracking()
+    {
+        m_alloc.reset_free_space_tracking();
+    }
+
     void close_internal(std::unique_lock<InterprocessMutex>) noexcept;
     friend class Transaction;
 };
@@ -813,7 +818,7 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
         throw LogicError(LogicError::no_history);
 
     // Mark all managed space (beyond the attached file) as free.
-    reset_free_space_tracking(); // Throws
+    db->reset_free_space_tracking(); // Throws
 
     BinaryData uncommitted_changes = repl->get_uncommitted_changes();
 

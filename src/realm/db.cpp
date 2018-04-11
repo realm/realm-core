@@ -1926,9 +1926,6 @@ DB::version_type Transaction::commit_and_continue_as_read()
 
     db->do_end_write();
 
-    // Free memory that was allocated during the write transaction.
-    reset_free_space_tracking(); // Throws
-
     // Remap file if it has grown, and update refs in underlying node structure
     remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, m_read_lock.m_version, false); // Throws
 
@@ -2052,6 +2049,10 @@ void DB::low_level_commit(uint_fast64_t new_version, Group& group)
             break;
     }
     size_t new_file_size = out.get_file_size();
+    // We must reset the allocators free space tracking before communicating the new
+    // version through the ring buffer. If not, a reader may start updating the allocators
+    // mappings while the allocator is in dirty state.
+    reset_free_space_tracking();
     // Update reader info. If this fails in any way, the ringbuffer may be corrupted.
     // This can lead to other readers seing invalid data which is likely to cause them
     // to crash. Other writers *must* be prevented from writing any further updates
@@ -2100,55 +2101,6 @@ void DB::reserve(size_t size)
     // Linux) runs concurrently with modfications via a memory map of
     // the file. This assumption must be verified though.
     m_alloc.reserve_disk_space(size); // Throws
-}
-#endif
-
-
-#if 0
-// old handover interface - to be removed
-std::unique_ptr<DB::Handover<LinkList>> DB::export_linkview_for_handover(const LinkListPtr& accessor)
-{
-    if (m_transact_stage != transact_Reading) {
-        throw LogicError(LogicError::wrong_transact_state);
-    }
-    std::unique_ptr<Handover<LinkList>> result(new Handover<LinkList>());
-    LinkList::generate_patch(accessor.get(), result->patch);
-    result->clone = 0; // not used for LinkView - maybe specialize Handover<LinkView> ?
-    result->version = get_version_of_current_transaction();
-    return result;
-}
-
-
-LinkListPtr DB::import_linkview_from_handover(std::unique_ptr<Handover<LinkList>> handover)
-{
-    if (handover->version != get_version_of_current_transaction()) {
-        throw BadVersion();
-    }
-    // move data
-    return LinkList::create_from_and_consume_patch(handover->patch, m_group);
-}
-
-
-std::unique_ptr<DB::Handover<Table>> DB::export_table_for_handover(const TableRef& accessor)
-{
-    if (m_transact_stage != transact_Reading) {
-        throw LogicError(LogicError::wrong_transact_state);
-    }
-    std::unique_ptr<Handover<Table>> result(new Handover<Table>());
-    Table::generate_patch(accessor, result->patch);
-    result->clone = 0;
-    result->version = get_version_of_current_transaction();
-    return result;
-}
-
-
-TableRef DB::import_table_from_handover(std::unique_ptr<Handover<Table>> handover)
-{
-    if (handover->version != get_version_of_current_transaction()) {
-        throw BadVersion();
-    }
-    TableRef result = Table::create_from_and_consume_patch(handover->patch, m_group);
-    return result;
 }
 #endif
 
@@ -2259,7 +2211,7 @@ void Transaction::rollback()
 
     if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
-
+    db->reset_free_space_tracking();
     db->do_end_write();
 
     if (Replication* repl = get_replication())
@@ -2286,9 +2238,6 @@ DB::version_type Transaction::commit()
     db->release_read_lock(lock_after_commit);
 
     db->do_end_write();
-
-    // Free memory that was allocated during the write transaction.
-    reset_free_space_tracking(); // Throws
 
     end_read();
     m_read_lock = lock_after_commit;

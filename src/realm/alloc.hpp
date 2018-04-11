@@ -444,6 +444,8 @@ inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_siz
     if (ref == m_debug_watch)
         REALM_TERMINATE("Allocator watch: Ref was reallocated");
 #endif
+    if (m_is_read_only)
+        throw realm::LogicError(realm::LogicError::wrong_transact_state);
     return do_realloc(ref, addr, old_size, new_size);
 }
 
@@ -453,6 +455,8 @@ inline void Allocator::free_(ref_type ref, const char* addr) noexcept
     if (ref == m_debug_watch)
         REALM_TERMINATE("Allocator watch: Ref was freed");
 #endif
+    if (m_is_read_only)
+        throw realm::LogicError(realm::LogicError::wrong_transact_state);
     return do_free(ref, addr);
 }
 

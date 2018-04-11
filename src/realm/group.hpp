@@ -1084,6 +1084,9 @@ inline const Table* Group::do_get_table(StringData name, DescMatcher desc_matche
 
 inline void Group::reset_free_space_tracking()
 {
+    // if used whith a shared allocator, free space should never be reset through
+    // Group, but rather through the proper owner of the allocator, which is the DB object.
+    REALM_ASSERT(m_local_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
 }
 

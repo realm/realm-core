@@ -25,6 +25,7 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <thread>
 
 #include <realm/history.hpp>
 #include <realm/util/file.hpp>
@@ -160,6 +161,83 @@ TEST(Transactions_StateChanges)
     reader->rollback_and_continue_as_read();
     CHECK_THROW(tr->create_object(), realm::LogicError);
 }
+
+namespace {
+
+void writer_thread(TestContext& test_context, int runs, DB* db, TableKey tk, ColKey ck1, ColKey ck2, ObjKey ok)
+{
+    try {
+        for (int n = 0; n < runs; ++n) {
+            auto writer = db->start_write();
+            // writer->verify();
+            auto obj = writer->get_table(tk)->get_object(ok);
+            int a = obj.get<Int>(ck1);
+            int b = obj.get<Int>(ck2);
+            CHECK_EQUAL(a * a, b);
+            obj.set_all(a + 1, (a + 1) * (a + 1));
+            writer->commit();
+        }
+    }
+    catch (std::runtime_error& e) {
+        std::cout << "gylle: " << e.what() << std::endl;
+    }
+    catch (realm::LogicError& e) {
+        std::cout << "gylle2: " << e.what() << std::endl;
+    }
+    catch (...) {
+        std::cout << "VERY GYLLE" << std::endl;
+    }
+}
+
+void verifier_thread(TestContext& test_context, int limit, DB* db, TableKey tk, ColKey ck1, ColKey ck2, ObjKey ok)
+{
+    bool done = false;
+    while (!done) {
+        auto reader = db->start_read();
+        // reader->verify();
+        auto obj = reader->get_table(tk)->get_object(ok);
+        int a = obj.get<Int>(ck1);
+        int b = obj.get<Int>(ck2);
+        CHECK_EQUAL(a * a, b);
+        done = (a >= limit);
+    }
+}
+}
+
+TEST(Transactions_Threaded)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    // std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db(path);
+    TableKey tk;
+    ObjKey ok;
+    ColKey ck1;
+    ColKey ck2;
+    {
+        auto wt = db.start_write();
+        auto table = wt->add_table("my_table");
+        auto col1 = table->add_column(type_Int, "my_col_1");
+        auto col2 = table->add_column(type_Int, "my_col_2");
+        auto obj = table->create_object().set_all(1, 1);
+        tk = table->get_key();
+        ck1 = col1;
+        ck2 = col2;
+        ok = obj.get_key();
+        wt->commit();
+    }
+    const int num_threads = 100;
+    std::thread writers[num_threads];
+    std::thread verifiers[num_threads];
+    for (int i = 0; i < num_threads; ++i) {
+        verifiers[i] = std::thread([&] { verifier_thread(test_context, 10000, &db, tk, ck1, ck2, ok); });
+        writers[i] = std::thread([&] { writer_thread(test_context, 100, &db, tk, ck1, ck2, ok); });
+    }
+    for (int i = 0; i < num_threads; ++i) {
+        writers[i].join();
+        verifiers[i].join();
+    }
+}
+
 
 #ifdef LEGACY_TESTS
 
@@ -690,45 +768,38 @@ TEST(Transactions_General)
     }
     // End of read transaction
 }
+#endif
 
 
 TEST(Transactions_RollbackCreateObject)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    DB sg_w(*hist_w, DBOptions(crypt_key()));
     TransactionRef tr = sg_w.start_write();
-    // WriteTransaction wt(sg_w);
-    // Group& g = wt.get_group();
 
     auto tk = tr->add_table("t0")->get_key();
     auto col = tr->get_table(tk)->add_column(type_Int, "integers");
 
-    // LangBindHelper::commit_and_continue_as_read(sg_w);'
     tr->commit_and_continue_as_read();
-    // LangBindHelper::promote_to_write(sg_w);
     tr->promote_to_write();
 
     tr->get_table(tk)->create_object(ObjKey(0)).set(col, 5);
     auto o = tr->get_table(tk)->get_object(ObjKey(0));
     CHECK_EQUAL(o.get<int64_t>(col), 5);
 
-    // LangBindHelper::rollback_and_continue_as_read(sg_w);
     tr->rollback_and_continue_as_read();
 
     CHECK_THROW(o.get<int64_t>(col), InvalidKey);
     tr->verify();
 
-    // LangBindHelper::promote_to_write(sg_w);
     tr->promote_to_write();
 
     CHECK_EQUAL(tr->get_table(tk)->size(), 0);
 }
-#endif
 
 #ifdef LEGACY_TESTS
 
-<<<<<<< HEAD
 // Rollback a table move operation and check accessors.
 // This case checks column accessors when a table is inserted, moved, rolled back.
 // In this case it is easy to see (by just looking at the assert message) that the
@@ -786,9 +857,7 @@ TEST(Transactions_RollbackMoveTableReferences)
     CHECK_EQUAL(g.get_table(t0k)->get_name(), StringData("t0"));
     CHECK_EQUAL(g.size(), 1);
 }
-
-=======
->>>>>>> v5.0.1
+#endif
 // Check that the spec.enumkeys become detached when
 // rolling back the insertion of a string enum column
 #ifdef LEGACY_TESTS
@@ -839,7 +908,7 @@ TEST(LangBindHelper_RollbackStringEnumInsert)
     CHECK_EQUAL(g.get_table(t1k)->size(), 3);
 }
 #endif
-
+#ifdef LEGACY_TESTS
 // Check that the table.spec.subspec array becomes detached
 // after rolling back the insertion of a subspec type
 TEST(LangBindHelper_RollbackLinkInsert)
