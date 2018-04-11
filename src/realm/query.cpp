@@ -165,16 +165,16 @@ Query::~Query() noexcept = default;
 
 Query::Query(const Query* source, Transaction* tr, PayloadPolicy policy)
 {
-    m_table = tr->copy_of(source->m_table);
+    m_table = tr->import_copy_of(source->m_table);
     if (source->m_source_table_view) {
-        m_owned_source_table_view = tr->copy_of(*source->m_source_table_view, policy);
+        m_owned_source_table_view = tr->import_copy_of(*source->m_source_table_view, policy);
         m_source_table_view = m_owned_source_table_view.get();
     }
     else {
         // nothing?
     }
     if (source->m_source_link_list.get()) {
-        m_source_link_list = tr->copy_of(source->m_source_link_list);
+        m_source_link_list = tr->import_copy_of(source->m_source_link_list);
     }
     m_groups.reserve(source->m_groups.size());
     for (const auto& cur_group : source->m_groups) {

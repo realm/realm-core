@@ -72,7 +72,7 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
     , m_query(src.m_query, tr, mode)
     , m_table_view_key_values(Allocator::get_default())
 {
-    m_table = tr->copy_of(src.m_table);
+    m_table = tr->import_copy_of(src.m_table);
     bool was_in_sync;
     if (mode == PayloadPolicy::Stay)
         was_in_sync = false;
@@ -98,10 +98,10 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
     if (mode == PayloadPolicy::Move) {
         src.m_last_seen_versions.clear();
     }
-    m_table = tr->copy_of(src.m_table);
-    m_linklist_source = tr->copy_of(src.m_linklist_source);
+    m_table = tr->import_copy_of(src.m_table);
+    m_linklist_source = tr->import_copy_of(src.m_linklist_source);
     if (src.m_source_column_key) {
-        m_linked_obj = tr->copy_of(src.m_linked_obj);
+        m_linked_obj = tr->import_copy_of(src.m_linked_obj);
     }
     m_descriptor_ordering = src.m_descriptor_ordering;
     m_start = src.m_start;
