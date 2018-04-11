@@ -42,11 +42,6 @@ const char* type_to_str<Int>()
     return "Int";
 }
 template <>
-const char* type_to_str<int>()
-{
-    return "Int";
-}
-template <>
 const char* type_to_str<Float>()
 {
     return "Float";

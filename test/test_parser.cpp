@@ -1892,7 +1892,7 @@ TEST(Parser_BacklinkCount)
     std::string message;
     // backlink count requires comparison to a numeric type
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count == 'string'", -1), message);
-    CHECK_EQUAL(message, "Cannot convert string 'string' to type 'Int'");
+    CHECK_EQUAL(message, "Cannot convert string 'string'");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count == 2018-04-09@14:21:0", -1), message);
     CHECK_EQUAL(message, "Attempting to compare a numeric property to a non-numeric value");
 

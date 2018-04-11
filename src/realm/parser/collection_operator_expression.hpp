@@ -192,12 +192,12 @@ typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double>::value> >{
     {
         if (expr.pe.link_chain.empty() || expr.pe.get_dest_ndx() == realm::npos) {
             // here we are operating on the current table from a "@links.@count" query with no link keypath prefix
-            return expr.table_getter()->get_backlink_count<Int>();
+            return expr.table_getter()->template get_backlink_count<Int>();
         } else {
             if (expr.pe.dest_type_is_backlink()) {
-                return expr.table_getter()->template column<Link>(*expr.pe.get_dest_table(), expr.pe.get_dest_ndx()).backlink_count<Int>();
+                return expr.table_getter()->template column<Link>(*expr.pe.get_dest_table(), expr.pe.get_dest_ndx()).template backlink_count<Int>();
             } else {
-                return expr.table_getter()->template column<Link>(expr.pe.get_dest_ndx()).backlink_count<Int>();
+                return expr.table_getter()->template column<Link>(expr.pe.get_dest_ndx()).template backlink_count<Int>();
             }
         }
     }
