@@ -20,6 +20,7 @@
 #include <atomic>
 #include <cerrno>
 #include <fcntl.h>
+#include <realm/db.hpp>
 #include <iostream>
 #include <mutex>
 #include <sstream>
@@ -31,7 +32,6 @@
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/group_writer.hpp>
-#include <realm/group_shared.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/replication.hpp>
 #include <realm/table_view.hpp>
@@ -491,7 +491,7 @@ struct alignas(8) DB::SharedInfo {
     /// Cleared by the daemon when it decides to exit.
     uint8_t daemon_ready = 0; // Offset 42
 
-    uint8_t filler_1;  // Offset 43
+    uint8_t filler_1; // Offset 43
 
     /// Stores a history schema version (as returned by
     /// Replication::get_history_schema_version()). Must match across all
@@ -553,7 +553,7 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
     history_type = ht;
     history_schema_version = static_cast<uint16_t>(hsv);
     InterprocessCondVar::init_shared_part(new_commit_available); // Throws
-    InterprocessCondVar::init_shared_part(pick_next_writer); // Throws
+    InterprocessCondVar::init_shared_part(pick_next_writer);     // Throws
     next_ticket = 0;
 #ifdef REALM_ASYNC_DAEMON
     InterprocessCondVar::init_shared_part(room_to_write);        // Throws
@@ -561,66 +561,56 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
     InterprocessCondVar::init_shared_part(daemon_becomes_ready); // Throws
 #endif
 
-    // IMPORTANT: The offsets, types (, and meanings) of these members must
-    // never change, not even when the SharedInfo layout version is bumped. The
-    // eternal constancy of this part of the layout is what ensures that a
-    // joining session participant can reliably verify that the actual format is
-    // as expected.
-    //
-    // offsetof() is undefined for non-pod types but often behaves correct. 
-    // Since we just use it in static_assert(), a bug is caught at compile time
-    // which isn't critical. FIXME: See if there is a way to fix this, but it
-    // might not be trivial since it contains RobustMutex members and others
+// IMPORTANT: The offsets, types (, and meanings) of these members must
+// never change, not even when the SharedInfo layout version is bumped. The
+// eternal constancy of this part of the layout is what ensures that a
+// joining session participant can reliably verify that the actual format is
+// as expected.
+//
+// offsetof() is undefined for non-pod types but often behaves correct.
+// Since we just use it in static_assert(), a bug is caught at compile time
+// which isn't critical. FIXME: See if there is a way to fix this, but it
+// might not be trivial since it contains RobustMutex members and others
 #ifndef _WIN32
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 #endif
-    static_assert(offsetof(SharedInfo, init_complete) == 0 &&
-                  ATOMIC_BOOL_LOCK_FREE==2 &&
-                  std::is_same<decltype(init_complete), std::atomic<uint8_t>>::value &&
-                  offsetof(SharedInfo, shared_info_version) == 6 &&
-                  std::is_same<decltype(shared_info_version), uint16_t>::value,
+    static_assert(offsetof(SharedInfo, init_complete) == 0 && ATOMIC_BOOL_LOCK_FREE == 2 &&
+                      std::is_same<decltype(init_complete), std::atomic<uint8_t>>::value &&
+                      offsetof(SharedInfo, shared_info_version) == 6 &&
+                      std::is_same<decltype(shared_info_version), uint16_t>::value,
                   "Forbidden change in SharedInfo layout");
 
     // Try to catch some of the memory layout changes that requires bumping of
     // the SharedInfo file format version (shared_info_version).
-    static_assert(offsetof(SharedInfo, size_of_mutex) == 1 &&
-                  std::is_same<decltype(size_of_mutex), uint8_t>::value &&
-                  offsetof(SharedInfo, size_of_condvar) == 2 &&
-                  std::is_same<decltype(size_of_condvar), uint8_t>::value &&
-                  offsetof(SharedInfo, commit_in_critical_phase) == 3 &&
-                  std::is_same<decltype(commit_in_critical_phase), std::atomic<uint8_t>>::value &&
-                  offsetof(SharedInfo, file_format_version) == 4 &&
-                  std::is_same<decltype(file_format_version), uint8_t>::value &&
-                  offsetof(SharedInfo, history_type) == 5 &&
-                  std::is_same<decltype(history_type), int8_t>::value &&
-                  offsetof(SharedInfo, durability) == 8 &&
-                  std::is_same<decltype(durability), uint16_t>::value &&
-                  offsetof(SharedInfo, free_write_slots) == 10 &&
-                  std::is_same<decltype(free_write_slots), uint16_t>::value &&
-                  offsetof(SharedInfo, num_participants) == 12 &&
-                  std::is_same<decltype(num_participants), uint32_t>::value &&
-                  offsetof(SharedInfo, latest_version_number) == 16 &&
-                  std::is_same<decltype(latest_version_number), uint64_t>::value &&
-                  offsetof(SharedInfo, session_initiator_pid) == 24 &&
-                  std::is_same<decltype(session_initiator_pid), uint64_t>::value &&
-                  offsetof(SharedInfo, number_of_versions) == 32 &&
-                  std::is_same<decltype(number_of_versions), uint64_t>::value &&
-                  offsetof(SharedInfo, sync_agent_present) == 40 &&
-                  std::is_same<decltype(sync_agent_present), uint8_t>::value &&
-                  offsetof(SharedInfo, daemon_started) == 41 &&
-                  std::is_same<decltype(daemon_started), uint8_t>::value &&
-                  offsetof(SharedInfo, daemon_ready) == 42 &&
-                  std::is_same<decltype(daemon_ready), uint8_t>::value &&
-                  offsetof(SharedInfo, filler_1) == 43 &&
-                  std::is_same<decltype(filler_1), uint8_t>::value &&
-                  offsetof(SharedInfo, history_schema_version) == 44 &&
-                  std::is_same<decltype(history_schema_version), uint16_t>::value &&
-                  offsetof(SharedInfo, filler_2) == 46 &&
-                  std::is_same<decltype(filler_2), uint16_t>::value &&
-                  offsetof(SharedInfo, shared_writemutex) == 48 &&
-                  std::is_same<decltype(shared_writemutex), InterprocessMutex::SharedPart>::value,
-                  "Caught layout change requiring SharedInfo file format bumping");
+    static_assert(
+        offsetof(SharedInfo, size_of_mutex) == 1 && std::is_same<decltype(size_of_mutex), uint8_t>::value &&
+            offsetof(SharedInfo, size_of_condvar) == 2 && std::is_same<decltype(size_of_condvar), uint8_t>::value &&
+            offsetof(SharedInfo, commit_in_critical_phase) == 3 &&
+            std::is_same<decltype(commit_in_critical_phase), std::atomic<uint8_t>>::value &&
+            offsetof(SharedInfo, file_format_version) == 4 &&
+            std::is_same<decltype(file_format_version), uint8_t>::value && offsetof(SharedInfo, history_type) == 5 &&
+            std::is_same<decltype(history_type), int8_t>::value && offsetof(SharedInfo, durability) == 8 &&
+            std::is_same<decltype(durability), uint16_t>::value && offsetof(SharedInfo, free_write_slots) == 10 &&
+            std::is_same<decltype(free_write_slots), uint16_t>::value &&
+            offsetof(SharedInfo, num_participants) == 12 &&
+            std::is_same<decltype(num_participants), uint32_t>::value &&
+            offsetof(SharedInfo, latest_version_number) == 16 &&
+            std::is_same<decltype(latest_version_number), uint64_t>::value &&
+            offsetof(SharedInfo, session_initiator_pid) == 24 &&
+            std::is_same<decltype(session_initiator_pid), uint64_t>::value &&
+            offsetof(SharedInfo, number_of_versions) == 32 &&
+            std::is_same<decltype(number_of_versions), uint64_t>::value &&
+            offsetof(SharedInfo, sync_agent_present) == 40 &&
+            std::is_same<decltype(sync_agent_present), uint8_t>::value &&
+            offsetof(SharedInfo, daemon_started) == 41 && std::is_same<decltype(daemon_started), uint8_t>::value &&
+            offsetof(SharedInfo, daemon_ready) == 42 && std::is_same<decltype(daemon_ready), uint8_t>::value &&
+            offsetof(SharedInfo, filler_1) == 43 && std::is_same<decltype(filler_1), uint8_t>::value &&
+            offsetof(SharedInfo, history_schema_version) == 44 &&
+            std::is_same<decltype(history_schema_version), uint16_t>::value && offsetof(SharedInfo, filler_2) == 46 &&
+            std::is_same<decltype(filler_2), uint16_t>::value && offsetof(SharedInfo, shared_writemutex) == 48 &&
+            std::is_same<decltype(shared_writemutex), InterprocessMutex::SharedPart>::value,
+        "Caught layout change requiring SharedInfo file format bumping");
 #ifndef _WIN32
 #pragma GCC diagnostic pop
 #endif
@@ -815,7 +805,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             // We're alone in the world, and it is Ok to initialize the
             // file. Start by truncating the file to zero to ensure that
             // the following resize will generate a file filled with zeroes.
-            // 
+            //
             // This will in particular set m_init_complete to 0.
             m_file.resize(0);
             m_file.prealloc(sizeof(SharedInfo));
@@ -825,20 +815,18 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             // get the exclusive lock because we hold it, and hence were
             // waiting for the shared lock instead, to observe and use an
             // old lock file.
-            m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo),
-                           File::map_NoSync); // Throws
+            m_file_map.map(m_file, File::access_ReadWrite, sizeof(SharedInfo), File::map_NoSync); // Throws
             File::UnmapGuard fug(m_file_map);
             SharedInfo* info_2 = m_file_map.get_addr();
-            
-            new (info_2) SharedInfo{options.durability, openers_hist_type,
-                                    openers_hist_schema_version}; // Throws
-            
+
+            new (info_2) SharedInfo{options.durability, openers_hist_type, openers_hist_schema_version}; // Throws
+
             // Because init_complete is an std::atomic, it's guaranteed not to be observable by others
             // as being 1 before the entire SharedInfo header has been written.
             info_2->init_complete = 1;
         }
 
-        // We hold the shared lock from here until we close the file!
+// We hold the shared lock from here until we close the file!
 #if REALM_PLATFORM_APPLE
         // macOS has a bug which can cause a hang waiting to obtain a lock, even
         // if the lock is already open in shared mode, so we work around it by
@@ -885,10 +873,10 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         File::UnmapGuard fug_1(m_file_map);
         SharedInfo* info = m_file_map.get_addr();
 
-        // offsetof() is undefined for non-pod types but often behaves correct. 
-        // Since we just use it in static_assert(), a bug is caught at compile time
-        // which isn't critical. FIXME: See if there is a way to fix this, but it
-        // might not be trivial since it contains RobustMutex members and others
+// offsetof() is undefined for non-pod types but often behaves correct.
+// Since we just use it in static_assert(), a bug is caught at compile time
+// which isn't critical. FIXME: See if there is a way to fix this, but it
+// might not be trivial since it contains RobustMutex members and others
 #ifndef _WIN32
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
@@ -1061,8 +1049,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 throw InvalidDatabase("Unsupported Realm file format version", path);
 
             target_file_format_version =
-                gf::get_target_file_format_version_for_session(current_file_format_version,
-                                                               openers_hist_type);
+                gf::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
 
             if (begin_new_session) {
                 // Determine version (snapshot number) and check history
@@ -1088,15 +1075,13 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                             throw IncompatibleHistories("Expected a Realm with no or in-realm history", path);
                         break;
                     case Replication::hist_SyncClient:
-                        good_history_type = ((stored_hist_type == Replication::hist_SyncClient) ||
-                                             (top_ref == 0));
+                        good_history_type = ((stored_hist_type == Replication::hist_SyncClient) || (top_ref == 0));
                         if (!good_history_type)
                             throw IncompatibleHistories(
                                 "Expected an empty Realm or a Realm written by Realm Mobile Platform", path);
                         break;
                     case Replication::hist_SyncServer:
-                        good_history_type = ((stored_hist_type == Replication::hist_SyncServer) ||
-                                             (top_ref == 0));
+                        good_history_type = ((stored_hist_type == Replication::hist_SyncServer) || (top_ref == 0));
                         if (!good_history_type)
                             throw IncompatibleHistories("Expected a Realm containing "
                                                         "a server-side history",
@@ -1127,7 +1112,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                     uint64_t pid = getpid();
 #endif
                     info->session_initiator_pid = pid;
-
                 }
 
                 info->file_format_version = uint_fast8_t(target_file_format_version);
@@ -1211,7 +1195,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit",
                                                    options.temp_dir);
             m_pick_next_writer.set_shared_part(info->pick_next_writer, m_lockfile_prefix, "pick_writer",
-                                                   options.temp_dir);
+                                               options.temp_dir);
 #ifdef REALM_ASYNC_DAEMON
             if (options.durability == Durability::Async) {
                 m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready, m_lockfile_prefix, "daemon_ready",
@@ -1653,7 +1637,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
 // this code in a long while, and it was dramatically slowing down a unit test
 // in realm-sync.
 
-        // millisleep(200);
+// millisleep(200);
 #endif
 
         // WriteTransaction wt(*this);
@@ -1698,7 +1682,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
             if (!allow_file_format_upgrade)
                 throw FileFormatUpgradeRequired();
             Replication* repl = wt->get_replication();
-            repl->upgrade_history_schema(current_hist_schema_version_2); // Throws
+            repl->upgrade_history_schema(current_hist_schema_version_2);     // Throws
             gf::set_history_schema_version(*wt, target_hist_schema_version); // Throws
             dirty = true;
         }
@@ -1813,7 +1797,7 @@ void DB::do_begin_write()
     // b) we could use 64 bit counters instead, but it is unclear if all platforms
     //    have support for interprocess atomics for 64 bit values.
 
-    timespec time_limit;  // only compute the time limit if we're going to use it:
+    timespec time_limit; // only compute the time limit if we're going to use it:
     if (should_yield) {
         // This clock is not monotonic, so time can move backwards. This can lead
         // to a wrong time limit, but the only effect of a wrong time limit is that
@@ -1834,8 +1818,8 @@ void DB::do_begin_write()
         m_pick_next_writer.wait(m_writemutex, &time_limit);
         timeval tv;
         gettimeofday(&tv, nullptr);
-        if (time_limit.tv_sec < tv.tv_sec
-            || (time_limit.tv_sec == tv.tv_sec && time_limit.tv_nsec < tv.tv_usec * 1000)) {
+        if (time_limit.tv_sec < tv.tv_sec ||
+            (time_limit.tv_sec == tv.tv_sec && time_limit.tv_nsec < tv.tv_usec * 1000)) {
             // Timeout!
             break;
         }
@@ -1937,7 +1921,7 @@ DB::version_type Transaction::commit_and_continue_as_read()
     // completed commit.
     db->release_read_lock(m_read_lock);
 
-    VersionID version_id = VersionID();      // Latest available snapshot
+    VersionID version_id = VersionID();          // Latest available snapshot
     db->grab_read_lock(m_read_lock, version_id); // Throws
 
     db->do_end_write();

@@ -29,7 +29,6 @@
 #include <mysql/mysql.h>
 #include <realm.hpp>
 #include <realm/util/file.hpp>
-#include <realm/group_shared.hpp>
 
 using namespace realm;
 

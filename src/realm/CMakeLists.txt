@@ -28,7 +28,7 @@ set(REALM_SOURCES
     disable_sync_to_disk.cpp
     exceptions.cpp
     group.cpp
-    group_shared.cpp
+    db.cpp
     group_writer.cpp
     history.cpp
     impl/output_stream.cpp
@@ -108,8 +108,8 @@ set(REALM_INSTALL_GENERAL_HEADERS
     disable_sync_to_disk.hpp
     exceptions.hpp
     group.hpp
-    group_shared.hpp
-    group_shared_options.hpp
+    db.hpp
+    db_options.hpp
     group_writer.hpp
     handover_defs.hpp
     history.hpp

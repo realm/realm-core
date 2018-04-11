@@ -25,9 +25,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
 
-#include <realm/query_expression.hpp>
-#include <realm/group_shared.hpp>
-#include <realm/table_view.hpp>
+#include <realm.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/replication.hpp>

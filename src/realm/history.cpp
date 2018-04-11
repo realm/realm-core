@@ -18,7 +18,7 @@
 
 #include <realm/impl/cont_transact_hist.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 #include <realm/replication.hpp>
 #include <realm/history.hpp>
 

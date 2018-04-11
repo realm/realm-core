@@ -18,7 +18,7 @@
 
 #include <realm/table_view.hpp>
 #include <realm/column.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 
 #include <unordered_set>
 

@@ -28,7 +28,7 @@
 
 #include <realm/history.hpp>
 #include <realm/util/file.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 
 #include "util/crypt_key.hpp"
 #include "util/thread_wrapper.hpp"

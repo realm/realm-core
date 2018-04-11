@@ -20,11 +20,10 @@
 #ifdef TEST_QUERY
 
 #include <realm.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/history.hpp>
 
 #include "test.hpp"
 #include "test_table_helper.hpp"
-#include <realm/history.hpp>
 
 using namespace realm;
 using namespace realm::util;

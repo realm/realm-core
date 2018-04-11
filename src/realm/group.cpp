@@ -36,7 +36,7 @@
 #include <realm/column_linkbase.hpp>
 #include <realm/column_backlink.hpp>
 #include <realm/group_writer.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 #include <realm/replication.hpp>
 
 using namespace realm;

@@ -19,7 +19,7 @@
 #include <realm/query_engine.hpp>
 
 #include <realm/query_expression.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 
 using namespace realm;
 

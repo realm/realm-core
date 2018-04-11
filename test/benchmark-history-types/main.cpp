@@ -20,11 +20,9 @@
 #include <algorithm>
 #include <iostream>
 
+#include <realm/db.hpp>
 #include <realm/util/file.hpp>
-#include <realm/group_shared.hpp>
 #include <realm/history.hpp>
-#include <realm/commit_log.hpp>
-#include <realm/lang_bind_helper.hpp>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"

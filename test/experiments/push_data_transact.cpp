@@ -22,7 +22,6 @@
 #include <iostream>
 
 #include <realm.hpp>
-#include <realm/group_shared.hpp>
 
 using namespace realm;
 

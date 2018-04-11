@@ -18,7 +18,6 @@
 
 #include <iostream>
 #include <realm.hpp>
-#include <realm/group_shared.hpp>
 #include <realm/util/file.hpp>
 
 using namespace realm;

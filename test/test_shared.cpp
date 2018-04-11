@@ -41,7 +41,6 @@
 #endif
 
 #include <realm/history.hpp>
-#include <realm/group_shared.hpp>
 #include <realm.hpp>
 #include <realm/util/features.h>
 #include <realm/util/safe_int_ops.hpp>

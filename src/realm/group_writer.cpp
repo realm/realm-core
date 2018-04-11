@@ -25,7 +25,7 @@
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/group_writer.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 #include <realm/alloc_slab.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/metrics/metric_timer.hpp>

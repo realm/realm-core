@@ -34,7 +34,7 @@
 #include <realm/utilities.hpp> // gettimeofday()
 #endif
 
-#include <realm/group_shared_options.hpp>
+#include <realm/db_options.hpp>
 #include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>

@@ -27,12 +27,12 @@
 #include <realm/util/interprocess_condvar.hpp>
 #include <realm/util/interprocess_mutex.hpp>
 #include <realm/group.hpp>
-#include <realm/group_shared_options.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/impl/transact_log.hpp>
 #include <realm/metrics/metrics.hpp>
 #include <realm/replication.hpp>
 #include <realm/version_id.hpp>
+#include "db_options.hpp"
 
 namespace realm {
 
@@ -781,7 +781,7 @@ inline void Transaction::promote_to_write(O* observer)
 
     db->do_begin_write(); // Throws
     try {
-        VersionID version = VersionID();                                  // Latest
+        VersionID version = VersionID();                                              // Latest
         bool history_updated = internal_advance_read(observer, version, *hist, true); // Throws
 
         Replication* repl = get_replication();

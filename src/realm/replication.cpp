@@ -22,7 +22,7 @@
 
 #include <realm/group.hpp>
 #include <realm/table.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 #include <realm/replication.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/array_bool.hpp>
