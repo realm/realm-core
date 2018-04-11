@@ -2281,69 +2281,69 @@ TransactionRef DB::start_write()
     return TransactionRef(tr, TransactionDeleter);
 }
 
-Obj Transaction::copy_of(const ConstObj& original)
+Obj Transaction::import_copy_of(const ConstObj& original)
 {
     TableKey tk = original.get_table_key();
     ObjKey rk = original.get_key();
     return get_table(tk)->get_object(rk);
 }
 
-ConstTableRef Transaction::copy_of(ConstTableRef original)
+ConstTableRef Transaction::import_copy_of(ConstTableRef original)
 {
     TableKey tk = original->get_key();
     return get_table(tk);
 }
 
-TableRef Transaction::copy_of(TableRef original)
+TableRef Transaction::import_copy_of(TableRef original)
 {
     TableKey tk = original->get_key();
     return get_table(tk);
 }
 
-LinkList Transaction::copy_of(const LinkList& original)
+LinkList Transaction::import_copy_of(const LinkList& original)
 {
-    Obj obj = copy_of(original.m_obj);
+    Obj obj = import_copy_of(original.m_obj);
     ColKey ck = original.m_col_key;
     return obj.get_linklist(ck);
 }
 
-LinkListPtr Transaction::copy_of(const LinkListPtr& original)
+LinkListPtr Transaction::import_copy_of(const LinkListPtr& original)
 {
     if (!bool(original))
         return nullptr;
-    Obj obj = copy_of(original->m_obj);
+    Obj obj = import_copy_of(original->m_obj);
     ColKey ck = original->m_col_key;
     return obj.get_linklist_ptr(ck);
 }
 
-ConstLinkList Transaction::copy_of(const ConstLinkList& original)
+ConstLinkList Transaction::import_copy_of(const ConstLinkList& original)
 {
-    ConstObj obj = copy_of(original.m_obj);
+    ConstObj obj = import_copy_of(original.m_obj);
     ColKey ck = original.m_col_key;
     return obj.get_linklist(ck);
 }
 
-ConstLinkListPtr Transaction::copy_of(const ConstLinkListPtr& original)
+ConstLinkListPtr Transaction::import_copy_of(const ConstLinkListPtr& original)
 {
     if (!bool(original))
         return nullptr;
-    Obj obj = copy_of(original->m_obj);
+    Obj obj = import_copy_of(original->m_obj);
     ColKey ck = original->m_col_key;
     return obj.get_linklist_ptr(ck);
 }
 
 
-std::unique_ptr<Query> Transaction::copy_of(Query& query, PayloadPolicy policy)
+std::unique_ptr<Query> Transaction::import_copy_of(Query& query, PayloadPolicy policy)
 {
     return query.clone_for_handover(this, policy);
 }
 
-std::unique_ptr<ConstTableView> Transaction::copy_of(TableView& tv, PayloadPolicy policy)
+std::unique_ptr<ConstTableView> Transaction::import_copy_of(TableView& tv, PayloadPolicy policy)
 {
     return tv.clone_for_handover(this, policy);
 }
 
-std::unique_ptr<ConstTableView> Transaction::copy_of(ConstTableView& tv, PayloadPolicy policy)
+std::unique_ptr<ConstTableView> Transaction::import_copy_of(ConstTableView& tv, PayloadPolicy policy)
 {
     return tv.clone_for_handover(this, policy);
 }

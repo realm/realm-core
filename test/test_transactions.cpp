@@ -134,7 +134,7 @@ TEST(Transactions_StateChanges)
     // verify that we can freeze a read transaction
     TransactionRef frozen = writer->freeze();
     // verify that we can handover an accessor directly to the frozen transaction.
-    auto frozen_obj = frozen->copy_of(obj);
+    auto frozen_obj = frozen->import_copy_of(obj);
     // verify that we can read the correct value(s)
     int val = frozen_obj.get<int64_t>(col);
     CHECK_EQUAL(45, val);
@@ -146,7 +146,7 @@ TEST(Transactions_StateChanges)
     CHECK_THROW(frozen_obj.set<int64_t>(col, 47), realm::LogicError);
     // verify handover of a list
     // FIXME: no change should be needed here
-    auto frozen_list = frozen->copy_of(list);
+    auto frozen_list = frozen->import_copy_of(list);
     CHECK_EQUAL(frozen_list.get(0), 5);
     CHECK_EQUAL(frozen_list.get(1), 7);
 

@@ -522,20 +522,20 @@ public:
     TransactionRef duplicate();
 
     // direct handover of accessor instances
-    Obj copy_of(const ConstObj& original); // slicing is OK for Obj/ConstObj
-    TableRef copy_of(const TableRef original);
-    ConstTableRef copy_of(const ConstTableRef original);
+    Obj import_copy_of(const ConstObj& original); // slicing is OK for Obj/ConstObj
+    TableRef import_copy_of(const TableRef original);
+    ConstTableRef import_copy_of(const ConstTableRef original);
     template <typename T>
-    List<T> copy_of(const List<T>& original);
-    LinkList copy_of(const LinkList& original);
-    LinkListPtr copy_of(const LinkListPtr& original);
-    ConstLinkList copy_of(const ConstLinkList& original);
-    ConstLinkListPtr copy_of(const ConstLinkListPtr& original);
+    List<T> import_copy_of(const List<T>& original);
+    LinkList import_copy_of(const LinkList& original);
+    LinkListPtr import_copy_of(const LinkListPtr& original);
+    ConstLinkList import_copy_of(const ConstLinkList& original);
+    ConstLinkListPtr import_copy_of(const ConstLinkListPtr& original);
 
     // handover of the heavier Query and TableView
-    std::unique_ptr<Query> copy_of(Query&, PayloadPolicy);
-    std::unique_ptr<ConstTableView> copy_of(TableView&, PayloadPolicy);
-    std::unique_ptr<ConstTableView> copy_of(ConstTableView&, PayloadPolicy);
+    std::unique_ptr<Query> import_copy_of(Query&, PayloadPolicy);
+    std::unique_ptr<ConstTableView> import_copy_of(TableView&, PayloadPolicy);
+    std::unique_ptr<ConstTableView> import_copy_of(ConstTableView&, PayloadPolicy);
 
     /// Get the current transaction type
     DB::TransactStage get_transact_stage() const noexcept;
@@ -749,9 +749,9 @@ private:
 };
 
 template <typename T>
-inline List<T> Transaction::copy_of(const List<T>& original)
+inline List<T> Transaction::import_copy_of(const List<T>& original)
 {
-    Obj obj = copy_of(original.m_obj);
+    Obj obj = import_copy_of(original.m_obj);
     ColKey ck = original.m_col_key;
     return obj.get_list<T>(ck);
 }

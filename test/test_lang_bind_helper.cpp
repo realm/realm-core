@@ -9398,7 +9398,7 @@ TEST(LangBindHelper_HandoverQuery)
     size_t count = query.count();
     // CHECK(query.is_in_sync());
     auto vtrans = rt->duplicate();
-    std::unique_ptr<Query> q2 = vtrans->copy_of(query, PayloadPolicy::Move);
+    std::unique_ptr<Query> q2 = vtrans->import_copy_of(query, PayloadPolicy::Move);
     CHECK_EQUAL(count, 50);
     {
         // Delete first column. This alters the index of 'second' column
@@ -9498,7 +9498,7 @@ TEST(LangBindHelper_SubqueryHandoverDependentViews)
             tv1 = table->where().less_equal(col0, 50).find_all();
             Query qq = tv1.get_parent().where(&tv1);
             reader = writer->duplicate();
-            qq2 = reader->copy_of(qq, PayloadPolicy::Copy);
+            qq2 = reader->import_copy_of(qq, PayloadPolicy::Copy);
             CHECK(tv1.is_attached());
             CHECK_EQUAL(51, tv1.size());
         }
@@ -9537,7 +9537,7 @@ TEST(LangBindHelper_HandoverPartialQuery)
             tv1 = table->where().less_equal(col0, 50).find_all();
             Query qq = tv1.get_parent().where(&tv1);
             reader = writer->duplicate();
-            qq2 = reader->copy_of(qq, PayloadPolicy::Copy);
+            qq2 = reader->import_copy_of(qq, PayloadPolicy::Copy);
             CHECK(tv1.is_attached());
             CHECK_EQUAL(51, tv1.size());
         }
@@ -9632,28 +9632,28 @@ TEST(LangBindHelper_HandoverAccessors)
             CHECK_EQUAL(i, tv.get(i).get<Int>(col));
 
         reader = writer->duplicate();
-        tv2 = reader->copy_of(tv, PayloadPolicy::Copy);
+        tv2 = reader->import_copy_of(tv, PayloadPolicy::Copy);
         CHECK(tv.is_attached());
         CHECK(tv.is_in_sync());
 
-        tv3 = reader->copy_of(tv, PayloadPolicy::Stay);
+        tv3 = reader->import_copy_of(tv, PayloadPolicy::Stay);
         CHECK(tv.is_attached());
         CHECK(tv.is_in_sync());
 
-        tv4 = reader->copy_of(tv, PayloadPolicy::Move);
+        tv4 = reader->import_copy_of(tv, PayloadPolicy::Move);
         CHECK(tv.is_attached());
         CHECK(!tv.is_in_sync());
 
         // and again, but this time with the source out of sync:
-        tv5 = reader->copy_of(tv, PayloadPolicy::Copy);
+        tv5 = reader->import_copy_of(tv, PayloadPolicy::Copy);
         CHECK(tv.is_attached());
         CHECK(!tv.is_in_sync());
 
-        tv6 = reader->copy_of(tv, PayloadPolicy::Stay);
+        tv6 = reader->import_copy_of(tv, PayloadPolicy::Stay);
         CHECK(tv.is_attached());
         CHECK(!tv.is_in_sync());
 
-        tv7 = reader->copy_of(tv, PayloadPolicy::Move);
+        tv7 = reader->import_copy_of(tv, PayloadPolicy::Move);
         CHECK(tv.is_attached());
         CHECK(!tv.is_in_sync());
 
@@ -10320,7 +10320,7 @@ TEST(LangBindHelper_HandoverTableRef)
         writer->commit_and_continue_as_read();
         auto vid = writer->get_version_of_current_transaction();
         reader = sg.start_read(vid);
-        table = reader->copy_of(table1);
+        table = reader->import_copy_of(table1);
     }
     CHECK(bool(table));
     CHECK(table->size() == 0);
@@ -10359,7 +10359,7 @@ TEST(LangBindHelper_HandoverLinkView)
     lvr->add(to3.get_key());
     writer->commit_and_continue_as_read();
     reader = writer->duplicate();
-    auto ll = reader->copy_of(lvr);
+    auto ll = reader->import_copy_of(lvr);
     {
         // validate inside reader transaction
         // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
@@ -10422,8 +10422,8 @@ TEST(LangBindHelper_HandoverDistinctView)
             CHECK(tv1.is_attached());
 
             reader = writer->duplicate();
-            tv2 = reader->copy_of(tv1, PayloadPolicy::Copy);
-            obj2b = reader->copy_of(obj1);
+            tv2 = reader->import_copy_of(tv1, PayloadPolicy::Copy);
+            obj2b = reader->import_copy_of(obj1);
             CHECK(tv1.is_attached());
         }
         {
