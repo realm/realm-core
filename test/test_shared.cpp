@@ -3828,6 +3828,17 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
 }
 #endif
 
+TEST(Shared_RollbackFirstTransaction)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db(*hist_w);
+    auto wt = db.start_write();
+
+    wt->add_table("table");
+    wt->rollback_and_continue_as_read();
+}
+
 TEST(Shared_SimpleTransaction)
 {
     SHARED_GROUP_TEST_PATH(path);

@@ -1590,6 +1590,11 @@ void Group::update_allocator_wrappers(bool writable)
 
 void Group::refresh_dirty_accessors()
 {
+    if (!m_tables.is_attached()) {
+        m_table_accessors.clear();
+        return;
+    }
+
     // The array of Tables cannot have shrunk:
     REALM_ASSERT(m_tables.size() >= m_table_accessors.size());
 

@@ -2657,6 +2657,24 @@ TEST(Table_object_basic)
     CHECK_EQUAL(k12.value, 12);
 }
 
+
+TEST(Table_ObjectsWithNoColumns)
+{
+    Table table;
+    std::vector<ObjKey> keys;
+    table.create_objects(120, keys);
+    CHECK_NOT(table.is_empty());
+    CHECK_EQUAL(table.size(), 120);
+    for (ObjKey k : keys) {
+        Obj obj = table.get_object(k);
+        CHECK(obj.is_valid());
+        obj.remove();
+        CHECK(!obj.is_valid());
+    }
+    CHECK(table.is_empty());
+    CHECK_EQUAL(table.size(), 0);
+}
+
 TEST(Table_remove_column)
 {
     Table table;

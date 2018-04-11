@@ -692,6 +692,16 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(0, obj2.get_backlink_count(*origin, col_link));
 }
 
+TEST(Links_AddBacklinkToTableWithEnumColumns)
+{
+    Group g;
+    auto table = g.add_table("fshno");
+    auto col = table->add_column(type_String, "strings", false);
+    table->create_object();
+    table->add_column_link(type_Link, "link1", *table);
+    table->enumerate_string_column(col);
+    table->add_column_link(type_Link, "link2", *table);
+}
 
 #ifdef LEGACY_TESTS
 TEST(Links_LinkList_Inserts)

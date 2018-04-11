@@ -747,10 +747,11 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
 void Table::do_erase_root_column(ColKey col_key)
 {
     size_t ndx = colkey2ndx(col_key);
+    bool removing_public_column = ndx < m_spec.get_public_column_count(); // cache before changing spec below
     remove_col_mapping(ndx);
     m_spec.erase_column(ndx); // Throws
 
-    if (ndx < m_spec.get_public_column_count()) {
+    if (removing_public_column) {
         // If the column had a source index we have to remove and destroy that as well
         ref_type index_ref = m_index_refs.get_as_ref(ndx);
         if (index_ref) {

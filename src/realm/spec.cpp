@@ -308,7 +308,7 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
         }
     }
 
-    if (m_enumkeys.is_attached()) {
+    if (m_enumkeys.is_attached() && type != col_type_BackLink) {
         m_enumkeys.insert(column_ndx, 0);
     }
 
