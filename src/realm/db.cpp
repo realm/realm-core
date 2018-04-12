@@ -758,6 +758,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
     m_key = options.encryption_key;
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     SlabAlloc& alloc = m_alloc;
+    m_alloc.set_read_only(false);
 
 #if REALM_METRICS
     if (options.enable_metrics) {

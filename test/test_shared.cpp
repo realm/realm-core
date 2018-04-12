@@ -3859,4 +3859,23 @@ TEST(Shared_SimpleTransaction)
     }
 }
 
+TEST(Shared_OpenAfterClose)
+{
+    // Test case generated in [realm-core-6.0.0-rc1] on Wed Apr 11 16:08:05 2018.
+    // REALM_MAX_BPNODE_SIZE is 4
+    // ----------------------------------------------------------------------
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = nullptr;
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db_w(*hist_w, DBOptions(key));
+    auto wt = db_w.start_write();
+
+    wt = nullptr;
+    db_w.close();
+    db_w.open(path, true, DBOptions(key));
+    wt = db_w.start_write();
+    wt = nullptr;
+    db_w.close();
+}
+
 #endif // TEST_SHARED

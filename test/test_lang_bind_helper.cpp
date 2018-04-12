@@ -9554,7 +9554,6 @@ TEST(LangBindHelper_HandoverPartialQuery)
 }
 
 
-#ifdef LEGACY_TESTS
 // Verify that an in-sync TableView backed by a Query that is restricted to a TableView
 // remains in sync when handed-over using a mutable payload.
 TEST(LangBindHelper_HandoverNestedTableViews)
@@ -9562,45 +9561,30 @@ TEST(LangBindHelper_HandoverNestedTableViews)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, DBOptions(crypt_key()));
-    sg.begin_read();
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
-    DB::VersionID vid;
     {
-        // Untyped interface
-        std::unique_ptr<DB::Handover<TableView>> handover;
+        TransactionRef reader;
+        std::unique_ptr<ConstTableView> tv;
         {
-            LangBindHelper::promote_to_write(sg_w);
-            TableRef table = group_w.add_table("table2");
-            table->add_column(type_Int, "first");
+            auto writer = sg.start_write();
+            TableRef table = writer->add_table("table2");
+            auto col = table->add_column(type_Int, "first");
             for (int i = 0; i < 100; ++i) {
-                table->add_empty_row();
-                table->set_int(0, i, i);
+                table->create_object().set_all(i);
             }
-            LangBindHelper::commit_and_continue_as_read(sg_w);
-            vid = sg_w.get_version_of_current_transaction();
-
+            writer->commit_and_continue_as_read();
             // Create a TableView tv2 that is backed by a Query that is restricted to rows from TableView tv1.
-            TableView tv1 = table->where().less_equal(0, 50).find_all();
+            TableView tv1 = table->where().less_equal(col, 50).find_all();
             TableView tv2 = tv1.get_parent().where(&tv1).find_all();
-            handover = sg_w.export_for_handover(tv2, MutableSourcePayload::Move);
+            CHECK(tv2.is_in_sync());
+            reader = writer->duplicate();
+            tv = reader->import_copy_of(tv2, PayloadPolicy::Move);
         }
-        {
-            LangBindHelper::advance_read(sg, vid);
-            sg_w.close();
-
-            std::unique_ptr<TableView> tv(sg.import_from_handover(std::move(handover)));
-
-            CHECK(tv->is_in_sync());
-            CHECK(tv->is_attached());
-            CHECK_EQUAL(51, tv->size());
-        }
+        CHECK(tv->is_in_sync());
+        CHECK(tv->is_attached());
+        CHECK_EQUAL(51, tv->size());
     }
 }
-#endif
+
 
 TEST(LangBindHelper_HandoverAccessors)
 {
@@ -9861,8 +9845,9 @@ void handover_verifier(HandoverControl<DB::Handover<TableView>>* control, TestCo
 }
 
 } // anonymous namespace
+#endif
 
-
+#ifdef LEGACY_TESTS
 namespace {
 
 void attacher(std::string path)
@@ -9904,8 +9889,9 @@ TEST(LangBindHelper_RacingAttachers)
         attachers[i].join();
     }
 }
+#endif
 
-
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_HandoverBetweenThreads)
 {
     SHARED_GROUP_TEST_PATH(path);
