@@ -100,7 +100,7 @@ public:
     ///
     /// Note: The underscore has been added because the name `free
     /// would conflict with a macro on the Windows platform.
-    void free_(ref_type, const char* addr) noexcept;
+    void free_(ref_type, const char* addr);
 
     /// Shorthand for free_(mem.get_ref(), mem.get_addr()).
     void free_(MemRef mem) noexcept;
@@ -188,7 +188,7 @@ protected:
     virtual MemRef do_realloc(ref_type, const char* addr, size_t old_size, size_t new_size) = 0;
 
     /// Release the specified chunk of memory.
-    virtual void do_free(ref_type, const char* addr) noexcept = 0;
+    virtual void do_free(ref_type, const char* addr) = 0;
 
     /// Map the specified \a ref to the corresponding memory
     /// address. Note that if is_read_only(ref) returns true, then the
@@ -449,7 +449,7 @@ inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_siz
     return do_realloc(ref, addr, old_size, new_size);
 }
 
-inline void Allocator::free_(ref_type ref, const char* addr) noexcept
+inline void Allocator::free_(ref_type ref, const char* addr)
 {
 #ifdef REALM_DEBUG
     if (ref == m_debug_watch)

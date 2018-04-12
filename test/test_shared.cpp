@@ -2066,7 +2066,7 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #endif // !defined(_WIN32) && !REALM_PLATFORM_APPLE
 
 #ifdef _WIN32
-
+#ifdef LEGACY_TESTS
 #if 0
 
 TEST(Shared_WaitForChangeAfterOwnCommit)
@@ -2154,7 +2154,7 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
     sg->begin_write();
     sg->commit();
 }
-
+#endif
 #endif
 
 #ifdef LEGACY_TESTS
