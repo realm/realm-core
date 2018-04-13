@@ -6,6 +6,12 @@
 
 ### Breaking changes
 
+* SharedGroup class removed. New DB class added allowing you to specify the Realm file
+  only once regardless of the number of threads.
+* New Transaction class added, inheriting from Group. Transactions are produced by DB.
+* TransactionRef added to provide reference to a Transaction. This is a std::shared_ptr.
+* Old export_for_handover/import_from_handover has been removed. Handover is now direct
+  from one transaction to another, using a new method Transaction::import_copy_of().
 * 'begin' argument removed from Query::count();
 * Table::optimize replaced with explicit Table::enumerate_string_column. It will enumerate
   column unconditionally.
@@ -15,23 +21,6 @@
   operation is not supported by the sync protocol and allegedly not used in the bindings.
 * Moved `get_uncommitted_changes()` from `History` class to `Replication` class. This removes the
   need to call TrivialReplication::get_uncommitted_changes from a decendant of History.
-
-### Enhancements
-
-* None.
-
------------
-
-### Internals
-
-* None.
-
-----------------------------------------------
-
-# 6.0.0-rc1 Release notes
-
-### Breaking changes
-
 * Column identifier changed from size_t to ColKey. This identifier is subsequently
   used when accessing/mutating the data and when making queries.
 * Table identifiers changed from size_t to TableKey.
@@ -52,6 +41,17 @@
   This implies that an old database cannot be opened in read-only, as read-only
   prevents updating.
 * Only file format versions from 6 and onwards can be opened (realm core v2.0.0)
+
+### Enhancements
+
+* None. Or see below.
+
+-----------
+
+### Internals
+
+* Major simplifications and optimizations to management of memory mappings.
+* Speed improvement for Sort().
 
 ----------------------------------------------
 
