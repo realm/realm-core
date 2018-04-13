@@ -9328,4 +9328,84 @@ TEST(Query_LinksTo)
     CHECK_EQUAL(found_key, source_keys[2]);
 }
 
+TEST(Query_Group_bug)
+{
+    // Tests for a bug in queries with OR nodes at different nesting levels
+
+    Group g;
+    TableRef service_table = g.add_table("service");
+    TableRef profile_table = g.add_table("profile");
+    TableRef person_table = g.add_table("person");
+
+    auto col_service_id = service_table->add_column(type_String, "id");
+    auto col_service_link = service_table->add_column_link(type_LinkList, "profiles", *profile_table);
+
+    auto col_profile_id = profile_table->add_column(type_String, "role");
+    auto col_profile_link = profile_table->add_column_link(type_Link, "services", *service_table);
+
+    auto col_person_id = person_table->add_column(type_String, "id");
+    auto col_person_link = person_table->add_column_link(type_LinkList, "services", *service_table);
+
+    auto sk0 = service_table->create_object().set(col_service_id, "service_1").get_key();
+    auto sk1 = service_table->create_object().set(col_service_id, "service_2").get_key();
+
+    auto pk0 = profile_table->create_object().set(col_profile_id, "profile_1").get_key();
+    auto pk1 = profile_table->create_object().set(col_profile_id, "profile_2").get_key();
+    auto pk2 = profile_table->create_object().set(col_profile_id, "profile_3").get_key();
+    auto pk3 = profile_table->create_object().set(col_profile_id, "profile_4").get_key();
+    auto pk4 = profile_table->create_object().set(col_profile_id, "profile_5").get_key();
+
+    {
+        auto ll0 = service_table->get_object(sk0).get_linklist(col_service_link);
+        auto ll1 = service_table->get_object(sk1).get_linklist(col_service_link);
+        ll0.add(pk0);
+        ll0.add(pk1);
+        ll1.add(pk2);
+        ll0.add(pk3);
+        ll0.add(pk4);
+    }
+
+    profile_table->get_object(pk0).set(col_profile_link, sk0);
+    profile_table->get_object(pk1).set(col_profile_link, sk0);
+    profile_table->get_object(pk2).set(col_profile_link, sk1);
+    profile_table->get_object(pk3).set(col_profile_link, sk0);
+    profile_table->get_object(pk4).set(col_profile_link, sk0);
+
+    person_table->create_object().set(col_person_id, "person_1").get_linklist(col_person_link).add(sk0);
+    person_table->create_object().set(col_person_id, "person_2").get_linklist(col_person_link).add(sk0);
+    person_table->create_object().set(col_person_id, "person_3").get_linklist(col_person_link).add(sk1);
+    person_table->create_object().set(col_person_id, "person_4").get_linklist(col_person_link).add(sk0);
+    person_table->create_object().set(col_person_id, "person_5").get_linklist(col_person_link).add(sk0);
+
+    realm::Query q0 =
+        person_table->where()
+            .group()
+
+            .group()
+            .and_query(person_table->link(col_person_link)
+                           .link(col_service_link)
+                           .column<String>(col_profile_id)
+                           .equal("profile_1"))
+            .Or()
+            .and_query(person_table->link(col_person_link)
+                           .link(col_service_link)
+                           .column<String>(col_profile_id)
+                           .equal("profile_2"))
+            .end_group()
+
+            .group()
+            .and_query(person_table->link(col_person_link).column<String>(col_service_id).equal("service_1"))
+            .end_group()
+
+            .end_group()
+
+            .Or()
+
+            .group()
+            .equal(col_person_id, "person_3")
+            .end_group();
+
+    CHECK_EQUAL(5, q0.count());
+}
+
 #endif // TEST_QUERY

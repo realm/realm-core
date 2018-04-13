@@ -54,6 +54,55 @@
 * Only file format versions from 6 and onwards can be opened (realm core v2.0.0)
 
 ----------------------------------------------
+
+# 5.4.1 Release notes
+
+### Enhancements
+
+* Reduced the number of files opened when the async commit daemon is not used.
+  PR [#3022](https://github.com/realm/realm-core/pull/3022).
+
+-----------
+
+### Internals
+
+* Exported CMake targets have been renamed to "modern" conventions, e.g.
+  `Realm::Core` and `Realm::QueryParser`.
+
+----------------------------------------------
+
+# 5.4.0 Release notes
+
+### Bugfixes
+
+* Fixed usage of disk space preallocation which would occasionally fail on recent MacOS
+  running with the APFS filesystem. PR [#3013](https://github.com/realm/realm-core/pull/3013).
+  Issue [#3005](https://github.com/realm/realm-core/issues/3005).
+* Fixed a bug in queries containing 'or' at different nesting levels.
+  PR [#3006](https://github.com/realm/realm-core/pull/3006).
+
+### Breaking changes
+
+* None.
+
+### Enhancements
+
+* Added `Table::get_link_type()` as a helper method for getting the link type from link columns.
+  PR [#2987](https://github.com/realm/realm-core/pull/2987).
+
+-----------
+
+### Internals
+
+* Silenced a false positive strict aliasing warning.
+  PR [#3002](https://github.com/realm/realm-core/pull/3002).
+* Assertions will print more information in relase mode.
+  PR [#2982](https://github.com/realm/realm-core/pull/2982).
+:
+(xed:22928): Gtk-WARNING **: Calling Inhibit failed: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.gnome.SessionManager was not provided by any .service files
+
+----------------------------------------------
+
 # 5.3.0 Release notes
 
 ### Bugfixes

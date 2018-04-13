@@ -17,7 +17,7 @@ set(TEST_UTIL_SOURCES
     jsmn.cpp
 ) # TEST_UTIL_SOURCES
 
-add_library(test-util ${TEST_UTIL_SOURCES})
+add_library(TestUtil ${TEST_UTIL_SOURCES})
 
-target_link_libraries(test-util realm)
+target_link_libraries(TestUtil Core)
 

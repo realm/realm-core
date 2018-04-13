@@ -51,8 +51,8 @@ jobWrapper {
       stage('check') {
           parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
                                checkLinuxDebug     : doBuildInDocker('Debug'),
-                               buildMacOsDebug     : doBuildMacOs('Debug'),
-                               buildMacOsRelease   : doBuildMacOs('Release'),
+                               buildMacOsDebug     : doBuildMacOs('Debug', true),
+                               buildMacOsRelease   : doBuildMacOs('Release', false),
                                buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
                                buildWin32Release   : doBuildWindows('Release', false, 'Win32'),
                                buildWin64Debug     : doBuildWindows('Debug', false, 'x64'),
@@ -389,7 +389,7 @@ def buildPerformance() {
   }
 }
 
-def doBuildMacOs(String buildType) {
+def doBuildMacOs(String buildType, boolean runTests) {
     def sdk = 'macosx'
     return {
         node('osx') {
@@ -420,12 +420,36 @@ def doBuildMacOs(String buildType) {
                             """)
                 }
             }
+
             archiveArtifacts("build-macos-${buildType}/*.tar.gz")
 
             def stashName = "macos___${buildType}"
             stash includes:"build-macos-${buildType}/*.tar.gz", name:stashName
             cocoaStashes << stashName
             publishingStashes << stashName
+
+            if (runTests) {
+                try {
+                    dir("build-macos-${buildType}") {
+                        def environment = environment()
+                        environment << 'UNITTEST_PROGRESS=1'
+                        withEnv(environment) {
+                        sh """
+                            cd test
+                            ./${buildType}/realm-tests.app/Contents/MacOS/realm-tests
+                            cp $TMPDIR/unit-test-report.xml .
+                        """
+                        }
+                    }
+                } finally {
+                    // recordTests expects the test results xml file in a build-dir/test/ folder
+                    sh """
+                        mkdir -p build-dir/test
+                        cp build-macos-${buildType}/test/unit-test-report.xml build-dir/test/
+                    """
+                    recordTests("macos_${buildType}")
+                }
+            }
         }
     }
 }

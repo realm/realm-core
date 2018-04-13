@@ -791,6 +791,10 @@ void Table::set_link_type(ColKey col_key, LinkType link_type)
 LinkType Table::get_link_type(ColKey col_key) const
 {
     size_t col_ndx = colkey2ndx(col_key);
+    if (!(m_spec.get_column_type(col_ndx) == col_type_Link) &&
+        !(m_spec.get_column_type(col_ndx) == col_type_LinkList)) {
+        throw LogicError{LogicError::illegal_type};
+    }
     return m_spec.get_column_attr(col_ndx).test(col_attr_StrongLinks) ? link_Strong : link_Weak;
 }
 

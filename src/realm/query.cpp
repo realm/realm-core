@@ -1194,8 +1194,7 @@ void Query::handle_pending_not()
 Query& Query::Or()
 {
     auto& current_group = m_groups.back();
-    OrNode* or_node = dynamic_cast<OrNode*>(current_group.m_root_node.get());
-    if (!or_node) {
+    if (current_group.m_state != QueryGroup::State::OrConditionChildren) {
         // Reparent the current group's nodes within an OrNode.
         add_node(std::unique_ptr<ParentNode>(new OrNode(std::move(current_group.m_root_node))));
     }

@@ -201,6 +201,8 @@ public:
     ///
     /// \param link_type The type of links the column should store.
     void set_link_type(ColKey col_key, LinkType);
+    // Returns the link type for the given column.
+    // Throws an LogicError if target column is not a link column.
     LinkType get_link_type(ColKey col_key) const;
 
     //@{
@@ -503,7 +505,35 @@ public:
         return Query(*this, list);
     }
 
-    Table& link(ColKey link_column);
+    //@{
+    /// WARNING: The link() and backlink() methods will alter a state on the Table object and return a reference
+    /// to itself. Be aware if assigning the return value of link() to a variable; this might be an error!
+
+    /// This is an error:
+
+    /// Table& cats = owners->link(1);
+    /// auto& dogs = owners->link(2);
+
+    /// Query q = person_table->where()
+    /// .and_query(cats.column<String>(5).equal("Fido"))
+    /// .Or()
+    /// .and_query(dogs.column<String>(6).equal("Meowth"));
+
+    /// Instead, do this:
+
+    /// Query q = owners->where()
+    /// .and_query(person_table->link(1).column<String>(5).equal("Fido"))
+    /// .Or()
+    /// .and_query(person_table->link(2).column<String>(6).equal("Meowth"));
+
+    /// The two calls to link() in the erroneous example will append the two values 0 and 1 to an internal vector in
+    /// the owners table, and we end up with three references to that same table: owners, cats and dogs. They are all
+    /// the same table, its vector has the values {0, 1}, so a query would not make any sense.
+    Table& link(ColKey link_column)
+    {
+        m_link_chain.push_back(link_column);
+        return *this;
+    }
     Table& backlink(const Table& origin, ColKey origin_col_key);
 
     // Conversion
@@ -1003,13 +1033,6 @@ SubQuery<T> Table::column(const Table& origin, ColKey origin_col_key, Query subq
 {
     static_assert(std::is_same<T, BackLink>::value, "A subquery must involve a link list or backlink column");
     return SubQuery<T>(column<T>(origin, origin_col_key), std::move(subquery));
-}
-
-// For use by queries
-inline Table& Table::link(ColKey link_column)
-{
-    m_link_chain.push_back(link_column);
-    return *this;
 }
 
 inline Table& Table::backlink(const Table& origin, ColKey origin_col_key)

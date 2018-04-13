@@ -3802,5 +3802,26 @@ TEST(Table_StaleColumnKey)
     CHECK_THROW_ANY(obj.get<Int>(col));
 }
 
+TEST(Table_getLinkType)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+
+    auto col_int = table->add_column(type_Int, "int");
+    auto col_weak_link = table->add_column_link(type_Link, "weak_link", *table);
+    auto col_strong_link = table->add_column_link(type_Link, "strong_link", *table, link_Strong);
+    auto col_weak_linklist = table->add_column_link(type_LinkList, "weak_list", *table);
+    auto col_strong_linklist = table->add_column_link(type_LinkList, "strong_list", *table, link_Strong);
+
+    CHECK(link_Weak == table->get_link_type(col_weak_link));
+    CHECK(link_Strong == table->get_link_type(col_strong_link));
+    CHECK(link_Weak == table->get_link_type(col_weak_linklist));
+    CHECK(link_Strong == table->get_link_type(col_strong_linklist));
+
+    CHECK_THROW(table->get_link_type(col_int), LogicError);
+
+    g.remove_table("table");
+    CHECK_THROW(table->get_link_type(col_weak_link), NoSuchTable);
+}
 
 #endif // TEST_TABLE

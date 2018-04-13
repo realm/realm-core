@@ -1432,8 +1432,8 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         if (i % 2) {
             t->set_int(col_int, i, i);
             t->set_int(col_int_null, i, i);
-            t->set_bool(col_bool, i, (i % 2) == 0);
-            t->set_bool(col_bool_null, i, (i % 2) == 0);
+            t->set_bool(col_bool, i, (i % 3) == 0);
+            t->set_bool(col_bool_null, i, (i % 3) == 0);
             t->set_float(col_float, i, i * 1.5f);
             t->set_double(col_double, i, i * 2.5);
 

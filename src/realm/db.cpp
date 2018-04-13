@@ -959,7 +959,8 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
         m_writemutex.set_shared_part(info->shared_writemutex, m_lockfile_prefix, "write");
 #ifdef REALM_ASYNC_DAEMON
-        m_balancemutex.set_shared_part(info->shared_balancemutex, m_lockfile_prefix, "balance");
+        if (info->durability == static_cast<uint16_t>(Durability::Async))
+            m_balancemutex.set_shared_part(info->shared_balancemutex, m_lockfile_prefix, "balance");
 #endif
         m_controlmutex.set_shared_part(info->shared_controlmutex, m_lockfile_prefix, "control");
 
