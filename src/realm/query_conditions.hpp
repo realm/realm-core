@@ -50,7 +50,7 @@ public:
     size_t m_match_count;
     size_t m_limit;
     int64_t m_minmax_index; // used only for min/max, to save index of current min/max value
-    int64_t m_key_offset;
+    uint64_t m_key_offset;
     const ClusterKeyArray* m_key_values;
     QueryStateBase(size_t limit)
         : m_match_count(0)

@@ -140,7 +140,7 @@ private:
 
     struct ChildInfo {
         size_t ndx;
-        int64_t offset;
+        uint64_t offset;
         ObjKey key;
     };
     ChildInfo find_child(ObjKey key) const

@@ -59,7 +59,7 @@ public:
         size_t m_current_index = 0;
     };
 
-    ClusterNode(int64_t offset, Allocator& allocator, const ClusterTree& tree_top)
+    ClusterNode(uint64_t offset, Allocator& allocator, const ClusterTree& tree_top)
         : Array(allocator)
         , m_tree_top(tree_top)
         , m_keys(allocator)
@@ -133,11 +133,11 @@ public:
     {
         return &m_keys;
     }
-    void set_offset(int64_t offs)
+    void set_offset(uint64_t offs)
     {
         m_offset = offs;
     }
-    int64_t get_offset() const
+    uint64_t get_offset() const
     {
         return m_offset;
     }
@@ -148,12 +148,12 @@ protected:
 
     const ClusterTree& m_tree_top;
     ClusterKeyArray m_keys;
-    int64_t m_offset;
+    uint64_t m_offset;
 };
 
 class Cluster : public ClusterNode {
 public:
-    Cluster(int64_t offset, Allocator& allocator, const ClusterTree& tree_top)
+    Cluster(uint64_t offset, Allocator& allocator, const ClusterTree& tree_top)
         : ClusterNode(offset, allocator, tree_top)
     {
     }

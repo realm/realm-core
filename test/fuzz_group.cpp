@@ -434,7 +434,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
                 TableRef t = wt->get_table(table_key);
                 auto all_col_keys = t->get_col_keys();
-                if (!all_col_keys.empty() > 0 && t->size() > 0) {
+                if (!all_col_keys.empty() && t->size() > 0) {
                     ColKey col = all_col_keys[get_next(s) % all_col_keys.size()];
                     size_t row = get_next(s) % t->size();
                     DataType type = t->get_column_type(col);

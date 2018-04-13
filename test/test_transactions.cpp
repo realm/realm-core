@@ -136,7 +136,7 @@ TEST(Transactions_StateChanges)
     // verify that we can handover an accessor directly to the frozen transaction.
     auto frozen_obj = frozen->import_copy_of(obj);
     // verify that we can read the correct value(s)
-    int val = frozen_obj.get<int64_t>(col);
+    int64_t val = frozen_obj.get<int64_t>(col);
     CHECK_EQUAL(45, val);
     // FIXME: Why does  this cause a write?
     auto list2 = frozen_obj.get_list<int64_t>(lcol);
@@ -171,8 +171,8 @@ void writer_thread(TestContext& test_context, int runs, DB* db, TableKey tk, Col
             auto writer = db->start_write();
             // writer->verify();
             auto obj = writer->get_table(tk)->get_object(ok);
-            int a = obj.get<Int>(ck1);
-            int b = obj.get<Int>(ck2);
+            int64_t a = obj.get<int64_t>(ck1);
+            int64_t b = obj.get<int64_t>(ck2);
             CHECK_EQUAL(a * a, b);
             obj.set_all(a + 1, (a + 1) * (a + 1));
             writer->commit();
@@ -196,8 +196,8 @@ void verifier_thread(TestContext& test_context, int limit, DB* db, TableKey tk, 
         auto reader = db->start_read();
         // reader->verify();
         auto obj = reader->get_table(tk)->get_object(ok);
-        int a = obj.get<Int>(ck1);
-        int b = obj.get<Int>(ck2);
+        int64_t a = obj.get<int64_t>(ck1);
+        int64_t b = obj.get<int64_t>(ck2);
         CHECK_EQUAL(a * a, b);
         done = (a >= limit);
     }

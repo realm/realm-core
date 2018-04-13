@@ -981,7 +981,7 @@ void copy_column(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, Alloca
 
     ClusterTree::UpdateFunction func = [col_ndx, &from_column, &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
-        int64_t offset = cluster->get_offset();
+        size_t offset = size_t(cluster->get_offset());
         typename ColumnTypeTraits<T>::cluster_leaf_type arr(allocator);
         arr.create();
         for (size_t i = 0; i < sz; i++) {
@@ -1002,7 +1002,7 @@ void copy_column<util::Optional<bool>>(ClusterTree& clusters, size_t col_ndx, re
 
     ClusterTree::UpdateFunction func = [col_ndx, &from_column, &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
-        int64_t offset = cluster->get_offset();
+        size_t offset = size_t(cluster->get_offset());
         ArrayBoolNull arr(allocator);
         arr.create();
         for (size_t i = 0; i < sz; i++) {
@@ -1030,7 +1030,7 @@ void copy_column<Timestamp>(ClusterTree& clusters, size_t col_ndx, ref_type col_
 
     ClusterTree::UpdateFunction func = [col_ndx, &seconds, &nano_seconds, &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
-        int64_t offset = cluster->get_offset();
+        size_t offset = size_t(cluster->get_offset());
         ArrayTimestamp arr(allocator);
         arr.create();
         for (size_t i = 0; i < sz; i++) {
@@ -1056,7 +1056,7 @@ void copy_column_backlink(ClusterTree& clusters, size_t col_ndx, ref_type col_re
 
     ClusterTree::UpdateFunction func = [col_ndx, &list_refs, &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
-        int64_t offset = cluster->get_offset();
+        size_t offset = size_t(cluster->get_offset());
         ArrayInteger arr(allocator);
         arr.Array::create(NodeHeader::type_HasRefs, false, sz, 0);
         for (size_t i = 0; i < sz; i++) {
@@ -1088,11 +1088,11 @@ void copy_column_list(ClusterTree& clusters, size_t col_ndx, ref_type col_ref, C
 
     ClusterTree::UpdateFunction func = [col_ndx, col_type, &list_refs, &allocator](Cluster* cluster) {
         size_t sz = cluster->node_size();
-        int64_t offset = cluster->get_offset();
+        size_t offset = size_t(cluster->get_offset());
         ArrayInteger arr(allocator);
         arr.Array::create(NodeHeader::type_HasRefs, false, sz, 0);
         for (size_t i = 0; i < sz; i++) {
-            ref_type ref = list_refs.get(i + offset);
+            ref_type ref = to_ref(list_refs.get(i + offset));
             if (ref) {
                 // List is not null - just clone the list
                 if (col_type != col_type_LinkList) {
@@ -1191,7 +1191,7 @@ bool Table::copy_content_from_columns(size_t col_ndx)
 
     if (attr.test(col_attr_Indexed)) {
         // Move index over to new position in table
-        ref_type index_ref = col_refs.get(ndx_in_parent + 1);
+        ref_type index_ref = col_refs.get_as_ref(ndx_in_parent + 1);
         m_index_refs.set(col_ndx, index_ref);
         col_refs.set(ndx_in_parent + 1, 0);
     }
