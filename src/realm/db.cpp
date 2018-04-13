@@ -1258,8 +1258,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
     try {
         if (stored_hist_schema_version == -1) {
             // current_hist_schema_version has not been read. Read it now
-            auto trans = start_read();
-            stored_hist_schema_version = trans->get_history_schema_version();
+            stored_hist_schema_version = start_read()->get_history_schema_version();
         }
         if (current_file_format_version == 0) {
             // If the current file format is still undecided, no upgrade is

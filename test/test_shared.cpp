@@ -3113,7 +3113,7 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
     }
     else {
         // Number of fuzzy tests
-        const size_t iterations = 100;
+        const size_t iterations = 3;
 
         // Number of instructions in each test
         // Changing this strongly affects the test suite run time

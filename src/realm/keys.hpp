@@ -116,7 +116,7 @@ struct ColKey {
 
 inline std::ostream& operator<<(std::ostream& os, ColKey ck)
 {
-    os << "ObjKey(" << ck.value << ")";
+    os << "ColKey(" << ck.value << ")";
     return os;
 }
 
@@ -166,7 +166,7 @@ private:
 
 inline std::ostream& operator<<(std::ostream& ostr, ObjKey key)
 {
-    ostr << "Key(" << key.value << ")";
+    ostr << "ObjKey(" << key.value << ")";
     return ostr;
 }
 

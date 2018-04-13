@@ -238,51 +238,53 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
     const size_t max_rows = 100000;
     column_index = table_index = 0;
 
-    try {
-        State s;
-        s.str = in;
-        s.pos = 0;
+    State s;
+    s.str = in;
+    s.pos = 0;
 
-        const bool use_encryption = get_next(s) % 2 == 0;
-        const char* encryption_key = use_encryption ? get_encryption_key() : nullptr;
+    // const bool use_encryption = false;
+    const bool use_encryption = get_next(s) % 2 == 0;
+    const char* encryption_key = use_encryption ? get_encryption_key() : nullptr;
 
-        if (log) {
-            *log << "// Test case generated in " REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
-            *log << "// REALM_MAX_BPNODE_SIZE is " << REALM_MAX_BPNODE_SIZE << "\n";
-            *log << "// ----------------------------------------------------------------------\n";
-            std::string printable_key;
-            if (encryption_key == nullptr) {
-                printable_key = "nullptr";
-            }
-            else {
-                printable_key = std::string("\"") + encryption_key + "\"";
-            }
-
-            *log << "SHARED_GROUP_TEST_PATH(path);\n";
-
-            *log << "const char* key = " << printable_key << ";\n";
-            *log << "std::unique_ptr<Replication> hist_r(make_in_realm_history(path));\n";
-            *log << "std::unique_ptr<Replication> hist_w(make_in_realm_history(path));\n";
-
-            *log << "DB db_w(*hist_w, DBOptions(key));\n";
-            *log << "DB db_r(*hist_r, DBOptions(key));\n";
-            *log << "auto wt = db_w.start_write();\n";
-            *log << "auto rt = db_r.start_read();\n";
-            *log << "std::vector<TableView> table_views;\n";
-            *log << "std::vector<TableRef> subtable_refs;\n";
-
-            *log << "\n";
+    if (log) {
+        *log << "// Test case generated in " REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
+        *log << "// REALM_MAX_BPNODE_SIZE is " << REALM_MAX_BPNODE_SIZE << "\n";
+        *log << "// ----------------------------------------------------------------------\n";
+        std::string printable_key;
+        if (encryption_key == nullptr) {
+            printable_key = "nullptr";
+        }
+        else {
+            printable_key = std::string("\"") + encryption_key + "\"";
         }
 
-        std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
-        std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+        *log << "SHARED_GROUP_TEST_PATH(path);\n";
 
-        DB db_r(*hist_r, DBOptions(encryption_key));
-        DB db_w(*hist_w, DBOptions(encryption_key));
-        auto wt = db_w.start_write();
-        auto rt = db_r.start_read();
-        std::vector<TableView> table_views;
-        std::vector<TableRef> subtable_refs;
+        *log << "const char* key = " << printable_key << ";\n";
+        *log << "std::unique_ptr<Replication> hist_r(make_in_realm_history(path));\n";
+        *log << "std::unique_ptr<Replication> hist_w(make_in_realm_history(path));\n";
+
+        *log << "DB db_w(*hist_w, DBOptions(key));\n";
+        *log << "DB db_r(*hist_r, DBOptions(key));\n";
+        *log << "auto wt = db_w.start_write();\n";
+        *log << "auto rt = db_r.start_read();\n";
+        *log << "std::vector<TableView> table_views;\n";
+        *log << "std::vector<TableRef> subtable_refs;\n";
+
+        *log << "\n";
+    }
+
+    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+
+    DB db_r(*hist_r, DBOptions(encryption_key));
+    DB db_w(*hist_w, DBOptions(encryption_key));
+    auto wt = db_w.start_write();
+    auto rt = db_r.start_read();
+    std::vector<TableView> table_views;
+    std::vector<TableRef> subtable_refs;
+
+    try {
 
         for (;;) {
             char instr = get_next(s) % COUNT;
@@ -643,8 +645,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     db_r.open(path, true, DBOptions(encryption_key));
                     if (log) {
+                        *log << "rt = nullptr;\n";
                         *log << "rt = db_r.start_read();\n";
                     }
+                    rt = nullptr;
                     rt = db_r.start_read();
                     REALM_DO_IF_VERIFY(log, rt->verify());
                 }

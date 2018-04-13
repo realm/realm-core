@@ -502,8 +502,17 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
     m_attached = true;
     set_size();
 
-    if (m_tables.is_attached())
-        m_table_accessors.resize(m_tables.size());
+    size_t sz = m_tables.is_attached() ? m_tables.size() : 0;
+    while (m_table_accessors.size() > sz) {
+        if (Table* t = m_table_accessors.back()) {
+            t->detach();
+            recycle_table_accessor(t);
+        }
+        m_table_accessors.pop_back();
+    }
+    while (m_table_accessors.size() < sz) {
+        m_table_accessors.emplace_back();
+    }
 #if REALM_METRICS
     update_num_objects();
 #endif // REALM_METRICS
@@ -1601,7 +1610,7 @@ void Group::refresh_dirty_accessors()
     REALM_ASSERT(m_tables.size() >= m_table_accessors.size());
 
     // but it may have grown - and if so, we must resize the accessor array to match
-    if (m_table_accessors.size() > 0 && m_tables.size() > m_table_accessors.size()) {
+    if (m_tables.size() > m_table_accessors.size()) {
         m_table_accessors.resize(m_tables.size());
     }
 

@@ -1483,12 +1483,12 @@ TEST(Group_CascadeNotify_Simple)
 
         CHECK_EQUAL(2, notification.links.size());
 
-        CHECK_EQUAL(col_link_list, notification.links[0].origin_col_ndx);
-        CHECK_EQUAL(o_keys[15], notification.links[0].origin_key);
+        CHECK_EQUAL(col_link, notification.links[0].origin_col_ndx);
+        CHECK_EQUAL(o_keys[10], notification.links[0].origin_key);
         CHECK_EQUAL(t_keys[11], notification.links[0].old_target_key);
 
-        CHECK_EQUAL(col_link, notification.links[1].origin_col_ndx);
-        CHECK_EQUAL(o_keys[10], notification.links[1].origin_key);
+        CHECK_EQUAL(col_link_list, notification.links[1].origin_col_ndx);
+        CHECK_EQUAL(o_keys[15], notification.links[1].origin_key);
         CHECK_EQUAL(t_keys[11], notification.links[1].old_target_key);
     });
     t->remove_object(t_keys[11]);
