@@ -593,9 +593,6 @@ public:
 
     //@}
 
-    void on_table_destroyed(const Table*) noexcept;
-    void on_spec_destroyed(const Spec*) noexcept;
-
 protected:
     TransactLogConvenientEncoder(TransactLogStream& encoder);
 
@@ -637,7 +634,6 @@ private:
     // These are mutable because they are caches.
     mutable util::Buffer<size_t> m_subtab_path_buf;
     mutable const Table* m_selected_table;
-    mutable const Spec* m_selected_spec;
     mutable LinkListId m_selected_list;
 
     void unselect_all() noexcept;
@@ -992,7 +988,6 @@ void TransactLogEncoder::append_simple_instr(L... numbers)
 inline void TransactLogConvenientEncoder::unselect_all() noexcept
 {
     m_selected_table = nullptr;
-    m_selected_spec = nullptr;
     m_selected_list = LinkListId();
 }
 
@@ -1000,7 +995,6 @@ inline void TransactLogConvenientEncoder::select_table(const Table* table)
 {
     if (table != m_selected_table)
         do_select_table(table); // Throws
-    m_selected_spec = nullptr;
     m_selected_list = LinkListId();
 }
 
@@ -1009,7 +1003,6 @@ inline void TransactLogConvenientEncoder::select_list(const ConstListBase& list)
     if (LinkListId(list) != m_selected_list) {
         do_select_list(list); // Throws
     }
-    m_selected_spec = nullptr;
 }
 
 inline bool TransactLogEncoder::insert_group_level_table(TableKey table_key, size_t prior_num_tables, StringData name)
@@ -1713,19 +1706,6 @@ inline bool TransactLogEncoder::list_clear(size_t old_list_size)
     append_simple_instr(instr_ListClear, old_list_size); // Throws
     return true;
 }
-
-inline void TransactLogConvenientEncoder::on_table_destroyed(const Table* t) noexcept
-{
-    if (m_selected_table == t)
-        m_selected_table = nullptr;
-}
-
-inline void TransactLogConvenientEncoder::on_spec_destroyed(const Spec* s) noexcept
-{
-    if (m_selected_spec == s)
-        m_selected_spec = nullptr;
-}
-
 
 inline TransactLogParser::TransactLogParser()
     : m_input_buffer(1024) // Throws

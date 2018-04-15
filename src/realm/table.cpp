@@ -821,8 +821,6 @@ void Table::erase_backlink_column(TableKey origin_table_key, ColKey origin_col_k
 
 void Table::detach() noexcept
 {
-    if (Replication* repl = get_repl())
-        repl->on_table_destroyed(this);
     m_alloc.bump_instance_version();
 }
 

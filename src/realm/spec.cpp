@@ -25,10 +25,6 @@ using namespace realm;
 
 Spec::~Spec() noexcept
 {
-    if (m_top.is_attached()) {
-        if (Replication* repl = m_top.get_alloc().get_replication())
-            repl->on_spec_destroyed(this);
-    }
 }
 
 void Spec::detach() noexcept
