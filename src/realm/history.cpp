@@ -49,6 +49,11 @@ public:
         m_changesets = nullptr;
     }
 
+    Allocator* get_alloc() const
+    {
+        return m_alloc;
+    }
+
     void set_group(Group* group)
     {
         m_group = group;
@@ -273,9 +278,16 @@ public:
         REALM_ASSERT(false);
     }
 
-    _impl::History* get_history() override
+    _impl::History* get_history_write() override
     {
         return &m_history;
+    }
+
+    std::unique_ptr<_impl::History> get_history_read() override
+    {
+        auto hist = std::make_unique<InRealmHistory>();
+        hist->initialize(m_history.get_alloc());
+        return std::move(hist);
     }
 
 private:

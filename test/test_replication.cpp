@@ -114,7 +114,12 @@ public:
         REALM_ASSERT(false);
     }
 
-    _impl::History* get_history() override
+    _impl::History* get_history_write() override
+    {
+        return nullptr;
+    }
+
+    std::unique_ptr<_impl::History> get_history_read() override
     {
         return nullptr;
     }

@@ -1883,7 +1883,7 @@ void Group::verify() const
 
     // Verify history if present
     if (Replication* repl = get_replication()) {
-        if (_impl::History* hist = repl->get_history()) {
+        if (auto hist = repl->get_history_read()) {
             _impl::History::version_type version = 0;
             int history_type = 0;
             int history_schema_version = 0;

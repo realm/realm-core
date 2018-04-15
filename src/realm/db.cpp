@@ -2012,7 +2012,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Group& group)
 
         // Allow for trimming of the history. Some types of histories do not
         // need store changesets prior to the oldest bound snapshot.
-        if (_impl::History* hist = get_history())
+        if (auto hist = get_history_write())
             hist->set_oldest_bound_version(oldest_version); // Throws
 
         // Cleanup any stale mappings

@@ -457,7 +457,8 @@ private:
     /// If there is an associated \ref Replication object, then this function
     /// returns `repl->get_history()` where `repl` is that Replication object,
     /// otherwise this function returns null.
-    _impl::History* get_history();
+    _impl::History* get_history_write();
+    std::unique_ptr<_impl::History> get_history_read();
 
     int get_file_format_version() const noexcept;
 
@@ -767,7 +768,7 @@ inline void Transaction::advance_read(O* observer, VersionID version_id)
     if (version_id.version < m_read_lock.m_version)
         throw LogicError(LogicError::bad_version);
 
-    _impl::History* hist = db->get_history(); // Throws
+    auto hist = db->get_history_read(); // Throws
     if (!hist)
         throw LogicError(LogicError::no_history);
 
@@ -780,7 +781,7 @@ inline void Transaction::promote_to_write(O* observer)
     if (m_transact_stage != DB::transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
-    _impl::History* hist = db->get_history(); // Throws
+    auto hist = db->get_history_read(); // Throws
     if (!hist)
         throw LogicError(LogicError::no_history);
 
@@ -915,11 +916,18 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     return true; // _impl::History::update_early_from_top_ref() was called
 }
 
-inline _impl::History* DB::get_history()
+inline _impl::History* DB::get_history_write()
 {
     if (Replication* repl = m_alloc.get_replication())
-        return repl->get_history();
+        return repl->get_history_write();
     return nullptr;
+}
+
+inline std::unique_ptr<_impl::History> DB::get_history_read()
+{
+    if (Replication* repl = m_alloc.get_replication())
+        return repl->get_history_read();
+    return {};
 }
 
 inline int DB::get_file_format_version() const noexcept

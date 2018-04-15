@@ -337,13 +337,22 @@ public:
     /// get_history_schema_version().
     virtual void upgrade_history_schema(int stored_schema_version) = 0;
 
+    /// Returns an object that gives access to the history of changesets
+    /// used by writers. All writers can share the same object as all write
+    /// transactions are serialized.
+    ///
+    /// This function must return null when, and only when get_history_type()
+    /// returns \ref hist_None.
+    virtual _impl::History* get_history_write() = 0;
+
     /// Returns an object that gives access to the history of changesets in a
-    /// way that allows for continuous transactions to work
+    /// way that allows for continuous transactions to work. All readers must
+    /// get their own exclusive object as readers are not blocking each other.
     /// (Group::advance_transact() in particular).
     ///
     /// This function must return null when, and only when get_history_type()
     /// returns \ref hist_None.
-    virtual _impl::History* get_history() = 0;
+    virtual std::unique_ptr<_impl::History> get_history_read() = 0;
 
     /// Returns false by default, but must return true if, and only if this
     /// history object represents a session participant that is a sync

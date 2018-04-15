@@ -84,8 +84,63 @@ class LangBindHelper {
 public:
 };
 
+class MyHistory : public _impl::History {
+public:
+    std::vector<char> m_incoming_changeset;
+    version_type m_incoming_version;
+    struct ChangeSet {
+        std::vector<char> changes;
+        bool finalized = false;
+    };
+    std::map<uint_fast64_t, ChangeSet> m_changesets;
 
-class ShortCircuitHistory : public TrivialReplication, public _impl::History {
+    void update_from_ref(ref_type, version_type) override
+    {
+        // No-op
+    }
+    version_type add_changeset(const char* data, size_t size, version_type orig_version)
+    {
+        m_incoming_changeset.assign(data, data + size); // Throws
+        version_type new_version = orig_version + 1;
+        m_incoming_version = new_version;
+        // Allocate space for the new changeset in m_changesets such that we can
+        // be sure no exception will be thrown whan adding the changeset in
+        // finalize_changeset().
+        m_changesets[new_version]; // Throws
+        return new_version;
+    }
+    void finalize()
+    {
+        // The following operation will not throw due to the space reservation
+        // carried out in prepare_new_changeset().
+        m_changesets[m_incoming_version].changes = std::move(m_incoming_changeset);
+        m_changesets[m_incoming_version].finalized = true;
+    }
+    void get_changesets(version_type begin_version, version_type end_version, BinaryIterator* buffer) const
+        noexcept override
+    {
+        size_t n = size_t(end_version - begin_version);
+        for (size_t i = 0; i < n; ++i) {
+            uint_fast64_t version = begin_version + i + 1;
+            auto j = m_changesets.find(version);
+            REALM_ASSERT(j != m_changesets.end());
+            const ChangeSet& changeset = j->second;
+            REALM_ASSERT(changeset.finalized); // Must have been finalized
+            buffer[i] = BinaryData(changeset.changes.data(), changeset.changes.size());
+        }
+    }
+    void set_oldest_bound_version(version_type) override
+    {
+        // No-op
+    }
+
+    void verify() const override
+    {
+        // No-op
+    }
+};
+
+class ShortCircuitHistory : public TrivialReplication {
 public:
     using version_type = _impl::History::version_type;
 
@@ -106,22 +161,12 @@ public:
 
     version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
     {
-        m_incoming_changeset = Buffer<char>(size); // Throws
-        std::copy(data, data + size, m_incoming_changeset.data());
-        version_type new_version = orig_version + 1;
-        m_incoming_version = new_version;
-        // Allocate space for the new changeset in m_changesets such that we can
-        // be sure no exception will be thrown whan adding the changeset in
-        // finalize_changeset().
-        m_changesets[new_version]; // Throws
-        return new_version;
+        return m_history.add_changeset(data, size, orig_version); // Throws
     }
 
     void finalize_changeset() noexcept override
     {
-        // The following operation will not throw due to the space reservation
-        // carried out in prepare_new_changeset().
-        m_changesets[m_incoming_version] = std::move(m_incoming_changeset);
+        m_history.finalize();
     }
 
     HistoryType get_history_type() const noexcept override
@@ -129,9 +174,16 @@ public:
         return hist_InRealm;
     }
 
-    _impl::History* get_history() override
+    _impl::History* get_history_write() override
     {
-        return this;
+        return &m_history;
+    }
+
+    std::unique_ptr<_impl::History> get_history_read() override
+    {
+        auto hist = std::make_unique<MyHistory>();
+        *hist = m_history;
+        return std::move(hist);
     }
 
     int get_history_schema_version() const noexcept override
@@ -150,39 +202,9 @@ public:
         REALM_ASSERT(false);
     }
 
-    void update_from_ref(ref_type, version_type) override
-    {
-        // No-op
-    }
-
-    void get_changesets(version_type begin_version, version_type end_version, BinaryIterator* buffer) const
-        noexcept override
-    {
-        size_t n = size_t(end_version - begin_version);
-        for (size_t i = 0; i < n; ++i) {
-            uint_fast64_t version = begin_version + i + 1;
-            auto j = m_changesets.find(version);
-            REALM_ASSERT(j != m_changesets.end());
-            const Buffer<char>& changeset = j->second;
-            REALM_ASSERT(changeset); // Must have been finalized
-            buffer[i] = BinaryData(changeset.data(), changeset.size());
-        }
-    }
-
-    void set_oldest_bound_version(version_type) override
-    {
-        // No-op
-    }
-
-    void verify() const override
-    {
-        // No-op
-    }
 
 private:
-    Buffer<char> m_incoming_changeset;
-    version_type m_incoming_version;
-    std::map<uint_fast64_t, Buffer<char>> m_changesets;
+    MyHistory m_history;
 };
 
 } // anonymous namespace
