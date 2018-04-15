@@ -1928,7 +1928,7 @@ DB::version_type Transaction::commit_and_continue_as_read()
     db->do_end_write();
 
     // Remap file if it has grown, and update refs in underlying node structure
-    remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, m_read_lock.m_version, false); // Throws
+    remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
 
     set_transact_stage(DB::transact_Reading);
 
@@ -2016,7 +2016,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Group& group)
             hist->set_oldest_bound_version(oldest_version); // Throws
 
         // Cleanup any stale mappings
-        m_alloc.purge_old_mappings(oldest_version);
+        m_alloc.purge_old_mappings(oldest_version, new_version);
     }
 
     // Do the actual commit
@@ -2166,7 +2166,7 @@ Transaction::Transaction(DB* _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::T
     m_transact_stage = DB::transact_Ready;
     set_metrics(db->m_metrics);
     set_transact_stage(stage);
-    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable, m_read_lock.m_version);
+    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable);
 }
 
 void Transaction::close()

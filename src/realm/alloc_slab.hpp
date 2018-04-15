@@ -288,11 +288,8 @@ public:
     /// The version parameter is subtly different from the mapping_version obtained
     /// by get_mapping_version() below. The mapping version changes whenever a
     /// ref->ptr translation changes, and is used by Group to enforce re-translation.
-    /// The version parameter, on the other hand, builds an association between
-    /// database transaction numbers and the delayed deletion of mappings. It is
-    /// used to drive deletion of old translations and old mappings at safe points.
-    void update_reader_view(size_t file_size, uint64_t version = 0);
-    void purge_old_mappings(uint64_t oldest_live_version);
+    void update_reader_view(size_t file_size);
+    void purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version);
 
     /// Get an ID for the current mapping version. This ID changes whenever any part
     /// of an existing mapping is changed. Such a change requires all refs to be
@@ -430,7 +427,7 @@ private:
 
     size_t m_fast_mapping_size = 0;
     uint64_t m_mapping_version = 1;
-    uint64_t m_current_transaction = 0;
+    uint64_t m_youngest_live_version = 1;
     std::mutex m_mapping_mutex;
     util::File m_file;
     // vectors where old mappings, are held from deletion to ensure mappings are

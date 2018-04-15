@@ -148,7 +148,7 @@ void SlabAlloc::detach() noexcept
     m_fast_mapping_ptr.store(nullptr);
     m_fast_mapping_size = 0;
     set_read_only(true);
-    purge_old_mappings(static_cast<uint64_t>(-1));
+    purge_old_mappings(static_cast<uint64_t>(-1), 0);
     switch (m_attach_mode) {
         case attach_None:
             break;
@@ -161,7 +161,7 @@ void SlabAlloc::detach() noexcept
         case attach_UnsharedFile:
             m_data = 0;
             m_mappings.clear();
-            m_current_transaction = 0;
+            m_youngest_live_version = 0;
             m_file.close();
             break;
         default:
@@ -987,14 +987,12 @@ inline bool randomly_false_in_debug(bool x)
 
   (FIXME: This is not implemented yet, goes as part of threading related changes)
  */
-void SlabAlloc::update_reader_view(size_t file_size, uint64_t version)
+void SlabAlloc::update_reader_view(size_t file_size)
 {
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
     if (file_size <= m_baseline) {
         return;
     }
-    REALM_ASSERT(version >= m_current_transaction);
-    m_current_transaction = version;
     REALM_ASSERT(file_size % 8 == 0); // 8-byte alignment required
     REALM_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     REALM_ASSERT_DEBUG(is_free_space_clean());
@@ -1019,7 +1017,7 @@ void SlabAlloc::update_reader_view(size_t file_size, uint64_t version)
                 size_t section_reservation = get_section_base(old_num_sections) - section_start_offset;
                 size_t section_size = m_baseline - section_start_offset;
                 // save the old mapping/keep it open
-                OldMapping oldie(version, m_mappings[old_num_sections - 1]);
+                OldMapping oldie(m_youngest_live_version, m_mappings[old_num_sections - 1]);
                 m_old_mappings.emplace_back(std::move(oldie));
                 m_mappings[old_num_sections - 1].reserve(m_file, File::access_ReadOnly, section_start_offset,
                                                          section_reservation);
@@ -1043,7 +1041,7 @@ void SlabAlloc::update_reader_view(size_t file_size, uint64_t version)
                     size_t section_size = old_slab_base - section_start_offset;
                     REALM_ASSERT(section_size == section_reservation);
                     // save the old mapping/keep it open
-                    OldMapping oldie(version, m_mappings[old_num_sections - 1]);
+                    OldMapping oldie(m_youngest_live_version, m_mappings[old_num_sections - 1]);
                     m_old_mappings.emplace_back(std::move(oldie));
                     m_mappings[old_num_sections - 1].map(m_file, File::access_ReadOnly, section_size);
                     m_mapping_version++;
@@ -1126,7 +1124,7 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
         new_fast_mapping[i] = m_fast_mapping_ptr[i];
     }
     OldFastMapping oldie;
-    oldie.replaced_at_version = m_current_transaction;
+    oldie.replaced_at_version = m_youngest_live_version;
     oldie.mappings = m_fast_mapping_ptr.load();
     m_old_fast_mappings.push_back(oldie);
 #if REALM_ENABLE_ENCRYPTION
@@ -1151,7 +1149,7 @@ void SlabAlloc::rebuild_fast_mapping(bool requires_new_fast_mapping)
         // we need a new mapping, but must preserve old, as translations using it
         // may be in progress concurrently
         OldFastMapping oldie;
-        oldie.replaced_at_version = m_current_transaction;
+        oldie.replaced_at_version = m_youngest_live_version;
         oldie.mappings = m_fast_mapping_ptr;
         m_old_fast_mappings.push_back(oldie);
         m_fast_mapping_size = num_mappings + free_space_size;
@@ -1175,7 +1173,7 @@ void SlabAlloc::rebuild_fast_mapping(bool requires_new_fast_mapping)
     m_fast_mapping_ptr = new_fast_mapping;
 }
 
-void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version)
+void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version)
 {
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
     for (size_t i = 0; i < m_old_mappings.size();) {
@@ -1201,6 +1199,7 @@ void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version)
         m_old_fast_mappings.pop_back();
         delete[] oldie.mappings;
     }
+    m_youngest_live_version = youngest_live_version;
 }
 
 

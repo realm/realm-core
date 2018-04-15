@@ -447,11 +447,11 @@ void Group::remap(size_t new_file_size)
 }
 
 
-void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, uint64_t new_version, bool writable)
+void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
     size_t old_baseline = m_alloc.get_baseline();
 
-    m_alloc.update_reader_view(new_file_size, new_version); // Throws
+    m_alloc.update_reader_view(new_file_size); // Throws
     update_allocator_wrappers(writable);
 
     // force update of all ref->ptr translations if the mapping has changed
@@ -549,13 +549,13 @@ void Group::update_num_objects()
 }
 
 
-void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint64_t new_version)
+void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
     REALM_ASSERT_3(new_top_ref, <, new_file_size);
     REALM_ASSERT(!is_attached());
 
     // update readers view of memory
-    m_alloc.update_reader_view(new_file_size, new_version); // Throws
+    m_alloc.update_reader_view(new_file_size); // Throws
     update_allocator_wrappers(writable);
 
     // When `new_top_ref` is null, ask attach() to create a new node structure
@@ -1644,8 +1644,7 @@ void Group::refresh_dirty_accessors()
 }
 
 
-void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in,
-                             uint64_t new_version, bool writable)
+void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in, bool writable)
 {
     REALM_ASSERT(is_attached());
     // REALM_ASSERT(false); // FIXME: accessor updates need to be handled differently
@@ -1703,7 +1702,10 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     // transaction logs.
     // Update memory mapping if database file has grown
 
-    m_alloc.update_reader_view(new_file_size, new_version); // Throws
+    // FIXME: When called from Transaction::internal_advance_read(), a previous
+    // call has already updated mappings and wrappers to the new state. By aligning
+    // other callers, we could remove the 2 calls below:
+    m_alloc.update_reader_view(new_file_size); // Throws
     update_allocator_wrappers(writable);
 
     // This is no longer needed in Core, but we need to compute "schema_changed",

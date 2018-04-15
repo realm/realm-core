@@ -839,7 +839,7 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
     ref_type top_ref = m_read_lock.m_top_ref;
     size_t file_size = m_read_lock.m_file_size;
     _impl::ReversedNoCopyInputStream reversed_in(reverser);
-    advance_transact(top_ref, file_size, reversed_in, m_read_lock.m_version, false); // Throws
+    advance_transact(top_ref, file_size, reversed_in, false); // Throws
 
     db->do_end_write();
 
@@ -857,6 +857,7 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     if (new_read_lock.m_version == m_read_lock.m_version) {
         db->release_read_lock(new_read_lock);
         // _impl::History::update_early_from_top_ref() was not called
+        // update allocator wrappers merely to update write protection
         update_allocator_wrappers(writable);
         return false;
     }
@@ -869,10 +870,10 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
 
         // Synchronize readers view of the file
         SlabAlloc& alloc = m_alloc;
-        alloc.update_reader_view(new_file_size, new_version);
-
+        alloc.update_reader_view(new_file_size);
+        update_allocator_wrappers(writable);
         using gf = _impl::GroupFriend;
-        remap(new_file_size); // Throws
+        // remap(new_file_size); // Throws
         ref_type hist_ref = gf::get_history_ref(alloc, new_top_ref);
 
         hist.update_from_ref(hist_ref, new_version);
@@ -905,9 +906,8 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
         ref_type new_top_ref = new_read_lock.m_top_ref;
         size_t new_file_size = new_read_lock.m_file_size;
         _impl::ChangesetInputStream in(hist, old_version, new_version);
-        advance_transact(new_top_ref, new_file_size, in, new_version, writable); // Throws
+        advance_transact(new_top_ref, new_file_size, in, writable); // Throws
     }
-
     g.release();
     db->release_read_lock(m_read_lock);
     m_read_lock = new_read_lock;
