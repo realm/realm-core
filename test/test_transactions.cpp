@@ -164,15 +164,17 @@ TEST(Transactions_StateChanges)
 
 namespace {
 
-void writer_thread(TestContext& test_context, int runs, DB* db, TableKey tk, ColKey ck1, ColKey ck2, ObjKey ok)
+void writer_thread(TestContext& test_context, int runs, DB* db, TableKey tk)
 {
     try {
         for (int n = 0; n < runs; ++n) {
             auto writer = db->start_write();
             // writer->verify();
-            auto obj = writer->get_table(tk)->get_object(ok);
-            int64_t a = obj.get<int64_t>(ck1);
-            int64_t b = obj.get<int64_t>(ck2);
+            auto table = writer->get_table(tk);
+            auto obj = table->get_object(0);
+            auto cols = table->get_col_keys();
+            int64_t a = obj.get<int64_t>(cols[0]);
+            int64_t b = obj.get<int64_t>(cols[1]);
             CHECK_EQUAL(a * a, b);
             obj.set_all(a + 1, (a + 1) * (a + 1));
             writer->commit();
@@ -189,15 +191,33 @@ void writer_thread(TestContext& test_context, int runs, DB* db, TableKey tk, Col
     }
 }
 
-void verifier_thread(TestContext& test_context, int limit, DB* db, TableKey tk, ColKey ck1, ColKey ck2, ObjKey ok)
+void verifier_thread(TestContext& test_context, int limit, DB* db, TableKey tk)
 {
     bool done = false;
     while (!done) {
         auto reader = db->start_read();
         // reader->verify();
-        auto obj = reader->get_table(tk)->get_object(ok);
-        int64_t a = obj.get<int64_t>(ck1);
-        int64_t b = obj.get<int64_t>(ck2);
+        auto table = reader->get_table(tk);
+        auto obj = table->get_object(0);
+        auto cols = table->get_col_keys();
+        int64_t a = obj.get<int64_t>(cols[0]);
+        int64_t b = obj.get<int64_t>(cols[1]);
+        CHECK_EQUAL(a * a, b);
+        done = (a >= limit);
+    }
+}
+
+void verifier_thread_advance(TestContext& test_context, int limit, DB* db, TableKey tk)
+{
+    auto reader = db->start_read();
+    bool done = false;
+    while (!done) {
+        reader->advance_read();
+        auto table = reader->get_table(tk);
+        auto obj = table->get_object(0);
+        auto cols = table->get_col_keys();
+        int64_t a = obj.get<int64_t>(cols[0]);
+        int64_t b = obj.get<int64_t>(cols[1]);
         CHECK_EQUAL(a * a, b);
         done = (a >= limit);
     }
@@ -210,27 +230,51 @@ TEST(Transactions_Threaded)
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DB db(*hist_w);
     TableKey tk;
-    ObjKey ok;
-    ColKey ck1;
-    ColKey ck2;
     {
         auto wt = db.start_write();
         auto table = wt->add_table("my_table");
-        auto col1 = table->add_column(type_Int, "my_col_1");
-        auto col2 = table->add_column(type_Int, "my_col_2");
-        auto obj = table->create_object().set_all(1, 1);
+        table->add_column(type_Int, "my_col_1");
+        table->add_column(type_Int, "my_col_2");
+        table->create_object().set_all(1, 1);
         tk = table->get_key();
-        ck1 = col1;
-        ck2 = col2;
-        ok = obj.get_key();
         wt->commit();
     }
     const int num_threads = 100;
     std::thread writers[num_threads];
     std::thread verifiers[num_threads];
     for (int i = 0; i < num_threads; ++i) {
-        verifiers[i] = std::thread([&] { verifier_thread(test_context, num_threads * 100, &db, tk, ck1, ck2, ok); });
-        writers[i] = std::thread([&] { writer_thread(test_context, 100, &db, tk, ck1, ck2, ok); });
+        verifiers[i] = std::thread([&] { verifier_thread(test_context, num_threads * 100, &db, tk); });
+        writers[i] = std::thread([&] { writer_thread(test_context, 100, &db, tk); });
+    }
+    for (int i = 0; i < num_threads; ++i) {
+        writers[i].join();
+        verifiers[i].join();
+    }
+}
+
+TEST(Transactions_ThreadedAdvanceRead)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db(*hist_w);
+    TableKey tk;
+    {
+        auto wt = db.start_write();
+        auto table = wt->add_table("my_table");
+        table->add_column(type_Int, "my_col_1");
+        table->add_column(type_Int, "my_col_2");
+        table->create_object().set_all(1, 1);
+        tk = table->get_key();
+        wt->commit();
+    }
+    const int num_threads = 20;
+    const int num_iterations = 100;
+    std::thread writers[num_threads];
+    std::thread verifiers[num_threads];
+    for (int i = 0; i < num_threads; ++i) {
+        verifiers[i] =
+            std::thread([&] { verifier_thread_advance(test_context, num_threads * num_iterations, &db, tk); });
+        writers[i] = std::thread([&] { writer_thread(test_context, num_iterations, &db, tk); });
     }
     for (int i = 0; i < num_threads; ++i) {
         writers[i].join();
