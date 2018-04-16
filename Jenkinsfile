@@ -39,6 +39,12 @@ jobWrapper {
               }
           }
 
+          releaseTesting = false;
+          if (['release'].contains(env.BRANCH_NAME)) {
+              releaseTesting = true;
+          }
+
+          echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
           echo "Publishing Run: ${gitTag ? 'yes' : 'no'}"
 
           if (['master'].contains(env.BRANCH_NAME)) {
@@ -48,31 +54,16 @@ jobWrapper {
           }
       }
 
-      stage('check') {
-          parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
-                               checkLinuxDebug     : doBuildInDocker('Debug'),
-                               buildMacOsDebug     : doBuildMacOs('Debug', true),
+      stage('Fastcheck') {
+          parallelExecutors = [checkLinuxDebug     : doBuildInDocker('Debug'),
                                buildMacOsRelease   : doBuildMacOs('Release', false),
                                buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
-                               buildWin32Release   : doBuildWindows('Release', false, 'Win32'),
-                               buildWin64Debug     : doBuildWindows('Debug', false, 'x64'),
                                buildWin64Release   : doBuildWindows('Release', false, 'x64'),
-                               buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
-                               buildUwpWin32Release: doBuildWindows('Release', true, 'Win32'),
-                               buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
-                               buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
-                               buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
-                               buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
-                               // FIXME packageGeneric      : doBuildPackage('generic', 'tgz'),
-                               // FIXME packageCentos7      : doBuildPackage('centos-7', 'rpm'),
-                               // FIXME packageCentos6      : doBuildPackage('centos-6', 'rpm'),
-                               // FIXME packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
                                threadSanitizer     : doBuildInDocker('Debug', 'thread'),
                                addressSanitizer    : doBuildInDocker('Debug', 'address'),
-                               coverage            : doBuildCoverage()
               ]
 
-          androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
+          androidAbis = ['arm64-v8a']
           androidBuildTypes = ['Debug', 'Release']
 
           for (def i = 0; i < androidAbis.size(); i++) {
@@ -83,20 +74,61 @@ jobWrapper {
               }
           }
 
-          appleSdks = ['ios', 'tvos', 'watchos']
-          appleBuildTypes = ['MinSizeDebug', 'Release']
-
-          for (def i = 0; i < appleSdks.size(); i++) {
-              def sdk = appleSdks[i]
-              for (def j = 0; j < appleBuildTypes.size(); j++) {
-                  def buildType = appleBuildTypes[j]
-                  parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
-              }
-          }
-          if (env.CHANGE_TARGET) {
-              parallelExecutors['performance'] = buildPerformance()
-          }
           parallel parallelExecutors
+      }
+
+      if (releaseTesting) {
+          stage('Extendedcheck') {
+              parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
+                                   buildMacOsDebug     : doBuildMacOs('Debug', true),
+                                   buildWin32Release   : doBuildWindows('Release', false, 'Win32'),
+                                   buildWin64Debug     : doBuildWindows('Debug', false, 'x64'),
+                                   buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
+                                   buildUwpWin32Release: doBuildWindows('Release', true, 'Win32'),
+                                   buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
+                                   buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
+                                   buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
+                                   buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
+                                   coverage            : doBuildCoverage()
+                  ]
+
+              androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64']
+              androidBuildTypes = ['Debug', 'Release']
+
+              for (def i = 0; i < androidAbis.size(); i++) {
+                  def abi = androidAbis[i]
+                  for (def j = 0; j < androidBuildTypes.size(); j++) {
+                      def buildType = androidBuildTypes[j]
+                      parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Release')
+                  }
+              }
+
+              appleSdks = ['ios', 'tvos', 'watchos']
+              appleBuildTypes = ['MinSizeDebug', 'Release']
+
+              for (def i = 0; i < appleSdks.size(); i++) {
+                  def sdk = appleSdks[i]
+                  for (def j = 0; j < appleBuildTypes.size(); j++) {
+                      def buildType = appleBuildTypes[j]
+                      parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
+                  }
+              }
+              if (env.CHANGE_TARGET) {
+                  parallelExecutors['performance'] = buildPerformance()
+              }
+              parallel parallelExecutors
+          }
+      }
+
+      if (gitTag) {
+          stage('Package') {
+              parallel(
+                  packageGeneric      : doBuildPackage('generic', 'tgz'),
+                  packageCentos7      : doBuildPackage('centos-7', 'rpm'),
+                  packageCentos6      : doBuildPackage('centos-6', 'rpm'),
+                  packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
+              )
+          }
       }
 
       stage('Aggregate') {

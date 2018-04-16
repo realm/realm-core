@@ -43,6 +43,7 @@ using namespace std::chrono;
 #include "test_table_helper.hpp"
 
 // #include <valgrind/callgrind.h>
+// #define PERFORMACE_TESTING
 
 using namespace realm;
 using namespace realm::util;
@@ -2994,12 +2995,12 @@ TEST(Table_QuickSort2)
 
 TEST(Table_object_sequential)
 {
-#ifdef REALM_DEBUG
-    int nb_rows = 10000;
-    int num_runs = 10;
-#else
+#ifdef PERFORMACE_TESTING
     int nb_rows = 100000;
     int num_runs = 100;
+#else
+    int nb_rows = 1024;
+    int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
     DB sg(path);
@@ -3136,12 +3137,12 @@ TEST(Table_object_sequential)
 
 TEST(Table_object_seq_rnd)
 {
-#ifdef REALM_DEBUG
-    size_t rows = 50000;
-    int runs = 20;
-#else
+#ifdef PERFORMACE_TESTING
     size_t rows = 100000;
     int runs = 100;     // runs for building scenario
+#else
+    size_t rows = 50000;
+    int runs = 1;
 #endif
     int64_t next_key = 0;
     std::vector<int64_t> key_values;
@@ -3178,10 +3179,10 @@ TEST(Table_object_seq_rnd)
     }
     // scenario established!
     int nb_rows = int(key_values.size());
-#ifdef REALM_DEBUG
-    int num_runs = 1; // runs for timing access
-#else
+#ifdef PERFORMACE_TESTING
     int num_runs = 100; // runs for timing access
+#else
+    int num_runs = 1; // runs for timing access
 #endif
     std::cout << "Scenario has " << nb_rows << " rows. Timing...." << std::endl;
     {
@@ -3245,12 +3246,12 @@ TEST(Table_object_seq_rnd)
 
 TEST(Table_object_random)
 {
-#ifdef REALM_DEBUG
-    int nb_rows = 10000;
-    int num_runs = 10;
-#else
+#ifdef PERFORMACE_TESTING
     int nb_rows = 100000;
     int num_runs = 100;
+#else
+    int nb_rows = 1024;
+    int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
     DB sg(path);
