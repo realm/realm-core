@@ -438,7 +438,7 @@ private:
     // versioning information for later deletion - 'requires_new_fast_mapping' must be
     // true if there are changes to entries among the existing mappings. Must be called
     // with m_mapping_mutex locked.
-    void rebuild_fast_mapping(bool requires_new_fast_mapping);
+    void rebuild_fast_mapping(bool requires_new_fast_mapping, size_t old_num_sections);
     // Add a translation covering a new section in the slab area. The translation is always
     // added at the end.
     void extend_fast_mapping_with_slab(char* address);

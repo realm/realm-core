@@ -151,7 +151,7 @@ public:
 protected:
     constexpr static int section_shift = 26;
 
-    size_t m_baseline = 0; // Separation line between immutable and mutable refs.
+    std::atomic<size_t> m_baseline; // Separation line between immutable and mutable refs.
 
     Replication* m_replication = nullptr;
     ref_type m_debug_watch = 0;
@@ -271,7 +271,7 @@ public:
     WrappedAllocator(Allocator& underlying_allocator)
         : m_alloc(&underlying_allocator)
     {
-        m_baseline = m_alloc->m_baseline;
+        m_baseline.store(m_alloc->m_baseline);
         m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
         m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
@@ -284,7 +284,7 @@ public:
     void switch_underlying_allocator(Allocator& underlying_allocator)
     {
         m_alloc = &underlying_allocator;
-        m_baseline = m_alloc->m_baseline;
+        m_baseline.store(m_alloc->m_baseline);
         m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
         m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
@@ -302,7 +302,7 @@ private:
     {
         auto result = m_alloc->do_alloc(size);
         bump_storage_version();
-        m_baseline = m_alloc->m_baseline;
+        m_baseline.store(m_alloc->m_baseline);
         m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
         return result;
     }
@@ -310,7 +310,7 @@ private:
     {
         auto result = m_alloc->do_realloc(ref, addr, old_size, new_size);
         bump_storage_version();
-        m_baseline = m_alloc->m_baseline;
+        m_baseline.store(m_alloc->m_baseline);
         m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
         return result;
     }
