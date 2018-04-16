@@ -97,7 +97,7 @@ ObjList::ObjList(KeyColumn& key_values, const Table* parent)
 {
 }
 
-ConstObj ObjList::get(size_t row_ndx) const
+ConstObj ObjList::get_object(size_t row_ndx) const
 {
     REALM_ASSERT(m_table);
     REALM_ASSERT(row_ndx < m_key_values.size());

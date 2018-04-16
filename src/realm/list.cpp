@@ -155,16 +155,9 @@ template List<Timestamp>::List(const Obj& obj, ColKey col_key);
 template List<ObjKey>::List(const Obj& obj, ColKey col_key);
 }
 
-ConstObj ConstLinkListIf::get(size_t link_ndx) const
+ConstObj ConstLinkListIf::get_object(size_t link_ndx) const
 {
     return m_const_obj->get_target_table(m_col_key)->get_object(ConstListIf<ObjKey>::get(link_ndx));
-}
-
-/********************************* LinkList **********************************/
-
-Obj LinkList::get(size_t link_ndx)
-{
-    return get_target_table().get_object(List<ObjKey>::get(link_ndx));
 }
 
 /********************************* List<Key> *********************************/
@@ -279,7 +272,8 @@ void LinkList::remove_target_row(size_t link_ndx)
 {
     // Deleting the object will automatically remove all links
     // to it. So we do not have to manually remove the deleted link
-    get(link_ndx).remove();
+    auto key = List<ObjKey>::get(link_ndx);
+    const_cast<Table*>(get_table())->remove_object(key);
 }
 
 void LinkList::remove_all_target_rows()

@@ -917,7 +917,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
         }
         else {
             for (size_t t = 0; t < m_view->size(); t++) {
-                ConstObj obj = m_view->get(t);
+                ConstObj obj = m_view->get_object(t);
                 if (eval_object(obj)) {
                     st.template match<action, false>(size_t(obj.get_key().value), 0, obj.get<T>(column_key));
                 }
@@ -1227,7 +1227,7 @@ ObjKey Query::find()
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t i = 0; i < sz; i++) {
-            ConstObj obj = m_view->get(i);
+            ConstObj obj = m_view->get_object(i);
             if (eval_object(obj)) {
                 return obj.get_key();
             }
@@ -1270,7 +1270,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t t = 0; t < sz && ret.size() < limit; t++) {
-            ConstObj obj = m_view->get(t);
+            ConstObj obj = m_view->get_object(t);
             if (t >= begin && t < end && eval_object(obj)) {
                 ret.m_key_values.add(obj.get_key());
             }
@@ -1367,7 +1367,7 @@ size_t Query::count() const
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t t = 0; t < sz; t++) {
-            ConstObj obj = m_view->get(t);
+            ConstObj obj = m_view->get_object(t);
             if (eval_object(obj)) {
                 cnt++;
             }

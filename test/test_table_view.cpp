@@ -1959,7 +1959,7 @@ struct DistinctDirect {
 
     StringData get_string(const TableView& tv, ColKey col, size_t row) const
     {
-        return tv.ConstTableView::get(row).get<String>(col);
+        return tv.ConstTableView::get_object(row).get<String>(col);
     }
 
     TableView find_all() const
@@ -1995,12 +1995,12 @@ struct DistinctOverLink {
 
     ObjKey get_key(const TableView& tv, size_t ndx) const
     {
-        return tv.ConstTableView::get(ndx).get<ObjKey>(m_col_link);
+        return tv.ConstTableView::get_object(ndx).get<ObjKey>(m_col_link);
     }
 
     StringData get_string(const TableView& tv, ColKey col, size_t ndx) const
     {
-        return tv.ConstTableView::get(ndx).get_linked_object(m_col_link).get<String>(col);
+        return tv.ConstTableView::get_object(ndx).get_linked_object(m_col_link).get<String>(col);
     }
 
     TableView find_all() const

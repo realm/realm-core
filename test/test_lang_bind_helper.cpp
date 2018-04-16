@@ -9676,21 +9676,21 @@ TEST(LangBindHelper_HandoverAccessors)
         CHECK(tv2->is_in_sync());
         CHECK_EQUAL(100, tv2->size());
         for (int i = 0; i < 100; ++i)
-            CHECK_EQUAL(i, tv2->get(i).get<Int>(col));
+            CHECK_EQUAL(i, tv2->get_object(i).get<Int>(col));
         // importing one without payload:
         CHECK(tv3->is_attached());
         CHECK(!tv3->is_in_sync());
         tv3->sync_if_needed();
         CHECK_EQUAL(100, tv3->size());
         for (int i = 0; i < 100; ++i)
-            CHECK_EQUAL(i, tv3->get(i).get<Int>(col));
+            CHECK_EQUAL(i, tv3->get_object(i).get<Int>(col));
 
         // one with payload:
         CHECK(tv4->is_attached());
         CHECK(tv4->is_in_sync());
         CHECK_EQUAL(100, tv4->size());
         for (int i = 0; i < 100; ++i)
-            CHECK_EQUAL(i, tv4->get(i).get<Int>(col));
+            CHECK_EQUAL(i, tv4->get_object(i).get<Int>(col));
 
         // verify that subsequent imports are all without payload:
         CHECK(tv5->is_attached());

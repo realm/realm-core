@@ -677,12 +677,12 @@ TEST(Replication_Links)
         CHECK_NOT(o_1_0.is_null(o_1_ll_1));
         CHECK_EQUAL(0, o_1_0.get_linklist(o_1_ll_1).size());
         CHECK_EQUAL(1, o_1_1.get_linklist(o_1_ll_1).size());
-        CHECK_EQUAL(target_1_keys[0], o_1_1.get_linklist(o_1_ll_1).get(0).get_key());
+        CHECK_EQUAL(target_1_keys[0], o_1_1.get_linklist(o_1_ll_1).get(0));
         CHECK_EQUAL(1, o_2_0.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[1], o_2_0.get_linklist(o_2_ll_3).get(0).get_key());
+        CHECK_EQUAL(target_2_keys[1], o_2_0.get_linklist(o_2_ll_3).get(0));
         CHECK_EQUAL(2, o_2_1.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[0], o_2_1.get_linklist(o_2_ll_3).get(0).get_key());
-        CHECK_EQUAL(target_2_keys[1], o_2_1.get_linklist(o_2_ll_3).get(1).get_key());
+        CHECK_EQUAL(target_2_keys[0], o_2_1.get_linklist(o_2_ll_3).get(0));
+        CHECK_EQUAL(target_2_keys[1], o_2_1.get_linklist(o_2_ll_3).get(1));
 
         ConstObj t_1_0 = target_1->get_object(target_1_keys[0]);
         ConstObj t_1_1 = target_1->get_object(target_1_keys[1]);
@@ -835,12 +835,12 @@ TEST(Replication_Links)
 
         ConstObj o_2_1 = origin_2->get_object(origin_2_keys[1]);
         CHECK_EQUAL(1, o_2_1.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[1], o_2_1.get_linklist(o_2_ll_3).get(0).get_key());
+        CHECK_EQUAL(target_2_keys[1], o_2_1.get_linklist(o_2_ll_3).get(0));
 
         ConstObj o_2_2 = origin_2->get_object(origin_2_keys[2]);
         CHECK_EQUAL(2, o_2_2.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[0], o_2_2.get_linklist(o_2_ll_3).get(0).get_key());
-        CHECK_EQUAL(target_2_keys[1], o_2_2.get_linklist(o_2_ll_3).get(1).get_key());
+        CHECK_EQUAL(target_2_keys[0], o_2_2.get_linklist(o_2_ll_3).get(0));
+        CHECK_EQUAL(target_2_keys[1], o_2_2.get_linklist(o_2_ll_3).get(1));
 
         ConstObj t_2_0 = target_2->get_object(target_2_keys[0]);
         ConstObj t_2_1 = target_2->get_object(target_2_keys[1]);
@@ -933,8 +933,8 @@ TEST(Replication_Links)
 
         ConstObj o_2_2 = origin_2->get_object(origin_2_keys[2]);
         CHECK_EQUAL(2, o_2_2.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[1], o_2_2.get_linklist(o_2_ll_3).get(0).get_key());
-        CHECK_EQUAL(target_2_keys[0], o_2_2.get_linklist(o_2_ll_3).get(1).get_key());
+        CHECK_EQUAL(target_2_keys[1], o_2_2.get_linklist(o_2_ll_3).get(0));
+        CHECK_EQUAL(target_2_keys[0], o_2_2.get_linklist(o_2_ll_3).get(1));
 
         ConstObj t_1_0 = target_1->get_object(target_1_keys[0]);
         ConstObj t_2_0 = target_2->get_object(target_2_keys[0]);
@@ -985,8 +985,8 @@ TEST(Replication_Links)
 
         ConstObj o_2_2 = origin_2->get_object(origin_2_keys[2]);
         CHECK_EQUAL(2, o_2_2.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[0], o_2_2.get_linklist(o_2_ll_3).get(0).get_key());
-        CHECK_EQUAL(target_2_keys[1], o_2_2.get_linklist(o_2_ll_3).get(1).get_key());
+        CHECK_EQUAL(target_2_keys[0], o_2_2.get_linklist(o_2_ll_3).get(0));
+        CHECK_EQUAL(target_2_keys[1], o_2_2.get_linklist(o_2_ll_3).get(1));
 
         ConstObj t_1_0 = target_1->get_object(target_1_keys[0]);
         ConstObj t_2_0 = target_2->get_object(target_2_keys[0]);

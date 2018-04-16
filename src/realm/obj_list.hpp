@@ -52,19 +52,19 @@ public:
     // Get key for object this view is "looking" at.
     ObjKey get_key(size_t ndx) const;
 
-    ConstObj get(size_t row_ndx) const;
+    ConstObj get_object(size_t row_ndx) const;
     ConstObj front() const noexcept
     {
-        return get(0);
+        return get_object(0);
     }
     ConstObj back() const noexcept
     {
         size_t last_row_ndx = size() - 1;
-        return get(last_row_ndx);
+        return get_object(last_row_ndx);
     }
     ConstObj operator[](size_t row_ndx) const noexcept
     {
-        return get(row_ndx);
+        return get_object(row_ndx);
     }
 
     template <class F>
@@ -108,7 +108,7 @@ void ObjList::for_each(F func) const
     auto sz = size();
     for (size_t i = 0; i < sz; i++) {
         try {
-            ConstObj o = get(i);
+            ConstObj o = get_object(i);
             if (func(o))
                 return;
         }

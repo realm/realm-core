@@ -550,9 +550,9 @@ public:
     // Getting links
     ConstObj operator[](size_t link_ndx) const
     {
-        return get(link_ndx);
+        return get_object(link_ndx);
     }
-    ConstObj get(size_t link_ndx) const;
+    ConstObj get_object(size_t link_ndx) const;
 
 protected:
     ConstLinkListIf(ColKey col_key, Allocator& alloc)
@@ -609,12 +609,8 @@ public:
     {
         return List<ObjKey>::size();
     }
-    // Getting links
-    Obj operator[](size_t link_ndx)
-    {
-        return get(link_ndx);
-    }
-    Obj get(size_t link_ndx);
+
+    using ObjList::operator[];
 
     TableView get_sorted_view(SortDescriptor order) const;
     TableView get_sorted_view(ColKey column_key, bool ascending = true) const;
