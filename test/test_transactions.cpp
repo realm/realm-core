@@ -239,7 +239,7 @@ TEST(Transactions_Threaded)
         tk = table->get_key();
         wt->commit();
     }
-    const int num_threads = 100;
+    const int num_threads = 20;
     std::thread writers[num_threads];
     std::thread verifiers[num_threads];
     for (int i = 0; i < num_threads; ++i) {
