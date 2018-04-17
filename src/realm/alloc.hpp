@@ -115,9 +115,9 @@ public:
     /// this interface.
     bool is_read_only(ref_type) const noexcept;
 
-    void set_read_only(bool is_read_only)
+    void set_read_only(bool ro)
     {
-        m_is_read_only = is_read_only;
+        m_is_read_only = ro;
     }
     /// Returns a simple allocator that can be used with free-standing
     /// Realm objects (such as a free-standing table). A

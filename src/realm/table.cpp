@@ -1066,7 +1066,7 @@ void copy_column_backlink(ClusterTree& clusters, size_t col_ndx, ref_type col_re
                 }
                 else {
                     // This is a list - just clone the list
-                    MemRef mem(v, allocator);
+                    MemRef mem(to_ref(v), allocator);
                     MemRef copy_mem = Array::clone(mem, allocator, allocator); // Throws
                     arr.set_as_ref(i, copy_mem.get_ref());
                 }
