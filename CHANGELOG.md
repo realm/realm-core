@@ -6,17 +6,52 @@
 
 ### Breaking changes
 
-* None.
+* SharedGroup class removed. New DB class added allowing you to specify the Realm file
+  only once regardless of the number of threads.
+* New Transaction class added, inheriting from Group. Transactions are produced by DB.
+* TransactionRef added to provide reference to a Transaction. This is a std::shared_ptr.
+* Old export_for_handover/import_from_handover has been removed. Handover is now direct
+  from one transaction to another, using a new method Transaction::import_copy_of().
+* 'begin' argument removed from Query::count();
+* Table::optimize replaced with explicit Table::enumerate_string_column. It will enumerate
+  column unconditionally.
+* TableView::num_attached_rows() no longer available. get(), front, back()... and similar
+  functions will throw `InvalidKey` if the referenced object has been deleted.
+* Removed the ability to sort a linklist according to some property of the target table. This
+  operation is not supported by the sync protocol and allegedly not used in the bindings.
+* Moved `get_uncommitted_changes()` from `History` class to `Replication` class. This removes the
+  need to call TrivialReplication::get_uncommitted_changes from a decendant of History.
+* Column identifier changed from size_t to ColKey. This identifier is subsequently
+  used when accessing/mutating the data and when making queries.
+* Table identifiers changed from size_t to TableKey.
+* Row interface on Table removed. All access to data goes through the new Obj
+  interface. Obj objects are created with an ObjKey identifier, which subsequently
+  is used to get access to and optionally delete the object.
+* Support for sub-tables removed. The feature was only used to implement support for
+  array-of-primitives. This is now implemented by a more specific List class.
+* Descriptor class removed. No longer needed as we don't have sub-tables.
+* Mixed column no longer supported. Will be revived at a later point in time.
+* LinkView is replaced by the more general list interface
+* Limiting parameters removed from Query aggregate functions (start, end, limit)
+* Table::get_range_view() has been removed.
+* Table::merge_rows() not supported. Not needed anymore.
+* Ref-counted freestanding tables can no longer be created (by Table::create)
+* OldDateTime is no longer supported
+* An old database cannot be opened without being updated to the new file version.
+  This implies that an old database cannot be opened in read-only, as read-only
+  prevents updating.
+* Only file format versions from 6 and onwards can be opened (realm core v2.0.0)
 
 ### Enhancements
 
-* None.
+* None. Or see below.
 
 -----------
 
 ### Internals
 
-* None.
+* Major simplifications and optimizations to management of memory mappings.
+* Speed improvement for Sort().
 
 ----------------------------------------------
 
@@ -72,6 +107,8 @@
   PR [#3002](https://github.com/realm/realm-core/pull/3002).
 * Assertions will print more information in relase mode.
   PR [#2982](https://github.com/realm/realm-core/pull/2982).
+:
+(xed:22928): Gtk-WARNING **: Calling Inhibit failed: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.gnome.SessionManager was not provided by any .service files
 
 ----------------------------------------------
 

@@ -75,22 +75,22 @@ fpm \
     /lib64/librealm-parser.a=/usr/lib64/librealm-parser.a \
     /bin/realm-config=/usr/bin/realm-config
 
-fpm \
-    -t rpm \
-    -s dir \
-    -n realm-utils \
-    --rpm-dist el6 \
-    --license "Apache 2.0" \
-    --version "${VERSION}" \
-    --iteration "${ITERATION}" \
-    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
-    --url "https://realm.io" \
-    --category "System Environment/Libraries" \
-    --vendor "Realm" \
-    --maintainer "Realm <help@realm.io>" \
-    -d "realm = ${VERSION}-${ITERATION}.el6" \
-    -C "/prod" \
-    /bin/realm-importer=/usr/bin/realm-importer
+#fpm \
+#    -t rpm \
+#    -s dir \
+#    -n realm-utils \
+#    --rpm-dist el6 \
+#    --license "Apache 2.0" \
+#    --version "${VERSION}" \
+#    --iteration "${ITERATION}" \
+#    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
+#    --url "https://realm.io" \
+#    --category "System Environment/Libraries" \
+#    --vendor "Realm" \
+#    --maintainer "Realm <help@realm.io>" \
+#    -d "realm = ${VERSION}-${ITERATION}.el6" \
+#    -C "/prod" \
+#    /bin/realm-importer=/usr/bin/realm-importer
 )
 
 

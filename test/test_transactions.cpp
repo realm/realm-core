@@ -25,11 +25,11 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <thread>
 
 #include <realm/history.hpp>
-#include <realm/lang_bind_helper.hpp>
 #include <realm/util/file.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 
 #include "util/crypt_key.hpp"
 #include "util/thread_wrapper.hpp"
@@ -72,7 +72,249 @@ using realm::test_util::crypt_key;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+TEST(Transactions_LargeMappingChange)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DB sg(path);
+    int data_size = 12 * 1024 * 1024;
+    {
+        TransactionRef g = sg.start_write();
+        TableRef tr = g->add_table("test");
+        auto col = tr->add_column(type_Binary, "binary");
+        char* data = new char[data_size];
+        for (int i = 0; i < data_size; i += 721) {
+            data[i] = i & 0xFF;
+        }
+        for (int i = 0; i < 20; ++i) {
+            auto obj = tr->create_object();
+            obj.set(col, BinaryData(data, data_size));
+            auto data2 = obj.get<BinaryData>(col);
+            for (int k = 0; k < data_size; k += 721) {
+                const char* p = data2.data();
+                CHECK_EQUAL((p[k] & 0xFF), (k & 0xFF));
+            }
+        }
+        delete[] data;
+        g->commit();
+    }
+    {
+        TransactionRef g = sg.start_read();
+        ConstTableRef tr = g->get_table("test");
+        auto col = tr->get_column_key("binary");
+        for (auto it = tr->begin(); it != tr->end(); ++it) {
+            auto data = it->get<BinaryData>(col);
+            for (int i = 0; i < data_size; i += 721) {
+                const char* p = data.data();
+                CHECK_EQUAL((p[i] & 0xFF), (i & 0xFF));
+            }
+        }
+    }
+}
 
+TEST(Transactions_StateChanges)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db(*hist_w);
+    TransactionRef writer = db.start_write();
+    TableRef tr = writer->add_table("hygge");
+    auto col = tr->add_column(type_Int, "hejsa");
+    auto lcol = tr->add_column_list(type_Int, "gurgle");
+    auto obj = tr->create_object().set_all(45);
+    List<int64_t> list = obj.get_list<int64_t>(lcol);
+    list.add(5);
+    list.add(7);
+    // verify that we cannot freeze a write transaction
+    CHECK_THROW(writer->freeze(), realm::LogicError);
+    writer->commit_and_continue_as_read();
+    // verify that we cannot modify data in a read transaction
+    // FIXME: Checks are not applied at group level yet.
+    // CHECK_THROW(writer->add_table("gylle"), realm::LogicError);
+    CHECK_THROW(obj.set(col, 100), realm::LogicError);
+    // verify that we can freeze a read transaction
+    TransactionRef frozen = writer->freeze();
+    // verify that we can handover an accessor directly to the frozen transaction.
+    auto frozen_obj = frozen->import_copy_of(obj);
+    // verify that we can read the correct value(s)
+    int64_t val = frozen_obj.get<int64_t>(col);
+    CHECK_EQUAL(45, val);
+    // FIXME: Why does  this cause a write?
+    auto list2 = frozen_obj.get_list<int64_t>(lcol);
+    CHECK_EQUAL(list2.get(0), 5);
+    CHECK_EQUAL(list2.get(1), 7);
+    // verify that we can't change it
+    CHECK_THROW(frozen_obj.set<int64_t>(col, 47), realm::LogicError);
+    // verify handover of a list
+    // FIXME: no change should be needed here
+    auto frozen_list = frozen->import_copy_of(list);
+    CHECK_EQUAL(frozen_list.get(0), 5);
+    CHECK_EQUAL(frozen_list.get(1), 7);
+
+    // verify that a fresh read transaction is read only
+    TransactionRef reader = db.start_read();
+    tr = reader->get_table("hygge");
+    CHECK_THROW(tr->create_object(), realm::LogicError);
+    // ..but if promoted, becomes writable
+    reader->promote_to_write();
+    tr->create_object();
+    // ..and if rolled back, becomes read-only again
+    reader->rollback_and_continue_as_read();
+    CHECK_THROW(tr->create_object(), realm::LogicError);
+}
+
+namespace {
+
+void writer_thread(TestContext& test_context, int runs, DB* db, TableKey tk)
+{
+    try {
+        for (int n = 0; n < runs; ++n) {
+            auto writer = db->start_write();
+            // writer->verify();
+            auto table = writer->get_table(tk);
+            auto obj = table->get_object(0);
+            auto cols = table->get_col_keys();
+            int64_t a = obj.get<int64_t>(cols[0]);
+            int64_t b = obj.get<int64_t>(cols[1]);
+            CHECK_EQUAL(a * a, b);
+            obj.set_all(a + 1, (a + 1) * (a + 1));
+            writer->commit();
+        }
+    }
+    catch (std::runtime_error& e) {
+        std::cout << "gylle: " << e.what() << std::endl;
+    }
+    catch (realm::LogicError& e) {
+        std::cout << "gylle2: " << e.what() << std::endl;
+    }
+    catch (...) {
+        std::cout << "VERY GYLLE" << std::endl;
+    }
+}
+
+void verifier_thread(TestContext& test_context, int limit, DB* db, TableKey tk)
+{
+    bool done = false;
+    while (!done) {
+        auto reader = db->start_read();
+        // reader->verify();
+        auto table = reader->get_table(tk);
+        auto obj = table->get_object(0);
+        auto cols = table->get_col_keys();
+        int64_t a = obj.get<int64_t>(cols[0]);
+        int64_t b = obj.get<int64_t>(cols[1]);
+        CHECK_EQUAL(a * a, b);
+        done = (a >= limit);
+    }
+}
+
+void verifier_thread_advance(TestContext& test_context, int limit, DB* db, TableKey tk)
+{
+    auto reader = db->start_read();
+    bool done = false;
+    while (!done) {
+        reader->advance_read();
+        auto table = reader->get_table(tk);
+        auto obj = table->get_object(0);
+        auto cols = table->get_col_keys();
+        int64_t a = obj.get<int64_t>(cols[0]);
+        int64_t b = obj.get<int64_t>(cols[1]);
+        CHECK_EQUAL(a * a, b);
+        done = (a >= limit);
+    }
+}
+}
+
+TEST(Transactions_Threaded)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db(*hist_w);
+    TableKey tk;
+    {
+        auto wt = db.start_write();
+        auto table = wt->add_table("my_table");
+        table->add_column(type_Int, "my_col_1");
+        table->add_column(type_Int, "my_col_2");
+        table->create_object().set_all(1, 1);
+        tk = table->get_key();
+        wt->commit();
+    }
+    const int num_threads = 20;
+    std::thread writers[num_threads];
+    std::thread verifiers[num_threads];
+    for (int i = 0; i < num_threads; ++i) {
+        verifiers[i] = std::thread([&] { verifier_thread(test_context, num_threads * 100, &db, tk); });
+        writers[i] = std::thread([&] { writer_thread(test_context, 100, &db, tk); });
+    }
+    for (int i = 0; i < num_threads; ++i) {
+        writers[i].join();
+        verifiers[i].join();
+    }
+}
+
+TEST(Transactions_ThreadedAdvanceRead)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db(*hist_w);
+    TableKey tk;
+    {
+        auto wt = db.start_write();
+        auto table = wt->add_table("my_table");
+        table->add_column(type_Int, "my_col_1");
+        table->add_column(type_Int, "my_col_2");
+        table->create_object().set_all(1, 1);
+        tk = table->get_key();
+        wt->commit();
+    }
+    const int num_threads = 20;
+    const int num_iterations = 100;
+    std::thread writers[num_threads];
+    std::thread verifiers[num_threads];
+    for (int i = 0; i < num_threads; ++i) {
+        verifiers[i] =
+            std::thread([&] { verifier_thread_advance(test_context, num_threads * num_iterations, &db, tk); });
+        writers[i] = std::thread([&] { writer_thread(test_context, num_iterations, &db, tk); });
+    }
+    for (int i = 0; i < num_threads; ++i) {
+        writers[i].join();
+        verifiers[i].join();
+    }
+}
+
+TEST(Transactions_ListOfBinary)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DB db(path);
+    {
+        auto wt = db.start_write();
+        auto table = wt->add_table("my_table");
+        table->add_column_list(type_Binary, "list");
+        table->create_object();
+        wt->commit();
+    }
+    for (int iter = 0; iter < 1000; iter++) {
+        auto wt = db.start_write();
+        wt->verify();
+        auto table = wt->get_table("my_table");
+        auto col1 = table->get_column_key("list");
+        Obj obj = table->get_object(0);
+        auto list = obj.get_list<Binary>(col1);
+        std::string bin(15, 'z');
+        list.add(BinaryData(bin.data(), 15));
+        if (fastrand(100) < 5) {
+            size_t sz = list.size();
+            for (size_t i = 0; i < sz - 1; i++) {
+                list.remove(0);
+            }
+        }
+        wt->commit();
+        auto rt = db.start_read();
+        rt->verify();
+    }
+}
+
+#ifdef LEGACY_TESTS
 
 enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi, kumi_na_moja, kumi_na_mbili, kumi_na_tatu };
 
@@ -139,7 +381,7 @@ void my_table_add_columns(T table)
     subtable_add_columns(subdesc);
 }
 
-void round(TestContext& test_context, SharedGroup& db, int index)
+void round(TestContext& test_context, DB& db, int index)
 {
     // Testing all value types
     {
@@ -465,7 +707,7 @@ void round(TestContext& test_context, SharedGroup& db, int index)
 void thread(TestContext& test_context, int index, std::string path)
 {
     for (int i = 0; i < num_rounds; ++i) {
-        SharedGroup db(path);
+        DB db(path);
         round(test_context, db, index);
     }
 }
@@ -504,7 +746,7 @@ TEST(Transactions_General)
     table1_theta_size *= num_rounds;
     table1_theta_size += 2;
 
-    SharedGroup db(path);
+    DB db(path);
     ReadTransaction rt(db);
     ConstTableRef table = rt.get_table("my_table");
     CHECK(2 <= table->size());
@@ -601,48 +843,106 @@ TEST(Transactions_General)
     }
     // End of read transaction
 }
+#endif
 
-TEST(Transactions_RollbackAddRows)
+
+TEST(Transactions_RollbackCreateObject)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    TransactionRef tr = sg_w.start_write();
+
+    auto tk = tr->add_table("t0")->get_key();
+    auto col = tr->get_table(tk)->add_column(type_Int, "integers");
+
+    tr->commit_and_continue_as_read();
+    tr->promote_to_write();
+
+    tr->get_table(tk)->create_object(ObjKey(0)).set(col, 5);
+    auto o = tr->get_table(tk)->get_object(ObjKey(0));
+    CHECK_EQUAL(o.get<int64_t>(col), 5);
+
+    tr->rollback_and_continue_as_read();
+
+    CHECK_THROW(o.get<int64_t>(col), InvalidKey);
+    tr->verify();
+
+    tr->promote_to_write();
+
+    CHECK_EQUAL(tr->get_table(tk)->size(), 0);
+}
+
+#ifdef LEGACY_TESTS
+
+// Rollback a table move operation and check accessors.
+// This case checks column accessors when a table is inserted, moved, rolled back.
+// In this case it is easy to see (by just looking at the assert message) that the
+// accessors have not been updated after rollback because the column count is swapped.
+TEST(Transactions_RollbackMoveTableColumns)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
 
-    g.insert_table(0, "t0");
-    g.get_table(0)->add_column(type_Int, "integers");
+    auto t0k = g.add_table("t0")->get_key();
+    g.get_table(t0k)->insert_column_link(0, type_Link, "t0_link0_to_t0", *g.get_table(t0k));
 
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
 
-    g.get_table(0)->add_empty_row();
-    g.get_table(0)->add_row_with_key(0, 45);
-    Row r0 = g.get_table(0)->get(0);
-    Row r1 = g.get_table(0)->get(1);
-    CHECK(r0.is_attached());
-    CHECK(r1.is_attached());
+    g.add_table("t1")->get_key();
+
+    g.add_table(0, "inserted_at_the end");
     LangBindHelper::rollback_and_continue_as_read(sg_w);
 
-    CHECK(!r0.is_attached());
-    CHECK(!r1.is_attached());
-    g.verify();
+    g.verify(); // table.cpp:5249: [realm-core-0.97.0] Assertion failed: col_ndx <= m_cols.size() [2, 0]
 
     LangBindHelper::promote_to_write(sg_w);
 
-    CHECK_EQUAL(g.get_table(0)->size(), 0);
+    CHECK_EQUAL(g.get_table(t0k)->get_name(), StringData("t0"));
+    CHECK_EQUAL(g.size(), 1);
 }
 
+// Rollback a table move operation and check accessors.
+// This case reveals that after cancelling a table move operation
+// the accessor references in memory are not what they should be
+TEST(Transactions_RollbackMoveTableReferences)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    WriteTransaction wt(sg_w);
+    Group& g = wt.get_group();
 
+    auto t0k = g.add_table(0, "t0")->get_key();
+    g.get_table(t0k)->insert_column(0, type_Int, "t0_int0");
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+    g.add_table("t1");
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+
+    g.verify(); // array.cpp:2111: [realm-core-0.97.0] Assertion failed: ref_in_parent == m_ref [112, 4864]
+
+    LangBindHelper::promote_to_write(sg_w);
+
+    CHECK_EQUAL(g.get_table(t0k)->get_name(), StringData("t0"));
+    CHECK_EQUAL(g.size(), 1);
+}
+#endif
 // Check that the spec.enumkeys become detached when
 // rolling back the insertion of a string enum column
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_RollbackStringEnumInsert)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     std::unique_ptr<Replication> hist_2(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w);
-    SharedGroup sg_2(*hist_2);
+    DB sg_w(*hist_w);
+    DB sg_2(*hist_2);
     Group& g = const_cast<Group&>(sg_w.begin_read());
     Group& g2 = const_cast<Group&>(sg_2.begin_read());
     LangBindHelper::promote_to_write(sg_w);
@@ -658,31 +958,32 @@ TEST(LangBindHelper_RollbackStringEnumInsert)
     };
 
     g.add_table("t0");
-    g.add_table("t1");
+    auto t1k = g.add_table("t1")->get_key();
 
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
 
-    populate_with_string_enum(g.get_table(1));
+    populate_with_string_enum(g.get_table(t1k));
 
     LangBindHelper::rollback_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
 
-    populate_with_string_enum(g.get_table(1));
+    populate_with_string_enum(g.get_table(t1k));
 
-    g.get_table(1)->set_string(0, 0, "duplicate");
+    g.get_table(t1k)->set_string(0, 0, "duplicate");
 
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::advance_read(sg_2);
 
-    CHECK_EQUAL(g2.get_table(1)->size(), 3);
-    CHECK_EQUAL(g2.get_table(1)->get_string(0, 2), "duplicate");
+    CHECK_EQUAL(g2.get_table(t1k)->size(), 3);
+    CHECK_EQUAL(g2.get_table(t1k)->get_string(0, 2), "duplicate");
 
     CHECK_EQUAL(g.size(), 2);
-    CHECK_EQUAL(g.get_table(1)->get_column_count(), 1);
-    CHECK_EQUAL(g.get_table(1)->size(), 3);
+    CHECK_EQUAL(g.get_table(t1k)->get_column_count(), 1);
+    CHECK_EQUAL(g.get_table(t1k)->size(), 3);
 }
-
+#endif
+#ifdef LEGACY_TESTS
 // Check that the table.spec.subspec array becomes detached
 // after rolling back the insertion of a subspec type
 TEST(LangBindHelper_RollbackLinkInsert)
@@ -690,17 +991,17 @@ TEST(LangBindHelper_RollbackLinkInsert)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
 
-    SharedGroup sg_w(*hist_w);
+    DB sg_w(*hist_w);
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
-    g.add_table("t0");
-    g.add_table("t1");
+    auto t0k = g.add_table("t0")->get_key();
+    auto t1k = g.add_table("t1")->get_key();
 
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
 
-    g.get_table(1)->add_column_link(type_LinkList, "t1_col0_link", *g.get_table(0));
+    g.get_table(t1k)->add_column_link(type_LinkList, "t1_col0_link", *g.get_table(t0k));
     // or
     // g.get_table(0)->add_column_link(type_Link, "t0_col0_link", *g.get_table(1));
 
@@ -708,16 +1009,17 @@ TEST(LangBindHelper_RollbackLinkInsert)
     LangBindHelper::promote_to_write(sg_w);
 
     g.add_table("t2");
-    g.get_table(1)->add_column_link(type_Link, "link", *g.get_table(0));
+    g.get_table(t1k)->add_column_link(type_Link, "link", *g.get_table(t0k));
     // or
     // g.get_table(0)->add_column_link(type_Link, "link", *g.get_table(1));
 
     g.add_table("t3");
 
     CHECK_EQUAL(g.size(), 4);
-    CHECK_EQUAL(g.get_table(1)->get_column_count(), 1);
-    CHECK_EQUAL(g.get_table(1)->get_link_target(0), g.get_table(0));
+    CHECK_EQUAL(g.get_table(t1k)->get_column_count(), 1);
+    CHECK_EQUAL(g.get_table(t1k)->get_link_target(0), g.get_table(t0k));
 }
+#endif
 
 
 #endif // TEST_TRANSACTIONS

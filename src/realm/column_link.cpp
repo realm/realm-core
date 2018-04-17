@@ -140,56 +140,8 @@ void LinkColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 }
 
 
-void LinkColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
-{
-    int_fast64_t value = LinkColumnBase::get(row_ndx);
-    bool value_is_null = value == 0;
-    if (value_is_null)
-        return;
-
-    // Remove the reciprocal backlink at target_row_ndx that points to row_ndx
-    size_t target_row_ndx = to_size_t(value - 1);
-    m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
-
-    if (m_weak_links && state.only_strong_links)
-        return;
-    if (m_target_table == state.stop_on_table)
-        return;
-
-    // Recurse on target row when appropriate
-    size_t target_table_ndx = m_target_table->get_index_in_group();
-    check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws
-}
-
-
-void LinkColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState& state)
-{
-    size_t num_target_rows = m_target_table->size();
-    m_backlink_column->remove_all_backlinks(num_target_rows);
-
-    if (m_weak_links)
-        return;
-    if (m_target_table == state.stop_on_table)
-        return;
-
-    size_t target_table_ndx = m_target_table->get_index_in_group();
-    for (size_t i = 0; i < num_rows; ++i) {
-        int_fast64_t value = LinkColumnBase::get(i);
-        bool value_is_null = value == 0;
-        if (value_is_null)
-            continue;
-
-        size_t target_row_ndx = to_size_t(value - 1);
-        check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws
-    }
-}
-
-
 void LinkColumn::do_nullify_link(size_t row_ndx, size_t)
 {
-    if (Replication* repl = get_root_array()->get_alloc().get_replication()) {
-        repl->nullify_link(m_table, get_column_index(), row_ndx);
-    }
     LinkColumnBase::set(row_ndx, 0);
 }
 

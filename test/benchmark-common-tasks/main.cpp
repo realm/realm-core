@@ -64,27 +64,43 @@ const double min_warmup_time_s = 0.05;
 const char* to_lead_cstr(RealmDurability level);
 const char* to_ident_cstr(RealmDurability level);
 
+#ifdef REALM_CLUSTER_IF
+#define KEY(x) ObjKey(x)
+#else
+#define KEY(x) x
+using ColKey = size_t;
+#endif
+
 
 struct Benchmark {
+    Benchmark()
+    {
+    }
     virtual ~Benchmark()
     {
     }
     virtual const char* name() const = 0;
-    virtual void before_all(SharedGroup&)
+    virtual void before_all(DB&)
     {
     }
-    virtual void after_all(SharedGroup&)
+    virtual void after_all(DB&)
     {
     }
-    virtual void before_each(SharedGroup&)
+    virtual void before_each(DB&)
     {
     }
-    virtual void after_each(SharedGroup&)
+    virtual void after_each(DB&)
     {
+#ifdef REALM_CLUSTER_IF
+        m_keys.clear();
+#endif
     }
-    virtual void operator()(SharedGroup&) = 0;
+    virtual void operator()(DB&) = 0;
     RealmDurability m_durability = RealmDurability::Full;
     const char* m_encryption_key = nullptr;
+#ifdef REALM_CLUSTER_IF
+    std::vector<ObjKey> m_keys;
+#endif
 };
 
 struct BenchmarkUnorderedTableViewClear : Benchmark {
@@ -93,23 +109,32 @@ struct BenchmarkUnorderedTableViewClear : Benchmark {
         return "UnorderedTableViewClear";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         const size_t rows = 10000;
         WriteTransaction tr(group);
         TableRef tbl = tr.add_table(name());
-        tbl->add_column(type_String, "s", true);
+        auto col = tbl->add_column(type_String, "s", true);
+#ifdef REALM_CLUSTER_IF
+        tbl->create_objects(rows, m_keys);
+#else
         tbl->add_empty_row(rows);
-
-        tbl->add_search_index(0);
+#endif
+        tbl->add_search_index(col);
 
         for (size_t t = 0; t < rows / 3; t += 3) {
-            tbl->set_string(0, t + 0, StringData("foo"));
-            tbl->set_string(0, t + 1, StringData("bar"));
-            tbl->set_string(0, t + 2, StringData("hello"));
+#ifdef REALM_CLUSTER_IF
+            tbl->get_object(m_keys[t + 0]).set(col, StringData("foo"));
+            tbl->get_object(m_keys[t + 1]).set(col, StringData("bar"));
+            tbl->get_object(m_keys[t + 2]).set(col, StringData("hello"));
+#else
+            tbl->set_string(col, t + 0, StringData("foo"));
+            tbl->set_string(col, t + 1, StringData("bar"));
+            tbl->set_string(col, t + 2, StringData("hello"));
+#endif
         }
 
-        TableView tv = (tbl->column<String>(0) == "foo").find_all();
+        TableView tv = (tbl->column<String>(col) == "foo").find_all();
         tv.clear();
     }
 };
@@ -120,7 +145,7 @@ struct AddTable : Benchmark {
         return "AddTable";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         WriteTransaction tr(group);
         TableRef t = tr.add_table(name());
@@ -130,82 +155,103 @@ struct AddTable : Benchmark {
         tr.commit();
     }
 
-    void after_each(SharedGroup& group)
+    void after_each(DB& group)
     {
-        Group& g = group.begin_write();
-        g.remove_table(name());
-        group.commit();
+        TransactionRef tr = group.start_write();
+        tr->remove_table(name());
+        tr->commit();
     }
 };
 
 struct BenchmarkWithStringsTable : Benchmark {
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         WriteTransaction tr(group);
         TableRef t = tr.add_table("StringOnly");
-        t->add_column(type_String, "chars");
+        m_col = t->add_column(type_String, "chars");
         tr.commit();
     }
 
-    void after_all(SharedGroup& group)
+    void after_all(DB& group)
     {
-        Group& g = group.begin_write();
-        g.remove_table("StringOnly");
-        group.commit();
+        TransactionRef tr = group.start_write();
+        tr->remove_table("StringOnly");
+        tr->commit();
     }
+    ColKey m_col;
 };
 
 struct BenchmarkWithStrings : BenchmarkWithStringsTable {
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         BenchmarkWithStringsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->add_empty_row(BASE_SIZE * 4);
+
         for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             std::stringstream ss;
             ss << rand();
             auto s = ss.str();
-            t->set_string(0, i, s);
+#ifdef REALM_CLUSTER_IF
+            Obj obj = t->create_object();
+            obj.set<StringData>(m_col, s);
+            m_keys.push_back(obj.get_key());
+#else
+            auto r = t->add_empty_row();
+            t->set_string(m_col, r, s);
+#endif
         }
         tr.commit();
     }
 };
 
 struct BenchmarkWithStringsFewDup : BenchmarkWithStringsTable {
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         BenchmarkWithStringsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->add_empty_row(BASE_SIZE * 4);
+
         Random r;
         for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             std::stringstream ss;
             ss << r.draw_int(0, BASE_SIZE * 2);
             auto s = ss.str();
-            t->set_string(0, i, s);
+#ifdef REALM_CLUSTER_IF
+            Obj obj = t->create_object();
+            obj.set<StringData>(m_col, s);
+            m_keys.push_back(obj.get_key());
+#else
+            auto row = t->add_empty_row();
+            t->set_string(m_col, row, s);
+#endif
         }
-        t->add_search_index(0);
+        t->add_search_index(m_col);
         tr.commit();
     }
 };
 
 struct BenchmarkWithStringsManyDup : BenchmarkWithStringsTable {
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         BenchmarkWithStringsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->add_empty_row(BASE_SIZE * 4);
         Random r;
         for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             std::stringstream ss;
             ss << r.draw_int(0, 100);
             auto s = ss.str();
-            t->set_string(0, i, s);
+#ifdef REALM_CLUSTER_IF
+            Obj obj = t->create_object();
+            obj.set<StringData>(m_col, s);
+            m_keys.push_back(obj.get_key());
+#else
+            auto row = t->add_empty_row();
+            t->set_string(m_col, row, s);
+#endif
         }
-        t->add_search_index(0);
+        t->add_search_index(m_col);
         tr.commit();
     }
 };
@@ -216,11 +262,11 @@ struct BenchmarkDistinctStringFewDupes : BenchmarkWithStringsFewDup {
         return "DistinctStringFewDupes";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        ConstTableView view = table->get_distinct_view(0);
+        ConstTableView view = table->get_distinct_view(m_col);
     }
 };
 
@@ -230,11 +276,11 @@ struct BenchmarkDistinctStringManyDupes : BenchmarkWithStringsManyDup {
         return "DistinctStringManyDupes";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        ConstTableView view = table->get_distinct_view(0);
+        ConstTableView view = table->get_distinct_view(m_col);
     }
 };
 
@@ -244,11 +290,11 @@ struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
         return "FindAllStringFewDupes";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        ConstTableView view = table->where().equal(0, StringData("10", 2)).find_all();
+        ConstTableView view = table->where().equal(m_col, StringData("10", 2)).find_all();
     }
 };
 
@@ -258,11 +304,11 @@ struct BenchmarkFindAllStringManyDupes : BenchmarkWithStringsManyDup {
         return "FindAllStringManyDupes";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        ConstTableView view = table->where().equal(0, StringData("10", 2)).find_all();
+        ConstTableView view = table->where().equal(m_col, StringData("10", 2)).find_all();
     }
 };
 
@@ -272,7 +318,7 @@ struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
         return "FindFirstStringFewDupes";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -280,7 +326,7 @@ struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
             "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
         };
         for (auto s : strs) {
-            table->where().equal(0, StringData(s)).find();
+            table->where().equal(m_col, StringData(s)).find();
         }
     }
 };
@@ -291,7 +337,7 @@ struct BenchmarkFindFirstStringManyDupes : BenchmarkWithStringsManyDup {
         return "FindFirstStringManyDupes";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -299,54 +345,72 @@ struct BenchmarkFindFirstStringManyDupes : BenchmarkWithStringsManyDup {
             "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
         };
         for (auto s : strs) {
-            table->where().equal(0, StringData(s)).find();
+            table->where().equal(m_col, StringData(s)).find();
         }
     }
 };
 
 struct BenchmarkWithLongStrings : BenchmarkWithStrings {
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         BenchmarkWithStrings::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->insert_empty_row(0);
+
         // This should be enough to upgrade the entire array:
-        t->set_string(0, 0, "A really long string, longer than 63 bytes at least, I guess......");
-        t->set_string(0, BASE_SIZE, "A really long string, longer than 63 bytes at least, I guess......");
-        t->set_string(0, BASE_SIZE * 2, "A really long string, longer than 63 bytes at least, I guess......");
-        t->set_string(0, BASE_SIZE * 3, "A really long string, longer than 63 bytes at least, I guess......");
+        static std::string really_long_string = "A really long string, longer than 63 bytes at least, I guess......";
+#ifdef REALM_CLUSTER_IF
+        t->get_object(m_keys[0]).set<StringData>(m_col, really_long_string);
+        t->get_object(m_keys[BASE_SIZE]).set<StringData>(m_col, really_long_string);
+        t->get_object(m_keys[BASE_SIZE * 2]).set<StringData>(m_col, really_long_string);
+        t->get_object(m_keys[BASE_SIZE * 3]).set<StringData>(m_col, really_long_string);
+#else
+        t->insert_empty_row(0);
+        t->set_string(m_col, 0, really_long_string);
+        t->set_string(m_col, BASE_SIZE, really_long_string);
+        t->set_string(m_col, BASE_SIZE * 2, really_long_string);
+        t->set_string(m_col, BASE_SIZE * 3, really_long_string);
+#endif
         tr.commit();
     }
 };
 
 struct BenchmarkWithIntsTable : Benchmark {
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         WriteTransaction tr(group);
         TableRef t = tr.add_table("IntOnly");
-        t->add_column(type_Int, "ints");
+        m_col = t->add_column(type_Int, "ints");
         tr.commit();
     }
 
-    void after_all(SharedGroup& group)
+    void after_all(DB& group)
     {
-        Group& g = group.begin_write();
-        g.remove_table("IntOnly");
-        group.commit();
+        TransactionRef tr = group.start_write();
+        tr->remove_table("IntOnly");
+        tr->commit();
     }
+    ColKey m_col;
 };
 
 struct BenchmarkWithInts : BenchmarkWithIntsTable {
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         BenchmarkWithIntsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("IntOnly");
-        t->add_empty_row(BASE_SIZE * 4);
+
         Random r;
         for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
-            t->set_int(0, i, r.draw_int<int64_t>());
+            int64_t val = r.draw_int<int64_t>();
+#ifdef REALM_CLUSTER_IF
+            Obj obj = t->create_object();
+            obj.set(m_col, val);
+            m_keys.push_back(obj.get_key());
+#else
+            auto row = t->add_empty_row();
+            t->set_int(m_col, row, val);
+#endif
         }
         tr.commit();
     }
@@ -358,11 +422,11 @@ struct BenchmarkQuery : BenchmarkWithStrings {
         return "Query";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        ConstTableView view = table->find_all_string(0, "200");
+        ConstTableView view = table->find_all_string(m_col, "200");
     }
 };
 
@@ -372,7 +436,7 @@ struct BenchmarkSize : BenchmarkWithStrings {
         return "Size";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -387,11 +451,11 @@ struct BenchmarkSort : BenchmarkWithStrings {
         return "Sort";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        ConstTableView view = table->get_sorted_view(0);
+        ConstTableView view = table->get_sorted_view(m_col);
     }
 };
 
@@ -401,7 +465,7 @@ struct BenchmarkEmptyCommit : Benchmark {
         return "EmptyCommit";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         WriteTransaction tr(group);
         tr.commit();
@@ -414,11 +478,11 @@ struct BenchmarkSortInt : BenchmarkWithInts {
         return "SortInt";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
-        ConstTableView view = table->get_sorted_view(0);
+        ConstTableView view = table->get_sorted_view(m_col);
     }
 };
 
@@ -428,25 +492,32 @@ struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
         return "DistinctIntNoDupes";
     }
 
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         BenchmarkWithIntsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("IntOnly");
-        t->add_empty_row(BASE_SIZE * 4);
         Random r;
         for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
-            t->set_int(0, i, r.draw_int(0, BASE_SIZE * 2));
+            int64_t val = r.draw_int(0, BASE_SIZE * 2);
+#ifdef REALM_CLUSTER_IF
+            Obj obj = t->create_object();
+            obj.set(m_col, val);
+            m_keys.push_back(obj.get_key());
+#else
+            auto row = t->add_empty_row();
+            t->set_int(m_col, row, val);
+#endif
         }
-        t->add_search_index(0);
+        t->add_search_index(m_col);
         tr.commit();
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
-        ConstTableView view = table->get_distinct_view(0);
+        ConstTableView view = table->get_distinct_view(m_col);
     }
 };
 
@@ -456,25 +527,32 @@ struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
         return "DistinctIntManyDupes";
     }
 
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         BenchmarkWithIntsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("IntOnly");
-        t->add_empty_row(BASE_SIZE * 4);
         Random r;
         for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
-            t->set_int(0, i, r.draw_int(0, 10));
+            int64_t val = r.draw_int(0, 10);
+#ifdef REALM_CLUSTER_IF
+            Obj obj = t->create_object();
+            obj.set(m_col, val);
+            m_keys.push_back(obj.get_key());
+#else
+            auto row = t->add_empty_row();
+            t->set_int(m_col, row, val);
+#endif
         }
-        t->add_search_index(0);
+        t->add_search_index(m_col);
         tr.commit();
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
-        ConstTableView view = table->get_distinct_view(0);
+        ConstTableView view = table->get_distinct_view(m_col);
     }
 };
 
@@ -484,13 +562,20 @@ struct BenchmarkInsert : BenchmarkWithStringsTable {
         return "Insert";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
+
         for (size_t i = 0; i < 10000; ++i) {
-            t->add_empty_row();
-            t->set_string(0, i, "a");
+#ifdef REALM_CLUSTER_IF
+            Obj obj = t->create_object();
+            obj.set(m_col, "a");
+            m_keys.push_back(obj.get_key());
+#else
+            auto row = t->add_empty_row();
+            t->set_string(m_col, row, "a");
+#endif
         }
         tr.commit();
     }
@@ -502,16 +587,24 @@ struct BenchmarkGetString : BenchmarkWithStrings {
         return "GetString";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        size_t len = table->size();
+
         volatile int dummy = 0;
-        for (size_t i = 0; i < len; ++i) {
-            StringData str = table->get_string(0, i);
+#ifdef REALM_CLUSTER_IF
+        for (auto obj : *table) {
+            StringData str = obj.get<String>(m_col);
             dummy += str[0]; // to avoid over-optimization
         }
+#else
+        size_t len = table->size();
+        for (size_t i = 0; i < len; ++i) {
+            StringData str = table->get_string(m_col, i);
+            dummy += str[0]; // to avoid over-optimization
+        }
+#endif
     }
 };
 
@@ -521,14 +614,21 @@ struct BenchmarkSetString : BenchmarkWithStrings {
         return "SetString";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         WriteTransaction tr(group);
         TableRef table = tr.get_table("StringOnly");
+
+#ifdef REALM_CLUSTER_IF
+        for (auto obj : *table) {
+            obj.set<String>(m_col, "c");
+        }
+#else
         size_t len = table->size();
         for (size_t i = 0; i < len; ++i) {
-            table->set_string(0, i, "c");
+            table->set_string(m_col, i, "c");
         }
+#endif
         tr.commit();
     }
 };
@@ -538,11 +638,11 @@ struct BenchmarkCreateIndex : BenchmarkWithStrings {
     {
         return "CreateIndex";
     }
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         WriteTransaction tr(group);
         TableRef table = tr.get_table("StringOnly");
-        table->add_search_index(0);
+        table->add_search_index(m_col);
         tr.commit();
     }
 };
@@ -553,16 +653,23 @@ struct BenchmarkGetLongString : BenchmarkWithLongStrings {
         return "GetLongString";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        size_t len = table->size();
         volatile int dummy = 0;
-        for (size_t i = 0; i < len; ++i) {
-            StringData str = table->get_string(0, i);
+#ifdef REALM_CLUSTER_IF
+        for (auto obj : *table) {
+            StringData str = obj.get<String>(m_col);
             dummy += str[0]; // to avoid over-optimization
         }
+#else
+        size_t len = table->size();
+        for (size_t i = 0; i < len; ++i) {
+            StringData str = table->get_string(m_col, i);
+            dummy += str[0]; // to avoid over-optimization
+        }
+#endif
     }
 };
 
@@ -575,26 +682,33 @@ struct BenchmarkQueryLongString : BenchmarkWithStrings {
         return "QueryLongString";
     }
 
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         BenchmarkWithStrings::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->set_string(0, 0, "Some random string");
-        t->set_string(0, 1, long_string);
+#ifdef REALM_CLUSTER_IF
+        auto it = t->begin();
+        it->set<String>(m_col, "Some random string");
+        ++it;
+        it->set<String>(m_col, long_string);
+#else
+        t->set_string(m_col, 0, "Some random string");
+        t->set_string(m_col, 1, long_string);
+#endif
         tr.commit();
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
         StringData str(long_string);
         ok = true;
-        auto q = table->where().equal(0, str);
+        auto q = table->where().equal(m_col, str);
         for (size_t ndx = 0; ndx < 1000; ndx++) {
             auto res = q.find();
-            if (res != 1) {
+            if (res != KEY(1)) {
                 ok = false;
             }
         }
@@ -635,7 +749,7 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
         return seeded_rand.draw_int<size_t>();
     }
 
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         BenchmarkWithStringsTable::before_all(group);
 
@@ -645,13 +759,20 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
 
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->add_empty_row(BASE_SIZE * 4);
+
         const size_t max_chars_in_string = 100;
 
         for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             size_t num_chars = rand() % max_chars_in_string;
             std::string randomly_cased_string = gen_random_case_string(num_chars);
-            t->set_string(0, i, randomly_cased_string);
+#ifdef REALM_CLUSTER_IF
+            Obj obj = t->create_object();
+            obj.set<String>(m_col, randomly_cased_string);
+            m_keys.push_back(obj.get_key());
+#else
+            auto row = t->add_empty_row();
+            t->set_string(m_col, row, randomly_cased_string);
+#endif
         }
         tr.commit();
     }
@@ -659,21 +780,26 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
     bool successful = false;
     Random seeded_rand;
 
-    void before_each(SharedGroup& group)
+    void before_each(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
         size_t target_row = rand() % table->size();
+#ifdef REALM_CLUSTER_IF
+        ConstObj obj = table->get_object(m_keys[target_row]);
+        StringData target_str = obj.get<String>(m_col);
+#else
         StringData target_str = table->get_string(0, target_row);
+#endif
         needle = shuffle_case(target_str.data());
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
         StringData str(needle);
-        Query q = table->where().equal(0, str, false);
+        Query q = table->where().equal(m_col, str, false);
         TableView res = q.find_all();
         successful = res.size() > 0;
     }
@@ -684,12 +810,12 @@ struct BenchmarkQueryInsensitiveStringIndexed : BenchmarkQueryInsensitiveString 
     {
         return "QueryInsensitiveStringIndexed";
     }
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         BenchmarkQueryInsensitiveString::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->add_search_index(0);
+        t->add_search_index(m_col);
         tr.commit();
     }
 };
@@ -700,14 +826,20 @@ struct BenchmarkSetLongString : BenchmarkWithLongStrings {
         return "SetLongString";
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         WriteTransaction tr(group);
         TableRef table = tr.get_table("StringOnly");
+#ifdef REALM_CLUSTER_IF
+        Obj obj = table->create_object();
+        obj.set<String>(m_col, "c");
+        m_keys.push_back(obj.get_key());
+#else
         size_t len = table->size();
         for (size_t i = 0; i < len; ++i) {
-            table->set_string(0, i, "c");
+            table->set_string(m_col, i, "c");
         }
+#endif
         tr.commit();
     }
 };
@@ -718,34 +850,42 @@ struct BenchmarkQueryNot : Benchmark {
         return "QueryNot";
     }
 
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         WriteTransaction tr(group);
         TableRef table = tr.add_table(name());
-        table->add_column(type_Int, "first");
+        m_col = table->add_column(type_Int, "first");
+#ifdef REALM_CLUSTER_IF
+        for (size_t i = 0; i < 1000; ++i) {
+            table->create_object().set(m_col, 1);
+        }
+#else
         table->add_empty_row(1000);
         for (size_t i = 0; i < 1000; ++i) {
-            table->set_int(0, i, 1);
+            table->set_int(m_col, i, 1);
         }
+#endif
         tr.commit();
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table(name());
         Query q = table->where();
-        q.not_equal(0, 2); // never found, = worst case
+        q.not_equal(m_col, 2); // never found, = worst case
         TableView results = q.find_all();
         results.size();
     }
 
-    void after_all(SharedGroup& group)
+    void after_all(DB& group)
     {
-        Group& g = group.begin_write();
-        g.remove_table(name());
-        group.commit();
+        TransactionRef tr = group.start_write();
+        tr->remove_table(name());
+        tr->commit();
     }
+
+    ColKey m_col;
 };
 
 struct BenchmarkGetLinkList : Benchmark {
@@ -755,41 +895,62 @@ struct BenchmarkGetLinkList : Benchmark {
     }
     static const size_t rows = 10000;
 
-    void before_all(SharedGroup& group)
+    void before_all(DB& group)
     {
         WriteTransaction tr(group);
         std::string n = std::string(name()) + "_Destination";
         TableRef destination_table = tr.add_table(n);
         TableRef table = tr.add_table(name());
-        table->add_column_link(type_LinkList, "linklist", *destination_table);
+        m_col_link = table->add_column_link(type_LinkList, "linklist", *destination_table);
+#ifdef REALM_CLUSTER_IF
+        table->create_objects(rows, m_keys);
+#else
         table->add_empty_row(rows);
+#endif
         tr.commit();
     }
 
-    void operator()(SharedGroup& group)
+    void operator()(DB& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table(name());
-        std::vector<ConstLinkViewRef> linklists(rows);
+#ifdef REALM_CLUSTER_IF
+        std::vector<ConstLinkListPtr> linklists(rows);
         for (size_t i = 0; i < rows; ++i) {
-            linklists[i] = table->get_linklist(0, i);
+            auto obj = table->get_object(m_keys[i]);
+            linklists[i] = obj.get_linklist_ptr(m_col_link);
         }
         for (size_t i = 0; i < rows; ++i) {
-            table->get_linklist(0, i);
+            auto obj = table->get_object(m_keys[i]);
+            obj.get_linklist_ptr(m_col_link);
         }
         for (size_t i = 0; i < rows; ++i) {
             linklists[i].reset();
         }
+#else
+        std::vector<ConstLinkViewRef> linklists(rows);
+        for (size_t i = 0; i < rows; ++i) {
+            linklists[i] = table->get_linklist(m_col_link, i);
+        }
+        for (size_t i = 0; i < rows; ++i) {
+            table->get_linklist(m_col_link, i);
+        }
+        for (size_t i = 0; i < rows; ++i) {
+            linklists[i].reset();
+        }
+#endif
     }
 
-    void after_all(SharedGroup& group)
+    void after_all(DB& group)
     {
-        Group& g = group.begin_write();
-        g.remove_table(name());
+        TransactionRef tr = group.start_write();
+        tr->remove_table(name());
         auto n = std::string(name()) + "_Destination";
-        g.remove_table(n);
-        group.commit();
+        tr->remove_table(n);
+        tr->commit();
     }
+
+    ColKey m_col_link;
 };
 
 struct BenchmarkNonInitatorOpen : Benchmark {
@@ -799,15 +960,15 @@ struct BenchmarkNonInitatorOpen : Benchmark {
     }
     // the shared realm will be removed after the benchmark finishes
     std::unique_ptr<realm::test_util::SharedGroupTestPathGuard> path;
-    std::unique_ptr<SharedGroup> initiator;
+    std::unique_ptr<DB> initiator;
 
-    std::unique_ptr<SharedGroup> do_open()
+    std::unique_ptr<DB> do_open()
     {
         const std::string realm_path = *path;
-        return std::unique_ptr<SharedGroup>(create_new_shared_group(realm_path, m_durability, m_encryption_key));
+        return std::unique_ptr<DB>(create_new_shared_group(realm_path, m_durability, m_encryption_key));
     }
 
-    void before_all(SharedGroup&)
+    void before_all(DB&)
     {
         // Generate the benchmark result texts:
         std::stringstream ident_ss;
@@ -827,7 +988,7 @@ struct BenchmarkNonInitatorOpen : Benchmark {
         initiator = do_open();
     }
 
-    void operator()(SharedGroup&)
+    void operator()(DB&)
     {
         // use groups of 10 to get higher times
         for (size_t i = 0; i < 10; ++i) {
@@ -868,7 +1029,7 @@ const char* to_ident_cstr(RealmDurability level)
     return nullptr;
 }
 
-void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
+void run_benchmark_once(Benchmark& benchmark, DB& sg, Timer& timer)
 {
     timer.pause();
     benchmark.before_each(sg);
@@ -927,7 +1088,7 @@ void run_benchmark(BenchmarkResults& results)
 
         // Open a SharedGroup:
         realm::test_util::SharedGroupTestPathGuard realm_path("benchmark_common_tasks" + ident);
-        std::unique_ptr<SharedGroup> group;
+        std::unique_ptr<DB> group;
         group.reset(create_new_shared_group(realm_path, level, key));
         benchmark.before_all(*group);
 
@@ -975,7 +1136,6 @@ int benchmark_common_tasks_main()
     BenchmarkResults results(40, results_file_stem.c_str());
 
 #define BENCH(B) run_benchmark<B>(results)
-
     BENCH(BenchmarkUnorderedTableViewClear);
     BENCH(BenchmarkEmptyCommit);
     BENCH(AddTable);
@@ -984,14 +1144,17 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkSize);
     BENCH(BenchmarkSort);
     BENCH(BenchmarkSortInt);
+
     BENCH(BenchmarkDistinctIntFewDupes);
     BENCH(BenchmarkDistinctIntManyDupes);
     BENCH(BenchmarkDistinctStringFewDupes);
     BENCH(BenchmarkDistinctStringManyDupes);
+
     BENCH(BenchmarkFindAllStringFewDupes);
     BENCH(BenchmarkFindAllStringManyDupes);
     BENCH(BenchmarkFindFirstStringFewDupes);
     BENCH(BenchmarkFindFirstStringManyDupes);
+
     BENCH(BenchmarkInsert);
     BENCH(BenchmarkGetString);
     BENCH(BenchmarkSetString);

@@ -53,9 +53,7 @@
 
 #if REALM_METRICS
 
-#include <realm/descriptor.hpp>
-#include <realm/query_expression.hpp>
-#include <realm/lang_bind_helper.hpp>
+#include <realm.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/replication.hpp>
@@ -71,6 +69,7 @@ using namespace realm::metrics;
 using namespace realm::test_util;
 using namespace realm::util;
 
+#ifdef LEGACY_TESTS
 TEST(Metrics_HasNoReportsWhenDisabled)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -229,8 +228,7 @@ void populate(SharedGroup& sg)
         person->set_bool(account_col, row, overdue);
         BinaryData bd(data);
         person->set_binary(data_col, row, bd);
-        for (auto ndx : owes_coffee_to)
-        {
+        for (auto ndx : owes_coffee_to) {
             LinkViewRef list = person->get_linklist(owes_col, row);
             list->add(ndx);
         }
@@ -492,7 +490,8 @@ TEST(Metrics_LinkQueries)
     q0.find_all();
     q1.find_all();
     q2.find_all();
-    q3.find_all();;
+    q3.find_all();
+    ;
 
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
@@ -677,7 +676,7 @@ TEST(Metrics_SubQueries)
     CHECK_THROW(q3.find_all(), SerialisationError);
 
     sg.commit();
-/*
+    /*
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
@@ -700,7 +699,7 @@ TEST(Metrics_SubQueries)
     std::string str_equal_description = queries->at(3).get_description();
     CHECK_EQUAL(find_count(str_equal_description, "=="), 1);
     CHECK_EQUAL(find_count(str_equal_description, str_col_name), 1);
-*/
+    */
 }
 
 
@@ -863,6 +862,6 @@ TEST(Metrics_TransactionVersions)
 }
 
 
-
+#endif // LEGACY_TESTS
 #endif // REALM_METRICS
 #endif // TEST_METRICS

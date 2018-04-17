@@ -456,7 +456,6 @@ TEST(File_PreallocResizing)
 
     CHECK(::close(fd) == 0);
 #endif
-
 }
 
 TEST(File_PreallocResizingAPFSBug)

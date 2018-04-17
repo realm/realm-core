@@ -26,8 +26,8 @@
 namespace realm {
 namespace parser {
 
-PropertyExpression::PropertyExpression(Query &q, const std::string &key_path_string, parser::KeyPathMapping& mapping)
-: query(q)
+PropertyExpression::PropertyExpression(Query& q, const std::string& key_path_string, parser::KeyPathMapping& mapping)
+    : query(q)
 {
     ConstTableRef cur_table = query.get_table();
     KeyPath key_path = key_path_from_string(key_path_string);
@@ -37,12 +37,13 @@ PropertyExpression::PropertyExpression(Query &q, const std::string &key_path_str
         KeyPathElement element = mapping.process_next_path(cur_table, key_path, index);
         if (index != key_path.size()) {
             realm_precondition(element.col_type == type_Link || element.col_type == type_LinkList,
-                         util::format("Property '%1' is not a link in object of type '%2'",
-                                      element.table->get_column_name(element.col_ndx),
-                                      get_printable_table_name(*element.table)));
+                               util::format("Property '%1' is not a link in object of type '%2'",
+                                            element.table->get_column_name(element.col_key),
+                                            get_printable_table_name(*element.table)));
             if (element.table == cur_table) {
-                cur_table = element.table->get_link_target(element.col_ndx); // advance through forward link
-            } else {
+                cur_table = element.table->get_link_target(element.col_key); // advance through forward link
+            }
+            else {
                 cur_table = element.table; // advance through backlink
             }
         }

@@ -28,6 +28,7 @@
 namespace realm {
 
 class Group;
+class BinaryIterator;
 
 namespace _impl {
 
@@ -62,9 +63,11 @@ public:
     /// implementations will want to also provide for ways to modify the
     /// history, but in those cases, modifications must occur only after the
     /// Group accessor has been fully updated to reflect the new snapshot.
-    virtual void update_early_from_top_ref(version_type new_version, size_t new_file_size, ref_type new_top_ref) = 0;
+    // virtual void update_early_from_top_ref(version_type new_version, size_t new_file_size, ref_type new_top_ref) =
+    // 0;
 
-    virtual void update_from_parent(version_type current_version) = 0;
+    // virtual void update_from_parent(version_type current_version) = 0;
+    virtual void update_from_ref(ref_type, version_type) = 0;
 
     /// Get all changesets between the specified versions. References to those
     /// changesets will be made availble in successive entries of `buffer`. The
@@ -127,18 +130,6 @@ public:
     /// open for additional modifications. This is necessary because some types
     /// of histories are stored inside the Realm file.
     virtual void set_oldest_bound_version(version_type version) = 0;
-
-    /// Get the list of uncommited changes accumulated so far in the current
-    /// write transaction.
-    ///
-    /// The callee retains ownership of the referenced memory. The ownership is
-    /// not handed over the the caller.
-    ///
-    /// This function may be called only during a write transaction (prior to
-    /// initiation of commit operation). In that case, the caller may assume that the
-    /// returned memory reference stays valid for the remainder of the transaction (up
-    /// until initiation of the commit operation).
-    virtual BinaryData get_uncommitted_changes() noexcept = 0;
 
     virtual void verify() const = 0;
 

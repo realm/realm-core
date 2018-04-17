@@ -54,8 +54,7 @@ struct Predicate
         False
     } type = Type::And;
 
-    enum class Operator
-    {
+    enum class Operator {
         None,
         Equal,
         NotEqual,
@@ -76,8 +75,7 @@ struct Predicate
         CaseInsensitive,
     };
 
-    enum class ComparisonType
-    {
+    enum class ComparisonType {
         Unspecified,
         Any,
         All,

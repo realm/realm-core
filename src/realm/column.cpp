@@ -28,8 +28,11 @@
 #endif
 
 #include <realm/column.hpp>
-#include <realm/column_table.hpp>
-#include <realm/column_mixed.hpp>
+#include <realm/column_timestamp.hpp>
+#include <realm/column_string.hpp>
+#include <realm/column_binary.hpp>
+#include <realm/column_string_enum.hpp>
+#include <realm/column_linklist.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/table.hpp>
@@ -70,39 +73,10 @@ void ColumnBase::refresh_accessor_tree(size_t new_col_ndx, const realm::Spec&)
     m_column_ndx = new_col_ndx;
 }
 
-void ColumnBaseWithIndex::move_assign(ColumnBaseWithIndex& col) noexcept
-{
-    ColumnBase::move_assign(col);
-    m_search_index = std::move(col.m_search_index);
-}
-
 void ColumnBase::set_string(size_t, StringData)
 {
     throw LogicError(LogicError::type_mismatch);
 }
-
-void ColumnBaseWithIndex::set_ndx_in_parent(size_t ndx) noexcept
-{
-    if (m_search_index) {
-        m_search_index->set_ndx_in_parent(ndx + 1);
-    }
-}
-
-void ColumnBaseWithIndex::update_from_parent(size_t old_baseline) noexcept
-{
-    if (m_search_index) {
-        m_search_index->update_from_parent(old_baseline);
-    }
-}
-
-void ColumnBaseWithIndex::refresh_accessor_tree(size_t new_col_ndx, const realm::Spec& spec)
-{
-    ColumnBase::refresh_accessor_tree(new_col_ndx, spec);
-    if (m_search_index) {
-        m_search_index->refresh_accessor_tree(new_col_ndx, spec);
-    }
-}
-
 
 void ColumnBase::cascade_break_backlinks_to(size_t, CascadeState&)
 {
@@ -113,13 +87,6 @@ void ColumnBase::cascade_break_backlinks_to(size_t, CascadeState&)
 void ColumnBase::cascade_break_backlinks_to_all_rows(size_t, CascadeState&)
 {
     // No-op by default
-}
-
-void ColumnBaseWithIndex::destroy() noexcept
-{
-    if (m_search_index) {
-        m_search_index->destroy();
-    }
 }
 
 void ColumnBase::verify(const Table&, size_t column_ndx) const
@@ -136,88 +103,6 @@ void ColumnBaseSimple::replace_root_array(std::unique_ptr<Array> leaf)
     leaf->set_parent(parent, ndx_in_parent);
     leaf->update_parent(); // Throws
     m_array = std::move(leaf);
-}
-
-
-namespace {
-
-struct GetSizeFromRef {
-    const ref_type m_ref;
-    Allocator& m_alloc;
-    size_t m_size;
-    GetSizeFromRef(ref_type r, Allocator& a)
-        : m_ref(r)
-        , m_alloc(a)
-        , m_size(0)
-    {
-    }
-
-    template <class Col>
-    void call() noexcept
-    {
-        m_size = Col::get_size_from_ref(m_ref, m_alloc);
-    }
-};
-
-template <class Op>
-void col_type_deleg(Op& op, ColumnType type, bool nullable)
-{
-    switch (type) {
-        case col_type_Int:
-        case col_type_Bool:
-        case col_type_OldDateTime:
-            if (nullable)
-                op.template call<IntNullColumn>();
-            else
-                op.template call<IntegerColumn>();
-            return;
-        case col_type_Link:
-            op.template call<IntegerColumn>();
-            return;
-        case col_type_Timestamp:
-            op.template call<TimestampColumn>();
-            return;
-        case col_type_String:
-            op.template call<StringColumn>();
-            return;
-        case col_type_StringEnum:
-            op.template call<StringEnumColumn>();
-            return;
-        case col_type_Binary:
-            op.template call<BinaryColumn>();
-            return;
-        case col_type_Table:
-            op.template call<SubtableColumn>();
-            return;
-        case col_type_Mixed:
-            op.template call<MixedColumn>();
-            return;
-        case col_type_Float:
-            op.template call<FloatColumn>();
-            return;
-        case col_type_Double:
-            op.template call<DoubleColumn>();
-            return;
-        case col_type_LinkList:
-            op.template call<LinkListColumn>();
-            return;
-        case col_type_BackLink:
-            op.template call<BacklinkColumn>();
-            return;
-        case col_type_Reserved4:
-            break;
-    }
-    REALM_ASSERT_DEBUG(false);
-}
-
-} // anonymous namespace
-
-
-size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref, Allocator& alloc, bool nullable) noexcept
-{
-    GetSizeFromRef op(ref, alloc);
-    col_type_deleg(op, type, nullable);
-    return op.m_size;
 }
 
 
@@ -360,18 +245,6 @@ void IntegerColumn::reference_sort(size_t start, size_t end, Column& ref)
         ref.add(ResI->get(t));
 }
 */
-
-
-void ColumnBaseWithIndex::destroy_search_index() noexcept
-{
-    m_search_index.reset();
-}
-
-void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
-{
-    REALM_ASSERT(!m_search_index);
-    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, get_alloc())); // Throws
-}
 
 
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions

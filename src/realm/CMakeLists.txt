@@ -2,46 +2,53 @@ set(REALM_SOURCES
     alloc.cpp
     alloc_slab.cpp
     array.cpp
+    array_backlink.cpp
     array_binary.cpp
     array_blob.cpp
+    array_blobs_small.cpp
     array_blobs_big.cpp
     array_integer.cpp
+    array_unsigned.cpp
     array_string.cpp
+    array_string_short.cpp
     array_string_long.cpp
+    array_timestamp.cpp
     bptree.cpp
+    bplustree.cpp
+    cluster.cpp
     column.cpp
     column_backlink.cpp
     column_binary.cpp
     column_link.cpp
     column_link_base.cpp
     column_linklist.cpp
-    column_mixed.cpp
     column_string.cpp
     column_string_enum.cpp
-    column_table.cpp
     column_timestamp.cpp
-    descriptor.cpp
     disable_sync_to_disk.cpp
     exceptions.cpp
     group.cpp
-    group_shared.cpp
+    db.cpp
     group_writer.cpp
     history.cpp
     impl/output_stream.cpp
     impl/simulated_failure.cpp
     impl/transact_log.cpp
     index_string.cpp
-    lang_bind_helper.cpp
-    link_view.cpp
+    list.cpp
+    node.cpp
+    obj.cpp
     query.cpp
     query_engine.cpp
     query_expression.cpp
     replication.cpp
-    row.cpp
     spec.cpp
     string_data.cpp
     table.cpp
+    table_ref.cpp
+    obj_list.cpp
     table_view.cpp
+    sort_descriptor.cpp
     unicode.cpp
     util/base64.cpp
     util/basic_system_errors.cpp
@@ -59,24 +66,31 @@ set(REALM_SOURCES
     util/to_string.cpp
     utilities.cpp
     version.cpp
-    views.cpp
 ) # REALM_SOURCES
 
 set(REALM_INSTALL_GENERAL_HEADERS
     alloc.hpp
     alloc_slab.hpp
     array.hpp
+    array_backlink.hpp
     array_basic.hpp
     array_basic_tpl.hpp
     array_binary.hpp
     array_blob.hpp
+    array_blobs_small.hpp
     array_blobs_big.hpp
     array_direct.hpp
     array_integer.hpp
+    array_bool.hpp
+    array_unsigned.hpp
     array_string.hpp
+    array_string_short.hpp
     array_string_long.hpp
+    array_timestamp.hpp
     binary_data.hpp
     bptree.hpp
+    cluster.hpp
+    cluster_tree.hpp
     column.hpp
     column_backlink.hpp
     column_binary.hpp
@@ -84,52 +98,47 @@ set(REALM_INSTALL_GENERAL_HEADERS
     column_link.hpp
     column_linkbase.hpp
     column_linklist.hpp
-    column_mixed.hpp
-    column_mixed_tpl.hpp
     column_string.hpp
     column_string_enum.hpp
-    column_table.hpp
     column_timestamp.hpp
     column_tpl.hpp
     column_type.hpp
     column_type_traits.hpp
     data_type.hpp
-    descriptor.hpp
-    descriptor_fwd.hpp
     disable_sync_to_disk.hpp
     exceptions.hpp
     group.hpp
-    group_shared.hpp
-    group_shared_options.hpp
+    db.hpp
+    db_options.hpp
     group_writer.hpp
     handover_defs.hpp
     history.hpp
     index_string.hpp
-    lang_bind_helper.hpp
-    link_view.hpp
-    link_view_fwd.hpp
+    keys.hpp
     mixed.hpp
     null.hpp
-    olddatetime.hpp
+    list.hpp
+    node.hpp
+    node_header.hpp
+    obj.hpp
     owned_data.hpp
     query.hpp
     query_conditions.hpp
     query_engine.hpp
     query_expression.hpp
-    query_operators.hpp
     realm_nmmintrin.h
     replication.hpp
-    row.hpp
     spec.hpp
     string_data.hpp
     table.hpp
     table_ref.hpp
+    sort_descriptor.hpp
+    obj_list.hpp
     table_view.hpp
     timestamp.hpp
     unicode.hpp
     utilities.hpp
     version_id.hpp
-    views.hpp
 ) # REALM_INSTALL_GENERAL_HEADERS
 
 set(REALM_PARSER_SOURCES
@@ -161,7 +170,6 @@ set(REALM_INSTALL_IMPL_HEADERS
     impl/destroy_guard.hpp
     impl/input_stream.hpp
     impl/output_stream.hpp
-    impl/sequential_getter.hpp
     impl/simulated_failure.hpp
     impl/transact_log.hpp
 )
@@ -192,7 +200,6 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/priority_queue.hpp
     util/safe_int_ops.hpp
     util/serializer.hpp
-    util/scope_exit.hpp
     util/shared_ptr.hpp
     util/string_buffer.hpp
     util/terminate.hpp
@@ -419,18 +426,18 @@ if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NO
         OUTPUT_NAME "realm-config"
         DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
 
-    add_executable(RealmImporter importer_tool.cpp importer.cpp importer.hpp)
-    set_target_properties(RealmImporter PROPERTIES
-        OUTPUT_NAME "realm-importer"
-        DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
-    target_link_libraries(RealmImporter realm)
+    # FIXME add_executable(RealmImporter importer_tool.cpp importer.cpp importer.hpp)
+    # set_target_properties(RealmImporter PROPERTIES
+    #     OUTPUT_NAME "realm-importer"
+    #     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
+    # target_link_libraries(RealmImporter realm)
 
     add_executable(RealmTrawler realm_trawler.cpp)
     set_target_properties(RealmTrawler PROPERTIES
         OUTPUT_NAME "realm-trawler"
         DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
 
-    install(TARGETS RealmConfig RealmImporter
+    install(TARGETS RealmConfig # RealmImporter
             COMPONENT runtime
             DESTINATION ${CMAKE_INSTALL_BINDIR})
 

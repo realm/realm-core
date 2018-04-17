@@ -57,6 +57,7 @@ public:
     // Get the list of metric objects tracked since the last take
     std::unique_ptr<QueryInfoList> take_queries();
     std::unique_ptr<TransactionInfoList> take_transactions();
+
 private:
     std::unique_ptr<QueryInfoList> m_query_info;
     std::unique_ptr<TransactionInfoList> m_transaction_info;
@@ -68,15 +69,13 @@ private:
 
 #else
 
-class Metrics
-{
+class Metrics {
 };
 
 #endif // REALM_METRICS
 
 } // namespace metrics
 } // namespace realm
-
 
 
 #endif // REALM_METRICS_HPP

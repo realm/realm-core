@@ -24,26 +24,31 @@
 namespace realm {
 namespace parser {
 
-ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression& e, query_builder::Arguments& args, parser::KeyPathMapping& mapping)
+ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression& e, query_builder::Arguments& args,
+                                         parser::KeyPathMapping& mapping)
 {
     if (e.type == parser::Expression::Type::KeyPath) {
         PropertyExpression pe(query, e.s, mapping);
         switch (e.collection_op) {
             case parser::Expression::KeyPathOp::Min:
                 type = ExpressionInternal::exp_OpMin;
-                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Min>(std::move(pe), e.op_suffix, mapping);
+                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Min>(std::move(pe), e.op_suffix,
+                                                                                           mapping);
                 break;
             case parser::Expression::KeyPathOp::Max:
                 type = ExpressionInternal::exp_OpMax;
-                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Max>(std::move(pe), e.op_suffix, mapping);
+                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Max>(std::move(pe), e.op_suffix,
+                                                                                           mapping);
                 break;
             case parser::Expression::KeyPathOp::Sum:
                 type = ExpressionInternal::exp_OpSum;
-                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum>(std::move(pe), e.op_suffix, mapping);
+                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Sum>(std::move(pe), e.op_suffix,
+                                                                                           mapping);
                 break;
             case parser::Expression::KeyPathOp::Avg:
                 type = ExpressionInternal::exp_OpAvg;
-                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>(std::move(pe), e.op_suffix, mapping);
+                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>(std::move(pe), e.op_suffix,
+                                                                                           mapping);
                 break;
             case parser::Expression::KeyPathOp::Count:
                 REALM_FALLTHROUGH;
@@ -52,15 +57,18 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
             case parser::Expression::KeyPathOp::SizeBinary:
                 if (pe.get_dest_type() == type_LinkList || pe.get_dest_type() == type_Link) {
                     type = ExpressionInternal::exp_OpCount;
-                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>(std::move(pe), e.op_suffix, mapping);
+                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>(
+                        std::move(pe), e.op_suffix, mapping);
                 }
                 else if (pe.get_dest_type() == type_String) {
                     type = ExpressionInternal::exp_OpSizeString;
-                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>(std::move(pe), e.op_suffix, mapping);
+                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>(
+                        std::move(pe), e.op_suffix, mapping);
                 }
                 else if (pe.get_dest_type() == type_Binary) {
                     type = ExpressionInternal::exp_OpSizeBinary;
-                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>(std::move(pe), e.op_suffix, mapping);
+                    storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>(
+                        std::move(pe), e.op_suffix, mapping);
                 }
                 else {
                     throw std::runtime_error("Invalid query: @size and @count can only operate on types list, binary, or string");
@@ -81,7 +89,9 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
         // other properties of the parent table).
         // This means that every keypath must start with the variable, we require it to be there and remove it.
         bool did_add = mapping.add_mapping(exp.get_subquery().get_table(), e.subquery_var, "");
-        realm_precondition(did_add, util::format("Unable to create a subquery expression with variable '%1' since an identical variable already exists in this context", e.subquery_var));
+        realm_precondition(did_add, util::format("Unable to create a subquery expression with variable '%1' since an "
+                                                 "identical variable already exists in this context",
+                                                 e.subquery_var));
         query_builder::apply_predicate(exp.get_subquery(), *e.subquery, args, mapping);
         mapping.remove_mapping(exp.get_subquery().get_table(), e.subquery_var);
         storage = std::move(exp);
@@ -196,10 +206,10 @@ DataType ExpressionContainer::check_type_compatibility(DataType other_type)
 
 bool is_count_type(ExpressionContainer::ExpressionInternal exp_type)
 {
-    return exp_type == ExpressionContainer::ExpressionInternal::exp_OpCount
-        || exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeString
-        || exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeBinary
-        || exp_type == ExpressionContainer::ExpressionInternal::exp_SubQuery;
+    return exp_type == ExpressionContainer::ExpressionInternal::exp_OpCount ||
+           exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeString ||
+           exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeBinary ||
+           exp_type == ExpressionContainer::ExpressionInternal::exp_SubQuery;
 }
 
 DataType ExpressionContainer::get_comparison_type(ExpressionContainer& rhs) {

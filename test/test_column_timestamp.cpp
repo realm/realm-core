@@ -75,17 +75,17 @@ TEST(TimestampColumn_Basic_Nulls)
 
     // Test that default value is null() for nullable column and non-null for non-nullable column
     Table t;
-    t.add_column(type_Timestamp, "date", non_nullable);
-    t.add_column(type_Timestamp, "date", nullable);
+    auto col_non_nullable = t.add_column(type_Timestamp, "date", non_nullable);
+    auto col_nullable = t.add_column(type_Timestamp, "date_null", nullable);
 
-    t.add_empty_row();
-    CHECK(!t.is_null(0, 0));
-    CHECK(t.is_null(1, 0));
+    Obj obj = t.create_object();
+    CHECK(!obj.is_null(col_non_nullable));
+    CHECK(obj.is_null(col_nullable));
 
-    CHECK_THROW_ANY(t.set_null(0, 0));
-    t.set_null(1, 0);
+    CHECK_THROW_ANY(obj.set_null(col_non_nullable));
+    obj.set_null(col_nullable);
 
-    CHECK_THROW_ANY(t.set_timestamp(0, 0, Timestamp{}));
+    CHECK_THROW_ANY(obj.set<Timestamp>(col_non_nullable, Timestamp{}));
 }
 
 TEST(TimestampColumn_Relocate)
@@ -94,11 +94,10 @@ TEST(TimestampColumn_Relocate)
 
     // Fill so much data in a column that it relocates, to check if relocation propagates up correctly
     Table t;
-    t.add_column(type_Timestamp, "date", nullable);
+    auto col = t.add_column(type_Timestamp, "date", nullable);
 
     for (unsigned int i = 0; i < 10000; i++) {
-        t.add_empty_row();
-        t.set_timestamp(0, i, Timestamp(i, i));
+        t.create_object().set<Timestamp>(col, Timestamp(i, i));
     }
 }
 
@@ -124,6 +123,7 @@ TEST_TYPES(TimestampColumn_Compare, std::true_type, std::false_type)
     c.destroy();
 }
 
+#ifdef LEGACY_TESTS
 TEST_TYPES(TimestampColumn_Index, std::true_type, std::false_type)
 {
     constexpr bool nullable_toggle = TEST_TYPE::value;
@@ -436,6 +436,7 @@ TEST(TimestampColumn_LargeNegativeTimestampSearchIndexErase)
     c.destroy_search_index();
     c.destroy();
 }
+#endif
 
 namespace { // anonymous namespace
 
@@ -556,6 +557,7 @@ TEST_TYPES(TimestampColumn_ForceReallocate, std::true_type, std::false_type)
     c.destroy();
 }
 
+#ifdef LEGACY_TESTS
 TEST(TimestampColumn_FindFirst)
 {
     constexpr bool nullable = true;
@@ -594,6 +596,7 @@ TEST(TimestampColumn_FindFirst)
     CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(1, 1)), 4);
     CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(-1, 0)), 5);
 }
+#endif
 
 TEST(TimestampColumn_AddColumnAfterRows)
 {
@@ -601,19 +604,21 @@ TEST(TimestampColumn_AddColumnAfterRows)
     constexpr bool non_nullable = false;
 
     Table t;
-    t.add_column(type_Int, "1", non_nullable);
-    t.add_empty_row(REALM_MAX_BPNODE_SIZE * 2 + 1);
-    t.set_int(0, 0, 100);
+    auto col_0 = t.add_column(type_Int, "1", non_nullable);
+    std::vector<ObjKey> keys;
+    t.create_objects(REALM_MAX_BPNODE_SIZE * 2 + 1, keys);
+    t.get_object(keys[0]).set<Int>(col_0, 100);
 
-    t.add_column(type_Timestamp, "2", non_nullable);
-    t.add_column(type_Timestamp, "3", nullable);
-    CHECK_EQUAL(t.get_timestamp(1, 0).get_seconds(), 0);
-    CHECK_EQUAL(t.get_timestamp(1, 0).get_nanoseconds(), 0);
-    CHECK(t.get_timestamp(2, 0).is_null());
-    CHECK(t.is_null(2, 0));
+    auto col_1 = t.add_column(type_Timestamp, "2", non_nullable);
+    auto col_2 = t.add_column(type_Timestamp, "3", nullable);
+    CHECK_EQUAL(t.get_object(keys[0]).get<Timestamp>(col_1).get_seconds(), 0);
+    CHECK_EQUAL(t.get_object(keys[0]).get<Timestamp>(col_1).get_nanoseconds(), 0);
+    CHECK(t.get_object(keys[0]).get<Timestamp>(col_2).is_null());
+    CHECK(t.get_object(keys[0]).is_null(col_2));
 }
 
 // max/min on pure null timestamps must reuturn npos like for int, float and double
+#ifdef LEGACY_TESTS
 TEST(TimestampColumn_AggregateBug)
 {
     size_t index;
@@ -658,23 +663,7 @@ TEST(TimestampColumn_AggregateBug)
     CHECK_EQUAL(2, index);
     CHECK_EQUAL(ts, Timestamp(1, 0));
 }
-
-TEST(Table_DistinctTimestamp)
-{
-    Table table;
-    table.add_column(type_Timestamp, "first");
-    table.add_empty_row(4);
-    table.set_timestamp(0, 0, Timestamp(0, 0));
-    table.set_timestamp(0, 1, Timestamp(1, 0));
-    table.set_timestamp(0, 2, Timestamp(3, 0));
-    table.set_timestamp(0, 3, Timestamp(3, 0));
-
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
-
-    TableView view = table.get_distinct_view(0);
-    CHECK_EQUAL(3, view.size());
-}
+#endif
 
 
 namespace {

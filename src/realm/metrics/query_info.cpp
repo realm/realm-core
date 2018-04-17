@@ -64,7 +64,7 @@ std::unique_ptr<MetricTimer> QueryInfo::track(const Query* query, QueryType type
 {
     REALM_ASSERT_DEBUG(query);
 
-    if (!bool(query->m_table) || !query->m_table->is_attached()) {
+    if (!bool(query->m_table)) {
         return nullptr;
     }
 
@@ -87,8 +87,7 @@ std::unique_ptr<MetricTimer> QueryInfo::track(const Query* query, QueryType type
 
 QueryInfo::QueryType QueryInfo::type_from_action(Action action)
 {
-    switch (action)
-    {
+    switch (action) {
         case act_ReturnFirst:
             return type_Find;
         case act_Sum:

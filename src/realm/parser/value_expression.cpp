@@ -104,7 +104,7 @@ ValueExpression::ValueExpression(Query& query, query_builder::Arguments* args, c
 , arguments(args) {
     table_getter = [&] {
         auto& tbl = query.get_table();
-        return tbl.get();
+        return tbl;
     };
 }
 

@@ -19,8 +19,22 @@
 #include <realm/query_engine.hpp>
 
 #include <realm/query_expression.hpp>
+#include <realm/db.hpp>
 
 using namespace realm;
+
+ParentNode::ParentNode(const ParentNode& from, Transaction* tr)
+    : m_child(from.m_child ? from.m_child->clone(tr) : nullptr)
+    , m_condition_column_name(from.m_condition_column_name)
+    , m_condition_column_key(from.m_condition_column_key)
+    , m_dD(from.m_dD)
+    , m_dT(from.m_dT)
+    , m_probes(from.m_probes)
+    , m_matches(from.m_matches)
+    , m_table(tr ? tr->import_copy_of(from.m_table) : from.m_table)
+{
+}
+
 
 size_t ParentNode::find_first(size_t start, size_t end)
 {
@@ -51,13 +65,23 @@ size_t ParentNode::find_first(size_t start, size_t end)
     return not_found;
 }
 
+bool ParentNode::match(ConstObj& obj)
+{
+    auto cb = [this](const Cluster* cluster, size_t row) {
+        set_cluster(cluster);
+        size_t m = find_first(row, row + 1);
+        return m != npos;
+    };
+    return obj.evaluate(cb);
+}
+
 void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)
 {
     if (TAction == act_ReturnFirst) {
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayInteger>;
     }
     else if (TAction == act_Count) {
         // For count(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being read
@@ -66,43 +90,43 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
         if (nullable)
             REALM_ASSERT(false);
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Count, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Count, ArrayInteger>;
     }
     else if (TAction == act_Sum && col_id == type_Int) {
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayInteger>;
     }
     else if (TAction == act_Sum && col_id == type_Float) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, FloatColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayFloat>;
     }
     else if (TAction == act_Sum && col_id == type_Double) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, DoubleColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayDouble>;
     }
     else if (TAction == act_Max && col_id == type_Int) {
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayInteger>;
     }
     else if (TAction == act_Max && col_id == type_Float) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, FloatColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayFloat>;
     }
     else if (TAction == act_Max && col_id == type_Double) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, DoubleColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayDouble>;
     }
     else if (TAction == act_Min && col_id == type_Int) {
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayInteger>;
     }
     else if (TAction == act_Min && col_id == type_Float) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, FloatColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayFloat>;
     }
     else if (TAction == act_Min && col_id == type_Double) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, DoubleColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayDouble>;
     }
     else if (TAction == act_FindAll) {
         // For find_all(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being read
@@ -111,16 +135,16 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
         if (nullable)
             REALM_ASSERT(false);
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, ArrayInteger>;
     }
     else if (TAction == act_CallbackIdx) {
         // Future features where for each query match, you want to perform an action that only requires knowlege
         // about the row index, and not the payload there. Examples could be find_all(), however, this code path
         // below is for new features given in a callback method and not yet supported by core.
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayInteger>;
     }
     else {
         REALM_ASSERT(false);
@@ -128,7 +152,7 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
 }
 
 size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                                   SequentialGetterBase* source_column)
+                                   ArrayPayload* source_column)
 {
     // aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
     // integer version, because find_first_local() is relatively slower here (because it's non-integers).
@@ -138,6 +162,7 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     // in a tight loop if so (instead of testing if there are sub criterias after each match). Harder: Specialize
     // data type array to make array call match() directly on each match, like for integers.
 
+    m_state = st;
     size_t local_matches = 0;
 
     size_t r = start - 1;
@@ -177,51 +202,24 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     }
 }
 
-void StringNodeEqualBase::deallocate() noexcept
-{
-    // Must be called after each query execution to free temporary resources used by the execution. Run in
-    // destructor, but also in Init because a user could define a query once and execute it multiple times.
-    clear_leaf_state();
-
-    if (m_index_matches_destroy)
-        m_index_matches->destroy();
-
-    m_index_matches_destroy = false;
-    m_index_matches.reset();
-    m_index_getter.reset();
-}
-
 void StringNodeEqualBase::init()
 {
-    deallocate();
     m_dD = 10.0;
     StringNodeBase::init();
 
-    if (m_column_type == col_type_StringEnum) {
+    if (m_is_string_enum) {
         m_dT = 1.0;
-        m_key_ndx = static_cast<const StringEnumColumn*>(m_condition_column)->get_key_ndx(m_value);
     }
-    else if (m_condition_column->has_search_index()) {
+    else if (m_has_search_index) {
         m_dT = 0.0;
     }
     else {
         m_dT = 10.0;
     }
 
-    if (m_condition_column->has_search_index()) {
-        m_index_matches_destroy = false;
-        m_last_start = size_t(-1);
-
+    if (m_has_search_index) {
         // Will set m_index_matches, m_index_matches_destroy, m_results_start and m_results_end
         _search_index_init();
-
-        if (m_index_matches) {
-            m_index_getter.reset(new SequentialGetter<IntegerColumn>(m_index_matches.get()));
-        }
-    }
-    else if (m_column_type != col_type_String) {
-        REALM_ASSERT_DEBUG(dynamic_cast<const StringEnumColumn*>(m_condition_column));
-        m_cse.init(static_cast<const StringEnumColumn*>(m_condition_column));
     }
 }
 
@@ -229,60 +227,34 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
 {
     REALM_ASSERT(m_table);
 
-    if (m_condition_column->has_search_index()) {
-        // Indexed string column
-        if (!m_index_getter)
-            return not_found; // no matches in the index
+    if (m_has_search_index) {
+        // Check if m_actual_key is in the current leaf
 
-        if (m_last_start > start)
-            m_last_indexed = m_results_start;
-        m_last_start = start;
-
-        while (m_last_indexed < m_results_end) {
-            m_index_getter->cache_next(m_last_indexed);
-            size_t f = m_index_getter->m_leaf_ptr->find_gte(start, m_last_indexed - m_index_getter->m_leaf_start,
-                                                            m_results_end - m_index_getter->m_leaf_start);
-
-            if (f == not_found) {
-                // Not found in this leaf - move on to next
-                m_last_indexed = m_index_getter->m_leaf_end;
-            }
-            else if (f >= (m_results_end - m_index_getter->m_leaf_start)) {
-                // Found outside valid range
-                return not_found;
-            }
-            else {
-                size_t found_index = to_size_t(m_index_getter->m_leaf_ptr->get(f));
-                if (found_index >= end)
+        // Check if we can expect to find more keys
+        if (m_results_start < m_results_end && start < end) {
+            // Check if we should advance to next key to search for
+            ObjKey first_key = m_cluster->get_real_key(start);
+            while (first_key > m_actual_key) {
+                m_results_start++;
+                if (m_results_start == m_results_end)
                     return not_found;
-                else {
-                    m_last_indexed = f + m_index_getter->m_leaf_start;
-                    return found_index;
-                }
+                m_actual_key = get_key(m_results_start);
             }
+
+            // If actual_key is bigger than last key, it is not in this leaf
+            ObjKey last_key = m_cluster->get_real_key(end - 1);
+            if (m_actual_key > last_key)
+                return not_found;
+
+            // Now actual_key must be found in leaf keys
+            return m_cluster->lower_bound_key(ObjKey(m_actual_key.value - m_cluster->get_offset()));
         }
-        return not_found;
-    }
-
-    if (m_column_type != col_type_String) {
-        // Enum string column
-        if (m_key_ndx == not_found)
-            return not_found; // not in key set
-
-        for (size_t s = start; s < end; ++s) {
-            m_cse.cache_next(s);
-            s = m_cse.m_leaf_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.local_end(end));
-            if (s == not_found)
-                s = m_cse.m_leaf_end - 1;
-            else
-                return s + m_cse.m_leaf_start;
-        }
-
         return not_found;
     }
 
     return _find_first_local(start, end);
 }
+
 
 namespace realm {
 
@@ -291,20 +263,12 @@ void StringNode<Equal>::_search_index_init()
     FindRes fr;
     InternalFindResult res;
 
-    if (m_column_type == col_type_StringEnum) {
-        fr = static_cast<const StringEnumColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
-    }
-    else {
-        fr = static_cast<const StringColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
-    }
+    auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+    fr = index->find_all_no_copy(StringData(StringNodeBase::m_value), res);
 
     switch (fr) {
         case FindRes_single:
-            m_index_matches.reset(
-                new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
-            m_index_matches->get_root_array()->create(Array::type_Normal);                          // Throws
-            m_index_matches->add(res.payload);
-            m_index_matches_destroy = true; // we own m_index_matches, so we must destroy it
+            m_actual_key = ObjKey(res.payload);
             m_results_start = 0;
             m_results_end = 1;
             break;
@@ -312,76 +276,33 @@ void StringNode<Equal>::_search_index_init()
             // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which
             // simply makes
             // translate(x) = x. Shouldn't it inherit owner column's allocator?!
-            m_index_matches.reset(new IntegerColumn(m_condition_column->get_alloc(), res.payload)); // Throws
+            m_index_matches.reset(new IntegerColumn(m_table->get_alloc(), res.payload)); // Throws
             m_results_start = res.start_ndx;
             m_results_end = res.end_ndx;
-
-            // FIXME: handle start and end of find_result!
+            m_actual_key = ObjKey(m_index_matches->get(m_results_start));
             break;
         case FindRes_not_found:
             m_index_matches.reset();
-            m_index_getter.reset();
+            m_results_start = 0;
+            m_results_end = 0;
             break;
     }
 }
 
 size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 {
-    // Normal string column, with long or short leaf
-    for (size_t s = start; s < end; ++s) {
-        const StringColumn* asc = static_cast<const StringColumn*>(m_condition_column);
-        if (s >= m_leaf_end || s < m_leaf_start) {
-            clear_leaf_state();
-            size_t ndx_in_leaf;
-            m_leaf = asc->get_leaf(s, ndx_in_leaf, m_leaf_type);
-            m_leaf_start = s - ndx_in_leaf;
-            if (m_leaf_type == StringColumn::leaf_type_Small)
-                m_leaf_end = m_leaf_start + static_cast<const ArrayString&>(*m_leaf).size();
-            else if (m_leaf_type == StringColumn::leaf_type_Medium)
-                m_leaf_end = m_leaf_start + static_cast<const ArrayStringLong&>(*m_leaf).size();
-            else
-                m_leaf_end = m_leaf_start + static_cast<const ArrayBigBlobs&>(*m_leaf).size();
-            REALM_ASSERT(m_leaf);
-        }
-        size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
-
-        if (m_leaf_type == StringColumn::leaf_type_Small)
-            s = static_cast<const ArrayString&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
-        else if (m_leaf_type == StringColumn::leaf_type_Medium)
-            s = static_cast<const ArrayStringLong&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
-        else
-            s = static_cast<const ArrayBigBlobs&>(*m_leaf).find_first(str_to_bin(m_value), true, s - m_leaf_start,
-                                                                      end2);
-
-        if (s == not_found)
-            s = m_leaf_end - 1;
-        else
-            return s + m_leaf_start;
-    }
-
-    return not_found;
+    return m_leaf_ptr->find_first(m_value, start, end);
 }
 
 void StringNode<EqualIns>::_search_index_init()
 {
-    if (m_column_type == col_type_StringEnum) {
-        REALM_ASSERT_RELEASE(false && "Case insensitive searches in StringEnum columns is not yet implemented.");
-        // FindRes fr;
-        InternalFindResult res;
-        /*fr = */ static_cast<const StringEnumColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
-    }
-    else {
-        m_index_matches.reset(
-            new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
-        m_index_matches->get_root_array()->create(Array::type_Normal);                          // Throws
-        // m_index_matches->add(res.payload);
-        StringData needle(m_value);
-        m_condition_column->get_search_index()->find_all(*m_index_matches, needle, true);
-    }
-
-    m_index_matches_destroy = true; // we own m_index_matches, so we must destroy it
+    auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+    index->find_all(m_index_matches, StringData(StringNodeBase::m_value), true);
     m_results_start = 0;
-    m_results_end = m_index_matches->size();
+    m_results_end = m_index_matches.size();
+    if (m_results_start != m_results_end) {
+        m_actual_key = m_index_matches[0];
+    }
 }
 
 size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
@@ -541,7 +462,12 @@ ExpressionNode::ExpressionNode(std::unique_ptr<Expression> expression)
 
 void ExpressionNode::table_changed()
 {
-    m_expression->set_base_table(m_table.get());
+    m_expression->set_base_table(m_table);
+}
+
+void ExpressionNode::cluster_changed()
+{
+    m_expression->set_cluster(m_cluster);
 }
 
 std::string ExpressionNode::describe(util::serializer::SerialisationState& state) const
@@ -554,9 +480,9 @@ std::string ExpressionNode::describe(util::serializer::SerialisationState& state
     }
 }
 
-void ExpressionNode::verify_column() const
+void ExpressionNode::collect_dependencies(std::vector<TableKey>& tables) const
 {
-    m_expression->verify_column();
+    m_expression->collect_dependencies(tables);
 }
 
 size_t ExpressionNode::find_first_local(size_t start, size_t end)
@@ -564,19 +490,13 @@ size_t ExpressionNode::find_first_local(size_t start, size_t end)
     return m_expression->find_first(start, end);
 }
 
-std::unique_ptr<ParentNode> ExpressionNode::clone(QueryNodeHandoverPatches* patches) const
+std::unique_ptr<ParentNode> ExpressionNode::clone(Transaction* tr) const
 {
-    return std::unique_ptr<ParentNode>(new ExpressionNode(*this, patches));
+    return std::unique_ptr<ParentNode>(new ExpressionNode(*this, tr));
 }
 
-void ExpressionNode::apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group)
-{
-    m_expression->apply_handover_patch(patches, group);
-    ParentNode::apply_handover_patch(patches, group);
-}
-
-ExpressionNode::ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatches* patches)
-: ParentNode(from, patches)
-, m_expression(from.m_expression->clone(patches))
+ExpressionNode::ExpressionNode(const ExpressionNode& from, Transaction* tr)
+    : ParentNode(from, tr)
+    , m_expression(from.m_expression->clone(tr))
 {
 }

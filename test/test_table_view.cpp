@@ -25,9 +25,7 @@
 #include <ostream>
 #include <cwchar>
 
-#include <realm/group_shared.hpp>
-#include <realm/table_view.hpp>
-#include <realm/query_expression.hpp>
+#include <realm.hpp>
 
 #include "util/misc.hpp"
 
@@ -65,6 +63,7 @@ using namespace test_util;
 // Another way to debug a particular test, is to copy that test into
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
+#ifdef LEGACY_TESTS
 
 TEST(TableView_Json)
 {
@@ -216,68 +215,72 @@ TEST(TableView_FloatsGetSet)
     v[0].set_double(1, 123.3219);
     CHECK_EQUAL(123.3219, v[0].get_double(1));
 }
+#endif
 
 TEST(TableView_FloatsFindAndAggregations)
 {
-    TestTable table;
-    table.add_column(type_Float, "1");
-    table.add_column(type_Double, "2");
-    table.add_column(type_Int, "3");
+    Table table;
+    auto col_float = table.add_column(type_Float, "1");
+    auto col_double = table.add_column(type_Double, "2");
+    auto col_int = table.add_column(type_Int, "3");
 
     float f_val[] = {1.2f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f};
     double d_val[] = {-1.2, 2.2, 3.2, -1.2, 2.3, 0.0};
     // v_some =       ^^^^            ^^^^
     double sum_f = 0.0;
     double sum_d = 0.0;
-    for (size_t i = 0; i < 6; ++i) {
-        add(table, f_val[i], d_val[i], 1);
+    std::vector<ObjKey> keys;
+    table.create_objects(6, keys);
+    for (int i = 0; i < 6; ++i) {
+        table.get_object(keys[i]).set_all(f_val[i], d_val[i], 1);
         sum_d += d_val[i];
         sum_f += f_val[i];
     }
 
     // Test find_all()
-    TableView v_all = table.find_all_int(2, 1);
+    TableView v_all = table.find_all_int(col_int, 1);
     CHECK_EQUAL(6, v_all.size());
 
-    TableView v_some = table.find_all_double(1, -1.2);
+    TableView v_some = table.find_all_double(col_double, -1.2);
     CHECK_EQUAL(2, v_some.size());
-    CHECK_EQUAL(0, v_some.get_source_ndx(0));
-    CHECK_EQUAL(3, v_some.get_source_ndx(1));
+    CHECK_EQUAL(ObjKey(0), v_some.get_key(0));
+    CHECK_EQUAL(ObjKey(3), v_some.get_key(1));
 
     // Test find_first
-    CHECK_EQUAL(0, v_all.find_first_double(1, -1.2));
-    CHECK_EQUAL(5, v_all.find_first_double(1, 0.0));
-    CHECK_EQUAL(2, v_all.find_first_double(1, 3.2));
+    CHECK_EQUAL(keys[0], v_all.find_first<Double>(col_double, -1.2));
+    CHECK_EQUAL(keys[5], v_all.find_first<Double>(col_double, 0.0));
+    CHECK_EQUAL(keys[2], v_all.find_first<Double>(col_double, 3.2));
 
-    CHECK_EQUAL(1, v_all.find_first_float(0, 2.1f));
-    CHECK_EQUAL(5, v_all.find_first_float(0, 0.0f));
-    CHECK_EQUAL(2, v_all.find_first_float(0, 3.1f));
+    CHECK_EQUAL(keys[1], v_all.find_first<float>(col_float, 2.1f));
+    CHECK_EQUAL(keys[5], v_all.find_first<float>(col_float, 0.0f));
+    CHECK_EQUAL(keys[2], v_all.find_first<float>(col_float, 3.1f));
 
     // TODO: add for float as well
 
     double epsilon = std::numeric_limits<double>::epsilon();
 
     // Test sum
-    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.sum_double(1), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.sum_float(0), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.sum_double(1), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.sum_float(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.sum_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.sum_float(col_float), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.sum_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.sum_float(col_float), 10 * epsilon);
 
-    size_t ndx = not_found;
+    ObjKey key;
 
     // Test max
-    CHECK_EQUAL(3.2, v_all.maximum_double(1, &ndx));
-    CHECK_EQUAL(2, ndx);
+    CHECK_EQUAL(3.2, v_all.maximum_double(col_double, &key));
+    CHECK_EQUAL(ObjKey(2), key);
 
-    CHECK_EQUAL(-1.2, v_some.maximum_double(1, &ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(-1.2, v_some.maximum_double(col_double, &key));
+    CHECK_EQUAL(ObjKey(0), key);
 
-    CHECK_EQUAL(3.1f, v_all.maximum_float(0, &ndx));
-    CHECK_EQUAL(2, ndx);
+    CHECK_EQUAL(3.1f, v_all.maximum_float(col_float, &key));
+    CHECK_EQUAL(ObjKey(2), key);
 
-    CHECK_EQUAL(1.2f, v_some.maximum_float(0, &ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(1.2f, v_some.maximum_float(col_float, &key));
+    CHECK_EQUAL(ObjKey(0), key);
 
+#ifdef LEGACY_TESTS
     // Max without ret_index
     CHECK_EQUAL(3.2, v_all.maximum_double(1));
     CHECK_EQUAL(-1.2, v_some.maximum_double(1));
@@ -289,35 +292,36 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(-1.2, v_some.minimum_double(1));
     CHECK_EQUAL(-1.1f, v_all.minimum_float(0));
     CHECK_EQUAL(-1.1f, v_some.minimum_float(0));
-
+#endif
     // min with ret_ndx
-    CHECK_EQUAL(-1.2, v_all.minimum_double(1, &ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(-1.2, v_all.minimum_double(col_double, &key));
+    CHECK_EQUAL(ObjKey(0), key);
 
-    CHECK_EQUAL(-1.2, v_some.minimum_double(1, &ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(-1.2, v_some.minimum_double(col_double, &key));
+    CHECK_EQUAL(ObjKey(0), key);
 
-    CHECK_EQUAL(-1.1f, v_all.minimum_float(0, &ndx));
-    CHECK_EQUAL(3, ndx);
+    CHECK_EQUAL(-1.1f, v_all.minimum_float(col_float, &key));
+    CHECK_EQUAL(ObjKey(3), key);
 
-    CHECK_EQUAL(-1.1f, v_some.minimum_float(0, &ndx));
-    CHECK_EQUAL(1, ndx);
+    CHECK_EQUAL(-1.1f, v_some.minimum_float(col_float, &key));
+    CHECK_EQUAL(ObjKey(3), key);
 
     // Test avg
-    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.average_double(1), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.average_double(1), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.average_float(0), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.average_float(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.average_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.average_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.average_float(col_float), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.average_float(col_float), 10 * epsilon);
 
-    CHECK_EQUAL(1, v_some.count_float(0, 1.2f));
-    CHECK_EQUAL(2, v_some.count_double(1, -1.2));
-    CHECK_EQUAL(2, v_some.count_int(2, 1));
+    CHECK_EQUAL(1, v_some.count_float(col_float, 1.2f));
+    CHECK_EQUAL(2, v_some.count_double(col_double, -1.2));
+    CHECK_EQUAL(2, v_some.count_int(col_int, 1));
 
-    CHECK_EQUAL(2, v_all.count_float(0, 2.1f));
-    CHECK_EQUAL(2, v_all.count_double(1, -1.2));
-    CHECK_EQUAL(6, v_all.count_int(2, 1));
+    CHECK_EQUAL(2, v_all.count_float(col_float, 2.1f));
+    CHECK_EQUAL(2, v_all.count_double(col_double, -1.2));
+    CHECK_EQUAL(6, v_all.count_int(col_int, 1));
 }
 
+#ifdef LEGACY_TESTS
 TEST(TableView_Sum)
 {
     TestTable table;
@@ -1922,39 +1926,40 @@ TEST(TableView_BacklinksWithColumnInsertion)
     CHECK_EQUAL(tv2.size(), 1);
     CHECK_EQUAL(tv2.get_source_ndx(0), 2);
 }
+#endif
 
 namespace {
 struct DistinctDirect {
     Table& table;
-    DistinctDirect(TableRef, TableRef t)
+    DistinctDirect(TableRef, TableRef t, ColKey)
         : table(*t)
     {
     }
 
-    SortDescriptor get_sort(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
+    SortDescriptor get_sort(std::initializer_list<ColKey> columns, std::vector<bool> ascending = {}) const
     {
-        std::vector<std::vector<size_t>> column_indices;
-        for (size_t col : columns)
+        std::vector<std::vector<ColKey>> column_indices;
+        for (ColKey col : columns)
             column_indices.push_back({col});
         return SortDescriptor(table, column_indices, ascending);
     }
 
-    DistinctDescriptor get_distinct(std::initializer_list<size_t> columns) const
+    DistinctDescriptor get_distinct(std::initializer_list<ColKey> columns) const
     {
-        std::vector<std::vector<size_t>> column_indices;
-        for (size_t col : columns)
+        std::vector<std::vector<ColKey>> column_indices;
+        for (ColKey col : columns)
             column_indices.push_back({col});
         return DistinctDescriptor(table, column_indices);
     }
 
-    size_t get_source_ndx(const TableView& tv, size_t ndx) const
+    ObjKey get_key(const TableView& tv, size_t ndx) const
     {
-        return tv.get_source_ndx(ndx);
+        return tv.get_key(ndx);
     }
 
-    StringData get_string(const TableView& tv, size_t col, size_t row) const
+    StringData get_string(const TableView& tv, ColKey col, size_t row) const
     {
-        return tv.get_string(col, row);
+        return tv.ConstTableView::get_object(row).get<String>(col);
     }
 
     TableView find_all() const
@@ -1965,35 +1970,37 @@ struct DistinctDirect {
 
 struct DistinctOverLink {
     Table& table;
-    DistinctOverLink(TableRef t, TableRef)
+    ColKey m_col_link;
+    DistinctOverLink(TableRef t, TableRef, ColKey col_link)
         : table(*t)
+        , m_col_link(col_link)
     {
     }
 
-    SortDescriptor get_sort(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
+    SortDescriptor get_sort(std::initializer_list<ColKey> columns, std::vector<bool> ascending = {}) const
     {
-        std::vector<std::vector<size_t>> column_indices;
-        for (size_t col : columns)
-            column_indices.push_back({0, col});
+        std::vector<std::vector<ColKey>> column_indices;
+        for (ColKey col : columns)
+            column_indices.push_back({m_col_link, col});
         return SortDescriptor(table, column_indices, ascending);
     }
 
-    DistinctDescriptor get_distinct(std::initializer_list<size_t> columns) const
+    DistinctDescriptor get_distinct(std::initializer_list<ColKey> columns) const
     {
-        std::vector<std::vector<size_t>> column_indices;
-        for (size_t col : columns)
-            column_indices.push_back({0, col});
+        std::vector<std::vector<ColKey>> column_indices;
+        for (ColKey col : columns)
+            column_indices.push_back({m_col_link, col});
         return DistinctDescriptor(table, column_indices);
     }
 
-    size_t get_source_ndx(const TableView& tv, size_t ndx) const
+    ObjKey get_key(const TableView& tv, size_t ndx) const
     {
-        return tv.get_link(0, ndx);
+        return tv.ConstTableView::get_object(ndx).get<ObjKey>(m_col_link);
     }
 
-    StringData get_string(const TableView& tv, size_t col, size_t row) const
+    StringData get_string(const TableView& tv, ColKey col, size_t ndx) const
     {
-        return tv.get_link_target(0)->get_string(col, tv.get_link(0, row));
+        return tv.ConstTableView::get_object(ndx).get_linked_object(m_col_link).get<String>(col);
     }
 
     TableView find_all() const
@@ -2018,188 +2025,165 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     Group g;
     TableRef target = g.add_table("target");
     TableRef origin = g.add_table("origin");
-    origin->add_column_link(type_Link, "link", *target);
+    auto col_link = origin->add_column_link(type_Link, "link", *target);
 
     Table& t = *target;
-    t.add_column(type_String, "s", true);
-    t.add_column(type_Int, "i", true);
+    auto col_str = t.add_column(type_String, "s", true);
+    auto col_int = t.add_column(type_Int, "i", true);
     t.add_column(type_Float, "f", true);
 
-    t.add_empty_row(7);
-    t.set_string(0, 0, StringData(""));
-    t.set_int(1, 0, 100);
-    t.set_float(2, 0, 100.f);
+    ObjKey k0 = t.create_object().set_all(StringData(""), 100, 100.f).get_key();
+    ObjKey k1 = t.create_object().set_all(StringData(), 200, 200.f).get_key();
+    t.create_object().set_all(StringData(""), 100, 100.f).get_key();
+    t.create_object().set_all(StringData(), 200, 200.f).get_key();
+    ObjKey k4 = t.create_object().set_all(StringData("foo"), 300, 300.f).get_key();
+    ObjKey k5 = t.create_object().set_all(StringData("foo"), 400, 400.f).get_key();
+    ObjKey k6 = t.create_object().set_all(StringData("bar"), 500, 500.f).get_key();
 
-    t.set_string(0, 1, realm::null());
-    t.set_int(1, 1, 200);
-    t.set_float(2, 1, 200.f);
+    for (auto it : t) {
+        origin->create_object().set(col_link, it.get_key());
+    }
 
-    t.set_string(0, 2, StringData(""));
-    t.set_int(1, 2, 100);
-    t.set_float(2, 2, 100.f);
-
-    t.set_string(0, 3, realm::null());
-    t.set_int(1, 3, 200);
-    t.set_float(2, 3, 200.f);
-
-    t.set_string(0, 4, "foo");
-    t.set_int(1, 4, 300);
-    t.set_float(2, 4, 300.f);
-
-    t.set_string(0, 5, "foo");
-    t.set_int(1, 5, 400);
-    t.set_float(2, 5, 400.f);
-
-    t.set_string(0, 6, "bar");
-    t.set_int(1, 6, 500);
-    t.set_float(2, 6, 500.f);
-
-    origin->add_empty_row(t.size());
-    for (size_t i = 0; i < t.size(); ++i)
-        origin->set_link(0, i, i);
-
-    TEST_TYPE h(origin, target);
+    TEST_TYPE h(origin, target, col_link);
 
     TableView tv;
     tv = h.find_all();
-    tv.distinct(h.get_distinct({0}));
+    tv.distinct(h.get_distinct({col_str}));
     CHECK_EQUAL(tv.size(), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 0), 0);
-    CHECK_EQUAL(h.get_source_ndx(tv, 1), 1);
-    CHECK_EQUAL(h.get_source_ndx(tv, 2), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 3), 6);
+    CHECK_EQUAL(h.get_key(tv, 0), k0);
+    CHECK_EQUAL(h.get_key(tv, 1), k1);
+    CHECK_EQUAL(h.get_key(tv, 2), k4);
+    CHECK_EQUAL(h.get_key(tv, 3), k6);
 
     tv = h.find_all();
-    tv.distinct(h.get_distinct({0}));
-    tv.sort(h.get_sort({0}));
+    tv.distinct(h.get_distinct({col_str}));
+    tv.sort(h.get_sort({col_str}));
     CHECK_EQUAL(tv.size(), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 0), 1);
-    CHECK_EQUAL(h.get_source_ndx(tv, 1), 0);
-    CHECK_EQUAL(h.get_source_ndx(tv, 2), 6);
-    CHECK_EQUAL(h.get_source_ndx(tv, 3), 4);
+    CHECK_EQUAL(h.get_key(tv, 0), k1);
+    CHECK_EQUAL(h.get_key(tv, 1), k0);
+    CHECK_EQUAL(h.get_key(tv, 2), k6);
+    CHECK_EQUAL(h.get_key(tv, 3), k4);
 
     tv = h.find_all();
-    tv.distinct(h.get_distinct({0}));
-    tv.sort(h.get_sort({0}, {false}));
-    CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 1), 6);
-    CHECK_EQUAL(h.get_source_ndx(tv, 2), 0);
-    CHECK_EQUAL(h.get_source_ndx(tv, 3), 1);
+    tv.distinct(h.get_distinct({col_str}));
+    tv.sort(h.get_sort({col_str}, {false}));
+    CHECK_EQUAL(h.get_key(tv, 0), k4);
+    CHECK_EQUAL(h.get_key(tv, 1), k6);
+    CHECK_EQUAL(h.get_key(tv, 2), k0);
+    CHECK_EQUAL(h.get_key(tv, 3), k1);
 
     // Note here that our stable sort will sort the two "foo"s like row {4, 5}
     tv = h.find_all();
-    tv.distinct(h.get_distinct({0, 1}));
-    tv.sort(h.get_sort({0}, {false}));
+    tv.distinct(h.get_distinct({col_str, col_int}));
+    tv.sort(h.get_sort({col_str}, {false}));
     CHECK_EQUAL(tv.size(), 5);
-    CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
-    CHECK_EQUAL(h.get_source_ndx(tv, 2), 6);
-    CHECK_EQUAL(h.get_source_ndx(tv, 3), 0);
-    CHECK_EQUAL(h.get_source_ndx(tv, 4), 1);
+    CHECK_EQUAL(h.get_key(tv, 0), k4);
+    CHECK_EQUAL(h.get_key(tv, 1), k5);
+    CHECK_EQUAL(h.get_key(tv, 2), k6);
+    CHECK_EQUAL(h.get_key(tv, 3), k0);
+    CHECK_EQUAL(h.get_key(tv, 4), k1);
 
 
     // Now try distinct on string+float column. The float column has the same values as the int column
     // so the result should equal the test above
     tv = h.find_all();
-    tv.distinct(h.get_distinct({0, 1}));
-    tv.sort(h.get_sort({0}, {false}));
+    tv.distinct(h.get_distinct({col_str, col_int}));
+    tv.sort(h.get_sort({col_str}, {false}));
     CHECK_EQUAL(tv.size(), 5);
-    CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
-    CHECK_EQUAL(h.get_source_ndx(tv, 2), 6);
-    CHECK_EQUAL(h.get_source_ndx(tv, 3), 0);
-    CHECK_EQUAL(h.get_source_ndx(tv, 4), 1);
+    CHECK_EQUAL(h.get_key(tv, 0), k4);
+    CHECK_EQUAL(h.get_key(tv, 1), k5);
+    CHECK_EQUAL(h.get_key(tv, 2), k6);
+    CHECK_EQUAL(h.get_key(tv, 3), k0);
+    CHECK_EQUAL(h.get_key(tv, 4), k1);
 
 
     // Same as previous test, but with string column being Enum
-    t.optimize(true); // true = enforce regardless if Realm thinks it pays off or not
+    t.enumerate_string_column(col_str);
     tv = h.find_all();
-    tv.distinct(h.get_distinct({0, 1}));
-    tv.sort(h.get_sort({0}, {false}));
+    tv.distinct(h.get_distinct({col_str, col_int}));
+    tv.sort(h.get_sort({col_str}, {false}));
     CHECK_EQUAL(tv.size(), 5);
-    CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
-    CHECK_EQUAL(h.get_source_ndx(tv, 2), 6);
-    CHECK_EQUAL(h.get_source_ndx(tv, 3), 0);
-    CHECK_EQUAL(h.get_source_ndx(tv, 4), 1);
+    CHECK_EQUAL(h.get_key(tv, 0), k4);
+    CHECK_EQUAL(h.get_key(tv, 1), k5);
+    CHECK_EQUAL(h.get_key(tv, 2), k6);
+    CHECK_EQUAL(h.get_key(tv, 3), k0);
+    CHECK_EQUAL(h.get_key(tv, 4), k1);
 
 
     // Now test sync_if_needed()
     tv = h.find_all();
     // "", null, "", null, "foo", "foo", "bar"
 
-    tv.distinct(h.get_distinct({0}));
-    tv.sort(h.get_sort({0}, {false}));
+    tv.distinct(h.get_distinct({col_str}));
+    tv.sort(h.get_sort({col_str}, {false}));
     // "foo", "bar", "", null
 
     CHECK_EQUAL(tv.size(), 4);
-    CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
-    CHECK_EQUAL(h.get_string(tv, 0, 1), "bar");
-    CHECK_EQUAL(h.get_string(tv, 0, 2), "");
-    CHECK(h.get_string(tv, 0, 3).is_null());
+    CHECK_EQUAL(h.get_string(tv, col_str, 0), "foo");
+    CHECK_EQUAL(h.get_string(tv, col_str, 1), "bar");
+    CHECK_EQUAL(h.get_string(tv, col_str, 2), "");
+    CHECK(h.get_string(tv, col_str, 3).is_null());
 
     // remove "bar"
-    origin->remove(6);
-    target->remove(6);
+    target->remove_object(k6);
     // access to tv undefined; may crash
 
     tv.sync_if_needed();
     // "foo", "", null
 
     CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
-    CHECK_EQUAL(h.get_string(tv, 0, 1), "");
-    CHECK(h.get_string(tv, 0, 2).is_null());
+    CHECK_EQUAL(h.get_string(tv, col_str, 0), "foo");
+    CHECK_EQUAL(h.get_string(tv, col_str, 1), "");
+    CHECK(h.get_string(tv, col_str, 2).is_null());
 }
 
 TEST(TableView_DistinctOverNullLink)
 {
     Group g;
     TableRef target = g.add_table("target");
-    target->add_column(type_Int, "value");
-    target->add_empty_row(2);
-    target->set_int(0, 0, 1);
-    target->set_int(0, 0, 2);
+    auto col_int = target->add_column(type_Int, "value");
+
+    ObjKey k0 = target->create_object().set(col_int, 0).get_key();
+    ObjKey k1 = target->create_object().set(col_int, 1).get_key();
 
     TableRef origin = g.add_table("origin");
-    origin->add_column_link(type_Link, "link", *target);
-    origin->add_empty_row(5);
-    origin->set_link(0, 0, 0);
-    origin->set_link(0, 1, 1);
-    origin->set_link(0, 2, 0);
-    origin->set_link(0, 3, 1);
-    // 4 is null
+    auto col_link = origin->add_column_link(type_Link, "link", *target);
+
+    origin->create_object().set(col_link, k0);
+    origin->create_object().set(col_link, k1);
+    origin->create_object().set(col_link, k0);
+    origin->create_object().set(col_link, k1);
+    origin->create_object(); // link is null
 
     auto tv = origin->where().find_all();
-    tv.distinct(DistinctDescriptor(*origin, {{0, 0}}));
+    tv.distinct(DistinctDescriptor(*origin, {{col_link, col_int}}));
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_source_ndx(0), 0);
-    CHECK_EQUAL(tv.get_source_ndx(1), 1);
+    CHECK_EQUAL(tv.get(0).get_linked_object(col_link).get<Int>(col_int), 0);
+    CHECK_EQUAL(tv.get(1).get_linked_object(col_link).get<Int>(col_int), 1);
 }
 
 TEST(TableView_IsRowAttachedAfterClear)
 {
     Table t;
-    size_t col_id = t.add_column(type_Int, "id");
+    auto col_id = t.add_column(type_Int, "id");
 
-    t.add_empty_row(2);
-    t.set_int(col_id, 0, 0);
-    t.set_int(col_id, 1, 1);
+    t.create_object().set(col_id, 0);
+    t.create_object().set(col_id, 1);
 
     TableView tv = t.where().find_all();
     CHECK_EQUAL(2, tv.size());
-    CHECK(tv.is_row_attached(0));
-    CHECK(tv.is_row_attached(1));
+    CHECK(tv.is_obj_valid(0));
+    CHECK(tv.is_obj_valid(1));
 
-    t.move_last_over(1);
+    t.get_object(1).remove();
     CHECK_EQUAL(2, tv.size());
-    CHECK(tv.is_row_attached(0));
-    CHECK(!tv.is_row_attached(1));
+    CHECK(tv.is_obj_valid(0));
+    CHECK(!tv.is_obj_valid(1));
 
     t.clear();
     CHECK_EQUAL(2, tv.size());
-    CHECK(!tv.is_row_attached(0));
-    CHECK(!tv.is_row_attached(1));
+    CHECK(!tv.is_obj_valid(0));
+    CHECK(!tv.is_obj_valid(1));
 }
 
 TEST(TableView_IsInTableOrder)
@@ -2209,13 +2193,14 @@ TEST(TableView_IsInTableOrder)
     TableRef source = g.add_table("source");
     TableRef target = g.add_table("target");
 
-    size_t col_link = source->add_column_link(type_LinkList, "link", *target);
-    size_t col_name = source->add_column(type_String, "name");
-    size_t col_id = target->add_column(type_Int, "id");
-    target->add_search_index(col_id);
+    auto col_link = source->add_column_link(type_LinkList, "link", *target);
+    auto col_name = source->add_column(type_String, "name");
+    auto col_id = target->add_column(type_Int, "id");
+    // target->add_search_index(col_id);
 
-    source->add_empty_row();
-    target->add_empty_row();
+    target->create_object(ObjKey(7));
+    Obj src_obj = source->create_object();
+    src_obj.get_list<ObjKey>(col_link).add(ObjKey(7));
 
     // Detached views are in table order.
     TableView tv;
@@ -2239,26 +2224,24 @@ TEST(TableView_IsInTableOrder)
     CHECK_EQUAL(false, tv.is_in_table_order());
 
     // Backlinks are not guaranteed to be in table order.
-    tv = target->get_backlink_view(0, source.get(), col_link);
+    tv = target->get_backlink_view(ObjKey(7), source, col_link);
     CHECK_EQUAL(false, tv.is_in_table_order());
 
     // Views derived from a LinkView are not guaranteed to be in table order.
-    LinkViewRef ll = source->get_linklist(col_link, 0);
+    auto ll = src_obj.get_linklist_ptr(col_link);
     tv = ll->get_sorted_view(col_name);
     CHECK_EQUAL(false, tv.is_in_table_order());
 
-    // Views based directly on a table are in table order.
-    tv = target->get_range_view(0, 1);
-    CHECK_EQUAL(true, tv.is_in_table_order());
+#ifdef LEGACY_TESTS
     tv = target->get_distinct_view(col_id);
     CHECK_EQUAL(true, tv.is_in_table_order());
-
+#endif
     // … unless sorted.
     tv = target->get_sorted_view(col_id);
     CHECK_EQUAL(false, tv.is_in_table_order());
 }
 
-
+#ifdef LEGACY_TESTS
 NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
 {
     TestTable table;
@@ -3387,15 +3370,17 @@ NONCONCURRENT_TEST(TableView_SortOrder_Core)
     // Set back to default in case other tests rely on this
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 }
-
+#endif
 
 // Verify that copy-constructed and copy-assigned TableViews work normally.
 TEST(TableView_Copy)
 {
     Table table;
-    size_t col_id = table.add_column(type_Int, "id");
-    for (size_t i = 0; i < 3; ++i)
-        table.set_int(col_id, table.add_empty_row(), i);
+    auto col_id = table.add_column(type_Int, "id");
+
+    table.create_object().set(col_id, -1);
+    ObjKey k1 = table.create_object().set(col_id, 1).get_key();
+    ObjKey k2 = table.create_object().set(col_id, 2).get_key();
 
     TableView tv = (table.column<Int>(col_id) > 0).find_all();
     CHECK_EQUAL(2, tv.size());
@@ -3405,69 +3390,95 @@ TEST(TableView_Copy)
     copy_2 = tv;
 
     CHECK_EQUAL(2, copy_1.size());
-    CHECK_EQUAL(1, copy_1.get_source_ndx(0));
-    CHECK_EQUAL(2, copy_1.get_source_ndx(1));
+    CHECK_EQUAL(k1, copy_1.get_key(0));
+    CHECK_EQUAL(k2, copy_1.get_key(1));
 
     CHECK_EQUAL(2, copy_2.size());
-    CHECK_EQUAL(1, copy_2.get_source_ndx(0));
-    CHECK_EQUAL(2, copy_2.get_source_ndx(1));
+    CHECK_EQUAL(k1, copy_2.get_key(0));
+    CHECK_EQUAL(k2, copy_2.get_key(1));
 
-    table.move_last_over(1);
+    table.remove_object(k1);
 
     CHECK(!copy_1.is_in_sync());
     CHECK(!copy_2.is_in_sync());
 
     copy_1.sync_if_needed();
     CHECK_EQUAL(1, copy_1.size());
-    CHECK_EQUAL(1, copy_1.get_source_ndx(0));
+    CHECK_EQUAL(k2, copy_1.get_key(0));
 
     copy_2.sync_if_needed();
     CHECK_EQUAL(1, copy_2.size());
-    CHECK_EQUAL(1, copy_2.get_source_ndx(0));
+    CHECK_EQUAL(k2, copy_2.get_key(0));
 }
 
-TEST(TableView_InsertColumnsAfterSort)
+TEST(TableView_RemoveColumnsAfterSort)
 {
     Table table;
-    table.add_column(type_Int, "value");
-    table.add_empty_row(10);
-    for (size_t i = 0; i < 10; ++i)
-        table.set_int(0, i, i);
+    auto col_str0 = table.add_column(type_String, "0");
+    auto col_str1 = table.add_column(type_String, "1");
+    auto col_int = table.add_column(type_Int, "value");
+    for (int i = 0; i < 10; ++i) {
+        table.create_object().set(col_int, i);
+    }
 
-    SortDescriptor desc(table, {{0}}, {false}); // sort by the one column in descending order
+    SortDescriptor desc(table, {{col_int}}, {false}); // sort by the one column in descending order
 
-    table.insert_column(0, type_String, "0");
+    table.remove_column(col_str0);
     auto tv = table.get_sorted_view(desc);
-    CHECK_EQUAL(tv.get_int(1, 0), 9);
-    CHECK_EQUAL(tv.get_int(1, 9), 0);
+    CHECK_EQUAL(tv.get(0).get<Int>(col_int), 9);
+    CHECK_EQUAL(tv.get(9).get<Int>(col_int), 0);
 
-    table.insert_column(0, type_String, "1");
-    table.add_empty_row();
+    table.remove_column(col_str1);
+    table.create_object();
     tv.sync_if_needed();
-    CHECK_EQUAL(tv.get_int(2, 0), 9);
-    CHECK_EQUAL(tv.get_int(2, 10), 0);
+    CHECK_EQUAL(tv.get(0).get<Int>(col_int), 9);
+    CHECK_EQUAL(tv.get(10).get<Int>(col_int), 0);
 }
 
 TEST(TableView_TimestampMaxRemoveRow)
 {
     Table table;
-    table.add_column(type_Timestamp, "time");
+    auto col_date = table.add_column(type_Timestamp, "time");
     for (size_t i = 0; i < 10; ++i) {
-        table.add_empty_row();
-        table.set_timestamp(0, i, Timestamp(i, 0));
+        table.create_object().set(col_date, Timestamp(i, 0));
     }
 
     TableView tv = table.where().find_all();
     CHECK_EQUAL(tv.size(), 10);
-    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(9, 0));
+    CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(9, 0));
 
-    table.move_last_over(9);
+    table.remove_object(ObjKey(9));
     CHECK_EQUAL(tv.size(), 10);                            // not changed since sync_if_needed hasn't been called
-    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0)); // but aggregate functions skip removed rows
+    CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(8, 0)); // but aggregate functions skip removed rows
 
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 9);
-    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0));
+    CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(8, 0));
+}
+
+TEST(TableView_FindAll)
+{
+    Table t;
+    auto col_str = t.add_column(type_String, "strings");
+    auto col_int = t.add_column(type_Int, "integers");
+
+    ObjKey k0 = t.create_object().set_all("hello", 1).get_key();
+    ObjKey k1 = t.create_object().set_all("world", 2).get_key();
+    ObjKey k2 = t.create_object().set_all("hello", 3).get_key();
+    ObjKey k3 = t.create_object().set_all("world", 4).get_key();
+    ObjKey k4 = t.create_object().set_all("hello", 5).get_key();
+
+    ConstTableView tv = t.where().find_all();
+
+    ObjKey j = tv.find_first<Int>(col_int, 4);
+    CHECK_EQUAL(j, k3);
+    ObjKey k = tv.find_first<String>(col_str, "world");
+    CHECK_EQUAL(k, k1);
+    auto tv1 = tv.find_all<String>(col_str, "hello");
+    CHECK_EQUAL(tv1.size(), 3);
+    CHECK_EQUAL(tv1.get_key(0), k0);
+    CHECK_EQUAL(tv1.get_key(1), k2);
+    CHECK_EQUAL(tv1.get_key(2), k4);
 }
 
 #endif // TEST_TABLE_VIEW

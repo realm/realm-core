@@ -128,7 +128,6 @@ void ArrayIntNull::init_from_mem(MemRef mem) noexcept
 
         // Since init_* functions are noexcept, but insert() isn't, we
         // need to ensure that insert() will not allocate.
-        REALM_ASSERT(m_capacity != 0);
         Array::insert(0, m_ubound);
     }
 }

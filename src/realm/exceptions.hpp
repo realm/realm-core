@@ -99,6 +99,15 @@ public:
     /// runtime_error::what() returns the msg provided in the constructor.
 };
 
+/// Thrown when a key can not be used (either not found or already existing
+/// when trying to create a new object)
+class InvalidKey : public std::runtime_error {
+public:
+    InvalidKey(const std::string& msg)
+        : std::runtime_error(msg)
+    {
+    }
+};
 
 class SerialisationError : public std::runtime_error {
 public:
@@ -145,6 +154,8 @@ public:
         binary_too_big,
         table_name_too_long,
         column_name_too_long,
+        column_name_in_use,
+        invalid_column_name,
         table_index_out_of_range,
         row_index_out_of_range,
         column_index_out_of_range,
@@ -291,12 +302,12 @@ inline MaximumFileSizeExceeded::MaximumFileSizeExceeded(const std::string& msg)
 }
 
 inline OutOfDiskSpace::OutOfDiskSpace(const std::string& msg)
-: std::runtime_error(msg)
+    : std::runtime_error(msg)
 {
 }
 
 inline SerialisationError::SerialisationError(const std::string& msg)
-: std::runtime_error(msg)
+    : std::runtime_error(msg)
 {
 }
 

@@ -91,9 +91,9 @@ const char* data_type_to_str(DataType type)
             return "DateTime";
         case type_Timestamp:
             return "Timestamp";
-        case type_Table:
+        case type_OldTable:
             return "Table";
-        case type_Mixed:
+        case type_OldMixed:
             return "Mixed";
         case type_Link:
             return "Link";

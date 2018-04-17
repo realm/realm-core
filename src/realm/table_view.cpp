@@ -17,162 +17,100 @@
  **************************************************************************/
 
 #include <realm/table_view.hpp>
-
 #include <realm/column.hpp>
-#include <realm/column_timestamp.hpp>
-#include <realm/column_tpl.hpp>
-#include <realm/impl/sequential_getter.hpp>
+#include <realm/db.hpp>
 
 #include <unordered_set>
 
 using namespace realm;
 
-TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSourcePayload mode)
-    : RowIndexes(src, mode)
-    , m_linked_column(src.m_linked_column)
+ConstTableView::ConstTableView(ConstTableView& src, Transaction*, PayloadPolicy)
+    : ObjList(m_table_view_key_values)
+    , m_source_column_key(src.m_source_column_key)
+    , m_table_view_key_values(Allocator::get_default())
 {
-    patch.was_in_sync = src.is_in_sync();
-    // m_query must be exported after patch.was_in_sync is updated
-    // as exporting m_query will bring src out of sync.
-    m_query = Query(src.m_query, patch.query_patch, mode);
+    REALM_ASSERT(false); // unimplemented
+}
 
-    Table::generate_patch(src.m_table.get(), patch.m_table);
-    LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
-    DescriptorOrdering::generate_patch(src.m_descriptor_ordering, patch.descriptors_patch);
-
-    if (src.m_linked_column) {
-        ConstRow::generate_patch(src.m_linked_row, patch.linked_row);
-        patch.linked_col = src.m_linked_column->get_origin_column_index();
+ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, PayloadPolicy mode)
+    : ObjList(m_table_view_key_values)
+    , m_source_column_key(src.m_source_column_key)
+    , m_table_view_key_values(Allocator::get_default())
+{
+    bool was_in_sync = src.is_in_sync();
+    m_query = Query(src.m_query, tr, mode);
+    m_table = tr->import_copy_of(src.m_table);
+    if (mode == PayloadPolicy::Stay)
+        was_in_sync = false;
+    VersionID src_version =
+        dynamic_cast<Transaction*>(src.m_table->get_parent_group())->get_version_of_current_transaction();
+    if (src_version != tr->get_version_of_current_transaction())
+        throw realm::LogicError(LogicError::bad_version);
+    if (was_in_sync)
+        m_last_seen_versions = outside_version();
+    else
+        m_last_seen_versions.clear();
+    if (mode == PayloadPolicy::Copy && src.m_key_values.is_attached()) {
+        // FIXME: Doesn't this lead to sharing between the 2 TableViews?
+        m_key_values = src.m_key_values;
     }
-
-    src.m_last_seen_version = util::none; // bring source out-of-sync, now that it has lost its data
-    m_last_seen_version = 0;
+    else if (mode == PayloadPolicy::Move && src.m_key_values.is_attached())
+        m_key_values = std::move(src.m_key_values);
+    else {
+        m_key_values.create();
+    }
+    if (mode == PayloadPolicy::Move) {
+        src.m_last_seen_versions.clear();
+    }
+    m_table = tr->import_copy_of(src.m_table);
+    m_linklist_source = tr->import_copy_of(src.m_linklist_source);
+    if (src.m_source_column_key) {
+        m_linked_obj = tr->import_copy_of(src.m_linked_obj);
+    }
+    m_descriptor_ordering = src.m_descriptor_ordering;
     m_start = src.m_start;
     m_end = src.m_end;
     m_limit = src.m_limit;
 }
-
-TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch, ConstSourcePayload mode)
-    : RowIndexes(src, mode)
-    , m_linked_column(src.m_linked_column)
-    , m_query(src.m_query, patch.query_patch, mode)
-{
-    if (mode == ConstSourcePayload::Stay)
-        patch.was_in_sync = false;
-    else
-        patch.was_in_sync = src.is_in_sync();
-    Table::generate_patch(src.m_table.get(), patch.m_table);
-    if (src.m_linked_column) {
-        ConstRow::generate_patch(src.m_linked_row, patch.linked_row);
-        patch.linked_col = src.m_linked_column->get_origin_column_index();
-    }
-    LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
-    DescriptorOrdering::generate_patch(src.m_descriptor_ordering, patch.descriptors_patch);
-
-    m_last_seen_version = 0;
-    m_start = src.m_start;
-    m_end = src.m_end;
-    m_limit = src.m_limit;
-}
-
-void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
-{
-    m_table = Table::create_from_and_consume_patch(patch.m_table, group);
-    m_table->register_view(this);
-    m_query.apply_patch(patch.query_patch, group);
-    m_linkview_source = LinkView::create_from_and_consume_patch(patch.linkview_patch, group);
-    m_descriptor_ordering = DescriptorOrdering::create_from_and_consume_patch(patch.descriptors_patch, *m_table);
-
-    if (patch.linked_row) {
-        m_linked_column = &m_table->get_column_link_base(patch.linked_col).get_backlink_column();
-        m_linked_row.apply_and_consume_patch(patch.linked_row, group);
-    }
-
-    if (patch.was_in_sync)
-        m_last_seen_version = outside_version();
-    else
-        m_last_seen_version = util::none;
-}
-
-// Searching
-
-template<typename T>
-size_t TableViewBase::find_first(size_t column_ndx, T value) const
-{
-    check_cookie();
-
-    for (size_t i = 0, num_rows = m_row_indexes.size(); i < num_rows; ++i) {
-        const int64_t real_ndx = m_row_indexes.get(i);
-        if (real_ndx != detached_ref && m_table->get<T>(column_ndx, to_size_t(real_ndx)) == value)
-            return i;
-    }
-
-    return size_t(-1);
-}
-
-template size_t TableViewBase::find_first(size_t, int64_t) const;
-template size_t TableViewBase::find_first(size_t, util::Optional<int64_t>) const;
-template size_t TableViewBase::find_first(size_t, bool) const;
-template size_t TableViewBase::find_first(size_t, Optional<bool>) const;
-template size_t TableViewBase::find_first(size_t, float) const;
-template size_t TableViewBase::find_first(size_t, util::Optional<float>) const;
-template size_t TableViewBase::find_first(size_t, double) const;
-template size_t TableViewBase::find_first(size_t, util::Optional<double>) const;
-template size_t TableViewBase::find_first(size_t, Timestamp) const;
-template size_t TableViewBase::find_first(size_t, StringData) const;
-template size_t TableViewBase::find_first(size_t, BinaryData) const;
-
 
 // Aggregates ----------------------------------------------------
 
-// count_target is ignored by all <int function> except Count. Hack because of bug in optional
-// arguments in clang and vs2010 (fixed in 2012)
-template <int function, typename T, typename R, class ColType>
-R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx,
-                           T count_target, size_t* return_ndx) const
+template <Action action, typename T, typename R>
+R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* return_key) const
 {
-    static_cast<void>(aggregateMethod);
     check_cookie();
     size_t non_nulls = 0;
 
-    if (return_ndx)
-        *return_ndx = npos;
+    if (return_key)
+        *return_key = null_key;
+    if (result_count)
+        *result_count = 0;
 
-    using ColTypeTraits = ColumnTypeTraits<typename ColType::value_type>;
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColTypeTraits::id);
-    REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count ||
-                 function == act_Average);
+    REALM_ASSERT(action == act_Sum || action == act_Max || action == act_Min || action == act_Average);
     REALM_ASSERT(m_table);
-    REALM_ASSERT(column_ndx < m_table->get_column_count());
+    REALM_ASSERT(m_table->valid_column(column_key));
 
-    if ((m_row_indexes.size() - m_num_detached_refs) == 0) {
-        if (return_ndx) {
-            if (function == act_Average)
-                *return_ndx = 0;
-            else
-                *return_ndx = npos;
-        }
-        return 0;
+    if ((m_key_values.size()) == 0) {
+        return {};
     }
 
-    typedef typename ColTypeTraits::leaf_type ArrType;
-    const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_ndx));
+    // typedef typename ColTypeTraits::leaf_type ArrType;
 
     // FIXME: Optimization temporarely removed for stability
-/*
-    if (m_num_detached_refs == 0 && m_row_indexes.size() == column->size()) {
-        // direct aggregate on the column
-        if (function == act_Count)
-            return static_cast<R>(column->count(count_target));
-        else
-            return (column->*aggregateMethod)(0, size_t(-1), size_t(-1), return_ndx); // end == limit == -1
-    }
-*/
+    /*
+        if (m_num_detached_refs == 0 && m_key_values.size() == column->size()) {
+            // direct aggregate on the column
+            if (action == act_Count)
+                return static_cast<R>(column->count(count_target));
+            else
+                return (column->*aggregateMethod)(0, size_t(-1), size_t(-1), return_ndx); // end == limit == -1
+        }
+    */
 
     // Array object instantiation must NOT allocate initial memory (capacity)
     // with 'new' because it will lead to mem leak. The column keeps ownership
     // of the payload in array and will free it itself later, so we must not call destroy() on array.
-    ArrType arr(column->get_alloc());
+    // ArrType arr(column->get_alloc());
 
     // FIXME: Speed optimization disabled because we need is_null() which is not available on all leaf types.
 
@@ -183,26 +121,26 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
     size_t row_ndx;
 */
     R res = R{};
-    size_t row = to_size_t(m_row_indexes.get(0));
-    auto first = column->get(row);
+    {
+        ObjKey key(m_key_values.get(0));
+        ConstObj obj = m_table->get_object(key);
+        auto first = obj.get<T>(column_key);
 
-    if (function == act_Count) {
-        res = static_cast<R>((first == count_target ? 1 : 0));
-    }
-    else if(!column->is_null(row)) { // cannot just use if(v) on float/double types
-        res = static_cast<R>(util::unwrap(first));
-        non_nulls++;
-        if (return_ndx) {
-            *return_ndx = 0;
+        if (!obj.is_null(column_key)) { // cannot just use if(v) on float/double types
+            res = static_cast<R>(util::unwrap(first));
+            non_nulls++;
+            if (return_key) {
+                *return_key = key;
+            }
         }
     }
 
-    for (size_t tv_index = 1; tv_index < m_row_indexes.size(); ++tv_index) {
+    for (size_t tv_index = 1; tv_index < m_key_values.size(); ++tv_index) {
 
-        int64_t signed_row_ndx = m_row_indexes.get(tv_index);
+        ObjKey key(m_key_values.get(tv_index));
 
         // skip detached references:
-        if (signed_row_ndx == detached_ref)
+        if (key == realm::null_key)
             continue;
 
         // FIXME: Speed optimization disabled because we need is_null() which is not available on all leaf types.
@@ -215,212 +153,209 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
             leaf_end = leaf_start + arrp->size();
         }
 */
-        auto v = column->get(to_size_t(signed_row_ndx));
+        ConstObj obj = m_table->get_object(key);
+        auto v = obj.get<T>(column_key);
 
-        if (function == act_Count && v == count_target) {
-            res++;
-        }
-        else if (function != act_Count && !column->is_null(to_size_t(signed_row_ndx))){
+        if (!obj.is_null(column_key)) {
             non_nulls++;
             R unpacked = static_cast<R>(util::unwrap(v));
 
-            if (function == act_Sum || function == act_Average) {
+            if (action == act_Sum || action == act_Average) {
                 res += unpacked;
             }
-            else if ((function == act_Max && unpacked > res) || non_nulls == 1) {
+            else if ((action == act_Max && unpacked > res) || non_nulls == 1) {
                 res = unpacked;
-                if (return_ndx)
-                    *return_ndx = tv_index;
+                if (return_key)
+                    *return_key = key;
             }
-            else if ((function == act_Min && unpacked < res) || non_nulls == 1) {
+            else if ((action == act_Min && unpacked < res) || non_nulls == 1) {
                 res = unpacked;
-                if (return_ndx)
-                    *return_ndx = tv_index;
+                if (return_key)
+                    *return_key = key;
             }
         }
     }
 
-    if (function == act_Average) {
-        if (return_ndx)
-            *return_ndx = non_nulls;
+    if (action == act_Average) {
+        if (result_count)
+            *result_count = non_nulls;
         return res / (non_nulls == 0 ? 1 : non_nulls);
     }
-    else {
-        return res;
-    }
+
+    return res;
 }
 
-// Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume we have leaf
-// types
-// and also assume numeric types that support arithmetic (+, /, etc).
-template <class C>
-Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, size_t* return_ndx) const
+template <typename T>
+size_t ConstTableView::aggregate_count(ColKey column_key, T count_target) const
 {
-    C compare = C();
-    Timestamp best = Timestamp{};
-    TimestampColumn& column = m_table->get_column_timestamp(column_ndx);
-    size_t ndx = npos;
-    for (size_t t = 0; t < size(); t++) {
-        int64_t signed_row_ndx = m_row_indexes.get(t);
+    check_cookie();
+    REALM_ASSERT(m_table);
+    REALM_ASSERT(m_table->valid_column(column_key));
+
+    if ((m_key_values.size()) == 0) {
+        return {};
+    }
+
+    size_t cnt = 0;
+    for (size_t tv_index = 0; tv_index < m_key_values.size(); ++tv_index) {
+
+        ObjKey key(m_key_values.get(tv_index));
 
         // skip detached references:
-        if (signed_row_ndx == detached_ref)
+        if (key == realm::null_key)
             continue;
 
-        auto ts = column.get(static_cast<size_t>(signed_row_ndx));
-        // Because realm::Greater(non-null, null) == false, we need to pick the initial 'best' manually when we see
-        // the first non-null entry
-        if ((ndx == npos && !ts.is_null()) || compare(ts, best, ts.is_null(), best.is_null())) {
-            best = ts;
-            ndx = t;
+        ConstObj obj = m_table->get_object(key);
+        auto v = obj.get<T>(column_key);
+
+        if (v == count_target) {
+            cnt++;
         }
     }
 
-    if (return_ndx)
-        *return_ndx = ndx;
+    return cnt;
+}
 
-    return best;
+// Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume
+// numeric types that support arithmetic (+, /, etc).
+template <class C>
+Timestamp ConstTableView::minmax_timestamp(ColKey column_key, ObjKey* return_key) const
+{
+    Timestamp best_value;
+    ObjKey best_key;
+    for_each([&best_key, &best_value, column_key](ConstObj& obj) {
+        C compare;
+        auto ts = obj.get<Timestamp>(column_key);
+        // Because realm::Greater(non-null, null) == false, we need to pick the initial 'best' manually when we see
+        // the first non-null entry
+        if ((best_key == null_key && !ts.is_null()) || compare(ts, best_value, ts.is_null(), best_value.is_null())) {
+            best_value = ts;
+            best_key = obj.get_key();
+        }
+        return false;
+    });
+    if (return_key)
+        *return_key = best_key;
+
+    return best_value;
 }
 
 // sum
-int64_t TableViewBase::sum_int(size_t column_ndx) const
+int64_t ConstTableView::sum_int(ColKey column_key) const
 {
-    if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Sum, int64_t>(&IntNullColumn::sum, column_ndx, 0);
+    if (m_table->is_nullable(column_key))
+        return aggregate<act_Sum, util::Optional<int64_t>, int64_t>(column_key, 0);
     else {
-        return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0);
+        return aggregate<act_Sum, int64_t, int64_t>(column_key, 0);
     }
 }
-double TableViewBase::sum_float(size_t column_ndx) const
+double ConstTableView::sum_float(ColKey column_key) const
 {
-    return aggregate<act_Sum, float>(&FloatColumn::sum, column_ndx, 0.0);
+    return aggregate<act_Sum, float, double>(column_key);
 }
-double TableViewBase::sum_double(size_t column_ndx) const
+double ConstTableView::sum_double(ColKey column_key) const
 {
-    return aggregate<act_Sum, double>(&DoubleColumn::sum, column_ndx, 0.0);
+    return aggregate<act_Sum, double, double>(column_key);
 }
 
 // Maximum
-int64_t TableViewBase::maximum_int(size_t column_ndx, size_t* return_ndx) const
+int64_t ConstTableView::maximum_int(ColKey column_key, ObjKey* return_key) const
 {
-    if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, 0, return_ndx);
+    if (m_table->is_nullable(column_key))
+        return aggregate<act_Max, util::Optional<int64_t>, int64_t>(column_key, nullptr, return_key);
     else
-        return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
+        return aggregate<act_Max, int64_t, int64_t>(column_key, nullptr, return_key);
 }
-float TableViewBase::maximum_float(size_t column_ndx, size_t* return_ndx) const
+float ConstTableView::maximum_float(ColKey column_key, ObjKey* return_key) const
 {
-    return aggregate<act_Max, float>(&FloatColumn::maximum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Max, float, float>(column_key, nullptr, return_key);
 }
-double TableViewBase::maximum_double(size_t column_ndx, size_t* return_ndx) const
+double ConstTableView::maximum_double(ColKey column_key, ObjKey* return_key) const
 {
-    return aggregate<act_Max, double>(&DoubleColumn::maximum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Max, double, double>(column_key, nullptr, return_key);
 }
-OldDateTime TableViewBase::maximum_olddatetime(size_t column_ndx, size_t* return_ndx) const
+Timestamp ConstTableView::maximum_timestamp(ColKey column_key, ObjKey* return_key) const
 {
-    if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, 0, return_ndx);
-    else
-        return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
-}
-
-Timestamp TableViewBase::maximum_timestamp(size_t column_ndx, size_t* return_ndx) const
-{
-    return minmax_timestamp<realm::Greater>(column_ndx, return_ndx);
+    return minmax_timestamp<realm::Greater>(column_key, return_key);
 }
 
 
 // Minimum
-int64_t TableViewBase::minimum_int(size_t column_ndx, size_t* return_ndx) const
+int64_t ConstTableView::minimum_int(ColKey column_key, ObjKey* return_key) const
 {
-    if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, 0, return_ndx);
+    if (m_table->is_nullable(column_key))
+        return aggregate<act_Min, util::Optional<int64_t>, int64_t>(column_key, nullptr, return_key);
     else
-        return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
+        return aggregate<act_Min, int64_t, int64_t>(column_key, nullptr, return_key);
 }
-float TableViewBase::minimum_float(size_t column_ndx, size_t* return_ndx) const
+float ConstTableView::minimum_float(ColKey column_key, ObjKey* return_key) const
 {
-    return aggregate<act_Min, float>(&FloatColumn::minimum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Min, float, float>(column_key, nullptr, return_key);
 }
-double TableViewBase::minimum_double(size_t column_ndx, size_t* return_ndx) const
+double ConstTableView::minimum_double(ColKey column_key, ObjKey* return_key) const
 {
-    return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, 0.0, return_ndx);
+    return aggregate<act_Min, double, double>(column_key, nullptr, return_key);
 }
-OldDateTime TableViewBase::minimum_olddatetime(size_t column_ndx, size_t* return_ndx) const
+Timestamp ConstTableView::minimum_timestamp(ColKey column_key, ObjKey* return_key) const
 {
-    if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, 0, return_ndx);
-    else
-        return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
-}
-
-Timestamp TableViewBase::minimum_timestamp(size_t column_ndx, size_t* return_ndx) const
-{
-    return minmax_timestamp<realm::Less>(column_ndx, return_ndx);
+    return minmax_timestamp<realm::Less>(column_key, return_key);
 }
 
 // Average. The number of values used to compute the result is written to `value_count` by callee
-double TableViewBase::average_int(size_t column_ndx, size_t* value_count) const
+double ConstTableView::average_int(ColKey column_key, size_t* value_count) const
 {
-    if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Average, int64_t>(&IntNullColumn::average, column_ndx, 0, value_count);
+    if (m_table->is_nullable(column_key))
+        return aggregate<act_Average, util::Optional<int64_t>, double>(column_key, value_count);
     else
-        return aggregate<act_Average, int64_t>(&IntegerColumn::average, column_ndx, 0, value_count);
+        return aggregate<act_Average, int64_t, double>(column_key, value_count);
 }
-double TableViewBase::average_float(size_t column_ndx, size_t* value_count) const
+double ConstTableView::average_float(ColKey column_key, size_t* value_count) const
 {
-    return aggregate<act_Average, float>(&FloatColumn::average, column_ndx, 0, value_count);
+    return aggregate<act_Average, float, double>(column_key, value_count);
 }
-double TableViewBase::average_double(size_t column_ndx, size_t* value_count) const
+double ConstTableView::average_double(ColKey column_key, size_t* value_count) const
 {
-    return aggregate<act_Average, double>(&DoubleColumn::average, column_ndx, 0, value_count);
+    return aggregate<act_Average, double, double>(column_key, value_count);
 }
 
 // Count
-size_t TableViewBase::count_int(size_t column_ndx, int64_t target) const
+size_t ConstTableView::count_int(ColKey column_key, int64_t target) const
 {
-    if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Count, int64_t, size_t, IntNullColumn>(nullptr, column_ndx, target);
+    if (m_table->is_nullable(column_key))
+        return aggregate_count<util::Optional<int64_t>>(column_key, target);
     else
-        return aggregate<act_Count, int64_t, size_t, IntegerColumn>(nullptr, column_ndx, target);
+        return aggregate_count<int64_t>(column_key, target);
 }
-size_t TableViewBase::count_float(size_t column_ndx, float target) const
+size_t ConstTableView::count_float(ColKey column_key, float target) const
 {
-    return aggregate<act_Count, float, size_t, FloatColumn>(nullptr, column_ndx, target);
+    return aggregate_count<float>(column_key, target);
 }
-size_t TableViewBase::count_double(size_t column_ndx, double target) const
+size_t ConstTableView::count_double(ColKey column_key, double target) const
 {
-    return aggregate<act_Count, double, size_t, DoubleColumn>(nullptr, column_ndx, target);
+    return aggregate_count<double>(column_key, target);
 }
 
-size_t TableViewBase::count_timestamp(size_t column_ndx, Timestamp target) const
+size_t ConstTableView::count_timestamp(ColKey column_key, Timestamp target) const
 {
-    TimestampColumn& column = m_table->get_column_timestamp(column_ndx);
     size_t count = 0;
     for (size_t t = 0; t < size(); t++) {
-        int64_t signed_row_ndx = m_row_indexes.get(t);
-
-        // skip detached references:
-        if (signed_row_ndx == detached_ref)
-            continue;
-
-        auto ts = column.get(static_cast<size_t>(signed_row_ndx));
-
-        realm::Equal e;
-        if (e(ts, target, ts.is_null(), target.is_null())) {
-            count++;
+        try {
+            ObjKey key = m_key_values.get(t);
+            ConstObj obj = m_table->get_object(key);
+            auto ts = obj.get<Timestamp>(column_key);
+            realm::Equal e;
+            if (e(ts, target, ts.is_null(), target.is_null())) {
+                count++;
+            }
+        }
+        catch (const InvalidKey&) {
+            // Just skip objects that might have been deleted
         }
     }
     return count;
 }
 
-// Simple pivot aggregate method. Experimental! Please do not document method publicly.
-void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const
-{
-    m_table->aggregate(group_by_column, aggr_column, op, result, &m_row_indexes);
-}
-
-void TableViewBase::to_json(std::ostream& out) const
+void ConstTableView::to_json(std::ostream& out) const
 {
     check_cookie();
 
@@ -429,18 +364,18 @@ void TableViewBase::to_json(std::ostream& out) const
 
     const size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
-        const int64_t real_row_index = get_source_ndx(r);
-        if (real_row_index != detached_ref) {
+        ObjKey key = get_key(r);
+        if (key != realm::null_key) {
             if (r > 0)
                 out << ",";
-            m_table->to_json_row(to_size_t(real_row_index), out);
+            m_table->to_json_row(size_t(key.value), out); // FIXME
         }
     }
 
     out << "]";
 }
 
-void TableViewBase::to_string(std::ostream& out, size_t limit) const
+void ConstTableView::to_string(std::ostream& out, size_t limit) const
 {
     check_cookie();
 
@@ -449,16 +384,16 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
     m_table->to_string_header(out, widths);
 
     // Set limit=-1 to print all rows, otherwise only print to limit
-    const size_t row_count = num_attached_rows();
+    const size_t row_count = size();
     const size_t out_count = (limit == size_t(-1)) ? row_count : (row_count < limit) ? row_count : limit;
 
     // Print rows
     size_t i = 0;
     size_t count = out_count;
     while (count) {
-        const int64_t real_row_index = get_source_ndx(i);
-        if (real_row_index != detached_ref) {
-            m_table->to_string_row(to_size_t(real_row_index), out, widths);
+        ObjKey key = get_key(count);
+        if (key != realm::null_key) {
+            m_table->to_string_row(key, out, widths); // FIXME
             --count;
         }
         ++i;
@@ -470,196 +405,104 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
     }
 }
 
-void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
+void ConstTableView::row_to_string(size_t row_ndx, std::ostream& out) const
 {
     check_cookie();
 
-    REALM_ASSERT(row_ndx < m_row_indexes.size());
+    REALM_ASSERT(row_ndx < m_key_values.size());
 
     // Print header (will also calculate widths)
     std::vector<size_t> widths;
     m_table->to_string_header(out, widths);
 
     // Print row contents
-    int64_t real_ndx = get_source_ndx(row_ndx);
-    REALM_ASSERT(real_ndx != detached_ref);
-    m_table->to_string_row(to_size_t(real_ndx), out, widths);
+    ObjKey key = get_key(row_ndx);
+    REALM_ASSERT(key != realm::null_key);
+    m_table->to_string_row(key, out, widths); // FIXME
 }
 
 
-bool TableViewBase::depends_on_deleted_object() const
+bool ConstTableView::depends_on_deleted_object() const
 {
-    uint64_t max = std::numeric_limits<uint64_t>::max();
     // outside_version() will call itself recursively for each TableView in the dependency chain
     // and terminate with `max` if the deepest depends on a deleted LinkList or Row
-    return outside_version() == max;
+    return outside_version().empty();
 }
 
 // Return version of whatever this TableView depends on
-uint64_t TableViewBase::outside_version() const
+TableVersions ConstTableView::outside_version() const
 {
     check_cookie();
 
-    // If the TableView directly or indirectly depends on a view that has been deleted, there is no way to know
-    // its version number. Return the biggest possible value to trigger a refresh later.
-    const uint64_t max = std::numeric_limits<uint64_t>::max();
-
-    if (m_linkview_source) {
+    if (m_linklist_source) {
         // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
-        return m_linkview_source->is_attached() ? m_linkview_source->get_origin_table().observe_version() : max;
+        if (m_linklist_source->is_attached()) {
+            Table& table = m_linklist_source->get_target_table();
+            return {table.get_key(), table.get_content_version()};
+        }
+        else {
+            return {};
+        }
     }
 
-    if (m_linked_column) {
+    if (m_source_column_key) {
         // m_linked_column is set when this TableView was created by Table::get_backlink_view().
-        return m_linked_row ? m_linked_row.get_table()->observe_version() : max;
-    }
-
-    if (m_query.m_table) {
-        // m_query.m_table is set when this TableView was created by a query.
-
-        if (auto* view = dynamic_cast<LinkView*>(m_query.m_view)) {
-            // This TableView depends on Query that is restricted by a LinkView (with where(&link_view))
-            return view->is_attached() ? view->get_origin_table().observe_version() : max;
+        if (m_linked_obj.is_valid()) {
+            auto table = m_linked_obj.get_table();
+            return {table->get_key(), table->get_content_version()};
         }
-
-        if (auto* view = dynamic_cast<TableView*>(m_query.m_view)) {
-            // This LinkView depends on a Query that is restricted by a TableView (with where(&table_view))
-            return view->outside_version();
+        else {
+            return {};
         }
     }
+    else if (m_query.m_table) {
+        return m_query.get_outside_versions();
+    }
 
-    // This TableView was either created by Table::get_distinct_view(), or a Query that is not restricted to a view.
-    return m_table->observe_version();
+    // This TableView was created by Table::get_distinct_view()
+    return {m_table->get_key(), m_table->get_content_version()};
 }
 
-bool TableViewBase::is_in_sync() const
+bool ConstTableView::is_in_sync() const
 {
     check_cookie();
 
     bool table = bool(m_table);
-    bool version = bool(m_last_seen_version == outside_version());
+    bool version = bool(m_last_seen_versions == outside_version());
     bool view = bool(m_query.m_view);
 
     return table && version && (view ? m_query.m_view->is_in_sync() : true);
 }
 
-uint_fast64_t TableViewBase::sync_if_needed() const
+TableVersions ConstTableView::sync_if_needed() const
 {
     if (!is_in_sync()) {
         // FIXME: Is this a reasonable handling of constness?
-        const_cast<TableViewBase*>(this)->do_sync();
+        const_cast<ConstTableView*>(this)->do_sync();
     }
-    return *m_last_seen_version;
+    return m_last_seen_versions;
 }
 
 
-void TableViewBase::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
+void TableView::remove(size_t row_ndx)
 {
-    m_row_indexes.adjust_ge(int_fast64_t(row_ndx), num_rows);
-}
-
-
-void TableViewBase::adj_row_acc_erase_row(size_t row_ndx) noexcept
-{
-    size_t it = 0;
-    for (;;) {
-        it = m_row_indexes.find_first(row_ndx, it);
-        if (it == not_found)
-            break;
-        ++m_num_detached_refs;
-        m_row_indexes.set(it, -1);
-    }
-    m_row_indexes.adjust_ge(int_fast64_t(row_ndx) + 1, -1);
-}
-
-
-void TableViewBase::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
-{
-    size_t it = 0;
-    // kill any refs to the target row ndx
-    for (;;) {
-        it = m_row_indexes.find_first(to_row_ndx, it);
-        if (it == not_found)
-            break;
-        ++m_num_detached_refs;
-        m_row_indexes.set(it, -1);
-    }
-    // adjust any refs to the source row ndx to point to the target row ndx.
-    it = 0;
-    for (;;) {
-        it = m_row_indexes.find_first(from_row_ndx, it);
-        if (it == not_found)
-            break;
-        m_row_indexes.set(it, to_row_ndx);
-    }
-}
-
-
-void TableViewBase::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
-{
-    // Always adjust only the earliest ref which matches either ndx_1 or ndx_2
-    // to avoid double-swapping the refs
-    size_t it_1 = m_row_indexes.find_first(row_ndx_1, 0);
-    size_t it_2 =  m_row_indexes.find_first(row_ndx_2, 0);
-    while (it_1 != not_found || it_2 != not_found) {
-        if (it_1 < it_2) {
-            m_row_indexes.set(it_1, row_ndx_2);
-            it_1 = m_row_indexes.find_first(row_ndx_1, it_1);
-        }
-        else {
-            m_row_indexes.set(it_2, row_ndx_1);
-            it_2 = m_row_indexes.find_first(row_ndx_2, it_2);
-        }
-    }
-}
-
-
-void TableViewBase::adj_row_acc_move_row(size_t from_row_ndx, size_t to_row_ndx) noexcept
-{
-    if (from_row_ndx > to_row_ndx)
-        ++from_row_ndx;
-    else
-        ++to_row_ndx;
-
-    m_row_indexes.adjust_ge(int_fast64_t(to_row_ndx), 1);
-    size_t it = 0;
-    while ((it = m_row_indexes.find_first(from_row_ndx, it)) != not_found)
-        m_row_indexes.set(it, to_row_ndx);
-    m_row_indexes.adjust_ge(int_fast64_t(from_row_ndx), -1);
-}
-
-
-void TableViewBase::adj_row_acc_clear() noexcept
-{
-    m_num_detached_refs = m_row_indexes.size();
-    for (size_t i = 0, num_rows = m_row_indexes.size(); i < num_rows; ++i)
-        m_row_indexes.set(i, -1);
-}
-
-
-void TableView::remove(size_t row_ndx, RemoveMode underlying_mode)
-{
-    check_cookie();
-
     REALM_ASSERT(m_table);
-    REALM_ASSERT(row_ndx < m_row_indexes.size());
+    REALM_ASSERT(row_ndx < m_key_values.size());
 
-    bool sync_to_keep = m_last_seen_version == outside_version();
+    bool sync_to_keep = m_last_seen_versions == outside_version();
 
-    size_t origin_row_ndx = size_t(m_row_indexes.get(row_ndx));
+    ObjKey key = m_key_values.get(row_ndx);
 
     // Update refs
-    m_row_indexes.erase(row_ndx);
+    m_key_values.erase(row_ndx);
 
     // Delete row in origin table
-    using tf = _impl::TableFriend;
-    bool is_move_last_over = (underlying_mode == RemoveMode::unordered);
-    tf::erase_row(*m_table, origin_row_ndx, is_move_last_over); // Throws
+    get_parent().remove_object(key);
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
-        m_last_seen_version = outside_version();
+        m_last_seen_versions = outside_version();
 
     // Adjustment of row indexes greater than the removed index is done by
     // adj_row_acc_move_over or adj_row_acc_erase_row as sideeffect of the actual
@@ -667,69 +510,61 @@ void TableView::remove(size_t row_ndx, RemoveMode underlying_mode)
 }
 
 
-void TableView::clear(RemoveMode underlying_mode)
+void TableView::clear()
 {
     REALM_ASSERT(m_table);
 
-    bool sync_to_keep = m_last_seen_version == outside_version();
+    bool sync_to_keep = m_last_seen_versions == outside_version();
 
-    // Temporarily unregister this view so that it's not pointlessly updated
-    // for the row removals
-    using tf = _impl::TableFriend;
-    tf::unregister_view(*m_table, this);
+    _impl::TableFriend::batch_erase_rows(get_parent(), m_key_values); // Throws
 
-    bool is_move_last_over = (underlying_mode == RemoveMode::unordered);
-    tf::batch_erase_rows(*m_table, m_row_indexes, is_move_last_over); // Throws
-
-    m_row_indexes.clear();
-    m_num_detached_refs = 0;
-    tf::register_view(*m_table, this); // Throws
+    m_key_values.clear();
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
-        m_last_seen_version = outside_version();
+        m_last_seen_versions = outside_version();
 }
 
-void TableViewBase::distinct(size_t column)
+void ConstTableView::distinct(ColKey column)
 {
     distinct(DistinctDescriptor(*m_table, {{column}}));
 }
 
 /// Remove rows that are duplicated with respect to the column set passed as argument.
 /// Will keep original sorting order so that you can both have a distinct and sorted view.
-void TableViewBase::distinct(DistinctDescriptor columns)
+void ConstTableView::distinct(DistinctDescriptor columns)
 {
     m_descriptor_ordering.append_distinct(std::move(columns));
     do_sync();
 }
 
-void TableViewBase::apply_descriptor_ordering(DescriptorOrdering new_ordering)
+void ConstTableView::apply_descriptor_ordering(DescriptorOrdering new_ordering)
 {
     m_descriptor_ordering = new_ordering;
     do_sync();
 }
 
-std::string TableViewBase::get_descriptor_ordering_description() const
+std::string ConstTableView::get_descriptor_ordering_description() const
 {
     return m_descriptor_ordering.get_description(m_table);
 }
 
 // Sort according to one column
-void TableViewBase::sort(size_t column, bool ascending)
+void ConstTableView::sort(ColKey column, bool ascending)
 {
     sort(SortDescriptor(*m_table, {{column}}, {ascending}));
 }
 
 // Sort according to multiple columns, user specified order on each column
-void TableViewBase::sort(SortDescriptor order)
+void ConstTableView::sort(SortDescriptor order)
 {
     m_descriptor_ordering.append_sort(std::move(order));
     do_sort(m_descriptor_ordering);
 }
 
 
-void TableViewBase::do_sync()
+void ConstTableView::do_sync()
 {
     // This TableView can be "born" from 4 different sources:
     // - LinkView
@@ -737,63 +572,66 @@ void TableViewBase::do_sync()
     // - Table::get_distinct_view()
     // - Table::get_backlink_view()
     // Here we sync with the respective source.
+    m_last_seen_versions.clear();
 
-    if (m_linkview_source) {
-        m_row_indexes.clear();
-        for (size_t t = 0; t < m_linkview_source->size(); t++)
-            m_row_indexes.add(m_linkview_source->get(t).get_index());
+    if (m_linklist_source) {
+        m_key_values.clear();
+        std::for_each(m_linklist_source->begin(), m_linklist_source->end(),
+                      [this](ObjKey key) { m_key_values.add(key); });
     }
-    else if (m_distinct_column_source != npos) {
-        m_row_indexes.clear();
-        REALM_ASSERT(m_table->has_search_index(m_distinct_column_source));
-        if (!m_table->is_degenerate()) {
-            const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
-            col.get_search_index()->distinct(m_row_indexes);
+    else if (m_distinct_column_source) {
+        m_key_values.clear();
+        auto index = m_table->get_search_index(m_distinct_column_source);
+        REALM_ASSERT(index);
+        index->distinct(m_key_values);
+    }
+    else if (m_source_column_key) {
+        m_key_values.clear();
+        if (m_linked_obj.is_valid() && m_table) {
+            TableKey origin_table_key = m_table->get_key();
+            const Table* target_table = m_linked_obj.get_table();
+            const Spec& spec = _impl::TableFriend::get_spec(*target_table);
+            size_t backlink_col_ndx = spec.find_backlink_column(origin_table_key, m_source_column_key);
+            if (backlink_col_ndx != realm::npos) {
+                size_t backlink_count = m_linked_obj.get_backlink_count(backlink_col_ndx);
+                for (size_t i = 0; i < backlink_count; i++)
+                    m_key_values.add(m_linked_obj.get_backlink(backlink_col_ndx, i));
+            }
         }
     }
-    else if (m_linked_column) {
-        m_row_indexes.clear();
-        if (m_linked_row.is_attached()) {
-            size_t linked_row_ndx = m_linked_row.get_index();
-            size_t backlink_count = m_linked_column->get_backlink_count(linked_row_ndx);
-            for (size_t i = 0; i < backlink_count; i++)
-                m_row_indexes.add(m_linked_column->get_backlink(linked_row_ndx, i));
-        }
-    }
+    // FIXME: Unimplemented for link to a column
     else {
         REALM_ASSERT(m_query.m_table);
 
         // valid query, so clear earlier results and reexecute it.
-        if (m_row_indexes.is_attached())
-            m_row_indexes.clear();
+        if (m_key_values.is_attached())
+            m_key_values.clear();
         else
-            m_row_indexes.init_from_ref(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()));
+            m_key_values.create();
 
-        // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();
 
-        m_query.find_all(*const_cast<TableViewBase*>(this), m_start, m_end, m_limit);
+        m_query.find_all(*const_cast<ConstTableView*>(this), m_start, m_end, m_limit);
     }
-    m_num_detached_refs = 0;
 
     do_sort(m_descriptor_ordering);
 
-    m_last_seen_version = outside_version();
+    m_last_seen_versions = outside_version();
 }
 
-bool TableViewBase::is_in_table_order() const
+bool ConstTableView::is_in_table_order() const
 {
     if (!m_table) {
         return false;
     }
-    else if (m_linkview_source) {
+    else if (m_linklist_source) {
         return false;
     }
-    else if (m_distinct_column_source != npos) {
+    else if (m_distinct_column_source) {
         return !m_descriptor_ordering.will_apply_sort();
     }
-    else if (m_linked_column) {
+    else if (m_source_column_key) {
         return false;
     }
     else {

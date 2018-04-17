@@ -31,39 +31,69 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
+#ifdef REALM_CLUSTER_IF
+using OrderVec = std::vector<ObjKey>;
+#else
+using OrderVec = std::vector<size_t>;
+#endif
 
 namespace {
 
-inline int_fast64_t read(TableRef table, const std::vector<size_t>& order)
+inline int_fast64_t read(TableRef table, const OrderVec& order)
 {
     int_fast64_t dummy = 0;
     size_t n = order.size();
+#ifdef REALM_CLUSTER_IF
+    ColKey col0 = table->ndx2colkey(0);
+#endif
     for (size_t i = 0; i != n; ++i)
+#ifdef REALM_CLUSTER_IF
+        dummy += table->get_object(order[i]).get<Int>(col0);
+#else
         dummy += table->get_int(0, order[i]);
+#endif
     return dummy;
 }
 
-inline void write(TableRef table, const std::vector<size_t>& order)
+inline void write(TableRef table, const OrderVec& order)
 {
     size_t n = order.size();
+#ifdef REALM_CLUSTER_IF
+    ColKey col0 = table->ndx2colkey(0);
+#endif
     for (size_t i = 0; i != n; ++i)
+#ifdef REALM_CLUSTER_IF
+        table->get_object(order[i]).set(col0, 125);
+#else
         table->set_int(0, order[i], 125);
+#endif
 }
 
-inline void insert(TableRef table, const std::vector<size_t>& order)
+inline void insert(TableRef table, const OrderVec& order)
 {
     size_t n = order.size();
+#ifdef REALM_CLUSTER_IF
+    ColKey col0 = table->ndx2colkey(0);
+#endif
     for (size_t i = 0; i != n; ++i) {
+#ifdef REALM_CLUSTER_IF
+        table->create_object(order[i]).set(col0, 127);
+#else
         table->insert_empty_row(order[i]);
         table->set_int(0, order[i], 127);
+#endif
     }
 }
 
-inline void erase(TableRef table, const std::vector<size_t>& order)
+inline void erase(TableRef table, const OrderVec& order)
 {
     size_t n = order.size();
     for (size_t i = 0; i != n; ++i)
+#ifdef REALM_CLUSTER_IF
+        table->remove_object(order[i]);
+#else
         table->remove(order[i]);
+#endif
 }
 
 } // anonymous namepsace
@@ -72,24 +102,33 @@ inline void erase(TableRef table, const std::vector<size_t>& order)
 int main()
 {
     const size_t target_size = 1100 * 100L;
-    const int num_tables = 500;
+    const int num_tables = 20;
     std::cout << "Number of tables: " << num_tables << "\n";
     std::cout << "Elements per table: " << target_size << "\n";
 
-    std::vector<size_t> rising_order;
-    std::vector<size_t> falling_order;
-    std::vector<size_t> random_order;
-    std::vector<size_t> random_insert_order;
-    std::vector<size_t> random_erase_order;
+    OrderVec rising_order;
+    OrderVec falling_order;
+    OrderVec random_order;
+    OrderVec random_insert_order;
+    OrderVec random_erase_order;
     for (size_t i = 0; i != target_size; ++i) {
-        rising_order.push_back(i);
-        falling_order.push_back(target_size - 1 - i);
-        random_order.push_back(i);
+        rising_order.emplace_back(i);
+        falling_order.emplace_back(target_size - 1 - i);
+        random_order.emplace_back(i);
+#ifdef REALM_CLUSTER_IF
+        random_insert_order.emplace_back(i);
+        random_erase_order.emplace_back(i);
+#else
         random_insert_order.push_back(rand() % (i + 1));
         random_erase_order.push_back(rand() % (target_size - i));
+#endif
     }
     Random random;
     random.shuffle(random_order.begin(), random_order.end());
+#ifdef REALM_CLUSTER_IF
+    random.shuffle(random_insert_order.begin(), random_insert_order.end());
+    random.shuffle(random_erase_order.begin(), random_erase_order.end());
+#endif
 
     std::unique_ptr<Group> group;
     TableRef tables_1[num_tables], tables_2[num_tables];

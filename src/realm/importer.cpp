@@ -54,12 +54,8 @@ const char* DataTypeToText(DataType t)
         return "String";
     else if (t == type_Binary)
         return "Binary";
-    else if (t == type_OldDateTime)
+    else if (t == type_Timestamp)
         return "Date";
-    else if (t == type_Table)
-        return "Table";
-    else if (t == type_Mixed)
-        return "Mixed";
     else {
         REALM_ASSERT(true);
         return "";
@@ -667,7 +663,8 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* imp
                 std::cout << imported_rows << " rows\r";
 
             // Add empty row to Realm
-            table.add_empty_row();
+            REALM_ASSERT(false); // unimplemented
+            // table.add_empty_row();
 
             // Add all fields to new row
             for (size_t col = 0; col < scheme.size(); col++) {

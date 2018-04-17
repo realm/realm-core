@@ -35,6 +35,7 @@ public:
     ArrayBigBlobs(const ArrayBigBlobs&) = delete;
 
     BinaryData get(size_t ndx) const noexcept;
+    bool is_null(size_t ndx) const;
     BinaryData get_at(size_t ndx, size_t& pos) const noexcept;
     void set(size_t ndx, BinaryData value, bool add_zero_term = false);
     void add(BinaryData value, bool add_zero_term = false);
@@ -112,6 +113,12 @@ inline BinaryData ArrayBigBlobs::get(size_t ndx) const noexcept
         return BinaryData(value, blob_size);
     }
     return {};
+}
+
+inline bool ArrayBigBlobs::is_null(size_t ndx) const
+{
+    ref_type ref = get_as_ref(ndx);
+    return ref == 0;
 }
 
 inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx, Allocator& alloc) noexcept

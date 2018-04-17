@@ -21,8 +21,6 @@
 
 #include <realm.hpp>
 #include <realm/index_string.hpp>
-#include <realm/column_linklist.hpp>
-#include <realm/column_string.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/util/to_string.hpp>
 #include <set>
@@ -68,7 +66,12 @@ using unit_test::TestContext;
 // check-testcase` (or one of its friends) from the command line.
 
 
+#ifdef LEGACY_TESTS
 namespace {
+
+#ifdef LEGACY_TESTS
+// disable to avoid warnings about not being used - enable when tests
+// needed them are enabled again
 
 // strings used by tests
 const char s1[] = "John";
@@ -82,12 +85,13 @@ const char s7[] = "Sam";
 // integers used by integer index tests
 const int64_t ints[] = {0x1111,     0x11112222, 0x11113333, 0x1111333, 0x111122223333ull, 0x1111222233334ull,
                         0x22223333, 0x11112227, 0x11112227, 0x78923};
-
+#endif
 using nullable = std::true_type;
 using non_nullable = std::false_type;
 
 } // anonymous namespace
 
+#ifdef LEGACY_TESTS
 TEST(StringIndex_NonIndexable)
 {
     // Create a column with string values
@@ -195,7 +199,7 @@ TEST_TYPES(StringIndex_DeleteAll, string_column, nullable_string_column, enum_co
     CHECK(ndx.is_empty());
 }
 
-TEST_TYPES(StringIndex_Delete,string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Delete, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -320,7 +324,7 @@ TEST_TYPES(StringIndex_ClearEmpty, string_column, nullable_string_column, enum_c
     CHECK(ndx.is_empty());
 }
 
-TEST_TYPES(StringIndex_Clear,string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Clear, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -653,7 +657,8 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
     col.destroy();
 }
 
-TEST_TYPES(StringIndex_FindAllNoCopyCommonPrefixStrings, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_FindAllNoCopyCommonPrefixStrings, string_column, nullable_string_column, enum_column,
+           nullable_enum_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -972,6 +977,7 @@ TEST_TYPES(StringIndex_Null, nullable_string_column, nullable_enum_column)
     CHECK_EQUAL(r1, 1);
 }
 
+#ifdef LEGACY_TESTS
 TEST_TYPES(StringIndex_Zero_Crash, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
     bool nullable = TEST_TYPE::is_nullable();
@@ -1198,10 +1204,11 @@ TEST_TYPES(StringIndex_Duplicate_Values, string_column, nullable_string_column, 
     CHECK(!ndx.has_duplicate_values());
     CHECK(col.size() == 0);
 }
+#endif
 
 namespace {
 
-template<class TestColumn>
+template <class TestColumn>
 void verify_single_move_last_over(TestContext& test_context, TestColumn& col, size_t index)
 {
     std::string value = col.get(col.size() - 1);
@@ -1213,7 +1220,8 @@ void verify_single_move_last_over(TestContext& test_context, TestColumn& col, si
 
 } // unnamed namespace
 
-TEST_TYPES(StringIndex_MoveLastOver_DoUpdateRef, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_MoveLastOver_DoUpdateRef, string_column, nullable_string_column, enum_column,
+           nullable_enum_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -1422,7 +1430,8 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
     col.clear(); // calls recursive function Array::destroy_deep()
 }
 
-TEST_TYPES(StringIndex_InsertLongPrefixAndQuery, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_InsertLongPrefixAndQuery, string_column, nullable_string_column, enum_column,
+           nullable_enum_column)
 {
     constexpr int half_node_size = REALM_MAX_BPNODE_SIZE / 2;
     bool nullable_column = TEST_TYPE::is_nullable();
@@ -1536,7 +1545,7 @@ TEST(StringIndex_Fuzzy)
                 CHECK_EQUAL(tv0.size(), tv1.size());
 
                 for (size_t v = 0; v < tv0.size(); v++) {
-                    CHECK_EQUAL(tv0.get_source_ndx(v), tv1.get_source_ndx(v));
+                    CHECK_EQUAL(tv0.get_source_key(v), tv1.get_source_key(v));
                 }
             }
 
@@ -1560,7 +1569,7 @@ TEST(StringIndex_Fuzzy)
                 CHECK_EQUAL(tv0.size(), tv1.size());
 
                 for (size_t v = 0; v < tv0.size(); v++) {
-                    CHECK_EQUAL(tv0.get_source_ndx(v), tv1.get_source_ndx(v));
+                    CHECK_EQUAL(tv0.get_source_key(v), tv1.get_source_key(v));
                 }
             }
             if (t->size() > 10)
@@ -1582,7 +1591,7 @@ TEST(StringIndex_Fuzzy)
         }
     }
 }
-
+#endif
 
 namespace {
 
@@ -1835,7 +1844,8 @@ TEST_TYPES(StringIndex_Insensitive_Fuzz, string_column, nullable_string_column, 
 
 // Exercise the StringIndex case insensitive search for strings with very long, common prefixes
 // to cover the special case code paths where different strings are stored in a list.
-TEST_TYPES(StringIndex_Insensitive_VeryLongStrings, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST_TYPES(StringIndex_Insensitive_VeryLongStrings, string_column, nullable_string_column, enum_column,
+           nullable_enum_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -1915,6 +1925,6 @@ TEST_TYPES(StringIndex_Rover, string_column, nullable_string_column, enum_column
 
     results.destroy();
 }
-
+#endif // LEGACY_TESTS
 
 #endif // TEST_INDEX_STRING

@@ -375,6 +375,42 @@ private:
 };
 
 
+class RaceDetector {
+    std::atomic<bool> busy;
+
+public:
+    RaceDetector()
+    {
+        busy.store(false);
+    }
+    void enter()
+    {
+        bool already_busy = busy.exchange(true, std::memory_order_acq_rel);
+        if (already_busy)
+            throw std::runtime_error("Race detected - critical section busy on entry");
+    }
+    void leave()
+    {
+        busy.store(false, std::memory_order_release);
+    }
+    friend class CriticalSection;
+};
+
+class CriticalSection {
+    RaceDetector& rd;
+
+public:
+    CriticalSection(RaceDetector& race)
+        : rd(race)
+    {
+        rd.enter();
+    }
+    ~CriticalSection()
+    {
+        rd.leave();
+    }
+};
+
 // Implementation:
 
 inline Thread::Thread()

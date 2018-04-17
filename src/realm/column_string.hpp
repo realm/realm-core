@@ -20,7 +20,7 @@
 #define REALM_COLUMN_STRING_HPP
 
 #include <memory>
-#include <realm/array_string.hpp>
+#include <realm/array_string_short.hpp>
 #include <realm/array_string_long.hpp>
 #include <realm/array_blobs_big.hpp>
 #include <realm/column.hpp>
@@ -88,23 +88,6 @@ public:
     void set_string(size_t, StringData) override;
 
     bool is_nullable() const noexcept final;
-
-    // Search index
-    StringData get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept final;
-    bool has_search_index() const noexcept override;
-    void set_search_index_ref(ref_type, ArrayParent*, size_t) override;
-    StringIndex* get_search_index() noexcept override;
-    const StringIndex* get_search_index() const noexcept override;
-    std::unique_ptr<StringIndex> release_search_index() noexcept;
-    bool supports_search_index() const noexcept final
-    {
-        return true;
-    }
-    StringIndex* create_search_index() override;
-
-    // Simply inserts all column values in the index in a loop
-    void populate_search_index();
-    void destroy_search_index() noexcept override;
 
     // Optimizing data layout. enforce == true will enforce enumeration;
     // enforce == false will auto-evaluate if it should be enumerated or not
@@ -200,7 +183,7 @@ inline size_t StringColumn::size() const noexcept
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
-            ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
+            ArrayStringShort* leaf = static_cast<ArrayStringShort*>(m_array.get());
             return leaf->size();
         }
         bool is_big = m_array->get_context_flag();
@@ -292,21 +275,6 @@ inline void StringColumn::set_string(size_t row_ndx, StringData value)
     set(row_ndx, value); // Throws
 }
 
-inline bool StringColumn::has_search_index() const noexcept
-{
-    return m_search_index != 0;
-}
-
-inline StringIndex* StringColumn::get_search_index() noexcept
-{
-    return m_search_index.get();
-}
-
-inline const StringIndex* StringColumn::get_search_index() const noexcept
-{
-    return m_search_index.get();
-}
-
 inline size_t StringColumn::get_size_from_ref(ref_type root_ref, Allocator& alloc) noexcept
 {
     const char* root_header = alloc.translate(root_ref);
@@ -315,7 +283,7 @@ inline size_t StringColumn::get_size_from_ref(ref_type root_ref, Allocator& allo
         bool long_strings = Array::get_hasrefs_from_header(root_header);
         if (!long_strings) {
             // Small strings leaf
-            return ArrayString::get_size_from_header(root_header);
+            return ArrayStringShort::get_size_from_header(root_header);
         }
         bool is_big = Array::get_context_flag_from_header(root_header);
         if (!is_big) {

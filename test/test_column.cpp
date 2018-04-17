@@ -23,6 +23,7 @@
 #include <algorithm>
 
 #include <realm/column.hpp>
+#include <realm/bplustree.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/column_tpl.hpp>
 
@@ -721,25 +722,9 @@ TEST_TYPES(Column_SwapRows, IntegerColumn, IntNullColumn)
 
         c.destroy();
     }
-
-    // With search index
-    {
-        ref_type col_ref = TEST_TYPE::create(Allocator::get_default());
-        TEST_TYPE c(Allocator::get_default(), col_ref);
-
-        auto search_index = c.create_search_index();
-        c.add({});
-        c.add({});
-        c.add({});
-
-        c.swap_rows(1, 2);
-
-        c.destroy();
-        search_index->destroy();
-    }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST_TYPES(Column_Average, IntegerColumn, IntNullColumn)
 {
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
@@ -882,7 +867,6 @@ TEST_TYPES(Column_Min2, IntegerColumn, IntNullColumn)
     c.destroy();
 }
 
-
 TEST(Column_IndexCrash)
 {
     // Trying to reproduce bug found by Samuel / segiddins: "Assertion when setting value on indexed IntNullColumn"
@@ -898,6 +882,7 @@ TEST(Column_IndexCrash)
 
     col.destroy();
 }
+#endif
 
 /*
 TEST_TYPES(Column_Sort2, IntegerColumn, IntNullColumn)
@@ -1156,24 +1141,6 @@ TEST(ColumnIntNull_Null)
 }
 
 
-TEST(ColumnIntNull_MoveLastOverPreservesNull)
-{
-    ref_type ref = IntNullColumn::create(Allocator::get_default());
-    IntNullColumn c(Allocator::get_default(), ref);
-    c.create_search_index();
-    c.insert(0, 0, 3);
-    c.set(0, 123);
-    c.set(1, 456);
-    c.set(2, 4776);
-    c.set_null(2);
-    c.move_last_over(0, 2);
-    CHECK(c.is_null(0));
-    c.move_last_over(0, 1);
-    CHECK_EQUAL(*c.get(0), 456);
-    c.destroy();
-}
-
-
 TEST(ColumnIntNull_CompareInts)
 {
     ref_type ref1 = IntNullColumn::create(Allocator::get_default());
@@ -1202,14 +1169,11 @@ TEST(ColumnIntNull_CompareInts)
 }
 
 
-TEST_TYPES(Column_Iterators, std::true_type, std::false_type)
+TEST(Column_Iterators)
 {
     std::vector<int64_t> list;
     ref_type ref = IntegerColumn::create(Allocator::get_default());
     IntegerColumn c(Allocator::get_default(), ref);
-    if (TEST_TYPE::value) {
-        c.create_search_index();
-    }
 
     Random random(random_int<long>());
     const size_t num_elements = 1000;
@@ -1316,6 +1280,40 @@ TEST_TYPES(Column_Iterators, std::true_type, std::false_type)
     CHECK(realm_next >= realm_it);
     CHECK(realm_next >= realm_next);
     CHECK(!(realm_it >= realm_next));
+
+    c.destroy();
+}
+
+// This test confirms that we can read columns produced by Column<T>
+// with a BPlusTree<T> accessor
+TEST(BPlusTree_ColumnIntCompatibility)
+{
+    ref_type ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn c(Allocator::get_default(), ref);
+
+    for (int i = 0; i < 500; i++) {
+        c.add(i);
+    }
+
+    BPlusTree<Int> tree(Allocator::get_default());
+    tree.init_from_ref(c.get_ref());
+
+    CHECK_EQUAL(c.size(), tree.size());
+    size_t sz = c.size();
+    for (size_t i = 0; i < sz; i++) {
+        CHECK_EQUAL(c.get(i), tree.get(i));
+    }
+
+    c.insert(17, 1234);
+    c.insert(177, 5678);
+    c.erase(321);
+    tree.init_from_ref(c.get_ref());
+
+    CHECK_EQUAL(c.size(), tree.size());
+    sz = c.size();
+    for (size_t i = 0; i < sz; i++) {
+        CHECK_EQUAL(c.get(i), tree.get(i));
+    }
 
     c.destroy();
 }

@@ -77,6 +77,8 @@ public:
     /// Construct a null reference.
     StringData() noexcept;
 
+    StringData(int) = delete;
+
     /// If \a external_data is 'null', \a data_size must be zero.
     StringData(const char* external_data, size_t data_size) noexcept;
 
@@ -364,8 +366,13 @@ inline StringData StringData::substr(size_t i) const noexcept
 template <class C, class T>
 inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const StringData& d)
 {
-    for (const char* i = d.m_data; i != d.m_data + d.m_size; ++i)
-        out << *i;
+    if (d.is_null()) {
+        out << "<null>";
+    }
+    else {
+        for (const char* i = d.m_data; i != d.m_data + d.m_size; ++i)
+            out << *i;
+    }
     return out;
 }
 

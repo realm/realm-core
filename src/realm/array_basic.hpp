@@ -26,11 +26,23 @@ namespace realm {
 /// A BasicArray can currently only be used for simple unstructured
 /// types like float, double.
 template <class T>
-class BasicArray : public Array {
+class BasicArray : public Array, public ArrayPayload {
 public:
+    using value_type = T;
+
     explicit BasicArray(Allocator&) noexcept;
     ~BasicArray() noexcept override
     {
+    }
+
+    static T default_value(bool nullable)
+    {
+        return nullable ? null::get_null_float<T>() : T(0.0);
+    }
+
+    void init_from_ref(ref_type ref) noexcept override
+    {
+        Array::init_from_ref(ref);
     }
 
     // Disable copying, this is not allowed.
@@ -45,6 +57,10 @@ public:
     void insert(size_t ndx, T value);
     void erase(size_t ndx);
     void truncate(size_t size);
+    void truncate_and_destroy_children(size_t new_size)
+    {
+        truncate(new_size); // There are no children to destroy
+    }
     void clear();
 
     size_t find_first(T value, size_t begin = 0, size_t end = npos) const;

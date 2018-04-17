@@ -85,7 +85,8 @@ size_t TransactionInfo::get_num_available_versions() const
     return m_num_versions;
 }
 
-void TransactionInfo::update_stats(size_t disk_size, size_t free_space, size_t total_objects, size_t available_versions)
+void TransactionInfo::update_stats(size_t disk_size, size_t free_space, size_t total_objects,
+                                   size_t available_versions)
 {
     m_realm_disk_size = disk_size;
     m_realm_free_space = free_space;

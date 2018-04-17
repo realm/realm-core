@@ -13,22 +13,20 @@ set(NORMAL_TESTS
     test_all.cpp
     test_alloc.cpp
     test_array.cpp
-    test_array_binary.cpp
+    test_array_blobs_small.cpp
     test_array_blob.cpp
     test_array_blobs_big.cpp
     test_array_float.cpp
     test_array_integer.cpp
-    test_array_string.cpp
+    test_array_string_short.cpp
     test_array_string_long.cpp
     test_basic_utils.cpp
     test_binary_data.cpp
+    test_bplus_tree.cpp
     test_column.cpp
-    test_column_binary.cpp
     test_column_float.cpp
-    test_column_mixed.cpp
     test_column_string.cpp
     test_column_timestamp.cpp
-    test_descriptor.cpp
     test_destroy_guard.cpp
     test_destructor_thread_safety.cpp
     test_file.cpp
@@ -45,6 +43,7 @@ set(NORMAL_TESTS
     test_parser.cpp
     test_priority_queue.cpp
     test_query.cpp
+    test_query_big.cpp
     test_replication.cpp
     test_safe_int_ops.cpp
     test_self.cpp
@@ -65,7 +64,6 @@ set(NORMAL_TESTS
     test_util_logger.cpp
     test_util_memory_stream.cpp
     test_util_overload.cpp
-    test_util_scope_exit.cpp
     test_util_stringbuffer.cpp
     test_util_to_string.cpp
     test_util_type_list.cpp
@@ -116,7 +114,7 @@ else()
 endif()
 
 if (MSVC)
-    set_source_files_properties(test_query.cpp PROPERTIES COMPILE_FLAGS /bigobj)
+    set_source_files_properties(test_query.cpp test_query_big.cpp PROPERTIES COMPILE_FLAGS /bigobj)
 endif()
 
 add_executable(CoreTests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})

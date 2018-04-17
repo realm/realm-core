@@ -4,17 +4,6 @@
 # where this branch diverged from a specified development branch.
 # Empty lines and lines beginning with '#" are ignored.
 
-tags/v0.90.0
-tags/v0.91.0
-tags/v0.92.0
-# the following two tags fail to compile
-#tags/v0.93.0
-#tags/v0.94.0
-tags/v0.95.0
-tags/v0.96.0
-tags/v0.97.0
-tags/v0.98.0
-tags/v0.99.0
 tags/v1.0.0
 tags/v1.1.0
 tags/v1.2.0

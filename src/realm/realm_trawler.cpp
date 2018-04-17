@@ -596,3 +596,17 @@ int main (int argc, const char* argv[])
 
     return 0;
 }
+
+// Solving a linker issue..... :-(
+namespace realm {
+namespace util {
+void File::write(const char*, size_t)
+{
+    REALM_ASSERT(false);
+}
+void File::seek(SizeType)
+{
+    REALM_ASSERT(false);
+}
+}
+}

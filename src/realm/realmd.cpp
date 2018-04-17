@@ -18,7 +18,7 @@
 
 // Realm daemon (realmd) responsible for async commits
 
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 #include <unistd.h>
 #include <iostream>
 
@@ -43,10 +43,9 @@ int main(int argc, char* argv[])
 #ifdef REALM_ENABLE_LOGFILE
         std::cerr << "Daemon starting" << std::endl;
 #endif
-        SharedGroup async_committer((SharedGroup::unattached_tag()));
+        DB async_committer((DB::unattached_tag()));
         char* file = argv[1];
-        using sgf = _impl::SharedGroupFriend;
-        sgf::async_daemon_open(async_committer, file);
+        async_committer.open(file);
     }
     else if (pid > 0) {
         // in parent, fork was ok, so return succes

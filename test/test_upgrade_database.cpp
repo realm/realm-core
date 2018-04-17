@@ -72,6 +72,7 @@ using namespace realm::util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+#ifdef LEGACY_TESTS
 
 TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
@@ -132,7 +133,7 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         const char* encryption_key = nullptr;
         bool allow_upgrade = false;
 
-        CHECK_THROW(SharedGroup(temp_copy, no_create, SharedGroupOptions(durability, encryption_key, allow_upgrade)),
+        CHECK_THROW(DB(temp_copy, no_create, SharedGroupOptions(durability, encryption_key, allow_upgrade)),
                     FileFormatUpgradeRequired);
     }
 
@@ -141,7 +142,7 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
         File::copy(path, temp_copy);
 
-        SharedGroup sg(temp_copy);
+        DB sg(temp_copy);
         ReadTransaction rt(sg);
         ConstTableRef t = rt.get_table("table");
 
@@ -163,7 +164,7 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
     // Now see if we can open the upgraded file and also commit to it
     {
-        SharedGroup sg(temp_copy);
+        DB sg(temp_copy);
         WriteTransaction rt(sg);
         TableRef t = rt.get_table("table");
 
@@ -191,7 +192,7 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
         File::copy(path, temp_copy);
 
-        SharedGroup sg(temp_copy);
+        DB sg(temp_copy);
         WriteTransaction rt(sg);
         TableRef t = rt.get_table("table");
 
@@ -236,7 +237,7 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         File::copy(path, temp_copy);
 
         std::unique_ptr<Replication> hist = make_in_realm_history(temp_copy);
-        SharedGroup sg(*hist);
+        DB sg(*hist);
         ReadTransaction rt(sg);
         ConstTableRef t = rt.get_table("table");
 
@@ -280,7 +281,6 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 #endif // TEST_READ_UPGRADE_MODE
 }
 
-
 // Same as above test, just with different string lengths to get better coverage of the different String array types
 // that all have been modified by null support
 TEST_IF(Upgrade_Database_2_Backwards_Compatible, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
@@ -294,7 +294,7 @@ TEST_IF(Upgrade_Database_2_Backwards_Compatible, REALM_MAX_BPNODE_SIZE == 4 || R
     SHARED_GROUP_TEST_PATH(temp_copy);
 
     File::copy(path, temp_copy);
-    SharedGroup g(temp_copy, 0);
+    DB g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
     CHECK_EQUAL(9, sgf::get_file_format_version(g));
@@ -391,7 +391,7 @@ TEST_IF(Upgrade_Database_2_Backwards_Compatible_WriteTransaction, REALM_MAX_BPNO
     SHARED_GROUP_TEST_PATH(temp_copy);
 
     File::copy(path, temp_copy);
-    SharedGroup g(temp_copy, 0);
+    DB g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
     CHECK_EQUAL(9, sgf::get_file_format_version(g));
@@ -488,7 +488,7 @@ TEST_IF(Upgrade_Database_Binary, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_
     SHARED_GROUP_TEST_PATH(temp_copy);
 
     File::copy(path, temp_copy);
-    SharedGroup g(temp_copy, 0);
+    DB g(temp_copy, 0);
 
     WriteTransaction wt(g);
     TableRef t = wt.get_table(0);
@@ -580,7 +580,7 @@ TEST_IF(Upgrade_Database_Strings_With_NUL, REALM_MAX_BPNODE_SIZE == 4 || REALM_M
     SHARED_GROUP_TEST_PATH(temp_copy);
 
     File::copy(path, temp_copy);
-    SharedGroup g(temp_copy, 0);
+    DB g(temp_copy, 0);
 
     WriteTransaction wt(g);
     TableRef t = wt.get_table("table");
@@ -643,8 +643,8 @@ TEST_IF(Upgrade_Database_2_3_Writes_New_File_Format, REALM_MAX_BPNODE_SIZE == 4 
     CHECK_OR_RETURN(File::exists(path));
     SHARED_GROUP_TEST_PATH(temp_copy);
     File::copy(path, temp_copy);
-    SharedGroup sg1(temp_copy);
-    SharedGroup sg2(temp_copy); // verify that the we can open another shared group, and it won't deadlock
+    DB sg1(temp_copy);
+    DB sg2(temp_copy); // verify that the we can open another shared group, and it won't deadlock
     using sgf = _impl::SharedGroupFriend;
     CHECK_EQUAL(sgf::get_file_format_version(sg1), sgf::get_file_format_version(sg2));
 }
@@ -667,7 +667,7 @@ TEST_IF(Upgrade_Database_2_3_Writes_New_File_Format_new, REALM_MAX_BPNODE_SIZE =
     util::Thread t[10];
 
     for (auto& tt : t) {
-        tt.start([&]() { SharedGroup sg(temp_copy); });
+        tt.start([&]() { DB sg(temp_copy); });
     }
 
     for (auto& tt : t)
@@ -692,7 +692,7 @@ TEST_IF(Upgrade_InRealmHistory, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
     {
         File::copy(path, temp_path);
         std::unique_ptr<Replication> hist = make_in_realm_history(temp_path);
-        SharedGroup sg(*hist);
+        DB sg(*hist);
         using sgf = _impl::SharedGroupFriend;
         CHECK_LESS_EQUAL(4, sgf::get_file_format_version(sg));
     }
@@ -703,13 +703,13 @@ TEST_IF(Upgrade_InRealmHistory, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
         File::copy(path, temp_path);
         bool no_create = true;
         {
-            SharedGroup sg(temp_path, no_create);
+            DB sg(temp_path, no_create);
             using sgf = _impl::SharedGroupFriend;
             CHECK_EQUAL(9, sgf::get_file_format_version(sg));
         }
         {
             std::unique_ptr<Replication> hist = make_in_realm_history(temp_path);
-            SharedGroup sg(*hist);
+            DB sg(*hist);
             using sgf = _impl::SharedGroupFriend;
             CHECK_LESS_EQUAL(4, sgf::get_file_format_version(sg));
         }
@@ -745,8 +745,8 @@ TEST_IF(Upgrade_DatabaseWithCallback, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BP
 
     upgrade_callback = callback;
 
-    SharedGroup sg(temp_copy, no_create,
-                   SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
+    DB sg(temp_copy, no_create,
+          SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
 
     CHECK(did_upgrade);
     CHECK_EQUAL(old_version, 3);
@@ -785,8 +785,8 @@ TEST_IF(Upgrade_DatabaseWithCallbackWithException, REALM_MAX_BPNODE_SIZE == 4 ||
     upgrade_callback = exception_callback;
     bool exception_thrown = false;
     try {
-        SharedGroup sg1(temp_copy, no_create,
-                        SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
+        DB sg1(temp_copy, no_create,
+               SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
     }
     catch (...) {
         exception_thrown = true;
@@ -796,16 +796,16 @@ TEST_IF(Upgrade_DatabaseWithCallbackWithException, REALM_MAX_BPNODE_SIZE == 4 ||
 
     // Callback should be triggered here because the file still needs to be upgraded
     upgrade_callback = successful_callback;
-    SharedGroup sg2(temp_copy, no_create,
-                    SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
+    DB sg2(temp_copy, no_create,
+           SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
     CHECK(did_upgrade);
     CHECK_EQUAL(old_version, 3);
     CHECK(new_version >= 5);
 
     // Callback should not be triggered here because the file is already upgraded
     did_upgrade = false;
-    SharedGroup sg3(temp_copy, no_create,
-                    SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
+    DB sg3(temp_copy, no_create,
+           SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
     CHECK(!did_upgrade);
 }
 
@@ -828,7 +828,7 @@ TEST_IF(Upgrade_Database_4_5_DateTime1, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_
 
         // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
         // in version 4
-        SharedGroup sg(temp_copy);
+        DB sg(temp_copy);
 
         WriteTransaction rt(sg);
         TableRef t = rt.get_table("table");
@@ -943,7 +943,7 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
 
         // Constructing this SharedGroup will trigger an upgrade
         // for all tables because the file is in version 4
-        SharedGroup sg(temp_copy);
+        DB sg(temp_copy);
 
         WriteTransaction wt(sg);
         TableRef t = wt.get_table("t1");
@@ -1084,7 +1084,7 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
         // Constructing this SharedGroup will trigger an upgrade
         auto hist = make_in_realm_history(temp_copy);
-        SharedGroup sg(*hist);
+        DB sg(*hist);
 
         ReadTransaction rt(sg);
         CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(rt.get_group()),
@@ -1142,7 +1142,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
         // Constructing this SharedGroup will trigger an upgrade
         auto hist = make_in_realm_history(temp_copy);
-        SharedGroup sg(*hist);
+        DB sg(*hist);
 
         ReadTransaction rt(sg);
         CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(rt.get_group()),
@@ -1186,7 +1186,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-    util::to_string(REALM_MAX_BPNODE_SIZE) + "_8_to_9.realm";
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_8_to_9.realm";
     std::string validation_str = "test string";
 #if TEST_READ_UPGRADE_MODE
 
@@ -1201,7 +1201,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
         // Constructing this SharedGroup will trigger an upgrade
         auto hist = make_in_realm_history(temp_copy);
-        SharedGroup sg(*hist);
+        DB sg(*hist);
 
         ReadTransaction rt(sg);
         CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(rt.get_group()),
@@ -1245,8 +1245,9 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
+#endif
 
-// ONLY(Upgrade_Database_9_10)
+#ifdef LEGACY_TESTS
 TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     size_t nb_rows = (REALM_MAX_BPNODE_SIZE == 4) ? 50 : 500;
@@ -1257,81 +1258,147 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
 
-    // Opening in read-only mode, so it doesn't upgrade
-    Group g(path);
-    CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(g), 0);
-    CHECK_EQUAL(_impl::GroupFriend::get_file_format_version(g), 9);
+    SHARED_GROUP_TEST_PATH(temp_copy);
 
-    ConstTableRef t = g.get_table("table");
-    ConstTableRef o = g.get_table("other");
-    CHECK(t);
-    CHECK(o);
-    CHECK_EQUAL(t->size(), nb_rows + 1);
-    CHECK_EQUAL(o->size(), 25);
+    // Make a copy of the version 9 database so that we keep the
+    // original file intact and unmodified
+    File::copy(path, temp_copy);
 
-    auto col_int = 0;
-    auto col_int_null = 1;
-    auto col_bool = 2;
-    auto col_bool_null = 3;
-    auto col_float = 4;
-    auto col_double = 5;
-    auto col_string = 6;
-    auto col_string_i = 7;
-    auto col_binary = 8;
-    auto col_date = 9;
-    auto col_link = 10;
-    auto col_linklist = 11;
-    auto col_int_list = 12;
+    int iter = 2;
+    while (iter) {
+        try {
+            // Constructing this SharedGroup will trigger an upgrade first time around
+            auto hist = make_in_realm_history(temp_copy);
+            DB sg(*hist);
 
-    CHECK_EQUAL(t->get_column_name(col_int), "int");
-    CHECK_EQUAL(t->get_column_name(col_int_null), "int");
-    CHECK_EQUAL(t->get_column_name(col_bool), "");
-    CHECK_EQUAL(t->get_column_name(col_bool_null), "bool_null");
-    CHECK_EQUAL(t->get_column_name(col_float), "float");
-    CHECK_EQUAL(t->get_column_name(col_double), "double");
-    CHECK_EQUAL(t->get_column_name(col_string), "string");
-    CHECK_EQUAL(t->get_column_name(col_string_i), "string_i");
-    CHECK_EQUAL(t->get_column_name(col_binary), "binary");
-    CHECK_EQUAL(t->get_column_name(col_date), "date");
-    CHECK_EQUAL(t->get_column_name(col_link), "link");
-    CHECK_EQUAL(t->get_column_name(col_linklist), "linklist");
-    CHECK_EQUAL(t->get_column_name(col_int_list), "integers");
-    CHECK_EQUAL(o->get_column_name(0), "int");
+            ReadTransaction rt(sg);
 
-    CHECK_EQUAL(t->get_column_type(col_int), type_Int);
-    CHECK_EQUAL(t->get_column_type(col_int_null), type_Int);
-    CHECK_EQUAL(t->get_column_type(col_bool), type_Bool);
-    CHECK_EQUAL(t->get_column_type(col_bool_null), type_Bool);
-    CHECK_EQUAL(t->get_column_type(col_float), type_Float);
-    CHECK_EQUAL(t->get_column_type(col_double), type_Double);
-    CHECK_EQUAL(t->get_column_type(col_string), type_String);
-    CHECK_EQUAL(t->get_column_type(col_string_i), type_String);
-    CHECK_EQUAL(t->get_column_type(col_binary), type_Binary);
-    CHECK_EQUAL(t->get_column_type(col_date), type_Timestamp);
-    CHECK_EQUAL(t->get_column_type(col_link), type_Link);
-    CHECK_EQUAL(t->get_column_type(col_linklist), type_LinkList);
-    CHECK_EQUAL(t->get_column_type(col_int_list), type_Table);
+            ConstTableRef t = rt.get_table("table");
+            ConstTableRef o = rt.get_table("other");
+            rt.get_group().verify();
 
-    CHECK_EQUAL(t->is_nullable(col_int), false);
-    CHECK_EQUAL(t->is_nullable(col_int_null), true);
-    CHECK_EQUAL(t->is_nullable(col_bool), false);
-    CHECK_EQUAL(t->is_nullable(col_bool_null), true);
-    CHECK_EQUAL(t->is_nullable(col_float), false);
-    CHECK_EQUAL(t->is_nullable(col_double), false);
-    CHECK_EQUAL(t->is_nullable(col_string), false);
-    CHECK_EQUAL(t->is_nullable(col_string_i), true);
-    CHECK_EQUAL(t->is_nullable(col_binary), false);
-    CHECK_EQUAL(t->is_nullable(col_date), false);
-    CHECK_EQUAL(t->is_nullable(col_link), true);
-    CHECK_EQUAL(t->is_nullable(col_linklist), false);
-    CHECK_EQUAL(t->is_nullable(col_int_list), false);
+            CHECK(t);
+            CHECK(o);
+            CHECK_EQUAL(t->size(), nb_rows + 1);
+            CHECK_EQUAL(o->size(), 25);
 
-    CHECK_EQUAL(t->has_search_index(col_string), false);
-    CHECK_EQUAL(t->has_search_index(col_string_i), true);
+            auto col_keys = t->get_col_keys();
+            CHECK_EQUAL(col_keys.size(), 13);
+            ColKey col_o = o->get_col_keys()[0];
 
-    CHECK_EQUAL(t->get_string(col_string, insert_pos),
-                "This is a rather long string, that should not be very much shorter");
-    CHECK_EQUAL(t->get_binary(col_binary, insert_pos), BinaryData("", 0));
+            auto col_int = col_keys[0];
+            auto col_int_null = col_keys[1];
+            auto col_bool = col_keys[2];
+            auto col_bool_null = col_keys[3];
+            auto col_float = col_keys[4];
+            auto col_double = col_keys[5];
+            auto col_string = col_keys[6];
+            auto col_string_i = col_keys[7];
+            auto col_binary = col_keys[8];
+            auto col_date = col_keys[9];
+            auto col_link = col_keys[10];
+            auto col_linklist = col_keys[11];
+            auto col_int_list = col_keys[12];
+
+            CHECK_EQUAL(t->get_column_name(col_int), "int");
+            CHECK_EQUAL(t->get_column_name(col_int_null), "int_1");
+            CHECK_EQUAL(t->get_column_name(col_bool), "col_2");
+            CHECK_EQUAL(t->get_column_name(col_bool_null), "bool_null");
+            CHECK_EQUAL(t->get_column_name(col_float), "float");
+            CHECK_EQUAL(t->get_column_name(col_double), "double");
+            CHECK_EQUAL(t->get_column_name(col_string), "string");
+            CHECK_EQUAL(t->get_column_name(col_string_i), "string_i");
+            CHECK_EQUAL(t->get_column_name(col_binary), "binary");
+            CHECK_EQUAL(t->get_column_name(col_date), "date");
+            CHECK_EQUAL(t->get_column_name(col_link), "link");
+            CHECK_EQUAL(t->get_column_name(col_linklist), "linklist");
+            CHECK_EQUAL(t->get_column_name(col_int_list), "integers");
+            CHECK_EQUAL(o->get_column_name(col_o), "int");
+
+            CHECK_EQUAL(t->get_column_type(col_int_null), type_Int);
+            CHECK_EQUAL(t->get_column_type(col_bool), type_Bool);
+            CHECK_EQUAL(t->get_column_type(col_bool_null), type_Bool);
+            CHECK_EQUAL(t->get_column_type(col_float), type_Float);
+            CHECK_EQUAL(t->get_column_type(col_double), type_Double);
+            CHECK_EQUAL(t->get_column_type(col_string), type_String);
+            CHECK_EQUAL(t->get_column_type(col_string_i), type_String);
+            CHECK_EQUAL(t->get_column_type(col_binary), type_Binary);
+            CHECK_EQUAL(t->get_column_type(col_date), type_Timestamp);
+            CHECK_EQUAL(t->get_column_type(col_link), type_Link);
+            CHECK_EQUAL(t->get_column_type(col_linklist), type_LinkList);
+            CHECK_EQUAL(t->get_column_type(col_int_list), type_Int);
+            CHECK(t->get_column_attr(col_int_list).test(col_attr_List));
+            CHECK_EQUAL(o->get_column_type(col_o), type_Int);
+
+            CHECK_EQUAL(t->is_nullable(col_int), false);
+            CHECK_EQUAL(t->is_nullable(col_int_null), true);
+            CHECK_EQUAL(t->is_nullable(col_bool), false);
+            CHECK_EQUAL(t->is_nullable(col_bool_null), true);
+            CHECK_EQUAL(t->is_nullable(col_float), false);
+            CHECK_EQUAL(t->is_nullable(col_double), false);
+            CHECK_EQUAL(t->is_nullable(col_string), false);
+            CHECK_EQUAL(t->is_nullable(col_string_i), true);
+            CHECK_EQUAL(t->is_nullable(col_binary), false);
+            CHECK_EQUAL(t->is_nullable(col_date), false);
+            CHECK_EQUAL(t->is_nullable(col_link), true);
+            CHECK_EQUAL(t->is_nullable(col_linklist), false);
+            CHECK_EQUAL(t->is_nullable(col_int_list), false);
+
+            CHECK_EQUAL(t->has_search_index(col_string), false);
+            CHECK_EQUAL(t->has_search_index(col_string_i), true);
+
+            ConstObj obj0 = t->get_object(ObjKey(0));
+            CHECK(obj0.is_null(col_int_null));
+            CHECK(obj0.is_null(col_bool_null));
+
+            ConstObj obj17 = t->get_object(ObjKey(17));
+            ConstObj obj23 = t->get_object(ObjKey(23));
+            ConstObj obj27 = t->get_object(ObjKey(27));
+            ConstObj obj = t->get_object(ObjKey(insert_pos));
+
+            CHECK_EQUAL(obj17.get<Int>(col_int), 17);
+            CHECK_EQUAL(obj17.get<util::Optional<Int>>(col_int_null), 17);
+            CHECK_EQUAL(obj17.get<Bool>(col_bool), false);
+            CHECK_EQUAL(obj17.get<util::Optional<Bool>>(col_bool_null), false);
+            CHECK_EQUAL(obj17.get<Float>(col_float), 17 * 1.5f);
+            CHECK_EQUAL(obj17.get<Double>(col_double), 17 * 2.5);
+            CHECK_EQUAL(obj17.get<String>(col_string), "This is a medium long string");
+            CHECK_EQUAL(t->find_first(col_string_i, StringData("foo 17")), obj17.get_key());
+            std::string bigbin(1000, 'x');
+            CHECK_EQUAL(obj17.get<Binary>(col_binary), BinaryData(bigbin));
+            CHECK_EQUAL(obj17.get<Timestamp>(col_date), Timestamp(1700, 17));
+            CHECK_EQUAL(obj17.get<ObjKey>(col_link), obj27.get_key());
+            auto int_list_null = obj17.get_list<Int>(col_int_list);
+            CHECK(int_list_null.is_null());
+
+            auto int_list = obj23.get_list<Int>(col_int_list);
+            CHECK(!int_list.is_null());
+            CHECK_EQUAL(int_list.size(), 18);
+            CHECK_EQUAL(int_list.get(0), 24);
+            CHECK_EQUAL(int_list.get(17), 41);
+
+            CHECK_EQUAL(obj27.get<Bool>(col_bool), true);
+            std::string bin("abcdefghijklmnopqrstuvwxyz");
+            CHECK_EQUAL(obj27.get<Binary>(col_binary), BinaryData(bin));
+            CHECK_EQUAL(obj27.get_backlink_count(*t, col_link), 1);
+            CHECK_EQUAL(obj27.get_backlink(*t, col_link, 0), obj17.get_key());
+            auto ll = obj27.get_linklist(col_linklist);
+            CHECK_EQUAL(ll.size(), 7);
+            ConstObj linked_obj = ll.get(0);
+            CHECK_EQUAL(linked_obj.get_key(), ObjKey(12));
+            size_t expected_back_link_count = (REALM_MAX_BPNODE_SIZE == 4) ? 1 : 4;
+            CHECK_EQUAL(linked_obj.get_backlink_count(*t, col_linklist), expected_back_link_count);
+
+            CHECK_EQUAL(obj.get<String>(col_string),
+                        "This is a rather long string, that should not be very much shorter");
+            CHECK_EQUAL(obj.get<Binary>(col_binary), BinaryData("", 0));
+
+            --iter;
+        }
+        catch (...) {
+            // Upgrade failed - try again
+        }
+    }
 
 #else
     // NOTE: This code must be executed from an old file-format-version 9
@@ -1417,6 +1484,6 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
-
+#endif
 
 #endif // TEST_GROUP

@@ -23,6 +23,9 @@
 #include <realm/column_string.hpp>
 #include <realm/column_string_enum.hpp>
 #include <realm/index_string.hpp>
+#include <realm/bplustree.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_key.hpp>
 
 #include "test.hpp"
 #include "test_string_types.hpp"
@@ -594,7 +597,7 @@ TEST_TYPES(ColumnString_AutoEnumerate, non_nullable, nullable)
     e.destroy();
 }
 
-
+#ifdef LEGACY_TESTS
 TEST_TYPES(ColumnString_AutoEnumerateIndex, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
@@ -747,7 +750,7 @@ TEST_TYPES(ColumnString_AutoEnumerateIndexReuse, non_nullable, nullable)
     c.destroy();
     e.destroy();
 }
-
+#endif // LEGACY_TESTS
 
 TEST(StringEnumColumn_CloneDeep)
 {
@@ -1110,7 +1113,9 @@ TEST_TYPES(ColumnString_FindAllRanges, string_column, nullable_string_column, en
     c.destroy();
 }
 
-TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, string_column, nullable_string_column, enum_column, nullable_enum_column)
+#ifdef LEGACY_TESTS
+TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, string_column, nullable_string_column, enum_column,
+           nullable_enum_column)
 {
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
@@ -1184,6 +1189,7 @@ TEST_TYPES(ColumnString_SetIndexInParent, string_column, nullable_string_column,
     sc.set_ndx_in_parent(0);
     CHECK_EQUAL(sc.get_ndx_in_parent() + 1, ndx->get_ndx_in_parent());
 }
+#endif
 
 TEST_TYPES(ColumnString_SwapRows, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
@@ -1289,7 +1295,7 @@ TEST_TYPES(ColumnString_SwapRows, string_column, nullable_string_column, enum_co
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST_TYPES(ColumnString_Index, string_column, nullable_string_column, enum_column, nullable_enum_column)
 {
     TEST_TYPE test_resources;
@@ -1314,6 +1320,7 @@ TEST_TYPES(ColumnString_Index, string_column, nullable_string_column, enum_colum
     asc.add("15");
     asc.add("HEJSA"); // 16
 
+#ifdef LEGACY_TESTS
     const StringIndex& ndx = *asc.create_search_index();
     CHECK(asc.has_search_index());
 #ifdef REALM_DEBUG
@@ -1321,7 +1328,7 @@ TEST_TYPES(ColumnString_Index, string_column, nullable_string_column, enum_colum
 #else
     static_cast<void>(ndx);
 #endif
-
+#endif // LEGACY_TESTS
     size_t count0 = asc.count("HEJ");
     size_t count1 = asc.count("HEJSA");
     size_t count2 = asc.count("1");
@@ -1385,7 +1392,7 @@ TEST_TYPES(ColumnString_Index, string_column, nullable_string_column, enum_colum
     CHECK_EQUAL(not_found, c1);
     CHECK_EQUAL(not_found, c2);
 }
-
+#endif
 
 /**
  * This test ensures that StringColumn::EraseLeafElem is called. It is called when you
@@ -1536,6 +1543,42 @@ TEST(ColumnString_NonLeafRoot)
 
         c.destroy();
     }
+}
+
+// This test confirms that we can read columns produced by Column<T>
+// with a BPlusTree<T> accessor
+TEST(BPlusTree_ColumnStringCompatibility)
+{
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn c(Allocator::get_default(), ref);
+
+    for (int i = 0; i < 500; i++) {
+        std::string str = "foo ";
+        str += util::to_string(i);
+        c.add(str);
+    }
+
+    BPlusTree<String> tree(Allocator::get_default());
+    tree.init_from_ref(c.get_ref());
+
+    CHECK_EQUAL(c.size(), tree.size());
+    size_t sz = c.size();
+    for (size_t i = 0; i < sz; i++) {
+        CHECK_EQUAL(c.get(i), tree.get(i));
+    }
+
+    c.insert(17, "This is a medium long string");
+    c.insert(177, "This is a rather long string, that should not be very much shorter");
+    c.erase(321);
+    tree.init_from_ref(c.get_ref());
+
+    CHECK_EQUAL(c.size(), tree.size());
+    sz = c.size();
+    for (size_t i = 0; i < sz; i++) {
+        CHECK_EQUAL(c.get(i), tree.get(i));
+    }
+
+    c.destroy();
 }
 
 #endif // TEST_COLUMN_STRING

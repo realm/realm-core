@@ -92,13 +92,16 @@ struct avg : TAOCPP_PEGTL_ISTRING(".@avg.") {};
 // these operators are normal strings (no proceeding string characters)
 struct count : string_token_t(".@count") {};
 struct size : string_token_t(".@size") {};
-struct backlinks : string_token_t("@links") {};
+struct backlinks : string_token_t("@links") {
+};
 
 struct single_collection_operators : sor< count, size > {};
 struct key_collection_operators : sor< min, max, sum, avg > {};
 
 // key paths
-struct key_path : list< sor< backlinks, seq< sor< alpha, one< '_', '$' > >, star< sor< alnum, one< '_', '-', '$' > > > > >, one< '.' > > {};
+struct key_path
+    : list<sor<backlinks, seq<sor<alpha, one<'_', '$'>>, star<sor<alnum, one<'_', '-', '$'>>>>>, one<'.'>> {
+};
 
 struct key_path_prefix : disable< key_path > {};
 struct key_path_suffix : disable< key_path > {};
@@ -107,31 +110,50 @@ struct collection_operator_match : sor< seq< key_path_prefix, key_collection_ope
 
 // argument
 struct argument_index : plus< digit > {};
-struct argument : seq< one< '$' >, argument_index > {};
+struct argument : seq<one<'$'>, argument_index> {
+};
 
 // subquery eg: SUBQUERY(items, $x, $x.name CONTAINS 'a' && $x.price > 5).@count
-struct subq_prefix : seq< string_token_t("subquery"), star< blank >, one< '(' > > {};
-struct subq_suffix : one< ')' > {};
-struct sub_path : disable < key_path > {};
-struct sub_var_name : seq < one< '$' >, seq< sor< alpha, one< '_', '$' > >, star< sor< alnum, one< '_', '-', '$' > > > > > {};
-struct sub_result_op : sor< count, size > {};
-struct sub_preamble : seq< subq_prefix, pad< sub_path, blank >, one< ',' >, pad< sub_var_name, blank >, one< ',' > > {};
-struct subquery :  seq< sub_preamble, pad< pred, blank >, pad< subq_suffix, blank >, sub_result_op > {};
+struct subq_prefix : seq<string_token_t("subquery"), star<blank>, one<'('>> {
+};
+struct subq_suffix : one<')'> {
+};
+struct sub_path : disable<key_path> {
+};
+struct sub_var_name : seq<one<'$'>, seq<sor<alpha, one<'_', '$'>>, star<sor<alnum, one<'_', '-', '$'>>>>> {
+};
+struct sub_result_op : sor<count, size> {
+};
+struct sub_preamble : seq<subq_prefix, pad<sub_path, blank>, one<','>, pad<sub_var_name, blank>, one<','>> {
+};
+struct subquery : seq<sub_preamble, pad<pred, blank>, pad<subq_suffix, blank>, sub_result_op> {
+};
 
 // list aggregate operations
-struct agg_target : seq< key_path > {};
-struct agg_any : seq< sor< string_token_t("any"), string_token_t("some") >, plus<blank>, agg_target, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
-struct agg_all : seq< string_token_t("all"), plus<blank>, agg_target, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
-struct agg_none : seq< string_token_t("none"), plus<blank>, agg_target, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
-struct agg_shortcut_pred : sor< agg_any, agg_all, agg_none > {};
+struct agg_target : seq<key_path> {
+};
+struct agg_any : seq<sor<string_token_t("any"), string_token_t("some")>, plus<blank>, agg_target,
+                     pad<sor<string_oper, symbolic_oper>, blank>, expr> {
+};
+struct agg_all
+    : seq<string_token_t("all"), plus<blank>, agg_target, pad<sor<string_oper, symbolic_oper>, blank>, expr> {
+};
+struct agg_none
+    : seq<string_token_t("none"), plus<blank>, agg_target, pad<sor<string_oper, symbolic_oper>, blank>, expr> {
+};
+struct agg_shortcut_pred : sor<agg_any, agg_all, agg_none> {
+};
 
 // expressions and operators
-struct expr : sor< dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, base64, collection_operator_match, subquery, key_path > {};
+struct expr : sor<dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, base64,
+                  collection_operator_match, subquery, key_path> {
+};
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
 
 struct eq : seq< sor< two< '=' >, one< '=' > >, star< blank >, opt< case_insensitive > >{};
 struct noteq : seq< sor< tao::pegtl::string< '!', '=' >, tao::pegtl::string< '<', '>' > >, star< blank >, opt< case_insensitive > > {};
-struct in: seq< string_token_t("in"), star< blank >, opt< case_insensitive > >{};
+struct in : seq<string_token_t("in"), star<blank>, opt<case_insensitive>> {
+};
 struct lteq : sor< tao::pegtl::string< '<', '=' >, tao::pegtl::string< '=', '<' > > {};
 struct lt : one< '<' > {};
 struct gteq : sor< tao::pegtl::string< '>', '=' >, tao::pegtl::string< '=', '>' > > {};
@@ -154,22 +176,29 @@ struct descriptor_ordering : sor< sort, distinct > {};
 
 struct string_oper : seq< sor< contains, begins, ends, like>, star< blank >, opt< case_insensitive > > {};
 // "=" is equality and since other operators can start with "=" we must check equal last
-struct symbolic_oper : sor< noteq, lteq, lt, gteq, gt, eq, in > {};
+struct symbolic_oper : sor<noteq, lteq, lt, gteq, gt, eq, in> {
+};
 
 // predicates
 struct comparison_pred : seq< expr, pad< sor< string_oper, symbolic_oper >, blank >, expr > {};
 
 // we need to alias the group tokens because these are also used in other expressions above and we have to match
 // the predicate group tokens without also matching () in other expressions.
-struct begin_pred_group : one< '(' > {};
-struct end_pred_group : one< ')' > {};
+struct begin_pred_group : one<'('> {
+};
+struct end_pred_group : one<')'> {
+};
 
-struct group_pred : if_must< begin_pred_group, pad< pred, blank >, end_pred_group > {};
+struct group_pred : if_must<begin_pred_group, pad<pred, blank>, end_pred_group> {
+};
 struct true_pred : string_token_t("truepredicate") {};
 struct false_pred : string_token_t("falsepredicate") {};
 
 struct not_pre : seq< sor< one< '!' >, string_token_t("not") > > {};
-struct atom_pred : seq< opt< not_pre >, pad< sor<group_pred, true_pred, false_pred, agg_shortcut_pred, comparison_pred>, blank >, star< pad< descriptor_ordering, blank > > > {};
+struct atom_pred
+    : seq<opt<not_pre>, pad<sor<group_pred, true_pred, false_pred, agg_shortcut_pred, comparison_pred>, blank>,
+          star<pad<descriptor_ordering, blank>>> {
+};
 
 struct and_op : pad< sor< two< '&' >, string_token_t("and") >, blank > {};
 struct or_op : pad< sor< two< '|' >, string_token_t("or") >, blank > {};
@@ -466,20 +495,20 @@ template<> struct action< distinct >
     }
 };
 
-template<> struct action< sub_path >
-{
-    template< typename Input >
-    static void apply(const Input& in, ParserState & state)
+template <>
+struct action<sub_path> {
+    template <typename Input>
+    static void apply(const Input& in, ParserState& state)
     {
         DEBUG_PRINT_TOKEN(in.string() + " SUB PATH");
         state.subquery_path = in.string();
     }
 };
 
-template<> struct action< sub_var_name >
-{
-    template< typename Input >
-    static void apply(const Input& in, ParserState & state)
+template <>
+struct action<sub_var_name> {
+    template <typename Input>
+    static void apply(const Input& in, ParserState& state)
     {
         DEBUG_PRINT_TOKEN(in.string() + " SUB VAR NAME");
         state.subquery_var = in.string();
@@ -487,10 +516,10 @@ template<> struct action< sub_var_name >
 };
 
 // the preamble acts as the opening for a sub predicate group which is the subquery conditions
-template<> struct action< sub_preamble >
-{
-    template< typename Input >
-    static void apply(const Input& in, ParserState & state)
+template <>
+struct action<sub_preamble> {
+    template <typename Input>
+    static void apply(const Input& in, ParserState& state)
     {
         DEBUG_PRINT_TOKEN(in.string() + "<BEGIN SUBQUERY CONDITIONS>");
 
@@ -507,10 +536,10 @@ template<> struct action< sub_preamble >
 
 
 // once the whole subquery syntax is matched, we close the subquery group and add the expression
-template<> struct action< subquery >
-{
-    template< typename Input >
-    static void apply(const Input& in, ParserState & state)
+template <>
+struct action<subquery> {
+    template <typename Input>
+    static void apply(const Input& in, ParserState& state)
     {
         DEBUG_PRINT_TOKEN(in.string() + "<END SUBQUERY CONDITIONS>");
         state.group_stack.pop_back();
@@ -556,20 +585,26 @@ template<> struct action< collection_operator_match > {
     }
 };
 
-#define LIST_AGG_OP_TYPE_ACTION(rule, type)                         \
-template<> struct action< rule > {                                  \
-template< typename Input >                                          \
-    static void apply(const Input& in, ParserState& state) {        \
-        DEBUG_PRINT_TOKEN(in.string() + #rule);                     \
-        state.pending_comparison_type = type; }};
+#define LIST_AGG_OP_TYPE_ACTION(rule, type)                                                                          \
+    template <>                                                                                                      \
+    struct action<rule> {                                                                                            \
+        template <typename Input>                                                                                    \
+        static void apply(const Input& in, ParserState& state)                                                       \
+        {                                                                                                            \
+            DEBUG_PRINT_TOKEN(in.string() + #rule);                                                                  \
+            state.pending_comparison_type = type;                                                                    \
+        }                                                                                                            \
+    };
 
 LIST_AGG_OP_TYPE_ACTION(agg_any, Predicate::ComparisonType::Any)
 LIST_AGG_OP_TYPE_ACTION(agg_all, Predicate::ComparisonType::All)
 LIST_AGG_OP_TYPE_ACTION(agg_none, Predicate::ComparisonType::None)
 
-template<> struct action< agg_shortcut_pred > {
-    template< typename Input >
-    static void apply(const Input& in, ParserState& state) {
+template <>
+struct action<agg_shortcut_pred> {
+    template <typename Input>
+    static void apply(const Input& in, ParserState& state)
+    {
         DEBUG_PRINT_TOKEN(in.string() + " Aggregate shortcut matched");
         state.apply_list_aggregate_operation();
     }
@@ -595,12 +630,16 @@ template<> struct action< false_pred >
     }
 };
 
-#define OPERATOR_ACTION(rule, oper)                                 \
-template<> struct action< rule > {                                  \
-    template< typename Input >                                      \
-    static void apply(const Input& in, ParserState& state) {        \
-        DEBUG_PRINT_TOKEN(in.string() + #oper);                     \
-        state.last_predicate()->cmpr.op = oper; }};
+#define OPERATOR_ACTION(rule, oper)                                                                                  \
+    template <>                                                                                                      \
+    struct action<rule> {                                                                                            \
+        template <typename Input>                                                                                    \
+        static void apply(const Input& in, ParserState& state)                                                       \
+        {                                                                                                            \
+            DEBUG_PRINT_TOKEN(in.string() + #oper);                                                                  \
+            state.last_predicate()->cmpr.op = oper;                                                                  \
+        }                                                                                                            \
+    };
 
 OPERATOR_ACTION(eq, Predicate::Operator::Equal)
 OPERATOR_ACTION(noteq, Predicate::Operator::NotEqual)
@@ -624,8 +663,8 @@ template<> struct action< case_insensitive >
     }
 };
 
-template<> struct action< begin_pred_group >
-{
+template <>
+struct action<begin_pred_group> {
     template< typename Input >
     static void apply(const Input&, ParserState & state)
     {

@@ -35,6 +35,7 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/table_ref.hpp>
+#include <realm/keys.hpp>
 
 namespace realm {
 
@@ -201,20 +202,6 @@ public:
     ColumnBase& operator=(const ColumnBase&) = delete;
     ColumnBase(const ColumnBase&) = delete;
 
-    // Getter function for index. For integer index, the caller must supply a
-    // buffer that we can store the extracted value in (it may be bitpacked, so
-    // we cannot return a pointer in to the Array as we do with String index).
-    virtual StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept = 0;
-
-    // Search index
-    virtual bool supports_search_index() const noexcept;
-    virtual bool has_search_index() const noexcept;
-    virtual StringIndex* create_search_index();
-    virtual void destroy_search_index() noexcept;
-    virtual const StringIndex* get_search_index() const noexcept;
-    virtual StringIndex* get_search_index() noexcept;
-    virtual void set_search_index_ref(ref_type, ArrayParent*, size_t ndx_in_parent);
-
     virtual Allocator& get_alloc() const noexcept = 0;
 
     /// Returns the 'ref' of the root array.
@@ -225,8 +212,6 @@ public:
     virtual MemRef clone_deep(Allocator& alloc) const = 0;
     virtual void detach(void) = 0;
     virtual bool is_attached(void) const noexcept = 0;
-
-    static size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&, bool) noexcept;
 
     // These assume that the right column compile-time type has been
     // figured out.
@@ -266,8 +251,8 @@ public:
     /// Table::cascade_break_backlinks_to_all_rows() to pass the number of rows
     /// in the table as \a num_rows.
 
-    virtual void cascade_break_backlinks_to(size_t row_ndx, CascadeState&);
-    virtual void cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState&);
+    virtual void cascade_break_backlinks_to(size_t, CascadeState&);
+    virtual void cascade_break_backlinks_to_all_rows(size_t, CascadeState&);
 
     //@}
 
@@ -283,15 +268,6 @@ public:
     /// exists. For column types that are unable to contain subtable, this
     /// function does nothing.
     virtual void discard_subtable_accessor(size_t row_ndx) noexcept;
-
-    virtual void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
-    virtual void adj_acc_erase_row(size_t row_ndx) noexcept;
-    /// See Table::adj_acc_move_over()
-    virtual void adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
-    virtual void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
-    virtual void adj_acc_move_row(size_t from_ndx, size_t to_ndx) noexcept;
-    virtual void adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
-    virtual void adj_acc_clear_root_table() noexcept;
 
     enum {
         mark_Recursive = 0x01,
@@ -480,48 +456,10 @@ protected:
 #endif
 };
 
-class ColumnBaseWithIndex : public ColumnBase {
-public:
-    ~ColumnBaseWithIndex() noexcept override
-    {
-    }
-    void set_ndx_in_parent(size_t ndx) noexcept override;
-    void update_from_parent(size_t old_baseline) noexcept override;
-    void refresh_accessor_tree(size_t, const Spec&) override;
-    void move_assign(ColumnBaseWithIndex& col) noexcept;
-    void destroy() noexcept override;
-
-    virtual bool supports_search_index() const noexcept override
-    {
-        return true;
-    }
-    bool has_search_index() const noexcept final
-    {
-        return bool(m_search_index);
-    }
-    StringIndex* get_search_index() noexcept final
-    {
-        return m_search_index.get();
-    }
-    const StringIndex* get_search_index() const noexcept final
-    {
-        return m_search_index.get();
-    }
-    void destroy_search_index() noexcept override;
-    void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent) final;
-    StringIndex* create_search_index() override = 0;
-
-protected:
-    using ColumnBase::ColumnBase;
-    ColumnBaseWithIndex(ColumnBaseWithIndex&&) = default;
-    std::unique_ptr<StringIndex> m_search_index;
-};
-
-
 /// A column (Column) is a single B+-tree, and the root of
 /// the column is the root of the B+-tree. All leaf nodes are arrays.
 template <class T>
-class Column : public ColumnBaseWithIndex {
+class Column : public ColumnBase {
 public:
     using value_type = T;
     using LeafInfo = typename BpTree<T>::LeafInfo;
@@ -533,8 +471,7 @@ public:
     };
 
     explicit Column() noexcept
-        : ColumnBaseWithIndex(npos)
-        , m_tree(Allocator::get_default())
+        : m_tree(Allocator::get_default())
     {
     }
     REALM_DEPRECATED("Initialize with ref instead") explicit Column(std::unique_ptr<Array> root) noexcept;
@@ -603,9 +540,6 @@ public:
     void move_last_over(size_t row_ndx, size_t last_row_ndx);
     void clear();
 
-    // Index support
-    StringData get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept override;
-
     // FIXME: Remove these
     uint64_t get_uint(size_t ndx) const noexcept;
     ref_type get_as_ref(size_t ndx) const noexcept;
@@ -636,17 +570,6 @@ public:
 
     size_t find_first(T value, size_t begin = 0, size_t end = npos) const;
     void find_all(Column<int64_t>& out_indices, T value, size_t begin = 0, size_t end = npos) const;
-
-    void populate_search_index();
-    StringIndex* create_search_index() override;
-    inline bool supports_search_index() const noexcept override
-    {
-        if (realm::is_any<T, float, double>::value)
-            return false;
-        else
-            return true;
-    }
-
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -779,40 +702,6 @@ inline size_t IntNullColumn::get_size_from_ref(ref_type root_ref, Allocator& all
 }
 
 
-inline bool ColumnBase::supports_search_index() const noexcept
-{
-    REALM_ASSERT(!has_search_index());
-    return false;
-}
-
-inline bool ColumnBase::has_search_index() const noexcept
-{
-    return get_search_index() != nullptr;
-}
-
-inline StringIndex* ColumnBase::create_search_index()
-{
-    return nullptr;
-}
-
-inline void ColumnBase::destroy_search_index() noexcept
-{
-}
-
-inline const StringIndex* ColumnBase::get_search_index() const noexcept
-{
-    return nullptr;
-}
-
-inline StringIndex* ColumnBase::get_search_index() noexcept
-{
-    return nullptr;
-}
-
-inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, size_t)
-{
-}
-
 inline void ColumnBase::discard_child_accessors() noexcept
 {
     do_discard_child_accessors();
@@ -823,40 +712,6 @@ inline void ColumnBase::discard_subtable_accessor(size_t) noexcept
     // Noop
 }
 
-inline void ColumnBase::adj_acc_insert_rows(size_t, size_t) noexcept
-{
-    // Noop
-}
-
-inline void ColumnBase::adj_acc_erase_row(size_t) noexcept
-{
-    // Noop
-}
-
-inline void ColumnBase::adj_acc_move_over(size_t, size_t) noexcept
-{
-    // Noop
-}
-
-inline void ColumnBase::adj_acc_swap_rows(size_t, size_t) noexcept
-{
-    // Noop
-}
-
-inline void ColumnBase::adj_acc_move_row(size_t, size_t) noexcept
-{
-    // Noop
-}
-
-inline void ColumnBase::adj_acc_merge_rows(size_t, size_t) noexcept
-{
-    // Noop
-}
-
-inline void ColumnBase::adj_acc_clear_root_table() noexcept
-{
-    // Noop
-}
 
 inline void ColumnBase::mark(int) noexcept
 {
@@ -894,9 +749,6 @@ template <class T>
 void Column<T>::set(size_t ndx, T value)
 {
     REALM_ASSERT_DEBUG(ndx < size());
-    if (has_search_index()) {
-        m_search_index->set(ndx, value);
-    }
     set_without_updating_index(ndx, std::move(value));
 }
 
@@ -906,9 +758,6 @@ void Column<T>::set_null(size_t ndx)
     REALM_ASSERT_DEBUG(ndx < size());
     if (!is_nullable()) {
         throw LogicError{LogicError::column_not_nullable};
-    }
-    if (has_search_index()) {
-        m_search_index->set(ndx, null{});
     }
     m_tree.set_null(ndx);
 }
@@ -954,9 +803,6 @@ void Column<T>::adjust_ge(T limit, U diff)
 template <class T>
 size_t Column<T>::count(T target) const
 {
-    if (has_search_index()) {
-        return m_search_index->count(target);
-    }
     return to_size_t(aggregate<T, int64_t, act_Count, Equal>(*this, target, 0, size(), npos, nullptr));
 }
 
@@ -1007,43 +853,6 @@ void Column<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf, LeafInfo& inout_leaf_i
     m_tree.get_leaf(ndx, ndx_in_leaf, inout_leaf_info);
 }
 
-template <class T>
-StringData Column<T>::get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept
-{
-    T x = get(ndx);
-    return to_str(x, buffer);
-}
-
-template <class T>
-void Column<T>::populate_search_index()
-{
-    REALM_ASSERT(has_search_index());
-    // Populate the index
-    size_t num_rows = size();
-    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
-        bool is_append = true;
-        if (is_null(row_ndx)) {
-            m_search_index->insert(row_ndx, null{}, 1, is_append); // Throws
-        }
-        else {
-            T value = get(row_ndx);
-            m_search_index->insert(row_ndx, value, 1, is_append); // Throws
-        }
-    }
-}
-
-template <class T>
-StringIndex* Column<T>::create_search_index()
-{
-    if (realm::is_any<T, float, double>::value)
-        return nullptr;
-
-    REALM_ASSERT(!has_search_index());
-    REALM_ASSERT(supports_search_index());
-    m_search_index.reset(new StringIndex(this, get_alloc())); // Throws
-    populate_search_index();
-    return m_search_index.get();
-}
 
 template <class T>
 size_t Column<T>::find_first(T value, size_t begin, size_t end) const
@@ -1051,8 +860,6 @@ size_t Column<T>::find_first(T value, size_t begin, size_t end) const
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
-    if (m_search_index && begin == 0 && end == npos)
-        return m_search_index->find_first(value);
     return m_tree.find_first(value, begin, end);
 }
 
@@ -1062,8 +869,6 @@ void Column<T>::find_all(IntegerColumn& result, T value, size_t begin, size_t en
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
-    if (m_search_index && begin == 0 && end == npos)
-        return m_search_index->find_all(result, value);
     return m_tree.find_all(result, value, begin, end);
 }
 
@@ -1125,9 +930,8 @@ inline ref_type ColumnBase::create(Allocator& alloc, size_t column_size, CreateH
 }
 
 template <class T>
-Column<T>::Column(Allocator& alloc, ref_type ref, size_t column_ndx)
-    : ColumnBaseWithIndex(column_ndx)
-    , m_tree(BpTreeBase::unattached_tag{})
+Column<T>::Column(Allocator& alloc, ref_type ref, size_t)
+    : m_tree(BpTreeBase::unattached_tag{})
 {
     // fixme, must m_search_index be copied here?
     m_tree.init_from_ref(alloc, ref);
@@ -1135,8 +939,7 @@ Column<T>::Column(Allocator& alloc, ref_type ref, size_t column_ndx)
 
 template <class T>
 Column<T>::Column(unattached_root_tag, Allocator& alloc)
-    : ColumnBaseWithIndex(npos)
-    , m_tree(alloc)
+    : m_tree(alloc)
 {
 }
 
@@ -1172,14 +975,12 @@ void Column<T>::init_from_mem(Allocator& alloc, MemRef mem)
 template <class T>
 void Column<T>::destroy() noexcept
 {
-    ColumnBaseWithIndex::destroy();
     m_tree.destroy();
 }
 
 template <class T>
 void Column<T>::move_assign(Column<T>& col)
 {
-    ColumnBaseWithIndex::move_assign(col);
     m_tree = std::move(col.m_tree);
 }
 
@@ -1204,7 +1005,6 @@ size_t Column<T>::get_ndx_in_parent() const noexcept
 template <class T>
 void Column<T>::set_ndx_in_parent(size_t ndx_in_parent) noexcept
 {
-    ColumnBaseWithIndex::set_ndx_in_parent(ndx_in_parent);
     m_tree.set_ndx_in_parent(ndx_in_parent);
 }
 
@@ -1235,7 +1035,6 @@ MemRef Column<T>::get_mem() const noexcept
 template <class T>
 void Column<T>::update_from_parent(size_t old_baseline) noexcept
 {
-    ColumnBaseWithIndex::update_from_parent(old_baseline);
     m_tree.update_from_parent(old_baseline);
 }
 
@@ -1312,11 +1111,6 @@ void Column<T>::insert(size_t row_ndx, T value, size_t num_rows)
     size_t ndx_or_npos_if_append = is_append ? npos : row_ndx;
 
     m_tree.insert(ndx_or_npos_if_append, value, num_rows); // Throws
-
-    if (has_search_index()) {
-        row_ndx = is_append ? column_size : row_ndx;
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
-    }
 }
 
 template <class T>
@@ -1353,18 +1147,6 @@ void Column<T>::move_last_over(size_t row_ndx, size_t last_row_ndx)
     REALM_ASSERT_3(row_ndx, <=, last_row_ndx);
     REALM_ASSERT_DEBUG(last_row_ndx + 1 == size());
 
-    if (has_search_index()) {
-        // remove the value to be overwritten from index
-        bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
-        m_search_index->erase<StringData>(row_ndx, is_last); // Throws
-
-        // update index to point to new location
-        if (row_ndx != last_row_ndx) {
-            T moved_value = get(last_row_ndx);
-            m_search_index->update_ref(moved_value, last_row_ndx, row_ndx); // Throws
-        }
-    }
-
     move_last_over_without_updating_index(row_ndx, last_row_ndx);
 }
 
@@ -1374,19 +1156,6 @@ void Column<T>::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     REALM_ASSERT_3(row_ndx_1, <, size());
     REALM_ASSERT_3(row_ndx_2, <, size());
     REALM_ASSERT_DEBUG(row_ndx_1 != row_ndx_2);
-
-    if (has_search_index()) {
-        T value_1 = get(row_ndx_1);
-        T value_2 = get(row_ndx_2);
-        size_t column_size = this->size();
-        bool row_ndx_1_is_last = row_ndx_1 == column_size - 1;
-        bool row_ndx_2_is_last = row_ndx_2 == column_size - 1;
-        m_search_index->erase<StringData>(row_ndx_1, row_ndx_1_is_last);
-        m_search_index->insert(row_ndx_1, value_2, 1, row_ndx_1_is_last);
-
-        m_search_index->erase<StringData>(row_ndx_2, row_ndx_2_is_last);
-        m_search_index->insert(row_ndx_2, value_1, 1, row_ndx_2_is_last);
-    }
 
     swap_rows_without_updating_index(row_ndx_1, row_ndx_2);
 }
@@ -1410,9 +1179,6 @@ void Column<T>::clear_without_updating_index()
 template <class T>
 void Column<T>::clear()
 {
-    if (has_search_index()) {
-        m_search_index->clear();
-    }
     clear_without_updating_index();
 }
 
@@ -1595,21 +1361,14 @@ ref_type Column<T>::write(size_t slice_offset, size_t slice_size, size_t table_s
 }
 
 template <class T>
-void Column<T>::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec)
+void Column<T>::refresh_accessor_tree(size_t, const Spec&)
 {
     m_tree.init_from_parent();
-    ColumnBaseWithIndex::refresh_accessor_tree(new_col_ndx, spec);
 }
 
 template <class T>
 void Column<T>::do_erase(size_t row_ndx, size_t num_rows_to_erase, bool is_last)
 {
-    if (has_search_index()) {
-        for (size_t i = num_rows_to_erase; i > 0; --i) {
-            size_t row_ndx_2 = row_ndx + i - 1;
-            m_search_index->erase<T>(row_ndx_2, is_last); // Throws
-        }
-    }
     for (size_t i = num_rows_to_erase; i > 0; --i) {
         size_t row_ndx_2 = row_ndx + i - 1;
         erase_without_updating_index(row_ndx_2, is_last); // Throws

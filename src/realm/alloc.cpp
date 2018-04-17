@@ -21,6 +21,7 @@
 #include <stdexcept>
 #include <algorithm>
 
+#include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 #include <realm/group.hpp>
 #include <realm/replication.hpp>
@@ -59,7 +60,7 @@ class DefaultAllocator : public realm::Allocator {
 public:
     DefaultAllocator()
     {
-        m_baseline = 1; // Zero is not available
+        m_baseline = 0; // Zero is not available .. WHY? FIXME!
     }
 
     MemRef do_alloc(const size_t size) override
@@ -90,7 +91,7 @@ public:
         return MemRef(new_addr, reinterpret_cast<size_t>(new_addr), *this);
     }
 
-    void do_free(ref_type, const char* addr) noexcept override
+    void do_free(ref_type, const char* addr) override
     {
         ::free(const_cast<char*>(addr));
     }
@@ -112,8 +113,10 @@ DefaultAllocator default_alloc;
 
 } // anonymous namespace
 
+namespace realm {
 
 Allocator& Allocator::get_default() noexcept
 {
     return default_alloc;
+}
 }

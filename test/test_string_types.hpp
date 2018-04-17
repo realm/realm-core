@@ -42,15 +42,29 @@ struct string_column {
     }
     realm::ref_type m_ref;
     realm::StringColumn* m_col;
-    static bool is_nullable() { return false; }
-    static bool is_enumerated() { return false; }
+    static bool is_nullable()
+    {
+        return false;
+    }
+    static bool is_enumerated()
+    {
+        return false;
+    }
 };
 
-struct nullable_string_column : public string_column
-{
-    nullable_string_column() : string_column(true) {}
-    static bool is_nullable() { return true; }
-    static bool is_enumerated() { return false; }
+struct nullable_string_column : public string_column {
+    nullable_string_column()
+        : string_column(true)
+    {
+    }
+    static bool is_nullable()
+    {
+        return true;
+    }
+    static bool is_enumerated()
+    {
+        return false;
+    }
 };
 
 struct enum_column : public string_column {
@@ -74,15 +88,29 @@ struct enum_column : public string_column {
         return *m_enum_col;
     }
     realm::StringEnumColumn* m_enum_col;
-    static bool is_nullable() { return false; }
-    static bool is_enumerated() { return true; }
+    static bool is_nullable()
+    {
+        return false;
+    }
+    static bool is_enumerated()
+    {
+        return true;
+    }
 };
 
-struct nullable_enum_column : public enum_column
-{
-    nullable_enum_column() : enum_column(true) {}
-    static bool is_nullable() { return true; }
-    static bool is_enumerated() { return true; }
+struct nullable_enum_column : public enum_column {
+    nullable_enum_column()
+        : enum_column(true)
+    {
+    }
+    static bool is_nullable()
+    {
+        return true;
+    }
+    static bool is_enumerated()
+    {
+        return true;
+    }
 };
 
 #endif // REALM_TEST_STRING_TYPES_HPP

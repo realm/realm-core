@@ -51,7 +51,7 @@ void do_add_null_comparison_to_query(Query &, Predicate::Operator, const ValueEx
 template<typename T>
 void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
-    Columns<T> column = expr.table_getter()->template column<T>(expr.get_dest_ndx());
+    Columns<T> column = expr.table_getter()->template column<T>(expr.get_dest_col_key());
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.and_query(column != realm::null());
@@ -77,7 +77,7 @@ void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op,
         case Predicate::Operator::In:
             REALM_FALLTHROUGH;
         case Predicate::Operator::Equal:
-            query.and_query(query.get_table()->column<Link>(expr.get_dest_ndx()).is_null());
+            query.and_query(query.get_table()->column<Link>(expr.get_dest_col_key()).is_null());
             break;
         default:
             throw std::logic_error("Only 'equal' and 'not equal' operators supported for object comparison.");
@@ -299,7 +299,7 @@ void add_link_constraint_to_query(realm::Query &query,
                                   Predicate::Operator op,
                                   const PropertyExpression &prop_expr,
                                   const ValueExpression &value_expr) {
-    size_t row_index = value_expr.arguments->object_index_for_argument(stot<int>(value_expr.value->s));
+    ObjKey obj_key = value_expr.arguments->object_index_for_argument(stot<int>(value_expr.value->s));
     realm_precondition(prop_expr.link_chain.size() == 1, "KeyPath queries not supported for object comparisons.");
     switch (op) {
         case Predicate::Operator::NotEqual:
@@ -308,8 +308,8 @@ void add_link_constraint_to_query(realm::Query &query,
         case Predicate::Operator::In:
             REALM_FALLTHROUGH;
         case Predicate::Operator::Equal: {
-            size_t col = prop_expr.get_dest_ndx();
-            query.links_to(col, query.get_table()->get_link_target(col)->get(row_index));
+            ColKey col = prop_expr.get_dest_col_key();
+            query.links_to(col, obj_key);
             break;
         }
         default:
@@ -440,7 +440,8 @@ void add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, Expre
         case ExpressionContainer::ExpressionInternal::exp_Value:
             throw std::runtime_error("Unsupported query comparing 'null' and a literal. A comparison must include at least one keypath.");
         case ExpressionContainer::ExpressionInternal::exp_Property:
-            do_add_null_comparison_to_query(query, cmp, exp.get_property(), exp.get_property().get_dest_type(), location);
+            do_add_null_comparison_to_query(query, cmp, exp.get_property(), exp.get_property().get_dest_type(),
+                                            location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpMin:
             do_add_null_comparison_to_query(query, cmp, exp.get_min(), exp.get_min().post_link_col_type, location);
@@ -540,24 +541,32 @@ void add_comparison_to_query(Query &query, ExpressionContainer& lhs, Predicate::
 }
 
 
-std::pair<std::string, std::string> separate_list_parts(PropertyExpression& pe) {
+std::pair<std::string, std::string> separate_list_parts(PropertyExpression& pe)
+{
     std::string pre_and_list = "";
     std::string post_list = "";
     bool past_list = false;
     for (KeyPathElement& e : pe.link_chain) {
         std::string cur_name;
         if (e.is_backlink) {
-            cur_name = std::string("@links") + util::serializer::value_separator + std::string(e.table->get_name()) + util::serializer::value_separator + std::string(e.table->get_column_name(e.col_ndx));
-        } else {
-            cur_name = e.table->get_column_name(e.col_ndx);
+            cur_name = std::string("@links") + util::serializer::value_separator + std::string(e.table->get_name()) +
+                       util::serializer::value_separator + std::string(e.table->get_column_name(e.col_key));
+        }
+        else {
+            cur_name = e.table->get_column_name(e.col_key);
         }
         if (!past_list) {
             if (!pre_and_list.empty()) {
                 pre_and_list += util::serializer::value_separator;
             }
             pre_and_list += cur_name;
-        } else {
-            realm_precondition(!e.is_backlink && e.col_type != type_LinkList, util::format("The keypath after '%1' must not contain any additional list properties, but '%2' is a list.", pre_and_list, cur_name));
+        }
+        else {
+            realm_precondition(
+                !e.is_backlink && e.col_type != type_LinkList,
+                util::format(
+                    "The keypath after '%1' must not contain any additional list properties, but '%2' is a list.",
+                    pre_and_list, cur_name));
             if (!post_list.empty()) {
                 post_list += util::serializer::value_separator;
             }
@@ -572,9 +581,11 @@ std::pair<std::string, std::string> separate_list_parts(PropertyExpression& pe) 
 
 
 // some query types are not supported in core but can be produced by a transformation:
-// "ALL path.to.list.property >= 20"    --> "SUBQUERY(path.to.list, $x, $x.property >= 20).@count == path.to.list.@count"
+// "ALL path.to.list.property >= 20"    --> "SUBQUERY(path.to.list, $x, $x.property >= 20).@count ==
+// path.to.list.@count"
 // "NONE path.to.list.property >= 20"   --> "SUBQUERY(path.to.list, $x, $x.property >= 20).@count == 0"
-void preprocess_for_comparison_types(Query &query, Predicate::Comparison &cmpr, ExpressionContainer &lhs, ExpressionContainer &rhs, Arguments &args, parser::KeyPathMapping& mapping)
+void preprocess_for_comparison_types(Query& query, Predicate::Comparison& cmpr, ExpressionContainer& lhs,
+                                     ExpressionContainer& rhs, Arguments& args, parser::KeyPathMapping& mapping)
 {
     auto get_cmp_type_name = [&]() {
         if (cmpr.compare_type == Predicate::ComparisonType::Any) {
@@ -583,21 +594,20 @@ void preprocess_for_comparison_types(Query &query, Predicate::Comparison &cmpr, 
         return util::format("'%1'", comparison_type_to_str(cmpr.compare_type));
     };
 
-    if (cmpr.compare_type != Predicate::ComparisonType::Unspecified)
-    {
-        realm_precondition(lhs.type == ExpressionContainer::ExpressionInternal::exp_Property,
-                           util::format("The expression after %1 must be a keypath containing a list",
-                                        get_cmp_type_name()));
+    if (cmpr.compare_type != Predicate::ComparisonType::Unspecified) {
+        realm_precondition(
+            lhs.type == ExpressionContainer::ExpressionInternal::exp_Property,
+            util::format("The expression after %1 must be a keypath containing a list", get_cmp_type_name()));
         size_t list_count = 0;
         for (KeyPathElement e : lhs.get_property().link_chain) {
             if (e.col_type == type_LinkList || e.is_backlink) {
                 list_count++;
             }
         }
-        realm_precondition(list_count > 0, util::format("The keypath following %1 must contain a list",
-                                                         get_cmp_type_name()));
-        realm_precondition(list_count == 1, util::format("The keypath following %1 must contain only one list",
-                                                        get_cmp_type_name()));
+        realm_precondition(list_count > 0,
+                           util::format("The keypath following %1 must contain a list", get_cmp_type_name()));
+        realm_precondition(list_count == 1,
+                           util::format("The keypath following %1 must contain only one list", get_cmp_type_name()));
     }
 
     if (cmpr.compare_type == Predicate::ComparisonType::All || cmpr.compare_type == Predicate::ComparisonType::None) {
@@ -619,7 +629,8 @@ void preprocess_for_comparison_types(Query &query, Predicate::Comparison &cmpr, 
 
         exp.subquery_var = var_name;
         exp.subquery = std::make_shared<Predicate>(Predicate::Type::Comparison);
-        exp.subquery->cmpr.expr[0] = parser::Expression(parser::Expression::Type::KeyPath, var_name + util::serializer::value_separator + path_parts.second);
+        exp.subquery->cmpr.expr[0] = parser::Expression(
+            parser::Expression::Type::KeyPath, var_name + util::serializer::value_separator + path_parts.second);
         exp.subquery->cmpr.op = cmpr.op;
         exp.subquery->cmpr.option = cmpr.option;
         exp.subquery->cmpr.expr[1] = cmpr.expr[1];
@@ -632,10 +643,12 @@ void preprocess_for_comparison_types(Query &query, Predicate::Comparison &cmpr, 
         if (cmpr.compare_type == Predicate::ComparisonType::All) {
             cmpr.expr[1] = parser::Expression(path_parts.first, parser::Expression::KeyPathOp::Count, "");
             rhs = ExpressionContainer(query, cmpr.expr[1], args, mapping);
-        } else if (cmpr.compare_type == Predicate::ComparisonType::None) {
+        }
+        else if (cmpr.compare_type == Predicate::ComparisonType::None) {
             cmpr.expr[1] = parser::Expression(parser::Expression::Type::Number, "0");
             rhs = ExpressionContainer(query, cmpr.expr[1], args, mapping);
-        } else {
+        }
+        else {
             REALM_UNREACHABLE();
         }
     }
@@ -661,7 +674,7 @@ bool is_property_operation(parser::Expression::Type type)
     return type == parser::Expression::Type::KeyPath || type == parser::Expression::Type::SubQuery;
 }
 
-void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &args, parser::KeyPathMapping& mapping)
+void add_comparison_to_query(Query& query, const Predicate& pred, Arguments& args, parser::KeyPathMapping& mapping)
 {
     Predicate::Comparison cmpr = pred.cmpr;
     auto lhs_type = cmpr.expr[0].type, rhs_type = cmpr.expr[1].type;
@@ -686,7 +699,8 @@ void add_comparison_to_query(Query &query, const Predicate &pred, Arguments &arg
     }
 }
 
-void update_query_with_predicate(Query &query, const Predicate &pred, Arguments &arguments, parser::KeyPathMapping& mapping)
+void update_query_with_predicate(Query& query, const Predicate& pred, Arguments& arguments,
+                                 parser::KeyPathMapping& mapping)
 {
     if (pred.negate) {
         query.Not();
@@ -737,7 +751,7 @@ void update_query_with_predicate(Query &query, const Predicate &pred, Arguments 
 namespace realm {
 namespace query_builder {
 
-void apply_predicate(Query &query, const Predicate &predicate, Arguments &arguments, parser::KeyPathMapping mapping)
+void apply_predicate(Query& query, const Predicate& predicate, Arguments& arguments, parser::KeyPathMapping mapping)
 {
 
     if (predicate.type == Predicate::Type::True && !predicate.negate) {
@@ -752,35 +766,36 @@ void apply_predicate(Query &query, const Predicate &predicate, Arguments &argume
     realm_precondition(validateMessage.empty(), validateMessage.c_str());
 }
 
-void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state, Arguments&)
+void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state,
+                    Arguments&)
 {
     for (const DescriptorOrderingState::SingleOrderingState& cur_ordering : state.orderings) {
-        std::vector<std::vector<size_t>> property_indices;
+        std::vector<std::vector<ColKey>> property_columns;
         std::vector<bool> ascendings;
         for (const DescriptorOrderingState::PropertyState& cur_property : cur_ordering.properties) {
             KeyPath path = key_path_from_string(cur_property.key_path);
-            std::vector<size_t> indices;
+            std::vector<ColKey> columns;
             ConstTableRef cur_table = target;
             for (size_t ndx_in_path = 0; ndx_in_path < path.size(); ++ndx_in_path) {
-                size_t col_ndx = cur_table->get_column_index(path[ndx_in_path]);
-                if (col_ndx == realm::not_found) {
+                ColKey col_key = cur_table->get_column_key(path[ndx_in_path]);
+                if (!col_key) {
                     throw std::runtime_error(
                         util::format("No property '%1' found on object type '%2' specified in '%3' clause",
                             path[ndx_in_path], cur_table->get_name(), cur_ordering.is_distinct ? "distinct" : "sort"));
                 }
-                indices.push_back(col_ndx);
+                columns.push_back(col_key);
                 if (ndx_in_path < path.size() - 1) {
-                    cur_table = cur_table->get_link_target(col_ndx);
+                    cur_table = cur_table->get_link_target(col_key);
                 }
             }
-            property_indices.push_back(indices);
+            property_columns.push_back(columns);
             ascendings.push_back(cur_property.ascending);
         }
 
         if (cur_ordering.is_distinct) {
-            ordering.append_distinct(DistinctDescriptor{*target.get(), property_indices});
+            ordering.append_distinct(DistinctDescriptor(*target, property_columns));
         } else {
-            ordering.append_sort(SortDescriptor{*target.get(), property_indices, ascendings});
+            ordering.append_sort(SortDescriptor(*target, property_columns, ascendings));
         }
     }
 }

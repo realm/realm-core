@@ -16,272 +16,165 @@
  *
  **************************************************************************/
 
-#include <utility> // pair
-
 #include <realm/array_binary.hpp>
-#include <realm/array_blob.hpp>
-#include <realm/array_integer.hpp>
-#include <realm/impl/destroy_guard.hpp>
 
 using namespace realm;
 
+ArrayBinary::ArrayBinary(Allocator& a)
+    : m_alloc(a)
+{
+    m_arr = new (&m_storage.m_small_blobs) ArraySmallBlobs(a);
+}
+
+void ArrayBinary::create()
+{
+    static_cast<ArraySmallBlobs*>(m_arr)->create();
+}
+
 void ArrayBinary::init_from_mem(MemRef mem) noexcept
 {
-    Array::init_from_mem(mem);
-    ref_type offsets_ref = get_as_ref(0);
-    ref_type blob_ref = get_as_ref(1);
+    char* header = mem.get_addr();
 
-    m_offsets.init_from_ref(offsets_ref);
-    m_blob.init_from_ref(blob_ref);
+    ArrayParent* parent = m_arr->get_parent();
+    size_t ndx_in_parent = m_arr->get_ndx_in_parent();
 
-    if (!legacy_array_type()) {
-        ref_type nulls_ref = get_as_ref(2);
-        m_nulls.init_from_ref(nulls_ref);
-    }
-}
-
-size_t ArrayBinary::read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept
-{
-    REALM_ASSERT_3(ndx, <, m_offsets.size());
-
-    if (!legacy_array_type() && m_nulls.get(ndx)) {
-        return 0;
+    m_is_big = Array::get_context_flag_from_header(header);
+    if (!m_is_big) {
+        auto arr = new (&m_storage.m_small_blobs) ArraySmallBlobs(m_alloc);
+        arr->init_from_mem(mem);
     }
     else {
-        size_t begin_idx = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
-        size_t end_idx = to_size_t(m_offsets.get(ndx));
-        size_t sz = end_idx - begin_idx;
+        auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
+        arr->init_from_mem(mem);
+    }
 
-        size_t size_to_copy = (pos > sz) ? 0 : std::min(max_size, sz - pos);
-        const char* begin = m_blob.get(begin_idx) + pos;
-        realm::safe_copy_n(begin, size_to_copy, buffer);
-        return size_to_copy;
+    m_arr->set_parent(parent, ndx_in_parent);
+}
+
+
+void ArrayBinary::init_from_parent()
+{
+    ref_type ref = m_arr->get_ref_from_parent();
+    init_from_ref(ref);
+}
+
+size_t ArrayBinary::size() const
+{
+    if (!m_is_big) {
+        return static_cast<ArraySmallBlobs*>(m_arr)->size();
+    }
+    else {
+        return static_cast<ArrayBigBlobs*>(m_arr)->size();
     }
 }
 
-void ArrayBinary::add(BinaryData value, bool add_zero_term)
+void ArrayBinary::add(BinaryData value)
 {
-    REALM_ASSERT_7(value.size(), ==, 0, ||, value.data(), !=, 0);
-
-    if (value.is_null() && legacy_array_type())
-        throw LogicError(LogicError::column_not_nullable);
-
-    m_blob.add(value.data(), value.size(), add_zero_term);
-    size_t stored_size = value.size();
-    if (add_zero_term)
-        ++stored_size;
-    size_t offset = stored_size;
-    if (!m_offsets.is_empty())
-        offset += to_size_t(m_offsets.back());
-    m_offsets.add(offset);
-
-    if (!legacy_array_type())
-        m_nulls.add(value.is_null());
+    bool is_big = upgrade_leaf(value.size());
+    if (!is_big) {
+        static_cast<ArraySmallBlobs*>(m_arr)->add(value);
+    }
+    else {
+        static_cast<ArrayBigBlobs*>(m_arr)->add(value);
+    }
 }
 
-void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
+void ArrayBinary::set(size_t ndx, BinaryData value)
 {
-    REALM_ASSERT_3(ndx, <, m_offsets.size());
-    REALM_ASSERT_3(value.size(), == 0 ||, value.data());
-
-    if (value.is_null() && legacy_array_type())
-        throw LogicError(LogicError::column_not_nullable);
-
-    int_fast64_t start = ndx ? m_offsets.get(ndx - 1) : 0;
-    int_fast64_t current_end = m_offsets.get(ndx);
-    size_t stored_size = value.size();
-    if (add_zero_term)
-        ++stored_size;
-    int_fast64_t diff = (start + stored_size) - current_end;
-    m_blob.replace(to_size_t(start), to_size_t(current_end), value.data(), value.size(), add_zero_term);
-    m_offsets.adjust(ndx, m_offsets.size(), diff);
-
-    if (!legacy_array_type())
-        m_nulls.set(ndx, value.is_null());
+    bool is_big = upgrade_leaf(value.size());
+    if (!is_big) {
+        static_cast<ArraySmallBlobs*>(m_arr)->set(ndx, value);
+    }
+    else {
+        static_cast<ArrayBigBlobs*>(m_arr)->set(ndx, value);
+    }
 }
 
-void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
+void ArrayBinary::insert(size_t ndx, BinaryData value)
 {
-    REALM_ASSERT_3(ndx, <=, m_offsets.size());
-    REALM_ASSERT_3(value.size(), == 0 ||, value.data());
+    bool is_big = upgrade_leaf(value.size());
+    if (!is_big) {
+        static_cast<ArraySmallBlobs*>(m_arr)->insert(ndx, value);
+    }
+    else {
+        static_cast<ArrayBigBlobs*>(m_arr)->insert(ndx, value);
+    }
+}
 
-    if (value.is_null() && legacy_array_type())
-        throw LogicError(LogicError::column_not_nullable);
+BinaryData ArrayBinary::get(size_t ndx) const
+{
+    if (!m_is_big) {
+        return static_cast<ArraySmallBlobs*>(m_arr)->get(ndx);
+    }
+    else {
+        return static_cast<ArrayBigBlobs*>(m_arr)->get(ndx);
+    }
+}
 
-    size_t pos = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
-    m_blob.insert(pos, value.data(), value.size(), add_zero_term);
+BinaryData ArrayBinary::get_at(size_t ndx, size_t& pos) const
+{
+    if (!m_is_big) {
+        pos = 0;
+        return static_cast<ArraySmallBlobs*>(m_arr)->get(ndx);
+    }
+    else {
+        return static_cast<ArrayBigBlobs*>(m_arr)->get_at(ndx, pos);
+    }
+}
 
-    size_t stored_size = value.size();
-    if (add_zero_term)
-        ++stored_size;
-    m_offsets.insert(ndx, pos + stored_size);
-    m_offsets.adjust(ndx + 1, m_offsets.size(), stored_size);
-
-    if (!legacy_array_type())
-        m_nulls.insert(ndx, value.is_null());
+bool ArrayBinary::is_null(size_t ndx) const
+{
+    if (!m_is_big) {
+        return static_cast<ArraySmallBlobs*>(m_arr)->is_null(ndx);
+    }
+    else {
+        return static_cast<ArrayBigBlobs*>(m_arr)->is_null(ndx);
+    }
 }
 
 void ArrayBinary::erase(size_t ndx)
 {
-    REALM_ASSERT_3(ndx, <, m_offsets.size());
-
-    size_t start = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
-    size_t end = to_size_t(m_offsets.get(ndx));
-
-    m_blob.erase(start, end);
-    m_offsets.erase(ndx);
-    m_offsets.adjust(ndx, m_offsets.size(), int64_t(start) - end);
-
-    if (!legacy_array_type())
-        m_nulls.erase(ndx);
-}
-
-BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) noexcept
-{
-    // Column *may* be nullable if top has 3 refs (3'rd being m_nulls). Else, if it has 2, it's non-nullable
-    // See comment in legacy_array_type() and also in array_binary.hpp.
-    size_t siz = Array::get_size_from_header(header);
-    REALM_ASSERT_7(siz, ==, 2, ||, siz, ==, 3);
-
-    if (siz == 3) {
-        std::pair<int64_t, int64_t> p = get_two(header, 1);
-        const char* nulls_header = alloc.translate(to_ref(p.second));
-        int64_t n = ArrayInteger::get(nulls_header, ndx);
-        // 0 or 1 is all that is ever written to m_nulls; any other content would be a bug
-        REALM_ASSERT_3(n == 1, ||, n == 0);
-        bool null = (n != 0);
-        if (null)
-            return BinaryData{};
-    }
-
-    std::pair<int64_t, int64_t> p = get_two(header, 0);
-    const char* offsets_header = alloc.translate(to_ref(p.first));
-    const char* blob_header = alloc.translate(to_ref(p.second));
-    size_t begin, end;
-    if (ndx) {
-        p = get_two(offsets_header, ndx - 1);
-        begin = to_size_t(p.first);
-        end = to_size_t(p.second);
+    if (!m_is_big) {
+        return static_cast<ArraySmallBlobs*>(m_arr)->erase(ndx);
     }
     else {
-        begin = 0;
-        end = to_size_t(Array::get(offsets_header, ndx));
+        return static_cast<ArrayBigBlobs*>(m_arr)->erase(ndx);
     }
-    BinaryData bd = BinaryData(ArrayBlob::get(blob_header, begin), end - begin);
-    return bd;
 }
 
-// FIXME: Not exception safe (leaks are possible).
-ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_zero_term, TreeInsertBase& state)
+void ArrayBinary::truncate_and_destroy_children(size_t ndx)
 {
-    size_t leaf_size = size();
-    REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
-    if (leaf_size < ndx)
-        ndx = leaf_size;
-    if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-        insert(ndx, value, add_zero_term); // Throws
-        return 0;                          // Leaf was not split
-    }
-
-    // Split leaf node
-    ArrayBinary new_leaf(get_alloc());
-    new_leaf.create(); // Throws
-    if (ndx == leaf_size) {
-        new_leaf.add(value, add_zero_term); // Throws
-        state.m_split_offset = ndx;
+    if (!m_is_big) {
+        return static_cast<ArraySmallBlobs*>(m_arr)->truncate(ndx);
     }
     else {
-        for (size_t i = ndx; i != leaf_size; ++i)
-            new_leaf.add(get(i));  // Throws
-        truncate(ndx);             // Throws
-        add(value, add_zero_term); // Throws
-        state.m_split_offset = ndx + 1;
+        return static_cast<ArrayBigBlobs*>(m_arr)->truncate(ndx);
     }
-    state.m_split_size = leaf_size + 1;
-    return new_leaf.get_ref();
 }
 
-
-MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, BinaryData values)
+bool ArrayBinary::upgrade_leaf(size_t value_size)
 {
-    // Only null and zero-length non-null allowed as initialization value
-    REALM_ASSERT(values.size() == 0);
-    Array top(alloc);
-    _impl::DeepArrayDestroyGuard dg(&top);
-    top.create(type_HasRefs); // Throws
+    if (m_is_big)
+        return true;
 
-    _impl::DeepArrayRefDestroyGuard dg_2(alloc);
-    {
-        bool context_flag = false;
-        int64_t value = 0;
-        MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
-        dg_2.reset(mem.get_ref());
-        int64_t v = from_ref(mem.get_ref());
-        top.add(v); // Throws
-        dg_2.release();
-    }
-    {
-        size_t blobs_size = 0;
-        MemRef mem = ArrayBlob::create_array(blobs_size, alloc); // Throws
-        dg_2.reset(mem.get_ref());
-        int64_t v = from_ref(mem.get_ref());
-        top.add(v); // Throws
-        dg_2.release();
-    }
-    {
-        // Always create a m_nulls array, regardless if its column is marked as nullable or not. NOTE: This is new
-        // - existing binary arrays from earier versions of core will not have this third array. All methods on
-        // ArrayBinary must thus check if this array exists before trying to access it. If it doesn't, it must be
-        // interpreted as if its column isn't nullable.
-        bool context_flag = false;
-        int64_t value = values.is_null() ? 1 : 0;
-        MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
-        dg_2.reset(mem.get_ref());
-        int64_t v = from_ref(mem.get_ref());
-        top.add(v); // Throws
-        dg_2.release();
-    }
+    if (value_size <= small_blob_max_size)
+        return false;
 
-    dg.release();
-    return top.get_mem();
+    // Upgrade root leaf from small to big blobs
+    auto small_blobs = static_cast<ArraySmallBlobs*>(m_arr);
+    ArrayBigBlobs big_blobs(m_alloc, true);
+    big_blobs.create(); // Throws
+
+    size_t n = small_blobs->size();
+    for (size_t i = 0; i < n; i++) {
+        big_blobs.add(small_blobs->get(i)); // Throws
+    }
+    big_blobs.set_parent(small_blobs->get_parent(), small_blobs->get_ndx_in_parent());
+    big_blobs.update_parent(); // Throws
+    small_blobs->destroy();
+    auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
+    arr->init_from_mem(big_blobs.get_mem());
+
+    m_is_big = true;
+    return true;
 }
-
-
-MemRef ArrayBinary::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    REALM_ASSERT(is_attached());
-
-    ArrayBinary array_slice(target_alloc);
-    _impl::ShallowArrayDestroyGuard dg(&array_slice);
-    array_slice.create(); // Throws
-    size_t begin = offset;
-    size_t end = offset + slice_size;
-    for (size_t i = begin; i != end; ++i) {
-        BinaryData value = get(i);
-        array_slice.add(value); // Throws
-    }
-    dg.release();
-    return array_slice.get_mem();
-}
-
-
-#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
-
-void ArrayBinary::to_dot(std::ostream& out, bool, StringData title) const
-{
-    ref_type ref = get_ref();
-
-    out << "subgraph cluster_binary" << ref << " {" << std::endl;
-    out << " label = \"ArrayBinary";
-    if (title.size() != 0)
-        out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
-
-    Array::to_dot(out, "binary_top");
-    m_offsets.to_dot(out, "offsets");
-    m_blob.to_dot(out, "blob");
-
-    out << "}" << std::endl;
-}
-
-#endif // LCOV_EXCL_STOP ignore debug functions

@@ -29,30 +29,31 @@
 namespace realm {
 namespace parser {
 
-struct KeyPathElement
-{
+struct KeyPathElement {
     ConstTableRef table;
-    size_t col_ndx;
+    ColKey col_key;
     DataType col_type;
     bool is_backlink;
 };
 
 class BacklinksRestrictedError : public std::runtime_error {
 public:
-    BacklinksRestrictedError(const std::string& msg) : std::runtime_error(msg) {}
+    BacklinksRestrictedError(const std::string& msg)
+        : std::runtime_error(msg)
+    {
+    }
     /// runtime_error::what() returns the msg provided in the constructor.
 };
 
 struct TableAndColHash {
-    std::size_t operator () (const std::pair<ConstTableRef, std::string> &p) const;
+    std::size_t operator()(const std::pair<ConstTableRef, std::string>& p) const;
 };
 
 
 // This class holds state which allows aliasing variable names in key paths used in queries.
 // It is used to allow variable naming in subqueries such as 'SUBQUERY(list, $obj, $obj.intCol = 5).@count'
 // It can also be used to allow querying named backlinks if bindings provide the mappings themselves.
-class KeyPathMapping
-{
+class KeyPathMapping {
 public:
     KeyPathMapping();
     // returns true if added, false if duplicate key already exists
@@ -62,6 +63,7 @@ public:
     KeyPathElement process_next_path(ConstTableRef table, KeyPath& path, size_t& index);
     void set_allow_backlinks(bool allow);
     static Table* table_getter(TableRef table, const std::vector<KeyPathElement>& links);
+
 protected:
     bool m_allow_backlinks;
     std::unordered_map<std::pair<ConstTableRef, std::string>, std::string, TableAndColHash> m_mapping;

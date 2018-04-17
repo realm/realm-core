@@ -77,6 +77,12 @@ using namespace realm::util;
 namespace realm {
 namespace util {
 
+size_t round_up_to_page_size(size_t size) noexcept
+{
+    return (size + page_size() - 1) & ~(page_size() - 1);
+}
+
+
 #if REALM_ENABLE_ENCRYPTION
 
 // A list of all of the active encrypted mappings for a single file
@@ -115,6 +121,7 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 
     return 0;
 }
+
 
 EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t file_offset, File::AccessMode access,
                                   const char* encryption_key)
@@ -241,6 +248,61 @@ void remove_mapping(void* addr, size_t size)
     }
 }
 
+void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key,
+           EncryptedFileMapping*& mapping)
+{
+    if (encryption_key) {
+        size = round_up_to_page_size(size);
+        void* addr = mmap_anon(size);
+        mapping = add_mapping(addr, size, fd, offset, access, encryption_key);
+        return addr;
+    }
+    else {
+        mapping = nullptr;
+        return mmap(fd, size, access, offset, nullptr);
+    }
+}
+
+void* mmap_reserve(FileDesc fd, size_t reservation_size, File::AccessMode access, size_t offset_in_file,
+                   const char* enc_key, EncryptedFileMapping*& mapping)
+{
+    auto addr = mmap_reserve(fd, reservation_size, offset_in_file);
+    if (enc_key) {
+        REALM_ASSERT(reservation_size == round_up_to_page_size(reservation_size));
+        // we create a mapping for the entire reserved area. This causes full initialization of some fairly
+        // large std::vectors, which it would be nice to avoid. This is left as a future optimization.
+        mapping = add_mapping(addr, reservation_size, fd, offset_in_file, access, enc_key);
+    }
+    else {
+        mapping = nullptr;
+    }
+    return addr;
+}
+
+void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
+                 const char* enc_key, EncryptedFileMapping* mapping)
+{
+    REALM_ASSERT((enc_key == nullptr) ==
+                 (mapping == nullptr)); // Mapping must already have been set if encryption is used
+    if (mapping) {
+// Since the encryption layer must be able to WRITE into the memory area,
+// we have to map it read/write regardless of the request.
+// FIXME: Make this work for windows!
+#ifdef _WIN32
+        REALM_ASSERT(false); // not supported on windows
+        return nullptr;
+#else
+        return ::mmap(address_request, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
+#endif
+    }
+    else {
+        return mmap_fixed(fd, address_request, size, access, offset, enc_key);
+    }
+}
+
+
+#endif
+
 void* mmap_anon(size_t size)
 {
 #ifdef _WIN32
@@ -276,27 +338,41 @@ void* mmap_anon(size_t size)
 #endif
 }
 
-size_t round_up_to_page_size(size_t size) noexcept
+void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
+                 const char* enc_key)
 {
-    return (size + page_size() - 1) & ~(page_size() - 1);
+    static_cast<void>(enc_key); // FIXME: Consider removing this parameter
+#ifdef _WIN32
+    REALM_ASSERT(false);
+    return nullptr; // silence warning
+#else
+    auto prot = PROT_READ;
+    if (access == File::access_ReadWrite)
+        prot |= PROT_WRITE;
+    auto addr = ::mmap(address_request, size, prot, MAP_SHARED | MAP_FIXED, fd, offset);
+    if (addr != address_request) {
+        throw std::runtime_error(get_errno_msg("mmap() failed: ", errno) +
+                                 ", when mapping an already reserved memory area");
+    }
+    return addr;
+#endif
 }
 
-void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key,
-           EncryptedFileMapping*& mapping)
+void* mmap_reserve(FileDesc fd, size_t reservation_size, size_t offset_in_file)
 {
-    if (encryption_key) {
-        size = round_up_to_page_size(size);
-        void* addr = mmap_anon(size);
-        mapping = add_mapping(addr, size, fd, offset, access, encryption_key);
-        return addr;
-    }
-    else {
-        mapping = nullptr;
-        return mmap(fd, size, access, offset, nullptr);
-    }
+    // The other mmap operations take an fd as a parameter, so we do too.
+    // We're not using it for anything currently, but this may change.
+    // Similarly for offset_in_file.
+    static_cast<void>(fd);
+    static_cast<void>(offset_in_file);
+#ifdef _WIN32
+    REALM_ASSERT(false); // unsupported on windows
+    return nullptr;
+#else
+    auto addr = ::mmap(0, reservation_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    return addr;
+#endif
 }
-
-#endif // enable encryption
 
 
 void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key)

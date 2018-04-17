@@ -17,51 +17,229 @@
  **************************************************************************/
 
 #include <realm/query_expression.hpp>
+#include <realm/group.hpp>
 
 namespace realm {
 
-void Columns<Link>::evaluate(size_t index, ValueBase& destination)
+void LinkMap::set_base_table(const Table* table)
 {
-    std::vector<size_t> links = m_link_map.get_links(index);
-    Value<RowIndex> v = make_value_for_link<RowIndex>(m_link_map.only_unary_links(), links.size());
+    if (table == get_base_table())
+        return;
 
-    for (size_t t = 0; t < links.size(); t++) {
-        v.m_storage.set(t, RowIndex(links[t]));
+    m_tables.clear();
+    m_tables.push_back(ConstTableRef(table));
+    m_link_types.clear();
+    m_only_unary_links = true;
+
+    Group* group = _impl::TableFriend::get_parent_group(*table);
+
+    for (size_t i = 0; i < m_link_column_keys.size(); i++) {
+        ColKey link_column_key = m_link_column_keys[i];
+        size_t link_column_ndx = m_tables[i]->colkey2ndx(link_column_key);
+        // Link column can be either LinkList or single Link
+        const Table* t = m_tables.back();
+        const Spec& spec = _impl::TableFriend::get_spec(*t);
+
+        ColumnType type = t->get_real_column_type(link_column_key);
+        REALM_ASSERT(Table::is_link_type(type) || type == col_type_BackLink);
+        if (type == col_type_LinkList || type == col_type_BackLink) {
+            m_only_unary_links = false;
+        }
+
+        m_link_types.push_back(type);
+        TableKey target_table_key = spec.get_opposite_link_table_key(link_column_ndx);
+        auto target_table = group->get_table(target_table_key);
+        m_tables.push_back(target_table);
     }
-    destination.import(v);
 }
 
-void Columns<SubTable>::evaluate_internal(size_t index, ValueBase& destination, size_t nb_elements)
+void LinkMap::collect_dependencies(std::vector<TableKey>& tables) const
 {
-    REALM_ASSERT_DEBUG(dynamic_cast<Value<ConstTableRef>*>(&destination) != nullptr);
-    Value<ConstTableRef>* d = static_cast<Value<ConstTableRef>*>(&destination);
-    REALM_ASSERT(d);
+    for (auto& t : m_tables) {
+        TableKey k = t->get_key();
+        if (find(tables.begin(), tables.end(), k) == tables.end()) {
+            tables.push_back(k);
+        }
+    }
+}
 
-    if (m_link_map.m_link_columns.size() > 0) {
-        std::vector<size_t> links = m_link_map.get_links(index);
+std::string LinkMap::description(util::serializer::SerialisationState& state) const
+{
+    std::string s;
+    for (size_t i = 0; i < m_link_column_keys.size(); ++i) {
+        if (i < m_tables.size() && m_tables[i]) {
+            s += state.get_column_name(m_tables[i]->get_table_ref(), m_link_column_keys[i]);
+            if (i != m_link_column_keys.size() - 1) {
+                s += util::serializer::value_separator;
+            }
+        }
+    }
+    return s;
+}
+
+void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm)
+{
+    bool last = (column + 1 == m_link_column_keys.size());
+    ColumnType type = m_link_types[column];
+    ConstObj obj = m_tables[column]->get_object(key);
+    if (type == col_type_Link) {
+        if (ObjKey k = obj.get<ObjKey>(m_link_column_keys[column])) {
+            if (last)
+                lm.consume(k);
+            else
+                map_links(column + 1, k, lm);
+        }
+    }
+    else if (type == col_type_LinkList) {
+        auto linklist = obj.get_list<ObjKey>(m_link_column_keys[column]);
+        size_t sz = linklist.size();
+        for (size_t t = 0; t < sz; t++) {
+            ObjKey k = linklist.get(t);
+            if (last) {
+                bool continue2 = lm.consume(k);
+                if (!continue2)
+                    return;
+            }
+            else
+                map_links(column + 1, k, lm);
+        }
+    }
+    else if (type == col_type_BackLink) {
+        auto backlink_column = m_link_column_keys[column];
+        size_t backlink_column_ndx = m_tables[column]->colkey2ndx(backlink_column);
+        size_t sz = obj.get_backlink_count(backlink_column_ndx);
+        for (size_t t = 0; t < sz; t++) {
+            ObjKey k = obj.get_backlink(backlink_column_ndx, t);
+            if (last) {
+                bool continue2 = lm.consume(k);
+                if (!continue2)
+                    return;
+            }
+            else
+                map_links(column + 1, k, lm);
+        }
+    }
+    else {
+        REALM_ASSERT(false);
+    }
+}
+
+void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm)
+{
+    REALM_ASSERT(m_leaf_ptr != nullptr);
+
+    bool last = (column + 1 == m_link_column_keys.size());
+    ColumnType type = m_link_types[column];
+    if (type == col_type_Link) {
+        if (ObjKey k = static_cast<const ArrayKey*>(m_leaf_ptr)->get(row)) {
+            if (last)
+                lm.consume(k);
+            else
+                map_links(column + 1, k, lm);
+        }
+    }
+    else if (type == col_type_LinkList) {
+        if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(row)) {
+            BPlusTree<ObjKey> links(get_base_table()->get_alloc());
+            links.init_from_ref(ref);
+            size_t sz = links.size();
+            for (size_t t = 0; t < sz; t++) {
+                ObjKey k = links.get(t);
+                if (last) {
+                    bool continue2 = lm.consume(k);
+                    if (!continue2)
+                        return;
+                }
+                else
+                    map_links(column + 1, k, lm);
+            }
+        }
+    }
+    else if (type == col_type_BackLink) {
+        auto back_links = static_cast<const ArrayBacklink*>(m_leaf_ptr);
+        size_t sz = back_links->get_backlink_count(row);
+        for (size_t t = 0; t < sz; t++) {
+            ObjKey k = back_links->get_backlink(row, t);
+            if (last) {
+                bool continue2 = lm.consume(k);
+                if (!continue2)
+                    return;
+            }
+            else
+                map_links(column + 1, k, lm);
+        }
+    }
+    else {
+        REALM_ASSERT(false);
+    }
+}
+
+void Columns<Link>::evaluate(size_t index, ValueBase& destination)
+{
+    // Destination must be of Key type. It only makes sense to
+    // compare keys with keys
+    REALM_ASSERT_DEBUG(dynamic_cast<Value<ObjKey>*>(&destination));
+    auto d = static_cast<Value<ObjKey>*>(&destination);
+    std::vector<ObjKey> links = m_link_map.get_links(index);
+
+    if (m_link_map.only_unary_links()) {
+        ObjKey key;
+        if (!links.empty()) {
+            key = links[0];
+        }
+        d->init(false, 1, key);
+    }
+    else {
+        d->init(true, links);
+    }
+}
+
+void ColumnListBase::set_cluster(const Cluster* cluster)
+{
+    m_leaf_ptr = nullptr;
+    m_array_ptr = nullptr;
+    if (m_link_map.has_links()) {
+        m_link_map.set_cluster(cluster);
+    }
+    else {
+        // Create new Leaf
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayList(m_link_map.get_base_table()->get_alloc()));
+        size_t column_ndx = m_link_map.get_target_table()->colkey2ndx(m_column_key);
+        cluster->init_leaf(column_ndx, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
+    }
+}
+
+void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_t nb_elements)
+{
+    if (m_link_map.has_links()) {
+        std::vector<ObjKey> links = m_link_map.get_links(index);
         auto sz = links.size();
 
         if (m_link_map.only_unary_links()) {
-            ConstTableRef val;
+            ref_type val = 0;
             if (sz == 1) {
-                val = m_column->get(links[0]);
+                ConstObj obj = m_link_map.get_target_table()->get_object(links[0]);
+                val = to_ref(obj.get<int64_t>(m_column_key));
             }
-            d->init(false, 1, val);
+            destination.init(false, 1, val);
         }
         else {
-            d->init(true, sz);
+            destination.init(true, sz);
             for (size_t t = 0; t < sz; t++) {
-                d->m_storage.set(t, m_column->get(links[t]));
+                ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
+                ref_type val = to_ref(obj.get<int64_t>(m_column_key));
+                destination.m_storage.set(t, val);
             }
         }
     }
     else {
-        size_t rows = std::min(m_column->size() - index, nb_elements);
+        size_t rows = std::min(m_leaf_ptr->size() - index, nb_elements);
 
-        d->init(false, rows);
+        destination.init(false, rows);
 
         for (size_t t = 0; t < rows; t++) {
-            d->m_storage.set(t, m_column->get(index + t));
+            destination.m_storage.set(t, to_ref(m_leaf_ptr->get(index + t)));
         }
     }
 }
@@ -188,5 +366,4 @@ Query Subexpr2<BinaryData>::like(const Subexpr2<BinaryData>& col, bool case_sens
 {
     return binary_compare<Like, LikeIns>(*this, col, case_sensitive);
 }
-
 }

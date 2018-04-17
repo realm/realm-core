@@ -31,8 +31,6 @@ template <class T, class cond>
 class FloatDoubleNode;
 template <class ColType, class Cond>
 class IntegerNode;
-template <class T>
-class SequentialGetter;
 
 template <class cond, class T>
 struct ColumnTypeTraits2;
@@ -112,29 +110,10 @@ struct FindInLeaf<IntNullColumn> {
 } // namespace _impl
 
 template <class T, class R, Action action, class Condition, class ColType>
-R aggregate(const ColType& column, T target, size_t start, size_t end, size_t limit, size_t* return_ndx)
+R aggregate(const ColType&, T, size_t, size_t, size_t, size_t*)
 {
-    if (end == npos)
-        end = column.size();
-
-    QueryState<R> state;
-    state.init(action, nullptr, limit);
-    SequentialGetter<ColType> sg{&column};
-
-    bool cont = true;
-    for (size_t s = start; cont && s < end;) {
-        sg.cache_next(s);
-        size_t start2 = s - sg.m_leaf_start;
-        size_t end2 = sg.local_end(end);
-        cont = _impl::FindInLeaf<ColType>::template find<action, Condition>(*sg.m_leaf_ptr, target, start2, end2,
-                                                                            sg.m_leaf_start, state);
-        s = sg.m_leaf_start + end2;
-    }
-
-    if (return_ndx)
-        *return_ndx = action == act_Sum ? state.m_match_count : state.m_minmax_index;
-
-    return state.m_state;
+    REALM_ASSERT(false); // FIXME: Unimplemented
+    return R();          // avoid a warning
 }
 
 

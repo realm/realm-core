@@ -28,8 +28,6 @@ class ColumnBase;
 class StringColumn;
 class StringEnumColumn;
 class BinaryColumn;
-class SubtableColumn;
-class MixedColumn;
 class LinkColumn;
 class LinkListColumn;
 class TimestampColumn;
