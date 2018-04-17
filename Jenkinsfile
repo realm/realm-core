@@ -120,53 +120,46 @@ jobWrapper {
           }
       }
 
-      if (gitTag) {
-          stage('Package') {
-              parallel(
-                  packageGeneric      : doBuildPackage('generic', 'tgz'),
-                  packageCentos7      : doBuildPackage('centos-7', 'rpm'),
-                  packageCentos6      : doBuildPackage('centos-6', 'rpm'),
-                  packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
+      if (releaseTesting && gitTag) {
+          stage('Aggregate') {
+              parallel (
+                packageGeneric      : doBuildPackage('generic', 'tgz'),
+                packageCentos7      : doBuildPackage('centos-7', 'rpm'),
+                packageCentos6      : doBuildPackage('centos-6', 'rpm'),
+                packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
+                cocoa: {
+                      node('docker') {
+                          getArchive()
+                          for (int i = 0; i < cocoaStashes.size(); i++) {
+                              unstash name:cocoaStashes[i]
+                          }
+                          sh 'tools/build-cocoa.sh'
+                          archiveArtifacts('realm-core-cocoa*.tar.xz')
+                          if(gitTag) {
+                              def stashName = 'cocoa'
+                              stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
+                              publishingStashes << stashName
+                          }
+                      }
+                  },
+                android: {
+                      node('docker') {
+                          getArchive()
+                          for (int i = 0; i < androidStashes.size(); i++) {
+                              unstash name:androidStashes[i]
+                          }
+                          sh 'tools/build-android.sh'
+                          archiveArtifacts('realm-core-android*.tar.gz')
+                          if(gitTag) {
+                              def stashName = 'android'
+                              stash includes: 'realm-core-android*.tar.gz', name: stashName
+                              publishingStashes << stashName
+                          }
+                      }
+                  }
               )
           }
-      }
 
-      stage('Aggregate') {
-          parallel (
-            cocoa: {
-                  node('docker') {
-                      getArchive()
-                      for (int i = 0; i < cocoaStashes.size(); i++) {
-                          unstash name:cocoaStashes[i]
-                      }
-                      sh 'tools/build-cocoa.sh'
-                      archiveArtifacts('realm-core-cocoa*.tar.xz')
-                      if(gitTag) {
-                          def stashName = 'cocoa'
-                          stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
-                          publishingStashes << stashName
-                      }
-                  }
-              },
-            android: {
-                  node('docker') {
-                      getArchive()
-                      for (int i = 0; i < androidStashes.size(); i++) {
-                          unstash name:androidStashes[i]
-                      }
-                      sh 'tools/build-android.sh'
-                      archiveArtifacts('realm-core-android*.tar.gz')
-                      if(gitTag) {
-                          def stashName = 'android'
-                          stash includes: 'realm-core-android*.tar.gz', name: stashName
-                          publishingStashes << stashName
-                      }
-                  }
-              }
-          )
-      }
-
-      if (gitTag) {
           stage('publish-packages') {
               parallel(
                   generic: doPublishGeneric(),
