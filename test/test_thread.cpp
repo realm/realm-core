@@ -34,7 +34,7 @@
 #include <realm/utilities.hpp> // gettimeofday()
 #endif
 
-#include <realm/group_shared_options.hpp>
+#include <realm/db_options.hpp>
 #include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
@@ -754,7 +754,7 @@ NONCONCURRENT_TEST(Thread_CondvarWaits)
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     TEST_PATH(path);
-    SharedGroupOptions default_options;
+    DBOptions default_options;
     mutex.set_shared_part(mutex_part, path, "Thread_CondvarWaits_Mutex");
     changed.set_shared_part(condvar_part, path, "Thread_CondvarWaits_CondVar", default_options.temp_dir);
     changed.init_shared_part(condvar_part);
@@ -786,7 +786,7 @@ NONCONCURRENT_TEST(Thread_CondvarIsStateless)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
-    SharedGroupOptions default_options;
+    DBOptions default_options;
 
     // Must have names because default_options.temp_dir is empty string on Windows
     mutex.set_shared_part(mutex_part, path, "Thread_CondvarIsStateless_Mutex");
@@ -824,7 +824,7 @@ NONCONCURRENT_TEST(Thread_CondvarTimeout)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
-    SharedGroupOptions default_options;
+    DBOptions default_options;
     mutex.set_shared_part(mutex_part, path, "Thread_CondvarTimeout_Mutex");
     changed.set_shared_part(condvar_part, path, "Thread_CondvarTimeout_CondVar", default_options.temp_dir);
     struct timespec time_limit;
@@ -857,7 +857,7 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
-    SharedGroupOptions default_options;
+    DBOptions default_options;
     mutex.set_shared_part(mutex_part, path, "Thread_CondvarNotifyAllWakeup_Mutex");
     changed.set_shared_part(condvar_part, path, "Thread_CondvarNotifyAllWakeup_CondVar", default_options.temp_dir);
 
@@ -903,7 +903,7 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
     InterprocessCondVar::init_shared_part(condvar_part);
     bowl_of_stones_semaphore feedback(0);
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroupOptions default_options;
+    DBOptions default_options;
     mutex.set_shared_part(mutex_part, path, "Thread_CondvarNotifyWakeup_Mutex");
     changed.set_shared_part(condvar_part, path, "Thread_CondvarNotifyWakeup_CondVar", default_options.temp_dir);
     const int num_waiters = 10;
@@ -956,7 +956,7 @@ TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind)
             InterprocessMutex::SharedPart mutex_part;
             InterprocessCondVar condvar;
             InterprocessCondVar::SharedPart condvar_part;
-            SharedGroupOptions default_options;
+            DBOptions default_options;
 
             std::stringstream ss;
             ss << std::this_thread::get_id();
@@ -1027,7 +1027,7 @@ TEST(Thread_Win32InterprocessBackslashes)
     InterprocessCondVar condvar;
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
-    SharedGroupOptions default_options;
+    DBOptions default_options;
 
     mutex.set_shared_part(mutex_part, "Path\\With\\Slashes", "my_mutex");
     condvar.set_shared_part(condvar_part, "Path\\With\\Slashes", "my_condvar", default_options.temp_dir);

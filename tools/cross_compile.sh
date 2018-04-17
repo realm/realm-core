@@ -92,6 +92,7 @@ else
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D REALM_NO_TESTS=1 \
           -D REALM_VERSION="${VERSION}" \
+          -D CPACK_SYSTEM_NAME="${SDK}os" \
           -G Xcode ..
 
     xcodebuild -sdk "${SDK}os" \
@@ -109,18 +110,5 @@ else
          -output "src/realm/${BUILD_TYPE}/librealm-parser${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
-    xcodebuild -sdk "${SDK}os" \
-               -configuration "${BUILD_TYPE}" \
-               -target install \
-               ONLY_ACTIVE_ARCH=NO
-    xcodebuild -sdk "${SDK}simulator" \
-               -configuration "${BUILD_TYPE}" \
-               -target install \
-               ONLY_ACTIVE_ARCH=NO
-    mkdir -p install/lib
-    cp "src/realm/${BUILD_TYPE}/librealm${suffix}.a" install/lib
-    cp "src/realm/${BUILD_TYPE}/librealm-parser${suffix}.a" install/lib
-    cd install || exit 1
-    tar -cvzf "realm-core-${BUILD_TYPE}-${VERSION}-${SDK}os.tar.gz" lib include
-    mv ./*.tar.gz ..
+    cpack -C ${BUILD_TYPE} || exit 1
 fi

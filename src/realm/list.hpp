@@ -22,6 +22,7 @@
 #include <realm/obj.hpp>
 #include <realm/bplustree.hpp>
 #include <realm/obj_list.hpp>
+#include <realm/array_basic.hpp>
 #include <realm/array_key.hpp>
 #include <realm/array_bool.hpp>
 #include <realm/array_string.hpp>
@@ -33,7 +34,6 @@ namespace realm {
 class TableView;
 class SortDescriptor;
 class Group;
-struct LinkListHandoverPatch;
 
 // To be used in query for size. Adds nullability to size so that
 // it can be put in a NullableVector
@@ -307,11 +307,7 @@ protected:
 
     void init_from_parent() const override
     {
-        ref_type ref = get_child_ref(0);
-        if (ref) {
-            m_tree->init_from_ref(ref);
-            m_valid = true;
-        }
+        m_valid = m_tree->init_from_parent();
     }
 };
 
@@ -533,6 +529,8 @@ protected:
     }
     void set_repl(Replication* repl, size_t ndx, T value);
     void insert_repl(Replication* repl, size_t ndx, T value);
+
+    friend class Transaction;
 };
 
 template <>
@@ -552,9 +550,9 @@ public:
     // Getting links
     ConstObj operator[](size_t link_ndx) const
     {
-        return get(link_ndx);
+        return get_object(link_ndx);
     }
-    ConstObj get(size_t link_ndx) const;
+    ConstObj get_object(size_t link_ndx) const;
 
 protected:
     ConstLinkListIf(ColKey col_key, Allocator& alloc)
@@ -583,13 +581,13 @@ public:
     }
 
 private:
+    friend class Transaction;
+
     ConstObj m_obj;
 };
 
 class LinkList : public List<ObjKey>, public ObjList {
 public:
-    using HandoverPatch = LinkListHandoverPatch;
-
     LinkList(const Obj& owner, ColKey col_key)
         : List<ObjKey>(owner, col_key)
         , ObjList(*this->m_tree, &get_target_table())
@@ -611,12 +609,8 @@ public:
     {
         return List<ObjKey>::size();
     }
-    // Getting links
-    Obj operator[](size_t link_ndx)
-    {
-        return get(link_ndx);
-    }
-    Obj get(size_t link_ndx);
+
+    using ObjList::operator[];
 
     TableView get_sorted_view(SortDescriptor order) const;
     TableView get_sorted_view(ColKey column_key, bool ascending = true) const;
@@ -624,14 +618,11 @@ public:
     void remove_all_target_rows();
 
 private:
-    friend class SharedGroup;
+    friend class DB;
     friend class ConstTableView;
     friend class Query;
 
     TableVersions sync_if_needed() const override;
-
-    static void generate_patch(const LinkList* ref, std::unique_ptr<LinkListHandoverPatch>& patch);
-    static LinkListPtr create_from_and_consume_patch(std::unique_ptr<LinkListHandoverPatch>& patch, Group& group);
 };
 
 template <typename U>

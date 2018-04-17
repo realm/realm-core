@@ -22,7 +22,7 @@
 
 #include <realm/group.hpp>
 #include <realm/table.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 #include <realm/replication.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/array_bool.hpp>
@@ -913,12 +913,12 @@ public:
 
 } // anonymous namespace
 
-void TrivialReplication::apply_changeset(const char* data, size_t size, SharedGroup& target, util::Logger* logger)
+void TrivialReplication::apply_changeset(const char* data, size_t size, DB& target, util::Logger* logger)
 {
     InputStreamImpl in(data, size);
-    WriteTransaction wt(target);                              // Throws
-    Replication::apply_changeset(in, wt.get_group(), logger); // Throws
-    wt.commit();                                              // Throws
+    TransactionRef trans = target.start_write();
+    Replication::apply_changeset(in, *trans.get(), logger);
+    trans->commit();
 }
 
 std::string TrivialReplication::get_database_path()
@@ -926,22 +926,23 @@ std::string TrivialReplication::get_database_path()
     return m_database_file;
 }
 
-void TrivialReplication::initialize(SharedGroup&)
+void TrivialReplication::initialize(DB&)
 {
     // Nothing needs to be done here
 }
 
-void TrivialReplication::do_initiate_transact(version_type, bool history_updated)
+void TrivialReplication::do_initiate_transact(Group& group, version_type, bool history_updated)
 {
-    char* data = m_transact_log_buffer.data();
-    size_t size = m_transact_log_buffer.size();
+    m_group = &group;
+    char* data = m_stream.get_data();
+    size_t size = m_stream.get_size();
     set_buffer(data, data + size);
     m_history_updated = history_updated;
 }
 
 Replication::version_type TrivialReplication::do_prepare_commit(version_type orig_version)
 {
-    char* data = m_transact_log_buffer.data();
+    char* data = m_stream.get_data();
     size_t size = write_position() - data;
     version_type new_version = prepare_changeset(data, size, orig_version); // Throws
     return new_version;
@@ -964,8 +965,3 @@ void TrivialReplication::do_clear_interrupt() noexcept
 {
 }
 
-void TrivialReplication::transact_log_append(const char* data, size_t size, char** new_begin, char** new_end)
-{
-    internal_transact_log_reserve(size, new_begin, new_end);
-    *new_begin = realm::safe_copy_n(data, size, *new_begin);
-}

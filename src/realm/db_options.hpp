@@ -24,7 +24,7 @@
 
 namespace realm {
 
-struct SharedGroupOptions {
+struct DBOptions {
 
     /// The persistence level of the SharedGroup.
     /// uint16_t is the type of SharedGroup::SharedInfo::durability
@@ -34,10 +34,9 @@ struct SharedGroupOptions {
         Async ///< Not yet supported on windows.
     };
 
-    explicit SharedGroupOptions(Durability level = Durability::Full, const char* key = nullptr,
-                                bool allow_upgrade = true,
-                                std::function<void(int, int)> file_upgrade_callback = std::function<void(int, int)>(),
-                                std::string temp_directory = sys_tmp_dir, bool track_metrics = false)
+    explicit DBOptions(Durability level = Durability::Full, const char* key = nullptr, bool allow_upgrade = true,
+                       std::function<void(int, int)> file_upgrade_callback = std::function<void(int, int)>(),
+                       std::string temp_directory = sys_tmp_dir, bool track_metrics = false)
         : durability(level)
         , encryption_key(key)
         , allow_file_format_upgrade(allow_upgrade)
@@ -48,7 +47,7 @@ struct SharedGroupOptions {
     {
     }
 
-    explicit SharedGroupOptions(const char* key)
+    explicit DBOptions(const char* key)
         : durability(Durability::Full)
         , encryption_key(key)
         , allow_file_format_upgrade(true)
@@ -98,8 +97,14 @@ struct SharedGroupOptions {
     /// It must be writable and allowed to create pipe/fifo file on it.
     /// set_sys_tmp_dir is not a thread-safe call and it is only supposed to be called once
     //  when process starts.
-    static void set_sys_tmp_dir(const std::string& dir) noexcept { sys_tmp_dir = dir; }
-    static std::string get_sys_tmp_dir() noexcept { return sys_tmp_dir; }
+    static void set_sys_tmp_dir(const std::string& dir) noexcept
+    {
+        sys_tmp_dir = dir;
+    }
+    static std::string get_sys_tmp_dir() noexcept
+    {
+        return sys_tmp_dir;
+    }
 
 private:
     static std::string sys_tmp_dir;

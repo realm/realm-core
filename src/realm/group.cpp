@@ -36,7 +36,7 @@
 #include <realm/column_linkbase.hpp>
 #include <realm/column_backlink.hpp>
 #include <realm/group_writer.hpp>
-#include <realm/group.hpp>
+#include <realm/db.hpp>
 #include <realm/replication.hpp>
 
 using namespace realm;
@@ -58,7 +58,8 @@ Initialization initialization;
 
 
 Group::Group()
-    : m_alloc() // Throws
+    : m_local_alloc(new SlabAlloc)
+    , m_alloc(*m_local_alloc) // Throws
     , m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
@@ -70,6 +71,73 @@ Group::Group()
     ref_type top_ref = 0; // Instantiate a new empty group
     bool create_group_when_missing = true;
     attach(top_ref, create_group_when_missing); // Throws
+}
+
+
+Group::Group(const std::string& file, const char* key, OpenMode mode)
+    : m_local_alloc(new SlabAlloc) // Throws
+    , m_alloc(*m_local_alloc)
+    , m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(false)
+    , m_total_rows(0)
+{
+    init_array_parents();
+
+    open(file, key, mode); // Throws
+}
+
+
+Group::Group(BinaryData buffer, bool take_ownership)
+    : m_local_alloc(new SlabAlloc) // Throws
+    , m_alloc(*m_local_alloc)
+    , m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(false)
+    , m_total_rows(0)
+{
+    init_array_parents();
+    open(buffer, take_ownership); // Throws
+}
+
+Group::Group(unattached_tag) noexcept
+    : m_local_alloc(new SlabAlloc) // Throws
+    , m_alloc(*m_local_alloc)
+    , // Throws
+    m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(false)
+    , m_total_rows(0)
+{
+    init_array_parents();
+}
+
+Group::Group(shared_tag) noexcept
+    : m_local_alloc(new SlabAlloc) // Throws
+    , m_alloc(*m_local_alloc)
+    , // Throws
+    m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(true)
+    , m_total_rows(0)
+{
+    init_array_parents();
+}
+
+Group::Group(SlabAlloc* alloc) noexcept
+    : m_alloc(*alloc)
+    , // Throws
+    m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(true)
+    , m_total_rows(0)
+{
+    init_array_parents();
 }
 
 
@@ -205,7 +273,7 @@ int Group::get_target_file_format_version_for_session(int /* current_file_format
 }
 
 
-void Group::upgrade_file_format(int target_file_format_version)
+void Transaction::upgrade_file_format(int target_file_format_version)
 {
     REALM_ASSERT(is_attached());
 
@@ -238,16 +306,39 @@ void Group::upgrade_file_format(int target_file_format_version)
 
     // NOTE: Additional future upgrade steps go here.
     if (current_file_format_version <= 9 && target_file_format_version >= 10) {
+        bool changes = false;
+        std::vector<TableKey> table_keys;
         for (size_t t = 0; t < m_table_names.size(); t++) {
             StringData name = m_table_names.get(t);
             auto table = get_table(name);
-            table->create_columns_in_clusters();
+            table_keys.push_back(table->get_key());
+            changes |= table->convert_columns();
         }
-        for (auto t : m_table_accessors) {
-            t->create_objects();
+
+        if (changes) {
+            commit_and_continue_as_read();
+            promote_to_write();
         }
-        for (auto t : m_table_accessors) {
-            t->copy_content_from_columns();
+
+        for (auto k : table_keys) {
+            auto table = get_table(k);
+            if (table->create_objects()) {
+                commit_and_continue_as_read();
+                promote_to_write();
+            }
+        }
+
+        for (auto k : table_keys) {
+            auto table = get_table(k);
+            const Spec& spec = _impl::TableFriend::get_spec(*table);
+            size_t nb_cols = spec.get_column_count();
+            for (size_t col_ndx = 0; col_ndx < nb_cols; col_ndx++) {
+                if (table->copy_content_from_columns(col_ndx)) {
+                    commit_and_continue_as_read();
+                    promote_to_write();
+                    table = get_table(k);
+                }
+            }
         }
     }
 
@@ -339,28 +430,29 @@ Group::~Group() noexcept
         return;
 
     // Free-standing group accessor
+    detach();
 
-    detach_table_accessors();
-
-    // Just allow the allocator to release all memory in one chunk without
-    // having to traverse the entire tree first
-    m_alloc.detach();
+    // if a local allocator is set in m_local_alloc, then the destruction
+    // of m_local_alloc will trigger destruction of the allocator, which will
+    // verify that the allocator has been detached, so....
+    if (m_local_alloc)
+        m_local_alloc->detach();
 }
 
 
 void Group::remap(size_t new_file_size)
 {
     m_alloc.update_reader_view(new_file_size); // Throws
-    update_allocator_wrappers();
+    update_allocator_wrappers(m_is_writable);
 }
 
 
-void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
+void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
     size_t old_baseline = m_alloc.get_baseline();
 
-    m_alloc.update_reader_view(new_file_size, new_version); // Throws
-    update_allocator_wrappers();
+    m_alloc.update_reader_view(new_file_size); // Throws
+    update_allocator_wrappers(writable);
 
     // force update of all ref->ptr translations if the mapping has changed
     auto mapping_version = m_alloc.get_mapping_version();
@@ -382,6 +474,7 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
 
     m_tables.detach();
     m_table_names.detach();
+    m_is_writable = create_group_when_missing;
 
     if (top_ref != 0) {
         m_top.init_from_ref(top_ref);
@@ -409,8 +502,17 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
     m_attached = true;
     set_size();
 
-    if (m_tables.is_attached())
-        m_table_accessors.resize(m_tables.size());
+    size_t sz = m_tables.is_attached() ? m_tables.size() : 0;
+    while (m_table_accessors.size() > sz) {
+        if (Table* t = m_table_accessors.back()) {
+            t->detach();
+            recycle_table_accessor(t);
+        }
+        m_table_accessors.pop_back();
+    }
+    while (m_table_accessors.size() < sz) {
+        m_table_accessors.emplace_back();
+    }
 #if REALM_METRICS
     update_num_objects();
 #endif // REALM_METRICS
@@ -447,18 +549,14 @@ void Group::update_num_objects()
 }
 
 
-void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint64_t new_version)
+void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
     REALM_ASSERT_3(new_top_ref, <, new_file_size);
     REALM_ASSERT(!is_attached());
 
-    // Make all dynamically allocated memory (space beyond the attached file) as
-    // available free-space.
-    reset_free_space_tracking(); // Throws
-
     // update readers view of memory
-    m_alloc.update_reader_view(new_file_size, new_version); // Throws
-    update_allocator_wrappers();
+    m_alloc.update_reader_view(new_file_size); // Throws
+    update_allocator_wrappers(writable);
 
     // When `new_top_ref` is null, ask attach() to create a new node structure
     // for an empty group, but only during the initiation of write
@@ -555,6 +653,8 @@ Table* Group::do_get_table(TableKey key, DescMatcher desc_matcher)
 
 Table* Group::do_add_table(StringData name, DescSetter desc_setter, bool require_unique_name)
 {
+    if (!m_is_writable)
+        throw LogicError(LogicError::wrong_transact_state);
     // get new key and index
     if (!m_table_names.is_attached())
         return 0;
@@ -707,11 +807,11 @@ Table* Group::create_table_accessor(size_t table_ndx)
         }
     }
     if (table) {
-        table->revive(m_alloc);
-        table->init(ref, this, table_ndx);
+        table->revive(m_alloc, m_is_writable);
+        table->init(ref, this, table_ndx, m_is_writable);
     }
     else {
-        table = tf::create_accessor(m_alloc, ref, this, table_ndx); // Throws
+        table = tf::create_accessor(m_alloc, ref, this, table_ndx, m_is_writable); // Throws
     }
     m_table_accessors[table_ndx] = table;
     tf::complete_accessor(*table);
@@ -749,6 +849,8 @@ void Group::remove_table(TableKey key)
 
 void Group::remove_table(size_t table_ndx, TableKey key)
 {
+    if (!m_is_writable)
+        throw LogicError(LogicError::wrong_transact_state);
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
@@ -814,6 +916,8 @@ void Group::rename_table(TableKey key, StringData new_name, bool require_unique_
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
+    if (!m_is_writable)
+        throw LogicError(LogicError::wrong_transact_state);
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (require_unique_name && has_table(new_name))
         throw TableNameInUse();
@@ -1053,7 +1157,7 @@ void Group::commit()
     // Update view of the file
     size_t new_file_size = out.get_file_size();
     m_alloc.update_reader_view(new_file_size); // Throws
-    update_allocator_wrappers();
+    update_allocator_wrappers(true);
 
     out.commit(top_ref); // Throws
 
@@ -1482,12 +1586,14 @@ private:
 };
 
 
-void Group::update_allocator_wrappers()
+void Group::update_allocator_wrappers(bool writable)
 {
+    m_is_writable = writable;
+    // FIXME: We can't write protect at group level as the allocator is shared: m_alloc.set_read_only(!writable);
     for (size_t i = 0; i < m_table_accessors.size(); ++i) {
         auto table_accessor = m_table_accessors[i];
         if (table_accessor) {
-            table_accessor->update_allocator_wrapper();
+            table_accessor->update_allocator_wrapper(writable);
         }
     }
 }
@@ -1495,11 +1601,16 @@ void Group::update_allocator_wrappers()
 
 void Group::refresh_dirty_accessors()
 {
+    if (!m_tables.is_attached()) {
+        m_table_accessors.clear();
+        return;
+    }
+
     // The array of Tables cannot have shrunk:
     REALM_ASSERT(m_tables.size() >= m_table_accessors.size());
 
     // but it may have grown - and if so, we must resize the accessor array to match
-    if (m_table_accessors.size() > 0 && m_tables.size() > m_table_accessors.size()) {
+    if (m_tables.size() > m_table_accessors.size()) {
         m_table_accessors.resize(m_tables.size());
     }
 
@@ -1533,8 +1644,7 @@ void Group::refresh_dirty_accessors()
 }
 
 
-void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in,
-                             uint64_t new_version)
+void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in, bool writable)
 {
     REALM_ASSERT(is_attached());
     // REALM_ASSERT(false); // FIXME: accessor updates need to be handled differently
@@ -1592,8 +1702,11 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     // transaction logs.
     // Update memory mapping if database file has grown
 
-    m_alloc.update_reader_view(new_file_size, new_version); // Throws
-    update_allocator_wrappers();
+    // FIXME: When called from Transaction::internal_advance_read(), a previous
+    // call has already updated mappings and wrappers to the new state. By aligning
+    // other callers, we could remove the 2 calls below:
+    m_alloc.update_reader_view(new_file_size); // Throws
+    update_allocator_wrappers(writable);
 
     // This is no longer needed in Core, but we need to compute "schema_changed",
     // for the benefit of ObjectStore.
@@ -1612,8 +1725,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
 }
 
 
-void Group::prepare_history_parent(Array& history_root, int history_type,
-                                   int history_schema_version)
+void Group::prepare_history_parent(BPlusTreeBase& history_root, int history_type, int history_schema_version)
 {
     REALM_ASSERT(m_file_format_version >= 7);
     if (m_top.size() < 10) {
@@ -1771,13 +1883,14 @@ void Group::verify() const
 
     // Verify history if present
     if (Replication* repl = get_replication()) {
-        if (_impl::History* hist = repl->get_history()) {
+        if (auto hist = repl->get_history_read()) {
             _impl::History::version_type version = 0;
             int history_type = 0;
             int history_schema_version = 0;
             get_version_and_history_info(m_top, version, history_type, history_schema_version);
             REALM_ASSERT(history_type != Replication::hist_None || history_schema_version == 0);
-            hist->update_from_parent(version);
+            ref_type hist_ref = get_history_ref(m_top);
+            hist->update_from_ref(hist_ref, version);
             hist->verify();
         }
     }

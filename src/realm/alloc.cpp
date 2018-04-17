@@ -91,7 +91,7 @@ public:
         return MemRef(new_addr, reinterpret_cast<size_t>(new_addr), *this);
     }
 
-    void do_free(ref_type, const char* addr) noexcept override
+    void do_free(ref_type, const char* addr) override
     {
         ::free(const_cast<char*>(addr));
     }

@@ -689,36 +689,22 @@ void File::prealloc(size_t size)
     // Mostly Linux only
     prealloc_if_supported(0, size);
 
-#elif REALM_PLATFORM_APPLE // Non-atomic fallback
-    // posix_fallocate() is not supported on MacOS or iOS
-    fstore_t store = {F_ALLOCATEALL, F_PEOFPOSMODE, 0, static_cast<off_t>(size), 0};
-    int ret = fcntl(m_fd, F_PREALLOCATE, &store);
-    if (ret == -1) {
-        int err = errno;
-        std::string msg = get_errno_msg("fcntl() inside prealloc() failed: ", err);
-        throw OutOfDiskSpace(msg);
+#else // Non-atomic fallback
+
+    if (size <= to_size_t(get_size())) {
+        return;
     }
 
-    do {
-        ret = ftruncate(m_fd, size);
-    } while (ret == -1 && errno == EINTR);
-
-    if (ret != 0) {
-        int err = errno;
-        std::string msg = get_errno_msg("ftruncate() inside prealloc() failed: ", err);
-        throw OutOfDiskSpace(msg);
-    }
-#elif REALM_ANDROID || defined(_WIN32)
-    if (size > to_size_t(get_size())) {
-        size_t new_size = size;
-        if (m_encryption_key) {
-            new_size = static_cast<size_t>(data_size_to_encrypted_size(size));
-            if (new_size < size) {
-                throw std::runtime_error("File size overflow: data_size_to_encrypted_size(" +
-                                         realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
-            }
+    size_t new_size = size;
+    if (m_encryption_key) {
+        new_size = static_cast<size_t>(data_size_to_encrypted_size(size));
+        if (new_size < size) {
+            throw std::runtime_error("File size overflow: data_size_to_encrypted_size(" +
+                                     realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
         }
+    }
 
+    auto manually_consume_space = [&]() {
         constexpr size_t chunk_size = 4096;
         int64_t original_size = get_size_static(m_fd);
         seek(original_size);
@@ -729,10 +715,79 @@ void File::prealloc(size_t size)
             write_static(m_fd, zeros.c_str(), t);
             num_bytes -= t;
         }
+    };
+
+#if REALM_PLATFORM_APPLE
+    // posix_fallocate() is not supported on MacOS or iOS, so use a combination of fcntl(F_PREALLOCATE) and
+    // ftruncate().
+
+    struct stat statbuf;
+    if (::fstat(m_fd, &statbuf) != 0) {
+        int err = errno;
+        throw std::runtime_error(get_errno_msg("fstat() inside prealloc() failed: ", err));
     }
+
+    size_t allocated_size;
+    if (int_cast_with_overflow_detect(statbuf.st_blocks, allocated_size)) {
+        throw std::runtime_error("Overflow on block conversion to size_t " +
+                                 realm::util::to_string(statbuf.st_blocks));
+    }
+    if (int_multiply_with_overflow_detect(allocated_size, S_BLKSIZE)) {
+        throw std::runtime_error("Overflow computing existing file space allocation blocks: " +
+                                 realm::util::to_string(allocated_size) + " block size: " +
+                                 realm::util::to_string(S_BLKSIZE));
+    }
+
+    // Only attempt to preallocate space if there's not already sufficient free space in the file.
+    // APFS would fail with EINVAL if we attempted it, and HFS+ would preallocate extra space unnecessarily.
+    // See <https://github.com/realm/realm-core/issues/3005> for details.
+    if (new_size > allocated_size) {
+
+        off_t to_allocate = static_cast<off_t>(new_size - statbuf.st_size);
+        fstore_t store = {F_ALLOCATEALL, F_PEOFPOSMODE, 0, to_allocate, 0};
+        int ret = fcntl(m_fd, F_PREALLOCATE, &store);
+        if (ret == -1) {
+            int err = errno;
+
+            if (err == EINVAL) {
+                // There's a timing sensitive bug on APFS which causes fcntl to sometimes throw EINVAL.
+                // This might not be the case, but we'll fall back and attempt to manually allocate all the requested
+                // space. Worst case, this might also fail, but there is also a chance it will succeed. We don't
+                // call this in the first place because using fcntl(F_PREALLOCATE) will be faster if it works (it has
+                // been reliable on HSF+).
+                manually_consume_space();
+            }
+            else {
+                std::string msg = util::format("fcntl() inside prealloc() failed allocating %1 bytes, new_size=%2, "
+                                               "cur_size=%3, allocated_size=%4, event: ",
+                                               to_allocate, new_size, statbuf.st_size, allocated_size);
+                msg += util::make_basic_system_error_code(err).message();
+                throw OutOfDiskSpace(msg);
+            }
+        }
+    }
+
+    int ret = 0;
+
+    do {
+        ret = ftruncate(m_fd, new_size);
+    } while (ret == -1 && errno == EINTR);
+
+    if (ret != 0) {
+        int err = errno;
+        // by the definition of F_PREALLOCATE, a proceeding ftruncate will not fail due to out of disk space
+        // so this is some other runtime error and not OutOfDiskSpace
+        throw std::runtime_error(get_errno_msg("ftruncate() inside prealloc() failed: ", err));
+    }
+#elif REALM_ANDROID || defined(_WIN32)
+
+    manually_consume_space();
+
 #else
 #error Please check if/how your OS supports file preallocation
 #endif
+
+#endif // !(_POSIX_C_SOURCE >= 200112L)
 }
 
 
@@ -750,6 +805,12 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
         throw std::runtime_error("File size overflow");
+
+    if (size2 == 0) {
+        // calling posix_fallocate with a size of 0 will cause a return of EINVAL
+        // since this is a meaningless operation anyway, we just return early here
+        return;
+    }
 
     // posix_fallocate() does not set errno, it returns the error (if any) or zero.
     // It is also possible for it to be interrupted by EINTR according to some man pages (ex fedora 24)

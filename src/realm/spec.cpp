@@ -25,10 +25,6 @@ using namespace realm;
 
 Spec::~Spec() noexcept
 {
-    if (m_top.is_attached()) {
-        if (Replication* repl = m_top.get_alloc().get_replication())
-            repl->on_spec_destroyed(this);
-    }
 }
 
 void Spec::detach() noexcept
@@ -38,14 +34,9 @@ void Spec::detach() noexcept
 
 bool Spec::init(ref_type ref) noexcept
 {
-    // Needs only initialization if not previously initialized
-    // or if the ref has changed
-    if (!m_top.is_attached() || m_top.get_ref() != ref) {
-        MemRef mem(ref, get_alloc());
-        init(mem);
-        return true;
-    }
-    return false;
+    MemRef mem(ref, get_alloc());
+    init(mem);
+    return true;
 }
 
 void Spec::init(MemRef mem) noexcept
@@ -203,17 +194,20 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
     return spec_set.get_mem();
 }
 
-void Spec::convert_column(size_t column_ndx)
+bool Spec::convert_column(size_t column_ndx)
 {
+    bool changes = false;
     if (column_ndx < m_num_public_columns) {
         StringData name = m_names.get(column_ndx);
         if (name.size() == 0) {
             auto new_name = std::string("col_") + util::to_string(column_ndx);
             m_names.set(column_ndx, new_name);
+            changes = true;
         }
         else if (m_names.find_first(name) != column_ndx) {
             auto new_name = std::string(name.data()) + '_' + util::to_string(column_ndx);
             m_names.set(column_ndx, new_name);
+            changes = true;
         }
     }
     ColumnType type = ColumnType(m_types.get(column_ndx));
@@ -227,14 +221,17 @@ void Spec::convert_column(size_t column_ndx)
             m_attr.set(column_ndx, m_attr.get(column_ndx) | col_attr_List);
             sub_spec.destroy();
             m_subspecs.erase(subspec_ndx);
+            changes = true;
             break;
         }
         case col_type_LinkList:
             m_attr.set(column_ndx, m_attr.get(column_ndx) | col_attr_List);
+            changes = true;
             break;
         default:
             break;
     }
+    return changes;
 }
 
 
@@ -302,7 +299,7 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
         }
     }
 
-    if (m_enumkeys.is_attached()) {
+    if (m_enumkeys.is_attached() && type != col_type_BackLink) {
         m_enumkeys.insert(column_ndx, 0);
     }
 

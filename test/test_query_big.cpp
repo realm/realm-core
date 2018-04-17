@@ -20,11 +20,10 @@
 #ifdef TEST_QUERY
 
 #include <realm.hpp>
-#include <realm/lang_bind_helper.hpp>
+#include <realm/history.hpp>
 
 #include "test.hpp"
 #include "test_table_helper.hpp"
-#include <realm/history.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -60,6 +59,8 @@ using namespace realm::test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+#ifdef LEGACY_TESTS
+// FIXME: Realign this to refer to a Transaction instead of a DB (ex SharedGroup)
 namespace {
 struct QueryInitHelper;
 
@@ -155,9 +156,9 @@ struct Compose<Func> {
 
 struct QueryInitHelper {
     test_util::unit_test::TestContext& test_context;
-    SharedGroup* sg;
-    SharedGroup* sg2;
-    SharedGroup::VersionID initial_version, extra_col_version;
+    DB* sg;
+    DB* sg2;
+    DB::VersionID initial_version, extra_col_version;
     Table* table;
 
     template <typename Func>
@@ -230,12 +231,12 @@ TEST(Query_TableInitialization)
 
     auto repl = make_in_realm_history(path);
     auto repl2 = make_in_realm_history(path);
-    SharedGroup sg(*repl, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
-    SharedGroup sg2(*repl2, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+    DB sg(*repl, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+    DB sg2(*repl2, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
     Group& g = const_cast<Group&>(sg.begin_read());
     LangBindHelper::promote_to_write(sg);
 
-    SharedGroup::VersionID initial_version, extra_col_version;
+    DB::VersionID initial_version, extra_col_version;
 
     Table& table = *g.add_table("table");
     // The columns are ordered to avoid having types which are backed by the
@@ -555,4 +556,5 @@ TEST(Query_TableInitialization)
         [&](Query& q, auto&& test) { test(helper.table->column<Link>(col_list, q.equal(col_int, 0)).count() > 0); });
 }
 
+#endif
 #endif

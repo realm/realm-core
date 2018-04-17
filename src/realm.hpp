@@ -19,7 +19,7 @@
 #ifndef REALM_HPP
 #define REALM_HPP
 
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 #include <realm/obj.hpp>
 #include <realm/list.hpp>
 #include <realm/table_view.hpp>

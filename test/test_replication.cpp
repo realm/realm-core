@@ -76,7 +76,7 @@ public:
     {
     }
 
-    void replay_transacts(SharedGroup& target, util::Logger& replay_logger)
+    void replay_transacts(DB& target, util::Logger& replay_logger)
     {
         for (const Buffer<char>& changeset : m_changesets)
             apply_changeset(changeset.data(), changeset.size(), target, &replay_logger);
@@ -114,7 +114,12 @@ public:
         REALM_ASSERT(false);
     }
 
-    _impl::History* get_history() override
+    _impl::History* get_history_write() override
+    {
+        return nullptr;
+    }
+
+    std::unique_ptr<_impl::History> get_history_read() override
     {
         return nullptr;
     }
@@ -150,11 +155,9 @@ public:
     {
     }
 
-    void initialize(SharedGroup& sg) override
+    void initialize(DB& sg) override
     {
         TrivialReplication::initialize(sg);
-        using sgf = _impl::SharedGroupFriend;
-        m_group = &sgf::get_group(sg);
     }
 
     version_type prepare_changeset(const char*, size_t, version_type) override
@@ -162,10 +165,10 @@ public:
         if (!m_arr) {
             using gf = _impl::GroupFriend;
             Allocator& alloc = gf::get_alloc(*m_group);
-            m_arr = std::make_unique<Array>(alloc);
-            m_arr->create(Array::type_Normal);
+            m_arr = std::make_unique<BinaryColumn>(alloc);
+            m_arr->create();
             gf::prepare_history_parent(*m_group, *m_arr, hist_SyncClient, m_history_schema_version);
-            m_arr->update_parent(); // Throws
+            // m_arr->update_parent(); // Throws
         }
         return 1;
     }
@@ -198,12 +201,11 @@ public:
 private:
     int m_history_schema_version;
     bool m_upgraded = false;
-    Group* m_group = nullptr;
-    std::unique_ptr<Array> m_arr;
+    std::unique_ptr<BinaryColumn> m_arr;
 };
 
 #ifdef LEGACY_TESTS
-void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& rt_2)
+void check(TestContext& test_context, DB& sg_1, const ReadTransaction& rt_2)
 {
     ReadTransaction rt_1(sg_1);
     rt_1.get_group().verify();
@@ -211,7 +213,7 @@ void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& 
     CHECK(rt_1.get_group() == rt_2.get_group());
 }
 #endif
-void check(TestContext&, SharedGroup& sg_1, const ReadTransaction& rt_2)
+void check(TestContext&, DB& sg_1, const ReadTransaction& rt_2)
 {
     ReadTransaction rt_1(sg_1);
     rt_1.get_group().verify();
@@ -242,7 +244,7 @@ TEST(Replication_General)
     CHECK(Version::has_feature(Feature::feature_Replication));
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
+    DB sg_1(repl);
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.add_table("my_table");
@@ -295,7 +297,7 @@ TEST(Replication_General)
     }
 
     util::Logger& replay_logger = test_context.logger;
-    SharedGroup sg_2(path_2);
+    DB sg_2(path_2);
     repl.replay_transacts(sg_2, replay_logger);
 
     {
@@ -330,7 +332,7 @@ TEST(Replication_Timestamp)
     SHARED_GROUP_TEST_PATH(path_2);
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
+    DB sg_1(repl);
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.add_table("t");
@@ -376,7 +378,7 @@ TEST(Replication_Timestamp)
     }
 
     util::Logger& replay_logger = test_context.logger;
-    SharedGroup sg_2(path_2);
+    DB sg_2(path_2);
     repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt_1(sg_1);
@@ -422,8 +424,8 @@ TEST(Replication_Links)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
-    SharedGroup sg_2(path_2);
+    DB sg_1(repl);
+    DB sg_2(path_2);
     std::vector<ObjKey> origin_1_keys{ObjKey(0), ObjKey(1)};
     std::vector<ObjKey> origin_2_keys{ObjKey(10), ObjKey(11)};
     const std::vector<ObjKey> target_1_keys{ObjKey(20), ObjKey(21)};
@@ -675,12 +677,12 @@ TEST(Replication_Links)
         CHECK_NOT(o_1_0.is_null(o_1_ll_1));
         CHECK_EQUAL(0, o_1_0.get_linklist(o_1_ll_1).size());
         CHECK_EQUAL(1, o_1_1.get_linklist(o_1_ll_1).size());
-        CHECK_EQUAL(target_1_keys[0], o_1_1.get_linklist(o_1_ll_1).get(0).get_key());
+        CHECK_EQUAL(target_1_keys[0], o_1_1.get_linklist(o_1_ll_1).get(0));
         CHECK_EQUAL(1, o_2_0.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[1], o_2_0.get_linklist(o_2_ll_3).get(0).get_key());
+        CHECK_EQUAL(target_2_keys[1], o_2_0.get_linklist(o_2_ll_3).get(0));
         CHECK_EQUAL(2, o_2_1.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[0], o_2_1.get_linklist(o_2_ll_3).get(0).get_key());
-        CHECK_EQUAL(target_2_keys[1], o_2_1.get_linklist(o_2_ll_3).get(1).get_key());
+        CHECK_EQUAL(target_2_keys[0], o_2_1.get_linklist(o_2_ll_3).get(0));
+        CHECK_EQUAL(target_2_keys[1], o_2_1.get_linklist(o_2_ll_3).get(1));
 
         ConstObj t_1_0 = target_1->get_object(target_1_keys[0]);
         ConstObj t_1_1 = target_1->get_object(target_1_keys[1]);
@@ -833,12 +835,12 @@ TEST(Replication_Links)
 
         ConstObj o_2_1 = origin_2->get_object(origin_2_keys[1]);
         CHECK_EQUAL(1, o_2_1.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[1], o_2_1.get_linklist(o_2_ll_3).get(0).get_key());
+        CHECK_EQUAL(target_2_keys[1], o_2_1.get_linklist(o_2_ll_3).get(0));
 
         ConstObj o_2_2 = origin_2->get_object(origin_2_keys[2]);
         CHECK_EQUAL(2, o_2_2.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[0], o_2_2.get_linklist(o_2_ll_3).get(0).get_key());
-        CHECK_EQUAL(target_2_keys[1], o_2_2.get_linklist(o_2_ll_3).get(1).get_key());
+        CHECK_EQUAL(target_2_keys[0], o_2_2.get_linklist(o_2_ll_3).get(0));
+        CHECK_EQUAL(target_2_keys[1], o_2_2.get_linklist(o_2_ll_3).get(1));
 
         ConstObj t_2_0 = target_2->get_object(target_2_keys[0]);
         ConstObj t_2_1 = target_2->get_object(target_2_keys[1]);
@@ -931,8 +933,8 @@ TEST(Replication_Links)
 
         ConstObj o_2_2 = origin_2->get_object(origin_2_keys[2]);
         CHECK_EQUAL(2, o_2_2.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[1], o_2_2.get_linklist(o_2_ll_3).get(0).get_key());
-        CHECK_EQUAL(target_2_keys[0], o_2_2.get_linklist(o_2_ll_3).get(1).get_key());
+        CHECK_EQUAL(target_2_keys[1], o_2_2.get_linklist(o_2_ll_3).get(0));
+        CHECK_EQUAL(target_2_keys[0], o_2_2.get_linklist(o_2_ll_3).get(1));
 
         ConstObj t_1_0 = target_1->get_object(target_1_keys[0]);
         ConstObj t_2_0 = target_2->get_object(target_2_keys[0]);
@@ -983,8 +985,8 @@ TEST(Replication_Links)
 
         ConstObj o_2_2 = origin_2->get_object(origin_2_keys[2]);
         CHECK_EQUAL(2, o_2_2.get_linklist(o_2_ll_3).size());
-        CHECK_EQUAL(target_2_keys[0], o_2_2.get_linklist(o_2_ll_3).get(0).get_key());
-        CHECK_EQUAL(target_2_keys[1], o_2_2.get_linklist(o_2_ll_3).get(1).get_key());
+        CHECK_EQUAL(target_2_keys[0], o_2_2.get_linklist(o_2_ll_3).get(0));
+        CHECK_EQUAL(target_2_keys[1], o_2_2.get_linklist(o_2_ll_3).get(1));
 
         ConstObj t_1_0 = target_1->get_object(target_1_keys[0]);
         ConstObj t_2_0 = target_2->get_object(target_2_keys[0]);
@@ -1009,8 +1011,8 @@ TEST(Replication_ListOfPrimitives)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
-    SharedGroup sg_2(path_2);
+    DB sg_1(repl);
+    DB sg_2(path_2);
 
     // Create table
     {
@@ -1173,9 +1175,9 @@ TEST(Replication_CascadeRemove_ColumnLink)
 
     util::Logger& replay_logger = test_context.logger;
 
-    SharedGroup sg(path_1);
+    DB sg(path_1);
     MyTrivialReplication repl(path_2);
-    SharedGroup sg_w(repl);
+    DB sg_w(repl);
 
     {
         WriteTransaction wt(sg_w);
@@ -1265,8 +1267,8 @@ TEST(Replication_LinkListSelfLinkNullification)
     SHARED_GROUP_TEST_PATH(path_2);
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
-    SharedGroup sg_2(path_2);
+    DB sg_1(repl);
+    DB sg_2(path_2);
 
     util::Logger& replay_logger = test_context.logger;
 
@@ -1305,9 +1307,9 @@ TEST(Replication_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 
     util::Logger& replay_logger = test_context.logger;
 
-    SharedGroup sg(path_1);
+    DB sg(path_1);
     MyTrivialReplication repl(path_2);
-    SharedGroup sg_w(repl);
+    DB sg_w(repl);
 
     {
         WriteTransaction wt(sg_w);
@@ -1406,8 +1408,8 @@ TEST(Replication_NullStrings)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
-    SharedGroup sg_2(path_2);
+    DB sg_1(repl);
+    DB sg_2(path_2);
 
     {
         WriteTransaction wt(sg_1);
@@ -1465,8 +1467,8 @@ TEST(Replication_NullInteger)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
-    SharedGroup sg_2(path_2);
+    DB sg_1(repl);
+    DB sg_2(path_2);
 
     {
         WriteTransaction wt(sg_1);
@@ -1512,8 +1514,8 @@ TEST(Replication_RenameGroupLevelTable_RenameColumn)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
-    SharedGroup sg_2(path_2);
+    DB sg_1(repl);
+    DB sg_2(path_2);
 
     {
         WriteTransaction wt(sg_1);
@@ -1552,8 +1554,8 @@ TEST(Replication_LinkListNullifyThroughTableView)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
-    SharedGroup sg_2(path_2);
+    DB sg_1(repl);
+    DB sg_2(path_2);
 
     {
         WriteTransaction wt(sg_1);
@@ -1591,8 +1593,8 @@ TEST(Replication_Substrings)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
-    SharedGroup sg_2(path_2);
+    DB sg_1(repl);
+    DB sg_2(path_2);
 
     {
         WriteTransaction wt(sg_1);
@@ -1632,8 +1634,8 @@ TEST(Replication_MoveSelectedLinkView)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
-    SharedGroup sg_2(path_2);
+    DB sg_1(repl);
+    DB sg_2(path_2);
 
     {
         WriteTransaction wt(sg_1);
@@ -1678,10 +1680,10 @@ TEST(Replication_HistorySchemaVersionNormal)
 {
     SHARED_GROUP_TEST_PATH(path);
     ReplSyncClient repl(path, 1);
-    SharedGroup sg_1(repl);
+    DB sg_1(repl);
     // it should be possible to have two open shared groups on the same thread
     // without any read/write transactions in between
-    SharedGroup sg_2(repl);
+    DB sg_2(repl);
 }
 
 TEST(Replication_HistorySchemaVersionDuringWT)
@@ -1689,7 +1691,7 @@ TEST(Replication_HistorySchemaVersionDuringWT)
     SHARED_GROUP_TEST_PATH(path);
 
     ReplSyncClient repl(path, 1);
-    SharedGroup sg_1(repl);
+    DB sg_1(repl);
     {
         // Do an empty commit to force the file format version to be established.
         WriteTransaction wt(sg_1);
@@ -1700,7 +1702,7 @@ TEST(Replication_HistorySchemaVersionDuringWT)
 
     // It should be possible to open a second SharedGroup at the same path
     // while a WriteTransaction is active via another SharedGroup.
-    SharedGroup sg_2(repl);
+    DB sg_2(repl);
 }
 
 TEST(Replication_HistorySchemaVersionUpgrade)
@@ -1709,7 +1711,7 @@ TEST(Replication_HistorySchemaVersionUpgrade)
 
     {
         ReplSyncClient repl(path, 1);
-        SharedGroup sg(repl);
+        DB sg(repl);
         {
             // Do an empty commit to force the file format version to be established.
             WriteTransaction wt(sg);
@@ -1718,13 +1720,13 @@ TEST(Replication_HistorySchemaVersionUpgrade)
     }
 
     ReplSyncClient repl(path, 2);
-    SharedGroup sg_1(repl); // This will be the session initiater
+    DB sg_1(repl); // This will be the session initiater
     CHECK(repl.is_upgraded());
     WriteTransaction wt(sg_1);
     // When this one is opened, the file should have been upgraded
     // If this was not the case we would have triggered another upgrade
     // and the test would hang
-    SharedGroup sg_2(repl);
+    DB sg_2(repl);
 }
 
 TEST(Replication_CreateAndRemoveObject)
@@ -1735,8 +1737,8 @@ TEST(Replication_CreateAndRemoveObject)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
-    SharedGroup sg_2(path_2);
+    DB sg_1(repl);
+    DB sg_2(path_2);
     ColKey c0;
     {
         WriteTransaction wt(sg_1);

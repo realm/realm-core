@@ -90,7 +90,7 @@ public:
     /// ConstTableRef that refer to it, or to any of its subtables,
     /// when it goes out of scope.
     Table(const Table&, Allocator& = Allocator::get_default());
-    void revive(Allocator& new_allocator);
+    void revive(Allocator& new_allocator, bool writable);
 
     ~Table() noexcept;
 
@@ -112,11 +112,14 @@ public:
     /// Conventience functions for inspecting the dynamic table type.
     ///
     size_t get_column_count() const noexcept;
-    DataType get_column_type(ColKey column_key) const noexcept;
-    StringData get_column_name(ColKey column_key) const noexcept;
+    DataType get_column_type(ColKey column_key) const;
+    StringData get_column_name(ColKey column_key) const;
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
     ColKey find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept;
+    typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
+    BacklinkOrigin find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept;
+    BacklinkOrigin find_backlink_origin(ColKey backlink_col) const noexcept;
     //@}
 
     //@{
@@ -198,6 +201,8 @@ public:
     ///
     /// \param link_type The type of links the column should store.
     void set_link_type(ColKey col_key, LinkType);
+    // Returns the link type for the given column.
+    // Throws an LogicError if target column is not a link column.
     LinkType get_link_type(ColKey col_key) const;
 
     //@{
@@ -500,7 +505,35 @@ public:
         return Query(*this, list);
     }
 
-    Table& link(ColKey link_column);
+    //@{
+    /// WARNING: The link() and backlink() methods will alter a state on the Table object and return a reference
+    /// to itself. Be aware if assigning the return value of link() to a variable; this might be an error!
+
+    /// This is an error:
+
+    /// Table& cats = owners->link(1);
+    /// auto& dogs = owners->link(2);
+
+    /// Query q = person_table->where()
+    /// .and_query(cats.column<String>(5).equal("Fido"))
+    /// .Or()
+    /// .and_query(dogs.column<String>(6).equal("Meowth"));
+
+    /// Instead, do this:
+
+    /// Query q = owners->where()
+    /// .and_query(person_table->link(1).column<String>(5).equal("Fido"))
+    /// .Or()
+    /// .and_query(person_table->link(2).column<String>(6).equal("Meowth"));
+
+    /// The two calls to link() in the erroneous example will append the two values 0 and 1 to an internal vector in
+    /// the owners table, and we end up with three references to that same table: owners, cats and dogs. They are all
+    /// the same table, its vector has the values {0, 1}, so a query would not make any sense.
+    Table& link(ColKey link_column)
+    {
+        m_link_chain.push_back(link_column);
+        return *this;
+    }
     Table& backlink(const Table& origin, ColKey origin_col_key);
 
     // Conversion
@@ -559,10 +592,6 @@ public:
     void dump_node_structure(std::ostream&, int level) const;
 #endif
 
-    using HandoverPatch = TableHandoverPatch;
-    static void generate_patch(const Table* ref, std::unique_ptr<HandoverPatch>& patch);
-    static TableRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
-
 protected:
     /// Compare the objects of two tables under the assumption that the two tables
     /// have the same number of columns, and the same data type at each column
@@ -576,9 +605,9 @@ private:
 
     mutable WrappedAllocator m_alloc;
     Array m_top;
-    void update_allocator_wrapper()
+    void update_allocator_wrapper(bool writable)
     {
-        m_alloc.update_from_underlying_allocator();
+        m_alloc.update_from_underlying_allocator(writable);
     }
     Spec m_spec;            // 1st slot in m_top
     ClusterTree m_clusters; // 3rd slot in m_top
@@ -595,12 +624,9 @@ private:
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
 
     void populate_search_index(ColKey column_ndx);
-    void create_columns_in_clusters();
-    void create_objects();
-    template <class U>
-    void copy_list_of_primitives(Obj& obj, ColKey col, ref_type ref);
-    void copy_content_from_columns();
-    ColumnBase* create_column_accessor(ColumnType col_type, size_t col_ndx, ref_type ref);
+    bool convert_columns();
+    bool create_objects();
+    bool copy_content_from_columns(size_t col_ndx);
 
     /// Disable copying assignment.
     ///
@@ -630,7 +656,7 @@ private:
     /// Create an uninitialized accessor whose lifetime is managed by Group
     Table(ref_count_tag, Allocator&);
 
-    void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool skip_create_column_accessors = false);
+    void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool is_writable);
 
     void set_key(TableKey key);
 
@@ -833,13 +859,12 @@ private:
     friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
-    template <class>
-    friend class SequentialGetter;
-    friend class RowBase;
+    friend struct util::serializer::SerialisationState;
     friend class LinksToNode;
     friend class LinkMap;
     friend class LinkView;
     friend class Group;
+    friend class Transaction;
     friend class ClusterTree;
     friend class ArrayBacklink;
 };
@@ -881,7 +906,7 @@ inline size_t Table::get_column_count() const noexcept
     return m_spec.get_public_column_count();
 }
 
-inline StringData Table::get_column_name(ColKey column_key) const noexcept
+inline StringData Table::get_column_name(ColKey column_key) const
 {
     auto ndx = colkey2ndx(column_key);
     REALM_ASSERT_3(ndx, <, get_column_count());
@@ -903,7 +928,7 @@ inline ColumnType Table::get_real_column_type(ColKey col_key) const noexcept
     return m_spec.get_column_type(ndx);
 }
 
-inline DataType Table::get_column_type(ColKey column_key) const noexcept
+inline DataType Table::get_column_type(ColKey column_key) const
 {
     auto ndx = colkey2ndx(column_key);
     REALM_ASSERT_3(ndx, <, m_spec.get_column_count());
@@ -921,7 +946,7 @@ inline Table::Table(Allocator& alloc)
     ref_type ref = create_empty_table(m_alloc); // Throws
     ArrayParent* parent = nullptr;
     size_t ndx_in_parent = 0;
-    init(ref, parent, ndx_in_parent);
+    init(ref, parent, ndx_in_parent, true);
 }
 
 inline Table::Table(ref_count_tag, Allocator& alloc)
@@ -933,9 +958,10 @@ inline Table::Table(ref_count_tag, Allocator& alloc)
 {
 }
 
-inline void Table::revive(Allocator& alloc)
+inline void Table::revive(Allocator& alloc, bool writable)
 {
     m_alloc.switch_underlying_allocator(alloc);
+    m_alloc.update_from_underlying_allocator(writable);
     // since we're rebinding to a new table, we'll bump version counters
     // FIXME
     // this can be optimized if version counters are saved along with the
@@ -1007,13 +1033,6 @@ SubQuery<T> Table::column(const Table& origin, ColKey origin_col_key, Query subq
 {
     static_assert(std::is_same<T, BackLink>::value, "A subquery must involve a link list or backlink column");
     return SubQuery<T>(column<T>(origin, origin_col_key), std::move(subquery));
-}
-
-// For use by queries
-inline Table& Table::link(ColKey link_column)
-{
-    m_link_chain.push_back(link_column);
-    return *this;
 }
 
 inline Table& Table::backlink(const Table& origin, ColKey origin_col_key)
@@ -1138,10 +1157,11 @@ public:
         return Table::create_empty_table(alloc, key); // Throws
     }
 
-    static Table* create_accessor(Allocator& alloc, ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent)
+    static Table* create_accessor(Allocator& alloc, ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent,
+                                  bool is_writable)
     {
         std::unique_ptr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
-        table->init(top_ref, parent, ndx_in_parent);                            // Throws
+        table->init(top_ref, parent, ndx_in_parent, is_writable);               // Throws
         return table.release();
     }
 

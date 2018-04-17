@@ -29,7 +29,6 @@
 #include <mysql/mysql.h>
 #include <realm.hpp>
 #include <realm/util/file.hpp>
-#include <realm/group_shared.hpp>
 
 using namespace realm;
 
@@ -275,7 +274,7 @@ static void* realm_reader(void* arg)
     size_t c = 0;
     srandom(tinfo->thread_num);
     clock_gettime(CLOCK_REALTIME, &ts_1);
-    SharedGroup sg(tinfo->datfile);
+    DB sg(tinfo->datfile);
     while (true) {
         pthread_mutex_lock(&mtx_runnable);
         bool local_runnable = runnable;
@@ -401,7 +400,7 @@ static void* realm_writer(void* arg)
     struct timespec ts_1, ts_2;
     struct thread_info* tinfo = (struct thread_info*)arg;
     srandom(tinfo->thread_num);
-    SharedGroup sg(tinfo->datfile);
+    DB sg(tinfo->datfile);
     while (true) {
         pthread_mutex_lock(&mtx_runnable);
         bool local_runnable = runnable;
@@ -497,7 +496,7 @@ void realm_create(const char* f, long n)
 {
     util::File::try_remove(f);
     util::File::try_remove(std::string(f) + ".lock");
-    SharedGroup sg(f);
+    DB sg(f);
     {
         WriteTransaction wt(sg);
         BasicTableRef<TestTable> t = wt.get_or_add_table<TestTable>("test");

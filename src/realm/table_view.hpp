@@ -162,7 +162,6 @@ namespace realm {
 /// for more on this.
 class ConstTableView : public ObjList {
 public:
-    using HandoverPatch = TableViewHandoverPatch;
 
     /// Construct null view (no memory allocated).
     ConstTableView()
@@ -190,15 +189,8 @@ public:
     ConstTableView& operator=(const ConstTableView&);
     ConstTableView& operator=(ConstTableView&&) noexcept;
 
-    void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
-    {
-        apply_patch(*patch, group);
-        patch.reset();
-    }
-    // handover machinery entry points based on static type
-    void apply_patch(HandoverPatch& patch, Group& group);
-    ConstTableView(const ConstTableView& source, HandoverPatch& patch, ConstSourcePayload mode);
-    ConstTableView(ConstTableView& source, HandoverPatch& patch, MutableSourcePayload mode);
+    ConstTableView(const ConstTableView& source, Transaction* tr, PayloadPolicy mode);
+    ConstTableView(ConstTableView& source, Transaction* tr, PayloadPolicy mode);
 
     ~ConstTableView()
     {
@@ -220,7 +212,7 @@ public:
         return bool(m_table);
     }
 
-    bool is_row_attached(size_t row_ndx) const noexcept
+    bool is_obj_valid(size_t row_ndx) const noexcept
     {
         return m_table->is_valid(ObjKey(m_key_values.get(row_ndx)));
     }
@@ -241,22 +233,11 @@ public:
     // handover machinery entry points based on dynamic type. These methods:
     // a) forward their calls to the static type entry points.
     // b) new/delete patch data structures.
-    virtual std::unique_ptr<ConstTableView> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                               ConstSourcePayload mode) const
+    virtual std::unique_ptr<ConstTableView> clone_for_handover(Transaction* tr, PayloadPolicy mode) const
     {
-        patch.reset(new HandoverPatch);
-        std::unique_ptr<ConstTableView> retval(new ConstTableView(*this, *patch, mode));
+        std::unique_ptr<ConstTableView> retval(new ConstTableView(*this, tr, mode));
         return retval;
     }
-
-    virtual std::unique_ptr<ConstTableView> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                               MutableSourcePayload mode)
-    {
-        patch.reset(new HandoverPatch);
-        std::unique_ptr<ConstTableView> retval(new ConstTableView(*this, *patch, mode));
-        return retval;
-    }
-
     template <Action action, typename T, typename R>
     R aggregate(ColKey column_key, size_t* result_count = nullptr, ObjKey* return_key = nullptr) const;
     template <typename T>
@@ -393,7 +374,7 @@ private:
 
     friend class Table;
     friend class Query;
-    friend class SharedGroup;
+    friend class DB;
 };
 
 enum class RemoveMode { ordered, unordered };
@@ -446,19 +427,9 @@ public:
         return std::unique_ptr<ConstTableView>(new TableView(*this));
     }
 
-    std::unique_ptr<ConstTableView> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                       ConstSourcePayload mode) const override
+    std::unique_ptr<ConstTableView> clone_for_handover(Transaction* tr, PayloadPolicy policy) const override
     {
-        patch.reset(new HandoverPatch);
-        std::unique_ptr<ConstTableView> retval(new TableView(*this, *patch, mode));
-        return retval;
-    }
-
-    std::unique_ptr<ConstTableView> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                       MutableSourcePayload mode) override
-    {
-        patch.reset(new HandoverPatch);
-        std::unique_ptr<ConstTableView> retval(new TableView(*this, *patch, mode));
+        std::unique_ptr<ConstTableView> retval(new TableView(*this, tr, policy));
         return retval;
     }
 

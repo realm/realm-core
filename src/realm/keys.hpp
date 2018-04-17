@@ -20,6 +20,8 @@
 #define REALM_KEYS_HPP
 
 #include <realm/util/to_string.hpp>
+#include <ostream>
+#include <vector>
 
 namespace realm {
 
@@ -52,21 +54,10 @@ struct TableKey {
     int64_t value;
 };
 
-class TableVersions : public std::vector<std::pair<TableKey, uint64_t>> {
-public:
-    TableVersions()
-    {
-    }
-    TableVersions(TableKey key, uint64_t version)
-    {
-        emplace_back(key, version);
-    }
-    bool operator==(const TableVersions& other) const;
-};
 
 inline std::ostream& operator<<(std::ostream& os, TableKey tk)
 {
-    os << tk.value;
+    os << "TableKey(" << tk.value << ")";
     return os;
 }
 
@@ -78,6 +69,17 @@ inline std::string to_string(TableKey tk)
 }
 }
 
+class TableVersions : public std::vector<std::pair<TableKey, uint64_t>> {
+public:
+    TableVersions()
+    {
+    }
+    TableVersions(TableKey key, uint64_t version)
+    {
+        emplace_back(key, version);
+    }
+    bool operator==(const TableVersions& other) const;
+};
 
 struct ColKey {
     constexpr ColKey()
@@ -114,9 +116,61 @@ struct ColKey {
 
 inline std::ostream& operator<<(std::ostream& os, ColKey ck)
 {
-    os << ck.value;
+    os << "ColKey(" << ck.value << ")";
     return os;
 }
+
+struct ObjKey {
+    constexpr ObjKey()
+        : value(-1)
+    {
+    }
+    explicit ObjKey(int64_t val)
+        : value(val)
+    {
+    }
+    ObjKey& operator=(int64_t val)
+    {
+        value = val;
+        return *this;
+    }
+    bool operator==(const ObjKey& rhs) const
+    {
+        return value == rhs.value;
+    }
+    bool operator!=(const ObjKey& rhs) const
+    {
+        return value != rhs.value;
+    }
+    bool operator<(const ObjKey& rhs) const
+    {
+        return value < rhs.value;
+    }
+    bool operator>(const ObjKey& rhs) const
+    {
+        return value > rhs.value;
+    }
+    operator bool() const
+    {
+        return value != -1;
+    }
+    int64_t value;
+
+private:
+    // operator bool will enable casting to integer. Prevent this.
+    operator int64_t() const
+    {
+        return 0;
+    }
+};
+
+inline std::ostream& operator<<(std::ostream& ostr, ObjKey key)
+{
+    ostr << "ObjKey(" << key.value << ")";
+    return ostr;
+}
+
+constexpr ObjKey null_key;
 
 namespace util {
 

@@ -19,8 +19,22 @@
 #include <realm/query_engine.hpp>
 
 #include <realm/query_expression.hpp>
+#include <realm/db.hpp>
 
 using namespace realm;
+
+ParentNode::ParentNode(const ParentNode& from, Transaction* tr)
+    : m_child(from.m_child ? from.m_child->clone(tr) : nullptr)
+    , m_condition_column_name(from.m_condition_column_name)
+    , m_condition_column_key(from.m_condition_column_key)
+    , m_dD(from.m_dD)
+    , m_dT(from.m_dT)
+    , m_probes(from.m_probes)
+    , m_matches(from.m_matches)
+    , m_table(tr ? tr->import_copy_of(from.m_table) : from.m_table)
+{
+}
+
 
 size_t ParentNode::find_first(size_t start, size_t end)
 {
@@ -456,10 +470,10 @@ void ExpressionNode::cluster_changed()
     m_expression->set_cluster(m_cluster);
 }
 
-std::string ExpressionNode::describe() const
+std::string ExpressionNode::describe(util::serializer::SerialisationState& state) const
 {
     if (m_expression) {
-        return m_expression->description();
+        return m_expression->description(state);
     }
     else {
         return "empty expression";
@@ -476,19 +490,13 @@ size_t ExpressionNode::find_first_local(size_t start, size_t end)
     return m_expression->find_first(start, end);
 }
 
-std::unique_ptr<ParentNode> ExpressionNode::clone(QueryNodeHandoverPatches* patches) const
+std::unique_ptr<ParentNode> ExpressionNode::clone(Transaction* tr) const
 {
-    return std::unique_ptr<ParentNode>(new ExpressionNode(*this, patches));
+    return std::unique_ptr<ParentNode>(new ExpressionNode(*this, tr));
 }
 
-void ExpressionNode::apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group)
-{
-    m_expression->apply_handover_patch(patches, group);
-    ParentNode::apply_handover_patch(patches, group);
-}
-
-ExpressionNode::ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatches* patches)
-: ParentNode(from, patches)
-, m_expression(from.m_expression->clone(patches))
+ExpressionNode::ExpressionNode(const ExpressionNode& from, Transaction* tr)
+    : ParentNode(from, tr)
+    , m_expression(from.m_expression->clone(tr))
 {
 }

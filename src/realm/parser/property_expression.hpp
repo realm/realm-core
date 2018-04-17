@@ -19,6 +19,7 @@
 #ifndef REALM_PROPERTY_EXPRESSION_HPP
 #define REALM_PROPERTY_EXPRESSION_HPP
 
+#include <realm/parser/keypath_mapping.hpp>
 #include <realm/query.hpp>
 #include <realm/table.hpp>
 
@@ -27,21 +28,48 @@ namespace parser {
 
 struct PropertyExpression
 {
-    std::vector<ColKey> indexes;
-    ColKey col_key;
-    DataType col_type;
     Query &query;
+    std::vector<KeyPathElement> link_chain;
+    DataType get_dest_type() const;
+    ColKey get_dest_col_key() const;
+    ConstTableRef get_dest_table() const;
+    bool dest_type_is_backlink() const;
 
-    PropertyExpression(Query &q, const std::string &key_path_string);
+    PropertyExpression(Query& q, const std::string& key_path_string, parser::KeyPathMapping& mapping);
 
     Table* table_getter() const;
 
     template <typename RetType>
     auto value_of_type_for_query() const
     {
-        return this->table_getter()->template column<RetType>(this->col_key);
+        return this->table_getter()->template column<RetType>(get_dest_col_key());
     }
 };
+
+inline DataType PropertyExpression::get_dest_type() const
+{
+    REALM_ASSERT_DEBUG(link_chain.size() > 0);
+    return link_chain.back().col_type;
+}
+
+inline bool PropertyExpression::dest_type_is_backlink() const
+{
+    REALM_ASSERT_DEBUG(link_chain.size() > 0);
+    return link_chain.back().is_backlink;
+}
+
+inline ColKey PropertyExpression::get_dest_col_key() const
+{
+    REALM_ASSERT_DEBUG(link_chain.size() > 0);
+    return link_chain.back().col_key;
+}
+
+inline ConstTableRef PropertyExpression::get_dest_table() const
+{
+    REALM_ASSERT_DEBUG(link_chain.size() > 0);
+    return link_chain.back().table;
+}
+
 
 } // namespace parser
 } // namespace realm

@@ -151,15 +151,27 @@ public:
 
     void init_from_ref(ref_type ref)
     {
-        replace_root(create_root_from_ref(ref));
+        auto new_root = create_root_from_ref(ref);
+        new_root->set_parent(m_parent, m_ndx_in_parent);
+
+        m_root = std::move(new_root);
+
         invalidate_leaf_cache();
         m_size = m_root->get_tree_size();
     }
 
-    void init_from_parent()
+    bool init_from_parent()
     {
         ref_type ref = m_parent->get_child_ref(m_ndx_in_parent);
-        init_from_ref(ref);
+        if (!ref) {
+            return false;
+        }
+        auto new_root = create_root_from_ref(ref);
+        new_root->set_parent(m_parent, m_ndx_in_parent);
+        m_root = std::move(new_root);
+        invalidate_leaf_cache();
+        m_size = m_root->get_tree_size();
+        return true;
     }
 
     void set_parent(ArrayParent* parent, size_t ndx_in_parent)
@@ -172,6 +184,9 @@ public:
 
     void create();
     void destroy();
+    void verify()
+    {
+    }
 
 protected:
     template <class U>
@@ -400,7 +415,7 @@ public:
         m_root->bptree_traverse(func);
     }
 
-private:
+protected:
     using LeafArray = typename LeafTypeTrait<T>::type;
 
     /**

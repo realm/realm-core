@@ -36,7 +36,8 @@
 
 namespace realm {
 
-class SharedGroup;
+class DB;
+
 namespace _impl {
 class GroupFriend;
 class TransactLogConvenientEncoder;
@@ -222,6 +223,8 @@ public:
     bool is_empty() const noexcept;
 
     size_t size() const noexcept;
+
+    int get_history_schema_version() noexcept;
 
     /// Returns the keys for all tables in this group.
     std::vector<TableKey> get_keys() const;
@@ -515,7 +518,11 @@ public:
 #endif
 
 private:
-    SlabAlloc m_alloc;
+    // nullptr, if we're sharing an allocator provided during initialization
+    std::unique_ptr<SlabAlloc> m_local_alloc;
+    // in-use allocator. If local, then equal to m_local_alloc.
+    SlabAlloc& m_alloc;
+
 
     int m_file_format_version;
     /// `m_top` is the root node (or top array) of the Realm, and has the
@@ -570,6 +577,7 @@ private:
     mutable std::mutex m_accessor_mutex;
     mutable int m_num_tables = 0;
     bool m_attached = false;
+    bool m_is_writable = true;
     const bool m_is_shared;
 
     std::function<void(const CascadeNotification&)> m_notify_handler;
@@ -603,13 +611,15 @@ private:
     };
     Group(shared_tag) noexcept;
 
+    Group(SlabAlloc* alloc) noexcept;
     void init_array_parents() noexcept;
 
     void open(ref_type top_ref, const std::string& file_path);
 
     // If the underlying memory mappings have been extended, this method is used
-    // to update all the tables' allocator wrappers.
-    void update_allocator_wrappers();
+    // to update all the tables' allocator wrappers. The allocator wrappers are
+    // configure to either allow or deny changes.
+    void update_allocator_wrappers(bool writable);
 
     /// If `top_ref` is not zero, attach this group accessor to the specified
     /// underlying node structure. If `top_ref` is zero and \a
@@ -625,7 +635,7 @@ private:
 
     /// \param writable Must be set to true when, and only when attaching for a
     /// write transaction.
-    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint64_t new_version);
+    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable);
 
     void create_empty_group();
     void remove_table(size_t table_ndx, TableKey key);
@@ -633,7 +643,7 @@ private:
     void reset_free_space_tracking();
 
     void remap(size_t new_file_size);
-    void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, uint64_t new_version);
+    void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable);
 
     /// Recursively update refs stored in all cached array
     /// accessors. This includes cached array accessors in any
@@ -690,8 +700,7 @@ private:
     void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
     void update_num_objects();
     class TransactAdvancer;
-    void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&,
-                          uint64_t new_version);
+    void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&, bool writable);
     void refresh_dirty_accessors();
 
     /// \brief The version of the format of the node structure (in file or in
@@ -766,9 +775,6 @@ private:
     /// The specified history type must be a value of Replication::HistoryType.
     static int get_target_file_format_version_for_session(int current_file_format_version, int history_type) noexcept;
 
-    /// Must be called from within a write transaction
-    void upgrade_file_format(int target_file_format_version);
-
     std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override;
 
     void send_cascade_notification(const CascadeNotification& notification) const;
@@ -777,10 +783,9 @@ private:
     static void get_version_and_history_info(const Array& top, _impl::History::version_type& version,
                                              int& history_type, int& history_schema_version) noexcept;
     static ref_type get_history_ref(const Array& top) noexcept;
-    static int get_history_schema_version(const Array& top) noexcept;
     void set_history_schema_version(int version);
-    void set_history_parent(Array& history_root) noexcept;
-    void prepare_history_parent(Array& history_root, int history_type, int history_schema_version);
+    void set_history_parent(BPlusTreeBase& history_root) noexcept;
+    void prepare_history_parent(BPlusTreeBase& history_root, int history_type, int history_schema_version);
 
     size_t find_table_index(StringData name) const noexcept;
     TableKey ndx2key(size_t ndx) const;
@@ -790,7 +795,7 @@ private:
 
     friend class Table;
     friend class GroupWriter;
-    friend class SharedGroup;
+    friend class DB;
     friend class _impl::GroupFriend;
     friend class _impl::TransactLogConvenientEncoder;
     friend class _impl::TransactLogParser;
@@ -798,60 +803,11 @@ private:
     friend class TrivialReplication;
     friend class metrics::QueryInfo;
     friend class metrics::Metrics;
+    friend class Transaction;
 };
 
 
 // Implementation
-
-inline Group::Group(const std::string& file, const char* key, OpenMode mode)
-    : m_alloc() // Throws
-    , m_top(m_alloc)
-    , m_tables(m_alloc)
-    , m_table_names(m_alloc)
-    , m_is_shared(false)
-    , m_total_rows(0)
-{
-    init_array_parents();
-
-    open(file, key, mode); // Throws
-}
-
-
-inline Group::Group(BinaryData buffer, bool take_ownership)
-    : m_alloc() // Throws
-    , m_top(m_alloc)
-    , m_tables(m_alloc)
-    , m_table_names(m_alloc)
-    , m_is_shared(false)
-    , m_total_rows(0)
-{
-    init_array_parents();
-    open(buffer, take_ownership); // Throws
-}
-
-inline Group::Group(unattached_tag) noexcept
-    : m_alloc()
-    , // Throws
-    m_top(m_alloc)
-    , m_tables(m_alloc)
-    , m_table_names(m_alloc)
-    , m_is_shared(false)
-    , m_total_rows(0)
-{
-    init_array_parents();
-}
-
-inline Group::Group(shared_tag) noexcept
-    : m_alloc()
-    , // Throws
-    m_top(m_alloc)
-    , m_tables(m_alloc)
-    , m_table_names(m_alloc)
-    , m_is_shared(true)
-    , m_total_rows(0)
-{
-    init_array_parents();
-}
 
 inline bool Group::is_attached() const noexcept
 {
@@ -1083,13 +1039,13 @@ inline ref_type Group::get_history_ref(const Array& top) noexcept
     return 0;
 }
 
-inline int Group::get_history_schema_version(const Array& top) noexcept
+inline int Group::get_history_schema_version() noexcept
 {
-    bool has_history = (top.is_attached() && top.size() >= 8);
+    bool has_history = (m_top.is_attached() && m_top.size() >= 8);
     if (has_history) {
         // This function is only used is shared mode (from SharedGroup)
-        REALM_ASSERT(top.size() >= 10);
-        return int(top.get_as_ref_or_tagged(9).get_as_int());
+        REALM_ASSERT(m_top.size() >= 10);
+        return int(m_top.get_as_ref_or_tagged(9).get_as_int());
     }
     return 0;
 }
@@ -1101,7 +1057,7 @@ inline void Group::set_history_schema_version(int version)
     m_top.set(9, RefOrTagged::make_tagged(unsigned(version))); // Throws
 }
 
-inline void Group::set_history_parent(Array& history_root) noexcept
+inline void Group::set_history_parent(BPlusTreeBase& history_root) noexcept
 {
     history_root.set_parent(&m_top, 8);
 }
@@ -1127,6 +1083,9 @@ inline const Table* Group::do_get_table(StringData name, DescMatcher desc_matche
 
 inline void Group::reset_free_space_tracking()
 {
+    // if used whith a shared allocator, free space should never be reset through
+    // Group, but rather through the proper owner of the allocator, which is the DB object.
+    REALM_ASSERT(m_local_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
 }
 
@@ -1238,10 +1197,9 @@ public:
         group.detach();
     }
 
-    static void attach_shared(Group& group, ref_type new_top_ref, size_t new_file_size, bool writable,
-                              uint64_t new_version)
+    static void attach_shared(Group& group, ref_type new_top_ref, size_t new_file_size, bool writable)
     {
-        group.attach_shared(new_top_ref, new_file_size, writable, new_version); // Throws
+        group.attach_shared(new_top_ref, new_file_size, writable); // Throws
     }
 
     static void reset_free_space_tracking(Group& group)
@@ -1254,15 +1212,15 @@ public:
         group.remap(new_file_size); // Throws
     }
 
-    static void remap_and_update_refs(Group& group, ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
+    static void remap_and_update_refs(Group& group, ref_type new_top_ref, size_t new_file_size, bool writable)
     {
-        group.remap_and_update_refs(new_top_ref, new_file_size, new_version); // Throws
+        group.remap_and_update_refs(new_top_ref, new_file_size, writable); // Throws
     }
 
     static void advance_transact(Group& group, ref_type new_top_ref, size_t new_file_size,
-                                 _impl::NoCopyInputStream& in, uint64_t new_version)
+                                 _impl::NoCopyInputStream& in, bool writable)
     {
-        group.advance_transact(new_top_ref, new_file_size, in, new_version); // Throws
+        group.advance_transact(new_top_ref, new_file_size, in, writable); // Throws
     }
 
     static void create_empty_group_when_missing(Group& group)
@@ -1295,30 +1253,17 @@ public:
         return Group::get_history_ref(top);
     }
 
-    static int get_history_schema_version(const Group& group) noexcept
-    {
-        return Group::get_history_schema_version(group.m_top);
-    }
-
-    static int get_history_schema_version(Allocator& alloc, ref_type top_ref) noexcept
-    {
-        Array top{alloc};
-        if (top_ref != 0)
-            top.init_from_ref(top_ref);
-        return Group::get_history_schema_version(top);
-    }
-
     static void set_history_schema_version(Group& group, int version)
     {
         group.set_history_schema_version(version); // Throws
     }
 
-    static void set_history_parent(Group& group, Array& history_root) noexcept
+    static void set_history_parent(Group& group, BPlusTreeBase& history_root) noexcept
     {
         group.set_history_parent(history_root);
     }
 
-    static void prepare_history_parent(Group& group, Array& history_root, int history_type,
+    static void prepare_history_parent(Group& group, BPlusTreeBase& history_root, int history_type,
                                        int history_schema_version)
     {
         group.prepare_history_parent(history_root, history_type, history_schema_version); // Throws
@@ -1342,11 +1287,6 @@ public:
     static int get_target_file_format_version_for_session(int current_file_format_version, int history_type) noexcept
     {
         return Group::get_target_file_format_version_for_session(current_file_format_version, history_type);
-    }
-
-    static void upgrade_file_format(Group& group, int target_file_format_version)
-    {
-        group.upgrade_file_format(target_file_format_version); // Throws
     }
 };
 

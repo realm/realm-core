@@ -181,8 +181,8 @@ using realm::ConstTableRef;
 using realm::Group;
 using realm::LangBindHelper;
 using realm::ReadTransaction;
-using realm::SharedGroup;
-using realm::SharedGroupOptions;
+using realm::DB;
+using realm::DBOptions;
 
 class SchemaDumper {
 public:
@@ -199,7 +199,7 @@ private:
 
     // private members
     const Configuration& m_config;
-    SharedGroup m_sg{SharedGroup::unattached_tag{}};
+    DB m_sg{DB::unattached_tag{}};
 };
 
 SchemaDumper::SchemaDumper(const Configuration& config)
@@ -258,7 +258,7 @@ void SchemaDumper::open()
         encryption_key = (*m_config.key).c_str();
         LOG("Using encryption key `" << *m_config.key << '\'');
     }
-    SharedGroupOptions options;
+    DBOptions options;
     options.encryption_key = encryption_key;
     options.allow_file_format_upgrade = upgrade_file_format;
     m_sg.open(m_config.path, dont_create, options);

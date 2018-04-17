@@ -85,6 +85,7 @@ public:
     {
         return get<U>(get_column_key(col_name));
     }
+    ConstObj get_linked_object(ColKey link_col_key) const;
     int cmp(const ConstObj& other, ColKey col_key) const;
 
     template <typename U>
@@ -119,6 +120,7 @@ protected:
     friend class LinkList;
     friend class LinkMap;
     friend class ConstTableView;
+    friend class Transaction;
 
     const ClusterTree* m_tree_top;
     ObjKey m_key;
@@ -129,7 +131,7 @@ protected:
     mutable uint64_t m_instance_version;
     bool is_in_sync() const;
     bool update_if_needed() const;
-    void update(ConstObj other) const
+    void update(ConstObj& other) const
     {
         m_mem = other.m_mem;
         m_row_ndx = other.m_row_ndx;

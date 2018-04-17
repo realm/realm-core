@@ -24,7 +24,6 @@
 #include <realm/string_data.hpp>
 #include <realm/data_type.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/mixed.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/impl/input_stream.hpp>
@@ -85,14 +84,20 @@ enum Instruction {
 
 class TransactLogStream {
 public:
+    virtual ~TransactLogStream()
+    {
+    }
+
     /// Ensure contiguous free space in the transaction log
     /// buffer. This method must update `out_free_begin`
     /// and `out_free_end` such that they refer to a chunk
     /// of free space whose size is at least \a n.
     ///
-    /// \param n The required amount of contiguous free space. Must be
+    /// \param size The required amount of contiguous free space. Must be
     /// small (probably not greater than 1024)
-    /// \param n Must be small (probably not greater than 1024)
+    /// \param out_free_begin must point to current write position which must be inside earlier
+    /// allocated area. Will be updated to point to new writing position.
+    /// \param out_free_end Will be updated to point to end of allocated area.
     virtual void transact_log_reserve(size_t size, char** out_free_begin, char** out_free_end) = 0;
 
     /// Copy the specified data into the transaction log buffer. This
@@ -111,8 +116,11 @@ public:
     void transact_log_reserve(size_t size, char** out_free_begin, char** out_free_end) override;
     void transact_log_append(const char* data, size_t size, char** out_free_begin, char** out_free_end) override;
 
-    const char* transact_log_data() const;
+    const char* get_data() const;
+    char* get_data();
+    size_t get_size();
 
+private:
     util::Buffer<char> m_buffer;
 };
 
@@ -505,9 +513,6 @@ private:
     template <class... L>
     void append_simple_instr(L... numbers);
 
-    template <class... L>
-    void append_mixed_instr(Instruction instr, const Mixed& value, L... numbers);
-
     template <class T>
     static char* encode_int(char*, T value);
     friend class TransactLogParser;
@@ -588,9 +593,6 @@ public:
 
     //@}
 
-    void on_table_destroyed(const Table*) noexcept;
-    void on_spec_destroyed(const Spec*) noexcept;
-
 protected:
     TransactLogConvenientEncoder(TransactLogStream& encoder);
 
@@ -632,7 +634,6 @@ private:
     // These are mutable because they are caches.
     mutable util::Buffer<size_t> m_subtab_path_buf;
     mutable const Table* m_selected_table;
-    mutable const Spec* m_selected_spec;
     mutable LinkListId m_selected_list;
 
     void unselect_all() noexcept;
@@ -722,15 +723,15 @@ public:
 
 /// Implementation:
 
-inline void TransactLogBufferStream::transact_log_reserve(size_t n, char** inout_new_begin, char** out_new_end)
+inline void TransactLogBufferStream::transact_log_reserve(size_t size, char** inout_new_begin, char** out_new_end)
 {
     char* data = m_buffer.data();
     REALM_ASSERT(*inout_new_begin >= data);
     REALM_ASSERT(*inout_new_begin <= (data + m_buffer.size()));
-    size_t size = *inout_new_begin - data;
-    m_buffer.reserve_extra(size, n);
+    size_t used_size = *inout_new_begin - data;
+    m_buffer.reserve_extra(used_size, size);
     data = m_buffer.data(); // May have changed
-    *inout_new_begin = data + size;
+    *inout_new_begin = data + used_size;
     *out_new_end = data + m_buffer.size();
 }
 
@@ -741,9 +742,19 @@ inline void TransactLogBufferStream::transact_log_append(const char* data, size_
     *out_new_begin = realm::safe_copy_n(data, size, *out_new_begin);
 }
 
-inline const char* TransactLogBufferStream::transact_log_data() const
+inline const char* TransactLogBufferStream::get_data() const
 {
     return m_buffer.data();
+}
+
+inline char* TransactLogBufferStream::get_data()
+{
+    return m_buffer.data();
+}
+
+inline size_t TransactLogBufferStream::get_size()
+{
+    return m_buffer.size();
 }
 
 inline TransactLogEncoder::TransactLogEncoder(TransactLogStream& stream)
@@ -977,7 +988,6 @@ void TransactLogEncoder::append_simple_instr(L... numbers)
 inline void TransactLogConvenientEncoder::unselect_all() noexcept
 {
     m_selected_table = nullptr;
-    m_selected_spec = nullptr;
     m_selected_list = LinkListId();
 }
 
@@ -985,7 +995,6 @@ inline void TransactLogConvenientEncoder::select_table(const Table* table)
 {
     if (table != m_selected_table)
         do_select_table(table); // Throws
-    m_selected_spec = nullptr;
     m_selected_list = LinkListId();
 }
 
@@ -994,7 +1003,6 @@ inline void TransactLogConvenientEncoder::select_list(const ConstListBase& list)
     if (LinkListId(list) != m_selected_list) {
         do_select_list(list); // Throws
     }
-    m_selected_spec = nullptr;
 }
 
 inline bool TransactLogEncoder::insert_group_level_table(TableKey table_key, size_t prior_num_tables, StringData name)
@@ -1698,19 +1706,6 @@ inline bool TransactLogEncoder::list_clear(size_t old_list_size)
     append_simple_instr(instr_ListClear, old_list_size); // Throws
     return true;
 }
-
-inline void TransactLogConvenientEncoder::on_table_destroyed(const Table* t) noexcept
-{
-    if (m_selected_table == t)
-        m_selected_table = nullptr;
-}
-
-inline void TransactLogConvenientEncoder::on_spec_destroyed(const Spec* s) noexcept
-{
-    if (m_selected_spec == s)
-        m_selected_spec = nullptr;
-}
-
 
 inline TransactLogParser::TransactLogParser()
     : m_input_buffer(1024) // Throws
@@ -2788,8 +2783,8 @@ private:
 
     size_t transact_log_size() const
     {
-        REALM_ASSERT_3(m_encoder.write_position(), >=, m_buffer.transact_log_data());
-        return m_encoder.write_position() - m_buffer.transact_log_data();
+        REALM_ASSERT_3(m_encoder.write_position(), >=, m_buffer.get_data());
+        return m_encoder.write_position() - m_buffer.get_data();
     }
 
     void append_instruction()
@@ -2839,7 +2834,7 @@ public:
         // push any pending select_table or select_descriptor into the buffer
         reverser.sync_table();
 
-        m_buffer = reverser.m_buffer.transact_log_data();
+        m_buffer = reverser.m_buffer.get_data();
         m_current = m_instr_order.size();
     }
 

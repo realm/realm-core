@@ -213,8 +213,6 @@ public:
     virtual void detach(void) = 0;
     virtual bool is_attached(void) const noexcept = 0;
 
-    static size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&, bool) noexcept;
-
     // These assume that the right column compile-time type has been
     // figured out.
     static size_t get_size_from_ref(ref_type root_ref, Allocator&);

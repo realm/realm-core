@@ -100,7 +100,7 @@ public:
     ///
     /// Note: The underscore has been added because the name `free
     /// would conflict with a macro on the Windows platform.
-    void free_(ref_type, const char* addr) noexcept;
+    void free_(ref_type, const char* addr);
 
     /// Shorthand for free_(mem.get_ref(), mem.get_addr()).
     void free_(MemRef mem) noexcept;
@@ -115,6 +115,10 @@ public:
     /// this interface.
     bool is_read_only(ref_type) const noexcept;
 
+    void set_read_only(bool ro)
+    {
+        m_is_read_only = ro;
+    }
     /// Returns a simple allocator that can be used with free-standing
     /// Realm objects (such as a free-standing table). A
     /// free-standing object is one that is not part of a Group, and
@@ -147,10 +151,9 @@ public:
 protected:
     constexpr static int section_shift = 26;
 
-    size_t m_baseline = 0; // Separation line between immutable and mutable refs.
+    std::atomic<size_t> m_baseline; // Separation line between immutable and mutable refs.
 
     Replication* m_replication = nullptr;
-
     ref_type m_debug_watch = 0;
 
     // The following logically belongs in the slab allocator, but is placed
@@ -185,7 +188,7 @@ protected:
     virtual MemRef do_realloc(ref_type, const char* addr, size_t old_size, size_t new_size) = 0;
 
     /// Release the specified chunk of memory.
-    virtual void do_free(ref_type, const char* addr) noexcept = 0;
+    virtual void do_free(ref_type, const char* addr) = 0;
 
     /// Map the specified \a ref to the corresponding memory
     /// address. Note that if is_read_only(ref) returns true, then the
@@ -252,6 +255,9 @@ protected:
         m_instance_versioning_counter.fetch_add(1, std::memory_order_acq_rel);
     }
 
+private:
+    bool m_is_read_only = false; // prevent any alloc or free operations
+
     friend class Table;
     friend class ClusterTree;
     friend class Group;
@@ -265,7 +271,7 @@ public:
     WrappedAllocator(Allocator& underlying_allocator)
         : m_alloc(&underlying_allocator)
     {
-        m_baseline = m_alloc->m_baseline;
+        m_baseline.store(m_alloc->m_baseline);
         m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
         m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
@@ -278,15 +284,16 @@ public:
     void switch_underlying_allocator(Allocator& underlying_allocator)
     {
         m_alloc = &underlying_allocator;
-        m_baseline = m_alloc->m_baseline;
+        m_baseline.store(m_alloc->m_baseline);
         m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
         m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
     }
 
-    void update_from_underlying_allocator()
+    void update_from_underlying_allocator(bool writable)
     {
         switch_underlying_allocator(*m_alloc);
+        set_read_only(!writable);
     }
 
 private:
@@ -295,7 +302,7 @@ private:
     {
         auto result = m_alloc->do_alloc(size);
         bump_storage_version();
-        m_baseline = m_alloc->m_baseline;
+        m_baseline.store(m_alloc->m_baseline);
         m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
         return result;
     }
@@ -303,7 +310,7 @@ private:
     {
         auto result = m_alloc->do_realloc(ref, addr, old_size, new_size);
         bump_storage_version();
-        m_baseline = m_alloc->m_baseline;
+        m_baseline.store(m_alloc->m_baseline);
         m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
         return result;
     }
@@ -426,6 +433,8 @@ inline void MemRef::set_addr(char* addr)
 
 inline MemRef Allocator::alloc(size_t size)
 {
+    if (m_is_read_only)
+        throw realm::LogicError(realm::LogicError::wrong_transact_state);
     return do_alloc(size);
 }
 
@@ -435,15 +444,19 @@ inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_siz
     if (ref == m_debug_watch)
         REALM_TERMINATE("Allocator watch: Ref was reallocated");
 #endif
+    if (m_is_read_only)
+        throw realm::LogicError(realm::LogicError::wrong_transact_state);
     return do_realloc(ref, addr, old_size, new_size);
 }
 
-inline void Allocator::free_(ref_type ref, const char* addr) noexcept
+inline void Allocator::free_(ref_type ref, const char* addr)
 {
 #ifdef REALM_DEBUG
     if (ref == m_debug_watch)
         REALM_TERMINATE("Allocator watch: Ref was freed");
 #endif
+    if (m_is_read_only)
+        throw realm::LogicError(realm::LogicError::wrong_transact_state);
     return do_free(ref, addr);
 }
 

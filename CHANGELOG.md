@@ -6,6 +6,12 @@
 
 ### Breaking changes
 
+* SharedGroup class removed. New DB class added allowing you to specify the Realm file
+  only once regardless of the number of threads.
+* New Transaction class added, inheriting from Group. Transactions are produced by DB.
+* TransactionRef added to provide reference to a Transaction. This is a std::shared_ptr.
+* Old export_for_handover/import_from_handover has been removed. Handover is now direct
+  from one transaction to another, using a new method Transaction::import_copy_of().
 * 'begin' argument removed from Query::count();
 * Table::optimize replaced with explicit Table::enumerate_string_column. It will enumerate
   column unconditionally.
@@ -13,24 +19,8 @@
   functions will throw `InvalidKey` if the referenced object has been deleted.
 * Removed the ability to sort a linklist according to some property of the target table. This
   operation is not supported by the sync protocol and allegedly not used in the bindings.
-
-### Enhancements
-
-* None.
-
------------
-
-### Internals
-
-<<<<<<< HEAD
-* None.
-
-----------------------------------------------
-
-# 6.0.0-rc1 Release notes
-
-### Breaking changes
-
+* Moved `get_uncommitted_changes()` from `History` class to `Replication` class. This removes the
+  need to call TrivialReplication::get_uncommitted_changes from a decendant of History.
 * Column identifier changed from size_t to ColKey. This identifier is subsequently
   used when accessing/mutating the data and when making queries.
 * Table identifiers changed from size_t to TableKey.
@@ -52,8 +42,68 @@
   prevents updating.
 * Only file format versions from 6 and onwards can be opened (realm core v2.0.0)
 
+### Enhancements
+
+* None. Or see below.
+
+-----------
+
+### Internals
+
+* Major simplifications and optimizations to management of memory mappings.
+* Speed improvement for Sort().
+
 ----------------------------------------------
-# NEXT RELEASE
+
+# 5.4.1 Release notes
+
+### Enhancements
+
+* Reduced the number of files opened when the async commit daemon is not used.
+  PR [#3022](https://github.com/realm/realm-core/pull/3022).
+
+-----------
+
+### Internals
+
+* Exported CMake targets have been renamed to "modern" conventions, e.g.
+  `Realm::Core` and `Realm::QueryParser`.
+
+----------------------------------------------
+
+# 5.4.0 Release notes
+
+### Bugfixes
+
+* Fixed usage of disk space preallocation which would occasionally fail on recent MacOS
+  running with the APFS filesystem. PR [#3013](https://github.com/realm/realm-core/pull/3013).
+  Issue [#3005](https://github.com/realm/realm-core/issues/3005).
+* Fixed a bug in queries containing 'or' at different nesting levels.
+  PR [#3006](https://github.com/realm/realm-core/pull/3006).
+
+### Breaking changes
+
+* None.
+
+### Enhancements
+
+* Added `Table::get_link_type()` as a helper method for getting the link type from link columns.
+  PR [#2987](https://github.com/realm/realm-core/pull/2987).
+
+-----------
+
+### Internals
+
+* Silenced a false positive strict aliasing warning.
+  PR [#3002](https://github.com/realm/realm-core/pull/3002).
+* Assertions will print more information in relase mode.
+  PR [#2982](https://github.com/realm/realm-core/pull/2982).
+:
+(xed:22928): Gtk-WARNING **: Calling Inhibit failed: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.gnome.SessionManager was not provided by any .service files
+
+----------------------------------------------
+
+# 5.3.0 Release notes
 
 ### Bugfixes
 
@@ -65,19 +115,24 @@
   of any string enum columns. Not affecting end users.
   PR [#2956](https://github.com/realm/realm-core/pull/2956).
 
-### Breaking changes
-
-* None.
-
 ### Enhancements
 
-* None.
+* Parser improvements:
+    - Support subquery count expressions, for example: "SUBQUERY(list, $x, $x.price > 5 && $x.colour == 'blue').@count > 1"
+        - Subqueries can be nested, but all properties must start with the closest variable (no parent scope properties)
+    - Support queries over unnamed backlinks, for example: "@links.class_Person.items.cost > 10"
+        - Backlinks can be used like lists in expressions including: min, max, sum, avg, count/size, and subqueries
+    - Keypath substitution is supported to allow querying over named backlinks and property aliases, see `KeyPathMapping`
+    - Parsing backlinks can be disabled at runtime by configuring `KeyPathMapping::set_allow_backlinks`
+    - Support for ANY/SOME/ALL/NONE on list properties (parser only). For example: `ALL items.price > 10`
+    - Support for operator 'IN' on list properties (parser only). For example: `'milk' IN ingredients.name`
+    PR [#2989](https://github.com/realm/realm-core/pull/2989).
 
 -----------
 
 ### Internals
-  
-  * Add support for libfuzzer.
+
+* Add support for libfuzzer.
   PR [#2922](https://github.com/realm/realm-core/pull/2922).
 
 ----------------------------------------------

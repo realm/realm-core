@@ -95,10 +95,22 @@ if(MSVC)
         foreach(flag_var
             CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
             CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-           if(${flag_var} MATCHES "/MD")
-              string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
-           endif()
+            if(${flag_var} MATCHES "/MD")
+                string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+            endif()
+
+            # Disable runtime stack bound checks, because these slow down unit tests
+            # disproportionately.
+            if(${flag_var} MATCHES "/RTC")
+                string(REGEX REPLACE "/RTC(su|[1su])" "" ${flag_var} "${${flag_var}}")
+            endif()
         endforeach()
+
+        # Let the compiler optimize debug builds ever so slightly.
+        # /Ob1: This allows the compiler to inline functions marked __inline.
+        # /Oi:  This enables (faster) intrinsic functions.
+        string(REPLACE "/Ob0" "/Ob1" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+        string(CONCAT CMAKE_CXX_FLAGS_DEBUG "/Oi " "${CMAKE_CXX_FLAGS_DEBUG}")
     endif()
 endif()
 
@@ -157,7 +169,7 @@ endif()
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
 # Make the project importable from the build directory
-export(TARGETS realm realm-parser FILE realm-config.cmake)
+export(TARGETS Core QueryParser NAMESPACE Realm:: FILE realm-config.cmake)
 
 # Make the project importable from the install directory
 install(EXPORT realm

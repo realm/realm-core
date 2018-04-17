@@ -25,11 +25,11 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <thread>
 
 #include <realm/history.hpp>
-#include <realm/lang_bind_helper.hpp>
 #include <realm/util/file.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 
 #include "util/crypt_key.hpp"
 #include "util/thread_wrapper.hpp"
@@ -75,12 +75,11 @@ using realm::test_util::crypt_key;
 TEST(Transactions_LargeMappingChange)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    DB sg(path);
     int data_size = 12 * 1024 * 1024;
     {
-        WriteTransaction wt(sg);
-        Group& g = wt.get_group();
-        TableRef tr = g.add_table("test");
+        TransactionRef g = sg.start_write();
+        TableRef tr = g->add_table("test");
         auto col = tr->add_column(type_Binary, "binary");
         char* data = new char[data_size];
         for (int i = 0; i < data_size; i += 721) {
@@ -96,12 +95,11 @@ TEST(Transactions_LargeMappingChange)
             }
         }
         delete[] data;
-        wt.commit();
+        g->commit();
     }
     {
-        ReadTransaction rt(sg);
-        const Group& g = rt.get_group();
-        ConstTableRef tr = g.get_table("test");
+        TransactionRef g = sg.start_read();
+        ConstTableRef tr = g->get_table("test");
         auto col = tr->get_column_key("binary");
         for (auto it = tr->begin(); it != tr->end(); ++it) {
             auto data = it->get<BinaryData>(col);
@@ -112,6 +110,210 @@ TEST(Transactions_LargeMappingChange)
         }
     }
 }
+
+TEST(Transactions_StateChanges)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db(*hist_w);
+    TransactionRef writer = db.start_write();
+    TableRef tr = writer->add_table("hygge");
+    auto col = tr->add_column(type_Int, "hejsa");
+    auto lcol = tr->add_column_list(type_Int, "gurgle");
+    auto obj = tr->create_object().set_all(45);
+    List<int64_t> list = obj.get_list<int64_t>(lcol);
+    list.add(5);
+    list.add(7);
+    // verify that we cannot freeze a write transaction
+    CHECK_THROW(writer->freeze(), realm::LogicError);
+    writer->commit_and_continue_as_read();
+    // verify that we cannot modify data in a read transaction
+    // FIXME: Checks are not applied at group level yet.
+    // CHECK_THROW(writer->add_table("gylle"), realm::LogicError);
+    CHECK_THROW(obj.set(col, 100), realm::LogicError);
+    // verify that we can freeze a read transaction
+    TransactionRef frozen = writer->freeze();
+    // verify that we can handover an accessor directly to the frozen transaction.
+    auto frozen_obj = frozen->import_copy_of(obj);
+    // verify that we can read the correct value(s)
+    int64_t val = frozen_obj.get<int64_t>(col);
+    CHECK_EQUAL(45, val);
+    // FIXME: Why does  this cause a write?
+    auto list2 = frozen_obj.get_list<int64_t>(lcol);
+    CHECK_EQUAL(list2.get(0), 5);
+    CHECK_EQUAL(list2.get(1), 7);
+    // verify that we can't change it
+    CHECK_THROW(frozen_obj.set<int64_t>(col, 47), realm::LogicError);
+    // verify handover of a list
+    // FIXME: no change should be needed here
+    auto frozen_list = frozen->import_copy_of(list);
+    CHECK_EQUAL(frozen_list.get(0), 5);
+    CHECK_EQUAL(frozen_list.get(1), 7);
+
+    // verify that a fresh read transaction is read only
+    TransactionRef reader = db.start_read();
+    tr = reader->get_table("hygge");
+    CHECK_THROW(tr->create_object(), realm::LogicError);
+    // ..but if promoted, becomes writable
+    reader->promote_to_write();
+    tr->create_object();
+    // ..and if rolled back, becomes read-only again
+    reader->rollback_and_continue_as_read();
+    CHECK_THROW(tr->create_object(), realm::LogicError);
+}
+
+namespace {
+
+void writer_thread(TestContext& test_context, int runs, DB* db, TableKey tk)
+{
+    try {
+        for (int n = 0; n < runs; ++n) {
+            auto writer = db->start_write();
+            // writer->verify();
+            auto table = writer->get_table(tk);
+            auto obj = table->get_object(0);
+            auto cols = table->get_col_keys();
+            int64_t a = obj.get<int64_t>(cols[0]);
+            int64_t b = obj.get<int64_t>(cols[1]);
+            CHECK_EQUAL(a * a, b);
+            obj.set_all(a + 1, (a + 1) * (a + 1));
+            writer->commit();
+        }
+    }
+    catch (std::runtime_error& e) {
+        std::cout << "gylle: " << e.what() << std::endl;
+    }
+    catch (realm::LogicError& e) {
+        std::cout << "gylle2: " << e.what() << std::endl;
+    }
+    catch (...) {
+        std::cout << "VERY GYLLE" << std::endl;
+    }
+}
+
+void verifier_thread(TestContext& test_context, int limit, DB* db, TableKey tk)
+{
+    bool done = false;
+    while (!done) {
+        auto reader = db->start_read();
+        // reader->verify();
+        auto table = reader->get_table(tk);
+        auto obj = table->get_object(0);
+        auto cols = table->get_col_keys();
+        int64_t a = obj.get<int64_t>(cols[0]);
+        int64_t b = obj.get<int64_t>(cols[1]);
+        CHECK_EQUAL(a * a, b);
+        done = (a >= limit);
+    }
+}
+
+void verifier_thread_advance(TestContext& test_context, int limit, DB* db, TableKey tk)
+{
+    auto reader = db->start_read();
+    bool done = false;
+    while (!done) {
+        reader->advance_read();
+        auto table = reader->get_table(tk);
+        auto obj = table->get_object(0);
+        auto cols = table->get_col_keys();
+        int64_t a = obj.get<int64_t>(cols[0]);
+        int64_t b = obj.get<int64_t>(cols[1]);
+        CHECK_EQUAL(a * a, b);
+        done = (a >= limit);
+    }
+}
+}
+
+TEST(Transactions_Threaded)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db(*hist_w);
+    TableKey tk;
+    {
+        auto wt = db.start_write();
+        auto table = wt->add_table("my_table");
+        table->add_column(type_Int, "my_col_1");
+        table->add_column(type_Int, "my_col_2");
+        table->create_object().set_all(1, 1);
+        tk = table->get_key();
+        wt->commit();
+    }
+    const int num_threads = 20;
+    std::thread writers[num_threads];
+    std::thread verifiers[num_threads];
+    for (int i = 0; i < num_threads; ++i) {
+        verifiers[i] = std::thread([&] { verifier_thread(test_context, num_threads * 100, &db, tk); });
+        writers[i] = std::thread([&] { writer_thread(test_context, 100, &db, tk); });
+    }
+    for (int i = 0; i < num_threads; ++i) {
+        writers[i].join();
+        verifiers[i].join();
+    }
+}
+
+TEST(Transactions_ThreadedAdvanceRead)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db(*hist_w);
+    TableKey tk;
+    {
+        auto wt = db.start_write();
+        auto table = wt->add_table("my_table");
+        table->add_column(type_Int, "my_col_1");
+        table->add_column(type_Int, "my_col_2");
+        table->create_object().set_all(1, 1);
+        tk = table->get_key();
+        wt->commit();
+    }
+    const int num_threads = 20;
+    const int num_iterations = 100;
+    std::thread writers[num_threads];
+    std::thread verifiers[num_threads];
+    for (int i = 0; i < num_threads; ++i) {
+        verifiers[i] =
+            std::thread([&] { verifier_thread_advance(test_context, num_threads * num_iterations, &db, tk); });
+        writers[i] = std::thread([&] { writer_thread(test_context, num_iterations, &db, tk); });
+    }
+    for (int i = 0; i < num_threads; ++i) {
+        writers[i].join();
+        verifiers[i].join();
+    }
+}
+
+TEST(Transactions_ListOfBinary)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DB db(path);
+    {
+        auto wt = db.start_write();
+        auto table = wt->add_table("my_table");
+        table->add_column_list(type_Binary, "list");
+        table->create_object();
+        wt->commit();
+    }
+    for (int iter = 0; iter < 1000; iter++) {
+        auto wt = db.start_write();
+        wt->verify();
+        auto table = wt->get_table("my_table");
+        auto col1 = table->get_column_key("list");
+        Obj obj = table->get_object(0);
+        auto list = obj.get_list<Binary>(col1);
+        std::string bin(15, 'z');
+        list.add(BinaryData(bin.data(), 15));
+        if (fastrand(100) < 5) {
+            size_t sz = list.size();
+            for (size_t i = 0; i < sz - 1; i++) {
+                list.remove(0);
+            }
+        }
+        wt->commit();
+        auto rt = db.start_read();
+        rt->verify();
+    }
+}
+
 #ifdef LEGACY_TESTS
 
 enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi, kumi_na_moja, kumi_na_mbili, kumi_na_tatu };
@@ -179,7 +381,7 @@ void my_table_add_columns(T table)
     subtable_add_columns(subdesc);
 }
 
-void round(TestContext& test_context, SharedGroup& db, int index)
+void round(TestContext& test_context, DB& db, int index)
 {
     // Testing all value types
     {
@@ -505,7 +707,7 @@ void round(TestContext& test_context, SharedGroup& db, int index)
 void thread(TestContext& test_context, int index, std::string path)
 {
     for (int i = 0; i < num_rounds; ++i) {
-        SharedGroup db(path);
+        DB db(path);
         round(test_context, db, index);
     }
 }
@@ -544,7 +746,7 @@ TEST(Transactions_General)
     table1_theta_size *= num_rounds;
     table1_theta_size += 2;
 
-    SharedGroup db(path);
+    DB db(path);
     ReadTransaction rt(db);
     ConstTableRef table = rt.get_table("my_table");
     CHECK(2 <= table->size());
@@ -643,38 +845,36 @@ TEST(Transactions_General)
 }
 #endif
 
-#ifdef LEGACY_TESTS
 
 TEST(Transactions_RollbackCreateObject)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    WriteTransaction wt(sg_w);
-    Group& g = wt.get_group();
+    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    TransactionRef tr = sg_w.start_write();
 
-    auto tk = g.add_table("t0")->get_key();
-    g.get_table(tk)->add_column(type_Int, "integers");
+    auto tk = tr->add_table("t0")->get_key();
+    auto col = tr->get_table(tk)->add_column(type_Int, "integers");
 
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    LangBindHelper::promote_to_write(sg_w);
+    tr->commit_and_continue_as_read();
+    tr->promote_to_write();
 
-    g.get_table(tk)->create_object(Key(0)).set(0, 5);
-    auto o = g.get_table(tk)->get_object(Key(0));
-    CHECK_EQUAL(o.get<int64_t>(0), 5);
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    tr->get_table(tk)->create_object(ObjKey(0)).set(col, 5);
+    auto o = tr->get_table(tk)->get_object(ObjKey(0));
+    CHECK_EQUAL(o.get<int64_t>(col), 5);
 
+    tr->rollback_and_continue_as_read();
 
-    CHECK_THROW(o.get<int64_t>(0), InvalidKey);
-    g.verify();
+    CHECK_THROW(o.get<int64_t>(col), InvalidKey);
+    tr->verify();
 
-    LangBindHelper::promote_to_write(sg_w);
+    tr->promote_to_write();
 
-    CHECK_EQUAL(g.get_table(tk)->size(), 0);
+    CHECK_EQUAL(tr->get_table(tk)->size(), 0);
 }
 
+#ifdef LEGACY_TESTS
 
-<<<<<<< HEAD
 // Rollback a table move operation and check accessors.
 // This case checks column accessors when a table is inserted, moved, rolled back.
 // In this case it is easy to see (by just looking at the assert message) that the
@@ -683,7 +883,7 @@ TEST(Transactions_RollbackMoveTableColumns)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
 
@@ -713,7 +913,7 @@ TEST(Transactions_RollbackMoveTableReferences)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
 
@@ -732,9 +932,7 @@ TEST(Transactions_RollbackMoveTableReferences)
     CHECK_EQUAL(g.get_table(t0k)->get_name(), StringData("t0"));
     CHECK_EQUAL(g.size(), 1);
 }
-
-=======
->>>>>>> v5.0.1
+#endif
 // Check that the spec.enumkeys become detached when
 // rolling back the insertion of a string enum column
 #ifdef LEGACY_TESTS
@@ -743,8 +941,8 @@ TEST(LangBindHelper_RollbackStringEnumInsert)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     std::unique_ptr<Replication> hist_2(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w);
-    SharedGroup sg_2(*hist_2);
+    DB sg_w(*hist_w);
+    DB sg_2(*hist_2);
     Group& g = const_cast<Group&>(sg_w.begin_read());
     Group& g2 = const_cast<Group&>(sg_2.begin_read());
     LangBindHelper::promote_to_write(sg_w);
@@ -785,7 +983,7 @@ TEST(LangBindHelper_RollbackStringEnumInsert)
     CHECK_EQUAL(g.get_table(t1k)->size(), 3);
 }
 #endif
-
+#ifdef LEGACY_TESTS
 // Check that the table.spec.subspec array becomes detached
 // after rolling back the insertion of a subspec type
 TEST(LangBindHelper_RollbackLinkInsert)
@@ -793,7 +991,7 @@ TEST(LangBindHelper_RollbackLinkInsert)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
 
-    SharedGroup sg_w(*hist_w);
+    DB sg_w(*hist_w);
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 

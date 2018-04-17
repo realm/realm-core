@@ -18,101 +18,59 @@
 
 #include <realm/table_view.hpp>
 #include <realm/column.hpp>
+#include <realm/db.hpp>
 
 #include <unordered_set>
 
 using namespace realm;
 
-ConstTableView::ConstTableView(ConstTableView& src, HandoverPatch& patch, MutableSourcePayload mode)
+ConstTableView::ConstTableView(ConstTableView& src, Transaction*, PayloadPolicy)
     : ObjList(m_table_view_key_values)
     , m_source_column_key(src.m_source_column_key)
     , m_table_view_key_values(Allocator::get_default())
 {
-    // move the data payload, but make sure to leave the source array intact or
-    // attempts to reuse it for a query rerun will crash (or assert, if lucky)
-    // There really *has* to be a way where we don't need to first create an empty
-    // array, and then destroy it
-    if (src.m_key_values.is_attached()) {
-        m_key_values = std::move(src.m_key_values); // Will leave src.m_key_values detached
-        src.m_key_values.create();
-    }
-    else {
-        m_key_values.create();
-    }
-
-    patch.was_in_sync = src.is_in_sync();
-    // m_query must be exported after patch.was_in_sync is updated
-    // as exporting m_query will bring src out of sync.
-    m_query = Query(src.m_query, patch.query_patch, mode);
-
-    Table::generate_patch(src.m_table, patch.m_table);
-    LinkList::generate_patch(src.m_linklist_source.get(), patch.linklist_patch);
-    DescriptorOrdering::generate_patch(src.m_descriptor_ordering, patch.descriptors_patch);
-
-    if (src.m_source_column_key) {
-        patch.linked_obj.reset(new ObjectHandoverPatch);
-        Table::generate_patch(src.m_linked_obj.get_table(), patch.m_table);
-        patch.linked_obj->key_value = src.m_linked_obj.get_key().value;
-        patch.linked_col = src.m_source_column_key;
-    }
-
-    src.m_last_seen_versions.clear(); // bring source out-of-sync, now that it has lost its data
-    m_last_seen_versions.clear();
-    m_start = src.m_start;
-    m_end = src.m_end;
-    m_limit = src.m_limit;
+    REALM_ASSERT(false); // unimplemented
 }
 
-ConstTableView::ConstTableView(const ConstTableView& src, HandoverPatch& patch, ConstSourcePayload mode)
+ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, PayloadPolicy mode)
     : ObjList(m_table_view_key_values)
     , m_source_column_key(src.m_source_column_key)
-    , m_query(src.m_query, patch.query_patch, mode)
     , m_table_view_key_values(Allocator::get_default())
 {
-    if (mode == ConstSourcePayload::Copy && src.m_key_values.is_attached()) {
-        m_key_values = src.m_key_values;
-    }
-    else {
-        m_key_values.create();
-    }
-
-    if (mode == ConstSourcePayload::Stay)
-        patch.was_in_sync = false;
-    else
-        patch.was_in_sync = src.is_in_sync();
-    Table::generate_patch(src.m_table, patch.m_table);
-    if (src.m_source_column_key) {
-        patch.linked_obj.reset(new ObjectHandoverPatch);
-        Table::generate_patch(src.m_linked_obj.get_table(), patch.m_table);
-        patch.linked_obj->key_value = src.m_linked_obj.get_key().value;
-        patch.linked_col = src.m_source_column_key;
-    }
-    LinkList::generate_patch(src.m_linklist_source.get(), patch.linklist_patch);
-    DescriptorOrdering::generate_patch(src.m_descriptor_ordering, patch.descriptors_patch);
-
-    m_last_seen_versions.clear();
-    m_start = src.m_start;
-    m_end = src.m_end;
-    m_limit = src.m_limit;
-}
-
-void ConstTableView::apply_patch(HandoverPatch& patch, Group& group)
-{
-    m_table = Table::create_from_and_consume_patch(patch.m_table, group);
-    m_query.apply_patch(patch.query_patch, group);
-    m_linklist_source = LinkList::create_from_and_consume_patch(patch.linklist_patch, group);
-    m_descriptor_ordering = DescriptorOrdering::create_from_and_consume_patch(patch.descriptors_patch, *m_table);
-
-    if (patch.linked_obj) {
-        TableRef table = Table::create_from_and_consume_patch(patch.m_table, group);
-        m_linked_obj = table->get_object(ObjKey(patch.linked_obj->key_value));
-        m_source_column_key = patch.linked_col;
-    }
-
-    if (patch.was_in_sync)
+    bool was_in_sync = src.is_in_sync();
+    m_query = Query(src.m_query, tr, mode);
+    m_table = tr->import_copy_of(src.m_table);
+    if (mode == PayloadPolicy::Stay)
+        was_in_sync = false;
+    VersionID src_version =
+        dynamic_cast<Transaction*>(src.m_table->get_parent_group())->get_version_of_current_transaction();
+    if (src_version != tr->get_version_of_current_transaction())
+        throw realm::LogicError(LogicError::bad_version);
+    if (was_in_sync)
         m_last_seen_versions = outside_version();
     else
         m_last_seen_versions.clear();
+    if (mode == PayloadPolicy::Copy && src.m_key_values.is_attached()) {
+        // FIXME: Doesn't this lead to sharing between the 2 TableViews?
+        m_key_values = src.m_key_values;
+    }
+    else if (mode == PayloadPolicy::Move && src.m_key_values.is_attached())
+        m_key_values = std::move(src.m_key_values);
+    else {
+        m_key_values.create();
+    }
+    if (mode == PayloadPolicy::Move) {
+        src.m_last_seen_versions.clear();
+    }
+    m_table = tr->import_copy_of(src.m_table);
+    m_linklist_source = tr->import_copy_of(src.m_linklist_source);
+    if (src.m_source_column_key) {
+        m_linked_obj = tr->import_copy_of(src.m_linked_obj);
+    }
+    m_descriptor_ordering = src.m_descriptor_ordering;
+    m_start = src.m_start;
+    m_end = src.m_end;
+    m_limit = src.m_limit;
 }
 
 // Aggregates ----------------------------------------------------

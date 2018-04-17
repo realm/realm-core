@@ -155,16 +155,9 @@ template List<Timestamp>::List(const Obj& obj, ColKey col_key);
 template List<ObjKey>::List(const Obj& obj, ColKey col_key);
 }
 
-ConstObj ConstLinkListIf::get(size_t link_ndx) const
+ConstObj ConstLinkListIf::get_object(size_t link_ndx) const
 {
     return m_const_obj->get_target_table(m_col_key)->get_object(ConstListIf<ObjKey>::get(link_ndx));
-}
-
-/********************************* LinkList **********************************/
-
-Obj LinkList::get(size_t link_ndx)
-{
-    return get_target_table().get_object(List<ObjKey>::get(link_ndx));
 }
 
 /********************************* List<Key> *********************************/
@@ -279,7 +272,8 @@ void LinkList::remove_target_row(size_t link_ndx)
 {
     // Deleting the object will automatically remove all links
     // to it. So we do not have to manually remove the deleted link
-    get(link_ndx).remove();
+    auto key = List<ObjKey>::get(link_ndx);
+    const_cast<Table*>(get_table())->remove_object(key);
 }
 
 void LinkList::remove_all_target_rows()
@@ -299,46 +293,6 @@ TableVersions LinkList::sync_if_needed() const
         versions.emplace_back(table->get_key(), table->get_content_version());
     }
     return versions;
-}
-
-void LinkList::generate_patch(const LinkList* list, std::unique_ptr<LinkListHandoverPatch>& patch)
-{
-    if (list) {
-        if (list->is_attached()) {
-            patch.reset(new LinkListHandoverPatch);
-            Table::generate_patch(list->get_table(), patch->m_table);
-            patch->m_col_key = list->get_col_key();
-            patch->m_key_value = list->ConstListBase::get_key().value;
-        }
-        else {
-            // if the LinkView has become detached, indicate it by passing
-            // a handover patch with a nullptr in m_table.
-            patch.reset(new LinkListHandoverPatch);
-            patch->m_table = nullptr;
-        }
-    }
-    else
-        patch.reset();
-}
-
-
-LinkListPtr LinkList::create_from_and_consume_patch(std::unique_ptr<LinkListHandoverPatch>& patch, Group& group)
-{
-    if (patch) {
-        if (patch->m_table) {
-            TableRef tr = Table::create_from_and_consume_patch(patch->m_table, group);
-            auto result = tr->get_object(ObjKey(patch->m_key_value)).get_linklist_ptr(patch->m_col_key);
-            patch.reset();
-            return result;
-        }
-        else {
-            // We end up here if we're handing over a detached LinkView.
-            // This is indicated by a patch with a null m_table.
-
-            // TODO: Should we be able to create a detached LinkView
-        }
-    }
-    return {};
 }
 
 namespace realm {

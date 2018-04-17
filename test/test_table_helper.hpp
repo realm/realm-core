@@ -19,6 +19,20 @@
 #ifndef TEST_TEST_TABLE_HELPER_HPP_
 #define TEST_TEST_TABLE_HELPER_HPP_
 
+namespace realm {
+
+class ObjKeyVector : public std::vector<ObjKey> {
+public:
+    ObjKeyVector(const std::vector<int64_t>& init)
+    {
+        reserve(init.size());
+        for (auto i : init) {
+            emplace_back(i);
+        }
+    }
+};
+}
+
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
 #endif /* TEST_TEST_TABLE_HELPER_HPP_ */

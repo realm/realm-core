@@ -25,7 +25,7 @@
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/group_writer.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 #include <realm/alloc_slab.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/metrics/metric_timer.hpp>
@@ -200,7 +200,7 @@ GroupWriter::GroupWriter(Group& group)
     }
 
     if (is_shared) {
-        SharedGroup::version_type initial_version = 0;
+        DB::version_type initial_version = 0;
 
         // Expand top array from 5 to 7 elements. Only nonshared Realms are
         // allowed to have less than 7 elements.

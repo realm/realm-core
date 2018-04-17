@@ -288,11 +288,8 @@ public:
     /// The version parameter is subtly different from the mapping_version obtained
     /// by get_mapping_version() below. The mapping version changes whenever a
     /// ref->ptr translation changes, and is used by Group to enforce re-translation.
-    /// The version parameter, on the other hand, builds an association between
-    /// database transaction numbers and the delayed deletion of mappings. It is
-    /// used to drive deletion of old translations and old mappings at safe points.
-    void update_reader_view(size_t file_size, uint64_t version = 0);
-    void purge_old_mappings(uint64_t oldest_live_version);
+    void update_reader_view(size_t file_size);
+    void purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version);
 
     /// Get an ID for the current mapping version. This ID changes whenever any part
     /// of an existing mapping is changed. Such a change requires all refs to be
@@ -322,7 +319,7 @@ protected:
     MemRef do_alloc(const size_t size) override;
     MemRef do_realloc(ref_type, const char*, size_t old_size, size_t new_size) override;
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    void do_free(ref_type, const char*) noexcept override;
+    void do_free(ref_type, const char*) override;
     char* do_translate(ref_type) const noexcept override;
 
     /// Returns the first section boundary *above* the given position.
@@ -430,7 +427,7 @@ private:
 
     size_t m_fast_mapping_size = 0;
     uint64_t m_mapping_version = 1;
-    uint64_t m_current_transaction = 0;
+    uint64_t m_youngest_live_version = 1;
     std::mutex m_mapping_mutex;
     util::File m_file;
     // vectors where old mappings, are held from deletion to ensure mappings are
@@ -441,7 +438,7 @@ private:
     // versioning information for later deletion - 'requires_new_fast_mapping' must be
     // true if there are changes to entries among the existing mappings. Must be called
     // with m_mapping_mutex locked.
-    void rebuild_fast_mapping(bool requires_new_fast_mapping);
+    void rebuild_fast_mapping(bool requires_new_fast_mapping, size_t old_num_sections);
     // Add a translation covering a new section in the slab area. The translation is always
     // added at the end.
     void extend_fast_mapping_with_slab(char* address);
@@ -503,7 +500,7 @@ private:
     }
 
     friend class Group;
-    friend class SharedGroup;
+    friend class DB;
     friend class GroupWriter;
 };
 

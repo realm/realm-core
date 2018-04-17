@@ -25,7 +25,6 @@
 #include <vector>
 
 #include <realm.hpp>
-#include <realm/lang_bind_helper.hpp>
 #include <realm/column.hpp>
 #include <realm/array_bool.hpp>
 #include <realm/history.hpp>
@@ -3175,126 +3174,99 @@ TEST(Query_Simple)
     CHECK_EQUAL(k2, tv2.get_key(0));
 }
 
-#ifdef LEGACY_TESTS
-
 TEST(Query_Sort1)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
+    Table ttt;
+    auto col_int = ttt.add_column(type_Int, "1");
     ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a"); // 0
-    add(ttt, 2, "a"); // 1
-    add(ttt, 3, "X"); // 2
-    add(ttt, 1, "a"); // 3
-    add(ttt, 2, "a"); // 4
-    add(ttt, 3, "X"); // 5
-    add(ttt, 9, "a"); // 6
-    add(ttt, 8, "a"); // 7
-    add(ttt, 7, "X"); // 8
+    ttt.create_object().set_all(1, "a"); // 0
+    ttt.create_object().set_all(2, "a"); // 1
+    ttt.create_object().set_all(3, "X"); // 2
+    ttt.create_object().set_all(1, "a"); // 3
+    ttt.create_object().set_all(2, "a"); // 4
+    ttt.create_object().set_all(3, "X"); // 5
+    ttt.create_object().set_all(9, "a"); // 6
+    ttt.create_object().set_all(8, "a"); // 7
+    ttt.create_object().set_all(7, "X"); // 8
 
     // tv.get_key()  = 0, 2, 3, 5, 6, 7, 8
     // Vals         = 1, 3, 1, 3, 9, 8, 7
     // result       = 3, 0, 5, 2, 8, 7, 6
 
-    Query q = ttt.where().not_equal(0, 2);
+    Query q = ttt.where().not_equal(col_int, 2);
     TableView tv = q.find_all();
-    tv.sort(0);
+    tv.sort(col_int);
 
     CHECK_EQUAL(tv.size(), 7);
-    CHECK_EQUAL(tv[0].get_int(0), 1);
-    CHECK_EQUAL(tv[1].get_int(0), 1);
-    CHECK_EQUAL(tv[2].get_int(0), 3);
-    CHECK_EQUAL(tv[3].get_int(0), 3);
-    CHECK_EQUAL(tv[4].get_int(0), 7);
-    CHECK_EQUAL(tv[5].get_int(0), 8);
-    CHECK_EQUAL(tv[6].get_int(0), 9);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 1);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 1);
+    CHECK_EQUAL(tv[2].get<Int>(col_int), 3);
+    CHECK_EQUAL(tv[3].get<Int>(col_int), 3);
+    CHECK_EQUAL(tv[4].get<Int>(col_int), 7);
+    CHECK_EQUAL(tv[5].get<Int>(col_int), 8);
+    CHECK_EQUAL(tv[6].get<Int>(col_int), 9);
 
-    CHECK_EQUAL(tv[0].get_index(), 0);
-    CHECK_EQUAL(tv[1].get_index(), 3);
-    CHECK_EQUAL(tv[2].get_index(), 2);
-    CHECK_EQUAL(tv[3].get_index(), 5);
-    CHECK_EQUAL(tv[4].get_index(), 8);
-    CHECK_EQUAL(tv[5].get_index(), 7);
-    CHECK_EQUAL(tv[6].get_index(), 6);
+    CHECK_EQUAL(tv[0].get_key(), ObjKey(0));
+    CHECK_EQUAL(tv[1].get_key(), ObjKey(3));
+    CHECK_EQUAL(tv[2].get_key(), ObjKey(2));
+    CHECK_EQUAL(tv[3].get_key(), ObjKey(5));
+    CHECK_EQUAL(tv[4].get_key(), ObjKey(8));
+    CHECK_EQUAL(tv[5].get_key(), ObjKey(7));
+    CHECK_EQUAL(tv[6].get_key(), ObjKey(6));
 
     tv = q.find_all();
-    tv.sort(0, false);
+    tv.sort(col_int, false);
 
     CHECK_EQUAL(tv.size(), 7);
-    CHECK_EQUAL(tv[0].get_index(), 6);
-    CHECK_EQUAL(tv[1].get_index(), 7);
-    CHECK_EQUAL(tv[2].get_index(), 8);
-    CHECK_EQUAL(tv[3].get_index(), 2);
-    CHECK_EQUAL(tv[4].get_index(), 5);
-    CHECK_EQUAL(tv[5].get_index(), 0);
-    CHECK_EQUAL(tv[6].get_index(), 3);
+    CHECK_EQUAL(tv[0].get_key(), ObjKey(6));
+    CHECK_EQUAL(tv[1].get_key(), ObjKey(7));
+    CHECK_EQUAL(tv[2].get_key(), ObjKey(8));
+    CHECK_EQUAL(tv[3].get_key(), ObjKey(2));
+    CHECK_EQUAL(tv[4].get_key(), ObjKey(5));
+    CHECK_EQUAL(tv[5].get_key(), ObjKey(0));
+    CHECK_EQUAL(tv[6].get_key(), ObjKey(3));
 }
 
-
-TEST(Query_QuickSort)
+TEST(Query_SortAscending)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-    // Triggers QuickSort because range > len
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
+    Table ttt;
+    auto col_int = ttt.add_column(type_Int, "1");
     ttt.add_column(type_String, "2");
 
     for (size_t t = 0; t < 1000; t++)
-        add(ttt, random.draw_int_mod(1100), "a"); // 0
+        ttt.create_object().set_all(random.draw_int_mod(1100), "a"); // 0
 
     Query q = ttt.where();
     TableView tv = q.find_all();
-    tv.sort(0);
+    tv.sort(col_int);
 
     CHECK(tv.size() == 1000);
     for (size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t].get_int(0) >= tv[t - 1].get_int(0));
+        CHECK(tv[t].get<Int>(col_int) >= tv[t - 1].get<Int>(col_int));
     }
 }
-
-TEST(Query_CountSort)
-{
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-
-    // Triggers CountSort because range <= len
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    for (size_t t = 0; t < 1000; t++)
-        add(ttt, random.draw_int_mod(900), "a"); // 0
-
-    Query q = ttt.where();
-    TableView tv = q.find_all();
-    tv.sort(0);
-
-    CHECK(tv.size() == 1000);
-    for (size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t].get_int(0) >= tv[t - 1].get_int(0));
-    }
-}
-
 
 TEST(Query_SortDescending)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
+    Table ttt;
+    auto col_int = ttt.add_column(type_Int, "1");
     ttt.add_column(type_String, "2");
 
     for (size_t t = 0; t < 1000; t++)
-        add(ttt, random.draw_int_mod(1100), "a"); // 0
+        ttt.create_object().set_all(random.draw_int_mod(1100), "a"); // 0
 
     Query q = ttt.where();
     TableView tv = q.find_all();
-    tv.sort(0, false);
+    tv.sort(col_int, false);
 
     CHECK(tv.size() == 1000);
     for (size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t].get_int(0) <= tv[t - 1].get_int(0));
+        CHECK(tv[t].get<Int>(col_int) <= tv[t - 1].get<Int>(col_int));
     }
 }
 
@@ -3302,49 +3274,38 @@ TEST(Query_SortDescending)
 TEST(Query_SortDates)
 {
     Table table;
-    table.add_column(type_OldDateTime, "first");
+    auto col_date = table.add_column(type_Timestamp, "first");
 
-    table.insert_empty_row(0);
-    table.set_olddatetime(0, 0, 1000);
-    table.insert_empty_row(1);
-    table.set_olddatetime(0, 1, 3000);
-    table.insert_empty_row(2);
-    table.set_olddatetime(0, 2, 2000);
+    table.create_object().set(col_date, Timestamp(1000, 0));
+    table.create_object().set(col_date, Timestamp(3000, 0));
+    table.create_object().set(col_date, Timestamp(2000, 0));
 
     TableView tv = table.where().find_all();
     CHECK(tv.size() == 3);
-    CHECK(tv.get_key(0) == 0);
-    CHECK(tv.get_key(1) == 1);
-    CHECK(tv.get_key(2) == 2);
 
-    tv.sort(0);
-
-    CHECK(tv.size() == 3);
-    CHECK(tv.get_olddatetime(0, 0) == OldDateTime(1000));
-    CHECK(tv.get_olddatetime(0, 1) == OldDateTime(2000));
-    CHECK(tv.get_olddatetime(0, 2) == OldDateTime(3000));
+    tv.sort(col_date);
+    CHECK_EQUAL(tv[0].get<Timestamp>(col_date), Timestamp(1000, 0));
+    CHECK_EQUAL(tv[1].get<Timestamp>(col_date), Timestamp(2000, 0));
+    CHECK_EQUAL(tv[2].get<Timestamp>(col_date), Timestamp(3000, 0));
 }
 
 
 TEST(Query_SortBools)
 {
     Table table;
-    table.add_column(type_Bool, "first");
+    auto col = table.add_column(type_Bool, "first");
 
-    table.insert_empty_row(0);
-    table.set_bool(0, 0, true);
-    table.insert_empty_row(0);
-    table.set_bool(0, 0, false);
-    table.insert_empty_row(0);
-    table.set_bool(0, 0, true);
+    table.create_object().set(col, true);
+    table.create_object().set(col, false);
+    table.create_object().set(col, true);
 
     TableView tv = table.where().find_all();
-    tv.sort(0);
-
     CHECK(tv.size() == 3);
-    CHECK(tv.get_bool(0, 0) == false);
-    CHECK(tv.get_bool(0, 1) == true);
-    CHECK(tv.get_bool(0, 2) == true);
+
+    tv.sort(col);
+    CHECK_EQUAL(tv[0].get<Bool>(col), false);
+    CHECK_EQUAL(tv[1].get<Bool>(col), true);
+    CHECK_EQUAL(tv[2].get<Bool>(col), true);
 }
 
 TEST(Query_SortLinks)
@@ -3354,26 +3315,23 @@ TEST(Query_SortLinks)
     TableRef t1 = g.add_table("t1");
     TableRef t2 = g.add_table("t2");
 
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_str_col = t1->add_column(type_String, "t1_string");
-    size_t t1_link_t2_col = t1->add_column_link(type_Link, "t1_link_to_t2", *t2);
-    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
-    size_t t2_str_col = t2->add_column(type_String, "t2_string");
-    size_t t2_link_t1_col = t2->add_column_link(type_Link, "t2_link_to_t1", *t1);
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(type_String, "t1_string");
+    auto t1_link_t2_col = t1->add_column_link(type_Link, "t1_link_to_t2", *t2);
+    t2->add_column(type_Int, "t2_int");
+    t2->add_column(type_String, "t2_string");
+    t2->add_column_link(type_Link, "t2_link_to_t1", *t1);
 
-    t1->add_empty_row(num_rows);
-    t2->add_empty_row(num_rows);
+    std::vector<ObjKey> t1_keys;
+    std::vector<ObjKey> t2_keys;
+    t1->create_objects(num_rows, t1_keys);
+    t2->create_objects(num_rows, t2_keys);
     std::vector<std::string> ordered_strings;
 
     for (size_t i = 0; i < num_rows; ++i) {
         ordered_strings.push_back(std::string("a string") + util::to_string(i));
-        t1->set_int(t1_int_col, i, i);
-        t1->set_string(t1_str_col, i, ordered_strings[i]);
-        t1->set_link(t1_link_t2_col, i, num_rows - i - 1);
-
-        t2->set_int(t2_int_col, i, i);
-        t2->set_string(t2_str_col, i, ordered_strings[i]);
-        t2->set_link(t2_link_t1_col, i, i);
+        t1->get_object(t1_keys[i]).set_all(int64_t(i), StringData(ordered_strings[i]), t2_keys[num_rows - i - 1]);
+        t2->get_object(t1_keys[i]).set_all(int64_t(i), StringData(ordered_strings[i]), t1_keys[i]);
     }
 
     TableView tv = t1->where().find_all();
@@ -3381,16 +3339,16 @@ TEST(Query_SortLinks)
     // Check natural order
     CHECK_EQUAL(tv.size(), num_rows);
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), i);
-        CHECK_EQUAL(tv.get_string(t1_str_col, i), ordered_strings[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), i);
+        CHECK_EQUAL(tv[i].get<String>(t1_str_col), ordered_strings[i]);
     }
 
     // Check sorted order by ints
     tv.sort(t1_int_col);
     CHECK_EQUAL(tv.size(), num_rows);
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), i);
-        CHECK_EQUAL(tv.get_string(t1_str_col, i), ordered_strings[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), i);
+        CHECK_EQUAL(tv[i].get<String>(t1_str_col), ordered_strings[i]);
     }
 
     // Check that you can sort on a regular link column
@@ -3398,11 +3356,10 @@ TEST(Query_SortLinks)
     tv.sort(t1_link_t2_col);
     CHECK_EQUAL(tv.size(), num_rows);
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), num_rows - i - 1);
-        CHECK_EQUAL(tv.get_string(t1_str_col, i), ordered_strings[num_rows - i - 1]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), num_rows - i - 1);
+        CHECK_EQUAL(tv[i].get<String>(t1_str_col), ordered_strings[num_rows - i - 1]);
     }
 }
-
 
 TEST(Query_SortLinkChains)
 {
@@ -3411,71 +3368,73 @@ TEST(Query_SortLinkChains)
     TableRef t2 = g.add_table("t2");
     TableRef t3 = g.add_table("t3");
 
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
-    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
-    size_t t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
-    size_t t3_int_col = t3->add_column(type_Int, "t3_int", true);
-    size_t t3_str_col = t3->add_column(type_String, "t3_str");
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
 
-    t1->add_empty_row(7);
-    t2->add_empty_row(6);
-    t3->add_empty_row(4);
+    auto t2_int_col = t2->add_column(type_Int, "t2_int");
+    auto t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
 
-    t1->set_int(t1_int_col, 0, 99);
+    auto t3_int_col = t3->add_column(type_Int, "t3_int", true);
+    auto t3_str_col = t3->add_column(type_String, "t3_str");
+
+    ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5, 6});
+    ObjKeyVector t2_keys({10, 11, 12, 13, 14, 15});
+    ObjKeyVector t3_keys({20, 21, 22, 23});
+    t1->create_objects(t1_keys);
+    t2->create_objects(t2_keys);
+    t3->create_objects(t3_keys);
+
+    t1->get_object(t1_keys[0]).set(t1_int_col, 99);
     for (size_t i = 0; i < t2->size(); i++) {
-        t1->set_int(t1_int_col, i + 1, i);
-        t2->set_int(t2_int_col, i, t1->size() - i);
+        t1->get_object(t1_keys[i + 1]).set(t1_int_col, int64_t(i));
+        t2->get_object(t2_keys[i]).set(t2_int_col, int64_t(t1->size() - i));
     }
 
-    t1->set_link(t1_link_col, 0, 1);
-    t1->set_link(t1_link_col, 1, 0);
-    t1->set_link(t1_link_col, 2, 2);
-    t1->set_link(t1_link_col, 3, 3);
-    t1->set_link(t1_link_col, 4, 5);
-    t1->set_link(t1_link_col, 5, 4);
-    t1->set_link(t1_link_col, 6, 1);
+    t1->get_object(t1_keys[0]).set(t1_link_col, t2_keys[1]);
+    t1->get_object(t1_keys[1]).set(t1_link_col, t2_keys[0]);
+    t1->get_object(t1_keys[2]).set(t1_link_col, t2_keys[2]);
+    t1->get_object(t1_keys[3]).set(t1_link_col, t2_keys[3]);
+    t1->get_object(t1_keys[4]).set(t1_link_col, t2_keys[5]);
+    t1->get_object(t1_keys[5]).set(t1_link_col, t2_keys[4]);
+    t1->get_object(t1_keys[6]).set(t1_link_col, t2_keys[1]);
 
-    t2->set_link(t2_link_col, 0, 3);
-    t2->set_link(t2_link_col, 1, 2);
-    t2->set_link(t2_link_col, 2, 0);
-    t2->set_link(t2_link_col, 3, 1);
-    t2->nullify_link(t2_link_col, 4);
-    t2->nullify_link(t2_link_col, 5);
+    t2->get_object(t2_keys[0]).set(t2_link_col, t3_keys[3]);
+    t2->get_object(t2_keys[1]).set(t2_link_col, t3_keys[2]);
+    t2->get_object(t2_keys[2]).set(t2_link_col, t3_keys[0]);
+    t2->get_object(t2_keys[3]).set(t2_link_col, t3_keys[1]);
 
-    t3->set_null(t3_int_col, 0);
-    t3->set_int(t3_int_col, 1, 4);
-    t3->set_int(t3_int_col, 2, 7);
-    t3->set_int(t3_int_col, 3, 3);
-    t3->set_string(t3_str_col, 0, "b");
-    t3->set_string(t3_str_col, 1, "a");
-    t3->set_string(t3_str_col, 2, "c");
-    t3->set_string(t3_str_col, 3, "k");
+    t3->get_object(t3_keys[1]).set(t3_int_col, 4);
+    t3->get_object(t3_keys[2]).set(t3_int_col, 7);
+    t3->get_object(t3_keys[3]).set(t3_int_col, 3);
+    t3->get_object(t3_keys[0]).set(t3_str_col, "b");
+    t3->get_object(t3_keys[1]).set(t3_str_col, "a");
+    t3->get_object(t3_keys[2]).set(t3_str_col, "c");
+    t3->get_object(t3_keys[3]).set(t3_str_col, "k");
 
     //  T1                       T2                     T3
     //  t1_int   t1_link_t2  |   t2_int  t2_link_t3 |   t3_int  t3_str
     //  ==============================================================
-    //  99       1           |   5       3          |   null    "b"
-    //  0        0           |   4       2          |   4       "a"
-    //  1        2           |   3       0          |   7       "c"
-    //  2        3           |   2       1          |   3       "k"
-    //  3        5           |   1       null       |
-    //  4        4           |   0       null       |
-    //  5        1           |                      |
+    //  99       11          |   5       23         |   null    "b"
+    //  0        10          |   4       22         |   4       "a"
+    //  1        12          |   3       20         |   7       "c"
+    //  2        13          |   2       21         |   3       "k"
+    //  3        15          |   1       null       |
+    //  4        14          |   0       null       |
+    //  5        11          |                      |
 
     TableView tv = t1->where().less(t1_int_col, 6).find_all();
 
-    // Test original funcionality through chain class
+    // Test original functionality through chain class
     std::vector<size_t> results1 = {0, 1, 2, 3, 4, 5};
     tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
     CHECK_EQUAL(tv.size(), results1.size());
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results1[i]);
     }
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results1[results1.size() - 1 - i]);
     }
 
     // Test basic one link chain
@@ -3484,12 +3443,12 @@ TEST(Query_SortLinkChains)
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
     CHECK_EQUAL(tv.size(), results2.size());
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results2[i]);
     }
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[results2.size() - 1 - i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results2[results2.size() - 1 - i]);
     }
 
     // Test link chain through two links with nulls
@@ -3498,15 +3457,22 @@ TEST(Query_SortLinkChains)
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {true}));
     // No guarantees about nullified links except they are at the end.
     CHECK(tv.size() >= results3.size());
+    util::Optional<int64_t> last;
     for (size_t i = 0; i < results3.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[i]);
+        util::Optional<int64_t> current = tv[i]
+                                              .get_linked_object(t1_link_col)
+                                              .get_linked_object(t2_link_col)
+                                              .get<util::Optional<int64_t>>(t3_int_col);
+        CHECK(!last || current.value() >= last.value());
+        last = current;
     }
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
     // No guarantees about nullified links except they are at the beginning.
     size_t num_nulls = tv.size() - results3.size();
     for (size_t i = num_nulls; i < results3.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[results2.size() - 1 - i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[results2.size() - 1 - i]);
     }
 
     // Test link chain with nulls and a single local column
@@ -3515,28 +3481,27 @@ TEST(Query_SortLinkChains)
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}));
     CHECK_EQUAL(tv.size(), results4.size());
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results4[i]);
     }
     std::vector<size_t> results4_rev = {1, 0, 2, 5, 4, 3};
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {true, false}));
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results4_rev[i]);
     }
     std::vector<size_t> results4_rev2 = {3, 4, 5, 2, 0, 1};
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, true}));
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev2[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results4_rev2[i]);
     }
     std::vector<size_t> results4_rev3 = {4, 3, 5, 2, 0, 1};
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, false}));
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev3[i]);
+        CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results4_rev3[i]);
     }
 }
-
 
 TEST(Query_LinkChainSortErrors)
 {
@@ -3544,15 +3509,15 @@ TEST(Query_LinkChainSortErrors)
     TableRef t1 = g.add_table("t1");
     TableRef t2 = g.add_table("t2");
 
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_linklist_col = t1->add_column_link(type_LinkList, "t1_linklist", *t2);
-    size_t t2_string_col = t2->add_column(type_String, "t2_string");
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_linklist_col = t1->add_column_link(type_LinkList, "t1_linklist", *t2);
+    auto t2_string_col = t2->add_column(type_String, "t2_string");
     t2->add_column_link(type_Link, "t2_link_t1", *t1); // add a backlink to t1
 
-    // Disallow backlinks, linklists, other non-link column types.
-    size_t backlink_ndx = 2;
+    // Disallow invalid column ids, linklists, other non-link column types.
+    ColKey backlink_ndx(2);
     CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{t1_linklist_col, t2_string_col}}), LogicError::type_mismatch);
-    CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{backlink_ndx, t2_string_col}}), LogicError::type_mismatch);
+    CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{backlink_ndx, t2_string_col}}), LogicError::column_does_not_exist);
     CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{t1_int_col, t2_string_col}}), LogicError::type_mismatch);
 }
 
@@ -3562,13 +3527,12 @@ TEST(Query_EmptyDescriptors)
     Group g;
     TableRef t1 = g.add_table("t1");
 
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
 
-    t1->add_empty_row(4);
-    t1->set_int(t1_int_col, 0, 4);
-    t1->set_int(t1_int_col, 1, 3);
-    t1->set_int(t1_int_col, 2, 2);
-    t1->set_int(t1_int_col, 3, 3);
+    t1->create_object().set(t1_int_col, 4);
+    t1->create_object().set(t1_int_col, 3);
+    t1->create_object().set(t1_int_col, 2);
+    t1->create_object().set(t1_int_col, 3);
 
     std::vector<size_t> results = {4, 3, 2, 3}; // original order
 
@@ -3576,14 +3540,14 @@ TEST(Query_EmptyDescriptors)
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor(*t1, {}));
         for (size_t i = 0; i < results.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
     {   // Distinct with an empty descriptor is a no-op
         TableView tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor(*t1, {}));
         for (size_t i = 0; i < results.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
     {   // Empty sort, empty distinct is still a no-op
@@ -3591,7 +3555,7 @@ TEST(Query_EmptyDescriptors)
         tv.sort(SortDescriptor(*t1, {}));
         tv.distinct(DistinctDescriptor(*t1, {}));
         for (size_t i = 0; i < results.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
     {   // Arbitrary compounded empty sort and distinct is still a no-op
@@ -3604,7 +3568,7 @@ TEST(Query_EmptyDescriptors)
         tv.distinct(DistinctDescriptor(*t1, {}));
         tv.distinct(DistinctDescriptor(*t1, {}));
         for (size_t i = 0; i < results.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
     {   // Empty distinct compounded on a valid distinct is a no-op
@@ -3614,7 +3578,7 @@ TEST(Query_EmptyDescriptors)
         tv.distinct(DistinctDescriptor(*t1, {}));
         results = {4, 3, 2};
         for (size_t i = 0; i < results.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
     {   // Empty sort compounded on a valid sort is a no-op
@@ -3624,19 +3588,19 @@ TEST(Query_EmptyDescriptors)
         tv.sort(SortDescriptor(*t1, {}));
         results = {2, 3, 3, 4};
         for (size_t i = 0; i < results.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
 }
-
 
 TEST(Query_DescriptorsWillApply)
 {
     Group g;
     TableRef t1 = g.add_table("t1");
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_str_col = t1->add_column(type_String, "t1_str");
-    t1->add_empty_row(1);
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(type_String, "t1_str");
+
+    t1->create_object();
 
     DescriptorOrdering ordering;
 
@@ -3674,32 +3638,34 @@ TEST(Query_DescriptorsWillApply)
     CHECK(ordering_copy.will_apply_distinct());
 }
 
-
 TEST(Query_DistinctAndSort)
 {
     Group g;
     TableRef t1 = g.add_table("t1");
     TableRef t2 = g.add_table("t2");
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_str_col = t1->add_column(type_String, "t1_str");
-    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
-    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
-    t1->add_empty_row(6);
-    t2->add_empty_row(6);
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(type_String, "t1_str");
+    auto t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    auto t2_int_col = t2->add_column(type_Int, "t2_int");
 
-    t1->set_int(0, 0, 1); t1->set_string(1, 0, "A"); t1->set_link(2, 0, 1);
-    t1->set_int(0, 1, 1); t1->set_string(1, 1, "A"); t1->set_link(2, 1, 0);
-    t1->set_int(0, 2, 1); t1->set_string(1, 2, "B"); t1->set_link(2, 2, 2);
-    t1->set_int(0, 3, 2); t1->set_string(1, 3, "B"); t1->set_link(2, 3, 3);
-    t1->set_int(0, 4, 2); t1->set_string(1, 4, "A"); t1->set_link(2, 4, 5);
-    t1->set_int(0, 5, 2); t1->set_string(1, 5, "A"); t1->set_link(2, 5, 4);
+    ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5});
+    ObjKeyVector t2_keys({10, 11, 12, 13, 14, 15});
+    t1->create_objects(t1_keys);
+    t2->create_objects(t2_keys);
 
-    t2->set_int(0, 0, 0);
-    t2->set_int(0, 1, 0);
-    t2->set_int(0, 2, 1);
-    t2->set_int(0, 3, 1);
-    t2->set_int(0, 4, 2);
-    t2->set_int(0, 5, 2);
+    t1->get_object(t1_keys[0]).set_all(1, "A", t2_keys[1]);
+    t1->get_object(t1_keys[1]).set_all(1, "A", t2_keys[0]);
+    t1->get_object(t1_keys[2]).set_all(1, "B", t2_keys[2]);
+    t1->get_object(t1_keys[3]).set_all(2, "B", t2_keys[3]);
+    t1->get_object(t1_keys[4]).set_all(2, "A", t2_keys[5]);
+    t1->get_object(t1_keys[5]).set_all(2, "A", t2_keys[4]);
+
+    t2->get_object(t2_keys[0]).set(t2_int_col, 0);
+    t2->get_object(t2_keys[1]).set(t2_int_col, 0);
+    t2->get_object(t2_keys[2]).set(t2_int_col, 1);
+    t2->get_object(t2_keys[3]).set(t2_int_col, 1);
+    t2->get_object(t2_keys[4]).set(t2_int_col, 2);
+    t2->get_object(t2_keys[5]).set(t2_int_col, 2);
 
     //     T1                              T2
     //   | t1_int   t1_str   t1_link_t2  | t2_int  |
@@ -3711,110 +3677,110 @@ TEST(Query_DistinctAndSort)
     // 4 | 2        "A"      5           | 2       |
     // 5 | 2        "A"      4           | 2       |
 
-    using ResultList = std::vector<std::pair<size_t, size_t>>; // value, index
+    using ResultList = std::vector<std::pair<size_t, ObjKey>>; // value, key
     {   // distinct with no sort keeps original order
         TableView tv = t1->where().find_all();
-        ResultList expected = {{1, 0}, {2, 3}};
+        ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[3]}};
         tv.distinct(t1_int_col);
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
     {   // distinct on a sorted view retains sorted order
         TableView tv = t1->where().find_all();
-        ResultList expected = {{1, 0}, {2, 4}};
+        ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[4]}};
         tv.sort(SortDescriptor(*t1, {{t1_str_col}, {t1_int_col}}));
         tv.distinct(t1_int_col);
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
     {   // distinct on a view sorted descending retains sorted order
         TableView tv = t1->where().find_all();
-        ResultList expected = {{2, 3}, {1, 2}};
+        ResultList expected = {{2, t1_keys[3]}, {1, t1_keys[2]}};
         tv.sort(SortDescriptor(*t1, {{t1_str_col}, {t1_int_col}},
                             {false /* descending */, false /* descending */}));
         tv.distinct(t1_int_col);
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
     {   // distinct on a sorted view (different from table order) retains sorted order
         TableView tv = t1->where().find_all();
-        ResultList expected = {{2, 3}, {1, 0}};
+        ResultList expected = {{2, t1_keys[3]}, {1, t1_keys[0]}};
         tv.sort(t1_int_col, false /* descending */);
         tv.distinct(t1_int_col);
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
     {   // distinct across links on an unsorted view retains original order
         TableView tv = t1->where().find_all();
-        ResultList expected = {{1, 0}, {1, 2}, {2, 4}};
+        ResultList expected = {{1, t1_keys[0]}, {1, t1_keys[2]}, {2, t1_keys[4]}};
         tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
     {   // distinct on a view sorted across links retains sorted order
         TableView tv = t1->where().find_all();
-        ResultList expected = {{1, 0}, {2, 3}};
+        ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[3]}};
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         tv.distinct(t1_int_col);
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
     {   // distinct across links and sort across links
         TableView tv = t1->where().find_all();
-        ResultList expected = {{1, 0}, {1, 2}, {2, 4}};
+        ResultList expected = {{1, t1_keys[0]}, {1, t1_keys[2]}, {2, t1_keys[4]}};
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(Query_SortDistinctOrderThroughHandover) {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = sg_w.begin_write();
 
     TableRef t1 = g.add_table("t1");
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_str_col = t1->add_column(type_String, "t1_str");
-    t1->add_empty_row(5);
-    t1->set_int(0, 0, 100); t1->set_string(1, 0, "A");
-    t1->set_int(0, 1, 200); t1->set_string(1, 1, "A");
-    t1->set_int(0, 2, 300); t1->set_string(1, 2, "A");
-    t1->set_int(0, 3, 300); t1->set_string(1, 3, "A");
-    t1->set_int(0, 4, 400); t1->set_string(1, 4, "A");
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(type_String, "t1_str");
+
+    ObjKey k0 = t1->create_object().set_all(100, "A").get_key();
+    ObjKey k1 = t1->create_object().set_all(200, "A").get_key();
+    ObjKey k2 = t1->create_object().set_all(300, "A").get_key();
+    t1->create_object().set_all(300, "A");
+    ObjKey k4 = t1->create_object().set_all(400, "A").get_key();
 
     LangBindHelper::commit_and_continue_as_read(sg_w);
-    SharedGroup::VersionID version_id = sg_w.get_version_of_current_transaction();
-    using HandoverPtr = std::unique_ptr<SharedGroup::Handover<TableView>>;
-    using ResultList = std::vector<std::pair<std::string, size_t>>;
+    DB::VersionID version_id = sg_w.get_version_of_current_transaction();
+    using HandoverPtr = std::unique_ptr<DB::Handover<TableView>>;
+    using ResultList = std::vector<std::pair<std::string, ObjKey>>;
 
     auto check_across_handover = [&](ResultList results, HandoverPtr handover) {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+        DB sg(*hist, SharedGroupOptions(crypt_key()));
         sg.begin_read();
         LangBindHelper::advance_read(sg, version_id);
         auto tv = sg.import_from_handover(std::move(handover));
@@ -3822,7 +3788,7 @@ TEST(Query_SortDistinctOrderThroughHandover) {
         CHECK(tv->is_in_sync());
         CHECK_EQUAL(tv->size(), results.size());
         for (size_t i = 0; i < tv->size(); ++i) {
-            CHECK_EQUAL(tv->get_string(1, i), results[i].first);
+            CHECK_EQUAL(tv->get(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv->get_key(i), results[i].second);
         }
         sg.end_read();
@@ -3839,13 +3805,13 @@ TEST(Query_SortDistinctOrderThroughHandover) {
 
     {   // sort descending then distinct
         TableView tv = t1->where().find_all();
-        ResultList results = {{"A", 4}};
+        ResultList results = {{"A", k4}};
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
         tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
 
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_string(1, i), results[i].first);
+            CHECK_EQUAL(tv.get(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
@@ -3853,12 +3819,12 @@ TEST(Query_SortDistinctOrderThroughHandover) {
     }
     {   // distinct then sort descending
         TableView tv = t1->where().find_all();
-        std::vector<std::pair<std::string, size_t>> results = {{"A", 0}};
+        std::vector<std::pair<std::string, ObjKey>> results = {{"A", k0}};
         tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_string(1, i), results[i].first);
+            CHECK_EQUAL(tv.get(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
@@ -3866,13 +3832,12 @@ TEST(Query_SortDistinctOrderThroughHandover) {
     }
     {   // sort descending then multicolumn distinct
         TableView tv = t1->where().find_all();
-        std::vector<std::pair<std::string, size_t>> results =
-            {{"A", 4}, {"A", 2}, {"A", 1}, {"A", 0}};
+        std::vector<std::pair<std::string, ObjKey>> results = {{"A", k4}, {"A", k2}, {"A", k1}, {"A", k0}};
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
         tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}, {t1_int_col}}));
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_string(1, i), results[i].first);
+            CHECK_EQUAL(tv.get(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
@@ -3880,13 +3845,12 @@ TEST(Query_SortDistinctOrderThroughHandover) {
     }
     {   // multicolumn distinct then sort descending
         TableView tv = t1->where().find_all();
-        std::vector<std::pair<std::string, size_t>> results =
-        {{"A", 4}, {"A", 2}, {"A", 1}, {"A", 0}};
+        std::vector<std::pair<std::string, ObjKey>> results = {{"A", k4}, {"A", k2}, {"A", k1}, {"A", k0}};
         tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}, {t1_int_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_string(1, i), results[i].first);
+            CHECK_EQUAL(tv.get(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
@@ -3898,29 +3862,28 @@ TEST(Query_SortDistinctOrderThroughHandover) {
 TEST(Query_CompoundDescriptors) {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    DB sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = sg_w.begin_write();
 
     TableRef t1 = g.add_table("t1");
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_str_col = t1->add_column(type_String, "t1_str");
-    t1->add_empty_row(6);
+    ColKey t1_int_col = t1->add_column(type_Int, "t1_int");
+    ColKey t1_str_col = t1->add_column(type_String, "t1_str");
 
-    t1->set_int(0, 0, 1); t1->set_string(1, 0, "A");
-    t1->set_int(0, 1, 1); t1->set_string(1, 1, "A");
-    t1->set_int(0, 2, 1); t1->set_string(1, 2, "B");
-    t1->set_int(0, 3, 2); t1->set_string(1, 3, "B");
-    t1->set_int(0, 4, 2); t1->set_string(1, 4, "A");
-    t1->set_int(0, 5, 2); t1->set_string(1, 5, "A");
+    ObjKey k0 = t1->create_object().set_all(1, "A").get_key();
+    ObjKey k1 = t1->create_object().set_all(1, "A").get_key();
+    ObjKey k2 = t1->create_object().set_all(1, "B").get_key();
+    ObjKey k3 = t1->create_object().set_all(2, "B").get_key();
+    ObjKey k4 = t1->create_object().set_all(2, "A").get_key();
+    ObjKey k5 = t1->create_object().set_all(2, "A").get_key();
 
     LangBindHelper::commit_and_continue_as_read(sg_w);
-    SharedGroup::VersionID version_id = sg_w.get_version_of_current_transaction();
-    using HandoverPtr = std::unique_ptr<SharedGroup::Handover<TableView>>;
-    using ResultList = std::vector<std::pair<size_t, size_t>>; // value, index
+    DB::VersionID version_id = sg_w.get_version_of_current_transaction();
+    using HandoverPtr = std::unique_ptr<DB::Handover<TableView>>;
+    using ResultList = std::vector<std::pair<size_t, ObjKey>>; // value, index
 
     auto check_across_handover = [&](ResultList results, HandoverPtr handover) {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+        DB sg(*hist, SharedGroupOptions(crypt_key()));
         sg.begin_read();
         LangBindHelper::advance_read(sg, version_id);
         auto tv = sg.import_from_handover(std::move(handover));
@@ -3928,7 +3891,7 @@ TEST(Query_CompoundDescriptors) {
         CHECK(tv->is_in_sync());
         CHECK_EQUAL(tv->size(), results.size());
         for (size_t i = 0; i < tv->size(); ++i) {
-            CHECK_EQUAL(tv->get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv->get(i).get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv->get_key(i), results[i].second);
         }
         sg.end_read();
@@ -3946,13 +3909,13 @@ TEST(Query_CompoundDescriptors) {
 
     {   // sorting twice should the same as a single sort with both criteria
         // but reversed: sort(a).sort(b) == sort(b, a)
-        ResultList results = {{2, 3}, {1, 2}, {2, 4}, {2, 5}, {1, 0}, {1, 1}};
+        ResultList results = {{2, k3}, {1, k2}, {2, k4}, {2, k5}, {1, k0}, {1, k1}};
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
         tv.sort(SortDescriptor(*t1, {{t1_str_col}}, {false}));
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
@@ -3962,7 +3925,7 @@ TEST(Query_CompoundDescriptors) {
         tv.sort(SortDescriptor(*t1, {{t1_str_col}, {t1_int_col}}, {false, false}));
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
@@ -3970,24 +3933,24 @@ TEST(Query_CompoundDescriptors) {
     }
 
     {   // two distincts are not the same as a single distinct with both criteria
-        ResultList results = {{1, 0}, {2, 3}};
+        ResultList results = {{1, k0}, {2, k3}};
         TableView tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
         tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
         check_across_handover(results, std::move(hp));
 
-        results = {{1, 0}, {1, 2}, {2, 3}, {2, 4}};
+        results = {{1, k0}, {1, k2}, {2, k3}, {2, k4}};
         tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}, {t1_str_col}}));
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
@@ -3998,10 +3961,10 @@ TEST(Query_CompoundDescriptors) {
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor(*t1, {{t1_str_col}, {t1_int_col}}, {true, true}));
         tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
-        ResultList results = {{1, 0}, {2, 4}};
+        ResultList results = {{1, k0}, {2, k4}};
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
@@ -4009,17 +3972,17 @@ TEST(Query_CompoundDescriptors) {
 
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false})); // = {{2, 4}, {1, 0}}
         tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));  // = {{2, 4}}
-        results = {{2, 4}};
+        results = {{2, k4}};
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
         check_across_handover(results, std::move(hp));
     }
 }
-
+#endif
 
 TEST(Query_DistinctThroughLinks)
 {
@@ -4028,48 +3991,50 @@ TEST(Query_DistinctThroughLinks)
     TableRef t2 = g.add_table("t2");
     TableRef t3 = g.add_table("t3");
 
-    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
-    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
-    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
-    size_t t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
-    size_t t3_int_col = t3->add_column(type_Int, "t3_int", true);
-    size_t t3_str_col = t3->add_column(type_String, "t3_str");
+    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
 
-    t1->add_empty_row(7);
-    t2->add_empty_row(6);
-    t3->add_empty_row(4);
+    auto t2_int_col = t2->add_column(type_Int, "t2_int");
+    auto t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
 
-    t1->set_int(t1_int_col, 0, 99);
+    auto t3_int_col = t3->add_column(type_Int, "t3_int", true);
+    auto t3_str_col = t3->add_column(type_String, "t3_str");
+
+    ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5, 6});
+    ObjKeyVector t2_keys({10, 11, 12, 13, 14, 15});
+    ObjKeyVector t3_keys({20, 21, 22, 23});
+    t1->create_objects(t1_keys);
+    t2->create_objects(t2_keys);
+    t3->create_objects(t3_keys);
+
+    t1->get_object(t1_keys[0]).set(t1_int_col, 99);
     for (size_t i = 0; i < t2->size(); i++) {
-        t1->set_int(t1_int_col, i + 1, i);
-        t2->set_int(t2_int_col, i, t2->size() - i - 1);
+        t1->get_object(t1_keys[i + 1]).set(t1_int_col, int64_t(i));
+        t2->get_object(t2_keys[i]).set(t2_int_col, int64_t(t2->size() - i - 1));
     }
-    t2->set_int(t2_int_col, 0, 0);
-    t2->set_int(t2_int_col, 1, 0);
+    t2->get_object(t2_keys[0]).set(t2_int_col, 0);
+    t2->get_object(t2_keys[1]).set(t2_int_col, 0);
 
-    t1->set_link(t1_link_col, 0, 1);
-    t1->set_link(t1_link_col, 1, 0);
-    t1->set_link(t1_link_col, 2, 2);
-    t1->set_link(t1_link_col, 3, 3);
-    t1->set_link(t1_link_col, 4, 5);
-    t1->set_link(t1_link_col, 5, 4);
-    t1->set_link(t1_link_col, 6, 1);
+    t1->get_object(t1_keys[0]).set(t1_link_col, t2_keys[1]);
+    t1->get_object(t1_keys[1]).set(t1_link_col, t2_keys[0]);
+    t1->get_object(t1_keys[2]).set(t1_link_col, t2_keys[2]);
+    t1->get_object(t1_keys[3]).set(t1_link_col, t2_keys[3]);
+    t1->get_object(t1_keys[4]).set(t1_link_col, t2_keys[5]);
+    t1->get_object(t1_keys[5]).set(t1_link_col, t2_keys[4]);
+    t1->get_object(t1_keys[6]).set(t1_link_col, t2_keys[1]);
 
-    t2->set_link(t2_link_col, 0, 3);
-    t2->set_link(t2_link_col, 1, 2);
-    t2->set_link(t2_link_col, 2, 0);
-    t2->set_link(t2_link_col, 3, 1);
-    t2->nullify_link(t2_link_col, 4);
-    t2->nullify_link(t2_link_col, 5);
+    t2->get_object(t2_keys[0]).set(t2_link_col, t3_keys[3]);
+    t2->get_object(t2_keys[1]).set(t2_link_col, t3_keys[2]);
+    t2->get_object(t2_keys[2]).set(t2_link_col, t3_keys[0]);
+    t2->get_object(t2_keys[3]).set(t2_link_col, t3_keys[1]);
 
-    t3->set_null(t3_int_col, 0);
-    t3->set_int(t3_int_col, 1, 4);
-    t3->set_int(t3_int_col, 2, 7);
-    t3->set_int(t3_int_col, 3, 3);
-    t3->set_string(t3_str_col, 0, "b");
-    t3->set_string(t3_str_col, 1, "a");
-    t3->set_string(t3_str_col, 2, "c");
-    t3->set_string(t3_str_col, 3, "k");
+    t3->get_object(t3_keys[1]).set(t3_int_col, 4);
+    t3->get_object(t3_keys[2]).set(t3_int_col, 7);
+    t3->get_object(t3_keys[3]).set(t3_int_col, 3);
+    t3->get_object(t3_keys[0]).set(t3_str_col, "b");
+    t3->get_object(t3_keys[1]).set(t3_str_col, "a");
+    t3->get_object(t3_keys[2]).set(t3_str_col, "c");
+    t3->get_object(t3_keys[3]).set(t3_str_col, "k");
 
     //  T1                       T2                     T3
     //  t1_int   t1_link_t2  |   t2_int  t2_link_t3 |   t3_int  t3_str
@@ -4090,22 +4055,22 @@ TEST(Query_DistinctThroughLinks)
         tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
         CHECK_EQUAL(tv.size(), results1.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results1[i]);
         }
         tv = t1->where().less(t1_int_col, 6).find_all();
         tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // results haven't been sorted
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results1[i]); // results haven't been sorted
         }
         tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // still same order here by conincidence
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results1[i]); // still same order here by conincidence
         }
         tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]); // now its reversed
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results1[results1.size() - 1 - i]); // now its reversed
         }
     }
 
@@ -4117,7 +4082,7 @@ TEST(Query_DistinctThroughLinks)
         tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         CHECK_EQUAL(tv.size(), results2.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results2[i]);
         }
 
         std::vector<size_t> results2_sorted_link = {0, 4, 2, 1};
@@ -4126,13 +4091,13 @@ TEST(Query_DistinctThroughLinks)
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
         CHECK_EQUAL(tv.size(), results2_sorted_link.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2_sorted_link[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results2_sorted_link[i]);
         }
         tv = t1->where().less(t1_int_col, 6).find_all();
         tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2_sorted_link[results2_sorted_link.size() - 1 - i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results2_sorted_link[results2_sorted_link.size() - 1 - i]);
         }
     }
 
@@ -4146,7 +4111,7 @@ TEST(Query_DistinctThroughLinks)
         // Nullified links are excluded from distinct.
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[i]);
         }
 
         results3 = {1, 0, 2, 5}; // sorted order on t3_col_int { null, 3, 4, 7 }
@@ -4155,303 +4120,172 @@ TEST(Query_DistinctThroughLinks)
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[i]);
         }
         tv = t1->where().less(t1_int_col, 6).find_all();
         tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[results3.size() - 1 - i]);
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[results3.size() - 1 - i]);
         }
     }
 }
 
-
 TEST(Query_Sort_And_Requery_Typed1)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table ttt;
+    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_str = ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a"); // 0 *
-    add(ttt, 2, "a"); // 1
-    add(ttt, 3, "X"); // 2
-    add(ttt, 1, "a"); // 3 *
-    add(ttt, 2, "a"); // 4
-    add(ttt, 3, "X"); // 5
-    add(ttt, 9, "a"); // 6 *
-    add(ttt, 8, "a"); // 7 *
-    add(ttt, 7, "X"); // 8
+    ttt.create_object().set_all(1, "a"); // 0 *
+    ttt.create_object().set_all(2, "a"); // 1
+    ttt.create_object().set_all(3, "X"); // 2
+    ttt.create_object().set_all(1, "a"); // 3 *
+    ttt.create_object().set_all(2, "a"); // 4
+    ttt.create_object().set_all(3, "X"); // 5
+    ttt.create_object().set_all(9, "a"); // 6 *
+    ttt.create_object().set_all(8, "a"); // 7 *
+    ttt.create_object().set_all(7, "X"); // 8
 
     // tv.get_key()  = 0, 2, 3, 5, 6, 7, 8
     // Vals         = 1, 3, 1, 3, 9, 8, 7
     // result       = 3, 0, 5, 2, 8, 7, 6
 
-    Query q = ttt.where().not_equal(0, 2);
+    Query q = ttt.where().not_equal(col_int, 2);
     TableView tv = q.find_all();
 
-    size_t match = ttt.where(&tv).equal(0, 7).find();
-    CHECK_EQUAL(match, 8);
+    ObjKey match = ttt.where(&tv).equal(col_int, 7).find();
+    CHECK_EQUAL(match, ObjKey(8));
 
-    tv.sort(0);
+    tv.sort(col_int);
 
     CHECK(tv.size() == 7);
-    CHECK(tv[0].get_int(0) == 1);
-    CHECK(tv[1].get_int(0) == 1);
-    CHECK(tv[2].get_int(0) == 3);
-    CHECK(tv[3].get_int(0) == 3);
-    CHECK(tv[4].get_int(0) == 7);
-    CHECK(tv[5].get_int(0) == 8);
-    CHECK(tv[6].get_int(0) == 9);
+    CHECK(tv[0].get<Int>(col_int) == 1);
+    CHECK(tv[1].get<Int>(col_int) == 1);
+    CHECK(tv[2].get<Int>(col_int) == 3);
+    CHECK(tv[3].get<Int>(col_int) == 3);
+    CHECK(tv[4].get<Int>(col_int) == 7);
+    CHECK(tv[5].get<Int>(col_int) == 8);
+    CHECK(tv[6].get<Int>(col_int) == 9);
 
-    Query q2 = ttt.where(&tv).not_equal(1, "X");
+    Query q2 = ttt.where(&tv).not_equal(col_str, "X");
     TableView tv2 = q2.find_all();
 
     CHECK_EQUAL(4, tv2.size());
-    CHECK_EQUAL(1, tv2[0].get_int(0));
-    CHECK_EQUAL(1, tv2[1].get_int(0));
-    CHECK_EQUAL(8, tv2[2].get_int(0)); // 8, 9 (sort order) instead of 9, 8 (table order)
-    CHECK_EQUAL(9, tv2[3].get_int(0));
+    CHECK_EQUAL(1, tv2[0].get<Int>(col_int));
+    CHECK_EQUAL(1, tv2[1].get<Int>(col_int));
+    CHECK_EQUAL(8, tv2[2].get<Int>(col_int)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv2[3].get<Int>(col_int));
 
-    match = ttt.where(&tv).not_equal(1, "X").find();
-    CHECK_EQUAL(match, 0);
+    match = ttt.where(&tv).not_equal(col_str, "X").find();
+    CHECK_EQUAL(match, ObjKey(0));
 
-    match = ttt.where(&tv).not_equal(1, "X").find(1);
-    CHECK_EQUAL(match, 3);
-
-    match = ttt.where(&tv).not_equal(1, "X").find(2);
-    CHECK_EQUAL(match, 3);
-
-    match = ttt.where(&tv).not_equal(1, "X").find(6);
-    CHECK_EQUAL(match, 7);
+    match = ttt.where(&tv).not_equal(col_str, "a").find();
+    CHECK_EQUAL(match, ObjKey(2));
 }
 
 
 TEST(Query_Sort_And_Requery_FindFirst)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_Int, "2");
+    Table ttt;
+    auto col_int0 = ttt.add_column(type_Int, "1");
+    auto col_int1 = ttt.add_column(type_Int, "2");
 
-    add(ttt, 1, 60);
-    add(ttt, 2, 50); // **
-    add(ttt, 3, 40); // *
-    add(ttt, 1, 30);
-    add(ttt, 2, 20); // **
-    add(ttt, 3, 10); // **
+    ttt.create_object().set_all(1, 60);
+    ttt.create_object().set_all(2, 50); // **
+    ttt.create_object().set_all(3, 40); // *
+    ttt.create_object().set_all(1, 30);
+    ttt.create_object().set_all(2, 20); // **
+    ttt.create_object().set_all(3, 10); // **
 
-    Query q = ttt.where().greater(0, 1);
+    Query q = ttt.where().greater(col_int0, 1);
     TableView tv = q.find_all();
-    tv.sort(1);
+    CHECK_EQUAL(tv.size(), 4);
+    tv.sort(col_int1);
 
-    // 3, 2, 1, 3, 2, 1
-    size_t t = ttt.where(&tv).equal(0, 3).find();
-    int64_t s = ttt.where(&tv).not_equal(1, 40).sum_int(0);
-
-    static_cast<void>(s);
-    static_cast<void>(t);
+    // 3, 2, 3, 2
+    ObjKey k = ttt.where(&tv).equal(col_int0, 3).find();
+    int64_t s = ttt.where(&tv).not_equal(col_int1, 40).sum_int(col_int0);
+    CHECK_EQUAL(k, ObjKey(5));
+    CHECK_EQUAL(s, 7);
 }
 
 
-TEST(Query_Sort_And_Requery_Untyped2)
+TEST(Query_Sort_And_Requery)
 {
     // New where(tableview) method
     Table table;
-    table.add_column(type_Int, "first1");
-    table.add_column(type_String, "second1");
+    auto col_int = table.add_column(type_Int, "first1");
+    auto col_str = table.add_column(type_String, "second1");
 
-    table.add_empty_row();
-    table.set_int(0, 0, 1);
-    table.set_string(1, 0, "a");
+    table.create_object().set_all(1, "a");
+    table.create_object().set_all(2, "a");
+    table.create_object().set_all(3, "X");
+    table.create_object().set_all(1, "a");
+    table.create_object().set_all(2, "a");
+    table.create_object().set_all(3, "X");
+    table.create_object().set_all(9, "a");
+    table.create_object().set_all(8, "a");
+    table.create_object().set_all(7, "X");
 
-    table.add_empty_row();
-    table.set_int(0, 1, 2);
-    table.set_string(1, 1, "a");
-
-    table.add_empty_row();
-    table.set_int(0, 2, 3);
-    table.set_string(1, 2, "X");
-
-    table.add_empty_row();
-    table.set_int(0, 3, 1);
-    table.set_string(1, 3, "a");
-
-    table.add_empty_row();
-    table.set_int(0, 4, 2);
-    table.set_string(1, 4, "a");
-
-    table.add_empty_row();
-    table.set_int(0, 5, 3);
-    table.set_string(1, 5, "X");
-
-    table.add_empty_row();
-    table.set_int(0, 6, 9);
-    table.set_string(1, 6, "a");
-
-    table.add_empty_row();
-    table.set_int(0, 7, 8);
-    table.set_string(1, 7, "a");
-
-    table.add_empty_row();
-    table.set_int(0, 8, 7);
-    table.set_string(1, 8, "X");
-
-    // tv.get_key()  = 0, 2, 3, 5, 6, 7, 8
-    // Vals         = 1, 3, 1, 3, 9, 8, 7
-    // result       = 3, 0, 5, 2, 8, 7, 6
-
-    Query q = table.where().not_equal(0, 2);
+    Query q = table.where().not_equal(col_int, 2);
     TableView tv = q.find_all();
-    tv.sort(0);
+    tv.sort(col_int);
 
     CHECK(tv.size() == 7);
 
-    CHECK(tv.get_int(0, 0) == 1);
-    CHECK(tv.get_int(0, 1) == 1);
-    CHECK(tv.get_int(0, 2) == 3);
-    CHECK(tv.get_int(0, 3) == 3);
-    CHECK(tv.get_int(0, 4) == 7);
-    CHECK(tv.get_int(0, 5) == 8);
-    CHECK(tv.get_int(0, 6) == 9);
+    CHECK(tv[0].get<Int>(col_int) == 1);
+    CHECK(tv[1].get<Int>(col_int) == 1);
+    CHECK(tv[2].get<Int>(col_int) == 3);
+    CHECK(tv[3].get<Int>(col_int) == 3);
+    CHECK(tv[4].get<Int>(col_int) == 7);
+    CHECK(tv[5].get<Int>(col_int) == 8);
+    CHECK(tv[6].get<Int>(col_int) == 9);
 
-    Query q2 = table.where(&tv).not_equal(1, "X");
+    Query q2 = table.where(&tv).not_equal(col_str, "X");
     TableView tv2 = q2.find_all();
 
     CHECK_EQUAL(4, tv2.size());
-    CHECK_EQUAL(1, tv2.get_int(0, 0));
-    CHECK_EQUAL(1, tv2.get_int(0, 1));
-    CHECK_EQUAL(8, tv2.get_int(0, 2)); // 8, 9 (sort order) instead of 9, 8 (table order)
-    CHECK_EQUAL(9, tv2.get_int(0, 3));
+    CHECK_EQUAL(1, tv2[0].get<Int>(col_int));
+    CHECK_EQUAL(1, tv2[1].get<Int>(col_int));
+    CHECK_EQUAL(8, tv2[2].get<Int>(col_int)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv2[3].get<Int>(col_int));
 
-    Query q3 = table.where(&tv2).not_equal(1, "X");
+    Query q3 = table.where(&tv2).not_equal(col_str, "X");
     TableView tv3 = q3.find_all();
 
     CHECK_EQUAL(4, tv3.size());
-    CHECK_EQUAL(1, tv3.get_int(0, 0));
-    CHECK_EQUAL(1, tv3.get_int(0, 1));
-    CHECK_EQUAL(8, tv3.get_int(0, 2)); // 8, 9 (sort order) instead of 9, 8 (table order)
-    CHECK_EQUAL(9, tv3.get_int(0, 3));
+    CHECK_EQUAL(1, tv3[0].get<Int>(col_int));
+    CHECK_EQUAL(1, tv3[1].get<Int>(col_int));
+    CHECK_EQUAL(8, tv3[2].get<Int>(col_int)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv3[3].get<Int>(col_int));
 
     // Test that remove() maintains order
     tv3.remove(0);
     // q5 and q3 should behave the same.
-    Query q5 = table.where(&tv2).not_equal(1, "X");
+    Query q5 = table.where(&tv2).not_equal(col_str, "X");
     TableView tv5 = q5.find_all();
     tv5.sync_if_needed(); // you may think tv5 is in sync, BUT it was generated from tv2 which wasn't
     // Note the side effect - as tv5 depends on ... on tv2 etc, all views are synchronized.
     CHECK_EQUAL(3, tv5.size());
-    CHECK_EQUAL(1, tv5.get_int(0, 0));
-    CHECK_EQUAL(8, tv5.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
-    CHECK_EQUAL(9, tv5.get_int(0, 2));
+    CHECK_EQUAL(1, tv5[0].get<Int>(col_int));
+    CHECK_EQUAL(8, tv5[1].get<Int>(col_int)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv5[2].get<Int>(col_int));
 
     CHECK_EQUAL(6, tv.size());
     CHECK_EQUAL(3, tv3.size());
-    CHECK_EQUAL(1, tv3.get_int(0, 0));
-    CHECK_EQUAL(8, tv3.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
-    CHECK_EQUAL(9, tv3.get_int(0, 2));
+    CHECK_EQUAL(1, tv3[0].get<Int>(col_int));
+    CHECK_EQUAL(8, tv3[1].get<Int>(col_int)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv3[2].get<Int>(col_int));
 
-    Query q4 = table.where(&tv3).not_equal(1, "X");
+    Query q4 = table.where(&tv3).not_equal(col_str, "X");
     TableView tv4 = q4.find_all();
 
     CHECK_EQUAL(3, tv4.size());
-    CHECK_EQUAL(1, tv4.get_int(0, 0));
-    CHECK_EQUAL(8, tv4.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
-    CHECK_EQUAL(9, tv4.get_int(0, 2));
-}
-
-
-TEST(Query_Sort_And_Requery_Untyped1)
-{
-    // More tests on new where(tv) query on tableviews
-    Table table;
-    table.add_column(type_Int, "first1");
-    table.add_column(type_String, "second1");
-
-    table.add_empty_row();
-    table.set_int(0, 0, 1);
-    table.set_string(1, 0, "a");
-
-    table.add_empty_row();
-    table.set_int(0, 1, 2);
-    table.set_string(1, 1, "a");
-
-    table.add_empty_row();
-    table.set_int(0, 2, 3);
-    table.set_string(1, 2, "X");
-
-    table.add_empty_row();
-    table.set_int(0, 3, 1);
-    table.set_string(1, 3, "a");
-
-    table.add_empty_row();
-    table.set_int(0, 4, 2);
-    table.set_string(1, 4, "a");
-
-    table.add_empty_row();
-    table.set_int(0, 5, 3);
-    table.set_string(1, 5, "X");
-
-    table.add_empty_row();
-    table.set_int(0, 6, 9);
-    table.set_string(1, 6, "a");
-
-    table.add_empty_row();
-    table.set_int(0, 7, 8);
-    table.set_string(1, 7, "a");
-
-    table.add_empty_row();
-    table.set_int(0, 8, 7);
-    table.set_string(1, 8, "X");
-
-
-    // tv.get_key()  = 0, 2, 3, 5, 6, 7, 8
-    // Vals         = 1, 3, 1, 3, 9, 8, 7
-    // result       = 3, 0, 5, 2, 8, 7, 6
-
-    Query q = table.where().not_equal(0, 2);
-    TableView tv = q.find_all();
-    tv.sort(0);
-
-    CHECK(tv.size() == 7);
-
-    CHECK(tv.get_int(0, 0) == 1);
-    CHECK(tv.get_int(0, 1) == 1);
-    CHECK(tv.get_int(0, 2) == 3);
-    CHECK(tv.get_int(0, 3) == 3);
-    CHECK(tv.get_int(0, 4) == 7);
-    CHECK(tv.get_int(0, 5) == 8);
-    CHECK(tv.get_int(0, 6) == 9);
-
-    Query q2 = table.where(&tv).not_equal(1, "X");
-    TableView tv2 = q2.find_all();
-
-    CHECK_EQUAL(4, tv2.size());
-    CHECK_EQUAL(1, tv2.get_int(0, 0));
-    CHECK_EQUAL(1, tv2.get_int(0, 1));
-    CHECK_EQUAL(8, tv2.get_int(0, 2)); // 8, 9 (sort order) instead of 9, 8 (table order)
-    CHECK_EQUAL(9, tv2.get_int(0, 3));
-
-    Query q3 = table.where(&tv2).not_equal(1, "X");
-    TableView tv3 = q3.find_all();
-
-    CHECK_EQUAL(4, tv3.size());
-
-    CHECK_EQUAL(4, tv3.size());
-    CHECK_EQUAL(1, tv3.get_int(0, 0));
-    CHECK_EQUAL(1, tv3.get_int(0, 1));
-    CHECK_EQUAL(8, tv3.get_int(0, 2)); // 8, 9 (sort order) instead of 9, 8 (table order)
-    CHECK_EQUAL(9, tv3.get_int(0, 3));
-
-    // Test remove()
-    tv3.remove(0);
-    Query q4 = table.where(&tv3).not_equal(1, "X");
-    TableView tv4 = q4.find_all();
-
-    CHECK_EQUAL(3, tv4.size());
-    CHECK_EQUAL(1, tv4.get_int(0, 0));
-    CHECK_EQUAL(8, tv4.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
-    CHECK_EQUAL(9, tv4.get_int(0, 2));
+    CHECK_EQUAL(1, tv4[0].get<Int>(col_int));
+    CHECK_EQUAL(8, tv4[1].get<Int>(col_int)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv4[2].get<Int>(col_int));
 }
 
 
@@ -4461,31 +4295,29 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
     for (int iter = 0; iter < 1; iter++) {
         size_t b;
         Table table;
-        table.add_column(type_Int, "first1");
-        table.add_column(type_Int, "second1");
+        auto col_int0 = table.add_column(type_Int, "first1");
+        auto col_int1 = table.add_column(type_Int, "second1");
 
         // Add random data to table
         for (size_t t = 0; t < 2 * REALM_MAX_BPNODE_SIZE; t++) {
-            table.add_empty_row();
             int64_t val1 = rand() % 5;
-            table.set_int(0, t, val1);
             int64_t val2 = rand() % 5;
-            table.set_int(1, t, val2);
+            table.create_object().set_all(val1, val2);
         }
 
         // Query and sort
-        Query q = table.where().equal(1, 2);
+        Query q = table.where().equal(col_int1, 2);
         TableView tv = q.find_all();
-        tv.sort(0);
+        tv.sort(col_int0);
 
         // Requery and keep original sort order
-        Query q2 = table.where(&tv).not_equal(0, 3);
+        Query q2 = table.where(&tv).not_equal(col_int0, 3);
         TableView tv2 = q2.find_all();
 
         b = 0;
         // Test if sort order is the same as original
         for (size_t t = 0; t < tv2.size(); t++) {
-            size_t a = tv2.get_key(t);
+            ObjKey a = tv2.get_key(t);
             REALM_ASSERT_EX(b < tv.size(), b, tv.size());
             while (a != tv.get_key(b)) {
                 b++;
@@ -4499,13 +4331,13 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         size_t remove = rand() % tv2.size();
         static_cast<void>(remove);
 
-        Query q3 = table.where(&tv2).not_equal(0, 2);
+        Query q3 = table.where(&tv2).not_equal(col_int0, 2);
         TableView tv3 = q3.find_all();
 
         b = 0;
         // Test if sort order is the same as original
         for (size_t t = 0; t < tv3.size(); t++) {
-            size_t a = tv3.get_key(t);
+            ObjKey a = tv3.get_key(t);
             REALM_ASSERT_EX(b < tv2.size(), b, tv2.size());
             while (a != tv2.get_key(b)) {
                 b++;
@@ -4514,10 +4346,10 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         }
 
         // Now test combinations of sorted and non-sorted tableviews
-        Query q4 = table.where().not_equal(0, 1);
+        Query q4 = table.where().not_equal(col_int0, 1);
         TableView tv4 = q4.find_all();
 
-        Query q5 = table.where(&tv4).not_equal(0, 2);
+        Query q5 = table.where(&tv4).not_equal(col_int0, 2);
         TableView tv5 = q5.find_all();
 
         for (size_t t = 1; t < tv5.size(); t++) {
@@ -4536,10 +4368,10 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         }
 
         // New test where both tableviews are sorted according to a column, and both sets are equal
-        Query q6 = table.where().not_equal(0, 2);
+        Query q6 = table.where().not_equal(col_int0, 2);
         TableView tv6 = q6.find_all();
 
-        Query q7 = table.where(&tv6).not_equal(0, 2);
+        Query q7 = table.where(&tv6).not_equal(col_int0, 2);
         TableView tv7 = q7.find_all();
 
         // Test that tv7 is ordered the same way as tv6
@@ -4553,8 +4385,8 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
             foreignindex = foreignindex2;
         }
 
-        tv7.sort(1);
-        tv6.sort(1);
+        tv7.sort(col_int1);
+        tv6.sort(col_int1);
 
         // Test that tv7 is ordered the same way as tv6
         foreignindex = 0;
@@ -4570,190 +4402,66 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
 }
 
 
-TEST(Query_Threads)
-{
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    // Spread query search hits in an odd way to test more edge cases
-    // (thread job size is THREAD_CHUNK_SIZE = 10)
-    for (int i = 0; i < 30; i++) {
-        for (int j = 0; j < 10; j++) {
-            add(ttt, 5, "a");
-            add(ttt, j, "b");
-            add(ttt, 6, "c");
-            add(ttt, 6, "a");
-            add(ttt, 6, "b");
-            add(ttt, 6, "c");
-            add(ttt, 6, "a");
-        }
-    }
-    Query q1 = ttt.where().equal(0, 2).equal(1, "b");
-
-    // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
-    // q1.set_threads(5);
-    TableView tv = q1.find_all();
-
-    CHECK_EQUAL(30, tv.size());
-    for (int i = 0; i < 30; i++) {
-        const size_t expected = i * 7 * 10 + 14 + 1;
-        const size_t actual = tv.get_key(i);
-        CHECK_EQUAL(expected, actual);
-    }
-}
-
-
-TEST(Query_LongString)
-{
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    // Spread query search hits in an odd way to test more edge cases
-    // (thread job size is THREAD_CHUNK_SIZE = 10)
-    for (int i = 0; i < 30; i++) {
-        for (int j = 0; j < 10; j++) {
-            add(ttt, 5, "aaaaaaaaaaaaaaaaaa");
-            add(ttt, j, "bbbbbbbbbbbbbbbbbb");
-            add(ttt, 6, "cccccccccccccccccc");
-            add(ttt, 6, "aaaaaaaaaaaaaaaaaa");
-            add(ttt, 6, "bbbbbbbbbbbbbbbbbb");
-            add(ttt, 6, "cccccccccccccccccc");
-            add(ttt, 6, "aaaaaaaaaaaaaaaaaa");
-        }
-    }
-    Query q1 = ttt.where().equal(0, 2).equal(1, "bbbbbbbbbbbbbbbbbb");
-
-    // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
-    // q1.set_threads(5);
-    TableView tv = q1.find_all();
-
-    CHECK_EQUAL(30, tv.size());
-    for (int i = 0; i < 30; i++) {
-        const size_t expected = i * 7 * 10 + 14 + 1;
-        const size_t actual = tv.get_key(i);
-        CHECK_EQUAL(expected, actual);
-    }
-}
-
-
-TEST(Query_LongEnum)
-{
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    // Spread query search hits in an odd way to test more edge cases
-    // (thread job size is THREAD_CHUNK_SIZE = 10)
-    for (int i = 0; i < 30; i++) {
-        for (int j = 0; j < 10; j++) {
-            add(ttt, 5, "aaaaaaaaaaaaaaaaaa");
-            add(ttt, j, "bbbbbbbbbbbbbbbbbb");
-            add(ttt, 6, "cccccccccccccccccc");
-            add(ttt, 6, "aaaaaaaaaaaaaaaaaa");
-            add(ttt, 6, "bbbbbbbbbbbbbbbbbb");
-            add(ttt, 6, "cccccccccccccccccc");
-            add(ttt, 6, "aaaaaaaaaaaaaaaaaa");
-        }
-    }
-    ttt.optimize();
-    Query q1 = ttt.where().equal(0, 2).not_equal(1, "aaaaaaaaaaaaaaaaaa");
-
-    // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
-    // q1.set_threads(5);
-    TableView tv = q1.find_all();
-
-    CHECK_EQUAL(30, tv.size());
-    for (int i = 0; i < 30; i++) {
-        const size_t expected = i * 7 * 10 + 14 + 1;
-        const size_t actual = tv.get_key(i);
-        CHECK_EQUAL(expected, actual);
-    }
-}
-
 TEST(Query_BigString)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table ttt;
+    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_str = ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a");
-    size_t res1 = ttt.where().equal(1, "a").find();
-    CHECK_EQUAL(0, res1);
+    ttt.create_object().set_all(1, "a");
+    ObjKey res1 = ttt.where().equal(col_str, "a").find();
+    CHECK_EQUAL(ttt.get_object(res1).get<Int>(col_int), 1);
 
-    add(ttt, 2, "40 chars  40 chars  40 chars  40 chars  ");
-    size_t res2 = ttt.where().equal(1, "40 chars  40 chars  40 chars  40 chars  ").find();
-    CHECK_EQUAL(1, res2);
+    const char* medium_string = "40 chars  40 chars  40 chars  40 chars  ";
+    ttt.create_object().set_all(2, medium_string);
+    ObjKey res2 = ttt.where().equal(col_str, medium_string).find();
+    CHECK_EQUAL(ttt.get_object(res2).get<Int>(col_int), 2);
 
-    add(ttt, 1, "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-    size_t res3 =
-        ttt.where().equal(1, "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ").find();
-    CHECK_EQUAL(2, res3);
-}
-
-TEST(Query_Simple2)
-{
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-
-    Query q1 = ttt.where().equal(0, 2);
-    TableView tv1 = q1.find_all();
-    CHECK_EQUAL(3, tv1.size());
-    CHECK_EQUAL(1, tv1.get_key(0));
-    CHECK_EQUAL(4, tv1.get_key(1));
-    CHECK_EQUAL(7, tv1.get_key(2));
+    const char* long_string = "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ";
+    ttt.create_object().set_all(3, long_string);
+    ObjKey res3 = ttt.where().equal(col_str, long_string).find();
+    CHECK_EQUAL(ttt.get_object(res3).get<Int>(col_int), 3);
 }
 
 
 TEST(Query_Limit)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
+    Table ttt;
+    auto col_id = ttt.add_column(type_Int, "id");
+    auto col_int = ttt.add_column(type_Int, "1");
     ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a");
-    add(ttt, 2, "a"); //
-    add(ttt, 3, "X");
-    add(ttt, 1, "a");
-    add(ttt, 2, "a"); //
-    add(ttt, 3, "X");
-    add(ttt, 1, "a");
-    add(ttt, 2, "a"); //
-    add(ttt, 3, "X");
-    add(ttt, 1, "a");
-    add(ttt, 2, "a"); //
-    add(ttt, 3, "X");
-    add(ttt, 1, "a");
-    add(ttt, 2, "a"); //
-    add(ttt, 3, "X");
+    ttt.create_object().set_all(0, 1, "a");
+    ttt.create_object().set_all(1, 2, "a"); //
+    ttt.create_object().set_all(2, 3, "X");
+    ttt.create_object().set_all(3, 1, "a");
+    ttt.create_object().set_all(4, 2, "a"); //
+    ttt.create_object().set_all(5, 3, "X");
+    ttt.create_object().set_all(6, 1, "a");
+    ttt.create_object().set_all(7, 2, "a"); //
+    ttt.create_object().set_all(8, 3, "X");
+    ttt.create_object().set_all(9, 1, "a");
+    ttt.create_object().set_all(10, 2, "a"); //
+    ttt.create_object().set_all(11, 3, "X");
+    ttt.create_object().set_all(12, 1, "a");
+    ttt.create_object().set_all(13, 2, "a"); //
+    ttt.create_object().set_all(14, 3, "X");
 
-    Query q1 = ttt.where().equal(0, 2);
+    Query q1 = ttt.where().equal(col_int, 2);
 
     TableView tv1 = q1.find_all(0, size_t(-1), 2);
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(1, tv1.get_key(0));
-    CHECK_EQUAL(4, tv1.get_key(1));
+    CHECK_EQUAL(1, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(4, tv1[1].get<Int>(col_id));
 
-    TableView tv2 = q1.find_all(tv1.get_key(tv1.size() - 1) + 1, size_t(-1), 2);
+    TableView tv2 = q1.find_all(5, size_t(-1), 2);
     CHECK_EQUAL(2, tv2.size());
-    CHECK_EQUAL(7, tv2.get_key(0));
-    CHECK_EQUAL(10, tv2.get_key(1));
+    CHECK_EQUAL(7, tv2[0].get<Int>(col_id));
+    CHECK_EQUAL(10, tv2[1].get<Int>(col_id));
 
-    TableView tv3 = q1.find_all(tv2.get_key(tv2.size() - 1) + 1, size_t(-1), 2);
+    TableView tv3 = q1.find_all(11, size_t(-1), 2);
     CHECK_EQUAL(1, tv3.size());
-    CHECK_EQUAL(13, tv3.get_key(0));
+    CHECK_EQUAL(13, tv3[0].get<Int>(col_id));
 
 
     Query q2 = ttt.where();
@@ -4766,550 +4474,392 @@ TEST(Query_Limit)
 }
 
 
-TEST(Query_FindNext)
-{
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 4, "a");
-    add(ttt, 5, "a");
-    add(ttt, 6, "X");
-    add(ttt, 7, "X");
-
-    Query q1 = ttt.where().equal(1, "X").greater(0, 4);
-
-    const size_t res1 = q1.find();
-    const size_t res2 = q1.find(res1 + 1);
-    const size_t res3 = q1.find(res2 + 1);
-
-    CHECK_EQUAL(5, res1);
-    CHECK_EQUAL(6, res2);
-    CHECK_EQUAL(not_found, res3); // no more matches
-
-    // Do same searches with new query every time
-    const size_t res4 = ttt.where().equal(1, "X").greater(0, 4).find();
-    const size_t res5 = ttt.where().equal(1, "X").greater(0, 4).find(res1 + 1);
-    const size_t res6 = ttt.where().equal(1, "X").greater(0, 4).find(res2 + 1);
-
-    CHECK_EQUAL(5, res4);
-    CHECK_EQUAL(6, res5);
-    CHECK_EQUAL(not_found, res6); // no more matches
-}
-
-
-TEST(Query_FindNextBackwards)
-{
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    // Create multiple leaves
-    for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 4; i++) {
-        add(ttt, 6, "X");
-        add(ttt, 7, "X");
-    }
-
-    Query q = ttt.where().greater(0, 4);
-
-    // Check if leaf caching works correctly in the case you go backwards. 'res' result is not so important
-    // in this test; this test tests if we assert errorneously. Next test (TestQueryFindRandom) is more exhaustive
-    size_t res = q.find(REALM_MAX_BPNODE_SIZE * 2);
-    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE * 2, res);
-    res = q.find(0);
-    CHECK_EQUAL(0, res);
-}
-
-
-// Begin search at arbitrary positions for *same* query object (other tests in this test_query file test same thing,
-// but for independent query objects) to test if leaf cacher works correctly (can go backwards, etc).
-TEST(Query_FindRandom)
-{
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    int64_t search = REALM_MAX_BPNODE_SIZE / 2;
-    size_t rows = REALM_MAX_BPNODE_SIZE * 20;
-
-    // Create multiple leaves
-    for (size_t i = 0; i < rows; i++) {
-        // This value distribution makes us sometimes cross a leaf boundary, and sometimes not, with both having
-        // a fair probability of happening
-        add(ttt, random.draw_int_mod(REALM_MAX_BPNODE_SIZE), "X");
-    }
-
-    Query q = ttt.where().equal(0, search);
-
-    for (size_t t = 0; t < 100; t++) {
-        size_t begin = random.draw_int_mod(rows);
-        size_t res = q.find(begin);
-
-        // Find correct match position manually in a for-loop
-        size_t expected = not_found;
-        for (size_t u = begin; u < rows; u++) {
-            if (ttt.get_int(0, u) == search) {
-                expected = u;
-                break;
-            }
-        }
-
-        // Compare .find() with manual for-loop-result
-        CHECK_EQUAL(expected, res);
-    }
-}
-
-TEST(Query_FindNext2)
-{
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 4, "a");
-    add(ttt, 5, "a");
-    add(ttt, 6, "X");
-    add(ttt, 7, "X"); // match
-
-    Query q1 = ttt.where().equal(1, "X").greater(0, 4);
-
-    const size_t res1 = q1.find(6);
-    CHECK_EQUAL(6, res1);
-}
-
 TEST(Query_FindAll1)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table ttt;
+    auto col_id = ttt.add_column(type_Int, "id");
+    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_str = ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 4, "a");
-    add(ttt, 5, "a");
-    add(ttt, 6, "X");
-    add(ttt, 7, "X");
+    ttt.create_object().set_all(0, 1, "a");
+    ttt.create_object().set_all(1, 2, "a");
+    ttt.create_object().set_all(2, 3, "X");
+    ttt.create_object().set_all(3, 4, "a");
+    ttt.create_object().set_all(4, 5, "a");
+    ttt.create_object().set_all(5, 6, "X");
+    ttt.create_object().set_all(6, 7, "X");
 
-    Query q1 = ttt.where().equal(1, "a").greater(0, 2).not_equal(0, 4);
+    Query q1 = ttt.where().equal(col_str, "a").greater(col_int, 2).not_equal(col_int, 4);
     TableView tv1 = q1.find_all();
-    CHECK_EQUAL(4, tv1.get_key(0));
+    CHECK_EQUAL(4, tv1[0].get<Int>(col_id));
 
-    Query q2 = ttt.where().equal(1, "X").greater(0, 4);
+    Query q2 = ttt.where().equal(col_str, "X").greater(col_int, 4);
     TableView tv2 = q2.find_all();
-    CHECK_EQUAL(5, tv2.get_key(0));
-    CHECK_EQUAL(6, tv2.get_key(1));
+    CHECK_EQUAL(tv2.size(), 2);
+    CHECK_EQUAL(5, tv2[0].get<Int>(col_id));
+    CHECK_EQUAL(6, tv2[1].get<Int>(col_id));
 }
 
 TEST(Query_FindAll2)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table ttt;
+    auto col_id = ttt.add_column(type_Int, "id");
+    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_str = ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 4, "a");
-    add(ttt, 5, "a");
-    add(ttt, 11, "X");
-    add(ttt, 0, "X");
+    ttt.create_object().set_all(0, 1, "a");
+    ttt.create_object().set_all(1, 2, "a");
+    ttt.create_object().set_all(2, 3, "X");
+    ttt.create_object().set_all(3, 4, "a");
+    ttt.create_object().set_all(4, 5, "a");
+    ttt.create_object().set_all(5, 11, "X");
+    ttt.create_object().set_all(6, 0, "X");
 
-    Query q2 = ttt.where().not_equal(1, "a").less(0, 3);
+    Query q2 = ttt.where().not_equal(col_str, "a").less(col_int, 3);
     TableView tv2 = q2.find_all();
-    CHECK_EQUAL(6, tv2.get_key(0));
+    CHECK_EQUAL(tv2.size(), 1);
+    CHECK_EQUAL(6, tv2[0].get<Int>(col_id));
 }
 
 TEST(Query_FindAllBetween)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
+    Table ttt;
+    auto col_id = ttt.add_column(type_Int, "id");
+    auto col_int = ttt.add_column(type_Int, "1");
     ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 4, "a");
-    add(ttt, 5, "a");
-    add(ttt, 11, "X");
-    add(ttt, 3, "X");
+    ttt.create_object().set_all(0, 1, "a");
+    ttt.create_object().set_all(1, 2, "a");
+    ttt.create_object().set_all(2, 3, "X");
+    ttt.create_object().set_all(3, 4, "a");
+    ttt.create_object().set_all(4, 5, "a");
+    ttt.create_object().set_all(5, 11, "X");
+    ttt.create_object().set_all(6, 3, "X");
 
-    Query q2 = ttt.where().between(0, 3, 5);
+    Query q2 = ttt.where().between(col_int, 3, 5);
     TableView tv2 = q2.find_all();
-    CHECK_EQUAL(2, tv2.get_key(0));
-    CHECK_EQUAL(3, tv2.get_key(1));
-    CHECK_EQUAL(4, tv2.get_key(2));
-    CHECK_EQUAL(6, tv2.get_key(3));
-}
-
-
-TEST(Query_FindAllRange)
-{
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    add(ttt, 5, "a");
-    add(ttt, 5, "a");
-    add(ttt, 5, "a");
-
-    Query q1 = ttt.where().equal(1, "a").greater(0, 2).not_equal(0, 4);
-    TableView tv1 = q1.find_all(1, 2);
-    CHECK_EQUAL(1, tv1.get_key(0));
+    CHECK_EQUAL(tv2.size(), 4);
+    CHECK_EQUAL(2, tv2[0].get<Int>(col_id));
+    CHECK_EQUAL(3, tv2[1].get<Int>(col_id));
+    CHECK_EQUAL(4, tv2[2].get<Int>(col_id));
+    CHECK_EQUAL(6, tv2[3].get<Int>(col_id));
 }
 
 
 TEST(Query_FindAllOr)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table ttt;
+    auto col_id = ttt.add_column(type_Int, "id");
+    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_str = ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 4, "a");
-    add(ttt, 5, "a");
-    add(ttt, 6, "a");
-    add(ttt, 7, "X");
+    ttt.create_object().set_all(0, 1, "a");
+    ttt.create_object().set_all(1, 2, "a");
+    ttt.create_object().set_all(2, 3, "X");
+    ttt.create_object().set_all(3, 4, "a");
+    ttt.create_object().set_all(4, 5, "a");
+    ttt.create_object().set_all(5, 6, "a");
+    ttt.create_object().set_all(6, 7, "X");
 
     // first == 5 || second == X
-    Query q1 = ttt.where().equal(0, 5).Or().equal(1, "X");
+    Query q1 = ttt.where().equal(col_int, 5).Or().equal(col_str, "X");
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
-    CHECK_EQUAL(2, tv1.get_key(0));
-    CHECK_EQUAL(4, tv1.get_key(1));
-    CHECK_EQUAL(6, tv1.get_key(2));
+    CHECK_EQUAL(2, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(4, tv1[1].get<Int>(col_id));
+    CHECK_EQUAL(6, tv1[2].get<Int>(col_id));
 }
 
 
 TEST(Query_FindAllParens1)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table ttt;
+    auto col_id = ttt.add_column(type_Int, "id");
+    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_str = ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 3, "X");
-    add(ttt, 4, "a");
-    add(ttt, 5, "a");
-    add(ttt, 11, "X");
+    ttt.create_object().set_all(0, 1, "a");
+    ttt.create_object().set_all(1, 2, "a");
+    ttt.create_object().set_all(2, 3, "X");
+    ttt.create_object().set_all(3, 3, "X");
+    ttt.create_object().set_all(4, 4, "a");
+    ttt.create_object().set_all(5, 5, "a");
+    ttt.create_object().set_all(6, 11, "X");
 
     // first > 3 && (second == X)
-    Query q1 = ttt.where().greater(0, 3).group().equal(1, "X").end_group();
+    Query q1 = ttt.where().greater(col_int, 3).group().equal(col_str, "X").end_group();
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(6, tv1.get_key(0));
+    CHECK_EQUAL(6, tv1[0].get<Int>(col_id));
 }
 
 
 TEST(Query_FindAllOrParan)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table ttt;
+    auto col_id = ttt.add_column(type_Int, "id");
+    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_str = ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X"); //
-    add(ttt, 4, "a");
-    add(ttt, 5, "a"); //
-    add(ttt, 6, "a");
-    add(ttt, 7, "X"); //
-    add(ttt, 2, "X");
+    ttt.create_object().set_all(0, 1, "a");
+    ttt.create_object().set_all(1, 2, "a");
+    ttt.create_object().set_all(2, 3, "X"); //
+    ttt.create_object().set_all(3, 4, "a");
+    ttt.create_object().set_all(4, 5, "a"); //
+    ttt.create_object().set_all(5, 6, "a");
+    ttt.create_object().set_all(6, 7, "X"); //
+    ttt.create_object().set_all(7, 2, "X");
 
     // (first == 5 || second == X && first > 2)
-    Query q1 = ttt.where().group().equal(0, 5).Or().equal(1, "X").greater(0, 2).end_group();
+    Query q1 = ttt.where().group().equal(col_int, 5).Or().equal(col_str, "X").greater(col_int, 2).end_group();
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
-    CHECK_EQUAL(2, tv1.get_key(0));
-    CHECK_EQUAL(4, tv1.get_key(1));
-    CHECK_EQUAL(6, tv1.get_key(2));
+    CHECK_EQUAL(2, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(4, tv1[1].get<Int>(col_id));
+    CHECK_EQUAL(6, tv1[2].get<Int>(col_id));
 }
 
 
 TEST(Query_FindAllOrNested0)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table ttt;
+    auto col_id = ttt.add_column(type_Int, "id");
+    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_str = ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 3, "X");
-    add(ttt, 4, "a");
-    add(ttt, 5, "a");
-    add(ttt, 11, "X");
-    add(ttt, 8, "Y");
+    ttt.create_object().set_all(0, 1, "a");
+    ttt.create_object().set_all(1, 2, "a");
+    ttt.create_object().set_all(2, 3, "X");
+    ttt.create_object().set_all(3, 3, "X");
+    ttt.create_object().set_all(4, 4, "a");
+    ttt.create_object().set_all(5, 5, "a");
+    ttt.create_object().set_all(6, 11, "X");
+    ttt.create_object().set_all(7, 8, "Y");
 
     // first > 3 && (first == 5 || second == X)
-    Query q1 = ttt.where().greater(0, 3).group().equal(0, 5).Or().equal(1, "X").end_group();
+    Query q1 = ttt.where().greater(col_int, 3).group().equal(col_int, 5).Or().equal(col_str, "X").end_group();
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(5, tv1.get_key(0));
-    CHECK_EQUAL(6, tv1.get_key(1));
+    CHECK_EQUAL(5, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(6, tv1[1].get<Int>(col_id));
 }
 
 TEST(Query_FindAllOrNested)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table ttt;
+    auto col_id = ttt.add_column(type_Int, "id");
+    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_str = ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 3, "X");
-    add(ttt, 4, "a");
-    add(ttt, 5, "a");
-    add(ttt, 11, "X");
-    add(ttt, 8, "Y");
+    ttt.create_object().set_all(0, 1, "a");
+    ttt.create_object().set_all(1, 2, "a");
+    ttt.create_object().set_all(2, 3, "X");
+    ttt.create_object().set_all(3, 3, "X");
+    ttt.create_object().set_all(4, 4, "a");
+    ttt.create_object().set_all(5, 5, "a");
+    ttt.create_object().set_all(6, 11, "X");
+    ttt.create_object().set_all(7, 8, "Y");
 
     // first > 3 && (first == 5 || second == X || second == Y)
-    Query q1 =
-        ttt.where().greater(0, 3).group().equal(0, 5).Or().equal(1, "X").Or().equal(1, "Y").end_group();
+    Query q1 = ttt.where()
+                   .greater(col_int, 3)
+                   .group()
+                   .equal(col_int, 5)
+                   .Or()
+                   .equal(col_str, "X")
+                   .Or()
+                   .equal(col_str, "Y")
+                   .end_group();
     TableView tv1 = q1.find_all();
-    CHECK_EQUAL(5, tv1.get_key(0));
-    CHECK_EQUAL(6, tv1.get_key(1));
-    CHECK_EQUAL(7, tv1.get_key(2));
+    CHECK_EQUAL(3, tv1.size());
+    CHECK_EQUAL(5, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(6, tv1[1].get<Int>(col_id));
+    CHECK_EQUAL(7, tv1[2].get<Int>(col_id));
 }
 
 TEST(Query_FindAllOrNestedInnerGroup)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table ttt;
+    auto col_id = ttt.add_column(type_Int, "id");
+    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_str = ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 3, "X");
-    add(ttt, 4, "a");
-    add(ttt, 5, "a");
-    add(ttt, 11, "X");
-    add(ttt, 8, "Y");
+    ttt.create_object().set_all(0, 1, "a");
+    ttt.create_object().set_all(1, 2, "a");
+    ttt.create_object().set_all(2, 3, "X");
+    ttt.create_object().set_all(3, 3, "X");
+    ttt.create_object().set_all(4, 4, "a");
+    ttt.create_object().set_all(5, 5, "a");
+    ttt.create_object().set_all(6, 11, "X");
+    ttt.create_object().set_all(7, 8, "Y");
 
     // first > 3 && (first == 5 || (second == X || second == Y))
     Query q1 = ttt.where()
-                                   .greater(0, 3)
-                                   .group()
-                                   .equal(0, 5)
-                                   .Or()
-                                   .group()
-                                   .equal(1, "X")
-                                   .Or()
-                                   .equal(1, "Y")
-                                   .end_group()
-                                   .end_group();
+                   .greater(col_int, 3)
+                   .group()
+                   .equal(col_int, 5)
+                   .Or()
+                   .group()
+                   .equal(col_str, "X")
+                   .Or()
+                   .equal(col_str, "Y")
+                   .end_group()
+                   .end_group();
     TableView tv1 = q1.find_all();
-    CHECK_EQUAL(5, tv1.get_key(0));
-    CHECK_EQUAL(6, tv1.get_key(1));
-    CHECK_EQUAL(7, tv1.get_key(2));
+    CHECK_EQUAL(3, tv1.size());
+    CHECK_EQUAL(5, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(6, tv1[1].get<Int>(col_id));
+    CHECK_EQUAL(7, tv1[2].get<Int>(col_id));
 }
 
 TEST(Query_FindAllOrPHP)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table ttt;
+    auto col_id = ttt.add_column(type_Int, "id");
+    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_str = ttt.add_column(type_String, "2");
 
-    add(ttt, 1, "Joe");
-    add(ttt, 2, "Sara");
-    add(ttt, 3, "Jim");
-
-    // (second == Jim || second == Joe) && first = 1
-    Query q1 =
-        ttt.where().group().equal(1, "Jim").Or().equal(1, "Joe").end_group().equal(0, 1);
-    TableView tv1 = q1.find_all();
-    CHECK_EQUAL(0, tv1.get_key(0));
-}
-
-TEST(Query_FindAllOr2)
-{
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    add(ttt, 1, "Joe");
-    add(ttt, 2, "Sara");
-    add(ttt, 3, "Jim");
+    ttt.create_object().set_all(0, 1, "Joe");
+    ttt.create_object().set_all(1, 2, "Sara");
+    ttt.create_object().set_all(2, 3, "Jim");
 
     // (second == Jim || second == Joe) && first = 1
-    Query q1 =
-        ttt.where().group().equal(1, "Jim").Or().equal(1, "Joe").end_group().equal(0, 3);
+    Query q1 = ttt.where().group().equal(col_str, "Jim").Or().equal(col_str, "Joe").end_group().equal(col_int, 1);
     TableView tv1 = q1.find_all();
-    CHECK_EQUAL(2, tv1.get_key(0));
-}
+    CHECK_EQUAL(0, tv1[0].get<Int>(col_id));
 
+    q1 = ttt.where().group().equal(col_str, "Jim").Or().equal(col_str, "Joe").end_group().equal(col_int, 3);
+    tv1 = q1.find_all();
+    CHECK_EQUAL(2, tv1[0].get<Int>(col_id));
+}
 
 TEST(Query_FindAllParens2)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table ttt;
+    auto col_id = ttt.add_column(type_Int, "id");
+    auto col_int = ttt.add_column(type_Int, "1");
 
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 3, "X");
-    add(ttt, 4, "a");
-    add(ttt, 5, "a");
-    add(ttt, 11, "X");
-
-    // ()((first > 3()) && (()))
-    Query q1 = ttt.where()
-                                   .group()
-                                   .end_group()
-                                   .group()
-                                   .group()
-                                   .greater(0, 3)
-                                   .group()
-                                   .end_group()
-                                   .end_group()
-                                   .group()
-                                   .group()
-                                   .end_group()
-                                   .end_group()
-                                   .end_group();
-    TableView tv1 = q1.find_all();
-    CHECK_EQUAL(3, tv1.size());
-    CHECK_EQUAL(4, tv1.get_key(0));
-    CHECK_EQUAL(5, tv1.get_key(1));
-    CHECK_EQUAL(6, tv1.get_key(2));
-}
-
-TEST(Query_FindAllParens4)
-{
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
-    add(ttt, 3, "X");
-    add(ttt, 4, "a");
-    add(ttt, 5, "a");
-    add(ttt, 11, "X");
+    ttt.create_object().set_all(0, 1);
+    ttt.create_object().set_all(1, 2);
+    ttt.create_object().set_all(2, 3);
+    ttt.create_object().set_all(3, 3);
+    ttt.create_object().set_all(4, 4);
+    ttt.create_object().set_all(5, 5);
+    ttt.create_object().set_all(6, 11);
 
     // ()
     Query q1 = ttt.where().group().end_group();
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(7, tv1.size());
+
+    // ()((first > 3()) && (()))
+    q1 = ttt.where()
+             .group()
+             .end_group()
+             .group()
+             .group()
+             .greater(col_int, 3)
+             .group()
+             .end_group()
+             .end_group()
+             .group()
+             .group()
+             .end_group()
+             .end_group()
+             .end_group();
+    tv1 = q1.find_all();
+    CHECK_EQUAL(3, tv1.size());
+    CHECK_EQUAL(4, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(5, tv1[1].get<Int>(col_id));
+    CHECK_EQUAL(6, tv1[2].get<Int>(col_id));
 }
 
 
 TEST(Query_FindAllBool)
 {
-    TestTable btt;
-    btt.add_column(type_Int, "1");
-    btt.add_column(type_Bool, "2");
+    Table table;
+    auto col_id = table.add_column(type_Int, "id");
+    auto col_bool = table.add_column(type_Bool, "2");
 
-    add(btt, 1, true);
-    add(btt, 2, false);
-    add(btt, 3, true);
-    add(btt, 3, false);
+    table.create_object().set_all(0, true);
+    table.create_object().set_all(1, false);
+    table.create_object().set_all(2, true);
+    table.create_object().set_all(3, false);
 
-    Query q1 = btt.where().equal(1, true);
+    Query q1 = table.where().equal(col_bool, true);
     TableView tv1 = q1.find_all();
-    CHECK_EQUAL(0, tv1.get_key(0));
-    CHECK_EQUAL(2, tv1.get_key(1));
+    CHECK_EQUAL(0, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(2, tv1[1].get<Int>(col_id));
 
-    Query q2 = btt.where().equal(1, false);
+    Query q2 = table.where().equal(col_bool, false);
     TableView tv2 = q2.find_all();
-    CHECK_EQUAL(1, tv2.get_key(0));
-    CHECK_EQUAL(3, tv2.get_key(1));
+    CHECK_EQUAL(1, tv2[0].get<Int>(col_id));
+    CHECK_EQUAL(3, tv2[1].get<Int>(col_id));
 }
 
 TEST(Query_FindAllBegins)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table table;
+    auto col_id = table.add_column(type_Int, "id");
+    auto col_str = table.add_column(type_String, "2");
 
-    add(ttt, 0, "fo");
-    add(ttt, 0, "foo");
-    add(ttt, 0, "foobar");
+    table.create_object().set_all(0, "fo");
+    table.create_object().set_all(1, "foo");
+    table.create_object().set_all(2, "foobar");
 
-    Query q1 = ttt.where().begins_with(1, "foo");
+    Query q1 = table.where().begins_with(col_str, "foo");
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(1, tv1.get_key(0));
-    CHECK_EQUAL(2, tv1.get_key(1));
+    CHECK_EQUAL(1, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(2, tv1[1].get<Int>(col_id));
 }
 
 TEST(Query_FindAllEnds)
 {
+    Table table;
+    auto col_id = table.add_column(type_Int, "id");
+    auto col_str = table.add_column(type_String, "2");
 
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    table.create_object().set_all(0, "barfo");
+    table.create_object().set_all(1, "barfoo");
+    table.create_object().set_all(2, "barfoobar");
 
-    add(ttt, 0, "barfo");
-    add(ttt, 0, "barfoo");
-    add(ttt, 0, "barfoobar");
-
-    Query q1 = ttt.where().ends_with(1, "foo");
+    Query q1 = table.where().ends_with(col_str, "foo");
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(1, tv1.get_key(0));
+    CHECK_EQUAL(1, tv1[0].get<Int>(col_id));
 }
 
 
 TEST(Query_FindAllContains)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table table;
+    auto col_id = table.add_column(type_Int, "id");
+    auto col_str = table.add_column(type_String, "2");
 
-    add(ttt, 0, "foo");
-    add(ttt, 0, "foobar");
-    add(ttt, 0, "barfoo");
-    add(ttt, 0, "barfoobaz");
-    add(ttt, 0, "fo");
-    add(ttt, 0, "fobar");
-    add(ttt, 0, "barfo");
+    table.create_object().set_all(0, "foo");
+    table.create_object().set_all(1, "foobar");
+    table.create_object().set_all(2, "barfoo");
+    table.create_object().set_all(3, "barfoobaz");
+    table.create_object().set_all(4, "fo");
+    table.create_object().set_all(5, "fobar");
+    table.create_object().set_all(6, "barfo");
 
-    Query q1 = ttt.where().contains(1, "foo");
+    Query q1 = table.where().contains(col_str, "foo");
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
-    CHECK_EQUAL(0, tv1.get_key(0));
-    CHECK_EQUAL(1, tv1.get_key(1));
-    CHECK_EQUAL(2, tv1.get_key(2));
-    CHECK_EQUAL(3, tv1.get_key(3));
-}
+    CHECK_EQUAL(0, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(1, tv1[1].get<Int>(col_id));
+    CHECK_EQUAL(2, tv1[2].get<Int>(col_id));
+    CHECK_EQUAL(3, tv1[3].get<Int>(col_id));
 
-TEST(Query_FindAllLike)
-{
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
-
-    add(ttt, 0, "foo");
-    add(ttt, 0, "foobar");
-    add(ttt, 0, "barfoo");
-    add(ttt, 0, "barfoobaz");
-    add(ttt, 0, "fo");
-    add(ttt, 0, "fobar");
-    add(ttt, 0, "barfo");
-
-    Query q1 = ttt.where().like(1, "*foo*");
-    TableView tv1 = q1.find_all();
+    q1 = table.where().like(col_str, "*foo*");
+    tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
-    CHECK_EQUAL(0, tv1.get_key(0));
-    CHECK_EQUAL(1, tv1.get_key(1));
-    CHECK_EQUAL(2, tv1.get_key(2));
-    CHECK_EQUAL(3, tv1.get_key(3));
+    CHECK_EQUAL(0, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(1, tv1[1].get<Int>(col_id));
+    CHECK_EQUAL(2, tv1[2].get<Int>(col_id));
+    CHECK_EQUAL(3, tv1[3].get<Int>(col_id));
 }
 
 TEST(Query_FindAllLikeStackOverflow)
@@ -5318,36 +4868,35 @@ TEST(Query_FindAllLikeStackOverflow)
     StringData sd(str);
 
     Table table;
-    table.add_column(type_String, "strings");
-    table.add_empty_row();
-    table.set_string(0, 0, sd);
+    auto col = table.add_column(type_String, "strings");
+    ObjKey k = table.create_object().set(col, sd).get_key();
 
-    table.where().like(0, sd).find();
+    auto res = table.where().like(col, sd).find();
+    CHECK_EQUAL(res, k);
 }
 
 TEST(Query_FindAllLikeCaseInsensitive)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table table;
+    auto col_id = table.add_column(type_Int, "id");
+    auto col_str = table.add_column(type_String, "2");
 
-    add(ttt, 0, "Foo");
-    add(ttt, 0, "FOOBAR");
-    add(ttt, 0, "BaRfOo");
-    add(ttt, 0, "barFOObaz");
-    add(ttt, 0, "Fo");
-    add(ttt, 0, "Fobar");
-    add(ttt, 0, "baRFo");
+    table.create_object().set_all(0, "Foo");
+    table.create_object().set_all(1, "FOOBAR");
+    table.create_object().set_all(2, "BaRfOo");
+    table.create_object().set_all(3, "barFOObaz");
+    table.create_object().set_all(4, "Fo");
+    table.create_object().set_all(5, "Fobar");
+    table.create_object().set_all(6, "baRFo");
 
-    Query q1 = ttt.where().like(1, "*foo*", false);
+    Query q1 = table.where().like(col_str, "*foo*", false);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
-    CHECK_EQUAL(0, tv1.get_key(0));
-    CHECK_EQUAL(1, tv1.get_key(1));
-    CHECK_EQUAL(2, tv1.get_key(2));
-    CHECK_EQUAL(3, tv1.get_key(3));
+    CHECK_EQUAL(0, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(1, tv1[1].get<Int>(col_id));
+    CHECK_EQUAL(2, tv1[2].get<Int>(col_id));
+    CHECK_EQUAL(3, tv1[3].get<Int>(col_id));
 }
-#endif
 
 TEST(Query_Binary)
 {
@@ -5426,46 +4975,34 @@ TEST(Query_Binary)
     }
 }
 
-#ifdef LEGACY_TESTS
 TEST(Query_Enums)
 {
-    TestTable t;
-    t.add_column(type_Int, "1");
-    t.add_column(type_String, "2");
+    Table table;
+    auto col_int = table.add_column(type_Int, "1");
+    auto col_str = table.add_column(type_String, "2");
+
 
     for (size_t i = 0; i < 5; ++i) {
-        add(t, 1, "abd");
-        add(t, 2, "eftg");
-        add(t, 5, "hijkl");
-        add(t, 8, "mnopqr");
-        add(t, 9, "stuvxyz");
+        table.create_object().set_all(1, "abd");
+        table.create_object().set_all(2, "eftg");
+        table.create_object().set_all(5, "hijkl");
+        table.create_object().set_all(8, "mnopqr");
+        table.create_object().set_all(9, "stuvxyz");
     }
 
-    t.optimize();
+    table.enumerate_string_column(col_str);
 
-    Query q1 = t.where().equal(1, "eftg");
+    Query q1 = table.where().equal(col_str, "eftg");
     TableView tv1 = q1.find_all();
 
     CHECK_EQUAL(5, tv1.size());
-    CHECK_EQUAL(1, tv1.get_key(0));
-    CHECK_EQUAL(6, tv1.get_key(1));
-    CHECK_EQUAL(11, tv1.get_key(2));
-    CHECK_EQUAL(16, tv1.get_key(3));
-    CHECK_EQUAL(21, tv1.get_key(4));
+    CHECK_EQUAL(2, tv1[0].get<Int>(col_int));
+    CHECK_EQUAL(2, tv1[1].get<Int>(col_int));
+    CHECK_EQUAL(2, tv1[2].get<Int>(col_int));
+    CHECK_EQUAL(2, tv1[3].get<Int>(col_int));
+    CHECK_EQUAL(2, tv1[4].get<Int>(col_int));
 }
 
-
-#define uY "\x0CE\x0AB"            // greek capital letter upsilon with dialytika (U+03AB)
-#define uYd "\x0CE\x0A5\x0CC\x088" // decomposed form (Y followed by two dots)
-#define uy "\x0CF\x08B"            // greek small letter upsilon with dialytika (U+03AB)
-#define uyd "\x0cf\x085\x0CC\x088" // decomposed form (Y followed by two dots)
-
-#define uA "\x0c3\x085"       // danish capital A with ring above (as in BLAABAERGROED)
-#define uAd "\x041\x0cc\x08a" // decomposed form (A (41) followed by ring)
-#define ua "\x0c3\x0a5"       // danish lower case a with ring above (as in blaabaergroed)
-#define uad "\x061\x0cc\x08a" // decomposed form (a (41) followed by ring)
-
-#endif // LEGACY_TESTS
 
 TEST_TYPES(Query_CaseSensitivity, std::true_type, std::false_type)
 {
@@ -5496,187 +5033,194 @@ TEST_TYPES(Query_CaseSensitivity, std::true_type, std::false_type)
     CHECK_EQUAL(3, tv3.size());
 }
 
-#ifdef LEGACY_TESTS
+#define uY "\x0CE\x0AB"            // greek capital letter upsilon with dialytika (U+03AB)
+#define uYd "\x0CE\x0A5\x0CC\x088" // decomposed form (Y followed by two dots)
+#define uy "\x0CF\x08B"            // greek small letter upsilon with dialytika (U+03AB)
+#define uyd "\x0cf\x085\x0CC\x088" // decomposed form (Y followed by two dots)
+
+#define uA "\x0c3\x085"       // danish capital A with ring above (as in BLAABAERGROED)
+#define uAd "\x041\x0cc\x08a" // decomposed form (A (41) followed by ring)
+#define ua "\x0c3\x0a5"       // danish lower case a with ring above (as in blaabaergroed)
+#define uad "\x061\x0cc\x08a" // decomposed form (a (41) followed by ring)
 
 #if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
 
 TEST(Query_Unicode2)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table table;
+    auto col_id = table.add_column(type_Int, "id");
+    auto col_str = table.add_column(type_String, "2");
 
-    add(ttt, 1, uY);
-    add(ttt, 1, uYd);
-    add(ttt, 1, uy);
-    add(ttt, 1, uyd);
+    table.create_object().set_all(0, uY);
+    table.create_object().set_all(1, uYd);
+    table.create_object().set_all(2, uy);
+    table.create_object().set_all(3, uyd);
 
-    Query q1 = ttt.where().equal(1, uY, false);
+    Query q1 = table.where().equal(col_str, uY, false);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(0, tv1.get_key(0));
-    CHECK_EQUAL(2, tv1.get_key(1));
+    CHECK_EQUAL(0, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(2, tv1[1].get<Int>(col_id));
 
-    Query q2 = ttt.where().equal(1, uYd, false);
+    Query q2 = table.where().equal(col_str, uYd, false);
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(2, tv2.size());
-    CHECK_EQUAL(1, tv2.get_key(0));
-    CHECK_EQUAL(3, tv2.get_key(1));
+    CHECK_EQUAL(1, tv2[0].get<Int>(col_id));
+    CHECK_EQUAL(3, tv2[1].get<Int>(col_id));
 
-    Query q3 = ttt.where().equal(1, uYd, true);
+    Query q3 = table.where().equal(col_str, uYd, true);
     TableView tv3 = q3.find_all();
     CHECK_EQUAL(1, tv3.size());
-    CHECK_EQUAL(1, tv3.get_key(0));
+    CHECK_EQUAL(1, tv3[0].get<Int>(col_id));
 }
 
 
 TEST(Query_Unicode3)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table table;
+    auto col_id = table.add_column(type_Int, "id");
+    auto col_str = table.add_column(type_String, "2");
 
-    add(ttt, 1, uA);
-    add(ttt, 1, uAd);
-    add(ttt, 1, ua);
-    add(ttt, 1, uad);
+    table.create_object().set_all(0, uA);
+    table.create_object().set_all(1, uAd);
+    table.create_object().set_all(2, ua);
+    table.create_object().set_all(3, uad);
 
-    Query q1 = ttt.where().equal(1, uA, false);
+    Query q1 = table.where().equal(col_str, uA, false);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(0, tv1.get_key(0));
-    CHECK_EQUAL(2, tv1.get_key(1));
+    CHECK_EQUAL(0, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(2, tv1[1].get<Int>(col_id));
 
-    Query q2 = ttt.where().equal(1, ua, false);
+    Query q2 = table.where().equal(col_str, ua, false);
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(2, tv2.size());
-    CHECK_EQUAL(0, tv2.get_key(0));
-    CHECK_EQUAL(2, tv2.get_key(1));
+    CHECK_EQUAL(0, tv2[0].get<Int>(col_id));
+    CHECK_EQUAL(2, tv2[1].get<Int>(col_id));
 
-
-    Query q3 = ttt.where().equal(1, uad, false);
+    Query q3 = table.where().equal(col_str, uad, false);
     TableView tv3 = q3.find_all();
     CHECK_EQUAL(2, tv3.size());
-    CHECK_EQUAL(1, tv3.get_key(0));
-    CHECK_EQUAL(3, tv3.get_key(1));
+    CHECK_EQUAL(1, tv3[0].get<Int>(col_id));
+    CHECK_EQUAL(3, tv3[1].get<Int>(col_id));
 
-    Query q4 = ttt.where().equal(1, uad, true);
+    Query q4 = table.where().equal(col_str, uad, true);
     TableView tv4 = q4.find_all();
     CHECK_EQUAL(1, tv4.size());
-    CHECK_EQUAL(3, tv4.get_key(0));
+    CHECK_EQUAL(3, tv4[0].get<Int>(col_id));
 }
 
 #endif
 
 TEST(Query_FindAllBeginsUnicode)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table table;
+    auto col_id = table.add_column(type_Int, "id");
+    auto col_str = table.add_column(type_String, "2");
 
-    add(ttt, 0, uad "fo");
-    add(ttt, 0, uad "foo");
-    add(ttt, 0, uad "foobar");
+    table.create_object().set_all(0, uad "fo");
+    table.create_object().set_all(1, uad "foo");
+    table.create_object().set_all(2, uad "foobar");
 
-    Query q1 = ttt.where().begins_with(1, uad "foo");
+    Query q1 = table.where().begins_with(col_str, uad "foo");
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
-    CHECK_EQUAL(1, tv1.get_key(0));
-    CHECK_EQUAL(2, tv1.get_key(1));
+    CHECK_EQUAL(1, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(2, tv1[1].get<Int>(col_id));
 }
 
 
 TEST(Query_FindAllEndsUnicode)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table table;
+    auto col_id = table.add_column(type_Int, "id");
+    auto col_str = table.add_column(type_String, "2");
 
-    add(ttt, 0, "barfo");
-    add(ttt, 0, "barfoo" uad);
-    add(ttt, 0, "barfoobar");
+    table.create_object().set_all(0, "barfo");
+    table.create_object().set_all(1, "barfoo" uad);
+    table.create_object().set_all(2, "barfoobar");
 
-    Query q1 = ttt.where().ends_with(1, "foo" uad);
+    Query q1 = table.where().ends_with(col_str, "foo" uad);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
-    CHECK_EQUAL(1, tv1.get_key(0));
+    CHECK_EQUAL(1, tv1[0].get<Int>(col_id));
 
-    Query q2 = ttt.where().ends_with(1, "foo" uAd, false);
+    Query q2 = table.where().ends_with(col_str, "foo" uAd, false);
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(1, tv2.size());
-    CHECK_EQUAL(1, tv2.get_key(0));
+    CHECK_EQUAL(1, tv2[0].get<Int>(col_id));
 }
 
 
 TEST(Query_FindAllContainsUnicode)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table table;
+    auto col_id = table.add_column(type_Int, "id");
+    auto col_str = table.add_column(type_String, "2");
 
-    add(ttt, 0, uad "foo");
-    add(ttt, 0, uad "foobar");
-    add(ttt, 0, "bar" uad "foo");
-    add(ttt, 0, uad "bar" uad "foobaz");
-    add(ttt, 0, uad "fo");
-    add(ttt, 0, uad "fobar");
-    add(ttt, 0, uad "barfo");
+    table.create_object().set_all(0, uad "foo");
+    table.create_object().set_all(1, uad "foobar");
+    table.create_object().set_all(2, "bar" uad "foo");
+    table.create_object().set_all(3, uad "bar" uad "foobaz");
+    table.create_object().set_all(4, uad "fo");
+    table.create_object().set_all(5, uad "fobar");
+    table.create_object().set_all(6, uad "barfo");
 
-    Query q1 = ttt.where().contains(1, uad "foo");
+    Query q1 = table.where().contains(col_str, uad "foo");
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
-    CHECK_EQUAL(0, tv1.get_key(0));
-    CHECK_EQUAL(1, tv1.get_key(1));
-    CHECK_EQUAL(2, tv1.get_key(2));
-    CHECK_EQUAL(3, tv1.get_key(3));
+    CHECK_EQUAL(0, tv1[0].get<Int>(col_id));
+    CHECK_EQUAL(1, tv1[1].get<Int>(col_id));
+    CHECK_EQUAL(2, tv1[2].get<Int>(col_id));
+    CHECK_EQUAL(3, tv1[3].get<Int>(col_id));
 
-    Query q2 = ttt.where().contains(1, uAd "foo", false);
-    TableView tv2 = q1.find_all();
+    Query q2 = table.where().contains(col_str, uAd "foo", false);
+    TableView tv2 = q2.find_all();
     CHECK_EQUAL(4, tv2.size());
-    CHECK_EQUAL(0, tv2.get_key(0));
-    CHECK_EQUAL(1, tv2.get_key(1));
-    CHECK_EQUAL(2, tv2.get_key(2));
-    CHECK_EQUAL(3, tv2.get_key(3));
+    CHECK_EQUAL(0, tv2[0].get<Int>(col_id));
+    CHECK_EQUAL(1, tv2[1].get<Int>(col_id));
+    CHECK_EQUAL(2, tv2[2].get<Int>(col_id));
+    CHECK_EQUAL(3, tv2[3].get<Int>(col_id));
 }
 
 TEST(Query_SyntaxCheck)
 {
-    TestTable ttt;
-    ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    Table table;
+    auto col_int = table.add_column(type_Int, "1");
+    table.add_column(type_String, "2");
 
     std::string s;
 
-    add(ttt, 1, "a");
-    add(ttt, 2, "a");
-    add(ttt, 3, "X");
+    table.create_object().set_all(1, "a");
+    table.create_object().set_all(2, "a");
+    table.create_object().set_all(3, "X");
 
-    Query q1 = ttt.where().equal(0, 2).end_group();
+    Query q1 = table.where().equal(col_int, 2).end_group();
     s = q1.validate();
     CHECK(s != "");
 
-    Query q2 = ttt.where().group().group().equal(0, 2).end_group();
+    Query q2 = table.where().group().group().equal(col_int, 2).end_group();
     s = q2.validate();
     CHECK(s != "");
 
-    Query q3 = ttt.where().equal(0, 2).Or();
+    Query q3 = table.where().equal(col_int, 2).Or();
     s = q3.validate();
     CHECK(s != "");
 
-    Query q4 = ttt.where().Or().equal(0, 2);
+    Query q4 = table.where().Or().equal(col_int, 2);
     s = q4.validate();
     CHECK(s != "");
 
-    Query q5 = ttt.where().equal(0, 2);
+    Query q5 = table.where().equal(col_int, 2);
     s = q5.validate();
     CHECK(s == "");
 
-    Query q6 = ttt.where().group().equal(0, 2);
+    Query q6 = table.where().group().equal(col_int, 2);
     s = q6.validate();
     CHECK(s != "");
 
     // FIXME: Work is currently underway to fully support locale
-    // indenepdent case folding as defined by Unicode. Reenable this test
+    // independent case folding as defined by Unicode. Reenable this test
     // when is becomes available.
     /*
     Query q7 = ttt.where().equal(1, "\xa0", false);
@@ -5687,129 +5231,50 @@ TEST(Query_SyntaxCheck)
     */
 }
 
-TEST(Query_SubtableSyntaxCheck)
-{
-    Group group;
-    TableRef table = group.add_table("test");
-    std::string s;
-
-    // Create specification with sub-table
-    DescriptorRef subdesc;
-    table->add_column(type_Int, "first");
-    table->add_column(type_String, "second");
-    table->add_column(type_Table, "third", &subdesc);
-    subdesc->add_column(type_Int, "sub_first");
-    subdesc->add_column(type_String, "sub_second");
-
-    // Main table
-    table->insert_empty_row(0);
-    table->set_int(0, 0, 111);
-    table->set_string(1, 0, "this");
-
-    table->insert_empty_row(1);
-    table->set_int(0, 1, 222);
-    table->set_string(1, 1, "is");
-
-    table->insert_empty_row(2);
-    table->set_int(0, 2, 333);
-    table->set_string(1, 2, "a test");
-
-    table->insert_empty_row(3);
-    table->set_int(0, 3, 444);
-    table->set_string(1, 3, "of queries");
-
-
-    // Sub tables
-    TableRef subtable = table->get_subtable(2, 0);
-    subtable->insert_empty_row(0);
-    subtable->set_int(0, 0, 11);
-    subtable->set_string(1, 0, "a");
-
-    subtable = table->get_subtable(2, 1);
-    subtable->insert_empty_row(0);
-    subtable->set_int(0, 0, 22);
-    subtable->set_string(1, 0, "b");
-    subtable->insert_empty_row(1);
-    subtable->set_int(0, 1, 33);
-    subtable->set_string(1, 1, "c");
-
-    subtable = table->get_subtable(2, 2);
-    subtable->insert_empty_row(0);
-    subtable->set_int(0, 0, 44);
-    subtable->set_string(1, 0, "d");
-
-    subtable = table->get_subtable(2, 3);
-    subtable->insert_empty_row(0);
-    subtable->set_int(0, 0, 55);
-    subtable->set_string(1, 0, "e");
-
-    Query q1 = table->where();
-    q1.subtable(2);
-    q1.greater(0, 50);
-    s = q1.validate();
-    CHECK(s != "");
-
-    Query q2 = table->where();
-    q2.subtable(2);
-    q2.greater(0, 50);
-    q2.end_subtable();
-    s = q2.validate();
-    CHECK(s == "");
-
-    Query q3 = table->where();
-    q3.greater(0, 50);
-    q3.end_subtable();
-    s = q3.validate();
-    CHECK(s != "");
-}
-
-
 TEST(Query_TestTV_where)
 {
     // When using .where(&tv), tv can have any order, and the resulting view will retain its order
-    TestTable t;
-    t.add_column(type_Int, "1");
-    t.add_column(type_String, "2");
+    Table table;
+    auto col_int = table.add_column(type_Int, "1");
+    auto col_str = table.add_column(type_String, "2");
 
-    add(t, 1, "a");
-    add(t, 2, "a");
-    add(t, 3, "c");
+    table.create_object().set_all(1, "a");
+    table.create_object().set_all(2, "a");
+    table.create_object().set_all(3, "c");
 
-    TableView v = t.where().greater(0, 1).find_all();
+    TableView v = table.where().greater(col_int, 1).find_all();
 
-    Query q1 = t.where(&v);
+    Query q1 = table.where(&v);
     CHECK_EQUAL(2, q1.count());
 
-    Query q3 = t.where(&v).equal(1, "a");
+    Query q3 = table.where(&v).equal(col_str, "a");
     CHECK_EQUAL(1, q3.count());
 
-    Query q4 = t.where(&v).between(0, 3, 6);
+    Query q4 = table.where(&v).between(col_int, 3, 6);
     CHECK_EQUAL(1, q4.count());
 }
-#endif
 
-#ifdef LEGACY_TESTS
+
 TEST(Query_SumMinMaxAvg)
 {
     Table t;
 
     auto int_col = t.add_column(type_Int, "1");
-    t.add_column(type_String, "2");
-    t.add_column(type_Timestamp, "3");
-    t.add_column(type_Float, "4");
-    t.add_column(type_Double, "5");
+    auto date_col = t.add_column(type_Timestamp, "3");
+    auto float_col = t.add_column(type_Float, "4");
+    auto double_col = t.add_column(type_Double, "5");
 
     std::vector<ObjKey> keys;
     t.create_objects(9, keys);
-    t.get_object(keys[0]).set_all(1, "a", Timestamp{200, 0}, 1.0f, 2.0);
-    t.get_object(keys[1]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 1.0);
-    t.get_object(keys[2]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 1.0);
-    t.get_object(keys[3]).set_all(1, "a", Timestamp{100, 0}, 1.0f, 1.0);
-    t.get_object(keys[4]).set_all(2, "b", Timestamp{300, 0}, 3.0f, 3.0);
-    t.get_object(keys[5]).set_all(3, "c", Timestamp{50, 0}, 5.0f, 5.0);
-    t.get_object(keys[6]).set_all(0, "a", Timestamp{100, 0}, 1.0f, 1.0);
-    t.get_object(keys[7]).set_all(0, "b", Timestamp{3000, 0}, 30.0f, 30.0);
-    t.get_object(keys[8]).set_all(0, "c", Timestamp{5, 0}, 0.5f, 0.5);
+    t.get_object(keys[0]).set_all(1, Timestamp{200, 0}, 1.0f, 2.0);
+    t.get_object(keys[1]).set_all(1, Timestamp{100, 0}, 1.0f, 1.0);
+    t.get_object(keys[2]).set_all(1, Timestamp{100, 0}, 1.0f, 1.0);
+    t.get_object(keys[3]).set_all(1, Timestamp{100, 0}, 1.0f, 1.0);
+    t.get_object(keys[4]).set_all(2, Timestamp{300, 0}, 3.0f, 3.0);
+    t.get_object(keys[5]).set_all(3, Timestamp{50, 0}, 5.0f, 5.0);
+    t.get_object(keys[6]).set_all(0, Timestamp{100, 0}, 1.0f, 1.0);
+    t.get_object(keys[7]).set_all(0, Timestamp{3000, 0}, 30.0f, 30.0);
+    t.get_object(keys[8]).set_all(0, Timestamp{5, 0}, 0.5f, 0.5);
 
     CHECK_EQUAL(9, t.where().sum_int(int_col));
 
@@ -5821,188 +5286,82 @@ TEST(Query_SumMinMaxAvg)
     t.where().maximum_int(int_col, &resindex);
     CHECK_EQUAL(keys[5], resindex);
 
-    t.where().minimum_int(0, &resindex);
+    t.where().minimum_int(int_col, &resindex);
     CHECK_EQUAL(keys[6], resindex);
 
-    t.where().maximum_float(3, &resindex);
+    t.where().maximum_float(float_col, &resindex);
     CHECK_EQUAL(keys[7], resindex);
 
-    t.where().minimum_float(3, &resindex);
+    t.where().minimum_float(float_col, &resindex);
     CHECK_EQUAL(keys[8], resindex);
 
-    t.where().maximum_double(4, &resindex);
+    t.where().maximum_double(double_col, &resindex);
     CHECK_EQUAL(keys[7], resindex);
 
-    t.where().minimum_double(4, &resindex);
+    t.where().minimum_double(double_col, &resindex);
     CHECK_EQUAL(keys[8], resindex);
 
-    t.where().maximum_timestamp(2, &resindex);
+    t.where().maximum_timestamp(date_col, &resindex);
     CHECK_EQUAL(keys[7], resindex);
 
-    t.where().minimum_timestamp(2, &resindex);
+    t.where().minimum_timestamp(date_col, &resindex);
     CHECK_EQUAL(keys[8], resindex);
 
     // Now with condition (tests another code path in Array::minmax())
-    t.where().not_equal(0, 0).minimum_double(4, &resindex);
+    t.where().not_equal(int_col, 0).minimum_double(double_col, &resindex);
     CHECK_EQUAL(keys[1], resindex);
 
-    t.where().not_equal(0, 0).minimum_float(3, &resindex);
+    t.where().not_equal(int_col, 0).minimum_float(float_col, &resindex);
     CHECK_EQUAL(keys[0], resindex);
 
-    t.where().not_equal(0, 0).minimum_timestamp(2, &resindex);
+    t.where().not_equal(int_col, 0).minimum_timestamp(date_col, &resindex);
     CHECK_EQUAL(keys[5], resindex);
 
-    t.where().not_equal(0, 0).maximum_timestamp(2, &resindex);
+    t.where().not_equal(int_col, 0).maximum_timestamp(date_col, &resindex);
     CHECK_EQUAL(keys[4], resindex);
 
-    CHECK_APPROXIMATELY_EQUAL(1, t.where().average_int(0), 0.001);
+    CHECK_APPROXIMATELY_EQUAL(1, t.where().average_int(int_col), 0.001);
 
-    CHECK_EQUAL(t.where().maximum_timestamp(2), Timestamp(3000, 0));
-    CHECK_EQUAL(t.where().minimum_timestamp(2), Timestamp(5, 0));
+    CHECK_EQUAL(t.where().maximum_timestamp(date_col), Timestamp(3000, 0));
+    CHECK_EQUAL(t.where().minimum_timestamp(date_col), Timestamp(5, 0));
 }
-#endif
 
-#ifdef LEGACY_TESTS
-TEST(Query_SumMinMaxAvg_where)
-{
-    TestTable t;
-
-    t.add_column(type_Int, "1");
-    t.add_column(type_String, "2");
-    t.add_column(type_OldDateTime, "3");
-    t.add_column(type_Float, "4");
-    t.add_column(type_Double, "5");
-
-    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 2, "b", OldDateTime(300), 3.0f, 3.0);
-    add(t, 3, "c", OldDateTime(50), 5.0f, 5.0);
-    add(t, 0, "a", OldDateTime(100), 1.0f, 1.0);
-    add(t, 0, "b", OldDateTime(3000), 30.0f, 30.0);
-    add(t, 0, "c", OldDateTime(5), 0.5f, 0.5);
-
-    TableView v = t.where().find_all();
-
-    CHECK_EQUAL(9, t.where(&v).sum_int(0));
-
-    CHECK_EQUAL(0, t.where(&v).minimum_int(0));
-    CHECK_EQUAL(3, t.where(&v).maximum_int(0));
-
-    ObjKey resindex;
-
-    t.where(&v).maximum_int(0, &resindex);
-    CHECK_EQUAL(5, resindex);
-
-    t.where(&v).minimum_int(0, &resindex);
-    CHECK_EQUAL(6, resindex);
-
-    t.where(&v).maximum_float(3, &resindex);
-    CHECK_EQUAL(7, resindex);
-
-    t.where(&v).minimum_float(3, &resindex);
-    CHECK_EQUAL(8, resindex);
-
-    t.where(&v).maximum_double(4, &resindex);
-    CHECK_EQUAL(7, resindex);
-
-    t.where(&v).minimum_double(4, &resindex);
-    CHECK_EQUAL(8, resindex);
-
-    CHECK_APPROXIMATELY_EQUAL(1, t.where(&v).average_int(0), 0.001);
-
-    size_t cnt;
-    CHECK_EQUAL(0, t.where(&v).sum_int(0, &cnt, 0, 0));
-    CHECK_EQUAL(0, cnt);
-    CHECK_EQUAL(0, t.where(&v).sum_int(0, &cnt, 1, 1));
-    CHECK_EQUAL(0, cnt);
-    CHECK_EQUAL(0, t.where(&v).sum_int(0, &cnt, 2, 2));
-    CHECK_EQUAL(0, cnt);
-
-    CHECK_EQUAL(1, t.where(&v).sum_int(0, &cnt, 0, 1));
-    CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(2, t.where(&v).sum_int(0, &cnt, 4, 5));
-    CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(3, t.where(&v).sum_int(0, &cnt, 5, 6));
-    CHECK_EQUAL(1, cnt);
-
-    CHECK_EQUAL(2, t.where(&v).sum_int(0, &cnt, 0, 2));
-    CHECK_EQUAL(2, cnt);
-    CHECK_EQUAL(5, t.where(&v).sum_int(0, &cnt, 1, 5));
-    CHECK_EQUAL(4, cnt);
-
-    CHECK_EQUAL(3, t.where(&v).sum_int(0, &cnt, 0, 3));
-    CHECK_EQUAL(3, cnt);
-    CHECK_EQUAL(9, t.where(&v).sum_int(0, &cnt, 0, size_t(-1)));
-    CHECK_EQUAL(9, cnt);
-}
 
 TEST(Query_Avg)
 {
-    TestTable t;
-    t.add_column(type_Int, "1");
-    t.add_column(type_String, "2");
+    Table t;
+    auto col = t.add_column(type_Int, "1");
 
-    size_t cnt;
-    add(t, 10, "a");
-    CHECK_EQUAL(10, t.where().average_int(0));
-    add(t, 30, "b");
-    CHECK_EQUAL(20, t.where().average_int(0));
-
-    CHECK_EQUAL(0, t.where().average_int(0, nullptr, 0, 0));   // none
-    CHECK_EQUAL(0, t.where().average_int(0, nullptr, 1, 1));   // none
-    CHECK_EQUAL(20, t.where().average_int(0, nullptr, 0, 2));  // both
-    CHECK_EQUAL(20, t.where().average_int(0, nullptr, 0, -1)); // both
-
-    CHECK_EQUAL(10, t.where().average_int(0, &cnt, 0, 1)); // first
-
-    CHECK_EQUAL(30, t.where().sum_int(0, nullptr, 1, 2));     // second
-    CHECK_EQUAL(30, t.where().average_int(0, nullptr, 1, 2)); // second
+    t.create_object().set(col, 10);
+    CHECK_EQUAL(10, t.where().average_int(col));
+    t.create_object().set(col, 30);
+    CHECK_EQUAL(20, t.where().average_int(col));
 }
 
 TEST(Query_Avg2)
 {
-    TestTable t;
-    t.add_column(type_Int, "1");
-    t.add_column(type_String, "2");
+    Table t;
+    auto col_int = t.add_column(type_Int, "1");
+    auto col_str = t.add_column(type_String, "2");
 
     size_t cnt;
 
-    add(t, 10, "a");
-    add(t, 100, "b");
-    add(t, 20, "a");
-    add(t, 100, "b");
-    add(t, 100, "b");
-    add(t, 30, "a");
-    Query q = t.where().equal(1, "a");
-    CHECK_EQUAL(3, q.count());
-    q.sum_int(0);
+    t.create_object().set_all(10, "a");
+    t.create_object().set_all(100, "b");
+    t.create_object().set_all(20, "a");
+    t.create_object().set_all(100, "b");
+    t.create_object().set_all(100, "b");
+    t.create_object().set_all(30, "a");
 
-    CHECK_EQUAL(60, t.where().equal(1, "a").sum_int(0));
+    CHECK_EQUAL(60, t.where().equal(col_str, "a").sum_int(col_int));
 
-    CHECK_EQUAL(0, t.where().equal(1, "a").average_int(0, &cnt, 0, 0));
-    CHECK_EQUAL(0, t.where().equal(1, "a").average_int(0, &cnt, 1, 1));
-    CHECK_EQUAL(0, t.where().equal(1, "a").average_int(0, &cnt, 2, 2));
-    CHECK_EQUAL(0, cnt);
-
-    CHECK_EQUAL(10, t.where().equal(1, "a").average_int(0, &cnt, 0, 1));
-    CHECK_EQUAL(20, t.where().equal(1, "a").average_int(0, &cnt, 1, 5));
-    CHECK_EQUAL(30, t.where().equal(1, "a").average_int(0, &cnt, 5, 6));
-    CHECK_EQUAL(1, cnt);
-
-    CHECK_EQUAL(15, t.where().equal(1, "a").average_int(0, &cnt, 0, 3));
-    CHECK_EQUAL(20, t.where().equal(1, "a").average_int(0, &cnt, 2, 5));
-    CHECK_EQUAL(1, cnt);
-
-    CHECK_EQUAL(20, t.where().equal(1, "a").average_int(0, &cnt));
+    CHECK_EQUAL(20, t.where().equal(col_str, "a").average_int(col_int, &cnt));
     CHECK_EQUAL(3, cnt);
-    CHECK_EQUAL(15, t.where().equal(1, "a").average_int(0, &cnt, 0, 3));
-    CHECK_EQUAL(2, cnt);
-    CHECK_EQUAL(20, t.where().equal(1, "a").average_int(0, &cnt, 0, size_t(-1)));
+    CHECK_EQUAL(100, t.where().equal(col_str, "b").average_int(col_int, &cnt));
     CHECK_EQUAL(3, cnt);
 }
 
+#ifdef LEGACY_TESTS
 TEST(Query_OfByOne)
 {
     TestTable t;
@@ -9268,26 +8627,25 @@ TEST(Query_Timestamp)
     CHECK_EQUAL(match, null_key); // Note that (null < null) == false
 }
 
-#ifdef LEGACY_TESTS
 TEST(Query_Timestamp_Null)
 {
     // Test that querying for null on non-nullable column (with default value being non-null value) is
     // possible (i.e. does not throw or fail) and also gives no search matches.
     Table table;
-    size_t match;
+    ObjKey match;
 
-    table.add_column(type_Timestamp, "first", false);
-    table.add_column(type_Timestamp, "second", true);
-    table.add_empty_row();
+    auto col0 = table.add_column(type_Timestamp, "first", false);
+    auto col1 = table.add_column(type_Timestamp, "second", true);
+    ObjKey k0 = table.create_object().get_key();
 
-    Columns<Timestamp> first = table.column<Timestamp>(0);
-    Columns<Timestamp> second = table.column<Timestamp>(1);
+    Columns<Timestamp> first = table.column<Timestamp>(col0);
+    Columns<Timestamp> second = table.column<Timestamp>(col1);
 
     match = (first == Timestamp{}).find();
-    CHECK_EQUAL(match, npos);
+    CHECK_EQUAL(match, null_key);
 
     match = (second == Timestamp{}).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, k0);
 }
 
 // Ensure that coyping a Query copies a restricting TableView if the query owns the view.
@@ -9318,7 +8676,6 @@ TEST(Query_CopyRestrictingTableViewWhenOwned)
         CHECK_EQUAL(0, q2.count());
     }
 }
-#endif // LEGACY_TESTS
 
 TEST(Query_SyncViewIfNeeded)
 {
@@ -9420,16 +8777,15 @@ TEST(Query_SyncViewIfNeeded)
     }
 }
 
-#ifdef LEGACY_TESTS
 // Ensure that two queries can be combined via Query::and_query, &&, and || even if one of them has no conditions.
 TEST(Query_CombineWithEmptyQueryDoesntCrash)
 {
     Table table;
-    size_t col_id = table.add_column(type_Int, "id");
-    table.add_empty_row(3);
-    table.set_int(col_id, 0, 0);
-    table.set_int(col_id, 1, 1);
-    table.set_int(col_id, 2, 2);
+    auto col_id = table.add_column(type_Int, "id");
+
+    table.create_object().set(col_id, 0);
+    table.create_object().set(col_id, 1);
+    table.create_object().set(col_id, 2);
 
     {
         Query q = table.where().equal(col_id, 1);
@@ -9481,25 +8837,24 @@ TEST(Query_CombineWithEmptyQueryDoesntCrash)
 TEST(Query_AccountForRestrictingViews)
 {
     Table table;
-    size_t col_id = table.add_column(type_Int, "id");
-    table.add_empty_row(3);
-    table.set_int(col_id, 0, 42);
-    table.set_int(col_id, 1, 43);
-    table.set_int(col_id, 2, 44);
+    auto col_id = table.add_column(type_Int, "id");
+
+    table.create_object().set(col_id, 42);
+    table.create_object().set(col_id, 43);
+    table.create_object().set(col_id, 44);
 
     {
         // Create initial table view
         TableView results = table.where().equal(col_id, 44).find_all();
         CHECK_EQUAL(1, results.size());
-        CHECK_EQUAL(44, results.get(0).get_int(col_id));
+        CHECK_EQUAL(44, results[0].get<Int>(col_id));
 
         // Create query based on restricting view
         Query q = Query(results.get_parent().where(&results));
-        size_t table_index = q.find(0);
-        CHECK_EQUAL(2, table_index);
+        ObjKey obj_key = q.find();
+        CHECK_EQUAL(obj_key, results.get_key(0));
     }
 }
-#endif // LEGACY_TESTS
 
 /*
 
@@ -9971,6 +9326,86 @@ TEST(Query_LinksTo)
     q = source->column<Link>(col_linklist) != target->get_object(target_keys[7]);
     found_key = q.find();
     CHECK_EQUAL(found_key, source_keys[2]);
+}
+
+TEST(Query_Group_bug)
+{
+    // Tests for a bug in queries with OR nodes at different nesting levels
+
+    Group g;
+    TableRef service_table = g.add_table("service");
+    TableRef profile_table = g.add_table("profile");
+    TableRef person_table = g.add_table("person");
+
+    auto col_service_id = service_table->add_column(type_String, "id");
+    auto col_service_link = service_table->add_column_link(type_LinkList, "profiles", *profile_table);
+
+    auto col_profile_id = profile_table->add_column(type_String, "role");
+    auto col_profile_link = profile_table->add_column_link(type_Link, "services", *service_table);
+
+    auto col_person_id = person_table->add_column(type_String, "id");
+    auto col_person_link = person_table->add_column_link(type_LinkList, "services", *service_table);
+
+    auto sk0 = service_table->create_object().set(col_service_id, "service_1").get_key();
+    auto sk1 = service_table->create_object().set(col_service_id, "service_2").get_key();
+
+    auto pk0 = profile_table->create_object().set(col_profile_id, "profile_1").get_key();
+    auto pk1 = profile_table->create_object().set(col_profile_id, "profile_2").get_key();
+    auto pk2 = profile_table->create_object().set(col_profile_id, "profile_3").get_key();
+    auto pk3 = profile_table->create_object().set(col_profile_id, "profile_4").get_key();
+    auto pk4 = profile_table->create_object().set(col_profile_id, "profile_5").get_key();
+
+    {
+        auto ll0 = service_table->get_object(sk0).get_linklist(col_service_link);
+        auto ll1 = service_table->get_object(sk1).get_linklist(col_service_link);
+        ll0.add(pk0);
+        ll0.add(pk1);
+        ll1.add(pk2);
+        ll0.add(pk3);
+        ll0.add(pk4);
+    }
+
+    profile_table->get_object(pk0).set(col_profile_link, sk0);
+    profile_table->get_object(pk1).set(col_profile_link, sk0);
+    profile_table->get_object(pk2).set(col_profile_link, sk1);
+    profile_table->get_object(pk3).set(col_profile_link, sk0);
+    profile_table->get_object(pk4).set(col_profile_link, sk0);
+
+    person_table->create_object().set(col_person_id, "person_1").get_linklist(col_person_link).add(sk0);
+    person_table->create_object().set(col_person_id, "person_2").get_linklist(col_person_link).add(sk0);
+    person_table->create_object().set(col_person_id, "person_3").get_linklist(col_person_link).add(sk1);
+    person_table->create_object().set(col_person_id, "person_4").get_linklist(col_person_link).add(sk0);
+    person_table->create_object().set(col_person_id, "person_5").get_linklist(col_person_link).add(sk0);
+
+    realm::Query q0 =
+        person_table->where()
+            .group()
+
+            .group()
+            .and_query(person_table->link(col_person_link)
+                           .link(col_service_link)
+                           .column<String>(col_profile_id)
+                           .equal("profile_1"))
+            .Or()
+            .and_query(person_table->link(col_person_link)
+                           .link(col_service_link)
+                           .column<String>(col_profile_id)
+                           .equal("profile_2"))
+            .end_group()
+
+            .group()
+            .and_query(person_table->link(col_person_link).column<String>(col_service_id).equal("service_1"))
+            .end_group()
+
+            .end_group()
+
+            .Or()
+
+            .group()
+            .equal(col_person_id, "person_3")
+            .end_group();
+
+    CHECK_EQUAL(5, q0.count());
 }
 
 #endif // TEST_QUERY

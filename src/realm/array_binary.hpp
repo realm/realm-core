@@ -69,6 +69,7 @@ public:
     }
     void insert(size_t ndx, BinaryData value);
     BinaryData get(size_t ndx) const;
+    BinaryData get_at(size_t ndx, size_t& pos) const;
     bool is_null(size_t ndx) const;
     void erase(size_t ndx);
     void truncate_and_destroy_children(size_t ndx);

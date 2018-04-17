@@ -24,7 +24,6 @@ set(NORMAL_TESTS
     test_binary_data.cpp
     test_bplus_tree.cpp
     test_column.cpp
-    test_column_binary.cpp
     test_column_float.cpp
     test_column_string.cpp
     test_column_timestamp.cpp
@@ -65,7 +64,6 @@ set(NORMAL_TESTS
     test_util_logger.cpp
     test_util_memory_stream.cpp
     test_util_overload.cpp
-    test_util_scope_exit.cpp
     test_util_stringbuffer.cpp
     test_util_to_string.cpp
     test_util_type_list.cpp
@@ -119,19 +117,20 @@ if (MSVC)
     set_source_files_properties(test_query.cpp test_query_big.cpp PROPERTIES COMPILE_FLAGS /bigobj)
 endif()
 
-add_executable(realm-tests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
+add_executable(CoreTests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
+set_target_properties(CoreTests PROPERTIES OUTPUT_NAME "realm-tests")
 
 if(CMAKE_GENERATOR STREQUAL Xcode)
-    set_target_properties(realm-tests PROPERTIES
+    set_target_properties(CoreTests PROPERTIES
                           MACOSX_BUNDLE YES
                           RESOURCE "${REQUIRED_TEST_FILES}")
 endif()
 
-target_link_libraries(realm-tests
-                      test-util realm-parser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
+target_link_libraries(CoreTests
+                      TestUtil QueryParser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
 )
 
-target_include_directories(realm-tests PUBLIC ${EXTRA_TEST_CFLAGS})
+target_include_directories(CoreTests PUBLIC ${EXTRA_TEST_CFLAGS})
 
 add_test(NAME RealmTests COMMAND realm-tests)
 

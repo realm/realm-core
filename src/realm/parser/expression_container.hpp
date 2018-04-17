@@ -25,6 +25,7 @@
 #include "parser.hpp"
 #include "property_expression.hpp"
 #include "query_builder.hpp"
+#include "subquery_expression.hpp"
 #include "value_expression.hpp"
 
 namespace realm {
@@ -33,7 +34,8 @@ namespace parser {
 class ExpressionContainer
 {
 public:
-    ExpressionContainer(Query& query, const parser::Expression& e, query_builder::Arguments& args);
+    ExpressionContainer(Query& query, const parser::Expression& e, query_builder::Arguments& args,
+                        parser::KeyPathMapping& mapping);
 
     bool is_null();
 
@@ -46,12 +48,12 @@ public:
     CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>& get_count();
     CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>& get_size_string();
     CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeBinary>& get_size_binary();
+    SubqueryExpression& get_subexpression();
 
     DataType check_type_compatibility(DataType type);
     DataType get_comparison_type(ExpressionContainer& rhs);
 
-    enum class ExpressionInternal
-    {
+    enum class ExpressionInternal {
         exp_Value,
         exp_Property,
         exp_OpMin,
@@ -60,7 +62,8 @@ public:
         exp_OpAvg,
         exp_OpCount,
         exp_OpSizeString,
-        exp_OpSizeBinary
+        exp_OpSizeBinary,
+        exp_SubQuery
     };
 
     ExpressionInternal type;

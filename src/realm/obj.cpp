@@ -27,6 +27,7 @@
 #include "realm/array_key.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/column_type_traits.hpp"
+#include "realm/index_string.hpp"
 #include "realm/cluster_tree.hpp"
 #include "realm/spec.hpp"
 #include "realm/replication.hpp"
@@ -64,10 +65,10 @@ inline int ConstObj::cmp(const ConstObj& other, size_t col_ndx) const
     T val1 = _get<T>(col_ndx);
     T val2 = other._get<T>(col_ndx);
     if (val1 < val2) {
-        return 1;
+        return -1;
     }
     else if (val1 > val2) {
-        return -1;
+        return 1;
     }
     return 0;
 }
@@ -80,7 +81,10 @@ int ConstObj::cmp(const ConstObj& other, size_t col_ndx) const
 
     switch (spec.get_public_column_type(col_ndx)) {
         case type_Int:
-            return cmp<Int>(other, col_ndx);
+            if (attr.test(col_attr_Nullable))
+                return cmp<util::Optional<Int>>(other, col_ndx);
+            else
+                return cmp<Int>(other, col_ndx);
         case type_Bool:
             return cmp<Bool>(other, col_ndx);
         case type_Float:
@@ -200,6 +204,14 @@ T ConstObj::_get(size_t col_ndx) const
     values.init_from_ref(ref);
 
     return values.get(m_row_ndx);
+}
+
+ConstObj ConstObj::get_linked_object(ColKey link_col_key) const
+{
+    TableRef target_table = get_target_table(link_col_key);
+    ObjKey key = get<ObjKey>(link_col_key);
+
+    return target_table->get_object(key);
 }
 
 template <class T>

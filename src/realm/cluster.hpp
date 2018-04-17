@@ -19,6 +19,7 @@
 #ifndef REALM_CLUSTER_HPP
 #define REALM_CLUSTER_HPP
 
+#include <realm/keys.hpp>
 #include <realm/array.hpp>
 #include <realm/array_unsigned.hpp>
 #include <realm/data_type.hpp>
@@ -33,58 +34,6 @@ class ClusterNodeInner;
 class ClusterTree;
 class ColumnAttrMask;
 struct CascadeState;
-
-struct ObjKey {
-    constexpr ObjKey()
-        : value(-1)
-    {
-    }
-    explicit ObjKey(int64_t val)
-        : value(val)
-    {
-    }
-    ObjKey& operator=(int64_t val)
-    {
-        value = val;
-        return *this;
-    }
-    bool operator==(const ObjKey& rhs) const
-    {
-        return value == rhs.value;
-    }
-    bool operator!=(const ObjKey& rhs) const
-    {
-        return value != rhs.value;
-    }
-    bool operator<(const ObjKey& rhs) const
-    {
-        return value < rhs.value;
-    }
-    bool operator>(const ObjKey& rhs) const
-    {
-        return value > rhs.value;
-    }
-    operator bool() const
-    {
-        return value != -1;
-    }
-    int64_t value;
-
-private:
-    // operator bool will enable casting to integer. Prevent this.
-    operator int64_t() const
-    {
-        return 0;
-    }
-};
-
-inline std::ostream& operator<<(std::ostream& ostr, ObjKey key)
-{
-    ostr << "Key(" << key.value << ")";
-    return ostr;
-}
-
-constexpr ObjKey null_key;
 
 class ClusterNode : public Array {
 public:
@@ -110,7 +59,7 @@ public:
         size_t m_current_index = 0;
     };
 
-    ClusterNode(int64_t offset, Allocator& allocator, const ClusterTree& tree_top)
+    ClusterNode(uint64_t offset, Allocator& allocator, const ClusterTree& tree_top)
         : Array(allocator)
         , m_tree_top(tree_top)
         , m_keys(allocator)
@@ -148,8 +97,6 @@ public:
     virtual int64_t get_last_key_value() const = 0;
     virtual void ensure_general_form() = 0;
 
-    /// Create an empty node
-    virtual void create(int sub_tree_depth) = 0;
     /// Initialize node from 'mem'
     virtual void init(MemRef mem) = 0;
     /// Descend the tree from the root and copy-on-write the leaf
@@ -186,11 +133,11 @@ public:
     {
         return &m_keys;
     }
-    void set_offset(int64_t offs)
+    void set_offset(uint64_t offs)
     {
         m_offset = offs;
     }
-    int64_t get_offset() const
+    uint64_t get_offset() const
     {
         return m_offset;
     }
@@ -201,18 +148,18 @@ protected:
 
     const ClusterTree& m_tree_top;
     ClusterKeyArray m_keys;
-    int64_t m_offset;
+    uint64_t m_offset;
 };
 
 class Cluster : public ClusterNode {
 public:
-    Cluster(int64_t offset, Allocator& allocator, const ClusterTree& tree_top)
+    Cluster(uint64_t offset, Allocator& allocator, const ClusterTree& tree_top)
         : ClusterNode(offset, allocator, tree_top)
     {
     }
     ~Cluster() override;
 
-    void create(int = 0) override;
+    void create(size_t nb_columns);
     void init(MemRef mem) override;
     bool update_from_parent(size_t old_baseline) noexcept override;
     bool is_writeable() const
@@ -270,6 +217,7 @@ public:
     void upgrade_string_to_enum(size_t col_ndx, ArrayString& keys);
 
     void init_leaf(size_t col_ndx, ArrayPayload* leaf) const noexcept;
+    void add_leaf(size_t col_ndx, ref_type ref);
 
     void dump_objects(int64_t key_offset, std::string lead) const override;
 

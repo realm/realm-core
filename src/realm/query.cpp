@@ -20,7 +20,7 @@
 
 #include <realm/array.hpp>
 #include <realm/column_fwd.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/table_view.hpp>
@@ -163,39 +163,22 @@ Query& Query::operator=(Query&&) = default;
 
 Query::~Query() noexcept = default;
 
-Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
+Query::Query(const Query* source, Transaction* tr, PayloadPolicy policy)
 {
-    Table::generate_patch(source.m_table, patch.m_table);
-    if (source.m_source_table_view) {
-        m_owned_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
+    m_table = tr->import_copy_of(source->m_table);
+    if (source->m_source_table_view) {
+        m_owned_source_table_view = tr->import_copy_of(*source->m_source_table_view, policy);
         m_source_table_view = m_owned_source_table_view.get();
     }
     else {
-        patch.table_view_data = nullptr;
+        // nothing?
     }
-    LinkList::generate_patch(source.m_source_link_list.get(), patch.link_list_data);
-
-    m_groups.reserve(source.m_groups.size());
-    for (const auto& cur_group : source.m_groups) {
-        m_groups.emplace_back(cur_group, patch.m_node_data);
+    if (source->m_source_link_list.get()) {
+        m_source_link_list = tr->import_copy_of(source->m_source_link_list);
     }
-}
-
-Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
-{
-    Table::generate_patch(source.m_table, patch.m_table);
-    if (source.m_source_table_view) {
-        m_owned_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
-        m_source_table_view = m_owned_source_table_view.get();
-    }
-    else {
-        patch.table_view_data = nullptr;
-    }
-    LinkList::generate_patch(source.m_source_link_list.get(), patch.link_list_data);
-
-    m_groups.reserve(source.m_groups.size());
-    for (const auto& cur_group : source.m_groups) {
-        m_groups.emplace_back(cur_group, patch.m_node_data);
+    m_groups.reserve(source->m_groups.size());
+    for (const auto& cur_group : source->m_groups) {
+        m_groups.emplace_back(cur_group, tr);
     }
 }
 
@@ -219,32 +202,6 @@ void Query::set_table(TableRef tr)
     }
 }
 
-
-void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
-{
-    if (m_source_table_view) {
-        m_source_table_view->apply_and_consume_patch(patch.table_view_data, dest_group);
-    }
-    m_source_link_list = LinkList::create_from_and_consume_patch(patch.link_list_data, dest_group);
-    if (m_source_link_list) {
-        m_view = m_source_link_list.get();
-    }
-    else if (m_source_table_view)
-        m_view = m_source_table_view;
-    else
-        m_view = nullptr;
-
-    for (auto it = m_groups.rbegin(); it != m_groups.rend(); ++it) {
-        if (auto& cur_root_node = it->m_root_node)
-            cur_root_node->apply_handover_patch(patch.m_node_data, dest_group);
-    }
-    // not going through Table::create_from_and_consume_patch because we need to use
-    // set_table() to update all table references
-    if (patch.m_table) {
-        set_table(dest_group.get_table(patch.m_table->m_table_key));
-    }
-    REALM_ASSERT(patch.m_node_data.empty());
-}
 
 void Query::add_expression_node(std::unique_ptr<Expression> expression)
 {
@@ -960,7 +917,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
         }
         else {
             for (size_t t = 0; t < m_view->size(); t++) {
-                ConstObj obj = m_view->get(t);
+                ConstObj obj = m_view->get_object(t);
                 if (eval_object(obj)) {
                     st.template match<action, false>(size_t(obj.get_key().value), 0, obj.get<T>(column_key));
                 }
@@ -1237,8 +1194,7 @@ void Query::handle_pending_not()
 Query& Query::Or()
 {
     auto& current_group = m_groups.back();
-    OrNode* or_node = dynamic_cast<OrNode*>(current_group.m_root_node.get());
-    if (!or_node) {
+    if (current_group.m_state != QueryGroup::State::OrConditionChildren) {
         // Reparent the current group's nodes within an OrNode.
         add_node(std::unique_ptr<ParentNode>(new OrNode(std::move(current_group.m_root_node))));
     }
@@ -1271,7 +1227,7 @@ ObjKey Query::find()
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t i = 0; i < sz; i++) {
-            ConstObj obj = m_view->get(i);
+            ConstObj obj = m_view->get_object(i);
             if (eval_object(obj)) {
                 return obj.get_key();
             }
@@ -1314,7 +1270,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t t = 0; t < sz && ret.size() < limit; t++) {
-            ConstObj obj = m_view->get(t);
+            ConstObj obj = m_view->get_object(t);
             if (t >= begin && t < end && eval_object(obj)) {
                 ret.m_key_values.add(obj.get_key());
             }
@@ -1324,7 +1280,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         if (!has_conditions()) {
             KeyColumn& refs = ret.m_key_values;
 
-            ClusterTree::TraverseFunction f = [&begin, &end, &refs, this](const Cluster* cluster) {
+            ClusterTree::TraverseFunction f = [&begin, &end, &limit, &refs, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 if (begin < e) {
                     if (e > end) {
@@ -1332,8 +1288,9 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                     }
                     auto offset = cluster->get_offset();
                     auto key_values = cluster->get_key_array();
-                    for (size_t i = begin; i < e; i++) {
+                    for (size_t i = begin; (i < e) && limit; i++) {
                         refs.add(ObjKey(key_values->get(i) + offset));
+                        --limit;
                     }
                     begin = 0;
                 }
@@ -1342,7 +1299,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                 }
                 end -= e;
                 // Stop if end is reached
-                return end == 0;
+                return (end == 0) || (limit == 0);
             };
 
             m_table->traverse_clusters(f);
@@ -1410,7 +1367,7 @@ size_t Query::count() const
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t t = 0; t < sz; t++) {
-            ConstObj obj = m_view->get(t);
+            ConstObj obj = m_view->get_object(t);
             if (eval_object(obj)) {
                 cnt++;
             }
@@ -1591,17 +1548,23 @@ std::string Query::validate()
     return root_node()->validate(); // errors detected by QueryEngine
 }
 
-std::string Query::get_description() const
+std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
     if (root_node()) {
         if (m_view) {
             throw SerialisationError("Serialisation of a query constrianed by a view is not currently supported");
         }
-        return root_node()->describe_expression();
+        return root_node()->describe_expression(state);
     }
     // An empty query returns all results and one way to indicate this
     // is to serialise TRUEPREDICATE which is functionally equivilent
     return "TRUEPREDICATE";
+}
+
+std::string Query::get_description() const
+{
+    util::serializer::SerialisationState state;
+    return get_description(state);
 }
 
 void Query::init() const
@@ -1787,8 +1750,8 @@ QueryGroup& QueryGroup::operator=(const QueryGroup& other)
     return *this;
 }
 
-QueryGroup::QueryGroup(const QueryGroup& other, QueryNodeHandoverPatches& patches)
-    : m_root_node(other.m_root_node ? other.m_root_node->clone(&patches) : nullptr)
+QueryGroup::QueryGroup(const QueryGroup& other, Transaction* tr)
+    : m_root_node(other.m_root_node ? other.m_root_node->clone(tr) : nullptr)
     , m_pending_not(other.m_pending_not)
     , m_subtable_column(other.m_subtable_column)
     , m_state(other.m_state)

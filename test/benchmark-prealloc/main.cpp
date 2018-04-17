@@ -38,19 +38,19 @@ REALM_TABLE_2(Alpha, foo, Int, bar, Int)
 int main()
 {
     bool no_create = false;
-    SharedGroupOptions::Durability dlevel = SharedGroupOptions::Durability::Full;
+    DBOptions::Durability dlevel = DBOptions::Durability::Full;
 
     File::try_remove(DIR "/benchmark-prealloc.realm");
-    SharedGroup sg(DIR "/benchmark-prealloc.realm", no_create, {dlevel});
+    DB sg(DIR "/benchmark-prealloc.realm", no_create, {dlevel});
 
     File::try_remove(DIR "/benchmark-prealloc-interfere1.realm");
-    SharedGroup sg_interfere1(DIR "/benchmark-prealloc-interfere1.realm", no_create, dlevel);
+    DB sg_interfere1(DIR "/benchmark-prealloc-interfere1.realm", no_create, dlevel);
 
     File::try_remove(DIR "/benchmark-prealloc-interfere2.realm");
-    SharedGroup sg_interfere2(DIR "/benchmark-prealloc-interfere2.realm", no_create, dlevel);
+    DB sg_interfere2(DIR "/benchmark-prealloc-interfere2.realm", no_create, dlevel);
 
     File::try_remove(DIR "/benchmark-prealloc-interfere3.realm");
-    SharedGroup sg_interfere3(DIR "/benchmark-prealloc-interfere3.realm", no_create, dlevel);
+    DB sg_interfere3(DIR "/benchmark-prealloc-interfere3.realm", no_create, dlevel);
 
     int n_outer = 100;
     {

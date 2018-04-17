@@ -31,7 +31,6 @@ using namespace std::chrono;
 
 #include <realm.hpp>
 #include <realm/history.hpp>
-#include <realm/lang_bind_helper.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/array_bool.hpp>
@@ -44,6 +43,7 @@ using namespace std::chrono;
 #include "test_table_helper.hpp"
 
 // #include <valgrind/callgrind.h>
+// #define PERFORMACE_TESTING
 
 using namespace realm;
 using namespace realm::util;
@@ -2657,6 +2657,24 @@ TEST(Table_object_basic)
     CHECK_EQUAL(k12.value, 12);
 }
 
+
+TEST(Table_ObjectsWithNoColumns)
+{
+    Table table;
+    std::vector<ObjKey> keys;
+    table.create_objects(120, keys);
+    CHECK_NOT(table.is_empty());
+    CHECK_EQUAL(table.size(), 120);
+    for (ObjKey k : keys) {
+        Obj obj = table.get_object(k);
+        CHECK(obj.is_valid());
+        obj.remove();
+        CHECK(!obj.is_valid());
+    }
+    CHECK(table.is_empty());
+    CHECK_EQUAL(table.size(), 0);
+}
+
 TEST(Table_remove_column)
 {
     Table table;
@@ -2977,15 +2995,15 @@ TEST(Table_QuickSort2)
 
 TEST(Table_object_sequential)
 {
-#ifdef REALM_DEBUG
-    int nb_rows = 10000;
-    int num_runs = 10;
-#else
+#ifdef PERFORMACE_TESTING
     int nb_rows = 100000;
     int num_runs = 100;
+#else
+    int nb_rows = 1024;
+    int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    DB sg(path);
     ColKey c0;
     ColKey c1;
 
@@ -3119,18 +3137,18 @@ TEST(Table_object_sequential)
 
 TEST(Table_object_seq_rnd)
 {
-#ifdef REALM_DEBUG
-    size_t rows = 50000;
-    int runs = 20;
-#else
+#ifdef PERFORMACE_TESTING
     size_t rows = 100000;
     int runs = 100;     // runs for building scenario
+#else
+    size_t rows = 50000;
+    int runs = 1;
 #endif
     int64_t next_key = 0;
     std::vector<int64_t> key_values;
     std::set<int64_t> key_set;
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    DB sg(path);
     ColKey c0;
     {
         std::cout << "Establishing scenario seq ins/rnd erase " << std::endl;
@@ -3161,10 +3179,10 @@ TEST(Table_object_seq_rnd)
     }
     // scenario established!
     int nb_rows = int(key_values.size());
-#ifdef REALM_DEBUG
-    int num_runs = 1; // runs for timing access
-#else
+#ifdef PERFORMACE_TESTING
     int num_runs = 100; // runs for timing access
+#else
+    int num_runs = 1; // runs for timing access
 #endif
     std::cout << "Scenario has " << nb_rows << " rows. Timing...." << std::endl;
     {
@@ -3228,15 +3246,15 @@ TEST(Table_object_seq_rnd)
 
 TEST(Table_object_random)
 {
-#ifdef REALM_DEBUG
-    int nb_rows = 10000;
-    int num_runs = 10;
-#else
+#ifdef PERFORMACE_TESTING
     int nb_rows = 100000;
     int num_runs = 100;
+#else
+    int nb_rows = 1024;
+    int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    DB sg(path);
     ColKey c0;
     ColKey c1;
     std::vector<int64_t> key_values;
@@ -3785,5 +3803,26 @@ TEST(Table_StaleColumnKey)
     CHECK_THROW_ANY(obj.get<Int>(col));
 }
 
+TEST(Table_getLinkType)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+
+    auto col_int = table->add_column(type_Int, "int");
+    auto col_weak_link = table->add_column_link(type_Link, "weak_link", *table);
+    auto col_strong_link = table->add_column_link(type_Link, "strong_link", *table, link_Strong);
+    auto col_weak_linklist = table->add_column_link(type_LinkList, "weak_list", *table);
+    auto col_strong_linklist = table->add_column_link(type_LinkList, "strong_list", *table, link_Strong);
+
+    CHECK(link_Weak == table->get_link_type(col_weak_link));
+    CHECK(link_Strong == table->get_link_type(col_strong_link));
+    CHECK(link_Weak == table->get_link_type(col_weak_linklist));
+    CHECK(link_Strong == table->get_link_type(col_strong_linklist));
+
+    CHECK_THROW(table->get_link_type(col_int), LogicError);
+
+    g.remove_table("table");
+    CHECK_THROW(table->get_link_type(col_weak_link), NoSuchTable);
+}
 
 #endif // TEST_TABLE

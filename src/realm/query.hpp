@@ -39,6 +39,7 @@
 #include <realm/binary_data.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/handover_defs.hpp>
+#include <realm/util/serializer.hpp>
 
 namespace realm {
 
@@ -51,6 +52,7 @@ class ConstTableView;
 class Array;
 class Expression;
 class Group;
+class Transaction;
 
 namespace metrics {
 class QueryInfo;
@@ -71,7 +73,7 @@ struct QueryGroup {
     QueryGroup(QueryGroup&&) = default;
     QueryGroup& operator=(QueryGroup&&) = default;
 
-    QueryGroup(const QueryGroup&, QueryNodeHandoverPatches&);
+    QueryGroup(const QueryGroup&, Transaction*);
 
     std::unique_ptr<ParentNode> m_root_node;
 
@@ -274,6 +276,7 @@ public:
     std::string validate();
 
     std::string get_description() const;
+    std::string get_description(util::serializer::SerialisationState& state) const;
 
     bool eval_object(ConstObj& obj) const;
 
@@ -285,31 +288,17 @@ private:
     size_t find_internal(size_t start = 0, size_t end = size_t(-1)) const;
     void handle_pending_not();
     void set_table(TableRef tr);
-
 public:
-    using HandoverPatch = QueryHandoverPatch;
-
-    std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch, ConstSourcePayload mode) const
+    std::unique_ptr<Query> clone_for_handover(Transaction* tr, PayloadPolicy policy)
     {
-        patch.reset(new HandoverPatch);
-        return std::make_unique<Query>(*this, *patch, mode);
+        return std::make_unique<Query>(this, tr, policy);
     }
 
-    std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch, MutableSourcePayload mode)
+    Query(const Query* source, Transaction* tr, PayloadPolicy policy);
+    Query(const Query& source, Transaction* tr, PayloadPolicy policy)
+        : Query(&source, tr, policy)
     {
-        patch.reset(new HandoverPatch);
-        return std::make_unique<Query>(*this, *patch, mode);
     }
-
-    void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& dest_group)
-    {
-        apply_patch(*patch, dest_group);
-        patch.reset();
-    }
-
-    void apply_patch(HandoverPatch& patch, Group& dest_group);
-    Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode);
-    Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode);
 
 private:
     void add_expression_node(std::unique_ptr<Expression>);

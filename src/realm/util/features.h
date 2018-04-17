@@ -283,7 +283,7 @@
 #endif
 
 #if !REALM_IOS && !REALM_WATCHOS && !REALM_TVOS && !defined(_WIN32) && !REALM_ANDROID
-#define REALM_ASYNC_DAEMON
+// #define REALM_ASYNC_DAEMON FIXME Async commits not supported
 #endif
 
 // We're in i686 mode
