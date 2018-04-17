@@ -458,6 +458,37 @@ TEST(File_PreallocResizing)
 #endif
 }
 
+TEST(File_PreallocResizingAPFSBug)
+{
+    TEST_PATH(path);
+    File file(path, File::mode_Write);
+    CHECK(file.is_attached());
+    file.write("aaaaaaaaaaaaaaaaaaaa"); // 20 a's
+    // calling prealloc on a newly created file would sometimes fail on APFS with EINVAL via fcntl(F_PREALLOCATE)
+    // this may not be the only way to trigger the error, but it does seem to be timing dependant.
+    file.prealloc(100);
+    CHECK_EQUAL(file.get_size(), 100);
+
+    // let's write past the first prealloc block (@ 4096) and verify it reads correctly too.
+    file.write("aaaaa");
+    // this will change the file size, but likely won't preallocate more space since the first call to prealloc
+    // will probably have allocated a whole 4096 block.
+    file.prealloc(200);
+    CHECK_EQUAL(file.get_size(), 200);
+    file.write("aa");
+    file.prealloc(5020); // expands to another 4096 block
+    constexpr size_t insert_pos = 5000;
+    const char* insert_str = "hello";
+    file.seek(insert_pos);
+    file.write(insert_str);
+    file.seek(insert_pos);
+    CHECK_EQUAL(file.get_size(), 5020);
+    constexpr size_t input_size = 6;
+    char input[input_size];
+    file.read(input, input_size);
+    CHECK_EQUAL(strncmp(input, insert_str, input_size), 0);
+}
+
 
 #ifndef _WIN32
 TEST(File_GetUniqueID)
