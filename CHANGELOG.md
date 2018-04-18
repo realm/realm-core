@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 6.0.0-alpha.0 Release notes
 
 ### Bugfixes
 
