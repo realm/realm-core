@@ -2761,6 +2761,7 @@ TEST(Table_StableIteration)
 TEST(Table_ListOfPrimitives)
 {
     Group g;
+    std::vector<ConstListBase*> lists;
     TableRef t = g.add_table("table");
     ColKey int_col = t->add_column_list(type_Int, "integers");
     ColKey bool_col = t->add_column_list(type_Bool, "booleans");
@@ -2787,6 +2788,7 @@ TEST(Table_ListOfPrimitives)
     obj.set_list_values(timestamp_col, timestamp_vector);
 
     auto int_list = obj.get_list<int64_t>(int_col);
+    lists.push_back(&int_list);
     std::vector<int64_t> vec(int_list.size());
     CHECK_EQUAL(integer_vector.size(), int_list.size());
     // {1, 2, 3, 4}
@@ -2829,12 +2831,15 @@ TEST(Table_ListOfPrimitives)
     CHECK_EQUAL(2, int_list.size());
     CHECK_EQUAL(2, int_list[0]);
     CHECK_EQUAL(0, int_list[1]);
+    CHECK_EQUAL(lists[0]->size(), 2);
+    CHECK_EQUAL(lists[0]->get_col_key(), int_col);
 
     int_list.clear();
     auto int_list2 = obj.get_list<int64_t>(int_col);
     CHECK_EQUAL(0, int_list2.size());
 
     auto bool_list = obj.get_list<bool>(bool_col);
+    lists.push_back(&bool_list);
     CHECK_EQUAL(bool_vector.size(), bool_list.size());
     for (unsigned i = 0; i < bool_list.size(); i++) {
         CHECK_EQUAL(bool_vector[i], bool_list[i]);
