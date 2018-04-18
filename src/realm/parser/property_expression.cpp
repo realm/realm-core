@@ -41,7 +41,11 @@ PropertyExpression::PropertyExpression(Query &q, const std::string &key_path_str
                                       element.table->get_column_name(element.col_ndx),
                                       get_printable_table_name(*element.table)));
             if (element.table == cur_table) {
-                cur_table = element.table->get_link_target(element.col_ndx); // advance through forward link
+                if (element.col_ndx == realm::npos) {
+                    cur_table = element.table;
+                } else {
+                    cur_table = element.table->get_link_target(element.col_ndx); // advance through forward link
+                }
             } else {
                 cur_table = element.table; // advance through backlink
             }

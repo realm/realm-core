@@ -84,9 +84,20 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
 
     // Process backlinks which consumes 3 parts of the keypath
     if (is_backlinks_prefix(keypath[index])) {
+        if (index + 1 == keypath.size()) {
+            // we do support @links.@count and @links.@size so if @links is the end, that's what we are doing
+            // any other operation on @links would have thrown a predicate error from the parser level
+            index = index + 1;
+            KeyPathElement element;
+            element.table = table;
+            element.col_ndx = realm::npos; // unused
+            element.col_type = type_LinkList;
+            element.is_backlink = false;
+            return element;
+        }
         realm_precondition(index + 2 < keypath.size(), "'@links' must be proceeded by type name and a property name");
-
-        Table::BacklinkOrigin info = table->find_backlink_origin(keypath[index + 1], keypath[index + 2]);
+        std::string origin_table_name = m_backlink_class_prefix + keypath[index + 1];
+        Table::BacklinkOrigin info = table->find_backlink_origin(origin_table_name, keypath[index + 2]);
         realm_precondition(bool(info), util::format("No property '%1' found in type '%2' which links to type '%3'",
                   keypath[index + 2], get_printable_table_name(keypath[index + 1]), get_printable_table_name(*table)));
 
@@ -94,7 +105,7 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
             throw BacklinksRestrictedError(util::format(
                 "Querying over backlinks is disabled but backlinks were found in the inverse relationship of property '%1' on type '%2'",
                 keypath[index + 2], get_printable_table_name(keypath[index + 1])));
-       }
+        }
 
         index = index + 3;
         KeyPathElement element;
@@ -124,6 +135,11 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
 void KeyPathMapping::set_allow_backlinks(bool allow)
 {
     m_allow_backlinks = allow;
+}
+
+void KeyPathMapping::set_backlink_class_prefix(std::string prefix)
+{
+    m_backlink_class_prefix = prefix;
 }
 
 Table* KeyPathMapping::table_getter(TableRef table, const std::vector<KeyPathElement>& links)

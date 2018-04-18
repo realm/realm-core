@@ -45,6 +45,10 @@ ExpressionContainer::ExpressionContainer(Query& query, const parser::Expression&
                 type = ExpressionInternal::exp_OpAvg;
                 storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::Avg>(std::move(pe), e.op_suffix, mapping);
                 break;
+            case parser::Expression::KeyPathOp::BacklinkCount:
+                type = ExpressionInternal::exp_OpBacklinkCount;
+                storage = CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount>(std::move(pe), e.op_suffix, mapping);
+                break;
             case parser::Expression::KeyPathOp::Count:
                 REALM_FALLTHROUGH;
             case parser::Expression::KeyPathOp::SizeString:
@@ -128,6 +132,11 @@ CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>& ExpressionCo
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpCount);
     return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::Count>&>(storage);
 }
+CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount>& ExpressionContainer::get_backlink_count()
+{
+    REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpBacklinkCount);
+    return util::any_cast<CollectionOperatorExpression<parser::Expression::KeyPathOp::BacklinkCount>&>(storage);
+}
 CollectionOperatorExpression<parser::Expression::KeyPathOp::SizeString>& ExpressionContainer::get_size_string()
 {
     REALM_ASSERT_DEBUG(type == ExpressionInternal::exp_OpSizeString);
@@ -169,6 +178,8 @@ DataType ExpressionContainer::check_type_compatibility(DataType other_type)
             break;
         case ExpressionInternal::exp_SubQuery:
             REALM_FALLTHROUGH;
+        case ExpressionInternal::exp_OpBacklinkCount:
+            REALM_FALLTHROUGH;
         case ExpressionInternal::exp_OpCount:
             // linklist count can handle any numeric type
             if (other_type == type_Int || other_type == type_Double || other_type == type_Float) {
@@ -197,6 +208,7 @@ DataType ExpressionContainer::check_type_compatibility(DataType other_type)
 bool is_count_type(ExpressionContainer::ExpressionInternal exp_type)
 {
     return exp_type == ExpressionContainer::ExpressionInternal::exp_OpCount
+        || exp_type == ExpressionContainer::ExpressionInternal::exp_OpBacklinkCount
         || exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeString
         || exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeBinary
         || exp_type == ExpressionContainer::ExpressionInternal::exp_SubQuery;
@@ -233,7 +245,7 @@ DataType ExpressionContainer::get_comparison_type(ExpressionContainer& rhs) {
         return type_Int;
     }
 
-    throw std::runtime_error("Unsupported query (type undeductable). A comparison must include at lease one keypath.");
+    throw std::runtime_error("Unsupported query (type undeductable). A comparison must include at least one keypath.");
 }
 
 bool ExpressionContainer::is_null() {
