@@ -1,12 +1,4 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* None.
-
-### Breaking changes
-
-* None.
+# 5.5.0 Release notes
 
 ### Enhancements
 
