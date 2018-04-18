@@ -694,8 +694,6 @@ private:
     void write(util::File& file, const char* encryption_key, uint_fast64_t version_number) const;
     void write(std::ostream&, bool pad, uint_fast64_t version_numer) const;
 
-    Replication* get_replication() const noexcept;
-    void set_replication(Replication*) noexcept;
     std::shared_ptr<metrics::Metrics> get_metrics() const noexcept;
     void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
     void update_num_objects();
@@ -1089,16 +1087,6 @@ inline void Group::reset_free_space_tracking()
     m_alloc.reset_free_space_tracking(); // Throws
 }
 
-inline Replication* Group::get_replication() const noexcept
-{
-    return m_alloc.get_replication();
-}
-
-inline void Group::set_replication(Replication* repl) noexcept
-{
-    m_alloc.set_replication(repl);
-}
-
 inline std::shared_ptr<metrics::Metrics> Group::get_metrics() const noexcept
 {
     return m_metrics;
@@ -1180,16 +1168,6 @@ public:
     static void send_cascade_notification(const Group& group, const Group::CascadeNotification& notification)
     {
         group.send_cascade_notification(notification);
-    }
-
-    static Replication* get_replication(const Group& group) noexcept
-    {
-        return group.get_replication();
-    }
-
-    static void set_replication(Group& group, Replication* repl) noexcept
-    {
-        group.set_replication(repl);
     }
 
     static void detach(Group& group) noexcept

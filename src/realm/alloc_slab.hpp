@@ -490,10 +490,6 @@ private:
     class SlabRefEndEq;
     static bool ref_less_than_slab_ref_end(ref_type, const Slab&) noexcept;
 
-    Replication* get_replication() const noexcept
-    {
-        return m_replication;
-    }
     void set_replication(Replication* r) noexcept
     {
         m_replication = r;

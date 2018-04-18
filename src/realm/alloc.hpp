@@ -145,7 +145,11 @@ public:
     }
 #endif
 
-    Replication* get_replication() noexcept;
+    Replication* get_replication() const
+    {
+        return m_replication;
+    }
+
     struct MappedFile;
 
 protected:
@@ -492,11 +496,6 @@ inline Allocator::Allocator() noexcept
 
 inline Allocator::~Allocator() noexcept
 {
-}
-
-inline Replication* Allocator::get_replication() noexcept
-{
-    return m_replication;
 }
 
 inline char* Allocator::translate(ref_type ref) const noexcept

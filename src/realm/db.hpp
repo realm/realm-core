@@ -169,6 +169,17 @@ public:
         return m_alloc;
     }
 
+    Replication* get_replication() const noexcept
+    {
+        return m_alloc.get_replication();
+    }
+
+    void set_replication(Replication* repl) noexcept
+    {
+        m_alloc.set_replication(repl);
+    }
+
+
 #ifdef REALM_DEBUG
     /// Deprecated method, only called from a unit test
     ///
@@ -474,6 +485,23 @@ private:
     friend class Transaction;
 };
 
+class DisableReplication {
+public:
+    DisableReplication(DB& owner)
+        : m_owner(owner)
+    {
+        m_repl = owner.get_replication();
+        owner.set_replication(nullptr);
+    }
+    ~DisableReplication()
+    {
+        m_owner.set_replication(m_repl);
+    }
+
+private:
+    DB& m_owner;
+    Replication* m_repl;
+};
 
 inline void DB::get_stats(size_t& free_space, size_t& used_space)
 {
@@ -790,7 +818,7 @@ inline void Transaction::promote_to_write(O* observer)
         VersionID version = VersionID();                                              // Latest
         bool history_updated = internal_advance_read(observer, version, *hist, true); // Throws
 
-        Replication* repl = get_replication();
+        Replication* repl = db->get_replication();
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
         DB::version_type current_version = m_read_lock.m_version;
         repl->initiate_transact(*this, current_version, history_updated); // Throws
@@ -814,7 +842,7 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
     if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
-    Replication* repl = get_replication();
+    Replication* repl = db->get_replication();
     if (!repl)
         throw LogicError(LogicError::no_history);
 

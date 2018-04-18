@@ -1682,7 +1682,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         if (need_hist_schema_upgrade) {
             if (!allow_file_format_upgrade)
                 throw FileFormatUpgradeRequired();
-            Replication* repl = wt->get_replication();
+            Replication* repl = get_replication();
             repl->upgrade_history_schema(current_hist_schema_version_2);     // Throws
             gf::set_history_schema_version(*wt, target_hist_schema_version); // Throws
             dirty = true;
@@ -2215,7 +2215,7 @@ void Transaction::rollback()
     db->reset_free_space_tracking();
     db->do_end_write();
 
-    if (Replication* repl = get_replication())
+    if (Replication* repl = db->get_replication())
         repl->abort_transact();
 
     end_read();

@@ -1882,7 +1882,7 @@ void Group::verify() const
     }
 
     // Verify history if present
-    if (Replication* repl = get_replication()) {
+    if (Replication* repl = m_alloc.get_replication()) {
         if (auto hist = repl->get_history_read()) {
             _impl::History::version_type version = 0;
             int history_type = 0;
