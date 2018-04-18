@@ -12,165 +12,183 @@ repo = tokens[tokens.size()-2]
 branch = tokens[tokens.size()-1]
 
 jobWrapper {
-  timeout(time: 5, unit: 'HOURS') {
-      stage('gather-info') {
-          node('docker') {
-              getSourceArchive()
-              stash includes: '**', name: 'core-source', useDefaultExcludes: false
+    timeout(time: 5, unit: 'HOURS') {
+        stage('gather-info') {
+            node('docker') {
+                getSourceArchive()
+                stash includes: '**', name: 'core-source', useDefaultExcludes: false
 
-              dependencies = readProperties file: 'dependencies.list'
-              echo "Version in dependencies.list: ${dependencies.VERSION}"
+                dependencies = readProperties file: 'dependencies.list'
+                echo "Version in dependencies.list: ${dependencies.VERSION}"
 
-              gitTag = readGitTag()
-              gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim().take(8)
-              gitDescribeVersion = sh(returnStdout: true, script: 'git describe --tags').trim()
+                gitTag = readGitTag()
+                gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim().take(8)
+                gitDescribeVersion = sh(returnStdout: true, script: 'git describe --tags').trim()
 
-              echo "Git tag: ${gitTag ?: 'none'}"
-              if (!gitTag) {
-                  echo "No tag given for this build"
-                  setBuildName(gitSha)
-              } else {
-                  if (gitTag != "v${dependencies.VERSION}") {
-                      error "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
-                  } else {
-                      echo "Building release: '${gitTag}'"
-                      setBuildName("Tag ${gitTag}")
-                  }
-              }
-          }
+                echo "Git tag: ${gitTag ?: 'none'}"
+                if (!gitTag) {
+                    echo "No tag given for this build"
+                    setBuildName(gitSha)
+                } else {
+                    if (gitTag != "v${dependencies.VERSION}") {
+                        error "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
+                    } else {
+                        echo "Building release: '${gitTag}'"
+                        setBuildName("Tag ${gitTag}")
+                    }
+                }
+            }
 
-          releaseTesting = false;
-          if (['release'].contains(env.BRANCH_NAME)) {
-              releaseTesting = true;
-          }
+            targetBranch = env.CHANGE_TARGET ? env.CHANGE_TARGET : "none"
+            println "Building branch: ${env.BRANCH_NAME}"
+            println "Target branch: ${targetBranch}"
 
-          echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
-          echo "Publishing Run: ${gitTag ? 'yes' : 'no'}"
+            releaseTesting = targetBranch.contains('release')
 
-          if (['master'].contains(env.BRANCH_NAME)) {
-              // If we're on master, instruct the docker image builds to push to the
-              // cache registry
-              env.DOCKER_PUSH = "1"
-          }
-      }
+            echo "Pull request: ${env.CHANGE_TARGET ? 'yes' : 'no'}"
+            echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
+            echo "Publishing Run: ${gitTag ? 'yes' : 'no'}"
 
-      stage('Fastcheck') {
-          parallelExecutors = [checkLinuxDebug     : doBuildInDocker('Debug'),
-                               buildMacOsRelease   : doBuildMacOs('Release', false),
-                               buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
-                               buildWin64Release   : doBuildWindows('Release', false, 'x64'),
-                               threadSanitizer     : doBuildInDocker('Debug', 'thread'),
-                               addressSanitizer    : doBuildInDocker('Debug', 'address'),
-              ]
+            if (['master'].contains(env.BRANCH_NAME)) {
+                // If we're on master, instruct the docker image builds to push to the
+                // cache registry
+                env.DOCKER_PUSH = "1"
+            }
+        }
 
-          androidAbis = ['arm64-v8a']
-          androidBuildTypes = ['Debug', 'Release']
+        if (env.CHANGE_TARGET) {
+            stage('Fastcheck') {
+                parallel(
+                    checkLinuxDebug     	: doBuildInDocker('Debug'),
+                    checkMacOsRelease   	: doBuildMacOs('Release', true),
+                    checkWin32Debug     	: doBuildWindows('Debug', false, 'Win32'),
+                    checkWin64Release   	: doBuildWindows('Release', false, 'x64'),
+                    androidArmeabiRelease	: doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
+                    androidArm64Debug   	: doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+                    threadSanitizer     	: doBuildInDocker('Debug', 'thread'),
+                    addressSanitizer    	: doBuildInDocker('Debug', 'address'),
+                )
+            }
+        }
 
-          for (def i = 0; i < androidAbis.size(); i++) {
-              def abi = androidAbis[i]
-              for (def j = 0; j < androidBuildTypes.size(); j++) {
-                  def buildType = androidBuildTypes[j]
-                  parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Release')
-              }
-          }
+        if (env.CHANGE_TARGET && releaseTesting) {
+            stage('ExtendedCheck') {
+                parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
+                                    checkMacOsDebug     : doBuildMacOs('Debug', true),
+                                    buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
+                                    buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
+                                    buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
+                                    coverage            : doBuildCoverage(),
+                                    performance         : buildPerformance()
+                    ]
 
-          parallel parallelExecutors
-      }
+                androidAbis = ['x86', 'mips', 'x86_64']
 
-      if (releaseTesting) {
-          stage('Extendedcheck') {
-              parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
-                                   buildMacOsDebug     : doBuildMacOs('Debug', true),
-                                   buildWin32Release   : doBuildWindows('Release', false, 'Win32'),
-                                   buildWin64Debug     : doBuildWindows('Debug', false, 'x64'),
-                                   buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
-                                   buildUwpWin32Release: doBuildWindows('Release', true, 'Win32'),
-                                   buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
-                                   buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
-                                   buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
-                                   buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
-                                   coverage            : doBuildCoverage()
-                  ]
+                for (def i = 0; i < androidAbis.size(); i++) {
+                    def abi = androidAbis[i]
+                    parallelExecutors["android-${abi}-Debug"] = doAndroidBuildInDocker(abi, 'Debug', false)
+                }
 
-              androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64']
-              androidBuildTypes = ['Debug', 'Release']
+                appleSdks = ['ios', 'tvos', 'watchos']
 
-              for (def i = 0; i < androidAbis.size(); i++) {
-                  def abi = androidAbis[i]
-                  for (def j = 0; j < androidBuildTypes.size(); j++) {
-                      def buildType = androidBuildTypes[j]
-                      parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Release')
-                  }
-              }
+                for (def i = 0; i < appleSdks.size(); i++) {
+                    def sdk = appleSdks[i]
+                    parallelExecutors["${sdk}-Debug"] = doBuildAppleDevice(sdk, 'MinSizeDebug')
+                }
+                parallel parallelExecutors
+            }
+        }
 
-              appleSdks = ['ios', 'tvos', 'watchos']
-              appleBuildTypes = ['MinSizeDebug', 'Release']
+        if (gitTag) {
+            stage('BuildPackages') {
+                parallelExecutors = [
+                                    buildMacOsDebug     : doBuildMacOs('Debug', false),
+                                    buildMacOsRelease   : doBuildMacOs('Release', false),
+                                    buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
+                                    buildWin32Release   : doBuildWindows('Release', false, 'Win32'),
+                                    buildWin64Debug     : doBuildWindows('Debug', false, 'x64'),
+                                    buildWin64Release   : doBuildWindows('Release', false, 'x64'),
+                                    buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
+                                    buildUwpWin32Release: doBuildWindows('Release', true, 'Win32'),
+                                    buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
+                                    buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
+                                    buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
+                                    buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
+                                    packageGeneric      : doBuildPackage('generic', 'tgz'),
+                                    packageCentos7      : doBuildPackage('centos-7', 'rpm'),
+                                    packageCentos6      : doBuildPackage('centos-6', 'rpm'),
+                                    packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb')
+                    ]
 
-              for (def i = 0; i < appleSdks.size(); i++) {
-                  def sdk = appleSdks[i]
-                  for (def j = 0; j < appleBuildTypes.size(); j++) {
-                      def buildType = appleBuildTypes[j]
-                      parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
-                  }
-              }
-              if (env.CHANGE_TARGET) {
-                  parallelExecutors['performance'] = buildPerformance()
-              }
-              parallel parallelExecutors
-          }
-      }
+                androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
+                androidBuildTypes = ['Debug', 'Release']
 
-      if (releaseTesting && gitTag) {
-          stage('Aggregate') {
-              parallel (
-                packageGeneric      : doBuildPackage('generic', 'tgz'),
-                packageCentos7      : doBuildPackage('centos-7', 'rpm'),
-                packageCentos6      : doBuildPackage('centos-6', 'rpm'),
-                packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
-                cocoa: {
-                      node('docker') {
-                          getArchive()
-                          for (int i = 0; i < cocoaStashes.size(); i++) {
-                              unstash name:cocoaStashes[i]
-                          }
-                          sh 'tools/build-cocoa.sh'
-                          archiveArtifacts('realm-core-cocoa*.tar.xz')
-                          if(gitTag) {
-                              def stashName = 'cocoa'
-                              stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
-                              publishingStashes << stashName
-                          }
-                      }
-                  },
-                android: {
-                      node('docker') {
-                          getArchive()
-                          for (int i = 0; i < androidStashes.size(); i++) {
-                              unstash name:androidStashes[i]
-                          }
-                          sh 'tools/build-android.sh'
-                          archiveArtifacts('realm-core-android*.tar.gz')
-                          if(gitTag) {
-                              def stashName = 'android'
-                              stash includes: 'realm-core-android*.tar.gz', name: stashName
-                              publishingStashes << stashName
-                          }
-                      }
-                  }
-              )
-          }
+                for (def i = 0; i < androidAbis.size(); i++) {
+                    def abi = androidAbis[i]
+                    for (def j = 0; j < androidBuildTypes.size(); j++) {
+                        def buildType = androidBuildTypes[j]
+                        parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, false)
+                    }
+                }
 
-          stage('publish-packages') {
-              parallel(
-                  generic: doPublishGeneric(),
-                  centos7: doPublish('centos-7', 'rpm', 'el', 7),
-                  centos6: doPublish('centos-6', 'rpm', 'el', 6),
-                  ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
-                  others: doPublishLocalArtifacts()
-              )
-          }
-      }
-  }
+                appleSdks = ['ios', 'tvos', 'watchos']
+                appleBuildTypes = ['MinSizeDebug', 'Release']
+
+                for (def i = 0; i < appleSdks.size(); i++) {
+                    def sdk = appleSdks[i]
+                    for (def j = 0; j < appleBuildTypes.size(); j++) {
+                        def buildType = appleBuildTypes[j]
+                        parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
+                    }
+                }
+                parallel parallelExecutors
+            }
+            stage('Aggregate') {
+                parallel (
+                    cocoa: {
+                        node('docker') {
+                            getArchive()
+                            for (int i = 0; i < cocoaStashes.size(); i++) {
+                                unstash name:cocoaStashes[i]
+                            }
+                            sh 'tools/build-cocoa.sh'
+                            archiveArtifacts('realm-core-cocoa*.tar.xz')
+                            if(gitTag) {
+                                def stashName = 'cocoa'
+                                stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
+                                publishingStashes << stashName
+                            }
+                        }
+                    },
+                    android: {
+                        node('docker') {
+                            getArchive()
+                            for (int i = 0; i < androidStashes.size(); i++) {
+                                unstash name:androidStashes[i]
+                            }
+                            sh 'tools/build-android.sh'
+                            archiveArtifacts('realm-core-android*.tar.gz')
+                            if(gitTag) {
+                                def stashName = 'android'
+                                stash includes: 'realm-core-android*.tar.gz', name: stashName
+                                publishingStashes << stashName
+                            }
+                        }
+                    }
+                )
+            }
+
+            stage('publish-packages') {
+                parallel(
+                    generic: doPublishGeneric(),
+                    centos7: doPublish('centos-7', 'rpm', 'el', 7),
+                    centos6: doPublish('centos-6', 'rpm', 'el', 6),
+                    ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
+                    others: doPublishLocalArtifacts()
+                )
+            }
+        }
+    }
 }
 
 def buildDockerEnv(name) {
