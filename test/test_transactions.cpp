@@ -239,12 +239,17 @@ TEST(Transactions_Threaded)
         tk = table->get_key();
         wt->commit();
     }
+#if defined(_WIN32) || REALM_ANDROID
+    const int num_threads = 2;
+#else
     const int num_threads = 20;
+#endif
+    const int num_iterations = 100;
     std::thread writers[num_threads];
     std::thread verifiers[num_threads];
     for (int i = 0; i < num_threads; ++i) {
-        verifiers[i] = std::thread([&] { verifier_thread(test_context, num_threads * 100, &db, tk); });
-        writers[i] = std::thread([&] { writer_thread(test_context, 100, &db, tk); });
+        verifiers[i] = std::thread([&] { verifier_thread(test_context, num_threads * num_iterations, &db, tk); });
+        writers[i] = std::thread([&] { writer_thread(test_context, num_iterations, &db, tk); });
     }
     for (int i = 0; i < num_threads; ++i) {
         writers[i].join();
@@ -267,7 +272,11 @@ TEST(Transactions_ThreadedAdvanceRead)
         tk = table->get_key();
         wt->commit();
     }
+#if defined(_WIN32) || REALM_ANDROID
+    const int num_threads = 2;
+#else
     const int num_threads = 20;
+#endif
     const int num_iterations = 100;
     std::thread writers[num_threads];
     std::thread verifiers[num_threads];

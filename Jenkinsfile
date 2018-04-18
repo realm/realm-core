@@ -39,13 +39,14 @@ jobWrapper {
                 }
             }
 
-            targetBranch = env.CHANGE_TARGET ? env.CHANGE_TARGET : "none"
+            isPullRequest = !!env.CHANGE_TARGET
+            targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
             println "Building branch: ${env.BRANCH_NAME}"
             println "Target branch: ${targetBranch}"
 
             releaseTesting = targetBranch.contains('release')
 
-            echo "Pull request: ${env.CHANGE_TARGET ? 'yes' : 'no'}"
+            echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
             echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
             echo "Publishing Run: ${gitTag ? 'yes' : 'no'}"
 
@@ -56,50 +57,37 @@ jobWrapper {
             }
         }
 
-        if (env.CHANGE_TARGET) {
+        if (isPullRequest) {
             stage('Fastcheck') {
                 parallel(
-                    checkLinuxDebug     	: doBuildInDocker('Debug'),
+                    checkLinuxDebug     	: doBuildInDocker('Debug', '4'),
                     checkMacOsRelease   	: doBuildMacOs('Release', true),
                     checkWin32Debug     	: doBuildWindows('Debug', false, 'Win32'),
                     checkWin64Release   	: doBuildWindows('Release', false, 'x64'),
-                    androidArmeabiRelease	: doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
+                    iosDebug              : doBuildAppleDevice('ios', 'MinSizeDebug'),
                     androidArm64Debug   	: doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-                    threadSanitizer     	: doBuildInDocker('Debug', 'thread'),
-                    addressSanitizer    	: doBuildInDocker('Debug', 'address'),
+                    threadSanitizer     	: doBuildInDocker('Debug', '1000', 'thread'),
+                    addressSanitizer    	: doBuildInDocker('Debug', '1000', 'address'),
                 )
             }
         }
 
-        if (env.CHANGE_TARGET && releaseTesting) {
+        if (isPullRequest && releaseTesting) {
             stage('ExtendedCheck') {
-                parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
-                                    checkMacOsDebug     : doBuildMacOs('Debug', true),
-                                    buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
-                                    buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
-                                    buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
-                                    coverage            : doBuildCoverage(),
-                                    performance         : buildPerformance()
-                    ]
-
-                androidAbis = ['x86', 'mips', 'x86_64']
-
-                for (def i = 0; i < androidAbis.size(); i++) {
-                    def abi = androidAbis[i]
-                    parallelExecutors["android-${abi}-Debug"] = doAndroidBuildInDocker(abi, 'Debug', false)
-                }
-
-                appleSdks = ['ios', 'tvos', 'watchos']
-
-                for (def i = 0; i < appleSdks.size(); i++) {
-                    def sdk = appleSdks[i]
-                    parallelExecutors["${sdk}-Debug"] = doBuildAppleDevice(sdk, 'MinSizeDebug')
-                }
-                parallel parallelExecutors
+                parallel(
+                		checkLinuxRelease   : doBuildInDocker('Release'),
+                    checkMacOsDebug     : doBuildMacOs('Debug', true),
+                    buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
+                    buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
+                    buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
+                    androidArmeabiRelease	: doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
+                    coverage            : doBuildCoverage(),
+                    performance         : buildPerformance()
+                )
             }
         }
 
-        if (gitTag) {
+        if (gitTag && !isPullRequest) {
             stage('BuildPackages') {
                 parallelExecutors = [
                                     buildMacOsDebug     : doBuildMacOs('Debug', false),
@@ -200,7 +188,7 @@ def buildDockerEnv(name) {
     return docker.image(name)
 }
 
-def doBuildInDocker(String buildType, String sanitizeMode='') {
+def doBuildInDocker(String buildType, String maxBpNodeSize = '1000', String sanitizeMode='') {
     return {
         node('docker') {
             getArchive()
@@ -222,7 +210,7 @@ def doBuildInDocker(String buildType, String sanitizeMode='') {
                         sh """
                            mkdir build-dir
                            cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType} ${sanitizeFlags} -G Ninja ..
+                           cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} ${sanitizeFlags} -G Ninja ..
                         """
                         runAndCollectWarnings(script: "cd build-dir && ninja")
                         sh """
