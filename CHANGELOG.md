@@ -21,7 +21,7 @@
 
 ### Internals
 
-* None.
+* Apple binaries are now built with Xcode 8.3.3.
 
 ----------------------------------------------
 
