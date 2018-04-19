@@ -26,8 +26,9 @@
 namespace realm {
 
 struct TableKey {
+    static constexpr int64_t null_value = uint64_t(-1) >> 1; // free top bit
     constexpr TableKey()
-        : value(uint64_t(-1) >> 1) // free top bit
+        : value(null_value)
     {
     }
     explicit TableKey(int64_t val)
@@ -50,6 +51,10 @@ struct TableKey {
     bool operator<(const TableKey& rhs) const
     {
         return value < rhs.value;
+    }
+    explicit operator bool() const
+    {
+        return value != null_value;
     }
     int64_t value;
 };
@@ -150,7 +155,7 @@ struct ObjKey {
     {
         return value > rhs.value;
     }
-    operator bool() const
+    explicit operator bool() const
     {
         return value != -1;
     }

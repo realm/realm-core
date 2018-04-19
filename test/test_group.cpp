@@ -463,6 +463,8 @@ TEST(Group_TableKey)
     CHECK_EQUAL("moja", group.get_table_name(moja->get_key()));
     CHECK_EQUAL("mbili", group.get_table_name(mbili->get_key()));
     CHECK_EQUAL("tatu", group.get_table_name(tatu->get_key()));
+    CHECK_EQUAL(group.find_table("moja"), moja->get_key());
+    CHECK_NOT(group.find_table("hello"));
 }
 
 

@@ -843,7 +843,7 @@ inline TableKey Group::find_table(StringData name) const noexcept
     if (!is_attached())
         return TableKey();
     size_t ndx = find_table_index(name);
-    return ndx2key(ndx);
+    return (ndx != npos) ? ndx2key(ndx) : TableKey{};
 }
 
 inline TableRef Group::get_table(TableKey key)
