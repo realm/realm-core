@@ -960,7 +960,7 @@ TEST(Group_Serialize1)
 
         CHECK_EQUAL(4, t->get_column_count());
         CHECK_EQUAL(10, t->size());
-        auto cols = t->get_col_keys();
+        auto cols = t->get_column_keys();
         // Verify that original values are there
         CHECK(*table == *t);
 
@@ -1185,7 +1185,7 @@ TEST(Group_Serialize_All)
 
     CHECK_EQUAL(5, t->get_column_count());
     CHECK_EQUAL(1, t->size());
-    auto cols = t->get_col_keys();
+    auto cols = t->get_column_keys();
     Obj obj = t->get_object(ObjKey(0));
     CHECK_EQUAL(12, obj.get<Int>(cols[0]));
     CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
@@ -1221,7 +1221,7 @@ TEST(Group_Persist)
     {
         CHECK_EQUAL(5, table->get_column_count());
         CHECK_EQUAL(1, table->size());
-        auto cols = table->get_col_keys();
+        auto cols = table->get_column_keys();
         Obj obj = table->get_object(ObjKey(0));
         CHECK_EQUAL(12, obj.get<Int>(cols[0]));
         CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
@@ -1244,7 +1244,7 @@ TEST(Group_Persist)
     {
         CHECK_EQUAL(5, table->get_column_count());
         CHECK_EQUAL(1, table->size());
-        auto cols = table->get_col_keys();
+        auto cols = table->get_column_keys();
         Obj obj = table->get_object(ObjKey(0));
         CHECK_EQUAL(12, obj.get<Int>(cols[0]));
         CHECK_EQUAL(true, obj.get<Bool>(cols[1]));

@@ -321,7 +321,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(1, rt->size());
     ConstTableRef foo = rt->get_table("foo");
     CHECK_EQUAL(1, foo->get_column_count());
-    auto cols = foo->get_col_keys();
+    auto cols = foo->get_column_keys();
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(1, foo->size());
     CHECK_EQUAL(0, foo->get_object(k0).get<int64_t>(cols[0]));
@@ -333,7 +333,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         WriteTransaction wt(sg_w);
         TableRef foo_w = wt.get_table("foo");
         foo_w->add_column(type_String, "s");
-        cols = foo_w->get_col_keys();
+        cols = foo_w->get_column_keys();
         k1 = foo_w->create_object().get_key();
         auto obj0 = foo_w->get_object(k0);
         auto obj1 = foo_w->get_object(k1);
@@ -403,7 +403,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->verify();
     CHECK_EQUAL(2, rt->size());
     CHECK_EQUAL(2, foo->get_column_count());
-    cols = foo->get_col_keys();
+    cols = foo->get_column_keys();
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
@@ -413,7 +413,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL("b", obj1.get<StringData>(cols[1]));
     CHECK_EQUAL(foo, rt->get_table("foo"));
     ConstTableRef bar = rt->get_table("bar");
-    cols = bar->get_col_keys();
+    cols = bar->get_column_keys();
     CHECK_EQUAL(3, bar->get_column_count());
     CHECK_EQUAL(type_Int, bar->get_column_type(cols[0]));
     CHECK_EQUAL(type_Float, bar->get_column_type(cols[1]));

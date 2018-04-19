@@ -181,7 +181,7 @@ void TableKeyIterator::load_key()
     m_table_key = TableKey();
 }
 
-TableKey TableKeys::operator[](size_t p)
+TableKey TableKeys::operator[](size_t p) const
 {
     if (p < m_iter.m_pos) {
         m_iter = TableKeyIterator(m_iter.m_group, 0);
