@@ -37,6 +37,7 @@
 namespace realm {
 
 class DB;
+class TableKeys;
 
 namespace _impl {
 class GroupFriend;
@@ -227,7 +228,7 @@ public:
     int get_history_schema_version() noexcept;
 
     /// Returns the keys for all tables in this group.
-    std::vector<TableKey> get_keys() const;
+    TableKeys get_table_keys() const;
 
     /// \defgroup group_table_access Table Accessors
     ///
@@ -802,10 +803,65 @@ private:
     friend class metrics::QueryInfo;
     friend class metrics::Metrics;
     friend class Transaction;
+    friend class TableKeyIterator;
 };
 
+class TableKeyIterator {
+public:
+    bool operator!=(const TableKeyIterator& other)
+    {
+        return m_pos != other.m_pos;
+    }
+    TableKeyIterator& operator++();
+    TableKey operator*();
+
+private:
+    friend class TableKeys;
+    const Group* m_group;
+    size_t m_pos;
+    size_t m_index_in_group = 0;
+    size_t m_max_index_in_group;
+    TableKey m_table_key;
+
+    TableKeyIterator(const Group* g, size_t p)
+        : m_group(g)
+        , m_pos(p)
+        , m_max_index_in_group(m_group->m_tables.size())
+    {
+    }
+    void load_key();
+};
+
+class TableKeys {
+public:
+    TableKeys(const Group* g)
+        : m_iter(g, 0)
+    {
+    }
+    size_t size()
+    {
+        return m_iter.m_group->size();
+    }
+    TableKey operator[](size_t p);
+    TableKeyIterator begin()
+    {
+        return TableKeyIterator(m_iter.m_group, 0);
+    }
+    TableKeyIterator end()
+    {
+        return TableKeyIterator(m_iter.m_group, size());
+    }
+
+private:
+    TableKeyIterator m_iter;
+};
 
 // Implementation
+
+inline TableKeys Group::get_table_keys() const
+{
+    return TableKeys(this);
+}
 
 inline bool Group::is_attached() const noexcept
 {
@@ -928,7 +984,7 @@ void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string
 
     out << "{";
 
-    auto keys = get_keys();
+    auto keys = get_table_keys();
     for (size_t i = 0; i < keys.size(); ++i) {
         auto key = keys[i];
         StringData name = get_table_name(key);

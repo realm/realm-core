@@ -465,6 +465,15 @@ TEST(Group_TableKey)
     CHECK_EQUAL("tatu", group.get_table_name(tatu->get_key()));
     CHECK_EQUAL(group.find_table("moja"), moja->get_key());
     CHECK_NOT(group.find_table("hello"));
+
+    auto all_table_keys = group.get_table_keys();
+    CHECK_EQUAL(all_table_keys.size(), 3);
+    int cnt = 0;
+    for (auto key : group.get_table_keys()) {
+        CHECK_EQUAL(key, all_table_keys[cnt]);
+        cnt++;
+    }
+    CHECK_EQUAL(cnt, 3);
 }
 
 
@@ -537,6 +546,7 @@ TEST(Group_BasicRemoveTable)
     TableRef gamma = group.add_table("gamma");
     TableRef delta = group.add_table("delta");
     CHECK_EQUAL(4, group.size());
+    group.verify();
     group.remove_table(gamma->get_key()); // By key
     CHECK_EQUAL(3, group.size());
     CHECK(alpha);
