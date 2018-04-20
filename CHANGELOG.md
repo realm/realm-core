@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* None.
+* In the parser, fix `@links.@count` when applied over lists to return
+  the sum of backlinks for all connected rows in the list.
 
 ### Breaking changes
 

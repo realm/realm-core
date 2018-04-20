@@ -1858,7 +1858,13 @@ TEST(Parser_BacklinkCount)
 
     // backlink count through forward links
     verify_query(test_context, t, "fav_item.@links.@count == 5 && fav_item.item_id == 12", 1);
+    verify_query(test_context, t, "fav_item.@links.@count == 3 && fav_item.item_id == 2", 1);
     verify_query(test_context, t, "fav_item.@links.@count == 13 && fav_item.item_id == 5", 1);
+
+    // backlink count through lists; the semantics are to sum the backlinks for each connected row
+    verify_query(test_context, t, "items.@links.@count == 21 && customer_id == 0", 1);  // 13 + 3 + 5
+    verify_query(test_context, t, "items.@links.@count == 130 && customer_id == 1", 1); // 13 * 10
+    verify_query(test_context, t, "items.@links.@count == 10 && customer_id == 2", 1);  // 5 + 5
 
     // backlink count through backlinks first
     verify_query(test_context, items, "@links.class_Items.self.@links.@count == 1 && item_id == 14", 1);
