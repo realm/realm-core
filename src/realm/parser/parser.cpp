@@ -82,7 +82,8 @@ struct timestamp : sor< internal_timestamp, readable_timestamp > {};
 
 struct true_value : string_token_t("true") {};
 struct false_value : string_token_t("false") {};
-struct null_value : string_token_t("null") {};
+struct null_value : seq<sor<string_token_t("null"), string_token_t("nil")>> {
+};
 
 // following operators must allow proceeding string characters
 struct min : TAOCPP_PEGTL_ISTRING(".@min.") {};
@@ -94,19 +95,26 @@ struct count : string_token_t(".@count") {};
 struct size : string_token_t(".@size") {};
 struct backlinks : string_token_t("@links") {
 };
+struct one_key_path : seq<sor<alpha, one<'_', '$'>>, star<sor<alnum, one<'_', '-', '$'>>>> {
+};
+struct backlink_path : seq<backlinks, dot, one_key_path, dot, one_key_path> {
+};
+struct backlink_count : seq<disable<backlinks>, sor<disable<count>, disable<size>>> {
+};
 
 struct single_collection_operators : sor< count, size > {};
 struct key_collection_operators : sor< min, max, sum, avg > {};
 
 // key paths
-struct key_path
-    : list<sor<backlinks, seq<sor<alpha, one<'_', '$'>>, star<sor<alnum, one<'_', '-', '$'>>>>>, one<'.'>> {
+struct key_path : list<sor<backlink_path, one_key_path>, one<'.'>> {
 };
 
 struct key_path_prefix : disable< key_path > {};
 struct key_path_suffix : disable< key_path > {};
-struct collection_operator_match : sor< seq< key_path_prefix, key_collection_operators, key_path_suffix >,
-                                   seq< key_path_prefix, single_collection_operators > > {};
+struct collection_operator_match
+    : sor<seq<key_path_prefix, key_collection_operators, key_path_suffix>,
+          seq<opt<key_path_prefix, dot>, backlink_count>, seq<key_path_prefix, single_collection_operators>> {
+};
 
 // argument
 struct argument_index : plus< digit > {};
@@ -361,12 +369,16 @@ template<> struct action< or_op >
 };
 
 
-#define EXPRESSION_ACTION(rule, type)                               \
-template<> struct action< rule > {                                  \
-    template< typename Input >                                      \
-    static void apply(const Input& in, ParserState& state) {        \
-    DEBUG_PRINT_TOKEN(in.string() + #rule);                             \
-        state.add_expression(Expression(type, in.string())); }};
+#define EXPRESSION_ACTION(rule, type)                                                                                \
+    template <>                                                                                                      \
+    struct action<rule> {                                                                                            \
+        template <typename Input>                                                                                    \
+        static void apply(const Input& in, ParserState& state)                                                       \
+        {                                                                                                            \
+            DEBUG_PRINT_TOKEN("expression:" + in.string() + #rule);                                                  \
+            state.add_expression(Expression(type, in.string()));                                                     \
+        }                                                                                                            \
+    };
 
 EXPRESSION_ACTION(dq_string_content, Expression::Type::String)
 EXPRESSION_ACTION(sq_string_content, Expression::Type::String)
@@ -546,12 +558,16 @@ struct action<subquery> {
     }
 };
 
-#define COLLECTION_OPERATION_ACTION(rule, type)                     \
-template<> struct action< rule > {                                  \
-template< typename Input >                                          \
-    static void apply(const Input& in, ParserState& state) {        \
-        DEBUG_PRINT_TOKEN(in.string());                             \
-        state.pending_op = type; }};
+#define COLLECTION_OPERATION_ACTION(rule, type)                                                                      \
+    template <>                                                                                                      \
+    struct action<rule> {                                                                                            \
+        template <typename Input>                                                                                    \
+        static void apply(const Input& in, ParserState& state)                                                       \
+        {                                                                                                            \
+            DEBUG_PRINT_TOKEN("operation: " + in.string());                                                          \
+            state.pending_op = type;                                                                                 \
+        }                                                                                                            \
+    };
 
 
 COLLECTION_OPERATION_ACTION(min, Expression::KeyPathOp::Min)
@@ -560,11 +576,12 @@ COLLECTION_OPERATION_ACTION(sum, Expression::KeyPathOp::Sum)
 COLLECTION_OPERATION_ACTION(avg, Expression::KeyPathOp::Avg)
 COLLECTION_OPERATION_ACTION(count, Expression::KeyPathOp::Count)
 COLLECTION_OPERATION_ACTION(size, Expression::KeyPathOp::SizeString)
+COLLECTION_OPERATION_ACTION(backlink_count, Expression::KeyPathOp::BacklinkCount)
 
 template<> struct action< key_path_prefix > {
     template< typename Input >
     static void apply(const Input& in, ParserState& state) {
-        DEBUG_PRINT_TOKEN(in.string());
+        DEBUG_PRINT_TOKEN("key_path_prefix: " + in.string());
         state.collection_key_path_prefix = in.string();
     }
 };
@@ -572,7 +589,7 @@ template<> struct action< key_path_prefix > {
 template<> struct action< key_path_suffix > {
     template< typename Input >
     static void apply(const Input& in, ParserState& state) {
-        DEBUG_PRINT_TOKEN(in.string());
+        DEBUG_PRINT_TOKEN("key_path_suffix: " + in.string());
         state.collection_key_path_suffix = in.string();
     }
 };
