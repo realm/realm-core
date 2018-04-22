@@ -485,24 +485,6 @@ private:
     friend class Transaction;
 };
 
-class DisableReplication {
-public:
-    DisableReplication(DB& owner)
-        : m_owner(owner)
-    {
-        m_repl = owner.get_replication();
-        owner.set_replication(nullptr);
-    }
-    ~DisableReplication()
-    {
-        m_owner.set_replication(m_repl);
-    }
-
-private:
-    DB& m_owner;
-    Replication* m_repl;
-};
-
 inline void DB::get_stats(size_t& free_space, size_t& used_space)
 {
     free_space = m_free_space;
@@ -515,7 +497,11 @@ public:
     Transaction(DB* _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage);
     // convenience, so you don't need to carry a reference to the DB around
     ~Transaction();
-    DB* get_db();
+
+    DB* get_db() const
+    {
+        return db;
+    }
     DB::version_type get_version() const noexcept
     {
         return m_read_lock.m_version;
@@ -587,6 +573,24 @@ private:
     friend class DB;
 };
 
+class DisableReplication {
+public:
+    DisableReplication(Transaction& t)
+        : m_owner(t.get_db())
+    {
+        m_repl = m_owner->get_replication();
+        m_owner->set_replication(nullptr);
+    }
+    ~DisableReplication()
+    {
+        m_owner->set_replication(m_repl);
+    }
+
+private:
+    DB* m_owner;
+    Replication* m_repl;
+};
+
 
 /*
  * classes providing backward Compatibility with the older
@@ -602,6 +606,11 @@ public:
 
     ~ReadTransaction() noexcept
     {
+    }
+
+    operator Transaction&()
+    {
+        return *trans;
     }
 
     bool has_table(StringData name) const noexcept
@@ -644,6 +653,11 @@ public:
 
     ~WriteTransaction() noexcept
     {
+    }
+
+    operator Transaction&()
+    {
+        return *trans;
     }
 
     bool has_table(StringData name) const noexcept

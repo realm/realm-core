@@ -323,8 +323,8 @@ TEST(Replication_General)
         CHECK(!sd1.is_null());
     }
     {
-        DisableReplication disable(sg_1);
         WriteTransaction wt(sg_1);
+        DisableReplication disable(wt);
         TableRef table = wt.get_table("my_table");
         table->create_object(ObjKey(100));
         wt.commit();
