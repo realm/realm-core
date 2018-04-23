@@ -179,6 +179,11 @@ Int ValueExpression::value_of_type_for_query<Int>()
     if (value->type == parser::Expression::Type::Argument) {
         return arguments->long_for_argument(stot<int>(value->s));
     }
+    // We can allow string types here in case people have numbers in their strings like "int == '23'"
+    // it's just a convienence but if the string conversion fails we'll throw from the stot function.
+    if (value->type != parser::Expression::Type::Number && value->type != parser::Expression::Type::String) {
+        throw std::logic_error("Attempting to compare a numeric property to a non-numeric value");
+    }
     return stot<long long>(value->s);
 }
 

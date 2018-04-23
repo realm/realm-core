@@ -296,6 +296,31 @@ bool ConstObj::has_backlinks(bool only_strong_links) const
     return false;
 }
 
+size_t ConstObj::get_backlink_count(bool only_strong_links) const
+{
+    const Spec& spec = m_tree_top->get_spec();
+    size_t backlink_columns_begin = spec.first_backlink_column_index();
+    size_t backlink_columns_end = backlink_columns_begin + spec.backlink_column_count();
+
+    const Table* target_table = m_tree_top->get_owner();
+    const Spec& target_table_spec = _impl::TableFriend::get_spec(*target_table);
+
+    size_t cnt = 0;
+    for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
+        ColKey backlink_col_key = target_table->ndx2colkey(i);
+
+        // Find origin table and column for this backlink column
+        TableRef origin_table = _impl::TableFriend::get_opposite_link_table(*target_table, backlink_col_key);
+        auto origin_col = target_table_spec.get_origin_column_key(i);
+
+        if (!only_strong_links || origin_table->get_link_type(origin_col) == link_Strong) {
+            cnt += get_backlink_count(*origin_table, origin_col);
+        }
+    }
+
+    return cnt;
+}
+
 size_t ConstObj::get_backlink_count(const Table& origin, ColKey origin_col_key) const
 {
     size_t cnt = 0;
