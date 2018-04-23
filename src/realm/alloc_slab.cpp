@@ -1124,10 +1124,7 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
     for (size_t i = 0; i < m_fast_mapping_size - 1; ++i) {
         new_fast_mapping[i] = m_fast_mapping_ptr[i];
     }
-    OldFastMapping oldie;
-    oldie.replaced_at_version = m_youngest_live_version;
-    oldie.mappings = m_fast_mapping_ptr.load();
-    m_old_fast_mappings.push_back(oldie);
+    m_old_fast_mappings.emplace_back(m_youngest_live_version, m_fast_mapping_ptr.load());
 #if REALM_ENABLE_ENCRYPTION
     new_fast_mapping[m_fast_mapping_size - 1] = {address, nullptr};
 #else
@@ -1149,10 +1146,7 @@ void SlabAlloc::rebuild_fast_mapping(bool requires_new_fast_mapping, size_t old_
     if (requires_new_fast_mapping) {
         // we need a new mapping, but must preserve old, as translations using it
         // may be in progress concurrently
-        OldFastMapping oldie;
-        oldie.replaced_at_version = m_youngest_live_version;
-        oldie.mappings = m_fast_mapping_ptr;
-        m_old_fast_mappings.push_back(oldie);
+        m_old_fast_mappings.emplace_back(m_youngest_live_version, m_fast_mapping_ptr.load());
         m_fast_mapping_size = num_mappings + free_space_size;
         new_fast_mapping = new FastMap[m_fast_mapping_size];
         old_num_sections = 0;
