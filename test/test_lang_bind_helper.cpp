@@ -80,9 +80,42 @@ using unit_test::TestContext;
 
 namespace {
 
-class LangBindHelper {
-public:
-};
+void work_on_frozen(TestContext& test_context, TransactionRef frozen)
+{
+    CHECK_THROW(frozen->promote_to_write(), LogicError);
+    auto table = frozen->get_table("my_table");
+    auto col = table->get_column_key("my_col_1");
+    int sum = 0;
+    for (auto i : *table) {
+        sum += i.get<Int>(col);
+    }
+    CHECK_EQUAL(sum, 1000 / 2 * 999);
+}
+
+TEST(Transactions_Frozen)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db(*hist_w);
+    TransactionRef frozen;
+    {
+        auto wt = db.start_write();
+        auto table = wt->add_table("my_table");
+        table->add_column(type_Int, "my_col_1");
+        for (int j = 0; j < 1000; ++j) {
+            table->create_object().set_all(j);
+        }
+        wt->commit_and_continue_as_read();
+        frozen = wt->freeze();
+    }
+    // create multiple threads, all doing read-only work on Frozen
+    const int num_threads = 100;
+    std::thread frozen_workers[num_threads];
+    for (int j = 0; j < num_threads; ++j)
+        frozen_workers[j] = std::thread([&] { work_on_frozen(test_context, frozen); });
+    for (int j = 0; j < num_threads; ++j)
+        frozen_workers[j].join();
+}
 
 class MyHistory : public _impl::History {
 public:
