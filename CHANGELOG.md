@@ -55,6 +55,25 @@
 
 ----------------------------------------------
 
+# 5.5.0 Release notes
+
+### Enhancements
+
+* Parser improvements:
+    - Allow an arbitrary prefix on backlink class names of @links queries.
+      This will allow users to query unnamed backlinks using the `@links.Class.property` syntax.
+    - Case insensitive `nil` is now recognised as a synonym to `NULL`.
+    - Add support for `@links.@count` which gives the count of all backlinks to an object.
+      See Issue [#3003](https://github.com/realm/realm-core/issues/3003).
+
+-----------
+
+### Internals
+
+* Apple binaries are now built with Xcode 8.3.3.
+
+----------------------------------------------
+
 # 5.4.2 Release notes
 
 ### Bugfixes

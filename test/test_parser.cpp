@@ -61,6 +61,7 @@
 #include <realm/util/any.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/to_string.hpp>
+#include "test_table_helper.hpp"
 
 #include <chrono>
 #include <string>
@@ -99,6 +100,7 @@ static std::vector<std::string> valid_queries = {
     "truelove = false",
     "true = falsey",
     "nullified = null",
+    "nullified = nil",
     "_ = a",
     "_a = _.aZ",
     "a09._br.z = __-__.Z-9",
@@ -424,12 +426,14 @@ TEST(Parser_basic_serialisation)
     Query q = t->where();
 
     verify_query(test_context, t, "time == NULL", 1);
+    verify_query(test_context, t, "time == NIL", 1);
     verify_query(test_context, t, "time != NULL", 4);
     verify_query(test_context, t, "time > T0:0", 3);
     verify_query(test_context, t, "time == T1:2", 1);
     verify_query(test_context, t, "time > 2017-12-1@12:07:53", 1);
     verify_query(test_context, t, "time == 2017-12-01@12:07:53:505", 1);
     verify_query(test_context, t, "buddy == NULL", 4);
+    verify_query(test_context, t, "buddy == nil", 4);
     verify_query(test_context, t, "buddy != NULL", 1);
     verify_query(test_context, t, "buddy <> NULL", 1);
     verify_query(test_context, t, "age > 2", 2);
@@ -640,6 +644,7 @@ TEST(Parser_StringOperations)
     verify_query(test_context, t, "father.name like[c] \"?O?\"", 2);
 
     verify_query(test_context, t, "name == NULL", 1);
+    verify_query(test_context, t, "name == nil", 1);
     verify_query(test_context, t, "NULL == name", 1);
     verify_query(test_context, t, "name != NULL", 5);
     verify_query(test_context, t, "NULL != name", 5);
@@ -709,6 +714,7 @@ TEST(Parser_Timestamps)
 
     verify_query(test_context, t, "T2017-12-04 == NULL", 3);
     verify_query(test_context, t, "T2017-12-04 != NULL", 2);
+    verify_query(test_context, t, "T2017-12-04 != NIL", 2);
     verify_query(test_context, t, "linked.T2017-12-04 == NULL", 3); // null links count as a match for null here
     verify_query(test_context, t, "linked != NULL && linked.T2017-12-04 == NULL", 0);
     verify_query(test_context, t, "linked.T2017-12-04 != NULL", 2);
@@ -718,7 +724,9 @@ TEST(Parser_Timestamps)
     verify_query(test_context, t, "T2017-12-04 == 2017-12-04@0:0:0", 0);
 
     verify_query(test_context, t, "birthday == NULL", 0);
+    verify_query(test_context, t, "birthday == NIL", 0);
     verify_query(test_context, t, "birthday != NULL", 5);
+    verify_query(test_context, t, "birthday != NIL", 5);
     verify_query(test_context, t, "birthday == T0:0", 3);
     verify_query(test_context, t, "birthday == 1970-1-1@0:0:0:0", 3); // epoch is default non-null Timestamp
 
@@ -788,6 +796,10 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, items, "data != NULL", 5);
     verify_query(test_context, items, "nullable_data == NULL", 2);
     verify_query(test_context, items, "nullable_data != NULL", 3);
+    verify_query(test_context, items, "data == NIL", 0);
+    verify_query(test_context, items, "data != NIL", 5);
+    verify_query(test_context, items, "nullable_data == NIL", 2);
+    verify_query(test_context, items, "nullable_data != NIL", 3);
 
     verify_query(test_context, items, "nullable_data CONTAINS 'f'", 2);
     verify_query(test_context, items, "nullable_data BEGINSWITH 'f'", 1);
@@ -1805,8 +1817,7 @@ TEST(Parser_Backlinks)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.fav_item == NULL", 1),
                                 message);
     CHECK_EQUAL(message, "Comparing a list property to 'null' is not supported");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count > 0", 1), message);
-    CHECK_EQUAL(message, "'@links' must be proceeded by type name and a property name");
+    CHECK_THROW_ANY(verify_query(test_context, items, "@links.attr. > 0", 1));
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Factory.items > 0", 1), message);
     CHECK_EQUAL(message, "No property 'items' found in type 'Factory' which links to type 'Items'");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.artifacts > 0", 1), message);
@@ -1835,6 +1846,148 @@ TEST(Parser_Backlinks)
     CHECK_THROW_ANY_GET_MESSAGE(realm::query_builder::apply_predicate(q, p, args, mapping), message);
     CHECK_EQUAL(message, "Querying over backlinks is disabled but backlinks were found in the inverse relationship "
                          "of property 'items' on type 'Person'");
+
+    // check that arbitrary aliasing for named backlinks works with a arbitrary prefix
+    parser::KeyPathMapping mapping_with_prefix;
+    mapping_with_prefix.set_backlink_class_prefix("class_");
+    mapping_with_prefix.add_mapping(items, "purchasers", "@links.Person.items");
+    mapping_with_prefix.add_mapping(t, "money", "account_balance");
+
+    q = items->where();
+    p = realm::parser::parse("purchasers.@count > 2").predicate;
+    realm::query_builder::apply_predicate(q, p, args, mapping_with_prefix);
+    CHECK_EQUAL(q.count(), 2);
+
+    q = items->where();
+    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
+    realm::query_builder::apply_predicate(q, p, args, mapping_with_prefix);
+    CHECK_EQUAL(q.count(), 3);
+}
+
+
+ONLY(Parser_BacklinkCount)
+{
+    Group g;
+
+    TableRef items = g.add_table("class_Items");
+    items->add_column(type_Int, "item_id");
+    auto item_link_col = items->add_column_link(type_Link, "self", *items);
+    items->add_column(type_Double, "double_col");
+
+    std::vector<int64_t> item_ids{5, 2, 12, 14, 20};
+    ObjKeyVector item_keys(item_ids);
+    for (size_t i = 0; i < item_keys.size(); ++i) {
+        items->create_object(item_keys[i]).set_all(item_ids[i], item_keys[i], double(i) + 0.5);
+    }
+    items->get_object(item_keys[4]).set(item_link_col, null_key); // last item will have a total of 0 backlinks
+
+    TableRef t = g.add_table("class_Person");
+    auto id_col = t->add_column(type_Int, "customer_id");
+    auto items_col = t->add_column_link(type_LinkList, "items", *items);
+    auto fav_col = t->add_column_link(type_Link, "fav_item", *items);
+    auto float_col = t->add_column(type_Float, "float_col");
+
+    for (int i = 0; i < 3; ++i) {
+        Obj obj = t->create_object();
+        obj.set(id_col, i);
+        obj.set(fav_col, item_keys[2 - i]);
+        obj.set(float_col, float(i) + 0.5f);
+    }
+
+    auto it = t->begin();
+    auto list_0 = it->get_linklist(items_col);
+    list_0.add(item_keys[0]);
+    list_0.add(item_keys[1]);
+    list_0.add(item_keys[2]);
+
+    ++it;
+    auto list_1 = it->get_linklist(items_col);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1.add(item_keys[0]);
+    }
+
+    ++it;
+    auto list_2 = it->get_linklist(items_col);
+    list_2.add(item_keys[2]);
+    list_2.add(item_keys[2]);
+
+    verify_query(test_context, items, "@links.@count == 0", 1);
+    verify_query(test_context, items, "@links.@count == 0 && item_id == 20", 1);
+    verify_query(test_context, items, "@links.@count == 1", 1);
+    verify_query(test_context, items, "@links.@count == 1 && item_id == 14", 1);
+    verify_query(test_context, items, "@links.@count == 5", 1);
+    verify_query(test_context, items, "@links.@count == 5 && item_id == 12", 1);
+    verify_query(test_context, items, "@links.@count == 3", 1);
+    verify_query(test_context, items, "@links.@count == 3 && item_id == 2", 1);
+    verify_query(test_context, items, "@links.@count == 13", 1);
+    verify_query(test_context, items, "@links.@count == 13 && item_id == 5", 1);
+
+    // @size is still a synonym to @count
+    verify_query(test_context, items, "@links.@size == 0", 1);
+    verify_query(test_context, items, "@links.@size == 0 && item_id == 20", 1);
+
+    // backlink count through forward links
+    verify_query(test_context, t, "fav_item.@links.@count == 5 && fav_item.item_id == 12", 1);
+    verify_query(test_context, t, "fav_item.@links.@count == 3 && fav_item.item_id == 2", 1);
+    verify_query(test_context, t, "fav_item.@links.@count == 13 && fav_item.item_id == 5", 1);
+
+    // backlink count through lists; the semantics are to sum the backlinks for each connected row
+    verify_query(test_context, t, "items.@links.@count == 21 && customer_id == 0", 1);  // 13 + 3 + 5
+    verify_query(test_context, t, "items.@links.@count == 130 && customer_id == 1", 1); // 13 * 10
+    verify_query(test_context, t, "items.@links.@count == 10 && customer_id == 2", 1);  // 5 + 5
+
+    // backlink count through backlinks first
+    verify_query(test_context, items, "@links.class_Items.self.@links.@count == 1 && item_id == 14", 1);
+    verify_query(test_context, items, "@links.class_Person.items.@links.@count == 0", 5);
+
+    // backlink count through backlinks and forward links
+    verify_query(test_context, items, "@links.class_Person.fav_item.items.@links.@count == 130 && item_id == 2", 1);
+    verify_query(test_context, items, "@links.class_Person.fav_item.fav_item.@links.@count == 3 && item_id == 2", 1);
+
+    // backlink count compared to int
+    verify_query(test_context, items, "@links.@count == 0", 1);
+    verify_query(test_context, items, "@links.@count >= item_id", 2); // 2 items have an id less than
+                                                                      // their backlink count
+    verify_query(test_context, items, "@links.@count >= @links.class_Person.fav_item.customer_id", 3);
+
+    // backlink count compared to double
+    verify_query(test_context, items, "@links.@count == 0.0", 1);
+    verify_query(test_context, items, "@links.@count >= double_col", 3);
+
+    // backlink count compared to float
+    verify_query(test_context, items, "@links.@count >= @links.class_Person.fav_item.float_col", 3);
+
+    // backlink count compared to link count
+    verify_query(test_context, items, "@links.@count >= self.@count", 5);
+    verify_query(test_context, t, "items.@count >= fav_item.@links.@count", 1); // second object
+
+    // all backlinks count compared to single column backlink count
+    // this is essentially checking if a single column contains all backlinks of a object
+    verify_query(test_context, items, "@links.@count == @links.class_Person.fav_item.@count", 1); // item 5 (0 links)
+    verify_query(test_context, items, "@links.@count == @links.class_Person.items.@count", 1);    // item 5 (0 links)
+    verify_query(test_context, items, "@links.@count == @links.class_Items.self.@count", 2); // items 4,5 (1,0 links)
+
+    std::string message;
+    // backlink count requires comparison to a numeric type
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count == 'string'", -1), message);
+    CHECK_EQUAL(message, "Cannot convert string 'string'");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count == 2018-04-09@14:21:0", -1),
+                                message);
+    CHECK_EQUAL(message, "Attempting to compare a numeric property to a non-numeric value");
+
+    // no suffix after @links.@count is allowed
+    CHECK_THROW_ANY(verify_query(test_context, items, "@links.@count.item_id == 0", -1));
+    CHECK_THROW_ANY(verify_query(test_context, items, "@links.@count.@avg.items_id == 0", -1));
+
+    // other aggregate operators are not supported
+    CHECK_THROW_ANY(verify_query(test_context, items, "@links.@avg == 1", -1));
+    CHECK_THROW_ANY(verify_query(test_context, items, "@links.@sum == 1", -1));
+    CHECK_THROW_ANY(verify_query(test_context, items, "@links.@min == 1", -1));
+    CHECK_THROW_ANY(verify_query(test_context, items, "@links.@max == 1", -1));
+    CHECK_THROW_ANY(verify_query(test_context, items, "@links.@avg.item_id == 1", -1));
+    CHECK_THROW_ANY(verify_query(test_context, items, "@links.@sum.item_id == 1", -1));
+    CHECK_THROW_ANY(verify_query(test_context, items, "@links.@min.item_id == 1", -1));
+    CHECK_THROW_ANY(verify_query(test_context, items, "@links.@max.item_id == 1", -1));
 }
 
 

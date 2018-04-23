@@ -120,6 +120,8 @@ const char* collection_operator_to_str(parser::Expression::KeyPathOp op)
             return "@size";
         case parser::Expression::KeyPathOp::SizeBinary:
             return "@size";
+        case parser::Expression::KeyPathOp::BacklinkCount:
+            return "@links.@count";
         case parser::Expression::KeyPathOp::Count:
             return "@count";
     }
