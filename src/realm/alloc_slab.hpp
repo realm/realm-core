@@ -544,7 +544,7 @@ inline bool SlabAlloc::nonempty_attachment() const noexcept
 inline size_t SlabAlloc::get_baseline() const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
-    return m_baseline;
+    return m_baseline.load(std::memory_order_relaxed);
 }
 
 inline bool SlabAlloc::is_free_space_clean() const noexcept

@@ -295,7 +295,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     size_t new_size = 1UL << section_shift;
     ref_type ref;
     if (m_slabs.empty()) {
-        ref = align_size_to_section_boundary(m_baseline);
+        ref = align_size_to_section_boundary(m_baseline.load(std::memory_order_relaxed));
     }
     else {
         // Find size of memory that has been modified (through copy-on-write) in current write transaction
@@ -871,7 +871,7 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
 
 size_t SlabAlloc::get_total_size() const noexcept
 {
-    return m_slabs.empty() ? size_t(m_baseline) : m_slabs.back().ref_end;
+    return m_slabs.empty() ? size_t(m_baseline.load(std::memory_order_relaxed)) : m_slabs.back().ref_end;
 }
 
 
@@ -888,7 +888,7 @@ void SlabAlloc::reset_free_space_tracking()
 
     // Rebuild free list to include all slabs
     Chunk chunk;
-    chunk.ref = align_size_to_section_boundary(m_baseline);
+    chunk.ref = align_size_to_section_boundary(m_baseline.load(std::memory_order_relaxed));
 
     for (const auto& slab : m_slabs) {
         chunk.size = slab.ref_end - chunk.ref;
@@ -991,7 +991,7 @@ inline bool randomly_false_in_debug(bool x)
 void SlabAlloc::update_reader_view(size_t file_size)
 {
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
-    if (file_size <= m_baseline) {
+    if (file_size <= m_baseline.load(std::memory_order_relaxed)) {
         return;
     }
     REALM_ASSERT(file_size % 8 == 0); // 8-byte alignment required
@@ -1000,11 +1000,11 @@ void SlabAlloc::update_reader_view(size_t file_size)
     bool requires_new_fast_mapping = false;
 
     // Extend mapping by adding sections, or by extending sections
-    size_t old_baseline = m_baseline;
+    size_t old_baseline = m_baseline.load(std::memory_order_relaxed);
     auto old_slab_base = align_size_to_section_boundary(old_baseline);
     size_t old_num_sections = get_section_index(old_slab_base);
     REALM_ASSERT(m_mappings.size() == old_num_sections);
-    m_baseline.store(file_size);
+    m_baseline.store(file_size, std::memory_order_relaxed);
     {
         // 0. Special case: figure out if extension is to be done entirely within a single
         // existing mapping. This is the case if the new baseline (which must be larger
@@ -1275,7 +1275,7 @@ bool SlabAlloc::is_all_free() const
         return false;
 
     // Verify that free space matches slabs
-    ref_type slab_ref = align_size_to_section_boundary(m_baseline);
+    ref_type slab_ref = align_size_to_section_boundary(m_baseline.load(std::memory_order_relaxed));
     for (const auto& slab : m_slabs) {
         size_t slab_size = slab.ref_end - slab_ref;
         chunks::const_iterator chunk = find_if(m_free_space.begin(), m_free_space.end(), ChunkRefEq(slab_ref));
