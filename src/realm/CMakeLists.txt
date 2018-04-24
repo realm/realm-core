@@ -17,11 +17,7 @@ set(REALM_SOURCES
     bplustree.cpp
     cluster.cpp
     column.cpp
-    column_backlink.cpp
     column_binary.cpp
-    column_link.cpp
-    column_link_base.cpp
-    column_linklist.cpp
     column_string.cpp
     column_string_enum.cpp
     column_timestamp.cpp
@@ -92,12 +88,8 @@ set(REALM_INSTALL_GENERAL_HEADERS
     cluster.hpp
     cluster_tree.hpp
     column.hpp
-    column_backlink.hpp
     column_binary.hpp
     column_fwd.hpp
-    column_link.hpp
-    column_linkbase.hpp
-    column_linklist.hpp
     column_string.hpp
     column_string_enum.hpp
     column_timestamp.hpp

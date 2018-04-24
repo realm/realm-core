@@ -33,8 +33,6 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/utilities.hpp>
 #include <realm/exceptions.hpp>
-#include <realm/column_linkbase.hpp>
-#include <realm/column_backlink.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/db.hpp>
 #include <realm/replication.hpp>

@@ -32,7 +32,6 @@
 #include <realm/column_string.hpp>
 #include <realm/column_binary.hpp>
 #include <realm/column_string_enum.hpp>
-#include <realm/column_linklist.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/table.hpp>
