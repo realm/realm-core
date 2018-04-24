@@ -838,22 +838,26 @@ public:
         : m_iter(g, 0)
     {
     }
-    size_t size()
+    size_t size() const
     {
         return m_iter.m_group->size();
     }
-    TableKey operator[](size_t p);
-    TableKeyIterator begin()
+    bool empty() const
+    {
+        return size() == 0;
+    }
+    TableKey operator[](size_t p) const;
+    TableKeyIterator begin() const
     {
         return TableKeyIterator(m_iter.m_group, 0);
     }
-    TableKeyIterator end()
+    TableKeyIterator end() const
     {
         return TableKeyIterator(m_iter.m_group, size());
     }
 
 private:
-    TableKeyIterator m_iter;
+    mutable TableKeyIterator m_iter;
 };
 
 // Implementation

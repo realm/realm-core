@@ -172,7 +172,7 @@ void writer_thread(TestContext& test_context, int runs, DB* db, TableKey tk)
             // writer->verify();
             auto table = writer->get_table(tk);
             auto obj = table->get_object(0);
-            auto cols = table->get_col_keys();
+            auto cols = table->get_column_keys();
             int64_t a = obj.get<int64_t>(cols[0]);
             int64_t b = obj.get<int64_t>(cols[1]);
             CHECK_EQUAL(a * a, b);
@@ -199,7 +199,7 @@ void verifier_thread(TestContext& test_context, int limit, DB* db, TableKey tk)
         // reader->verify();
         auto table = reader->get_table(tk);
         auto obj = table->get_object(0);
-        auto cols = table->get_col_keys();
+        auto cols = table->get_column_keys();
         int64_t a = obj.get<int64_t>(cols[0]);
         int64_t b = obj.get<int64_t>(cols[1]);
         CHECK_EQUAL(a * a, b);
@@ -215,7 +215,7 @@ void verifier_thread_advance(TestContext& test_context, int limit, DB* db, Table
         reader->advance_read();
         auto table = reader->get_table(tk);
         auto obj = table->get_object(0);
-        auto cols = table->get_col_keys();
+        auto cols = table->get_column_keys();
         int64_t a = obj.get<int64_t>(cols[0]);
         int64_t b = obj.get<int64_t>(cols[1]);
         CHECK_EQUAL(a * a, b);
