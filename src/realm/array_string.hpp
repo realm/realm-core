@@ -67,6 +67,7 @@ public:
         init_from_mem(MemRef(m_alloc.translate(ref), ref, m_alloc));
     }
     void init_from_parent();
+    void destroy();
 
     size_t size() const;
 
@@ -81,6 +82,10 @@ public:
     bool is_null(size_t ndx) const;
     void erase(size_t ndx);
     void truncate_and_destroy_children(size_t ndx);
+    void clear()
+    {
+        truncate_and_destroy_children(0);
+    }
 
     size_t find_first(StringData value, size_t begin, size_t end) const noexcept;
 

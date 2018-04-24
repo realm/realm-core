@@ -139,7 +139,6 @@ struct ColumnTypeTraits<Timestamp> {
 
 template <>
 struct ColumnTypeTraits<StringData> {
-    using column_type = StringColumn;
     using cluster_leaf_type = ArrayString;
     static const DataType id = type_String;
     static const ColumnType column_id = col_type_String;
@@ -147,7 +146,6 @@ struct ColumnTypeTraits<StringData> {
 
 template <>
 struct ColumnTypeTraits<BinaryData> {
-    using column_type = BinaryColumn;
     using leaf_type = ArraySmallBlobs;
     using cluster_leaf_type = ArrayBinary;
     static const DataType id = type_Binary;

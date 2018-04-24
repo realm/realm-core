@@ -20,8 +20,6 @@
 #ifdef TEST_COLUMN_STRING
 
 #include <vector>
-#include <realm/column_string.hpp>
-#include <realm/column_string_enum.hpp>
 #include <realm/index_string.hpp>
 #include <realm/bplustree.hpp>
 #include <realm/array_string.hpp>
@@ -63,23 +61,10 @@ using namespace realm::test_util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-namespace {
-
-struct nullable {
-    static constexpr bool value = true;
-};
-
-struct non_nullable {
-    static constexpr bool value = false;
-};
-
-} // anonymous namespace
-
-
-TEST_TYPES(ColumnString_Basic, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST(ColumnString_Basic)
 {
-    TEST_TYPE test_resources;
-    typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
+    string_column test_resources;
+    auto& c = test_resources.get_column();
 
     // TEST(ColumnString_MultiEmpty)
 
@@ -128,10 +113,9 @@ TEST_TYPES(ColumnString_Basic, string_column, nullable_string_column, enum_colum
     // TEST(ColumnString_Add0)
 
     c.clear();
-    c.add();
+    c.add(StringData());
 
-    // for StringColumn the default value is dependent on nullability
-    StringData default_string_value = TEST_TYPE::is_nullable() ? realm::null() : StringData("");
+    StringData default_string_value = StringData();
 
     CHECK_EQUAL(default_string_value, c.get(0));
     CHECK_EQUAL(1, c.size());
@@ -415,57 +399,24 @@ TEST_TYPES(ColumnString_Basic, string_column, nullable_string_column, enum_colum
         CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", c.get(1));
         CHECK_EQUAL("baz", c.get(2));
     }
+}
 
+TEST(ColumnString_AdaptiveStringLeak)
+{
+    string_column test_resources;
+    auto& col = test_resources.get_column();
 
-    // TEST(ColumnString_FindAjacentLong)
-
-    // Test against a bug where FindWithLen() would fail finding
-    // ajacent hits
-    c.clear();
-
-    {
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn col(Allocator::get_default(), col_ref);
-
-        c.add("40 chars  40 chars  40 chars  40 chars  ");
-        c.add("baz");
-        c.add("baz");
-        c.add("foo");
-
-        c.find_all(col, "baz");
-
-        CHECK_EQUAL(2, col.size());
-
-        col.destroy();
-    }
-
-
-    // TEST(ColumnString_FindAjacentBig)
-
-    c.clear();
-
-    {
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn col(Allocator::get_default(), col_ref);
-
-        c.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-        c.add("baz");
-        c.add("baz");
-        c.add("foo");
-
-        c.find_all(col, "baz");
-
-        CHECK_EQUAL(2, col.size());
-
-        col.destroy();
+    std::string large_str(100, 'a'); // use constant larger than 'medium_string_max_size'
+    for (size_t i = 0; i != 2 * REALM_MAX_BPNODE_SIZE; ++i) {
+        col.insert(0, large_str);
     }
 }
 
 
-TEST_TYPES(ColumnString_Find1, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST(ColumnString_Find1)
 {
-    TEST_TYPE test_resources;
-    typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
+    string_column test_resources;
+    auto& c = test_resources.get_column();
 
     c.add("a");
     c.add("bc");
@@ -483,10 +434,10 @@ TEST_TYPES(ColumnString_Find1, string_column, nullable_string_column, enum_colum
     CHECK_EQUAL(4, res3);
 }
 
-TEST_TYPES(ColumnString_Find2, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST(ColumnString_Find2)
 {
-    TEST_TYPE test_resources;
-    typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
+    string_column test_resources;
+    auto& c = test_resources.get_column();
 
     c.add("a");
     c.add("bc");
@@ -510,293 +461,18 @@ TEST_TYPES(ColumnString_Find2, string_column, nullable_string_column, enum_colum
     CHECK_EQUAL(5, res4);
 }
 
-TEST_TYPES(ColumnString_UpperLowerBounds1, string_column, nullable_string_column, enum_column, nullable_enum_column)
-{
-    TEST_TYPE test_resources;
-    typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
-
-    c.add("a");
-    c.add("bc");
-    c.add("def");
-    c.add("ghij");
-    c.add("klmop");
-
-    CHECK_EQUAL(c.lower_bound_string("baboo"), 1);
-    CHECK_EQUAL(c.upper_bound_string("baboo"), 1);
-}
-
-TEST_TYPES(ColumnString_UpperLowerBounds2, string_column, nullable_string_column, enum_column, nullable_enum_column)
-{
-    TEST_TYPE test_resources;
-    typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
-
-    c.add("a");
-    c.add("bc");
-    c.add("def");
-    c.add("ghij");
-    c.add("klmop");
-
-    CHECK_EQUAL(c.lower_bound_string("baboo"), 1);
-    CHECK_EQUAL(c.upper_bound_string("baboo"), 1);
-    // Medium size
-    c.add("mnbvcxzlkjhgfdsa");
-    CHECK_EQUAL(c.lower_bound_string("def"), 2);
-    CHECK_EQUAL(c.upper_bound_string("def"), 3);
-    // Big size
-    c.add("qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio ");
-    CHECK_EQUAL(c.upper_bound_string("oops"), 6);
-}
-
-TEST_TYPES(ColumnString_AutoEnumerate, non_nullable, nullable)
-{
-    constexpr bool nullable = TEST_TYPE::value;
-
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn c(Allocator::get_default(), ref, nullable);
-    CHECK_EQUAL(c.is_nullable(), nullable);
-
-    // Add duplicate values
-    for (size_t i = 0; i < 5; ++i) {
-        c.add("a");
-        c.add("bc");
-        c.add("def");
-        c.add("ghij");
-        c.add("klmop");
-    }
-
-    // Create StringEnum
-    ref_type keys;
-    ref_type values;
-    bool res = c.auto_enumerate(keys, values);
-    CHECK(res);
-    StringEnumColumn e(Allocator::get_default(), values, keys, nullable);
-
-    // Verify that all entries match source
-    CHECK_EQUAL(c.size(), e.size());
-    for (size_t i = 0; i < c.size(); ++i) {
-        StringData s1 = c.get(i);
-        StringData s2 = e.get(i);
-        CHECK_EQUAL(s1, s2);
-    }
-
-    // Search for a value that does not exist
-    size_t res1 = e.find_first("nonexist");
-    CHECK_EQUAL(size_t(-1), res1);
-
-    // Search for an existing value
-    size_t res2 = e.find_first("klmop");
-    CHECK_EQUAL(4, res2);
-
-    if (nullable) {
-        e.set_null(0);
-        CHECK(e.is_null(0));
-    }
-
-    // Cleanup
-    c.destroy();
-    e.destroy();
-}
-
-#ifdef LEGACY_TESTS
-TEST_TYPES(ColumnString_AutoEnumerateIndex, non_nullable, nullable)
-{
-    constexpr bool nullable = TEST_TYPE::value;
-
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn c(Allocator::get_default(), ref, nullable);
-
-    // Add duplicate values
-    for (size_t i = 0; i < 5; ++i) {
-        c.add("a");
-        c.add("bc");
-        c.add("def");
-        c.add("ghij");
-        c.add("klmop");
-    }
-
-    // Create StringEnum
-    ref_type keys;
-    ref_type values;
-    bool res = c.auto_enumerate(keys, values);
-    CHECK(res);
-    StringEnumColumn e(Allocator::get_default(), values, keys, false);
-
-    // Set index
-    e.create_search_index();
-    CHECK(e.has_search_index());
-
-    // Search for a value that does not exist
-    size_t res1 = e.find_first("nonexist");
-    CHECK_EQUAL(not_found, res1);
-
-    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn results(Allocator::get_default(), results_ref);
-    e.find_all(results, "nonexist");
-    CHECK(results.is_empty());
-
-    // Search for an existing value
-    size_t res2 = e.find_first("klmop");
-    CHECK_EQUAL(4, res2);
-
-    e.find_all(results, "klmop");
-    CHECK_EQUAL(5, results.size());
-    CHECK_EQUAL(4, results.get(0));
-    CHECK_EQUAL(9, results.get(1));
-    CHECK_EQUAL(14, results.get(2));
-    CHECK_EQUAL(19, results.get(3));
-    CHECK_EQUAL(24, results.get(4));
-
-    results.clear();
-    e.find_all(results, "a");
-    CHECK_EQUAL(5, results.size());
-    CHECK_EQUAL(0, results.get(0));
-    CHECK_EQUAL(5, results.get(1));
-    CHECK_EQUAL(10, results.get(2));
-    CHECK_EQUAL(15, results.get(3));
-    CHECK_EQUAL(20, results.get(4));
-
-    results.clear();
-    e.find_all(results, "bc");
-    CHECK_EQUAL(5, results.size());
-    CHECK_EQUAL(1, results.get(0));
-    CHECK_EQUAL(6, results.get(1));
-    CHECK_EQUAL(11, results.get(2));
-    CHECK_EQUAL(16, results.get(3));
-    CHECK_EQUAL(21, results.get(4));
-
-    // Set a value
-    e.set(1, "newval");
-    size_t res3 = e.count("a");
-    size_t res4 = e.count("bc");
-    size_t res5 = e.count("newval");
-    CHECK_EQUAL(5, res3);
-    CHECK_EQUAL(4, res4);
-    CHECK_EQUAL(1, res5);
-
-    results.clear();
-    e.find_all(results, "newval");
-    CHECK_EQUAL(1, results.size());
-    CHECK_EQUAL(1, results.get(0));
-
-    // Insert a value
-    e.insert(4, "newval");
-    size_t res6 = e.count("newval");
-    CHECK_EQUAL(2, res6);
-
-    // Append a value
-    e.add("lastval");
-    auto last_val = e.get(e.size() - 1);
-    CHECK_EQUAL("lastval", last_val);
-
-    // Delete values
-    e.erase(1);
-    e.erase(0);
-    size_t res7 = e.count("a");
-    size_t res8 = e.count("newval");
-    CHECK_EQUAL(4, res7);
-    CHECK_EQUAL(1, res8);
-
-    // Clear all
-    e.clear();
-    size_t res9 = e.count("a");
-    CHECK_EQUAL(0, res9);
-
-    // Cleanup
-    c.destroy();
-    e.destroy();
-    results.destroy();
-}
-
-TEST_TYPES(ColumnString_AutoEnumerateIndexReuse, non_nullable, nullable)
-{
-    constexpr bool nullable = TEST_TYPE::value;
-
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn c(Allocator::get_default(), ref, nullable);
-
-    // Add duplicate values
-    for (size_t i = 0; i < 5; ++i) {
-        c.add("a");
-        c.add("bc");
-        c.add("def");
-        c.add("ghij");
-        c.add("klmop");
-    }
-
-    // Set index
-    c.create_search_index();
-    CHECK(c.has_search_index());
-
-    // Create StringEnum
-    ref_type keys;
-    ref_type values;
-    bool res = c.auto_enumerate(keys, values);
-    CHECK(res);
-    StringEnumColumn e(Allocator::get_default(), values, keys, false);
-
-    // Reuse the index from original column
-    e.install_search_index(c.release_search_index());
-    CHECK(e.has_search_index());
-
-    // Search for a value that does not exist
-    size_t res1 = e.find_first("nonexist");
-    CHECK_EQUAL(not_found, res1);
-
-    // Search for an existing value
-    size_t res2 = e.find_first("klmop");
-    CHECK_EQUAL(4, res2);
-
-    // Cleanup
-    c.destroy();
-    e.destroy();
-}
-#endif // LEGACY_TESTS
-
-TEST(StringEnumColumn_CloneDeep)
-{
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn o(Allocator::get_default(), ref, false);
-
-    o.add("black");
-    o.add("white");
-    o.add("grey");
-    o.add("white");
-    o.add("black");
-    o.add("black");
-
-    // Create StringEnum
-    ref_type keys;
-    ref_type values;
-    bool res = o.auto_enumerate(keys, values);
-    CHECK(res);
-    StringEnumColumn e(Allocator::get_default(), values, keys, false);
-
-    auto new_ref = e.clone_deep(Allocator::get_default());
-    StringColumn c(Allocator::get_default(), new_ref.get_ref(), false);
-
-    // Verify that all entries match source
-    CHECK_EQUAL(o.size(), e.size());
-    for (size_t i = 0; i < o.size(); ++i) {
-        StringData s1 = o.get(i);
-        StringData s2 = c.get(i);
-        CHECK_EQUAL(s1, s2);
-    }
-
-    o.destroy();
-    e.destroy();
-    c.destroy();
-}
 
 // First test if width expansion (nulls->empty string, nulls->non-empty string, empty string->non-empty string, etc)
 // works. Then do a fuzzy test at the end.
-TEST_TYPES(ColumnString_Null, nullable_string_column, nullable_enum_column)
+TEST(ColumnString_Null)
 {
+    using TEST_TYPE = string_array;
     {
         TEST_TYPE test_resources;
         typename TEST_TYPE::ColumnTestType& a = test_resources.get_column();
 
         a.add("");
-        size_t t = a.find_first("");
+        size_t t = a.find_first("", 0, 1);
         CHECK_EQUAL(t, 0);
     }
 
@@ -938,265 +614,12 @@ TEST_TYPES(ColumnString_Null, nullable_string_column, nullable_enum_column)
     }
 }
 
-TEST(ColumnString_SetNullThrowsUnlessNullable)
-{
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn c(Allocator::get_default(), ref, false);
-    c.add("Hello, World!");
-    CHECK_LOGIC_ERROR(c.set_null(0), LogicError::column_not_nullable);
-
-    size_t keys, values;
-    bool res = c.auto_enumerate(keys, values, true);
-    CHECK(res);
-    StringEnumColumn enum_column{Allocator::get_default(), values, keys, false};
-    CHECK_LOGIC_ERROR(enum_column.set_null(0), LogicError::column_not_nullable);
-
-    c.destroy();
-    enum_column.destroy();
-}
-
-
-TEST_TYPES(ColumnString_FindAllExpand, string_column, nullable_string_column, enum_column, nullable_enum_column)
-{
-    TEST_TYPE test_resources;
-    typename TEST_TYPE::ColumnTestType& asc = test_resources.get_column();
-
-    ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn c(Allocator::get_default(), col_ref);
-
-    asc.add("HEJ");
-    asc.add("sdfsd");
-    asc.add("HEJ");
-    asc.add("sdfsd");
-    asc.add("HEJ");
-
-    asc.find_all(c, "HEJ");
-
-    CHECK_EQUAL(5, asc.size());
-    CHECK_EQUAL(3, c.size());
-    CHECK_EQUAL(0, c.get(0));
-    CHECK_EQUAL(2, c.get(1));
-    CHECK_EQUAL(4, c.get(2));
-
-    // Expand to ArrayStringLong
-    asc.add("dfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfs");
-    asc.add("HEJ");
-    asc.add("dfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfs");
-    asc.add("HEJ");
-    asc.add("dfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfgdfg djf "
-            "gjkfdghkfds");
-
-    // Todo, should the API behaviour really require us to clear c manually?
-    c.clear();
-    asc.find_all(c, "HEJ");
-
-    CHECK_EQUAL(10, asc.size());
-    CHECK_EQUAL(5, c.size());
-    CHECK_EQUAL(0, c.get(0));
-    CHECK_EQUAL(2, c.get(1));
-    CHECK_EQUAL(4, c.get(2));
-    CHECK_EQUAL(6, c.get(3));
-    CHECK_EQUAL(8, c.get(4));
-
-    c.destroy();
-}
-
-// FindAll using ranges, when expanded ArrayStringLong
-TEST_TYPES(ColumnString_FindAllRangesLong, string_column, nullable_string_column, enum_column, nullable_enum_column)
-{
-    TEST_TYPE test_resources;
-    typename TEST_TYPE::ColumnTestType& asc = test_resources.get_column();
-
-    ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn c(Allocator::get_default(), col_ref);
-
-    // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
-    asc.add("HEJSA"); // 0
-    asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-    asc.add("HEJSA");
-    asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-    asc.add("HEJSA");
-    asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-    asc.add("HEJSA");
-    asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-    asc.add("HEJSA");
-    asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-    asc.add("HEJSA");
-    asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-    asc.add("HEJSA");
-    asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-    asc.add("HEJSA");
-    asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-    asc.add("HEJSA"); // 16
-
-    c.clear();
-    asc.find_all(c, "HEJSA", 0, 17);
-    CHECK_EQUAL(9, c.size());
-    CHECK_EQUAL(0, c.get(0));
-    CHECK_EQUAL(2, c.get(1));
-    CHECK_EQUAL(4, c.get(2));
-    CHECK_EQUAL(6, c.get(3));
-    CHECK_EQUAL(8, c.get(4));
-    CHECK_EQUAL(10, c.get(5));
-    CHECK_EQUAL(12, c.get(6));
-    CHECK_EQUAL(14, c.get(7));
-    CHECK_EQUAL(16, c.get(8));
-
-    c.clear();
-    asc.find_all(c, "HEJSA", 1, 16);
-    CHECK_EQUAL(7, c.size());
-    CHECK_EQUAL(2, c.get(0));
-    CHECK_EQUAL(4, c.get(1));
-    CHECK_EQUAL(6, c.get(2));
-    CHECK_EQUAL(8, c.get(3));
-    CHECK_EQUAL(10, c.get(4));
-    CHECK_EQUAL(12, c.get(5));
-    CHECK_EQUAL(14, c.get(6));
-
-    // Clean-up
-    c.destroy();
-}
-
-// FindAll using ranges, when not expanded (using ArrayString)
-TEST_TYPES(ColumnString_FindAllRanges, string_column, nullable_string_column, enum_column, nullable_enum_column)
-{
-    TEST_TYPE test_resources;
-    typename TEST_TYPE::ColumnTestType& asc = test_resources.get_column();
-
-    ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn c(Allocator::get_default(), col_ref);
-
-    // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
-    asc.add("HEJSA"); // 0
-    asc.add("1");
-    asc.add("HEJSA");
-    asc.add("3");
-    asc.add("HEJSA");
-    asc.add("5");
-    asc.add("HEJSA");
-    asc.add("7");
-    asc.add("HEJSA");
-    asc.add("9");
-    asc.add("HEJSA");
-    asc.add("11");
-    asc.add("HEJSA");
-    asc.add("13");
-    asc.add("HEJSA");
-    asc.add("15");
-    asc.add("HEJSA"); // 16
-
-    c.clear();
-    asc.find_all(c, "HEJSA", 0, 17);
-    CHECK_EQUAL(9, c.size());
-    CHECK_EQUAL(0, c.get(0));
-    CHECK_EQUAL(2, c.get(1));
-    CHECK_EQUAL(4, c.get(2));
-    CHECK_EQUAL(6, c.get(3));
-    CHECK_EQUAL(8, c.get(4));
-    CHECK_EQUAL(10, c.get(5));
-    CHECK_EQUAL(12, c.get(6));
-    CHECK_EQUAL(14, c.get(7));
-    CHECK_EQUAL(16, c.get(8));
-
-    c.clear();
-    asc.find_all(c, "HEJSA", 1, 16);
-    CHECK_EQUAL(7, c.size());
-    CHECK_EQUAL(2, c.get(0));
-    CHECK_EQUAL(4, c.get(1));
-    CHECK_EQUAL(6, c.get(2));
-    CHECK_EQUAL(8, c.get(3));
-    CHECK_EQUAL(10, c.get(4));
-    CHECK_EQUAL(12, c.get(5));
-    CHECK_EQUAL(14, c.get(6));
-
-    // Clean-up
-    c.destroy();
-}
-
-#ifdef LEGACY_TESTS
-TEST_TYPES(ColumnString_FindAll_NoDuplicatesWithIndex, string_column, nullable_string_column, enum_column,
-           nullable_enum_column)
-{
-    TEST_TYPE test_resources;
-    typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
-
-    col.add("a");
-    col.add("b");
-    col.add("c");
-    col.add("d");
-
-    col.create_search_index();
-
-    ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn res(Allocator::get_default(), col_ref);
-    col.find_all(res, "a", 0, npos);
-
-    CHECK_EQUAL(1, res.size());
-
-    // Clean-up
-    res.destroy();
-}
-
-TEST_TYPES(ColumnString_Count, non_nullable, nullable)
-{
-    constexpr bool nullable = TEST_TYPE::value;
-
-    ref_type asc_ref = StringColumn::create(Allocator::get_default());
-    StringColumn asc(Allocator::get_default(), asc_ref, nullable);
-
-    // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
-    asc.add("HEJSA"); // 0
-    asc.add("1");
-    asc.add("HEJSA");
-    asc.add("3");
-    asc.add("HEJSA");
-    asc.add("5");
-    asc.add("HEJSA");
-    asc.add("7");
-    asc.add("HEJSA");
-    asc.add("9");
-    asc.add("HEJSA");
-    asc.add("11");
-    asc.add("HEJSA");
-    asc.add("13");
-    asc.add("HEJSA");
-    asc.add("15");
-    asc.add("HEJSA"); // 16
-
-    CHECK_EQUAL(9, asc.count("HEJSA"));
-
-    // Create StringEnum
-    size_t keys;
-    size_t values;
-    CHECK(asc.auto_enumerate(keys, values));
-    StringEnumColumn e(Allocator::get_default(), values, keys, false);
-
-    // Check that enumerated column return same result
-    CHECK_EQUAL(9, e.count("HEJSA"));
-
-    // Clean-up
-    asc.destroy();
-    e.destroy();
-}
-
-TEST_TYPES(ColumnString_SetIndexInParent, string_column, nullable_string_column, enum_column, nullable_enum_column)
-{
-    TEST_TYPE test_resources;
-    typename TEST_TYPE::ColumnTestType& sc = test_resources.get_column();
-
-    StringIndex* ndx = sc.create_search_index();
-    CHECK(ndx != nullptr);
-    sc.set_ndx_in_parent(0);
-    CHECK_EQUAL(sc.get_ndx_in_parent() + 1, ndx->get_ndx_in_parent());
-}
-#endif
-
-TEST_TYPES(ColumnString_SwapRows, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST(ColumnString_SwapRows)
 {
     // Normal case
     {
-        TEST_TYPE test_resources;
-        typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
+        string_column test_resources;
+        auto& c = test_resources.get_column();
 
         c.add("a");
         c.add("b");
@@ -1207,7 +630,7 @@ TEST_TYPES(ColumnString_SwapRows, string_column, nullable_string_column, enum_co
         CHECK_EQUAL(c.get(2), "c");
         CHECK_EQUAL(c.size(), 4); // size should not change
 
-        c.swap_rows(1, 2);
+        c.swap(1, 2);
 
         CHECK_EQUAL(c.get(1), "c");
         CHECK_EQUAL(c.get(2), "b");
@@ -1216,14 +639,14 @@ TEST_TYPES(ColumnString_SwapRows, string_column, nullable_string_column, enum_co
 
     // First two elements
     {
-        TEST_TYPE test_resources;
-        typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
+        string_column test_resources;
+        auto& c = test_resources.get_column();
 
         c.add("a");
         c.add("b");
         c.add("c");
 
-        c.swap_rows(0, 1);
+        c.swap(0, 1);
 
         CHECK_EQUAL(c.get(0), "b");
         CHECK_EQUAL(c.get(1), "a");
@@ -1232,14 +655,14 @@ TEST_TYPES(ColumnString_SwapRows, string_column, nullable_string_column, enum_co
 
     // Last two elements
     {
-        TEST_TYPE test_resources;
-        typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
+        string_column test_resources;
+        auto& c = test_resources.get_column();
 
         c.add("a");
         c.add("b");
         c.add("c");
 
-        c.swap_rows(1, 2);
+        c.swap(1, 2);
 
         CHECK_EQUAL(c.get(1), "c");
         CHECK_EQUAL(c.get(2), "b");
@@ -1248,14 +671,14 @@ TEST_TYPES(ColumnString_SwapRows, string_column, nullable_string_column, enum_co
 
     // Indices in wrong order
     {
-        TEST_TYPE test_resources;
-        typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
+        string_column test_resources;
+        auto& c = test_resources.get_column();
 
         c.add("a");
         c.add("b");
         c.add("c");
 
-        c.swap_rows(2, 1);
+        c.swap(2, 1);
 
         CHECK_EQUAL(c.get(1), "c");
         CHECK_EQUAL(c.get(2), "b");
@@ -1264,42 +687,24 @@ TEST_TYPES(ColumnString_SwapRows, string_column, nullable_string_column, enum_co
 
     // Column with duplicate values
     {
-        TEST_TYPE test_resources;
-        typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
+        string_column test_resources;
+        auto& c = test_resources.get_column();
 
         c.add("a");
         c.add("a");
         c.add("c");
 
-        c.swap_rows(0, 1);
+        c.swap(0, 1);
 
         CHECK_EQUAL(c.get(0), "a");
         CHECK_EQUAL(c.get(1), "a");
     }
-
-    // Null values
-    if (TEST_TYPE::is_nullable()) {
-        TEST_TYPE test_resources;
-        typename TEST_TYPE::ColumnTestType& c = test_resources.get_column();
-
-        c.add("a");
-        c.add("b");
-        c.add(realm::null());
-
-        CHECK(c.get(2).is_null()); // passes
-
-        c.swap_rows(1, 2);
-
-        CHECK(c.get(1).is_null());  // fails
-        CHECK_EQUAL(c.get(2), "b"); // passes
-    }
 }
 
-#ifdef LEGACY_TESTS
-TEST_TYPES(ColumnString_Index, string_column, nullable_string_column, enum_column, nullable_enum_column)
+TEST(ColumnString_Index)
 {
-    TEST_TYPE test_resources;
-    typename TEST_TYPE::ColumnTestType& asc = test_resources.get_column();
+    string_column test_resources;
+    auto& asc = test_resources.get_column();
 
     // 17 elements, to test node splits with REALM_MAX_BPNODE_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
@@ -1319,24 +724,6 @@ TEST_TYPES(ColumnString_Index, string_column, nullable_string_column, enum_colum
     asc.add("HEJSA");
     asc.add("15");
     asc.add("HEJSA"); // 16
-
-#ifdef LEGACY_TESTS
-    const StringIndex& ndx = *asc.create_search_index();
-    CHECK(asc.has_search_index());
-#ifdef REALM_DEBUG
-    ndx.verify_entries(asc);
-#else
-    static_cast<void>(ndx);
-#endif
-#endif // LEGACY_TESTS
-    size_t count0 = asc.count("HEJ");
-    size_t count1 = asc.count("HEJSA");
-    size_t count2 = asc.count("1");
-    size_t count3 = asc.count("15");
-    CHECK_EQUAL(0, count0);
-    CHECK_EQUAL(9, count1);
-    CHECK_EQUAL(1, count2);
-    CHECK_EQUAL(1, count3);
 
     size_t ndx0 = asc.find_first("HEJS");
     size_t ndx1 = asc.find_first("HEJSA");
@@ -1392,7 +779,6 @@ TEST_TYPES(ColumnString_Index, string_column, nullable_string_column, enum_colum
     CHECK_EQUAL(not_found, c1);
     CHECK_EQUAL(not_found, c2);
 }
-#endif
 
 /**
  * This test ensures that StringColumn::EraseLeafElem is called. It is called when you
@@ -1402,26 +788,16 @@ TEST(ColumnString_NonLeafRoot)
 {
     // Small strings
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn c(Allocator::get_default(), ref);
+        BPlusTree<StringData> c(Allocator::get_default());
+        c.create();
 
         for (int i = 0; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
             std::string s = util::to_string(i);
-            c.add(s);
+            c.add(StringData(s));
         }
 
-        CHECK_EQUAL(c.count("3"), 1);
         CHECK_EQUAL(c.find_first("3"), 3);
         CHECK_EQUAL(c.find_first("5000"), not_found);
-        auto mid_point = util::to_string(REALM_MAX_BPNODE_SIZE / 2);
-        CHECK_EQUAL(c.upper_bound_string(mid_point), REALM_MAX_BPNODE_SIZE / 2 + 1);
-
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn col(Allocator::get_default(), col_ref);
-        c.find_all(col, "3");
-        CHECK_EQUAL(col.size(), 1);
-        CHECK_EQUAL(col.get(0), 3);
-        col.destroy();
 
         CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE));
         CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
@@ -1434,8 +810,8 @@ TEST(ColumnString_NonLeafRoot)
     }
     // Medium strings
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn c(Allocator::get_default(), ref);
+        BPlusTree<StringData> c(Allocator::get_default());
+        c.create();
 
         c.add("This is a medium long string");
         for (int i = 1; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
@@ -1443,15 +819,7 @@ TEST(ColumnString_NonLeafRoot)
             c.add(s);
         }
 
-        CHECK_EQUAL(c.count("3"), 1);
         CHECK_EQUAL(c.find_first("3"), 3);
-
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn col(Allocator::get_default(), col_ref);
-        c.find_all(col, "3");
-        CHECK_EQUAL(col.size(), 1);
-        CHECK_EQUAL(col.get(0), 3);
-        col.destroy();
 
         CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE));
         CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
@@ -1464,8 +832,8 @@ TEST(ColumnString_NonLeafRoot)
     }
     // Big strings
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn c(Allocator::get_default(), ref);
+        BPlusTree<StringData> c(Allocator::get_default());
+        c.create();
 
         c.add("This is a rather long string, that should not be very much shorter");
         for (int i = 1; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
@@ -1473,15 +841,7 @@ TEST(ColumnString_NonLeafRoot)
             c.add(s);
         }
 
-        CHECK_EQUAL(c.count("3"), 1);
         CHECK_EQUAL(c.find_first("3"), 3);
-
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn col(Allocator::get_default(), col_ref);
-        c.find_all(col, "3");
-        CHECK_EQUAL(col.size(), 1);
-        CHECK_EQUAL(col.get(0), 3);
-        col.destroy();
 
         CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE));
         CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
@@ -1494,8 +854,8 @@ TEST(ColumnString_NonLeafRoot)
     }
     // Upgrade leaf from medium to big
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn c(Allocator::get_default(), ref);
+        BPlusTree<StringData> c(Allocator::get_default());
+        c.create();
 
         for (int i = 0; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
             std::string s = util::to_string(i);
@@ -1512,8 +872,8 @@ TEST(ColumnString_NonLeafRoot)
     }
     // Upgrade leaf from small to big while inserting
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn c(Allocator::get_default(), ref);
+        BPlusTree<StringData> c(Allocator::get_default());
+        c.create();
 
         for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; i++) {
             std::string s = util::to_string(i);
@@ -1528,8 +888,8 @@ TEST(ColumnString_NonLeafRoot)
     }
     // Upgrade leaf from medium to big while inserting
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn c(Allocator::get_default(), ref);
+        BPlusTree<StringData> c(Allocator::get_default());
+        c.create();
 
         c.add("This is a medium long string");
         for (int i = 1; i < REALM_MAX_BPNODE_SIZE + 1; i++) {
@@ -1543,42 +903,6 @@ TEST(ColumnString_NonLeafRoot)
 
         c.destroy();
     }
-}
-
-// This test confirms that we can read columns produced by Column<T>
-// with a BPlusTree<T> accessor
-TEST(BPlusTree_ColumnStringCompatibility)
-{
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn c(Allocator::get_default(), ref);
-
-    for (int i = 0; i < 500; i++) {
-        std::string str = "foo ";
-        str += util::to_string(i);
-        c.add(str);
-    }
-
-    BPlusTree<String> tree(Allocator::get_default());
-    tree.init_from_ref(c.get_ref());
-
-    CHECK_EQUAL(c.size(), tree.size());
-    size_t sz = c.size();
-    for (size_t i = 0; i < sz; i++) {
-        CHECK_EQUAL(c.get(i), tree.get(i));
-    }
-
-    c.insert(17, "This is a medium long string");
-    c.insert(177, "This is a rather long string, that should not be very much shorter");
-    c.erase(321);
-    tree.init_from_ref(c.get_ref());
-
-    CHECK_EQUAL(c.size(), tree.size());
-    sz = c.size();
-    for (size_t i = 0; i < sz; i++) {
-        CHECK_EQUAL(c.get(i), tree.get(i));
-    }
-
-    c.destroy();
 }
 
 #endif // TEST_COLUMN_STRING

@@ -28,9 +28,6 @@
 #endif
 
 #include <realm/column.hpp>
-#include <realm/column_string.hpp>
-#include <realm/column_binary.hpp>
-#include <realm/column_string_enum.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/table.hpp>
@@ -92,62 +89,6 @@ void ColumnBase::verify(const Table&, size_t column_ndx) const
     verify();
     REALM_ASSERT_EX(column_ndx == m_column_ndx, column_ndx, m_column_ndx);
 }
-
-void ColumnBaseSimple::replace_root_array(std::unique_ptr<Array> leaf)
-{
-    // FIXME: Duplicated from bptree.cpp.
-    ArrayParent* parent = m_array->get_parent();
-    size_t ndx_in_parent = m_array->get_ndx_in_parent();
-    leaf->set_parent(parent, ndx_in_parent);
-    leaf->update_parent(); // Throws
-    m_array = std::move(leaf);
-}
-
-
-ref_type ColumnBaseSimple::write(const Array* root, size_t slice_offset, size_t slice_size, size_t table_size,
-                                 SliceHandler& handler, _impl::OutputStream& out)
-{
-    REALM_ASSERT(root->is_inner_bptree_node());
-    return BpTreeBase::write_subtree(static_cast<const BpTreeNode&>(*root), slice_offset, slice_size, table_size,
-                                     handler, out);
-}
-
-
-void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, TreeInsertBase& state, bool is_append)
-{
-    // At this point the original root and its new sibling is either
-    // both leaves, or both inner nodes on the same form, compact or
-    // general. Due to invar:bptree-node-form, the new root is allowed
-    // to be on the compact form if is_append is true and both
-    // siblings are either leaves or inner nodes on the compact form.
-
-    Array* orig_root = get_root_array();
-    Allocator& alloc = get_alloc();
-    std::unique_ptr<Array> new_root(new BpTreeNode(alloc)); // Throws
-    new_root->create(Array::type_InnerBptreeNode);          // Throws
-    new_root->set_parent(orig_root->get_parent(), orig_root->get_ndx_in_parent());
-    new_root->update_parent(); // Throws
-    bool compact_form = is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 != 0);
-    // Something is wrong if we were not appending and the original
-    // root is still on the compact form.
-    REALM_ASSERT(!compact_form || is_append);
-    if (compact_form) {
-        int_fast64_t v = to_int64(state.m_split_offset); // elems_per_child
-        new_root->add(1 + 2 * v);                        // Throws
-    }
-    else {
-        Array new_offsets(alloc);
-        new_offsets.create(Array::type_Normal);          // Throws
-        new_offsets.add(to_int64(state.m_split_offset)); // Throws
-        new_root->add(from_ref(new_offsets.get_ref()));  // Throws
-    }
-    new_root->add(from_ref(orig_root->get_ref())); // Throws
-    new_root->add(from_ref(new_sibling_ref));      // Throws
-    int_fast64_t v = to_int64(state.m_split_size); // total_elems_in_tree
-    new_root->add(1 + 2 * v);                      // Throws
-    replace_root_array(std::move(new_root));
-}
-
 
 ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height, Allocator& alloc, CreateHandler& handler)
 {
@@ -259,11 +200,6 @@ public:
         m_column.leaf_to_dot(mem, parent, ndx_in_parent, out);
     }
 };
-
-void ColumnBaseSimple::tree_to_dot(std::ostream& out) const
-{
-    ColumnBase::bptree_to_dot(get_root_array(), out);
-}
 
 void ColumnBase::bptree_to_dot(const Array* root, std::ostream& out) const
 {

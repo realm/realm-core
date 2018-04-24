@@ -25,9 +25,6 @@ namespace realm {
 
 // Regular classes
 class ColumnBase;
-class StringColumn;
-class StringEnumColumn;
-class BinaryColumn;
 
 // Templated classes
 template <class T>

@@ -22,7 +22,9 @@
 #include <cstring>
 
 #include <realm/array_blob.hpp>
-#include <realm/column_string.hpp>
+#include <realm/bplustree.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_key.hpp>
 
 #include "test.hpp"
 
@@ -58,7 +60,6 @@ using namespace realm::test_util;
 // Another way to debug a particular test, is to copy that test into
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
-
 
 TEST(ArrayBlob_AddEmpty)
 {
@@ -132,24 +133,11 @@ TEST(ArrayBlob_General)
     blob.destroy();
 }
 
-
-TEST(ArrayBlob_AdaptiveStringLeak)
-{
-    ref_type col_ref = StringColumn::create(Allocator::get_default());
-    StringColumn col(Allocator::get_default(), col_ref);
-    std::string large_str(100, 'a'); // use constant larger than 'medium_string_max_size'
-    for (size_t i = 0; i != 2 * REALM_MAX_BPNODE_SIZE; ++i)
-        col.insert(0, large_str);
-
-    col.destroy();
-}
-
-
 TEST(ArrayBlob_Null)
 {
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        ArrayString a(Allocator::get_default());
+        a.create();
         a.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
         a.clear();
 
@@ -174,8 +162,8 @@ TEST(ArrayBlob_Null)
     }
 
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        ArrayString a(Allocator::get_default());
+        a.create();
         a.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
         a.clear();
 
@@ -204,8 +192,8 @@ TEST(ArrayBlob_Null)
     }
 
     {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        ArrayString a(Allocator::get_default());
+        a.create();
         a.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
         a.clear();
 
@@ -232,8 +220,8 @@ TEST(ArrayBlob_Null)
     Random random(random_int<unsigned long>());
 
     for (size_t t = 0; t < 2; t++) {
-        ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        ArrayString a(Allocator::get_default());
+        a.create();
         a.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
         a.clear();
 

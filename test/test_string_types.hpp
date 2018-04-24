@@ -20,15 +20,47 @@
 #define REALM_TEST_STRING_TYPES_HPP
 
 #include <realm/alloc.hpp>
-#include <realm/column_string.hpp>
-#include <realm/column_string_enum.hpp>
+#include <realm/bplustree.hpp>
+#include <realm/array_string.hpp>
+#include <realm/array_key.hpp>
+
+struct string_array {
+    using ColumnTestType = realm::ArrayString;
+    string_array(bool = false)
+    {
+        m_col = new ColumnTestType(realm::Allocator::get_default());
+        m_col->create();
+        m_ref = m_col->get_ref();
+    }
+    virtual ~string_array()
+    {
+        m_col->destroy();
+        delete m_col;
+        m_col = nullptr;
+    }
+    ColumnTestType& get_column()
+    {
+        return *m_col;
+    }
+    realm::ref_type m_ref;
+    ColumnTestType* m_col;
+    static bool is_nullable()
+    {
+        return true;
+    }
+    static bool is_enumerated()
+    {
+        return false;
+    }
+};
 
 struct string_column {
-    using ColumnTestType = realm::StringColumn;
-    string_column(bool nullable = false)
+    using ColumnTestType = realm::BPlusTree<realm::StringData>;
+    string_column(bool = false)
     {
-        m_ref = realm::StringColumn::create(realm::Allocator::get_default());
-        m_col = new realm::StringColumn(realm::Allocator::get_default(), m_ref, nullable);
+        m_col = new ColumnTestType(realm::Allocator::get_default());
+        m_col->create();
+        m_ref = m_col->get_ref();
     }
     virtual ~string_column()
     {
@@ -36,12 +68,12 @@ struct string_column {
         delete m_col;
         m_col = nullptr;
     }
-    realm::StringColumn& get_column()
+    ColumnTestType& get_column()
     {
         return *m_col;
     }
     realm::ref_type m_ref;
-    realm::StringColumn* m_col;
+    ColumnTestType* m_col;
     static bool is_nullable()
     {
         return false;
@@ -49,67 +81,6 @@ struct string_column {
     static bool is_enumerated()
     {
         return false;
-    }
-};
-
-struct nullable_string_column : public string_column {
-    nullable_string_column()
-        : string_column(true)
-    {
-    }
-    static bool is_nullable()
-    {
-        return true;
-    }
-    static bool is_enumerated()
-    {
-        return false;
-    }
-};
-
-struct enum_column : public string_column {
-    using ColumnTestType = realm::StringEnumColumn;
-    enum_column(bool nullable = false) : string_column(nullable)
-    {
-        realm::ref_type ref, keys_ref;
-        bool enforce = true;
-        bool created = m_col->auto_enumerate(keys_ref, ref, enforce);
-        REALM_ASSERT(created);
-        m_enum_col = new realm::StringEnumColumn(realm::Allocator::get_default(), ref, keys_ref, nullable); // Throws
-    }
-    ~enum_column()
-    {
-        m_enum_col->destroy();
-        delete m_enum_col;
-        m_enum_col = nullptr;
-    }
-    realm::StringEnumColumn& get_column()
-    {
-        return *m_enum_col;
-    }
-    realm::StringEnumColumn* m_enum_col;
-    static bool is_nullable()
-    {
-        return false;
-    }
-    static bool is_enumerated()
-    {
-        return true;
-    }
-};
-
-struct nullable_enum_column : public enum_column {
-    nullable_enum_column()
-        : enum_column(true)
-    {
-    }
-    static bool is_nullable()
-    {
-        return true;
-    }
-    static bool is_enumerated()
-    {
-        return true;
     }
 };
 

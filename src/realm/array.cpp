@@ -39,7 +39,6 @@
 #include <realm/column.hpp>
 #include <realm/bplustree.hpp>
 #include <realm/query_conditions.hpp>
-#include <realm/column_string.hpp>
 #include <realm/index_string.hpp>
 #include <realm/array_integer.hpp>
 #include <realm/array_key.hpp>
