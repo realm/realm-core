@@ -596,8 +596,6 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // in the shared slab allocator, because we always create a minimal group
     // representation in memory, even in a read-transaction, if the file is empty.
     // m_is_read_only = cfg.read_only;
-    // Even though we're the first to map the file, we cannot assume that we're
-    // the session initiator. Another process may have the session initiator.
 
     m_file.open(path.c_str(), access, create, 0); // Throws
     auto physical_file_size = m_file.get_size();
@@ -943,7 +941,6 @@ inline bool randomly_false_in_debug(bool x)
   old one in the mapping table. However, we must keep the old mapping open, because older
   read transactions will continue to use it. Hence, the replaced mappings are accumulated
   and only cleaned out once we know that no transaction can refer to them anymore.
-  (FIXME: This is not implemented yet, goes as part of threading related changes)
 
   Interaction with encryption
 
@@ -986,7 +983,6 @@ inline bool randomly_false_in_debug(bool x)
   * The old one is held in a waiting area until it is no longer relevant because no
     live transaction can refer to it any more.
 
-  (FIXME: This is not implemented yet, goes as part of threading related changes)
  */
 void SlabAlloc::update_reader_view(size_t file_size)
 {
@@ -1100,14 +1096,13 @@ void SlabAlloc::update_reader_view(size_t file_size)
 
     // Build the fast path mapping
 
-    // The fast path mapping is an array which will eventually be used from multiple threads
+    // The fast path mapping is an array which will is used from multiple threads
     // without locking - see translate().
 
-    // Addition of a new mapping may require a completely new mapping table.
+    // Addition of a new mapping may require a completely new fast mapping table.
     //
-    // When used in a multithreaded scenario (not yet, FIXME), the old mappings must be
-    // retained open, until the realm version for which they were established has been
-    // closed/detached.
+    // Being used in a multithreaded scenario, the old mappings must be retained open,
+    // until the realm version for which they were established has been closed/detached.
     //
     // This assumes that only write transactions call do_alloc() or do_free() or needs to
     // translate refs in the slab area, and that all these uses are serialized, whether
@@ -1132,11 +1127,9 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
 #endif
     m_fast_mapping_ptr = new_fast_mapping;
 }
+
 void SlabAlloc::rebuild_fast_mapping(bool requires_new_fast_mapping, size_t old_num_sections)
 {
-    // FIXME: once/if we switch to more gradual extension of the
-    // free space, the exact correspondence between m_free_space.size()
-    // and the number of mappings for slab, will no longer hold....
     size_t free_space_size = m_free_space.size();
     auto num_mappings = m_mappings.size();
     if (m_fast_mapping_size < num_mappings + free_space_size) {
@@ -1165,7 +1158,6 @@ void SlabAlloc::rebuild_fast_mapping(bool requires_new_fast_mapping, size_t old_
         new_fast_mapping[num_mappings + k] = {base};
 #endif
     }
-    // FIXME: must be atomic:
     m_fast_mapping_ptr = new_fast_mapping;
 }
 
