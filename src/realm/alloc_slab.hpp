@@ -405,12 +405,18 @@ private:
         }
         void operator=(OldMapping&& other)
         {
+            replaced_at_version = other.replaced_at_version;
             mapping = std::move(other.mapping);
         }
         uint64_t replaced_at_version;
         util::File::Map<char> mapping;
     };
     struct OldFastMapping {
+        OldFastMapping(uint64_t v, FastMap* m)
+        {
+            replaced_at_version = v;
+            mappings = m;
+        }
         uint64_t replaced_at_version;
         FastMap* mappings;
     };
