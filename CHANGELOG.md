@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* None.
+* Fix null comparisons in queries not serialising properly in some cases.
+  Also explicitly disable list IN list comparisons since its not supported.
+  PR [#3037](https://github.com/realm/realm-core/pull/3037).
 
 ### Breaking changes
 

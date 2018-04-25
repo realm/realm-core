@@ -2339,4 +2339,33 @@ TEST(Parser_OperatorIN)
     CHECK_EQUAL(message, "The keypath preceeding 'IN' must not contain a list, list vs list comparisons are not currently supported");
 }
 
+
+// we won't support full object comparisons until we have stable keys in core, but as an exception
+// we allow comparison with null objects because we can serialise that and bindings use it to check agains nulls.
+TEST(Parser_RowIndex) {
+    Group g;
+    TableRef table = g.add_table("table");
+    size_t int_col_ndx = table->add_column(type_Int, "ints", true);
+    size_t link_col_ndx = table->add_column_link(type_Link, "link", *table);
+    table->add_empty_row(3);
+    for (size_t i = 0; i < table->size(); ++i) {
+        table->set_int(int_col_ndx, i, i);
+    }
+    table->set_link(link_col_ndx, 1, 0);
+    TableView tv = table->where().find_all();
+
+    verify_query(test_context, table, "link == NULL", 2); // vanilla base check
+
+    // object comparison not yet supported
+    Query q0 = table->where().and_query(table->column<Link>(link_col_ndx) == tv.get(0));
+    CHECK_THROW(q0.get_description(), SerialisationError);
+
+    Query q1 = table->column<Link>(link_col_ndx) == realm::null();
+    std::string description = q1.get_description(); // shouldn't throw
+    CHECK(description.find("NULL") != std::string::npos);
+    CHECK_EQUAL(q1.count(), 2);
+
+    CHECK_THROW_ANY(verify_query(test_context, table, "link == link", 3));
+}
+
 #endif // TEST_PARSER
