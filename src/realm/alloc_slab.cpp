@@ -145,9 +145,9 @@ private:
 
 void SlabAlloc::detach() noexcept
 {
-    delete[] m_fast_mapping_ptr;
-    m_fast_mapping_ptr.store(nullptr);
-    m_fast_mapping_size = 0;
+    delete[] m_ref_translation_ptr;
+    m_ref_translation_ptr.store(nullptr);
+    m_translation_table_size = 0;
     set_read_only(true);
     purge_old_mappings(static_cast<uint64_t>(-1), 0);
     switch (m_attach_mode) {
@@ -795,12 +795,12 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
     m_baseline = size;
     m_attach_mode = attach_UsersBuffer;
 
-    m_fast_mapping_size = 1;
-    m_fast_mapping_ptr = new FastMap[1];
+    m_translation_table_size = 1;
+    m_ref_translation_ptr = new RefTranslation[1];
 #if REALM_ENABLE_ENCRYPTION
-    m_fast_mapping_ptr[0] = {const_cast<char*>(m_data), nullptr};
+    m_ref_translation_ptr[0] = {const_cast<char*>(m_data), nullptr};
 #else
-    m_fast_mapping_ptr[0] = {const_cast<char*>(m_data)};
+    m_ref_translation_ptr[0] = {const_cast<char*>(m_data)};
 #endif
     // Below this point (assignment to `m_attach_mode`), nothing must throw.
 
@@ -824,12 +824,12 @@ void SlabAlloc::attach_empty()
     // baseline here.
     size_t size = align_size_to_section_boundary(sizeof(Header));
     m_baseline = size;
-    m_fast_mapping_size = 1;
-    m_fast_mapping_ptr = new FastMap[1];
+    m_translation_table_size = 1;
+    m_ref_translation_ptr = new RefTranslation[1];
 #if REALM_ENABLE_ENCRYPTION
-    m_fast_mapping_ptr[0] = {nullptr, nullptr};
+    m_ref_translation_ptr[0] = {nullptr, nullptr};
 #else
-    m_fast_mapping_ptr[0] = {nullptr};
+    m_ref_translation_ptr[0] = {nullptr};
 #endif
 }
 
@@ -993,7 +993,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
     REALM_ASSERT(file_size % 8 == 0); // 8-byte alignment required
     REALM_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     REALM_ASSERT_DEBUG(is_free_space_clean());
-    bool requires_new_fast_mapping = false;
+    bool requires_new_translation = false;
 
     // Extend mapping by adding sections, or by extending sections
     size_t old_baseline = m_baseline.load(std::memory_order_relaxed);
@@ -1009,7 +1009,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
             auto ok = m_mappings[old_num_sections - 1].extend(m_file, File::access_ReadOnly, file_size);
             ok = randomly_false_in_debug(ok);
             if (!ok) {
-                requires_new_fast_mapping = true;
+                requires_new_translation = true;
                 size_t section_start_offset = get_section_base(old_num_sections - 1);
                 size_t section_reservation = get_section_base(old_num_sections) - section_start_offset;
                 size_t section_size = file_size - section_start_offset;
@@ -1032,7 +1032,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
                 ok = randomly_false_in_debug(ok);
                 if (!ok) {
                     // we could not extend the old mapping, so replace it with a full, new one
-                    requires_new_fast_mapping = true;
+                    requires_new_translation = true;
                     size_t section_start_offset = get_section_base(old_num_sections - 1);
                     size_t section_reservation = get_section_base(old_num_sections) - section_start_offset;
                     size_t section_size = old_slab_base - section_start_offset;
@@ -1109,56 +1109,56 @@ void SlabAlloc::update_reader_view(size_t file_size)
     // that is achieved by being single threaded, interlocked or run from a sequential
     // scheduling queue.
     //
-    rebuild_fast_mapping(requires_new_fast_mapping, old_num_sections);
+    rebuild_translations(requires_new_translation, old_num_sections);
 }
 
 void SlabAlloc::extend_fast_mapping_with_slab(char* address)
 {
-    ++m_fast_mapping_size;
-    auto new_fast_mapping = new FastMap[m_fast_mapping_size];
-    for (size_t i = 0; i < m_fast_mapping_size - 1; ++i) {
-        new_fast_mapping[i] = m_fast_mapping_ptr[i];
+    ++m_translation_table_size;
+    auto new_fast_mapping = new RefTranslation[m_translation_table_size];
+    for (size_t i = 0; i < m_translation_table_size - 1; ++i) {
+        new_fast_mapping[i] = m_ref_translation_ptr[i];
     }
-    m_old_fast_mappings.emplace_back(m_youngest_live_version, m_fast_mapping_ptr.load());
+    m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
 #if REALM_ENABLE_ENCRYPTION
-    new_fast_mapping[m_fast_mapping_size - 1] = {address, nullptr};
+    new_fast_mapping[m_translation_table_size - 1] = {address, nullptr};
 #else
-    new_fast_mapping[m_fast_mapping_size - 1] = {address};
+    new_fast_mapping[m_translation_table_size - 1] = {address};
 #endif
-    m_fast_mapping_ptr = new_fast_mapping;
+    m_ref_translation_ptr = new_fast_mapping;
 }
 
-void SlabAlloc::rebuild_fast_mapping(bool requires_new_fast_mapping, size_t old_num_sections)
+void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_num_sections)
 {
     size_t free_space_size = m_free_space.size();
     auto num_mappings = m_mappings.size();
-    if (m_fast_mapping_size < num_mappings + free_space_size) {
-        requires_new_fast_mapping = true;
+    if (m_translation_table_size < num_mappings + free_space_size) {
+        requires_new_translation = true;
     }
-    FastMap* new_fast_mapping = m_fast_mapping_ptr;
-    if (requires_new_fast_mapping) {
-        // we need a new mapping, but must preserve old, as translations using it
+    RefTranslation* new_translation_table = m_ref_translation_ptr;
+    if (requires_new_translation) {
+        // we need a new translation table, but must preserve old, as translations using it
         // may be in progress concurrently
-        m_old_fast_mappings.emplace_back(m_youngest_live_version, m_fast_mapping_ptr.load());
-        m_fast_mapping_size = num_mappings + free_space_size;
-        new_fast_mapping = new FastMap[m_fast_mapping_size];
+        m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
+        m_translation_table_size = num_mappings + free_space_size;
+        new_translation_table = new RefTranslation[m_translation_table_size];
         old_num_sections = 0;
     }
     for (size_t k = old_num_sections; k < num_mappings; ++k) {
-        new_fast_mapping[k].mapping_addr = m_mappings[k].get_addr();
+        new_translation_table[k].mapping_addr = m_mappings[k].get_addr();
 #if REALM_ENABLE_ENCRYPTION
-        new_fast_mapping[k].encrypted_mapping = m_mappings[k].get_encrypted_mapping();
+        new_translation_table[k].encrypted_mapping = m_mappings[k].get_encrypted_mapping();
 #endif
     }
     for (size_t k = 0; k < free_space_size; ++k) {
         char* base = m_slabs[k].addr;
 #if REALM_ENABLE_ENCRYPTION
-        new_fast_mapping[num_mappings + k] = {base, nullptr};
+        new_translation_table[num_mappings + k] = {base, nullptr};
 #else
-        new_fast_mapping[num_mappings + k] = {base};
+        new_translation_table[num_mappings + k] = {base};
 #endif
     }
-    m_fast_mapping_ptr = new_fast_mapping;
+    m_ref_translation_ptr = new_translation_table;
 }
 
 void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version)
@@ -1176,16 +1176,16 @@ void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t younge
         oldie.mapping.unmap();
     }
 
-    for (size_t i = 0; i < m_old_fast_mappings.size();) {
-        if (m_old_fast_mappings[i].replaced_at_version >= oldest_live_version) {
+    for (size_t i = 0; i < m_old_translations.size();) {
+        if (m_old_translations[i].replaced_at_version >= oldest_live_version) {
             ++i;
             continue;
         }
         // move last over:
-        auto oldie = std::move(m_old_fast_mappings[i]);
-        m_old_fast_mappings[i] = std::move(m_old_fast_mappings.back());
-        m_old_fast_mappings.pop_back();
-        delete[] oldie.mappings;
+        auto oldie = std::move(m_old_translations[i]);
+        m_old_translations[i] = std::move(m_old_translations.back());
+        m_old_translations.pop_back();
+        delete[] oldie.translations;
     }
     m_youngest_live_version = youngest_live_version;
 }
