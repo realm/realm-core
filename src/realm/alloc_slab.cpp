@@ -150,6 +150,8 @@ void SlabAlloc::detach() noexcept
     m_translation_table_size = 0;
     set_read_only(true);
     purge_old_mappings(static_cast<uint64_t>(-1), 0);
+    m_compatibility_mapping.unmap();
+    m_sections_in_compatibility_mapping = 0;
     switch (m_attach_mode) {
         case attach_None:
             break;
@@ -1005,8 +1007,9 @@ void SlabAlloc::update_reader_view(size_t file_size)
         // 0. Special case: figure out if extension is to be done entirely within a single
         // existing mapping. This is the case if the new baseline (which must be larger
         // then the old baseline) is still below the old base of the slab area.
+        auto mapping_index = old_num_sections - 1 - m_sections_in_compatibility_mapping;
         if (file_size < old_slab_base) {
-            auto ok = m_mappings[old_num_sections - 1].extend(m_file, File::access_ReadOnly, file_size);
+            auto ok = m_mappings[mapping_index].extend(m_file, File::access_ReadOnly, file_size);
             ok = randomly_false_in_debug(ok);
             if (!ok) {
                 requires_new_translation = true;
@@ -1014,11 +1017,11 @@ void SlabAlloc::update_reader_view(size_t file_size)
                 size_t section_reservation = get_section_base(old_num_sections) - section_start_offset;
                 size_t section_size = file_size - section_start_offset;
                 // save the old mapping/keep it open
-                OldMapping oldie(m_youngest_live_version, m_mappings[old_num_sections - 1]);
+                OldMapping oldie(m_youngest_live_version, m_mappings[mapping_index]);
                 m_old_mappings.emplace_back(std::move(oldie));
-                m_mappings[old_num_sections - 1].reserve(m_file, File::access_ReadOnly, section_start_offset,
-                                                         section_reservation);
-                ok = m_mappings[old_num_sections - 1].extend(m_file, File::access_ReadOnly, section_size);
+                m_mappings[mapping_index].reserve(m_file, File::access_ReadOnly, section_start_offset,
+                                                  section_reservation);
+                ok = m_mappings[mapping_index].extend(m_file, File::access_ReadOnly, section_size);
                 m_mapping_version++;
             }
             REALM_ASSERT(ok);
@@ -1028,7 +1031,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
             // 1. figure out if there is a partially completed mapping, that we need to extend
             // to cover a full mapping section
             if (old_baseline < old_slab_base) {
-                auto ok = m_mappings[old_num_sections - 1].extend(m_file, File::access_ReadOnly, old_slab_base);
+                auto ok = m_mappings[mapping_index].extend(m_file, File::access_ReadOnly, old_slab_base);
                 ok = randomly_false_in_debug(ok);
                 if (!ok) {
                     // we could not extend the old mapping, so replace it with a full, new one
@@ -1038,9 +1041,9 @@ void SlabAlloc::update_reader_view(size_t file_size)
                     size_t section_size = old_slab_base - section_start_offset;
                     REALM_ASSERT(section_size == section_reservation);
                     // save the old mapping/keep it open
-                    OldMapping oldie(m_youngest_live_version, m_mappings[old_num_sections - 1]);
+                    OldMapping oldie(m_youngest_live_version, m_mappings[mapping_index]);
                     m_old_mappings.emplace_back(std::move(oldie));
-                    m_mappings[old_num_sections - 1].map(m_file, File::access_ReadOnly, section_size);
+                    m_mappings[mapping_index].map(m_file, File::access_ReadOnly, section_size);
                     m_mapping_version++;
                 }
             }
@@ -1048,21 +1051,23 @@ void SlabAlloc::update_reader_view(size_t file_size)
             // 2. add any full mappings
             //  - figure out how many full mappings we need to match the requested size
             auto new_slab_base = align_size_to_section_boundary(file_size);
-            size_t num_full_mappings = get_section_index(file_size);
-            size_t num_mappings = get_section_index(new_slab_base);
-            if (num_mappings > old_num_sections) {
+            size_t num_full_mappings = get_section_index(file_size) - m_sections_in_compatibility_mapping;
+            size_t num_mappings = get_section_index(new_slab_base) - m_sections_in_compatibility_mapping;
+            size_t old_num_mappings = old_num_sections - m_sections_in_compatibility_mapping;
+            if (num_mappings > old_num_mappings) {
                 // we can't just resize the vector since Maps do not support copy constructionn:
                 // m_mappings.resize(num_mappings);
                 std::vector<util::File::Map<char>> next_mapping(num_mappings);
-                for (size_t i = 0; i < old_num_sections; ++i) {
+                for (size_t i = 0; i < old_num_mappings; ++i) {
                     next_mapping[i] = std::move(m_mappings[i]);
                 }
                 m_mappings = std::move(next_mapping);
             }
 
-            for (size_t k = old_num_sections; k < num_full_mappings; ++k) {
-                size_t section_start_offset = get_section_base(k);
-                size_t section_size = get_section_base(1 + k) - section_start_offset;
+            for (size_t k = old_num_mappings; k < num_full_mappings; ++k) {
+                size_t section_start_offset = get_section_base(k + m_sections_in_compatibility_mapping);
+                size_t section_size =
+                    get_section_base(1 + k + m_sections_in_compatibility_mapping) - section_start_offset;
                 m_mappings[k] =
                     util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
             }
@@ -1070,8 +1075,11 @@ void SlabAlloc::update_reader_view(size_t file_size)
             // 3. add a final partial mapping if needed
             if (file_size < new_slab_base) {
                 REALM_ASSERT(num_mappings == num_full_mappings + 1);
-                size_t section_start_offset = get_section_base(num_full_mappings);
-                size_t section_reservation = get_section_base(num_full_mappings + 1) - section_start_offset;
+                size_t section_start_offset =
+                    get_section_base(num_full_mappings + m_sections_in_compatibility_mapping);
+                size_t section_reservation =
+                    get_section_base(num_full_mappings + 1 + m_sections_in_compatibility_mapping) -
+                    section_start_offset;
                 size_t section_size = file_size - section_start_offset;
                 util::File::Map<char> mapping;
                 mapping.reserve(m_file, File::access_ReadOnly, section_start_offset, section_reservation);

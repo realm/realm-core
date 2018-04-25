@@ -444,6 +444,10 @@ private:
     // mapping. This is the compatibility mapping. As such files extend, additional
     // mappings are added to m_mappings (above) - the compatibility mapping remains
     // unchanged until the file is closed.
+    // Note: If the initial file is smaller than a single section, the compatibility
+    // mapping is not needed and not used. Hence, it is not possible for the first mapping
+    // in m_mappings to completely overlap the compatibility mapping. Hence, we do not
+    // need special logic to detect if the compatibility mapping can be unmapped.
     util::File::Map<char> m_compatibility_mapping;
 
     size_t m_translation_table_size = 0;
