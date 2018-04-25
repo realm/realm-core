@@ -652,14 +652,26 @@ void preprocess_for_comparison_types(Query &query, Predicate::Comparison &cmpr, 
     if (cmpr.op == Predicate::Operator::In) {
         realm_precondition(rhs.type == ExpressionContainer::ExpressionInternal::exp_Property,
                            "The expression following 'IN' must be a keypath to a list");
-        size_t list_count = 0;
-        for (KeyPathElement e : rhs.get_property().link_chain) {
-            if (e.col_type == type_LinkList || e.is_backlink) {
-                list_count++;
+        auto get_list_count = [](const std::vector<KeyPathElement>& target_link_chain) {
+            size_t list_count = 0;
+            for (KeyPathElement e : target_link_chain) {
+                if (e.col_type == type_LinkList || e.is_backlink) {
+                    list_count++;
+                }
             }
+            return list_count;
+        };
+        if (lhs.type == ExpressionContainer::ExpressionInternal::exp_Property) {
+            // For list vs list comparisons, all the right code paths are hooked up, but we just don't define the
+            // actual behaviour, see the FIXME in query_expressions.hpp in Value::compare about many-to-many links
+            // Without this check here, we would assert in debug mode and always return false in release mode.
+            size_t lhs_list_count = get_list_count(lhs.get_property().link_chain);
+            realm_precondition(lhs_list_count == 0, "The keypath preceeding 'IN' must not contain a list, list vs list comparisons are not currently supported");
         }
-        realm_precondition(list_count > 0, "The keypath following 'IN' must contain a list");
-        realm_precondition(list_count == 1, "The keypath following 'IN' must contain only one list");
+
+        size_t rhs_list_count = get_list_count(rhs.get_property().link_chain);
+        realm_precondition(rhs_list_count > 0, "The keypath following 'IN' must contain a list");
+        realm_precondition(rhs_list_count == 1, "The keypath following 'IN' must contain only one list");
     }
 }
 

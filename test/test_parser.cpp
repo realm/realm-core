@@ -2334,6 +2334,9 @@ TEST(Parser_OperatorIN)
     CHECK_EQUAL(message, "The keypath following 'IN' must contain a list");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "'dairy' in items.allergens.name", 1), message);
     CHECK_EQUAL(message, "The keypath following 'IN' must contain only one list");
-
+    // list property vs list property is not supported by core yet
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price IN items.price", 0), message);
+    CHECK_EQUAL(message, "The keypath preceeding 'IN' must not contain a list, list vs list comparisons are not currently supported");
 }
+
 #endif // TEST_PARSER
