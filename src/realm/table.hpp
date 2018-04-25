@@ -43,14 +43,9 @@ class BacklinkCount;
 class BinaryColumy;
 class ConstTableView;
 class Group;
-class LinkColumn;
-class LinkColumnBase;
-class LinkListColumn;
-class LinkView;
 class SortDescriptor;
 class StringIndex;
 class TableView;
-class TimestampColumn;
 template <class>
 class Columns;
 template <class>

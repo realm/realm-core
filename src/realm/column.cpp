@@ -28,7 +28,6 @@
 #endif
 
 #include <realm/column.hpp>
-#include <realm/column_timestamp.hpp>
 #include <realm/column_string.hpp>
 #include <realm/column_binary.hpp>
 #include <realm/column_string_enum.hpp>

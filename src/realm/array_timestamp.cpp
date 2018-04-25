@@ -33,7 +33,7 @@ void ArrayTimestamp::create()
 {
     Array::create(Array::type_HasRefs, false /* context_flag */, 2);
 
-    MemRef seconds = ArrayIntNull::create_empty_array(Array::type_Normal, false, m_alloc);
+    MemRef seconds = ArrayIntNull::create_array(Array::type_Normal, false, 0, util::none, m_alloc);
     Array::set_as_ref(0, seconds.get_ref());
     MemRef nanoseconds = ArrayInteger::create_empty_array(Array::type_Normal, false, m_alloc);
     Array::set_as_ref(1, nanoseconds.get_ref());
@@ -75,4 +75,20 @@ void ArrayTimestamp::insert(size_t ndx, Timestamp value)
         m_seconds.insert(ndx, seconds);
         m_nanoseconds.insert(ndx, nanoseconds); // Throws
     }
+}
+
+size_t ArrayTimestamp::find_first(Timestamp value, size_t begin, size_t end) const noexcept
+{
+    if (value.is_null()) {
+        return m_seconds.find_first(realm::util::none, begin, end);
+    }
+    while (begin < end) {
+        auto res = m_seconds.find_first(value.get_seconds(), begin, end);
+        if (res == npos)
+            return not_found;
+        if (m_nanoseconds.get(res) == value.get_nanoseconds())
+            return res;
+        begin = res + 1;
+    }
+    return not_found;
 }

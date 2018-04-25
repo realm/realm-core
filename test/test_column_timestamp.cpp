@@ -19,8 +19,10 @@
 #include "testsettings.hpp"
 #ifdef TEST_COLUMN_TIMESTAMP
 
-#include <realm/column_timestamp.hpp>
 #include <realm.hpp>
+#include <realm/bplustree.hpp>
+#include <realm/array_timestamp.hpp>
+#include <realm/array_key.hpp>
 
 #include "test.hpp"
 
@@ -57,11 +59,12 @@ using namespace realm;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST_TYPES(TimestampColumn_Basic, std::true_type, std::false_type)
+using TimestampColumn = BPlusTree<Timestamp>;
+
+TEST(TimestampColumn_Basic)
 {
-    constexpr bool nullable_toggle = TEST_TYPE::value;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
-    TimestampColumn c(nullable_toggle, Allocator::get_default(), ref);
+    TimestampColumn c(Allocator::get_default());
+    c.create();
     c.add(Timestamp(123, 123));
     Timestamp ts = c.get(0);
     CHECK(ts == Timestamp(123, 123));
@@ -101,221 +104,11 @@ TEST(TimestampColumn_Relocate)
     }
 }
 
-TEST_TYPES(TimestampColumn_Compare, std::true_type, std::false_type)
+
+TEST(TimestampColumn_SwapRows)
 {
-    constexpr bool nullable_toggle = TEST_TYPE::value;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
-    TimestampColumn c(nullable_toggle, Allocator::get_default(), ref);
-
-    for (unsigned int i = 0; i < 10000; i++) {
-        c.add(Timestamp(i, i));
-    }
-
-    CHECK(c.compare(c));
-
-    {
-        ref_type ref2 = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
-        TimestampColumn c2(nullable_toggle, Allocator::get_default(), ref2);
-        CHECK_NOT(c.compare(c2));
-        c2.destroy();
-    }
-
-    c.destroy();
-}
-
-#ifdef LEGACY_TESTS
-TEST_TYPES(TimestampColumn_Index, std::true_type, std::false_type)
-{
-    constexpr bool nullable_toggle = TEST_TYPE::value;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
-    TimestampColumn c(nullable_toggle, Allocator::get_default(), ref);
-    StringIndex* index = c.create_search_index();
-    CHECK(index);
-
-    for (int32_t i = 0; i < 100; ++i) {
-        c.add(Timestamp{i + 10000, i});
-    }
-
-    Timestamp last_value{10099, 99};
-
-    CHECK_EQUAL(index->find_first(last_value), 99);
-
-    index->destroy();
-    c.destroy_search_index();
-    c.destroy();
-}
-
-TEST_TYPES(TimestampColumn_Is_Nullable, std::true_type, std::false_type)
-{
-    constexpr bool nullable_toggle = TEST_TYPE::value;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
-    TimestampColumn c(nullable_toggle, Allocator::get_default(), ref);
-    CHECK_EQUAL(c.is_nullable(), nullable_toggle);
-    c.destroy();
-}
-
-TEST(TimestampColumn_Set_Null_With_Index)
-{
-    constexpr bool nullable = true;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
-    TimestampColumn c(nullable, Allocator::get_default(), ref);
-    c.add(Timestamp{1, 1});
-    CHECK(!c.is_null(0));
-
-    StringIndex* index = c.create_search_index();
-    CHECK(index);
-
-    c.set_null(0);
-    CHECK(c.is_null(0));
-
-    index->destroy();
-    c.destroy_search_index();
-    c.destroy();
-}
-
-TEST_TYPES(TimestampColumn_Insert_Rows_With_Index, std::true_type, std::false_type)
-{
-    constexpr bool nullable_toggle = TEST_TYPE::value;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
-    TimestampColumn c(nullable_toggle, Allocator::get_default(), ref);
-
-    StringIndex* index = c.create_search_index();
-    CHECK(index);
-
-    c.insert_rows(0, 1, 0, true);
-    c.set(0, Timestamp{1, 1});
-    c.insert_rows(1, 1, 1, true);
-
-    index->destroy();
-    c.destroy_search_index();
-    c.destroy();
-}
-
-TEST(TimestampColumn_Move_Last_Over)
-{
-    constexpr bool nullable = true;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
-    TimestampColumn c(nullable, Allocator::get_default(), ref);
-    StringIndex* index = c.create_search_index();
-    CHECK(index);
-
-    c.add(Timestamp{1, 1});
-    c.add(Timestamp{2, 2});
-    c.add(Timestamp{3, 3});
-    c.set_null(2);
-    c.move_last_row_over(0, 3, false);
-    CHECK(c.is_null(0));
-
-    index->destroy();
-    c.destroy_search_index();
-    c.destroy();
-}
-
-TEST_TYPES(TimestampColumn_Clear, std::true_type, std::false_type)
-{
-    constexpr bool nullable_toggle = TEST_TYPE::value;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
-    TimestampColumn c(nullable_toggle, Allocator::get_default(), ref);
-    StringIndex* index = c.create_search_index();
-    CHECK(index);
-
-    c.add(Timestamp{1, 1});
-    c.add(Timestamp{2, 2});
-    c.clear(2, false);
-    c.add(Timestamp{3, 3});
-
-    Timestamp last_value{3, 3};
-    CHECK_EQUAL(c.get(0), last_value);
-
-    index->destroy();
-    c.destroy_search_index();
-    c.destroy();
-}
-
-TEST(TimestampColumn_StringIndex)
-{
-    constexpr bool nullable = true;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
-    TimestampColumn c(nullable, Allocator::get_default(), ref);
-
-    Timestamp first(123, 123);
-    Timestamp second(1234, 1234);
-
-    CHECK_EQUAL(c.size(), 0);
-    CHECK_EQUAL(first, first);
-    CHECK_NOT_EQUAL(first, second);
-
-    CHECK(!c.has_search_index());
-
-    c.add(first);
-
-    CHECK_EQUAL(c.size(), 1);
-
-    Timestamp ts = c.get(0);
-    CHECK(ts == Timestamp(123, 123));
-
-    StringIndex* index = c.create_search_index();
-    c.add(second);
-
-    CHECK_EQUAL(index->count(second), 1);
-    CHECK_EQUAL(c.size(), 2);
-
-    c.erase_rows(1, 1, c.size(), false);
-    CHECK_EQUAL(c.size(), 1);
-    CHECK_EQUAL(index->count(second), 0);
-    c.erase_rows(0, 1, c.size(), false);
-    CHECK_EQUAL(index->count(first), 0);
-    CHECK_EQUAL(c.size(), 0);
-
-    c.add(first);
-    c.add(second);
-
-    c.swap_rows(0, 1);
-
-    CHECK_EQUAL(c.get(0), second);
-    CHECK_EQUAL(c.get(1), first);
-    CHECK_EQUAL(index->find_first(second), 0);
-    CHECK_EQUAL(index->find_first(first), 1);
-
-    c.set(0, first);
-    c.set(1, second);
-
-    CHECK_EQUAL(c.get(0), first);
-    CHECK_EQUAL(c.get(1), second);
-    CHECK_EQUAL(index->find_first(first), 0);
-    CHECK_EQUAL(index->find_first(second), 1);
-
-    c.set_null(0);
-
-    CHECK(c.get(0).is_null());
-    CHECK_EQUAL(index->find_first(first), realm::npos);
-
-    c.move_last_row_over(0, c.size(), true);
-
-    CHECK(c.size() == 1);
-    CHECK_EQUAL(c.get(0), second);
-    CHECK_EQUAL(index->find_first(second), 0);
-
-    c.clear(1, false);
-    CHECK(c.size() == 0);
-    CHECK_EQUAL(index->find_first(second), realm::npos);
-
-    c.insert_rows(0, 5, 0, false);
-    CHECK(c.size() == 5);
-    c.set(4, first);
-    CHECK_EQUAL(c.get(4), first);
-    CHECK_EQUAL(index->find_first(first), 4);
-
-    c.destroy();
-}
-
-TEST_TYPES(TimestampColumn_SwapRows, std::true_type, std::false_type)
-{
-    constexpr bool nullable_toggle = TEST_TYPE::value;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
-    TimestampColumn c(nullable_toggle, Allocator::get_default(), ref);
-    StringIndex* index = c.create_search_index();
-    CHECK(index);
+    BPlusTree<Timestamp> c(Allocator::get_default());
+    c.create();
 
     Timestamp one{1, 1};
     Timestamp three{3, 3};
@@ -326,117 +119,27 @@ TEST_TYPES(TimestampColumn_SwapRows, std::true_type, std::false_type)
 
     CHECK_EQUAL(c.get(0), one);
     CHECK_EQUAL(c.get(2), three);
-    c.swap_rows(0, 2);
+    c.swap(0, 2);
     CHECK_EQUAL(c.get(2), one);
     CHECK_EQUAL(c.get(0), three);
 
-    index->destroy();
-    c.destroy_search_index();
     c.destroy();
 }
-
-TEST_TYPES(TimestampColumn_DeleteWithIndex, std::true_type, std::false_type)
-{
-    constexpr bool nullable_toggle = TEST_TYPE::value;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
-    TimestampColumn c(nullable_toggle, Allocator::get_default(), ref);
-    StringIndex* index = c.create_search_index();
-    CHECK(index);
-
-
-    c.add(Timestamp{2, 2});
-    c.erase_rows(0, 1, 1, false);
-    CHECK_EQUAL(c.size(), 0);
-
-    index->destroy();
-    c.destroy_search_index();
-    c.destroy();
-}
-
-
-// Bug found by AFL during development of TimestampColumn
-TEST_TYPES(TimestampColumn_DeleteAfterSetWithIndex, std::true_type, std::false_type)
-{
-    constexpr bool nullable_toggle = TEST_TYPE::value;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
-    TimestampColumn c(nullable_toggle, Allocator::get_default(), ref);
-    StringIndex* index = c.create_search_index();
-    CHECK(index);
-
-    c.add(Timestamp{1, 1});
-    c.set(0, Timestamp{2, 2});
-    c.erase_rows(0, 1, 1, false);
-    CHECK_EQUAL(c.size(), 0);
-
-    index->destroy();
-    c.destroy_search_index();
-    c.destroy();
-}
-
-
-// Bug found by AFL during development of TimestampColumn
-TEST(TimestampColumn_DeleteAfterSetNullWithIndex)
-{
-    constexpr bool nullable = true;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
-    TimestampColumn c(nullable, Allocator::get_default(), ref);
-    StringIndex* index = c.create_search_index();
-    CHECK(index);
-
-    c.add(Timestamp{0, 0});
-    c.set_null(0);
-    c.add(Timestamp{1, 1});
-    c.add(Timestamp{2, 2});
-    c.erase_rows(0, 1, 1, false);
-    CHECK_EQUAL(c.size(), 2);
-
-    index->destroy();
-    c.destroy_search_index();
-    c.destroy();
-}
-
-
-// Bug found by AFL during development of TimestampColumn
-TEST(TimestampColumn_LargeNegativeTimestampSearchIndex)
-{
-    constexpr bool nullable = true;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
-    TimestampColumn c(nullable, Allocator::get_default(), ref);
-
-    c.add(Timestamp{-1934556340879361, 0});
-    StringIndex* index = c.create_search_index();
-    CHECK(index);
-    c.set_null(0);
-
-    c.erase_rows(0, 1, 1, false);
-    CHECK_EQUAL(c.size(), 0);
-
-    index->destroy();
-    c.destroy_search_index();
-    c.destroy();
-}
-
 
 TEST(TimestampColumn_LargeNegativeTimestampSearchIndexErase)
 {
-    constexpr bool nullable = true;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
-    TimestampColumn c(nullable, Allocator::get_default(), ref);
+    Table t;
+    auto col = t.add_column(type_Timestamp, "date", true);
+    Obj obj = t.create_object();
 
-    c.add(Timestamp{-1934556340879361, 0});
-    StringIndex* index = c.create_search_index();
-    CHECK(index);
-    c.set_null(0);
+    obj.set(col, Timestamp{-1934556340879361, 0});
+    t.add_search_index(col);
+    CHECK(t.has_search_index(col));
+    obj.set_null(col);
 
-    c.erase(0, true);
-    CHECK_EQUAL(c.size(), 0);
-    CHECK(index->is_empty());
-
-    index->destroy();
-    c.destroy_search_index();
-    c.destroy();
+    obj.remove();
+    CHECK_EQUAL(t.size(), 0);
 }
-#endif
 
 namespace { // anonymous namespace
 
@@ -541,11 +244,10 @@ TEST(TimestampColumn_Operators)
 }
 
 
-TEST_TYPES(TimestampColumn_ForceReallocate, std::true_type, std::false_type)
+TEST(TimestampColumn_ForceReallocate)
 {
-    constexpr bool nullable_toggle = TEST_TYPE::value;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
-    TimestampColumn c(nullable_toggle, Allocator::get_default(), ref);
+    BPlusTree<Timestamp> c(Allocator::get_default());
+    c.create();
 
     int32_t items_count = REALM_MAX_BPNODE_SIZE * 5;
     for (int32_t i = 0; i < items_count; ++i) {
@@ -557,46 +259,39 @@ TEST_TYPES(TimestampColumn_ForceReallocate, std::true_type, std::false_type)
     c.destroy();
 }
 
-#ifdef LEGACY_TESTS
 TEST(TimestampColumn_FindFirst)
 {
     constexpr bool nullable = true;
     constexpr bool non_nullable = false;
 
     Table t;
-    t.add_column(type_Timestamp, "date", nullable);
-    t.add_column(type_Timestamp, "date", non_nullable);
+    auto col_nullable = t.add_column(type_Timestamp, "date_null", nullable);
+    auto col_non_nullable = t.add_column(type_Timestamp, "date", non_nullable);
 
-    t.add_empty_row(10);
+    std::vector<ObjKey> keys;
+    t.create_objects(10, keys);
 
-    t.set_timestamp(0, 0, Timestamp{}); // null
-    t.set_timestamp(0, 1, Timestamp(0, 0));
-    t.set_timestamp(0, 2, Timestamp(1, 0));
-    t.set_timestamp(0, 3, Timestamp(0, 1));
-    t.set_timestamp(0, 4, Timestamp(1, 1));
-    t.set_timestamp(0, 5, Timestamp(-1, 0));
+    t.get_object(keys[0]).set_all(Timestamp{}, Timestamp(0, 0)); // null
+    t.get_object(keys[1]).set_all(Timestamp(0, 0), Timestamp(0, 0));
+    t.get_object(keys[2]).set_all(Timestamp(1, 0), Timestamp(1, 0));
+    t.get_object(keys[3]).set_all(Timestamp(0, 1), Timestamp(0, 1));
+    t.get_object(keys[4]).set_all(Timestamp(1, 1), Timestamp(1, 1));
+    t.get_object(keys[5]).set_all(Timestamp(-1, 0), Timestamp(-1, 0));
 
-    t.set_timestamp(1, 0, Timestamp(0, 0)); // null not possible, so insert (0, 0 instead)
-    t.set_timestamp(1, 1, Timestamp(0, 0));
-    t.set_timestamp(1, 2, Timestamp(1, 0));
-    t.set_timestamp(1, 3, Timestamp(0, 1));
-    t.set_timestamp(1, 4, Timestamp(1, 1));
-    t.set_timestamp(1, 5, Timestamp(-1, 0));
+    CHECK_EQUAL(t.find_first_timestamp(col_nullable, Timestamp{}), keys[0]);
+    CHECK_EQUAL(t.find_first_timestamp(col_nullable, Timestamp(0, 0)), keys[1]);
+    CHECK_EQUAL(t.find_first_timestamp(col_nullable, Timestamp(1, 0)), keys[2]);
+    CHECK_EQUAL(t.find_first_timestamp(col_nullable, Timestamp(0, 1)), keys[3]);
+    CHECK_EQUAL(t.find_first_timestamp(col_nullable, Timestamp(1, 1)), keys[4]);
+    CHECK_EQUAL(t.find_first_timestamp(col_nullable, Timestamp(-1, 0)), keys[5]);
 
-    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp{}), 0);
-    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(0, 0)), 1);
-    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(1, 0)), 2);
-    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(0, 1)), 3);
-    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(1, 1)), 4);
-    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(-1, 0)), 5);
-
-    CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(0, 0)), 0);
-    CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(1, 0)), 2);
-    CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(0, 1)), 3);
-    CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(1, 1)), 4);
-    CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(-1, 0)), 5);
+    CHECK_EQUAL(t.find_first_timestamp(col_non_nullable, Timestamp(0, 0)), keys[0]);
+    CHECK_EQUAL(t.find_first_timestamp(col_non_nullable, Timestamp(1, 0)), keys[2]);
+    CHECK_EQUAL(t.find_first_timestamp(col_non_nullable, Timestamp(0, 1)), keys[3]);
+    CHECK_EQUAL(t.find_first_timestamp(col_non_nullable, Timestamp(1, 1)), keys[4]);
+    CHECK_EQUAL(t.find_first_timestamp(col_non_nullable, Timestamp(-1, 0)), keys[5]);
 }
-#endif
+
 
 TEST(TimestampColumn_AddColumnAfterRows)
 {
@@ -617,53 +312,52 @@ TEST(TimestampColumn_AddColumnAfterRows)
     CHECK(t.get_object(keys[0]).is_null(col_2));
 }
 
-// max/min on pure null timestamps must reuturn npos like for int, float and double
-#ifdef LEGACY_TESTS
+// max/min on pure null timestamps must return npos like for int, float and double
 TEST(TimestampColumn_AggregateBug)
 {
-    size_t index;
+    ObjKey index;
     Table t;
     TableView tv;
     Timestamp ts;
 
-    t.add_column(type_Timestamp, "ts", true);
-    t.add_empty_row(4);
+    auto col = t.add_column(type_Timestamp, "ts", true);
+    std::vector<ObjKey> keys;
+    t.create_objects(4, keys);
     tv = t.where().find_all();
     CHECK_EQUAL(4, tv.size());
-    ts = tv.maximum_timestamp(0, &index);
-    CHECK_EQUAL(npos, index);
-    ts = tv.minimum_timestamp(0, &index);
-    CHECK_EQUAL(npos, index);
+    ts = tv.maximum_timestamp(col, &index);
+    CHECK_EQUAL(null_key, index);
+    ts = tv.minimum_timestamp(col, &index);
+    CHECK_EQUAL(null_key, index);
 
     Query q;
 
-    ts = t.where().maximum_timestamp(0, &index);
-    CHECK_EQUAL(npos, index);
+    ts = t.where().maximum_timestamp(col, &index);
+    CHECK_EQUAL(null_key, index);
 
-    ts = t.where().minimum_timestamp(0, &index);
-    CHECK_EQUAL(npos, index);
+    ts = t.where().minimum_timestamp(col, &index);
+    CHECK_EQUAL(null_key, index);
 
-    t.set_timestamp(0, 2, Timestamp(1, 0));
+    t.get_object(keys[2]).set(col, Timestamp(1, 0));
 
-    ts = t.where().maximum_timestamp(0, &index);
-    CHECK_EQUAL(2, index);
+    ts = t.where().maximum_timestamp(col, &index);
+    CHECK_EQUAL(keys[2], index);
     CHECK_EQUAL(ts, Timestamp(1, 0));
 
-    ts = t.where().minimum_timestamp(0, &index);
-    CHECK_EQUAL(2, index);
+    ts = t.where().minimum_timestamp(col, &index);
+    CHECK_EQUAL(keys[2], index);
     CHECK_EQUAL(ts, Timestamp(1, 0));
 
-    t.set_timestamp(0, 3, Timestamp(1, 1));
+    t.get_object(keys[3]).set(col, Timestamp(1, 1));
 
-    ts = t.where().maximum_timestamp(0, &index);
-    CHECK_EQUAL(3, index);
+    ts = t.where().maximum_timestamp(col, &index);
+    CHECK_EQUAL(keys[3], index);
     CHECK_EQUAL(ts, Timestamp(1, 1));
 
-    ts = t.where().minimum_timestamp(0, &index);
-    CHECK_EQUAL(2, index);
+    ts = t.where().minimum_timestamp(col, &index);
+    CHECK_EQUAL(keys[2], index);
     CHECK_EQUAL(ts, Timestamp(1, 0));
 }
-#endif
 
 
 namespace {
@@ -688,11 +382,10 @@ int64_t timestamp_to_milliseconds(const Timestamp& ts)
 } // unnamed namespace
 
 
-TEST_TYPES(Timestamp_Conversions, std::true_type, std::false_type)
+TEST(Timestamp_Conversions)
 {
-    constexpr bool nullable_toggle = TEST_TYPE::value;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
-    TimestampColumn c(nullable_toggle, Allocator::get_default(), ref);
+    BPlusTree<Timestamp> c(Allocator::get_default());
+    c.create();
 
     constexpr int64_t millis[] = {1, 0, -1, 1000, -1000, 1001, -1001, 203558400, 1461746402, -1000000000};
     constexpr size_t num_millis = sizeof(millis) / sizeof(millis[0]);

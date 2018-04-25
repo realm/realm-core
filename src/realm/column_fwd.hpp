@@ -28,9 +28,6 @@ class ColumnBase;
 class StringColumn;
 class StringEnumColumn;
 class BinaryColumn;
-class LinkColumn;
-class LinkListColumn;
-class TimestampColumn;
 
 // Templated classes
 template <class T>

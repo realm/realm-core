@@ -147,6 +147,11 @@ public:
         return m_size;
     }
 
+    bool is_empty() const
+    {
+        return m_size == 0;
+    }
+
     ref_type get_ref() const
     {
         REALM_ASSERT(is_attached());
@@ -244,6 +249,49 @@ protected:
 template <>
 struct BPlusTreeBase::LeafTypeTrait<ObjKey> {
     using type = ArrayKeyNonNullable;
+};
+
+template <class T>
+struct SwapBufferType {
+    T val;
+    SwapBufferType(T v)
+        : val(v)
+    {
+    }
+    T get()
+    {
+        return val;
+    }
+};
+
+template <>
+struct SwapBufferType<StringData> {
+    std::string val;
+    bool n;
+    SwapBufferType(StringData v)
+        : val(v.data(), v.size())
+        , n(v.is_null())
+    {
+    }
+    StringData get()
+    {
+        return n ? StringData() : StringData(val);
+    }
+};
+
+template <>
+struct SwapBufferType<BinaryData> {
+    std::string val;
+    bool n;
+    SwapBufferType(BinaryData v)
+        : val(v.data(), v.size())
+        , n(v.is_null())
+    {
+    }
+    BinaryData get()
+    {
+        return n ? BinaryData() : BinaryData(val);
+    }
 };
 
 /*****************************************************************************/
@@ -355,6 +403,16 @@ public:
         };
 
         m_root->bptree_access(n, func);
+    }
+
+    void swap(size_t ndx1, size_t ndx2)
+    {
+        // We need two buffers. It is illegal to call set() with get() as argument
+        // in case of StingData and BinaryData. Source data may move or get overwritten
+        SwapBufferType<T> tmp1{get(ndx1)};
+        SwapBufferType<T> tmp2{get(ndx2)};
+        set(ndx1, tmp2.get());
+        set(ndx2, tmp1.get());
     }
 
     void erase(size_t n)

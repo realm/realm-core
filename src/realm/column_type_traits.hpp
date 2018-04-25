@@ -132,7 +132,6 @@ struct ColumnTypeTraits<double> {
 template <>
 
 struct ColumnTypeTraits<Timestamp> {
-    using column_type = TimestampColumn;
     using cluster_leaf_type = ArrayTimestamp;
     static const DataType id = type_Timestamp;
     static const ColumnType column_id = col_type_Timestamp;

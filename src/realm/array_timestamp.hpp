@@ -89,18 +89,7 @@ public:
         m_nanoseconds.truncate(ndx);
     }
 
-    size_t find_first(Timestamp value, size_t begin, size_t end) const noexcept
-    {
-        while (begin < end) {
-            auto res = m_seconds.find_first(value.get_seconds(), begin, end);
-            if (res == npos)
-                return not_found;
-            if (m_nanoseconds.get(res) == value.get_nanoseconds())
-                return res;
-            begin = res + 1;
-        }
-        return not_found;
-    }
+    size_t find_first(Timestamp value, size_t begin, size_t end) const noexcept;
 
 private:
     ArrayIntNull m_seconds;

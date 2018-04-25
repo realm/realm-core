@@ -477,9 +477,7 @@ public:
             if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
                 ConstListBase::swap_repl(repl, ndx1, ndx2);
             }
-            T tmp = m_tree->get(ndx1);
-            m_tree->set(ndx1, get(ndx2));
-            m_tree->set(ndx2, tmp);
+            m_tree->swap(ndx1, ndx2);
         }
     }
 
