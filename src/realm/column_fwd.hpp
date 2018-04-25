@@ -23,6 +23,23 @@
 
 namespace realm {
 
+#ifdef USE_NEW_INTEGER_COLUMN_CLASS
+class IntegerColumn;
+class IntegerColumnIterator;
+
+// Templated classes
+template <class T>
+class BPlusTree;
+
+namespace util {
+template <class>
+class Optional;
+}
+
+// Shortcuts, aka typedefs.
+using DoubleColumn = BPlusTree<double>;
+using FloatColumn = BPlusTree<float>;
+#else
 // Regular classes
 class ColumnBase;
 
@@ -45,6 +62,7 @@ using IntNullColumn = Column<util::Optional<int64_t>>;
 using DoubleColumn = Column<double>;
 using FloatColumn = Column<float>;
 using IntegerColumnIterator = ColumnRandIterator<int64_t>;
+#endif
 } // namespace realm
 
 #endif // REALM_COLUMN_FWD_HPP

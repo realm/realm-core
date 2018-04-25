@@ -86,6 +86,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     cluster_tree.hpp
     column.hpp
     column_binary.hpp
+    column_integer.hpp
     column_fwd.hpp
     column_tpl.hpp
     column_type.hpp

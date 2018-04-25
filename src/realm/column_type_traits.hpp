@@ -63,7 +63,6 @@ struct AggregateResultType<float, act_Sum> {
 
 template <>
 struct ColumnTypeTraits<int64_t> {
-    using column_type = Column<int64_t>;
     using leaf_type = ArrayInteger;
     using cluster_leaf_type = ArrayInteger;
     using sum_type = int64_t;
@@ -107,7 +106,6 @@ struct ColumnTypeTraits<util::Optional<bool>> : ColumnTypeTraits<util::Optional<
 
 template <>
 struct ColumnTypeTraits<float> {
-    using column_type = Column<float>;
     using leaf_type = BasicArray<float>;
     using cluster_leaf_type = BasicArray<float>;
     using sum_type = double;
@@ -119,7 +117,6 @@ struct ColumnTypeTraits<float> {
 
 template <>
 struct ColumnTypeTraits<double> {
-    using column_type = Column<double>;
     using leaf_type = BasicArray<double>;
     using cluster_leaf_type = BasicArray<double>;
     using sum_type = double;
