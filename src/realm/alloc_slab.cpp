@@ -655,7 +655,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         realm::util::encryption_read_barrier(map, 0, sizeof(Header));
         realm::util::encryption_read_barrier(map, size - sizeof(Header), sizeof(Header));
 
-        validate_buffer(map.get_addr(), size, path); // Throws
+        validate_header(map.get_addr(), size, path); // Throws
 
         top_ref = get_top_ref(map.get_addr(), size);
 
@@ -715,9 +715,6 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 
     // We can only safely mmap the file, if its size matches a page boundary. If not,
     // we must change the size to match before mmaping it.
-    // This can fail due to a race with a concurrent commmit, in which case we
-    // must throw allowing the caller to retry, but the common case is to succeed
-    // at first attempt
     if (size != round_up_to_page_size(size)) {
         // The file size did not match a page boundary.
         // We must extend the file to a page boundary (unless already there)
@@ -747,24 +744,17 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             if (cfg.session_initiator || !cfg.is_shared) {
 
                 // We can only safely extend the file if we're the session initiator, or if
-                // the file isn't shared at all.
-
-                // resizing the file (as we do here) without actually changing any internal
-                // datastructures to reflect the additional free space will work, because the
-                // free space management relies on the logical filesize and disregards the
-                // actual size of the file.
-                // FIXME: ^This needs a better explanation
+                // the file isn't shared at all. Extending the file to a page boundary is ONLY
+                // done to ensure well defined behavior for memory mappings. It does not matter,
+                // that the free space management isn't informed
                 size = round_up_to_page_size(size);
                 m_file.prealloc(size);
                 m_baseline = 0;
             }
             else {
                 // Getting here, we have a file of a size that will not work, and without being
-                // allowed to extend it.
-                // This can happen in the case where a concurrent commit is extending the file,
-                // and we observe it part-way (file extension is not atomic). If so, we
-                // need to start all over. The alternative would be to synchronize with commit,
-                // and we generally try to avoid this when possible.
+                // allowed to extend it. This should not be possible. But allowing a retry is
+                // arguably better than giving up and crashing...
                 throw Retry();
             }
         }
@@ -788,7 +778,7 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
     REALM_ASSERT(size <= (1UL << section_shift));
     // Verify the data structures
     std::string path; // No path
-    validate_buffer(data, size, path); // Throws
+    validate_header(data, size, path); // Throws
 
     ref_type top_ref = get_top_ref(data, size);
 
@@ -836,7 +826,7 @@ void SlabAlloc::attach_empty()
 }
 
 
-void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string& path)
+void SlabAlloc::validate_header(const char* data, size_t size, const std::string& path)
 {
     // Verify that size is sane and 8-byte aligned
     if (REALM_UNLIKELY(size < sizeof(Header) || size % 8 != 0))
