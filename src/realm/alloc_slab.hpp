@@ -434,18 +434,17 @@ private:
     // mappings used by newest transactions - additional mappings may be open
     // and in use by older transactions. These translations are in m_old_mappings.
     std::vector<util::File::Map<char>> m_mappings;
-    // The ref for the first mapping in m_mappings. Will be 0 for newer file formats,
-    // but nonzero if a compatibility mapping is in use. In that case, the ref for
+    // The section nr for the first mapping in m_mappings. Will be 0 for newer file formats,
+    // but will be nonzero if a compatibility mapping is in use. In that case, the ref for
     // the first mapping is the *last* section boundary in the file. Note: in this
     // mode, the first mapping in m_mappings may overlap with the last part of the
     // file, leading to aliasing.
-    ref_type m_mappings_start_ref = 0;
+    int m_sections_in_compatibility_mapping = 0;
     // if the file has an older format, it needs to be mapped by a single
     // mapping. This is the compatibility mapping. As such files extend, additional
     // mappings are added to m_mappings (above) - the compatibility mapping remains
     // unchanged until the file is closed.
     util::File::Map<char> m_compatibility_mapping;
-
 
     size_t m_translation_table_size = 0;
     uint64_t m_mapping_version = 1;
