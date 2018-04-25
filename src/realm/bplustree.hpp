@@ -83,6 +83,7 @@ public:
     // Move elements over in new node, starting with element at position 'ndx'.
     // If this is an inner node, the index offsets should be adjusted with 'adj'
     virtual void move(BPlusTreeNode* new_node, size_t ndx, int64_t offset_adj) = 0;
+    virtual void verify() const = 0;
 
 protected:
     BPlusTreeBase* m_tree;
@@ -110,6 +111,9 @@ public:
     void bptree_access(size_t n, AccessFunc&) override;
     size_t bptree_erase(size_t n, EraseFunc&) override;
     bool bptree_traverse(TraverseFunc&) override;
+    void verify() const override
+    {
+    }
 };
 
 /*****************************************************************************/
@@ -184,8 +188,9 @@ public:
 
     void create();
     void destroy();
-    void verify()
+    void verify() const
     {
+        m_root->verify();
     }
 
 protected:

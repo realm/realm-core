@@ -242,6 +242,22 @@ TEST(BPlusTree_Initialization)
     parent_array.destroy();
 }
 
+TEST(BPlusTree_Destruction)
+{
+    BPlusTree<Int> tree(Allocator::get_default());
+    tree.create();
+
+    for (int64_t i = 0; i < 100; i++) {
+        tree.add(i);
+    }
+    for (int64_t i = 0; i < 100; i++) {
+        CHECK_EQUAL(tree.get(0), i);
+        tree.erase(0);
+        tree.verify();
+    }
+    tree.destroy();
+}
+
 namespace {
 BPlusTree<Int> create_bplustree_int()
 {

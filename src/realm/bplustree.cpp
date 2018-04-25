@@ -77,6 +77,7 @@ public:
     void bptree_access(size_t n, AccessFunc&) override;
     size_t bptree_erase(size_t n, EraseFunc&) override;
     bool bptree_traverse(TraverseFunc&) override;
+    void verify() const override;
 
     // Other modifiers
 
@@ -116,7 +117,7 @@ private:
     {
         Array::set(m_size - 1, (sz << 1) + 1);
     }
-    size_t get_elems_per_child()
+    size_t get_elems_per_child() const
     {
         // Only relevant when in compact form
         REALM_ASSERT_DEBUG(!m_offsets.is_attached());
@@ -133,7 +134,7 @@ private:
     BPlusTreeLeaf* cache_leaf(MemRef mem, size_t ndx, size_t offset);
     void erase_and_destroy_child(size_t ndx);
     ref_type insert_child(size_t child_ndx, ref_type new_sibling_ref, State& state);
-    size_t get_child_offset(size_t child_ndx)
+    size_t get_child_offset(size_t child_ndx) const
     {
         return (child_ndx) > 0 ? size_t(m_offsets.get(child_ndx - 1)) : 0;
     }
@@ -222,6 +223,9 @@ void BPlusTreeInner::init_from_mem(MemRef mem)
     if ((rot & 1) == 0) {
         // rot is a ref
         m_offsets.init_from_ref(to_ref(rot));
+    }
+    else {
+        m_offsets.detach();
     }
 }
 
@@ -327,7 +331,12 @@ size_t BPlusTreeInner::bptree_erase(size_t n, EraseFunc& func)
     if (child_is_leaf) {
         leaf = cache_leaf(mem, child_ndx, child_offset + m_my_offset);
         erase_node_size = func(leaf, n - child_offset);
-        m_tree->adjust_leaf_bounds(-1);
+        if (erase_node_size == 0) {
+            m_tree->invalidate_leaf_cache();
+        }
+        else {
+            m_tree->adjust_leaf_bounds(-1);
+        }
     }
     else {
         node.set_parent(this, child_ndx + 1);
@@ -348,6 +357,7 @@ size_t BPlusTreeInner::bptree_erase(size_t n, EraseFunc& func)
         }
         // Child leaf is empty - destroy it!
         erase_and_destroy_child(child_ndx);
+        return num_children - 1;
     }
     else if (erase_node_size < REALM_MAX_BPNODE_SIZE / 2 && child_ndx < (num_children - 1)) {
         // Candidate for merge. First calculate if the combined size of current and
@@ -568,6 +578,65 @@ ref_type BPlusTreeInner::insert_child(size_t child_ndx, ref_type new_sibling_ref
     state.split_size = new_split_size;
 
     return new_sibling.get_ref();
+}
+
+void BPlusTreeInner::verify() const
+{
+#ifdef REALM_DEBUG
+    Array::verify();
+
+    // This node must not be a leaf
+    REALM_ASSERT_3(Array::get_type(), ==, Array::type_InnerBptreeNode);
+
+    REALM_ASSERT_3(Array::size(), >=, 2);
+    size_t num_children = get_node_size();
+
+    // Verify invar:bptree-nonempty-inner
+    REALM_ASSERT_3(num_children, >=, 1);
+
+    size_t elems_per_child = 0;
+    if (m_offsets.is_attached()) {
+        REALM_ASSERT_DEBUG(m_offsets.size() == num_children - 1);
+    }
+    else {
+        elems_per_child = get_elems_per_child();
+    }
+
+    size_t num_elems = 0;
+    for (size_t i = 0; i < num_children; i++) {
+        ref_type child_ref = get_child_ref(i);
+        char* child_header = m_alloc.translate(child_ref);
+        MemRef mem(child_header, child_ref, m_alloc);
+        bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
+        size_t elems_in_child;
+        if (child_is_leaf) {
+            auto leaf = const_cast<BPlusTreeInner*>(this)->cache_leaf(mem, i, 0);
+            elems_in_child = leaf->get_node_size();
+        }
+        else {
+            BPlusTreeInner node(m_tree);
+            node.init_from_mem(mem);
+            node.verify();
+            elems_in_child = node.get_tree_size();
+        }
+        num_elems += elems_in_child;
+        if (m_offsets.is_attached()) {
+            if (i < num_children - 1) {
+                REALM_ASSERT_DEBUG(num_elems == m_offsets.get(i));
+            }
+        }
+        else {
+            if (i < num_children - 1) {
+                REALM_ASSERT_DEBUG(elems_in_child == elems_per_child);
+            }
+            else {
+                REALM_ASSERT_DEBUG(elems_in_child <= elems_per_child);
+            }
+        }
+    }
+    REALM_ASSERT_DEBUG(get_tree_size() == num_elems);
+    m_tree->invalidate_leaf_cache();
+#endif
 }
 
 /****************************** BPlusTreeBase ********************************/
