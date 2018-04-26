@@ -74,10 +74,10 @@ ListBasePtr Obj::get_listbase_ptr(ColKey col_key, DataType type)
 
 template <class T>
 ConstList<T>::ConstList(const ConstObj& obj, ColKey col_key)
-    : ConstListIf<T>(col_key, obj.get_alloc())
+    : ConstListBase(col_key, &m_obj)
+    , ConstListIf<T>(obj.get_alloc())
     , m_obj(obj)
 {
-    this->set_obj(&m_obj);
     this->init_from_parent();
 }
 
@@ -123,10 +123,10 @@ void ConstListBase::clear_repl(Replication* repl) const
 
 template <class T>
 List<T>::List(const Obj& obj, ColKey col_key)
-    : ConstListIf<T>(col_key, obj.m_tree_top->get_alloc())
+    : ConstListBase(col_key, &m_obj)
+    , ConstListIf<T>(obj.m_tree_top->get_alloc())
     , m_obj(obj)
 {
-    this->set_obj(&m_obj);
     this->init_from_parent();
     if (!ConstListIf<T>::m_valid && m_obj.is_valid()) {
         create();

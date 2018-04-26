@@ -29,6 +29,10 @@
 #include <realm/array_binary.hpp>
 #include <realm/array_timestamp.hpp>
 
+#ifdef _MSC_VER
+#pragma warning(disable : 4250) // Suppress 'inherits ... via dominance' on MSVC
+#endif
+
 namespace realm {
 
 class TableView;
@@ -72,6 +76,7 @@ inline std::ostream& operator<<(std::ostream& ostr, SizeOfList size_of_list)
 
 class ConstListBase : public ArrayParent {
 public:
+    ConstListBase(ConstListBase&&) = delete;
     virtual ~ConstListBase();
     /*
      * Operations that makes sense without knowing the specific type
@@ -100,21 +105,18 @@ protected:
     template <class>
     friend class ListIterator;
 
-    const ConstObj* m_const_obj = nullptr;
+    const ConstObj* m_const_obj;
     const ColKey m_col_key;
 
     mutable std::vector<size_t> m_deleted;
 
-    ConstListBase(ColKey col_key)
-        : m_col_key(col_key)
+    ConstListBase(ColKey col_key, const ConstObj* obj)
+        : m_const_obj(obj)
+        , m_col_key(col_key)
     {
     }
     virtual void init_from_parent() const = 0;
 
-    void set_obj(const ConstObj* obj)
-    {
-        m_const_obj = obj;
-    }
     ref_type get_child_ref(size_t) const noexcept override;
     std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
 
@@ -245,7 +247,7 @@ private:
 /// The ConstList class has the ConstObj member m_obj, which should not be
 /// inherited from List<T>.
 template <class T>
-class ConstListIf : public ConstListBase {
+class ConstListIf : public virtual ConstListBase {
 public:
     /**
      * Only member functions not referring to an index in the list will check if
@@ -289,8 +291,8 @@ protected:
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
     mutable bool m_valid = false;
 
-    ConstListIf(ColKey col_key, Allocator& alloc)
-        : ConstListBase(col_key)
+    ConstListIf(Allocator& alloc)
+        : ConstListBase(ColKey{}, nullptr)
         , m_tree(new BPlusTree<T>(alloc))
     {
         m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
@@ -298,7 +300,7 @@ protected:
 
     ConstListIf(const ConstListIf&) = delete;
     ConstListIf(ConstListIf&& other)
-        : ConstListBase(std::move(other))
+        : ConstListBase(ColKey{}, nullptr)
         , m_tree(std::move(other.m_tree))
         , m_valid(other.m_valid)
     {
@@ -316,10 +318,10 @@ class ConstList : public ConstListIf<T> {
 public:
     ConstList(const ConstObj& owner, ColKey col_key);
     ConstList(ConstList&& other)
-        : ConstListIf<T>(std::move(other))
+        : ConstListBase(other.m_col_key, &m_obj)
+        , ConstListIf<T>(std::move(other))
         , m_obj(std::move(other.m_obj))
     {
-        this->set_obj(&m_obj);
     }
 
 private:
@@ -331,12 +333,15 @@ private:
 /*
  * This class defines a virtual interface to a writable list
  */
-class ListBase {
+class ListBase : public virtual ConstListBase {
 public:
+    ListBase()
+        : ConstListBase(ColKey{}, nullptr)
+    {
+    }
     virtual ~ListBase()
     {
     }
-    virtual size_t size() const = 0;
     virtual void insert_null(size_t ndx) = 0;
     virtual void resize(size_t new_size) = 0;
     virtual void remove(size_t from, size_t to) = 0;
@@ -353,10 +358,10 @@ public:
 
     List(const Obj& owner, ColKey col_key);
     List(List&& other)
-        : ConstListIf<T>(std::move(other))
+        : ConstListBase(other.m_col_key, &m_obj)
+        , ConstListIf<T>(other.m_obj.get_alloc())
         , m_obj(std::move(other.m_obj))
     {
-        this->set_obj(&m_obj);
     }
 
     List& operator=(const BPlusTree<T>& other)
@@ -374,11 +379,6 @@ public:
     {
         m_tree->create();
         ConstListIf<T>::m_valid = true;
-    }
-
-    size_t size() const override
-    {
-        return ConstListIf<T>::size();
     }
 
     void insert_null(size_t ndx) override
@@ -481,9 +481,7 @@ public:
             if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
                 ConstListBase::swap_repl(repl, ndx1, ndx2);
             }
-            T tmp = m_tree->get(ndx1);
-            m_tree->set(ndx1, get(ndx2));
-            m_tree->set(ndx2, tmp);
+            m_tree->swap(ndx1, ndx2);
         }
     }
 
@@ -555,8 +553,9 @@ public:
     ConstObj get_object(size_t link_ndx) const;
 
 protected:
-    ConstLinkListIf(ColKey col_key, Allocator& alloc)
-        : ConstListIf<ObjKey>(col_key, alloc)
+    ConstLinkListIf(Allocator& alloc)
+        : ConstListBase(ColKey{}, nullptr)
+        , ConstListIf<ObjKey>(alloc)
     {
     }
 };
@@ -564,17 +563,17 @@ protected:
 class ConstLinkList : public ConstLinkListIf {
 public:
     ConstLinkList(const ConstObj& obj, ColKey col_key)
-        : ConstLinkListIf(col_key, obj.get_alloc())
+        : ConstListBase(col_key, &m_obj)
+        , ConstLinkListIf(obj.get_alloc())
         , m_obj(obj)
     {
-        this->set_obj(&m_obj);
         this->init_from_parent();
     }
     ConstLinkList(ConstLinkList&& other)
-        : ConstLinkListIf(std::move(other))
+        : ConstListBase(other.m_col_key, &m_obj)
+        , ConstLinkListIf(other.m_obj.get_alloc())
         , m_obj(std::move(other.m_obj))
     {
-        this->set_obj(&m_obj);
     }
     void update_child_ref(size_t, ref_type) override
     {
@@ -589,8 +588,15 @@ private:
 class LinkList : public List<ObjKey>, public ObjList {
 public:
     LinkList(const Obj& owner, ColKey col_key)
-        : List<ObjKey>(owner, col_key)
+        : ConstListBase(col_key, &m_obj)
+        , List<ObjKey>(owner, col_key)
         , ObjList(*this->m_tree, &get_target_table())
+    {
+    }
+    LinkList(LinkList&& other)
+        : ConstListBase(other.m_col_key, &m_obj)
+        , List<ObjKey>(std::move(other))
+        , ObjList(std::move(other))
     {
     }
     LinkListPtr clone() const

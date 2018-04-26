@@ -169,6 +169,17 @@ public:
         return m_alloc;
     }
 
+    Replication* get_replication() const noexcept
+    {
+        return m_alloc.get_replication();
+    }
+
+    void set_replication(Replication* repl) noexcept
+    {
+        m_alloc.set_replication(repl);
+    }
+
+
 #ifdef REALM_DEBUG
     /// Deprecated method, only called from a unit test
     ///
@@ -474,7 +485,6 @@ private:
     friend class Transaction;
 };
 
-
 inline void DB::get_stats(size_t& free_space, size_t& used_space)
 {
     free_space = m_free_space;
@@ -487,7 +497,11 @@ public:
     Transaction(DB* _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage);
     // convenience, so you don't need to carry a reference to the DB around
     ~Transaction();
-    DB* get_db();
+
+    DB* get_db() const
+    {
+        return db;
+    }
     DB::version_type get_version() const noexcept
     {
         return m_read_lock.m_version;
@@ -559,6 +573,24 @@ private:
     friend class DB;
 };
 
+class DisableReplication {
+public:
+    DisableReplication(Transaction& t)
+        : m_owner(t.get_db())
+    {
+        m_repl = m_owner->get_replication();
+        m_owner->set_replication(nullptr);
+    }
+    ~DisableReplication()
+    {
+        m_owner->set_replication(m_repl);
+    }
+
+private:
+    DB* m_owner;
+    Replication* m_repl;
+};
+
 
 /*
  * classes providing backward Compatibility with the older
@@ -574,6 +606,11 @@ public:
 
     ~ReadTransaction() noexcept
     {
+    }
+
+    operator Transaction&()
+    {
+        return *trans;
     }
 
     bool has_table(StringData name) const noexcept
@@ -616,6 +653,11 @@ public:
 
     ~WriteTransaction() noexcept
     {
+    }
+
+    operator Transaction&()
+    {
+        return *trans;
     }
 
     bool has_table(StringData name) const noexcept
@@ -790,7 +832,7 @@ inline void Transaction::promote_to_write(O* observer)
         VersionID version = VersionID();                                              // Latest
         bool history_updated = internal_advance_read(observer, version, *hist, true); // Throws
 
-        Replication* repl = get_replication();
+        Replication* repl = db->get_replication();
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
         DB::version_type current_version = m_read_lock.m_version;
         repl->initiate_transact(*this, current_version, history_updated); // Throws
@@ -814,7 +856,7 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
     if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
-    Replication* repl = get_replication();
+    Replication* repl = db->get_replication();
     if (!repl)
         throw LogicError(LogicError::no_history);
 

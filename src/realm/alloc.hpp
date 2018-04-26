@@ -145,7 +145,11 @@ public:
     }
 #endif
 
-    Replication* get_replication() noexcept;
+    Replication* get_replication() const
+    {
+        return m_replication;
+    }
+
     struct MappedFile;
 
 protected:
@@ -271,7 +275,7 @@ public:
     WrappedAllocator(Allocator& underlying_allocator)
         : m_alloc(&underlying_allocator)
     {
-        m_baseline.store(m_alloc->m_baseline);
+        m_baseline.store(m_alloc->m_baseline, std::memory_order_relaxed);
         m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
         m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
@@ -284,7 +288,7 @@ public:
     void switch_underlying_allocator(Allocator& underlying_allocator)
     {
         m_alloc = &underlying_allocator;
-        m_baseline.store(m_alloc->m_baseline);
+        m_baseline.store(m_alloc->m_baseline, std::memory_order_relaxed);
         m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
         m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
@@ -302,7 +306,7 @@ private:
     {
         auto result = m_alloc->do_alloc(size);
         bump_storage_version();
-        m_baseline.store(m_alloc->m_baseline);
+        m_baseline.store(m_alloc->m_baseline, std::memory_order_relaxed);
         m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
         return result;
     }
@@ -310,7 +314,7 @@ private:
     {
         auto result = m_alloc->do_realloc(ref, addr, old_size, new_size);
         bump_storage_version();
-        m_baseline.store(m_alloc->m_baseline);
+        m_baseline.store(m_alloc->m_baseline, std::memory_order_relaxed);
         m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
         return result;
     }
@@ -479,7 +483,7 @@ inline bool Allocator::is_read_only(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(ref != 0);
     // REALM_ASSERT_DEBUG(m_baseline != 0); // Attached SlabAlloc
-    return ref < m_baseline;
+    return ref < m_baseline.load(std::memory_order_relaxed);
 }
 
 inline Allocator::Allocator() noexcept
@@ -492,11 +496,6 @@ inline Allocator::Allocator() noexcept
 
 inline Allocator::~Allocator() noexcept
 {
-}
-
-inline Replication* Allocator::get_replication() noexcept
-{
-    return m_replication;
 }
 
 inline char* Allocator::translate(ref_type ref) const noexcept

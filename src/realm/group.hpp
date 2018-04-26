@@ -37,6 +37,7 @@
 namespace realm {
 
 class DB;
+class TableKeys;
 
 namespace _impl {
 class GroupFriend;
@@ -227,7 +228,7 @@ public:
     int get_history_schema_version() noexcept;
 
     /// Returns the keys for all tables in this group.
-    std::vector<TableKey> get_keys() const;
+    TableKeys get_table_keys() const;
 
     /// \defgroup group_table_access Table Accessors
     ///
@@ -694,8 +695,6 @@ private:
     void write(util::File& file, const char* encryption_key, uint_fast64_t version_number) const;
     void write(std::ostream&, bool pad, uint_fast64_t version_numer) const;
 
-    Replication* get_replication() const noexcept;
-    void set_replication(Replication*) noexcept;
     std::shared_ptr<metrics::Metrics> get_metrics() const noexcept;
     void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
     void update_num_objects();
@@ -804,10 +803,69 @@ private:
     friend class metrics::QueryInfo;
     friend class metrics::Metrics;
     friend class Transaction;
+    friend class TableKeyIterator;
 };
 
+class TableKeyIterator {
+public:
+    bool operator!=(const TableKeyIterator& other)
+    {
+        return m_pos != other.m_pos;
+    }
+    TableKeyIterator& operator++();
+    TableKey operator*();
+
+private:
+    friend class TableKeys;
+    const Group* m_group;
+    size_t m_pos;
+    size_t m_index_in_group = 0;
+    size_t m_max_index_in_group;
+    TableKey m_table_key;
+
+    TableKeyIterator(const Group* g, size_t p)
+        : m_group(g)
+        , m_pos(p)
+        , m_max_index_in_group(m_group->m_tables.size())
+    {
+    }
+    void load_key();
+};
+
+class TableKeys {
+public:
+    TableKeys(const Group* g)
+        : m_iter(g, 0)
+    {
+    }
+    size_t size() const
+    {
+        return m_iter.m_group->size();
+    }
+    bool empty() const
+    {
+        return size() == 0;
+    }
+    TableKey operator[](size_t p) const;
+    TableKeyIterator begin() const
+    {
+        return TableKeyIterator(m_iter.m_group, 0);
+    }
+    TableKeyIterator end() const
+    {
+        return TableKeyIterator(m_iter.m_group, size());
+    }
+
+private:
+    mutable TableKeyIterator m_iter;
+};
 
 // Implementation
+
+inline TableKeys Group::get_table_keys() const
+{
+    return TableKeys(this);
+}
 
 inline bool Group::is_attached() const noexcept
 {
@@ -845,7 +903,7 @@ inline TableKey Group::find_table(StringData name) const noexcept
     if (!is_attached())
         return TableKey();
     size_t ndx = find_table_index(name);
-    return ndx2key(ndx);
+    return (ndx != npos) ? ndx2key(ndx) : TableKey{};
 }
 
 inline TableRef Group::get_table(TableKey key)
@@ -930,7 +988,7 @@ void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string
 
     out << "{";
 
-    auto keys = get_keys();
+    auto keys = get_table_keys();
     for (size_t i = 0; i < keys.size(); ++i) {
         auto key = keys[i];
         StringData name = get_table_name(key);
@@ -1089,16 +1147,6 @@ inline void Group::reset_free_space_tracking()
     m_alloc.reset_free_space_tracking(); // Throws
 }
 
-inline Replication* Group::get_replication() const noexcept
-{
-    return m_alloc.get_replication();
-}
-
-inline void Group::set_replication(Replication* repl) noexcept
-{
-    m_alloc.set_replication(repl);
-}
-
 inline std::shared_ptr<metrics::Metrics> Group::get_metrics() const noexcept
 {
     return m_metrics;
@@ -1180,16 +1228,6 @@ public:
     static void send_cascade_notification(const Group& group, const Group::CascadeNotification& notification)
     {
         group.send_cascade_notification(notification);
-    }
-
-    static Replication* get_replication(const Group& group) noexcept
-    {
-        return group.get_replication();
-    }
-
-    static void set_replication(Group& group, Replication* repl) noexcept
-    {
-        group.set_replication(repl);
     }
 
     static void detach(Group& group) noexcept

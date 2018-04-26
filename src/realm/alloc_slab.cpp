@@ -295,7 +295,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     size_t new_size = 1UL << section_shift;
     ref_type ref;
     if (m_slabs.empty()) {
-        ref = align_size_to_section_boundary(m_baseline);
+        ref = align_size_to_section_boundary(m_baseline.load(std::memory_order_relaxed));
     }
     else {
         // Find size of memory that has been modified (through copy-on-write) in current write transaction
@@ -596,8 +596,6 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // in the shared slab allocator, because we always create a minimal group
     // representation in memory, even in a read-transaction, if the file is empty.
     // m_is_read_only = cfg.read_only;
-    // Even though we're the first to map the file, we cannot assume that we're
-    // the session initiator. Another process may have the session initiator.
 
     m_file.open(path.c_str(), access, create, 0); // Throws
     auto physical_file_size = m_file.get_size();
@@ -871,7 +869,7 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
 
 size_t SlabAlloc::get_total_size() const noexcept
 {
-    return m_slabs.empty() ? size_t(m_baseline) : m_slabs.back().ref_end;
+    return m_slabs.empty() ? size_t(m_baseline.load(std::memory_order_relaxed)) : m_slabs.back().ref_end;
 }
 
 
@@ -888,7 +886,7 @@ void SlabAlloc::reset_free_space_tracking()
 
     // Rebuild free list to include all slabs
     Chunk chunk;
-    chunk.ref = align_size_to_section_boundary(m_baseline);
+    chunk.ref = align_size_to_section_boundary(m_baseline.load(std::memory_order_relaxed));
 
     for (const auto& slab : m_slabs) {
         chunk.size = slab.ref_end - chunk.ref;
@@ -943,7 +941,6 @@ inline bool randomly_false_in_debug(bool x)
   old one in the mapping table. However, we must keep the old mapping open, because older
   read transactions will continue to use it. Hence, the replaced mappings are accumulated
   and only cleaned out once we know that no transaction can refer to them anymore.
-  (FIXME: This is not implemented yet, goes as part of threading related changes)
 
   Interaction with encryption
 
@@ -986,12 +983,11 @@ inline bool randomly_false_in_debug(bool x)
   * The old one is held in a waiting area until it is no longer relevant because no
     live transaction can refer to it any more.
 
-  (FIXME: This is not implemented yet, goes as part of threading related changes)
  */
 void SlabAlloc::update_reader_view(size_t file_size)
 {
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
-    if (file_size <= m_baseline) {
+    if (file_size <= m_baseline.load(std::memory_order_relaxed)) {
         return;
     }
     REALM_ASSERT(file_size % 8 == 0); // 8-byte alignment required
@@ -1000,11 +996,11 @@ void SlabAlloc::update_reader_view(size_t file_size)
     bool requires_new_fast_mapping = false;
 
     // Extend mapping by adding sections, or by extending sections
-    size_t old_baseline = m_baseline;
+    size_t old_baseline = m_baseline.load(std::memory_order_relaxed);
     auto old_slab_base = align_size_to_section_boundary(old_baseline);
     size_t old_num_sections = get_section_index(old_slab_base);
     REALM_ASSERT(m_mappings.size() == old_num_sections);
-    m_baseline.store(file_size);
+    m_baseline.store(file_size, std::memory_order_relaxed);
     {
         // 0. Special case: figure out if extension is to be done entirely within a single
         // existing mapping. This is the case if the new baseline (which must be larger
@@ -1100,14 +1096,13 @@ void SlabAlloc::update_reader_view(size_t file_size)
 
     // Build the fast path mapping
 
-    // The fast path mapping is an array which will eventually be used from multiple threads
+    // The fast path mapping is an array which will is used from multiple threads
     // without locking - see translate().
 
-    // Addition of a new mapping may require a completely new mapping table.
+    // Addition of a new mapping may require a completely new fast mapping table.
     //
-    // When used in a multithreaded scenario (not yet, FIXME), the old mappings must be
-    // retained open, until the realm version for which they were established has been
-    // closed/detached.
+    // Being used in a multithreaded scenario, the old mappings must be retained open,
+    // until the realm version for which they were established has been closed/detached.
     //
     // This assumes that only write transactions call do_alloc() or do_free() or needs to
     // translate refs in the slab area, and that all these uses are serialized, whether
@@ -1124,10 +1119,7 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
     for (size_t i = 0; i < m_fast_mapping_size - 1; ++i) {
         new_fast_mapping[i] = m_fast_mapping_ptr[i];
     }
-    OldFastMapping oldie;
-    oldie.replaced_at_version = m_youngest_live_version;
-    oldie.mappings = m_fast_mapping_ptr.load();
-    m_old_fast_mappings.push_back(oldie);
+    m_old_fast_mappings.emplace_back(m_youngest_live_version, m_fast_mapping_ptr.load());
 #if REALM_ENABLE_ENCRYPTION
     new_fast_mapping[m_fast_mapping_size - 1] = {address, nullptr};
 #else
@@ -1135,11 +1127,9 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
 #endif
     m_fast_mapping_ptr = new_fast_mapping;
 }
+
 void SlabAlloc::rebuild_fast_mapping(bool requires_new_fast_mapping, size_t old_num_sections)
 {
-    // FIXME: once/if we switch to more gradual extension of the
-    // free space, the exact correspondence between m_free_space.size()
-    // and the number of mappings for slab, will no longer hold....
     size_t free_space_size = m_free_space.size();
     auto num_mappings = m_mappings.size();
     if (m_fast_mapping_size < num_mappings + free_space_size) {
@@ -1149,10 +1139,7 @@ void SlabAlloc::rebuild_fast_mapping(bool requires_new_fast_mapping, size_t old_
     if (requires_new_fast_mapping) {
         // we need a new mapping, but must preserve old, as translations using it
         // may be in progress concurrently
-        OldFastMapping oldie;
-        oldie.replaced_at_version = m_youngest_live_version;
-        oldie.mappings = m_fast_mapping_ptr;
-        m_old_fast_mappings.push_back(oldie);
+        m_old_fast_mappings.emplace_back(m_youngest_live_version, m_fast_mapping_ptr.load());
         m_fast_mapping_size = num_mappings + free_space_size;
         new_fast_mapping = new FastMap[m_fast_mapping_size];
         old_num_sections = 0;
@@ -1171,7 +1158,6 @@ void SlabAlloc::rebuild_fast_mapping(bool requires_new_fast_mapping, size_t old_
         new_fast_mapping[num_mappings + k] = {base};
 #endif
     }
-    // FIXME: must be atomic:
     m_fast_mapping_ptr = new_fast_mapping;
 }
 
@@ -1275,7 +1261,7 @@ bool SlabAlloc::is_all_free() const
         return false;
 
     // Verify that free space matches slabs
-    ref_type slab_ref = align_size_to_section_boundary(m_baseline);
+    ref_type slab_ref = align_size_to_section_boundary(m_baseline.load(std::memory_order_relaxed));
     for (const auto& slab : m_slabs) {
         size_t slab_size = slab.ref_end - slab_ref;
         chunks::const_iterator chunk = find_if(m_free_space.begin(), m_free_space.end(), ChunkRefEq(slab_ref));

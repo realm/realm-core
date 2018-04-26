@@ -33,8 +33,6 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/utilities.hpp>
 #include <realm/exceptions.hpp>
-#include <realm/column_linkbase.hpp>
-#include <realm/column_backlink.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/db.hpp>
 #include <realm/replication.hpp>
@@ -146,28 +144,51 @@ Group::TableRecycler Group::g_table_recycler_2;
 std::mutex Group::g_table_recycler_mutex;
 
 
-std::vector<TableKey> Group::get_keys() const
+TableKeyIterator& TableKeyIterator::operator++()
 {
-    std::vector<TableKey> retval;
-    if (is_attached() && m_table_names.is_attached()) {
-        size_t max_index = m_tables.size();
-        REALM_ASSERT(max_index < (1 << 16));
-        for (size_t j = 0; j < max_index; ++j) {
-            RefOrTagged rot = m_tables.get_as_ref_or_tagged(j);
-            if (rot.is_ref()) {
-                if (j < m_table_accessors.size() && m_table_accessors[j]) {
-                    retval.push_back(m_table_accessors[j]->get_key());
-                }
-                else {
-                    TableKey key = Table::get_key_direct(m_tables.get_alloc(), rot.get_as_ref());
-                    retval.push_back(key);
-                }
-            }
-        }
-    }
-    return retval;
+    m_pos++;
+    m_index_in_group++;
+    load_key();
+    return *this;
 }
 
+TableKey TableKeyIterator::operator*()
+{
+    if (!bool(m_table_key)) {
+        load_key();
+    }
+    return m_table_key;
+}
+
+void TableKeyIterator::load_key()
+{
+    const Group& g = *m_group;
+    while (m_index_in_group < m_max_index_in_group) {
+        RefOrTagged rot = g.m_tables.get_as_ref_or_tagged(m_index_in_group);
+        if (rot.is_ref()) {
+            if (m_index_in_group < g.m_table_accessors.size() && g.m_table_accessors[m_index_in_group]) {
+                m_table_key = g.m_table_accessors[m_index_in_group]->get_key();
+            }
+            else {
+                m_table_key = Table::get_key_direct(g.m_tables.get_alloc(), rot.get_as_ref());
+            }
+            return;
+        }
+        m_index_in_group++;
+    }
+    m_table_key = TableKey();
+}
+
+TableKey TableKeys::operator[](size_t p) const
+{
+    if (p < m_iter.m_pos) {
+        m_iter = TableKeyIterator(m_iter.m_group, 0);
+    }
+    while (m_iter.m_pos < p) {
+        ++m_iter;
+    }
+    return *m_iter;
+}
 
 size_t Group::size() const noexcept
 {
@@ -539,7 +560,7 @@ void Group::update_num_objects()
         // where table accessors are only instantiated on demand, because they are all created here.
 
         m_total_rows = 0;
-        auto keys = get_keys();
+        auto keys = get_table_keys();
         for (auto key : keys) {
             ConstTableRef t = get_table(key);
             m_total_rows += t->size();
@@ -1209,8 +1230,8 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
 
 bool Group::operator==(const Group& g) const
 {
-    auto keys_this = get_keys();
-    auto keys_g = g.get_keys();
+    auto keys_this = get_table_keys();
+    auto keys_g = g.get_table_keys();
     size_t n = keys_this.size();
     if (n != keys_g.size())
         return false;
@@ -1246,7 +1267,7 @@ void Group::to_string(std::ostream& out) const
     size_t name_width = 10;
     size_t rows_width = 6;
 
-    auto keys = get_keys();
+    auto keys = get_table_keys();
     for (auto key : keys) {
         StringData name = get_table_name(key);
         if (name_width < name.size())
@@ -1873,7 +1894,7 @@ void Group::verify() const
 
     // Verify tables
     {
-        auto keys = get_keys();
+        auto keys = get_table_keys();
         for (auto key : keys) {
             ConstTableRef table = get_table(key);
             REALM_ASSERT_3(table->get_key().value, ==, key.value);
@@ -1882,7 +1903,7 @@ void Group::verify() const
     }
 
     // Verify history if present
-    if (Replication* repl = get_replication()) {
+    if (Replication* repl = m_alloc.get_replication()) {
         if (auto hist = repl->get_history_read()) {
             _impl::History::version_type version = 0;
             int history_type = 0;
@@ -2062,7 +2083,7 @@ void Group::to_dot(std::ostream& out) const
     m_tables.to_dot(out, "tables");
 
     // Tables
-    auto keys = get_keys();
+    auto keys = get_table_keys();
     for (auto key : keys) {
         ConstTableRef table = get_table(key);
         StringData name = get_table_name(key);

@@ -80,9 +80,42 @@ using unit_test::TestContext;
 
 namespace {
 
-class LangBindHelper {
-public:
-};
+void work_on_frozen(TestContext& test_context, TransactionRef frozen)
+{
+    CHECK_THROW(frozen->promote_to_write(), LogicError);
+    auto table = frozen->get_table("my_table");
+    auto col = table->get_column_key("my_col_1");
+    int64_t sum = 0;
+    for (auto i : *table) {
+        sum += i.get<int64_t>(col);
+    }
+    CHECK_EQUAL(sum, 1000 / 2 * 999);
+}
+
+TEST(Transactions_Frozen)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DB db(*hist_w);
+    TransactionRef frozen;
+    {
+        auto wt = db.start_write();
+        auto table = wt->add_table("my_table");
+        table->add_column(type_Int, "my_col_1");
+        for (int j = 0; j < 1000; ++j) {
+            table->create_object().set_all(j);
+        }
+        wt->commit_and_continue_as_read();
+        frozen = wt->freeze();
+    }
+    // create multiple threads, all doing read-only work on Frozen
+    const int num_threads = 100;
+    std::thread frozen_workers[num_threads];
+    for (int j = 0; j < num_threads; ++j)
+        frozen_workers[j] = std::thread([&] { work_on_frozen(test_context, frozen); });
+    for (int j = 0; j < num_threads; ++j)
+        frozen_workers[j].join();
+}
 
 class MyHistory : public _impl::History {
 public:
@@ -321,7 +354,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(1, rt->size());
     ConstTableRef foo = rt->get_table("foo");
     CHECK_EQUAL(1, foo->get_column_count());
-    auto cols = foo->get_col_keys();
+    auto cols = foo->get_column_keys();
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(1, foo->size());
     CHECK_EQUAL(0, foo->get_object(k0).get<int64_t>(cols[0]));
@@ -333,7 +366,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         WriteTransaction wt(sg_w);
         TableRef foo_w = wt.get_table("foo");
         foo_w->add_column(type_String, "s");
-        cols = foo_w->get_col_keys();
+        cols = foo_w->get_column_keys();
         k1 = foo_w->create_object().get_key();
         auto obj0 = foo_w->get_object(k0);
         auto obj1 = foo_w->get_object(k1);
@@ -403,7 +436,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->verify();
     CHECK_EQUAL(2, rt->size());
     CHECK_EQUAL(2, foo->get_column_count());
-    cols = foo->get_col_keys();
+    cols = foo->get_column_keys();
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
@@ -413,7 +446,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL("b", obj1.get<StringData>(cols[1]));
     CHECK_EQUAL(foo, rt->get_table("foo"));
     ConstTableRef bar = rt->get_table("bar");
-    cols = bar->get_col_keys();
+    cols = bar->get_column_keys();
     CHECK_EQUAL(3, bar->get_column_count());
     CHECK_EQUAL(type_Int, bar->get_column_type(cols[0]));
     CHECK_EQUAL(type_Float, bar->get_column_type(cols[1]));

@@ -405,12 +405,18 @@ private:
         }
         void operator=(OldMapping&& other)
         {
+            replaced_at_version = other.replaced_at_version;
             mapping = std::move(other.mapping);
         }
         uint64_t replaced_at_version;
         util::File::Map<char> mapping;
     };
     struct OldFastMapping {
+        OldFastMapping(uint64_t v, FastMap* m)
+        {
+            replaced_at_version = v;
+            mappings = m;
+        }
         uint64_t replaced_at_version;
         FastMap* mappings;
     };
@@ -490,10 +496,6 @@ private:
     class SlabRefEndEq;
     static bool ref_less_than_slab_ref_end(ref_type, const Slab&) noexcept;
 
-    Replication* get_replication() const noexcept
-    {
-        return m_replication;
-    }
     void set_replication(Replication* r) noexcept
     {
         m_replication = r;
@@ -548,7 +550,7 @@ inline bool SlabAlloc::nonempty_attachment() const noexcept
 inline size_t SlabAlloc::get_baseline() const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
-    return m_baseline;
+    return m_baseline.load(std::memory_order_relaxed);
 }
 
 inline bool SlabAlloc::is_free_space_clean() const noexcept

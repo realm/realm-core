@@ -463,6 +463,17 @@ TEST(Group_TableKey)
     CHECK_EQUAL("moja", group.get_table_name(moja->get_key()));
     CHECK_EQUAL("mbili", group.get_table_name(mbili->get_key()));
     CHECK_EQUAL("tatu", group.get_table_name(tatu->get_key()));
+    CHECK_EQUAL(group.find_table("moja"), moja->get_key());
+    CHECK_NOT(group.find_table("hello"));
+
+    auto all_table_keys = group.get_table_keys();
+    CHECK_EQUAL(all_table_keys.size(), 3);
+    int cnt = 0;
+    for (auto key : group.get_table_keys()) {
+        CHECK_EQUAL(key, all_table_keys[cnt]);
+        cnt++;
+    }
+    CHECK_EQUAL(cnt, 3);
 }
 
 
@@ -535,6 +546,7 @@ TEST(Group_BasicRemoveTable)
     TableRef gamma = group.add_table("gamma");
     TableRef delta = group.add_table("delta");
     CHECK_EQUAL(4, group.size());
+    group.verify();
     group.remove_table(gamma->get_key()); // By key
     CHECK_EQUAL(3, group.size());
     CHECK(alpha);
@@ -948,7 +960,7 @@ TEST(Group_Serialize1)
 
         CHECK_EQUAL(4, t->get_column_count());
         CHECK_EQUAL(10, t->size());
-        auto cols = t->get_col_keys();
+        auto cols = t->get_column_keys();
         // Verify that original values are there
         CHECK(*table == *t);
 
@@ -1173,7 +1185,7 @@ TEST(Group_Serialize_All)
 
     CHECK_EQUAL(5, t->get_column_count());
     CHECK_EQUAL(1, t->size());
-    auto cols = t->get_col_keys();
+    auto cols = t->get_column_keys();
     Obj obj = t->get_object(ObjKey(0));
     CHECK_EQUAL(12, obj.get<Int>(cols[0]));
     CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
@@ -1209,7 +1221,7 @@ TEST(Group_Persist)
     {
         CHECK_EQUAL(5, table->get_column_count());
         CHECK_EQUAL(1, table->size());
-        auto cols = table->get_col_keys();
+        auto cols = table->get_column_keys();
         Obj obj = table->get_object(ObjKey(0));
         CHECK_EQUAL(12, obj.get<Int>(cols[0]));
         CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
@@ -1232,7 +1244,7 @@ TEST(Group_Persist)
     {
         CHECK_EQUAL(5, table->get_column_count());
         CHECK_EQUAL(1, table->size());
-        auto cols = table->get_col_keys();
+        auto cols = table->get_column_keys();
         Obj obj = table->get_object(ObjKey(0));
         CHECK_EQUAL(12, obj.get<Int>(cols[0]));
         CHECK_EQUAL(true, obj.get<Bool>(cols[1]));

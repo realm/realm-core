@@ -1865,7 +1865,7 @@ TEST(Parser_Backlinks)
 }
 
 
-ONLY(Parser_BacklinkCount)
+TEST(Parser_BacklinkCount)
 {
     Group g;
 

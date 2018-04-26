@@ -83,6 +83,7 @@ public:
     // Move elements over in new node, starting with element at position 'ndx'.
     // If this is an inner node, the index offsets should be adjusted with 'adj'
     virtual void move(BPlusTreeNode* new_node, size_t ndx, int64_t offset_adj) = 0;
+    virtual void verify() const = 0;
 
 protected:
     BPlusTreeBase* m_tree;
@@ -110,6 +111,9 @@ public:
     void bptree_access(size_t n, AccessFunc&) override;
     size_t bptree_erase(size_t n, EraseFunc&) override;
     bool bptree_traverse(TraverseFunc&) override;
+    void verify() const override
+    {
+    }
 };
 
 /*****************************************************************************/
@@ -141,6 +145,11 @@ public:
     size_t size() const
     {
         return m_size;
+    }
+
+    bool is_empty() const
+    {
+        return m_size == 0;
     }
 
     ref_type get_ref() const
@@ -184,8 +193,9 @@ public:
 
     void create();
     void destroy();
-    void verify()
+    void verify() const
     {
+        m_root->verify();
     }
 
 protected:
@@ -239,6 +249,49 @@ protected:
 template <>
 struct BPlusTreeBase::LeafTypeTrait<ObjKey> {
     using type = ArrayKeyNonNullable;
+};
+
+template <class T>
+struct SwapBufferType {
+    T val;
+    SwapBufferType(T v)
+        : val(v)
+    {
+    }
+    T get()
+    {
+        return val;
+    }
+};
+
+template <>
+struct SwapBufferType<StringData> {
+    std::string val;
+    bool n;
+    SwapBufferType(StringData v)
+        : val(v.data(), v.size())
+        , n(v.is_null())
+    {
+    }
+    StringData get()
+    {
+        return n ? StringData() : StringData(val);
+    }
+};
+
+template <>
+struct SwapBufferType<BinaryData> {
+    std::string val;
+    bool n;
+    SwapBufferType(BinaryData v)
+        : val(v.data(), v.size())
+        , n(v.is_null())
+    {
+    }
+    BinaryData get()
+    {
+        return n ? BinaryData() : BinaryData(val);
+    }
 };
 
 /*****************************************************************************/
@@ -350,6 +403,16 @@ public:
         };
 
         m_root->bptree_access(n, func);
+    }
+
+    void swap(size_t ndx1, size_t ndx2)
+    {
+        // We need two buffers. It is illegal to call set() with get() as argument
+        // in case of StingData and BinaryData. Source data may move or get overwritten
+        SwapBufferType<T> tmp1{get(ndx1)};
+        SwapBufferType<T> tmp2{get(ndx2)};
+        set(ndx1, tmp2.get());
+        set(ndx2, tmp1.get());
     }
 
     void erase(size_t n)

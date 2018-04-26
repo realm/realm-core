@@ -297,7 +297,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 wt->add_table(name);
             }
             else if (instr == REMOVE_TABLE && wt->size() > 0) {
-                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 if (log) {
                     *log << "try { wt->remove_table(" << table_key << "); }"
                                                                       " catch (const CrossTableLinkTarget&) { }\n";
@@ -312,14 +312,14 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
             }
             else if (instr == CLEAR_TABLE && wt->size() > 0) {
-                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 if (log) {
                     *log << "wt->get_table(" << table_key << ")->clear();\n";
                 }
                 wt->get_table(table_key)->clear();
             }
             else if (instr == CREATE_OBJECT && wt->size() > 0) {
-                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 if (wt->get_table(table_key)->get_column_count() == 0) {
                     continue; // do not insert rows if there are no columns
                 }
@@ -338,7 +338,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
             }
             else if (instr == ADD_COLUMN && wt->size() > 0) {
-                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 DataType type = get_type(get_next(s));
                 std::string name = create_column_name(type);
                 // Mixed cannot be nullable. For other types, chose nullability randomly
@@ -350,11 +350,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 wt->get_table(table_key)->add_column(type, name, nullable);
             }
             else if (instr == REMOVE_COLUMN && wt->size() > 0) {
-                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t = wt->get_table(table_key);
-                auto all_col_keys = t->get_col_keys();
-                if (!all_col_keys.empty()) {
-                    ColKey col = all_col_keys[get_next(s) % all_col_keys.size()];
+                auto column_keys = t->get_column_keys();
+                if (!column_keys.empty()) {
+                    ColKey col = column_keys[get_next(s) % column_keys.size()];
                     if (log) {
                         *log << "wt->get_table(" << table_key << ")->remove_column(" << col << ");\n";
                     }
@@ -362,11 +362,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
             }
             else if (instr == RENAME_COLUMN && wt->size() > 0) {
-                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t = wt->get_table(table_key);
-                auto all_col_keys = t->get_col_keys();
-                if (!all_col_keys.empty()) {
-                    ColKey col = all_col_keys[get_next(s) % all_col_keys.size()];
+                auto column_keys = t->get_column_keys();
+                if (!column_keys.empty()) {
+                    ColKey col = column_keys[get_next(s) % column_keys.size()];
                     std::string name = create_column_name(t->get_column_type(col));
                     if (log) {
                         *log << "wt->get_table(" << table_key << ")->rename_column(" << col << ", \"" << name
@@ -376,11 +376,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
             }
             else if (instr == ADD_SEARCH_INDEX && wt->size() > 0) {
-                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t = wt->get_table(table_key);
-                auto all_col_keys = t->get_col_keys();
-                if (!all_col_keys.empty()) {
-                    ColKey col = all_col_keys[get_next(s) % all_col_keys.size()];
+                auto column_keys = t->get_column_keys();
+                if (!column_keys.empty()) {
+                    ColKey col = column_keys[get_next(s) % column_keys.size()];
                     bool supports_search_index = StringIndex::type_supported(t->get_column_type(col));
 
                     if (supports_search_index) {
@@ -392,11 +392,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
             }
             else if (instr == REMOVE_SEARCH_INDEX && wt->size() > 0) {
-                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t = wt->get_table(table_key);
-                auto all_col_keys = t->get_col_keys();
-                if (!all_col_keys.empty()) {
-                    ColKey col = all_col_keys[get_next(s) % all_col_keys.size()];
+                auto column_keys = t->get_column_keys();
+                if (!column_keys.empty()) {
+                    ColKey col = column_keys[get_next(s) % column_keys.size()];
                     // We don't need to check if the column is of a type that is indexable or if it has index on or
                     // off
                     // because Realm will just do a no-op at worst (no exception or assert).
@@ -407,8 +407,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
             }
             else if (instr == ADD_COLUMN_LINK && wt->size() >= 1) {
-                TableKey table_key_1 = wt->get_keys()[get_next(s) % wt->size()];
-                TableKey table_key_2 = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key_1 = wt->get_table_keys()[get_next(s) % wt->size()];
+                TableKey table_key_2 = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t1 = wt->get_table(table_key_1);
                 TableRef t2 = wt->get_table(table_key_2);
                 std::string name = create_column_name(type_Link);
@@ -419,8 +419,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 t1->add_column_link(type_Link, name, *t2);
             }
             else if (instr == ADD_COLUMN_LINK_LIST && wt->size() >= 2) {
-                TableKey table_key_1 = wt->get_keys()[get_next(s) % wt->size()];
-                TableKey table_key_2 = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key_1 = wt->get_table_keys()[get_next(s) % wt->size()];
+                TableKey table_key_2 = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t1 = wt->get_table(table_key_1);
                 TableRef t2 = wt->get_table(table_key_2);
                 std::string name = create_column_name(type_LinkList);
@@ -431,9 +431,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 t1->add_column_link(type_LinkList, name, *t2);
             }
             else if (instr == SET && wt->size() > 0) {
-                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t = wt->get_table(table_key);
-                auto all_col_keys = t->get_col_keys();
+                auto all_col_keys = t->get_column_keys();
                 if (!all_col_keys.empty() && t->size() > 0) {
                     ColKey col = all_col_keys[get_next(s) % all_col_keys.size()];
                     size_t row = get_next(s) % t->size();
@@ -568,7 +568,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
             }
             else if (instr == REMOVE_OBJECT && wt->size() > 0) {
-                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t = wt->get_table(table_key);
                 if (t->size() > 0) {
                     ObjKey key = t->get_object(get_next(s) % t->size()).get_key();
@@ -579,7 +579,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
             }
             else if (instr == REMOVE_RECURSIVE && wt->size() > 0) {
-                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t = wt->get_table(table_key);
                 if (t->size() > 0) {
                     ObjKey key = t->get_object(get_next(s) % t->size()).get_key();
@@ -590,9 +590,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
             }
             else if (instr == ENUMERATE_COLUMN && wt->size() > 0) {
-                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t = wt->get_table(table_key);
-                auto all_col_keys = t->get_col_keys();
+                auto all_col_keys = t->get_column_keys();
                 if (!all_col_keys.empty()) {
                     size_t ndx = get_next(s) % all_col_keys.size();
                     ColKey col = all_col_keys[ndx];
@@ -672,9 +672,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             }
             else if (instr == GET_ALL_COLUMN_NAMES && wt->size() > 0) {
                 // try to fuzz find this: https://github.com/realm/realm-core/issues/1769
-                for (auto table_key : wt->get_keys()) {
+                for (auto table_key : wt->get_table_keys()) {
                     TableRef t = wt->get_table(table_key);
-                    auto all_col_keys = t->get_col_keys();
+                    auto all_col_keys = t->get_column_keys();
                     for (auto col : all_col_keys) {
                         StringData col_name = t->get_column_name(col);
                         static_cast<void>(col_name);
@@ -682,7 +682,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
             }
             else if (instr == CREATE_TABLE_VIEW && wt->size() > 0) {
-                TableKey table_key = wt->get_keys()[get_next(s) % wt->size()];
+                TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t = wt->get_table(table_key);
                 if (log) {
                     *log << "table_views.push_back(wt->get_table(" << table_key << ")->where().find_all());\n";
@@ -722,10 +722,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 */
             }
             else if (instr == IS_NULL && rt->size() > 0) {
-                TableKey table_key = rt->get_keys()[get_next(s) % rt->size()];
+                TableKey table_key = rt->get_table_keys()[get_next(s) % rt->size()];
                 TableRef t = rt->get_table(table_key);
                 if (t->get_column_count() > 0 && t->size() > 0) {
-                    auto all_col_keys = t->get_col_keys();
+                    auto all_col_keys = t->get_column_keys();
                     size_t ndx = get_next(s) % all_col_keys.size();
                     ColKey col = all_col_keys[ndx];
                     ObjKey key = t->get_object(get_int32(s) % t->size()).get_key();

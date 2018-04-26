@@ -43,19 +43,15 @@ class BacklinkCount;
 class BinaryColumy;
 class ConstTableView;
 class Group;
-class LinkColumn;
-class LinkColumnBase;
-class LinkListColumn;
-class LinkView;
 class SortDescriptor;
 class StringIndex;
 class TableView;
-class TimestampColumn;
 template <class>
 class Columns;
 template <class>
 class SubQuery;
 struct LinkTargetInfo;
+class ColKeys;
 
 struct Link {
 };
@@ -118,6 +114,7 @@ public:
     StringData get_column_name(ColKey column_key) const;
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
+    ColKeys get_column_keys() const;
     ColKey find_backlink_column(TableKey origin_table_key, ColKey origin_col_key) const noexcept;
     typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
     BacklinkOrigin find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept;
@@ -132,7 +129,6 @@ public:
     ColKey add_column(DataType type, StringData name, bool nullable = false);
     ColKey add_column_list(DataType type, StringData name);
     ColKey add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
-    std::vector<ColKey> get_col_keys() const;
 
     // Pass a ColKey() as first argument to have a new colkey generated
     // Requesting a specific ColKey may fail with invalidkey exception, if the key is already in use
@@ -872,10 +868,77 @@ private:
     friend class Transaction;
     friend class ClusterTree;
     friend class ArrayBacklink;
+    friend class ColKeyIterator;
+};
+
+class ColKeyIterator {
+public:
+    bool operator!=(const ColKeyIterator& other)
+    {
+        return m_pos != other.m_pos;
+    }
+    ColKeyIterator& operator++()
+    {
+        ++m_pos;
+        return *this;
+    }
+    ColKey operator*()
+    {
+        if (m_pos < m_table->get_column_count()) {
+            return m_table->m_spec.get_key(m_pos);
+        }
+        return {};
+    }
+
+private:
+    friend class ColKeys;
+    const Table* m_table;
+    size_t m_pos;
+
+    ColKeyIterator(const Table* t, size_t p)
+        : m_table(t)
+        , m_pos(p)
+    {
+    }
+};
+
+class ColKeys {
+public:
+    ColKeys(const Table* t)
+        : m_table(t)
+    {
+    }
+    size_t size() const
+    {
+        return m_table->get_column_count();
+    }
+    bool empty() const
+    {
+        return size() == 0;
+    }
+    ColKey operator[](size_t p) const
+    {
+        return ColKeyIterator(m_table, p).operator*();
+    }
+    ColKeyIterator begin() const
+    {
+        return ColKeyIterator(m_table, 0);
+    }
+    ColKeyIterator end() const
+    {
+        return ColKeyIterator(m_table, size());
+    }
+
+private:
+    const Table* m_table;
 };
 
 // Implementation:
 
+inline ColKeys Table::get_column_keys() const
+{
+    return ColKeys(this);
+}
 
 inline uint_fast64_t Table::get_content_version() const noexcept
 {

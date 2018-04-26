@@ -322,6 +322,30 @@ TEST(Replication_General)
 
         CHECK(!sd1.is_null());
     }
+    {
+        WriteTransaction wt(sg_1);
+        DisableReplication disable(wt);
+        TableRef table = wt.get_table("my_table");
+        table->create_object(ObjKey(100));
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("my_table");
+        table->create_object(ObjKey(200));
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt_1(sg_1);
+        ReadTransaction rt_2(sg_2);
+        rt_1.get_group().verify();
+        rt_2.get_group().verify();
+        CHECK(rt_1.get_group() != rt_2.get_group());
+        auto table = rt_2.get_table("my_table");
+        CHECK_NOT(table->is_valid(ObjKey(100)));
+        CHECK(table->is_valid(ObjKey(200)));
+    }
 }
 
 #ifdef LEGACY_TESTS

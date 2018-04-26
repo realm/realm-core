@@ -2679,15 +2679,6 @@ Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noe
     return {};
 }
 
-std::vector<ColKey> Table::get_col_keys() const
-{
-    std::vector<ColKey> retval;
-    retval.reserve(m_spec.get_public_column_count());
-    for (size_t idx = 0; idx < m_spec.get_public_column_count(); ++idx)
-        retval.push_back(m_spec.get_key(idx));
-    return retval;
-}
-
 void Table::verify_inv() const
 {
 #ifdef REALM_DEBUG
