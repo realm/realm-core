@@ -710,6 +710,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             realm::util::encryption_read_barrier(initial_mapping, 0, sizeof(Header));
         }
     }
+    int file_format_version = get_committed_file_format_version();
     initial_mapping.unmap();
     m_data = nullptr;
 
@@ -761,12 +762,32 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     }
 
     reset_free_space_tracking();
-    update_reader_view(size);
+    // if the file format is older than version 10 and larger than a section we have
+    // to use the compatibility mapping
+    if (size > get_section_base(1) && file_format_version < 10) {
+        setup_compatibility_mapping(size);
+        m_data = m_compatibility_mapping.get_addr();
+    }
+    else {
+        update_reader_view(size);
+        m_data = m_mappings[0].get_addr();
+    }
     REALM_ASSERT(m_mappings.size());
-    m_data = m_mappings[0].get_addr();
     dg.release();  // Do not detach
     fcg.release(); // Do not close
     return top_ref;
+}
+
+void SlabAlloc::setup_compatibility_mapping(size_t file_size)
+{
+    m_sections_in_compatibility_mapping = get_section_index(file_size);
+    REALM_ASSERT(m_sections_in_compatibility_mapping);
+    m_compatibility_mapping = util::File::Map<char>(get_file());
+    // fake that we've only mapped the number of full sections in order
+    // to allow additional mappings to start aligned to a section boundary,
+    // even though the compatibility mapping may extend further.
+    m_baseline = get_section_base(m_sections_in_compatibility_mapping);
+    update_reader_view(file_size);
 }
 
 ref_type SlabAlloc::attach_buffer(const char* data, size_t size)

@@ -467,6 +467,9 @@ private:
     // Add a translation covering a new section in the slab area. The translation is always
     // added at the end.
     void extend_fast_mapping_with_slab(char* address);
+    // Prepare the initial mapping for a file which requires use of the compatibility mapping
+    void setup_compatibility_mapping(size_t file_size);
+
     const char* m_data = nullptr;
     size_t m_initial_section_size = 0;
     int m_section_shifts = 0;
