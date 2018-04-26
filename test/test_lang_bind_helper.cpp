@@ -85,9 +85,9 @@ void work_on_frozen(TestContext& test_context, TransactionRef frozen)
     CHECK_THROW(frozen->promote_to_write(), LogicError);
     auto table = frozen->get_table("my_table");
     auto col = table->get_column_key("my_col_1");
-    int sum = 0;
+    int64_t sum = 0;
     for (auto i : *table) {
-        sum += i.get<Int>(col);
+        sum += i.get<int64_t>(col);
     }
     CHECK_EQUAL(sum, 1000 / 2 * 999);
 }
