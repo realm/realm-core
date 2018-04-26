@@ -410,9 +410,9 @@ public:
             ensure_writeable();
             do_set(ndx, value);
             m_obj.bump_content_version();
-            if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
-                set_repl(repl, ndx, value);
-            }
+        }
+        if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+            set_repl(repl, ndx, value);
         }
         return old;
     }
