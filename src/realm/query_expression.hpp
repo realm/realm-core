@@ -1843,12 +1843,12 @@ public:
         return m_only_unary_links;
     }
 
-    ConstTableRef get_base_table() const
+    const Table* get_base_table() const
     {
-        return m_tables.empty() ? ConstTableRef() : m_tables[0];
+        return m_tables.empty() ? nullptr : m_tables[0];
     }
 
-    ConstTableRef get_target_table() const
+    const Table* get_target_table() const
     {
         REALM_ASSERT(!m_tables.empty());
         return m_tables.back();
@@ -1871,7 +1871,7 @@ private:
 
     mutable std::vector<ColKey> m_link_column_keys;
     std::vector<ColumnType> m_link_types;
-    std::vector<ConstTableRef> m_tables;
+    std::vector<const Table*> m_tables;
     bool m_only_unary_links = true;
     // Leaf cache
     using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
