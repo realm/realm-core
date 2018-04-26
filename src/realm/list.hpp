@@ -29,6 +29,10 @@
 #include <realm/array_binary.hpp>
 #include <realm/array_timestamp.hpp>
 
+#ifdef _MSC_VER
+#pragma warning(disable : 4250) // Suppress 'inherits ... via dominance' on MSVC
+#endif
+
 namespace realm {
 
 class TableView;
