@@ -121,15 +121,8 @@ void ArrayIntNull::init_from_mem(MemRef mem) noexcept
 {
     Array::init_from_mem(mem);
 
-    if (m_size == 0) {
-        // This can only happen when mem is being reused from another
-        // array (which happens when shrinking the B+tree), so we need
-        // to add the "magic" null value to the beginning.
-
-        // Since init_* functions are noexcept, but insert() isn't, we
-        // need to ensure that insert() will not allocate.
-        Array::insert(0, m_ubound);
-    }
+    // We always have the null value stored at position 0
+    REALM_ASSERT(m_size > 0);
 }
 
 void ArrayIntNull::init_from_parent() noexcept

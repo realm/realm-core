@@ -117,11 +117,11 @@ public:
 
     void insert(size_t ndx, value_type value);
     void add(value_type value);
-    void set(size_t ndx, value_type value) noexcept;
+    void set(size_t ndx, value_type value);
     value_type get(size_t ndx) const noexcept;
     static value_type get(const char* header, size_t ndx) noexcept;
     void get_chunk(size_t ndx, value_type res[8]) const noexcept;
-    void set_null(size_t ndx) noexcept;
+    void set_null(size_t ndx);
     bool is_null(size_t ndx) const noexcept;
     int64_t null_value() const noexcept;
 
@@ -347,7 +347,7 @@ inline void ArrayIntNull::add(value_type value)
     }
 }
 
-inline void ArrayIntNull::set(size_t ndx, value_type value) noexcept
+inline void ArrayIntNull::set(size_t ndx, value_type value)
 {
     if (value) {
         avoid_null_collision(*value);
@@ -358,7 +358,7 @@ inline void ArrayIntNull::set(size_t ndx, value_type value) noexcept
     }
 }
 
-inline void ArrayIntNull::set_null(size_t ndx) noexcept
+inline void ArrayIntNull::set_null(size_t ndx)
 {
     Array::set(ndx + 1, null_value());
 }
