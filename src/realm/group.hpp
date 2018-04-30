@@ -1120,9 +1120,9 @@ inline void Group::set_history_parent(Array& history_root) noexcept
 class Group::TableWriter {
 public:
     struct HistoryInfo {
-        ref_type ref;
-        int type;
-        int version;
+        ref_type ref = 0;
+        int type = 0;
+        int version = 0;
     };
 
     virtual ref_type write_names(_impl::OutputStream&) = 0;

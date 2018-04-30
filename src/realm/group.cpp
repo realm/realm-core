@@ -715,9 +715,6 @@ public:
         bool only_if_modified = false;                              // Always
         ref_type history_ref = _impl::GroupFriend::get_history_ref(m_group);
         HistoryInfo info;
-        info.ref = 0;
-        info.type = 0;
-        info.version = 0;
         if (history_ref) {
             _impl::History::version_type version;
             int history_type, history_schema_version;

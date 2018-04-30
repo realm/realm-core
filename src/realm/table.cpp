@@ -4958,11 +4958,7 @@ public:
 
     HistoryInfo write_history(_impl::OutputStream&) override
     {
-        HistoryInfo info;
-        info.ref = 0;
-        info.type = Replication::hist_None;
-        info.version = 0;
-        return info;
+        return HistoryInfo{}; // Empty history
     }
 
 private:
