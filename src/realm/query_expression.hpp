@@ -1751,6 +1751,27 @@ struct CountLinks : public LinkMapFunction {
     size_t m_link_count = 0;
 };
 
+struct CountBacklinks : public LinkMapFunction {
+    CountBacklinks(const Table* t)
+        : m_table(t)
+    {
+    }
+
+    bool consume(size_t row_index) override
+    {
+        m_link_count += m_table->get_backlink_count(row_index);
+        return true;
+    }
+
+    size_t result() const
+    {
+        return m_link_count;
+    }
+
+    const Table* m_table;
+    size_t m_link_count = 0;
+};
+
 
 /*
 The LinkMap and LinkMapFunction classes are used for query conditions on links themselves (contrary to conditions on
@@ -1869,7 +1890,9 @@ public:
 
     size_t count_all_backlinks(size_t row)
     {
-        return target_table()->get_backlink_count(row);
+        CountBacklinks counter(target_table());
+        map_links(row, counter);
+        return counter.result();
     }
 
     void map_links(size_t row, LinkMapFunction& lm)
@@ -2383,7 +2406,13 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        size_t count = m_link_map.count_all_backlinks(index);
+        size_t count;
+        if (m_link_map.links_exist()) {
+            count = m_link_map.count_all_backlinks(index);
+        }
+        else {
+            count = m_link_map.target_table()->get_backlink_count(index);
+        }
         destination.import(Value<Int>(false, 1, count));
     }
 

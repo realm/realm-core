@@ -1805,9 +1805,11 @@ TEST(Parser_BacklinkCount)
     size_t item_id_col = items->add_column(type_Int, "item_id");
     size_t item_link_col = items->add_column_link(type_Link, "self", *items);
     size_t double_col = items->add_column(type_Double, "double_col");
+
+    std::vector<int64_t> item_ids{5, 2, 12, 14, 20};
     items->add_empty_row(5);
     for (size_t i = 0; i < items->size(); ++i) {
-        items->set_int(item_id_col, i, i);
+        items->set_int(item_id_col, i, item_ids[i]);
         items->set_link(item_link_col, i, i);
         items->set_double(double_col, i, double(i) + 0.5);
     }
@@ -1821,7 +1823,7 @@ TEST(Parser_BacklinkCount)
     t->add_empty_row(3);
     for (size_t i = 0; i < t->size(); ++i) {
         t->set_int(id_col, i, i);
-        t->set_link(fav_col, i, i);
+        t->set_link(fav_col, i, 2 - i);
         t->set_float(float_col, i, float(i) + 0.5f);
     }
 
@@ -1840,35 +1842,41 @@ TEST(Parser_BacklinkCount)
     list_2->add(2);
 
     verify_query(test_context, items, "@links.@count == 0", 1);
-    verify_query(test_context, items, "@links.@count == 0 && item_id == 4", 1);
+    verify_query(test_context, items, "@links.@count == 0 && item_id == 20", 1);
     verify_query(test_context, items, "@links.@count == 1", 1);
-    verify_query(test_context, items, "@links.@count == 1 && item_id == 3", 1);
+    verify_query(test_context, items, "@links.@count == 1 && item_id == 14", 1);
     verify_query(test_context, items, "@links.@count == 5", 1);
-    verify_query(test_context, items, "@links.@count == 5 && item_id == 2", 1);
+    verify_query(test_context, items, "@links.@count == 5 && item_id == 12", 1);
     verify_query(test_context, items, "@links.@count == 3", 1);
-    verify_query(test_context, items, "@links.@count == 3 && item_id == 1", 1);
+    verify_query(test_context, items, "@links.@count == 3 && item_id == 2", 1);
     verify_query(test_context, items, "@links.@count == 13", 1);
-    verify_query(test_context, items, "@links.@count == 13 && item_id == 0", 1);
+    verify_query(test_context, items, "@links.@count == 13 && item_id == 5", 1);
 
     // @size is still a synonym to @count
     verify_query(test_context, items, "@links.@size == 0", 1);
-    verify_query(test_context, items, "@links.@size == 0 && item_id == 4", 1);
+    verify_query(test_context, items, "@links.@size == 0 && item_id == 20", 1);
 
     // backlink count through forward links
-    verify_query(test_context, t, "fav_item.@links.@count == 3 && fav_item.item_id == 1", 1);
-    verify_query(test_context, t, "fav_item.@links.@count == 13 && fav_item.item_id == 0", 1);
+    verify_query(test_context, t, "fav_item.@links.@count == 5 && fav_item.item_id == 12", 1);
+    verify_query(test_context, t, "fav_item.@links.@count == 3 && fav_item.item_id == 2", 1);
+    verify_query(test_context, t, "fav_item.@links.@count == 13 && fav_item.item_id == 5", 1);
+
+    // backlink count through lists; the semantics are to sum the backlinks for each connected row
+    verify_query(test_context, t, "items.@links.@count == 21 && customer_id == 0", 1);  // 13 + 3 + 5
+    verify_query(test_context, t, "items.@links.@count == 130 && customer_id == 1", 1); // 13 * 10
+    verify_query(test_context, t, "items.@links.@count == 10 && customer_id == 2", 1);  // 5 + 5
 
     // backlink count through backlinks first
-    verify_query(test_context, items, "@links.class_Items.self.@links.@count == 1 && item_id == 3", 1);
+    verify_query(test_context, items, "@links.class_Items.self.@links.@count == 1 && item_id == 14", 1);
     verify_query(test_context, items, "@links.class_Person.items.@links.@count == 0", 5);
 
     // backlink count through backlinks and forward links
-    verify_query(test_context, items, "@links.class_Person.fav_item.items.@links.@count == 1 && item_id == 3", 1);
-    verify_query(test_context, items, "@links.class_Person.fav_item.fav_item.@links.@count == 1 && item_id == 3", 1);
+    verify_query(test_context, items, "@links.class_Person.fav_item.items.@links.@count == 130 && item_id == 2", 1);
+    verify_query(test_context, items, "@links.class_Person.fav_item.fav_item.@links.@count == 3 && item_id == 2", 1);
 
     // backlink count compared to int
     verify_query(test_context, items, "@links.@count == 0", 1);
-    verify_query(test_context, items, "@links.@count >= item_id", 3); // 3 items have an id less than their backlink count
+    verify_query(test_context, items, "@links.@count >= item_id", 2); // 2 items have an id less than their backlink count
     verify_query(test_context, items, "@links.@count >= @links.class_Person.fav_item.customer_id", 3);
 
     // backlink count compared to double
@@ -1880,8 +1888,7 @@ TEST(Parser_BacklinkCount)
 
     // backlink count compared to link count
     verify_query(test_context, items, "@links.@count >= self.@count", 5);
-    verify_query(test_context, t, "items.@count >= items.@links.@count", 1);
-    verify_query(test_context, t, "items.@count >= fav_item.@links.@count", 1); // equivilent to above
+    verify_query(test_context, t, "items.@count >= fav_item.@links.@count", 1); // second object
 
     // all backlinks count compared to single column backlink count
     // this is essentially checking if a single column contains all backlinks of a object
