@@ -1247,7 +1247,6 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 }
 #endif
 
-#ifdef LEGACY_TESTS
 TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     size_t nb_rows = (REALM_MAX_BPNODE_SIZE == 4) ? 50 : 500;
@@ -1282,9 +1281,9 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
             CHECK_EQUAL(t->size(), nb_rows + 1);
             CHECK_EQUAL(o->size(), 25);
 
-            auto col_keys = t->get_col_keys();
+            auto col_keys = t->get_column_keys();
             CHECK_EQUAL(col_keys.size(), 13);
-            ColKey col_o = o->get_col_keys()[0];
+            ColKey col_o = o->get_column_keys()[0];
 
             auto col_int = col_keys[0];
             auto col_int_null = col_keys[1];
@@ -1384,7 +1383,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
             CHECK_EQUAL(obj27.get_backlink(*t, col_link, 0), obj17.get_key());
             auto ll = obj27.get_linklist(col_linklist);
             CHECK_EQUAL(ll.size(), 7);
-            ConstObj linked_obj = ll.get(0);
+            ConstObj linked_obj = ll.get_object(0);
             CHECK_EQUAL(linked_obj.get_key(), ObjKey(12));
             size_t expected_back_link_count = (REALM_MAX_BPNODE_SIZE == 4) ? 1 : 4;
             CHECK_EQUAL(linked_obj.get_backlink_count(*t, col_linklist), expected_back_link_count);
@@ -1484,6 +1483,5 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
-#endif
 
 #endif // TEST_GROUP
