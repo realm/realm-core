@@ -1132,7 +1132,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
 {
     size_t free_space_size = m_free_space.size();
     auto num_mappings = m_mappings.size();
-    if (m_translation_table_size < num_mappings + free_space_size) {
+    if (m_translation_table_size < num_mappings + free_space_size + m_sections_in_compatibility_mapping) {
         requires_new_translation = true;
     }
     RefTranslation* new_translation_table = m_ref_translation_ptr;
@@ -1140,22 +1140,30 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         // we need a new translation table, but must preserve old, as translations using it
         // may be in progress concurrently
         m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
-        m_translation_table_size = num_mappings + free_space_size;
+        m_translation_table_size = num_mappings + free_space_size + m_sections_in_compatibility_mapping;
         new_translation_table = new RefTranslation[m_translation_table_size];
+        for (int i = 0; i < m_sections_in_compatibility_mapping; ++i) {
+            new_translation_table[i].mapping_addr = m_compatibility_mapping.get_addr() + get_section_base(i);
+#if REALM_ENABLE_ENCRYPTION
+            new_translation_table[i].encrypted_mapping = m_compatibility_mapping.get_encrypted_mapping();
+#endif
+        }
         old_num_sections = 0;
     }
     for (size_t k = old_num_sections; k < num_mappings; ++k) {
-        new_translation_table[k].mapping_addr = m_mappings[k].get_addr();
+        auto i = k + m_sections_in_compatibility_mapping;
+        new_translation_table[i].mapping_addr = m_mappings[k].get_addr();
 #if REALM_ENABLE_ENCRYPTION
-        new_translation_table[k].encrypted_mapping = m_mappings[k].get_encrypted_mapping();
+        new_translation_table[i].encrypted_mapping = m_mappings[k].get_encrypted_mapping();
 #endif
     }
     for (size_t k = 0; k < free_space_size; ++k) {
         char* base = m_slabs[k].addr;
+        auto i = num_mappings + m_sections_in_compatibility_mapping + k;
 #if REALM_ENABLE_ENCRYPTION
-        new_translation_table[num_mappings + k] = {base, nullptr};
+        new_translation_table[i] = {base, nullptr};
 #else
-        new_translation_table[num_mappings + k] = {base};
+        new_translation_table[i] = {base};
 #endif
     }
     m_ref_translation_ptr = new_translation_table;
