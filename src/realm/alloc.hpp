@@ -100,7 +100,7 @@ public:
     ///
     /// Note: The underscore has been added because the name `free
     /// would conflict with a macro on the Windows platform.
-    void free_(ref_type, const char* addr);
+    void free_(ref_type, const char* addr) noexcept;
 
     /// Shorthand for free_(mem.get_ref(), mem.get_addr()).
     void free_(MemRef mem) noexcept;
@@ -453,14 +453,14 @@ inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_siz
     return do_realloc(ref, addr, old_size, new_size);
 }
 
-inline void Allocator::free_(ref_type ref, const char* addr)
+inline void Allocator::free_(ref_type ref, const char* addr) noexcept
 {
 #ifdef REALM_DEBUG
     if (ref == m_debug_watch)
         REALM_TERMINATE("Allocator watch: Ref was freed");
 #endif
-    if (m_is_read_only)
-        throw realm::LogicError(realm::LogicError::wrong_transact_state);
+    REALM_ASSERT(!m_is_read_only);
+
     return do_free(ref, addr);
 }
 
