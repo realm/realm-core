@@ -761,6 +761,9 @@ private:
     ///
     ///   9 Replication instruction values shuffled, instr_MoveRow added.
     ///
+    ///  10 Memory mapping changes which require special treatment of large files
+    ///     of preceeding versions.
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and SharedGroup::do_open, the file
     /// format selection logic in
