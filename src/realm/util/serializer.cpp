@@ -100,6 +100,15 @@ std::string print_value<>(realm::Timestamp t)
     return ss.str();
 }
 
+template <>
+std::string print_value<>(realm::RowIndex r)
+{
+    if (!r.is_attached() || !r.is_null()) {
+        throw SerialisationError("Serialisation of object comparisons is not supported");
+    }
+    // the remaining option is that it is NULL, and this we do know how to serialise
+    return "NULL";
+}
 
 // The variable name must be unique with respect to the already chosen variables at
 // this level of subquery nesting and with respect to the names of the columns in the table.

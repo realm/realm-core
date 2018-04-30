@@ -343,25 +343,9 @@ struct RowIndex {
     {
         return !(*this == other);
     }
-    template <class C, class T>
-    friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const RowIndex&);
-
 private:
     util::Optional<size_t> m_row_index;
 };
-
-template <class C, class T>
-inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const RowIndex& r)
-{
-    if (!r.is_attached()) {
-        out << "detached row";
-    } else if (r.is_null()) {
-        out << "null row";
-    } else {
-        out << r.m_row_index;
-    }
-    return out;
-}
 
 struct ValueBase {
     static const size_t default_size = 8;
