@@ -86,7 +86,7 @@ class Query final {
 public:
     Query(const Table& table, ConstTableView* tv = nullptr);
     Query(const Table& table, std::unique_ptr<ConstTableView>);
-    Query(const Table& table, const LinkListPtr& list);
+    Query(const Table& table, const LinkList& list);
     Query(const Table& table, LinkListPtr&& list);
     Query();
     Query(std::unique_ptr<Expression>);

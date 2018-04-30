@@ -10408,7 +10408,7 @@ TEST(LangBindHelper_HandoverLinkView)
         // q.m_table = table1
         // q.m_view = lvr
         TableRef table1b = reader->get_table("table1");
-        Query q = table1b->where(ll).and_query(table1b->column<Int>(col1) > 100);
+        Query q = table1b->where(*ll).and_query(table1b->column<Int>(col1) > 100);
 
         // tv.m_table == table1
         TableView tv = q.find_all(); // tv = { 0, 2 }
@@ -10426,7 +10426,7 @@ TEST(LangBindHelper_HandoverLinkView)
     }
     {
         TableRef table1b = reader->get_table("table1");
-        Query q = table1b->where(ll).and_query(table1b->column<Int>(col1) > 100);
+        Query q = table1b->where(*ll).and_query(table1b->column<Int>(col1) > 100);
 
         // tv.m_table == table1
         TableView tv = q.find_all(); // tv = { 0, 2 }

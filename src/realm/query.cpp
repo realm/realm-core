@@ -49,16 +49,16 @@ Query::Query(Table& table, ConstTableView* tv)
     create();
 }
 
-Query::Query(const Table& table, const LinkListPtr& list)
+Query::Query(const Table& table, const LinkList& list)
     : m_table((const_cast<Table&>(table)).get_table_ref())
-    , m_source_link_list(list->clone())
+    , m_source_link_list(list.clone())
 {
     m_view = m_source_link_list.get();
 #ifdef REALM_DEBUG
     if (m_view)
         m_view->check_cookie();
 #endif
-    REALM_ASSERT_DEBUG(&list->get_target_table() == m_table);
+    REALM_ASSERT_DEBUG(&list.get_target_table() == m_table);
     create();
 }
 

@@ -286,6 +286,10 @@ public:
     {
         return ListIterator<T>(this, size() + m_deleted.size());
     }
+    size_t find_first(T value) const
+    {
+        return m_tree->find_first(value);
+    }
 
 protected:
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
