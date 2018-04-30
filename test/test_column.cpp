@@ -22,10 +22,8 @@
 #include <vector>
 #include <algorithm>
 
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 #include <realm/bplustree.hpp>
-#include <realm/query_engine.hpp>
-#include <realm/column_tpl.hpp>
 
 #include "test.hpp"
 
@@ -65,10 +63,10 @@ using realm::util::unwrap;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
+TEST(Column_Basic)
 {
-    ref_type ref = TEST_TYPE::create(Allocator::get_default());
-    TEST_TYPE c(Allocator::get_default(), ref);
+    IntegerColumn c(Allocator::get_default());
+    c.create();
 
     // TEST(Column_IsEmpty)
 
@@ -406,58 +404,15 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
 
     CHECK_EQUAL(10, c.find_first(4294967296LL));
 
-
-    // Partial find is not fully implemented yet
-    /*
-    // TEST(Column_PartialFind1)
-
-    c.clear();
-
-    size_t partial_count = 100;
-    for (size_t i = 0; i < partial_count; ++i)
-        c.add(i);
-
-    CHECK_EQUAL(-1, c.find_first(partial_count+1, 0, partial_count));
-    CHECK_EQUAL(-1, c.find_first(0, 1, partial_count));
-    CHECK_EQUAL(partial_count-1, c.find_first(partial_count-1, partial_count-1, partial_count));
-    */
-
-
-    // TEST(Column_HeaderParse)
-
-    TEST_TYPE column(Allocator::get_default(), c.get_ref());
-    bool is_equal = c.compare(column);
-    CHECK(is_equal);
-
-    CHECK_LOGIC_ERROR(c.set_string(6, "FooBar"), LogicError::type_mismatch);
-
     // TEST(Column_Destroy)
 
     c.destroy();
 }
 
-TEST_TYPES(Column_IsNullAlwaysFalse, IntegerColumn, IntNullColumn)
+TEST(Column_FindLeafs)
 {
-    ref_type ref = TEST_TYPE::create(Allocator::get_default());
-    TEST_TYPE c(Allocator::get_default(), ref);
-    c.add(123);
-    CHECK(!c.is_null(0));
-    c.destroy();
-}
-
-TEST(Column_SetNullThrows)
-{
-    ref_type ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn c(Allocator::get_default(), ref);
-    c.add(123);
-    CHECK_LOGIC_ERROR(c.set_null(0), LogicError::column_not_nullable);
-    c.destroy();
-}
-
-TEST_TYPES(Column_FindLeafs, IntegerColumn, IntNullColumn)
-{
-    ref_type ref = TEST_TYPE::create(Allocator::get_default());
-    IntegerColumn a(Allocator::get_default(), ref);
+    IntegerColumn a(Allocator::get_default());
+    a.create();
 
     // Create values that span multible leaves
     // we use 5 to ensure that we get two levels
@@ -503,153 +458,12 @@ TEST_TYPES(Column_FindLeafs, IntegerColumn, IntNullColumn)
 }
 
 
-/*
-TEST_TYPES(Column_Sort, IntegerColumn, IntNullColumn)
-{
-    // Create IntegerColumn with random values
-    IntegerColumn a;
-    a.add(25);
-    a.add(12);
-    a.add(50);
-    a.add(3);
-    a.add(34);
-    a.add(0);
-    a.add(17);
-    a.add(51);
-    a.add(2);
-    a.add(40);
-
-    a.sort();
-
-    CHECK_EQUAL(0, a.get(0));
-    CHECK_EQUAL(2, a.get(1));
-    CHECK_EQUAL(3, a.get(2));
-    CHECK_EQUAL(12, a.get(3));
-    CHECK_EQUAL(17, a.get(4));
-    CHECK_EQUAL(25, a.get(5));
-    CHECK_EQUAL(34, a.get(6));
-    CHECK_EQUAL(40, a.get(7));
-    CHECK_EQUAL(50, a.get(8));
-    CHECK_EQUAL(51, a.get(9));
-
-    // Cleanup
-    a.destroy();
-}
-*/
-
-/** find_all() int tests spread out over bitwidth
- *
- */
-
-TEST_TYPES(Column_FindAllIntMin, IntegerColumn, IntNullColumn)
-{
-    ref_type ref_c = TEST_TYPE::create(Allocator::get_default());
-    ref_type ref_r = IntegerColumn::create(Allocator::get_default());
-    TEST_TYPE c(Allocator::get_default(), ref_c);
-    IntegerColumn r(Allocator::get_default(), ref_r);
-
-    const int64_t value = 0;
-    const int64_t reps = 5;
-
-    for (int i = 0; i < reps; i++)
-        c.add(0);
-
-    c.find_all(r, value);
-    CHECK_EQUAL(reps, r.size());
-
-    size_t i = 0;
-    size_t j = 0;
-    while (i < c.size()) {
-        if (c.get(i) == value)
-            CHECK_EQUAL(int64_t(i), r.get(j++));
-        i += 1;
-    }
-
-    // Cleanup
-    c.destroy();
-    r.destroy();
-}
-
-TEST_TYPES(Column_FindAllIntMax, IntegerColumn, IntNullColumn)
-{
-    ref_type ref_c = TEST_TYPE::create(Allocator::get_default());
-    ref_type ref_r = IntegerColumn::create(Allocator::get_default());
-    TEST_TYPE c(Allocator::get_default(), ref_c);
-    IntegerColumn r(Allocator::get_default(), ref_r);
-
-    const int64_t value = 4300000003ULL;
-    const int reps = 5;
-
-    for (int i = 0; i < reps; i++) {
-        // 64 bitwidth
-        c.add(4300000000ULL);
-        c.add(4300000001ULL);
-        c.add(4300000002ULL);
-        c.add(4300000003ULL);
-    }
-
-    c.find_all(r, value);
-    CHECK_EQUAL(reps, r.size());
-
-    size_t i = 0;
-    size_t j = 0;
-    while (i < c.size()) {
-        if (c.get(i) == value)
-            CHECK_EQUAL(int64_t(i), r.get(j++));
-        i += 1;
-    }
-
-    // Cleanup
-    c.destroy();
-    r.destroy();
-}
-
-
-TEST_TYPES(Column_LowerUpperBound, IntegerColumn, FloatColumn)
-{
-    using T = typename TEST_TYPE::value_type;
-
-    // Create column with sorted members
-    ref_type ref = TEST_TYPE::create(Allocator::get_default());
-    TEST_TYPE col(Allocator::get_default(), ref);
-    col.add(5);
-    for (size_t i = 5; i < 100; i += 5)
-        col.add(static_cast<T>(i));
-
-    // before first entry
-    CHECK_EQUAL(0, col.lower_bound(0));
-    CHECK_EQUAL(0, col.upper_bound(0));
-
-    // first entry (duplicate)
-    CHECK_EQUAL(0, col.lower_bound(5));
-    CHECK_EQUAL(2, col.upper_bound(5));
-
-    // middle entry
-    CHECK_EQUAL(10, col.lower_bound(50));
-    CHECK_EQUAL(11, col.upper_bound(50));
-
-    // non-existent middle entry
-    CHECK_EQUAL(11, col.lower_bound(52));
-    CHECK_EQUAL(11, col.upper_bound(52));
-
-    // last entry
-    CHECK_EQUAL(19, col.lower_bound(95));
-    CHECK_EQUAL(20, col.upper_bound(95));
-
-    // beyond last entry
-    CHECK_EQUAL(20, col.lower_bound(96));
-    CHECK_EQUAL(20, col.upper_bound(96));
-
-    // Clean up
-    col.destroy();
-}
-
-TEST_TYPES(Column_SwapRows, IntegerColumn, IntNullColumn)
+TEST(Column_SwapRows)
 {
     // Normal case
     {
-        ref_type col_ref = TEST_TYPE::create(Allocator::get_default());
-        TEST_TYPE c(Allocator::get_default(), col_ref);
+        IntegerColumn c(Allocator::get_default());
+        c.create();
 
         c.add(-21);
         c.add(30);
@@ -660,7 +474,7 @@ TEST_TYPES(Column_SwapRows, IntegerColumn, IntNullColumn)
         CHECK_EQUAL(c.get(2), 10);
         CHECK_EQUAL(c.size(), 4); // size should not change
 
-        c.swap_rows(1, 2);
+        c.swap(1, 2);
 
         CHECK_EQUAL(c.get(1), 10);
         CHECK_EQUAL(c.get(2), 30);
@@ -671,14 +485,14 @@ TEST_TYPES(Column_SwapRows, IntegerColumn, IntNullColumn)
 
     // First two elements
     {
-        ref_type col_ref = TEST_TYPE::create(Allocator::get_default());
-        TEST_TYPE c(Allocator::get_default(), col_ref);
+        IntegerColumn c(Allocator::get_default());
+        c.create();
 
         c.add(30);
         c.add(10);
         c.add(5);
 
-        c.swap_rows(0, 1);
+        c.swap(0, 1);
 
         CHECK_EQUAL(c.get(0), 10);
         CHECK_EQUAL(c.get(1), 30);
@@ -689,14 +503,14 @@ TEST_TYPES(Column_SwapRows, IntegerColumn, IntNullColumn)
 
     // Last two elements
     {
-        ref_type col_ref = TEST_TYPE::create(Allocator::get_default());
-        TEST_TYPE c(Allocator::get_default(), col_ref);
+        IntegerColumn c(Allocator::get_default());
+        c.create();
 
         c.add(5);
         c.add(30);
         c.add(10);
 
-        c.swap_rows(1, 2);
+        c.swap(1, 2);
 
         CHECK_EQUAL(c.get(1), 10);
         CHECK_EQUAL(c.get(2), 30);
@@ -707,14 +521,14 @@ TEST_TYPES(Column_SwapRows, IntegerColumn, IntNullColumn)
 
     // Indices in wrong order
     {
-        ref_type col_ref = TEST_TYPE::create(Allocator::get_default());
-        TEST_TYPE c(Allocator::get_default(), col_ref);
+        IntegerColumn c(Allocator::get_default());
+        c.create();
 
         c.add(5);
         c.add(30);
         c.add(10);
 
-        c.swap_rows(2, 1);
+        c.swap(2, 1);
 
         CHECK_EQUAL(c.get(1), 10);
         CHECK_EQUAL(c.get(2), 30);
@@ -724,190 +538,11 @@ TEST_TYPES(Column_SwapRows, IntegerColumn, IntNullColumn)
     }
 }
 
-#ifdef LEGACY_TESTS
-TEST_TYPES(Column_Average, IntegerColumn, IntNullColumn)
-{
-    ref_type ref = TEST_TYPE::create(Allocator::get_default());
-    TEST_TYPE c(Allocator::get_default(), ref);
-    c.add(10);
-    CHECK_EQUAL(10, c.average());
-
-    c.add(30);
-    CHECK_EQUAL(0, c.average(0, 0));  // None
-    CHECK_EQUAL(10, c.average(0, 1)); // first
-    CHECK_EQUAL(0, c.average(1, 1));  // None
-    CHECK_EQUAL(30, c.average(1, 2)); // second
-    CHECK_EQUAL(20, c.average(0, 2)); // both
-
-    c.destroy();
-}
-
-TEST_TYPES(Column_SumAverage, IntegerColumn, IntNullColumn)
-{
-    ref_type ref = TEST_TYPE::create(Allocator::get_default());
-    TEST_TYPE c(Allocator::get_default(), ref);
-    int64_t sum = 0;
-
-    // Sum of 0 elements
-    CHECK_EQUAL(0, c.sum());
-    CHECK_EQUAL(0, c.average());
-
-    // Sum of 1 elements
-    c.add(123);
-    CHECK_EQUAL(123, c.sum());
-    CHECK_EQUAL(123, c.average());
-
-    c.clear();
-
-    for (int i = 0; i < 100; i++)
-        c.add(i);
-
-    // Sum of entire range, using default args
-    sum = 0;
-    for (int i = 0; i < 100; i++)
-        sum += unwrap(c.get(i));
-    CHECK_EQUAL(sum, c.sum());
-    CHECK_EQUAL(sum / 100.0, c.average());
-
-    // Sum of entire range, given explicit range
-    sum = 0;
-    for (int i = 0; i < 100; i++)
-        sum += unwrap(c.get(i));
-    CHECK_EQUAL(sum, c.sum(0, 100));
-    CHECK_EQUAL(sum / 100.0, c.average(0, 100));
-
-    // Start to N
-    sum = 0;
-    for (int i = 0; i < 63; i++)
-        sum += unwrap(c.get(i));
-    CHECK_EQUAL(sum, c.sum(0, 63));
-    CHECK_EQUAL(sum / 63.0, c.average(0, 63));
-
-    // N to end
-    sum = 0;
-    for (int i = 47; i < 100; i++)
-        sum += unwrap(c.get(i));
-    CHECK_EQUAL(sum, c.sum(47, 100));
-    CHECK_EQUAL(sum / (100.0 - 47.0), c.average(47, 100));
-
-    // N to M
-    sum = 0;
-    for (int i = 55; i < 79; i++)
-        sum += unwrap(c.get(i));
-    CHECK_EQUAL(sum, c.sum(55, 79));
-    CHECK_EQUAL(sum / (79.0 - 55.0), c.average(55, 79));
-
-    c.destroy();
-}
-
-
-TEST_TYPES(Column_Max, IntegerColumn, IntNullColumn)
-{
-    ref_type ref = TEST_TYPE::create(Allocator::get_default());
-    TEST_TYPE c(Allocator::get_default(), ref);
-    int64_t t = c.maximum();
-    //    CHECK_EQUAL(0, t); // max on empty range returns zero // edit: is undefined!
-
-    c.add(1);
-    t = c.maximum();
-    CHECK_EQUAL(1, t);
-
-    c.destroy();
-}
-
-
-TEST_TYPES(Column_Max2, IntegerColumn, IntNullColumn)
-{
-    ref_type ref = TEST_TYPE::create(Allocator::get_default());
-    TEST_TYPE c(Allocator::get_default(), ref);
-
-    for (int i = 0; i < 100; i++)
-        c.add(10);
-    c.set(20, 20);
-    c.set(50, 11); // Max must select *first* occurence of largest value
-    c.set(51, 11);
-    c.set(81, 20);
-
-    int64_t t = c.maximum(51, 81);
-    CHECK_EQUAL(11, t);
-
-    c.destroy();
-}
-
-TEST_TYPES(Column_Min, IntegerColumn, IntNullColumn)
-{
-    ref_type ref = TEST_TYPE::create(Allocator::get_default());
-    TEST_TYPE c(Allocator::get_default(), ref);
-    int64_t t = c.minimum();
-    //    CHECK_EQUAL(0, t); // min on empty range returns zero // update: is undefined
-
-    c.add(1);
-    t = c.minimum();
-    CHECK_EQUAL(1, t);
-
-    c.destroy();
-}
-
-
-TEST_TYPES(Column_Min2, IntegerColumn, IntNullColumn)
-{
-    ref_type ref = TEST_TYPE::create(Allocator::get_default());
-    TEST_TYPE c(Allocator::get_default(), ref);
-
-    for (int i = 0; i < 100; i++)
-        c.add(10);
-    c.set(20, 20);
-    c.set(50, 9); // Max must select *first* occurence of lowest value
-    c.set(51, 9);
-    c.set(81, 20);
-
-    int64_t t = c.minimum(51, 81);
-    CHECK_EQUAL(9, t);
-
-    c.destroy();
-}
-
-TEST(Column_IndexCrash)
-{
-    // Trying to reproduce bug found by Samuel / segiddins: "Assertion when setting value on indexed IntNullColumn"
-    ref_type ref = IntNullColumn::create(Allocator::get_default());
-    IntNullColumn col(Allocator::get_default(), ref);
-
-    col.create_search_index();
-    col.insert_rows(0, 1, 0, true);
-    col.set(0, 0);
-
-    StringIndex& ndx = *col.get_search_index();
-    CHECK_EQUAL(ndx.count(int64_t(0)), 1);
-
-    col.destroy();
-}
-#endif
-
-/*
-TEST_TYPES(Column_Sort2, IntegerColumn, IntNullColumn)
-{
-    TEST_TYPE c;
-
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (size_t t = 0; t < 9*REALM_MAX_BPNODE_SIZE; t++)
-        c.add(random.draw_int(-100, 199));
-
-    c.sort();
-
-    for (size_t t = 1; t < 9*REALM_MAX_BPNODE_SIZE; t++)
-        CHECK(c.get(t) >= c.get(t - 1));
-
-    c.destroy();
-}
-*/
-
-
 TEST_IF(Column_PrependMany, TEST_DURATION >= 1)
 {
     // Test against a "Assertion failed: start < m_len, file src\Array.cpp, line 276" bug
-    ref_type ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn a(Allocator::get_default(), ref);
+    IntegerColumn a(Allocator::get_default());
+    a.create();
 
     for (size_t items = 0; items < 3000; ++items) {
         a.clear();
@@ -916,264 +551,14 @@ TEST_IF(Column_PrependMany, TEST_DURATION >= 1)
         a.insert(items, 444);
     }
     a.destroy();
-}
-
-
-TEST_IF(ColumnIntNull_PrependMany, TEST_DURATION >= 1)
-{
-    // Test against a "Assertion failed: start < m_len, file src\Array.cpp, line 276" bug
-    ref_type ref = IntNullColumn::create(Allocator::get_default());
-    IntNullColumn a(Allocator::get_default(), ref);
-
-    for (size_t items = 0; items < 3000; ++items) {
-        a.clear();
-        for (size_t j = 0; j < items + 1; ++j)
-            a.insert(0, j);
-        a.insert(items, 444);
-    }
-    a.destroy();
-}
-
-TEST(ColumnIntNull_Null)
-{
-    {
-        // test that the default value is null / none
-        ref_type ref = IntNullColumn::create(Allocator::get_default());
-        IntNullColumn a(Allocator::get_default(), ref);
-
-        a.insert(0);
-        CHECK(a.is_null(0));
-        a.insert(1, 3);
-        CHECK(a.is_null(0));
-        CHECK_EQUAL(a.get(1), 3);
-        CHECK_NOT(a.is_null(1));
-
-        a.destroy();
-    }
-
-    {
-        // test that the default value is null / none
-        ref_type ref = IntNullColumn::create(Allocator::get_default(), Array::type_Normal, 1);
-        IntNullColumn a(Allocator::get_default(), ref);
-
-        CHECK(a.is_null(0));
-        a.insert(1, 3);
-        CHECK(a.is_null(0));
-        CHECK_EQUAL(a.get(1), 3);
-        CHECK_NOT(a.is_null(1));
-
-        a.destroy();
-    }
-
-    {
-        // IntNullColumn::create failed if the default value was an upper bound for any bit width (i.e. 0, 1, 3 below)
-        constexpr int default_values[] = {0, 1, 3, 42};
-        constexpr size_t num_default_values = sizeof(default_values) / sizeof(default_values[0]);
-
-        for (size_t i = 0; i < num_default_values; ++i) {
-            int default_value = default_values[i];
-            // test that another default value (0) may be used
-            ref_type ref = IntNullColumn::create(Allocator::get_default(), Array::type_Normal, 1, default_value);
-            IntNullColumn a(Allocator::get_default(), ref);
-
-            CHECK_EQUAL(a.get(0), default_value);
-            CHECK_NOT(a.is_null(0));
-            a.insert(1); // default is null / none
-            CHECK_EQUAL(a.get(0), default_value);
-            CHECK_NOT(a.is_null(0));
-            CHECK(a.is_null(1));
-            a.destroy();
-        }
-    }
-
-    {
-        ref_type ref = IntNullColumn::create(Allocator::get_default());
-        IntNullColumn a(Allocator::get_default(), ref);
-
-        a.add(0);
-        size_t t = a.find_first(0);
-        CHECK_EQUAL(t, 0);
-
-        a.destroy();
-    }
-
-    {
-        ref_type ref = IntNullColumn::create(Allocator::get_default());
-        IntNullColumn a(Allocator::get_default(), ref);
-
-        a.add(123);
-        a.add(0);
-        a.add(realm::null());
-
-        CHECK_EQUAL(a.is_null(0), false);
-        CHECK_EQUAL(a.is_null(1), false);
-        CHECK_EQUAL(a.is_null(2), true);
-        CHECK(*a.get(0) == 123);
-
-        // Test set
-        a.set_null(0);
-        a.set_null(1);
-        a.set_null(2);
-        CHECK_EQUAL(a.is_null(1), true);
-        CHECK_EQUAL(a.is_null(0), true);
-        CHECK_EQUAL(a.is_null(2), true);
-
-        a.destroy();
-    }
-
-    {
-        ref_type ref = IntNullColumn::create(Allocator::get_default());
-        IntNullColumn a(Allocator::get_default(), ref);
-
-        a.add(realm::null());
-        a.add(0);
-        a.add(123);
-
-        CHECK_EQUAL(a.is_null(0), true);
-        CHECK_EQUAL(a.is_null(1), false);
-        CHECK_EQUAL(a.is_null(2), false);
-        CHECK(*a.get(2) == 123);
-
-        // Test insert
-        a.insert(0, realm::null());
-        a.insert(2, realm::null());
-        a.insert(4, realm::null());
-
-        CHECK_EQUAL(a.is_null(0), true);
-        CHECK_EQUAL(a.is_null(1), true);
-        CHECK_EQUAL(a.is_null(2), true);
-        CHECK_EQUAL(a.is_null(3), false);
-        CHECK_EQUAL(a.is_null(4), true);
-        CHECK_EQUAL(a.is_null(5), false);
-
-        a.destroy();
-    }
-
-    {
-        ref_type ref = IntNullColumn::create(Allocator::get_default());
-        IntNullColumn a(Allocator::get_default(), ref);
-
-        a.add(0);
-        a.add(realm::null());
-        a.add(123);
-
-        CHECK_EQUAL(a.is_null(0), false);
-        CHECK_EQUAL(a.is_null(1), true);
-        CHECK_EQUAL(a.is_null(2), false);
-        CHECK(*a.get(2) == 123);
-
-        a.erase(0);
-        CHECK_EQUAL(a.is_null(0), true);
-        CHECK_EQUAL(a.is_null(1), false);
-
-        a.erase(0);
-        CHECK_EQUAL(a.is_null(0), false);
-
-        a.destroy();
-    }
-
-    Random random(random_int<unsigned long>());
-
-    for (size_t t = 0; t < 50; t++) {
-        ref_type ref = IntNullColumn::create(Allocator::get_default());
-        IntNullColumn a(Allocator::get_default(), ref);
-
-        // vector that is kept in sync with the ArrayIntNull so that we can compare with it
-        std::vector<int64_t> v;
-
-        // ArrayString capacity starts at 128 bytes, so we need lots of elements
-        // to test if relocation works
-        for (size_t i = 0; i < 100; i++) {
-            unsigned char rnd = static_cast<unsigned char>(
-                random.draw_int<unsigned int>()); //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
-
-            // Add more often than removing, so that we grow
-            if (rnd < 80 && a.size() > 0) {
-                size_t del = rnd % a.size();
-                a.erase(del);
-                v.erase(v.begin() + del);
-            }
-            else {
-                int number = random.draw_int<int>();
-                bool null = false;
-
-                if (random.draw_int<int>() > 100) {
-                    null = true;
-                    a.add(realm::null());
-                    v.push_back(int64_t(INT_MAX) + 1);
-                }
-
-                if (random.draw_int<int>() > 100) {
-                    if (null) {
-                        a.add(realm::null());
-                        v.push_back(int64_t(INT_MAX) + 1);
-                    }
-                    else {
-                        a.add(number);
-                        v.push_back(number);
-                    }
-                }
-                else if (a.size() > 0) {
-                    size_t pos = rnd % a.size();
-                    if (null) {
-                        a.insert(pos, realm::null());
-                        v.insert(v.begin() + pos, int64_t(INT_MAX) + 1);
-                    }
-                    else {
-                        a.insert(pos, number);
-                        v.insert(v.begin() + pos, number);
-                    }
-                }
-
-                CHECK_EQUAL(a.size(), v.size());
-                for (size_t j = 0; j < a.size(); j++) {
-                    if (v[j] == int64_t(INT_MAX) + 1) {
-                        CHECK(a.is_null(j));
-                    }
-                    else {
-                        CHECK(a.get(j) == v[j]);
-                    }
-                }
-            }
-        }
-        a.destroy();
-    }
-}
-
-
-TEST(ColumnIntNull_CompareInts)
-{
-    ref_type ref1 = IntNullColumn::create(Allocator::get_default());
-    IntNullColumn c1(Allocator::get_default(), ref1);
-    ref_type ref2 = IntNullColumn::create(Allocator::get_default());
-    IntNullColumn c2(Allocator::get_default(), ref2);
-
-    c1.insert(0, null{}, 3);
-    c2.insert(0, null{}, 3);
-    CHECK(c1.is_null(0));
-    CHECK(c2.is_null(0));
-
-    CHECK(c1.compare(c2));
-
-    c1.set(0, 0);
-    CHECK_NOT(c1.is_null(0));
-    CHECK_NOT(c1.compare(c2));
-    c2.set(0, 0);
-    CHECK(c1.compare(c2));
-
-    c2.set(0, 1);
-    CHECK_NOT(c1.compare(c2));
-
-    c1.destroy();
-    c2.destroy();
 }
 
 
 TEST(Column_Iterators)
 {
     std::vector<int64_t> list;
-    ref_type ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn c(Allocator::get_default(), ref);
+    IntegerColumn c(Allocator::get_default());
+    c.create();
 
     Random random(random_int<long>());
     const size_t num_elements = 1000;
@@ -1205,7 +590,7 @@ TEST(Column_Iterators)
         }
         else {
             CHECK_EQUAL(ndx, realm_found - realm_begin);
-            CHECK_EQUAL(ndx, realm_found.get_col_ndx());
+            CHECK_EQUAL(ndx, realm_found.get_position());
         }
 
         ++std_it;
@@ -1217,25 +602,25 @@ TEST(Column_Iterators)
     realm_it = realm_begin + 5;
     CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
     CHECK_EQUAL(std_it - std_begin, realm_it - realm_begin);
-    CHECK_EQUAL(realm_it.get_col_ndx(), 5);
+    CHECK_EQUAL(realm_it.get_position(), 5);
     // operator +=
     std_it += 10;
     realm_it += 10;
     CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
     CHECK_EQUAL(std_it - std_begin, realm_it - realm_begin);
-    CHECK_EQUAL(realm_it.get_col_ndx(), 15);
+    CHECK_EQUAL(realm_it.get_position(), 15);
     // operator -=
     std_it -= 10;
     realm_it -= 10;
     CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
     CHECK_EQUAL(std_it - std_begin, realm_it - realm_begin);
-    CHECK_EQUAL(realm_it.get_col_ndx(), 5);
+    CHECK_EQUAL(realm_it.get_position(), 5);
     // operator -
     std_it = std_it - 5;
     realm_it = realm_it - 5;
     CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
     CHECK_EQUAL(std_it - std_begin, realm_it - realm_begin);
-    CHECK_EQUAL(realm_it.get_col_ndx(), 0);
+    CHECK_EQUAL(realm_it.get_position(), 0);
     // operator ++
     std_it++;
     ++std_it;
@@ -1243,7 +628,7 @@ TEST(Column_Iterators)
     ++realm_it;
     CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
     CHECK_EQUAL(std_it - std_begin, realm_it - realm_begin);
-    CHECK_EQUAL(realm_it.get_col_ndx(), 2);
+    CHECK_EQUAL(realm_it.get_position(), 2);
     // operator --
     std_it--;
     --std_it;
@@ -1251,7 +636,7 @@ TEST(Column_Iterators)
     --realm_it;
     CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
     CHECK_EQUAL(std_it - std_begin, realm_it - realm_begin);
-    CHECK_EQUAL(realm_it.get_col_ndx(), 0);
+    CHECK_EQUAL(realm_it.get_position(), 0);
     // operator [] offset
     int64_t std_value = (std_it + 10)[5];
     int64_t realm_value = (realm_it + 10)[5];
@@ -1280,40 +665,6 @@ TEST(Column_Iterators)
     CHECK(realm_next >= realm_it);
     CHECK(realm_next >= realm_next);
     CHECK(!(realm_it >= realm_next));
-
-    c.destroy();
-}
-
-// This test confirms that we can read columns produced by Column<T>
-// with a BPlusTree<T> accessor
-TEST(BPlusTree_ColumnIntCompatibility)
-{
-    ref_type ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn c(Allocator::get_default(), ref);
-
-    for (int i = 0; i < 500; i++) {
-        c.add(i);
-    }
-
-    BPlusTree<Int> tree(Allocator::get_default());
-    tree.init_from_ref(c.get_ref());
-
-    CHECK_EQUAL(c.size(), tree.size());
-    size_t sz = c.size();
-    for (size_t i = 0; i < sz; i++) {
-        CHECK_EQUAL(c.get(i), tree.get(i));
-    }
-
-    c.insert(17, 1234);
-    c.insert(177, 5678);
-    c.erase(321);
-    tree.init_from_ref(c.get_ref());
-
-    CHECK_EQUAL(c.size(), tree.size());
-    sz = c.size();
-    for (size_t i = 0; i < sz; i++) {
-        CHECK_EQUAL(c.get(i), tree.get(i));
-    }
 
     c.destroy();
 }

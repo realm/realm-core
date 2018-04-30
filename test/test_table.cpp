@@ -36,6 +36,7 @@ using namespace std::chrono;
 #include <realm/array_bool.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/index_string.hpp>
 
 #include "util/misc.hpp"
 

@@ -27,7 +27,7 @@
 
 #include <realm/array.hpp>
 #include <realm/array_unsigned.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 #include <realm/query_conditions.hpp>
 
 #include "test.hpp"
@@ -73,8 +73,8 @@ void has_zero_byte(TestContext& test_context, int64_t value, size_t reps)
 {
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
-    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn r(Allocator::get_default(), column_ref);
+    IntegerColumn r(Allocator::get_default());
+    r.create();
 
     for (size_t i = 0; i < reps - 1; ++i)
         a.add(value);
@@ -693,8 +693,8 @@ TEST(Array_FindAllInt0)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn r(Allocator::get_default(), column_ref);
+    IntegerColumn r(Allocator::get_default());
+    r.create();
 
     const int value = 0;
     const int vReps = 5;
@@ -733,8 +733,8 @@ TEST(Array_FindAllInt1)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn r(Allocator::get_default(), column_ref);
+    IntegerColumn r(Allocator::get_default());
+    r.create();
 
     const int value = 1;
     const int vReps = 5;
@@ -767,8 +767,8 @@ TEST(Array_FindAllInt2)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn r(Allocator::get_default(), column_ref);
+    IntegerColumn r(Allocator::get_default());
+    r.create();
 
     const int value = 3;
     const int vReps = 5;
@@ -801,8 +801,8 @@ TEST(Array_FindAllInt3)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn r(Allocator::get_default(), column_ref);
+    IntegerColumn r(Allocator::get_default());
+    r.create();
 
     const int value = 10;
     const int vReps = 5;
@@ -835,8 +835,8 @@ TEST(Array_FindAllInt4)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn r(Allocator::get_default(), column_ref);
+    IntegerColumn r(Allocator::get_default());
+    r.create();
 
     const int value = 20;
     const int vReps = 5;
@@ -870,8 +870,8 @@ TEST(Array_FindAllInt5)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn r(Allocator::get_default(), column_ref);
+    IntegerColumn r(Allocator::get_default());
+    r.create();
 
     const int value = 303;
     const int vReps = 5;
@@ -905,8 +905,8 @@ TEST(Array_FindAllInt6)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn r(Allocator::get_default(), column_ref);
+    IntegerColumn r(Allocator::get_default());
+    r.create();
 
     const int value = 70000;
     const int vReps = 5;
@@ -940,8 +940,8 @@ TEST(Array_FindAllInt7)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    ref_type column_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn r(Allocator::get_default(), column_ref);
+    IntegerColumn r(Allocator::get_default());
+    r.create();
 
     const int64_t value = 4300000003ULL;
     const int vReps = 5;

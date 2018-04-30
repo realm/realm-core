@@ -85,7 +85,6 @@ inline T no0(T v)
 // Pre-definitions
 struct ObjKey;
 class Array;
-class StringColumn;
 class GroupWriter;
 namespace _impl {
 class ArrayWriterBase;
@@ -806,7 +805,6 @@ private:
     friend class Allocator;
     friend class SlabAlloc;
     friend class GroupWriter;
-    friend class StringColumn;
 };
 
 class ClusterKeyArray : public ArrayUnsigned {

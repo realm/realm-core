@@ -19,7 +19,7 @@
 #include <realm/array_string_long.hpp>
 #include <realm/array_blob.hpp>
 #include <realm/impl/destroy_guard.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 
 using namespace realm;
 

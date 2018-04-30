@@ -84,6 +84,11 @@ void ArrayString::init_from_parent()
     init_from_ref(ref);
 }
 
+void ArrayString::destroy()
+{
+    Array::destroy_deep(m_arr->get_ref(), m_arr->get_alloc());
+}
+
 size_t ArrayString::size() const
 {
     switch (m_type) {
