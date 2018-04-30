@@ -359,7 +359,7 @@ public:
     List(const Obj& owner, ColKey col_key);
     List(List&& other)
         : ConstListBase(other.m_col_key, &m_obj)
-        , ConstListIf<T>(other.m_obj.get_alloc())
+        , ConstListIf<T>(std::move(other))
         , m_obj(std::move(other.m_obj))
     {
     }

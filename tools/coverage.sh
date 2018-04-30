@@ -7,7 +7,7 @@ rm -rf build.cov
 rm -rf html
 mkdir build.cov
 cd build.cov/
-cmake -G Ninja -D REALM_COVERAGE=ON ..
+cmake -G Ninja -D REALM_COVERAGE=ON -D CMAKE_CXX_FLAGS=-g ..
 ninja realm-tests
 cd ${PROJECT_DIR}
 lcov --no-external --capture --initial --directory . --output-file ./coverage-base.info
