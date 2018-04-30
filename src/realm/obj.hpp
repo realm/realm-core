@@ -123,7 +123,7 @@ public:
 
 protected:
     friend class ConstListBase;
-    friend class ConstLinkListIf;
+    friend class ConstLinkList;
     friend class LinkList;
     friend class LinkMap;
     friend class ConstTableView;

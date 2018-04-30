@@ -155,7 +155,7 @@ template List<Timestamp>::List(const Obj& obj, ColKey col_key);
 template List<ObjKey>::List(const Obj& obj, ColKey col_key);
 }
 
-ConstObj ConstLinkListIf::get_object(size_t link_ndx) const
+ConstObj ConstLinkList::get_object(size_t link_ndx) const
 {
     return m_const_obj->get_target_table(m_col_key)->get_object(ConstListIf<ObjKey>::get(link_ndx));
 }
