@@ -56,8 +56,6 @@ public:
     /// slower.
     static BinaryData get(const char* header, size_t ndx, Allocator&) noexcept;
 
-    ref_type bptree_leaf_insert(size_t ndx, BinaryData, bool add_zero_term, TreeInsertBase& state);
-
     //@{
     /// Those that return a string, discard the terminating zero from
     /// the stored value. Those that accept a string argument, add a
@@ -67,7 +65,6 @@ public:
     void set_string(size_t ndx, StringData value);
     void insert_string(size_t ndx, StringData value);
     static StringData get_string(const char* header, size_t ndx, Allocator&, bool nullable) noexcept;
-    ref_type bptree_leaf_insert_string(size_t ndx, StringData, TreeInsertBase& state);
     //@}
 
     /// Create a new empty big blobs array and attach this accessor to
@@ -202,14 +199,6 @@ inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx, Allo
         return realm::null();
     else
         return StringData(bin.data(), bin.size() - 1); // Do not include terminating zero
-}
-
-inline ref_type ArrayBigBlobs::bptree_leaf_insert_string(size_t ndx, StringData value, TreeInsertBase& state)
-{
-    REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
-    BinaryData bin(value.data(), value.size());
-    bool add_zero_term = true;
-    return bptree_leaf_insert(ndx, bin, add_zero_term, state);
 }
 
 inline void ArrayBigBlobs::create()

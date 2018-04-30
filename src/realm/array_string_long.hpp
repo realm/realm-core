@@ -81,8 +81,6 @@ public:
     /// slower.
     static StringData get(const char* header, size_t ndx, Allocator&, bool nullable) noexcept;
 
-    ref_type bptree_leaf_insert(size_t ndx, StringData, TreeInsertBase&);
-
     static size_t get_size_from_header(const char*, Allocator&) noexcept;
 
     /// Construct a long string array of the specified size and return

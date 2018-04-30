@@ -13,7 +13,6 @@ set(REALM_SOURCES
     array_string_short.cpp
     array_string_long.cpp
     array_timestamp.cpp
-    bptree.cpp
     bplustree.cpp
     cluster.cpp
     column_binary.cpp
@@ -80,7 +79,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_string_long.hpp
     array_timestamp.hpp
     binary_data.hpp
-    bptree.hpp
+    bplustree.hpp
     cluster.hpp
     cluster_tree.hpp
     column_binary.hpp

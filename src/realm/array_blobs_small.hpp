@@ -108,8 +108,6 @@ public:
     /// slower.
     static BinaryData get(const char* header, size_t ndx, Allocator&) noexcept;
 
-    ref_type bptree_leaf_insert(size_t ndx, BinaryData, bool add_zero_term, TreeInsertBase& state);
-
     static size_t get_size_from_header(const char*, Allocator&) noexcept;
 
     /// Construct a binary array of the specified size and return just

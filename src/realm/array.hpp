@@ -647,8 +647,6 @@ public:
     template <bool gt, Action action, size_t width, class Callback>
     bool find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
 
-    ref_type bptree_leaf_insert(size_t ndx, int64_t, TreeInsertBase& state);
-
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be

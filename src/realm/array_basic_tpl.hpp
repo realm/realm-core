@@ -363,38 +363,6 @@ bool BasicArray<T>::minimum(T& result, size_t begin, size_t end) const
 
 
 template <class T>
-ref_type BasicArray<T>::bptree_leaf_insert(size_t ndx, T value, TreeInsertBase& state)
-{
-    size_t leaf_size = size();
-    REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
-    if (leaf_size < ndx)
-        ndx = leaf_size;
-    if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-        insert(ndx, value);
-        return 0; // Leaf was not split
-    }
-
-    // Split leaf node
-    BasicArray<T> new_leaf(get_alloc());
-    new_leaf.create(); // Throws
-    if (ndx == leaf_size) {
-        new_leaf.add(value);
-        state.m_split_offset = ndx;
-    }
-    else {
-        // FIXME: Could be optimized by first resizing the target
-        // array, then copy elements with std::copy().
-        for (size_t i = ndx; i != leaf_size; ++i)
-            new_leaf.add(get(i));
-        truncate(ndx);
-        add(value);
-        state.m_split_offset = ndx + 1;
-    }
-    state.m_split_size = leaf_size + 1;
-    return new_leaf.get_ref();
-}
-
-template <class T>
 inline size_t BasicArray<T>::lower_bound(T value) const noexcept
 {
     const T* begin = reinterpret_cast<const T*>(m_data);

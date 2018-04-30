@@ -188,9 +188,6 @@ public:
     size_t find_first(value_type value, size_t begin = 0, size_t end = npos) const;
 
 
-    // Overwrite Array::bptree_leaf_insert to correctly split nodes.
-    ref_type bptree_leaf_insert(size_t ndx, value_type value, TreeInsertBase& state);
-
     MemRef slice(size_t offset, size_t slice_size, Allocator& target_alloc) const;
 
     /// Construct a deep copy of the specified slice of this array using the

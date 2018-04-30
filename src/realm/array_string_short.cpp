@@ -302,36 +302,6 @@ bool ArrayStringShort::compare_string(const ArrayStringShort& c) const noexcept
     return true;
 }
 
-ref_type ArrayStringShort::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
-{
-    size_t leaf_size = size();
-    REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
-    if (leaf_size < ndx)
-        ndx = leaf_size;
-    if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-        insert(ndx, value); // Throws
-        return 0;           // Leaf was not split
-    }
-
-    // Split leaf node
-    ArrayStringShort new_leaf(m_alloc, m_nullable);
-    new_leaf.create(); // Throws
-    if (ndx == leaf_size) {
-        new_leaf.add(value); // Throws
-        state.m_split_offset = ndx;
-    }
-    else {
-        for (size_t i = ndx; i != leaf_size; ++i)
-            new_leaf.add(get(i)); // Throws
-        truncate(ndx);            // Throws
-        add(value);               // Throws
-        state.m_split_offset = ndx + 1;
-    }
-    state.m_split_size = leaf_size + 1;
-    return new_leaf.get_ref();
-}
-
-
 MemRef ArrayStringShort::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
     REALM_ASSERT(is_attached());

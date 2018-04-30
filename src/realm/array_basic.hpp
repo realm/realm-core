@@ -79,8 +79,6 @@ public:
     /// slower.
     static T get(const char* header, size_t ndx) noexcept;
 
-    ref_type bptree_leaf_insert(size_t ndx, T, TreeInsertBase& state);
-
     size_t lower_bound(T value) const noexcept;
     size_t upper_bound(T value) const noexcept;
 
