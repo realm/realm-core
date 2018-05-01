@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.6.0 Release notes
 
 ### Bugfixes
 
@@ -8,21 +8,11 @@
   Also explicitly disable list IN list comparisons since its not supported.
   PR [#3037](https://github.com/realm/realm-core/pull/3037).
 
-### Breaking changes
-
-* None.
-
 ### Enhancements
 
 * `SharedGroup::compact()` now also compacts history information, which means
   that Sync'ed Realm files can now be compacted (under the usual restrictions;
   see `group_shared.hpp` for details).
-
------------
-
-### Internals
-
-* None.
 
 ----------------------------------------------
 
