@@ -111,6 +111,104 @@ TEST(Transactions_LargeMappingChange)
     }
 }
 
+// This Header declaration must match the file format header declared in alloc_slab.hpp
+// (we cannot use the original one, as it is private, and I don't want make new friends)
+struct Header {
+    uint64_t m_top_ref[2]; // 2 * 8 bytes
+    // Info-block 8-bytes
+    uint8_t m_mnemonic[4];    // "T-DB"
+    uint8_t m_file_format[2]; // See `library_file_format`
+    uint8_t m_reserved;
+    // bit 0 of m_flags is used to select between the two top refs.
+    uint8_t m_flags;
+};
+
+TEST(Transactions_LargeUpgrade)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DB sg(path);
+    int data_size = 12 * 1024 * 1024;
+    {
+        TransactionRef g = sg.start_write();
+        TableRef tr = g->add_table("test");
+        auto col = tr->add_column(type_Binary, "binary");
+        char* data = new char[data_size];
+        for (int i = 0; i < data_size; i += 721) {
+            data[i] = i & 0xFF;
+        }
+        for (int i = 0; i < 20; ++i) {
+            auto obj = tr->create_object();
+            obj.set(col, BinaryData(data, data_size));
+            auto data2 = obj.get<BinaryData>(col);
+            for (int k = 0; k < data_size; k += 721) {
+                const char* p = data2.data();
+                CHECK_EQUAL((p[k] & 0xFF), (k & 0xFF));
+            }
+        }
+        delete[] data;
+        g->commit();
+    }
+    sg.close();
+    {
+        util::File f(path, util::File::mode_Update);
+        util::File::Map<Header> headerMap(f, util::File::access_ReadWrite);
+        auto* header = headerMap.get_addr();
+        // at least one of the versions in the header must be 10.
+        CHECK(header->m_file_format[1] == 10 || header->m_file_format[0] == 10);
+        header->m_file_format[1] = header->m_file_format[0] = 9; // downgrade (both) to previous version
+        headerMap.sync();
+    }
+    sg.open(path); // triggers idempotent upgrade - but importantly for this test, uses compat mapping
+    {
+        // compat mapping is in effect for this part of the test
+        {
+            TransactionRef g = sg.start_read();
+            ConstTableRef tr = g->get_table("test");
+            auto col = tr->get_column_key("binary");
+            for (auto it = tr->begin(); it != tr->end(); ++it) {
+                auto data = it->get<BinaryData>(col);
+                for (int i = 0; i < data_size; i += 721) {
+                    const char* p = data.data();
+                    CHECK_EQUAL((p[i] & 0xFF), (i & 0xFF));
+                }
+            }
+        }
+        // grow the file further to trigger combined use of compatibility mapping and ordinary mappings
+        char* data = new char[data_size];
+        for (int i = 0; i < data_size; i += 721) {
+            data[i] = i & 0xFF;
+        }
+        auto g = sg.start_write();
+        auto tr = g->get_table("test");
+        auto col = tr->get_column_key("binary");
+        for (int i = 0; i < 10; ++i) {
+            auto obj = tr->create_object();
+            obj.set(col, BinaryData(data, data_size));
+            auto data2 = obj.get<BinaryData>(col);
+            for (int k = 0; k < data_size; k += 721) {
+                const char* p = data2.data();
+                CHECK_EQUAL((p[k] & 0xFF), (k & 0xFF));
+            }
+        }
+        delete[] data;
+        g->commit();
+    }
+    sg.close();    // file has been upgrade to version 10, so....
+    sg.open(path); // when opened again, compatibility mapping is NOT in use:
+    {
+        TransactionRef g = sg.start_read();
+        ConstTableRef tr = g->get_table("test");
+        auto col = tr->get_column_key("binary");
+        for (auto it = tr->begin(); it != tr->end(); ++it) {
+            auto data = it->get<BinaryData>(col);
+            for (int i = 0; i < data_size; i += 721) {
+                const char* p = data.data();
+                CHECK_EQUAL((p[i] & 0xFF), (i & 0xFF));
+            }
+        }
+    }
+}
+
 TEST(Transactions_StateChanges)
 {
     SHARED_GROUP_TEST_PATH(path);

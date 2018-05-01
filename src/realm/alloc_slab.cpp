@@ -764,7 +764,9 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     reset_free_space_tracking();
     // if the file format is older than version 10 and larger than a section we have
     // to use the compatibility mapping
-    if (size > get_section_base(1) && file_format_version < 10) {
+    // FIXME: For now always use compatibility mapping.
+    static_cast<void>(file_format_version); // silence a warning
+    if (size > get_section_base(1) /* && file_format_version < 10 */) {
         setup_compatibility_mapping(size);
         m_data = m_compatibility_mapping.get_addr();
     }
@@ -782,7 +784,7 @@ void SlabAlloc::setup_compatibility_mapping(size_t file_size)
 {
     m_sections_in_compatibility_mapping = get_section_index(file_size);
     REALM_ASSERT(m_sections_in_compatibility_mapping);
-    m_compatibility_mapping = util::File::Map<char>(get_file());
+    m_compatibility_mapping = util::File::Map<char>(get_file(), util::File::access_ReadOnly, file_size);
     // fake that we've only mapped the number of full sections in order
     // to allow additional mappings to start aligned to a section boundary,
     // even though the compatibility mapping may extend further.
@@ -1012,7 +1014,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
     size_t old_baseline = m_baseline.load(std::memory_order_relaxed);
     auto old_slab_base = align_size_to_section_boundary(old_baseline);
     size_t old_num_sections = get_section_index(old_slab_base);
-    REALM_ASSERT(m_mappings.size() == old_num_sections);
+    REALM_ASSERT(m_mappings.size() == old_num_sections - m_sections_in_compatibility_mapping);
     m_baseline.store(file_size, std::memory_order_relaxed);
     {
         // 0. Special case: figure out if extension is to be done entirely within a single
