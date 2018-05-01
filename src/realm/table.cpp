@@ -4956,6 +4956,11 @@ public:
         return ref;
     }
 
+    HistoryInfo write_history(_impl::OutputStream&) override
+    {
+        return HistoryInfo{}; // Empty history
+    }
+
 private:
     const Table& m_table;
     const StringData m_table_name;

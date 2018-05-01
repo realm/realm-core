@@ -709,6 +709,35 @@ public:
         return m_group.m_tables.write(out, deep, only_if_modified); // Throws
     }
 
+    HistoryInfo write_history(_impl::OutputStream& out) override
+    {
+        bool deep = true;                                           // Deep
+        bool only_if_modified = false;                              // Always
+        ref_type history_ref = _impl::GroupFriend::get_history_ref(m_group);
+        HistoryInfo info;
+        if (history_ref) {
+            _impl::History::version_type version;
+            int history_type, history_schema_version;
+            _impl::GroupFriend::get_version_and_history_info(_impl::GroupFriend::get_alloc(m_group),
+                                                             m_group.m_top.get_ref(),
+                                                             version,
+                                                             history_type,
+                                                             history_schema_version);
+            REALM_ASSERT(history_type != Replication::hist_None);
+            if (history_type == Replication::hist_OutOfRealm) {
+                return info; // Cannot write out-of-Realm history, report as none.
+            }
+            info.type = history_type;
+            info.version = history_schema_version;
+            // FIXME: It's ugly that we have to instantiate a new array here,
+            // but it isn't obvious that Group should have history as a member.
+            Array history{const_cast<Allocator&>(_impl::GroupFriend::get_alloc(m_group))};
+            history.init_from_ref(history_ref);
+            info.ref = history.write(out, deep, only_if_modified); // Throws
+        }
+        return info;
+    }
+
 private:
     const Group& m_group;
 };
@@ -814,6 +843,7 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         // into a separate file.
         ref_type names_ref = table_writer.write_names(out_2);   // Throws
         ref_type tables_ref = table_writer.write_tables(out_2); // Throws
+        TableWriter::HistoryInfo history_info = table_writer.write_history(out_2); // Throws
         SlabAlloc new_alloc;
         new_alloc.attach_empty(); // Throws
         Array top(new_alloc);
@@ -847,6 +877,13 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
             top.add(RefOrTagged::make_ref(version_list_ref));  // Throws
             top.add(RefOrTagged::make_tagged(version_number)); // Throws
             top_size = 7;
+
+            if (history_info.type != Replication::hist_None) {
+                top.add(RefOrTagged::make_tagged(history_info.type));
+                top.add(RefOrTagged::make_ref(history_info.ref));
+                top.add(RefOrTagged::make_tagged(history_info.version));
+                top_size = 10;
+            }
         }
         top_ref = out_2.get_ref_of_next_array();
 

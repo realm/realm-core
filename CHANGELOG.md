@@ -14,7 +14,9 @@
 
 ### Enhancements
 
-* None.
+* `SharedGroup::compact()` now also compacts history information, which means
+  that Sync'ed Realm files can now be compacted (under the usual restrictions;
+  see `group_shared.hpp` for details).
 
 -----------
 
