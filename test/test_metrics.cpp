@@ -69,26 +69,26 @@ using namespace realm::metrics;
 using namespace realm::test_util;
 using namespace realm::util;
 
-#ifdef LEGACY_TESTS
 TEST(Metrics_HasNoReportsWhenDisabled)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key());
+    DBOptions options(crypt_key());
     options.enable_metrics = false;
-    SharedGroup sg(*hist, options);
+    DB sg(*hist, options);
     CHECK(!sg.get_metrics());
-    Group& g = sg.begin_write();
-    auto table = g.add_table("table");
-    table->add_column(type_Int, "first");
-    table->add_empty_row(10);
-    sg.commit();
-    sg.begin_read();
-    table = g.get_table("table");
+    auto wt = sg.start_write();
+    auto table = wt->add_table("table");
+    auto col = table->add_column(type_Int, "first");
+    std::vector<ObjKey> keys;
+    table->create_objects(10, keys);
+    wt->commit();
+    auto rt = sg.start_read();
+    table = rt->get_table("table");
     CHECK(bool(table));
-    Query query = table->column<int64_t>(0) == 0;
+    Query query = table->column<int64_t>(col) == 0;
     query.count();
-    sg.end_read();
+    rt->end_read();
     CHECK(!sg.get_metrics());
 }
 
@@ -96,21 +96,22 @@ TEST(Metrics_HasReportsWhenEnabled)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key());
+    DBOptions options(crypt_key());
     options.enable_metrics = true;
-    SharedGroup sg(*hist, options);
+    DB sg(*hist, options);
     CHECK(sg.get_metrics());
-    Group& g = sg.begin_write();
-    auto table = g.add_table("table");
-    table->add_column(type_Int, "first");
-    table->add_empty_row(10);
-    sg.commit();
-    sg.begin_read();
-    table = g.get_table("table");
+    auto wt = sg.start_write();
+    auto table = wt->add_table("table");
+    auto col = table->add_column(type_Int, "first");
+    std::vector<ObjKey> keys;
+    table->create_objects(10, keys);
+    wt->commit();
+    auto rt = sg.start_read();
+    table = rt->get_table("table");
     CHECK(bool(table));
-    Query query = table->column<int64_t>(0) == 0;
+    Query query = table->column<int64_t>(col) == 0;
     query.count();
-    sg.end_read();
+    rt->end_read();
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
     CHECK(metrics->num_query_metrics() != 0);
@@ -121,22 +122,23 @@ TEST(Metrics_QueryTypes)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key());
+    DBOptions options(crypt_key());
     options.enable_metrics = true;
-    SharedGroup sg(*hist, options);
+    DB sg(*hist, options);
     CHECK(sg.get_metrics());
-    Group& g = sg.begin_write();
-    auto table = g.add_table("table");
-    size_t int_col = table->add_column(type_Int, "col_int");
-    size_t double_col = table->add_column(type_Double, "col_double");
-    size_t float_col = table->add_column(type_Float, "col_float");
-    size_t timestamp_col = table->add_column(type_Timestamp, "col_timestamp");
-    table->add_empty_row(10);
-    sg.commit();
-    sg.begin_read();
-    table = g.get_table("table");
+    auto wt = sg.start_write();
+    auto table = wt->add_table("table");
+    auto int_col = table->add_column(type_Int, "col_int");
+    auto double_col = table->add_column(type_Double, "col_double");
+    auto float_col = table->add_column(type_Float, "col_float");
+    auto timestamp_col = table->add_column(type_Timestamp, "col_timestamp");
+    std::vector<ObjKey> keys;
+    table->create_objects(10, keys);
+    wt->commit();
+    auto rt = sg.start_read();
+    table = rt->get_table("table");
     CHECK(bool(table));
-    Query query = table->column<int64_t>(0) == 0;
+    Query query = table->column<int64_t>(int_col) == 0;
     query.find();
     query.find_all();
     query.count();
@@ -155,11 +157,11 @@ TEST(Metrics_QueryTypes)
     query.maximum_float(float_col);
     query.minimum_float(float_col);
 
-    size_t return_dummy;
+    ObjKey return_dummy;
     query.maximum_timestamp(timestamp_col, &return_dummy);
     query.minimum_timestamp(timestamp_col, &return_dummy);
 
-    sg.end_read();
+    rt->end_read();
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
     CHECK_EQUAL(metrics->num_query_metrics(), 17);
@@ -203,97 +205,100 @@ size_t find_count(std::string haystack, std::string needle)
     return count;
 }
 
-void populate(SharedGroup& sg)
+void populate(DB& sg)
 {
-    Group& g = sg.begin_write();
-    auto person = g.add_table("person");
-    auto pet = g.add_table("pet");
-    size_t age_col = person->add_column(type_Int, "age");
-    size_t paid_col = person->add_column(type_Double, "paid");
-    size_t weight_col = person->add_column(type_Float, "weight");
-    size_t dob_col = person->add_column(type_Timestamp, "date_of_birth");
-    size_t name_col = person->add_column(type_String, "name");
-    size_t account_col = person->add_column(type_Bool, "account_overdue");
-    size_t data_col = person->add_column(type_Binary, "data");
-    size_t owes_col = person->add_column_link(type_LinkList, "owes_coffee_to", *person);
+    auto wt = sg.start_write();
+    auto person = wt->add_table("person");
+    auto pet = wt->add_table("pet");
+    person->add_column(type_Int, "age");
+    person->add_column(type_Double, "paid");
+    person->add_column(type_Float, "weight");
+    person->add_column(type_Timestamp, "date_of_birth");
+    person->add_column(type_String, "name");
+    person->add_column(type_Bool, "account_overdue");
+    person->add_column(type_Binary, "data");
+    auto owes_col = person->add_column_link(type_LinkList, "owes_coffee_to", *person);
 
     auto create_person = [&](int age, double paid, float weight, Timestamp dob, std::string name, bool overdue,
-                             std::string data, std::vector<size_t> owes_coffee_to) {
-        size_t row = person->add_empty_row();
-        person->set_int(age_col, row, age);
-        person->set_double(paid_col, row, paid);
-        person->set_float(weight_col, row, weight);
-        person->set_timestamp(dob_col, row, dob);
-        person->set_string(name_col, row, name);
-        person->set_bool(account_col, row, overdue);
+                             std::string data, std::vector<ObjKey> owes_coffee_to) {
         BinaryData bd(data);
-        person->set_binary(data_col, row, bd);
-        for (auto ndx : owes_coffee_to) {
-            LinkViewRef list = person->get_linklist(owes_col, row);
-            list->add(ndx);
+        Obj obj = person->create_object().set_all(age, paid, weight, dob, name, overdue, bd);
+        auto ll = obj.get_linklist(owes_col);
+        for (auto key : owes_coffee_to) {
+            ll.add(key);
         }
+        return obj.get_key();
     };
 
-    create_person(27, 28.80, 170.7f, Timestamp(27, 5), "Bob", true, "e72s", {});
-    create_person(28, 10.70, 165.8f, Timestamp(28, 8), "Ryan", false, "s83f", {0});
-    create_person(33, 55.28, 183.3f, Timestamp(33, 3), "Cole", true, "s822k", {1, 0});
-    create_person(39, 22.72, 173.8f, Timestamp(39, 2), "Nathan", true, "h282l", {1, 1, 0, 2});
-    create_person(33, 29.28, 188.7f, Timestamp(33, 9), "Riley", false, "a208s", {3, 3, 2, 1});
+    auto k0 = create_person(27, 28.80, 170.7f, Timestamp(27, 5), "Bob", true, "e72s", {});
+    auto k1 = create_person(28, 10.70, 165.8f, Timestamp(28, 8), "Ryan", false, "s83f", {k0});
+    auto k2 = create_person(33, 55.28, 183.3f, Timestamp(33, 3), "Cole", true, "s822k", {k1, k0});
+    auto k3 = create_person(39, 22.72, 173.8f, Timestamp(39, 2), "Nathan", true, "h282l", {k1, k1, k0, k2});
+    create_person(33, 29.28, 188.7f, Timestamp(33, 9), "Riley", false, "a208s", {k3, k3, k2, k1});
 
-    size_t pet_name_col = pet->add_column(type_String, "name");
-    size_t pet_owner_col = pet->add_column_link(type_Link, "owner", *person);
+    pet->add_column(type_String, "name");
+    pet->add_column_link(type_Link, "owner", *person);
 
-    auto create_pet = [&](std::string name, size_t owner) {
-        size_t row = pet->add_empty_row();
-        pet->set_string(pet_name_col, row, name);
-        pet->set_link(pet_owner_col, row, owner);
-    };
+    auto create_pet = [&](std::string name, ObjKey owner) { pet->create_object().set_all(name, owner); };
 
-    create_pet("Fido", 0);
-    create_pet("Max", 1);
-    create_pet("Buddy", 2);
-    create_pet("Rocky", 3);
-    create_pet("Toby", 3);
-    create_pet("Duke", 0);
+    create_pet("Fido", k0);
+    create_pet("Max", k1);
+    create_pet("Buddy", k2);
+    create_pet("Rocky", k3);
+    create_pet("Toby", k3);
+    create_pet("Duke", k0);
 
-    sg.commit();
+    wt->commit();
 }
 
 TEST(Metrics_QueryEqual)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key());
+    DBOptions options(crypt_key());
     options.enable_metrics = true;
-    SharedGroup sg(*hist, options);
+    DB sg(*hist, options);
     populate(sg);
 
     std::string person_table_name = "person";
     std::string pet_table_name = "pet";
     std::string query_search_term = "==";
 
-    Group& g = sg.begin_write();
-    TableRef person = g.get_table(person_table_name);
-    TableRef pet = g.get_table(pet_table_name);
+    auto wt = sg.start_write();
+    TableRef person = wt->get_table(person_table_name);
+    TableRef pet = wt->get_table(pet_table_name);
     CHECK(bool(person));
 
     CHECK_EQUAL(person->get_column_count(), 8);
     std::vector<std::string> column_names;
-    for (size_t i = 0; i < person->get_column_count(); ++i) {
-        column_names.push_back(person->get_column_name(i));
+    for (auto col : person->get_column_keys()) {
+        column_names.push_back(person->get_column_name(col));
     }
 
-    Query q0 = person->column<int64_t>(0) == 0;
-    Query q1 = person->column<double>(1) == 0.0;
-    Query q2 = person->column<float>(2) == 0.0f;
-    Query q3 = person->column<Timestamp>(3) == Timestamp(0, 0);
+    Obj p0 = person->get_object(0);
+
+    auto col_age = person->get_column_key("age");
+    auto col_paid = person->get_column_key("paid");
+    auto col_weight = person->get_column_key("weight");
+    auto col_birth = person->get_column_key("date_of_birth");
+    auto col_name = person->get_column_key("name");
+    auto col_overdue = person->get_column_key("account_overdue");
+    auto col_data = person->get_column_key("data");
+    auto col_owes = person->get_column_key("owes_coffee_to");
+
+    auto col_owner = pet->get_column_key("owner");
+
+    Query q0 = person->column<int64_t>(col_age) == 0;
+    Query q1 = person->column<double>(col_paid) == 0.0;
+    Query q2 = person->column<float>(col_weight) == 0.0f;
+    Query q3 = person->column<Timestamp>(col_birth) == Timestamp(0, 0);
     StringData name("");
-    Query q4 = person->column<StringData>(4) == name;
-    Query q5 = person->column<bool>(5) == false;
+    Query q4 = person->column<StringData>(col_name) == name;
+    Query q5 = person->column<bool>(col_overdue) == false;
     BinaryData bd("");
-    Query q6 = person->column<BinaryData>(6) == bd;
-    Query q7 = person->column<LinkList>(7) == person->get(0);
-    Query q8 = pet->column<Link>(1) == person->get(0);
+    Query q6 = person->column<BinaryData>(col_data) == bd;
+    Query q7 = person->column<Link>(col_owes) == p0;
+    Query q8 = pet->column<Link>(col_owner) == p0;
 
     q0.find_all();
     q1.find_all();
@@ -322,9 +327,9 @@ TEST(Metrics_QueryOrAndNot)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key());
+    DBOptions options(crypt_key());
     options.enable_metrics = true;
-    SharedGroup sg(*hist, options);
+    DB sg(*hist, options);
     populate(sg);
 
     std::string person_table_name = "person";
@@ -332,20 +337,23 @@ TEST(Metrics_QueryOrAndNot)
     std::string query_search_term = "==";
     std::string not_text = "!";
 
-    Group& g = sg.begin_write();
-    TableRef person = g.get_table(person_table_name);
-    TableRef pet = g.get_table(pet_table_name);
+    auto wt = sg.start_write();
+    TableRef person = wt->get_table(person_table_name);
+    TableRef pet = wt->get_table(pet_table_name);
     CHECK(bool(person));
 
     CHECK_EQUAL(person->get_column_count(), 8);
     std::vector<std::string> column_names;
-    for (size_t i = 0; i < person->get_column_count(); ++i) {
-        column_names.push_back(person->get_column_name(i));
+    for (auto col : person->get_column_keys()) {
+        column_names.push_back(person->get_column_name(col));
     }
 
-    Query q0 = person->column<int64_t>(0) == 0;
-    Query q1 = person->column<double>(1) == 0.0;
-    Query q2 = person->column<float>(2) == 0.1f;
+    auto col_age = person->get_column_key("age");
+    auto col_paid = person->get_column_key("paid");
+    auto col_weight = person->get_column_key("weight");
+    Query q0 = person->column<int64_t>(col_age) == 0;
+    Query q1 = person->column<double>(col_paid) == 0.0;
+    Query q2 = person->column<float>(col_weight) == 0.1f;
 
     Query simple_and = q0 && q1;
     Query simple_or = q0 || q1;
@@ -461,47 +469,45 @@ TEST(Metrics_LinkQueries)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key());
+    DBOptions options(crypt_key());
     options.enable_metrics = true;
-    SharedGroup sg(*hist, options);
+    DB sg(*hist, options);
     populate(sg);
 
     std::string person_table_name = "person";
     std::string pet_table_name = "pet";
 
-    Group& g = sg.begin_write();
-    TableRef person = g.get_table(person_table_name);
-    TableRef pet = g.get_table(pet_table_name);
+    auto wt = sg.start_write();
+    TableRef person = wt->get_table(person_table_name);
+    TableRef pet = wt->get_table(pet_table_name);
     CHECK(bool(person));
 
     CHECK_EQUAL(person->get_column_count(), 8);
     std::vector<std::string> column_names;
-    for (size_t i = 0; i < person->get_column_count(); ++i) {
-        column_names.push_back(person->get_column_name(i));
+    for (auto col : person->get_column_keys()) {
+        column_names.push_back(person->get_column_name(col));
     }
 
-    std::string pet_link_col_name = pet->get_column_name(1);
+    std::string pet_link_col_name = "owner";
+    ColKey col_owner = pet->get_column_key(pet_link_col_name);
+    auto col_age = person->get_column_key("age");
 
-    Query q0 = pet->column<Link>(1).is_null();
-    Query q1 = pet->column<Link>(1).is_not_null();
-    Query q2 = pet->column<Link>(1).count() == 1;
-    Query q3 = pet->column<Link>(1, person->column<int64_t>(0) >= 27).count() == 1;
+    Query q0 = pet->column<Link>(col_owner).is_null();
+    Query q1 = pet->column<Link>(col_owner).is_not_null();
+    Query q2 = pet->column<Link>(col_owner).count() == 1;
+    Query q3 = pet->column<Link>(col_owner, person->column<int64_t>(col_age) >= 27).count() == 1;
 
     q0.find_all();
     q1.find_all();
     q2.find_all();
     q3.find_all();
-    ;
 
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
 
-    // FIXME: q3 adds 6 queries: the find_all() + 1 sub query per row in person
-    // that's how subqueries across links are executed currently so it is accurate
-    // but not sure if this is acceptable for how we track queries
-    CHECK_EQUAL(queries->size(), 10);
+    CHECK_EQUAL(queries->size(), 4);
 
     std::string null_links_description = queries->at(0).get_description();
     CHECK_EQUAL(find_count(null_links_description, "NULL"), 1);
@@ -530,36 +536,37 @@ TEST(Metrics_LinkListQueries)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key());
+    DBOptions options(crypt_key());
     options.enable_metrics = true;
-    SharedGroup sg(*hist, options);
+    DB sg(*hist, options);
     populate(sg);
 
     std::string person_table_name = "person";
     std::string pet_table_name = "pet";
-    size_t ll_col_ndx = 7;
-    size_t str_col_ndx = 4;
-    size_t double_col_ndx = 1;
 
-    Group& g = sg.begin_write();
-    TableRef person = g.get_table(person_table_name);
-    TableRef pet = g.get_table(pet_table_name);
+    auto wt = sg.start_write();
+    TableRef person = wt->get_table(person_table_name);
+    TableRef pet = wt->get_table(pet_table_name);
     CHECK(bool(person));
 
     CHECK_EQUAL(person->get_column_count(), 8);
-    std::vector<std::string> column_names;
-    for (size_t i = 0; i < person->get_column_count(); ++i) {
-        column_names.push_back(person->get_column_name(i));
+    std::map<ColKey, std::string> column_names;
+    for (auto col : person->get_column_keys()) {
+        column_names[col] = person->get_column_name(col);
     }
 
-    std::string pet_link_col_name = pet->get_column_name(1);
+    Obj p0 = person->get_object(0);
 
-    Query q0 = person->column<LinkList>(ll_col_ndx).is_null();
-    Query q1 = person->column<LinkList>(ll_col_ndx).is_not_null();
-    Query q2 = person->column<LinkList>(ll_col_ndx).count() == 1;
-    Query q3 = person->column<LinkList>(ll_col_ndx) == person->get(0);
-    Query q4 = person->column<LinkList>(ll_col_ndx).column<double>(double_col_ndx).sum() >= 1;
-    Query q5 = person->column<LinkList>(ll_col_ndx, person->column<String>(str_col_ndx) == "Bob").count() == 1;
+    ColKey ll_col_key = person->get_column_key("owes_coffee_to");
+    auto col_name = person->get_column_key("name");
+    auto col_paid = person->get_column_key("paid");
+
+    Query q0 = person->column<Link>(ll_col_key).is_null();
+    Query q1 = person->column<Link>(ll_col_key).is_not_null();
+    Query q2 = person->column<Link>(ll_col_key).count() == 1;
+    Query q3 = person->column<Link>(ll_col_key) == p0;
+    Query q4 = person->column<Link>(ll_col_key).column<double>(col_paid).sum() >= 1;
+    Query q5 = person->column<Link>(ll_col_key, person->column<String>(col_name) == "Bob").count() == 1;
 
     q0.find_all();
     q1.find_all();
@@ -573,36 +580,36 @@ TEST(Metrics_LinkListQueries)
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
 
-    CHECK_EQUAL(queries->size(), 16);
+    CHECK_EQUAL(queries->size(), 5);
 
     std::string null_links_description = queries->at(0).get_description();
     CHECK_EQUAL(find_count(null_links_description, "NULL"), 1);
-    CHECK_EQUAL(find_count(null_links_description, column_names[ll_col_ndx]), 1);
+    CHECK_EQUAL(find_count(null_links_description, column_names[ll_col_key]), 1);
 
     std::string not_null_links_description = queries->at(1).get_description();
     CHECK_EQUAL(find_count(not_null_links_description, "NULL"), 1);
     CHECK_EQUAL(find_count(not_null_links_description, "!"), 1);
-    CHECK_EQUAL(find_count(not_null_links_description, column_names[ll_col_ndx]), 1);
+    CHECK_EQUAL(find_count(not_null_links_description, column_names[ll_col_key]), 1);
 
     std::string count_link_description = queries->at(2).get_description();
     CHECK_EQUAL(find_count(count_link_description, "@count"), 1);
-    CHECK_EQUAL(find_count(count_link_description, column_names[ll_col_ndx]), 1);
+    CHECK_EQUAL(find_count(count_link_description, column_names[ll_col_key]), 1);
     CHECK_EQUAL(find_count(count_link_description, "=="), 1);
 
     //CHECK_THROW(queries->at(3), SerialisationError);
 
     std::string sum_link_description = queries->at(3).get_description();
     CHECK_EQUAL(find_count(sum_link_description, "@sum"), 1);
-    CHECK_EQUAL(find_count(sum_link_description, column_names[ll_col_ndx]), 1);
-    CHECK_EQUAL(find_count(sum_link_description, column_names[double_col_ndx]), 1);
+    CHECK_EQUAL(find_count(sum_link_description, column_names[ll_col_key]), 1);
+    CHECK_EQUAL(find_count(sum_link_description, column_names[col_paid]), 1);
     // the query system can choose to flip the argument order and operators so that >= might be <=
     CHECK_EQUAL(find_count(sum_link_description, "<=") + find_count(sum_link_description, ">="), 1);
 
     std::string link_subquery_description = queries->at(4).get_description();
     CHECK_EQUAL(find_count(link_subquery_description, "@count"), 1);
-    CHECK_EQUAL(find_count(link_subquery_description, column_names[ll_col_ndx]), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, column_names[ll_col_key]), 1);
     CHECK_EQUAL(find_count(link_subquery_description, "=="), 2);
-    CHECK_EQUAL(find_count(link_subquery_description, column_names[str_col_ndx]), 1);
+    CHECK_EQUAL(find_count(link_subquery_description, column_names[col_name]), 1);
 }
 
 
@@ -610,72 +617,69 @@ TEST(Metrics_SubQueries)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key());
+    DBOptions options(crypt_key());
     options.enable_metrics = true;
-    SharedGroup sg(*hist, options);
+    DB sg(*hist, options);
 
-    Group& g = sg.begin_write();
+    auto wt = sg.start_write();
 
     std::string table_name = "table";
     std::string int_col_name = "integers";
     std::string str_col_name = "strings";
 
-    TableRef table = g.add_table(table_name);
+    TableRef table = wt->add_table(table_name);
 
-    DescriptorRef subdescr;
-    table->add_column(type_Table, int_col_name, &subdescr);
-    subdescr->add_column(type_Int, "list");
-    table->add_column(type_Table, str_col_name, &subdescr);
-    subdescr->add_column(type_String, "list", nullptr, true);
-    table->add_column(type_String, "other");
+    auto col_list_int = table->add_column_list(type_Int, int_col_name);
+    auto col_list_string = table->add_column_list(type_String, str_col_name);
+    auto col_other = table->add_column(type_String, "other");
 
-    table->add_empty_row(4);
+    std::vector<ObjKey> keys;
+    table->create_objects(4, keys);
 
     // see Query_SubtableExpression
-    auto set_int_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
-        size_t sz = value_list.size();
-        subtable->clear();
-        if (sz) {
-            subtable->add_empty_row(sz);
-            for (size_t i = 0; i < sz; i++) {
-                subtable->set_int(0, i, value_list[i]);
-            }
+    auto set_int_list = [](ListPtr<Int> list, const std::vector<int64_t>& value_list) {
+        list->clear();
+        for (auto i : value_list) {
+            list->add(i);
         }
     };
-    auto set_string_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
-        size_t sz = value_list.size();
-        subtable->clear();
-        subtable->add_empty_row(sz);
-        for (size_t i = 0; i < sz; i++) {
-            if (value_list[i] < 100) {
+    auto set_string_list = [](ListPtr<String> list, const std::vector<int64_t>& value_list) {
+        list->clear();
+        for (auto i : value_list) {
+            if (i < 100) {
                 std::string str("Str_");
-                str += util::to_string(value_list[i]);
-                subtable->set_string(0, i, str);
+                str += util::to_string(i);
+                list->add(StringData(str));
+            }
+            else {
+                list->add(StringData());
             }
         }
     };
-    set_int_list(table->get_subtable(0, 0), std::vector<Int>({0, 1}));
-    set_int_list(table->get_subtable(0, 1), std::vector<Int>({2, 3, 4, 5}));
-    set_int_list(table->get_subtable(0, 2), std::vector<Int>({6, 7, 8, 9}));
-    set_int_list(table->get_subtable(0, 3), std::vector<Int>({}));
-    set_string_list(table->get_subtable(1, 0), std::vector<Int>({0, 1}));
-    set_string_list(table->get_subtable(1, 1), std::vector<Int>({2, 3, 4, 5}));
-    set_string_list(table->get_subtable(1, 2), std::vector<Int>({6, 7, 100, 8, 9}));
-    table->set_string(2, 0, StringData("foo"));
-    table->set_string(2, 1, StringData("str"));
-    table->set_string(2, 2, StringData("str_9_baa"));
+    set_int_list(table->get_object(keys[0]).get_list_ptr<Int>(col_list_int), std::vector<Int>({0, 1}));
+    set_int_list(table->get_object(keys[1]).get_list_ptr<Int>(col_list_int), std::vector<Int>({2, 3, 4, 5}));
+    set_int_list(table->get_object(keys[2]).get_list_ptr<Int>(col_list_int), std::vector<Int>({6, 7, 8, 9}));
+    set_int_list(table->get_object(keys[3]).get_list_ptr<Int>(col_list_int), std::vector<Int>({}));
 
-    Query q0 = table->column<SubTable>(0).list<Int>() == 10;
-    Query q1 = table->column<SubTable>(0).list<Int>().max() > 5;
-    Query q2 = table->column<SubTable>(1).list<String>().begins_with("Str");
-    Query q3 = table->column<SubTable>(1).list<String>() == "Str_0";
+    set_string_list(table->get_object(keys[0]).get_list_ptr<String>(col_list_string), std::vector<Int>({0, 1}));
+    set_string_list(table->get_object(keys[1]).get_list_ptr<String>(col_list_string), std::vector<Int>({2, 3, 4, 5}));
+    set_string_list(table->get_object(keys[2]).get_list_ptr<String>(col_list_string),
+                    std::vector<Int>({6, 7, 100, 8, 9}));
+    table->get_object(keys[0]).set(col_other, StringData("foo"));
+    table->get_object(keys[1]).set(col_other, StringData("str"));
+    table->get_object(keys[2]).set(col_other, StringData("str_9_baa"));
+
+    Query q0 = table->column<List<Int>>(col_list_int) == 10;
+    Query q1 = table->column<List<Int>>(col_list_int).max() > 5;
+    Query q2 = table->column<List<String>>(col_list_string).begins_with("Str");
+    Query q3 = table->column<List<String>>(col_list_string) == "Str_0";
 
     CHECK_THROW(q0.find_all(), SerialisationError);
     CHECK_THROW(q1.find_all(), SerialisationError);
     CHECK_THROW(q2.find_all(), SerialisationError);
     CHECK_THROW(q3.find_all(), SerialisationError);
 
-    sg.commit();
+    wt->commit();
     /*
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
     CHECK(metrics);
@@ -702,26 +706,31 @@ TEST(Metrics_SubQueries)
     */
 }
 
-
 TEST(Metrics_TransactionTimings)
 {
+    ColKey col;
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key());
+    DBOptions options(crypt_key());
     options.enable_metrics = true;
-    SharedGroup sg(*hist, options);
+    DB sg(*hist, options);
     CHECK(sg.get_metrics());
-    Group& g = sg.begin_write();
-    auto table = g.add_table("table");
-    table->add_column(type_Int, "first");
-    table->add_empty_row(10);
-    sg.commit();
-    sg.begin_read();
-    table = g.get_table("table");
-    CHECK(bool(table));
-    Query query = table->column<int64_t>(0) == 0;
-    query.count();
-    sg.end_read();
+    {
+        auto wt = sg.start_write();
+        auto table = wt->add_table("table");
+        col = table->add_column(type_Int, "first");
+        std::vector<ObjKey> keys;
+        table->create_objects(10, keys);
+        wt->commit();
+    }
+    {
+        auto rt = sg.start_read();
+        auto table = rt->get_table("table");
+        CHECK(bool(table));
+        Query query = table->column<int64_t>(col) == 0;
+        query.count();
+        rt->end_read();
+    }
 
     using namespace std::literals::chrono_literals;
     {
@@ -730,8 +739,8 @@ TEST(Metrics_TransactionTimings)
     }
     {
         WriteTransaction wt(sg);
-        TableRef t = wt.get_table(0);
-        t->add_empty_row(1);
+        TableRef t = wt.get_table("table");
+        t->create_object();
         std::this_thread::sleep_for(80ms);
         wt.commit();
     }
@@ -775,21 +784,23 @@ TEST(Metrics_TransactionData)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key());
+    DBOptions options(crypt_key());
     options.enable_metrics = true;
-    SharedGroup sg(*hist, options);
+    DB sg(*hist, options);
     populate(sg);
 
     {
         ReadTransaction rt(sg);
     }
     {
-        WriteTransaction wt(sg);
-        TableRef t0 = wt.get_table(0);
-        TableRef t1 = wt.get_table(1);
-        t0->add_empty_row(3);
-        t1->add_empty_row(7);
-        wt.commit();
+        auto wt = sg.start_write();
+        auto table_keys = wt->get_table_keys();
+        TableRef t0 = wt->get_table(table_keys[0]);
+        TableRef t1 = wt->get_table(table_keys[1]);
+        std::vector<ObjKey> keys;
+        t0->create_objects(3, keys);
+        t1->create_objects(7, keys);
+        wt->commit();
     }
 
     std::shared_ptr<Metrics> metrics = sg.get_metrics();
@@ -810,36 +821,41 @@ TEST(Metrics_TransactionVersions)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroupOptions options(crypt_key());
+    DBOptions options(crypt_key());
     options.enable_metrics = true;
-    SharedGroup sg(*hist, options);
+    DB sg(*hist, options);
     populate(sg);
     const size_t num_writes_while_pinned = 10;
-
+    TableKey tk0;
+    TableKey tk1;
     {
-        ReadTransaction rt(sg);
+        auto rt = sg.start_read();
+        auto table_keys = rt->get_table_keys();
+        tk0 = table_keys[0];
+        tk1 = table_keys[1];
     }
     {
-        WriteTransaction wt(sg);
-        TableRef t0 = wt.get_table(0);
-        TableRef t1 = wt.get_table(1);
-        t0->add_empty_row(3);
-        t1->add_empty_row(7);
-        wt.commit();
+        auto wt = sg.start_write();
+        TableRef t0 = wt->get_table(tk0);
+        TableRef t1 = wt->get_table(tk1);
+        std::vector<ObjKey> keys;
+        t0->create_objects(3, keys);
+        t1->create_objects(7, keys);
+        wt->commit();
     }
     {
         std::unique_ptr<Replication> hist2(make_in_realm_history(path));
-        SharedGroup sg2(*hist2);
+        DB sg2(*hist2);
 
         // Pin this version. Note that since this read transaction is against a different shared group
         // it doesn't get tracked in the transaction metrics of the original shared group.
         ReadTransaction rt(sg2);
 
         for (size_t i = 0; i < num_writes_while_pinned; ++i) {
-            WriteTransaction wt(sg);
-            TableRef t0 = wt.get_table(0);
-            t0->add_empty_row(1);
-            wt.commit();
+            auto wt = sg.start_write();
+            TableRef t0 = wt->get_table(tk0);
+            t0->create_object();
+            wt->commit();
         }
     }
 
@@ -861,7 +877,5 @@ TEST(Metrics_TransactionVersions)
     }
 }
 
-
-#endif // LEGACY_TESTS
 #endif // REALM_METRICS
 #endif // TEST_METRICS
