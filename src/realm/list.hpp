@@ -547,8 +547,22 @@ void List<ObjKey>::do_remove(size_t ndx);
 template <>
 void List<ObjKey>::clear();
 
-class ConstLinkListIf : public ConstListIf<ObjKey> {
+class ConstLinkList : public ConstListIf<ObjKey> {
 public:
+    ConstLinkList(const ConstObj& obj, ColKey col_key)
+        : ConstListBase(col_key, &m_obj)
+        , ConstListIf<ObjKey>(obj.get_alloc())
+        , m_obj(obj)
+    {
+        this->init_from_parent();
+    }
+    ConstLinkList(ConstLinkList&& other)
+        : ConstListBase(other.m_col_key, &m_obj)
+        , ConstListIf<ObjKey>(std::move(other))
+        , m_obj(std::move(other.m_obj))
+    {
+    }
+
     // Getting links
     ConstObj operator[](size_t link_ndx) const
     {
@@ -556,29 +570,6 @@ public:
     }
     ConstObj get_object(size_t link_ndx) const;
 
-protected:
-    ConstLinkListIf(Allocator& alloc)
-        : ConstListBase(ColKey{}, nullptr)
-        , ConstListIf<ObjKey>(alloc)
-    {
-    }
-};
-
-class ConstLinkList : public ConstLinkListIf {
-public:
-    ConstLinkList(const ConstObj& obj, ColKey col_key)
-        : ConstListBase(col_key, &m_obj)
-        , ConstLinkListIf(obj.get_alloc())
-        , m_obj(obj)
-    {
-        this->init_from_parent();
-    }
-    ConstLinkList(ConstLinkList&& other)
-        : ConstListBase(other.m_col_key, &m_obj)
-        , ConstLinkListIf(other.m_obj.get_alloc())
-        , m_obj(std::move(other.m_obj))
-    {
-    }
     void update_child_ref(size_t, ref_type) override
     {
     }

@@ -342,6 +342,7 @@ ObjKey ConstObj::get_backlink(const Table& origin, ColKey origin_col_key, size_t
 
 size_t ConstObj::get_backlink_count(size_t backlink_col_ndx) const
 {
+    REALM_ASSERT(backlink_col_ndx != realm::npos);
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
     fields.init_from_mem(m_mem);
@@ -355,6 +356,7 @@ size_t ConstObj::get_backlink_count(size_t backlink_col_ndx) const
 
 ObjKey ConstObj::get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) const
 {
+    REALM_ASSERT(backlink_col_ndx != realm::npos);
     Allocator& alloc = m_tree_top->get_alloc();
     Array fields(alloc);
     fields.init_from_mem(m_mem);

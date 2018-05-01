@@ -80,14 +80,12 @@ using namespace realm::test_util;
 namespace {
 
 template <class T>
-std::vector<ColKey> test_table_add_columns(T t)
+void test_table_add_columns(T t)
 {
-    std::vector<ColKey> retval;
-    retval.push_back(t->add_column(type_String, "first"));
-    retval.push_back(t->add_column(type_Int, "second"));
-    retval.push_back(t->add_column(type_Bool, "third"));
-    retval.push_back(t->add_column(type_Int, "fourth"));
-    return retval;
+    t->add_column(type_String, "first");
+    t->add_column(type_Int, "second");
+    t->add_column(type_Bool, "third");
+    t->add_column(type_Int, "fourth");
 }
 
 template <class T>
@@ -110,30 +108,29 @@ TEST(Group_Unattached)
 }
 
 
-#ifdef LEGACY_TESTS
 TEST(Group_UnattachedErrorHandling)
 {
     Group group((Group::unattached_tag()));
 
     CHECK_EQUAL(false, group.is_empty());
-    CHECK_EQUAL(0, group.find_table("foo"));
-    CHECK_LOGIC_ERROR(group.get_table(0), LogicError::detached_accessor);
+    CHECK_EQUAL(TableKey(), group.find_table("foo"));
+    CHECK_LOGIC_ERROR(group.get_table(TableKey()), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.get_table("foo"), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.add_table("foo", false), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.get_table(0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table(TableKey()), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.get_table("foo"), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.add_table("foo", false), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.remove_table("foo"), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.remove_table(0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.remove_table(TableKey()), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.rename_table("foo", "bar", false), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.rename_table(0, "bar", false), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.rename_table(TableKey(), "bar", false), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.commit(), LogicError::detached_accessor);
 
     {
         const Group& const_group = group;
-        CHECK_LOGIC_ERROR(const_group.get_table(0), LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table(TableKey()), LogicError::detached_accessor);
         CHECK_LOGIC_ERROR(const_group.get_table("foo"), LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(const_group.get_table(0), LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table(TableKey()), LogicError::detached_accessor);
     }
 
     {
@@ -148,7 +145,6 @@ TEST(Group_UnattachedErrorHandling)
         CHECK_LOGIC_ERROR(group.to_json(out, link_depth, &renames), LogicError::detached_accessor);
     }
 }
-#endif
 
 
 TEST(Group_OpenFile)
@@ -244,7 +240,6 @@ TEST(Group_OpenUnencryptedFileWithKey)
 }
 #endif // REALM_ENABLE_ENCRYPTION
 
-#ifdef LEGACY_TESTS
 #ifndef _WIN32
 TEST(Group_Permissions)
 {
@@ -279,7 +274,6 @@ TEST(Group_Permissions)
         CHECK(!group2.is_attached());
     }
 }
-#endif
 #endif
 
 TEST(Group_BadFile)
@@ -641,18 +635,15 @@ TEST(Group_RemoveTableWithColumns)
     CHECK(delta);
     CHECK(epsilon);
 
-#ifdef LEGACY_TESTS
     // Try, but fail to remove table which is a target of link columns of other
     // tables.
     CHECK_THROW(group.remove_table("delta"), CrossTableLinkTarget);
     CHECK_EQUAL(2, group.size());
     CHECK(delta);
     CHECK(epsilon);
-#endif
 }
 
 
-#ifdef LEGACY_TESTS
 TEST(Group_RemoveTableMovesTableWithLinksOver)
 {
     // Create a scenario where a table is removed from the group, and the last
@@ -699,23 +690,23 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     group.verify();
 
     CHECK_EQUAL(3, group.size());
-    CHECK(first->is_attached());
-    CHECK_NOT(second->is_attached());
-    CHECK(third->is_attached());
-    CHECK(fourth->is_attached());
+    CHECK(bool(first));
+    CHECK_NOT(bool(second));
+    CHECK(bool(third));
+    CHECK(bool(fourth));
     CHECK_EQUAL(1, first->get_column_count());
-    CHECK_EQUAL("one", first->get_column_name(0));
-    CHECK_EQUAL(third, first->get_link_target(0));
+    CHECK_EQUAL("one", first->get_column_name(one));
+    CHECK_EQUAL(third, first->get_link_target(one));
     CHECK_EQUAL(2, third->get_column_count());
-    CHECK_EQUAL("two", third->get_column_name(0));
-    CHECK_EQUAL("three", third->get_column_name(1));
-    CHECK_EQUAL(fourth, third->get_link_target(0));
-    CHECK_EQUAL(third, third->get_link_target(1));
+    CHECK_EQUAL("two", third->get_column_name(two));
+    CHECK_EQUAL("three", third->get_column_name(three));
+    CHECK_EQUAL(fourth, third->get_link_target(two));
+    CHECK_EQUAL(third, third->get_link_target(three));
     CHECK_EQUAL(2, fourth->get_column_count());
-    CHECK_EQUAL("four", fourth->get_column_name(0));
-    CHECK_EQUAL("five", fourth->get_column_name(1));
-    CHECK_EQUAL(first, fourth->get_link_target(0));
-    CHECK_EQUAL(third, fourth->get_link_target(1));
+    CHECK_EQUAL("four", fourth->get_column_name(four));
+    CHECK_EQUAL("five", fourth->get_column_name(five));
+    CHECK_EQUAL(first, fourth->get_link_target(four));
+    CHECK_EQUAL(third, fourth->get_link_target(five));
 
     third->get_object(third_keys[0]).set(two, fourth_keys[0]);   // third[0].two   = fourth[0]
     fourth->get_object(fourth_keys[1]).set(four, first_keys[1]); // fourth[1].four = first[1]
@@ -726,8 +717,8 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     CHECK_EQUAL(2, first->size());
     CHECK_EQUAL(third_keys[1], first->get_object(first_keys[0]).get<ObjKey>(one));
     CHECK_EQUAL(third_keys[1], first->get_object(first_keys[1]).get<ObjKey>(one));
-    CHECK_EQUAL(1, first->get_object(first_keys[0]).get_backlink_count(*fourth, one));
-    CHECK_EQUAL(1, first->get_object(first_keys[1]).get_backlink_count(*fourth, one));
+    CHECK_EQUAL(1, first->get_object(first_keys[0]).get_backlink_count(*fourth, four));
+    CHECK_EQUAL(1, first->get_object(first_keys[1]).get_backlink_count(*fourth, four));
 
     CHECK_EQUAL(2, third->size());
     CHECK_EQUAL(fourth_keys[0], third->get_object(third_keys[0]).get<ObjKey>(two));
@@ -760,7 +751,7 @@ TEST(Group_RemoveLinkTable)
     table->add_column_link(type_Link, "link", *table);
     group.remove_table(table->get_key());
     CHECK(group.is_empty());
-    CHECK(!table->is_attached());
+    CHECK(!table);
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
     target->add_column(type_Int, "int");
@@ -768,11 +759,10 @@ TEST(Group_RemoveLinkTable)
     CHECK_THROW(group.remove_table(target->get_key()), CrossTableLinkTarget);
     group.remove_table(origin->get_key());
     CHECK_EQUAL(1, group.size());
-    CHECK(!origin->is_attached());
-    CHECK(target->is_attached());
+    CHECK(!origin);
+    CHECK(target);
     group.verify();
 }
-#endif
 
 
 TEST(Group_RenameTable)
@@ -798,7 +788,6 @@ TEST(Group_RenameTable)
 }
 
 
-#ifdef LEGACY_TESTS
 TEST(Group_Equal)
 {
     Group g1, g2, g3;
@@ -818,43 +807,6 @@ TEST(Group_Equal)
     setup_table(t3);
     CHECK(g1 != g3); // table names differ
 }
-
-
-TEST(Group_SubtableDescriptors)
-{
-    // This test originally only failed when checked with valgrind as the
-    // problem was that memory was read after being freed.
-    GROUP_TEST_PATH(path);
-
-    // Create new database
-    Group g(path, crypt_key(), Group::mode_ReadWrite);
-
-    TableRef table = g.add_table("first");
-    {
-        DescriptorRef subdescr;
-        table->add_column(type_Table, "sub", false, &subdescr);
-        subdescr->add_column(type_Int, "integers", nullptr, false);
-    }
-    table->add_empty_row(125);
-
-    TableRef sub = table->get_subtable(0, 3);
-    sub->clear();
-    sub->add_empty_row(5);
-    sub->set_int(0, 0, 127, false);
-    sub->set_int(0, 1, 127, false);
-    sub->set_int(0, 2, 255, false);
-    sub->set_int(0, 3, 128, false);
-    sub->set_int(0, 4, 4, false);
-
-    // this will keep a subdescriptor alive during the commit
-    int64_t val = sub->get_int(0, 2);
-    TableView tv = sub->where().equal(0, val).find_all();
-
-    table->get_subdescriptor(0)->add_search_index(0);
-    g.commit();
-    table->get_subdescriptor(0)->remove_search_index(0);
-}
-#endif
 
 TEST(Group_Invalid1)
 {
@@ -905,7 +857,8 @@ TEST(Group_Serialize0)
 
         // Create new table in group
         auto t = from_disk.add_table("test");
-        std::vector<ColKey> cols = test_table_add_columns(t);
+        test_table_add_columns(t);
+        auto cols = t->get_column_keys();
 
         CHECK_EQUAL(4, t->get_column_count());
         CHECK_EQUAL(0, t->size());
@@ -1115,7 +1068,6 @@ TEST(Group_Close)
     Group from_mem(buffer);
 }
 
-#ifdef LEGACY_TESTS
 TEST(Group_Serialize_Optimized)
 {
     // Create group with one table
@@ -1124,14 +1076,15 @@ TEST(Group_Serialize_Optimized)
     test_table_add_columns(table);
 
     for (size_t i = 0; i < 5; ++i) {
-        add(table, "abd", 1, true, Mon);
-        add(table, "eftg", 2, true, Tue);
-        add(table, "hijkl", 5, true, int(Wed));
-        add(table, "mnopqr", 8, true, Thu);
-        add(table, "stuvxyz", 9, true, Fri);
+        table->create_object().set_all("abd", 1, true, int(Mon));
+        table->create_object().set_all("eftg", 2, true, int(Tue));
+        table->create_object().set_all("hijkl", 5, true, int(Wed));
+        table->create_object().set_all("mnopqr", 8, true, int(Thu));
+        table->create_object().set_all("stuvxyz", 9, true, int(Fri));
     }
 
-    table->optimize();
+    ColKey col_string = table->get_column_keys()[0];
+    table->enumerate_string_column(col_string);
 
 #ifdef REALM_DEBUG
     to_mem.verify();
@@ -1150,17 +1103,17 @@ TEST(Group_Serialize_Optimized)
     CHECK(*table == *t);
 
     // Add a row with a known (but unique) value
-    add(table, "search_target", 9, true, Fri);
+    auto k = table->create_object().set_all("search_target", 9, true, int(Fri)).get_key();
 
-    const size_t res = table->find_first_string(0, "search_target");
-    CHECK_EQUAL(table->size() - 1, res);
+    const auto res = table->find_first_string(col_string, "search_target");
+    CHECK_EQUAL(k, res);
 
 #ifdef REALM_DEBUG
     to_mem.verify();
     from_mem.verify();
 #endif
 }
-#endif // LEGACY_TESTS
+
 
 TEST(Group_Serialize_All)
 {
@@ -1287,6 +1240,7 @@ TEST(Group_ToString)
     CHECK(str.length() > 0);
     CHECK_EQUAL("     tables     rows  \n   0 test       2     \n", str.c_str());
 }
+#endif // LEGACY_TESTS
 
 TEST(Group_IndexString)
 {
@@ -1294,31 +1248,32 @@ TEST(Group_IndexString)
     TableRef table = to_mem.add_table("test");
     test_table_add_columns(table);
 
-    add(table, "jeff", 1, true, int(Wed));
-    add(table, "jim", 1, true, int(Wed));
-    add(table, "jennifer", 1, true, int(Wed));
-    add(table, "john", 1, true, int(Wed));
-    add(table, "jimmy", 1, true, int(Wed));
-    add(table, "jimbo", 1, true, int(Wed));
-    add(table, "johnny", 1, true, int(Wed));
-    add(table, "jennifer", 1, true, int(Wed)); // duplicate
+    auto k0 = table->create_object().set_all("jeff", 1, true, int(Wed)).get_key();
+    auto k1 = table->create_object().set_all("jim", 1, true, int(Wed)).get_key();
+    table->create_object().set_all("jennifer", 1, true, int(Wed));
+    table->create_object().set_all("john", 1, true, int(Wed));
+    table->create_object().set_all("jimmy", 1, true, int(Wed));
+    auto k5 = table->create_object().set_all("jimbo", 1, true, int(Wed)).get_key();
+    auto k6 = table->create_object().set_all("johnny", 1, true, int(Wed)).get_key();
+    table->create_object().set_all("jennifer", 1, true, int(Wed)); // duplicate
 
-    table->add_search_index(0);
-    CHECK(table->has_search_index(0));
+    ColKey col_string = table->get_column_key("first");
+    table->add_search_index(col_string);
+    CHECK(table->has_search_index(col_string));
 
-    size_t r1 = table->find_first_string(0, "jimmi");
-    CHECK_EQUAL(not_found, r1);
+    auto r1 = table->find_first_string(col_string, "jimmi");
+    CHECK_EQUAL(null_key, r1);
 
-    size_t r2 = table->find_first_string(0, "jeff");
-    size_t r3 = table->find_first_string(0, "jim");
-    size_t r4 = table->find_first_string(0, "jimbo");
-    size_t r5 = table->find_first_string(0, "johnny");
-    CHECK_EQUAL(0, r2);
-    CHECK_EQUAL(1, r3);
-    CHECK_EQUAL(5, r4);
-    CHECK_EQUAL(6, r5);
+    auto r2 = table->find_first_string(col_string, "jeff");
+    auto r3 = table->find_first_string(col_string, "jim");
+    auto r4 = table->find_first_string(col_string, "jimbo");
+    auto r5 = table->find_first_string(col_string, "johnny");
+    CHECK_EQUAL(k0, r2);
+    CHECK_EQUAL(k1, r3);
+    CHECK_EQUAL(k5, r4);
+    CHECK_EQUAL(k6, r5);
 
-    size_t c1 = table->count_string(0, "jennifer");
+    size_t c1 = table->count_string(col_string, "jennifer");
     CHECK_EQUAL(2, c1);
 
     // Serialize to memory (we now own the buffer)
@@ -1330,34 +1285,34 @@ TEST(Group_IndexString)
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(8, t->size());
 
-    CHECK(t->has_search_index(0));
+    col_string = table->get_column_key("first");
+    CHECK(t->has_search_index(col_string));
 
-    size_t m1 = t->find_first_string(0, "jimmi");
-    CHECK_EQUAL(not_found, m1);
+    auto m1 = t->find_first_string(col_string, "jimmi");
+    CHECK_EQUAL(null_key, m1);
 
-    size_t m2 = t->find_first_string(0, "jeff");
-    size_t m3 = t->find_first_string(0, "jim");
-    size_t m4 = t->find_first_string(0, "jimbo");
-    size_t m5 = t->find_first_string(0, "johnny");
-    CHECK_EQUAL(0, m2);
-    CHECK_EQUAL(1, m3);
-    CHECK_EQUAL(5, m4);
-    CHECK_EQUAL(6, m5);
+    auto m2 = t->find_first_string(col_string, "jeff");
+    auto m3 = t->find_first_string(col_string, "jim");
+    auto m4 = t->find_first_string(col_string, "jimbo");
+    auto m5 = t->find_first_string(col_string, "johnny");
+    CHECK_EQUAL(k0, m2);
+    CHECK_EQUAL(k1, m3);
+    CHECK_EQUAL(k5, m4);
+    CHECK_EQUAL(k6, m5);
 
-    size_t m6 = t->count_string(0, "jennifer");
+    size_t m6 = t->count_string(col_string, "jennifer");
     CHECK_EQUAL(2, m6);
 
     // Remove the search index and verify
-    t->remove_search_index(0);
-    CHECK(!t->has_search_index(0));
+    t->remove_search_index(col_string);
+    CHECK(!t->has_search_index(col_string));
     from_mem.verify();
 
-    size_t m7 = t->find_first_string(0, "jimmi");
-    size_t m8 = t->find_first_string(0, "johnny");
-    CHECK_EQUAL(not_found, m7);
-    CHECK_EQUAL(6, m8);
+    auto m7 = t->find_first_string(col_string, "jimmi");
+    auto m8 = t->find_first_string(col_string, "johnny");
+    CHECK_EQUAL(null_key, m7);
+    CHECK_EQUAL(k6, m8);
 }
-#endif // LEGACY_TESTS
 
 TEST(Group_StockBug)
 {
@@ -1379,19 +1334,16 @@ TEST(Group_StockBug)
     }
 }
 
-#ifdef LEGACY_TESTS
 TEST(Group_CommitLinkListChange)
 {
     GROUP_TEST_PATH(path);
     Group group(path, crypt_key(), Group::mode_ReadWrite);
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
-    origin->add_column_link(type_LinkList, "", *target);
-    target->add_column(type_Int, "");
-    origin->add_empty_row();
-    target->add_empty_row();
-    LinkViewRef link_list = origin->get_linklist(0, 0);
-    link_list->add(0);
+    auto col_link = origin->add_column_link(type_LinkList, "links", *target);
+    target->add_column(type_Int, "integers");
+    auto k = target->create_object().get_key();
+    origin->create_object().get_linklist(col_link).add(k);
     group.commit();
     group.verify();
 }
@@ -1404,25 +1356,24 @@ TEST(Group_Commit_Update_Integer_Index)
 
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_table("table");
-    t->add_column(type_Int, "integer");
+    auto col = t->add_column(type_Int, "integer");
 
-    for (size_t i = 0; i < 200; i++) {
-        t->add_empty_row();
-        t->set_int(0, i, (i + 1) * 0xeeeeeeeeeeeeeeeeULL);
+    auto k0 = t->create_object().set<Int>(col, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL).get_key();
+    for (size_t i = 1; i < 200; i++) {
+        t->create_object().set<Int>(col, (i + 1) * 0xeeeeeeeeeeeeeeeeULL);
     }
 
-    t->add_search_index(0);
+    t->add_search_index(col);
 
     // This would always work
-    CHECK(t->find_first_int(0, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == 0);
+    CHECK(t->find_first_int(col, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == k0);
 
     g.commit();
 
     // This would fail (sometimes return not_found, sometimes crash)
-    CHECK(t->find_first_int(0, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == 0);
+    CHECK(t->find_first_int(col, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == k0);
 }
 
-#endif // REALM_TESTS
 
 TEST(Group_CascadeNotify_Simple)
 {
@@ -1770,7 +1721,6 @@ TEST(Group_CascadeNotify_TableViewClear)
     CHECK_EQUAL(called, 3);
 }
 
-#ifdef REALM_TESTS
 TEST(Group_WriteEmpty)
 {
     GROUP_TEST_PATH(path_1);
@@ -1892,17 +1842,16 @@ TEST(Group_ToDot)
 
 #endif // REALM_TO_DOT
 #endif // REALM_DEBUG
-#endif // LEGACY_TESTS
 
-#ifdef LEGACY_TESTS
 TEST_TYPES(Group_TimestampAddAIndexAndThenInsertEmptyRows, std::true_type, std::false_type)
 {
     constexpr bool nullable = TEST_TYPE::value;
     Group g;
     TableRef table = g.add_table("");
-    table->insert_column(0, type_Timestamp, "date", nullable);
-    table->add_search_index(0);
-    table->add_empty_row(5);
+    auto col = table->add_column(type_Timestamp, "date", nullable);
+    table->add_search_index(col);
+    std::vector<ObjKey> keys;
+    table->create_objects(5, keys);
     CHECK_EQUAL(table->size(), 5);
 }
 
@@ -1913,7 +1862,7 @@ TEST(Group_SharedMappingsForReadOnlyStreamingForm)
         Group g;
         auto table = g.add_table("table");
         table->add_column(type_Int, "col");
-        table->add_empty_row();
+        table->create_object();
         g.write(path, crypt_key());
     }
 
@@ -1929,6 +1878,7 @@ TEST(Group_SharedMappingsForReadOnlyStreamingForm)
 }
 
 
+#ifdef LEGACY_TESTS
 // This test embodies a current limitation of our merge algorithm. If this
 // limitation is lifted, the code for the SET_UNIQUE instruction in
 // fuzz_group.cpp should be strengthened to reflect this.
