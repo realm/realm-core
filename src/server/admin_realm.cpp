@@ -90,29 +90,57 @@ void AdminRealmListener::start()
         download_complete();
 
         auto realm = Realm::get_shared_realm(m_config);
-        m_results = Results(realm, *ObjectStore::table_for_object_type(realm->read_group(), "RealmFile"));
-        m_notification_token = m_results.add_notification_callback([=](CollectionChangeSet const& changes, std::exception_ptr err) {
-            auto self = weak_self.lock();
-            if (!self)
-                return;
-            if (err) {
-                error(err);
-                return;
+        m_results = Results(realm, *ObjectStore::table_for_object_type(realm->read_group(), "RealmFile")).sort({{"path", true}});
+
+        struct Handler {
+            bool initial_sent = false;
+            std::weak_ptr<AdminRealmListener> weak_self;
+            Handler(std::weak_ptr<AdminRealmListener> weak_self) : weak_self(std::move(weak_self)) { }
+
+            void before(CollectionChangeSet const& c)
+            {
+                if (c.deletions.empty())
+                    return;
+                auto self = weak_self.lock();
+                if (!self)
+                    return;
+
+                size_t path_col_ndx = self->m_results.get(0).get_column_index("path");
+                for (auto i : c.deletions.as_indexes())
+                    self->unregister_realm(self->m_results.get(i).get_string(path_col_ndx));
             }
 
-            auto& table = *ObjectStore::table_for_object_type(realm->read_group(), "RealmFile");
-            size_t path_col_ndx = table.get_column_index("path");
+            void after(CollectionChangeSet const& c)
+            {
+                if (c.insertions.empty() && initial_sent)
+                    return;
 
-            if (!m_initial_sent || changes.empty()) {
-                for (size_t i = 0, size = table.size(); i < size; ++i)
-                    register_realm(table.get_string(path_col_ndx, i));
-                m_initial_sent = true;
+                auto self = weak_self.lock();
+                if (!self)
+                    return;
+                if (self->m_results.size() == 0)
+                    return;
+
+                size_t path_col_ndx = self->m_results.get(0).get_column_index("path");
+
+                if (!initial_sent) {
+                    for (size_t i = 0, size = self->m_results.size(); i < size; ++i)
+                        self->register_realm(self->m_results.get(i).get_string(path_col_ndx));
+                    initial_sent = true;
+                }
+                else {
+                    for (auto i : c.insertions.as_indexes())
+                        self->register_realm(self->m_results.get(i).get_string(path_col_ndx));
+                }
             }
-            else {
-                for (auto i : changes.insertions.as_indexes())
-                    register_realm(table.get_string(path_col_ndx, i));
+
+            void error(std::exception_ptr e)
+            {
+                if (auto self = weak_self.lock())
+                    self->error(e);
             }
-        });
+        };
+        m_notification_token = m_results.add_notification_callback(Handler(std::move(weak_self)));
     });
     m_download_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
     bool result = m_download_session->wait_for_download_completion(std::move(download_callback));

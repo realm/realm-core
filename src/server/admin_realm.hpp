@@ -38,6 +38,7 @@ public:
     void start();
 
     virtual void register_realm(StringData virtual_path) = 0;
+    virtual void unregister_realm(StringData virtual_path) = 0;
     virtual void download_complete() = 0;
     virtual void error(std::exception_ptr) = 0;
 
@@ -46,7 +47,6 @@ private:
     Results m_results;
     NotificationToken m_notification_token;
     std::shared_ptr<SyncSession> m_download_session;
-    bool m_initial_sent = false;
 };
 
 } // namespace realm

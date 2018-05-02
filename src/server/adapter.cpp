@@ -536,6 +536,7 @@ public:
 
 private:
     void register_realm(StringData virtual_path) override;
+    void unregister_realm(StringData) override {}
     void error(std::exception_ptr) override {} // FIXME
     void download_complete() override {}
 

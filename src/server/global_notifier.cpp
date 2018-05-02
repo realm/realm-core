@@ -87,6 +87,7 @@ public:
 
 public:
     void register_realm(StringData virtual_path) override;
+    void unregister_realm(StringData) override {}
     void error(std::exception_ptr err) override { m_target->error(err); }
     void download_complete() override { m_target->download_complete(); }
 
