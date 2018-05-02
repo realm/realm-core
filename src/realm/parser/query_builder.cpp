@@ -133,10 +133,9 @@ void add_bool_constraint_to_query(Query &query, Predicate::Operator operatorType
     }
 }
 
-void add_string_constraint_to_query(Query &query,
-                                    Predicate::Comparison cmp,
-                                    Columns<String> &&column,
-                                    StringData &&value) {
+void add_string_constraint_to_query(Query& query, const Predicate::Comparison& cmp, Columns<String>&& column,
+                                    StringData&& value)
+{
     bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
     switch (cmp.op) {
         case Predicate::Operator::BeginsWith:
@@ -162,10 +161,9 @@ void add_string_constraint_to_query(Query &query,
     }
 }
 
-void add_string_constraint_to_query(realm::Query &query,
-                                    Predicate::Comparison cmp,
-                                    StringData &&value,
-                                    Columns<String> &&column) {
+void add_string_constraint_to_query(realm::Query& query, const Predicate::Comparison& cmp, StringData&& value,
+                                    Columns<String>&& column)
+{
     bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
     switch (cmp.op) {
         case Predicate::Operator::In:
@@ -183,10 +181,9 @@ void add_string_constraint_to_query(realm::Query &query,
     }
 }
 
-void add_string_constraint_to_query(realm::Query &query,
-                                    Predicate::Comparison cmp,
-                                    Columns<String> &&lhs_col,
-                                    Columns<String> &&rhs_col) {
+void add_string_constraint_to_query(realm::Query& query, const Predicate::Comparison& cmp, Columns<String>&& lhs_col,
+                                    Columns<String>&& rhs_col)
+{
     bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
     switch (cmp.op) {
         case Predicate::Operator::BeginsWith:
@@ -212,10 +209,9 @@ void add_string_constraint_to_query(realm::Query &query,
     }
 }
 
-void add_binary_constraint_to_query(Query &query,
-                                    Predicate::Comparison cmp,
-                                    Columns<Binary> &&column,
-                                    BinaryData &&value) {
+void add_binary_constraint_to_query(Query& query, const Predicate::Comparison& cmp, Columns<Binary>&& column,
+                                    BinaryData&& value)
+{
     bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
     switch (cmp.op) {
         case Predicate::Operator::BeginsWith:
@@ -241,10 +237,9 @@ void add_binary_constraint_to_query(Query &query,
     }
 }
 
-void add_binary_constraint_to_query(realm::Query &query,
-                                    Predicate::Comparison cmp,
-                                    BinaryData &&value,
-                                    Columns<Binary> &&column) {
+void add_binary_constraint_to_query(realm::Query& query, const Predicate::Comparison& cmp, BinaryData&& value,
+                                    Columns<Binary>&& column)
+{
     switch (cmp.op) {
         case Predicate::Operator::In:
             REALM_FALLTHROUGH;
@@ -259,10 +254,9 @@ void add_binary_constraint_to_query(realm::Query &query,
     }
 }
 
-void add_binary_constraint_to_query(Query &query,
-                                    Predicate::Comparison cmp,
-                                    Columns<Binary> &&lhs_col,
-                                    Columns<Binary> &&rhs_col) {
+void add_binary_constraint_to_query(Query& query, const Predicate::Comparison& cmp, Columns<Binary>&& lhs_col,
+                                    Columns<Binary>&& rhs_col)
+{
     bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
     switch (cmp.op) {
         case Predicate::Operator::BeginsWith:
@@ -328,7 +322,7 @@ void add_link_constraint_to_query(realm::Query &query,
 
 
 template <typename A, typename B>
-void do_add_comparison_to_query(Query &query, Predicate::Comparison cmp, A &lhs, B &rhs, DataType type)
+void do_add_comparison_to_query(Query& query, const Predicate::Comparison& cmp, A& lhs, B& rhs, DataType type)
 {
 
     switch (type) {
@@ -376,7 +370,7 @@ void do_add_comparison_to_query(Query &query, Predicate::Comparison cmp, A &lhs,
 }
 
 template <>
-void do_add_comparison_to_query(Query&, Predicate::Comparison, ValueExpression&, ValueExpression&, DataType)
+void do_add_comparison_to_query(Query&, const Predicate::Comparison&, ValueExpression&, ValueExpression&, DataType)
 {
     throw std::runtime_error("Invalid predicate: comparison between two literals is not supported.");
 }
@@ -387,7 +381,8 @@ enum class NullLocation {
 };
 
 template <class T>
-void do_add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, const T &expr, DataType type, NullLocation location)
+void do_add_null_comparison_to_query(Query& query, const Predicate::Comparison& cmp, const T& expr, DataType type,
+                                     NullLocation location)
 {
     if (type == type_LinkList) { // this handles backlinks as well since they are set to type LinkList
         throw std::logic_error("Comparing a list property to 'null' is not supported");
@@ -434,7 +429,8 @@ void do_add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, co
     }
 }
 
-void add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, ExpressionContainer& exp, NullLocation location)
+void add_null_comparison_to_query(Query& query, const Predicate::Comparison& cmp, ExpressionContainer& exp,
+                                  NullLocation location)
 {
     switch (exp.type) {
         case ExpressionContainer::ExpressionInternal::exp_Value:
@@ -469,7 +465,8 @@ void add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, Expre
 }
 
 template <typename LHS_T>
-void internal_add_comparison_to_query(Query& query, LHS_T& lhs, Predicate::Comparison cmp, ExpressionContainer& rhs, DataType comparison_type)
+void internal_add_comparison_to_query(Query& query, LHS_T& lhs, const Predicate::Comparison& cmp,
+                                      ExpressionContainer& rhs, DataType comparison_type)
 {
     switch (rhs.type) {
         case ExpressionContainer::ExpressionInternal::exp_Value:
@@ -508,7 +505,8 @@ void internal_add_comparison_to_query(Query& query, LHS_T& lhs, Predicate::Compa
     }
 }
 
-void add_comparison_to_query(Query &query, ExpressionContainer& lhs, Predicate::Comparison cmp, ExpressionContainer& rhs)
+void add_comparison_to_query(Query& query, ExpressionContainer& lhs, const Predicate::Comparison& cmp,
+                             ExpressionContainer& rhs)
 {
     DataType comparison_type = lhs.get_comparison_type(rhs);
     switch (lhs.type) {
