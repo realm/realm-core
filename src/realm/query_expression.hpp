@@ -2298,7 +2298,11 @@ private:
 template <class>
 class BacklinkCount : public Subexpr2<Int> {
 public:
-    BacklinkCount(LinkMap link_map)
+    BacklinkCount(const LinkMap& link_map)
+        : m_link_map(link_map)
+    {
+    }
+    BacklinkCount(LinkMap&& link_map)
         : m_link_map(std::move(link_map))
     {
     }
@@ -2368,8 +2372,8 @@ public:
     }
 
 private:
-    const ClusterKeyArray* m_keys;
-    uint64_t m_offset;
+    const ClusterKeyArray* m_keys = nullptr;
+    uint64_t m_offset = 0;
     LinkMap m_link_map;
 };
 
@@ -3148,9 +3152,9 @@ class SubColumnAggregate;
 template <typename T>
 class SubColumns : public Subexpr {
 public:
-    SubColumns(Columns<T> column, LinkMap link_map)
+    SubColumns(Columns<T>&& column, const LinkMap& link_map)
         : m_column(std::move(column))
-        , m_link_map(std::move(link_map))
+        , m_link_map(link_map)
     {
     }
 
@@ -3214,9 +3218,9 @@ private:
 template <typename T, typename Operation>
 class SubColumnAggregate : public Subexpr2<typename Operation::ResultType> {
 public:
-    SubColumnAggregate(Columns<T> column, LinkMap link_map)
-        : m_column(std::move(column))
-        , m_link_map(std::move(link_map))
+    SubColumnAggregate(const Columns<T>& column, const LinkMap& link_map)
+        : m_column(column)
+        , m_link_map(link_map)
     {
     }
     SubColumnAggregate(SubColumnAggregate const& other)
@@ -3289,9 +3293,9 @@ private:
 
 class SubQueryCount : public Subexpr2<Int> {
 public:
-    SubQueryCount(Query q, LinkMap link_map)
-        : m_query(std::move(q))
-        , m_link_map(std::move(link_map))
+    SubQueryCount(const Query& q, const LinkMap& link_map)
+        : m_query(q)
+        , m_link_map(link_map)
     {
     }
 
