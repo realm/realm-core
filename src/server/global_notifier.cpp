@@ -87,7 +87,7 @@ public:
 
 public:
     void register_realm(StringData virtual_path) override;
-    void unregister_realm(StringData) override {}
+    void unregister_realm(StringData) override;
     void error(std::exception_ptr err) override { m_target->error(err); }
     void download_complete() override { m_target->download_complete(); }
 
@@ -105,6 +105,7 @@ public:
         std::unique_ptr<Replication> history;
         std::unique_ptr<SharedGroup> shared_group;
         std::queue<VersionID> versions;
+        bool pending_deletion = false;
     };
     std::queue<RealmToCalculate*> m_work_queue;
     std::unordered_map<std::string, RealmToCalculate> m_realms;
@@ -199,6 +200,29 @@ void GlobalNotifier::Impl::register_realm(StringData path) {
     });
 }
 
+void GlobalNotifier::Impl::unregister_realm(StringData path) {
+    auto realm = m_realms.find(path);
+    if (realm == m_realms.end()) {
+        m_logger->trace("Global notifier: unwatched Realm at (%1) was deleted", path);
+        return;
+    }
+
+    std::lock_guard<std::mutex> l(m_work_queue_mutex);
+    if (realm->second.versions.empty()) {
+        // No notifications currently in progress, so we can just close the Realm and be done with it.
+        m_logger->trace("Global notifier: watched Realm at (%1) was deleted", path);
+        std::string path = realm->second.coordinator->get_config().path;
+        m_realms.erase(realm);
+        File::remove(path);
+        return;
+    }
+
+    // Otherwise we need to defer closing the Realm until we're done with our current work.
+    m_logger->trace("Global notifier: watched Realm at (%1) will be deleted once all notifications are processed", path);
+    realm->second.coordinator->set_transaction_callback(nullptr);
+    realm->second.pending_deletion = true;
+}
+
 void GlobalNotifier::Impl::release_version(std::string const& virtual_path, VersionID old_version, VersionID new_version)
 {
     std::lock_guard<std::mutex> l(m_work_queue_mutex);
@@ -217,6 +241,13 @@ void GlobalNotifier::Impl::release_version(std::string const& virtual_path, Vers
         info.shared_group = nullptr;
         info.history = nullptr;
         m_logger->trace("Global notifier: release version on (%1): no pending versions", info.virtual_path);
+
+        if (info.pending_deletion) {
+            m_logger->trace("Global notifier: completing pending deletion of (%1)", virtual_path);
+            std::string path = info.coordinator->get_config().path;
+            m_realms.erase(it);
+            File::remove(path);
+        }
     }
     else {
         LangBindHelper::advance_read(*sg, new_version);
