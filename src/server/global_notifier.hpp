@@ -59,6 +59,12 @@ public:
     // The virtual server path of the Realm which changed.
     std::string realm_path;
 
+    // The kind of change which happened to the Realm.
+    enum class Type {
+        Change,
+        Delete
+    } type;
+
     // The Realm which changed, at the version immediately before the changes
     // made. `modifications` and `deletions` within the change sets are indices
     // in this Realm.
@@ -92,6 +98,9 @@ private:
                        std::string realm_id,
                        Realm::Config config,
                        VersionID old_version, VersionID new_version);
+    ChangeNotification(std::shared_ptr<GlobalNotifier::Impl> notifier,
+                       std::string virtual_path,
+                       std::string realm_id);
     std::string m_realm_id;
     Realm::Config m_config;
     VersionID m_old_version;
