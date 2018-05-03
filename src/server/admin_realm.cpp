@@ -58,10 +58,11 @@ void AdminRealmListener::start()
     if (auto realm = m_results.get_realm()) {
         // If we've finished downloading the Realm, just re-report all the files listed in it
         auto& table = *ObjectStore::table_for_object_type(realm->read_group(), "RealmFile");
+        size_t id_col_ndx = table.get_column_index("id");
         size_t path_col_ndx = table.get_column_index("path");
 
         for (size_t i = 0, size = table.size(); i < size; ++i)
-            register_realm(table.get_string(path_col_ndx, i));
+            register_realm(table.get_string(id_col_ndx, i), table.get_string(path_col_ndx, i));
         return;
     }
 
@@ -105,9 +106,12 @@ void AdminRealmListener::start()
                 if (!self)
                     return;
 
+                size_t id_col_ndx = self->m_results.get(0).get_column_index("id");
                 size_t path_col_ndx = self->m_results.get(0).get_column_index("path");
-                for (auto i : c.deletions.as_indexes())
-                    self->unregister_realm(self->m_results.get(i).get_string(path_col_ndx));
+                for (auto i : c.deletions.as_indexes()) {
+                    auto row = self->m_results.get(i);
+                    self->unregister_realm(row.get_string(id_col_ndx), row.get_string(path_col_ndx));
+                }
             }
 
             void after(CollectionChangeSet const& c)
@@ -121,16 +125,21 @@ void AdminRealmListener::start()
                 if (self->m_results.size() == 0)
                     return;
 
+                size_t id_col_ndx = self->m_results.get(0).get_column_index("id");
                 size_t path_col_ndx = self->m_results.get(0).get_column_index("path");
 
                 if (!initial_sent) {
-                    for (size_t i = 0, size = self->m_results.size(); i < size; ++i)
-                        self->register_realm(self->m_results.get(i).get_string(path_col_ndx));
+                    for (size_t i = 0, size = self->m_results.size(); i < size; ++i) {
+                        auto row = self->m_results.get(i);
+                        self->register_realm(row.get_string(id_col_ndx), row.get_string(path_col_ndx));
+                    }
                     initial_sent = true;
                 }
                 else {
-                    for (auto i : c.insertions.as_indexes())
-                        self->register_realm(self->m_results.get(i).get_string(path_col_ndx));
+                    for (auto i : c.insertions.as_indexes()) {
+                        auto row = self->m_results.get(i);
+                        self->register_realm(row.get_string(id_col_ndx), row.get_string(path_col_ndx));
+                    }
                 }
             }
 

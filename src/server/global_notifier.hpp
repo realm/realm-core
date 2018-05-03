@@ -91,8 +91,10 @@ public:
 private:
     ChangeNotification(std::shared_ptr<GlobalNotifier::Impl> notifier,
                        std::string virtual_path,
+                       std::string realm_id,
                        Realm::Config config,
                        VersionID old_version, VersionID new_version);
+    std::string m_realm_id;
     Realm::Config m_config;
     VersionID m_old_version;
     VersionID m_new_version;

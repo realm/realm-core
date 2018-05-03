@@ -37,8 +37,8 @@ public:
 
     void start();
 
-    virtual void register_realm(StringData virtual_path) = 0;
-    virtual void unregister_realm(StringData virtual_path) = 0;
+    virtual void register_realm(StringData id, StringData virtual_path) = 0;
+    virtual void unregister_realm(StringData id, StringData virtual_path) = 0;
     virtual void download_complete() = 0;
     virtual void error(std::exception_ptr) = 0;
 

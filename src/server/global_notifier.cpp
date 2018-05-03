@@ -83,11 +83,11 @@ public:
 
     Realm::Config get_config(StringData virtual_path, util::Optional<Schema> schema) const;
     util::Optional<ChangeNotification> next_changed_realm();
-    void release_version(std::string const& virtual_path, VersionID old_version, VersionID new_version);
+    void release_version(std::string const& id, VersionID old_version, VersionID new_version);
 
 public:
-    void register_realm(StringData virtual_path) override;
-    void unregister_realm(StringData) override;
+    void register_realm(StringData, StringData virtual_path) override;
+    void unregister_realm(StringData, StringData) override;
     void error(std::exception_ptr err) override { m_target->error(err); }
     void download_complete() override { m_target->download_complete(); }
 
@@ -100,6 +100,7 @@ public:
 
     std::mutex m_work_queue_mutex;
     struct RealmToCalculate {
+        std::string realm_id;
         std::string virtual_path;
         std::shared_ptr<_impl::RealmCoordinator> coordinator;
         std::unique_ptr<Replication> history;
@@ -161,7 +162,7 @@ Realm::Config GlobalNotifier::Impl::get_config(StringData virtual_path, util::Op
     return config;
 }
 
-void GlobalNotifier::Impl::register_realm(StringData path) {
+void GlobalNotifier::Impl::register_realm(StringData id, StringData path) {
     if (!m_target->realm_available(path)) {
         m_logger->trace("Global notifier: not watching %1", path);
         return;
@@ -170,7 +171,7 @@ void GlobalNotifier::Impl::register_realm(StringData path) {
 
     auto config = get_config(path, util::none);
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config);
-    auto info = &m_realms.emplace(path, RealmToCalculate{path, coordinator}).first->second;
+    auto info = &m_realms.emplace(id, RealmToCalculate{id, path, coordinator}).first->second;
 
     std::weak_ptr<Impl> weak_self = std::static_pointer_cast<Impl>(shared_from_this());
     coordinator->set_transaction_callback([=, weak_self = std::move(weak_self)](VersionID old_version, VersionID new_version) {
@@ -200,8 +201,8 @@ void GlobalNotifier::Impl::register_realm(StringData path) {
     });
 }
 
-void GlobalNotifier::Impl::unregister_realm(StringData path) {
-    auto realm = m_realms.find(path);
+void GlobalNotifier::Impl::unregister_realm(StringData id, StringData path) {
+    auto realm = m_realms.find(id);
     if (realm == m_realms.end()) {
         m_logger->trace("Global notifier: unwatched Realm at (%1) was deleted", path);
         return;
@@ -223,11 +224,11 @@ void GlobalNotifier::Impl::unregister_realm(StringData path) {
     realm->second.pending_deletion = true;
 }
 
-void GlobalNotifier::Impl::release_version(std::string const& virtual_path, VersionID old_version, VersionID new_version)
+void GlobalNotifier::Impl::release_version(std::string const& id, VersionID old_version, VersionID new_version)
 {
     std::lock_guard<std::mutex> l(m_work_queue_mutex);
 
-    auto it = m_realms.find(virtual_path);
+    auto it = m_realms.find(id);
     REALM_ASSERT(it != m_realms.end());
     auto& info = it->second;
 
@@ -243,7 +244,7 @@ void GlobalNotifier::Impl::release_version(std::string const& virtual_path, Vers
         m_logger->trace("Global notifier: release version on (%1): no pending versions", info.virtual_path);
 
         if (info.pending_deletion) {
-            m_logger->trace("Global notifier: completing pending deletion of (%1)", virtual_path);
+            m_logger->trace("Global notifier: completing pending deletion of (%1)", info.virtual_path);
             std::string path = info.coordinator->get_config().path;
             m_realms.erase(it);
             File::remove(path);
@@ -295,7 +296,8 @@ util::Optional<GlobalNotifier::ChangeNotification> GlobalNotifier::next_changed_
     m_impl->m_logger->trace("Global notifier: notifying for realm at %1", next->virtual_path);
 
     auto old_version = next->shared_group->get_version_of_current_transaction();
-    return ChangeNotification(m_impl, next->virtual_path, next->coordinator->get_config(),
+    return ChangeNotification(m_impl, next->virtual_path, next->realm_id,
+                              next->coordinator->get_config(),
                               old_version, next->versions.front());
 }
 
@@ -311,10 +313,12 @@ void GlobalNotifier::set_logger_factory(SyncLoggerFactory* factory)
 
 GlobalNotifier::ChangeNotification::ChangeNotification(std::shared_ptr<GlobalNotifier::Impl> notifier,
                                                        std::string virtual_path,
+                                                       std::string realm_id,
                                                        Realm::Config config,
                                                        VersionID old_version,
                                                        VersionID new_version)
 : realm_path(std::move(virtual_path))
+, m_realm_id(std::move(realm_id))
 , m_config(std::move(config))
 , m_old_version(old_version)
 , m_new_version(new_version)
@@ -325,7 +329,7 @@ GlobalNotifier::ChangeNotification::ChangeNotification(std::shared_ptr<GlobalNot
 GlobalNotifier::ChangeNotification::~ChangeNotification()
 {
     if (m_notifier)
-        m_notifier->release_version(realm_path, m_old_version, m_new_version);
+        m_notifier->release_version(m_realm_id, m_old_version, m_new_version);
     if (m_old_realm)
         m_old_realm->close();
     if (m_new_realm)
@@ -336,6 +340,7 @@ std::string GlobalNotifier::ChangeNotification::serialize() const
 {
     nlohmann::json ret;
     ret["virtual_path"] = realm_path;
+    ret["realm_id"] = m_realm_id;
     ret["path"] = m_config.path;
     ret["old_version"] = m_old_version;
     ret["new_version"] = m_new_version;
@@ -346,6 +351,7 @@ GlobalNotifier::ChangeNotification::ChangeNotification(std::string const& serial
 {
     auto parsed = nlohmann::json::parse(serialized);
     realm_path = parsed["virtual_path"];
+    m_realm_id = parsed["realm_id"];
     m_old_version = parsed["old_version"];
     m_new_version = parsed["new_version"];
 
