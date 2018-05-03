@@ -2874,7 +2874,7 @@ Query compare(const Subexpr2<Link>& left, const ConstObj& obj)
     const Columns<Link>* column = dynamic_cast<const Columns<Link>*>(&left);
     if (column) {
         const LinkMap& link_map = column->link_map();
-        REALM_ASSERT(link_map.get_target_table() == ConstTableRef(obj.get_table()));
+        REALM_ASSERT(link_map.get_target_table()->get_key() == obj.get_table()->get_key());
 #ifdef REALM_OLDQUERY_FALLBACK
         if (link_map.get_nb_hops() == 1) {
             // We can fall back to Query::links_to for != and == operations on links, but only
