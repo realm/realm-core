@@ -71,9 +71,9 @@ struct IncompatibleHistories : util::File::AccessError {
 /// A DB facilitates transactions.
 ///
 /// Access to a database is done through transactions. Transactions
-/// are managed by a DB object. No matter how many transactions you
+/// are created by a DB object. No matter how many transactions you
 /// use, you only need a single DB object per file. Methods on the DB
-/// object is thread-safe.
+/// object are thread-safe.
 ///
 /// Realm has 3 types of Transactions:
 /// * A frozen transaction allows read only access
@@ -303,18 +303,18 @@ public:
 ///   TableView::sync_if_needed() is called. If the original payload was in
 ///   sync at the exporting side, it will also be in sync at the importing
 ///   side. This is indicated to handover_export() by the argument
-///   MutableSourcePayload::Move
+///   PayloadPolicy::Move
 ///
 /// - with payload copy: a copy of the payload is handed over, so both the
 ///   accessors on the exporting side *and* the accessors created at the
 ///   importing side has their own payload. This is indicated to
-///   handover_export() by the argument ConstSourcePayload::Copy
+///   handover_export() by the argument PayloadPolicy::Copy
 ///
 /// - without payload: the payload stays with the accessor on the exporting
 ///   side. On the importing side, the new accessor is created without
 ///   payload. A call to TableView::sync_if_needed() will trigger generation
 ///   of a new payload. This form of handover is indicated to
-///   handover_export() by the argument ConstSourcePayload::Stay.
+///   handover_export() by the argument PayloadPolicy::Stay.
 ///
 /// For all other (non-TableView) accessors, handover is done with payload
 /// copy, since the payload is trivial.
@@ -366,7 +366,8 @@ public:
 
 
 private:
-    std::mutex m_mutex;
+    std::recursive_mutex m_mutex;
+    int m_transaction_count = 0;
     SlabAlloc m_alloc;
     struct SharedInfo;
     struct ReadCount;

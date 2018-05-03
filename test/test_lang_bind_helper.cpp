@@ -11175,62 +11175,43 @@ TEST(LangBindHelper_RollbackToInitialState2)
     sg_w.begin_write();
     sg_w.rollback();
 }
-
+#endif
 
 TEST(LangBindHelper_Compact)
 {
     SHARED_GROUP_TEST_PATH(path);
     size_t N = 100;
 
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DB sg(*hist, DBOptions(crypt_key()));
     {
-        std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
-        WriteTransaction w(sg_w);
+        WriteTransaction w(sg);
         TableRef table = w.get_or_add_table("test");
         table->add_column(type_Int, "int");
         for (size_t i = 0; i < N; ++i) {
-            table->add_empty_row();
-            table->set_int(0, i, i);
+            table->create_object().set_all(static_cast<signed>(i));
         }
         w.commit();
-        sg_w.close();
     }
     {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, DBOptions(crypt_key()));
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
-        sg.close();
     }
-
     {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, DBOptions(crypt_key()));
         CHECK_EQUAL(true, sg.compact());
-        sg.close();
     }
-
     {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, DBOptions(crypt_key()));
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
-        sg.close();
     }
 }
-
 
 TEST(LangBindHelper_CompactLargeEncryptedFile)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    // We need to ensure that the size of the compacted file does not line up
-    // with the chunked-memory-mapping section boundaries, so that the file is
-    // resized on open. This targets the gap between 32 and 36 pages by writing
-    // 32 pages of data and assuming that the file overhead will be greater than
-    // zero bytes and less than four pages.
     std::vector<char> data(realm::util::page_size());
     const size_t N = 32;
 
@@ -11241,8 +11222,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
         TableRef table = wt.get_or_add_table("test");
         table->add_column(type_String, "string");
         for (size_t i = 0; i < N; ++i) {
-            table->add_empty_row();
-            table->set_string(0, i, StringData(data.data(), data.size()));
+            table->create_object().set_all(StringData(data.data(), data.size()));
         }
         wt.commit();
 
@@ -11257,11 +11237,10 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
-        sg.close();
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 {
     SHARED_GROUP_TEST_PATH(path);

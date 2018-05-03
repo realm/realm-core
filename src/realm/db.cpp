@@ -1287,31 +1287,32 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 // corrupt your database if something fails
 bool DB::compact()
 {
-    // FIXME: Make compact great again!
-    REALM_ASSERT(false);
-#if 0
     // Verify that the database file is attached
     if (is_attached() == false) {
-        throw std::runtime_error(m_db_path + ": compact must be done on an open/attached SharedGroup");
-    }
-    // Verify that preconditions for compacting is met:
-    if (m_transact_stage != transact_Ready) {
-        throw std::runtime_error(m_db_path + ": compact is not supported whithin a transaction");
+        throw std::runtime_error(m_db_path + ": compact must be done on an open/attached DB");
     }
     Durability dura;
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
     {
         SharedInfo* info = m_file_map.get_addr();
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
+
+        // We must be the ONLY DB object attached if we're to do compaction
         if (info->num_participants > 1)
             return false;
-
         // group::write() will throw if the file already exists.
         // To prevent this, we have to remove the file (should it exist)
         // before calling group::write().
         File::try_remove(tmp_path);
 
-        // Using begin_read here ensures that we have access to the latest entry
+        // local lock blocking any transaction from leaving or entering
+        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+
+        // We should be the only transaction active - otherwise back out
+        if (m_transaction_count != 0)
+            return false;
+
+        // Using start_read here ensures that we have access to the latest entry
         // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
         // This is also needed to attach the group (get the proper top pointer, etc)
         TransactionRef tr = start_read();
@@ -1321,7 +1322,7 @@ bool DB::compact()
         try {
             File file;
             file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
-            m_group.write(file, m_key, info->latest_version_number); // Throws
+            tr->write(file, m_key, info->latest_version_number); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync)
@@ -1341,26 +1342,27 @@ bool DB::compact()
             REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
             static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
         }
-        tr->close();
         dura = Durability(info->durability);
         // We need to release any shared mapping *before* releasing the control mutex.
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
-        m_group.m_alloc.detach();
+        m_alloc.detach();
 
 #ifdef _WIN32
         util::File::copy(tmp_path, m_db_path);
 #else
         util::File::move(tmp_path, m_db_path);
 #endif
+        tr->close();
         close_internal(/* with lock held: */ std::move(lock));
+        // release local lock here.
     }
     DBOptions new_options;
     new_options.durability = dura;
     new_options.encryption_key = m_key;
     new_options.allow_file_format_upgrade = false;
     do_open(m_db_path, true, false, new_options);
-#endif
+
     return true;
 }
 
@@ -1386,6 +1388,10 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
     if (!is_attached())
         return;
 
+    std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+
+    // All transactions must be closed when reaching this point.
+    REALM_ASSERT(m_transaction_count == 0);
     SharedInfo* info = m_file_map.get_addr();
     {
         bool is_sync_agent = false;
@@ -1696,7 +1702,8 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
 
 void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    --m_transaction_count;
     SharedInfo* r_info = m_reader_map.get_addr();
     const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
     atomic_double_dec(r.count); // <-- most of the exec time spent here
@@ -1705,7 +1712,7 @@ void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 
 void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (version_id.version == std::numeric_limits<version_type>::max()) {
         for (;;) {
             SharedInfo* r_info = m_reader_map.get_addr();
@@ -1723,6 +1730,7 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
             read_lock.m_version = r.version;
             read_lock.m_top_ref = to_size_t(r.current_top);
             read_lock.m_file_size = to_size_t(r.filesize);
+            ++m_transaction_count;
             return;
         }
     }
@@ -1757,6 +1765,7 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
         read_lock.m_version = r.version;
         read_lock.m_top_ref = to_size_t(r.current_top);
         read_lock.m_file_size = to_size_t(r.filesize);
+        ++m_transaction_count;
         return;
     }
 }
@@ -1881,7 +1890,7 @@ Replication::version_type DB::do_commit(Group& group)
 {
     version_type current_version;
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
+        std::lock_guard<std::recursive_mutex> lock(m_mutex);
         SharedInfo* r_info = m_reader_map.get_addr();
         current_version = r_info->get_current_version_unchecked();
     }
@@ -1956,7 +1965,7 @@ bool DB::grow_reader_mapping(uint_fast32_t index)
 
 DB::version_type DB::get_version_of_latest_snapshot()
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     // As get_version_of_latest_snapshot() may be called outside of the write
     // mutex, another thread may be performing changes to the ringbuffer
     // concurrently. It may even cleanup and recycle the current entry from
@@ -1997,7 +2006,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Group& group)
     // of the current session.
     uint_fast64_t oldest_version;
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
+        std::lock_guard<std::recursive_mutex> lock(m_mutex);
         SharedInfo* r_info = m_reader_map.get_addr();
 
         // the cleanup process may access the entire ring buffer, so make sure it is mapped.
@@ -2036,7 +2045,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Group& group)
         new_top_ref = out.write_group();                         // Throws
     }
     // protect access to shared variables and m_reader_mapping from here
-    std::lock_guard<std::mutex> lock_guard(m_mutex);
+    std::lock_guard<std::recursive_mutex> lock_guard(m_mutex);
     m_free_space = out.get_free_space();
     m_used_space = out.get_file_size() - m_free_space;
     // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
@@ -2185,6 +2194,8 @@ void Transaction::close()
 
 void Transaction::end_read()
 {
+    if (m_transact_stage == DB::transact_Ready)
+        return;
     detach();
     db->release_read_lock(m_read_lock);
     set_transact_stage(DB::transact_Ready);

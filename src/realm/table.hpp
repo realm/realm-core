@@ -914,6 +914,12 @@ public:
         : m_table(t)
     {
     }
+
+    ColKeys()
+        : m_table(nullptr)
+    {
+    }
+
     size_t size() const
     {
         return m_table->get_column_count();

@@ -639,6 +639,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     if (log) {
                         *log << "db_r.close();\n";
                     }
+                    rt = nullptr; // transactions must be done/closed before closing the DB.
                     db_r.close();
                     if (log) {
                         *log << "db_r.open(path, true, DBOptions(key));\n";
@@ -648,7 +649,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "rt = nullptr;\n";
                         *log << "rt = db_r.start_read();\n";
                     }
-                    rt = nullptr;
                     rt = db_r.start_read();
                     REALM_DO_IF_VERIFY(log, rt->verify());
                 }

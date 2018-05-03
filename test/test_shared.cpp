@@ -195,18 +195,15 @@ void test_table_add_columns(TableRef t)
 }
 }
 
-#ifdef LEGACY_TESTS
-// FIXME: Enable once tests using compact() is enabled
-void writer(std::string path, int id)
+void writer(DB* sg, int id)
 {
     // std::cerr << "Started writer " << std::endl;
     try {
         bool done = false;
-        DB sg(path, true, DBOptions(crypt_key()));
         // std::cerr << "Opened sg " << std::endl;
         for (int i = 0; !done; ++i) {
             // std::cerr << "       - " << getpid() << std::endl;
-            WriteTransaction wt(sg);
+            WriteTransaction wt(*sg);
             auto t1 = wt.get_table("test");
             auto cols = t1->get_column_keys();
             Obj obj = t1->get_object(ObjKey(id));
@@ -224,7 +221,6 @@ void writer(std::string path, int id)
         REALM_ASSERT(false);
     }
 }
-#endif
 
 #if !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
 void killer(TestContext& test_context, int pid, std::string path, int id)
@@ -427,8 +423,6 @@ ONLY(Shared_DiskSpace)
 
 #endif // Only disables above special unit test
 
-#ifdef LEGACY_TESTS
-// FIXME: Port to new API once compact() is great again
 TEST(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -436,7 +430,7 @@ TEST(Shared_CompactingOnTheFly)
     {
         DB sg(path, false, DBOptions(crypt_key()));
         // Create table entries
-        std::vector<ColKey> cols;
+        realm::ColKeys cols;
         {
             WriteTransaction wt(sg);
             auto t1 = wt.add_table("test");
@@ -448,7 +442,7 @@ TEST(Shared_CompactingOnTheFly)
             wt.commit();
         }
         {
-            writer_thread.start(std::bind(&writer, std::string(path), 41));
+            writer_thread.start(std::bind(&writer, &sg, 41));
 
             // make sure writer has started:
             bool waiting = true;
@@ -471,8 +465,9 @@ TEST(Shared_CompactingOnTheFly)
             t1->get_object(ObjKey(41)).set(cols[2], true);
             wt.commit();
         }
+        // we must join before the DB object goes out of scope
+        writer_thread.join();
     }
-    writer_thread.join();
     {
         DB sg2(path, true, DBOptions(crypt_key()));
         {
@@ -486,7 +481,6 @@ TEST(Shared_CompactingOnTheFly)
         CHECK(table);
         CHECK_EQUAL(table->size(), 100);
         rt2.get_group().verify();
-        sg2.close();
     }
     {
         DB sg2(path, true, DBOptions(crypt_key()));
@@ -529,7 +523,6 @@ TEST(Shared_EncryptedRemap)
     CHECK_EQUAL(table->size(), rows);
     rt2.get_group().verify();
 }
-#endif
 
 
 TEST(Shared_Initial)
@@ -2977,7 +2970,7 @@ TEST(Shared_WriteEmpty)
     }
 }
 
-#ifdef LEGACY_TESTS
+
 TEST(Shared_CompactEmpty)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2986,7 +2979,7 @@ TEST(Shared_CompactEmpty)
         CHECK(sg.compact());
     }
 }
-#endif
+
 
 TEST(Shared_VersionOfBoundSnapshot)
 {
@@ -3252,8 +3245,6 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
 }
 
 // Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
-#ifdef LEGACY_TESTS
-// FIXME: Enable once compact() is great again
 NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
 {
     // String length at 2K will not trigger the error.
@@ -3349,7 +3340,6 @@ TEST(Shared_Bptree_insert_failure)
         writer2->get_table(tk)->create_objects(396, keys);
     }
 }
-#endif
 
 NONCONCURRENT_TEST(SharedGroupOptions_tmp_dir)
 {
