@@ -107,6 +107,14 @@ public:
         std::unique_ptr<SharedGroup> shared_group;
         std::queue<VersionID> versions;
         bool pending_deletion = false;
+
+        // constructor to make GCC 4.9 happy
+        RealmToCalculate(std::string realm_id, std::string virtual_path, std::shared_ptr<_impl::RealmCoordinator> coordinator)
+            : realm_id(std::move(realm_id))
+            , virtual_path(std::move(virtual_path))
+            , coordinator(std::move(coordinator))
+        {
+        }
     };
     std::queue<RealmToCalculate*> m_work_queue;
     std::unordered_map<std::string, RealmToCalculate> m_realms;
