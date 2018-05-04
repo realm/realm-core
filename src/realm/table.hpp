@@ -869,6 +869,8 @@ private:
     friend class ClusterTree;
     friend class ArrayBacklink;
     friend class ColKeyIterator;
+    friend class ConstObj;
+    friend class Obj;
 };
 
 class ColKeyIterator {
