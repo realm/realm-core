@@ -184,6 +184,7 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/priority_queue.hpp
     util/safe_int_ops.hpp
     util/serializer.hpp
+    util/scope_exit.hpp
     util/shared_ptr.hpp
     util/string_buffer.hpp
     util/terminate.hpp
