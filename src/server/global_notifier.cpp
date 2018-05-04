@@ -81,7 +81,7 @@ public:
          std::string server_base_url, std::shared_ptr<SyncUser> user,
          std::function<SyncBindSessionHandler> bind_callback);
 
-    Realm::Config get_config(StringData virtual_path, util::Optional<Schema> schema) const;
+    Realm::Config get_config(StringData id, StringData virtual_path) const;
     util::Optional<ChangeNotification> next_changed_realm();
     void release_version(std::string const& id, VersionID old_version, VersionID new_version);
 
@@ -147,14 +147,9 @@ GlobalNotifier::Impl::Impl(std::unique_ptr<Callback> async_target,
     util::try_make_dir(m_regular_realms_dir); // Throws
 }
 
-Realm::Config GlobalNotifier::Impl::get_config(StringData virtual_path, util::Optional<Schema> schema) const {
+Realm::Config GlobalNotifier::Impl::get_config(StringData id, StringData virtual_path) const {
     Realm::Config config;
-    if (schema) {
-        config.schema = std::move(schema);
-        config.schema_version = 0;
-    }
-
-    std::string file_path = m_regular_realms_dir + virtual_path.data() + ".realm";
+    auto file_path = m_regular_realms_dir + virtual_path.data() + "/" + id.data() + ".realm";
     for (size_t pos = m_regular_realms_dir.size(); pos != file_path.npos; pos = file_path.find('/', pos + 1)) {
         file_path[pos] = '\0';
         util::try_make_dir(file_path);
@@ -177,7 +172,7 @@ void GlobalNotifier::Impl::register_realm(StringData id, StringData path) {
     }
     m_logger->trace("Global notifier: watching %1", path);
 
-    auto config = get_config(path, util::none);
+    auto config = get_config(id, path);
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config);
     auto info = &m_realms.emplace(id, RealmToCalculate{id, path, coordinator}).first->second;
 

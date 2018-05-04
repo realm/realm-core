@@ -42,8 +42,6 @@ public:
 
     void start();
 
-    Realm::Config get_config(std::string const& path, util::Optional<Schema> schema = util::none);
-
     class ChangeNotification;
     util::Optional<ChangeNotification> next_changed_realm();
 
