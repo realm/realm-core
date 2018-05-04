@@ -130,9 +130,11 @@ public:
     /// If this function returns false, the global notifier will not observe
     /// the Realm.
     ///
+    /// \param id A unique identifier for the Realm which will not be reused
+    ///           even if multiple Realms are created for a single virtual path.
     /// \param name The name (virtual path) by which the server knows that
     /// Realm.
-    virtual bool realm_available(std::string const& virtual_path) = 0;
+    virtual bool realm_available(StringData id, StringData virtual_path) = 0;
 
     /// Called when a new version is available in an observed Realm.
     virtual void realm_changed(GlobalNotifier*) = 0;

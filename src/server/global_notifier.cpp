@@ -171,7 +171,7 @@ Realm::Config GlobalNotifier::Impl::get_config(StringData virtual_path, util::Op
 }
 
 void GlobalNotifier::Impl::register_realm(StringData id, StringData path) {
-    if (!m_target->realm_available(path)) {
+    if (!m_target->realm_available(id, path)) {
         m_logger->trace("Global notifier: not watching %1", path);
         return;
     }
