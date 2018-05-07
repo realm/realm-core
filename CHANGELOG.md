@@ -16,7 +16,7 @@
 
 ### Internals
 
-* None.
+* Restore -fvisibility-inlines-hidden for the binaries for Apple platforms.
 
 ----------------------------------------------
 
