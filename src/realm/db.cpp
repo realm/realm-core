@@ -1294,6 +1294,13 @@ bool DB::compact()
     Durability dura;
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
     {
+        // local lock blocking any transaction from leaving or entering
+        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+
+        // We should be the only transaction active - otherwise back out
+        if (m_transaction_count != 0)
+            return false;
+
         SharedInfo* info = m_file_map.get_addr();
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
 
@@ -1304,13 +1311,6 @@ bool DB::compact()
         // To prevent this, we have to remove the file (should it exist)
         // before calling group::write().
         File::try_remove(tmp_path);
-
-        // local lock blocking any transaction from leaving or entering
-        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
-
-        // We should be the only transaction active - otherwise back out
-        if (m_transaction_count != 0)
-            return false;
 
         // Using start_read here ensures that we have access to the latest entry
         // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
