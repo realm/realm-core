@@ -782,7 +782,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 
 void SlabAlloc::setup_compatibility_mapping(size_t file_size)
 {
-    m_sections_in_compatibility_mapping = get_section_index(file_size);
+    m_sections_in_compatibility_mapping = int(get_section_index(file_size));
     REALM_ASSERT(m_sections_in_compatibility_mapping);
     m_compatibility_mapping = util::File::Map<char>(get_file(), util::File::access_ReadOnly, file_size);
     // fake that we've only mapped the number of full sections in order
