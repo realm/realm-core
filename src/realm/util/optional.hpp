@@ -410,7 +410,6 @@ constexpr Optional<T>::operator bool() const
 template <class T>
 constexpr const T& Optional<T>::value() const
 {
-    REALM_ASSERT(m_engaged);
     return m_value;
 }
 
@@ -424,7 +423,6 @@ T& Optional<T>::value()
 template <class T>
 constexpr const typename Optional<T&>::target_type& Optional<T&>::value() const
 {
-    REALM_ASSERT(m_ptr);
     return *m_ptr;
 }
 
