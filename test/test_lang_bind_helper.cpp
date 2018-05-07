@@ -452,7 +452,6 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(type_Float, bar->get_column_type(cols[1]));
     CHECK_EQUAL(type_Double, bar->get_column_type(cols[2]));
 
-#ifdef LEGACY_TESTS
     // Clear tables - not supported before backlinks work again
     {
         WriteTransaction wt(sg_w);
@@ -465,18 +464,17 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->advance_read();
     rt->verify();
     CHECK_EQUAL(2, rt->size());
-    CHECK(foo->is_attached());
+    CHECK(foo);
     CHECK_EQUAL(2, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(0, foo->size());
-    CHECK(bar->is_attached());
+    CHECK(bar);
     CHECK_EQUAL(3, bar->get_column_count());
     CHECK_EQUAL(type_Int, bar->get_column_type(cols[0]));
     CHECK_EQUAL(type_Float, bar->get_column_type(cols[1]));
     CHECK_EQUAL(type_Double, bar->get_column_type(cols[2]));
     CHECK_EQUAL(0, bar->size());
-#endif
     CHECK_EQUAL(foo, rt->get_table("foo"));
     CHECK_EQUAL(bar, rt->get_table("bar"));
 }
@@ -638,92 +636,6 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
     CHECK_EQUAL(rt->get_table("new table")->size(), 0);
 }
 
-#ifdef LEGACY_TESTS
-TEST(LangBindHelper_AdvanceReadTransact_InsertTableOrdered)
-{
-    SHARED_GROUP_TEST_PATH(path);
-
-    {
-        std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-
-        wt.add_table("table1");
-        wt.add_table("table2");
-        CHECK_EQUAL(wt.get_table(0), wt.get_table("table1"));
-        CHECK_EQUAL(wt.get_table(1), wt.get_table("table2"));
-        wt.commit();
-    }
-
-    std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    TransactionRef rt = sg.start_read()
-
-    {
-        std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-        CHECK_EQUAL(wt.get_group().size(), 2);
-        wt.get_group().insert_table(0, "table0");
-        CHECK_EQUAL(wt.get_group().size(), 3);
-        CHECK_EQUAL(wt.get_table(0), wt.get_table("table0"));
-        CHECK_EQUAL(wt.get_table(1), wt.get_table("table1"));
-        CHECK_EQUAL(wt.get_table(2), wt.get_table("table2"));
-        wt.commit();
-    }
-
-    rt->advance_read();
-
-    CHECK_EQUAL(rt.get_table(0), rt.get_table("table0"));
-    CHECK_EQUAL(rt.get_table(1), rt.get_table("table1"));
-    CHECK_EQUAL(rt.get_table(2), rt.get_table("table2"));
-    CHECK_EQUAL(rt.get_group().size(), 3);
-}
-
-
-TEST(LangBindHelper_AdvanceReadTransact_RemoveTableOrdered)
-{
-    SHARED_GROUP_TEST_PATH(path);
-
-    {
-        std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-
-        wt.add_table("table0");
-        wt.add_table("table1");
-        wt.add_table("table2");
-        CHECK_EQUAL(wt.get_table(0), wt.get_table("table0"));
-        CHECK_EQUAL(wt.get_table(1), wt.get_table("table1"));
-        CHECK_EQUAL(wt.get_table(2), wt.get_table("table2"));
-        wt.commit();
-    }
-
-    std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    TransactionRef rt = sg.start_read()
-
-    {
-        std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-        CHECK_EQUAL(wt.get_group().size(), 3);
-        wt.get_group().remove_table(0);
-        CHECK_EQUAL(wt.get_group().size(), 2);
-        CHECK_EQUAL(wt.get_table(0), wt.get_table("table1"));
-        CHECK_EQUAL(wt.get_table(1), wt.get_table("table2"));
-        wt.commit();
-    }
-
-    rt->advance_read();
-
-    CHECK_EQUAL(rt.get_table(0), rt.get_table("table1"));
-    CHECK_EQUAL(rt.get_table(1), rt.get_table("table2"));
-    CHECK_EQUAL(rt.get_group().size(), 2);
-}
-#endif
-
-
 TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
 {
     // Verify that the table accessor of a link-opposite table is refreshed even
@@ -758,61 +670,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
     rt->verify();
 }
 
-
 #ifdef LEGACY_TESTS
-TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
-
-    // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() const Group& group = rt;
-    CHECK_EQUAL(0, rt->size());
-
-    // Create a table via the other SharedGroup
-    {
-        WriteTransaction wt(sg_w);
-        TableRef foo_w = wt.add_table("foo");
-        foo_w->add_column(type_Int, "i");
-        foo_w->add_empty_row();
-        wt.commit();
-    }
-
-    // Verify that sorting a LinkList works
-    size_t link_col;
-    {
-        WriteTransaction wt(sg_w);
-        TableRef foo_w = wt.add_table("links");
-        link_col = foo_w->add_column_link(type_LinkList, "links", *foo_w); // just link to self
-        size_t val_col = foo_w->add_column(type_Int, "vals");              // just link to self
-        foo_w->add_empty_row(4);
-        foo_w->set_int(val_col, 0, 40);
-        foo_w->set_int(val_col, 1, 20);
-        foo_w->set_int(val_col, 2, 10);
-        foo_w->set_int(val_col, 3, 30);
-        LinkViewRef lvr = foo_w->get_linklist(link_col, 0);
-        lvr->add(0);
-        lvr->add(1);
-        lvr->add(2);
-        lvr->add(3);
-        lvr->sort(val_col); // sort such that they links become 2, 1, 3, 0
-        wt.commit();
-    }
-
-    rt->advance_read();
-
-    // Verify sorted LinkList (see above)
-    ConstTableRef linktable = rt->get_table("links");
-    ConstLinkViewRef lvr = linktable->get_linklist(link_col, 0);
-    CHECK_EQUAL(2, lvr->get(0).get_index());
-    CHECK_EQUAL(1, lvr->get(1).get_index());
-    CHECK_EQUAL(3, lvr->get(2).get_index());
-    CHECK_EQUAL(0, lvr->get(3).get_index());
-}
-
-
 TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1273,6 +1131,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2 + 6, 5)) &&
         CHECK_EQUAL(OldDateTime(60), table->get_mixed(2 + 6, 5).get_olddatetime());
 }
+#endif // LEGACY_TESTS
 
 
 TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
@@ -1280,53 +1139,48 @@ TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
     DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
+    ColKey c0, c1, c2;
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() const Group& group = rt;
+    auto rt = sg.start_read();
     CHECK_EQUAL(0, rt->size());
 
     // Create 3 string columns, one primed for conversion to "unique string
     // enumeration" representation
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef table_w = wt.add_table("t");
-        table_w->add_column(type_String, "a");
-        table_w->add_column(type_String, "b");
-        table_w->add_column(type_String, "c");
-        table_w->add_empty_row(1000);
+        c0 = table_w->add_column(type_String, "a");
+        c1 = table_w->add_column(type_String, "b");
+        c2 = table_w->add_column(type_String, "c");
         for (int i = 0; i < 1000; ++i) {
             std::ostringstream out;
             out << i;
             std::string str = out.str();
-            table_w->set_string(0, i, str);
-            table_w->set_string(1, i, "foo"); // Same value in all rows
-            table_w->set_string(2, i, str);
+            table_w->create_object().set_all(str, "foo", str);
         }
         wt.commit();
     }
     rt->advance_read();
     rt->verify();
     ConstTableRef table = rt->get_table("t");
-    ConstDescriptorRef desc = table->get_descriptor();
-    CHECK_EQUAL(0, desc->get_num_unique_values(0));
-    CHECK_EQUAL(0, desc->get_num_unique_values(1)); // Not yet "optimized"
-    CHECK_EQUAL(0, desc->get_num_unique_values(2));
+    CHECK_EQUAL(0, table->get_num_unique_values(c0));
+    CHECK_EQUAL(0, table->get_num_unique_values(c1)); // Not yet "optimized"
+    CHECK_EQUAL(0, table->get_num_unique_values(c2));
 
     // Optimize
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef table_w = wt.get_table("t");
-        table_w->optimize();
+        table_w->enumerate_string_column(c1);
         wt.commit();
     }
     rt->advance_read();
     rt->verify();
-    CHECK_EQUAL(0, desc->get_num_unique_values(0));
-    CHECK_NOT_EQUAL(0, desc->get_num_unique_values(1)); // Must be "optimized" now
-    CHECK_EQUAL(0, desc->get_num_unique_values(2));
+    CHECK_EQUAL(0, table->get_num_unique_values(c0));
+    CHECK_NOT_EQUAL(0, table->get_num_unique_values(c1)); // Must be "optimized" now
+    CHECK_EQUAL(0, table->get_num_unique_values(c2));
 }
-#endif // LEGACY_TESTS
 
 TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
 {
@@ -13185,49 +13039,42 @@ TEST(LangBindHelper_UpdateDescriptor)
     tv = sub->where().equal(0, 53).find_all();
     CHECK_EQUAL(tv.size(), 1);
 }
-
+#endif
 
 TEST(LangBindHelper_RemoveObject)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg_w(hist);
-    DB sg_r(hist);
-
-    ReadTransactionRef rt(sg_r);
+    DB sg(hist);
+    ColKey col;
+    auto rt = sg.start_read();
     {
-        WriteTransaction wt(sg_w);
-        Group& group = wt.get_group();
-        TableRef t = rt->add_table("Foo");
-        t->add_column(type_Int, "int");
-        t->create_object(ObjKey(123)).set(0, 1);
-        t->create_object(ObjKey(456)).set(0, 2);
-        wt.commit();
+        auto wt = sg.start_write();
+        TableRef t = wt->add_table("Foo");
+        col = t->add_column(type_Int, "int");
+        t->create_object(ObjKey(123)).set(col, 1);
+        t->create_object(ObjKey(456)).set(col, 2);
+        wt->commit();
     }
 
-    LangBindHelper::advance_read(sg_r);
-    const Group& g = rt.get_group();
-    auto table = g.get_table("Foo");
+    rt->advance_read();
+    auto table = rt->get_table("Foo");
     ConstObj o1 = table->get_object(ObjKey(123));
     ConstObj o2 = table->get_object(ObjKey(456));
-    CHECK_EQUAL(o1.get<int64_t>(0), 1);
-    CHECK_EQUAL(o2.get<int64_t>(0), 2);
+    CHECK_EQUAL(o1.get<int64_t>(col), 1);
+    CHECK_EQUAL(o2.get<int64_t>(col), 2);
 
     {
-        WriteTransaction wt(sg_w);
-        Group& group = wt.get_group();
-        TableRef t = rt->get_table("Foo");
+        auto wt = sg.start_write();
+        TableRef t = wt->get_table("Foo");
         t->remove_object(ObjKey(123));
-        wt.commit();
+        wt->commit();
     }
-    LangBindHelper::advance_read(sg_r);
-    CHECK_THROW(o1.get<int64_t>(0), InvalidKey);
-    CHECK_EQUAL(o2.get<int64_t>(0), 2);
+    rt->advance_read();
+    CHECK_THROW(o1.get<int64_t>(col), InvalidKey);
+    CHECK_EQUAL(o2.get<int64_t>(col), 2);
 }
-#endif // LEGACY_TESTS
 
-#ifdef LEGACY_TESTS
-// FIXME: Reenable once we have history support in place again
 TEST(LangBindHelper_callWithLock)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -13245,9 +13092,9 @@ TEST(LangBindHelper_callWithLock)
     {
         std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
         DB sg_w(*hist_w);
-        sg_w.begin_write();
+        WriteTransaction wt(sg_w);
         CHECK_NOT(DB::call_with_lock(path, callback_not_called));
-        sg_w.commit();
+        wt.commit();
         CHECK_NOT(DB::call_with_lock(path, callback_not_called));
     }
     CHECK(DB::call_with_lock(path, callback));
@@ -13261,8 +13108,8 @@ TEST(LangBindHelper_getCoreFiles)
     {
         std::unique_ptr<Replication> hist_w(make_in_realm_history(realm_path));
         DB sg_w(*hist_w);
-        sg_w.begin_write();
-        sg_w.commit();
+        WriteTransaction wt(sg_w);
+        wt.commit();
     }
 
     auto core_files = DB::get_core_files(realm_path);
@@ -13284,37 +13131,31 @@ TEST(LangBindHelper_getCoreFiles)
 
     CHECK(core_files.size() == 0);
 }
-#endif
 
-#ifdef LEGACY_TESTS
 TEST(LangBindHelper_AdvanceReadCluster)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg_w(hist);
-    DB sg_r(hist);
+    DB sg(hist);
 
-    ReadTransactionRef rt(sg_r);
+    auto rt = sg.start_read();
     {
-        WriteTransaction wt(sg_w);
-        Group& group = wt.get_group();
-        TableRef t = rt->add_table("Foo");
+        auto wt = sg.start_write();
+        TableRef t = wt->add_table("Foo");
         auto int_col = t->add_column(type_Int, "int");
         for (int64_t i = 0; i < 100; i++) {
             t->create_object(ObjKey(i)).set(int_col, i);
         }
-        wt.commit();
+        wt->commit();
     }
 
-    LangBindHelper::advance_read(sg_r);
-    const Group& g = rt.get_group();
-    auto table = g.get_table("Foo");
-    auto int_col = table->get_column_index("int");
+    rt->advance_read();
+    auto table = rt->get_table("Foo");
+    auto col = table->get_column_key("int");
     for (int64_t i = 0; i < 100; i++) {
         ConstObj o = table->get_object(ObjKey(i));
-        CHECK_EQUAL(o.get<int64_t>(int_col), i);
+        CHECK_EQUAL(o.get<int64_t>(col), i);
     }
 }
-#endif
 
 #endif
