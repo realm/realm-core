@@ -267,13 +267,6 @@ bool ConstObj::is_null(ColKey col_key) const
     update_if_needed();
     ColumnAttrMask attr = get_spec().get_column_attr(col_ndx);
 
-    if (attr.test(col_attr_List)) {
-        ArrayInteger values(get_alloc());
-        ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
-        values.init_from_ref(ref);
-        return values.get(m_row_ndx) == 0;
-    }
-
     if (attr.test(col_attr_Nullable)) {
         switch (get_spec().get_column_type(col_ndx)) {
             case col_type_Int:

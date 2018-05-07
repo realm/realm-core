@@ -3385,7 +3385,6 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
     CHECK_EQUAL(ll2.size(), 1);
 }
 
-#ifdef LEGACY_TESTS
 namespace {
 
 template <typename T>
@@ -3411,7 +3410,7 @@ public:
             not_full.wait(lock);
         if (is_empty())
             not_empty_or_closed.notify_all();
-        data[writer++ % sz] = e;
+        data[writer++ % sz] = std::move(e);
     }
 
     bool get(T& e)
@@ -3452,12 +3451,12 @@ private:
 };
 
 // Background thread for test below.
-void deleter_thread(ConcurrentQueue<LinkViewRef>& queue)
+void deleter_thread(ConcurrentQueue<LinkListPtr>& queue)
 {
     Random random(random_int<unsigned long>());
     bool closed = false;
     while (!closed) {
-        LinkViewRef r;
+        LinkListPtr r;
         // prevent the compiler from eliminating a loop:
         volatile int delay = random.draw_int_mod(10000);
         closed = !queue.get(r);
@@ -3501,18 +3500,20 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
     DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() Group& g = const_cast<Group&>(rt.get_group());
+    std::vector<ObjKey> o_keys;
+    std::vector<ObjKey> t_keys;
+    ColKey ck;
+    auto rt = sg.start_read();
     {
         // setup tables with empty linklists
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef origin = wt.add_table("origin");
         TableRef target = wt.add_table("target");
-        origin->add_column_link(type_LinkList, "ll", *target);
-        origin->add_empty_row(table_size);
-        target->add_empty_row(table_size);
+        ck = origin->add_column_link(type_LinkList, "ll", *target);
+        origin->create_objects(table_size, o_keys);
+        target->create_objects(table_size, t_keys);
         wt.commit();
     }
     rt->advance_read();
@@ -3522,30 +3523,19 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     // feed the accessor refs to the background thread for
     // later deletion.
     util::Thread deleter;
-    ConcurrentQueue<LinkViewRef> queue(buffer_size);
+    ConcurrentQueue<LinkListPtr> queue(buffer_size);
     deleter.start([&] { deleter_thread(queue); });
     for (int i = 0; i < max_refs; ++i) {
-        TableRef origin = g.get_table("origin");
-        TableRef target = g.get_table("target");
+        TableRef origin = rt->get_table("origin");
+        TableRef target = rt->get_table("target");
         int ndx = random.draw_int_mod(table_size);
-        LinkViewRef lw = origin->get_linklist(0, ndx);
-        bool will_modify = change_frequency_per_mill > random.draw_int_mod(1000000);
-        if (will_modify) {
-            int modification_type = random.draw_int_mod(2);
-            switch (modification_type) {
-                case 0: {
-                    LangBindHelper::promote_to_write(sg);
-                    lw->add(ndx);
-                    LangBindHelper::commit_and_continue_as_read(sg);
-                    break;
-                }
-                case 1: {
-                    LangBindHelper::promote_to_write(sg);
-                    origin->move_last_over(random.draw_int_mod(table_size));
-                    origin->add_empty_row();
-                    LangBindHelper::commit_and_continue_as_read(sg);
-                }
-            }
+        Obj o = origin->get_object(o_keys[ndx]);
+        LinkListPtr lw = o.get_linklist_ptr(ck);
+        bool will_add = change_frequency_per_mill > random.draw_int_mod(1000000);
+        if (will_add) {
+            rt->promote_to_write();
+            lw->add(t_keys[ndx]);
+            rt->commit_and_continue_as_read();
         }
         queue.put(lw);
     }
@@ -3553,7 +3543,7 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     deleter.join();
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_AdvanceReadTransact_Links)
 {
     // This test checks that all the links-related stuff works across

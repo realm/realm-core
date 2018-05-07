@@ -128,11 +128,6 @@ List<T>::List(const Obj& obj, ColKey col_key)
     , m_obj(obj)
 {
     this->init_from_parent();
-    if (!ConstListIf<T>::m_valid && m_obj.is_valid()) {
-        create();
-        ref_type ref = m_tree->get_ref();
-        m_obj.set_int(col_key, from_ref(ref));
-    }
 }
 
 namespace realm {
