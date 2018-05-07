@@ -17,7 +17,7 @@
  **************************************************************************/
 
 #include <realm/array_blobs_big.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 
 #include "test.hpp"
 
@@ -263,8 +263,8 @@ TEST(ArrayBigBlobs_Basic)
 
     CHECK_EQUAL(3, c.find_first(BinaryData("baz")));
 
-    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn results(Allocator::get_default(), results_ref);
+    IntegerColumn results(Allocator::get_default());
+    results.create();
     c.find_all(results, BinaryData("foobar"));
     CHECK_EQUAL(3, results.size());
 

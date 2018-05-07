@@ -120,9 +120,6 @@ struct DescriptorOrderingState
 
 struct ParserResult
 {
-    ParserResult(Predicate p, DescriptorOrderingState o)
-    : predicate(p)
-    , ordering(o) {}
     Predicate predicate;
     DescriptorOrderingState ordering;
 };

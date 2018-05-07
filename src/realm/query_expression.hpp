@@ -1843,12 +1843,12 @@ public:
         return m_only_unary_links;
     }
 
-    ConstTableRef get_base_table() const
+    const Table* get_base_table() const
     {
-        return m_tables.empty() ? ConstTableRef() : m_tables[0];
+        return m_tables.empty() ? nullptr : m_tables[0];
     }
 
-    ConstTableRef get_target_table() const
+    const Table* get_target_table() const
     {
         REALM_ASSERT(!m_tables.empty());
         return m_tables.back();
@@ -1871,7 +1871,7 @@ private:
 
     mutable std::vector<ColKey> m_link_column_keys;
     std::vector<ColumnType> m_link_types;
-    std::vector<ConstTableRef> m_tables;
+    std::vector<const Table*> m_tables;
     bool m_only_unary_links = true;
     // Leaf cache
     using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
@@ -2298,7 +2298,11 @@ private:
 template <class>
 class BacklinkCount : public Subexpr2<Int> {
 public:
-    BacklinkCount(LinkMap link_map)
+    BacklinkCount(const LinkMap& link_map)
+        : m_link_map(link_map)
+    {
+    }
+    BacklinkCount(LinkMap&& link_map)
         : m_link_map(std::move(link_map))
     {
     }
@@ -2368,8 +2372,8 @@ public:
     }
 
 private:
-    const ClusterKeyArray* m_keys;
-    uint64_t m_offset;
+    const ClusterKeyArray* m_keys = nullptr;
+    uint64_t m_offset = 0;
     LinkMap m_link_map;
 };
 
@@ -2874,7 +2878,7 @@ Query compare(const Subexpr2<Link>& left, const ConstObj& obj)
     const Columns<Link>* column = dynamic_cast<const Columns<Link>*>(&left);
     if (column) {
         const LinkMap& link_map = column->link_map();
-        REALM_ASSERT(link_map.get_target_table() == ConstTableRef(obj.get_table()));
+        REALM_ASSERT(link_map.get_target_table()->get_key() == obj.get_table()->get_key());
 #ifdef REALM_OLDQUERY_FALLBACK
         if (link_map.get_nb_hops() == 1) {
             // We can fall back to Query::links_to for != and == operations on links, but only
@@ -3148,9 +3152,9 @@ class SubColumnAggregate;
 template <typename T>
 class SubColumns : public Subexpr {
 public:
-    SubColumns(Columns<T> column, LinkMap link_map)
+    SubColumns(Columns<T>&& column, const LinkMap& link_map)
         : m_column(std::move(column))
-        , m_link_map(std::move(link_map))
+        , m_link_map(link_map)
     {
     }
 
@@ -3214,9 +3218,9 @@ private:
 template <typename T, typename Operation>
 class SubColumnAggregate : public Subexpr2<typename Operation::ResultType> {
 public:
-    SubColumnAggregate(Columns<T> column, LinkMap link_map)
-        : m_column(std::move(column))
-        , m_link_map(std::move(link_map))
+    SubColumnAggregate(const Columns<T>& column, const LinkMap& link_map)
+        : m_column(column)
+        , m_link_map(link_map)
     {
     }
     SubColumnAggregate(SubColumnAggregate const& other)
@@ -3289,9 +3293,9 @@ private:
 
 class SubQueryCount : public Subexpr2<Int> {
 public:
-    SubQueryCount(Query q, LinkMap link_map)
-        : m_query(std::move(q))
-        , m_link_map(std::move(link_map))
+    SubQueryCount(const Query& q, const LinkMap& link_map)
+        : m_query(q)
+        , m_link_map(link_map)
     {
     }
 

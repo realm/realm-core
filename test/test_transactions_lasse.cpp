@@ -24,7 +24,7 @@
 #include <thread>
 
 #include <realm.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 #include <realm/utilities.hpp>
 #include <realm/util/file.hpp>
 

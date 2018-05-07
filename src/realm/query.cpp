@@ -49,16 +49,16 @@ Query::Query(Table& table, ConstTableView* tv)
     create();
 }
 
-Query::Query(const Table& table, const LinkListPtr& list)
+Query::Query(const Table& table, const LinkList& list)
     : m_table((const_cast<Table&>(table)).get_table_ref())
-    , m_source_link_list(list->clone())
+    , m_source_link_list(list.clone())
 {
     m_view = m_source_link_list.get();
 #ifdef REALM_DEBUG
     if (m_view)
         m_view->check_cookie();
 #endif
-    REALM_ASSERT_DEBUG(&list->get_target_table() == m_table);
+    REALM_ASSERT_DEBUG(&list.get_target_table() == m_table);
     create();
 }
 
@@ -165,7 +165,6 @@ Query::~Query() noexcept = default;
 
 Query::Query(const Query* source, Transaction* tr, PayloadPolicy policy)
 {
-    m_table = tr->import_copy_of(source->m_table);
     if (source->m_source_table_view) {
         m_owned_source_table_view = tr->import_copy_of(*source->m_source_table_view, policy);
         m_source_table_view = m_owned_source_table_view.get();
@@ -180,6 +179,7 @@ Query::Query(const Query* source, Transaction* tr, PayloadPolicy policy)
     for (const auto& cur_group : source->m_groups) {
         m_groups.emplace_back(cur_group, tr);
     }
+    set_table(tr->import_copy_of(source->m_table));
 }
 
 Query::Query(std::unique_ptr<Expression> expr)

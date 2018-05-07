@@ -19,7 +19,7 @@
 #include <algorithm>
 
 #include <realm/array_blobs_big.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 
 
 using namespace realm;
@@ -172,38 +172,6 @@ void ArrayBigBlobs::find_all(IntegerColumn& result, BinaryData value, bool is_st
         result.add(add_offset + ndx); // Throws
         begin_2 = ndx + 1;
     }
-}
-
-
-ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_zero_term, TreeInsertBase& state)
-{
-    size_t leaf_size = size();
-    REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
-    if (leaf_size < ndx)
-        ndx = leaf_size;
-    if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-        insert(ndx, value, add_zero_term);
-        return 0; // Leaf was not split
-    }
-
-    // Split leaf node
-    ArrayBigBlobs new_leaf(m_alloc, m_nullable);
-    new_leaf.create(); // Throws
-    if (ndx == leaf_size) {
-        new_leaf.add(value, add_zero_term);
-        state.m_split_offset = ndx;
-    }
-    else {
-        for (size_t i = ndx; i != leaf_size; ++i) {
-            ref_type blob_ref = Array::get_as_ref(i);
-            new_leaf.Array::add(blob_ref);
-        }
-        Array::truncate(ndx); // Avoiding destruction of transferred blobs
-        add(value, add_zero_term);
-        state.m_split_offset = ndx + 1;
-    }
-    state.m_split_size = leaf_size + 1;
-    return new_leaf.get_ref();
 }
 
 

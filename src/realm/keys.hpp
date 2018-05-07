@@ -112,6 +112,10 @@ struct ColKey {
     {
         return value < rhs.value;
     }
+    bool operator>(const ColKey& rhs) const
+    {
+        return value > rhs.value;
+    }
     explicit operator bool() const
     {
         return value != ColKey().value;

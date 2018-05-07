@@ -27,7 +27,7 @@
 #include <realm/index_string.hpp>
 #include <realm/table.hpp>
 #include <realm/timestamp.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -192,8 +192,8 @@ int64_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFi
     str = column.get_index_data(last_key, buffer);
     if (str == value) {
         result_ref.payload = key_values.get_ref();
-        result_ref.start_ndx = lower.get_col_ndx();
-        result_ref.end_ndx = upper.get_col_ndx() + 1; // one past last match
+        result_ref.start_ndx = lower.get_position();
+        result_ref.end_ndx = upper.get_position() + 1; // one past last match
         return size_t(FindRes_column);
     }
 
@@ -203,8 +203,8 @@ int64_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFi
     upper = std::upper_bound(lower, upper, value, slc);
 
     result_ref.payload = to_ref(key_values.get_ref());
-    result_ref.start_ndx = lower.get_col_ndx();
-    result_ref.end_ndx = upper.get_col_ndx();
+    result_ref.start_ndx = lower.get_position();
+    result_ref.end_ndx = upper.get_position();
     return size_t(FindRes_column);
 }
 
@@ -731,11 +731,11 @@ void StringIndex::insert_to_existing_list_at_lower(ObjKey key, StringData value,
     IntegerColumn::const_iterator last = upper - ptrdiff_t(1);
     int64_t last_key_value = *last;
     if (key.value >= last_key_value) {
-        list.insert(upper.get_col_ndx(), key.value);
+        list.insert(upper.get_position(), key.value);
     }
     else {
         IntegerColumn::const_iterator inner_lower = std::lower_bound(lower, upper, key.value);
-        list.insert(inner_lower.get_col_ndx(), key.value);
+        list.insert(inner_lower.get_position(), key.value);
     }
 }
 
@@ -755,7 +755,7 @@ void StringIndex::insert_to_existing_list(ObjKey key, StringData value, IntegerC
         StringData lower_value = get(lower_key, buffer);
 
         if (lower_value != value) {
-            list.insert(lower.get_col_ndx(), key.value);
+            list.insert(lower.get_position(), key.value);
         }
         else {
             // At this point there exists duplicates of this value, we need to
@@ -1302,8 +1302,7 @@ void StringIndex::do_delete(ObjKey obj_key, StringData value, size_t offset)
                 size_t r = sub.find_first(obj_key.value);
                 size_t sub_size = sub.size(); // Slow
                 REALM_ASSERT_EX(r != sub_size, r, sub_size);
-                bool is_last = r == sub_size - 1;
-                sub.erase(r, is_last);
+                sub.erase(r);
 
                 if (sub_size == 1) {
                     values.erase(pos);
@@ -1341,7 +1340,7 @@ namespace {
 bool has_duplicate_values(const Array& node, const ClusterColumn& target_col) noexcept
 {
     Allocator& alloc = node.get_alloc();
-    BpTreeNode child(alloc);
+    Array child(alloc);
     size_t n = node.size();
     REALM_ASSERT(n >= 1);
     if (node.is_inner_bptree_node()) {
@@ -1373,9 +1372,8 @@ bool has_duplicate_values(const Array& node, const ClusterColumn& target_col) no
         }
 
         // Child is root of B+-tree of row indexes
-        size_t num_rows = child.is_inner_bptree_node() ? child.get_bptree_size() : child.size();
-        if (num_rows > 1) {
-            IntegerColumn sub(alloc, ref); // Throws
+        IntegerColumn sub(alloc, ref);
+        if (sub.size() > 1) {
             ObjKey first_key = ObjKey(sub.get(0));
             ObjKey last_key = ObjKey(sub.back());
             StringConversionBuffer first_buffer, last_buffer;
@@ -1623,9 +1621,10 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
                 dump_node_structure(subnode, out, level + 2);
                 continue;
             }
+            IntegerColumn indexes(alloc, to_ref(value));
             out << std::setw(indent) << ""
                 << "  List of row indexes\n";
-            IntegerColumn::dump_node_structure(subnode, out, level + 2);
+            indexes.dump_values(out, level + 2);
         }
         return;
     }
@@ -1682,9 +1681,11 @@ void StringIndex::to_dot_2(std::ostream& out, StringData title) const
 void StringIndex::array_to_dot(std::ostream& out, const Array& array)
 {
     if (!array.get_context_flag()) {
+        /* FIXME
         IntegerColumn col(array.get_alloc(), array.get_ref()); // Throws
         col.set_parent(array.get_parent(), array.get_ndx_in_parent());
         col.to_dot(out, "ref_list");
+        */
         return;
     }
 

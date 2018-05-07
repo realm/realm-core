@@ -294,7 +294,8 @@ public:
     /// Get an ID for the current mapping version. This ID changes whenever any part
     /// of an existing mapping is changed. Such a change requires all refs to be
     /// retranslated to new pointers. The allocator tries to avoid this, and we
-    /// believe it will only ever occur on Windows based platforms.
+    /// believe it will only ever occur on Windows based platforms, and when a
+    /// compatibility mapping is used to read earlier file versions.
     uint64_t get_mapping_version()
     {
         return m_mapping_version;
@@ -411,14 +412,14 @@ private:
         uint64_t replaced_at_version;
         util::File::Map<char> mapping;
     };
-    struct OldFastMapping {
-        OldFastMapping(uint64_t v, FastMap* m)
+    struct OldRefTranslation {
+        OldRefTranslation(uint64_t v, RefTranslation* m)
         {
             replaced_at_version = v;
-            mappings = m;
+            translations = m;
         }
         uint64_t replaced_at_version;
-        FastMap* mappings;
+        RefTranslation* translations;
     };
     static_assert(sizeof(Header) == 24, "Bad header size");
     static_assert(sizeof(StreamingFooter) == 16, "Bad footer size");
@@ -429,25 +430,46 @@ private:
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
     util::RaceDetector changes;
-    std::vector<util::File::Map<char>> m_mappings;
 
-    size_t m_fast_mapping_size = 0;
+    // mappings used by newest transactions - additional mappings may be open
+    // and in use by older transactions. These translations are in m_old_mappings.
+    std::vector<util::File::Map<char>> m_mappings;
+    // The section nr for the first mapping in m_mappings. Will be 0 for newer file formats,
+    // but will be nonzero if a compatibility mapping is in use. In that case, the ref for
+    // the first mapping is the *last* section boundary in the file. Note: in this
+    // mode, the first mapping in m_mappings may overlap with the last part of the
+    // file, leading to aliasing.
+    int m_sections_in_compatibility_mapping = 0;
+    // if the file has an older format, it needs to be mapped by a single
+    // mapping. This is the compatibility mapping. As such files extend, additional
+    // mappings are added to m_mappings (above) - the compatibility mapping remains
+    // unchanged until the file is closed.
+    // Note: If the initial file is smaller than a single section, the compatibility
+    // mapping is not needed and not used. Hence, it is not possible for the first mapping
+    // in m_mappings to completely overlap the compatibility mapping. Hence, we do not
+    // need special logic to detect if the compatibility mapping can be unmapped.
+    util::File::Map<char> m_compatibility_mapping;
+
+    size_t m_translation_table_size = 0;
     uint64_t m_mapping_version = 1;
     uint64_t m_youngest_live_version = 1;
     std::mutex m_mapping_mutex;
     util::File m_file;
-    // vectors where old mappings, are held from deletion to ensure mappings are
+    // vectors where old mappings, are held from deletion to ensure translations are
     // kept open and ref->ptr translations work for other threads..
     std::vector<OldMapping> m_old_mappings;
-    std::vector<OldFastMapping> m_old_fast_mappings;
-    // Rebuild the fast mapping in a thread-safe manner. Save the old one along with it's
+    std::vector<OldRefTranslation> m_old_translations;
+    // Rebuild the ref translations in a thread-safe manner. Save the old one along with it's
     // versioning information for later deletion - 'requires_new_fast_mapping' must be
-    // true if there are changes to entries among the existing mappings. Must be called
+    // true if there are changes to entries among the existing translations. Must be called
     // with m_mapping_mutex locked.
-    void rebuild_fast_mapping(bool requires_new_fast_mapping, size_t old_num_sections);
+    void rebuild_translations(bool requires_new_fast_mapping, size_t old_num_sections);
     // Add a translation covering a new section in the slab area. The translation is always
     // added at the end.
     void extend_fast_mapping_with_slab(char* address);
+    // Prepare the initial mapping for a file which requires use of the compatibility mapping
+    void setup_compatibility_mapping(size_t file_size);
+
     const char* m_data = nullptr;
     size_t m_initial_section_size = 0;
     int m_section_shifts = 0;
@@ -484,7 +506,7 @@ private:
     /// Throws InvalidDatabase if the file is not a Realm file, if the file is
     /// corrupted, or if the specified encryption key is incorrect. This
     /// function will not detect all forms of corruption, though.
-    void validate_buffer(const char* data, size_t len, const std::string& path);
+    void validate_header(const char* data, size_t len, const std::string& path);
 
     static bool is_file_on_streaming_form(const Header& header);
     /// Read the top_ref from the given buffer and set m_file_on_streaming_form

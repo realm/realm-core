@@ -744,7 +744,7 @@ ParserResult parse(const std::string &query)
         return ParserResult{ std::move(out_predicate.cpnd.sub_predicates.back()), state.ordering_state };
     }
 
-    return ParserResult{ out_predicate, state.ordering_state};
+    return ParserResult{std::move(out_predicate), state.ordering_state};
 }
 
 size_t analyze_grammar()

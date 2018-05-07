@@ -21,7 +21,7 @@
 #include <limits>
 
 #include <realm/array_integer.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 
 #include "test.hpp"
 
@@ -129,45 +129,6 @@ TEST_TYPES(ArrayInteger_Sum16, ArrayInteger, ArrayIntNull)
     CHECK_EQUAL(s1, a.sum(3, 100));
 
     a.destroy();
-}
-
-TEST(ArrayIntNull_InitFromTruncatedRef)
-{
-    // This is used when clearing/truncating the B+tree.
-
-    Array inner_node(Allocator::get_default());
-    inner_node.create(Array::type_Normal);
-    inner_node.add(123);
-    inner_node.add(456);
-
-    inner_node.clear();
-    CHECK_EQUAL(0, inner_node.size());
-
-    ArrayIntNull new_leaf(Allocator::get_default());
-    new_leaf.init_from_ref(inner_node.get_ref()); // ownership transferred
-    CHECK_EQUAL(0, new_leaf.size());
-    new_leaf.destroy();
-}
-
-TEST(ArrayIntNull_InitFromParent)
-{
-    Array inner_node(Allocator::get_default());
-    inner_node.create(Array::type_HasRefs);
-
-    {
-        ArrayIntNull leaf(Allocator::get_default());
-        leaf.create(Array::type_Normal);
-        leaf.add(123);
-        inner_node.add(0);
-        inner_node.set_as_ref(0, leaf.get_ref());
-    }
-
-    ArrayIntNull leaf2(Allocator::get_default());
-    leaf2.set_parent(&inner_node, 0);
-    leaf2.init_from_parent();
-    CHECK_EQUAL(123, leaf2.get(0));
-    inner_node.clear_and_destroy_children();
-    inner_node.destroy();
 }
 
 TEST(ArrayIntNull_SetNull)
@@ -361,8 +322,8 @@ TEST(ArrayIntNull_Find)
     CHECK_EQUAL(found, true);
 
     {
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn col(Allocator::get_default(), col_ref);
+        IntegerColumn col(Allocator::get_default());
+        col.create();
 
         a.find_all(&col, 0x44);
 

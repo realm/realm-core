@@ -19,7 +19,7 @@
 #include <realm/array_string_long.hpp>
 #include <realm/array_blob.hpp>
 #include <realm/impl/destroy_guard.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 
 using namespace realm;
 
@@ -197,37 +197,6 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
     const char* data = ArrayBlob::get(blob_header, begin);
     size_t size = end - begin;
     return StringData(data, size);
-}
-
-
-// FIXME: Not exception safe (leaks are possible).
-ref_type ArrayStringLong::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
-{
-    size_t leaf_size = size();
-    REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
-    if (leaf_size < ndx)
-        ndx = leaf_size;
-    if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-        insert(ndx, value); // Throws
-        return 0;           // Leaf was not split
-    }
-
-    // Split leaf node
-    ArrayStringLong new_leaf(get_alloc(), m_nullable);
-    new_leaf.create(); // Throws
-    if (ndx == leaf_size) {
-        new_leaf.add(value); // Throws
-        state.m_split_offset = ndx;
-    }
-    else {
-        for (size_t i = ndx; i != leaf_size; ++i)
-            new_leaf.add(get(i)); // Throws
-        truncate(ndx);            // Throws
-        add(value);               // Throws
-        state.m_split_offset = ndx + 1;
-    }
-    state.m_split_size = leaf_size + 1;
-    return new_leaf.get_ref();
 }
 
 

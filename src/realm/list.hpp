@@ -286,6 +286,10 @@ public:
     {
         return ListIterator<T>(this, size() + m_deleted.size());
     }
+    size_t find_first(T value) const
+    {
+        return m_tree->find_first(value);
+    }
 
 protected:
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
@@ -359,7 +363,7 @@ public:
     List(const Obj& owner, ColKey col_key);
     List(List&& other)
         : ConstListBase(other.m_col_key, &m_obj)
-        , ConstListIf<T>(other.m_obj.get_alloc())
+        , ConstListIf<T>(std::move(other))
         , m_obj(std::move(other.m_obj))
     {
     }
@@ -410,9 +414,9 @@ public:
             ensure_writeable();
             do_set(ndx, value);
             m_obj.bump_content_version();
-            if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
-                set_repl(repl, ndx, value);
-            }
+        }
+        if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
+            set_repl(repl, ndx, value);
         }
         return old;
     }
@@ -543,8 +547,22 @@ void List<ObjKey>::do_remove(size_t ndx);
 template <>
 void List<ObjKey>::clear();
 
-class ConstLinkListIf : public ConstListIf<ObjKey> {
+class ConstLinkList : public ConstListIf<ObjKey> {
 public:
+    ConstLinkList(const ConstObj& obj, ColKey col_key)
+        : ConstListBase(col_key, &m_obj)
+        , ConstListIf<ObjKey>(obj.get_alloc())
+        , m_obj(obj)
+    {
+        this->init_from_parent();
+    }
+    ConstLinkList(ConstLinkList&& other)
+        : ConstListBase(other.m_col_key, &m_obj)
+        , ConstListIf<ObjKey>(std::move(other))
+        , m_obj(std::move(other.m_obj))
+    {
+    }
+
     // Getting links
     ConstObj operator[](size_t link_ndx) const
     {
@@ -552,29 +570,6 @@ public:
     }
     ConstObj get_object(size_t link_ndx) const;
 
-protected:
-    ConstLinkListIf(Allocator& alloc)
-        : ConstListBase(ColKey{}, nullptr)
-        , ConstListIf<ObjKey>(alloc)
-    {
-    }
-};
-
-class ConstLinkList : public ConstLinkListIf {
-public:
-    ConstLinkList(const ConstObj& obj, ColKey col_key)
-        : ConstListBase(col_key, &m_obj)
-        , ConstLinkListIf(obj.get_alloc())
-        , m_obj(obj)
-    {
-        this->init_from_parent();
-    }
-    ConstLinkList(ConstLinkList&& other)
-        : ConstListBase(other.m_col_key, &m_obj)
-        , ConstLinkListIf(other.m_obj.get_alloc())
-        , m_obj(std::move(other.m_obj))
-    {
-    }
     void update_child_ref(size_t, ref_type) override
     {
     }

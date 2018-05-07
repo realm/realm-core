@@ -501,7 +501,7 @@ public:
     }
 
     // Perform queries on a LinkView. The returned Query holds a reference to list.
-    Query where(const LinkListPtr& list)
+    Query where(const LinkList& list) const
     {
         return Query(*this, list);
     }
@@ -881,6 +881,12 @@ public:
     {
         ++m_pos;
         return *this;
+    }
+    ColKeyIterator operator++(int)
+    {
+        ColKeyIterator tmp(m_table, m_pos);
+        ++m_pos;
+        return tmp;
     }
     ColKey operator*()
     {

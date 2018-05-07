@@ -59,7 +59,6 @@ using namespace realm::test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-#ifdef LEGACY_TESTS
 // FIXME: Realign this to refer to a Transaction instead of a DB (ex SharedGroup)
 namespace {
 struct QueryInitHelper;
@@ -92,23 +91,25 @@ struct AndQuery {
 };
 struct HandoverQuery {
     template <typename Next>
-    auto operator()(Query& q, Next&& next)
+    size_t operator()(Query& q, Next&& next)
     {
-        auto main_table = next.state.table;
+        auto old_tr = next.state.rt;
+        size_t ret;
 
-        // Hand over the query to the secondary SG and continue processing on that
-        std::swap(next.state.sg, next.state.sg2);
-        auto& group = next.state.sg->begin_read(next.state.sg2->get_version_of_current_transaction());
-        auto copy =
-            next.state.sg->import_from_handover(next.state.sg2->export_for_handover(q, ConstSourcePayload::Copy));
-        next.state.table = const_cast<Table*>(static_cast<const Table*>(group.get_table(TableKey(0))));
+        {
+            // Hand over the query to a new transaction and continue processing on that
+            auto new_transaction = next.state.sg->start_read(old_tr->get_version_of_current_transaction());
+            auto copy = new_transaction->import_copy_of(q, PayloadPolicy::Copy);
+            next.state.rt = new_transaction;
 
-        auto ret = next(*copy);
+            ret = next(*copy);
+
+            new_transaction->end_read();
+        }
 
         // Restore the old state
-        next.state.sg->end_read();
-        next.state.table = main_table;
-        std::swap(next.state.sg, next.state.sg2);
+        next.state.rt = old_tr;
+
         return ret;
     }
 };
@@ -117,22 +118,30 @@ struct SelfHandoverQuery {
     auto operator()(Query& q, Next&& next)
     {
         // Export the query and then re-import it to the same SG
-        auto handover = next.state.sg->export_for_handover(q, ConstSourcePayload::Copy);
-        return next(*next.state.sg->import_from_handover(std::move(handover)));
+        return next(*next.state.rt->import_copy_of(q, PayloadPolicy::Copy));
     }
 };
 struct InsertColumn {
     template <typename Next>
     auto operator()(Query& q, Next&& next)
     {
-        LangBindHelper::advance_read(*next.state.sg);
+        next.state.rt->advance_read();
         return next(q);
     }
 };
 struct GetCount {
     auto operator()(Query& q)
     {
-        return q.count();
+        auto cnt = q.count();
+#if 0
+        try {
+            std::cout << q.get_description() << " -> " << cnt << std::endl;
+        }
+        catch (const std::exception& e) {
+            std::cout << e.what() << std::endl;
+        }
+#endif
+        return cnt;
     }
 };
 
@@ -157,10 +166,13 @@ struct Compose<Func> {
 struct QueryInitHelper {
     test_util::unit_test::TestContext& test_context;
     DB* sg;
-    DB* sg2;
+    TransactionRef rt;
     DB::VersionID initial_version, extra_col_version;
-    Table* table;
 
+    Table& get_table()
+    {
+        return *rt->get_table(TableKey(0));
+    }
     template <typename Func>
     REALM_NOINLINE void operator()(Func&& fn);
 
@@ -212,12 +224,12 @@ void QueryInitHelper::operator()(Func&& fn)
 template <typename Func, typename... Mutations>
 size_t QueryInitHelper::run(Func& fn)
 {
-    auto& group = sg->begin_read(initial_version);
-    table = const_cast<Table*>(static_cast<const Table*>(group.get_table(TableKey(0))));
+    rt = sg->start_read(initial_version);
+    auto table = rt->get_table(TableKey(0));
     size_t count;
     Query query = table->where();
     fn(query, [&](auto&& q2) { count = Compose<Mutations..., GetCount>{*this}(q2); });
-    sg->end_read();
+    rt->end_read();
     return count;
 }
 } // anonymous namespace
@@ -230,15 +242,12 @@ TEST(Query_TableInitialization)
     SHARED_GROUP_TEST_PATH(path);
 
     auto repl = make_in_realm_history(path);
-    auto repl2 = make_in_realm_history(path);
-    DB sg(*repl, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
-    DB sg2(*repl2, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
-    Group& g = const_cast<Group&>(sg.begin_read());
-    LangBindHelper::promote_to_write(sg);
+    DB sg(*repl, DBOptions(DBOptions::Durability::MemOnly));
+    auto wt = sg.start_write();
 
     DB::VersionID initial_version, extra_col_version;
 
-    Table& table = *g.add_table("table");
+    Table& table = *wt->add_table("table");
     // The columns are ordered to avoid having types which are backed by the
     // same implementation column type next to each other so that being
     // off-by-one doesn't work by coincidence
@@ -273,31 +282,33 @@ TEST(Query_TableInitialization)
         Obj obj = table.get_object(keys[i]);
         obj.set(col_binary, BinaryData(str), false);
         obj.set(col_link, keys[i]);
+        obj.set(col_timestamp, Timestamp{int(i), int(i)});
         obj.get_linklist(col_list).add(keys[i]);
         obj.get_list<Int>(col_list_int).add(i);
     }
-    LangBindHelper::commit_and_continue_as_read(sg);
+    Obj obj0 = table.get_object(keys[0]);
+    wt->commit_and_continue_as_read();
 
     // Save this version so we can go back to it before every test
-    initial_version = sg.get_version_of_current_transaction();
-    sg.pin_version();
+    initial_version = wt->get_version_of_current_transaction();
+    auto dummy = wt->duplicate(); // Pin version
 
     // Create a second version which has the extra column at the beginning
     // of the table removed, so that anything which relies on stable column
     // numbers will use the wrong column after advancing
-    LangBindHelper::promote_to_write(sg);
+    wt->promote_to_write();
     table.remove_column(col_dummy);
-    LangBindHelper::commit_and_continue_as_read(sg);
-    sg.pin_version();
-    extra_col_version = sg.get_version_of_current_transaction();
-    sg.end_read();
+    wt->commit_and_continue_as_read();
 
-    QueryInitHelper helper{test_context, &sg, &sg2, initial_version, extra_col_version, nullptr};
+    extra_col_version = wt->get_version_of_current_transaction();
+    wt->end_read();
+
+    QueryInitHelper helper{test_context, &sg, {}, initial_version, extra_col_version};
 
     // links_to
-    helper([&](Query& q, auto&& test) { test(q.links_to(col_link, q.get_table()->begin()->get_key())); });
-    helper([&](Query& q, auto&& test) { test(q.links_to(col_list, q.get_table()->begin()->get_key())); });
-    helper([&](Query& q, auto&& test) { test(q.Not().links_to(col_link, q.get_table()->begin()->get_key())); });
+    helper([&](Query& q, auto&& test) { test(q.links_to(col_link, keys[0])); });
+    helper([&](Query& q, auto&& test) { test(q.links_to(col_list, keys[0])); });
+    helper([&](Query& q, auto&& test) { test(q.Not().links_to(col_link, keys[0])); });
     helper([&](Query& q, auto&& test) {
         auto it = q.get_table()->begin();
         ObjKey k0 = it->get_key();
@@ -384,12 +395,12 @@ TEST(Query_TableInitialization)
     helper([&](Query& q, auto&& test) { test(q.less_equal_double(col_double, col_double)); });
 
     // Conditions: timestamp
-    helper([&](Query& q, auto&& test) { test(q.equal(col_timestamp, Timestamp{})); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal(col_timestamp, Timestamp{})); });
-    helper([&](Query& q, auto&& test) { test(q.greater(col_timestamp, Timestamp{})); });
-    helper([&](Query& q, auto&& test) { test(q.greater_equal(col_timestamp, Timestamp{})); });
-    helper([&](Query& q, auto&& test) { test(q.less_equal(col_timestamp, Timestamp{})); });
-    helper([&](Query& q, auto&& test) { test(q.less(col_timestamp, Timestamp{})); });
+    helper([&](Query& q, auto&& test) { test(q.equal(col_timestamp, Timestamp{5, 5})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_timestamp, Timestamp{5, 5})); });
+    helper([&](Query& q, auto&& test) { test(q.greater(col_timestamp, Timestamp{5, 5})); });
+    helper([&](Query& q, auto&& test) { test(q.greater_equal(col_timestamp, Timestamp{5, 5})); });
+    helper([&](Query& q, auto&& test) { test(q.less_equal(col_timestamp, Timestamp{5, 5})); });
+    helper([&](Query& q, auto&& test) { test(q.less(col_timestamp, Timestamp{5, 5})); });
 
     // Conditions: bool
     helper([&](Query& q, auto&& test) { test(q.equal(col_bool, bool{})); });
@@ -500,11 +511,11 @@ TEST(Query_TableInitialization)
         if (mode == Mode::Direct) { // link equality over links isn't implemented
             helper([&](Query&, auto&& test) { test(link_col().is_null()); });
             helper([&](Query&, auto&& test) { test(link_col().is_not_null()); });
-            helper([&](Query&, auto&& test) { test(link_col() == *helper.table->begin()); });
-            helper([&](Query&, auto&& test) { test(link_col() != *helper.table->begin()); });
+            helper([&](Query&, auto&& test) { test(link_col() == obj0); });
+            helper([&](Query&, auto&& test) { test(link_col() != obj0); });
 
-            helper([&](Query&, auto&& test) { test(list_col() == *helper.table->begin()); });
-            helper([&](Query&, auto&& test) { test(list_col() != *helper.table->begin()); });
+            helper([&](Query&, auto&& test) { test(list_col() == obj0); });
+            helper([&](Query&, auto&& test) { test(list_col() != obj0); });
         }
 
         helper([&](Query&, auto&& test) { test(list_col().count() == 1); });
@@ -525,36 +536,40 @@ TEST(Query_TableInitialization)
 
     // Test all of the query expressions directly, over a link, over a backlink
     // over a linklist, and over two links
-    test_query_expression([&]() -> Table& { return *helper.table; }, Mode::Direct);
+    test_query_expression([&]() -> Table& { return helper.get_table(); }, Mode::Direct);
     test_query_expression(
         [&]() -> Table& {
-            helper.table->link(col_link);
-            return *helper.table;
+            Table& t = helper.get_table();
+            t.link(col_link);
+            return t;
         },
         Mode::Link);
     test_query_expression(
         [&]() -> Table& {
-            helper.table->backlink(*helper.table, col_link);
-            return *helper.table;
+            Table& t = helper.get_table();
+            t.backlink(t, col_link);
+            return t;
         },
         Mode::LinkList);
     test_query_expression(
         [&]() -> Table& {
-            helper.table->link(col_list);
-            return *helper.table;
+            Table& t = helper.get_table();
+            t.link(col_list);
+            return t;
         },
         Mode::LinkList);
     test_query_expression(
         [&]() -> Table& {
-            helper.table->link(col_link);
-            helper.table->link(col_list);
-            return *helper.table;
+            Table& t = helper.get_table();
+            t.link(col_link);
+            t.link(col_list);
+            return t;
         },
         Mode::LinkList);
 
-    helper(
-        [&](Query& q, auto&& test) { test(helper.table->column<Link>(col_list, q.equal(col_int, 0)).count() > 0); });
+    helper([&](Query& q, auto&& test) {
+        test(helper.get_table().column<Link>(col_list, q.equal(col_int, 0)).count() > 0);
+    });
 }
 
-#endif
 #endif

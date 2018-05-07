@@ -108,8 +108,6 @@ public:
     /// slower.
     static BinaryData get(const char* header, size_t ndx, Allocator&) noexcept;
 
-    ref_type bptree_leaf_insert(size_t ndx, BinaryData, bool add_zero_term, TreeInsertBase& state);
-
     static size_t get_size_from_header(const char*, Allocator&) noexcept;
 
     /// Construct a binary array of the specified size and return just
@@ -250,7 +248,7 @@ inline void ArraySmallBlobs::insert_string(size_t ndx, StringData value)
 
 inline void ArraySmallBlobs::truncate(size_t new_size)
 {
-    REALM_ASSERT_3(new_size, <, m_offsets.size());
+    REALM_ASSERT(new_size == 0 || new_size < m_offsets.size());
 
     size_t blob_size = new_size ? to_size_t(m_offsets.get(new_size - 1)) : 0;
 

@@ -341,7 +341,10 @@ public:
 /// import takes ownership of all other accessors (if any) being created as
 /// part of the import.
 #if REALM_METRICS
-    std::shared_ptr<metrics::Metrics> get_metrics();
+    std::shared_ptr<metrics::Metrics> get_metrics()
+    {
+        return m_metrics;
+    }
 #endif // REALM_METRICS
 
     // Try to grab a exclusive lock of the given realm path's lock file. If the lock
@@ -823,16 +826,15 @@ inline void Transaction::promote_to_write(O* observer)
     if (m_transact_stage != DB::transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
-    auto hist = db->get_history_read(); // Throws
-    if (!hist)
-        throw LogicError(LogicError::no_history);
-
     db->do_begin_write(); // Throws
     try {
-        VersionID version = VersionID();                                              // Latest
-        bool history_updated = internal_advance_read(observer, version, *hist, true); // Throws
-
         Replication* repl = db->get_replication();
+        if (!repl)
+            throw LogicError(LogicError::no_history);
+
+        VersionID version = VersionID();                                              // Latest
+        bool history_updated = internal_advance_read(observer, version, *repl->get_history_write(), true); // Throws
+
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
         DB::version_type current_version = m_read_lock.m_version;
         repl->initiate_transact(*this, current_version, history_updated); // Throws

@@ -1178,15 +1178,15 @@ TEST(LinkList_FindNotNullLink)
     items->create_objects(6, item_keys);
     datas->create_objects(6, data_keys);
 
-    auto ll = obj0.get_linklist_ptr(col_linklist);
+    auto ll = obj0.get_linklist(col_linklist);
     for (size_t i = 0; i < 6; ++i) {
         datas->get_object(data_keys[i]).set(col_str, "foo");
         items->get_object(item_keys[i]).set(col_link, data_keys[0]);
-        ll->insert(0, item_keys[i]);
+        ll.insert(0, item_keys[i]);
     }
 
     // This is how the Cocoa bindings do it normally:
-    Query q0 = ll->get_target_table().where(ll);
+    Query q0 = ll.get_target_table().where(ll);
     q0.and_query(q0.get_table()->column<Link>(col_linklist).is_null());
     CHECK_EQUAL(0, q0.find_all().size());
 
@@ -1197,7 +1197,7 @@ TEST(LinkList_FindNotNullLink)
     CHECK_EQUAL(6, q2.find_all().size());
 
     // This is how the Cocoa bindings to the "Not":
-    Query q1 = ll->get_target_table().where(ll);
+    Query q1 = ll.get_target_table().where(ll);
     q1.Not();
     q1.and_query(q1.get_table()->column<Link>(col_linklist).is_null());
     CHECK_EQUAL(6, q1.find_all().size());
@@ -1262,7 +1262,7 @@ TEST(LinkList_QueryOnLinkList)
 
     // q.m_table = target
     // q.m_view = list_ptr
-    Query q = target->where(list_ptr).and_query(target->column<Int>(col_int) > 100);
+    Query q = target->where(*list_ptr).and_query(target->column<Int>(col_int) > 100);
     Query q1 = origin->link(col_link2).column<Int>(col_int) == 300;
 
     // tv.m_table == target
@@ -1309,7 +1309,7 @@ TEST(LinkList_QueryOnLinkList)
     Query query2;
     {
         auto list_ptr2 = obj1.get_linklist_ptr(col_link2);
-        query2 = target->where(list_ptr2);
+        query2 = target->where(*list_ptr2);
         // lvr2 goes out of scope now but should be kept alive
     }
     tv = query2.find_all();

@@ -100,7 +100,7 @@ public:
     ///
     /// Note: The underscore has been added because the name `free
     /// would conflict with a macro on the Windows platform.
-    void free_(ref_type, const char* addr);
+    void free_(ref_type, const char* addr) noexcept;
 
     /// Shorthand for free_(mem.get_ref(), mem.get_addr()).
     void free_(MemRef mem) noexcept;
@@ -163,9 +163,9 @@ protected:
     // The following logically belongs in the slab allocator, but is placed
     // here to optimize a critical path:
 
-    // The fast_mapping splits the full ref-space (both below and above baseline)
+    // The ref translation splits the full ref-space (both below and above baseline)
     // into equal chunks.
-    struct FastMap {
+    struct RefTranslation {
         char* mapping_addr;
 #if REALM_ENABLE_ENCRYPTION
         util::EncryptedFileMapping* encrypted_mapping;
@@ -173,7 +173,7 @@ protected:
     };
     // This pointer may be changed concurrently with access, so make sure it is
     // atomic!
-    std::atomic<FastMap*> m_fast_mapping_ptr;
+    std::atomic<RefTranslation*> m_ref_translation_ptr;
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.
@@ -278,7 +278,7 @@ public:
         m_baseline.store(m_alloc->m_baseline, std::memory_order_relaxed);
         m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
-        m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
+        m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
     }
 
     ~WrappedAllocator()
@@ -291,7 +291,7 @@ public:
         m_baseline.store(m_alloc->m_baseline, std::memory_order_relaxed);
         m_replication = m_alloc->m_replication;
         m_debug_watch = 0;
-        m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
+        m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
     }
 
     void update_from_underlying_allocator(bool writable)
@@ -307,7 +307,7 @@ private:
         auto result = m_alloc->do_alloc(size);
         bump_storage_version();
         m_baseline.store(m_alloc->m_baseline, std::memory_order_relaxed);
-        m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
+        m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
         return result;
     }
     virtual MemRef do_realloc(ref_type ref, const char* addr, size_t old_size, size_t new_size) override
@@ -315,7 +315,7 @@ private:
         auto result = m_alloc->do_realloc(ref, addr, old_size, new_size);
         bump_storage_version();
         m_baseline.store(m_alloc->m_baseline, std::memory_order_relaxed);
-        m_fast_mapping_ptr.store(m_alloc->m_fast_mapping_ptr);
+        m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
         return result;
     }
 
@@ -453,14 +453,14 @@ inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_siz
     return do_realloc(ref, addr, old_size, new_size);
 }
 
-inline void Allocator::free_(ref_type ref, const char* addr)
+inline void Allocator::free_(ref_type ref, const char* addr) noexcept
 {
 #ifdef REALM_DEBUG
     if (ref == m_debug_watch)
         REALM_TERMINATE("Allocator watch: Ref was freed");
 #endif
-    if (m_is_read_only)
-        throw realm::LogicError(realm::LogicError::wrong_transact_state);
+    REALM_ASSERT(!m_is_read_only);
+
     return do_free(ref, addr);
 }
 
@@ -491,7 +491,7 @@ inline Allocator::Allocator() noexcept
     m_content_versioning_counter = 0;
     m_storage_versioning_counter = 0;
     m_instance_versioning_counter = 0;
-    m_fast_mapping_ptr = nullptr;
+    m_ref_translation_ptr = nullptr;
 }
 
 inline Allocator::~Allocator() noexcept
@@ -500,14 +500,15 @@ inline Allocator::~Allocator() noexcept
 
 inline char* Allocator::translate(ref_type ref) const noexcept
 {
-    if (m_fast_mapping_ptr) {
+    if (m_ref_translation_ptr) {
         char* base_addr;
         size_t idx = get_section_index(ref);
-        base_addr = m_fast_mapping_ptr[idx].mapping_addr;
+        base_addr = m_ref_translation_ptr[idx].mapping_addr;
         size_t offset = ref - get_section_base(idx);
         auto addr = base_addr + offset;
 #if REALM_ENABLE_ENCRYPTION
-        realm::util::encryption_read_barrier(addr, NodeHeader::header_size, m_fast_mapping_ptr[idx].encrypted_mapping,
+        realm::util::encryption_read_barrier(addr, NodeHeader::header_size,
+                                             m_ref_translation_ptr[idx].encrypted_mapping,
                                              NodeHeader::get_byte_size_from_header);
 #endif
         return addr;

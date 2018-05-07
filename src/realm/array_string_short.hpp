@@ -74,8 +74,6 @@ public:
     /// slower.
     static StringData get(const char* header, size_t ndx, bool nullable) noexcept;
 
-    ref_type bptree_leaf_insert(size_t ndx, StringData, TreeInsertBase& state);
-
     /// Construct a string array of the specified size and return just
     /// the reference to the underlying memory. All elements will be
     /// initialized to the empty string.

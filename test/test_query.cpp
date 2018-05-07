@@ -25,10 +25,11 @@
 #include <vector>
 
 #include <realm.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 #include <realm/array_bool.hpp>
 #include <realm/history.hpp>
 #include <realm/query_expression.hpp>
+#include <realm/index_string.hpp>
 
 #include "test.hpp"
 #include "test_table_helper.hpp"
@@ -8361,12 +8362,12 @@ TEST(Query_ReferDeletedLinkView)
     TableRef table = group.add_table("table");
     auto col_link = table->add_column_link(type_LinkList, "children", *table);
     auto col_int = table->add_column(type_Int, "age");
-    auto links = table->create_object().set(col_int, 123).get_linklist_ptr(col_link);
+    auto links = table->create_object().set(col_int, 123).get_linklist(col_link);
     Query q = table->where(links);
     TableView tv = q.find_all();
 
     // TableView that depends on LinkView soon to be deleted
-    TableView tv_sorted = links->get_sorted_view(col_int);
+    TableView tv_sorted = links.get_sorted_view(col_int);
 
     // First test depends_on_deleted_object()
     CHECK(!tv_sorted.depends_on_deleted_object());
@@ -8375,7 +8376,7 @@ TEST(Query_ReferDeletedLinkView)
 
     // Delete LinkList so LinkView gets detached
     table->remove_object(table->begin());
-    CHECK(!links->is_attached());
+    CHECK(!links.is_attached());
     CHECK(tv_sorted.depends_on_deleted_object());
 
     // See if "Query that depends on LinkView" returns sane "empty"-like values
@@ -8397,7 +8398,7 @@ TEST(Query_ReferDeletedLinkView)
     CHECK_EQUAL(q2.count(), 0);
     CHECK_EQUAL(q2.find(), null_key);
 
-    CHECK(!links->is_attached());
+    CHECK(!links.is_attached());
     tv.sync_if_needed();
 
     // PLEASE NOTE that 'tv' will still return true in this case! Even though it indirectly depends on
@@ -8406,7 +8407,7 @@ TEST(Query_ReferDeletedLinkView)
 
     // Before executing any methods on a LinkList, you must still always check is_attached(). If you
     // call links->add() on a deleted LinkViewRef (where is_attached() == false), it will assert
-    CHECK(!links->is_attached());
+    CHECK(!links.is_attached());
 }
 
 TEST(Query_SubQueries)
@@ -8725,27 +8726,27 @@ TEST(Query_SyncViewIfNeeded)
     // Restricting LinkView.
     {
         reset_table_contents();
-        LinkListPtr restricting_view = source->begin()->get_linklist_ptr(col_links);
+        LinkList restricting_view = source->begin()->get_linklist(col_links);
         Query q = target->where(restricting_view).less(col_id, 10);
-        CHECK_EQUAL(restricting_view->size(), 9);
+        CHECK_EQUAL(restricting_view.size(), 9);
 
         // Modify the underlying table to remove rows from the LinkView.
         target->remove_object(ObjKey(7));
         target->remove_object(ObjKey(8));
 
         // The view is out of sync.
-        CHECK_EQUAL(false, restricting_view->is_in_sync());
+        CHECK_EQUAL(false, restricting_view.is_in_sync());
         // Running the query will update embedded query
         CHECK_EQUAL(2, q.count());
         // The view is still out of sync.
-        CHECK_EQUAL(false, restricting_view->is_in_sync());
+        CHECK_EQUAL(false, restricting_view.is_in_sync());
         // Accessing it will bring it up to date
-        CHECK_EQUAL(restricting_view->size(), 7);
-        CHECK_EQUAL(true, restricting_view->is_in_sync());
+        CHECK_EQUAL(restricting_view.size(), 7);
+        CHECK_EQUAL(true, restricting_view.is_in_sync());
 
         // And that syncing the query does nothing.
         auto version = q.sync_view_if_needed();
-        CHECK_EQUAL(true, restricting_view->is_in_sync());
+        CHECK_EQUAL(true, restricting_view.is_in_sync());
         CHECK_EQUAL(version[0].first, target->get_key());
         CHECK_EQUAL(version[0].second, target->get_content_version());
         CHECK_EQUAL(2, q.count());

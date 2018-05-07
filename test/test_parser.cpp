@@ -380,9 +380,9 @@ TEST(Parser_ConstrainedQuery)
 
     obj1.set(int_col, 1);
 
-    auto list_0 = obj0.get_linklist_ptr(list_col);
-    list_0->add(obj0.get_key());
-    list_0->add(obj1.get_key());
+    auto list_0 = obj0.get_linklist(list_col);
+    list_0.add(obj0.get_key());
+    list_0.add(obj1.get_key());
 
     TableView tv = t->get_backlink_view(obj0.get_key(), t, list_col);
     Query q(const_cast<const Table&>(*t), &tv);

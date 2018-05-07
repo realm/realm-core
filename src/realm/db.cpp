@@ -1646,7 +1646,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         bool dirty = false;
 
         // File format upgrade
-        int current_file_format_version_2 = gf::get_committed_file_format_version(*wt);
+        int current_file_format_version_2 = m_alloc.get_committed_file_format_version();
         // The file must either still be using its initial file_format or have
         // been upgraded already to the chosen target file format via a
         // concurrent SharedGroup object.
@@ -2028,9 +2028,13 @@ void DB::low_level_commit(uint_fast64_t new_version, Group& group)
     // info->readers.dump();
     GroupWriter out(group); // Throws
     out.set_versions(new_version, oldest_version);
+    ref_type new_top_ref;
     // Recursively write all changed arrays to end of file
-    ref_type new_top_ref = out.write_group(); // Throws
-
+    {
+        // protect against race with any other DB trying to attach to the file
+        std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
+        new_top_ref = out.write_group();                         // Throws
+    }
     // protect access to shared variables and m_reader_mapping from here
     std::lock_guard<std::mutex> lock_guard(m_mutex);
     m_free_space = out.get_free_space();

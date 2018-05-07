@@ -36,13 +36,13 @@
 #include <realm/array.hpp>
 #include <realm/array_basic.hpp>
 #include <realm/impl/destroy_guard.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 #include <realm/bplustree.hpp>
 #include <realm/query_conditions.hpp>
-#include <realm/column_string.hpp>
 #include <realm/index_string.hpp>
 #include <realm/array_integer.hpp>
 #include <realm/array_key.hpp>
+#include <realm/impl/array_writer.hpp>
 
 
 // Header format (8 bytes):
@@ -1795,36 +1795,6 @@ void Array::set(size_t ndx, int64_t value)
     set_direct<width>(m_data, ndx, value);
 }
 
-
-// FIXME: Not exception safe (leaks are possible).
-ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& state)
-{
-    size_t leaf_size = size();
-    REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
-    if (leaf_size < ndx)
-        ndx = leaf_size;
-    if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-        insert(ndx, value); // Throws
-        return 0;           // Leaf was not split
-    }
-
-    // Split leaf node
-    Array new_leaf(m_alloc);
-    new_leaf.create(has_refs() ? type_HasRefs : type_Normal); // Throws
-    if (ndx == leaf_size) {
-        new_leaf.add(value); // Throws
-        state.m_split_offset = ndx;
-    }
-    else {
-        for (size_t i = ndx; i != leaf_size; ++i)
-            new_leaf.add(get(i)); // Throws
-        truncate(ndx);            // Throws
-        add(value);               // Throws
-        state.m_split_offset = ndx + 1;
-    }
-    state.m_split_size = leaf_size + 1;
-    return new_leaf.get_ref();
-}
 
 // LCOV_EXCL_START ignore debug functions
 

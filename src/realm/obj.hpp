@@ -72,6 +72,12 @@ public:
     }
     const Table* get_table() const;
 
+    // Check if this object is default constructed
+    explicit operator bool()
+    {
+        return m_tree_top != nullptr;
+    }
+
     // Check if the object is still alive
     bool is_valid() const;
     // Delete object from table. Object is invalid afterwards.
@@ -117,7 +123,7 @@ public:
 
 protected:
     friend class ConstListBase;
-    friend class ConstLinkListIf;
+    friend class ConstLinkList;
     friend class LinkList;
     friend class LinkMap;
     friend class ConstTableView;
@@ -167,6 +173,13 @@ public:
 
     template <typename U>
     Obj& set(ColKey col_key, U value, bool is_default = false);
+
+    template <typename U>
+    Obj& set(StringData col_name, U value, bool is_default = false)
+    {
+        return set(get_column_key(col_name), value, is_default);
+    }
+
     Obj& set_null(ColKey col_key, bool is_default = false);
 
     Obj& add_int(ColKey col_key, int64_t value);
@@ -270,6 +283,12 @@ inline Obj& Obj::set(ColKey col_key, const char* str, bool is_default)
 
 template <>
 inline Obj& Obj::set(ColKey col_key, char* str, bool is_default)
+{
+    return set(col_key, StringData(str), is_default);
+}
+
+template <>
+inline Obj& Obj::set(ColKey col_key, std::string str, bool is_default)
 {
     return set(col_key, StringData(str), is_default);
 }

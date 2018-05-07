@@ -463,14 +463,15 @@ public:
         return result;
     }
 
-    void dump_values() const
+    void dump_values(std::ostream& o, int level) const
     {
-        BPlusTreeNode::TraverseFunc func = [](BPlusTreeNode* node, size_t offset) {
+        std::string indent(" ", level * 2);
+
+        BPlusTreeNode::TraverseFunc func = [&o, indent](BPlusTreeNode* node, size_t) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
             size_t sz = leaf->size();
-            std::cout << "Offset: " << offset << std::endl;
             for (size_t i = 0; i < sz; i++) {
-                std::cout << "  " << leaf->get(i) << std::endl;
+                o << indent << leaf->get(i) << std::endl;
             }
             return false;
         };

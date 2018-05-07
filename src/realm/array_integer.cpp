@@ -19,8 +19,8 @@
 #include <vector>
 
 #include <realm/array_integer.hpp>
-#include <realm/column.hpp>
 #include <realm/impl/destroy_guard.hpp>
+#include <realm/column_integer.hpp>
 
 using namespace realm;
 
@@ -121,15 +121,8 @@ void ArrayIntNull::init_from_mem(MemRef mem) noexcept
 {
     Array::init_from_mem(mem);
 
-    if (m_size == 0) {
-        // This can only happen when mem is being reused from another
-        // array (which happens when shrinking the B+tree), so we need
-        // to add the "magic" null value to the beginning.
-
-        // Since init_* functions are noexcept, but insert() isn't, we
-        // need to ensure that insert() will not allocate.
-        Array::insert(0, m_ubound);
-    }
+    // We always have the null value stored at position 0
+    REALM_ASSERT(m_size > 0);
 }
 
 void ArrayIntNull::init_from_parent() noexcept
@@ -253,49 +246,6 @@ void ArrayIntNull::get_chunk(size_t ndx, value_type res[8]) const noexcept
     for (size_t i = 0; i < 8; ++i) {
         res[i] = tmp[i] == null ? util::Optional<int64_t>() : tmp[i];
     }
-}
-
-namespace {
-
-// FIXME: Move this logic to BpTree.
-struct ArrayIntNullLeafInserter {
-    static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, size_t ndx, util::Optional<int64_t> value,
-                                TreeInsertBase& state)
-    {
-        size_t leaf_size = self.size();
-        REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
-        if (leaf_size < ndx)
-            ndx = leaf_size;
-        if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-            self.insert(ndx, value); // Throws
-            return 0;                // Leaf was not split
-        }
-
-        // Split leaf node
-        ArrayIntNull new_leaf(alloc);
-        new_leaf.create(Array::type_Normal); // Throws
-        if (ndx == leaf_size) {
-            new_leaf.add(value); // Throws
-            state.m_split_offset = ndx;
-        }
-        else {
-            for (size_t i = ndx; i < leaf_size; ++i) {
-                new_leaf.add(self.get(i)); // Throws
-            }
-            self.truncate(ndx); // Throws
-            self.add(value);    // Throws
-            state.m_split_offset = ndx + 1;
-        }
-        state.m_split_size = leaf_size + 1;
-        return new_leaf.get_ref();
-    }
-};
-
-} // anonymous namespace
-
-ref_type ArrayIntNull::bptree_leaf_insert(size_t ndx, value_type value, TreeInsertBase& state)
-{
-    return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, ndx, value, state);
 }
 
 MemRef ArrayIntNull::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const

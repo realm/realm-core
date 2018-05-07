@@ -20,7 +20,7 @@
 #ifndef REALM_UTIL_OPTIONAL_HPP
 #define REALM_UTIL_OPTIONAL_HPP
 
-#include <realm/util/features.h>
+#include <realm/util/assert.hpp>
 
 #include <stdexcept>  // std::logic_error
 #include <functional> // std::less
@@ -410,58 +410,50 @@ constexpr Optional<T>::operator bool() const
 template <class T>
 constexpr const T& Optional<T>::value() const
 {
-    return m_engaged ? m_value : (throw BadOptionalAccess{"bad optional access"}, m_value);
+    return m_value;
 }
 
 template <class T>
 T& Optional<T>::value()
 {
-    if (!m_engaged) {
-        throw BadOptionalAccess{"bad optional access"};
-    }
+    REALM_ASSERT(m_engaged);
     return m_value;
 }
 
 template <class T>
 constexpr const typename Optional<T&>::target_type& Optional<T&>::value() const
 {
-    return m_ptr ? *m_ptr : (throw BadOptionalAccess{"bad optional access"}, *m_ptr);
+    return *m_ptr;
 }
 
 template <class T>
 typename Optional<T&>::target_type& Optional<T&>::value()
 {
-    if (!m_ptr) {
-        throw BadOptionalAccess{"bad optional access"};
-    }
+    REALM_ASSERT(m_ptr);
     return *m_ptr;
 }
 
 template <class T>
 constexpr const T& Optional<T>::operator*() const
 {
-    // Note: This differs from std::optional, which doesn't throw.
     return value();
 }
 
 template <class T>
 T& Optional<T>::operator*()
 {
-    // Note: This differs from std::optional, which doesn't throw.
     return value();
 }
 
 template <class T>
 constexpr const T* Optional<T>::operator->() const
 {
-    // Note: This differs from std::optional, which doesn't throw.
     return &value();
 }
 
 template <class T>
 T* Optional<T>::operator->()
 {
-    // Note: This differs from std::optional, which doesn't throw.
     return &value();
 }
 
