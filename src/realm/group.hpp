@@ -823,13 +823,11 @@ private:
     const Group* m_group;
     size_t m_pos;
     size_t m_index_in_group = 0;
-    size_t m_max_index_in_group;
     TableKey m_table_key;
 
     TableKeyIterator(const Group* g, size_t p)
         : m_group(g)
         , m_pos(p)
-        , m_max_index_in_group(m_group->m_tables.size())
     {
     }
     void load_key();

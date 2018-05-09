@@ -163,7 +163,8 @@ TableKey TableKeyIterator::operator*()
 void TableKeyIterator::load_key()
 {
     const Group& g = *m_group;
-    while (m_index_in_group < m_max_index_in_group) {
+    size_t max_index_in_group = g.m_table_names.size();
+    while (m_index_in_group < max_index_in_group) {
         RefOrTagged rot = g.m_tables.get_as_ref_or_tagged(m_index_in_group);
         if (rot.is_ref()) {
             if (m_index_in_group < g.m_table_accessors.size() && g.m_table_accessors[m_index_in_group]) {
