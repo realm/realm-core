@@ -701,6 +701,7 @@ private:
     class TransactAdvancer;
     void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&, bool writable);
     void refresh_dirty_accessors();
+    void flush_accessors_for_commit();
 
     /// \brief The version of the format of the node structure (in file or in
     /// memory) in use by Realm objects associated with this group.

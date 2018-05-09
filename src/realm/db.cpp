@@ -1923,6 +1923,8 @@ DB::version_type Transaction::commit_and_continue_as_read()
     if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
+    flush_accessors_for_commit();
+
     DB::version_type version = db->do_commit(*this); // Throws
 
     // advance read lock but dont update accessors:
@@ -2242,6 +2244,9 @@ DB::version_type Transaction::commit()
         throw LogicError(LogicError::wrong_transact_state);
 
     REALM_ASSERT(is_attached());
+
+    // before committing, allow any accessors at group level or below to sync
+    flush_accessors_for_commit();
 
     DB::version_type new_version = db->do_commit(*this); // Throws
 

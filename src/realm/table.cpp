@@ -404,7 +404,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
     // size_t columns_ndx_in_parent = 1;
     // columns no longer in use
-    while (m_top.size() <= top_position_for_column_key) {
+    while (m_top.size() <= top_position_for_version) {
         m_top.add(0);
     }
 
@@ -439,6 +439,13 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     if (!m_top.get_as_ref_or_tagged(top_position_for_column_key).is_tagged()) {
         m_top.set(top_position_for_column_key, RefOrTagged::make_tagged(0));
     }
+    auto rot_version = m_top.get_as_ref_or_tagged(top_position_for_version);
+    if (!rot_version.is_tagged()) {
+        m_top.set(top_position_for_version, RefOrTagged::make_tagged(0));
+        m_in_file_version_at_transaction_boundary = 0;
+    }
+    else
+        m_in_file_version_at_transaction_boundary = rot_version.get_as_int();
 
     // update column mapping
     m_ndx2colkey.clear();
@@ -1271,6 +1278,7 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     }
     rot = RefOrTagged::make_tagged(0);
     top.add(rot);
+    top.add(rot);
     dg.release();
     return top.get_ref();
 }
@@ -1774,9 +1782,9 @@ void Table::update_from_parent(size_t old_baseline) noexcept
                 }
             }
         }
+        refresh_content_version();
     }
     m_alloc.bump_storage_version();
-    m_alloc.bump_content_version();
 }
 
 
@@ -2154,6 +2162,36 @@ void Table::check_lists_are_empty(size_t) const
     REALM_ASSERT(false); // FIXME: Unimplemented
 }
 
+void Table::flush_for_commit()
+{
+    if (m_top.is_attached() && m_top.size() >= top_position_for_version) {
+        if (!m_top.is_read_only()) {
+            ++m_in_file_version_at_transaction_boundary;
+            auto rot_version = RefOrTagged::make_tagged(m_in_file_version_at_transaction_boundary);
+            m_top.set(top_position_for_version, rot_version);
+        }
+    }
+}
+
+void Table::refresh_content_version()
+{
+    REALM_ASSERT(m_top.is_attached());
+    if (m_top.size() >= top_position_for_version) {
+        // we have versioning info in the file. Use this to conditionally
+        // bump the version counter:
+        auto rot_version = m_top.get_as_ref_or_tagged(top_position_for_version);
+        REALM_ASSERT(rot_version.is_tagged());
+        if (m_in_file_version_at_transaction_boundary != rot_version.get_as_int()) {
+            m_in_file_version_at_transaction_boundary = rot_version.get_as_int();
+            bump_content_version();
+        }
+    }
+    else {
+        // assume the worst:
+        bump_content_version();
+    }
+}
+
 void Table::refresh_accessor_tree()
 {
     if (m_top.is_attached()) {
@@ -2167,6 +2205,8 @@ void Table::refresh_accessor_tree()
         if (m_top.size() > top_position_for_search_indexes) {
             m_index_refs.init_from_parent();
         }
+        refresh_content_version();
+        bump_storage_version();
         // update column mapping
         m_ndx2colkey.clear();
         m_colkey2ndx.clear();

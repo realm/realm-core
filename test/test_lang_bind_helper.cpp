@@ -9581,6 +9581,49 @@ TEST(LangBindHelper_HandoverAccessors)
     }
 }
 
+TEST(LangBindHelper_TableViewAndTransactionBoundaries)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DB sg(*hist, DBOptions(crypt_key()));
+    ColKey col;
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.add_table("myTable");
+        col = table->add_column(type_Int, "myColumn");
+        table->create_object().set_all(42);
+        wt.commit();
+    }
+    auto rt = sg.start_read();
+    auto tv = rt->get_table("myTable")->where().greater(col, 40).find_all();
+    CHECK(tv.is_in_sync());
+    {
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    rt->advance_read();
+    CHECK(tv.is_in_sync());
+    {
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    rt->promote_to_write();
+    CHECK(tv.is_in_sync());
+    rt->commit_and_continue_as_read();
+    CHECK(tv.is_in_sync());
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.get_table("myTable");
+        table->begin()->set_all(41);
+        wt.commit();
+    }
+    rt->advance_read();
+    CHECK(!tv.is_in_sync());
+    tv.sync_if_needed();
+    CHECK(tv.is_in_sync());
+    rt->advance_read();
+    CHECK(tv.is_in_sync());
+}
 
 #ifdef LEGACY_TESTS
 namespace {

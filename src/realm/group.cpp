@@ -1160,6 +1160,7 @@ void Group::commit()
     if (m_is_shared)
         throw LogicError(LogicError::wrong_group_state);
 
+    flush_accessors_for_commit();
     GroupWriter out(*this); // Throws
 
     // Recursively write all changed arrays to the database file. We
@@ -1620,6 +1621,12 @@ void Group::update_allocator_wrappers(bool writable)
     }
 }
 
+void Group::flush_accessors_for_commit()
+{
+    for (auto& acc : m_table_accessors)
+        if (acc)
+            acc->flush_for_commit();
+}
 
 void Group::refresh_dirty_accessors()
 {
@@ -1652,9 +1659,6 @@ void Group::refresh_dirty_accessors()
             }
             if (same_table) {
                 table_accessor->refresh_accessor_tree();
-                // FIXME: Move these into table::refresh_accessor_tree ??
-                table_accessor->bump_storage_version();
-                table_accessor->bump_content_version();
             }
             else {
                 table_accessor->detach();
