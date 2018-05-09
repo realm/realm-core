@@ -2705,9 +2705,10 @@ TEST(Table_list_basic)
 
     {
         Obj obj = table.create_object(ObjKey(5));
-        CHECK(obj.is_null(list_col));
+        CHECK_NOT(obj.is_null(list_col));
         auto list = obj.get_list<int64_t>(list_col);
         CHECK_NOT(obj.is_null(list_col));
+        CHECK(list.is_empty());
         for (int i = 0; i < 100; i++) {
             list.add(i + 1000);
         }

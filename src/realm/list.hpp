@@ -83,7 +83,10 @@ public:
      * can be made virtual.
      */
     virtual size_t size() const = 0;
-    virtual bool is_null() const = 0;
+    bool is_empty() const
+    {
+        return size() == 0;
+    }
     ObjKey get_key() const
     {
         return m_const_obj->get_key();
@@ -258,14 +261,11 @@ public:
     {
         if (!is_attached())
             return 0;
-
+        if (!m_valid)
+            return 0;
         update_if_needed();
 
-        return is_null() ? 0 : m_tree->size();
-    }
-    bool is_null() const override
-    {
-        return !m_valid;
+        return m_tree->size();
     }
     T get(size_t ndx) const
     {
@@ -423,6 +423,7 @@ public:
 
     void insert(size_t ndx, T value)
     {
+        ensure_created();
         if (ndx > m_tree->size()) {
             throw std::out_of_range("Index out of range");
         }
@@ -491,6 +492,7 @@ public:
 
     void clear() override
     {
+        ensure_created();
         update_if_needed();
         ensure_writeable();
         if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
@@ -509,6 +511,12 @@ protected:
             return true;
         }
         return false;
+    }
+    void ensure_created()
+    {
+        if (!ConstListIf<T>::m_valid && m_obj.is_valid()) {
+            create();
+        }
     }
     void ensure_writeable()
     {

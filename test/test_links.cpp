@@ -524,7 +524,7 @@ TEST(Links_LinkList_TableOps)
     target->create_object().set_all("test3", 3, true, int64_t(Wed));
 
     ConstObj obj1 = origin->create_object(ObjKey(0));
-    CHECK(obj1.get_list<ObjKey>(col_link).is_null());
+    CHECK(obj1.get_list<ObjKey>(col_link).is_empty());
     CHECK_EQUAL(0, obj1.get_link_count(col_link));
 
     // add some more rows and test that they can be deleted

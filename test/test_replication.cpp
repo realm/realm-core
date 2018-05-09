@@ -547,22 +547,28 @@ TEST(Replication_Links)
         ConstObj o_2_0 = origin_2->get_object(origin_2_keys[0]);
         ConstObj o_2_1 = origin_2->get_object(origin_2_keys[1]);
 
-        CHECK(o_1_0.is_null(o_1_ll_1));
-        CHECK(o_1_0.is_null(o_1_f_2));
+        CHECK(!o_1_0.is_null(o_1_ll_1));
+        CHECK(o_1_0.get_linklist(o_1_ll_1).is_empty());
+        CHECK(!o_1_0.is_null(o_1_f_2));
+        CHECK(o_1_0.get_linklist(o_1_f_2).is_empty());
         CHECK(o_1_0.is_null(o_1_l_3));
         CHECK(o_1_0.is_null(o_1_l_4));
 
-        CHECK(o_1_1.is_null(o_1_ll_1));
-        CHECK(o_1_1.is_null(o_1_f_2));
+        CHECK(!o_1_1.is_null(o_1_ll_1));
+        CHECK(o_1_1.get_linklist(o_1_ll_1).is_empty());
+        CHECK(!o_1_1.is_null(o_1_f_2));
+        CHECK(o_1_1.get_linklist(o_1_f_2).is_empty());
         CHECK(o_1_1.is_null(o_1_l_3));
         CHECK(o_1_1.is_null(o_1_l_4));
 
         CHECK(o_2_0.is_null(o_2_l_2));
-        CHECK(o_2_0.is_null(o_2_ll_3));
+        CHECK(!o_2_0.is_null(o_2_ll_3));
+        CHECK(o_2_0.get_linklist(o_2_ll_3).is_empty());
         CHECK(o_2_0.is_null(o_2_l_4));
 
         CHECK(o_2_1.is_null(o_2_l_2));
-        CHECK(o_2_1.is_null(o_2_ll_3));
+        CHECK(!o_2_1.is_null(o_2_ll_3));
+        CHECK(o_2_1.get_linklist(o_2_ll_3).is_empty());
         CHECK(o_2_1.is_null(o_2_l_4));
 
         ConstObj t_1_0 = target_1->get_object(target_1_keys[0]);
@@ -1071,13 +1077,20 @@ TEST(Replication_ListOfPrimitives)
 
         ConstObj obj = table->get_object(ObjKey(0));
 
-        CHECK(obj.is_null(col_int));
-        CHECK(obj.is_null(col_boo));
-        CHECK(obj.is_null(col_flo));
-        CHECK(obj.is_null(col_dou));
-        CHECK(obj.is_null(col_str));
-        CHECK(obj.is_null(col_bin));
-        CHECK(obj.is_null(col_tim));
+        CHECK(!obj.is_null(col_int));
+        CHECK(!obj.is_null(col_boo));
+        CHECK(!obj.is_null(col_flo));
+        CHECK(!obj.is_null(col_dou));
+        CHECK(!obj.is_null(col_str));
+        CHECK(!obj.is_null(col_bin));
+        CHECK(!obj.is_null(col_tim));
+        CHECK(obj.get_linklist(col_int).is_empty());
+        CHECK(obj.get_linklist(col_boo).is_empty());
+        CHECK(obj.get_linklist(col_flo).is_empty());
+        CHECK(obj.get_linklist(col_dou).is_empty());
+        CHECK(obj.get_linklist(col_str).is_empty());
+        CHECK(obj.get_linklist(col_bin).is_empty());
+        CHECK(obj.get_linklist(col_tim).is_empty());
     }
     // Add valuest to lists
     {
