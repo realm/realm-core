@@ -1022,20 +1022,12 @@ BinaryData Group::write_to_mem() const
     // is actually needed.
     size_t max_size = m_alloc.get_total_size();
 
-    char* buffer = static_cast<char*>(malloc(max_size)); // Throws
-    if (!buffer)
-        throw std::bad_alloc();
-    try {
-        MemoryOutputStream out; // Throws
-        out.set_buffer(buffer, buffer + max_size);
-        write(out); // Throws
-        size_t buffer_size = out.size();
-        return BinaryData(buffer, buffer_size);
-    }
-    catch (...) {
-        free(buffer);
-        throw;
-    }
+    auto buffer = std::unique_ptr<char[]>(new char[max_size]);
+    MemoryOutputStream out; // Throws
+    out.set_buffer(buffer.get(), buffer.get() + max_size);
+    write(out); // Throws
+    size_t buffer_size = out.size();
+    return BinaryData(buffer.release(), buffer_size);
 }
 
 

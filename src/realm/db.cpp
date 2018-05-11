@@ -2354,7 +2354,7 @@ std::unique_ptr<Query> Transaction::import_copy_of(Query& query, PayloadPolicy p
     return query.clone_for_handover(this, policy);
 }
 
-std::unique_ptr<ConstTableView> Transaction::import_copy_of(TableView& tv, PayloadPolicy policy)
+std::unique_ptr<TableView> Transaction::import_copy_of(TableView& tv, PayloadPolicy policy)
 {
     return tv.clone_for_handover(this, policy);
 }

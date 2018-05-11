@@ -197,7 +197,7 @@ TEST(Alloc_AttachBuffer)
         {
             File file(path);
             buffer_size = size_t(file.get_size());
-            buffer.reset(static_cast<char*>(malloc(buffer_size)));
+            buffer.reset(new char[buffer_size]);
             CHECK(bool(buffer));
             file.read(buffer.get(), buffer_size);
         }

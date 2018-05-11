@@ -510,6 +510,10 @@ public:
     {
         return m_read_lock.m_version;
     }
+    DB::version_type get_version_of_latest_snapshot()
+    {
+        return db->get_version_of_latest_snapshot();
+    }
     void close();
     DB::version_type commit();
     void rollback();
@@ -553,7 +557,7 @@ public:
 
     // handover of the heavier Query and TableView
     std::unique_ptr<Query> import_copy_of(Query&, PayloadPolicy);
-    std::unique_ptr<ConstTableView> import_copy_of(TableView&, PayloadPolicy);
+    std::unique_ptr<TableView> import_copy_of(TableView&, PayloadPolicy);
     std::unique_ptr<ConstTableView> import_copy_of(ConstTableView&, PayloadPolicy);
 
     /// Get the current transaction type

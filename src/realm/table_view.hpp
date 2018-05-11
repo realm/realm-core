@@ -225,7 +225,7 @@ public:
         return m_query;
     }
 
-    virtual std::unique_ptr<ConstTableView> clone() const
+    std::unique_ptr<ConstTableView> clone() const
     {
         return std::unique_ptr<ConstTableView>(new ConstTableView(*this));
     }
@@ -233,7 +233,7 @@ public:
     // handover machinery entry points based on dynamic type. These methods:
     // a) forward their calls to the static type entry points.
     // b) new/delete patch data structures.
-    virtual std::unique_ptr<ConstTableView> clone_for_handover(Transaction* tr, PayloadPolicy mode) const
+    std::unique_ptr<ConstTableView> clone_for_handover(Transaction* tr, PayloadPolicy mode) const
     {
         std::unique_ptr<ConstTableView> retval(new ConstTableView(*this, tr, mode));
         return retval;
@@ -422,14 +422,14 @@ public:
     void clear();
     //@}
 
-    std::unique_ptr<ConstTableView> clone() const override
+    std::unique_ptr<TableView> clone() const
     {
-        return std::unique_ptr<ConstTableView>(new TableView(*this));
+        return std::unique_ptr<TableView>(new TableView(*this));
     }
 
-    std::unique_ptr<ConstTableView> clone_for_handover(Transaction* tr, PayloadPolicy policy) const override
+    std::unique_ptr<TableView> clone_for_handover(Transaction* tr, PayloadPolicy policy) const
     {
-        std::unique_ptr<ConstTableView> retval(new TableView(*this, tr, policy));
+        std::unique_ptr<TableView> retval(new TableView(*this, tr, policy));
         return retval;
     }
 
