@@ -8387,53 +8387,44 @@ TEST(LangBindHelper_HandoverDistinctView)
 }
 
 
-#ifdef LEGACY_TESTS
 TEST(LangBindHelper_HandoverWithReverseDependency)
 {
-    // FIXME: This testcase is wrong!
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, DBOptions(crypt_key()));
-    sg.begin_read();
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
-    DB::VersionID vid;
+    auto trans = sg.start_read();
     {
         // Untyped interface
-        std::unique_ptr<DB::Handover<TableView>> handover1;
-        std::unique_ptr<DB::Handover<TableView>> handover2;
         TableView tv1;
         TableView tv2;
+        ColKey ck;
         {
-            LangBindHelper::promote_to_write(sg_w);
-            TableRef table = group_w.add_table("table2");
-            table->add_column(type_Int, "first");
+            trans->promote_to_write();
+            TableRef table = trans->add_table("table2");
+            ck = table->add_column(type_Int, "first");
             for (int i = 0; i < 100; ++i) {
-                table->add_empty_row();
-                table->set_int(0, i, i);
+                table->create_object().set_all(i);
             }
-            LangBindHelper::commit_and_continue_as_read(sg_w);
-            vid = sg_w.get_version_of_current_transaction();
+            trans->commit_and_continue_as_read();
             tv1 = table->where().find_all();
             tv2 = table->where(&tv1).find_all();
             CHECK(tv1.is_attached());
             CHECK(tv2.is_attached());
             CHECK_EQUAL(100, tv1.size());
             for (int i = 0; i < 100; ++i)
-                CHECK_EQUAL(i, tv1.get_int(0, i));
+                CHECK_EQUAL(i, tv1.get_object(i).get<int64_t>(ck));
             CHECK_EQUAL(100, tv2.size());
             for (int i = 0; i < 100; ++i)
-                CHECK_EQUAL(i, tv2.get_int(0, i));
-            handover2 = sg_w.export_for_handover(tv1, ConstSourcePayload::Copy);
+                CHECK_EQUAL(i, tv1.get_object(i).get<int64_t>(ck));
+            auto dummy_trans = trans->duplicate();
+            auto dummy_tv = dummy_trans->import_copy_of(tv1, PayloadPolicy::Copy);
             CHECK(tv1.is_attached());
             CHECK(tv2.is_attached());
         }
     }
 }
 
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_HandoverTableViewFromBacklink)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -8820,7 +8811,7 @@ TEST(LangBindHelper_HandoverQuerySubQuery)
         CHECK_EQUAL(1, query->count());
     }
 }
-
+#endif
 
 TEST(LangBindHelper_VersionControl)
 {
@@ -8833,26 +8824,25 @@ TEST(LangBindHelper_VersionControl)
     {
         // Create a new shared db
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
         DB sg(*hist, DBOptions(crypt_key()));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
         // first create 'num_version' versions
-        sg.begin_read();
+        ColKey col;
+        auto reader = sg.start_read();
         {
-            WriteTransaction wt(sg_w);
-            wt.get_or_add_table("test")->add_column(type_Int, "a");
+            WriteTransaction wt(sg);
+            col = wt.get_or_add_table("test")->add_column(type_Int, "a");
             wt.commit();
         }
         for (int i = 0; i < num_versions; ++i) {
             {
-                WriteTransaction wt(sg_w);
+                WriteTransaction wt(sg);
                 auto t = wt.get_table("test");
-                add(t, i);
+                t->create_object().set_all(i);
                 wt.commit();
             }
             {
-                ReadTransactionRef rt(sg_w);
-                versions[i] = sg_w.get_version_of_current_transaction();
+                auto rt = sg.start_read();
+                versions[i] = rt->get_version_of_current_transaction();
             }
         }
 
@@ -8861,18 +8851,14 @@ TEST(LangBindHelper_VersionControl)
         {
             for (int k = 0; k < num_versions; ++k) {
                 // std::cerr << "Advancing from initial version to version " << k << std::endl;
-                const Group& g = sg_w.begin_read(versions[0]);
-                auto t = g.get_table("test");
+                auto g = sg.start_read(versions[0]);
+                auto t = g->get_table("test");
                 CHECK(versions[k] >= versions[0]);
-                g.verify();
-
-                // FIXME: Oops, illegal attempt to access a specific version
-                // that is not currently tethered via another transaction.
-
-                LangBindHelper::advance_read(sg_w, versions[k]);
-                g.verify();
-                CHECK_EQUAL(k, t->get_int(0, k));
-                sg_w.end_read();
+                g->verify();
+                g->advance_read(versions[k]);
+                g->verify();
+                auto o = *(t->begin() + k);
+                CHECK_EQUAL(k, o.get<int64_t>(col));
             }
         }
 
@@ -8880,87 +8866,73 @@ TEST(LangBindHelper_VersionControl)
         for (int i = num_versions - 1; i >= 0; --i) {
             // std::cerr << "Jumping directly to version " << i << std::endl;
 
-            // FIXME: Oops, illegal attempt to access a specific version
-            // that is not currently tethered via another transaction.
-
-            const Group& g = sg_w.begin_read(versions[i]);
-            g.verify();
-            auto t = g.get_table("test");
-            CHECK_EQUAL(i, t->get_int(0, i));
-            sg_w.end_read();
+            auto g = sg.start_read(versions[i]);
+            g->verify();
+            auto t = g->get_table("test");
+            auto o = *(t->begin() + i);
+            CHECK_EQUAL(i, o.get<int64_t>(col));
         }
 
         // then advance through the versions going forward
         {
-            const Group& g = sg_w.begin_read(versions[0]);
-            g.verify();
-            auto t = g.get_table("test");
+            auto g = sg.start_read(versions[0]);
+            g->verify();
+            auto t = g->get_table("test");
             for (int k = 0; k < num_versions; ++k) {
                 // std::cerr << "Advancing to version " << k << std::endl;
                 CHECK(k == 0 || versions[k] >= versions[k - 1]);
 
-                // FIXME: Oops, illegal attempt to access a specific version
-                // that is not currently tethered via another transaction.
-
-                LangBindHelper::advance_read(sg_w, versions[k]);
-                g.verify();
-                CHECK_EQUAL(k, t->get_int(0, k));
+                g->advance_read(versions[k]);
+                g->verify();
+                auto o = *(t->begin() + k);
+                CHECK_EQUAL(k, o.get<int64_t>(col));
             }
-            sg_w.end_read();
         }
-
         // sync to a randomly selected version - use advance_read when going
         // forward in time, but begin_read when going back in time
         int old_version = 0;
-        const Group& g = sg_w.begin_read(versions[old_version]);
-        auto t = g.get_table("test");
-        CHECK_EQUAL(old_version, t->get_int(0, old_version));
+        auto g = sg.start_read(versions[old_version]);
+        auto t = g->get_table("test");
         for (int k = num_random_tests; k; --k) {
             int new_version = random.draw_int_mod(num_versions);
             // std::cerr << "Random jump: version " << old_version << " -> " << new_version << std::endl;
             if (new_version < old_version) {
                 CHECK(versions[new_version] < versions[old_version]);
-                sg_w.end_read();
-
-                // FIXME: Oops, illegal attempt to access a specific version
-                // that is not currently tethered via another transaction.
-
-                sg_w.begin_read(versions[new_version]);
-                g.verify();
-                t = g.get_table("test");
-                CHECK_EQUAL(new_version, t->get_int(0, new_version));
+                g->end_read();
+                g = sg.start_read(versions[new_version]);
+                g->verify();
+                t = g->get_table("test");
+                auto o = *(t->begin() + new_version);
+                CHECK_EQUAL(new_version, o.get<int64_t>(col));
             }
             else {
                 CHECK(versions[new_version] >= versions[old_version]);
-                g.verify();
-
-                // FIXME: Oops, illegal attempt to access a specific version
-                // that is not currently tethered via another transaction.
-
-                LangBindHelper::advance_read(sg_w, versions[new_version]);
-                g.verify();
-                CHECK_EQUAL(new_version, t->get_int(0, new_version));
+                g->verify();
+                g->advance_read(versions[new_version]);
+                g->verify();
+                auto o = *(t->begin() + new_version);
+                CHECK_EQUAL(new_version, o.get<int64_t>(col));
             }
             old_version = new_version;
         }
-        sg_w.end_read();
+        g->end_read();
         // release the first readlock and commit something to force a cleanup
         // we need to commit twice, because cleanup is done before the actual
         // commit, so during the first commit, the last of the previous versions
         // will still be kept. To get rid of it, we must commit once more.
-        sg.end_read();
-        sg_w.begin_write();
-        sg_w.commit();
-        sg_w.begin_write();
-        sg_w.commit();
+        reader->end_read();
+        g = sg.start_write();
+        g->commit();
+        g = sg.start_write();
+        g->commit();
 
         // Validate that all the versions are now unreachable
         for (int i = 0; i < num_versions; ++i)
-            CHECK_THROW(sg.begin_read(versions[i]), DB::BadVersion);
+            CHECK_THROW(sg.start_read(versions[i]), DB::BadVersion);
     }
 }
 
-
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_LinkListCrash)
 {
     SHARED_GROUP_TEST_PATH(path);
