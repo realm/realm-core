@@ -80,7 +80,6 @@ public:
     Impl(std::unique_ptr<Callback>,
          std::string local_root_dir, SyncConfig sync_config_template);
 
-    Realm::Config get_config(StringData id, StringData virtual_path) const;
     util::Optional<ChangeNotification> next_changed_realm();
     void release_version(std::string const& id, VersionID old_version, VersionID new_version);
 
