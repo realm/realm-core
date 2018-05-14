@@ -64,9 +64,6 @@ jobWrapper {
                                buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
                                buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
                                packageGeneric      : doBuildPackage('generic', 'tgz'),
-                               packageCentos7      : doBuildPackage('centos-7', 'rpm'),
-                               packageCentos6      : doBuildPackage('centos-6', 'rpm'),
-                               packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
                                threadSanitizer     : doBuildInDocker('Debug', 'thread'),
                                addressSanitizer    : doBuildInDocker('Debug', 'address'),
                                coverage            : doBuildCoverage()
@@ -140,9 +137,6 @@ jobWrapper {
           stage('publish-packages') {
               parallel(
                   generic: doPublishGeneric(),
-                  centos7: doPublish('centos-7', 'rpm', 'el', 7),
-                  centos6: doPublish('centos-6', 'rpm', 'el', 6),
-                  ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
                   others: doPublishLocalArtifacts()
               )
           }
