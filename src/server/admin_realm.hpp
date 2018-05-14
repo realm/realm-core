@@ -32,10 +32,11 @@ class SyncSession;
 
 class AdminRealmListener : public std::enable_shared_from_this<AdminRealmListener> {
 public:
-    AdminRealmListener(std::string local_root, std::string server_base_url,
-                       std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback);
+    AdminRealmListener(std::string local_root_dir, SyncConfig sync_config_template);
 
     void start();
+
+    Realm::Config get_config(StringData virtual_path, util::Optional<StringData> id = none) const;
 
     virtual void register_realm(StringData id, StringData virtual_path) = 0;
     virtual void unregister_realm(StringData id, StringData virtual_path) = 0;
@@ -44,6 +45,8 @@ public:
 
 private:
     Realm::Config m_config;
+    const std::string m_local_root_dir;
+    const SyncConfig m_sync_config_template;
     Results m_results;
     NotificationToken m_notification_token;
     std::shared_ptr<SyncSession> m_download_session;

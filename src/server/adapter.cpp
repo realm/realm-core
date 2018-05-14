@@ -526,9 +526,7 @@ public:
 class Adapter::Impl : public AdminRealmListener {
 public:
     Impl(std::function<void(std::string)> realm_changed, std::regex regex,
-         std::string local_root_dir, std::string server_base_url,
-         std::shared_ptr<SyncUser> user,
-         std::function<SyncBindSessionHandler> bind_callback);
+         std::string local_root_dir, SyncConfig sync_config_template);
 
     Realm::Config get_config(StringData virtual_path, util::Optional<Schema> schema) const;
 
@@ -554,12 +552,8 @@ private:
 };
 
 Adapter::Impl::Impl(std::function<void(std::string)> realm_changed, std::regex regex,
-                    std::string local_root_dir, std::string server_base_url,
-                    std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback)
-: AdminRealmListener(local_root_dir, server_base_url, user, bind_callback)
-, m_server_base_url(std::move(server_base_url))
-, m_user(std::move(user))
-, m_bind_callback(std::move(bind_callback))
+                    std::string local_root_dir, SyncConfig sync_config_template)
+: AdminRealmListener(std::move(local_root_dir), std::move(sync_config_template))
 , m_transformer(std::make_shared<ChangesetCooker>())
 , m_regular_realms_dir(util::File::resolve("realms", local_root_dir)) // Throws
 , m_realm_changed(std::move(realm_changed))
@@ -569,26 +563,12 @@ Adapter::Impl::Impl(std::function<void(std::string)> realm_changed, std::regex r
 }
 
 Realm::Config Adapter::Impl::get_config(StringData virtual_path, util::Optional<Schema> schema) const {
-    Realm::Config config;
+    Realm::Config config = AdminRealmListener::get_config(virtual_path);
     if (schema) {
         config.schema = std::move(schema);
         config.schema_version = 0;
     }
-
-    std::string file_path = m_regular_realms_dir + virtual_path.data() + ".realm";
-    for (size_t pos = m_regular_realms_dir.size(); pos != file_path.npos; pos = file_path.find('/', pos + 1)) {
-        file_path[pos] = '\0';
-        util::try_make_dir(file_path);
-        file_path[pos] = '/';
-    }
-
-    config.path = std::move(file_path);
-    config.sync_config = std::make_unique<SyncConfig>(m_user, m_server_base_url + virtual_path.data());
-    config.sync_config->bind_session_handler = m_bind_callback;
     config.sync_config->transformer = m_transformer;
-    config.schema_mode = SchemaMode::Additive;
-    config.cache = false;
-    config.automatic_change_notifications = false;
     return config;
 }
 
@@ -606,12 +586,10 @@ void Adapter::Impl::register_realm(StringData, StringData virtual_path) {
     m_realms.push_back(coordinator);
 }
 
-Adapter::Adapter(std::function<void(std::string)> realm_changed, std::string local_root_dir,
-                 std::string server_base_url, std::shared_ptr<SyncUser> user,
-                 std::function<SyncBindSessionHandler> bind_callback, std::regex regex)
+Adapter::Adapter(std::function<void(std::string)> realm_changed, std::regex regex,
+                 std::string local_root_dir, SyncConfig sync_config_template)
 : m_impl(std::make_shared<Adapter::Impl>(std::move(realm_changed), std::move(regex),
-                                         std::move(local_root_dir), std::move(server_base_url),
-                                         std::move(user), std::move(bind_callback)))
+                                         std::move(local_root_dir), std::move(sync_config_template)))
 {
     m_impl->start();
 }

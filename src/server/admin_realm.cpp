@@ -37,15 +37,15 @@
 using namespace realm;
 using namespace realm::_impl;
 
-AdminRealmListener::AdminRealmListener(std::string local_root, std::string server_base_url,
-                                       std::shared_ptr<SyncUser> user,
-                                       std::function<SyncBindSessionHandler> bind_callback)
+AdminRealmListener::AdminRealmListener(std::string local_root_dir, SyncConfig sync_config_template)
+: m_local_root_dir(std::move(local_root_dir))
+, m_sync_config_template(std::move(sync_config_template))
 {
     m_config.cache = false;
-    m_config.path = util::File::resolve("realms.realm", local_root);
+    m_config.path = util::File::resolve("realms.realm", m_local_root_dir);
     m_config.schema_mode = SchemaMode::ReadOnlyAlternative;
-    m_config.sync_config = std::make_shared<SyncConfig>(user, server_base_url + "/__admin");
-    m_config.sync_config->bind_session_handler = std::move(bind_callback);
+    m_config.sync_config = std::make_shared<SyncConfig>(m_sync_config_template);
+    m_config.sync_config->reference_realm_url += "/__admin";
 }
 
 void AdminRealmListener::start()
@@ -154,4 +154,27 @@ void AdminRealmListener::start()
     m_download_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
     bool result = m_download_session->wait_for_download_completion(std::move(download_callback));
     REALM_ASSERT_RELEASE(result);
+}
+
+Realm::Config AdminRealmListener::get_config(StringData virtual_path, util::Optional<StringData> id) const {
+    Realm::Config config;
+
+    std::string file_path = m_local_root_dir + virtual_path.data();
+    if (id && *id) {
+        file_path += std::string("/") + id->data();
+    }
+    file_path += + ".realm";
+    for (size_t pos = m_local_root_dir.size(); pos != file_path.npos; pos = file_path.find('/', pos + 1)) {
+        file_path[pos] = '\0';
+        util::try_make_dir(file_path);
+        file_path[pos] = '/';
+    }
+
+    config.path = std::move(file_path);
+    config.sync_config = std::make_unique<SyncConfig>(m_sync_config_template);
+    config.sync_config->reference_realm_url += virtual_path.data();
+    config.schema_mode = SchemaMode::Additive;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    return config;
 }

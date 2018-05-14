@@ -77,9 +77,8 @@ std::unique_ptr<util::Logger> make_logger()
 
 class GlobalNotifier::Impl : public AdminRealmListener {
 public:
-    Impl(std::unique_ptr<Callback>, std::string local_root_dir,
-         std::string server_base_url, std::shared_ptr<SyncUser> user,
-         std::function<SyncBindSessionHandler> bind_callback);
+    Impl(std::unique_ptr<Callback>,
+         std::string local_root_dir, SyncConfig sync_config_template);
 
     Realm::Config get_config(StringData id, StringData virtual_path) const;
     util::Optional<ChangeNotification> next_changed_realm();
@@ -93,9 +92,6 @@ public:
 
     const std::unique_ptr<util::Logger> m_logger;
     const std::unique_ptr<Callback> m_target;
-    const std::string m_server_base_url;
-    std::shared_ptr<SyncUser> m_user;
-    std::function<SyncBindSessionHandler> m_bind_callback;
     std::string m_regular_realms_dir;
 
     std::mutex m_work_queue_mutex;
@@ -133,35 +129,13 @@ public:
 };
 
 GlobalNotifier::Impl::Impl(std::unique_ptr<Callback> async_target,
-                           std::string local_root_dir, std::string server_base_url,
-                           std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback)
-: AdminRealmListener(local_root_dir, server_base_url, user, bind_callback)
+                           std::string local_root_dir, SyncConfig sync_config_template)
+: AdminRealmListener(local_root_dir, std::move(sync_config_template))
 , m_logger(make_logger())
 , m_target(std::move(async_target))
-, m_server_base_url(std::move(server_base_url))
-, m_user(std::move(user))
-, m_bind_callback(std::move(bind_callback))
 , m_regular_realms_dir(util::File::resolve("realms", local_root_dir)) // Throws
 {
     util::try_make_dir(m_regular_realms_dir); // Throws
-}
-
-Realm::Config GlobalNotifier::Impl::get_config(StringData id, StringData virtual_path) const {
-    Realm::Config config;
-    auto file_path = m_regular_realms_dir + virtual_path.data() + "/" + id.data() + ".realm";
-    for (size_t pos = m_regular_realms_dir.size(); pos != file_path.npos; pos = file_path.find('/', pos + 1)) {
-        file_path[pos] = '\0';
-        util::try_make_dir(file_path);
-        file_path[pos] = '/';
-    }
-
-    config.path = std::move(file_path);
-    config.sync_config = std::make_unique<SyncConfig>(m_user, m_server_base_url + virtual_path.data());
-    config.sync_config->bind_session_handler = m_bind_callback;
-    config.schema_mode = SchemaMode::Additive;
-    config.cache = false;
-    config.automatic_change_notifications = false;
-    return config;
 }
 
 void GlobalNotifier::Impl::register_realm(StringData id, StringData path) {
@@ -178,7 +152,7 @@ void GlobalNotifier::Impl::register_realm(StringData id, StringData path) {
     }
 
     m_logger->trace("Global notifier: watching %1", path);
-    auto config = get_config(id, path);
+    auto config = get_config(path, id);
     info->coordinator = _impl::RealmCoordinator::get_coordinator(config);
 
     std::weak_ptr<Impl> weak_self = std::static_pointer_cast<Impl>(shared_from_this());
@@ -279,13 +253,10 @@ void GlobalNotifier::Impl::release_version(std::string const& id, VersionID old_
 }
 
 GlobalNotifier::GlobalNotifier(std::unique_ptr<Callback> async_target,
-                               std::string local_root_dir, std::string server_base_url,
-                               std::shared_ptr<SyncUser> user, std::function<SyncBindSessionHandler> bind_callback)
+                               std::string local_root_dir, SyncConfig sync_config_template)
 : m_impl(std::make_shared<GlobalNotifier::Impl>(std::move(async_target),
                                                 std::move(local_root_dir),
-                                                std::move(server_base_url),
-                                                std::move(user),
-                                                std::move(bind_callback)))
+                                                std::move(sync_config_template)))
 {
     std::weak_ptr<GlobalNotifier::Impl> weak_impl = m_impl;
     m_impl->m_signal = std::make_shared<util::EventLoopSignal<Impl::SignalCallback>>(Impl::SignalCallback{weak_impl});

@@ -33,8 +33,7 @@ class GlobalNotifier {
 public:
     class Callback;
     GlobalNotifier(std::unique_ptr<Callback>, std::string local_root_dir,
-                   std::string server_base_url, std::shared_ptr<SyncUser> user,
-                   std::function<SyncBindSessionHandler> bind_callback);
+                   SyncConfig sync_config_template);
     ~GlobalNotifier();
 
     // Returns the target callback
