@@ -533,8 +533,8 @@ public:
     using AdminRealmListener::start;
 
 private:
-    void register_realm(StringData, StringData virtual_path) override;
-    void unregister_realm(StringData, StringData) override {}
+    void register_realm(sync::ObjectID, StringData virtual_path) override;
+    void unregister_realm(sync::ObjectID, StringData) override {}
     void error(std::exception_ptr) override {} // FIXME
     void download_complete() override {}
 
@@ -572,7 +572,7 @@ Realm::Config Adapter::Impl::get_config(StringData virtual_path, util::Optional<
     return config;
 }
 
-void Adapter::Impl::register_realm(StringData, StringData virtual_path) {
+void Adapter::Impl::register_realm(sync::ObjectID, StringData virtual_path) {
     std::string path = virtual_path;
     if (!std::regex_match(path, m_regex))
         return;

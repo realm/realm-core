@@ -37,6 +37,13 @@
 using namespace realm;
 using namespace realm::_impl;
 
+namespace {
+sync::ObjectID id_for_row(Group& group, RowExpr row)
+{
+    return sync::object_id_for_row(group, *row.get_table(), row.get_index());
+}
+} // anonymous namespace
+
 AdminRealmListener::AdminRealmListener(std::string local_root_dir, SyncConfig sync_config_template)
 : m_local_root_dir(std::move(local_root_dir))
 , m_sync_config_template(std::move(sync_config_template))
@@ -57,12 +64,12 @@ void AdminRealmListener::start()
 
     if (auto realm = m_results.get_realm()) {
         // If we've finished downloading the Realm, just re-report all the files listed in it
-        auto& table = *ObjectStore::table_for_object_type(realm->read_group(), "RealmFile");
-        size_t id_col_ndx = table.get_column_index("id");
+        auto& group = realm->read_group();
+        auto& table = *ObjectStore::table_for_object_type(group, "RealmFile");
         size_t path_col_ndx = table.get_column_index("path");
 
         for (size_t i = 0, size = table.size(); i < size; ++i)
-            register_realm(table.get_string(id_col_ndx, i), table.get_string(path_col_ndx, i));
+            register_realm(id_for_row(group, table[i]), table.get_string(path_col_ndx, i));
         return;
     }
 
@@ -106,11 +113,11 @@ void AdminRealmListener::start()
                 if (!self)
                     return;
 
-                size_t id_col_ndx = self->m_results.get(0).get_column_index("id");
+                auto& group = self->m_results.get_realm()->read_group();
                 size_t path_col_ndx = self->m_results.get(0).get_column_index("path");
                 for (auto i : c.deletions.as_indexes()) {
                     auto row = self->m_results.get(i);
-                    self->unregister_realm(row.get_string(id_col_ndx), row.get_string(path_col_ndx));
+                    self->unregister_realm(id_for_row(group, row), row.get_string(path_col_ndx));
                 }
             }
 
@@ -125,20 +132,20 @@ void AdminRealmListener::start()
                 if (self->m_results.size() == 0)
                     return;
 
-                size_t id_col_ndx = self->m_results.get(0).get_column_index("id");
+                auto& group = self->m_results.get_realm()->read_group();
                 size_t path_col_ndx = self->m_results.get(0).get_column_index("path");
 
                 if (!initial_sent) {
                     for (size_t i = 0, size = self->m_results.size(); i < size; ++i) {
                         auto row = self->m_results.get(i);
-                        self->register_realm(row.get_string(id_col_ndx), row.get_string(path_col_ndx));
+                        self->register_realm(id_for_row(group, row), row.get_string(path_col_ndx));
                     }
                     initial_sent = true;
                 }
                 else {
                     for (auto i : c.insertions.as_indexes()) {
                         auto row = self->m_results.get(i);
-                        self->register_realm(row.get_string(id_col_ndx), row.get_string(path_col_ndx));
+                        self->register_realm(id_for_row(group, row), row.get_string(path_col_ndx));
                     }
                 }
             }
@@ -156,12 +163,12 @@ void AdminRealmListener::start()
     REALM_ASSERT_RELEASE(result);
 }
 
-Realm::Config AdminRealmListener::get_config(StringData virtual_path, util::Optional<StringData> id) const {
+Realm::Config AdminRealmListener::get_config(StringData virtual_path, StringData id) const {
     Realm::Config config;
 
     std::string file_path = m_local_root_dir + virtual_path.data();
-    if (id && *id) {
-        file_path += std::string("/") + id->data();
+    if (id) {
+        file_path += std::string("/") + id.data();
     }
     file_path += + ".realm";
     for (size_t pos = m_local_root_dir.size(); pos != file_path.npos; pos = file_path.find('/', pos + 1)) {

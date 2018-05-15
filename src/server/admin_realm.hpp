@@ -26,9 +26,11 @@
 #include <memory>
 
 namespace realm {
-
 class SyncUser;
 class SyncSession;
+namespace sync {
+struct ObjectID;
+}
 
 class AdminRealmListener : public std::enable_shared_from_this<AdminRealmListener> {
 public:
@@ -36,10 +38,10 @@ public:
 
     void start();
 
-    Realm::Config get_config(StringData virtual_path, util::Optional<StringData> id = none) const;
+    Realm::Config get_config(StringData virtual_path, StringData id = nullptr) const;
 
-    virtual void register_realm(StringData id, StringData virtual_path) = 0;
-    virtual void unregister_realm(StringData id, StringData virtual_path) = 0;
+    virtual void register_realm(sync::ObjectID id, StringData virtual_path) = 0;
+    virtual void unregister_realm(sync::ObjectID id, StringData virtual_path) = 0;
     virtual void download_complete() = 0;
     virtual void error(std::exception_ptr) = 0;
 
