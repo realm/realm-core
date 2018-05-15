@@ -141,7 +141,7 @@ TEST_CASE("Object-level Permissions") {
         }
     }
 
-    SECTION("Non-partial sync Realms") {
+    SECTION("Full sync Realms") {
         SECTION("permit all operations") {
             auto r = Realm::get_shared_realm(config);
             auto& table = create_object(r);
@@ -152,7 +152,7 @@ TEST_CASE("Object-level Permissions") {
         }
     }
 
-    SECTION("Partial-sync Realms") {
+    SECTION("Query-based sync Realms") {
         SECTION("permit all operations prior to first sync") {
             config.sync_config->is_partial = true;
 
@@ -179,7 +179,7 @@ TEST_CASE("Object-level Permissions") {
             CHECK(r->get_privileges(table[0]) == ComputedPrivileges::AllObject);
         }
 
-        SECTION("permit all operations on a downloaded Realm created as a non-partial Realm when logged in as an admin") {
+        SECTION("permit all operations on a downloaded Realm created as a Full Realm when logged in as an admin") {
             server.start();
             {
                 auto r = Realm::get_shared_realm(config);
@@ -198,7 +198,7 @@ TEST_CASE("Object-level Permissions") {
             CHECK(r->get_privileges(r->read_group().get_table("class_object")->get(0)) == ComputedPrivileges::AllObject);
         }
 
-        SECTION("permit nothing on pre-existing types in a downloaded Realm created as a non-partial Realm") {
+        SECTION("permit nothing on pre-existing types in a downloaded Realm created as a Full Realm") {
             server.start();
             {
                 auto r = Realm::get_shared_realm(config);
