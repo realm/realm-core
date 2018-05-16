@@ -251,12 +251,11 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
                     return t;
             }
             break;
-        case Type::big_strings:
-            for (size_t t = begin; t < end; t++) {
-                if (static_cast<ArrayBigBlobs*>(m_arr)->get_string(t) == value)
-                    return t;
-            }
+        case Type::big_strings: {
+            BinaryData as_binary(value.data(), value.size());
+            return static_cast<ArrayBigBlobs*>(m_arr)->find_first(as_binary, true, begin, end);
             break;
+        }
         case Type::enum_strings: {
             size_t sz = m_string_enum_values->size();
             size_t res = m_string_enum_values->find_first(value, 0, sz);
