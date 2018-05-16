@@ -64,14 +64,12 @@ Run the following commands to configure, build and test core:
 
     mkdir build-dir # create a build folder
     cd build-dir
-    cmake ..
+    cmake -D CMAKE_BUILD_TYPE=<buildtype> ..
     cmake --build .
     ctest
 
-If you wan to build the debug version use:
-
-    cmake --build -D CMAKE_BUILD_TYPE=Debug .
-    
+Where `buildtype` is either `Debug` or `Release`
+    
 ## Building for Android, iOS, watchOS and tvOS
 
 Building for Android required the NDK r10e installed and ANDROID_NDK set 
