@@ -213,7 +213,7 @@ void check(TestContext& test_context, DB& sg_1, const ReadTransaction& rt_2)
     CHECK(rt_1.get_group() == rt_2.get_group());
 }
 #endif
-void check(TestContext&, DB& sg_1, const ReadTransaction& rt_2)
+void check(TestContext&, DBRef sg_1, const ReadTransaction& rt_2)
 {
     ReadTransaction rt_1(sg_1);
     rt_1.get_group().verify();
@@ -244,7 +244,7 @@ TEST(Replication_General)
     CHECK(Version::has_feature(Feature::feature_Replication));
 
     MyTrivialReplication repl(path_1);
-    DB sg_1(repl);
+    DBRef sg_1 = DB::create(repl);
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.add_table("my_table");
@@ -297,8 +297,8 @@ TEST(Replication_General)
     }
 
     util::Logger& replay_logger = test_context.logger;
-    DB sg_2(path_2);
-    repl.replay_transacts(sg_2, replay_logger);
+    DBRef sg_2 = DB::create(path_2);
+    repl.replay_transacts(*sg_2, replay_logger);
 
     {
         ReadTransaction rt_1(sg_1);
@@ -335,7 +335,7 @@ TEST(Replication_General)
         table->create_object(ObjKey(200));
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     {
         ReadTransaction rt_1(sg_1);
         ReadTransaction rt_2(sg_2);
@@ -356,7 +356,7 @@ TEST(Replication_Timestamp)
     SHARED_GROUP_TEST_PATH(path_2);
 
     MyTrivialReplication repl(path_1);
-    DB sg_1(repl);
+    DBRef sg_1 = DB::create(repl);
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.add_table("t");
@@ -402,7 +402,7 @@ TEST(Replication_Timestamp)
     }
 
     util::Logger& replay_logger = test_context.logger;
-    DB sg_2(path_2);
+    DBRef sg_2 = DB::create(path_2);
     repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt_1(sg_1);
@@ -448,8 +448,8 @@ TEST(Replication_Links)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    DB sg_1(repl);
-    DB sg_2(path_2);
+    DBRef sg_1 = DB::create(repl);
+    DBRef sg_2 = DB::create(path_2);
     std::vector<ObjKey> origin_1_keys{ObjKey(0), ObjKey(1)};
     std::vector<ObjKey> origin_2_keys{ObjKey(10), ObjKey(11)};
     const std::vector<ObjKey> target_1_keys{ObjKey(20), ObjKey(21)};
@@ -466,7 +466,7 @@ TEST(Replication_Links)
         target_2->create_objects(target_2_keys);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -491,7 +491,7 @@ TEST(Replication_Links)
         origin_2->create_objects(origin_2_keys);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       null       null                   null       null                   null
@@ -612,7 +612,7 @@ TEST(Replication_Links)
         o_2_1.set(o_2_l_4, target_2_keys[0]); // O_2_L_4[1] -> T_2[0]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     null                   T_1[1]     null                   T_2[1]
@@ -677,7 +677,7 @@ TEST(Replication_Links)
         o_2_1.get_linklist(o_2_ll_3).add(target_2_keys[1]); // O_2_LL_3[1] -> T_2[1]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -747,7 +747,7 @@ TEST(Replication_Links)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -796,7 +796,7 @@ TEST(Replication_Links)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -847,7 +847,7 @@ TEST(Replication_Links)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -894,7 +894,7 @@ TEST(Replication_Links)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1     O_1_F_2           O_2_L_2    O_2_LL_3               O_2_L_4
     // ------------------------------------------------------------------------------------------------
     // T_1[1]     T_2[0]     []           [ 7 ]             T_1[1]     [ T_2[1] ]             T_2[1]
@@ -936,7 +936,7 @@ TEST(Replication_Links)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1     O_1_F_2           O_2_L_2    O_2_LL_3               O_2_L_4
     // ------------------------------------------------------------------------------------------------
     // T_1[1]     T_2[0]     []           [ 7 ]             T_1[1]     [ T_2[1] ]             T_2[1]
@@ -990,7 +990,7 @@ TEST(Replication_Links)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1     O_1_F_2           O_2_L_2    O_2_LL_3               O_2_L_4
     // ------------------------------------------------------------------------------------------------
     // T_1[1]     T_2[0]     []           [ 7 ]             T_1[1]     [ T_2[1] ]             T_2[1]
@@ -1041,8 +1041,8 @@ TEST(Replication_ListOfPrimitives)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    DB sg_1(repl);
-    DB sg_2(path_2);
+    DBRef sg_1 = DB::create(repl);
+    DBRef sg_2 = DB::create(path_2);
 
     // Create table
     {
@@ -1058,7 +1058,7 @@ TEST(Replication_ListOfPrimitives)
         table->create_object(ObjKey(0));
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -1117,7 +1117,7 @@ TEST(Replication_ListOfPrimitives)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -1172,7 +1172,7 @@ TEST(Replication_ListOfPrimitives)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -1304,8 +1304,8 @@ TEST(Replication_LinkListSelfLinkNullification)
     SHARED_GROUP_TEST_PATH(path_2);
 
     MyTrivialReplication repl(path_1);
-    DB sg_1(repl);
-    DB sg_2(path_2);
+    DBRef sg_1 = DB::create(repl);
+    DBRef sg_2 = DB::create(path_2);
 
     util::Logger& replay_logger = test_context.logger;
 
@@ -1445,8 +1445,8 @@ TEST(Replication_NullStrings)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    DB sg_1(repl);
-    DB sg_2(path_2);
+    DBRef sg_1 = DB::create(repl);
+    DBRef sg_2 = DB::create(path_2);
 
     {
         WriteTransaction wt(sg_1);
@@ -1474,7 +1474,7 @@ TEST(Replication_NullStrings)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
@@ -1504,8 +1504,8 @@ TEST(Replication_NullInteger)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    DB sg_1(repl);
-    DB sg_2(path_2);
+    DBRef sg_1 = DB::create(repl);
+    DBRef sg_2 = DB::create(path_2);
 
     {
         WriteTransaction wt(sg_1);
@@ -1525,7 +1525,7 @@ TEST(Replication_NullInteger)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
@@ -1551,8 +1551,8 @@ TEST(Replication_RenameGroupLevelTable_RenameColumn)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    DB sg_1(repl);
-    DB sg_2(path_2);
+    DBRef sg_1 = DB::create(repl);
+    DBRef sg_2 = DB::create(path_2);
 
     {
         WriteTransaction wt(sg_1);
@@ -1591,8 +1591,8 @@ TEST(Replication_LinkListNullifyThroughTableView)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    DB sg_1(repl);
-    DB sg_2(path_2);
+    DBRef sg_1 = DB::create(repl);
+    DBRef sg_2 = DB::create(path_2);
 
     {
         WriteTransaction wt(sg_1);
@@ -1630,8 +1630,8 @@ TEST(Replication_Substrings)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    DB sg_1(repl);
-    DB sg_2(path_2);
+    DBRef sg_1 = DB::create(repl);
+    DBRef sg_2 = DB::create(path_2);
 
     {
         WriteTransaction wt(sg_1);
@@ -1671,8 +1671,8 @@ TEST(Replication_MoveSelectedLinkView)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    DB sg_1(repl);
-    DB sg_2(path_2);
+    DBRef sg_1 = DB::create(repl);
+    DBRef sg_2 = DB::create(path_2);
 
     {
         WriteTransaction wt(sg_1);
@@ -1717,10 +1717,10 @@ TEST(Replication_HistorySchemaVersionNormal)
 {
     SHARED_GROUP_TEST_PATH(path);
     ReplSyncClient repl(path, 1);
-    DB sg_1(repl);
+    DBRef sg_1 = DB::create(repl);
     // it should be possible to have two open shared groups on the same thread
     // without any read/write transactions in between
-    DB sg_2(repl);
+    DBRef sg_2 = DB::create(repl);
 }
 
 TEST(Replication_HistorySchemaVersionDuringWT)
@@ -1728,7 +1728,7 @@ TEST(Replication_HistorySchemaVersionDuringWT)
     SHARED_GROUP_TEST_PATH(path);
 
     ReplSyncClient repl(path, 1);
-    DB sg_1(repl);
+    DBRef sg_1 = DB::create(repl);
     {
         // Do an empty commit to force the file format version to be established.
         WriteTransaction wt(sg_1);
@@ -1739,7 +1739,7 @@ TEST(Replication_HistorySchemaVersionDuringWT)
 
     // It should be possible to open a second SharedGroup at the same path
     // while a WriteTransaction is active via another SharedGroup.
-    DB sg_2(repl);
+    DBRef sg_2 = DB::create(repl);
 }
 
 TEST(Replication_HistorySchemaVersionUpgrade)
@@ -1748,7 +1748,7 @@ TEST(Replication_HistorySchemaVersionUpgrade)
 
     {
         ReplSyncClient repl(path, 1);
-        DB sg(repl);
+        DBRef sg = DB::create(repl);
         {
             // Do an empty commit to force the file format version to be established.
             WriteTransaction wt(sg);
@@ -1757,13 +1757,13 @@ TEST(Replication_HistorySchemaVersionUpgrade)
     }
 
     ReplSyncClient repl(path, 2);
-    DB sg_1(repl); // This will be the session initiater
+    DBRef sg_1 = DB::create(repl); // This will be the session initiater
     CHECK(repl.is_upgraded());
     WriteTransaction wt(sg_1);
     // When this one is opened, the file should have been upgraded
     // If this was not the case we would have triggered another upgrade
     // and the test would hang
-    DB sg_2(repl);
+    DBRef sg_2 = DB::create(repl);
 }
 
 TEST(Replication_CreateAndRemoveObject)
@@ -1774,8 +1774,8 @@ TEST(Replication_CreateAndRemoveObject)
     util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
-    DB sg_1(repl);
-    DB sg_2(path_2);
+    DBRef sg_1 = DB::create(repl);
+    DBRef sg_2 = DB::create(path_2);
     ColKey c0;
     {
         WriteTransaction wt(sg_1);
@@ -1786,7 +1786,7 @@ TEST(Replication_CreateAndRemoveObject)
         CHECK_EQUAL(table1->size(), 2);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
@@ -1802,7 +1802,7 @@ TEST(Replication_CreateAndRemoveObject)
         CHECK_EQUAL(table1->size(), 1);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");

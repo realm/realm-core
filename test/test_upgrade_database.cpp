@@ -1268,7 +1268,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         try {
             // Constructing this SharedGroup will trigger an upgrade first time around
             auto hist = make_in_realm_history(temp_copy);
-            DB sg(*hist);
+            DBRef sg = DB::create(*hist);
 
             ReadTransaction rt(sg);
 

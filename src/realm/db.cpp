@@ -1283,6 +1283,34 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
     }
 }
 
+
+void DB::open(const std::string& path, bool no_create_file, const DBOptions options)
+{
+    // Exception safety: Since open() is called from constructors, if it throws,
+    // it must leave the file closed.
+
+    bool is_backend = false;
+    do_open(path, no_create_file, is_backend, options); // Throws
+}
+
+void DB::open(Replication& repl, const DBOptions options)
+{
+    // Exception safety: Since open() is called from constructors, if it throws,
+    // it must leave the file closed.
+
+    REALM_ASSERT(!is_attached());
+
+    repl.initialize(*this); // Throws
+
+    m_alloc.set_replication(&repl);
+
+    std::string file = repl.get_database_path();
+    bool no_create = false;
+    bool is_backend = false;
+    do_open(file, no_create, is_backend, options); // Throws
+}
+
+
 // WARNING / FIXME: compact() should NOT be exposed publicly on Windows because it's not crash safe! It may
 // corrupt your database if something fails
 bool DB::compact()
@@ -2155,7 +2183,7 @@ TransactionRef DB::start_read(VersionID version_id)
     ReadLockInfo read_lock;
     grab_read_lock(read_lock, version_id);
     ReadLockGuard g(*this, read_lock);
-    Transaction* tr = new Transaction(this, &m_alloc, read_lock, DB::transact_Reading);
+    Transaction* tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
     tr->set_file_format_version(get_file_format_version());
     g.release();
     return TransactionRef(tr, TransactionDeleter);
@@ -2166,13 +2194,13 @@ TransactionRef DB::start_frozen(VersionID version_id)
     ReadLockInfo read_lock;
     grab_read_lock(read_lock, version_id);
     ReadLockGuard g(*this, read_lock);
-    Transaction* tr = new Transaction(this, &m_alloc, read_lock, DB::transact_Frozen);
+    Transaction* tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
     tr->set_file_format_version(get_file_format_version());
     g.release();
     return TransactionRef(tr, TransactionDeleter);
 }
 
-Transaction::Transaction(DB* _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage)
+Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage)
     : Group(alloc)
     , db(_db)
     , m_read_lock(rli)
@@ -2285,7 +2313,7 @@ TransactionRef DB::start_write()
     try {
         grab_read_lock(read_lock, VersionID());
         ReadLockGuard g(*this, read_lock);
-        tr = new Transaction(this, &m_alloc, read_lock, DB::transact_Writing);
+        tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
         tr->set_file_format_version(get_file_format_version());
         if (Replication* repl = m_alloc.get_replication()) {
             version_type current_version = read_lock.m_version;
@@ -2367,4 +2395,18 @@ std::unique_ptr<TableView> Transaction::import_copy_of(TableView& tv, PayloadPol
 std::unique_ptr<ConstTableView> Transaction::import_copy_of(ConstTableView& tv, PayloadPolicy policy)
 {
     return tv.clone_for_handover(this, policy);
+}
+
+DBRef DB::create(const std::string& file, bool no_create, const DBOptions options)
+{
+    DBRef retval = std::make_shared<DB>(PrivateKey());
+    retval->open(file, no_create, options);
+    return retval;
+}
+
+DBRef DB::create(Replication& repl, const DBOptions options)
+{
+    DBRef retval = std::make_shared<DB>(PrivateKey());
+    retval->open(repl, options);
+    return retval;
 }

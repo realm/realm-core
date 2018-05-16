@@ -43,9 +43,8 @@ int main(int argc, char* argv[])
 #ifdef REALM_ENABLE_LOGFILE
         std::cerr << "Daemon starting" << std::endl;
 #endif
-        DB async_committer((DB::unattached_tag()));
         char* file = argv[1];
-        async_committer.open(file);
+        DBRef async_committer = DB::create(file);
     }
     else if (pid > 0) {
         // in parent, fork was ok, so return succes

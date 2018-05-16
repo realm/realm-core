@@ -75,21 +75,21 @@ TEST(Metrics_HasNoReportsWhenDisabled)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBOptions options(crypt_key());
     options.enable_metrics = false;
-    DB sg(*hist, options);
-    CHECK(!sg.get_metrics());
-    auto wt = sg.start_write();
+    DBRef sg = DB::create(*hist, options);
+    CHECK(!sg->get_metrics());
+    auto wt = sg->start_write();
     auto table = wt->add_table("table");
     auto col = table->add_column(type_Int, "first");
     std::vector<ObjKey> keys;
     table->create_objects(10, keys);
     wt->commit();
-    auto rt = sg.start_read();
+    auto rt = sg->start_read();
     table = rt->get_table("table");
     CHECK(bool(table));
     Query query = table->column<int64_t>(col) == 0;
     query.count();
     rt->end_read();
-    CHECK(!sg.get_metrics());
+    CHECK(!sg->get_metrics());
 }
 
 TEST(Metrics_HasReportsWhenEnabled)
@@ -98,21 +98,21 @@ TEST(Metrics_HasReportsWhenEnabled)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DB sg(*hist, options);
-    CHECK(sg.get_metrics());
-    auto wt = sg.start_write();
+    DBRef sg = DB::create(*hist, options);
+    CHECK(sg->get_metrics());
+    auto wt = sg->start_write();
     auto table = wt->add_table("table");
     auto col = table->add_column(type_Int, "first");
     std::vector<ObjKey> keys;
     table->create_objects(10, keys);
     wt->commit();
-    auto rt = sg.start_read();
+    auto rt = sg->start_read();
     table = rt->get_table("table");
     CHECK(bool(table));
     Query query = table->column<int64_t>(col) == 0;
     query.count();
     rt->end_read();
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
     CHECK(metrics->num_query_metrics() != 0);
     CHECK(metrics->num_transaction_metrics() != 0);
@@ -124,9 +124,9 @@ TEST(Metrics_QueryTypes)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DB sg(*hist, options);
-    CHECK(sg.get_metrics());
-    auto wt = sg.start_write();
+    DBRef sg = DB::create(*hist, options);
+    CHECK(sg->get_metrics());
+    auto wt = sg->start_write();
     auto table = wt->add_table("table");
     auto int_col = table->add_column(type_Int, "col_int");
     auto double_col = table->add_column(type_Double, "col_double");
@@ -135,7 +135,7 @@ TEST(Metrics_QueryTypes)
     std::vector<ObjKey> keys;
     table->create_objects(10, keys);
     wt->commit();
-    auto rt = sg.start_read();
+    auto rt = sg->start_read();
     table = rt->get_table("table");
     CHECK(bool(table));
     Query query = table->column<int64_t>(int_col) == 0;
@@ -162,7 +162,7 @@ TEST(Metrics_QueryTypes)
     query.minimum_timestamp(timestamp_col, &return_dummy);
 
     rt->end_read();
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
     CHECK_EQUAL(metrics->num_query_metrics(), 17);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
@@ -205,9 +205,9 @@ size_t find_count(std::string haystack, std::string needle)
     return count;
 }
 
-void populate(DB& sg)
+void populate(DBRef sg)
 {
-    auto wt = sg.start_write();
+    auto wt = sg->start_write();
     auto person = wt->add_table("person");
     auto pet = wt->add_table("pet");
     person->add_column(type_Int, "age");
@@ -257,14 +257,14 @@ TEST(Metrics_QueryEqual)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DB sg(*hist, options);
+    DBRef sg = DB::create(*hist, options);
     populate(sg);
 
     std::string person_table_name = "person";
     std::string pet_table_name = "pet";
     std::string query_search_term = "==";
 
-    auto wt = sg.start_write();
+    auto wt = sg->start_write();
     TableRef person = wt->get_table(person_table_name);
     TableRef pet = wt->get_table(pet_table_name);
     CHECK(bool(person));
@@ -310,7 +310,7 @@ TEST(Metrics_QueryEqual)
     CHECK_THROW(q7.find_all(), SerialisationError);
     CHECK_THROW(q8.find_all(), SerialisationError);
 
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
@@ -329,7 +329,7 @@ TEST(Metrics_QueryOrAndNot)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DB sg(*hist, options);
+    DBRef sg = DB::create(*hist, options);
     populate(sg);
 
     std::string person_table_name = "person";
@@ -337,7 +337,7 @@ TEST(Metrics_QueryOrAndNot)
     std::string query_search_term = "==";
     std::string not_text = "!";
 
-    auto wt = sg.start_write();
+    auto wt = sg->start_write();
     TableRef person = wt->get_table(person_table_name);
     TableRef pet = wt->get_table(pet_table_name);
     CHECK(bool(person));
@@ -388,7 +388,7 @@ TEST(Metrics_QueryOrAndNot)
     and_true.find_all();
     and_false.find_all();
 
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
@@ -471,13 +471,13 @@ TEST(Metrics_LinkQueries)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DB sg(*hist, options);
+    DBRef sg = DB::create(*hist, options);
     populate(sg);
 
     std::string person_table_name = "person";
     std::string pet_table_name = "pet";
 
-    auto wt = sg.start_write();
+    auto wt = sg->start_write();
     TableRef person = wt->get_table(person_table_name);
     TableRef pet = wt->get_table(pet_table_name);
     CHECK(bool(person));
@@ -502,7 +502,7 @@ TEST(Metrics_LinkQueries)
     q2.find_all();
     q3.find_all();
 
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
@@ -538,13 +538,13 @@ TEST(Metrics_LinkListQueries)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DB sg(*hist, options);
+    DBRef sg = DB::create(*hist, options);
     populate(sg);
 
     std::string person_table_name = "person";
     std::string pet_table_name = "pet";
 
-    auto wt = sg.start_write();
+    auto wt = sg->start_write();
     TableRef person = wt->get_table(person_table_name);
     TableRef pet = wt->get_table(pet_table_name);
     CHECK(bool(person));
@@ -575,7 +575,7 @@ TEST(Metrics_LinkListQueries)
     q4.find_all();
     q5.find_all();
 
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
@@ -619,9 +619,9 @@ TEST(Metrics_SubQueries)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DB sg(*hist, options);
+    DBRef sg = DB::create(*hist, options);
 
-    auto wt = sg.start_write();
+    auto wt = sg->start_write();
 
     std::string table_name = "table";
     std::string int_col_name = "integers";
@@ -681,7 +681,7 @@ TEST(Metrics_SubQueries)
 
     wt->commit();
     /*
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
@@ -713,10 +713,10 @@ TEST(Metrics_TransactionTimings)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DB sg(*hist, options);
-    CHECK(sg.get_metrics());
+    DBRef sg = DB::create(*hist, options);
+    CHECK(sg->get_metrics());
     {
-        auto wt = sg.start_write();
+        auto wt = sg->start_write();
         auto table = wt->add_table("table");
         col = table->add_column(type_Int, "first");
         std::vector<ObjKey> keys;
@@ -724,7 +724,7 @@ TEST(Metrics_TransactionTimings)
         wt->commit();
     }
     {
-        auto rt = sg.start_read();
+        auto rt = sg->start_read();
         auto table = rt->get_table("table");
         CHECK(bool(table));
         Query query = table->column<int64_t>(col) == 0;
@@ -744,7 +744,7 @@ TEST(Metrics_TransactionTimings)
         std::this_thread::sleep_for(80ms);
         wt.commit();
     }
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
     CHECK_NOT_EQUAL(metrics->num_query_metrics(), 0);
     CHECK_NOT_EQUAL(metrics->num_transaction_metrics(), 0);
@@ -786,14 +786,14 @@ TEST(Metrics_TransactionData)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DB sg(*hist, options);
+    DBRef sg = DB::create(*hist, options);
     populate(sg);
 
     {
         ReadTransaction rt(sg);
     }
     {
-        auto wt = sg.start_write();
+        auto wt = sg->start_write();
         auto table_keys = wt->get_table_keys();
         TableRef t0 = wt->get_table(table_keys[0]);
         TableRef t1 = wt->get_table(table_keys[1]);
@@ -803,7 +803,7 @@ TEST(Metrics_TransactionData)
         wt->commit();
     }
 
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
 
     std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
@@ -823,19 +823,19 @@ TEST(Metrics_TransactionVersions)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DB sg(*hist, options);
+    DBRef sg = DB::create(*hist, options);
     populate(sg);
     const size_t num_writes_while_pinned = 10;
     TableKey tk0;
     TableKey tk1;
     {
-        auto rt = sg.start_read();
+        auto rt = sg->start_read();
         auto table_keys = rt->get_table_keys();
         tk0 = table_keys[0];
         tk1 = table_keys[1];
     }
     {
-        auto wt = sg.start_write();
+        auto wt = sg->start_write();
         TableRef t0 = wt->get_table(tk0);
         TableRef t1 = wt->get_table(tk1);
         std::vector<ObjKey> keys;
@@ -845,21 +845,21 @@ TEST(Metrics_TransactionVersions)
     }
     {
         std::unique_ptr<Replication> hist2(make_in_realm_history(path));
-        DB sg2(*hist2);
+        DBRef sg2 = DB::create(*hist2);
 
         // Pin this version. Note that since this read transaction is against a different shared group
         // it doesn't get tracked in the transaction metrics of the original shared group.
         ReadTransaction rt(sg2);
 
         for (size_t i = 0; i < num_writes_while_pinned; ++i) {
-            auto wt = sg.start_write();
+            auto wt = sg->start_write();
             TableRef t0 = wt->get_table(tk0);
             t0->create_object();
             wt->commit();
         }
     }
 
-    std::shared_ptr<Metrics> metrics = sg.get_metrics();
+    std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
 
     std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions();
