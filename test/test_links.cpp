@@ -582,6 +582,14 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(key0, links.get(2));
     CHECK_EQUAL(Wed, Days(links[0].get<Int>(day_col)));
 
+    LinkList links1 = links;
+    CHECK_EQUAL(3, links1.size());
+    LinkList links2;
+    links2 = links;
+    CHECK_EQUAL(3, links2.size());
+    ObjList* obj_list = &links2;
+    CHECK_EQUAL(key2, obj_list->get_key(0));
+
     // verify that backlinks was set correctly
     CHECK_EQUAL(1, obj0.get_backlink_count(*origin, col_link));
     CHECK_EQUAL(key3, obj0.get_backlink(*origin, col_link, 0));

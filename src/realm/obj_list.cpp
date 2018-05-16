@@ -24,13 +24,13 @@ using namespace realm;
 
 size_t ObjList::size() const
 {
-    return m_key_values.size();
+    return m_key_values->size();
 }
 
 // Get key for object this view is "looking" at.
 ObjKey ObjList::get_key(size_t ndx) const
 {
-    return ObjKey(m_key_values.get(ndx));
+    return ObjKey(m_key_values->get(ndx));
 }
 
 void ObjList::do_sort(const DescriptorOrdering& ordering)
@@ -62,7 +62,7 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
     for (int desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
         const CommonDescriptor* common_descr = ordering[desc_ndx];
         const CommonDescriptor* next = ((desc_ndx + 1) < num_descriptors) ? ordering[desc_ndx + 1] : nullptr;
-        SortDescriptor::Sorter predicate = common_descr->sorter(m_key_values);
+        SortDescriptor::Sorter predicate = common_descr->sorter(*m_key_values);
 
         // Sorting can be specified by multiple columns, so that if two entries in the first column are
         // identical, then the rows are ordered according to the second column, and so forth. For the
@@ -72,15 +72,15 @@ void ObjList::do_sort(const DescriptorOrdering& ordering)
         common_descr->execute(index_pairs, predicate, next);
     }
     // Apply the results
-    m_key_values.clear();
+    m_key_values->clear();
     for (auto& pair : index_pairs) {
-        m_key_values.add(pair.key_for_object);
+        m_key_values->add(pair.key_for_object);
     }
     for (size_t t = 0; t < detached_ref_count; ++t)
-        m_key_values.add(null_key);
+        m_key_values->add(null_key);
 }
 
-ObjList::ObjList(KeyColumn& key_values)
+ObjList::ObjList(KeyColumn* key_values)
     : m_key_values(key_values)
 #ifdef REALM_COOKIE_CHECK
     , m_debug_cookie(cookie_expected)
@@ -88,7 +88,7 @@ ObjList::ObjList(KeyColumn& key_values)
 {
 }
 
-ObjList::ObjList(KeyColumn& key_values, const Table* parent)
+ObjList::ObjList(KeyColumn* key_values, const Table* parent)
     : m_table(parent->get_table_ref())
     , m_key_values(key_values)
 #ifdef REALM_COOKIE_CHECK
@@ -100,8 +100,14 @@ ObjList::ObjList(KeyColumn& key_values, const Table* parent)
 ConstObj ObjList::get_object(size_t row_ndx) const
 {
     REALM_ASSERT(m_table);
-    REALM_ASSERT(row_ndx < m_key_values.size());
-    ObjKey key(m_key_values.get(row_ndx));
+    REALM_ASSERT(row_ndx < m_key_values->size());
+    ObjKey key(m_key_values->get(row_ndx));
     REALM_ASSERT(key != realm::null_key);
     return m_table->get_object(key);
+}
+
+void ObjList::assign(KeyColumn* key_values, const Table* parent)
+{
+    m_key_values = key_values;
+    m_table = parent ? parent->get_table_ref() : TableRef();
 }

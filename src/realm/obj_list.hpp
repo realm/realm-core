@@ -32,8 +32,8 @@ class ConstTableView;
 
 class ObjList {
 public:
-    ObjList(KeyColumn& key_values);
-    ObjList(KeyColumn& key_values, const Table* parent);
+    ObjList(KeyColumn* key_values);
+    ObjList(KeyColumn* key_values, const Table* parent);
 
     virtual ~ObjList()
     {
@@ -92,8 +92,10 @@ protected:
 
     // Null if, and only if, the view is detached.
     mutable ConstTableRef m_table;
-    KeyColumn& m_key_values;
+    KeyColumn* m_key_values = nullptr;
     uint64_t m_debug_cookie;
+
+    void assign(KeyColumn* key_values, const Table* parent);
 
     void do_sort(const DescriptorOrdering&);
     void detach() const noexcept // may have to remove const

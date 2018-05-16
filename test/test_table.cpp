@@ -2760,6 +2760,32 @@ TEST(Table_StableIteration)
     CHECK_EQUAL(list[2], 2);
 }
 
+TEST(Table_ListOps)
+{
+    Table table;
+    ColKey col = table.add_column_list(type_Int, "integers");
+
+    Obj obj = table.create_object();
+    Obj obj1 = obj;
+    List<Int> list = obj.get_list<Int>(col);
+    list.add(1);
+    list.add(2);
+    list.swap(0, 1);
+    CHECK_EQUAL(list.get(0), 2);
+    CHECK_EQUAL(list.get(1), 1);
+
+    List<Int> list1;
+    CHECK_EQUAL(list1.size(), 0);
+    list1 = list;
+    CHECK_EQUAL(list1.size(), 2);
+    list.add(3);
+    CHECK_EQUAL(list.size(), 3);
+    CHECK_EQUAL(list1.size(), 3);
+
+    List<Int> list2 = list;
+    CHECK_EQUAL(list2.size(), 3);
+}
+
 TEST(Table_ListOfPrimitives)
 {
     Group g;
