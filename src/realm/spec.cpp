@@ -247,9 +247,6 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
     }
 
     if (type != col_type_BackLink) {
-        if (name.size() == 0) {
-            throw LogicError(LogicError::invalid_column_name);
-        }
         m_names.insert(column_ndx, name); // Throws
         m_num_public_columns++;
     }

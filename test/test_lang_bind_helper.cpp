@@ -4881,7 +4881,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK(link_list_3->is_empty());
     CHECK_EQUAL(0, table_3->get_backlink_count(0, *table_2, 0));
 }
-
+#endif
 
 TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
 {
@@ -4891,19 +4891,19 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
     DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() const Group& group = rt;
+    TransactionRef rt = sg.start_read();
     CHECK_EQUAL(0, rt->size());
-
+    ColKey col;
+    ObjKey target_key;
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef origin_w = wt.add_table("origin");
         TableRef target_w = wt.add_table("target");
-        origin_w->add_column_link(type_Link, "", *target_w);
+        col = origin_w->add_column_link(type_Link, "", *target_w);
         target_w->add_column(type_Int, "");
-        target_w->add_empty_row();
+        target_key = target_w->create_object().get_key();
         wt.commit();
     }
     rt->advance_read();
@@ -4911,112 +4911,15 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
     ConstTableRef origin = rt->get_table("origin");
     ConstTableRef target = rt->get_table("target");
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef origin_w = wt.get_table("origin");
-        origin_w->insert_empty_row(0);
-        origin_w->set_link(0, 0, 0);
+        auto obj = origin_w->create_object();
+        obj.set(col, target_key);
         wt.commit();
     }
     rt->advance_read();
     rt->verify();
 }
-
-
-TEST(LangBindHelper_AdvanceReadTransact_NonEndRowInsertWithLinks)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
-
-    // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() const Group& group = rt;
-
-    // Create two inter-linked tables, each with four rows
-    {
-        WriteTransaction wt(sg_w);
-        TableRef foo_w = wt.add_table("foo");
-        TableRef bar_w = wt.add_table("bar");
-        foo_w->add_column_link(type_Link, "l", *bar_w);
-        bar_w->add_column_link(type_LinkList, "ll", *foo_w);
-        foo_w->add_empty_row(4);
-        bar_w->add_empty_row(4);
-        foo_w->set_link(0, 0, 3);
-        foo_w->set_link(0, 1, 0);
-        foo_w->set_link(0, 3, 0);
-        bar_w->get_linklist(0, 0)->add(1);
-        bar_w->get_linklist(0, 0)->add(2);
-        bar_w->get_linklist(0, 1)->add(0);
-        bar_w->get_linklist(0, 1)->add(3);
-        bar_w->get_linklist(0, 1)->add(0);
-        bar_w->get_linklist(0, 2)->add(2);
-        bar_w->get_linklist(0, 2)->add(2);
-        bar_w->get_linklist(0, 2)->add(2);
-        bar_w->get_linklist(0, 2)->add(0);
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-
-    ConstTableRef foo = rt.get_table("foo");
-    ConstTableRef bar = rt.get_table("bar");
-    ConstRow foo_0 = (*foo)[0];
-    ConstRow foo_1 = (*foo)[1];
-    ConstRow foo_2 = (*foo)[2];
-    ConstRow foo_3 = (*foo)[3];
-    ConstRow bar_0 = (*bar)[0];
-    ConstRow bar_1 = (*bar)[1];
-    ConstRow bar_2 = (*bar)[2];
-    ConstRow bar_3 = (*bar)[3];
-    ConstLinkViewRef link_list_0 = bar->get_linklist(0, 0);
-    ConstLinkViewRef link_list_1 = bar->get_linklist(0, 1);
-    ConstLinkViewRef link_list_2 = bar->get_linklist(0, 2);
-    ConstLinkViewRef link_list_3 = bar->get_linklist(0, 3);
-
-    // Perform two non-end insertions in each table.
-    {
-        WriteTransaction wt(sg_w);
-        TableRef foo_w = wt.get_table("foo");
-        TableRef bar_w = wt.get_table("bar");
-        foo_w->insert_empty_row(2, 1);
-        foo_w->insert_empty_row(0, 1);
-        bar_w->insert_empty_row(3, 1);
-        bar_w->insert_empty_row(1, 3);
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-
-    // Check that row and link list accessors are also properly adjusted.
-    CHECK_EQUAL(1, foo_0.get_index());
-    CHECK_EQUAL(2, foo_1.get_index());
-    CHECK_EQUAL(4, foo_2.get_index());
-    CHECK_EQUAL(5, foo_3.get_index());
-    CHECK_EQUAL(0, bar_0.get_index());
-    CHECK_EQUAL(4, bar_1.get_index());
-    CHECK_EQUAL(5, bar_2.get_index());
-    CHECK_EQUAL(7, bar_3.get_index());
-    CHECK_EQUAL(0, link_list_0->get_origin_row_index());
-    CHECK_EQUAL(4, link_list_1->get_origin_row_index());
-    CHECK_EQUAL(5, link_list_2->get_origin_row_index());
-    CHECK_EQUAL(7, link_list_3->get_origin_row_index());
-
-    // Check that links and backlinks are properly adjusted.
-    CHECK_EQUAL(7, foo_0.get_link(0));
-    CHECK_EQUAL(0, foo_1.get_link(0));
-    CHECK(foo_2.is_null_link(0));
-    CHECK_EQUAL(0, foo_3.get_link(0));
-    CHECK_EQUAL(2, link_list_0->get(0).get_index());
-    CHECK_EQUAL(4, link_list_0->get(1).get_index());
-    CHECK_EQUAL(1, link_list_1->get(0).get_index());
-    CHECK_EQUAL(5, link_list_1->get(1).get_index());
-    CHECK_EQUAL(1, link_list_1->get(2).get_index());
-    CHECK_EQUAL(4, link_list_2->get(0).get_index());
-    CHECK_EQUAL(4, link_list_2->get(1).get_index());
-    CHECK_EQUAL(4, link_list_2->get(2).get_index());
-    CHECK_EQUAL(1, link_list_2->get(3).get_index());
-}
-#endif
 
 
 TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
@@ -5117,128 +5020,6 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
 }
 
 #ifdef LEGACY_TESTS
-TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
-{
-    // Create a scenario where a table is removed from the group, and the last
-    // table in the group (which will be moved into the vacated slot) has both
-    // link and backlink columns.
-
-    SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
-
-    // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() const Group& group = rt;
-    CHECK_EQUAL(0, rt->size());
-
-    std::string names[4];
-    {
-        WriteTransaction wt(sg_w);
-        wt.add_table("alpha");
-        wt.add_table("beta");
-        wt.add_table("gamma");
-        wt.add_table("delta");
-        names[0] = wt.get_group().get_table_name(0);
-        names[1] = wt.get_group().get_table_name(1);
-        names[2] = wt.get_group().get_table_name(2);
-        names[3] = wt.get_group().get_table_name(3);
-        TableRef first_w = wt.get_table(names[0]);
-        TableRef third_w = wt.get_table(names[2]);
-        TableRef fourth_w = wt.get_table(names[3]);
-        first_w->add_column_link(type_Link, "one", *third_w);
-        third_w->add_column_link(type_Link, "two", *fourth_w);
-        third_w->add_column_link(type_Link, "three", *third_w);
-        fourth_w->add_column_link(type_Link, "four", *first_w);
-        fourth_w->add_column_link(type_Link, "five", *third_w);
-        first_w->add_empty_row(2);
-        third_w->add_empty_row(2);
-        fourth_w->add_empty_row(2);
-        first_w->set_link(0, 0, 0);  // first[0].one   = third[0]
-        first_w->set_link(0, 1, 1);  // first[1].one   = third[1]
-        third_w->set_link(0, 0, 1);  // third[0].two   = fourth[1]
-        third_w->set_link(0, 1, 0);  // third[1].two   = fourth[0]
-        third_w->set_link(1, 0, 1);  // third[0].three = third[1]
-        third_w->set_link(1, 1, 1);  // third[1].three = third[1]
-        fourth_w->set_link(0, 0, 0); // fourth[0].four = first[0]
-        fourth_w->set_link(0, 1, 0); // fourth[1].four = first[0]
-        fourth_w->set_link(1, 0, 0); // fourth[0].five = third[0]
-        fourth_w->set_link(1, 1, 1); // fourth[1].five = third[1]
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-
-    ConstTableRef first = rt->get_table(names[0]);
-    ConstTableRef second = rt->get_table(names[1]);
-    ConstTableRef third = rt->get_table(names[2]);
-    ConstTableRef fourth = rt->get_table(names[3]);
-
-    {
-        WriteTransaction wt(sg_w);
-        wt.get_group().remove_table(1); // Second
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-
-    CHECK_EQUAL(3, rt->size());
-    CHECK(first->is_attached());
-    CHECK_NOT(second->is_attached());
-    CHECK(third->is_attached());
-    CHECK(fourth->is_attached());
-    CHECK_EQUAL(1, first->get_column_count());
-    CHECK_EQUAL("one", first->get_column_name(0));
-    CHECK_EQUAL(third, first->get_link_target(0));
-    CHECK_EQUAL(2, third->get_column_count());
-    CHECK_EQUAL("two", third->get_column_name(0));
-    CHECK_EQUAL("three", third->get_column_name(1));
-    CHECK_EQUAL(fourth, third->get_link_target(0));
-    CHECK_EQUAL(third, third->get_link_target(1));
-    CHECK_EQUAL(2, fourth->get_column_count());
-    CHECK_EQUAL("four", fourth->get_column_name(0));
-    CHECK_EQUAL("five", fourth->get_column_name(1));
-    CHECK_EQUAL(first, fourth->get_link_target(0));
-    CHECK_EQUAL(third, fourth->get_link_target(1));
-
-    {
-        WriteTransaction wt(sg_w);
-        TableRef first_w = wt.get_table(names[0]);
-        TableRef third_w = wt.get_table(names[2]);
-        TableRef fourth_w = wt.get_table(names[3]);
-        third_w->set_link(0, 0, 0);  // third[0].two   = fourth[0]
-        fourth_w->set_link(0, 1, 1); // fourth[1].four = first[1]
-        first_w->set_link(0, 0, 1);  // first[0].one   = third[1]
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-
-    CHECK_EQUAL(2, first->size());
-    CHECK_EQUAL(1, first->get_link(0, 0));
-    CHECK_EQUAL(1, first->get_link(0, 1));
-    CHECK_EQUAL(1, first->get_backlink_count(0, *fourth, 0));
-    CHECK_EQUAL(1, first->get_backlink_count(1, *fourth, 0));
-    CHECK_EQUAL(2, third->size());
-    CHECK_EQUAL(0, third->get_link(0, 0));
-    CHECK_EQUAL(0, third->get_link(0, 1));
-    CHECK_EQUAL(1, third->get_link(1, 0));
-    CHECK_EQUAL(1, third->get_link(1, 1));
-    CHECK_EQUAL(0, third->get_backlink_count(0, *first, 0));
-    CHECK_EQUAL(2, third->get_backlink_count(1, *first, 0));
-    CHECK_EQUAL(0, third->get_backlink_count(0, *third, 1));
-    CHECK_EQUAL(2, third->get_backlink_count(1, *third, 1));
-    CHECK_EQUAL(1, third->get_backlink_count(0, *fourth, 1));
-    CHECK_EQUAL(1, third->get_backlink_count(1, *fourth, 1));
-    CHECK_EQUAL(2, fourth->size());
-    CHECK_EQUAL(0, fourth->get_link(0, 0));
-    CHECK_EQUAL(1, fourth->get_link(0, 1));
-    CHECK_EQUAL(0, fourth->get_link(1, 0));
-    CHECK_EQUAL(1, fourth->get_link(1, 1));
-    CHECK_EQUAL(2, fourth->get_backlink_count(0, *third, 0));
-    CHECK_EQUAL(0, fourth->get_backlink_count(1, *third, 0));
-}
-
 TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -5458,26 +5239,26 @@ TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
     t_r->clear();
 }
 
-#ifdef LEGACY_TESTS
 TEST(LangBindHelper_AdvanceReadTransact_TableClear)
 {
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, DBOptions(crypt_key()));
-
+    ColKey col;
     {
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("table");
-        table->add_column(type_Int, "col");
-        table->add_empty_row();
+        col = table->add_column(type_Int, "col");
+        table->create_object();
         wt.commit();
     }
 
-    ConstTableRef table = sg.begin_read().get_table("table");
+    auto reader = sg.start_read();
+    auto table = reader->get_table("table");
     TableView tv = table->where().find_all();
-    ConstRow row = table->get(0);
-    CHECK(row.is_attached());
+    auto obj = *table->begin();
+    CHECK(obj.is_valid());
 
     {
         std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
@@ -5488,13 +5269,16 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
         wt.commit();
     }
 
-    rt->advance_read();
+    reader->advance_read();
 
-    CHECK(!row.is_attached());
+    CHECK(!obj.is_valid());
 
     CHECK_EQUAL(tv.size(), 1);
     CHECK(!tv.is_in_sync());
-    CHECK(!tv.is_row_attached(0));
+    // key is still there...
+    CHECK(tv.get_key(0));
+    // but no obj for that key...
+    CHECK_THROW(tv.get(0), realm::InvalidKey);
 
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 0);
@@ -5506,39 +5290,38 @@ TEST(LangBindHelper_AdvanceReadTransact_UnorderedTableViewClear)
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, DBOptions(crypt_key()));
-
+    ObjKey first_obj, last_obj;
+    ColKey col;
     {
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("table");
-        table->add_column(type_Int, "col");
-        table->add_empty_row(3);
-        table->set_int(0, 0, 0);
-        table->set_int(0, 1, 1);
-        table->set_int(0, 2, 2);
+        col = table->add_column(type_Int, "col");
+        first_obj = table->create_object().set_all(0).get_key();
+        table->create_object().set_all(1);
+        last_obj = table->create_object().set_all(2).get_key();
         wt.commit();
     }
 
-    ConstTableRef table = sg.begin_read().get_table("table");
-    ConstRow row = table->get(2);
-    CHECK_EQUAL(row.get_int(0), 2);
+    auto reader = sg.start_read();
+    auto table = reader->get_table("table");
+    auto obj = table->get_object(last_obj);
+    CHECK_EQUAL(obj.get<int64_t>(col), 2);
 
     {
-        std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
-
         // Remove the first row via unordered removal, resulting in the '2' row
         // moving to index 0 (with ordered removal it would instead move to index 1)
-        WriteTransaction wt(sg_w);
-        wt.get_table("table")->where().equal(0, 0).find_all().clear(RemoveMode::unordered);
+        WriteTransaction wt(sg);
+        wt.get_table("table")->where().equal(col, 0).find_all().clear();
         wt.commit();
     }
 
-    rt->advance_read();
+    reader->advance_read();
 
-    CHECK(row.is_attached());
-    CHECK_EQUAL(row.get_int(0), 2);
+    CHECK(obj.is_valid());
+    CHECK_EQUAL(obj.get<int64_t>(col), 2);
 }
 
+#ifdef LEGACY_TESTS
 namespace {
 // A base class for transaction log parsers so that tests which want to test
 // just a single part of the transaction log handling don't have to implement
@@ -6138,65 +5921,65 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
         sg.end_read();
     }
 }
-
+#endif
 
 TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, DBOptions(crypt_key()));
-    Group* group = const_cast<Group*>(&sg.begin_read());
+    auto reader = sg.start_read();
     {
-        LangBindHelper::promote_to_write(sg);
-        TableRef origin = group->get_or_add_table("a_table");
-        LangBindHelper::commit_and_continue_as_read(sg);
+        reader->promote_to_write();
+        TableRef origin = reader->get_or_add_table("a_table");
+        reader->commit_and_continue_as_read();
     }
-    group->verify();
+    reader->verify();
     {
         // rollback of group level table delete
-        LangBindHelper::promote_to_write(sg);
-        TableRef o2 = group->get_table("a_table");
+        reader->promote_to_write();
+        TableRef o2 = reader->get_table("a_table");
         REALM_ASSERT(o2);
-        group->remove_table("a_table");
-        TableRef o3 = group->get_table("a_table");
+        reader->remove_table("a_table");
+        TableRef o3 = reader->get_table("a_table");
         REALM_ASSERT(!o3);
-        LangBindHelper::rollback_and_continue_as_read(sg);
-        TableRef o4 = group->get_table("a_table");
+        reader->rollback_and_continue_as_read();
+        TableRef o4 = reader->get_table("a_table");
         REALM_ASSERT(o4);
     }
-    group->verify();
+    reader->verify();
 }
-
 
 TEST(LangBindHelper_RollbackCircularReferenceRemoval)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, DBOptions(crypt_key()));
-    Group* group = const_cast<Group*>(&sg.begin_read());
+    ColKey ca, cb;
+    auto group = sg.start_read();
     {
-        LangBindHelper::promote_to_write(sg);
+        group->promote_to_write();
         TableRef alpha = group->get_or_add_table("alpha");
         TableRef beta = group->get_or_add_table("beta");
-        alpha->add_column_link(type_Link, "beta-1", *beta);
-        beta->add_column_link(type_Link, "alpha-1", *alpha);
-        LangBindHelper::commit_and_continue_as_read(sg);
+        ca = alpha->add_column_link(type_Link, "beta-1", *beta);
+        cb = beta->add_column_link(type_Link, "alpha-1", *alpha);
+        group->commit_and_continue_as_read();
     }
     group->verify();
     {
-        LangBindHelper::promote_to_write(sg);
+        group->promote_to_write();
         CHECK_EQUAL(2, group->size());
         TableRef alpha = group->get_table("alpha");
         TableRef beta = group->get_table("beta");
 
         CHECK_THROW(group->remove_table("alpha"), CrossTableLinkTarget);
-        beta->remove_column(0);
-        alpha->remove_column(0);
+        beta->remove_column(cb);
+        alpha->remove_column(ca);
         group->remove_table("beta");
         CHECK_NOT(group->has_table("beta"));
 
         // Version 1: This crashes
-        LangBindHelper::rollback_and_continue_as_read(sg);
+        group->rollback_and_continue_as_read();
         CHECK_EQUAL(2, group->size());
 
         //        // Version 2: This works
@@ -6212,28 +5995,27 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, DBOptions(crypt_key()));
-    Group* group = const_cast<Group*>(&sg.begin_read());
+    auto group = sg.start_read();
     TableRef t;
     {
-        LangBindHelper::promote_to_write(sg);
+        group->promote_to_write();
         t = group->get_or_add_table("a_table");
         t->add_column(type_Int, "lorelei");
-        t->insert_empty_row(0);
-        t->set_int(0, 0, 43);
-        CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
-        LangBindHelper::commit_and_continue_as_read(sg);
+        t->create_object().set_all(43);
+        CHECK_EQUAL(1, t->get_column_count());
+        group->commit_and_continue_as_read();
     }
     group->verify();
     {
         // add a column and regret it again
-        LangBindHelper::promote_to_write(sg);
-        t->add_column(type_Int, "riget");
-        t->set_int(1, 0, 44);
-        CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
+        group->promote_to_write();
+        auto col = t->add_column(type_Int, "riget");
+        t->begin()->set(col, 44);
+        CHECK_EQUAL(2, t->get_column_count());
         group->verify();
-        LangBindHelper::rollback_and_continue_as_read(sg);
+        group->rollback_and_continue_as_read();
         group->verify();
-        CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
+        CHECK_EQUAL(1, t->get_column_count());
     }
     group->verify();
 }
@@ -6245,9 +6027,9 @@ TEST(LangBindHelper_TableLinkingRemovalIssue)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, DBOptions(crypt_key()));
-    Group* group = const_cast<Group*>(&sg.begin_read());
+    auto group = sg.start_read();
     {
-        LangBindHelper::promote_to_write(sg);
+        group->promote_to_write();
         TableRef t1 = group->get_or_add_table("t1");
         TableRef t2 = group->get_or_add_table("t2");
         TableRef t3 = group->get_or_add_table("t3");
@@ -6255,11 +6037,11 @@ TEST(LangBindHelper_TableLinkingRemovalIssue)
         t1->add_column_link(type_Link, "l12", *t2);
         t2->add_column_link(type_Link, "l23", *t3);
         t3->add_column_link(type_Link, "l34", *t4);
-        LangBindHelper::commit_and_continue_as_read(sg);
+        group->commit_and_continue_as_read();
     }
     group->verify();
     {
-        LangBindHelper::promote_to_write(sg);
+        group->promote_to_write();
         CHECK_EQUAL(4, group->size());
 
         group->remove_table("t1");
@@ -6267,7 +6049,7 @@ TEST(LangBindHelper_TableLinkingRemovalIssue)
         group->remove_table("t3"); // CRASHES HERE
         group->remove_table("t4");
 
-        LangBindHelper::rollback_and_continue_as_read(sg);
+        group->rollback_and_continue_as_read();
         CHECK_EQUAL(4, group->size());
     }
     group->verify();
@@ -6280,29 +6062,27 @@ TEST(LangBindHelper_RollbackTableRemove)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, DBOptions(crypt_key()));
-    Group* group = const_cast<Group*>(&sg.begin_read());
+    auto group = sg.start_read();
     {
-        LangBindHelper::promote_to_write(sg);
+        group->promote_to_write();
         TableRef alpha = group->get_or_add_table("alpha");
         TableRef beta = group->get_or_add_table("beta");
         beta->add_column_link(type_Link, "alpha-1", *alpha);
-        LangBindHelper::commit_and_continue_as_read(sg);
+        group->commit_and_continue_as_read();
     }
     group->verify();
     {
-        LangBindHelper::promote_to_write(sg);
+        group->promote_to_write();
         CHECK_EQUAL(2, group->size());
         TableRef alpha = group->get_table("alpha");
         TableRef beta = group->get_table("beta");
         group->remove_table("beta");
         CHECK_NOT(group->has_table("beta"));
-
-        LangBindHelper::rollback_and_continue_as_read(sg);
+        group->rollback_and_continue_as_read();
         CHECK_EQUAL(2, group->size());
     }
     group->verify();
 }
-#endif
 
 TEST(LangBindHelper_RollbackTableRemove2)
 {
@@ -6333,7 +6113,6 @@ TEST(LangBindHelper_RollbackTableRemove2)
     group->verify();
 }
 
-#ifdef LEGACY_TESTS
 TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
 {
     // Test that it is possible to modify a table, then remove it from the
@@ -6350,19 +6129,18 @@ TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, DBOptions(crypt_key()));
-    Group* group = const_cast<Group*>(&sg.begin_read());
-    LangBindHelper::promote_to_write(sg);
+    auto group = sg.start_read();
+    group->promote_to_write();
     TableRef filler = group->get_or_add_table("filler");
     TableRef table = group->get_or_add_table("table");
     auto col = table->add_column(type_Int, "i");
     Obj o = table->create_object();
-    LangBindHelper::commit_and_continue_as_read(sg);
-    LangBindHelper::promote_to_write(sg);
+    group->commit_and_continue_as_read();
+    group->promote_to_write();
     o.set<int>(col, 0);
     group->remove_table("table");
-    LangBindHelper::rollback_and_continue_as_read(sg);
+    group->rollback_and_continue_as_read();
 }
-#endif
 
 #ifdef LEGACY_TESTS
 TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
@@ -6562,6 +6340,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_LinkLists)
     CHECK_EQUAL(0, link_list->get(3).get_index());
     CHECK_EQUAL(2, link_list->get(4).get_index());
 }
+#endif
 
 
 TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
@@ -6569,11 +6348,11 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, DBOptions(crypt_key()));
-    Group& g = const_cast<Group&>(sg.begin_read());
+    auto group = sg.start_read();
 
-    LangBindHelper::promote_to_write(sg);
-    TableRef origin = g.add_table("origin");
-    TableRef target = g.add_table("target");
+    group->promote_to_write();
+    TableRef origin = group->add_table("origin");
+    TableRef target = group->add_table("target");
 
     target->add_column(type_Int, "int");
     auto c1 = origin->add_column_link(type_LinkList, "linklist", *target);
@@ -6584,23 +6363,16 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     o.set(c2, t.get_key());
     LinkList l = o.get_linklist(c1);
     l.add(t.get_key());
-    LangBindHelper::commit_and_continue_as_read(sg);
+    group->commit_and_continue_as_read();
 
-    LangBindHelper::promote_to_write(sg);
+    group->promote_to_write();
     CHECK_EQUAL(1, l.size());
     target->clear();
-#ifdef LEGACY_TESTS
-    // ^ Fails CHECK due to some problem with refreshing link list size.
-    // it seems to not follow backlinks and remove forward links
-
-    // target->remove_object(t.get_key()); // <-- fails with double free
     CHECK_EQUAL(0, l.size());
-#endif
 
-    LangBindHelper::rollback_and_continue_as_read(sg);
+    group->rollback_and_continue_as_read();
     CHECK_EQUAL(1, l.size());
 }
-#endif
 
 #ifdef LEGACY_TESTS
 TEST(LangBindHelper_RollbackAndContinueAsRead_IntIndex)
@@ -7330,62 +7102,57 @@ TEST(LangBindHelper_HandoverQuery)
     CHECK_EQUAL(count, 50);
 }
 
-#ifdef LEGACY_TESTS
 TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DB sg(*hist, DBOptions(crypt_key()));
-    sg.begin_read();
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
-    DB::VersionID vid;
+    TransactionRef reader;
+    auto writer = sg.start_write();
     {
-        // Untyped interface
-        std::unique_ptr<DB::Handover<TableView>> handover1;
-        std::unique_ptr<DB::Handover<Query>> handoverQuery;
-        {
-            TableView tv1;
-            LangBindHelper::promote_to_write(sg_w);
-            TableRef table = group_w.add_table("table");
-            auto table2 = group_w.add_table("table2");
-            table2->add_column(type_Int, "int");
-            table2->add_empty_row();
-            table2->set_int(0, 0, 42);
+        TableView tv1;
+        auto table = writer->add_table("table");
+        auto table2 = writer->add_table("table2");
+        table2->add_column(type_Int, "int");
+        auto key = table2->create_object().set_all(42).get_key();
 
-            table->add_column_link(type_LinkList, "first", *table2);
-            table->add_empty_row();
-            auto link_view = table->get_linklist(0, 0);
+        auto col = table->add_column_link(type_LinkList, "first", *table2);
+        auto obj = table->create_object();
+        auto link_view = obj.get_linklist(col);
 
-            link_view->add(0);
-            LangBindHelper::commit_and_continue_as_read(sg_w);
+        link_view.add(key);
+        writer->commit_and_continue_as_read();
 
-            Query qq = table2->where(link_view);
-            CHECK_EQUAL(qq.count(), 1);
-            LangBindHelper::promote_to_write(sg_w);
-            table->clear();
-            LangBindHelper::commit_and_continue_as_read(sg_w);
-            CHECK_EQUAL(qq.count(), 0);
-            handoverQuery = sg_w.export_for_handover(qq, ConstSourcePayload::Copy);
-            vid = sg_w.get_version_of_current_transaction();
-        }
-        {
-            LangBindHelper::advance_read(sg, vid);
-            sg_w.close();
+        Query qq = table2->where(link_view);
+        CHECK_EQUAL(qq.count(), 1);
+        writer->promote_to_write();
+        table->clear();
+        writer->commit_and_continue_as_read();
+        CHECK_EQUAL(link_view.size(), 0);
+        CHECK_EQUAL(qq.count(), 0);
 
-            std::unique_ptr<Query> q(sg.import_from_handover(move(handoverQuery)));
-            realm::TableView tv = q->find_all();
+        reader = writer->duplicate();
+#ifdef LEGACY_TESTS
+        // FIXME: Old core would allow the code below, but new core will throw.
+        //
+        // Why should a query still be valid after a change, when it would not be possible
+        // to reconstruct the query from new after said change?
+        //
+        // In this specific case, the query is constructed from a linkview on an object
+        // which is destroyed. After the object is destroyed, the linkview obviously
+        // cannot be constructed, and hence the query can also not be constructed.
+        auto lv2 = reader->import_copy_of(link_view);
+        auto rq = reader->import_copy_of(qq, PayloadPolicy::Copy);
+        writer->close();
+        auto tv = rq->find_all();
 
-            CHECK(tv.is_in_sync());
-            CHECK(tv.is_attached());
-            CHECK_EQUAL(0, tv.size());
-        }
+        CHECK(tv.is_in_sync());
+        CHECK(tv.is_attached());
+        CHECK_EQUAL(0, tv.size());
+#endif
     }
 }
-#endif
+
 
 TEST(LangBindHelper_SubqueryHandoverDependentViews)
 {
