@@ -87,30 +87,14 @@ struct IncompatibleHistories : util::File::AccessError {
 /// Two processes that want to share a database file must reside on
 /// the same host.
 ///
-class DB {
+
+class DB;
+using DBRef = std::shared_ptr<DB>;
+
+class DB : public std::enable_shared_from_this<DB> {
 public:
-    /// \brief Same as calling the corresponding version of open() on a instance
-    /// constructed in the unattached state. Exception safety note: if the
-    /// `upgrade_callback` throws, then the file will be closed properly and the
-    /// upgrade will be aborted.
-    explicit DB(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
-
-    /// \brief Same as calling the corresponding version of open() on a instance
-    /// constructed in the unattached state. Exception safety note: if the
-    /// `upgrade_callback` throws, then the file will be closed properly and
-    /// the upgrade will be aborted.
-    explicit DB(Replication& repl, const DBOptions options = DBOptions());
-
-    struct unattached_tag {
-    };
-
-    /// Create a DB instance in its unattached state. It may
-    /// then be attached to a database file later by calling
-    /// open(). You may test whether this instance is currently in its
-    /// attached state by calling is_attached(). Calling any other
-    /// function (except the destructor) while in the unattached state
-    /// has undefined behavior.
-    DB(unattached_tag) noexcept;
+    static DBRef create(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
+    static DBRef create(Replication& repl, const DBOptions options = DBOptions());
 
     ~DB() noexcept;
 
@@ -118,43 +102,6 @@ public:
     // instance, open another DB object on the same file. But you don't.
     DB(const DB&) = delete;
     DB& operator=(const DB&) = delete;
-
-    /// Attach this DB instance to the specified database file.
-    ///
-    /// While at least one instance of DB exists for a specific
-    /// database file, a "lock" file will be present too. The lock file will be
-    /// placed in the same directory as the database file, and its name will be
-    /// derived by appending ".lock" to the name of the database file.
-    ///
-    /// When multiple DB instances refer to the same file, they must
-    /// specify the same durability level, otherwise an exception will be
-    /// thrown.
-    ///
-    /// \param file Filesystem path to a Realm database file.
-    ///
-    /// \param no_create If the database file does not already exist, it will be
-    /// created (unless this is set to true.) When multiple threads are involved,
-    /// it is safe to let the first thread, that gets to it, create the file.
-    ///
-    /// \param options See SharedGroupOptions for details of each option.
-    /// Sensible defaults are provided if this parameter is left out.
-    ///
-    /// Calling open() on a DB instance that is already in the attached
-    /// state has undefined behavior.
-    ///
-    /// \throw util::File::AccessError If the file could not be opened. If the
-    /// reason corresponds to one of the exception types that are derived from
-    /// util::File::AccessError, the derived exception type is thrown. Note that
-    /// InvalidDatabase is among these derived exception types.
-    ///
-    /// \throw FileFormatUpgradeRequired only if \a SharedGroupOptions::allow_upgrade
-    /// is `false` and an upgrade is required.
-    void open(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
-
-    /// Open this group in replication mode. The specified Replication instance
-    /// must remain in existence for as long as the DB.
-    void open(Replication&, const DBOptions options = DBOptions());
-
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
 
@@ -411,6 +358,48 @@ private:
 #if REALM_METRICS
     std::shared_ptr<metrics::Metrics> m_metrics;
 #endif // REALM_METRICS
+    struct PrivateKey {
+    };  // classic trick for "privatizing" the constructor
+public: // not really - pseudo-private, but needed to allow for use of make_shared<>
+    explicit DB(PrivateKey, const DBOptions options = DBOptions());
+
+private:
+    /// Attach this DB instance to the specified database file.
+    ///
+    /// While at least one instance of DB exists for a specific
+    /// database file, a "lock" file will be present too. The lock file will be
+    /// placed in the same directory as the database file, and its name will be
+    /// derived by appending ".lock" to the name of the database file.
+    ///
+    /// When multiple DB instances refer to the same file, they must
+    /// specify the same durability level, otherwise an exception will be
+    /// thrown.
+    ///
+    /// \param file Filesystem path to a Realm database file.
+    ///
+    /// \param no_create If the database file does not already exist, it will be
+    /// created (unless this is set to true.) When multiple threads are involved,
+    /// it is safe to let the first thread, that gets to it, create the file.
+    ///
+    /// \param options See SharedGroupOptions for details of each option.
+    /// Sensible defaults are provided if this parameter is left out.
+    ///
+    /// Calling open() on a DB instance that is already in the attached
+    /// state has undefined behavior.
+    ///
+    /// \throw util::File::AccessError If the file could not be opened. If the
+    /// reason corresponds to one of the exception types that are derived from
+    /// util::File::AccessError, the derived exception type is thrown. Note that
+    /// InvalidDatabase is among these derived exception types.
+    ///
+    /// \throw FileFormatUpgradeRequired only if \a SharedGroupOptions::allow_upgrade
+    /// is `false` and an upgrade is required.
+    void open(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
+
+    /// Open this group in replication mode. The specified Replication instance
+    /// must remain in existence for as long as the DB.
+    void open(Replication&, const DBOptions options = DBOptions());
+
 
     void do_open(const std::string& file, bool no_create, bool is_backend, const DBOptions options);
 
@@ -498,14 +487,10 @@ inline void DB::get_stats(size_t& free_space, size_t& used_space)
 
 class Transaction : public Group {
 public:
-    Transaction(DB* _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage);
+    Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage);
     // convenience, so you don't need to carry a reference to the DB around
     ~Transaction();
 
-    DB* get_db() const
-    {
-        return db;
-    }
     DB::version_type get_version() const noexcept
     {
         return m_read_lock.m_version;
@@ -570,15 +555,20 @@ public:
     void upgrade_file_format(int target_file_format_version);
 
 private:
+    DBRef get_db() const
+    {
+        return db;
+    }
     template <class O>
     bool internal_advance_read(O* observer, VersionID target_version, _impl::History&, bool);
     void set_transact_stage(DB::TransactStage stage) noexcept;
 
-    DB* db = nullptr;
+    DBRef db;
     DB::ReadLockInfo m_read_lock;
     DB::TransactStage m_transact_stage = DB::transact_Ready;
 
     friend class DB;
+    friend class DisableReplication;
 };
 
 class DisableReplication {
@@ -595,7 +585,7 @@ public:
     }
 
 private:
-    DB* m_owner;
+    DBRef m_owner;
     Replication* m_repl;
 };
 
@@ -607,8 +597,8 @@ private:
 
 class ReadTransaction {
 public:
-    ReadTransaction(DB& sg)
-        : trans(sg.start_read())
+    ReadTransaction(DBRef sg)
+        : trans(sg->start_read())
     {
     }
 
@@ -654,8 +644,8 @@ private:
 
 class WriteTransaction {
 public:
-    WriteTransaction(DB& sg)
-        : trans(sg.start_write())
+    WriteTransaction(DBRef sg)
+        : trans(sg->start_write())
     {
     }
 
@@ -725,46 +715,9 @@ private:
 struct DB::BadVersion : std::exception {
 };
 
-inline DB::DB(const std::string& file, bool no_create, const DBOptions options)
+inline DB::DB(PrivateKey, const DBOptions options)
     : m_upgrade_callback(std::move(options.upgrade_callback))
 {
-    open(file, no_create, options); // Throws
-}
-
-inline DB::DB(unattached_tag) noexcept
-{
-}
-
-inline DB::DB(Replication& repl, const DBOptions options)
-    : m_upgrade_callback(std::move(options.upgrade_callback))
-{
-    open(repl, options); // Throws
-}
-
-inline void DB::open(const std::string& path, bool no_create_file, const DBOptions options)
-{
-    // Exception safety: Since open() is called from constructors, if it throws,
-    // it must leave the file closed.
-
-    bool is_backend = false;
-    do_open(path, no_create_file, is_backend, options); // Throws
-}
-
-inline void DB::open(Replication& repl, const DBOptions options)
-{
-    // Exception safety: Since open() is called from constructors, if it throws,
-    // it must leave the file closed.
-
-    REALM_ASSERT(!is_attached());
-
-    repl.initialize(*this); // Throws
-
-    m_alloc.set_replication(&repl);
-
-    std::string file = repl.get_database_path();
-    bool no_create = false;
-    bool is_backend = false;
-    do_open(file, no_create, is_backend, options); // Throws
 }
 
 inline bool DB::is_attached() const noexcept

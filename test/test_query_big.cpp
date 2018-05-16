@@ -165,7 +165,7 @@ struct Compose<Func> {
 
 struct QueryInitHelper {
     test_util::unit_test::TestContext& test_context;
-    DB* sg;
+    DBRef sg;
     TransactionRef rt;
     DB::VersionID initial_version, extra_col_version;
 
@@ -242,8 +242,8 @@ TEST(Query_TableInitialization)
     SHARED_GROUP_TEST_PATH(path);
 
     auto repl = make_in_realm_history(path);
-    DB sg(*repl, DBOptions(DBOptions::Durability::MemOnly));
-    auto wt = sg.start_write();
+    DBRef sg = DB::create(*repl, DBOptions(DBOptions::Durability::MemOnly));
+    auto wt = sg->start_write();
 
     DB::VersionID initial_version, extra_col_version;
 
@@ -303,7 +303,7 @@ TEST(Query_TableInitialization)
     extra_col_version = wt->get_version_of_current_transaction();
     wt->end_read();
 
-    QueryInitHelper helper{test_context, &sg, {}, initial_version, extra_col_version};
+    QueryInitHelper helper{test_context, sg, {}, initial_version, extra_col_version};
 
     // links_to
     helper([&](Query& q, auto&& test) { test(q.links_to(col_link, keys[0])); });

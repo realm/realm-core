@@ -96,10 +96,10 @@ TEST(Transactions_Frozen)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB db(*hist_w);
+    DBRef db = DB::create(*hist_w);
     TransactionRef frozen;
     {
-        auto wt = db.start_write();
+        auto wt = db->start_write();
         auto table = wt->add_table("my_table");
         table->add_column(type_Int, "my_col_1");
         for (int j = 0; j < 1000; ++j) {
@@ -247,11 +247,11 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read();
+    TransactionRef rt = sg->start_read();
     CHECK_EQUAL(0, rt->size());
 
     // Try to advance without anything having happened
@@ -442,7 +442,7 @@ TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
     // Add the first table
     {
         std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
+        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         wt.add_table("table_1");
         wt.commit();
@@ -450,13 +450,13 @@ TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
 
     // Create a SharedGroup to which we can apply a foreign transaction
     std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    TransactionRef rt = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    TransactionRef rt = sg->start_read();
 
     // Add the second table in a "foreign" transaction
     {
         std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
+        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         wt.add_table("table_2");
         wt.commit();
@@ -479,7 +479,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
     // Add the table
     {
         std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
+        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         wt.add_table("table");
         wt.commit();
@@ -487,13 +487,13 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
 
     // Create a SharedGroup to which we can apply a foreign transaction
     std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    TransactionRef rt = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    TransactionRef rt = sg->start_read();
 
     // remove the table in a "foreign" transaction
     {
         std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
+        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         wt.get_group().remove_table("table");
         wt.commit();
@@ -509,19 +509,19 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
+        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         wt.add_table("table");
         wt.commit();
     }
 
     std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    TransactionRef rt = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    TransactionRef rt = sg->start_read();
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
+        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
 
         WriteTransaction wt(sg_w);
         for (int i = 0; i < 16; ++i) {
@@ -543,7 +543,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
+        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
         WriteTransaction wt(sg_w);
 
         TableRef table = wt.add_table("table1");
@@ -557,15 +557,15 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
     }
 
     std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    TransactionRef rt = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    TransactionRef rt = sg->start_read();
 
     ConstTableRef table1 = rt->get_table("table1");
     ConstTableRef table2 = rt->get_table("table2");
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
+        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
 
         WriteTransaction wt(sg_w);
         wt.get_group().add_table("new table");
@@ -596,15 +596,15 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
 
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
     {
         WriteTransaction wt(sg_w);
         TableRef a = wt.get_or_add_table("a");
         wt.commit();
     }
 
-    TransactionRef rt = sg.start_read();
+    TransactionRef rt = sg->start_read();
     ConstTableRef a_r = rt->get_table("a");
 
     {
@@ -623,11 +623,11 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() const Group& group = rt;
+    TransactionRef rt = sg->start_read() const Group& group = rt;
     CHECK_EQUAL(0, rt->size());
 
     // Create a table for strings and one for other types
@@ -818,11 +818,11 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() const Group& group = rt;
+    TransactionRef rt = sg->start_read() const Group& group = rt;
     CHECK_EQUAL(0, rt->size());
 
     // Create 3 mixed columns and 3 rows
@@ -1086,11 +1086,11 @@ TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
     ColKey c0, c1, c2;
 
     // Start a read transaction (to be repeatedly advanced)
-    auto rt = sg.start_read();
+    auto rt = sg->start_read();
     CHECK_EQUAL(0, rt->size());
 
     // Create 3 string columns, one primed for conversion to "unique string
@@ -1134,8 +1134,8 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
     ColKey col_int;
     ColKey col_str1;
     ColKey col_str2;
@@ -1143,7 +1143,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     ColKey col_int4;
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read();
+    TransactionRef rt = sg->start_read();
     CHECK_EQUAL(0, rt->size());
     std::vector<ObjKey> keys;
 
@@ -1238,11 +1238,11 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() const Group& group = rt;
+    TransactionRef rt = sg->start_read() const Group& group = rt;
     CHECK_EQUAL(0, rt->size());
 
     // Create a table with two rows
@@ -1553,12 +1553,12 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
-    DB sg_q(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
+    DBRef sg_q = DB::create(hist, DBOptions(crypt_key()));
 
     // Start a continuous read transaction
-    TransactionRef rt = sg.start_read();
+    TransactionRef rt = sg->start_read();
 
     // Add some tables and rows.
     {
@@ -1710,13 +1710,13 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     // setup two tables with empty linklists inside
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     std::vector<ObjKey> o_keys;
     std::vector<ObjKey> t_keys;
     ColKey ck;
-    auto rt = sg.start_read();
+    auto rt = sg->start_read();
     {
         // setup tables with empty linklists
         WriteTransaction wt(sg);
@@ -1786,11 +1786,11 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
 
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() const Group& group = rt;
+    TransactionRef rt = sg->start_read() const Group& group = rt;
     CHECK_EQUAL(0, rt->size());
 
     // Create two origin tables and two target tables, and add some links
@@ -4369,11 +4369,11 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
 
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() const Group& group = rt;
+    TransactionRef rt = sg->start_read() const Group& group = rt;
     CHECK_EQUAL(0, rt->size());
 
     // Test that a table can refer to itself. First check that it works when the
@@ -4890,10 +4890,10 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
 
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read();
+    TransactionRef rt = sg->start_read();
     CHECK_EQUAL(0, rt->size());
     ColKey col;
     ObjKey target_key;
@@ -4926,11 +4926,11 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read();
+    TransactionRef rt = sg->start_read();
     CHECK_EQUAL(0, rt->size());
 
     {
@@ -5024,8 +5024,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
 
     {
         WriteTransaction wt(sg_w);
@@ -5037,7 +5037,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
     }
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() const Group& group = rt;
+    TransactionRef rt = sg->start_read() const Group& group = rt;
     const Table& target = *rt->get_table("target");
 
     ConstRow target_row_0, target_row_1;
@@ -5111,8 +5111,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
 
     {
         WriteTransaction wt(sg_w);
@@ -5124,7 +5124,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     }
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() const Group& group = rt;
+    TransactionRef rt = sg->start_read() const Group& group = rt;
     const Table& target = *rt->get_table("target");
 
     ConstRow target_row_0, target_row_1;
@@ -5207,8 +5207,8 @@ TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    auto g = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto g = sg->start_read();
     g->promote_to_write();
 
     TableRef target = g->add_table("target");
@@ -5221,7 +5221,7 @@ TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
     g->commit_and_continue_as_read();
 
     // open a second copy that'll be advanced over the write
-    auto g_r = sg.start_read();
+    auto g_r = sg->start_read();
     TableRef t_r = g_r->get_table("target");
 
     g->promote_to_write();
@@ -5244,7 +5244,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ColKey col;
     {
         WriteTransaction wt(sg);
@@ -5254,7 +5254,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
         wt.commit();
     }
 
-    auto reader = sg.start_read();
+    auto reader = sg->start_read();
     auto table = reader->get_table("table");
     TableView tv = table->where().find_all();
     auto obj = *table->begin();
@@ -5262,7 +5262,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
 
     {
         std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
+        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
 
         WriteTransaction wt(sg_w);
         wt.get_table("table")->clear();
@@ -5289,7 +5289,7 @@ TEST(LangBindHelper_AdvanceReadTransact_UnorderedTableViewClear)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ObjKey first_obj, last_obj;
     ColKey col;
     {
@@ -5302,7 +5302,7 @@ TEST(LangBindHelper_AdvanceReadTransact_UnorderedTableViewClear)
         wt.commit();
     }
 
-    auto reader = sg.start_read();
+    auto reader = sg->start_read();
     auto table = reader->get_table("table");
     auto obj = table->get_object(last_obj);
     CHECK_EQUAL(obj.get<int64_t>(col), 2);
@@ -5574,7 +5574,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     {
         WriteTransaction wt(sg);
@@ -5598,7 +5598,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
     }
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
 
     {
         // With an empty change, parse_complete() and nothing else should be called
@@ -5742,7 +5742,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     // Add some initial data and then begin a read transaction at that version
     {
@@ -5759,7 +5759,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
     // the read transaction is using
     {
         std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
+        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         wt.get_table("Table")->set_int(0, 0, 20);
         wt.commit();
@@ -5799,7 +5799,7 @@ TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     {
         WriteTransaction wt(sg);
         auto table = wt.add_table("table");
@@ -5810,7 +5810,7 @@ TEST(LangBindHelper_ImplicitTransactions)
         table->add_empty_row();
         wt.commit();
     }
-    auto g = sg.start_read();
+    auto g = sg->start_read();
     auto table = g->get_table("table");
     for (int i = 0; i < 100; i++) {
         {
@@ -5852,7 +5852,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     {
         Group* group = const_cast<Group*>(&sg.begin_read());
         {
@@ -5927,8 +5927,8 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    auto reader = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto reader = sg->start_read();
     {
         reader->promote_to_write();
         TableRef origin = reader->get_or_add_table("a_table");
@@ -5954,9 +5954,9 @@ TEST(LangBindHelper_RollbackCircularReferenceRemoval)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ColKey ca, cb;
-    auto group = sg.start_read();
+    auto group = sg->start_read();
     {
         group->promote_to_write();
         TableRef alpha = group->get_or_add_table("alpha");
@@ -5994,8 +5994,8 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    auto group = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto group = sg->start_read();
     TableRef t;
     {
         group->promote_to_write();
@@ -6026,8 +6026,8 @@ TEST(LangBindHelper_TableLinkingRemovalIssue)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    auto group = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto group = sg->start_read();
     {
         group->promote_to_write();
         TableRef t1 = group->get_or_add_table("t1");
@@ -6061,8 +6061,8 @@ TEST(LangBindHelper_RollbackTableRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    auto group = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto group = sg->start_read();
     {
         group->promote_to_write();
         TableRef alpha = group->get_or_add_table("alpha");
@@ -6088,8 +6088,8 @@ TEST(LangBindHelper_RollbackTableRemove2)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    auto group = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto group = sg->start_read();
     {
         group->promote_to_write();
         TableRef a = group->get_or_add_table("a");
@@ -6128,8 +6128,8 @@ TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
 
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    auto group = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto group = sg->start_read();
     group->promote_to_write();
     TableRef filler = group->get_or_add_table("filler");
     TableRef table = group->get_or_add_table("table");
@@ -6147,7 +6147,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t, t2;
     {
@@ -6174,7 +6174,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t;
     {
@@ -6207,7 +6207,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
     TableRef origin = group->add_table("origin");
@@ -6253,7 +6253,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_Links)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
     TableRef origin = group->add_table("origin");
@@ -6299,7 +6299,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_LinkLists)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
     TableRef origin = group->add_table("origin");
@@ -6347,8 +6347,8 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    auto group = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto group = sg->start_read();
 
     group->promote_to_write();
     TableRef origin = group->add_table("origin");
@@ -6379,7 +6379,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_IntIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg.begin_read());
 
     LangBindHelper::promote_to_write(sg);
@@ -6410,7 +6410,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     {
         WriteTransaction wt(sg);
@@ -6579,7 +6579,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     // shutdown/initialization of shared rt->
     std::unique_ptr<Replication> hist1(make_in_realm_history(path));
     {
-        DB sg(*hist1, DBOptions(crypt_key()));
+        DBRef sg = DB::create(*hist1, DBOptions(crypt_key()));
         {
             WriteTransaction wt(sg);
             TableRef tr = wt.add_table("table");
@@ -6592,7 +6592,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     }
     {
         std::unique_ptr<Replication> hist2(make_in_realm_history(path));
-        DB sg(*hist2, DBOptions(crypt_key()));
+        DBRef sg = DB::create(*hist2, DBOptions(crypt_key()));
         {
             WriteTransaction wt(sg);
             TableRef tr = wt.get_table("table");
@@ -6608,7 +6608,7 @@ TEST(LangBindHelper_ImplicitTransactions_LinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
     TableRef origin = group->add_table("origin");
@@ -6628,7 +6628,7 @@ TEST(LangBindHelper_ImplicitTransactions_StringIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
     TableRef table = group->add_table("a");
@@ -6648,7 +6648,7 @@ void multiple_trackers_writer_thread(std::string path)
     // transactions, then quit. No waiting.
     Random random(random_int<unsigned long>());
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     for (int i = 0; i < 10; ++i) {
         WriteTransaction wt(sg);
         auto tr = wt.get_table("table");
@@ -6670,7 +6670,7 @@ void multiple_trackers_reader_thread(TestContext& test_context, std::string path
     Random random(random_int<unsigned long>());
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg.begin_read());
     TableRef tr = g.get_table("table");
     Query q = tr->where().equal(0, 42);
@@ -6707,7 +6707,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     {
         WriteTransaction wt(sg);
         TableRef tr = wt.add_table("table");
@@ -6731,7 +6731,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
     // Busy-wait for all reader threads to find and lock onto value '42'
     for (;;) {
-        TransactionRef rt = sg.start_read() ConstTableRef tr = rt.get_table("table");
+        TransactionRef rt = sg->start_read() ConstTableRef tr = rt.get_table("table");
         if (tr->get_int(0, 0) == read_thread_count)
             break;
         std::this_thread::yield();
@@ -6781,7 +6781,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     int pid = fork();
     if (pid == 0) {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist);
+        DBRef sg = DB::create(*hist);
         {
             WriteTransaction wt(sg);
             TableRef tr = wt.add_table("table");
@@ -6825,9 +6825,9 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     // Wait for all reader threads to find and lock onto value '42'
     {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist);
+        DBRef sg = DB::create(*hist);
         for (;;) {
-            TransactionRef rt = sg.start_read()
+            TransactionRef rt = sg->start_read()
             ConstTableRef tr = rt.get_table("table");
             if (tr->get_int(0, 0) == read_process_count) break;
             sched_yield();
@@ -6837,7 +6837,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     // signal to all readers to complete
     {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist);
+        DBRef sg = DB::create(*hist);
         WriteTransaction wt(sg);
         TableRef tr = wt.get_table("table");
         Query q = tr->where().equal(0, 42);
@@ -6865,7 +6865,7 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
 
     for (int i = 0; i < 100; ++i) {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, DBOptions(crypt_key()));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
         sg.begin_read();
         LangBindHelper::promote_to_write(sg);
         LangBindHelper::commit_and_continue_as_read(sg);
@@ -6891,10 +6891,10 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     const Group& group = sg.begin_read();
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);
@@ -6928,11 +6928,11 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     const Group& group = sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);
@@ -6971,22 +6971,22 @@ TEST(LangBindHelper_MemOnly)
     // Verify that the db is empty after populating and then re-opening a file
     {
         ShortCircuitHistory hist(path);
-        DB sg(hist, DBOptions(DBOptions::Durability::MemOnly));
+        DBRef sg = DB::create(hist, DBOptions(DBOptions::Durability::MemOnly));
         WriteTransaction wt(sg);
         wt.add_table("table");
         wt.commit();
     }
     {
         ShortCircuitHistory hist(path);
-        DB sg(hist, DBOptions(DBOptions::Durability::MemOnly));
-        TransactionRef rt = sg.start_read() CHECK(rt.get_group().is_empty());
+        DBRef sg = DB::create(hist, DBOptions(DBOptions::Durability::MemOnly));
+        TransactionRef rt = sg->start_read() CHECK(rt.get_group().is_empty());
     }
 
     // Verify that basic replication functionality works
 
     ShortCircuitHistory hist(path);
     DB sg_r(hist, DBOptions(DBOptions::Durability::MemOnly));
-    DB sg_w(hist, DBOptions(DBOptions::Durability::MemOnly));
+    DBRef sg_w = DB::create(hist, DBOptions(DBOptions::Durability::MemOnly));
     ReadTransactionRef rt(sg_r);
 
     {
@@ -7005,11 +7005,11 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     const Group& group = sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     // Add initial data
@@ -7064,8 +7064,8 @@ TEST(LangBindHelper_HandoverQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    TransactionRef rt = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    TransactionRef rt = sg->start_read();
     {
         WriteTransaction wt(sg);
         Group& group_w = wt.get_group();
@@ -7106,9 +7106,9 @@ TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     TransactionRef reader;
-    auto writer = sg.start_write();
+    auto writer = sg->start_write();
     {
         TableView tv1;
         auto table = writer->add_table("table");
@@ -7158,14 +7158,14 @@ TEST(LangBindHelper_SubqueryHandoverDependentViews)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     std::unique_ptr<Query> qq2;
     TransactionRef reader;
     ColKey col1;
     {
         {
             TableView tv1;
-            auto writer = sg.start_write();
+            auto writer = sg->start_write();
             TableRef table = writer->add_table("table2");
             auto col0 = table->add_column(type_Int, "first");
             col1 = table->add_column(type_Bool, "even");
@@ -7197,14 +7197,14 @@ TEST(LangBindHelper_HandoverPartialQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     std::unique_ptr<Query> qq2;
     TransactionRef reader;
     ColKey col0;
     {
         {
             TableView tv1;
-            auto writer = sg.start_write();
+            auto writer = sg->start_write();
             TableRef table = writer->add_table("table2");
             col0 = table->add_column(type_Int, "first");
             auto col1 = table->add_column(type_Bool, "even");
@@ -7241,12 +7241,12 @@ TEST(LangBindHelper_HandoverNestedTableViews)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     {
         TransactionRef reader;
         std::unique_ptr<ConstTableView> tv;
         {
-            auto writer = sg.start_write();
+            auto writer = sg->start_write();
             TableRef table = writer->add_table("table2");
             auto col = table->add_column(type_Int, "first");
             for (int i = 0; i < 100; ++i) {
@@ -7271,7 +7271,7 @@ TEST(LangBindHelper_HandoverAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     TransactionRef reader;
     ColKey col;
     std::unique_ptr<ConstTableView> tv2;
@@ -7282,7 +7282,7 @@ TEST(LangBindHelper_HandoverAccessors)
     std::unique_ptr<ConstTableView> tv7;
     {
         TableView tv;
-        auto writer = sg.start_write();
+        auto writer = sg->start_write();
         TableRef table = writer->add_table("table2");
         col = table->add_column(type_Int, "first");
         for (int i = 0; i < 100; ++i) {
@@ -7367,7 +7367,7 @@ TEST(LangBindHelper_TableViewAndTransactionBoundaries)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ColKey col;
     {
         WriteTransaction wt(sg);
@@ -7376,7 +7376,7 @@ TEST(LangBindHelper_TableViewAndTransactionBoundaries)
         table->create_object().set_all(42);
         wt.commit();
     }
-    auto rt = sg.start_read();
+    auto rt = sg->start_read();
     auto tv = rt->get_table("myTable")->where().greater(col, 40).find_all();
     CHECK(tv.is_in_sync());
     {
@@ -7480,7 +7480,7 @@ struct HandoverControl {
 void handover_writer(std::string path)
 {
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg.begin_read());
     auto table = g.get_table("table");
     Random random(random_int<unsigned long>());
@@ -7505,7 +7505,7 @@ void handover_writer(std::string path)
 void handover_querier(HandoverControl<DB::Handover<TableView>>* control, TestContext& test_context, std::string path)
 {
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     // We need to ensure that the initial version observed is *before* the final
     // one written by the writer thread. We do this (simplisticly) by locking on
     // to the initial version before even starting the writer.
@@ -7542,7 +7542,7 @@ void handover_querier(HandoverControl<DB::Handover<TableView>>* control, TestCon
 void handover_verifier(HandoverControl<DB::Handover<TableView>>* control, TestContext& test_context, std::string path)
 {
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     for (;;) {
         std::unique_ptr<DB::Handover<TableView>> handover;
         DB::VersionID version;
@@ -7577,7 +7577,7 @@ namespace {
 void attacher(std::string path)
 {
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     for (int i = 0; i < 100; ++i) {
         Group& g = const_cast<Group&>(sg.begin_read());
         g.verify();
@@ -7598,7 +7598,7 @@ TEST(LangBindHelper_RacingAttachers)
     SHARED_GROUP_TEST_PATH(path);
     {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, DBOptions(crypt_key()));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
         Group& g = sg.begin_write();
         auto table = g.add_table("table");
         table->add_column(type_Int, "first");
@@ -7620,7 +7620,7 @@ TEST(LangBindHelper_HandoverBetweenThreads)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     Group& g = sg.begin_write();
     auto table = g.add_table("table");
     table->add_column(type_Int, "first");
@@ -7643,11 +7643,11 @@ TEST(LangBindHelper_HandoverDependentViews)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     DB::VersionID vid;
@@ -7705,11 +7705,11 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
     for (int detached = 0; detached < 2; detached++) {
         SHARED_GROUP_TEST_PATH(path);
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, DBOptions(crypt_key()));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
         sg.begin_read();
 
         std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
+        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
         Group& group_w = const_cast<Group&>(sg_w.begin_read());
         std::unique_ptr<DB::Handover<TableView>> handover;
         DB::VersionID vid;
@@ -7800,9 +7800,9 @@ void do_write_work(std::string path, size_t id, size_t num_rows) {
     const char* key = crypt_key(true);
     for (size_t rep = 0; rep < num_iterations; ++rep) {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, DBOptions(key));
+        DBRef sg = DB::create(*hist, DBOptions(key));
 
-        TransactionRef rt = sg.start_read() LangBindHelper::promote_to_write(sg);
+        TransactionRef rt = sg->start_read() LangBindHelper::promote_to_write(sg);
         Group& group = const_cast<Group&>(rt.get_group());
         TableRef t = rt->get_table(0);
 
@@ -7825,9 +7825,9 @@ void do_read_verify(std::string path) {
     const char* key = crypt_key(true);
     while (true) {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, DBOptions(key));
+        DBRef sg = DB::create(*hist, DBOptions(key));
         TransactionRef rt =
-            sg.start_read() if (rt.get_version() <= 2) continue; // let the writers make some initial data
+            sg->start_read() if (rt.get_version() <= 2) continue; // let the writers make some initial data
         Group& group = const_cast<Group&>(rt.get_group());
         ConstTableRef t = rt->get_table(0);
         size_t num_rows = t->size();
@@ -7869,7 +7869,7 @@ TEST_IF(Thread_AsynchronousIODataConsistency, false)
     const int num_rows = 200; //2 + REALM_MAX_BPNODE_SIZE;
     const char* key = crypt_key(true);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(key));
+    DBRef sg = DB::create(*hist, DBOptions(key));
     {
         WriteTransaction wt(sg);
         Group& group = wt.get_group();
@@ -7912,11 +7912,11 @@ TEST(Query_ListOfPrimitivesHandover)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     auto& group = sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
     DB::VersionID vid;
 
@@ -8021,15 +8021,15 @@ TEST(LangBindHelper_HandoverTableRef)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     TransactionRef reader;
     TableRef table;
     {
-        auto writer = sg.start_write();
+        auto writer = sg->start_write();
         TableRef table1 = writer->add_table("table1");
         writer->commit_and_continue_as_read();
         auto vid = writer->get_version_of_current_transaction();
-        reader = sg.start_read(vid);
+        reader = sg->start_read(vid);
         table = reader->import_copy_of(table1);
     }
     CHECK(bool(table));
@@ -8040,11 +8040,11 @@ TEST(LangBindHelper_HandoverLinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     TransactionRef reader;
     ColKey col1;
 
-    auto writer = sg.start_write();
+    auto writer = sg->start_write();
 
     TableRef table1 = writer->add_table("table1");
     TableRef table2 = writer->add_table("table2");
@@ -8111,14 +8111,14 @@ TEST(LangBindHelper_HandoverDistinctView)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     TransactionRef reader;
     std::unique_ptr<ConstTableView> tv2;
     ConstObj obj2b;
     {
         {
             TableView tv1;
-            auto writer = sg.start_write();
+            auto writer = sg->start_write();
             TableRef table = writer->add_table("table2");
             auto col = table->add_column(type_Int, "first");
             auto obj1 = table->create_object().set_all(100);
@@ -8158,8 +8158,8 @@ TEST(LangBindHelper_HandoverWithReverseDependency)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
-    auto trans = sg.start_read();
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto trans = sg->start_read();
     {
         // Untyped interface
         TableView tv1;
@@ -8196,10 +8196,10 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);
@@ -8242,10 +8242,10 @@ TEST(LangBindHelper_HandoverOutOfSyncTableViewFromBacklinksToDeletedRow)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);
@@ -8305,11 +8305,11 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     // First setup data so that we can do a query on links
@@ -8410,11 +8410,11 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     std::unique_ptr<DB::Handover<Query>> handoverQuery;
@@ -8522,11 +8522,11 @@ TEST(LangBindHelper_HandoverQuerySubQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     std::unique_ptr<DB::Handover<Query>> handoverQuery;
@@ -8591,10 +8591,10 @@ TEST(LangBindHelper_VersionControl)
     {
         // Create a new shared db
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, DBOptions(crypt_key()));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
         // first create 'num_version' versions
         ColKey col;
-        auto reader = sg.start_read();
+        auto reader = sg->start_read();
         {
             WriteTransaction wt(sg);
             col = wt.get_or_add_table("test")->add_column(type_Int, "a");
@@ -8608,7 +8608,7 @@ TEST(LangBindHelper_VersionControl)
                 wt.commit();
             }
             {
-                auto rt = sg.start_read();
+                auto rt = sg->start_read();
                 versions[i] = rt->get_version_of_current_transaction();
             }
         }
@@ -8618,7 +8618,7 @@ TEST(LangBindHelper_VersionControl)
         {
             for (int k = 0; k < num_versions; ++k) {
                 // std::cerr << "Advancing from initial version to version " << k << std::endl;
-                auto g = sg.start_read(versions[0]);
+                auto g = sg->start_read(versions[0]);
                 auto t = g->get_table("test");
                 CHECK(versions[k] >= versions[0]);
                 g->verify();
@@ -8633,7 +8633,7 @@ TEST(LangBindHelper_VersionControl)
         for (int i = num_versions - 1; i >= 0; --i) {
             // std::cerr << "Jumping directly to version " << i << std::endl;
 
-            auto g = sg.start_read(versions[i]);
+            auto g = sg->start_read(versions[i]);
             g->verify();
             auto t = g->get_table("test");
             auto o = *(t->begin() + i);
@@ -8642,7 +8642,7 @@ TEST(LangBindHelper_VersionControl)
 
         // then advance through the versions going forward
         {
-            auto g = sg.start_read(versions[0]);
+            auto g = sg->start_read(versions[0]);
             g->verify();
             auto t = g->get_table("test");
             for (int k = 0; k < num_versions; ++k) {
@@ -8658,7 +8658,7 @@ TEST(LangBindHelper_VersionControl)
         // sync to a randomly selected version - use advance_read when going
         // forward in time, but begin_read when going back in time
         int old_version = 0;
-        auto g = sg.start_read(versions[old_version]);
+        auto g = sg->start_read(versions[old_version]);
         auto t = g->get_table("test");
         for (int k = num_random_tests; k; --k) {
             int new_version = random.draw_int_mod(num_versions);
@@ -8666,7 +8666,7 @@ TEST(LangBindHelper_VersionControl)
             if (new_version < old_version) {
                 CHECK(versions[new_version] < versions[old_version]);
                 g->end_read();
-                g = sg.start_read(versions[new_version]);
+                g = sg->start_read(versions[new_version]);
                 g->verify();
                 t = g->get_table("test");
                 auto o = *(t->begin() + new_version);
@@ -8688,14 +8688,14 @@ TEST(LangBindHelper_VersionControl)
         // commit, so during the first commit, the last of the previous versions
         // will still be kept. To get rid of it, we must commit once more.
         reader->end_read();
-        g = sg.start_write();
+        g = sg->start_write();
         g->commit();
-        g = sg.start_write();
+        g = sg->start_write();
         g->commit();
 
         // Validate that all the versions are now unreachable
         for (int i = 0; i < num_versions; ++i)
-            CHECK_THROW(sg.start_read(versions[i]), DB::BadVersion);
+            CHECK_THROW(sg->start_read(versions[i]), DB::BadVersion);
     }
 }
 
@@ -8704,7 +8704,7 @@ TEST(LangBindHelper_LinkListCrash)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     {
         WriteTransaction wt(sg);
         TableRef points = wt.add_table("Point");
@@ -8725,7 +8725,7 @@ TEST(LangBindHelper_LinkListCrash)
         wt.commit();
     }
     {
-        TransactionRef rt = sg.start_read() rt.get_group().verify();
+        TransactionRef rt = sg->start_read() rt.get_group().verify();
     }
     g2.verify();
     LangBindHelper::advance_read(sg2);
@@ -8737,7 +8737,7 @@ TEST(LangBindHelper_OpenCloseOpen)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
     group_w.add_table("bar");
@@ -8756,7 +8756,7 @@ TEST(LangBindHelper_MixedCommitSizes)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     Group& g = const_cast<Group&>(sg.begin_read());
 
@@ -8801,7 +8801,7 @@ TEST(LangBindHelper_RollbackToInitialState1)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     sg_w.begin_read();
     LangBindHelper::promote_to_write(sg_w);
     LangBindHelper::rollback_and_continue_as_read(sg_w);
@@ -8812,7 +8812,7 @@ TEST(LangBindHelper_RollbackToInitialState2)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     sg_w.begin_write();
     sg_w.rollback();
 }
@@ -8824,7 +8824,7 @@ TEST(LangBindHelper_Compact)
     size_t N = 100;
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     {
         WriteTransaction w(sg);
         TableRef table = w.get_or_add_table("test");
@@ -8840,7 +8840,7 @@ TEST(LangBindHelper_Compact)
         CHECK_EQUAL(N, table->size());
     }
     {
-        CHECK_EQUAL(true, sg.compact());
+        CHECK_EQUAL(true, sg->compact());
     }
     {
         ReadTransaction r(sg);
@@ -8858,7 +8858,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
 
     {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, DBOptions(crypt_key(true)));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key(true)));
         WriteTransaction wt(sg);
         TableRef table = wt.get_or_add_table("test");
         table->add_column(type_String, "string");
@@ -8867,14 +8867,14 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
         }
         wt.commit();
 
-        CHECK_EQUAL(true, sg.compact());
+        CHECK_EQUAL(true, sg->compact());
 
-        sg.close();
+        sg->close();
     }
 
     {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, DBOptions(crypt_key(true)));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key(true)));
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
@@ -8887,7 +8887,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     {
         WriteTransaction w(sg_w);
         TableRef table = w.add_table("test");
@@ -8950,11 +8950,11 @@ TEST(LangBindHelper_HandoverFuzzyTest)
 
     {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, DBOptions(crypt_key()));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
         sg.begin_read();
 
         std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-        DB sg_w(*hist_w, DBOptions(crypt_key()));
+        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
         Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
         // First setup data so that we can do a query on links
@@ -8992,7 +8992,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
         // Async thread
         //************************************************************************************************
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DB sg(*hist, DBOptions(crypt_key()));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
         sg.begin_read();
 
         while (!end_signal) {
@@ -9022,7 +9022,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     };
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     Group& group = const_cast<Group&>(sg.begin_read());
 
     // Create and export query
@@ -9070,7 +9070,7 @@ TEST(LangBindHelper_TableViewClear)
     size_t number_of_line = 18;
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     // set up tables:
@@ -9164,7 +9164,7 @@ TEST(LangBindHelper_SessionHistoryConsistency)
     // session participants must still agree
     {
         // No history
-        DB sg(path, false, DBOptions(crypt_key()));
+        DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
 
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = realm::make_in_realm_history(path);
@@ -9177,11 +9177,11 @@ TEST(LangBindHelper_InRealmHistory_Basics)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist = make_in_realm_history(path);
     std::unique_ptr<Replication> hist_w = make_in_realm_history(path);
-    DB sg(*hist, DBOptions(crypt_key()));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg.start_read() const Group& group = rt;
+    TransactionRef rt = sg->start_read() const Group& group = rt;
     CHECK_EQUAL(0, rt->size());
 
     // Try to advance without anything having happened
@@ -9353,10 +9353,10 @@ TEST(LangBindHelper_AdvanceReadTransact_BigCommit)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist = make_in_realm_history(path);
     std::unique_ptr<Replication> hist_w = make_in_realm_history(path);
-    DB sg(*hist, DBOptions(crypt_key()));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
 
-    TransactionRef rt = sg.start_read() const Group& group = rt;
+    TransactionRef rt = sg->start_read() const Group& group = rt;
     CHECK_EQUAL(0, rt->size());
 
     {
@@ -9391,7 +9391,7 @@ TEST(LangBindHelper_InRealmHistory_RollbackAndContinueAsRead)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DB sg(*hist, DBOptions(crypt_key()));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     {
         Group* group = const_cast<Group*>(&sg.begin_read());
         {
@@ -9468,28 +9468,28 @@ TEST(LangBindHelper_InRealmHistory_Upgrade)
     {
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path_1);
-        DB sg(*hist, DBOptions(crypt_key()));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.commit();
     }
     {
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path_1);
-        DB sg(*hist, DBOptions(crypt_key()));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.commit();
     }
     SHARED_GROUP_TEST_PATH(path_2);
     {
         // No history
-        DB sg(path_2, false, DBOptions(crypt_key()));
+        DBRef sg = DB::create(path_2, false, DBOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.commit();
     }
     {
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path_2);
-        DB sg(*hist, DBOptions(crypt_key()));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.commit();
     }
@@ -9502,7 +9502,7 @@ TEST(LangBindHelper_InRealmHistory_Downgrade)
     {
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path);
-        DB sg(*hist, DBOptions(crypt_key()));
+        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.commit();
     }
@@ -9527,7 +9527,7 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
     // session participants must still agree
     {
         // No history
-        DB sg(path, false, DBOptions(crypt_key()));
+        DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
 
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path);
@@ -9545,7 +9545,7 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
-    DB sg_w(*hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist, DBOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);
@@ -9586,7 +9586,7 @@ TEST(LangBindHelper_RollbackInsertZeroRows)
 {
     SHARED_GROUP_TEST_PATH(shared_path)
     std::unique_ptr<Replication> hist_w(make_in_realm_history(shared_path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
@@ -9626,7 +9626,7 @@ TEST(LangBindHelper_IsRowAttachedAfterClear)
     std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DB sg_r(*hist_r, DBOptions(crypt_key()));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
 
@@ -9699,7 +9699,7 @@ TEST(LangBindHelper_RollbackRemoveZeroRows)
 {
     SHARED_GROUP_TEST_PATH(path)
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
@@ -9739,7 +9739,7 @@ TEST_TYPES(LangBindHelper_AddEmptyRowsAndRollBackTimestamp, std::true_type, std:
     constexpr bool nullable_toggle = TEST_TYPE::value;
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
     TableRef t = g.insert_table(0, "");
@@ -9759,7 +9759,7 @@ TEST_TYPES(LangBindHelper_EmptyWrites, std::true_type, std::false_type)
     constexpr bool nullable_toggle = TEST_TYPE::value;
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
@@ -9781,7 +9781,7 @@ TEST_TYPES(LangBindHelper_SetTimestampRollback, std::true_type, std::false_type)
     constexpr bool nullable_toggle = TEST_TYPE::value;
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
 
     TableRef t = g.add_table("");
@@ -9801,7 +9801,7 @@ TEST_TYPES(LangBindHelper_SetTimestampAdvanceRead, std::true_type, std::false_ty
     std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DB sg_r(*hist_r, DBOptions(crypt_key()));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
 
@@ -9823,7 +9823,7 @@ TEST(LangbindHelper_BoolSearchIndexCommitPromote)
     std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DB sg_r(*hist_r, DBOptions(crypt_key()));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
 
     TableRef t = g.add_table("");
@@ -9863,7 +9863,7 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DB sg_r(*hist_r, DBOptions(crypt_key()));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
 
@@ -9895,7 +9895,7 @@ TEST(LangBindHelper_SwapSimple)
     std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DB sg_r(*hist_r, DBOptions(crypt_key()));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
 
@@ -9952,7 +9952,7 @@ TEST(LangBindHelper_Bug2321)
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
     DB sg_r(hist, DBOptions(crypt_key()));
-    DB sg_w(hist, DBOptions(crypt_key()));
+    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
     int i;
 
     {
@@ -10003,7 +10003,7 @@ TEST(LangBindHelper_Bug2295)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg_w(hist);
+    DBRef sg_w = DB::create(hist);
     DB sg_r(hist);
     int i;
 
@@ -10059,7 +10059,7 @@ TEST(LangBindHelper_BigBinary)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg_w(hist);
+    DBRef sg_w = DB::create(hist);
     DB sg_r(hist);
     std::string big_data(0x1000000, 'x');
 
@@ -10096,7 +10096,7 @@ TEST(LangBindHelper_CopyOnWriteOverflow)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg_w(hist);
+    DBRef sg_w = DB::create(hist);
 
     {
         WriteTransaction wt(sg_w);
@@ -10126,7 +10126,7 @@ TEST(LangBindHelper_MixedStringRollback)
     SHARED_GROUP_TEST_PATH(path);
     const char* key = crypt_key();
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(key));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(key));
     Group& g = const_cast<Group&>(sg_w.begin_write());
 
     TableRef t = g.add_table("table");
@@ -10153,7 +10153,7 @@ TEST(LangBindHelper_RollbackOptimize)
     SHARED_GROUP_TEST_PATH(path);
     const char* key = crypt_key();
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(key));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(key));
     Group& g = sg_w.begin_write();
 
     g.insert_table(0, "t0");
@@ -10173,7 +10173,7 @@ TEST(LangBindHelper_BinaryReallocOverMax)
     SHARED_GROUP_TEST_PATH(path);
     const char* key = crypt_key();
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(key));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(key));
     Group& g = const_cast<Group&>(sg_w.begin_write());
 
     g.add_table("table");
@@ -10198,7 +10198,7 @@ TEST(LangBindHelper_MixedTimestampTransaction)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg_w(hist);
+    DBRef sg_w = DB::create(hist);
     DB sg_r(hist);
 
     // the seconds part is constructed to test 64 bit integer reads
@@ -10279,7 +10279,7 @@ TEST(LangBindHelper_IndexedStringEnumColumnSwapRows)
     SHARED_GROUP_TEST_PATH(path);
     const char* key = nullptr;
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(key));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(key));
     Group& g = sg_w.begin_write();
     try {
         g.insert_table(0, "t0");
@@ -10304,7 +10304,7 @@ TEST(LangBindHelper_IndexedStringEnumColumnSwapRowsWithValue)
     SHARED_GROUP_TEST_PATH(path);
     const char* key = crypt_key();
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(key));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(key));
     Group& g = sg_w.begin_write();
 
     try {
@@ -10393,11 +10393,11 @@ TEST(LangBindHelper_RemoveObject)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist);
+    DBRef sg = DB::create(hist);
     ColKey col;
-    auto rt = sg.start_read();
+    auto rt = sg->start_read();
     {
-        auto wt = sg.start_write();
+        auto wt = sg->start_write();
         TableRef t = wt->add_table("Foo");
         col = t->add_column(type_Int, "int");
         t->create_object(ObjKey(123)).set(col, 1);
@@ -10413,7 +10413,7 @@ TEST(LangBindHelper_RemoveObject)
     CHECK_EQUAL(o2.get<int64_t>(col), 2);
 
     {
-        auto wt = sg.start_write();
+        auto wt = sg->start_write();
         TableRef t = wt->get_table("Foo");
         t->remove_object(ObjKey(123));
         wt->commit();
@@ -10439,7 +10439,7 @@ TEST(LangBindHelper_callWithLock)
 
     {
         std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-        DB sg_w(*hist_w);
+        DBRef sg_w = DB::create(*hist_w);
         WriteTransaction wt(sg_w);
         CHECK_NOT(DB::call_with_lock(path, callback_not_called));
         wt.commit();
@@ -10455,7 +10455,7 @@ TEST(LangBindHelper_getCoreFiles)
 
     {
         std::unique_ptr<Replication> hist_w(make_in_realm_history(realm_path));
-        DB sg_w(*hist_w);
+        DBRef sg_w = DB::create(*hist_w);
         WriteTransaction wt(sg_w);
         wt.commit();
     }
@@ -10484,11 +10484,11 @@ TEST(LangBindHelper_AdvanceReadCluster)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    DB sg(hist);
+    DBRef sg = DB::create(hist);
 
-    auto rt = sg.start_read();
+    auto rt = sg->start_read();
     {
-        auto wt = sg.start_write();
+        auto wt = sg->start_write();
         TableRef t = wt->add_table("Foo");
         auto int_col = t->add_column(type_Int, "int");
         for (int64_t i = 0; i < 100; i++) {

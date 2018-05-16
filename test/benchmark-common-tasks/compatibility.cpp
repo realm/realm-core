@@ -37,9 +37,9 @@ DBOptions::Durability durability(RealmDurability level)
     return DBOptions::Durability::Full;
 }
 
-DB* create_new_shared_group(std::string path, RealmDurability level, const char* key)
+realm::DBRef create_new_shared_group(std::string path, RealmDurability level, const char* key)
 {
-    return new DB(path, false, DBOptions(durability(level), key));
+    return DB::create(path, false, DBOptions(durability(level), key));
 }
 
 } // end namespace compatibility
