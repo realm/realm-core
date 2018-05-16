@@ -204,7 +204,6 @@ T ConstObj::_get(size_t col_ndx) const
 
     typename ColumnTypeTraits<T>::cluster_leaf_type values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
-    values.set_spec(const_cast<Spec*>(&spec), col_ndx);
     values.init_from_ref(ref);
 
     return values.get(m_row_ndx);
@@ -227,6 +226,48 @@ int64_t ConstObj::_get<int64_t>(size_t col_ndx) const
     int width = Array::get_width_from_header(header);
     char* data = Array::get_data_from_header(header);
     REALM_TEMPEX(return get_direct, width, (data, m_row_ndx));
+}
+
+template <>
+StringData ConstObj::_get<StringData>(size_t col_ndx) const
+{
+    // FIXME: No type checks! for fast type checks we'll need to add
+    // type info inside the column key.
+    // manual inline of is_in_sync():
+    auto& alloc = get_alloc();
+    auto current_version = alloc.get_storage_version(m_instance_version);
+    if (current_version != m_storage_version) {
+        do_update();
+    }
+
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
+    auto& spec = get_spec();
+    if (spec.is_string_enum_type(col_ndx)) {
+        ArrayString values(get_alloc());
+        values.set_spec(const_cast<Spec*>(&spec), col_ndx);
+        values.init_from_ref(ref);
+
+        return values.get(m_row_ndx);
+    }
+    else {
+        return ArrayString::get(alloc.translate(ref), m_row_ndx, alloc);
+    }
+}
+
+template <>
+BinaryData ConstObj::_get<BinaryData>(size_t col_ndx) const
+{
+    // FIXME: No type checks! for fast type checks we'll need to add
+    // type info inside the column key.
+    // manual inline of is_in_sync():
+    auto& alloc = get_alloc();
+    auto current_version = alloc.get_storage_version(m_instance_version);
+    if (current_version != m_storage_version) {
+        do_update();
+    }
+
+    ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx + 1));
+    return ArrayBinary::get(alloc.translate(ref), m_row_ndx, alloc);
 }
 
 /* FIXME: Make this one fast too!

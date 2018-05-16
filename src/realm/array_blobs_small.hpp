@@ -89,7 +89,6 @@ public:
     BinaryData get(size_t ndx) const noexcept;
     StringData get_string(size_t ndx) const;
     bool is_null(size_t ndx) const;
-    size_t read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept;
 
     void add(BinaryData value, bool add_zero_term = false);
     void set(size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -107,6 +106,7 @@ public:
     /// you need to get multiple values, then this method will be
     /// slower.
     static BinaryData get(const char* header, size_t ndx, Allocator&) noexcept;
+    static StringData get_string(const char* header, size_t ndx, Allocator& alloc) noexcept;
 
     static size_t get_size_from_header(const char*, Allocator&) noexcept;
 
@@ -225,6 +225,15 @@ inline bool ArraySmallBlobs::is_null(size_t ndx) const
 inline StringData ArraySmallBlobs::get_string(size_t ndx) const
 {
     BinaryData bin = get(ndx);
+    if (bin.is_null())
+        return realm::null();
+    else
+        return StringData(bin.data(), bin.size() - 1); // Do not include terminating zero
+}
+
+inline StringData ArraySmallBlobs::get_string(const char* header, size_t ndx, Allocator& alloc) noexcept
+{
+    BinaryData bin = get(header, ndx, alloc);
     if (bin.is_null())
         return realm::null();
     else

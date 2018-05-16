@@ -91,6 +91,12 @@ public:
 
     size_t lower_bound(StringData value);
 
+    /// Get the specified element without the cost of constructing an
+    /// array instance. If an array instance is already available, or
+    /// you need to get multiple values, then this method will be
+    /// slower.
+    static StringData get(const char* header, size_t ndx, Allocator& alloc) noexcept;
+
 private:
     static constexpr size_t small_string_max_size = 15;  // ArrayStringShort
     static constexpr size_t medium_string_max_size = 63; // ArrayStringLong
@@ -111,6 +117,23 @@ private:
 
     Type upgrade_leaf(size_t value_size);
 };
+
+inline StringData ArrayString::get(const char* header, size_t ndx, Allocator& alloc) noexcept
+{
+    bool long_strings = Array::get_hasrefs_from_header(header);
+    if (!long_strings) {
+        return ArrayStringShort::get(header, ndx, true);
+    }
+    else {
+        bool is_big = Array::get_context_flag_from_header(header);
+        if (!is_big) {
+            return ArraySmallBlobs::get_string(header, ndx, alloc);
+        }
+        else {
+            return ArrayBigBlobs::get_string(header, ndx, alloc);
+        }
+    }
+}
 
 template <>
 class QueryState<StringData> : public QueryStateBase {

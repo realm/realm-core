@@ -190,7 +190,8 @@ inline void ArrayBigBlobs::insert_string(size_t ndx, StringData value)
     insert(ndx, bin, add_zero_term);
 }
 
-inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx, Allocator& alloc, bool nullable) noexcept
+inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx, Allocator& alloc,
+                                            bool nullable = true) noexcept
 {
     static_cast<void>(nullable);
     BinaryData bin = get(header, ndx, alloc);
