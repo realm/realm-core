@@ -32,7 +32,7 @@
 #include <realm/metrics/metrics.hpp>
 #include <realm/replication.hpp>
 #include <realm/version_id.hpp>
-#include "db_options.hpp"
+#include <realm/db_options.hpp>
 
 namespace realm {
 
