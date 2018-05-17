@@ -1,0 +1,3 @@
+codecov:
+  ignore:
+    - "test/**/*"  # ignore the test files
