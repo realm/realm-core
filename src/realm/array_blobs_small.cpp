@@ -195,6 +195,40 @@ MemRef ArraySmallBlobs::create_array(size_t size, Allocator& alloc, BinaryData v
     return top.get_mem();
 }
 
+size_t ArraySmallBlobs::find_first(BinaryData value, bool is_string, size_t begin, size_t end) const noexcept
+{
+    size_t sz = size();
+    if (end == npos)
+        end = sz;
+    REALM_ASSERT_11(begin, <=, sz, &&, end, <=, sz, &&, begin, <=, end);
+
+    if (value.is_null()) {
+        for (size_t i = begin; i != end; ++i) {
+            if (m_nulls.get(i))
+                return i;
+        }
+    }
+    else {
+        // When strings are stored as blobs, they are always zero-terminated
+        // but the value we get as input might not be.
+        size_t value_size = value.size();
+        size_t full_size = is_string ? value_size + 1 : value_size;
+
+        size_t start_ofs = begin ? to_size_t(m_offsets.get(begin - 1)) : 0;
+        for (size_t i = begin; i != end; ++i) {
+            size_t end_ofs = to_size_t(m_offsets.get(i));
+            size_t blob_size = end_ofs - start_ofs;
+            if (!m_nulls.get(i) && blob_size == full_size) {
+                const char* blob_value = m_blob.get(start_ofs);
+                if (std::equal(blob_value, blob_value + value_size, value.data()))
+                    return i;
+            }
+            start_ofs = end_ofs;
+        }
+    }
+
+    return not_found;
+}
 
 MemRef ArraySmallBlobs::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {

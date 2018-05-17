@@ -101,6 +101,8 @@ public:
     void clear();
     void destroy();
 
+    size_t find_first(BinaryData value, bool is_string, size_t begin, size_t end) const noexcept;
+
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
