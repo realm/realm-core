@@ -171,7 +171,8 @@ following example:
 
 ### Measuring test coverage:
 
-You can measure how much of the code is tested by executing:
+You can measure how much of the code is tested by adding the `-D REALM_COVERAGE=ON` option to the cmake call that generates the project.
+This will allow to produce coverage information which is then digestable by gcovr or lcov:
 
     cd test
     ./realm-tests
