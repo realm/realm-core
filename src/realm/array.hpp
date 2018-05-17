@@ -209,15 +209,6 @@ public:
     /// initialized to the specified value.
     static MemRef create_array(Type, bool context_flag, size_t size, int_fast64_t value, Allocator&);
 
-    /// Construct a shallow copy of the specified slice of this array using the
-    /// specified target allocator. Subarrays will **not** be cloned. See
-    /// slice_and_clone_children() for an alternative.
-    MemRef slice(size_t offset, size_t slice_size, Allocator& target_alloc) const;
-
-    /// Construct a deep copy of the specified slice of this array using the
-    /// specified target allocator. Subarrays will be cloned.
-    MemRef slice_and_clone_children(size_t offset, size_t slice_size, Allocator& target_alloc) const;
-
     Type get_type() const noexcept;
 
     static void add_to_column(IntegerColumn* column, int64_t value);

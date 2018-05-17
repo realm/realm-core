@@ -119,10 +119,6 @@ public:
     /// initialization value).
     static MemRef create_array(size_t size, Allocator&, BinaryData defaults);
 
-    /// Construct a copy of the specified slice of this binary array
-    /// using the specified target allocator.
-    MemRef slice(size_t offset, size_t slice_size, Allocator& target_alloc) const;
-
 #ifdef REALM_DEBUG
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif

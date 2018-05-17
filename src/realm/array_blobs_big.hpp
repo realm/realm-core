@@ -75,10 +75,6 @@ public:
     /// underlying node. It is not owned by the accessor.
     void create();
 
-    /// Construct a copy of the specified slice of this big blobs
-    /// array using the specified target allocator.
-    MemRef slice(size_t offset, size_t slice_size, Allocator& target_alloc) const;
-
 #ifdef REALM_DEBUG
     void verify() const;
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
@@ -207,12 +203,6 @@ inline void ArrayBigBlobs::create()
     bool context_flag = true;
     Array::create(type_HasRefs, context_flag); // Throws
 }
-
-inline MemRef ArrayBigBlobs::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    return slice_and_clone_children(offset, slice_size, target_alloc);
-}
-
 
 } // namespace realm
 

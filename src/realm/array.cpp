@@ -277,63 +277,6 @@ void Array::set_type(Type type)
 }
 
 
-MemRef Array::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    REALM_ASSERT(is_attached());
-
-    Array new_slice(target_alloc);
-    _impl::DeepArrayDestroyGuard dg(&new_slice);
-    Type type = get_type();
-    new_slice.create(type, m_context_flag); // Throws
-    size_t begin = offset;
-    size_t end = offset + slice_size;
-    for (size_t i = begin; i != end; ++i) {
-        int_fast64_t value = get(i);
-        new_slice.add(value); // Throws
-    }
-    dg.release();
-    return new_slice.get_mem();
-}
-
-
-MemRef Array::slice_and_clone_children(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    REALM_ASSERT(is_attached());
-    if (!has_refs())
-        return slice(offset, slice_size, target_alloc); // Throws
-
-    Array new_slice(target_alloc);
-    _impl::DeepArrayDestroyGuard dg(&new_slice);
-    Type type = get_type();
-    new_slice.create(type, m_context_flag); // Throws
-    _impl::DeepArrayRefDestroyGuard dg_2(target_alloc);
-    size_t begin = offset;
-    size_t end = offset + slice_size;
-    for (size_t i = begin; i != end; ++i) {
-        int_fast64_t value = get(i);
-
-        // Null-refs signify empty subtrees. Also, all refs are
-        // 8-byte aligned, so the lowest bits cannot be set. If they
-        // are, it means that it should not be interpreted as a ref.
-        bool is_subarray = value != 0 && (value & 1) == 0;
-        if (!is_subarray) {
-            new_slice.add(value); // Throws
-            continue;
-        }
-
-        ref_type ref = to_ref(value);
-        Allocator& allocator = get_alloc();
-        MemRef new_mem = clone(MemRef(ref, allocator), allocator, target_alloc); // Throws
-        dg_2.reset(new_mem.get_ref());
-        value = from_ref(new_mem.get_ref());
-        new_slice.add(value); // Throws
-        dg_2.release();
-    }
-    dg.release();
-    return new_slice.get_mem();
-}
-
-
 // Allocates space for 'num_items' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
 void Array::preset(size_t bitwidth, size_t num_items)
 {

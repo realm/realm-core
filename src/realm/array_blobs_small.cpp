@@ -230,24 +230,6 @@ size_t ArraySmallBlobs::find_first(BinaryData value, bool is_string, size_t begi
     return not_found;
 }
 
-MemRef ArraySmallBlobs::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    REALM_ASSERT(is_attached());
-
-    ArraySmallBlobs array_slice(target_alloc);
-    _impl::ShallowArrayDestroyGuard dg(&array_slice);
-    array_slice.create(); // Throws
-    size_t begin = offset;
-    size_t end = offset + slice_size;
-    for (size_t i = begin; i != end; ++i) {
-        BinaryData value = get(i);
-        array_slice.add(value); // Throws
-    }
-    dg.release();
-    return array_slice.get_mem();
-}
-
-
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void ArraySmallBlobs::to_dot(std::ostream& out, bool, StringData title) const

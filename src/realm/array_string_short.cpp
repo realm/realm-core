@@ -302,26 +302,6 @@ bool ArrayStringShort::compare_string(const ArrayStringShort& c) const noexcept
     return true;
 }
 
-MemRef ArrayStringShort::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    REALM_ASSERT(is_attached());
-
-    // FIXME: This can be optimized as a single contiguous copy
-    // operation.
-    ArrayStringShort array_slice(target_alloc, m_nullable);
-    _impl::ShallowArrayDestroyGuard dg(&array_slice);
-    array_slice.create(); // Throws
-    size_t begin = offset;
-    size_t end = offset + slice_size;
-    for (size_t i = begin; i != end; ++i) {
-        StringData value = get(i);
-        array_slice.add(value); // Throws
-    }
-    dg.release();
-    return array_slice.get_mem();
-}
-
-
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void ArrayStringShort::string_stats() const

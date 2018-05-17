@@ -602,8 +602,6 @@ protected:
     void check_lists_are_empty(size_t row_ndx) const;
 
 private:
-    class SliceWriter;
-
     mutable WrappedAllocator m_alloc;
     Array m_top;
     void update_allocator_wrapper(bool writable)

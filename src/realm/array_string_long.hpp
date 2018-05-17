@@ -88,10 +88,6 @@ public:
     /// be initialized to zero size blobs.
     static MemRef create_array(size_t size, Allocator&, bool nullable);
 
-    /// Construct a copy of the specified slice of this long string
-    /// array using the specified target allocator.
-    MemRef slice(size_t offset, size_t slice_size, Allocator& target_alloc) const;
-
 #ifdef REALM_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
