@@ -62,8 +62,8 @@ To get submodule dependencies:
     
 Run the following commands to configure, build and test core:
 
-    mkdir build-dir # create a build folder
-    cd build-dir
+    mkdir build.<buildtype>
+    cd build.<buildtype>
     cmake -D CMAKE_BUILD_TYPE=<buildtype> ..
     cmake --build .
     ctest
