@@ -524,7 +524,7 @@ TEST(Links_LinkList_TableOps)
     target->create_object().set_all("test3", 3, true, int64_t(Wed));
 
     ConstObj obj1 = origin->create_object(ObjKey(0));
-    CHECK(obj1.get_list<ObjKey>(col_link).is_null());
+    CHECK(obj1.get_list<ObjKey>(col_link).is_empty());
     CHECK_EQUAL(0, obj1.get_link_count(col_link));
 
     // add some more rows and test that they can be deleted
@@ -581,6 +581,14 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(key1, links.get(1));
     CHECK_EQUAL(key0, links.get(2));
     CHECK_EQUAL(Wed, Days(links[0].get<Int>(day_col)));
+
+    LinkList links1 = links;
+    CHECK_EQUAL(3, links1.size());
+    LinkList links2;
+    links2 = links;
+    CHECK_EQUAL(3, links2.size());
+    ObjList* obj_list = &links2;
+    CHECK_EQUAL(key2, obj_list->get_key(0));
 
     // verify that backlinks was set correctly
     CHECK_EQUAL(1, obj0.get_backlink_count(*origin, col_link));

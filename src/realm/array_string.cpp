@@ -245,18 +245,16 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
     switch (m_type) {
         case Type::small_strings:
             return static_cast<ArrayStringShort*>(m_arr)->find_first(value, begin, end);
-        case Type::medium_strings:
-            for (size_t t = begin; t < end; t++) {
-                if (static_cast<ArraySmallBlobs*>(m_arr)->get_string(t) == value)
-                    return t;
-            }
+        case Type::medium_strings: {
+            BinaryData as_binary(value.data(), value.size());
+            return static_cast<ArraySmallBlobs*>(m_arr)->find_first(as_binary, true, begin, end);
             break;
-        case Type::big_strings:
-            for (size_t t = begin; t < end; t++) {
-                if (static_cast<ArrayBigBlobs*>(m_arr)->get_string(t) == value)
-                    return t;
-            }
+        }
+        case Type::big_strings: {
+            BinaryData as_binary(value.data(), value.size());
+            return static_cast<ArrayBigBlobs*>(m_arr)->find_first(as_binary, true, begin, end);
             break;
+        }
         case Type::enum_strings: {
             size_t sz = m_string_enum_values->size();
             size_t res = m_string_enum_values->find_first(value, 0, sz);
@@ -332,19 +330,22 @@ ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
             return Type::medium_strings;
 
         // Upgrade root leaf from medium to big strings
-        auto string_long = static_cast<ArraySmallBlobs*>(m_arr);
+        auto string_medium = static_cast<ArraySmallBlobs*>(m_arr);
         ArrayBigBlobs big_blobs(m_alloc, true);
         big_blobs.create(); // Throws
 
-        size_t n = string_long->size();
+        size_t n = string_medium->size();
         for (size_t i = 0; i < n; i++) {
-            big_blobs.add_string(string_long->get_string(i)); // Throws
+            big_blobs.add_string(string_medium->get_string(i)); // Throws
         }
-        big_blobs.set_parent(string_long->get_parent(), string_long->get_ndx_in_parent());
-        big_blobs.update_parent(); // Throws
-        string_long->destroy();
+        auto parent = string_medium->get_parent();
+        auto ndx_in_parent = string_medium->get_ndx_in_parent();
+        string_medium->destroy();
+
         auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
         arr->init_from_mem(big_blobs.get_mem());
+        arr->set_parent(parent, ndx_in_parent);
+        arr->update_parent();
 
         m_type = Type::big_strings;
         return Type::big_strings;
@@ -364,11 +365,14 @@ ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
         for (size_t i = 0; i < n; i++) {
             string_long.add_string(string_short->get(i)); // Throws
         }
-        string_long.set_parent(string_short->get_parent(), string_short->get_ndx_in_parent());
-        string_long.update_parent(); // Throws
+        auto parent = string_short->get_parent();
+        auto ndx_in_parent = string_short->get_ndx_in_parent();
         string_short->destroy();
+
         auto arr = new (&m_storage.m_string_short) ArraySmallBlobs(m_alloc);
         arr->init_from_mem(string_long.get_mem());
+        arr->set_parent(parent, ndx_in_parent);
+        arr->update_parent();
 
         m_type = Type::medium_strings;
     }
@@ -382,11 +386,14 @@ ArrayString::Type ArrayString::upgrade_leaf(size_t value_size)
         for (size_t i = 0; i < n; i++) {
             big_blobs.add_string(string_short->get(i)); // Throws
         }
-        big_blobs.set_parent(string_short->get_parent(), string_short->get_ndx_in_parent());
-        big_blobs.update_parent(); // Throws
+        auto parent = string_short->get_parent();
+        auto ndx_in_parent = string_short->get_ndx_in_parent();
         string_short->destroy();
+
         auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
         arr->init_from_mem(big_blobs.get_mem());
+        arr->set_parent(parent, ndx_in_parent);
+        arr->update_parent();
 
         m_type = Type::big_strings;
     }

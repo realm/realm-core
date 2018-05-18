@@ -40,25 +40,6 @@ void ArraySmallBlobs::init_from_mem(MemRef mem) noexcept
     }
 }
 
-size_t ArraySmallBlobs::read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept
-{
-    REALM_ASSERT_3(ndx, <, m_offsets.size());
-
-    if (!legacy_array_type() && m_nulls.get(ndx)) {
-        return 0;
-    }
-    else {
-        size_t begin_idx = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
-        size_t end_idx = to_size_t(m_offsets.get(ndx));
-        size_t sz = end_idx - begin_idx;
-
-        size_t size_to_copy = (pos > sz) ? 0 : std::min(max_size, sz - pos);
-        const char* begin = m_blob.get(begin_idx) + pos;
-        realm::safe_copy_n(begin, size_to_copy, buffer);
-        return size_to_copy;
-    }
-}
-
 void ArraySmallBlobs::add(BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT_7(value.size(), ==, 0, ||, value.data(), !=, 0);
@@ -214,24 +195,40 @@ MemRef ArraySmallBlobs::create_array(size_t size, Allocator& alloc, BinaryData v
     return top.get_mem();
 }
 
-
-MemRef ArraySmallBlobs::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
+size_t ArraySmallBlobs::find_first(BinaryData value, bool is_string, size_t begin, size_t end) const noexcept
 {
-    REALM_ASSERT(is_attached());
+    size_t sz = size();
+    if (end == npos)
+        end = sz;
+    REALM_ASSERT_11(begin, <=, sz, &&, end, <=, sz, &&, begin, <=, end);
 
-    ArraySmallBlobs array_slice(target_alloc);
-    _impl::ShallowArrayDestroyGuard dg(&array_slice);
-    array_slice.create(); // Throws
-    size_t begin = offset;
-    size_t end = offset + slice_size;
-    for (size_t i = begin; i != end; ++i) {
-        BinaryData value = get(i);
-        array_slice.add(value); // Throws
+    if (value.is_null()) {
+        for (size_t i = begin; i != end; ++i) {
+            if (m_nulls.get(i))
+                return i;
+        }
     }
-    dg.release();
-    return array_slice.get_mem();
-}
+    else {
+        // When strings are stored as blobs, they are always zero-terminated
+        // but the value we get as input might not be.
+        size_t value_size = value.size();
+        size_t full_size = is_string ? value_size + 1 : value_size;
 
+        size_t start_ofs = begin ? to_size_t(m_offsets.get(begin - 1)) : 0;
+        for (size_t i = begin; i != end; ++i) {
+            size_t end_ofs = to_size_t(m_offsets.get(i));
+            size_t blob_size = end_ofs - start_ofs;
+            if (!m_nulls.get(i) && blob_size == full_size) {
+                const char* blob_value = m_blob.get(start_ofs);
+                if (std::equal(blob_value, blob_value + value_size, value.data()))
+                    return i;
+            }
+            start_ofs = end_ofs;
+        }
+    }
+
+    return not_found;
+}
 
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 

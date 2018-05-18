@@ -701,6 +701,7 @@ private:
     class TransactAdvancer;
     void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&, bool writable);
     void refresh_dirty_accessors();
+    void flush_accessors_for_commit();
 
     /// \brief The version of the format of the node structure (in file or in
     /// memory) in use by Realm objects associated with this group.
@@ -823,13 +824,11 @@ private:
     const Group* m_group;
     size_t m_pos;
     size_t m_index_in_group = 0;
-    size_t m_max_index_in_group;
     TableKey m_table_key;
 
     TableKeyIterator(const Group* g, size_t p)
         : m_group(g)
         , m_pos(p)
-        , m_max_index_in_group(m_group->m_tables.size())
     {
     }
     void load_key();

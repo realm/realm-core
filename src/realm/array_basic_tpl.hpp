@@ -94,34 +94,6 @@ inline void BasicArray<T>::create(Array::Type type, bool context_flag)
 
 
 template <class T>
-MemRef BasicArray<T>::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    REALM_ASSERT(is_attached());
-
-    // FIXME: This can be optimized as a single contiguous copy
-    // operation.
-    BasicArray array_slice(target_alloc);
-    _impl::ShallowArrayDestroyGuard dg(&array_slice);
-    array_slice.create(); // Throws
-    size_t begin = offset;
-    size_t end = offset + slice_size;
-    for (size_t i = begin; i != end; ++i) {
-        T value = get(i);
-        array_slice.add(value); // Throws
-    }
-    dg.release();
-    return array_slice.get_mem();
-}
-
-template <class T>
-MemRef BasicArray<T>::slice_and_clone_children(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    // BasicArray<T> never contains refs, so never has children.
-    return slice(offset, slice_size, target_alloc);
-}
-
-
-template <class T>
 inline void BasicArray<T>::add(T value)
 {
     insert(m_size, value);

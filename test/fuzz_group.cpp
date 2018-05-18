@@ -277,10 +277,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
     std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
 
-    DB db_r(*hist_r, DBOptions(encryption_key));
-    DB db_w(*hist_w, DBOptions(encryption_key));
-    auto wt = db_w.start_write();
-    auto rt = db_r.start_read();
+    DBRef db_r = DB::create(*hist_r, DBOptions(encryption_key));
+    DBRef db_w = DB::create(*hist_w, DBOptions(encryption_key));
+    auto wt = db_w->start_write();
+    auto rt = db_r->start_read();
     std::vector<TableView> table_views;
     std::vector<TableRef> subtable_refs;
 
@@ -639,17 +639,17 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     if (log) {
                         *log << "db_r.close();\n";
                     }
-                    db_r.close();
+                    rt = nullptr; // transactions must be done/closed before closing the DB.
+                    db_r->close();
                     if (log) {
                         *log << "db_r.open(path, true, DBOptions(key));\n";
                     }
-                    db_r.open(path, true, DBOptions(encryption_key));
+                    db_r = DB::create(*hist_r, DBOptions(encryption_key));
                     if (log) {
                         *log << "rt = nullptr;\n";
                         *log << "rt = db_r.start_read();\n";
                     }
-                    rt = nullptr;
-                    rt = db_r.start_read();
+                    rt = db_r->start_read();
                     REALM_DO_IF_VERIFY(log, rt->verify());
                 }
                 else {
@@ -658,15 +658,15 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "db_w.close();\n";
                     }
                     wt = nullptr;
-                    db_w.close();
+                    db_w->close();
                     if (log) {
                         *log << "db_w.open(path, true, DBOptions(key));\n";
                     }
-                    db_w.open(path, true, DBOptions(encryption_key));
+                    db_w = DB::create(*hist_w, DBOptions(encryption_key));
                     if (log) {
                         *log << "wt = db_w.start_write();\n";
                     }
-                    wt = db_w.start_write();
+                    wt = db_w->start_write();
                     REALM_DO_IF_VERIFY(log, wt->verify());
                 }
             }

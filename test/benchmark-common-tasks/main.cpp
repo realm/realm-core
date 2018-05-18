@@ -80,22 +80,22 @@ struct Benchmark {
     {
     }
     virtual const char* name() const = 0;
-    virtual void before_all(DB&)
+    virtual void before_all(DBRef)
     {
     }
-    virtual void after_all(DB&)
+    virtual void after_all(DBRef)
     {
     }
-    virtual void before_each(DB&)
+    virtual void before_each(DBRef)
     {
     }
-    virtual void after_each(DB&)
+    virtual void after_each(DBRef)
     {
 #ifdef REALM_CLUSTER_IF
         m_keys.clear();
 #endif
     }
-    virtual void operator()(DB&) = 0;
+    virtual void operator()(DBRef) = 0;
     RealmDurability m_durability = RealmDurability::Full;
     const char* m_encryption_key = nullptr;
 #ifdef REALM_CLUSTER_IF
@@ -109,7 +109,7 @@ struct BenchmarkUnorderedTableViewClear : Benchmark {
         return "UnorderedTableViewClear";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         const size_t rows = 10000;
         WriteTransaction tr(group);
@@ -145,7 +145,7 @@ struct AddTable : Benchmark {
         return "AddTable";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         WriteTransaction tr(group);
         TableRef t = tr.add_table(name());
@@ -155,16 +155,16 @@ struct AddTable : Benchmark {
         tr.commit();
     }
 
-    void after_each(DB& group)
+    void after_each(DBRef group)
     {
-        TransactionRef tr = group.start_write();
+        TransactionRef tr = group->start_write();
         tr->remove_table(name());
         tr->commit();
     }
 };
 
 struct BenchmarkWithStringsTable : Benchmark {
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         WriteTransaction tr(group);
         TableRef t = tr.add_table("StringOnly");
@@ -172,9 +172,9 @@ struct BenchmarkWithStringsTable : Benchmark {
         tr.commit();
     }
 
-    void after_all(DB& group)
+    void after_all(DBRef group)
     {
-        TransactionRef tr = group.start_write();
+        TransactionRef tr = group->start_write();
         tr->remove_table("StringOnly");
         tr->commit();
     }
@@ -182,7 +182,7 @@ struct BenchmarkWithStringsTable : Benchmark {
 };
 
 struct BenchmarkWithStrings : BenchmarkWithStringsTable {
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         BenchmarkWithStringsTable::before_all(group);
         WriteTransaction tr(group);
@@ -206,7 +206,7 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
 };
 
 struct BenchmarkWithStringsFewDup : BenchmarkWithStringsTable {
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         BenchmarkWithStringsTable::before_all(group);
         WriteTransaction tr(group);
@@ -232,7 +232,7 @@ struct BenchmarkWithStringsFewDup : BenchmarkWithStringsTable {
 };
 
 struct BenchmarkWithStringsManyDup : BenchmarkWithStringsTable {
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         BenchmarkWithStringsTable::before_all(group);
         WriteTransaction tr(group);
@@ -262,7 +262,7 @@ struct BenchmarkDistinctStringFewDupes : BenchmarkWithStringsFewDup {
         return "DistinctStringFewDupes";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -276,7 +276,7 @@ struct BenchmarkDistinctStringManyDupes : BenchmarkWithStringsManyDup {
         return "DistinctStringManyDupes";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -290,7 +290,7 @@ struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
         return "FindAllStringFewDupes";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -304,7 +304,7 @@ struct BenchmarkFindAllStringManyDupes : BenchmarkWithStringsManyDup {
         return "FindAllStringManyDupes";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -318,7 +318,7 @@ struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
         return "FindFirstStringFewDupes";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -337,7 +337,7 @@ struct BenchmarkFindFirstStringManyDupes : BenchmarkWithStringsManyDup {
         return "FindFirstStringManyDupes";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -351,7 +351,7 @@ struct BenchmarkFindFirstStringManyDupes : BenchmarkWithStringsManyDup {
 };
 
 struct BenchmarkWithLongStrings : BenchmarkWithStrings {
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         BenchmarkWithStrings::before_all(group);
         WriteTransaction tr(group);
@@ -376,7 +376,7 @@ struct BenchmarkWithLongStrings : BenchmarkWithStrings {
 };
 
 struct BenchmarkWithIntsTable : Benchmark {
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         WriteTransaction tr(group);
         TableRef t = tr.add_table("IntOnly");
@@ -384,9 +384,9 @@ struct BenchmarkWithIntsTable : Benchmark {
         tr.commit();
     }
 
-    void after_all(DB& group)
+    void after_all(DBRef group)
     {
-        TransactionRef tr = group.start_write();
+        TransactionRef tr = group->start_write();
         tr->remove_table("IntOnly");
         tr->commit();
     }
@@ -394,7 +394,7 @@ struct BenchmarkWithIntsTable : Benchmark {
 };
 
 struct BenchmarkWithInts : BenchmarkWithIntsTable {
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         BenchmarkWithIntsTable::before_all(group);
         WriteTransaction tr(group);
@@ -422,7 +422,7 @@ struct BenchmarkQuery : BenchmarkWithStrings {
         return "Query";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -436,7 +436,7 @@ struct BenchmarkSize : BenchmarkWithStrings {
         return "Size";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -451,7 +451,7 @@ struct BenchmarkSort : BenchmarkWithStrings {
         return "Sort";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -465,7 +465,7 @@ struct BenchmarkEmptyCommit : Benchmark {
         return "EmptyCommit";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         WriteTransaction tr(group);
         tr.commit();
@@ -478,7 +478,7 @@ struct BenchmarkSortInt : BenchmarkWithInts {
         return "SortInt";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
@@ -492,7 +492,7 @@ struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
         return "DistinctIntNoDupes";
     }
 
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         BenchmarkWithIntsTable::before_all(group);
         WriteTransaction tr(group);
@@ -513,7 +513,7 @@ struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
         tr.commit();
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
@@ -527,7 +527,7 @@ struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
         return "DistinctIntManyDupes";
     }
 
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         BenchmarkWithIntsTable::before_all(group);
         WriteTransaction tr(group);
@@ -548,7 +548,7 @@ struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
         tr.commit();
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
@@ -562,7 +562,7 @@ struct BenchmarkInsert : BenchmarkWithStringsTable {
         return "Insert";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
@@ -587,7 +587,7 @@ struct BenchmarkGetString : BenchmarkWithStrings {
         return "GetString";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -614,7 +614,7 @@ struct BenchmarkSetString : BenchmarkWithStrings {
         return "SetString";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         WriteTransaction tr(group);
         TableRef table = tr.get_table("StringOnly");
@@ -638,7 +638,7 @@ struct BenchmarkCreateIndex : BenchmarkWithStrings {
     {
         return "CreateIndex";
     }
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         WriteTransaction tr(group);
         TableRef table = tr.get_table("StringOnly");
@@ -653,7 +653,7 @@ struct BenchmarkGetLongString : BenchmarkWithLongStrings {
         return "GetLongString";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -682,7 +682,7 @@ struct BenchmarkQueryLongString : BenchmarkWithStrings {
         return "QueryLongString";
     }
 
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         BenchmarkWithStrings::before_all(group);
         WriteTransaction tr(group);
@@ -699,7 +699,7 @@ struct BenchmarkQueryLongString : BenchmarkWithStrings {
         tr.commit();
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -749,7 +749,7 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
         return seeded_rand.draw_int<size_t>();
     }
 
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         BenchmarkWithStringsTable::before_all(group);
 
@@ -780,7 +780,7 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
     bool successful = false;
     Random seeded_rand;
 
-    void before_each(DB& group)
+    void before_each(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -794,7 +794,7 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
         needle = shuffle_case(target_str.data());
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
@@ -810,7 +810,7 @@ struct BenchmarkQueryInsensitiveStringIndexed : BenchmarkQueryInsensitiveString 
     {
         return "QueryInsensitiveStringIndexed";
     }
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         BenchmarkQueryInsensitiveString::before_all(group);
         WriteTransaction tr(group);
@@ -826,7 +826,7 @@ struct BenchmarkSetLongString : BenchmarkWithLongStrings {
         return "SetLongString";
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         WriteTransaction tr(group);
         TableRef table = tr.get_table("StringOnly");
@@ -850,7 +850,7 @@ struct BenchmarkQueryNot : Benchmark {
         return "QueryNot";
     }
 
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         WriteTransaction tr(group);
         TableRef table = tr.add_table(name());
@@ -868,7 +868,7 @@ struct BenchmarkQueryNot : Benchmark {
         tr.commit();
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table(name());
@@ -878,9 +878,9 @@ struct BenchmarkQueryNot : Benchmark {
         results.size();
     }
 
-    void after_all(DB& group)
+    void after_all(DBRef group)
     {
-        TransactionRef tr = group.start_write();
+        TransactionRef tr = group->start_write();
         tr->remove_table(name());
         tr->commit();
     }
@@ -895,7 +895,7 @@ struct BenchmarkGetLinkList : Benchmark {
     }
     static const size_t rows = 10000;
 
-    void before_all(DB& group)
+    void before_all(DBRef group)
     {
         WriteTransaction tr(group);
         std::string n = std::string(name()) + "_Destination";
@@ -910,7 +910,7 @@ struct BenchmarkGetLinkList : Benchmark {
         tr.commit();
     }
 
-    void operator()(DB& group)
+    void operator()(DBRef group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table(name());
@@ -941,9 +941,9 @@ struct BenchmarkGetLinkList : Benchmark {
 #endif
     }
 
-    void after_all(DB& group)
+    void after_all(DBRef group)
     {
-        TransactionRef tr = group.start_write();
+        TransactionRef tr = group->start_write();
         tr->remove_table(name());
         auto n = std::string(name()) + "_Destination";
         tr->remove_table(n);
@@ -960,15 +960,15 @@ struct BenchmarkNonInitatorOpen : Benchmark {
     }
     // the shared realm will be removed after the benchmark finishes
     std::unique_ptr<realm::test_util::SharedGroupTestPathGuard> path;
-    std::unique_ptr<DB> initiator;
+    DBRef initiator;
 
-    std::unique_ptr<DB> do_open()
+    DBRef do_open()
     {
         const std::string realm_path = *path;
-        return std::unique_ptr<DB>(create_new_shared_group(realm_path, m_durability, m_encryption_key));
+        return create_new_shared_group(realm_path, m_durability, m_encryption_key);
     }
 
-    void before_all(DB&)
+    void before_all(DBRef)
     {
         // Generate the benchmark result texts:
         std::stringstream ident_ss;
@@ -988,7 +988,7 @@ struct BenchmarkNonInitatorOpen : Benchmark {
         initiator = do_open();
     }
 
-    void operator()(DB&)
+    void operator()(DBRef)
     {
         // use groups of 10 to get higher times
         for (size_t i = 0; i < 10; ++i) {
@@ -1029,7 +1029,7 @@ const char* to_ident_cstr(RealmDurability level)
     return nullptr;
 }
 
-void run_benchmark_once(Benchmark& benchmark, DB& sg, Timer& timer)
+void run_benchmark_once(Benchmark& benchmark, DBRef sg, Timer& timer)
 {
     timer.pause();
     benchmark.before_each(sg);
@@ -1088,9 +1088,9 @@ void run_benchmark(BenchmarkResults& results)
 
         // Open a SharedGroup:
         realm::test_util::SharedGroupTestPathGuard realm_path("benchmark_common_tasks" + ident);
-        std::unique_ptr<DB> group;
-        group.reset(create_new_shared_group(realm_path, level, key));
-        benchmark.before_all(*group);
+        DBRef group;
+        group = create_new_shared_group(realm_path, level, key);
+        benchmark.before_all(group);
 
         // Warm-up and initial measuring:
         size_t num_warmup_reps = 1;
@@ -1099,7 +1099,7 @@ void run_benchmark(BenchmarkResults& results)
             num_warmup_reps *= 10;
             Timer t(Timer::type_UserTime);
             for (size_t i = 0; i < num_warmup_reps; ++i) {
-                run_benchmark_once(benchmark, *group, t);
+                run_benchmark_once(benchmark, group, t);
             }
             time_to_execute_warmup_reps = t.get_elapsed_time();
         }
@@ -1114,12 +1114,12 @@ void run_benchmark(BenchmarkResults& results)
 
         for (size_t rep = 0; rep < required_reps; ++rep) {
             Timer t;
-            run_benchmark_once(benchmark, *group, t);
+            run_benchmark_once(benchmark, group, t);
             double s = t.get_elapsed_time();
             results.submit(ident.c_str(), s);
         }
 
-        benchmark.after_all(*group);
+        benchmark.after_all(group);
 
         results.finish(ident, lead_text_ss.str());
     }

@@ -602,8 +602,6 @@ protected:
     void check_lists_are_empty(size_t row_ndx) const;
 
 private:
-    class SliceWriter;
-
     mutable WrappedAllocator m_alloc;
     Array m_top;
     void update_allocator_wrapper(bool writable)
@@ -825,9 +823,10 @@ private:
     /// table.
     void refresh_accessor_tree();
     void refresh_index_accessors();
+    void refresh_content_version();
+    void flush_for_commit();
 
     bool is_cross_table_link_target() const noexcept;
-    std::recursive_mutex* get_parent_accessor_management_lock() const;
 #ifdef REALM_DEBUG
     void to_dot_internal(std::ostream&) const;
 #endif
@@ -840,6 +839,7 @@ private:
     // holds the ndx in the lower bits, the tag in the higher bit to save an indirection
     // when validating colkeys.
     std::vector<uint64_t> m_colkey2ndx;
+    uint64_t m_in_file_version_at_transaction_boundary;
 
     static constexpr int top_position_for_spec = 0;
     static constexpr int top_position_for_columns = 1;
@@ -847,6 +847,7 @@ private:
     static constexpr int top_position_for_key = 3;
     static constexpr int top_position_for_search_indexes = 4;
     static constexpr int top_position_for_column_key = 5;
+    static constexpr int top_position_for_version = 6;
 
     friend class SubtableNode;
     friend class _impl::TableFriend;
@@ -869,6 +870,8 @@ private:
     friend class ClusterTree;
     friend class ArrayBacklink;
     friend class ColKeyIterator;
+    friend class ConstObj;
+    friend class Obj;
 };
 
 class ColKeyIterator {
@@ -914,6 +917,12 @@ public:
         : m_table(t)
     {
     }
+
+    ColKeys()
+        : m_table(nullptr)
+    {
+    }
+
     size_t size() const
     {
         return m_table->get_column_count();

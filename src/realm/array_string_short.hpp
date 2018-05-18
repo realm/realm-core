@@ -87,10 +87,6 @@ public:
     /// underlying node. It is not owned by the accessor.
     void create();
 
-    /// Construct a copy of the specified slice of this string array
-    /// using the specified target allocator.
-    MemRef slice(size_t offset, size_t slice_size, Allocator& target_alloc) const;
-
 #ifdef REALM_DEBUG
     void string_stats() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;

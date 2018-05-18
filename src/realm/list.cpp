@@ -124,15 +124,10 @@ void ConstListBase::clear_repl(Replication* repl) const
 template <class T>
 List<T>::List(const Obj& obj, ColKey col_key)
     : ConstListBase(col_key, &m_obj)
-    , ConstListIf<T>(obj.m_tree_top->get_alloc())
+    , ConstListIf<T>(obj.m_table->get_alloc())
     , m_obj(obj)
 {
     this->init_from_parent();
-    if (!ConstListIf<T>::m_valid && m_obj.is_valid()) {
-        create();
-        ref_type ref = m_tree->get_ref();
-        m_obj.set_int(col_key, from_ref(ref));
-    }
 }
 
 namespace realm {

@@ -83,7 +83,10 @@ public:
      * can be made virtual.
      */
     virtual size_t size() const = 0;
-    virtual bool is_null() const = 0;
+    bool is_empty() const
+    {
+        return size() == 0;
+    }
     ObjKey get_key() const
     {
         return m_const_obj->get_key();
@@ -106,7 +109,7 @@ protected:
     friend class ListIterator;
 
     const ConstObj* m_const_obj;
-    const ColKey m_col_key;
+    ColKey m_col_key;
 
     mutable std::vector<size_t> m_deleted;
 
@@ -258,14 +261,11 @@ public:
     {
         if (!is_attached())
             return 0;
-
+        if (!m_valid)
+            return 0;
         update_if_needed();
 
-        return is_null() ? 0 : m_tree->size();
-    }
-    bool is_null() const override
-    {
-        return !m_valid;
+        return m_tree->size();
     }
     T get(size_t ndx) const
     {
@@ -295,6 +295,10 @@ protected:
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
     mutable bool m_valid = false;
 
+    ConstListIf()
+        : ConstListBase(ColKey{}, nullptr)
+    {
+    }
     ConstListIf(Allocator& alloc)
         : ConstListBase(ColKey{}, nullptr)
         , m_tree(new BPlusTree<T>(alloc))
@@ -302,13 +306,46 @@ protected:
         m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
     }
 
-    ConstListIf(const ConstListIf&) = delete;
+    ConstListIf(const ConstListIf& other)
+        : ConstListBase(other.m_col_key, nullptr)
+        , m_valid(other.m_valid)
+    {
+        if (other.m_tree) {
+            Allocator& alloc = other.m_tree->get_alloc();
+            m_tree = std::make_unique<BPlusTree<T>>(alloc);
+            m_tree->set_parent(this, 0);
+            m_tree->init_from_ref(other.m_tree->get_ref());
+        }
+    }
+
     ConstListIf(ConstListIf&& other)
         : ConstListBase(ColKey{}, nullptr)
         , m_tree(std::move(other.m_tree))
         , m_valid(other.m_valid)
     {
         m_tree->set_parent(this, 0);
+    }
+
+    ConstListIf& operator=(const ConstListIf& other)
+    {
+        if (this != &other) {
+            m_col_key = other.m_col_key;
+            m_deleted.clear();
+
+            if (other.m_tree) {
+                if (!m_tree) {
+                    Allocator& alloc = other.m_tree->get_alloc();
+                    m_tree = std::make_unique<BPlusTree<T>>(alloc);
+                    m_tree->set_parent(this, 0);
+                }
+                m_tree->init_from_ref(other.m_tree->get_ref());
+            }
+            else {
+                m_tree = nullptr;
+            }
+            m_valid = other.m_valid;
+        }
+        return *this;
     }
 
     void init_from_parent() const override
@@ -360,19 +397,16 @@ public:
     using ConstListIf<T>::m_tree;
     using ConstListIf<T>::get;
 
+    List()
+        : ConstListBase({}, &m_obj)
+    {
+    }
     List(const Obj& owner, ColKey col_key);
-    List(List&& other)
-        : ConstListBase(other.m_col_key, &m_obj)
-        , ConstListIf<T>(std::move(other))
-        , m_obj(std::move(other.m_obj))
-    {
-    }
+    List(const List& other);
+    List(List&& other);
 
-    List& operator=(const BPlusTree<T>& other)
-    {
-        *m_tree = other;
-        return *this;
-    }
+    List& operator=(const List& other);
+    List& operator=(const BPlusTree<T>& other);
 
     void update_child_ref(size_t, ref_type new_ref) override
     {
@@ -423,6 +457,7 @@ public:
 
     void insert(size_t ndx, T value)
     {
+        ensure_created();
         if (ndx > m_tree->size()) {
             throw std::out_of_range("Index out of range");
         }
@@ -491,6 +526,7 @@ public:
 
     void clear() override
     {
+        ensure_created();
         update_if_needed();
         ensure_writeable();
         if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
@@ -509,6 +545,12 @@ protected:
             return true;
         }
         return false;
+    }
+    void ensure_created()
+    {
+        if (!ConstListIf<T>::m_valid && m_obj.is_valid()) {
+            create();
+        }
     }
     void ensure_writeable()
     {
@@ -534,6 +576,38 @@ protected:
 
     friend class Transaction;
 };
+
+template <class T>
+List<T>::List(const List<T>& other)
+    : ConstListBase(other.m_col_key, &m_obj)
+    , ConstListIf<T>(other)
+    , m_obj(other.m_obj)
+{
+}
+
+template <class T>
+List<T>::List(List<T>&& other)
+    : ConstListBase(other.m_col_key, &m_obj)
+    , ConstListIf<T>(std::move(other))
+    , m_obj(std::move(other.m_obj))
+{
+}
+
+template <class T>
+List<T>& List<T>::operator=(const List& other)
+{
+    ConstListIf<T>::operator=(other);
+    m_obj = other.m_obj;
+    return *this;
+}
+
+template <class T>
+List<T>& List<T>::operator=(const BPlusTree<T>& other)
+{
+    *m_tree = other;
+    return *this;
+}
+
 
 template <>
 void List<ObjKey>::do_set(size_t ndx, ObjKey target_key);
@@ -582,18 +656,36 @@ private:
 
 class LinkList : public List<ObjKey>, public ObjList {
 public:
+    LinkList()
+        : ConstListBase({}, &m_obj)
+        , ObjList(this->m_tree.get())
+    {
+    }
     LinkList(const Obj& owner, ColKey col_key)
         : ConstListBase(col_key, &m_obj)
         , List<ObjKey>(owner, col_key)
-        , ObjList(*this->m_tree, &get_target_table())
+        , ObjList(this->m_tree.get(), &get_target_table())
+    {
+    }
+    LinkList(const LinkList& other)
+        : ConstListBase(other.m_col_key, &m_obj)
+        , List<ObjKey>(other)
+        , ObjList(this->m_tree.get(), &get_target_table())
     {
     }
     LinkList(LinkList&& other)
         : ConstListBase(other.m_col_key, &m_obj)
         , List<ObjKey>(std::move(other))
-        , ObjList(std::move(other))
+        , ObjList(this->m_tree.get(), &get_target_table())
     {
     }
+    LinkList& operator=(const LinkList& other)
+    {
+        List<ObjKey>::operator=(other);
+        this->ObjList::assign(this->m_tree.get(), &get_target_table());
+        return *this;
+    }
+
     LinkListPtr clone() const
     {
         return std::make_unique<LinkList>(m_obj, m_col_key);

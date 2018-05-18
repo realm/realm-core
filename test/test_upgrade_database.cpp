@@ -1268,7 +1268,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         try {
             // Constructing this SharedGroup will trigger an upgrade first time around
             auto hist = make_in_realm_history(temp_copy);
-            DB sg(*hist);
+            DBRef sg = DB::create(*hist);
 
             ReadTransaction rt(sg);
 
@@ -1368,10 +1368,10 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
             CHECK_EQUAL(obj17.get<Timestamp>(col_date), Timestamp(1700, 17));
             CHECK_EQUAL(obj17.get<ObjKey>(col_link), obj27.get_key());
             auto int_list_null = obj17.get_list<Int>(col_int_list);
-            CHECK(int_list_null.is_null());
+            CHECK(int_list_null.is_empty());
 
             auto int_list = obj23.get_list<Int>(col_int_list);
-            CHECK(!int_list.is_null());
+            CHECK(!int_list.is_empty());
             CHECK_EQUAL(int_list.size(), 18);
             CHECK_EQUAL(int_list.get(0), 24);
             CHECK_EQUAL(int_list.get(17), 41);

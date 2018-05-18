@@ -75,10 +75,10 @@ using realm::test_util::crypt_key;
 TEST(Transactions_LargeMappingChange)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DB sg(path);
+    DBRef sg = DB::create(path);
     int data_size = 12 * 1024 * 1024;
     {
-        TransactionRef g = sg.start_write();
+        TransactionRef g = sg->start_write();
         TableRef tr = g->add_table("test");
         auto col = tr->add_column(type_Binary, "binary");
         char* data = new char[data_size];
@@ -98,7 +98,7 @@ TEST(Transactions_LargeMappingChange)
         g->commit();
     }
     {
-        TransactionRef g = sg.start_read();
+        TransactionRef g = sg->start_read();
         ConstTableRef tr = g->get_table("test");
         auto col = tr->get_column_key("binary");
         for (auto it = tr->begin(); it != tr->end(); ++it) {
@@ -126,10 +126,10 @@ struct Header {
 TEST(Transactions_LargeUpgrade)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DB sg(path);
+    DBRef sg = DB::create(path);
     int data_size = 12 * 1024 * 1024;
     {
-        TransactionRef g = sg.start_write();
+        TransactionRef g = sg->start_write();
         TableRef tr = g->add_table("test");
         auto col = tr->add_column(type_Binary, "binary");
         char* data = new char[data_size];
@@ -148,7 +148,7 @@ TEST(Transactions_LargeUpgrade)
         delete[] data;
         g->commit();
     }
-    sg.close();
+    sg->close();
     {
         util::File f(path, util::File::mode_Update);
         util::File::Map<Header> headerMap(f, util::File::access_ReadWrite);
@@ -158,11 +158,11 @@ TEST(Transactions_LargeUpgrade)
         header->m_file_format[1] = header->m_file_format[0] = 9; // downgrade (both) to previous version
         headerMap.sync();
     }
-    sg.open(path); // triggers idempotent upgrade - but importantly for this test, uses compat mapping
+    sg = DB::create(path); // triggers idempotent upgrade - but importantly for this test, uses compat mapping
     {
         // compat mapping is in effect for this part of the test
         {
-            TransactionRef g = sg.start_read();
+            TransactionRef g = sg->start_read();
             ConstTableRef tr = g->get_table("test");
             auto col = tr->get_column_key("binary");
             for (auto it = tr->begin(); it != tr->end(); ++it) {
@@ -178,7 +178,7 @@ TEST(Transactions_LargeUpgrade)
         for (int i = 0; i < data_size; i += 721) {
             data[i] = i & 0xFF;
         }
-        auto g = sg.start_write();
+        auto g = sg->start_write();
         auto tr = g->get_table("test");
         auto col = tr->get_column_key("binary");
         for (int i = 0; i < 10; ++i) {
@@ -193,10 +193,10 @@ TEST(Transactions_LargeUpgrade)
         delete[] data;
         g->commit();
     }
-    sg.close();    // file has been upgrade to version 10, so....
-    sg.open(path); // when opened again, compatibility mapping is NOT in use:
+    sg->close();           // file has been upgrade to version 10, so....
+    sg = DB::create(path); // when opened again, compatibility mapping is NOT in use:
     {
-        TransactionRef g = sg.start_read();
+        TransactionRef g = sg->start_read();
         ConstTableRef tr = g->get_table("test");
         auto col = tr->get_column_key("binary");
         for (auto it = tr->begin(); it != tr->end(); ++it) {
@@ -213,8 +213,8 @@ TEST(Transactions_StateChanges)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB db(*hist_w);
-    TransactionRef writer = db.start_write();
+    DBRef db = DB::create(*hist_w);
+    TransactionRef writer = db->start_write();
     TableRef tr = writer->add_table("hygge");
     auto col = tr->add_column(type_Int, "hejsa");
     auto lcol = tr->add_column_list(type_Int, "gurgle");
@@ -249,7 +249,7 @@ TEST(Transactions_StateChanges)
     CHECK_EQUAL(frozen_list.get(1), 7);
 
     // verify that a fresh read transaction is read only
-    TransactionRef reader = db.start_read();
+    TransactionRef reader = db->start_read();
     tr = reader->get_table("hygge");
     CHECK_THROW(tr->create_object(), realm::LogicError);
     // ..but if promoted, becomes writable
@@ -262,7 +262,7 @@ TEST(Transactions_StateChanges)
 
 namespace {
 
-void writer_thread(TestContext& test_context, int runs, DB* db, TableKey tk)
+void writer_thread(TestContext& test_context, int runs, DBRef db, TableKey tk)
 {
     try {
         for (int n = 0; n < runs; ++n) {
@@ -289,7 +289,7 @@ void writer_thread(TestContext& test_context, int runs, DB* db, TableKey tk)
     }
 }
 
-void verifier_thread(TestContext& test_context, int limit, DB* db, TableKey tk)
+void verifier_thread(TestContext& test_context, int limit, DBRef db, TableKey tk)
 {
     bool done = false;
     while (!done) {
@@ -305,7 +305,7 @@ void verifier_thread(TestContext& test_context, int limit, DB* db, TableKey tk)
     }
 }
 
-void verifier_thread_advance(TestContext& test_context, int limit, DB* db, TableKey tk)
+void verifier_thread_advance(TestContext& test_context, int limit, DBRef db, TableKey tk)
 {
     auto reader = db->start_read();
     bool done = false;
@@ -326,10 +326,10 @@ TEST(Transactions_Threaded)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB db(*hist_w);
+    DBRef db = DB::create(*hist_w);
     TableKey tk;
     {
-        auto wt = db.start_write();
+        auto wt = db->start_write();
         auto table = wt->add_table("my_table");
         table->add_column(type_Int, "my_col_1");
         table->add_column(type_Int, "my_col_2");
@@ -346,8 +346,8 @@ TEST(Transactions_Threaded)
     std::thread writers[num_threads];
     std::thread verifiers[num_threads];
     for (int i = 0; i < num_threads; ++i) {
-        verifiers[i] = std::thread([&] { verifier_thread(test_context, num_threads * num_iterations, &db, tk); });
-        writers[i] = std::thread([&] { writer_thread(test_context, num_iterations, &db, tk); });
+        verifiers[i] = std::thread([&] { verifier_thread(test_context, num_threads * num_iterations, db, tk); });
+        writers[i] = std::thread([&] { writer_thread(test_context, num_iterations, db, tk); });
     }
     for (int i = 0; i < num_threads; ++i) {
         writers[i].join();
@@ -359,10 +359,10 @@ TEST(Transactions_ThreadedAdvanceRead)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB db(*hist_w);
+    DBRef db = DB::create(*hist_w);
     TableKey tk;
     {
-        auto wt = db.start_write();
+        auto wt = db->start_write();
         auto table = wt->add_table("my_table");
         table->add_column(type_Int, "my_col_1");
         table->add_column(type_Int, "my_col_2");
@@ -380,8 +380,8 @@ TEST(Transactions_ThreadedAdvanceRead)
     std::thread verifiers[num_threads];
     for (int i = 0; i < num_threads; ++i) {
         verifiers[i] =
-            std::thread([&] { verifier_thread_advance(test_context, num_threads * num_iterations, &db, tk); });
-        writers[i] = std::thread([&] { writer_thread(test_context, num_iterations, &db, tk); });
+            std::thread([&] { verifier_thread_advance(test_context, num_threads * num_iterations, db, tk); });
+        writers[i] = std::thread([&] { writer_thread(test_context, num_iterations, db, tk); });
     }
     for (int i = 0; i < num_threads; ++i) {
         writers[i].join();
@@ -392,16 +392,16 @@ TEST(Transactions_ThreadedAdvanceRead)
 TEST(Transactions_ListOfBinary)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DB db(path);
+    DBRef db = DB::create(path);
     {
-        auto wt = db.start_write();
+        auto wt = db->start_write();
         auto table = wt->add_table("my_table");
         table->add_column_list(type_Binary, "list");
         table->create_object();
         wt->commit();
     }
     for (int iter = 0; iter < 1000; iter++) {
-        auto wt = db.start_write();
+        auto wt = db->start_write();
         wt->verify();
         auto table = wt->get_table("my_table");
         auto col1 = table->get_column_key("list");
@@ -416,7 +416,7 @@ TEST(Transactions_ListOfBinary)
             }
         }
         wt->commit();
-        auto rt = db.start_read();
+        auto rt = db->start_read();
         rt->verify();
     }
 }
@@ -957,8 +957,8 @@ TEST(Transactions_RollbackCreateObject)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DB sg_w(*hist_w, DBOptions(crypt_key()));
-    TransactionRef tr = sg_w.start_write();
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
+    TransactionRef tr = sg_w->start_write();
 
     auto tk = tr->add_table("t0")->get_key();
     auto col = tr->get_table(tk)->add_column(type_Int, "integers");

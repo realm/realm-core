@@ -266,6 +266,7 @@ private:
     friend class ClusterTree;
     friend class Group;
     friend class WrappedAllocator;
+    friend class ConstObj;
     friend class Obj;
 };
 

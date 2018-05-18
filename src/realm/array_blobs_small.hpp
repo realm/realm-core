@@ -89,7 +89,6 @@ public:
     BinaryData get(size_t ndx) const noexcept;
     StringData get_string(size_t ndx) const;
     bool is_null(size_t ndx) const;
-    size_t read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept;
 
     void add(BinaryData value, bool add_zero_term = false);
     void set(size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -102,11 +101,14 @@ public:
     void clear();
     void destroy();
 
+    size_t find_first(BinaryData value, bool is_string, size_t begin, size_t end) const noexcept;
+
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
     static BinaryData get(const char* header, size_t ndx, Allocator&) noexcept;
+    static StringData get_string(const char* header, size_t ndx, Allocator& alloc) noexcept;
 
     static size_t get_size_from_header(const char*, Allocator&) noexcept;
 
@@ -116,10 +118,6 @@ public:
     /// null or zero-length non-null (value with size > 0 is not allowed as
     /// initialization value).
     static MemRef create_array(size_t size, Allocator&, BinaryData defaults);
-
-    /// Construct a copy of the specified slice of this binary array
-    /// using the specified target allocator.
-    MemRef slice(size_t offset, size_t slice_size, Allocator& target_alloc) const;
 
 #ifdef REALM_DEBUG
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
@@ -225,6 +223,15 @@ inline bool ArraySmallBlobs::is_null(size_t ndx) const
 inline StringData ArraySmallBlobs::get_string(size_t ndx) const
 {
     BinaryData bin = get(ndx);
+    if (bin.is_null())
+        return realm::null();
+    else
+        return StringData(bin.data(), bin.size() - 1); // Do not include terminating zero
+}
+
+inline StringData ArraySmallBlobs::get_string(const char* header, size_t ndx, Allocator& alloc) noexcept
+{
+    BinaryData bin = get(header, ndx, alloc);
     if (bin.is_null())
         return realm::null();
     else

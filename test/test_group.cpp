@@ -185,9 +185,7 @@ TEST(Group_DoubleOpening)
     // Buffer-based open()
     {
         // Produce a valid buffer
-        using Deleter = decltype(::free)*;
-        char* dummy = nullptr; // to make it compile on some early Visual Studio 2015 RC (now fixed properly in VC)
-        std::unique_ptr<char[], Deleter> buffer(dummy, ::free);
+        std::unique_ptr<char[]> buffer;
         size_t buffer_size;
 
         {
@@ -199,7 +197,7 @@ TEST(Group_DoubleOpening)
             {
                 File file(path);
                 buffer_size = size_t(file.get_size());
-                buffer.reset(static_cast<char*>(malloc(buffer_size)));
+                buffer.reset(new char[buffer_size]);
                 CHECK(bool(buffer));
                 file.read(buffer.get(), buffer_size);
             }
@@ -316,7 +314,7 @@ TEST(Group_OpenBuffer)
         {
             File file(path);
             buffer_size = size_t(file.get_size());
-            buffer.reset(static_cast<char*>(malloc(buffer_size)));
+            buffer.reset(new char[buffer_size]);
             CHECK(bool(buffer));
             file.read(buffer.get(), buffer_size);
         }

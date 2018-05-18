@@ -74,14 +74,13 @@ public:
     void erase(size_t ndx);
     void truncate_and_destroy_children(size_t ndx);
 
-    size_t find_first(BinaryData value, size_t begin, size_t end) const noexcept
-    {
-        for (size_t t = begin; t < end; t++) {
-            if (get(t) == value)
-                return t;
-        }
-        return not_found;
-    }
+    size_t find_first(BinaryData value, size_t begin, size_t end) const noexcept;
+
+    /// Get the specified element without the cost of constructing an
+    /// array instance. If an array instance is already available, or
+    /// you need to get multiple values, then this method will be
+    /// slower.
+    static BinaryData get(const char* header, size_t ndx, Allocator& alloc) noexcept;
 
 private:
     static constexpr size_t small_blob_max_size = 64;
@@ -99,6 +98,17 @@ private:
 
     bool upgrade_leaf(size_t value_size);
 };
+
+inline BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) noexcept
+{
+    bool is_big = Array::get_context_flag_from_header(header);
+    if (!is_big) {
+        return ArraySmallBlobs::get(header, ndx, alloc);
+    }
+    else {
+        return ArrayBigBlobs::get(header, ndx, alloc);
+    }
+}
 }
 
 #endif /* SRC_REALM_ARRAY_BINARY_HPP_ */

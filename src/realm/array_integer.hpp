@@ -187,13 +187,6 @@ public:
 
     size_t find_first(value_type value, size_t begin = 0, size_t end = npos) const;
 
-
-    MemRef slice(size_t offset, size_t slice_size, Allocator& target_alloc) const;
-
-    /// Construct a deep copy of the specified slice of this array using the
-    /// specified target allocator. Subarrays will be cloned.
-    MemRef slice_and_clone_children(size_t offset, size_t slice_size, Allocator& target_alloc) const;
-
 protected:
     void avoid_null_collision(int64_t value);
 

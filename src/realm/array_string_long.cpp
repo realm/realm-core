@@ -239,24 +239,6 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc, bool nullabl
 }
 
 
-MemRef ArrayStringLong::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    REALM_ASSERT(is_attached());
-
-    ArrayStringLong array_slice(target_alloc, m_nullable);
-    _impl::ShallowArrayDestroyGuard dg(&array_slice);
-    array_slice.create(); // Throws
-    size_t begin = offset;
-    size_t end = offset + slice_size;
-    for (size_t i = begin; i != end; ++i) {
-        StringData value = get(i);
-        array_slice.add(value); // Throws
-    }
-    dg.release();
-    return array_slice.get_mem();
-}
-
-
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void ArrayStringLong::to_dot(std::ostream& out, StringData title) const

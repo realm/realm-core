@@ -158,7 +158,7 @@ void SlabAlloc::detach() noexcept
         case attach_UsersBuffer:
             break;
         case attach_OwnedBuffer:
-            ::free(const_cast<char*>(m_data));
+            delete[] m_data;
             break;
         case attach_SharedFile:
         case attach_UnsharedFile:

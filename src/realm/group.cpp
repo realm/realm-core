@@ -163,7 +163,8 @@ TableKey TableKeyIterator::operator*()
 void TableKeyIterator::load_key()
 {
     const Group& g = *m_group;
-    while (m_index_in_group < m_max_index_in_group) {
+    size_t max_index_in_group = g.m_table_names.size();
+    while (m_index_in_group < max_index_in_group) {
         RefOrTagged rot = g.m_tables.get_as_ref_or_tagged(m_index_in_group);
         if (rot.is_ref()) {
             if (m_index_in_group < g.m_table_accessors.size() && g.m_table_accessors[m_index_in_group]) {
@@ -1021,20 +1022,12 @@ BinaryData Group::write_to_mem() const
     // is actually needed.
     size_t max_size = m_alloc.get_total_size();
 
-    char* buffer = static_cast<char*>(malloc(max_size)); // Throws
-    if (!buffer)
-        throw std::bad_alloc();
-    try {
-        MemoryOutputStream out; // Throws
-        out.set_buffer(buffer, buffer + max_size);
-        write(out); // Throws
-        size_t buffer_size = out.size();
-        return BinaryData(buffer, buffer_size);
-    }
-    catch (...) {
-        free(buffer);
-        throw;
-    }
+    auto buffer = std::unique_ptr<char[]>(new char[max_size]);
+    MemoryOutputStream out; // Throws
+    out.set_buffer(buffer.get(), buffer.get() + max_size);
+    write(out); // Throws
+    size_t buffer_size = out.size();
+    return BinaryData(buffer.release(), buffer_size);
 }
 
 
@@ -1159,6 +1152,7 @@ void Group::commit()
     if (m_is_shared)
         throw LogicError(LogicError::wrong_group_state);
 
+    flush_accessors_for_commit();
     GroupWriter out(*this); // Throws
 
     // Recursively write all changed arrays to the database file. We
@@ -1619,6 +1613,12 @@ void Group::update_allocator_wrappers(bool writable)
     }
 }
 
+void Group::flush_accessors_for_commit()
+{
+    for (auto& acc : m_table_accessors)
+        if (acc)
+            acc->flush_for_commit();
+}
 
 void Group::refresh_dirty_accessors()
 {
@@ -1651,9 +1651,6 @@ void Group::refresh_dirty_accessors()
             }
             if (same_table) {
                 table_accessor->refresh_accessor_tree();
-                // FIXME: Move these into table::refresh_accessor_tree ??
-                table_accessor->bump_storage_version();
-                table_accessor->bump_content_version();
             }
             else {
                 table_accessor->detach();

@@ -2705,9 +2705,10 @@ TEST(Table_list_basic)
 
     {
         Obj obj = table.create_object(ObjKey(5));
-        CHECK(obj.is_null(list_col));
+        CHECK_NOT(obj.is_null(list_col));
         auto list = obj.get_list<int64_t>(list_col);
         CHECK_NOT(obj.is_null(list_col));
+        CHECK(list.is_empty());
         for (int i = 0; i < 100; i++) {
             list.add(i + 1000);
         }
@@ -2757,6 +2758,32 @@ TEST(Table_StableIteration)
     CHECK_EQUAL(list[0], 1);
     CHECK_EQUAL(list[1], 3);
     CHECK_EQUAL(list[2], 2);
+}
+
+TEST(Table_ListOps)
+{
+    Table table;
+    ColKey col = table.add_column_list(type_Int, "integers");
+
+    Obj obj = table.create_object();
+    Obj obj1 = obj;
+    List<Int> list = obj.get_list<Int>(col);
+    list.add(1);
+    list.add(2);
+    list.swap(0, 1);
+    CHECK_EQUAL(list.get(0), 2);
+    CHECK_EQUAL(list.get(1), 1);
+
+    List<Int> list1;
+    CHECK_EQUAL(list1.size(), 0);
+    list1 = list;
+    CHECK_EQUAL(list1.size(), 2);
+    list.add(3);
+    CHECK_EQUAL(list.size(), 3);
+    CHECK_EQUAL(list1.size(), 3);
+
+    List<Int> list2 = list;
+    CHECK_EQUAL(list2.size(), 3);
 }
 
 TEST(Table_ListOfPrimitives)
@@ -3009,7 +3036,7 @@ TEST(Table_object_sequential)
     int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    DB sg(path);
+    DBRef sg = DB::create(path);
     ColKey c0;
     ColKey c1;
 
@@ -3154,7 +3181,7 @@ TEST(Table_object_seq_rnd)
     std::vector<int64_t> key_values;
     std::set<int64_t> key_set;
     SHARED_GROUP_TEST_PATH(path);
-    DB sg(path);
+    DBRef sg = DB::create(path);
     ColKey c0;
     {
         std::cout << "Establishing scenario seq ins/rnd erase " << std::endl;
@@ -3260,7 +3287,7 @@ TEST(Table_object_random)
     int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    DB sg(path);
+    DBRef sg = DB::create(path);
     ColKey c0;
     ColKey c1;
     std::vector<int64_t> key_values;

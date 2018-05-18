@@ -1216,7 +1216,7 @@ ObjKey Query::find()
     if (!has_conditions()) {
         if (m_view) {
             if (m_view->size() > 0) {
-                return ObjKey(m_view->m_key_values.get(0));
+                return m_view->get_key(0);
             }
             return null_key;
         }
@@ -1272,15 +1272,15 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         for (size_t t = 0; t < sz && ret.size() < limit; t++) {
             ConstObj obj = m_view->get_object(t);
             if (t >= begin && t < end && eval_object(obj)) {
-                ret.m_key_values.add(obj.get_key());
+                ret.m_key_values->add(obj.get_key());
             }
         }
     }
     else {
         if (!has_conditions()) {
-            KeyColumn& refs = ret.m_key_values;
+            KeyColumn* refs = ret.m_key_values;
 
-            ClusterTree::TraverseFunction f = [&begin, &end, &limit, &refs, this](const Cluster* cluster) {
+            ClusterTree::TraverseFunction f = [&begin, &end, &limit, refs, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 if (begin < e) {
                     if (e > end) {
@@ -1289,7 +1289,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                     auto offset = cluster->get_offset();
                     auto key_values = cluster->get_key_array();
                     for (size_t i = begin; (i < e) && limit; i++) {
-                        refs.add(ObjKey(key_values->get(i) + offset));
+                        refs->add(ObjKey(key_values->get(i) + offset));
                         --limit;
                     }
                     begin = 0;
@@ -1306,7 +1306,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         }
         else {
             auto node = root_node();
-            QueryState<int64_t> st(act_FindAll, &ret.m_key_values, limit);
+            QueryState<int64_t> st(act_FindAll, ret.m_key_values, limit);
 
             ClusterTree::TraverseFunction f = [&begin, &end, &node, &st, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();

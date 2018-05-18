@@ -247,34 +247,3 @@ void ArrayIntNull::get_chunk(size_t ndx, value_type res[8]) const noexcept
         res[i] = tmp[i] == null ? util::Optional<int64_t>() : tmp[i];
     }
 }
-
-MemRef ArrayIntNull::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    // NOTE: It would be nice to consolidate this with Array::slice somehow.
-
-    REALM_ASSERT(is_attached());
-
-    Array array_slice(target_alloc);
-    _impl::DeepArrayDestroyGuard dg(&array_slice);
-    Type type = get_type();
-    array_slice.create(type, m_context_flag); // Throws
-    array_slice.add(null_value());
-
-    size_t begin = offset + 1;
-    size_t end = offset + slice_size + 1;
-    for (size_t i = begin; i != end; ++i) {
-        int_fast64_t value = Array::get(i);
-        array_slice.add(value); // Throws
-    }
-    dg.release();
-    return array_slice.get_mem();
-}
-
-MemRef ArrayIntNull::slice_and_clone_children(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    // NOTE: It would be nice to consolidate this with Array::slice_and_clone_children somehow.
-
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT(!has_refs());
-    return slice(offset, slice_size, target_alloc);
-}

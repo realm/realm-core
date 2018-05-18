@@ -1,3 +1,28 @@
+# NEXT RELEASE
+
+### Bugfixes
+
+* Various small fixes.
+
+### Breaking changes
+
+* Disallowing list columns to be nullable. Conceptually you will always have a list
+  which initially will be empty.
+* DB objects are now heap allocated and accessed through a DBRef. You must create a DB using 
+  static DB::create() function.
+
+### Enhancements
+
+* None.
+
+-----------
+
+### Internals
+
+* None.
+
+----------------------------------------------
+
 # 6.0.0-alpha.0 Release notes
 
 ### Bugfixes

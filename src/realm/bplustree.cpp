@@ -669,7 +669,8 @@ BPlusTreeBase& BPlusTreeBase::operator=(BPlusTreeBase&& rhs)
     destroy();
 
     m_root = std::move(rhs.m_root);
-    m_root->change_owner(this);
+    if (m_root)
+        m_root->change_owner(this);
     m_size = rhs.m_size;
     invalidate_leaf_cache();
 

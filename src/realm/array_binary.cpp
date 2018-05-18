@@ -152,6 +152,17 @@ void ArrayBinary::truncate_and_destroy_children(size_t ndx)
     }
 }
 
+size_t ArrayBinary::find_first(BinaryData value, size_t begin, size_t end) const noexcept
+{
+    if (!m_is_big) {
+        return static_cast<ArraySmallBlobs*>(m_arr)->find_first(value, false, begin, end);
+    }
+    else {
+        return static_cast<ArrayBigBlobs*>(m_arr)->find_first(value, false, begin, end);
+    }
+}
+
+
 bool ArrayBinary::upgrade_leaf(size_t value_size)
 {
     if (m_is_big)
