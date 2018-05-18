@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* None.
+* More readable error message in the query parser when requesting an a bad argument.
 
 ### Breaking changes
 
