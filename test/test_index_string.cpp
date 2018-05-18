@@ -637,7 +637,7 @@ TEST(StringIndex_FindAllNoCopy2_Int)
             CHECK_EQUAL(real, results.end_ndx - results.start_ndx);
             CHECK_EQUAL(real, results_column.size());
             for (size_t y = 0; y < real; y++)
-                CHECK_EQUAL(i, ints[results_column.get(y)]);
+                CHECK_EQUAL(i, ints[size_t(results_column.get(y))]);
         }
     }
 }
@@ -678,7 +678,7 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
             CHECK_EQUAL(real, results.end_ndx - results.start_ndx);
             CHECK_EQUAL(real, results2.size());
             for (size_t y = 0; y < real; y++)
-                CHECK_EQUAL(ints[t], ints[results2.get(y)]);
+                CHECK_EQUAL(ints[t], ints[size_t(results2.get(y))]);
         }
     }
 
