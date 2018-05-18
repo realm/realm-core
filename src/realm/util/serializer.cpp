@@ -107,6 +107,18 @@ std::string print_value<>(realm::Timestamp t)
     return ss.str();
 }
 
+template <>
+std::string print_value<>(realm::ObjKey k)
+{
+    std::stringstream ss;
+    if (!k) {
+        ss << "NULL";
+    }
+    else {
+        ss << "O" << k.value;
+    }
+    return ss.str();
+}
 
 // The variable name must be unique with respect to the already chosen variables at
 // this level of subquery nesting and with respect to the names of the columns in the table.

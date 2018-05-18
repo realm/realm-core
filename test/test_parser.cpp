@@ -2478,5 +2478,41 @@ TEST(Parser_OperatorIN)
     CHECK_EQUAL(message, "The keypath following 'IN' must contain a list");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "'dairy' in items.allergens.name", 1), message);
     CHECK_EQUAL(message, "The keypath following 'IN' must contain only one list");
+    // list property vs list property is not supported by core yet
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price IN items.price", 0), message);
+    CHECK_EQUAL(
+        message,
+        "The keypath preceeding 'IN' must not contain a list, list vs list comparisons are not currently supported");
 }
+
+
+// we won't support full object comparisons until we have stable keys in core, but as an exception
+// we allow comparison with null objects because we can serialise that and bindings use it to check agains nulls.
+TEST(Parser_Object)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto int_col = table->add_column(type_Int, "ints", true);
+    auto link_col = table->add_column_link(type_Link, "link", *table);
+    for (size_t i = 0; i < 3; ++i) {
+        table->create_object().set<int64_t>(int_col, i);
+    }
+    table->get_object(1).set(link_col, table->begin()->get_key());
+    TableView tv = table->where().find_all();
+
+    verify_query(test_context, table, "link == NULL", 2); // vanilla base check
+    // FIXME: verify_query(test_context, table, "link == O0", 2);
+
+    Query q0 = table->where().and_query(table->column<Link>(link_col) == tv.get(0));
+    std::string description = q0.get_description(); // shouldn't throw
+    CHECK(description.find("O0") != std::string::npos);
+
+    Query q1 = table->column<Link>(link_col) == realm::null();
+    description = q1.get_description(); // shouldn't throw
+    CHECK(description.find("NULL") != std::string::npos);
+    CHECK_EQUAL(q1.count(), 2);
+
+    CHECK_THROW_ANY(verify_query(test_context, table, "link == link", 3));
+}
+
 #endif // TEST_PARSER

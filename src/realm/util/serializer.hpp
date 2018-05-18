@@ -31,6 +31,7 @@ namespace realm {
 class BinaryData;
 struct ColKey;
 struct null;
+struct ObjKey;
 class StringData;
 class Timestamp;
 class LinkMap;
@@ -54,6 +55,8 @@ template <> std::string print_value<>(bool);
 template <> std::string print_value<>(realm::null);
 template <> std::string print_value<>(StringData);
 template <> std::string print_value<>(realm::Timestamp);
+template <>
+std::string print_value<>(realm::ObjKey);
 
 // General implementation for most types
 template <typename T>
