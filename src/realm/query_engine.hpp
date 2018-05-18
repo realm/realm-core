@@ -1946,17 +1946,16 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    virtual std::string describe(util::serializer::SerialisationState&) const override
+    virtual std::string describe(util::serializer::SerialisationState& state) const override
     {
-        throw SerialisationError("Serialising a query which links to an object is currently unsupported.");
-        // We can do something like the following when core gets stable keys
-        // return describe_column() + " " + describe_condition() + " " +
-        // util::serializer::print_value(m_target_row.get_index());
+        REALM_ASSERT(m_condition_column_key);
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
+               util::serializer::print_value(m_target_key);
     }
 
     virtual std::string describe_condition() const override
     {
-        return "links to";
+        return "==";
     }
 
     size_t find_first_local(size_t start, size_t end) override

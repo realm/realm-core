@@ -1,5 +1,7 @@
 # NEXT RELEASE
 
+This release also includes 5.6.0
+
 ### Bugfixes
 
 * Various small fixes.
@@ -77,6 +79,24 @@
 
 * Major simplifications and optimizations to management of memory mappings.
 * Speed improvement for Sort().
+
+----------------------------------------------
+
+# 5.6.0 Release notes
+
+### Bugfixes
+
+* In the parser, fix `@links.@count` when applied over lists to return
+  the sum of backlinks for all connected rows in the list.
+* Fix null comparisons in queries not serialising properly in some cases.
+  Also explicitly disable list IN list comparisons since its not supported.
+  PR [#3037](https://github.com/realm/realm-core/pull/3037).
+
+### Enhancements
+
+* `SharedGroup::compact()` now also compacts history information, which means
+  that Sync'ed Realm files can now be compacted (under the usual restrictions;
+  see `group_shared.hpp` for details).
 
 ----------------------------------------------
 

@@ -274,6 +274,9 @@ TEST(Metrics_QueryEqual)
     for (auto col : person->get_column_keys()) {
         column_names.push_back(person->get_column_name(col));
     }
+    for (auto col : pet->get_column_keys()) {
+        column_names.push_back(pet->get_column_name(col));
+    }
 
     Obj p0 = person->get_object(0);
 
@@ -286,6 +289,7 @@ TEST(Metrics_QueryEqual)
     auto col_data = person->get_column_key("data");
     auto col_owes = person->get_column_key("owes_coffee_to");
 
+    auto col_pet_name = pet->get_column_key("name");
     auto col_owner = pet->get_column_key("owner");
 
     Query q0 = person->column<int64_t>(col_age) == 0;
@@ -298,7 +302,8 @@ TEST(Metrics_QueryEqual)
     BinaryData bd("");
     Query q6 = person->column<BinaryData>(col_data) == bd;
     Query q7 = person->column<Link>(col_owes) == p0;
-    Query q8 = pet->column<Link>(col_owner) == p0;
+    Query q8 = pet->column<String>(col_pet_name) == name;
+    Query q9 = pet->column<Link>(col_owner) == p0;
 
     q0.find_all();
     q1.find_all();
@@ -307,16 +312,17 @@ TEST(Metrics_QueryEqual)
     q4.find_all();
     q5.find_all();
     q6.find_all();
-    CHECK_THROW(q7.find_all(), SerialisationError);
-    CHECK_THROW(q8.find_all(), SerialisationError);
+    q7.find_all();
+    q8.find_all();
+    q9.find_all();
 
     std::shared_ptr<Metrics> metrics = sg->get_metrics();
     CHECK(metrics);
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
-    CHECK_EQUAL(queries->size(), 7);
+    CHECK_EQUAL(queries->size(), 10);
 
-    for (size_t i = 0; i < 7; ++i) {
+    for (size_t i = 0; i < 10; ++i) {
         std::string description = queries->at(i).get_description();
         CHECK_EQUAL(find_count(description, column_names[i]), 1);
         CHECK_GREATER_EQUAL(find_count(description, query_search_term), 1);
@@ -571,7 +577,7 @@ TEST(Metrics_LinkListQueries)
     q0.find_all();
     q1.find_all();
     q2.find_all();
-    CHECK_THROW(q3.find_all(), SerialisationError);
+    q3.find_all();
     q4.find_all();
     q5.find_all();
 
@@ -580,7 +586,7 @@ TEST(Metrics_LinkListQueries)
     std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries();
     CHECK(queries);
 
-    CHECK_EQUAL(queries->size(), 5);
+    CHECK_EQUAL(queries->size(), 6);
 
     std::string null_links_description = queries->at(0).get_description();
     CHECK_EQUAL(find_count(null_links_description, "NULL"), 1);
@@ -596,16 +602,19 @@ TEST(Metrics_LinkListQueries)
     CHECK_EQUAL(find_count(count_link_description, column_names[ll_col_key]), 1);
     CHECK_EQUAL(find_count(count_link_description, "=="), 1);
 
-    //CHECK_THROW(queries->at(3), SerialisationError);
+    std::string links_description = queries->at(3).get_description();
+    CHECK_EQUAL(find_count(links_description, "O0"), 1);
+    CHECK_EQUAL(find_count(links_description, column_names[ll_col_key]), 1);
+    CHECK_EQUAL(find_count(links_description, "=="), 1);
 
-    std::string sum_link_description = queries->at(3).get_description();
+    std::string sum_link_description = queries->at(4).get_description();
     CHECK_EQUAL(find_count(sum_link_description, "@sum"), 1);
     CHECK_EQUAL(find_count(sum_link_description, column_names[ll_col_key]), 1);
     CHECK_EQUAL(find_count(sum_link_description, column_names[col_paid]), 1);
     // the query system can choose to flip the argument order and operators so that >= might be <=
     CHECK_EQUAL(find_count(sum_link_description, "<=") + find_count(sum_link_description, ">="), 1);
 
-    std::string link_subquery_description = queries->at(4).get_description();
+    std::string link_subquery_description = queries->at(5).get_description();
     CHECK_EQUAL(find_count(link_subquery_description, "@count"), 1);
     CHECK_EQUAL(find_count(link_subquery_description, column_names[ll_col_key]), 1);
     CHECK_EQUAL(find_count(link_subquery_description, "=="), 2);
