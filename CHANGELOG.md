@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 6.0.0-alpha.1 Release notes
 
 Besides the changes below, this release also includes changes introduced by v5.6.0 and
 up until v5.8.0
