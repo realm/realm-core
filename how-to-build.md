@@ -56,19 +56,27 @@ to download the appropriate installers.
 
 ## Configure, build & test
 
+To get submodule dependencies:
+
+    git submodule update --init --recursive
+
 Run the following commands to configure, build and test core:
 
-    mkdir build-dir # create a build folder
-    cd build-dir
-    cmake ..
+    mkdir build.<buildtype>
+    cd build.<buildtype>
+    cmake -D CMAKE_BUILD_TYPE=<buildtype> ..
     cmake --build .
     ctest
 
+Where `buildtype` is either `debug` or `delease`
+    
 ## Building for Android, iOS, watchOS and tvOS
 
-Building for Android required the NDK r10e installed.
+Building for Android required the NDK r10e installed and ANDROID_NDK set
+to the directory where it's installed.
 
-These targets can be built using the cross_compile.sh command:
+These targets can be built using the cross_compile.sh command.
+'Release' can be replaced with 'Debug' to produce a debug build. :
 
     tools/cross_compile.sh -o android -a armeabi-v7a -t Release -v <X.Y.Z>
 
@@ -77,33 +85,19 @@ The command shows the available options simply with:
     tools/cross_compile.sh
 
 These commands produce a tarball containing the realm static library
-and its include files.
-
-## Configuration
-
-It is possible to install into a non-default location by running the
-following command before building and installing:
-
-    cmake -D CMAKE_INSTALL_PREFIX=/your/dir ..
-
-Here, `CMAKE_INSTALL_PREFIX` is the installation prefix. If it is not specified, it
-defaults to `/usr/local` on Linux and macOS.
-
-CMake can automatically detect your compiler and its location but it allows
-all kinds of customizations. For a brief overview you can reference to this
-CMake [wiki page](http://www.vtk.org/Wiki/CMake_Useful_Variables#Compilers_and_Tools)
+and its include files. The string after '-v' just denotes the version part
+of the name of the tarball produced - it's optional.
 
 ## Testing
 
-The core library comes with a suite of unit tests. You can run it in one of the
-following ways:
-
-    ctest
-
-or
+The core library comes with a suite of unit tests. You can run the unit tests like this:
 
     cd build-dir/test
     ./realm-tests
+
+or run both unit tests and performance tests with just:
+
+    ctest
 
 There are a number of environment variable that can be use the customize the
 execution. For example, here is how to run only the `Foo` test and those whose
@@ -177,11 +171,14 @@ following example:
 
 ### Measuring test coverage:
 
-You can measure how much of the code is tested by executing:
+You can measure how much of the code is tested by adding the `-D REALM_COVERAGE=ON` option to the cmake call that generates the project.
+This will allow to produce coverage information which is then digestable by gcovr or lcov:
 
     cd test
     ./realm-tests
     gcovr --filter='.*src/realm.*'
+
+Alternatively you can run the script `tools/coverage.sh`.
 
 ## Install
 
@@ -211,15 +208,34 @@ The following programs will be installed:
     /usr/local/bin/realm-config
     /usr/local/libexec/realmd
 
+### Configuration
+
+It is possible to install into a non-default location by running the
+following command before building and installing:
+
+    cmake -D CMAKE_INSTALL_PREFIX=/your/dir ..
+
+Here, `CMAKE_INSTALL_PREFIX` is the installation prefix. If it is not specified, it
+defaults to `/usr/local` on Linux and macOS.
+
+CMake can automatically detect your compiler and its location but it allows
+all kinds of customizations. For a brief overview you can reference to this
+CMake [wiki page](http://www.vtk.org/Wiki/CMake_Useful_Variables#Compilers_and_Tools)
+
+## Other tools
+
 The `realm-import` tool lets you load files containing
-comma-separated values into Realm. The next two are used
-transparently by the Realm library when `async` transactions are
+comma-separated values into Realm.
+
+The next two are used transparently by the Realm library when `async` transactions are
 enabled. The two `config` programs provide the necessary compiler
 flags for an application that needs to link against Realm. They work
 with GCC and other compilers, such as Clang, that are mostly command
 line compatible with GCC. Here is an example:
 
     g++  my_app.cpp  `realm-config --cflags --libs`
+
+## cmake options
 
 The CMake build system supports a big variety of features and targets
 that go beyond the purpose of this document. It supports the creation of projects
