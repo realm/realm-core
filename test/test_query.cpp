@@ -1571,8 +1571,8 @@ TEST(Query_size)
 
     auto strings = table1->column<String>(string_col);
     auto binaries = table1->column<Binary>(bin_col);
-    auto intlist = table1->column<List<Int>>(int_list_col);
-    auto linklist = table1->column<List<ObjKey>>(linklist_col);
+    auto intlist = table1->column<Lst<Int>>(int_list_col);
+    auto linklist = table1->column<Lst<ObjKey>>(linklist_col);
 
     for (int i = 0; i < 10; i++) {
         table2->get_object(table2_keys[i]).set(int_col, i);
@@ -1595,7 +1595,7 @@ TEST(Query_size)
     table1->get_object(table1_keys[0]).set(string_col, "Hi").set(bin_col, BinaryData(bin1));
     table1->get_object(table1_keys[1]).set(string_col, "world").set(bin_col, BinaryData(bin2));
 
-    auto set_list = [](ListPtr<Int> list, const std::vector<int64_t>& value_list) {
+    auto set_list = [](LstPtr<Int> list, const std::vector<int64_t>& value_list) {
         size_t sz = value_list.size();
         list->clear();
         for (size_t i = 0; i < sz; i++) {
@@ -1609,7 +1609,7 @@ TEST(Query_size)
     set_list(table1->get_object(table1_keys[3]).get_list_ptr<Int>(int_list_col),
              std::vector<Int>({1, 2, 3, 4, 5, 6, 7, 8, 9}));
 
-    auto set_links = [&table2_keys](LinkListPtr lv, const std::vector<int>& value_list) {
+    auto set_links = [&table2_keys](LnkLstPtr lv, const std::vector<int>& value_list) {
         for (auto v : value_list) {
             lv->add(table2_keys[v]);
         }
@@ -1668,12 +1668,12 @@ TEST(Query_size)
     CHECK_EQUAL(table1_keys[0], tv.get_key(0));
 
     // Single links
-    q = table3->link(link_col).column<List<Int>>(int_list_col).size() == 5;
+    q = table3->link(link_col).column<Lst<Int>>(int_list_col).size() == 5;
     tv = q.find_all();
     CHECK_EQUAL(5, tv.size());
 
     // Multiple links
-    q = table3->link(linklist_col1).column<List<Int>>(int_list_col).size() == 3;
+    q = table3->link(linklist_col1).column<Lst<Int>>(int_list_col).size() == 3;
     tv = q.find_all();
     CHECK_EQUAL(6, tv.size());
 }
@@ -1692,7 +1692,7 @@ TEST(Query_ListOfPrimitives)
     table->create_objects(4, keys);
 
     {
-        auto set_string_list = [](List<String> list, const std::vector<int64_t>& value_list) {
+        auto set_string_list = [](Lst<String> list, const std::vector<int64_t>& value_list) {
             size_t sz = value_list.size();
             list.clear();
             for (size_t i = 0; i < sz; i++) {
@@ -1721,45 +1721,45 @@ TEST(Query_ListOfPrimitives)
 
     Query q;
     TableView tv;
-    q = table->column<List<Int>>(col_int_list) == 5;
+    q = table->column<Lst<Int>>(col_int_list) == 5;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_key(0), keys[1]);
-    q = table->column<List<String>>(col_string_list) == "Str_5";
+    q = table->column<Lst<String>>(col_string_list) == "Str_5";
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_key(0), keys[1]);
 
-    q = table->column<List<String>>(col_string_list).begins_with("Str");
+    q = table->column<Lst<String>>(col_string_list).begins_with("Str");
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 3);
-    q = table->column<List<String>>(col_string_list).ends_with("_8");
+    q = table->column<Lst<String>>(col_string_list).ends_with("_8");
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_key(0), keys[2]);
-    q = table->column<List<String>>(col_string_list).begins_with(table->column<String>(col_string), false);
+    q = table->column<Lst<String>>(col_string_list).begins_with(table->column<String>(col_string), false);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_key(0), keys[1]);
-    q = table->column<String>(col_string).begins_with(table->column<List<String>>(col_string_list), false);
+    q = table->column<String>(col_string).begins_with(table->column<Lst<String>>(col_string_list), false);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_key(0), keys[2]);
 
-    q = table->column<List<Int>>(col_int_list).min() >= 2;
+    q = table->column<Lst<Int>>(col_int_list).min() >= 2;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get_key(0), keys[1]);
     CHECK_EQUAL(tv.get_key(1), keys[2]);
-    q = table->column<List<Int>>(col_int_list).max() > 6;
+    q = table->column<Lst<Int>>(col_int_list).max() > 6;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_key(0), keys[2]);
-    q = table->column<List<Int>>(col_int_list).sum() == 14;
+    q = table->column<Lst<Int>>(col_int_list).sum() == 14;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_key(0), keys[1]);
-    q = table->column<List<Int>>(col_int_list).average() < 4;
+    q = table->column<Lst<Int>>(col_int_list).average() < 4;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get_key(0), keys[0]);
@@ -1779,16 +1779,16 @@ TEST(Query_ListOfPrimitives)
     lv->add(keys[2]);
     lv->add(keys[3]);
 
-    q = baa->link(col_link).column<List<Int>>(col_int_list) == 5;
+    q = baa->link(col_link).column<Lst<Int>>(col_int_list) == 5;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_key(0), keys[0]);
 
-    q = baa->link(col_linklist).column<List<String>>(col_string_list) == "Str_5";
+    q = baa->link(col_linklist).column<Lst<String>>(col_string_list) == "Str_5";
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
 
-    q = baa->link(col_linklist).column<List<Int>>(col_int_list).average() >= 3.0;
+    q = baa->link(col_linklist).column<Lst<Int>>(col_int_list).average() >= 3.0;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     table->get_object(keys[1]).get_list<Int>(col_int_list).set(3, -10); // {2, 3, 4, -10}
@@ -7100,19 +7100,19 @@ TEST(Query_LinkCounts)
     size_t match;
 
     // Verify that queries against the count of a LinkList column work.
-    q = table2->column<LinkList>(col_linklist).count() == 0;
+    q = table2->column<LnkLst>(col_linklist).count() == 0;
     match = q.find();
     CHECK_EQUAL(0, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).count() == 1;
+    q = table2->column<LnkLst>(col_linklist).count() == 1;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).count() >= 1;
+    q = table2->column<LnkLst>(col_linklist).count() >= 1;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
@@ -7138,7 +7138,7 @@ TEST(Query_LinkCounts)
 
 
     // Verify that reusing the count expression works.
-    auto link_count = table2->column<LinkList>(col_linklist).count();
+    auto link_count = table2->column<LnkLst>(col_linklist).count();
     size_t match_count = (link_count == 0).count();
     CHECK_EQUAL(1, match_count);
 
@@ -7147,7 +7147,7 @@ TEST(Query_LinkCounts)
 
 
     // Verify that combining the count expression with other queries on the same table works.
-    q = table2->column<LinkList>(col_linklist).count() == 1 && table2->column<Int>(col_int) == 1;
+    q = table2->column<LnkLst>(col_linklist).count() == 1 && table2->column<Int>(col_int) == 1;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
@@ -7214,7 +7214,7 @@ TEST(Query_Link_Minimum)
     Query q;
     size_t match;
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).min() == 123;
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).min() == 123;
     match = q.find();
     CHECK_EQUAL(2, match);
     match = q.find(match + 1);
@@ -7222,20 +7222,20 @@ TEST(Query_Link_Minimum)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).min() == 456;
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).min() == 456;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).min() == null();
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).min() == null();
     match = q.find();
     CHECK_EQUAL(0, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
 
-    q = table2->column<LinkList>(col_linklist).column<Float>(1).min() == 123.0f;
+    q = table2->column<LnkLst>(col_linklist).column<Float>(1).min() == 123.0f;
     match = q.find();
     CHECK_EQUAL(2, match);
     match = q.find(match + 1);
@@ -7243,14 +7243,14 @@ TEST(Query_Link_Minimum)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Float>(1).min() == 456.0f;
+    q = table2->column<LnkLst>(col_linklist).column<Float>(1).min() == 456.0f;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
 
-    q = table2->column<LinkList>(col_linklist).column<Double>(2).min() == 123.0;
+    q = table2->column<LnkLst>(col_linklist).column<Double>(2).min() == 123.0;
     match = q.find();
     CHECK_EQUAL(2, match);
     match = q.find(match + 1);
@@ -7258,7 +7258,7 @@ TEST(Query_Link_Minimum)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Double>(2).min() == 456.0;
+    q = table2->column<LnkLst>(col_linklist).column<Double>(2).min() == 456.0;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
@@ -7337,7 +7337,7 @@ TEST(Query_Link_MaximumSumAverage)
 
     // Maximum.
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == 789;
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).max() == 789;
     match = q.find();
     CHECK_EQUAL(2, match);
     match = q.find(match + 1);
@@ -7345,19 +7345,19 @@ TEST(Query_Link_MaximumSumAverage)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == 456;
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).max() == 456;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == null();
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).max() == null();
     match = q.find();
     CHECK_EQUAL(0, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == table2->link(col_link).column<Int>(0);
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).max() == table2->link(col_link).column<Int>(0);
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
@@ -7365,29 +7365,14 @@ TEST(Query_Link_MaximumSumAverage)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == table2->column<Double>(col_double);
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).max() == table2->column<Double>(col_double);
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
 
-    q = table2->column<LinkList>(col_linklist).column<Float>(1).max() == 789.0f;
-    match = q.find();
-    CHECK_EQUAL(2, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(3, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
-
-    q = table2->column<LinkList>(col_linklist).column<Float>(1).max() == 456.0f;
-    match = q.find();
-    CHECK_EQUAL(1, match);
-    match = q.find(match + 1);
-    CHECK_EQUAL(not_found, match);
-
-
-    q = table2->column<LinkList>(col_linklist).column<Double>(2).max() == 789.0;
+    q = table2->column<LnkLst>(col_linklist).column<Float>(1).max() == 789.0f;
     match = q.find();
     CHECK_EQUAL(2, match);
     match = q.find(match + 1);
@@ -7395,7 +7380,22 @@ TEST(Query_Link_MaximumSumAverage)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Double>(2).max() == 456.0;
+    q = table2->column<LnkLst>(col_linklist).column<Float>(1).max() == 456.0f;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+
+    q = table2->column<LnkLst>(col_linklist).column<Double>(2).max() == 789.0;
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(3, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LnkLst>(col_linklist).column<Double>(2).max() == 456.0;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
@@ -7406,7 +7406,7 @@ TEST(Query_Link_MaximumSumAverage)
     // Floating point results below may be inexact for some combination of architectures, compilers, and compiler
     // flags.
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == 1245;
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).sum() == 1245;
     match = q.find();
     CHECK_EQUAL(2, match);
     match = q.find(match + 1);
@@ -7414,26 +7414,26 @@ TEST(Query_Link_MaximumSumAverage)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == 456;
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).sum() == 456;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == table2->link(col_link).column<Int>(0);
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).sum() == table2->link(col_link).column<Int>(0);
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == table2->column<Double>(col_double);
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).sum() == table2->column<Double>(col_double);
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
 
-    q = table2->column<LinkList>(col_linklist).column<Float>(1).sum() == 1245.0f;
+    q = table2->column<LnkLst>(col_linklist).column<Float>(1).sum() == 1245.0f;
     match = q.find();
     CHECK_EQUAL(2, match);
     match = q.find(match + 1);
@@ -7441,14 +7441,14 @@ TEST(Query_Link_MaximumSumAverage)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Float>(1).sum() == 456.0f;
+    q = table2->column<LnkLst>(col_linklist).column<Float>(1).sum() == 456.0f;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
 
-    q = table2->column<LinkList>(col_linklist).column<Double>(2).sum() == 1245.0;
+    q = table2->column<LnkLst>(col_linklist).column<Double>(2).sum() == 1245.0;
     match = q.find();
     CHECK_EQUAL(2, match);
     match = q.find(match + 1);
@@ -7456,7 +7456,7 @@ TEST(Query_Link_MaximumSumAverage)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Double>(2).sum() == 456.0;
+    q = table2->column<LnkLst>(col_linklist).column<Double>(2).sum() == 456.0;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
@@ -7467,7 +7467,7 @@ TEST(Query_Link_MaximumSumAverage)
     // Floating point results below may be inexact for some combination of architectures, compilers, and compiler
     // flags.
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == 622.5;
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).average() == 622.5;
     match = q.find();
     CHECK_EQUAL(2, match);
     match = q.find(match + 1);
@@ -7475,32 +7475,32 @@ TEST(Query_Link_MaximumSumAverage)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == 456;
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).average() == 456;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == null();
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).average() == null();
     match = q.find();
     CHECK_EQUAL(0, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() < table2->link(col_link).column<Int>(0);
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).average() < table2->link(col_link).column<Int>(0);
     match = q.find();
     CHECK_EQUAL(2, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == table2->column<Double>(col_double);
+    q = table2->column<LnkLst>(col_linklist).column<Int>(0).average() == table2->column<Double>(col_double);
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
 
-    q = table2->column<LinkList>(col_linklist).column<Float>(1).average() == 622.5;
+    q = table2->column<LnkLst>(col_linklist).column<Float>(1).average() == 622.5;
     match = q.find();
     CHECK_EQUAL(2, match);
     match = q.find(match + 1);
@@ -7508,14 +7508,14 @@ TEST(Query_Link_MaximumSumAverage)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Float>(1).average() == 456.0f;
+    q = table2->column<LnkLst>(col_linklist).column<Float>(1).average() == 456.0f;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
 
-    q = table2->column<LinkList>(col_linklist).column<Double>(2).average() == 622.5;
+    q = table2->column<LnkLst>(col_linklist).column<Double>(2).average() == 622.5;
     match = q.find();
     CHECK_EQUAL(2, match);
     match = q.find(match + 1);
@@ -7523,7 +7523,7 @@ TEST(Query_Link_MaximumSumAverage)
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    q = table2->column<LinkList>(col_linklist).column<Double>(2).average() == 456.0;
+    q = table2->column<LnkLst>(col_linklist).column<Double>(2).average() == 456.0;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
@@ -8695,7 +8695,7 @@ TEST(Query_SyncViewIfNeeded)
             target->create_object(ObjKey(i)).set(col_id, i);
         }
 
-        LinkList ll = source->create_object().get_linklist(col_links);
+        LnkLst ll = source->create_object().get_linklist(col_links);
         for (size_t i = 6; i < 15; ++i) {
             ll.add(ObjKey(i));
         }
@@ -8726,7 +8726,7 @@ TEST(Query_SyncViewIfNeeded)
     // Restricting LinkView.
     {
         reset_table_contents();
-        LinkList restricting_view = source->begin()->get_linklist(col_links);
+        LnkLst restricting_view = source->begin()->get_linklist(col_links);
         Query q = target->where(restricting_view).less(col_id, 10);
         CHECK_EQUAL(restricting_view.size(), 9);
 

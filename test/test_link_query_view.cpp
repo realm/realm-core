@@ -651,32 +651,32 @@ TEST(LinkList_QueryFindLinkTarget)
     CHECK_TABLE_VIEW(tv, {0, 1, 2});
 
     // find on query with LinkList
-    match = (table1->column<LinkList>(col_link3) == table2->get(1)).find();
+    match = (table1->column<LnkLst>(col_link3) == table2->get(1)).find();
     CHECK_EQUAL(0, match);
 
-    match = (table1->column<LinkList>(col_link3) == table2->get(2)).find();
+    match = (table1->column<LnkLst>(col_link3) == table2->get(2)).find();
     CHECK_EQUAL(1, match);
 
-    match = (table1->column<LinkList>(col_link3) == table2->get(3)).find();
+    match = (table1->column<LnkLst>(col_link3) == table2->get(3)).find();
     CHECK_EQUAL(not_found, match);
 
     // find_all on query with LinkList
-    tv = (table1->column<LinkList>(col_link3) == table2->get(2)).find_all();
+    tv = (table1->column<LnkLst>(col_link3) == table2->get(2)).find_all();
     CHECK_TABLE_VIEW(tv, {1});
 
-    tv = (table1->column<LinkList>(col_link3) == table2->get(1)).find_all();
+    tv = (table1->column<LnkLst>(col_link3) == table2->get(1)).find_all();
     CHECK_TABLE_VIEW(tv, {0, 1});
 
-    tv = (table1->column<LinkList>(col_link3) == table2->get(3)).find_all();
+    tv = (table1->column<LnkLst>(col_link3) == table2->get(3)).find_all();
     CHECK_TABLE_VIEW(tv, {});
 
-    tv = (table1->column<LinkList>(col_link3) != table2->get(2)).find_all();
+    tv = (table1->column<LnkLst>(col_link3) != table2->get(2)).find_all();
     CHECK_TABLE_VIEW(tv, {0, 1});
 
-    tv = (table1->column<LinkList>(col_link3) != table2->get(1)).find_all();
+    tv = (table1->column<LnkLst>(col_link3) != table2->get(1)).find_all();
     CHECK_TABLE_VIEW(tv, {0, 1});
 
-    tv = (table1->column<LinkList>(col_link3) != table2->get(3)).find_all();
+    tv = (table1->column<LnkLst>(col_link3) != table2->get(3)).find_all();
     CHECK_TABLE_VIEW(tv, {0, 1});
 }
 
@@ -931,7 +931,7 @@ TEST(LinkList_SortLinkView)
 
     Obj obj0 = table2->create_object();
 
-    LinkListPtr list_ptr;
+    LnkLstPtr list_ptr;
     TableView tv;
 
     list_ptr = obj0.get_linklist_ptr(col_link2);
@@ -1062,7 +1062,7 @@ TEST(Link_FindNullLink)
     obj_2_0.set(col_link2, obj_1_1.get_key());
     obj_2_2.set(col_link2, obj_1_2.get_key());
 
-    LinkList ll = obj_2_0.get_linklist(col_linklist2);
+    LnkLst ll = obj_2_0.get_linklist(col_linklist2);
     ll.add(obj_1_0.get_key());
     ll.add(obj_1_1.get_key());
     obj_2_2.get_linklist(col_linklist2).add(obj_1_0.get_key());
@@ -1246,7 +1246,7 @@ TEST(LinkList_QueryOnLinkList)
     Obj obj1 = origin->create_object();
     Obj obj2 = origin->create_object();
 
-    LinkListPtr list_ptr;
+    LnkLstPtr list_ptr;
     TableView tv;
     TableView tv1;
 

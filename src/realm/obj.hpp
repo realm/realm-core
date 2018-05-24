@@ -28,26 +28,26 @@
 
 namespace realm {
 
-class ListBase;
+class LstBase;
 
 template <class>
-class ConstListIf;
+class ConstLstIf;
 
 template <class>
-class ConstList;
+class ConstLst;
 
 template <class>
-class List;
+class Lst;
 template <class T>
-using ListPtr = std::unique_ptr<List<T>>;
+using LstPtr = std::unique_ptr<Lst<T>>;
 template <class T>
-using ConstListPtr = std::unique_ptr<const List<T>>;
-using ListBasePtr = std::unique_ptr<ListBase>;
+using ConstLstPtr = std::unique_ptr<const Lst<T>>;
+using LstBasePtr = std::unique_ptr<LstBase>;
 
-class LinkList;
-class ConstLinkList;
-using LinkListPtr = std::unique_ptr<LinkList>;
-using ConstLinkListPtr = std::unique_ptr<const LinkList>;
+class LnkLst;
+class ConstLnkLst;
+using LnkLstPtr = std::unique_ptr<LnkLst>;
+using ConstLnkLstPtr = std::unique_ptr<const LnkLst>;
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class ConstObj {
@@ -99,12 +99,12 @@ public:
     int cmp(const ConstObj& other, ColKey col_key) const;
 
     template <typename U>
-    ConstList<U> get_list(ColKey col_key) const;
+    ConstLst<U> get_list(ColKey col_key) const;
     template <typename U>
-    ConstListPtr<U> get_list_ptr(ColKey col_key) const;
+    ConstLstPtr<U> get_list_ptr(ColKey col_key) const;
 
-    ConstLinkList get_linklist(ColKey col_key);
-    ConstLinkListPtr get_linklist_ptr(ColKey col_key);
+    ConstLnkLst get_linklist(ColKey col_key);
+    ConstLnkLstPtr get_linklist_ptr(ColKey col_key);
 
     size_t get_link_count(ColKey col_key) const;
 
@@ -126,9 +126,9 @@ public:
     }
 
 protected:
-    friend class ConstListBase;
-    friend class ConstLinkList;
-    friend class LinkList;
+    friend class ConstLstBase;
+    friend class ConstLnkLst;
+    friend class LnkLst;
     friend class LinkMap;
     friend class ConstTableView;
     friend class Transaction;
@@ -201,23 +201,23 @@ public:
     Obj& set_all(Head v, Tail... tail);
 
     template <typename U>
-    List<U> get_list(ColKey col_key);
+    Lst<U> get_list(ColKey col_key);
     template <typename U>
-    ListPtr<U> get_list_ptr(ColKey col_key);
+    LstPtr<U> get_list_ptr(ColKey col_key);
 
-    LinkList get_linklist(ColKey col_key);
-    LinkListPtr get_linklist_ptr(ColKey col_key);
+    LnkLst get_linklist(ColKey col_key);
+    LnkLstPtr get_linklist_ptr(ColKey col_key);
 
-    ListBasePtr get_listbase_ptr(ColKey col_key, DataType type);
+    LstBasePtr get_listbase_ptr(ColKey col_key, DataType type);
 
 private:
     friend class Cluster;
-    friend class ConstListBase;
+    friend class ConstLstBase;
     friend class ArrayBacklink;
     friend class ConstObj;
     template <class>
-    friend class List;
-    friend class LinkList;
+    friend class Lst;
+    friend class LnkLst;
 
     mutable bool m_writeable;
 

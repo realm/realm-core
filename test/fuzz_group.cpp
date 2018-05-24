@@ -534,7 +534,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         else if (type == type_LinkList) {
                             TableRef target = t->get_link_target(col);
                             if (target->size() > 0) {
-                                LinkList links = obj.get_linklist(col);
+                                LnkLst links = obj.get_linklist(col);
                                 ObjKey target_key = target->get_object(get_next(s) % target->size()).get_key();
                                 // either add or set, 50/50 probability
                                 if (links.size() > 0 && get_next(s) > 128) {

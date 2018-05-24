@@ -548,18 +548,18 @@ TEST(Parser_LinksToDifferentTable)
     person1.set(id_col, int64_t(1));
     person2.set(id_col, int64_t(2));
 
-    LinkList list_0 = person0.get_linklist(items_col);
+    LnkLst list_0 = person0.get_linklist(items_col);
     list_0.add(item_keys[0]);
     list_0.add(item_keys[1]);
     list_0.add(item_keys[2]);
     list_0.add(item_keys[3]);
 
-    LinkList list_1 = person1.get_linklist(items_col);
+    LnkLst list_1 = person1.get_linklist(items_col);
     for (size_t i = 0; i < 10; ++i) {
         list_1.add(item_keys[0]);
     }
 
-    LinkList list_2 = person2.get_linklist(items_col);
+    LnkLst list_2 = person2.get_linklist(items_col);
     list_2.add(item_keys[2]);
     list_2.add(item_keys[2]);
     list_2.add(item_keys[3]);
@@ -992,18 +992,18 @@ TEST(Parser_TwoColumnAggregates)
     person2.set(id_col, int64_t(2));
     person2.set(account_col, double(30.0));
 
-    LinkList list_0 = person0.get_linklist(items_col);
+    LnkLst list_0 = person0.get_linklist(items_col);
     list_0.add(item_keys[0]);
     list_0.add(item_keys[1]);
     list_0.add(item_keys[2]);
     list_0.add(item_keys[3]);
 
-    LinkList list_1 = person1.get_linklist(items_col);
+    LnkLst list_1 = person1.get_linklist(items_col);
     for (size_t i = 0; i < 10; ++i) {
         list_1.add(item_keys[0]);
     }
 
-    LinkList list_2 = person2.get_linklist(items_col);
+    LnkLst list_2 = person2.get_linklist(items_col);
     list_2.add(item_keys[2]);
     list_2.add(item_keys[2]);
     list_2.add(item_keys[3]);
@@ -1123,11 +1123,11 @@ TEST(Parser_substitution)
     t->get_object(obj_keys[1]).set(nullable_double_col, 2.22f);
     t->get_object(obj_keys[0]).set(link_col, obj_keys[1]);
     t->get_object(obj_keys[1]).set(link_col, obj_keys[0]);
-    LinkList list_0 = t->get_object(obj_keys[0]).get_linklist(list_col);
+    LnkLst list_0 = t->get_object(obj_keys[0]).get_linklist(list_col);
     list_0.add(obj_keys[0]);
     list_0.add(obj_keys[1]);
     list_0.add(obj_keys[2]);
-    LinkList list_1 = t->get_object(obj_keys[1]).get_linklist(list_col);
+    LnkLst list_1 = t->get_object(obj_keys[1]).get_linklist(list_col);
     list_1.add(obj_keys[0]);
 
     util::Any args[] = {Int(2), Double(2.22), String("oe"), realm::null{}, Bool(true), Timestamp(1512130073, 505),
@@ -1422,20 +1422,20 @@ TEST(Parser_collection_aggregates)
         obj.set(fail_col, std::get<3>(course));
     }
     auto it = people->begin();
-    LinkListPtr billy_courses = it->get_linklist_ptr(courses_col);
+    LnkLstPtr billy_courses = it->get_linklist_ptr(courses_col);
     billy_courses->add(course_keys[0]);
     billy_courses->add(course_keys[1]);
     billy_courses->add(course_keys[4]);
     ++it;
-    LinkListPtr bob_courses = it->get_linklist_ptr(courses_col);
+    LnkLstPtr bob_courses = it->get_linklist_ptr(courses_col);
     bob_courses->add(course_keys[0]);
     bob_courses->add(course_keys[1]);
     bob_courses->add(course_keys[1]);
     ++it;
-    LinkListPtr joe_courses = it->get_linklist_ptr(courses_col);
+    LnkLstPtr joe_courses = it->get_linklist_ptr(courses_col);
     joe_courses->add(course_keys[3]);
     ++it;
-    LinkListPtr jane_courses = it->get_linklist_ptr(courses_col);
+    LnkLstPtr jane_courses = it->get_linklist_ptr(courses_col);
     jane_courses->add(course_keys[2]);
     jane_courses->add(course_keys[4]);
 
@@ -1750,7 +1750,7 @@ TEST(Parser_Backlinks)
         obj.set(fav_col, obj.get_key());
         if (i == 0) {
             obj.set(name_col, StringData("Adam"));
-            LinkList list_0 = obj.get_linklist(items_col);
+            LnkLst list_0 = obj.get_linklist(items_col);
             list_0.add(item_keys[0]);
             list_0.add(item_keys[1]);
             list_0.add(item_keys[2]);
@@ -1758,14 +1758,14 @@ TEST(Parser_Backlinks)
         }
         else if (i == 1) {
             obj.set(name_col, StringData("James"));
-            LinkList list_1 = obj.get_linklist(items_col);
+            LnkLst list_1 = obj.get_linklist(items_col);
             for (size_t j = 0; j < 10; ++j) {
                 list_1.add(item_keys[0]);
             }
         }
         else if (i == 2) {
             obj.set(name_col, StringData("John"));
-            LinkList list_2 = obj.get_linklist(items_col);
+            LnkLst list_2 = obj.get_linklist(items_col);
             list_2.add(item_keys[2]);
             list_2.add(item_keys[2]);
             list_2.add(item_keys[3]);
@@ -2071,19 +2071,19 @@ TEST(Parser_Subquery)
         obj.set(item_price_col, item_info[i].second);
         if (i == 0) {
             obj.set(item_discount_col, discount_keys[2]); // milk -0.50
-            LinkList milk_contains = obj.get_linklist(item_contains_col);
+            LnkLst milk_contains = obj.get_linklist(item_contains_col);
             milk_contains.add(ingredients_keys[0]);
         }
         else if (i == 2) {
             obj.set(item_discount_col, discount_keys[1]); // pizza -2.5
-            LinkList pizza_contains = obj.get_linklist(item_contains_col);
+            LnkLst pizza_contains = obj.get_linklist(item_contains_col);
             pizza_contains.add(ingredients_keys[0]);
             pizza_contains.add(ingredients_keys[2]);
             pizza_contains.add(ingredients_keys[3]);
         }
         else if (i == 3) {
             obj.set(item_discount_col, discount_keys[0]); // cereal -3.0 inactive
-            LinkList cereal_contains = obj.get_linklist(item_contains_col);
+            LnkLst cereal_contains = obj.get_linklist(item_contains_col);
             cereal_contains.add(ingredients_keys[0]);
             cereal_contains.add(ingredients_keys[1]);
             cereal_contains.add(ingredients_keys[2]);
@@ -2102,7 +2102,7 @@ TEST(Parser_Subquery)
         obj.set(id_col, int64_t(i));
         obj.set(account_col, double((i + 1) * 10.0));
         obj.set(fav_col, item_keys[i]);
-        LinkList list = obj.get_linklist(items_col);
+        LnkLst list = obj.get_linklist(items_col);
         if (i == 0) {
             list.add(item_keys[0]);
             list.add(item_keys[1]);
@@ -2231,17 +2231,17 @@ TEST(Parser_AggregateShortcuts)
         obj.set(item_name_col, StringData(item_info[i].first));
         obj.set(item_price_col, item_info[i].second);
         if (i == 0) {
-            LinkList milk_contains = obj.get_linklist(item_contains_col);
+            LnkLst milk_contains = obj.get_linklist(item_contains_col);
             milk_contains.add(allergens_keys[0]);
         }
         else if (i == 2) {
-            LinkList pizza_contains = obj.get_linklist(item_contains_col);
+            LnkLst pizza_contains = obj.get_linklist(item_contains_col);
             pizza_contains.add(allergens_keys[0]);
             pizza_contains.add(allergens_keys[2]);
             pizza_contains.add(allergens_keys[3]);
         }
         else if (i == 3) {
-            LinkList cereal_contains = obj.get_linklist(item_contains_col);
+            LnkLst cereal_contains = obj.get_linklist(item_contains_col);
             cereal_contains.add(allergens_keys[0]);
             cereal_contains.add(allergens_keys[1]);
             cereal_contains.add(allergens_keys[2]);
@@ -2260,7 +2260,7 @@ TEST(Parser_AggregateShortcuts)
         obj.set(id_col, int64_t(i));
         obj.set(account_col, double((i + 1) * 10.0));
         obj.set(fav_col, items_keys[i]);
-        LinkList list = obj.get_linklist(items_col);
+        LnkLst list = obj.get_linklist(items_col);
         if (i == 0) {
             list.add(items_keys[0]);
             list.add(items_keys[1]);
@@ -2408,17 +2408,17 @@ TEST(Parser_OperatorIN)
         obj.set(item_name_col, StringData(item_info[i].first));
         obj.set(item_price_col, item_info[i].second);
         if (i == 0) {
-            LinkList milk_contains = obj.get_linklist(item_contains_col);
+            LnkLst milk_contains = obj.get_linklist(item_contains_col);
             milk_contains.add(allergens_keys[0]);
         }
         else if (i == 2) {
-            LinkList pizza_contains = obj.get_linklist(item_contains_col);
+            LnkLst pizza_contains = obj.get_linklist(item_contains_col);
             pizza_contains.add(allergens_keys[0]);
             pizza_contains.add(allergens_keys[2]);
             pizza_contains.add(allergens_keys[3]);
         }
         else if (i == 3) {
-            LinkList cereal_contains = obj.get_linklist(item_contains_col);
+            LnkLst cereal_contains = obj.get_linklist(item_contains_col);
             cereal_contains.add(allergens_keys[0]);
             cereal_contains.add(allergens_keys[1]);
             cereal_contains.add(allergens_keys[2]);
@@ -2437,7 +2437,7 @@ TEST(Parser_OperatorIN)
         obj.set(id_col, int64_t(i));
         obj.set(account_col, double((i + 1) * 10.0));
         obj.set(fav_col, items_keys[i]);
-        LinkList list = obj.get_linklist(items_col);
+        LnkLst list = obj.get_linklist(items_col);
         if (i == 0) {
             list.add(items_keys[0]);
             list.add(items_keys[1]);

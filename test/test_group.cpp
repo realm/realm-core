@@ -1432,7 +1432,7 @@ TEST(Group_CascadeNotify_Simple)
     Obj obj10 = origin->get_object(o_keys[10]);
     Obj obj15 = origin->get_object(o_keys[15]);
     obj10.set(col_link, t_keys[11]);
-    LinkListPtr lv = obj15.get_linklist_ptr(col_link_list);
+    LnkLstPtr lv = obj15.get_linklist_ptr(col_link_list);
     lv->add(t_keys[11]);
     lv->add(t_keys[30]);
     called = false;

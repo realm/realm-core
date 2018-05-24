@@ -501,7 +501,7 @@ public:
     }
 
     // Perform queries on a LinkView. The returned Query holds a reference to list.
-    Query where(const LinkList& list) const
+    Query where(const LnkLst& list) const
     {
         return Query(*this, list);
     }
@@ -1080,7 +1080,7 @@ inline Columns<T> Table::column(ColKey col_key)
     else if (std::is_same<T, double>::value && ct != type_Double)
         throw LogicError(LogicError::type_mismatch);
 
-    if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value || std::is_same<T, BackLink>::value) {
+    if (std::is_same<T, Link>::value || std::is_same<T, LnkLst>::value || std::is_same<T, BackLink>::value) {
         link_chain.push_back(col_key);
     }
 

@@ -219,7 +219,7 @@ TEST(Transactions_StateChanges)
     auto col = tr->add_column(type_Int, "hejsa");
     auto lcol = tr->add_column_list(type_Int, "gurgle");
     auto obj = tr->create_object().set_all(45);
-    List<int64_t> list = obj.get_list<int64_t>(lcol);
+    Lst<int64_t> list = obj.get_list<int64_t>(lcol);
     list.add(5);
     list.add(7);
     // verify that we cannot freeze a write transaction

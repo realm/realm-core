@@ -274,8 +274,8 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
         log("list->set_int(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<Int>*>(m_list.get()));
-        static_cast<List<Int>*>(m_list.get())->set(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<Int>*>(m_list.get()));
+        static_cast<Lst<Int>*>(m_list.get())->set(list_ndx, value);
         return true;
     }
 
@@ -286,8 +286,8 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
         log("list->set_bool(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<Bool>*>(m_list.get()));
-        static_cast<List<Bool>*>(m_list.get())->set(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<Bool>*>(m_list.get()));
+        static_cast<Lst<Bool>*>(m_list.get())->set(list_ndx, value);
         return true;
     }
 
@@ -298,8 +298,8 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
         log("list->set_float(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<Float>*>(m_list.get()));
-        static_cast<List<Float>*>(m_list.get())->set(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<Float>*>(m_list.get()));
+        static_cast<Lst<Float>*>(m_list.get())->set(list_ndx, value);
         return true;
     }
 
@@ -310,8 +310,8 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
         log("list->set_double(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<Double>*>(m_list.get()));
-        static_cast<List<Double>*>(m_list.get())->set(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<Double>*>(m_list.get()));
+        static_cast<Lst<Double>*>(m_list.get())->set(list_ndx, value);
         return true;
     }
 
@@ -322,8 +322,8 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
         log("list->set_string(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<String>*>(m_list.get()));
-        static_cast<List<String>*>(m_list.get())->set(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<String>*>(m_list.get()));
+        static_cast<Lst<String>*>(m_list.get())->set(list_ndx, value);
         return true;
     }
 
@@ -334,8 +334,8 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
         log("list->set_binary(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<Binary>*>(m_list.get()));
-        static_cast<List<Binary>*>(m_list.get())->set(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<Binary>*>(m_list.get()));
+        static_cast<Lst<Binary>*>(m_list.get())->set(list_ndx, value);
         return true;
     }
 
@@ -346,8 +346,8 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx >= m_list->size())))
             return false;
         log("list->set_timestamp(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<Timestamp>*>(m_list.get()));
-        static_cast<List<Timestamp>*>(m_list.get())->set(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<Timestamp>*>(m_list.get()));
+        static_cast<Lst<Timestamp>*>(m_list.get())->set(list_ndx, value);
         return true;
     }
 
@@ -361,8 +361,8 @@ public:
             return false;
         static_cast<void>(prior_size);
         log("list->insert_int(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<Int>*>(m_list.get()));
-        static_cast<List<Int>*>(m_list.get())->insert(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<Int>*>(m_list.get()));
+        static_cast<Lst<Int>*>(m_list.get())->insert(list_ndx, value);
         return true;
     }
 
@@ -376,8 +376,8 @@ public:
             return false;
         static_cast<void>(prior_size);
         log("list->insert_bool(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<Bool>*>(m_list.get()));
-        static_cast<List<Bool>*>(m_list.get())->insert(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<Bool>*>(m_list.get()));
+        static_cast<Lst<Bool>*>(m_list.get())->insert(list_ndx, value);
         return true;
     }
 
@@ -391,8 +391,8 @@ public:
             return false;
         static_cast<void>(prior_size);
         log("list->insert_int(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<Float>*>(m_list.get()));
-        static_cast<List<Float>*>(m_list.get())->insert(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<Float>*>(m_list.get()));
+        static_cast<Lst<Float>*>(m_list.get())->insert(list_ndx, value);
         return true;
     }
 
@@ -406,8 +406,8 @@ public:
             return false;
         static_cast<void>(prior_size);
         log("list->insert_int(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<Double>*>(m_list.get()));
-        static_cast<List<Double>*>(m_list.get())->insert(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<Double>*>(m_list.get()));
+        static_cast<Lst<Double>*>(m_list.get())->insert(list_ndx, value);
         return true;
     }
 
@@ -421,8 +421,8 @@ public:
             return false;
         static_cast<void>(prior_size);
         log("list->insert_string(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<String>*>(m_list.get()));
-        static_cast<List<String>*>(m_list.get())->insert(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<String>*>(m_list.get()));
+        static_cast<Lst<String>*>(m_list.get())->insert(list_ndx, value);
         return true;
     }
 
@@ -436,8 +436,8 @@ public:
             return false;
         static_cast<void>(prior_size);
         log("list->insert_binary(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<Binary>*>(m_list.get()));
-        static_cast<List<Binary>*>(m_list.get())->insert(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<Binary>*>(m_list.get()));
+        static_cast<Lst<Binary>*>(m_list.get())->insert(list_ndx, value);
         return true;
     }
 
@@ -451,8 +451,8 @@ public:
             return false;
         static_cast<void>(prior_size);
         log("list->insert_timestamp(%1, %2);", list_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<List<Timestamp>*>(m_list.get()));
-        static_cast<List<Timestamp>*>(m_list.get())->insert(list_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<Lst<Timestamp>*>(m_list.get()));
+        static_cast<Lst<Timestamp>*>(m_list.get())->insert(list_ndx, value);
         return true;
     }
 
@@ -697,8 +697,8 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(link_ndx >= m_list->size())))
             return false;
         log("link_list->set(%1, %2);", link_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<LinkList*>(m_list.get()));
-        static_cast<LinkList*>(m_list.get())->set(link_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<LnkLst*>(m_list.get()));
+        static_cast<LnkLst*>(m_list.get())->set(link_ndx, value);
         return true;
     }
 
@@ -712,8 +712,8 @@ public:
             return false;
         static_cast<void>(prior_size);
         log("link_list->insert_link(%1, %2);", link_ndx, value); // Throws
-        REALM_ASSERT_DEBUG(dynamic_cast<LinkList*>(m_list.get()));
-        static_cast<LinkList*>(m_list.get())->insert(link_ndx, value);
+        REALM_ASSERT_DEBUG(dynamic_cast<LnkLst*>(m_list.get()));
+        static_cast<LnkLst*>(m_list.get())->insert(link_ndx, value);
         return true;
     }
 
@@ -799,7 +799,7 @@ public:
 private:
     Group& m_group;
     TableRef m_table;
-    ListBasePtr m_list;
+    LstBasePtr m_list;
     util::Logger* m_logger = nullptr;
 
     bool check_set_cell(ColKey col_key, ObjKey key) noexcept
