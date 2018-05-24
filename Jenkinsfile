@@ -171,11 +171,10 @@ def doBuildInDocker(String buildType, String sanitizeMode='') {
                 sanitizeFlags = '-D REALM_TSAN=ON'
             } else if (sanitizeMode.contains('address')) {
                 environment << 'UNITTEST_THREADS=1'
-                environment << 'LSAN_OPTIONS=verbosity=1:log_threads=1'
                 sanitizeFlags = '-D REALM_ASAN=ON'
             }
             withEnv(environment) {
-                buildEnv.inside {
+                buildEnv.inside(sanitizeMode == 'address' ? '--privileged' : '') {
                     try {
                         sh """
                            mkdir build-dir
