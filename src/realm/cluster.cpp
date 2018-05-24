@@ -1673,7 +1673,7 @@ void ClusterTree::enumerate_string_column(size_t col_ndx)
     ArrayString leaf(alloc);
     keys.create();
 
-    ClusterTree::TraverseFunction collect_strings = [col_ndx, &alloc, &leaf, &keys](const Cluster* cluster) {
+    ClusterTree::TraverseFunction collect_strings = [col_ndx, &leaf, &keys](const Cluster* cluster) {
         cluster->init_leaf(col_ndx, &leaf);
         size_t sz = leaf.size();
         size_t key_size = keys.size();
