@@ -17,6 +17,7 @@
 ### Internals
 
 * Restore -fvisibility-inlines-hidden for the binaries for Apple platforms.
+* Remove a few warnings at compile time.
 
 ----------------------------------------------
 
