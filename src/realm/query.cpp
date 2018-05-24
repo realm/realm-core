@@ -1280,7 +1280,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         if (!has_conditions()) {
             KeyColumn* refs = ret.m_key_values;
 
-            ClusterTree::TraverseFunction f = [&begin, &end, &limit, refs, this](const Cluster* cluster) {
+            ClusterTree::TraverseFunction f = [&begin, &end, &limit, refs](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 if (begin < e) {
                     if (e > end) {
