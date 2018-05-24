@@ -190,6 +190,7 @@ void test_table_add_columns(TableRef t)
 }
 }
 
+#ifdef LEGACY_TESTS
 void writer(DBRef sg, int id)
 {
     // std::cerr << "Started writer " << std::endl;
@@ -216,6 +217,7 @@ void writer(DBRef sg, int id)
         REALM_ASSERT(false);
     }
 }
+#endif
 
 #if !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
 void killer(TestContext& test_context, int pid, std::string path, int id)
@@ -418,6 +420,7 @@ ONLY(Shared_DiskSpace)
 
 #endif // Only disables above special unit test
 
+#ifdef LEGACY_TESTS
 TEST(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -486,6 +489,7 @@ TEST(Shared_CompactingOnTheFly)
         rt2.get_group().verify();
     }
 }
+#endif
 
 TEST(Shared_EncryptedRemap)
 {
