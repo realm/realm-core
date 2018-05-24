@@ -13564,7 +13564,7 @@ TEST(LangBindHelper_callWithLock)
         CHECK(realm_path.compare(path) == 0);
     };
 
-    SharedGroup::CallbackWithLock callback_not_called = [this, &path](const std::string&) {
+    SharedGroup::CallbackWithLock callback_not_called = [=](const std::string&) {
         CHECK(false);
     };
 
