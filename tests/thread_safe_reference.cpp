@@ -93,7 +93,7 @@ TEST_CASE("thread safe reference") {
 
     SECTION("cleanup properly unpins version") {
         auto history = make_in_realm_history(config.path);
-        SharedGroup shared_group(*history, config.options());
+        Transaction shared_group(*history, config.options());
 
         auto get_current_version = [&]() -> VersionID {
             shared_group.begin_read();

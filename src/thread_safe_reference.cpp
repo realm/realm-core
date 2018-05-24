@@ -28,6 +28,8 @@
 
 using namespace realm;
 
+#if 0
+
 ThreadSafeReferenceBase::ThreadSafeReferenceBase(SharedRealm source_realm) : m_source_realm(std::move(source_realm))
 {
     m_source_realm->verify_thread();
@@ -55,13 +57,13 @@ V ThreadSafeReferenceBase::invalidate_after_import(Realm& destination_realm, T c
     REALM_ASSERT_DEBUG(!m_source_realm->is_in_transaction());
     REALM_ASSERT_DEBUG(!is_invalidated());
 
-    SharedGroup& destination_shared_group = *Realm::Internal::get_shared_group(destination_realm);
+    Transaction& destination_shared_group = *Realm::Internal::get_shared_group(destination_realm);
     auto unpin_version = util::make_scope_exit([&]() noexcept { invalidate(); });
 
     return construct_with_shared_group(destination_shared_group);
 }
 
-SharedGroup& ThreadSafeReferenceBase::get_source_shared_group() const {
+Transaction& ThreadSafeReferenceBase::get_source_shared_group() const {
     return *Realm::Internal::get_shared_group(*m_source_realm);
 }
 
@@ -83,7 +85,7 @@ ThreadSafeReference<List>::ThreadSafeReference(List const& list)
 { }
 
 List ThreadSafeReference<List>::import_into_realm(SharedRealm realm) && {
-    return invalidate_after_import<List>(*realm, [&](SharedGroup& shared_group) {
+    return invalidate_after_import<List>(*realm, [&](Transaction& shared_group) {
         if (auto link_view = shared_group.import_linkview_from_handover(std::move(m_link_view)))
             return List(std::move(realm), std::move(link_view));
         return List(std::move(realm), shared_group.import_table_from_handover(std::move(m_table)));
@@ -96,7 +98,7 @@ ThreadSafeReference<Object>::ThreadSafeReference(Object const& object)
 , m_object_schema_name(object.get_object_schema().name) { }
 
 Object ThreadSafeReference<Object>::import_into_realm(SharedRealm realm) && {
-    return invalidate_after_import<Object>(*realm, [&](SharedGroup& shared_group) {
+    return invalidate_after_import<Object>(*realm, [&](Transaction& shared_group) {
         Row row = *shared_group.import_from_handover(std::move(m_row));
         auto object_schema = realm->schema().find(m_object_schema_name);
         REALM_ASSERT_DEBUG(object_schema != realm->schema().end());
@@ -114,10 +116,12 @@ ThreadSafeReference<Results>::ThreadSafeReference(Results const& results)
 }()){ }
 
 Results ThreadSafeReference<Results>::import_into_realm(SharedRealm realm) && {
-    return invalidate_after_import<Results>(*realm, [&](SharedGroup& shared_group) {
+    return invalidate_after_import<Results>(*realm, [&](Transaction& shared_group) {
         Query query = *shared_group.import_from_handover(std::move(m_query));
         Table& table = *query.get_table();
         DescriptorOrdering descriptors = DescriptorOrdering::create_from_and_consume_patch(m_ordering_patch, table);
         return Results(std::move(realm), std::move(query), std::move(descriptors));
     });
 }
+
+#endif

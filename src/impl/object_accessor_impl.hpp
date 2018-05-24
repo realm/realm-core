@@ -105,7 +105,7 @@ public:
     util::Any box(util::Optional<double> v) const { return v; }
     util::Any box(util::Optional<float> v) const { return v; }
     util::Any box(util::Optional<int64_t> v) const { return v; }
-    util::Any box(RowExpr) const;
+    util::Any box(Obj) const;
 
     // Any properties are only supported by the Cocoa binding to enable reading
     // old Realm files that may have used them. Other bindings can safely not
@@ -113,12 +113,12 @@ public:
     util::Any box(Mixed) const { REALM_TERMINATE("not supported"); }
 
     // Convert from the boxed type to core types. This needs to be implemented
-    // for all of the types which `box()` can take, plus `RowExpr` and optional
+    // for all of the types which `box()` can take, plus `Obj` and optional
     // versions of the numeric types, minus `List` and `Results`.
     //
-    // `create` and `update` are only applicable to `unbox<RowExpr>`. If
+    // `create` and `update` are only applicable to `unbox<Obj>`. If
     // `create` is false then when given something which is not a managed Realm
-    // object `unbox()` should simply return a detached row expr, while if it's
+    // object `unbox()` should simply return a detached obj, while if it's
     // true then `unbox()` should create a new object in the context's Realm
     // using the provided value. If `update` is true then upsert semantics
     // should be used for this.
@@ -148,10 +148,10 @@ private:
 
 };
 
-inline util::Any CppContext::box(RowExpr row) const
+inline util::Any CppContext::box(Obj obj) const
 {
     REALM_ASSERT(object_schema);
-    return Object(realm, *object_schema, row);
+    return Object(realm, *object_schema, obj);
 }
 
 template<>
@@ -173,17 +173,17 @@ inline BinaryData CppContext::unbox(util::Any& v, bool, bool) const
 }
 
 template<>
-inline RowExpr CppContext::unbox(util::Any& v, bool create, bool update) const
+inline Obj CppContext::unbox(util::Any& v, bool create, bool update) const
 {
     if (auto object = any_cast<Object>(&v))
-        return object->row();
-    if (auto row = any_cast<RowExpr>(&v))
-        return *row;
+        return object->obj();
+    if (auto obj = any_cast<Obj>(&v))
+        return *obj;
     if (!create)
-        return RowExpr();
+        return Obj();
 
     REALM_ASSERT(object_schema);
-    return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, update).row();
+    return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, update).obj();
 }
 
 template<>

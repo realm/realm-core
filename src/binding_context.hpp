@@ -132,9 +132,6 @@ public:
 
     // Change information for a single field of a row
     struct ColumnInfo {
-        // The index of this column prior to the changes in the tracked
-        // transaction, or -1 for newly inserted columns.
-        size_t initial_column_index = -1;
         // What kind of change occurred?
         // Always Set or None for everything but LinkList columns.
         enum class Kind {
@@ -159,8 +156,8 @@ public:
     struct ObserverState {
         // Initial table and row which is observed
         // May be updated by row insertions and removals
-        size_t table_ndx;
-        size_t row_ndx;
+        int64_t table_key;
+        int64_t obj_key;
 
         // Opaque userdata for the delegate's use
         void* info;
@@ -173,7 +170,7 @@ public:
         // Simple lexographic ordering
         friend bool operator<(ObserverState const& lft, ObserverState const& rgt)
         {
-            return std::tie(lft.table_ndx, lft.row_ndx) < std::tie(rgt.table_ndx, rgt.row_ndx);
+            return std::tie(lft.table_key, lft.obj_key) < std::tie(rgt.table_key, rgt.obj_key);
         }
     };
 };

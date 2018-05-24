@@ -20,6 +20,8 @@
 
 #include "shared_realm.hpp"
 
+#if 0
+
 using namespace realm;
 using namespace realm::_impl;
 
@@ -180,7 +182,7 @@ void ResultsNotifier::run()
     calculate_changes();
 }
 
-void ResultsNotifier::do_prepare_handover(SharedGroup& sg)
+void ResultsNotifier::do_prepare_handover(Transaction& sg)
 {
     if (!m_tv.is_attached()) {
         // if the table version didn't change we can just reuse the same handover
@@ -206,7 +208,7 @@ void ResultsNotifier::do_prepare_handover(SharedGroup& sg)
     m_tv = {};
 }
 
-void ResultsNotifier::deliver(SharedGroup& sg)
+void ResultsNotifier::deliver(Transaction& sg)
 {
     auto lock = lock_target();
 
@@ -234,14 +236,14 @@ bool ResultsNotifier::prepare_to_deliver()
     return true;
 }
 
-void ResultsNotifier::do_attach_to(SharedGroup& sg)
+void ResultsNotifier::do_attach_to(Transaction& sg)
 {
     REALM_ASSERT(m_query_handover);
     m_query = sg.import_from_handover(std::move(m_query_handover));
     m_descriptor_ordering = DescriptorOrdering::create_from_and_consume_patch(m_ordering_handover, *m_query->get_table());
 }
 
-void ResultsNotifier::do_detach_from(SharedGroup& sg)
+void ResultsNotifier::do_detach_from(Transaction& sg)
 {
     REALM_ASSERT(m_query);
     REALM_ASSERT(!m_tv.is_attached());
@@ -250,3 +252,5 @@ void ResultsNotifier::do_detach_from(SharedGroup& sg)
     m_query_handover = sg.export_for_handover(*m_query, MutableSourcePayload::Move);
     m_query = nullptr;
 }
+
+#endif

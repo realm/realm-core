@@ -25,12 +25,14 @@
 #include <vector>
 
 namespace realm {
-class Descriptor;
 class Group;
 class Schema;
 enum class PropertyType: unsigned char;
 struct ObjectSchemaValidationException;
 struct Property;
+struct TableKey;
+struct ColKey;
+class Table;
 
 class ObjectSchema {
 public:
@@ -42,7 +44,7 @@ public:
 
     // create object schema from existing table
     // if no table is provided it is looked up in the group
-    ObjectSchema(Group const& group, StringData name, size_t index=-1);
+    ObjectSchema(Group const& group, StringData name, TableKey key);
 
     std::string name;
     std::vector<Property> persisted_properties;
@@ -63,7 +65,7 @@ public:
 
     friend bool operator==(ObjectSchema const& a, ObjectSchema const& b);
 
-    static PropertyType from_core_type(Descriptor const& table, size_t col);
+    static PropertyType from_core_type(Table const& table, ColKey col);
 
 private:
     void set_primary_key_property();

@@ -21,12 +21,11 @@
 
 #include "impl/collection_notifier.hpp"
 
-#include <realm/row.hpp>
+#include <realm/obj.hpp>
 
 namespace realm {
 class ObjectSchema;
 struct Property;
-using RowExpr = BasicRowExpr<Table>;
 
 namespace _impl {
     class ObjectNotifier;
@@ -35,8 +34,8 @@ namespace _impl {
 class Object {
 public:
     Object();
-    Object(std::shared_ptr<Realm> r, ObjectSchema const& s, RowExpr const& o);
-    Object(std::shared_ptr<Realm> r, StringData object_type, size_t ndx);
+    Object(std::shared_ptr<Realm> r, ObjectSchema const& s, Obj const& o);
+    Object(std::shared_ptr<Realm> r, StringData object_type, ObjKey key);
 
     Object(Object const&);
     Object(Object&&);
@@ -47,9 +46,9 @@ public:
 
     std::shared_ptr<Realm> const& realm() const { return m_realm; }
     ObjectSchema const& get_object_schema() const { return *m_object_schema; }
-    RowExpr row() const { return m_row; }
+    Obj obj() const { return m_obj; }
 
-    bool is_valid() const { return m_row.is_attached(); }
+    bool is_valid() const { return m_obj.is_valid(); }
 
     NotificationToken add_notification_callback(CollectionChangeCallback callback) &;
 
@@ -74,12 +73,12 @@ public:
     template<typename ValueType, typename ContextType>
     static Object create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                          const ObjectSchema &object_schema, ValueType value,
-                         bool try_update = false, Row* = nullptr);
+                         bool try_update = false, Obj* = nullptr);
 
     template<typename ValueType, typename ContextType>
     static Object create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                          StringData object_type, ValueType value,
-                         bool try_update = false, Row* = nullptr);
+                         bool try_update = false, Obj* = nullptr);
 
     template<typename ValueType, typename ContextType>
     static Object get_for_primary_key(ContextType& ctx,
@@ -96,7 +95,7 @@ public:
 private:
     std::shared_ptr<Realm> m_realm;
     const ObjectSchema *m_object_schema;
-    Row m_row;
+    Obj m_obj;
     _impl::CollectionNotifier::Handle<_impl::ObjectNotifier> m_notifier;
 
 
@@ -107,8 +106,9 @@ private:
     ValueType get_property_value_impl(ContextType& ctx, const Property &property);
 
     template<typename ValueType, typename ContextType>
-    static size_t get_for_primary_key_impl(ContextType& ctx, Table const& table,
-                                           const Property &primary_prop, ValueType primary_value);
+    static ObjKey get_for_primary_key_impl(ContextType& ctx, Table const& table,
+                                           const Property &primary_prop,
+                                           ValueType primary_value);
 
     void verify_attached() const;
     Property const& property_for_name(StringData prop_name) const;

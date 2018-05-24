@@ -23,6 +23,8 @@
 #include "object_schema.hpp"
 #include "object_store.hpp"
 
+#include <realm/table.hpp>
+
 using namespace realm;
 
 InvalidatedObjectException::InvalidatedObjectException(const std::string& object_type)
@@ -49,13 +51,13 @@ ReadOnlyPropertyException::ReadOnlyPropertyException(const std::string& object_t
 : std::logic_error(util::format("Cannot modify read-only property '%1.%2'", object_type, property_name))
 , object_type(object_type), property_name(property_name) {}
 
-Object::Object(SharedRealm r, ObjectSchema const& s, RowExpr const& o)
-: m_realm(std::move(r)), m_object_schema(&s), m_row(o) { }
+Object::Object(SharedRealm r, ObjectSchema const& s, Obj const& o)
+: m_realm(std::move(r)), m_object_schema(&s), m_obj(o) { }
 
-Object::Object(SharedRealm r, StringData object_type, size_t ndx)
+Object::Object(SharedRealm r, StringData object_type, ObjKey key)
 : m_realm(std::move(r))
 , m_object_schema(&*m_realm->schema().find(object_type))
-, m_row(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get(ndx))
+, m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(key))
 { }
 
 Object::Object() = default;
@@ -69,7 +71,7 @@ NotificationToken Object::add_notification_callback(CollectionChangeCallback cal
 {
     verify_attached();
     if (!m_notifier) {
-        m_notifier = std::make_shared<_impl::ObjectNotifier>(m_row, m_realm);
+        m_notifier = std::make_shared<_impl::ObjectNotifier>(m_realm, m_obj.get_table()->get_key(), m_obj.get_key());
         _impl::RealmCoordinator::register_notifier(m_notifier);
     }
     return {m_notifier, m_notifier->add_callback(std::move(callback))};
@@ -78,7 +80,7 @@ NotificationToken Object::add_notification_callback(CollectionChangeCallback cal
 void Object::verify_attached() const
 {
     m_realm->verify_thread();
-    if (!m_row.is_attached()) {
+    if (!m_obj.is_valid()) {
         throw InvalidatedObjectException(m_object_schema->name);
     }
 }

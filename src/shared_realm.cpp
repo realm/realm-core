@@ -31,7 +31,7 @@
 #include "schema.hpp"
 #include "thread_safe_reference.hpp"
 
-#include <realm/history.hpp>
+#include <realm/db.hpp>
 #include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
@@ -52,90 +52,17 @@ namespace sync {
 using namespace realm;
 using namespace realm::_impl;
 
-Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator)
+Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator, MakeSharedTag)
 : m_config(std::move(config))
 , m_execution_context(m_config.execution_context)
 {
-    open_with_config(m_config, m_history, m_shared_group, m_read_only_group, this);
-
-    if (m_read_only_group) {
-        m_group = m_read_only_group.get();
-        m_schema_version = ObjectStore::get_schema_version(*m_group);
-        m_schema = ObjectStore::schema_from_group(*m_group);
-    }
-    else if (!coordinator || !coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
-        if (m_config.should_compact_on_launch_function) {
-            size_t free_space = -1;
-            size_t used_space = -1;
-            // getting stats requires committing a write transaction beforehand.
-            Group* group = nullptr;
-            if (m_shared_group->try_begin_write(group)) {
-                m_shared_group->commit();
-                m_shared_group->get_stats(free_space, used_space);
-                if (m_config.should_compact_on_launch_function(free_space + used_space, used_space))
-                    compact();
-            }
-        }
+    if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
         read_group();
-        if (coordinator)
-            coordinator->cache_schema(m_schema, m_schema_version, m_schema_transaction_version);
-        m_shared_group->end_read();
+        coordinator->cache_schema(m_schema, m_schema_version, m_schema_transaction_version);
         m_group = nullptr;
     }
 
     m_coordinator = std::move(coordinator);
-}
-
-REALM_NOINLINE static void translate_file_exception(StringData path, bool immutable=false)
-{
-    try {
-        throw;
-    }
-    catch (util::File::PermissionDenied const& ex) {
-        throw RealmFileException(RealmFileException::Kind::PermissionDenied, ex.get_path(),
-                                 util::format("Unable to open a realm at path '%1'. Please use a path where your app has %2 permissions.",
-                                              ex.get_path(), immutable ? "read" : "read-write"),
-                                 ex.what());
-    }
-    catch (util::File::Exists const& ex) {
-        throw RealmFileException(RealmFileException::Kind::Exists, ex.get_path(),
-                                 util::format("File at path '%1' already exists.", ex.get_path()),
-                                 ex.what());
-    }
-    catch (util::File::NotFound const& ex) {
-        throw RealmFileException(RealmFileException::Kind::NotFound, ex.get_path(),
-                                 util::format("Directory at path '%1' does not exist.", ex.get_path()), ex.what());
-    }
-    catch (util::File::AccessError const& ex) {
-        // Errors for `open()` include the path, but other errors don't. We
-        // don't want two copies of the path in the error, so strip it out if it
-        // appears, and then include it in our prefix.
-        std::string underlying = ex.what();
-        RealmFileException::Kind error_kind = RealmFileException::Kind::AccessError;
-        // FIXME: Replace this with a proper specific exception type once Core adds support for it.
-        if (underlying == "Bad or incompatible history type")
-            error_kind = RealmFileException::Kind::BadHistoryError;
-        auto pos = underlying.find(ex.get_path());
-        if (pos != std::string::npos && pos > 0) {
-            // One extra char at each end for the quotes
-            underlying.replace(pos - 1, ex.get_path().size() + 2, "");
-        }
-        throw RealmFileException(error_kind, ex.get_path(),
-                                 util::format("Unable to open a realm at path '%1': %2.", ex.get_path(), underlying), ex.what());
-    }
-    catch (IncompatibleLockFile const& ex) {
-        throw RealmFileException(RealmFileException::Kind::IncompatibleLockFile, path,
-                                 "Realm file is currently open in another process "
-                                 "which cannot share access with this process. "
-                                 "All processes sharing a single file must be the same architecture.",
-                                 ex.what());
-    }
-    catch (FileFormatUpgradeRequired const& ex) {
-        throw RealmFileException(RealmFileException::Kind::FormatUpgradeRequired, path,
-                                 "The Realm file format must be allowed to be upgraded "
-                                 "in order to proceed.",
-                                 ex.what());
-    }
 }
 
 #if REALM_ENABLE_SYNC
@@ -145,81 +72,6 @@ static bool is_nonupgradable_history(IncompatibleHistories const& ex)
     return ex.what() == std::string("Incompatible histories. Nonupgradable history schema");
 }
 #endif
-
-void Realm::open_with_config(const Config& config,
-                             std::unique_ptr<Replication>& history,
-                             std::unique_ptr<SharedGroup>& shared_group,
-                             std::unique_ptr<Group>& read_only_group,
-                             Realm* realm)
-{
-    bool server_synchronization_mode = bool(config.sync_config) || config.force_sync_history;
-    try {
-        if (config.immutable()) {
-            if (config.realm_data.is_null()) {
-                read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
-            }
-            else {
-                // Create in-memory read-only realm from existing buffer (without taking ownership of the buffer)
-                read_only_group = std::make_unique<Group>(config.realm_data, false);
-            }
-        }
-        else {
-            if (server_synchronization_mode) {
-#if REALM_ENABLE_SYNC
-                history = realm::sync::make_client_history(config.path);
-#else
-                REALM_TERMINATE("Realm was not built with sync enabled");
-#endif
-            }
-            else {
-                history = realm::make_in_realm_history(config.path);
-            }
-
-            SharedGroupOptions options;
-            options.durability = config.in_memory ? SharedGroupOptions::Durability::MemOnly :
-                                                    SharedGroupOptions::Durability::Full;
-            options.encryption_key = config.encryption_key.data();
-            options.allow_file_format_upgrade = !config.disable_format_upgrade &&
-                                                config.schema_mode != SchemaMode::ResetFile;
-            options.upgrade_callback = [&](int from_version, int to_version) {
-                if (realm) {
-                    realm->upgrade_initial_version = from_version;
-                    realm->upgrade_final_version = to_version;
-                }
-            };
-            shared_group = std::make_unique<SharedGroup>(*history, options);
-        }
-    }
-    catch (realm::FileFormatUpgradeRequired const&) {
-        if (config.schema_mode != SchemaMode::ResetFile) {
-            translate_file_exception(config.path, config.immutable());
-        }
-        util::File::remove(config.path);
-        open_with_config(config, history, shared_group, read_only_group, realm);
-    }
-#if REALM_ENABLE_SYNC
-    catch (IncompatibleHistories const& ex) {
-        if (!server_synchronization_mode || !is_nonupgradable_history(ex))
-            translate_file_exception(config.path, config.immutable()); // Throws
-
-        // Move the Realm file into the recovery directory.
-        std::string recovery_directory = SyncManager::shared().recovery_directory_path();
-        std::string new_realm_path = util::reserve_unique_file_name(recovery_directory, "synced-realm-XXXXXXX");
-        util::File::move(config.path, new_realm_path);
-
-        const char* message = "The local copy of this synced Realm was created with an incompatible version of "
-                              "Realm. It has been moved aside, and the Realm will be re-downloaded the next time it "
-                              "is opened. You should write a handler for this error that uses the provided "
-                              "configuration to open the old Realm in read-only mode to recover any pending changes "
-                              "and then remove the Realm file.";
-        throw RealmFileException(RealmFileException::Kind::IncompatibleSyncedRealm, std::move(new_realm_path),
-                                 message, ex.what());
-    }
-#endif // REALM_ENABLE_SYNC
-    catch (...) {
-        translate_file_exception(config.path, config.immutable());
-    }
-}
 
 Realm::~Realm()
 {
@@ -254,7 +106,7 @@ void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
 void Realm::begin_read(VersionID version_id)
 {
     REALM_ASSERT(!m_group);
-    m_group = &const_cast<Group&>(m_shared_group->begin_read(version_id));
+    m_group = m_coordinator->begin_read(version_id);
     add_schema_change_handler();
     read_schema_from_group_if_needed();
 }
@@ -275,10 +127,10 @@ void Realm::set_schema(Schema const& reference, Schema schema)
 
 void Realm::read_schema_from_group_if_needed()
 {
-    REALM_ASSERT(!m_read_only_group);
+    REALM_ASSERT(!m_config.immutable());
 
     Group& group = read_group();
-    auto current_version = m_shared_group->get_version_of_current_transaction().version;
+    auto current_version = transaction().get_version_of_current_transaction().version;
     if (m_schema_transaction_version == current_version)
         return;
 
@@ -296,8 +148,6 @@ void Realm::read_schema_from_group_if_needed()
         }
         else {
             // The structure of the schema has changed, so replace our copy of the schema.
-            // FIXME: This invalidates any pointers to the object schemas within the schema vector,
-            // which will cause problems for anyone that caches such a pointer.
             m_schema = std::move(schema);
         }
     }
@@ -315,11 +165,9 @@ bool Realm::reset_file(Schema& schema, std::vector<SchemaChange>& required_chang
     // synchronization. The latter is probably fixable, but making it
     // multi-process-safe requires some sort of multi-process exclusive lock
     m_group = nullptr;
-    m_shared_group = nullptr;
-    m_history = nullptr;
+    // FIXME: realm_coordinator->close() ?
     util::File::remove(m_config.path);
 
-    open_with_config(m_config, m_history, m_shared_group, m_read_only_group, this);
     m_schema = ObjectStore::schema_from_group(read_group());
     m_schema_version = ObjectStore::get_schema_version(read_group());
     required_changes = m_schema.compare(schema);
@@ -377,7 +225,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema,
 
 Schema Realm::get_full_schema()
 {
-    if (!m_read_only_group)
+    if (!m_config.immutable())
         refresh();
 
     // If the user hasn't specified a schema previously then m_schema is always
@@ -387,14 +235,14 @@ Schema Realm::get_full_schema()
 
     // Otherwise we may have a subset of the file's schema, so we need to get
     // the complete thing to calculate what changes to make
-    if (m_read_only_group)
+    if (m_config.immutable())
         return ObjectStore::schema_from_group(read_group());
 
     Schema actual_schema;
     uint64_t actual_version;
-    uint64_t transaction = -1;
-    bool got_cached = m_coordinator->get_cached_schema(actual_schema, actual_version, transaction);
-    if (!got_cached || transaction != m_shared_group->get_version_of_current_transaction().version)
+    uint64_t version = -1;
+    bool got_cached = m_coordinator->get_cached_schema(actual_schema, actual_version, version);
+    if (!got_cached || version != transaction().get_version_of_current_transaction().version)
         return ObjectStore::schema_from_group(read_group());
     return actual_schema;
 }
@@ -443,7 +291,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     // Either the schema version has changed or we need to do non-migration changes
 
     if (!in_transaction) {
-        transaction::begin_without_validation(*m_shared_group);
+        transaction::begin_without_validation(transaction());
 
         // Beginning the write transaction may have advanced the version and left
         // us with nothing to do if someone else initialized the schema on disk
@@ -471,10 +319,13 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     bool additive = m_config.schema_mode == SchemaMode::Additive;
     if (migration_function && !additive) {
         auto wrapper = [&] {
-            SharedRealm old_realm(new Realm(m_config, nullptr));
-            // Need to open in read-write mode so that it uses a SharedGroup, but
-            // users shouldn't actually be able to write via the old realm
-            old_realm->m_config.schema_mode = SchemaMode::Immutable;
+            auto config = m_config;
+            config.schema_mode = SchemaMode::ReadOnlyAlternative;
+            config.schema = util::none;
+            // Don't go through the normal codepath for opening a Realm because
+            // we're using a mismatched config
+            auto old_realm = std::make_shared<Realm>(std::move(config),
+                                                     m_coordinator, MakeSharedTag{});
             migration_function(old_realm, shared_from_this(), m_schema);
         };
 
@@ -533,8 +384,6 @@ void Realm::add_schema_change_handler()
         m_new_schema = ObjectStore::schema_from_group(read_group());
         m_schema_version = ObjectStore::get_schema_version(read_group());
         if (m_dynamic_schema) {
-            // FIXME: This invalidates any pointers to the object schemas within the schema vector,
-            // which will cause problems for anyone that caches such a pointer.
             m_schema = *m_new_schema;
         }
         else
@@ -549,19 +398,19 @@ void Realm::cache_new_schema()
     if (!m_shared_group)
         return;
 
-    auto new_version = m_shared_group->get_version_of_current_transaction().version;
-    if (m_coordinator) {
-        if (m_new_schema)
-            m_coordinator->cache_schema(std::move(*m_new_schema), m_schema_version, new_version);
-        else
-            m_coordinator->advance_schema_cache(m_schema_transaction_version, new_version);
-    }
+    auto new_version = transaction().get_version_of_current_transaction().version;
+    if (m_new_schema)
+        m_coordinator->cache_schema(std::move(*m_new_schema),
+                                    m_schema_version, new_version);
+    else
+        m_coordinator->advance_schema_cache(m_schema_transaction_version, new_version);
     m_schema_transaction_version = new_version;
     m_new_schema = util::none;
 }
 
 void Realm::translate_schema_error()
 {
+#if 0 // FIXME
     // Open another copy of the file to read the new (incompatible) schema without changing
     // our read transaction
     auto config = m_config;
@@ -571,6 +420,7 @@ void Realm::translate_schema_error()
 
     // Should always throw
     ObjectStore::verify_valid_external_changes(m_schema.compare(new_schema, true));
+#endif
 
     // Something strange happened so just rethrow the old exception
     throw;
@@ -623,10 +473,8 @@ void Realm::verify_open() const
 
 bool Realm::is_in_transaction() const noexcept
 {
-    if (!m_shared_group) {
-        return false;
-    }
-    return m_shared_group->get_transact_stage() == SharedGroup::transact_Writing;
+    return !m_config.immutable()
+        && transaction().get_transact_stage() == DB::transact_Writing;
 }
 
 void Realm::begin_transaction()
@@ -656,7 +504,9 @@ void Realm::begin_transaction()
     read_group();
 
     m_is_sending_notifications = true;
-    auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
+    auto cleanup = util::make_scope_exit([this]() noexcept {
+        m_is_sending_notifications = false;
+    });
 
     try {
         m_coordinator->promote_to_write(*this);
@@ -707,12 +557,8 @@ void Realm::invalidate()
     if (is_in_transaction()) {
         cancel_transaction();
     }
-    if (!m_group) {
-        return;
-    }
 
     m_permissions_cache = nullptr;
-    m_shared_group->end_read();
     m_group = nullptr;
 }
 
@@ -727,14 +573,9 @@ bool Realm::compact()
         throw InvalidTransactionException("Can't compact a Realm within a write transaction");
     }
 
-    Group& group = read_group();
-    for (auto &object_schema : m_schema) {
-        ObjectStore::table_for_object_type(group, object_schema.name)->optimize();
-    }
-    m_shared_group->end_read();
     m_group = nullptr;
-
-    return m_shared_group->compact();
+//    return m_shared_group->compact();
+    return false;
 }
 
 void Realm::write_copy(StringData path, BinaryData key)
@@ -747,7 +588,7 @@ void Realm::write_copy(StringData path, BinaryData key)
         read_group().write(path, key.data());
     }
     catch (...) {
-        translate_file_exception(path);
+        _impl::translate_file_exception(path);
     }
 }
 
@@ -779,7 +620,7 @@ void Realm::notify()
     }
 
     auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
-    if (!m_shared_group->has_changed()) {
+    if (!transaction().has_changed()) {
         m_is_sending_notifications = true;
         m_coordinator->process_available_async(*this);
         return;
@@ -790,7 +631,7 @@ void Realm::notify()
 
         // changes_available() may have advanced the read version, and if
         // so we don't need to do anything further
-        if (!m_shared_group->has_changed())
+        if (!transaction().has_changed())
             return;
     }
 
@@ -874,12 +715,11 @@ bool Realm::can_deliver_notifications() const noexcept
 
 uint64_t Realm::get_schema_version(const Realm::Config &config)
 {
-    auto coordinator = RealmCoordinator::get_existing_coordinator(config.path);
-    if (coordinator) {
-        return coordinator->get_schema_version();
-    }
-
-    return ObjectStore::get_schema_version(Realm(config, nullptr).read_group());
+    auto coordinator = RealmCoordinator::get_coordinator(config);
+    auto version = coordinator->get_schema_version();
+    if (version == ObjectStore::NotVersioned)
+        version = ObjectStore::get_schema_version(*coordinator->begin_read());
+    return version;
 }
 
 void Realm::close()
@@ -890,9 +730,6 @@ void Realm::close()
 
     m_permissions_cache = nullptr;
     m_group = nullptr;
-    m_shared_group = nullptr;
-    m_history = nullptr;
-    m_read_only_group = nullptr;
     m_binding_context = nullptr;
     m_coordinator = nullptr;
 }
@@ -946,7 +783,7 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
     }
     else {
         // A read transaction does exist, but let's make sure that its version matches the reference's
-        auto current_version = m_shared_group->get_version_of_current_transaction();
+        auto current_version = transaction().get_version_of_current_transaction();
         VersionID reference_version(reference.m_version_id);
 
         if (reference_version == current_version) {
@@ -955,21 +792,13 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
 
         refresh();
 
-        current_version = m_shared_group->get_version_of_current_transaction();
+        current_version = transaction().get_version_of_current_transaction();
 
         // If the reference's version is behind, advance it to our version
         if (reference_version < current_version) {
-            // Duplicate config for uncached Realm so we don't advance the user's Realm
-            Realm::Config config = m_coordinator->get_config();
-            config.automatic_change_notifications = false;
-            config.cache = false;
-            config.schema = util::none;
-            SharedRealm temporary_realm = m_coordinator->get_realm(config);
-            temporary_realm->begin_read(reference_version);
-
-            // With reference imported, advance temporary Realm to our version
-            T imported_value = std::move(reference).import_into_realm(temporary_realm);
-            transaction::advance(*temporary_realm->m_shared_group, nullptr, current_version);
+            auto transaction = m_coordinator->begin_read(reference_version);
+            T imported_value = std::move(reference).import_into(transaction);
+            transaction->advance_read(current_version);
             if (!imported_value.is_valid())
                 return T{};
             reference = ThreadSafeReference<T>(imported_value);
@@ -1080,20 +909,3 @@ MismatchedConfigException::MismatchedConfigException(StringData message, StringD
 
 MismatchedRealmException::MismatchedRealmException(StringData message)
 : std::logic_error(message.data()) { }
-
-// FIXME Those are exposed for Java async queries, mainly because of handover related methods.
-SharedGroup& RealmFriend::get_shared_group(Realm& realm)
-{
-    return *realm.m_shared_group;
-}
-
-Group& RealmFriend::read_group_to(Realm& realm, VersionID version)
-{
-    if (realm.m_group && realm.m_shared_group->get_version_of_current_transaction() == version)
-        return *realm.m_group;
-
-    if (realm.m_group)
-        realm.m_shared_group->end_read();
-    realm.begin_read(version);
-    return *realm.m_group;
-}

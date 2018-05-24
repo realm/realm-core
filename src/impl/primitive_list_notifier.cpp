@@ -20,6 +20,8 @@
 
 #include "shared_realm.hpp"
 
+#if 0
+
 #include <realm/link_view.hpp>
 
 using namespace realm;
@@ -38,14 +40,14 @@ void PrimitiveListNotifier::release_data() noexcept
     m_table.reset();
 }
 
-void PrimitiveListNotifier::do_attach_to(SharedGroup& sg)
+void PrimitiveListNotifier::do_attach_to(Transaction& sg)
 {
     REALM_ASSERT(m_table_handover);
     REALM_ASSERT(!m_table);
     m_table = sg.import_table_from_handover(std::move(m_table_handover));
 }
 
-void PrimitiveListNotifier::do_detach_from(SharedGroup& sg)
+void PrimitiveListNotifier::do_detach_from(Transaction& sg)
 {
     REALM_ASSERT(!m_table_handover);
     if (m_table) {
@@ -93,7 +95,9 @@ void PrimitiveListNotifier::run()
     m_prev_size = m_table->size();
 }
 
-void PrimitiveListNotifier::do_prepare_handover(SharedGroup&)
+void PrimitiveListNotifier::do_prepare_handover(Transaction&)
 {
     add_changes(std::move(m_change));
 }
+
+#endif

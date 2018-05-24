@@ -23,8 +23,7 @@
 #include "index_set.hpp"
 #include "shared_realm.hpp"
 
-#include <realm/group_shared.hpp>
-#include <realm/lang_bind_helper.hpp>
+#include <realm/db.hpp>
 
 #include <algorithm>
 #include <numeric>
@@ -37,8 +36,8 @@ class KVOAdapter : public _impl::TransactionChangeInfo {
 public:
     KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context);
 
-    void before(SharedGroup& sg);
-    void after(SharedGroup& sg);
+    void before(Transaction& sg);
+    void after(Transaction& sg);
 
 private:
     BindingContext* m_context;
@@ -48,13 +47,11 @@ private:
     struct ListInfo {
         BindingContext::ObserverState* observer;
         _impl::CollectionChangeBuilder builder;
-        size_t col;
+        ColKey col;
         size_t initial_size;
     };
     std::vector<ListInfo> m_lists;
     VersionID m_version;
-
-    size_t new_table_ndx(size_t ndx) const { return ndx < table_indices.size() ? table_indices[ndx] : ndx; }
 };
 
 KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context)
@@ -65,40 +62,39 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     if (m_observers.empty())
         return;
 
-    std::vector<size_t> tables_needed;
+    std::vector<int64_t> tables_needed;
     for (auto& observer : observers) {
-        tables_needed.push_back(observer.table_ndx);
+        tables_needed.push_back(observer.table_key);
     }
     std::sort(begin(tables_needed), end(tables_needed));
-    tables_needed.erase(std::unique(begin(tables_needed), end(tables_needed)), end(tables_needed));
+    tables_needed.erase(std::unique(begin(tables_needed), end(tables_needed)),
+                        end(tables_needed));
 
     auto realm = context->realm.lock();
     auto& group = realm->read_group();
     for (auto& observer : observers) {
-        auto table = group.get_table(observer.table_ndx);
-        for (size_t i = 0, count = table->get_column_count(); i < count; ++i) {
-            auto type = table->get_column_type(i);
+        auto table = group.get_table(TableKey(observer.table_key));
+        for (auto key : table->get_column_keys()) {
+            auto type = table->get_column_type(key);
             if (type == type_LinkList)
-                m_lists.push_back({&observer, {}, i, size_t(-1)});
-            else if (type == type_Table)
-                m_lists.push_back({&observer, {}, i, table->get_subtable_size(i, observer.row_ndx)});
+                m_lists.push_back({&observer, {}, key, size_t(-1)});
+//            else if (type == type_Table)
+//                m_lists.push_back({&observer, {}, i, table->get_subtable_size(i, observer.row_ndx)});
         }
     }
 
-    auto max = std::max_element(begin(tables_needed), end(tables_needed));
-    if (*max >= table_modifications_needed.size())
-        table_modifications_needed.resize(*max + 1, false);
-    if (*max >= table_moves_needed.size())
-        table_moves_needed.resize(*max + 1, false);
+    table_modifications_needed.reserve(tables_needed.size());
+    table_moves_needed.reserve(tables_needed.size());
     for (auto& tbl : tables_needed) {
-        table_modifications_needed[tbl] = true;
-        table_moves_needed[tbl] = true;
+        table_modifications_needed.insert(tbl);
+        table_moves_needed.insert(tbl);
     }
     for (auto& list : m_lists)
-        lists.push_back({list.observer->table_ndx, list.observer->row_ndx, list.col, &list.builder});
+        lists.push_back({list.observer->table_key,
+            list.observer->obj_key, list.col, &list.builder});
 }
 
-void KVOAdapter::before(SharedGroup& sg)
+void KVOAdapter::before(Transaction& sg)
 {
     if (!m_context)
         return;
@@ -108,37 +104,23 @@ void KVOAdapter::before(SharedGroup& sg)
         return;
 
     for (auto& observer : m_observers) {
-        size_t table_ndx = new_table_ndx(observer.table_ndx);
-        if (table_ndx >= tables.size())
+        if (observer.table_key >= tables.size())
             continue;
 
-        auto const& table = tables[table_ndx];
+        auto const& table = tables[observer.table_key];
         auto const& moves = table.moves;
-        auto idx = observer.row_ndx;
-        auto it = lower_bound(begin(moves), end(moves), idx,
-                              [](auto const& a, auto b) { return a.from < b; });
-        if (it != moves.end() && it->from == idx)
-            idx = it->to;
-        else if (table.deletions.contains(idx)) {
+        auto idx = observer.obj_key;
+        if (table.deletions.contains(idx)) {
             m_invalidated.push_back(observer.info);
             continue;
         }
-        else
-            idx = table.insertions.shift(table.deletions.unshift(idx));
         if (table.modifications.contains(idx)) {
             observer.changes.resize(table.columns.size());
             size_t i = 0;
             for (auto& c : table.columns) {
                 auto& change = observer.changes[i];
-                if (table_ndx >= column_indices.size() || column_indices[table_ndx].empty())
-                    change.initial_column_index = i;
-                else if (i >= column_indices[table_ndx].size())
-                    change.initial_column_index = i - column_indices[table_ndx].size() + column_indices[table_ndx].back() + 1;
-                else
-                    change.initial_column_index = column_indices[table_ndx][i];
-                if (change.initial_column_index != npos && c.contains(idx))
+                if (c.contains(idx))
                     change.kind = BindingContext::ColumnInfo::Kind::Set;
-                ++i;
             }
         }
     }
@@ -154,7 +136,7 @@ void KVOAdapter::before(SharedGroup& sg)
         }
         // If the containing row was deleted then changes will be empty
         if (list.observer->changes.empty()) {
-            REALM_ASSERT_DEBUG(tables[new_table_ndx(list.observer->table_ndx)].deletions.contains(list.observer->row_ndx));
+            REALM_ASSERT_DEBUG(tables[new_table_key(list.observer->table_key)].deletions.contains(list.observer->row_ndx));
             continue;
         }
         // otherwise the column should have been marked as modified
@@ -223,7 +205,7 @@ void KVOAdapter::before(SharedGroup& sg)
     m_context->will_change(m_observers, m_invalidated);
 }
 
-void KVOAdapter::after(SharedGroup& sg)
+void KVOAdapter::after(Transaction& sg)
 {
     if (!m_context)
         return;
@@ -243,28 +225,7 @@ struct MarkDirtyMixin  {
         return true;
     }
 
-    bool set_int(size_t c, size_t r, int_fast64_t, _impl::Instruction i, size_t) { return mark_dirty(r, c, i); }
-    bool set_bool(size_t c, size_t r, bool, _impl::Instruction i) { return mark_dirty(r, c, i); }
-    bool set_float(size_t c, size_t r, float, _impl::Instruction i) { return mark_dirty(r, c, i); }
-    bool set_double(size_t c, size_t r, double, _impl::Instruction i) { return mark_dirty(r, c, i); }
-    bool set_string(size_t c, size_t r, StringData, _impl::Instruction i, size_t) { return mark_dirty(r, c, i); }
-    bool set_binary(size_t c, size_t r, BinaryData, _impl::Instruction i) { return mark_dirty(r, c, i); }
-    bool set_olddatetime(size_t c, size_t r, OldDateTime, _impl::Instruction i) { return mark_dirty(r, c, i); }
-    bool set_timestamp(size_t c, size_t r, Timestamp, _impl::Instruction i) { return mark_dirty(r, c, i); }
-    bool set_table(size_t c, size_t r, _impl::Instruction i) { return mark_dirty(r, c, i); }
-    bool set_mixed(size_t c, size_t r, const Mixed&, _impl::Instruction i) { return mark_dirty(r, c, i); }
-    bool set_link(size_t c, size_t r, size_t, size_t, _impl::Instruction i) { return mark_dirty(r, c, i); }
-    bool set_null(size_t c, size_t r, _impl::Instruction i, size_t) { return mark_dirty(r, c, i); }
-
-    bool add_int(size_t col, size_t row, int_fast64_t) { return mark_dirty(row, col); }
-    bool nullify_link(size_t col, size_t row, size_t) { return mark_dirty(row, col); }
-    bool insert_substring(size_t col, size_t row, size_t, StringData) { return mark_dirty(row, col); }
-    bool erase_substring(size_t col, size_t row, size_t, size_t) { return mark_dirty(row, col); }
-
-    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) { return true; }
-    bool set_string_unique(size_t, size_t, size_t, StringData) { return true; }
-
-    bool add_row_with_key(size_t, size_t, size_t, int64_t) { return true; }
+    bool modify_object(size_t c, size_t r) { return mark_dirty(r, c); }
 };
 
 class TransactLogValidationMixin {
@@ -293,30 +254,17 @@ public:
     bool erase_group_level_table(size_t, size_t) { schema_error(); }
     bool rename_group_level_table(size_t, StringData) { schema_error(); }
     bool erase_column(size_t) { schema_error(); }
-    bool erase_link_column(size_t, size_t, size_t) { schema_error(); }
     bool rename_column(size_t, StringData) { schema_error(); }
-
-    // Schema changes which don't involve a change in the schema version are
-    // allowed
-    bool add_search_index(size_t) { return true; }
-    bool remove_search_index(size_t) { return true; }
 
     // Additive changes and reorderings are supported
     bool insert_group_level_table(size_t, size_t, StringData) { return true; }
     bool insert_column(size_t, DataType, StringData, bool) { return true; }
-    bool insert_link_column(size_t, DataType, StringData, size_t, size_t) { return true; }
     bool set_link_type(size_t, LinkType) { return true; }
-    bool move_column(size_t, size_t) { return true; }
-    bool move_group_level_table(size_t, size_t) { return true; }
 
     // Non-schema changes are all allowed
     void parse_complete() { }
-    bool select_descriptor(int, const size_t*) { return true; }
-    bool select_link_list(size_t, size_t, size_t) { return true; }
-    bool insert_empty_rows(size_t, size_t, size_t, bool) { return true; }
-    bool erase_rows(size_t, size_t, size_t, bool) { return true; }
-    bool swap_rows(size_t, size_t) { return true; }
-    bool move_row(size_t, size_t) { return true; }
+    bool create_object(ObjKey) { return true; }
+    bool remove_object(ObjKey) { return true; }
     bool clear_table(size_t=0) noexcept { return true; }
     bool link_list_set(size_t, size_t, size_t) { return true; }
     bool link_list_insert(size_t, size_t, size_t) { return true; }
@@ -325,8 +273,6 @@ public:
     bool link_list_clear(size_t) { return true; }
     bool link_list_move(size_t, size_t) { return true; }
     bool link_list_swap(size_t, size_t) { return true; }
-    bool merge_rows(size_t, size_t) { return true; }
-    bool optimize_table() { return true; }
 };
 
 
@@ -411,7 +357,7 @@ class TransactLogObserver : public TransactLogValidationMixin, public MarkDirtyM
         // change objects for a single LinkView, in which case we need to use
         // the last one
         for (auto it = m_info.lists.rbegin(), end = m_info.lists.rend(); it != end; ++it) {
-            if (it->table_ndx == tbl && it->row_ndx == row && it->col_ndx == col)
+            if (it->table_key == tbl && it->row_ndx == row && it->col_ndx == col)
                 return it->changes;
         }
         return nullptr;
@@ -435,51 +381,19 @@ public:
             list.changes->clean_up_stale_moves();
     }
 
-    bool select_descriptor(int levels, const size_t*) noexcept
+    bool select_table(TableKey key) noexcept
     {
-        if (levels == 0) // schema of selected table is being modified
-            m_active_descriptor = m_active_table;
-        else // schema of subtable is being modified; currently don't need to track this
-            m_active_descriptor = nullptr;
-        return true;
-    }
-
-    bool select_table(size_t group_level_ndx, int len, size_t const* path) noexcept
-    {
-        TransactLogValidationMixin::select_table(group_level_ndx, len, path);
+        TransactLogValidationMixin::select_table(key);
         m_active_table = nullptr;
-        m_is_top_level_table = true;
-
-        // Nested subtables currently not supported
-        if (len > 1) {
-            m_is_top_level_table = false;
-            return true;
-        }
 
         auto tbl_ndx = current_table();
-        if (!m_info.track_all && (tbl_ndx >= m_info.table_modifications_needed.size() || !m_info.table_modifications_needed[tbl_ndx]))
+        if (!m_info.track_all && !m_info.table_modifications_needed[tbl_ndx])
             return true;
 
-        m_need_move_info = m_info.track_all || (tbl_ndx < m_info.table_moves_needed.size() &&
-                                                m_info.table_moves_needed[tbl_ndx]);
+        m_need_move_info = m_info.track_all || m_info.table_moves_needed[tbl_ndx]);
         if (m_info.tables.size() <= tbl_ndx)
             m_info.tables.resize(std::max(m_info.tables.size() * 2, tbl_ndx + 1));
         m_active_table = &m_info.tables[tbl_ndx];
-
-        if (len == 1) {
-            // Mark the cell containing the subtable as modified since selecting
-            // a table is always followed by a modification of some sort
-            size_t col = path[0];
-            size_t row = path[1];
-            mark_dirty(row, col);
-
-            m_active_table = nullptr;
-            m_is_top_level_table = false;
-            if (auto table = find_list(current_table(), col, row)) {
-                m_active_table = table;
-                m_need_move_info = true;
-            }
-        }
         return true;
     }
 
@@ -490,30 +404,30 @@ public:
         return true;
     }
 
-    bool link_list_set(size_t index, size_t, size_t)
+    bool link_list_set(size_t index)
     {
         if (m_active_list)
             m_active_list->modify(index);
         return true;
     }
 
-    bool link_list_insert(size_t index, size_t, size_t)
+    bool link_list_insert(size_t index)
     {
         if (m_active_list)
             m_active_list->insert(index);
         return true;
     }
 
-    bool link_list_erase(size_t index, size_t)
+    bool link_list_erase(size_t index)
     {
         if (m_active_list)
             m_active_list->erase(index);
         return true;
     }
 
-    bool link_list_nullify(size_t index, size_t prior_size)
+    bool link_list_nullify(size_t index)
     {
-        return link_list_erase(index, prior_size);
+        return link_list_erase(index);
     }
 
     bool link_list_swap(size_t index1, size_t index2)
@@ -537,22 +451,10 @@ public:
         return true;
     }
 
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t, bool)
+    bool create_object(ObjKey key)
     {
         if (m_active_table)
             m_active_table->insert(row_ndx, num_rows_to_insert, m_need_move_info);
-        if (!m_is_top_level_table)
-            return true;
-        for (auto& list : m_info.lists) {
-            if (list.table_ndx == current_table() && list.row_ndx >= row_ndx)
-                list.row_ndx += num_rows_to_insert;
-        }
-        return true;
-    }
-
-    bool add_row_with_key(size_t row_ndx, size_t prior_num_rows, size_t, int64_t)
-    {
-        insert_empty_rows(row_ndx, 1, prior_num_rows, false);
         return true;
     }
 
@@ -571,7 +473,7 @@ public:
             return true;
         for (size_t i = 0; i < m_info.lists.size(); ++i) {
             auto& list = m_info.lists[i];
-            if (list.table_ndx != current_table())
+            if (list.table_key != current_table())
                 continue;
             if (list.row_ndx == row_ndx) {
                 if (i + 1 < m_info.lists.size())
@@ -600,7 +502,7 @@ public:
         if (m_active_table)
             m_active_table->swap(row_ndx_1, row_ndx_2, m_need_move_info);
         for (auto& list : m_info.lists) {
-            if (list.table_ndx == current_table()) {
+            if (list.table_key == current_table()) {
                 if (list.row_ndx == row_ndx_1)
                     list.row_ndx = row_ndx_2;
                 else if (list.row_ndx == row_ndx_2)
@@ -626,7 +528,7 @@ public:
         if (!m_is_top_level_table)
             return true;
         for (auto& list : m_info.lists) {
-            if (list.table_ndx == current_table() && list.row_ndx == from)
+            if (list.table_key == current_table() && list.row_ndx == from)
                 list.row_ndx = to;
         }
         return true;
@@ -640,7 +542,7 @@ public:
         if (!m_is_top_level_table)
             return true;
         auto it = remove_if(begin(m_info.lists), end(m_info.lists),
-                            [&](auto const& lv) { return lv.table_ndx == tbl_ndx; });
+                            [&](auto const& lv) { return lv.table_key == tbl_ndx; });
         m_info.lists.erase(it, end(m_info.lists));
         return true;
     }
@@ -654,7 +556,7 @@ public:
         if (m_active_descriptor != m_active_table || !m_is_top_level_table)
             return true;
         for (auto& list : m_info.lists) {
-            if (list.table_ndx == current_table() && list.col_ndx >= ndx)
+            if (list.table_key == current_table() && list.col_ndx >= ndx)
                 ++list.col_ndx;
         }
         if (m_info.column_indices.size() <= current_table())
@@ -679,8 +581,8 @@ public:
         m_info.schema_changed = true;
 
         for (auto& list : m_info.lists) {
-            if (list.table_ndx >= ndx)
-                ++list.table_ndx;
+            if (list.table_key >= ndx)
+                ++list.table_key;
         }
         prepare_table_indices();
         adjust_ge(m_info.table_indices, ndx);
@@ -690,53 +592,19 @@ public:
         return true;
     }
 
-    bool move_column(size_t from, size_t to)
-    {
-        m_info.schema_changed = true;
-
-        if (m_active_descriptor)
-            m_active_descriptor->move_column(from, to);
-        if (m_active_descriptor != m_active_table || !m_is_top_level_table)
-            return true;
-        for (auto& list : m_info.lists) {
-            if (list.table_ndx == current_table())
-                adjust_for_move(list.col_ndx, from, to);
-        }
-        if (m_info.column_indices.size() <= current_table())
-            m_info.column_indices.resize(current_table() + 1);
-        expand_to(m_info.column_indices[current_table()], std::max(from, to) + 1);
-        rotate(m_info.column_indices[current_table()], from, to);
-        return true;
-    }
-
-    bool move_group_level_table(size_t from, size_t to)
-    {
-        m_info.schema_changed = true;
-
-        for (auto& list : m_info.lists)
-            adjust_for_move(list.table_ndx, from, to);
-
-        prepare_table_indices();
-        adjust_for_move(m_info.table_indices, from, to);
-        rotate(m_info.tables, from, to);
-        rotate(m_info.table_modifications_needed, from, to);
-        rotate(m_info.table_moves_needed, from, to);
-        return true;
-    }
-
     bool insert_link_column(size_t ndx, DataType type, StringData name, size_t, size_t) { return insert_column(ndx, type, name, false); }
 };
 
 class KVOTransactLogObserver : public TransactLogObserver {
     KVOAdapter m_adapter;
     _impl::NotifierPackage& m_notifiers;
-    SharedGroup& m_sg;
+    Transaction& m_sg;
 
 public:
     KVOTransactLogObserver(std::vector<BindingContext::ObserverState>& observers,
                            BindingContext* context,
                            _impl::NotifierPackage& notifiers,
-                           SharedGroup& sg)
+                           Transaction& sg)
     : TransactLogObserver(m_adapter)
     , m_adapter(observers, context)
     , m_notifiers(notifiers)
@@ -754,14 +622,14 @@ public:
         TransactLogObserver::parse_complete();
         m_adapter.before(m_sg);
 
-        using sgf = _impl::SharedGroupFriend;
+        using sgf = _impl::TransactionFriend;
         m_notifiers.package_and_wait(sgf::get_version_of_latest_snapshot(m_sg));
         m_notifiers.before_advance();
     }
 };
 
 template<typename Func>
-void advance_with_notifications(BindingContext* context, const std::unique_ptr<SharedGroup>& sg,
+void advance_with_notifications(BindingContext* context, const std::unique_ptr<Transaction>& sg,
                                 Func&& func, _impl::NotifierPackage& notifiers)
 {
     auto old_version = sg->get_version_of_current_transaction();
@@ -816,36 +684,36 @@ UnsupportedSchemaChange::UnsupportedSchemaChange()
 }
 
 namespace transaction {
-void advance(SharedGroup& sg, BindingContext*, VersionID version)
+void advance(Transaction& sg, BindingContext*, VersionID version)
 {
     LangBindHelper::advance_read(sg, TransactLogValidator(), version);
 }
 
-void advance(const std::unique_ptr<SharedGroup>& sg, BindingContext* context, NotifierPackage& notifiers)
+void advance(const std::unique_ptr<Transaction>& sg, BindingContext* context, NotifierPackage& notifiers)
 {
     advance_with_notifications(context, sg, [&](auto&&... args) {
         LangBindHelper::advance_read(*sg, std::move(args)..., notifiers.version().value_or(VersionID{}));
     }, notifiers);
 }
 
-void begin_without_validation(SharedGroup& sg)
+void begin_without_validation(Transaction& sg)
 {
     LangBindHelper::promote_to_write(sg);
 }
 
-void begin(const std::unique_ptr<SharedGroup>& sg, BindingContext* context, NotifierPackage& notifiers)
+void begin(const std::unique_ptr<Transaction>& sg, BindingContext* context, NotifierPackage& notifiers)
 {
     advance_with_notifications(context, sg, [&](auto&&... args) {
         LangBindHelper::promote_to_write(*sg, std::move(args)...);
     }, notifiers);
 }
 
-void commit(SharedGroup& sg)
+void commit(Transaction& sg)
 {
     LangBindHelper::commit_and_continue_as_read(sg);
 }
 
-void cancel(SharedGroup& sg, BindingContext* context)
+void cancel(Transaction& sg, BindingContext* context)
 {
     std::vector<BindingContext::ObserverState> observers;
     if (context) {
@@ -860,7 +728,7 @@ void cancel(SharedGroup& sg, BindingContext* context)
     LangBindHelper::rollback_and_continue_as_read(sg, KVOTransactLogObserver(observers, context, notifiers, sg));
 }
 
-void advance(SharedGroup& sg, TransactionChangeInfo& info, VersionID version)
+void advance(Transaction& sg, TransactionChangeInfo& info, VersionID version)
 {
     if (!info.track_all && info.table_modifications_needed.empty() && info.lists.empty()) {
         LangBindHelper::advance_read(sg, version);

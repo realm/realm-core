@@ -21,11 +21,12 @@
 #include "impl/realm_coordinator.hpp"
 #include "shared_realm.hpp"
 
-#include <realm/group_shared.hpp>
-#include <realm/link_view.hpp>
+#include <realm/db.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
+
+#if 0
 
 std::function<bool (size_t)>
 CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
@@ -45,7 +46,7 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
         return [](size_t) { return false; };
     }
     if (m_related_tables.size() == 1) {
-        auto& modifications = info.tables[m_related_tables[0].table_ndx].modifications;
+        auto& modifications = info.tables[m_related_tables[0].table_key].modifications;
         return [&](size_t row) { return modifications.contains(row); };
     }
 
@@ -54,10 +55,8 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
 
 void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Table const& table)
 {
-    auto table_ndx = table.get_index_in_group();
-    if (table_ndx == npos)
-        return;
-    if (any_of(begin(out), end(out), [=](auto& tbl) { return tbl.table_ndx == table_ndx; }))
+    auto table_key = table.get_key().value;
+    if (any_of(begin(out), end(out), [=](auto& tbl) { return tbl.table_key == table_key; }))
         return;
 
     // We need to add this table to `out` before recurring so that the check
@@ -65,13 +64,13 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Tabl
     // because the recursive calls may resize `out`, so instead look it up by
     // index every time
     size_t out_index = out.size();
-    out.push_back({table_ndx, {}});
+    out.push_back({table_key, {}});
 
-    for (size_t i = 0, count = table.get_column_count(); i != count; ++i) {
-        auto type = table.get_column_type(i);
+    for (auto col_key : table.get_column_keys()) {
+        auto type = table.get_column_type(col_key);
         if (type == type_Link || type == type_LinkList) {
-            out[out_index].links.push_back({i, type == type_LinkList});
-            find_related_tables(out, *table.get_link_target(i));
+            out[out_index].links.push_back({col_key.value, type == type_LinkList});
+            find_related_tables(out, *table.get_link_target(col_key));
         }
     }
 }
@@ -81,48 +80,50 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info,
                                      std::vector<RelatedTable> const& related_tables)
 : m_info(info)
 , m_root_table(root_table)
-, m_root_table_ndx(root_table.get_index_in_group())
-, m_root_modifications(m_root_table_ndx < info.tables.size() ? &info.tables[m_root_table_ndx].modifications : nullptr)
+, m_root_table_key(root_table.get_key().value)
+, m_root_modifications(m_root_table_key < info.tables.size() ? &info.tables[m_root_table_key].modifications : nullptr)
 , m_related_tables(related_tables)
 {
 }
 
-bool DeepChangeChecker::check_outgoing_links(size_t table_ndx,
-                                             Table const& table,
-                                             size_t row_ndx, size_t depth)
+bool DeepChangeChecker::check_outgoing_links(int64_t table_key, Table const& table,
+                                             int64_t obj_key, size_t depth)
 {
     auto it = find_if(begin(m_related_tables), end(m_related_tables),
-                      [&](auto&& tbl) { return tbl.table_ndx == table_ndx; });
+                      [&](auto&& tbl) { return tbl.table_key == table_key; });
     if (it == m_related_tables.end())
+        return false;
+    if (it->links.empty())
         return false;
 
     // Check if we're already checking if the destination of the link is
     // modified, and if not add it to the stack
-    auto already_checking = [&](size_t col) {
+    auto already_checking = [&](int64_t col) {
         auto end = m_current_path.begin() + depth;
         auto match = std::find_if(m_current_path.begin(), end, [&](auto& p) {
-            return p.table == table_ndx && p.row == row_ndx && p.col == col;
+            return p.obj_key == obj_key && p.col_key == col;
         });
         if (match != end) {
             for (; match < end; ++match) match->depth_exceeded = true;
             return true;
         }
-        m_current_path[depth] = {table_ndx, row_ndx, col, false};
+        m_current_path[depth] = {obj_key, col, false};
         return false;
     };
 
+    Obj obj = table.get_object(obj_key);
     auto linked_object_changed = [&](OutgoingLink const& link) {
-        if (already_checking(link.col_ndx))
+        if (already_checking(link.col_key))
             return false;
         if (!link.is_list) {
-            if (table.is_null_link(link.col_ndx, row_ndx))
+            if (obj.is_null(ColKey(link.col_key)))
                 return false;
-            auto dst = table.get_link(link.col_ndx, row_ndx);
-            return check_row(*table.get_link_target(link.col_ndx), dst, depth + 1);
+            auto dst = obj.get<ObjKey>(ColKey(link.col_key)).value;
+            return check_row(*table.get_link_target(ColKey(link.col_key)), dst, depth + 1);
         }
 
-        auto& target = *table.get_link_target(link.col_ndx);
-        auto lvr = table.get_linklist(link.col_ndx, row_ndx);
+        auto& target = *table.get_link_target(ColKey(link.col_key));
+        auto lvr = obj.get<List<Obj>>(ColKey(link.col_key), ObjKey(obj_key));
         for (size_t j = 0, size = lvr->size(); j < size; ++j) {
             size_t dst = lvr->get(j).get_index();
             if (check_row(target, dst, depth + 1))
@@ -167,9 +168,11 @@ bool DeepChangeChecker::operator()(size_t ndx)
     return check_row(m_root_table, ndx, 0);
 }
 
+#endif
+
 CollectionNotifier::CollectionNotifier(std::shared_ptr<Realm> realm)
 : m_realm(std::move(realm))
-, m_sg_version(Realm::Internal::get_shared_group(*m_realm)->get_version_of_current_transaction())
+, m_sg_version(Realm::Internal::get_transaction(*m_realm).get_version_of_current_transaction())
 {
 }
 
@@ -276,14 +279,9 @@ void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)
         return;
     }
 
-    auto max = max_element(begin(m_related_tables), end(m_related_tables),
-                           [](auto&& a, auto&& b) { return a.table_ndx < b.table_ndx; });
-
-    if (max->table_ndx >= info.table_modifications_needed.size())
-        info.table_modifications_needed.resize(max->table_ndx + 1, false);
-    for (auto& tbl : m_related_tables) {
-        info.table_modifications_needed[tbl.table_ndx] = true;
-    }
+    info.table_modifications_needed.reserve(m_related_tables.size());
+    for (auto& tbl : m_related_tables)
+        info.table_modifications_needed.insert(tbl.table_key);
 }
 
 void CollectionNotifier::prepare_handover()
@@ -383,7 +381,7 @@ void CollectionNotifier::for_each_callback(Fn&& fn)
     m_callback_index = npos;
 }
 
-void CollectionNotifier::attach_to(SharedGroup& sg)
+void CollectionNotifier::attach_to(Transaction& sg)
 {
     REALM_ASSERT(!m_sg);
 
@@ -398,9 +396,9 @@ void CollectionNotifier::detach()
     m_sg = nullptr;
 }
 
-SharedGroup& CollectionNotifier::source_shared_group()
+Transaction& CollectionNotifier::source_shared_group()
 {
-    return *Realm::Internal::get_shared_group(*m_realm);
+    return Realm::Internal::get_transaction(*m_realm);
 }
 
 void CollectionNotifier::add_changes(CollectionChangeBuilder change)
@@ -468,7 +466,7 @@ void NotifierPackage::before_advance()
         notifier->before_advance();
 }
 
-void NotifierPackage::deliver(SharedGroup& sg)
+void NotifierPackage::deliver(Transaction& sg)
 {
     if (m_error) {
         for (auto& notifier : m_notifiers)
@@ -476,7 +474,7 @@ void NotifierPackage::deliver(SharedGroup& sg)
         return;
     }
     // Can't deliver while in a write transaction
-    if (sg.get_transact_stage() != SharedGroup::transact_Reading)
+    if (sg.get_transact_stage() != DB::transact_Reading)
         return;
     for (auto& notifier : m_notifiers)
         notifier->deliver(sg);

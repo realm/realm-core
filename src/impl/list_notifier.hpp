@@ -21,19 +21,17 @@
 
 #include "impl/collection_notifier.hpp"
 
-#include <realm/group_shared.hpp>
-
 namespace realm {
 namespace _impl {
 class ListNotifier : public CollectionNotifier {
 public:
-    ListNotifier(LinkViewRef lv, std::shared_ptr<Realm> realm);
+//    ListNotifier(LinkViewRef lv, std::shared_ptr<Realm> realm);
 
 private:
     // The linkview, in handover form if this has not been attached to the main
-    // SharedGroup yet
-    LinkViewRef m_lv;
-    std::unique_ptr<SharedGroup::Handover<LinkView>> m_lv_handover;
+    // Transaction yet
+//    LinkViewRef m_lv;
+//    std::unique_ptr<Transaction::Handover<LinkView>> m_lv_handover;
 
     // The last-seen size of the LinkView so that we can report row deletions
     // when the LinkView itself is deleted
@@ -45,10 +43,10 @@ private:
 
     void run() override;
 
-    void do_prepare_handover(SharedGroup&) override;
+    void do_prepare_handover(Transaction&) override;
 
-    void do_attach_to(SharedGroup& sg) override;
-    void do_detach_from(SharedGroup& sg) override;
+    void do_attach_to(Transaction& sg) override;
+    void do_detach_from(Transaction& sg) override;
 
     void release_data() noexcept override;
     bool do_add_required_change_info(TransactionChangeInfo& info) override;

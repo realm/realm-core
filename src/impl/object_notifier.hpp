@@ -21,17 +21,20 @@
 
 #include "impl/collection_notifier.hpp"
 
-#include <realm/group_shared.hpp>
+#include <realm/keys.hpp>
 
 namespace realm {
+
 namespace _impl {
 class ObjectNotifier : public CollectionNotifier {
 public:
-    ObjectNotifier(Row const& row, std::shared_ptr<Realm> realm);
+    ObjectNotifier(std::shared_ptr<Realm> realm, TableKey table, ObjKey obj);
 
 private:
-    std::unique_ptr<Row> m_row;
-    std::unique_ptr<SharedGroup::Handover<Row>> m_handover;
+    TableKey m_table;
+    ObjKey m_obj;
+//    std::unique_ptr<Row> m_row;
+//    std::unique_ptr<Transaction::Handover<Row>> m_handover;
 
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;
@@ -39,12 +42,8 @@ private:
 
     void run() override;
 
-    void do_prepare_handover(SharedGroup&) override;
+    void do_prepare_handover(Transaction&) override;
 
-    void do_attach_to(SharedGroup& sg) override;
-    void do_detach_from(SharedGroup& sg) override;
-
-    void release_data() noexcept override;
     bool do_add_required_change_info(TransactionChangeInfo& info) override;
 };
 }

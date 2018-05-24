@@ -74,7 +74,7 @@ public:
 
 private:
     std::unique_ptr<Replication> m_history;
-    SharedGroup m_sg;
+    Transaction m_sg;
     SharedRealm m_realm;
     Group const& m_group;
 
@@ -237,7 +237,7 @@ TEST_CASE("Transaction log parsing: schema change validation") {
     r->read_group();
 
     auto history = make_in_realm_history(config.path);
-    SharedGroup sg(*history, config.options());
+    Transaction sg(*history, config.options());
 
     SECTION("adding a table is allowed") {
         WriteTransaction wt(sg);
@@ -327,7 +327,7 @@ TEST_CASE("Transaction log parsing: schema change reporting") {
     auto& group = r->read_group();
 
     auto history = make_in_realm_history(config.path);
-    SharedGroup sg(*history, config.options());
+    Transaction sg(*history, config.options());
 
     auto track_changes = [&](auto&& f) {
         sg.begin_read();
@@ -422,7 +422,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 
         auto track_changes = [&](std::vector<bool> tables_needed, auto&& f) {
             auto history = make_in_realm_history(config.path);
-            SharedGroup sg(*history, config.options());
+            Transaction sg(*history, config.options());
             sg.begin_read();
 
             r->begin_transaction();
@@ -2197,7 +2197,7 @@ TEST_CASE("DeepChangeChecker") {
 
     auto track_changes = [&](auto&& f) {
         auto history = make_in_realm_history(config.path);
-        SharedGroup sg(*history, config.options());
+        Transaction sg(*history, config.options());
         Group const& g = sg.begin_read();
 
         r->begin_transaction();
@@ -2423,7 +2423,7 @@ TEST_CASE("DeepChangeChecker") {
     SECTION("changes made to subtables mark the containing row as modified") {
         {
             std::unique_ptr<Replication> history;
-            std::unique_ptr<SharedGroup> shared_group;
+            std::unique_ptr<Transaction> shared_group;
             std::unique_ptr<Group> read_only_group;
             Realm::open_with_config(config, history, shared_group, read_only_group, nullptr);
 

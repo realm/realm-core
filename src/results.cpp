@@ -42,17 +42,18 @@ Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
 
 Results::Results(SharedRealm r, Table& table)
 : m_realm(std::move(r))
+, m_table(&table)
 , m_mode(Mode::Table)
 {
-    m_table.reset(&table);
 }
 
+#if 0
 Results::Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q, SortDescriptor s)
 : m_realm(std::move(r))
 , m_link_view(lv)
 , m_mode(Mode::LinkView)
 {
-    m_table.reset(&lv->get_target_table());
+    m_table = lv->get_target_table();
     if (q) {
         m_query = std::move(*q);
         m_mode = Mode::Query;
@@ -66,7 +67,7 @@ Results::Results(SharedRealm r, TableView tv, DescriptorOrdering o)
 , m_descriptor_ordering(std::move(o))
 , m_mode(Mode::TableView)
 {
-    m_table.reset(&m_table_view.get_parent());
+    m_table = m_table_view.get_parent();
 }
 
 Results::Results(const Results&) = default;
@@ -794,5 +795,6 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(size_t c
 , property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column))
 {
 }
+#endif
 
 } // namespace realm

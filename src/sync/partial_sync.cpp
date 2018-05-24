@@ -74,11 +74,11 @@ void initialize_schema(Group& group)
 // and that notifies the sync session after committing a change.
 class WriteTransactionNotifyingSync {
 public:
-    WriteTransactionNotifyingSync(Realm::Config const& config, SharedGroup& sg)
+    WriteTransactionNotifyingSync(Realm::Config const& config, Transaction& sg)
     : m_config(config)
     , m_shared_group(&sg)
     {
-        if (m_shared_group->get_transact_stage() == SharedGroup::transact_Reading)
+        if (m_shared_group->get_transact_stage() == Transaction::transact_Reading)
             LangBindHelper::promote_to_write(*m_shared_group);
         else
             m_shared_group->begin_write();
@@ -90,7 +90,7 @@ public:
             m_shared_group->rollback();
     }
 
-    SharedGroup::version_type commit()
+    Transaction::version_type commit()
     {
         REALM_ASSERT(m_shared_group);
         auto version = m_shared_group->commit();
@@ -111,12 +111,12 @@ public:
     Group& get_group() const noexcept
     {
         REALM_ASSERT(m_shared_group);
-        return _impl::SharedGroupFriend::get_group(*m_shared_group);
+        return _impl::TransactionFriend::get_group(*m_shared_group);
     }
 
 private:
     Realm::Config const& m_config;
-    SharedGroup* m_shared_group;
+    Transaction* m_shared_group;
 };
 
 // Provides a convenient way for code in this file to access private details of `Realm`
@@ -148,8 +148,8 @@ struct RowHandover {
         REALM_ASSERT(!row);
     }
 
-    SharedGroup& source_shared_group;
-    std::unique_ptr<SharedGroup::Handover<Row>> row;
+    Transaction& source_shared_group;
+    std::unique_ptr<Transaction::Handover<Row>> row;
     VersionID version;
 };
 
@@ -163,7 +163,7 @@ template<typename F>
 void with_open_shared_group(Realm::Config const& config, F&& function)
 {
     std::unique_ptr<Replication> history;
-    std::unique_ptr<SharedGroup> sg;
+    std::unique_ptr<Transaction> sg;
     std::unique_ptr<Group> read_only_group;
     Realm::open_with_config(config, history, sg, read_only_group, nullptr);
 
@@ -245,7 +245,7 @@ void enqueue_registration(Realm& realm, std::string object_type, std::string que
     work_queue.enqueue([object_type=std::move(object_type), query=std::move(query), name=std::move(name),
                         callback=std::move(callback), config=std::move(config)] {
         try {
-            with_open_shared_group(config, [&](SharedGroup& sg) {
+            with_open_shared_group(config, [&](Transaction& sg) {
                 _impl::WriteTransactionNotifyingSync write(config, sg);
 
                 auto matches_property = std::string(object_type) + "_matches";
@@ -292,7 +292,7 @@ void enqueue_unregistration(Object result_set, std::function<void()> callback)
 
     work_queue.enqueue([handover=std::move(handover), callback=std::move(callback),
                         config=std::move(config)] () {
-        with_open_shared_group(config, [&](SharedGroup& sg) {
+        with_open_shared_group(config, [&](Transaction& sg) {
             // Import handed-over object.
             sg.begin_read(handover->version);
             Row row = *sg.import_from_handover(std::move(handover->row));
@@ -414,7 +414,7 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
         }
     }
 
-    void deliver(SharedGroup&) override
+    void deliver(Transaction&) override
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         m_error = m_pending_error;
@@ -463,10 +463,10 @@ struct Subscription::Notifier : public _impl::CollectionNotifier {
     }
 
 private:
-    void do_attach_to(SharedGroup&) override { }
-    void do_detach_from(SharedGroup&) override { }
+    void do_attach_to(Transaction&) override { }
+    void do_detach_from(Transaction&) override { }
 
-    void do_prepare_handover(SharedGroup&) override
+    void do_prepare_handover(Transaction&) override
     {
         add_changes(std::move(m_changes));
     }

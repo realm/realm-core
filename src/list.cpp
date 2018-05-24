@@ -27,6 +27,8 @@
 #include "schema.hpp"
 #include "shared_realm.hpp"
 
+#if 0
+
 #include <realm/link_view.hpp>
 
 namespace realm {
@@ -466,3 +468,4 @@ size_t hash<realm::List>::operator()(realm::List const& list) const
     return std::hash<void*>()(list.m_link_view ? list.m_link_view.get() : (void*)list.m_table.get());
 }
 }
+#endif

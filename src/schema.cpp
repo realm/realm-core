@@ -100,19 +100,6 @@ void Schema::validate() const
     }
 }
 
-namespace {
-struct IsNotRemoveProperty {
-    bool operator()(SchemaChange sc) const { return sc.visit(*this); }
-    bool operator()(schema_change::RemoveProperty) const { return false; }
-    template<typename T> bool operator()(T) const { return true; }
-};
-struct GetRemovedColumn {
-    size_t operator()(SchemaChange sc) const { return sc.visit(*this); }
-    size_t operator()(schema_change::RemoveProperty p) const { return p.property->table_column; }
-    template<typename T> size_t operator()(T) const { REALM_COMPILER_HINT_UNREACHABLE(); }
-};
-}
-
 static void compare(ObjectSchema const& existing_schema,
                     ObjectSchema const& target_schema,
                     std::vector<SchemaChange>& changes)
@@ -159,12 +146,6 @@ static void compare(ObjectSchema const& existing_schema,
             changes.emplace_back(schema_change::AddProperty{&existing_schema, &target_prop});
         }
     }
-
-    // Move all RemovePropertys to the end and sort in descending order of
-    // column index, as removing a column will shift all columns after that one
-    auto it = std::partition(begin(changes), end(changes), IsNotRemoveProperty{});
-    std::sort(it, end(changes),
-              [](auto a, auto b) { return GetRemovedColumn()(a) > GetRemovedColumn()(b); });
 }
 
 template<typename T, typename U, typename Func>
@@ -232,7 +213,7 @@ void Schema::copy_table_columns_from(realm::Schema const& other)
         for (auto& current_prop : other->persisted_properties) {
             auto target_prop = existing->property_for_name(current_prop.name);
             if (target_prop) {
-                target_prop->table_column = current_prop.table_column;
+                target_prop->column_key = current_prop.column_key;
             }
         }
     });

@@ -115,7 +115,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
 {
     std::string path;
-    std::string temporary_dir = SharedGroupOptions::get_sys_tmp_dir();
+    std::string temporary_dir = TransactionOptions::get_sys_tmp_dir();
     if (temporary_dir.empty()) {
         path = parent.get_path() + ".note";
     } else {

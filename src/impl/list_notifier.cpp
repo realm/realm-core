@@ -20,6 +20,8 @@
 
 #include "shared_realm.hpp"
 
+#if 0
+
 #include <realm/link_view.hpp>
 
 using namespace realm;
@@ -38,14 +40,14 @@ void ListNotifier::release_data() noexcept
     m_lv.reset();
 }
 
-void ListNotifier::do_attach_to(SharedGroup& sg)
+void ListNotifier::do_attach_to(Transaction& sg)
 {
     REALM_ASSERT(m_lv_handover);
     REALM_ASSERT(!m_lv);
     m_lv = sg.import_linkview_from_handover(std::move(m_lv_handover));
 }
 
-void ListNotifier::do_detach_from(SharedGroup& sg)
+void ListNotifier::do_detach_from(Transaction& sg)
 {
     REALM_ASSERT(!m_lv_handover);
     if (m_lv) {
@@ -103,7 +105,8 @@ void ListNotifier::run()
     m_prev_size = m_lv->size();
 }
 
-void ListNotifier::do_prepare_handover(SharedGroup&)
+void ListNotifier::do_prepare_handover(Transaction&)
 {
     add_changes(std::move(m_change));
 }
+#endif

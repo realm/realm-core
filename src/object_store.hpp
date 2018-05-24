@@ -97,10 +97,6 @@ public:
     // get existing Schema from a group
     static Schema schema_from_group(Group const& group);
 
-    // get the property for a existing column in the given table. return none if the column is reserved internally.
-    // NOTE: is_primary won't be set for the returned property.
-    static util::Optional<Property> property_for_column_index(ConstTableRef& table, size_t column_index);
-
     static void set_schema_columns(Group const& group, Schema& schema);
 
     // deletes the table for the given type

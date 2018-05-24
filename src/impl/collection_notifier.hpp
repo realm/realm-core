@@ -30,25 +30,26 @@
 #include <functional>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace realm {
 class Realm;
-class SharedGroup;
+class Transaction;
 class Table;
 
 namespace _impl {
 class RealmCoordinator;
 
 struct ListChangeInfo {
-    size_t table_ndx;
-    size_t row_ndx;
-    size_t col_ndx;
+    int64_t table_key;
+    int64_t row_key;
+    int64_t col_key;
     CollectionChangeBuilder* changes;
 };
 
 struct TransactionChangeInfo {
-    std::vector<bool> table_modifications_needed;
-    std::vector<bool> table_moves_needed;
+    std::unordered_set<int64_t> table_modifications_needed;
+    std::unordered_set<int64_t> table_moves_needed;
     std::vector<ListChangeInfo> lists;
     std::vector<CollectionChangeBuilder> tables;
     std::vector<std::vector<size_t>> column_indices;
@@ -60,11 +61,11 @@ struct TransactionChangeInfo {
 class DeepChangeChecker {
 public:
     struct OutgoingLink {
-        size_t col_ndx;
+        int64_t col_key;
         bool is_list;
     };
     struct RelatedTable {
-        size_t table_ndx;
+        int64_t table_key;
         std::vector<OutgoingLink> links;
     };
 
@@ -80,22 +81,21 @@ public:
 private:
     TransactionChangeInfo const& m_info;
     Table const& m_root_table;
-    const size_t m_root_table_ndx;
+    const int64_t m_root_table_key;
     IndexSet const* const m_root_modifications;
     std::vector<IndexSet> m_not_modified;
     std::vector<RelatedTable> const& m_related_tables;
 
     struct Path {
-        size_t table;
-        size_t row;
-        size_t col;
+        int64_t obj_key;
+        int64_t col_key;
         bool depth_exceeded;
     };
     std::array<Path, 4> m_current_path;
 
-    bool check_row(Table const& table, size_t row_ndx, size_t depth = 0);
-    bool check_outgoing_links(size_t table_ndx, Table const& table,
-                              size_t row_ndx, size_t depth = 0);
+    bool check_row(Table const& table, int64_t obj_key, size_t depth = 0);
+    bool check_outgoing_links(int64_t table_key, Table const& table,
+                              int64_t obj_key, size_t depth = 0);
 };
 
 // A base class for a notifier that keeps a collection up to date and/or
@@ -132,7 +132,7 @@ public:
     bool is_for_realm(Realm&) const noexcept;
     Realm* get_realm() const noexcept { return m_realm.get(); }
 
-    // Get the SharedGroup version which this collection can attach to (if it's
+    // Get the Transaction version which this collection can attach to (if it's
     // in handover mode), or can deliver to (if it's been handed over to the BG worker alredad)
     // precondition: RealmCoordinator::m_notifier_mutex is locked
     VersionID version() const noexcept { return m_sg_version; }
@@ -141,16 +141,16 @@ public:
     // This is called on the worker thread to ensure that non-thread-safe things
     // can be destroyed on the correct thread, even if the last reference to the
     // CollectionNotifier is released on a different thread
-    virtual void release_data() noexcept = 0;
+    virtual void release_data() noexcept { }
 
     // Prepare to deliver the new collection and call callbacks.
     // Returns whether or not it has anything to deliver.
     // precondition: RealmCoordinator::m_notifier_mutex is locked
     bool package_for_delivery();
 
-    // Deliver the new state to the target collection using the given SharedGroup
+    // Deliver the new state to the target collection using the given Transaction
     // precondition: RealmCoordinator::m_notifier_mutex is unlocked
-    virtual void deliver(SharedGroup&) { }
+    virtual void deliver(Transaction&) { }
 
     // Pass the given error to all registered callbacks, then remove them
     // precondition: RealmCoordinator::m_notifier_mutex is unlocked
@@ -166,11 +166,11 @@ public:
     // precondition: RealmCoordinator::m_notifier_mutex is locked *or* is called on worker thread
     bool has_run() const noexcept { return m_has_run; }
 
-    // Attach the handed-over query to `sg`. Must not be already attached to a SharedGroup.
+    // Attach the handed-over query to `sg`. Must not be already attached to a Transaction.
     // precondition: RealmCoordinator::m_notifier_mutex is locked
-    void attach_to(SharedGroup& sg);
+    void attach_to(Transaction& sg);
     // Create a new query handover object and stop using the previously attached
-    // SharedGroup
+    // Transaction
     // precondition: RealmCoordinator::m_notifier_mutex is locked
     void detach();
 
@@ -193,14 +193,14 @@ protected:
     void add_changes(CollectionChangeBuilder change);
     void set_table(Table const& table);
     std::unique_lock<std::mutex> lock_target();
-    SharedGroup& source_shared_group();
+    Transaction& source_shared_group();
 
     std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, Table const&);
 
 private:
-    virtual void do_attach_to(SharedGroup&) = 0;
-    virtual void do_detach_from(SharedGroup&) = 0;
-    virtual void do_prepare_handover(SharedGroup&) = 0;
+    virtual void do_attach_to(Transaction&) { }
+    virtual void do_detach_from(Transaction&) { }
+    virtual void do_prepare_handover(Transaction&) = 0;
     virtual bool do_add_required_change_info(TransactionChangeInfo&) = 0;
     virtual bool prepare_to_deliver() { return true; }
 
@@ -208,7 +208,7 @@ private:
     std::shared_ptr<Realm> m_realm;
 
     VersionID m_sg_version;
-    SharedGroup* m_sg = nullptr;
+    Transaction* m_sg = nullptr;
 
     bool m_has_run = false;
     bool m_error = false;
@@ -318,7 +318,7 @@ public:
     // Send the before-change notifications
     void before_advance();
     // Deliver the payload associated with the contained notifiers and/or the error
-    void deliver(SharedGroup& sg);
+    void deliver(Transaction& sg);
     // Send the after-change notifications
     void after_advance();
 

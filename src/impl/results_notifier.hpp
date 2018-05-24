@@ -22,7 +22,7 @@
 #include "collection_notifier.hpp"
 #include "results.hpp"
 
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 
 namespace realm {
 namespace _impl {
@@ -38,18 +38,18 @@ private:
     Results* m_target_results;
 
     // The source Query, in handover form iff m_sg is null
-    std::unique_ptr<SharedGroup::Handover<Query>> m_query_handover;
-    std::unique_ptr<Query> m_query;
-
-    DescriptorOrdering::HandoverPatch m_ordering_handover;
-    DescriptorOrdering m_descriptor_ordering;
+//    std::unique_ptr<Transaction::Handover<Query>> m_query_handover;
+//    std::unique_ptr<Query> m_query;
+//
+//    DescriptorOrdering::HandoverPatch m_ordering_handover;
+//    DescriptorOrdering m_descriptor_ordering;
     bool m_target_is_in_table_order;
 
     // The TableView resulting from running the query. Will be detached unless
     // the query was (re)run since the last time the handover object was created
     TableView m_tv;
-    std::unique_ptr<SharedGroup::Handover<TableView>> m_tv_handover;
-    std::unique_ptr<SharedGroup::Handover<TableView>> m_tv_to_deliver;
+//    std::unique_ptr<Transaction::Handover<TableView>> m_tv_handover;
+//    std::unique_ptr<Transaction::Handover<TableView>> m_tv_to_deliver;
 
     // The table version from the last time the query was run. Used to avoid
     // rerunning the query when there's no chance of it changing.
@@ -64,16 +64,16 @@ private:
 
     bool need_to_run();
     void calculate_changes();
-    void deliver(SharedGroup&) override;
+    void deliver(Transaction&) override;
 
     void run() override;
-    void do_prepare_handover(SharedGroup&) override;
+    void do_prepare_handover(Transaction&) override;
     bool do_add_required_change_info(TransactionChangeInfo& info) override;
     bool prepare_to_deliver() override;
 
     void release_data() noexcept override;
-    void do_attach_to(SharedGroup& sg) override;
-    void do_detach_from(SharedGroup& sg) override;
+    void do_attach_to(Transaction& sg) override;
+    void do_detach_from(Transaction& sg) override;
 };
 
 } // namespace _impl

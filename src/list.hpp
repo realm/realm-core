@@ -23,14 +23,14 @@
 #include "impl/collection_notifier.hpp"
 #include "property.hpp"
 
-#include <realm/link_view_fwd.hpp>
-#include <realm/row.hpp>
+#include <realm/mixed.hpp>
 #include <realm/table_ref.hpp>
 
 #include <functional>
 #include <memory>
 
 namespace realm {
+class Obj;
 class ObjectSchema;
 class Query;
 class Realm;
@@ -46,7 +46,7 @@ class List {
 public:
     List() noexcept;
     List(std::shared_ptr<Realm> r, Table& parent_table, size_t col, size_t row);
-    List(std::shared_ptr<Realm> r, LinkViewRef l) noexcept;
+//    List(std::shared_ptr<Realm> r, LinkViewRef l) noexcept;
     List(std::shared_ptr<Realm> r, TableRef l) noexcept;
     ~List();
 
@@ -79,7 +79,7 @@ public:
     void delete_at(size_t list_ndx);
     void delete_all();
 
-    template<typename T = RowExpr>
+    template<typename T = Obj>
     T get(size_t row_ndx) const;
     template<typename T>
     size_t find(T const& value) const;
@@ -153,12 +153,12 @@ private:
 
     std::shared_ptr<Realm> m_realm;
     mutable const ObjectSchema* m_object_schema = nullptr;
-    LinkViewRef m_link_view;
+//    LinkViewRef m_link_view;
     TableRef m_table;
     _impl::CollectionNotifier::Handle<_impl::CollectionNotifier> m_notifier;
 
     void verify_valid_row(size_t row_ndx, bool insertion = false) const;
-    void validate(RowExpr) const;
+    void validate(Obj) const;
 
     template<typename Fn>
     auto dispatch(Fn&&) const;

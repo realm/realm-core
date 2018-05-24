@@ -36,7 +36,7 @@ class BindingContext;
 class Group;
 class Realm;
 class Replication;
-class SharedGroup;
+class Transaction;
 class StringData;
 class Table;
 struct SyncConfig;
@@ -219,11 +219,6 @@ public:
         // The following are intended for internal/testing purposes and
         // should not be publicly exposed in binding APIs
 
-        // If false, always return a new Realm instance, and don't return
-        // that Realm instance for other requests for a cached Realm. Useful
-        // for dynamic Realms and for tests that need multiple instances on
-        // one thread
-        bool cache = true;
         // Throw an exception rather than automatically upgrading the file
         // format. Used by the browser to warn the user that it'll modify
         // the file.
@@ -246,9 +241,6 @@ public:
         bool force_sync_history = false;
     };
 
-    // Get a cached Realm or create a new one if no cached copies exists
-    // Caching is done by path - mismatches for in_memory, schema mode or
-    // encryption key will raise an exception.
     static SharedRealm get_shared_realm(Config config);
 
     // Updates a Realm to a given schema, using the Realm's pre-set schema mode.
@@ -280,6 +272,13 @@ public:
     bool is_in_transaction() const noexcept;
     bool is_in_read_transaction() const { return !!m_group; }
 
+    // Get the version of the current read transaction, or `none` if the Realm
+    // is not in a read transaction
+    util::Optional<VersionID> current_transaction_version() const;
+
+    bool wait_for_change();
+    void wait_for_change_release();
+
     bool is_in_migration() const noexcept { return m_in_migration; }
 
     bool refresh();
@@ -301,10 +300,9 @@ public:
 
     bool can_deliver_notifications() const noexcept;
 
-    // Close this Realm and remove it from the cache. Continuing to use a
-    // Realm after closing it will throw ClosedRealmException
+    // Close this Realm. Continuing to use a Realm after closing it will throw ClosedRealmException
     void close();
-    bool is_closed() const { return !m_read_only_group && !m_shared_group; }
+    bool is_closed() const { return !m_coordinator; }
 
     // returns the file format version upgraded from if an upgrade took place
     util::Optional<int> file_format_upgraded_from_version() const;
@@ -328,12 +326,10 @@ public:
     ComputedPrivileges get_privileges(StringData object_type);
     ComputedPrivileges get_privileges(RowExpr row);
 
-    static SharedRealm make_shared_realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator = nullptr) {
-        struct make_shared_enabler : public Realm {
-            make_shared_enabler(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator)
-            : Realm(std::move(config), std::move(coordinator)) { }
-        };
-        return std::make_shared<make_shared_enabler>(std::move(config), std::move(coordinator));
+    static SharedRealm make_shared_realm(Config config,
+                                         std::shared_ptr<_impl::RealmCoordinator> coordinator)
+    {
+        return std::make_shared<Realm>(std::move(config), std::move(coordinator), MakeSharedTag{});
     }
 
     // Expose some internal functionality to other parts of the ObjectStore
@@ -346,9 +342,17 @@ public:
         friend class GlobalNotifier;
         friend class TestHelper;
 
-        // ResultsNotifier and ListNotifier need access to the SharedGroup
+        static std::shared_ptr<Group> const& get_group_ptr(Realm& realm) {
+            return realm.m_group;
+        }
+
+        // ResultsNotifier and ListNotifier need access to the Transaction
         // to be able to call the handover functions, which are not very wrappable
-        static const std::unique_ptr<SharedGroup>& get_shared_group(Realm& realm) { return realm.m_shared_group; }
+        static Transaction& get_transaction(Realm& realm);
+//        {
+//            return static_cast<Transaction&>(*realm.m_group);
+//        }
+        static std::shared_ptr<Transaction> get_transaction_ref(Realm& realm);
 
         // CollectionNotifier needs to be able to access the owning
         // coordinator to wake up the worker thread when a callback is
@@ -358,25 +362,14 @@ public:
         static void begin_read(Realm&, VersionID);
     };
 
-    static void open_with_config(const Config& config,
-                                 std::unique_ptr<Replication>& history,
-                                 std::unique_ptr<SharedGroup>& shared_group,
-                                 std::unique_ptr<Group>& read_only_group,
-                                 Realm* realm);
-
 private:
-    // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead
-    Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator);
+    struct MakeSharedTag {};
 
     Config m_config;
     AnyExecutionContextID m_execution_context;
     bool m_auto_refresh = true;
 
-    std::unique_ptr<Replication> m_history;
-    std::unique_ptr<SharedGroup> m_shared_group;
-    std::unique_ptr<Group> m_read_only_group;
-
-    Group *m_group = nullptr;
+    std::shared_ptr<Group> m_group;
 
     uint64_t m_schema_version;
     Schema m_schema;
@@ -421,15 +414,15 @@ private:
     bool init_permission_cache();
     void invalidate_permission_cache();
 
+    Transaction& transaction();
+    Transaction& transaction() const;
+
 public:
     std::unique_ptr<BindingContext> m_binding_context;
-
-    // FIXME private
     Group& read_group();
 
-    Replication *history() { return m_history.get(); }
-
-    friend class _impl::RealmFriend;
+    // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead
+    Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator, MakeSharedTag);
 };
 
 class RealmFileException : public std::runtime_error {
@@ -502,14 +495,6 @@ class InvalidEncryptionKeyException : public std::logic_error {
 public:
     InvalidEncryptionKeyException() : std::logic_error("Encryption key must be 64 bytes.") {}
 };
-
-// FIXME Those are exposed for Java async queries, mainly because of handover related methods.
-class _impl::RealmFriend {
-public:
-    static SharedGroup& get_shared_group(Realm& realm);
-    static Group& read_group_to(Realm& realm, VersionID version);
-};
-
 } // namespace realm
 
 #endif /* defined(REALM_REALM_HPP) */

@@ -22,6 +22,8 @@
 #include "util/tagged_bool.hpp"
 
 #include <realm/util/features.h>
+// FIXME: keys.hpp is currently pretty heavyweight
+#include <realm/keys.hpp>
 
 #include <string>
 
@@ -29,13 +31,11 @@ namespace realm {
 namespace util {
     template<typename> class Optional;
 }
-class StringData;
 class BinaryData;
-class Timestamp;
+class Obj;
+class StringData;
 class Table;
-
-template<typename> class BasicRowExpr;
-using RowExpr = BasicRowExpr<Table>;
+class Timestamp;
 
 enum class PropertyType : unsigned char {
     Int    = 0,
@@ -69,7 +69,7 @@ struct Property {
     IsPrimary is_primary = false;
     IsIndexed is_indexed = false;
 
-    size_t table_column = -1;
+    ColKey column_key;
 
     Property() = default;
 
@@ -168,7 +168,7 @@ static auto switch_on_type(PropertyType type, Fn&& fn)
         case PT::String: return fn((StringData*)0);
         case PT::Data:   return fn((BinaryData*)0);
         case PT::Date:   return fn((Timestamp*)0);
-        case PT::Object: return fn((RowExpr*)0);
+        case PT::Object: return fn((Obj*)0);
         default: REALM_COMPILER_HINT_UNREACHABLE();
     }
 }
@@ -248,7 +248,7 @@ inline std::string Property::type_string() const
 
 inline bool operator==(Property const& lft, Property const& rgt)
 {
-    // note: not checking table_column
+    // note: not checking column_key
     // ordered roughly by the cost of the check
     return to_underlying(lft.type) == to_underlying(rgt.type)
         && lft.is_primary == rgt.is_primary

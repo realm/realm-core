@@ -27,11 +27,12 @@
 #include <mutex>
 
 namespace realm {
+class DB;
 class Replication;
 class Schema;
-class SharedGroup;
 class StringData;
 class SyncSession;
+class Transaction;
 
 namespace _impl {
 class CollectionNotifier;
@@ -50,8 +51,6 @@ public:
     static std::shared_ptr<RealmCoordinator> get_coordinator(StringData path);
     // Get the coordinator for the given config, creating it if neccesary
     static std::shared_ptr<RealmCoordinator> get_coordinator(const Realm::Config&);
-    // Get the coordinator for the given path, or null if there is none
-    static std::shared_ptr<RealmCoordinator> get_existing_coordinator(StringData path);
 
     // Get a thread-local shared Realm with the given configuration
     // If the Realm is already open on another thread, validates that the given
@@ -115,6 +114,8 @@ public:
 
     static void register_notifier(std::shared_ptr<CollectionNotifier> notifier);
 
+    std::shared_ptr<Group> begin_read(VersionID version={});
+
     // Advance the Realm to the most recent transaction version which all async
     // work is complete for
     void advance_to_ready(Realm& realm);
@@ -148,6 +149,9 @@ public:
 
 private:
     Realm::Config m_config;
+    std::unique_ptr<Replication> m_history;
+    std::shared_ptr<DB> m_db;
+    std::shared_ptr<Group> m_read_only_group;
 
     mutable std::mutex m_schema_cache_mutex;
     util::Optional<Schema> m_cached_schema;
@@ -164,16 +168,14 @@ private:
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> m_notifiers;
     VersionID m_notifier_skip_version = {0, 0};
 
-    // SharedGroup used for actually running async notifiers
+    // Transaction used for actually running async notifiers
     // Will have a read transaction iff m_notifiers is non-empty
-    std::unique_ptr<Replication> m_notifier_history;
-    std::unique_ptr<SharedGroup> m_notifier_sg;
+    std::shared_ptr<Transaction> m_notifier_sg;
 
-    // SharedGroup used to advance notifiers in m_new_notifiers to the main shared
+    // Transaction used to advance notifiers in m_new_notifiers to the main shared
     // group's transaction version
     // Will have a read transaction iff m_new_notifiers is non-empty
-    std::unique_ptr<Replication> m_advancer_history;
-    std::unique_ptr<SharedGroup> m_advancer_sg;
+    std::shared_ptr<Transaction> m_advancer_sg;
     std::exception_ptr m_async_error;
 
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
@@ -184,6 +186,8 @@ private:
     std::unique_ptr<partial_sync::WorkQueue> m_partial_sync_work_queue;
 #endif
 
+    void open_db();
+
     // must be called with m_notifier_mutex locked
     void pin_version(VersionID version);
 
@@ -191,13 +195,13 @@ private:
     void create_sync_session();
 
     void run_async_notifiers();
-    void open_helper_shared_group();
     void advance_helper_shared_group_to_latest();
     void clean_up_dead_notifiers();
 
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> notifiers_for_realm(Realm&);
 };
 
+void translate_file_exception(StringData path, bool immutable=false);
 
 template<typename Pred>
 std::unique_lock<std::mutex> RealmCoordinator::wait_for_notifiers(Pred&& wait_predicate)

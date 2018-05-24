@@ -19,8 +19,10 @@
 #ifndef REALM_THREAD_SAFE_REFERENCE_HPP
 #define REALM_THREAD_SAFE_REFERENCE_HPP
 
+#include <realm/version_id.hpp>
 
-#include <realm/group_shared.hpp>
+#include <memory>
+#include <string>
 
 namespace realm {
 class LinkView;
@@ -30,8 +32,7 @@ class Query;
 class Realm;
 class Results;
 class TableView;
-template<typename T> class BasicRow;
-typedef BasicRow<Table> Row;
+class Transaction;
 
 // Opaque type representing an object for handover
 class ThreadSafeReferenceBase {
@@ -49,7 +50,7 @@ protected:
     // Precondition: The associated Realm is for the current thread and is not in a write transaction;.
     ThreadSafeReferenceBase(std::shared_ptr<Realm> source_realm);
 
-    SharedGroup& get_source_shared_group() const;
+//    Transaction& get_source_shared_group() const;
 
     template <typename V, typename T>
     V invalidate_after_import(Realm& destination_realm, T construct_with_shared_group);
@@ -71,21 +72,22 @@ template<>
 class ThreadSafeReference<List>: public ThreadSafeReferenceBase {
     friend class Realm;
 
-    std::unique_ptr<SharedGroup::Handover<LinkView>> m_link_view;
-    std::unique_ptr<SharedGroup::Handover<Table>> m_table;
+//    std::unique_ptr<Transaction::Handover<LinkView>> m_link_view;
+//    std::unique_ptr<Transaction::Handover<Table>> m_table;
 
     // Precondition: The associated Realm is for the current thread and is not in a write transaction;.
     ThreadSafeReference(List const& value);
 
     // Precondition: Realm and handover are on same version.
     List import_into_realm(std::shared_ptr<Realm> realm) &&;
+    List import_into(Transaction& group);
 };
 
 template<>
 class ThreadSafeReference<Object>: public ThreadSafeReferenceBase {
     friend class Realm;
 
-    std::unique_ptr<SharedGroup::Handover<Row>> m_row;
+//    std::unique_ptr<Transaction::Handover<Row>> m_row;
     std::string m_object_schema_name;
 
     // Precondition: The associated Realm is for the current thread and is not in a write transaction;.
@@ -93,20 +95,22 @@ class ThreadSafeReference<Object>: public ThreadSafeReferenceBase {
 
     // Precondition: Realm and handover are on same version.
     Object import_into_realm(std::shared_ptr<Realm> realm) &&;
+    Object import_into(Transaction& group);
 };
 
 template<>
 class ThreadSafeReference<Results>: public ThreadSafeReferenceBase {
     friend class Realm;
 
-    std::unique_ptr<SharedGroup::Handover<Query>> m_query;
-    DescriptorOrdering::HandoverPatch m_ordering_patch;
+//    std::unique_ptr<Transaction::Handover<Query>> m_query;
+//    DescriptorOrdering::HandoverPatch m_ordering_patch;
 
     // Precondition: The associated Realm is for the current thread and is not in a write transaction;.
     ThreadSafeReference(Results const& value);
 
     // Precondition: Realm and handover are on same version.
     Results import_into_realm(std::shared_ptr<Realm> realm) &&;
+    Results import_into(Transaction& group);
 };
 }
 

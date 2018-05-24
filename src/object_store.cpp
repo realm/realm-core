@@ -24,7 +24,6 @@
 #include "shared_realm.hpp"
 #include "sync/partial_sync.hpp"
 
-#include <realm/descriptor.hpp>
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/table_view.hpp>
@@ -45,15 +44,10 @@ constexpr uint64_t ObjectStore::NotVersioned;
 namespace {
 const char * const c_metadataTableName = "metadata";
 const char * const c_versionColumnName = "version";
-const size_t c_versionColumnIndex = 0;
 
 const char * const c_primaryKeyTableName = "pk";
 const char * const c_primaryKeyObjectClassColumnName = "pk_table";
-const size_t c_primaryKeyObjectClassColumnIndex =  0;
 const char * const c_primaryKeyPropertyNameColumnName = "pk_property";
-const size_t c_primaryKeyPropertyNameColumnIndex =  1;
-
-const size_t c_zeroRowIndex = 0;
 
 const char c_object_table_prefix[] = "class_";
 
@@ -65,17 +59,15 @@ void create_metadata_tables(Group& group, bool partial_realm) {
     TableRef metadata_table = group.get_or_add_table(c_metadataTableName);
 
     if (metadata_table->get_column_count() == 0) {
-        metadata_table->insert_column(c_versionColumnIndex, type_Int, c_versionColumnName);
-        metadata_table->add_empty_row();
-        // set initial version
-        metadata_table->set_int(c_versionColumnIndex, c_zeroRowIndex, ObjectStore::NotVersioned);
+        metadata_table->add_column(type_Int, c_versionColumnName);
+        metadata_table->create_object().set(c_versionColumnName, ObjectStore::NotVersioned);
     }
 
     if (pk_table->get_column_count() == 0) {
-        pk_table->insert_column(c_primaryKeyObjectClassColumnIndex, type_String, c_primaryKeyObjectClassColumnName);
-        pk_table->insert_column(c_primaryKeyPropertyNameColumnIndex, type_String, c_primaryKeyPropertyNameColumnName);
+        auto pk_key = pk_table->add_column(type_String, c_primaryKeyObjectClassColumnName);
+        pk_table->add_column(type_String, c_primaryKeyPropertyNameColumnName);
+        pk_table->add_search_index(pk_key);
     }
-    pk_table->add_search_index(c_primaryKeyObjectClassColumnIndex);
 
 #if REALM_ENABLE_SYNC
     // Only add __ResultSets if Realm is a partial Realm
@@ -87,8 +79,7 @@ void create_metadata_tables(Group& group, bool partial_realm) {
 }
 
 void set_schema_version(Group& group, uint64_t version) {
-    TableRef table = group.get_table(c_metadataTableName);
-    table->set_int(c_versionColumnIndex, c_zeroRowIndex, version);
+    group.get_table(c_metadataTableName)->get_object(0).set<int64_t>(c_versionColumnName, version);
 }
 
 template<typename Group>
@@ -113,7 +104,7 @@ DataType to_core_type(PropertyType type)
     }
 }
 
-void insert_column(Group& group, Table& table, Property const& property, size_t col_ndx)
+ColKey add_column(Group& group, Table& table, Property const& property)
 {
     // Cannot directly insert a LinkingObjects column (a computed property).
     // LinkingObjects must be an artifact of an existing link column.
@@ -123,31 +114,25 @@ void insert_column(Group& group, Table& table, Property const& property, size_t 
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_table(target_name);
         REALM_ASSERT(link_table);
-        table.insert_column_link(col_ndx, is_array(property.type) ? type_LinkList : type_Link,
-                                 property.name, *link_table);
+        return table.add_column_link(is_array(property.type) ? type_LinkList : type_Link,
+                                     property.name, *link_table);
     }
     else if (is_array(property.type)) {
-        DescriptorRef desc;
-        table.insert_column(col_ndx, type_Table, property.name, &desc);
-        desc->add_column(to_core_type(property.type & ~PropertyType::Flags), ObjectStore::ArrayColumnName,
-                         nullptr, is_nullable(property.type));
+        return table.add_column_list(to_core_type(property.type & ~PropertyType::Flags),
+                                     property.name/*, is_nullable(property.type)*/);
     }
     else {
-        table.insert_column(col_ndx, to_core_type(property.type), property.name, is_nullable(property.type));
+        auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));
         if (property.requires_index())
-            table.add_search_index(col_ndx);
+            table.add_search_index(key);
+        return key;
     }
-}
-
-void add_column(Group& group, Table& table, Property const& property)
-{
-    insert_column(group, table, property, table.get_column_count());
 }
 
 void replace_column(Group& group, Table& table, Property const& old_property, Property const& new_property)
 {
-    insert_column(group, table, new_property, old_property.table_column);
-    table.remove_column(old_property.table_column + 1);
+    add_column(group, table, new_property);
+    table.remove_column(old_property.column_key);
 }
 
 TableRef create_table(Group& group, ObjectSchema const& object_schema)
@@ -186,62 +171,37 @@ void add_initial_columns(Group& group, ObjectSchema const& object_schema)
     }
 }
 
-void copy_property_values(Property const& prop, Table& table)
+void copy_property_values(Table& table, PropertyType type, ColKey old_col, ColKey new_col)
 {
-    auto copy_property_values = [&](auto getter, auto setter) {
-        for (size_t i = 0, count = table.size(); i < count; i++) {
-            bool is_default = false;
-            (table.*setter)(prop.table_column, i, (table.*getter)(prop.table_column + 1, i),
-                            is_default);
+    switch_on_type(type, [&](auto t) {
+        using T = std::decay_t<decltype(*t)>;
+        for (auto& obj : table) {
+            obj.set<T>(new_col, obj.get<T>(old_col));
         }
-    };
-
-    switch (prop.type & ~PropertyType::Flags) {
-        case PropertyType::Int:
-            copy_property_values(&Table::get_int, &Table::set_int);
-            break;
-        case PropertyType::Bool:
-            copy_property_values(&Table::get_bool, &Table::set_bool);
-            break;
-        case PropertyType::Float:
-            copy_property_values(&Table::get_float, &Table::set_float);
-            break;
-        case PropertyType::Double:
-            copy_property_values(&Table::get_double, &Table::set_double);
-            break;
-        case PropertyType::String:
-            copy_property_values(&Table::get_string, &Table::set_string);
-            break;
-        case PropertyType::Data:
-            copy_property_values(&Table::get_binary, &Table::set_binary);
-            break;
-        case PropertyType::Date:
-            copy_property_values(&Table::get_timestamp, &Table::set_timestamp);
-            break;
-        default:
-            break;
-    }
+    });
 }
 
 void make_property_optional(Group& group, Table& table, Property property)
 {
     property.type |= PropertyType::Nullable;
-    insert_column(group, table, property, property.table_column);
-    copy_property_values(property, table);
-    table.remove_column(property.table_column + 1);
+    auto new_key = add_column(group, table, property);
+    copy_property_values(table, property.type, property.column_key, new_key);
+    table.remove_column(property.column_key);
+    property.column_key = new_key.value;
 }
 
 void make_property_required(Group& group, Table& table, Property property)
 {
     property.type &= ~PropertyType::Nullable;
-    insert_column(group, table, property, property.table_column);
-    table.remove_column(property.table_column + 1);
+    auto key = add_column(group, table, property);
+    table.remove_column(property.column_key);
+    property.column_key = key.value;
 }
 
 void validate_primary_column_uniqueness(Group const& group, StringData object_type, StringData primary_property)
 {
     auto table = ObjectStore::table_for_object_type(group, object_type);
-    if (table->get_distinct_view(table->get_column_index(primary_property)).size() != table->size()) {
+    if (table->get_distinct_view(table->get_column_key(primary_property)).size() != table->size()) {
         throw DuplicatePrimaryKeyValueException(object_type, primary_property);
     }
 }
@@ -249,11 +209,11 @@ void validate_primary_column_uniqueness(Group const& group, StringData object_ty
 void validate_primary_column_uniqueness(Group const& group)
 {
     auto pk_table = group.get_table(c_primaryKeyTableName);
-    for (size_t i = 0, count = pk_table->size(); i < count; ++i) {
-        validate_primary_column_uniqueness(group,
-                                           pk_table->get_string(c_primaryKeyObjectClassColumnIndex, i),
-                                           pk_table->get_string(c_primaryKeyPropertyNameColumnIndex, i));
-    }
+    ColKey objectClass = pk_table->get_column_key(c_primaryKeyObjectClassColumnName);
+    ColKey propertyName = pk_table->get_column_key(c_primaryKeyPropertyNameColumnName);
+    for (auto pk_obj : *pk_table)
+        validate_primary_column_uniqueness(group, pk_obj.get<StringData>(objectClass),
+                                           pk_obj.get<StringData>(propertyName));
 }
 } // anonymous namespace
 
@@ -267,7 +227,7 @@ uint64_t ObjectStore::get_schema_version(Group const& group) {
     if (!table || table->get_column_count() == 0) {
         return ObjectStore::NotVersioned;
     }
-    return table->get_int(c_versionColumnIndex, c_zeroRowIndex);
+    return table->get_object(0).get<int64_t>(c_versionColumnName);
 }
 
 StringData ObjectStore::get_primary_key_for_object(Group const& group, StringData object_type) {
@@ -275,17 +235,17 @@ StringData ObjectStore::get_primary_key_for_object(Group const& group, StringDat
     if (!table) {
         return "";
     }
-    size_t row = table->find_first_string(c_primaryKeyObjectClassColumnIndex, object_type);
-    if (row == not_found) {
+    ObjKey row = table->find_first_string(table->get_column_key(c_primaryKeyObjectClassColumnName), object_type);
+    if (!row) {
         return "";
     }
-    return table->get_string(c_primaryKeyPropertyNameColumnIndex, row);
+    return table->get_object(row).get<StringData>(c_primaryKeyPropertyNameColumnName);
 }
 
 void ObjectStore::set_primary_key_for_object(Group& group, StringData object_type, StringData primary_key) {
     TableRef table = group.get_table(c_primaryKeyTableName);
 
-    size_t row = table->find_first_string(c_primaryKeyObjectClassColumnIndex, object_type);
+    ObjKey key = table->find_first_string(table->get_column_key(c_primaryKeyObjectClassColumnName), object_type);
 
 #if REALM_ENABLE_SYNC
     // sync::create_table* functions should have already updated the pk table.
@@ -300,20 +260,19 @@ void ObjectStore::set_primary_key_for_object(Group& group, StringData object_typ
     }
 #endif // REALM_ENABLE_SYNC
 
-    if (row == not_found && primary_key.size()) {
-        row = table->add_empty_row();
-        table->set_string_unique(c_primaryKeyObjectClassColumnIndex, row, object_type);
-        table->set_string(c_primaryKeyPropertyNameColumnIndex, row, primary_key);
-        return;
-    }
-    // set if changing, or remove if setting to nil
     if (primary_key.size() == 0) {
-        if (row != not_found) {
-            table->move_last_over(row);
-        }
+        if (key)
+            table->remove_object(key);
     }
     else {
-        table->set_string(c_primaryKeyPropertyNameColumnIndex, row, primary_key);
+        Obj obj;
+        if (key)
+            obj = table->get_object(key);
+        else {
+            auto obj = table->create_object();
+            obj.set(c_primaryKeyObjectClassColumnName, object_type);
+        }
+        obj.set(c_primaryKeyPropertyNameColumnName, primary_key);
     }
 }
 
@@ -556,8 +515,8 @@ static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> 
 
         void operator()(AddTable op) { create_table(group, *op.object); }
         void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
-        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->table_column); }
-        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
+        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
+        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->column_key); }
     } applier{group};
     verify_no_errors<SchemaMismatchException>(applier, changes);
 }
@@ -580,12 +539,12 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         // not-quite-correct files produced by other things and has no obvious
         // downside.
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
-        void operator()(RemoveProperty op) { table(op.object).remove_column(op.property->table_column); }
+        void operator()(RemoveProperty op) { table(op.object).remove_column(op.property->column_key); }
         void operator()(MakePropertyNullable op) { make_property_optional(group, table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
         void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? StringData{op.property->name} : ""); }
-        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->table_column); }
-        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
+        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
+        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->column_key); }
 
         void operator()(ChangePropertyType op)
         {
@@ -612,8 +571,8 @@ void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange>
         void operator()(RemoveTable) { }
         void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
-        void operator()(AddIndex op) { if (update_indexes) table(op.object).add_search_index(op.property->table_column); }
-        void operator()(RemoveIndex op) { if (update_indexes) table(op.object).remove_search_index(op.property->table_column); }
+        void operator()(AddIndex op) { if (update_indexes) table(op.object).add_search_index(op.property->column_key); }
+        void operator()(RemoveIndex op) { if (update_indexes) table(op.object).remove_search_index(op.property->column_key); }
         void operator()(RemoveProperty) { }
 
         // No need for errors for these, as we've already verified that they aren't present
@@ -645,8 +604,8 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         void operator()(MakePropertyNullable op) { make_property_optional(group, table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
         void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name.c_str(), op.property ? op.property->name.c_str() : ""); }
-        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->table_column); }
-        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
+        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
+        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->column_key); }
     } applier{group};
 
     for (auto& change : changes) {
@@ -675,7 +634,7 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
             if (!initial_schema.empty() && !initial_schema.find(op.object->name)->property_for_name(op.property->name))
                 throw std::logic_error(util::format("Renamed property '%1.%2' does not exist.", op.object->name, op.property->name));
             auto table = table_for_object_schema(group, *op.object);
-            table->remove_column(op.property->table_column);
+            table->remove_column(op.property->column_key);
         }
 
         void operator()(ChangePrimaryKey op)
@@ -696,8 +655,8 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
             }
         }
 
-        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->table_column); }
-        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
+        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
+        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->column_key); }
 
         void operator()(RemoveTable) { }
         void operator()(ChangePropertyType) { }
@@ -854,44 +813,13 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
 Schema ObjectStore::schema_from_group(Group const& group) {
     std::vector<ObjectSchema> schema;
     schema.reserve(group.size());
-    for (size_t i = 0; i < group.size(); i++) {
-        auto object_type = object_type_for_table_name(group.get_table_name(i));
+    for (auto key : group.get_table_keys()) {
+        auto object_type = object_type_for_table_name(group.get_table_name(key));
         if (object_type.size()) {
-            schema.emplace_back(group, object_type, i);
+            schema.emplace_back(group, object_type, key);
         }
     }
     return schema;
-}
-
-util::Optional<Property> ObjectStore::property_for_column_index(ConstTableRef& table, size_t column_index)
-{
-    StringData column_name = table->get_column_name(column_index);
-
-#if REALM_ENABLE_SYNC
-    // The object ID column is an implementation detail, and is omitted from the schema.
-    // FIXME: Consider filtering out all column names starting with `!`.
-    if (column_name == sync::object_id_column_name)
-        return util::none;
-#endif
-
-    if (table->get_column_type(column_index) == type_Table) {
-        auto subdesc = table->get_subdescriptor(column_index);
-        if (subdesc->get_column_count() != 1 || subdesc->get_column_name(0) != ObjectStore::ArrayColumnName)
-            return util::none;
-    }
-
-    Property property;
-    property.name = column_name;
-    property.type = ObjectSchema::from_core_type(*table->get_descriptor(), column_index);
-    property.is_indexed = table->has_search_index(column_index);
-    property.table_column = column_index;
-
-    if (property.type == PropertyType::Object) {
-        // set link type for objects and arrays
-        ConstTableRef linkTable = table->get_link_target(column_index);
-        property.object_type = ObjectStore::object_type_for_table_name(linkTable->get_name().data());
-    }
-    return property;
 }
 
 void ObjectStore::set_schema_columns(Group const& group, Schema& schema)
@@ -902,21 +830,21 @@ void ObjectStore::set_schema_columns(Group const& group, Schema& schema)
             continue;
         }
         for (auto& property : object_schema.persisted_properties) {
-            property.table_column = table->get_column_index(property.name);
+            property.column_key = table->get_column_key(property.name);
         }
     }
 }
 
 void ObjectStore::delete_data_for_object(Group& group, StringData object_type) {
     if (TableRef table = table_for_object_type(group, object_type)) {
-        group.remove_table(table->get_index_in_group());
+        group.remove_table(table->get_key());
         ObjectStore::set_primary_key_for_object(group, object_type, "");
     }
 }
 
 bool ObjectStore::is_empty(Group const& group) {
-    for (size_t i = 0; i < group.size(); i++) {
-        ConstTableRef table = group.get_table(i);
+    for (auto key : group.get_table_keys()) {
+        ConstTableRef table = group.get_table(key);
         auto object_type = object_type_for_table_name(table->get_name());
         if (object_type.size() == 0 || object_type.begins_with("__")) {
             continue;
@@ -945,7 +873,7 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
                                             object_type, old_name, new_name));
     }
 
-    ObjectSchema table_object_schema(group, object_type);
+    ObjectSchema table_object_schema(group, object_type, table->get_key());
     Property *old_property = table_object_schema.property_for_name(old_name);
     if (!old_property) {
         throw std::logic_error(util::format("Cannot rename property '%1.%2' because it does not exist.", object_type, old_name));
@@ -957,7 +885,7 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
         // renaming to an intermediate property in a multi-version migration.
         // This is safe because the migration will fail schema validation unless
         // this property is renamed again to a valid name before the end.
-        table->rename_column(old_property->table_column, new_name);
+        table->rename_column(old_property->column_key, new_name);
         return;
     }
 
@@ -971,22 +899,13 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
                                             object_type, old_name, new_name));
     }
 
-    size_t column_to_remove = new_property->table_column;
-    table->rename_column(old_property->table_column, new_name);
-    table->remove_column(column_to_remove);
-
-    // update table_column for each property since it may have shifted
-    for (auto& current_prop : target_object_schema->persisted_properties) {
-        if (current_prop.table_column == column_to_remove)
-            current_prop.table_column = old_property->table_column;
-        else if (current_prop.table_column > column_to_remove)
-            --current_prop.table_column;
-    }
+    table->remove_column(new_property->column_key);
+    table->rename_column(old_property->column_key, new_name);
 
     // update nullability for column
     if (is_nullable(new_property->type) && !is_nullable(old_property->type)) {
         auto prop = *new_property;
-        prop.table_column = old_property->table_column;
+        prop.column_key = old_property->column_key;
         make_property_optional(group, *table, prop);
     }
 }

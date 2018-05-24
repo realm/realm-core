@@ -43,7 +43,7 @@ public:
     Results(std::shared_ptr<Realm> r, Table& table);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
-    Results(std::shared_ptr<Realm> r, LinkViewRef lv, util::Optional<Query> q = {}, SortDescriptor s = {});
+//    Results(std::shared_ptr<Realm> r, LinkViewRef lv, util::Optional<Query> q = {}, SortDescriptor s = {});
     ~Results();
 
     // Results is copyable and moveable
@@ -74,7 +74,7 @@ public:
     PropertyType get_type() const;
 
     // Get the LinkView this Results is derived from, if any
-    LinkViewRef get_linkview() const { return m_link_view; }
+//    LinkViewRef get_linkview() const { return m_link_view; }
 
     // Get the size of this results
     // Can be either O(1) or O(N) depending on the state of things
@@ -82,7 +82,7 @@ public:
 
     // Get the row accessor for the given index
     // Throws OutOfBoundsIndexException if index >= size()
-    template<typename T = RowExpr>
+    template<typename T = Obj>
     T get(size_t index);
 
     // Get the boxed row accessor for the given index
@@ -92,9 +92,9 @@ public:
 
     // Get a row accessor for the first/last row, or none if the results are empty
     // More efficient than calling size()+get()
-    template<typename T = RowExpr>
+    template<typename T = Obj>
     util::Optional<T> first();
-    template<typename T = RowExpr>
+    template<typename T = Obj>
     util::Optional<T> last();
 
     // Get the index of the first row matching the query in this table
@@ -226,7 +226,7 @@ private:
     mutable const ObjectSchema *m_object_schema = nullptr;
     Query m_query;
     TableView m_table_view;
-    LinkViewRef m_link_view;
+//    LinkViewRef m_link_view;
     TableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
 
