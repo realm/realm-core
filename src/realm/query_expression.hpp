@@ -2646,9 +2646,9 @@ template <typename>
 class ColumnListSize;
 
 template <typename T>
-class Columns<List<T>> : public Subexpr2<T>, public ColumnListBase {
+class Columns<Lst<T>> : public Subexpr2<T>, public ColumnListBase {
 public:
-    Columns(const Columns<List<T>>& other)
+    Columns(const Columns<Lst<T>>& other)
         : Subexpr2<T>(other)
         , ColumnListBase(other)
     {
@@ -2656,7 +2656,7 @@ public:
 
     std::unique_ptr<Subexpr> clone(Transaction*) const override
     {
-        return make_subexpr<Columns<List<T>>>(*this);
+        return make_subexpr<Columns<Lst<T>>>(*this);
     }
 
     const Table* get_base_table() const override
@@ -2746,10 +2746,10 @@ private:
 };
 
 template <typename T>
-class ColumnListSize : public Columns<List<T>> {
+class ColumnListSize : public Columns<Lst<T>> {
 public:
-    ColumnListSize(const Columns<List<T>>& other)
-        : Columns<List<T>>(other)
+    ColumnListSize(const Columns<Lst<T>>& other)
+        : Columns<Lst<T>>(other)
     {
     }
     void evaluate(size_t index, ValueBase& destination) override
@@ -2782,7 +2782,7 @@ public:
 };
 
 template <typename T>
-SizeOperator<SizeOfList> Columns<List<T>>::size()
+SizeOperator<SizeOfList> Columns<Lst<T>>::size()
 {
     std::unique_ptr<Subexpr> ptr(new ColumnListSize<T>(*this));
     return SizeOperator<SizeOfList>(std::move(ptr));
@@ -2793,7 +2793,7 @@ class ListColumnAggregate : public Subexpr2<typename Operation::ResultType> {
 public:
     using R = typename Operation::ResultType;
 
-    ListColumnAggregate(ColKey column_key, Columns<List<T>> column)
+    ListColumnAggregate(ColKey column_key, Columns<Lst<T>> column)
         : m_column_key(column_key)
         , m_list(std::move(column))
     {
@@ -2867,7 +2867,7 @@ public:
 
 private:
     ColKey m_column_key;
-    Columns<List<T>> m_list;
+    Columns<Lst<T>> m_list;
 };
 
 template <class Operator>

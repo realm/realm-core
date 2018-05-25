@@ -271,13 +271,14 @@ TEST(Replication_General)
         TableRef table = wt.get_table("my_table");
         auto col_id = table->get_column_key("my_int");
         Obj obj = table->get_object(ObjKey(0)).set(col_id, 9);
+        table->add_search_index(col_id);
         wt.commit();
     }
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("my_table");
         auto col_id = table->get_column_key("my_int");
-        table->get_object(ObjKey(0)).set(col_id, 10);
+        table->get_object(ObjKey(0)).add_int(col_id, 5);
         table->get_object(ObjKey(3)).set(col_id, 2);
         wt.commit();
     }
@@ -312,8 +313,8 @@ TEST(Replication_General)
 
         CHECK_EQUAL(5, table->size());
 
-
-        CHECK_EQUAL(10, table->get_object(ObjKey(0)).get<Int>(col_id));
+        CHECK(table->has_search_index(col_id));
+        CHECK_EQUAL(14, table->get_object(ObjKey(0)).get<Int>(col_id));
         CHECK_EQUAL(3, table->get_object(ObjKey(1)).get<Int>(col_id));
         CHECK_EQUAL(2, table->get_object(ObjKey(3)).get<Int>(col_id));
         CHECK_EQUAL(8, table->get_object(ObjKey(4)).get<Int>(col_id));
@@ -332,7 +333,9 @@ TEST(Replication_General)
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("my_table");
+        auto col_id = table->get_column_key("my_int");
         table->create_object(ObjKey(200));
+        table->remove_search_index(col_id);
         wt.commit();
     }
     repl.replay_transacts(*sg_2, replay_logger);
@@ -343,12 +346,27 @@ TEST(Replication_General)
         rt_2.get_group().verify();
         CHECK(rt_1.get_group() != rt_2.get_group());
         auto table = rt_2.get_table("my_table");
+        auto col_id = table->get_column_key("my_int");
         CHECK_NOT(table->is_valid(ObjKey(100)));
         CHECK(table->is_valid(ObjKey(200)));
+        CHECK_NOT(table->has_search_index(col_id));
+    }
+    // Clear table
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("my_table");
+        table->clear();
+        wt.commit();
+    }
+    repl.replay_transacts(*sg_2, replay_logger);
+    {
+        ReadTransaction rt_2(sg_2);
+        rt_2.get_group().verify();
+        auto table = rt_2.get_table("my_table");
+        CHECK_EQUAL(table->size(), 0);
     }
 }
 
-#ifdef LEGACY_TESTS
 
 TEST(Replication_Timestamp)
 {
@@ -357,6 +375,8 @@ TEST(Replication_Timestamp)
 
     MyTrivialReplication repl(path_1);
     DBRef sg_1 = DB::create(repl);
+    ObjKey k1;
+    ObjKey k2;
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.add_table("t");
@@ -369,51 +389,50 @@ TEST(Replication_Timestamp)
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("t");
+        auto col = table->get_column_key("ts");
 
-        // First row is to have a row that we can test move_last_over() on later
-        table->add_empty_row();
-        CHECK(table->get_timestamp(0, 0).is_null());
+        Obj obj = table->create_object();
+        CHECK(obj.get<Timestamp>(col).is_null());
 
-        table->add_empty_row();
-        table->set_timestamp(0, 1, Timestamp(5, 6));
-        table->add_empty_row();
-        table->set_timestamp(0, 2, Timestamp(1, 2));
+        k1 = table->create_object().set(col, Timestamp(5, 6)).get_key();
+        k2 = table->create_object().set(col, Timestamp(1, 2)).get_key();
         wt.commit();
     }
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("t");
+        auto col = table->get_column_key("ts");
 
         // Overwrite non-null with null to test that
         // TransactLogParser::parse_one(InstructionHandler& handler) correctly will see a set_null instruction
         // and not a set_new_date instruction
-        table->set_timestamp(0, 1, Timestamp{});
+        table->get_object(k1).set(col, Timestamp{});
 
         // Overwrite non-null with other non-null
-        table->set_timestamp(0, 2, Timestamp(3, 4));
+        table->get_object(k2).set(col, Timestamp{3, 4});
         wt.commit();
     }
     {
-        // move_last_over
+        // Delete object
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("t");
-        table->move_last_over(0);
+        table->begin()->remove();
         wt.commit();
     }
 
     util::Logger& replay_logger = test_context.logger;
     DBRef sg_2 = DB::create(path_2);
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     {
         ReadTransaction rt_1(sg_1);
         rt_1.get_group().verify();
         ConstTableRef table = rt_1.get_table("t");
+        auto col = table->get_column_key("ts");
         CHECK_EQUAL(2, table->size());
-        CHECK(table->get_timestamp(0, 0) == Timestamp(3, 4));
-        CHECK(table->get_timestamp(0, 1).is_null());
+        CHECK(table->get_object(k1).is_null(col));
+        CHECK_EQUAL(table->get_object(k2).get<Timestamp>(col), Timestamp(3, 4));
     }
 }
-#endif
 
 TEST(Replication_Links)
 {
@@ -1043,18 +1062,25 @@ TEST(Replication_ListOfPrimitives)
     MyTrivialReplication repl(path_1);
     DBRef sg_1 = DB::create(repl);
     DBRef sg_2 = DB::create(path_2);
+    ColKey col_int;
+    ColKey col_boo;
+    ColKey col_flo;
+    ColKey col_dou;
+    ColKey col_str;
+    ColKey col_bin;
+    ColKey col_tim;
 
     // Create table
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.add_table("table");
-        table->add_column_list(type_Int, "integers");
-        table->add_column_list(type_Bool, "booleans");
-        table->add_column_list(type_Float, "floats");
-        table->add_column_list(type_Double, "doubles");
-        table->add_column_list(type_String, "strings");
-        table->add_column_list(type_Binary, "binaries");
-        table->add_column_list(type_Timestamp, "dates");
+        col_int = table->add_column_list(type_Int, "integers");
+        col_boo = table->add_column_list(type_Bool, "booleans");
+        col_flo = table->add_column_list(type_Float, "floats");
+        col_dou = table->add_column_list(type_Double, "doubles");
+        col_str = table->add_column_list(type_String, "strings");
+        col_bin = table->add_column_list(type_Binary, "binaries");
+        col_tim = table->add_column_list(type_Timestamp, "dates");
         table->create_object(ObjKey(0));
         wt.commit();
     }
@@ -1066,14 +1092,6 @@ TEST(Replication_ListOfPrimitives)
         ConstTableRef table = rt.get_table("table");
         CHECK(table);
         CHECK_EQUAL(1, table->size());
-
-        auto col_int = table->get_column_key("integers");
-        auto col_boo = table->get_column_key("booleans");
-        auto col_flo = table->get_column_key("floats");
-        auto col_dou = table->get_column_key("doubles");
-        auto col_str = table->get_column_key("strings");
-        auto col_bin = table->get_column_key("binaries");
-        auto col_tim = table->get_column_key("dates");
 
         ConstObj obj = table->get_object(ObjKey(0));
 
@@ -1096,13 +1114,6 @@ TEST(Replication_ListOfPrimitives)
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("table");
-        auto col_int = table->get_column_key("integers");
-        auto col_boo = table->get_column_key("booleans");
-        auto col_flo = table->get_column_key("floats");
-        auto col_dou = table->get_column_key("doubles");
-        auto col_str = table->get_column_key("strings");
-        auto col_bin = table->get_column_key("binaries");
-        auto col_tim = table->get_column_key("dates");
 
         char buf[10];
         memset(buf, 'A', sizeof(buf));
@@ -1126,14 +1137,6 @@ TEST(Replication_ListOfPrimitives)
         CHECK(table);
         CHECK_EQUAL(1, table->size());
 
-        auto col_int = table->get_column_key("integers");
-        auto col_boo = table->get_column_key("booleans");
-        auto col_flo = table->get_column_key("floats");
-        auto col_dou = table->get_column_key("doubles");
-        auto col_str = table->get_column_key("strings");
-        auto col_bin = table->get_column_key("binaries");
-        auto col_tim = table->get_column_key("dates");
-
         ConstObj obj = table->get_object(ObjKey(0));
 
         char buf[10];
@@ -1147,17 +1150,50 @@ TEST(Replication_ListOfPrimitives)
         CHECK_EQUAL(obj.get_list<Binary>(col_bin)[0], bin);
         CHECK_EQUAL(obj.get_list<Timestamp>(col_tim)[0], Timestamp(100, 0));
     }
+    // Modify values
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("table");
+
+        char buf[10];
+        memset(buf, 'B', sizeof(buf));
+        Obj obj = table->get_object(ObjKey(0));
+        obj.get_list<Int>(col_int).set(0, 200);
+        obj.get_list<Bool>(col_boo).set(0, false);
+        obj.get_list<Float>(col_flo).set(0, 200.f);
+        obj.get_list<Double>(col_dou).set(0, 200.);
+        obj.get_list<String>(col_str).set(0, StringData("World"));
+        obj.get_list<Binary>(col_bin).set(0, BinaryData(buf, sizeof(buf)));
+        obj.get_list<Timestamp>(col_tim).set(0, Timestamp(200, 0));
+
+        wt.commit();
+    }
+    repl.replay_transacts(*sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        check(test_context, sg_1, rt);
+
+        ConstTableRef table = rt.get_table("table");
+        CHECK(table);
+        CHECK_EQUAL(1, table->size());
+
+        ConstObj obj = table->get_object(ObjKey(0));
+
+        char buf[10];
+        memset(buf, 'B', sizeof(buf));
+        BinaryData bin(buf, sizeof(buf));
+        CHECK_EQUAL(obj.get_list<Int>(col_int)[0], 200);
+        CHECK_EQUAL(obj.get_list<Bool>(col_boo)[0], false);
+        CHECK_EQUAL(obj.get_list<Float>(col_flo)[0], 200.f);
+        CHECK_EQUAL(obj.get_list<Double>(col_dou)[0], 200.);
+        CHECK_EQUAL(obj.get_list<String>(col_str)[0], "World");
+        CHECK_EQUAL(obj.get_list<Binary>(col_bin)[0], bin);
+        CHECK_EQUAL(obj.get_list<Timestamp>(col_tim)[0], Timestamp(200, 0));
+    }
     // Clear/erase lists
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("table");
-        auto col_int = table->get_column_key("integers");
-        auto col_boo = table->get_column_key("booleans");
-        auto col_flo = table->get_column_key("floats");
-        auto col_dou = table->get_column_key("doubles");
-        auto col_str = table->get_column_key("strings");
-        auto col_bin = table->get_column_key("binaries");
-        auto col_tim = table->get_column_key("dates");
 
         char buf[10];
         memset(buf, 'A', sizeof(buf));
@@ -1180,14 +1216,6 @@ TEST(Replication_ListOfPrimitives)
         ConstTableRef table = rt.get_table("table");
         CHECK(table);
         CHECK_EQUAL(1, table->size());
-
-        auto col_int = table->get_column_key("integers");
-        auto col_boo = table->get_column_key("booleans");
-        auto col_flo = table->get_column_key("floats");
-        auto col_dou = table->get_column_key("doubles");
-        auto col_str = table->get_column_key("strings");
-        auto col_bin = table->get_column_key("binaries");
-        auto col_tim = table->get_column_key("dates");
 
         ConstObj obj = table->get_object(ObjKey(0));
 
@@ -1298,45 +1326,6 @@ TEST(Replication_CascadeRemove_ColumnLink)
     CHECK_EQUAL(target->size(), 0);
 }
 
-TEST(Replication_LinkListSelfLinkNullification)
-{
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-
-    MyTrivialReplication repl(path_1);
-    DBRef sg_1 = DB::create(repl);
-    DBRef sg_2 = DB::create(path_2);
-
-    util::Logger& replay_logger = test_context.logger;
-
-    {
-        WriteTransaction wt(sg_1);
-        TableRef t = wt.add_table("t");
-        t->add_column_link(type_LinkList, "l", *t);
-        t->add_empty_row(2);
-        LinkViewRef ll = t->get_linklist(0, 1);
-        ll->add(1);
-        ll->add(1);
-        ll->add(0);
-        LinkViewRef ll2 = t->get_linklist(0, 0);
-        ll2->add(0);
-        ll2->add(1);
-        wt.commit();
-    }
-    repl.replay_transacts(sg_2, replay_logger);
-
-    {
-        WriteTransaction wt(sg_1);
-        TableRef t = wt.get_table("t");
-        t->move_last_over(0);
-        wt.commit();
-    }
-    repl.replay_transacts(sg_2, replay_logger);
-    ReadTransaction rt_2{sg_2};
-    check(test_context, sg_1, rt_2);
-}
-
-
 TEST(Replication_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 {
     SHARED_GROUP_TEST_PATH(path_1);
@@ -1436,6 +1425,46 @@ TEST(Replication_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     CHECK_EQUAL(target->size(), 0);
 }
 #endif
+
+TEST(Replication_LinkListSelfLinkNullification)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    MyTrivialReplication repl(path_1);
+    DBRef sg_1 = DB::create(repl);
+    DBRef sg_2 = DB::create(path_2);
+
+    util::Logger& replay_logger = test_context.logger;
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef t = wt.add_table("t");
+        auto col = t->add_column_link(type_LinkList, "l", *t);
+        Obj obj0 = t->create_object();
+        Obj obj1 = t->create_object();
+        auto ll = obj1.get_linklist(col);
+        ll.add(obj1.get_key());
+        ll.add(obj1.get_key());
+        ll.add(obj0.get_key());
+        auto ll2 = obj0.get_linklist(col);
+        ll2.add(obj0.get_key());
+        ll2.add(obj1.get_key());
+        wt.commit();
+    }
+    repl.replay_transacts(*sg_2, replay_logger);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef t = wt.get_table("t");
+        t->begin()->remove();
+        wt.commit();
+    }
+    repl.replay_transacts(*sg_2, replay_logger);
+    ReadTransaction rt_2{sg_2};
+    check(test_context, sg_1, rt_2);
+}
+
 
 TEST(Replication_NullStrings)
 {
@@ -1542,7 +1571,6 @@ TEST(Replication_NullInteger)
 }
 
 
-#ifdef LEGACY_TESTS
 TEST(Replication_RenameGroupLevelTable_RenameColumn)
 {
     SHARED_GROUP_TEST_PATH(path_1);
@@ -1566,21 +1594,65 @@ TEST(Replication_RenameGroupLevelTable_RenameColumn)
         WriteTransaction wt(sg_1);
         wt.get_group().rename_table("foo", "bar");
         auto bar = wt.get_table("bar");
-        bar->rename_column(0, "b");
+        auto col_a = bar->get_column_key("a");
+        bar->rename_column(col_a, "b");
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger);
+    repl.replay_transacts(*sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         ConstTableRef foo = rt.get_table("foo");
         CHECK(!foo);
         ConstTableRef bar = rt.get_table("bar");
         CHECK(bar);
-        CHECK_EQUAL(0, bar->get_index_in_group());
-        CHECK_EQUAL(0, bar->get_column_key("b"));
+        CHECK(bar->get_column_key("b"));
     }
 }
-#endif
+
+TEST(Replication_RemoveGroupLevelTable_RemoveColumn)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    util::Logger& replay_logger = test_context.logger;
+
+    MyTrivialReplication repl(path_1);
+    DBRef sg_1 = DB::create(repl);
+    DBRef sg_2 = DB::create(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("foo");
+        TableRef table2 = wt.add_table("bar");
+        table1->add_column(type_Int, "a");
+        table2->add_column(type_Int, "c");
+        wt.commit();
+    }
+    repl.replay_transacts(*sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef foo = rt.get_table("foo");
+        ConstTableRef bar = rt.get_table("bar");
+        CHECK(foo->get_column_key("a"));
+        CHECK(bar->get_column_key("c"));
+    }
+    {
+        WriteTransaction wt(sg_1);
+        wt.get_group().remove_table("foo");
+        auto bar = wt.get_table("bar");
+        auto col_c = bar->get_column_key("c");
+        bar->remove_column(col_c);
+        wt.commit();
+    }
+    repl.replay_transacts(*sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        CHECK_NOT(rt.get_table("foo"));
+        ConstTableRef bar = rt.get_table("bar");
+        CHECK(bar);
+        CHECK_NOT(bar->get_column_key("c"));
+    }
+}
 
 #ifdef LEGACY_TESTS
 TEST(Replication_LinkListNullifyThroughTableView)

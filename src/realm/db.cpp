@@ -2349,14 +2349,14 @@ TableRef Transaction::import_copy_of(TableRef original)
     return get_table(tk);
 }
 
-LinkList Transaction::import_copy_of(const LinkList& original)
+LnkLst Transaction::import_copy_of(const LnkLst& original)
 {
     Obj obj = import_copy_of(original.m_obj);
     ColKey ck = original.m_col_key;
     return obj.get_linklist(ck);
 }
 
-LinkListPtr Transaction::import_copy_of(const LinkListPtr& original)
+LnkLstPtr Transaction::import_copy_of(const LnkLstPtr& original)
 {
     if (!bool(original))
         return nullptr;
@@ -2365,14 +2365,14 @@ LinkListPtr Transaction::import_copy_of(const LinkListPtr& original)
     return obj.get_linklist_ptr(ck);
 }
 
-ConstLinkList Transaction::import_copy_of(const ConstLinkList& original)
+ConstLnkLst Transaction::import_copy_of(const ConstLnkLst& original)
 {
     ConstObj obj = import_copy_of(original.m_obj);
     ColKey ck = original.m_col_key;
     return obj.get_linklist(ck);
 }
 
-ConstLinkListPtr Transaction::import_copy_of(const ConstLinkListPtr& original)
+ConstLnkLstPtr Transaction::import_copy_of(const ConstLnkLstPtr& original)
 {
     if (!bool(original))
         return nullptr;

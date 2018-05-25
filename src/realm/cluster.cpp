@@ -1030,7 +1030,7 @@ ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
     REALM_ASSERT_DEBUG(sz <= cluster_node_size);
     if (REALM_LIKELY(sz < cluster_node_size)) {
         insert_row(ndx, k); // Throws
-        state.ref = get_ref();
+        state.mem = get_mem();
         state.index = ndx;
     }
     else {
@@ -1040,7 +1040,7 @@ ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
         if (ndx == sz) {
             new_leaf.insert_row(0, ObjKey(0)); // Throws
             state.split_key = k.value;
-            state.ref = new_leaf.get_ref();
+            state.mem = new_leaf.get_mem();
             state.index = 0;
         }
         else {
@@ -1049,7 +1049,7 @@ ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
             new_leaf.ensure_general_form();
             move(ndx, &new_leaf, current_key_value);
             insert_row(ndx, k); // Throws
-            state.ref = get_ref();
+            state.mem = get_mem();
             state.split_key = current_key_value;
             state.index = ndx;
         }
@@ -1061,7 +1061,7 @@ ref_type Cluster::insert(ObjKey k, ClusterNode::State& state)
 
 void Cluster::get(ObjKey k, ClusterNode::State& state) const
 {
-    state.ref = get_ref();
+    state.mem = get_mem();
     if (m_keys.is_attached()) {
         state.index = m_keys.lower_bound(uint64_t(k.value));
         if (state.index == m_keys.size() || m_keys.get(state.index) != uint64_t(k.value)) {
@@ -1079,7 +1079,7 @@ void Cluster::get(ObjKey k, ClusterNode::State& state) const
 ObjKey Cluster::get(size_t ndx, ClusterNode::State& state) const
 {
     state.index = ndx;
-    state.ref = get_ref();
+    state.mem = get_mem();
     return get_real_key(ndx);
 }
 
@@ -1543,7 +1543,7 @@ Obj ClusterTree::insert(ObjKey k)
         repl->create_object(get_owner(), k);
     }
 
-    return Obj(this, state.ref, k, state.index);
+    return Obj(this, state.mem, k, state.index);
 }
 
 bool ClusterTree::is_valid(ObjKey k) const
@@ -1562,14 +1562,14 @@ ConstObj ClusterTree::get(ObjKey k) const
 {
     ClusterNode::State state;
     m_root->get(k, state);
-    return ConstObj(this, state.ref, k, state.index);
+    return ConstObj(this, state.mem, k, state.index);
 }
 
 Obj ClusterTree::get(ObjKey k)
 {
     ClusterNode::State state;
     m_root->get(k, state);
-    return Obj(this, state.ref, k, state.index);
+    return Obj(this, state.mem, k, state.index);
 }
 
 ConstObj ClusterTree::get(size_t ndx) const
@@ -1579,7 +1579,7 @@ ConstObj ClusterTree::get(size_t ndx) const
     }
     ClusterNode::State state;
     ObjKey k = m_root->get(ndx, state);
-    return ConstObj(this, state.ref, k, state.index);
+    return ConstObj(this, state.mem, k, state.index);
 }
 
 Obj ClusterTree::get(size_t ndx)
@@ -1589,7 +1589,7 @@ Obj ClusterTree::get(size_t ndx)
     }
     ClusterNode::State state;
     ObjKey k = m_root->get(ndx, state);
-    return Obj(this, state.ref, k, state.index);
+    return Obj(this, state.mem, k, state.index);
 }
 
 void ClusterTree::erase(ObjKey k, CascadeState& state)
@@ -1839,7 +1839,7 @@ ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
     REALM_ASSERT(m_leaf.is_attached());
 
     return new (&m_obj_cache_storage)
-        Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_ref(), m_key, m_state.m_current_index);
+        Obj(const_cast<ClusterTree*>(&m_tree), m_leaf.get_mem(), m_key, m_state.m_current_index);
 }
 
 ClusterTree::ConstIterator& Table::ConstIterator::operator++()

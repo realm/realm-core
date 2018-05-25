@@ -32,7 +32,7 @@
 #include <realm/metrics/metrics.hpp>
 #include <realm/replication.hpp>
 #include <realm/version_id.hpp>
-#include "db_options.hpp"
+#include <realm/db_options.hpp>
 
 namespace realm {
 
@@ -534,11 +534,11 @@ public:
     TableRef import_copy_of(const TableRef original);
     ConstTableRef import_copy_of(const ConstTableRef original);
     template <typename T>
-    List<T> import_copy_of(const List<T>& original);
-    LinkList import_copy_of(const LinkList& original);
-    LinkListPtr import_copy_of(const LinkListPtr& original);
-    ConstLinkList import_copy_of(const ConstLinkList& original);
-    ConstLinkListPtr import_copy_of(const ConstLinkListPtr& original);
+    Lst<T> import_copy_of(const Lst<T>& original);
+    LnkLst import_copy_of(const LnkLst& original);
+    LnkLstPtr import_copy_of(const LnkLstPtr& original);
+    ConstLnkLst import_copy_of(const ConstLnkLst& original);
+    ConstLnkLstPtr import_copy_of(const ConstLnkLstPtr& original);
 
     // handover of the heavier Query and TableView
     std::unique_ptr<Query> import_copy_of(Query&, PayloadPolicy);
@@ -753,7 +753,7 @@ private:
 };
 
 template <typename T>
-inline List<T> Transaction::import_copy_of(const List<T>& original)
+inline Lst<T> Transaction::import_copy_of(const Lst<T>& original)
 {
     Obj obj = import_copy_of(original.m_obj);
     ColKey ck = original.m_col_key;

@@ -2767,14 +2767,14 @@ TEST(Table_ListOps)
 
     Obj obj = table.create_object();
     Obj obj1 = obj;
-    List<Int> list = obj.get_list<Int>(col);
+    Lst<Int> list = obj.get_list<Int>(col);
     list.add(1);
     list.add(2);
     list.swap(0, 1);
     CHECK_EQUAL(list.get(0), 2);
     CHECK_EQUAL(list.get(1), 1);
 
-    List<Int> list1;
+    Lst<Int> list1;
     CHECK_EQUAL(list1.size(), 0);
     list1 = list;
     CHECK_EQUAL(list1.size(), 2);
@@ -2782,14 +2782,14 @@ TEST(Table_ListOps)
     CHECK_EQUAL(list.size(), 3);
     CHECK_EQUAL(list1.size(), 3);
 
-    List<Int> list2 = list;
+    Lst<Int> list2 = list;
     CHECK_EQUAL(list2.size(), 3);
 }
 
 TEST(Table_ListOfPrimitives)
 {
     Group g;
-    std::vector<ConstListBase*> lists;
+    std::vector<ConstLstBase*> lists;
     TableRef t = g.add_table("table");
     ColKey int_col = t->add_column_list(type_Int, "integers");
     ColKey bool_col = t->add_column_list(type_Bool, "booleans");

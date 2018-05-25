@@ -74,10 +74,10 @@ inline std::ostream& operator<<(std::ostream& ostr, SizeOfList size_of_list)
     return ostr;
 }
 
-class ConstListBase : public ArrayParent {
+class ConstLstBase : public ArrayParent {
 public:
-    ConstListBase(ConstListBase&&) = delete;
-    virtual ~ConstListBase();
+    ConstLstBase(ConstLstBase&&) = delete;
+    virtual ~ConstLstBase();
     /*
      * Operations that makes sense without knowing the specific type
      * can be made virtual.
@@ -106,14 +106,14 @@ public:
 
 protected:
     template <class>
-    friend class ListIterator;
+    friend class LstIterator;
 
     const ConstObj* m_const_obj;
     ColKey m_col_key;
 
     mutable std::vector<size_t> m_deleted;
 
-    ConstListBase(ColKey col_key, const ConstObj* obj)
+    ConstLstBase(ColKey col_key, const ConstObj* obj)
         : m_const_obj(obj)
         , m_col_key(col_key)
     {
@@ -183,7 +183,7 @@ protected:
 };
 
 /*
- * This class implements a forward iterator over the elements in a List.
+ * This class implements a forward iterator over the elements in a Lst.
  *
  * The iterator is stable against deletions in the list. If you try to
  * dereference an iterator that points to an element, that is deleted, the
@@ -195,7 +195,7 @@ protected:
  * to return T by value.
  */
 template <class T>
-class ListIterator {
+class LstIterator {
 public:
     typedef std::forward_iterator_tag iterator_category;
     typedef const T value_type;
@@ -203,7 +203,7 @@ public:
     typedef const T* pointer;
     typedef const T& reference;
 
-    ListIterator(const ConstListIf<T>* l, size_t ndx)
+    LstIterator(const ConstLstIf<T>* l, size_t ndx)
         : m_list(l)
         , m_ndx(ndx)
     {
@@ -217,40 +217,40 @@ public:
     {
         return *operator->();
     }
-    ListIterator& operator++()
+    LstIterator& operator++()
     {
         m_ndx = m_list->incr(m_ndx);
         return *this;
     }
-    ListIterator operator++(int)
+    LstIterator operator++(int)
     {
-        ListIterator tmp(*this);
+        LstIterator tmp(*this);
         operator++();
         return tmp;
     }
 
-    bool operator!=(const ListIterator& rhs)
+    bool operator!=(const LstIterator& rhs)
     {
         return m_ndx != rhs.m_ndx;
     }
 
-    bool operator==(const ListIterator& rhs)
+    bool operator==(const LstIterator& rhs)
     {
         return m_ndx == rhs.m_ndx;
     }
 
 private:
-    friend class List<T>;
+    friend class Lst<T>;
     T m_val;
-    const ConstListIf<T>* m_list;
+    const ConstLstIf<T>* m_list;
     size_t m_ndx;
 };
 
 /// This class defines the interface to ConstList, except for the constructor
 /// The ConstList class has the ConstObj member m_obj, which should not be
-/// inherited from List<T>.
+/// inherited from Lst<T>.
 template <class T>
-class ConstListIf : public virtual ConstListBase {
+class ConstLstIf : public virtual ConstLstBase {
 public:
     /**
      * Only member functions not referring to an index in the list will check if
@@ -278,13 +278,13 @@ public:
     {
         return get(ndx);
     }
-    ListIterator<T> begin() const
+    LstIterator<T> begin() const
     {
-        return ListIterator<T>(this, 0);
+        return LstIterator<T>(this, 0);
     }
-    ListIterator<T> end() const
+    LstIterator<T> end() const
     {
-        return ListIterator<T>(this, size() + m_deleted.size());
+        return LstIterator<T>(this, size() + m_deleted.size());
     }
     size_t find_first(T value) const
     {
@@ -295,19 +295,19 @@ protected:
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
     mutable bool m_valid = false;
 
-    ConstListIf()
-        : ConstListBase(ColKey{}, nullptr)
+    ConstLstIf()
+        : ConstLstBase(ColKey{}, nullptr)
     {
     }
-    ConstListIf(Allocator& alloc)
-        : ConstListBase(ColKey{}, nullptr)
+    ConstLstIf(Allocator& alloc)
+        : ConstLstBase(ColKey{}, nullptr)
         , m_tree(new BPlusTree<T>(alloc))
     {
         m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
     }
 
-    ConstListIf(const ConstListIf& other)
-        : ConstListBase(other.m_col_key, nullptr)
+    ConstLstIf(const ConstLstIf& other)
+        : ConstLstBase(other.m_col_key, nullptr)
         , m_valid(other.m_valid)
     {
         if (other.m_tree) {
@@ -318,15 +318,15 @@ protected:
         }
     }
 
-    ConstListIf(ConstListIf&& other)
-        : ConstListBase(ColKey{}, nullptr)
+    ConstLstIf(ConstLstIf&& other)
+        : ConstLstBase(ColKey{}, nullptr)
         , m_tree(std::move(other.m_tree))
         , m_valid(other.m_valid)
     {
         m_tree->set_parent(this, 0);
     }
 
-    ConstListIf& operator=(const ConstListIf& other)
+    ConstLstIf& operator=(const ConstLstIf& other)
     {
         if (this != &other) {
             m_col_key = other.m_col_key;
@@ -355,12 +355,12 @@ protected:
 };
 
 template <class T>
-class ConstList : public ConstListIf<T> {
+class ConstLst : public ConstLstIf<T> {
 public:
-    ConstList(const ConstObj& owner, ColKey col_key);
-    ConstList(ConstList&& other)
-        : ConstListBase(other.m_col_key, &m_obj)
-        , ConstListIf<T>(std::move(other))
+    ConstLst(const ConstObj& owner, ColKey col_key);
+    ConstLst(ConstLst&& other)
+        : ConstLstBase(other.m_col_key, &m_obj)
+        , ConstLstIf<T>(std::move(other))
         , m_obj(std::move(other.m_obj))
     {
     }
@@ -374,13 +374,13 @@ private:
 /*
  * This class defines a virtual interface to a writable list
  */
-class ListBase : public virtual ConstListBase {
+class LstBase : public virtual ConstLstBase {
 public:
-    ListBase()
-        : ConstListBase(ColKey{}, nullptr)
+    LstBase()
+        : ConstLstBase(ColKey{}, nullptr)
     {
     }
-    virtual ~ListBase()
+    virtual ~LstBase()
     {
     }
     virtual void insert_null(size_t ndx) = 0;
@@ -392,31 +392,31 @@ public:
 };
 
 template <class T>
-class List : public ConstListIf<T>, public ListBase {
+class Lst : public ConstLstIf<T>, public LstBase {
 public:
-    using ConstListIf<T>::m_tree;
-    using ConstListIf<T>::get;
+    using ConstLstIf<T>::m_tree;
+    using ConstLstIf<T>::get;
 
-    List()
-        : ConstListBase({}, &m_obj)
+    Lst()
+        : ConstLstBase({}, &m_obj)
     {
     }
-    List(const Obj& owner, ColKey col_key);
-    List(const List& other);
-    List(List&& other);
+    Lst(const Obj& owner, ColKey col_key);
+    Lst(const Lst& other);
+    Lst(Lst&& other);
 
-    List& operator=(const List& other);
-    List& operator=(const BPlusTree<T>& other);
+    Lst& operator=(const Lst& other);
+    Lst& operator=(const BPlusTree<T>& other);
 
     void update_child_ref(size_t, ref_type new_ref) override
     {
-        m_obj.set_int(ConstListBase::m_col_key, from_ref(new_ref));
+        m_obj.set_int(ConstLstBase::m_col_key, from_ref(new_ref));
     }
 
     void create()
     {
         m_tree->create();
-        ConstListIf<T>::m_valid = true;
+        ConstLstIf<T>::m_valid = true;
     }
 
     void insert_null(size_t ndx) override
@@ -469,20 +469,20 @@ public:
         m_obj.bump_both_versions();
     }
 
-    T remove(ListIterator<T>& it)
+    T remove(LstIterator<T>& it)
     {
-        return remove(ConstListBase::adjust(it.m_ndx));
+        return remove(ConstLstBase::adjust(it.m_ndx));
     }
 
     T remove(size_t ndx)
     {
         ensure_writeable();
         if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
-            ConstListBase::erase_repl(repl, ndx);
+            ConstLstBase::erase_repl(repl, ndx);
         }
         T old = get(ndx);
         do_remove(ndx);
-        ConstListBase::adj_remove(ndx);
+        ConstLstBase::adj_remove(ndx);
         m_obj.bump_both_versions();
 
         return old;
@@ -500,7 +500,7 @@ public:
         if (from != to) {
             ensure_writeable();
             if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
-                ConstListBase::move_repl(repl, from, to);
+                ConstLstBase::move_repl(repl, from, to);
             }
             T tmp = get(from);
             int adj = (from < to) ? 1 : -1;
@@ -518,7 +518,7 @@ public:
     {
         if (ndx1 != ndx2) {
             if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
-                ConstListBase::swap_repl(repl, ndx1, ndx2);
+                ConstLstBase::swap_repl(repl, ndx1, ndx2);
             }
             m_tree->swap(ndx1, ndx2);
         }
@@ -530,7 +530,7 @@ public:
         update_if_needed();
         ensure_writeable();
         if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
-            ConstListBase::clear_repl(repl);
+            ConstLstBase::clear_repl(repl);
         }
         m_tree->clear();
         m_obj.bump_both_versions();
@@ -548,7 +548,7 @@ protected:
     }
     void ensure_created()
     {
-        if (!ConstListIf<T>::m_valid && m_obj.is_valid()) {
+        if (!ConstLstIf<T>::m_valid && m_obj.is_valid()) {
             create();
         }
     }
@@ -578,31 +578,31 @@ protected:
 };
 
 template <class T>
-List<T>::List(const List<T>& other)
-    : ConstListBase(other.m_col_key, &m_obj)
-    , ConstListIf<T>(other)
+Lst<T>::Lst(const Lst<T>& other)
+    : ConstLstBase(other.m_col_key, &m_obj)
+    , ConstLstIf<T>(other)
     , m_obj(other.m_obj)
 {
 }
 
 template <class T>
-List<T>::List(List<T>&& other)
-    : ConstListBase(other.m_col_key, &m_obj)
-    , ConstListIf<T>(std::move(other))
+Lst<T>::Lst(Lst<T>&& other)
+    : ConstLstBase(other.m_col_key, &m_obj)
+    , ConstLstIf<T>(std::move(other))
     , m_obj(std::move(other.m_obj))
 {
 }
 
 template <class T>
-List<T>& List<T>::operator=(const List& other)
+Lst<T>& Lst<T>::operator=(const Lst& other)
 {
-    ConstListIf<T>::operator=(other);
+    ConstLstIf<T>::operator=(other);
     m_obj = other.m_obj;
     return *this;
 }
 
 template <class T>
-List<T>& List<T>::operator=(const BPlusTree<T>& other)
+Lst<T>& Lst<T>::operator=(const BPlusTree<T>& other)
 {
     *m_tree = other;
     return *this;
@@ -610,29 +610,29 @@ List<T>& List<T>::operator=(const BPlusTree<T>& other)
 
 
 template <>
-void List<ObjKey>::do_set(size_t ndx, ObjKey target_key);
+void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key);
 
 template <>
-void List<ObjKey>::do_insert(size_t ndx, ObjKey target_key);
+void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key);
 
 template <>
-void List<ObjKey>::do_remove(size_t ndx);
+void Lst<ObjKey>::do_remove(size_t ndx);
 
 template <>
-void List<ObjKey>::clear();
+void Lst<ObjKey>::clear();
 
-class ConstLinkList : public ConstListIf<ObjKey> {
+class ConstLnkLst : public ConstLstIf<ObjKey> {
 public:
-    ConstLinkList(const ConstObj& obj, ColKey col_key)
-        : ConstListBase(col_key, &m_obj)
-        , ConstListIf<ObjKey>(obj.get_alloc())
+    ConstLnkLst(const ConstObj& obj, ColKey col_key)
+        : ConstLstBase(col_key, &m_obj)
+        , ConstLstIf<ObjKey>(obj.get_alloc())
         , m_obj(obj)
     {
         this->init_from_parent();
     }
-    ConstLinkList(ConstLinkList&& other)
-        : ConstListBase(other.m_col_key, &m_obj)
-        , ConstListIf<ObjKey>(std::move(other))
+    ConstLnkLst(ConstLnkLst&& other)
+        : ConstLstBase(other.m_col_key, &m_obj)
+        , ConstLstIf<ObjKey>(std::move(other))
         , m_obj(std::move(other.m_obj))
     {
     }
@@ -654,41 +654,41 @@ private:
     ConstObj m_obj;
 };
 
-class LinkList : public List<ObjKey>, public ObjList {
+class LnkLst : public Lst<ObjKey>, public ObjList {
 public:
-    LinkList()
-        : ConstListBase({}, &m_obj)
+    LnkLst()
+        : ConstLstBase({}, &m_obj)
         , ObjList(this->m_tree.get())
     {
     }
-    LinkList(const Obj& owner, ColKey col_key)
-        : ConstListBase(col_key, &m_obj)
-        , List<ObjKey>(owner, col_key)
+    LnkLst(const Obj& owner, ColKey col_key)
+        : ConstLstBase(col_key, &m_obj)
+        , Lst<ObjKey>(owner, col_key)
         , ObjList(this->m_tree.get(), &get_target_table())
     {
     }
-    LinkList(const LinkList& other)
-        : ConstListBase(other.m_col_key, &m_obj)
-        , List<ObjKey>(other)
+    LnkLst(const LnkLst& other)
+        : ConstLstBase(other.m_col_key, &m_obj)
+        , Lst<ObjKey>(other)
         , ObjList(this->m_tree.get(), &get_target_table())
     {
     }
-    LinkList(LinkList&& other)
-        : ConstListBase(other.m_col_key, &m_obj)
-        , List<ObjKey>(std::move(other))
+    LnkLst(LnkLst&& other)
+        : ConstLstBase(other.m_col_key, &m_obj)
+        , Lst<ObjKey>(std::move(other))
         , ObjList(this->m_tree.get(), &get_target_table())
     {
     }
-    LinkList& operator=(const LinkList& other)
+    LnkLst& operator=(const LnkLst& other)
     {
-        List<ObjKey>::operator=(other);
+        Lst<ObjKey>::operator=(other);
         this->ObjList::assign(this->m_tree.get(), &get_target_table());
         return *this;
     }
 
-    LinkListPtr clone() const
+    LnkLstPtr clone() const
     {
-        return std::make_unique<LinkList>(m_obj, m_col_key);
+        return std::make_unique<LnkLst>(m_obj, m_col_key);
     }
     Table& get_target_table() const
     {
@@ -700,7 +700,7 @@ public:
     }
     size_t size() const override
     {
-        return List<ObjKey>::size();
+        return Lst<ObjKey>::size();
     }
 
     using ObjList::operator[];
@@ -719,55 +719,55 @@ private:
 };
 
 template <typename U>
-ConstList<U> ConstObj::get_list(ColKey col_key) const
+ConstLst<U> ConstObj::get_list(ColKey col_key) const
 {
-    return ConstList<U>(*this, col_key);
+    return ConstLst<U>(*this, col_key);
 }
 
 template <typename U>
-ConstListPtr<U> ConstObj::get_list_ptr(ColKey col_key) const
+ConstLstPtr<U> ConstObj::get_list_ptr(ColKey col_key) const
 {
     Obj obj(*this);
-    return std::const_pointer_cast<const List<U>>(obj.get_list_ptr<U>(col_key));
+    return std::const_pointer_cast<const Lst<U>>(obj.get_list_ptr<U>(col_key));
 }
 
 template <typename U>
-List<U> Obj::get_list(ColKey col_key)
+Lst<U> Obj::get_list(ColKey col_key)
 {
-    return List<U>(*this, col_key);
+    return Lst<U>(*this, col_key);
 }
 
 template <typename U>
-ListPtr<U> Obj::get_list_ptr(ColKey col_key)
+LstPtr<U> Obj::get_list_ptr(ColKey col_key)
 {
-    return std::make_unique<List<U>>(*this, col_key);
+    return std::make_unique<Lst<U>>(*this, col_key);
 }
 
 template <>
-inline ListPtr<ObjKey> Obj::get_list_ptr(ColKey col_key)
+inline LstPtr<ObjKey> Obj::get_list_ptr(ColKey col_key)
 {
     return get_linklist_ptr(col_key);
 }
 
-inline ConstLinkList ConstObj::get_linklist(ColKey col_key)
+inline ConstLnkLst ConstObj::get_linklist(ColKey col_key)
 {
-    return ConstLinkList(*this, col_key);
+    return ConstLnkLst(*this, col_key);
 }
 
-inline ConstLinkListPtr ConstObj::get_linklist_ptr(ColKey col_key)
+inline ConstLnkLstPtr ConstObj::get_linklist_ptr(ColKey col_key)
 {
     Obj obj(*this);
     return obj.get_linklist_ptr(col_key);
 }
 
-inline LinkList Obj::get_linklist(ColKey col_key)
+inline LnkLst Obj::get_linklist(ColKey col_key)
 {
-    return LinkList(*this, col_key);
+    return LnkLst(*this, col_key);
 }
 
-inline LinkListPtr Obj::get_linklist_ptr(ColKey col_key)
+inline LnkLstPtr Obj::get_linklist_ptr(ColKey col_key)
 {
-    return std::make_unique<LinkList>(*this, col_key);
+    return std::make_unique<LnkLst>(*this, col_key);
 }
 }
 

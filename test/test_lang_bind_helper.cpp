@@ -1662,12 +1662,12 @@ private:
 };
 
 // Background thread for test below.
-void deleter_thread(ConcurrentQueue<LinkListPtr>& queue)
+void deleter_thread(ConcurrentQueue<LnkLstPtr>& queue)
 {
     Random random(random_int<unsigned long>());
     bool closed = false;
     while (!closed) {
-        LinkListPtr r;
+        LnkLstPtr r;
         // prevent the compiler from eliminating a loop:
         volatile int delay = random.draw_int_mod(10000);
         closed = !queue.get(r);
@@ -1734,14 +1734,14 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     // feed the accessor refs to the background thread for
     // later deletion.
     util::Thread deleter;
-    ConcurrentQueue<LinkListPtr> queue(buffer_size);
+    ConcurrentQueue<LnkLstPtr> queue(buffer_size);
     deleter.start([&] { deleter_thread(queue); });
     for (int i = 0; i < max_refs; ++i) {
         TableRef origin = rt->get_table("origin");
         TableRef target = rt->get_table("target");
         int ndx = random.draw_int_mod(table_size);
         Obj o = origin->get_object(o_keys[ndx]);
-        LinkListPtr lw = o.get_linklist_ptr(ck);
+        LnkLstPtr lw = o.get_linklist_ptr(ck);
         bool will_add = change_frequency_per_mill > random.draw_int_mod(1000000);
         if (will_add) {
             rt->promote_to_write();
@@ -6361,7 +6361,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     Obj t = target->create_object();
     Obj o = origin->create_object();
     o.set(c2, t.get_key());
-    LinkList l = o.get_linklist(c1);
+    LnkLst l = o.get_linklist(c1);
     l.add(t.get_key());
     group->commit_and_continue_as_read();
 
@@ -8062,7 +8062,7 @@ TEST(LangBindHelper_HandoverLinkView)
 
     auto o1 = table2->create_object();
     auto o2 = table2->create_object();
-    LinkListPtr lvr = o1.get_linklist_ptr(col_link2);
+    LnkLstPtr lvr = o1.get_linklist_ptr(col_link2);
     lvr->clear();
     lvr->add(to1.get_key());
     lvr->add(to2.get_key());

@@ -86,8 +86,8 @@ class Query final {
 public:
     Query(const Table& table, ConstTableView* tv = nullptr);
     Query(const Table& table, std::unique_ptr<ConstTableView>);
-    Query(const Table& table, const LinkList& list);
-    Query(const Table& table, LinkListPtr&& list);
+    Query(const Table& table, const LnkLst& list);
+    Query(const Table& table, LnkLstPtr&& list);
     Query();
     Query(std::unique_ptr<Expression>);
     ~Query() noexcept;
@@ -368,7 +368,7 @@ private:
     ObjList* m_view = nullptr;
 
     // At most one of these can be non-zero, and if so the non-zero one indicates the restricting view.
-    LinkListPtr m_source_link_list;               // link lists are owned by the query.
+    LnkLstPtr m_source_link_list;                  // link lists are owned by the query.
     ConstTableView* m_source_table_view = nullptr; // table views are not refcounted, and not owned by the query.
     std::unique_ptr<ConstTableView> m_owned_source_table_view; // <--- except when indicated here
 };

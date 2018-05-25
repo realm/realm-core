@@ -53,17 +53,17 @@ bool TransactLogEncoder::select_list(ColKey col_key, ObjKey key)
 }
 
 
-void TransactLogConvenientEncoder::do_select_list(const ConstListBase& list)
+void TransactLogConvenientEncoder::do_select_list(const ConstLstBase& list)
 {
     select_table(list.get_table());
     ColKey col_key = list.get_col_key();
-    ObjKey key = list.ConstListBase::get_key();
+    ObjKey key = list.ConstLstBase::get_key();
 
     m_encoder.select_list(col_key, key); // Throws
     m_selected_list = LinkListId(list.get_table()->get_key(), key, col_key);
 }
 
-void TransactLogConvenientEncoder::list_clear(const ConstListBase& list)
+void TransactLogConvenientEncoder::list_clear(const ConstLstBase& list)
 {
     select_list(list);                 // Throws
     m_encoder.list_clear(list.size()); // Throws

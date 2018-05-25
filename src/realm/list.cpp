@@ -33,29 +33,29 @@
 
 using namespace realm;
 
-ListBasePtr Obj::get_listbase_ptr(ColKey col_key, DataType type)
+LstBasePtr Obj::get_listbase_ptr(ColKey col_key, DataType type)
 {
     switch (type) {
         case type_Int: {
-            return std::make_unique<List<Int>>(*this, col_key);
+            return std::make_unique<Lst<Int>>(*this, col_key);
         }
         case type_Bool: {
-            return std::make_unique<List<Bool>>(*this, col_key);
+            return std::make_unique<Lst<Bool>>(*this, col_key);
         }
         case type_Float: {
-            return std::make_unique<List<Float>>(*this, col_key);
+            return std::make_unique<Lst<Float>>(*this, col_key);
         }
         case type_Double: {
-            return std::make_unique<List<Double>>(*this, col_key);
+            return std::make_unique<Lst<Double>>(*this, col_key);
         }
         case type_String: {
-            return std::make_unique<List<String>>(*this, col_key);
+            return std::make_unique<Lst<String>>(*this, col_key);
         }
         case type_Binary: {
-            return std::make_unique<List<Binary>>(*this, col_key);
+            return std::make_unique<Lst<Binary>>(*this, col_key);
         }
         case type_Timestamp: {
-            return std::make_unique<List<Timestamp>>(*this, col_key);
+            return std::make_unique<Lst<Timestamp>>(*this, col_key);
         }
         case type_LinkList:
             return get_linklist_ptr(col_key);
@@ -70,22 +70,22 @@ ListBasePtr Obj::get_listbase_ptr(ColKey col_key, DataType type)
 }
 
 
-/********************************* ListBase **********************************/
+/********************************* LstBase **********************************/
 
 template <class T>
-ConstList<T>::ConstList(const ConstObj& obj, ColKey col_key)
-    : ConstListBase(col_key, &m_obj)
-    , ConstListIf<T>(obj.get_alloc())
+ConstLst<T>::ConstLst(const ConstObj& obj, ColKey col_key)
+    : ConstLstBase(col_key, &m_obj)
+    , ConstLstIf<T>(obj.get_alloc())
     , m_obj(obj)
 {
     this->init_from_parent();
 }
 
-ConstListBase::~ConstListBase()
+ConstLstBase::~ConstLstBase()
 {
 }
 
-ref_type ConstListBase::get_child_ref(size_t) const noexcept
+ref_type ConstLstBase::get_child_ref(size_t) const noexcept
 {
     try {
         return to_ref(m_const_obj->get<int64_t>(m_col_key));
@@ -95,70 +95,70 @@ ref_type ConstListBase::get_child_ref(size_t) const noexcept
     }
 }
 
-std::pair<ref_type, size_t> ConstListBase::get_to_dot_parent(size_t) const
+std::pair<ref_type, size_t> ConstLstBase::get_to_dot_parent(size_t) const
 {
     // TODO
     return {};
 }
 
-void ConstListBase::erase_repl(Replication* repl, size_t ndx) const
+void ConstLstBase::erase_repl(Replication* repl, size_t ndx) const
 {
     repl->list_erase(*this, ndx);
 }
 
-void ConstListBase::move_repl(Replication* repl, size_t from, size_t to) const
+void ConstLstBase::move_repl(Replication* repl, size_t from, size_t to) const
 {
     repl->list_move(*this, from, to);
 }
 
-void ConstListBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
+void ConstLstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
 {
     repl->list_swap(*this, ndx1, ndx2);
 }
 
-void ConstListBase::clear_repl(Replication* repl) const
+void ConstLstBase::clear_repl(Replication* repl) const
 {
     repl->list_clear(*this);
 }
 
 template <class T>
-List<T>::List(const Obj& obj, ColKey col_key)
-    : ConstListBase(col_key, &m_obj)
-    , ConstListIf<T>(obj.m_table->get_alloc())
+Lst<T>::Lst(const Obj& obj, ColKey col_key)
+    : ConstLstBase(col_key, &m_obj)
+    , ConstLstIf<T>(obj.m_table->get_alloc())
     , m_obj(obj)
 {
     this->init_from_parent();
 }
 
 namespace realm {
-template ConstList<int64_t>::ConstList(const ConstObj& obj, ColKey col_key);
-template ConstList<bool>::ConstList(const ConstObj& obj, ColKey col_key);
-template ConstList<float>::ConstList(const ConstObj& obj, ColKey col_key);
-template ConstList<double>::ConstList(const ConstObj& obj, ColKey col_key);
-template ConstList<StringData>::ConstList(const ConstObj& obj, ColKey col_key);
-template ConstList<BinaryData>::ConstList(const ConstObj& obj, ColKey col_key);
-template ConstList<Timestamp>::ConstList(const ConstObj& obj, ColKey col_key);
-template ConstList<ObjKey>::ConstList(const ConstObj& obj, ColKey col_key);
+template ConstLst<int64_t>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<bool>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<float>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<double>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<StringData>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<BinaryData>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<Timestamp>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<ObjKey>::ConstLst(const ConstObj& obj, ColKey col_key);
 
-template List<int64_t>::List(const Obj& obj, ColKey col_key);
-template List<bool>::List(const Obj& obj, ColKey col_key);
-template List<float>::List(const Obj& obj, ColKey col_key);
-template List<double>::List(const Obj& obj, ColKey col_key);
-template List<StringData>::List(const Obj& obj, ColKey col_key);
-template List<BinaryData>::List(const Obj& obj, ColKey col_key);
-template List<Timestamp>::List(const Obj& obj, ColKey col_key);
-template List<ObjKey>::List(const Obj& obj, ColKey col_key);
+template Lst<int64_t>::Lst(const Obj& obj, ColKey col_key);
+template Lst<bool>::Lst(const Obj& obj, ColKey col_key);
+template Lst<float>::Lst(const Obj& obj, ColKey col_key);
+template Lst<double>::Lst(const Obj& obj, ColKey col_key);
+template Lst<StringData>::Lst(const Obj& obj, ColKey col_key);
+template Lst<BinaryData>::Lst(const Obj& obj, ColKey col_key);
+template Lst<Timestamp>::Lst(const Obj& obj, ColKey col_key);
+template Lst<ObjKey>::Lst(const Obj& obj, ColKey col_key);
 }
 
-ConstObj ConstLinkList::get_object(size_t link_ndx) const
+ConstObj ConstLnkLst::get_object(size_t link_ndx) const
 {
-    return m_const_obj->get_target_table(m_col_key)->get_object(ConstListIf<ObjKey>::get(link_ndx));
+    return m_const_obj->get_target_table(m_col_key)->get_object(ConstLstIf<ObjKey>::get(link_ndx));
 }
 
-/********************************* List<Key> *********************************/
+/********************************* Lst<Key> *********************************/
 
 template <>
-void List<ObjKey>::do_set(size_t ndx, ObjKey target_key)
+void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 {
     CascadeState state;
     ObjKey old_key = get(ndx);
@@ -173,14 +173,14 @@ void List<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 }
 
 template <>
-void List<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
+void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
 {
     m_obj.set_backlink(m_col_key, target_key);
     m_tree->insert(ndx, target_key);
 }
 
 template <>
-void List<ObjKey>::do_remove(size_t ndx)
+void Lst<ObjKey>::do_remove(size_t ndx)
 {
     CascadeState state;
     ObjKey old_key = get(ndx);
@@ -195,7 +195,7 @@ void List<ObjKey>::do_remove(size_t ndx)
 }
 
 template <>
-void List<ObjKey>::clear()
+void Lst<ObjKey>::clear()
 {
     update_if_needed();
     Table* origin_table = const_cast<Table*>(m_obj.get_table());
@@ -208,7 +208,7 @@ void List<ObjKey>::clear()
         while (ndx--) {
             do_set(ndx, null_key);
             m_tree->erase(ndx);
-            ConstListBase::adj_remove(ndx);
+            ConstLstBase::adj_remove(ndx);
         }
         return;
     }
@@ -242,14 +242,14 @@ void List<ObjKey>::clear()
 #ifdef _WIN32
 namespace realm {
 // Explicit instantiation required on some windows builds
-template void List<ObjKey>::do_insert(size_t ndx, ObjKey target_key);
-template void List<ObjKey>::do_set(size_t ndx, ObjKey target_key);
-template void List<ObjKey>::do_remove(size_t ndx);
-template void List<ObjKey>::clear();
+template void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key);
+template void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key);
+template void Lst<ObjKey>::do_remove(size_t ndx);
+template void Lst<ObjKey>::clear();
 }
 #endif
 
-TableView LinkList::get_sorted_view(SortDescriptor order) const
+TableView LnkLst::get_sorted_view(SortDescriptor order) const
 {
     TableView tv(get_target_table(), clone());
     tv.do_sync();
@@ -257,21 +257,21 @@ TableView LinkList::get_sorted_view(SortDescriptor order) const
     return tv;
 }
 
-TableView LinkList::get_sorted_view(ColKey column_key, bool ascending) const
+TableView LnkLst::get_sorted_view(ColKey column_key, bool ascending) const
 {
     TableView v = get_sorted_view(SortDescriptor(get_target_table(), {{column_key}}, {ascending}));
     return v;
 }
 
-void LinkList::remove_target_row(size_t link_ndx)
+void LnkLst::remove_target_row(size_t link_ndx)
 {
     // Deleting the object will automatically remove all links
     // to it. So we do not have to manually remove the deleted link
-    auto key = List<ObjKey>::get(link_ndx);
+    auto key = Lst<ObjKey>::get(link_ndx);
     const_cast<Table*>(get_table())->remove_object(key);
 }
 
-void LinkList::remove_all_target_rows()
+void LnkLst::remove_all_target_rows()
 {
     if (is_attached()) {
         auto table = const_cast<Table*>(get_table());
@@ -279,11 +279,11 @@ void LinkList::remove_all_target_rows()
     }
 }
 
-TableVersions LinkList::sync_if_needed() const
+TableVersions LnkLst::sync_if_needed() const
 {
     TableVersions versions;
     if (this->is_attached()) {
-        const_cast<LinkList*>(this)->update_if_needed();
+        const_cast<LnkLst*>(this)->update_if_needed();
         auto table = get_table();
         versions.emplace_back(table->get_key(), table->get_content_version());
     }
@@ -291,100 +291,100 @@ TableVersions LinkList::sync_if_needed() const
 }
 
 namespace realm {
-/***************************** List<T>::set_repl *****************************/
+/***************************** Lst<T>::set_repl *****************************/
 template <>
-void List<Int>::set_repl(Replication* repl, size_t ndx, int64_t value)
+void Lst<Int>::set_repl(Replication* repl, size_t ndx, int64_t value)
 {
     repl->list_set_int(*this, ndx, value);
 }
 
 template <>
-void List<Bool>::set_repl(Replication* repl, size_t ndx, bool value)
+void Lst<Bool>::set_repl(Replication* repl, size_t ndx, bool value)
 {
     repl->list_set_bool(*this, ndx, value);
 }
 
 template <>
-void List<Float>::set_repl(Replication* repl, size_t ndx, float value)
+void Lst<Float>::set_repl(Replication* repl, size_t ndx, float value)
 {
     repl->list_set_float(*this, ndx, value);
 }
 
 template <>
-void List<Double>::set_repl(Replication* repl, size_t ndx, double value)
+void Lst<Double>::set_repl(Replication* repl, size_t ndx, double value)
 {
     repl->list_set_double(*this, ndx, value);
 }
 
 template <>
-void List<String>::set_repl(Replication* repl, size_t ndx, StringData value)
+void Lst<String>::set_repl(Replication* repl, size_t ndx, StringData value)
 {
     repl->list_set_string(*this, ndx, value);
 }
 
 template <>
-void List<Binary>::set_repl(Replication* repl, size_t ndx, BinaryData value)
+void Lst<Binary>::set_repl(Replication* repl, size_t ndx, BinaryData value)
 {
     repl->list_set_binary(*this, ndx, value);
 }
 
 template <>
-void List<Timestamp>::set_repl(Replication* repl, size_t ndx, Timestamp value)
+void Lst<Timestamp>::set_repl(Replication* repl, size_t ndx, Timestamp value)
 {
     repl->list_set_timestamp(*this, ndx, value);
 }
 
 template <>
-void List<ObjKey>::set_repl(Replication* repl, size_t ndx, ObjKey key)
+void Lst<ObjKey>::set_repl(Replication* repl, size_t ndx, ObjKey key)
 {
     repl->list_set_link(*this, ndx, key);
 }
 
-/*************************** List<T>::insert_repl ****************************/
+/*************************** Lst<T>::insert_repl ****************************/
 template <>
-void List<Int>::insert_repl(Replication* repl, size_t ndx, int64_t value)
+void Lst<Int>::insert_repl(Replication* repl, size_t ndx, int64_t value)
 {
     repl->list_insert_int(*this, ndx, value);
 }
 
 template <>
-void List<Bool>::insert_repl(Replication* repl, size_t ndx, bool value)
+void Lst<Bool>::insert_repl(Replication* repl, size_t ndx, bool value)
 {
     repl->list_insert_bool(*this, ndx, value);
 }
 
 template <>
-void List<Float>::insert_repl(Replication* repl, size_t ndx, float value)
+void Lst<Float>::insert_repl(Replication* repl, size_t ndx, float value)
 {
     repl->list_insert_float(*this, ndx, value);
 }
 
 template <>
-void List<Double>::insert_repl(Replication* repl, size_t ndx, double value)
+void Lst<Double>::insert_repl(Replication* repl, size_t ndx, double value)
 {
     repl->list_insert_double(*this, ndx, value);
 }
 
 template <>
-void List<String>::insert_repl(Replication* repl, size_t ndx, StringData value)
+void Lst<String>::insert_repl(Replication* repl, size_t ndx, StringData value)
 {
     repl->list_insert_string(*this, ndx, value);
 }
 
 template <>
-void List<Binary>::insert_repl(Replication* repl, size_t ndx, BinaryData value)
+void Lst<Binary>::insert_repl(Replication* repl, size_t ndx, BinaryData value)
 {
     repl->list_insert_binary(*this, ndx, value);
 }
 
 template <>
-void List<Timestamp>::insert_repl(Replication* repl, size_t ndx, Timestamp value)
+void Lst<Timestamp>::insert_repl(Replication* repl, size_t ndx, Timestamp value)
 {
     repl->list_insert_timestamp(*this, ndx, value);
 }
 
 template <>
-void List<ObjKey>::insert_repl(Replication* repl, size_t ndx, ObjKey key)
+void Lst<ObjKey>::insert_repl(Replication* repl, size_t ndx, ObjKey key)
 {
     repl->list_insert_link(*this, ndx, key);
 }
@@ -394,9 +394,9 @@ void List<ObjKey>::insert_repl(Replication* repl, size_t ndx, ObjKey key)
 // For some strange reason these functions needs to be explicitly instantiated
 // on Visual Studio 2017. Otherwise the code is not generated.
 namespace realm {
-template void List<ObjKey>::add(ObjKey target_key);
-template void List<ObjKey>::insert(size_t ndx, ObjKey target_key);
-template ObjKey List<ObjKey>::remove(size_t ndx);
-template void List<ObjKey>::clear();
+template void Lst<ObjKey>::add(ObjKey target_key);
+template void Lst<ObjKey>::insert(size_t ndx, ObjKey target_key);
+template ObjKey Lst<ObjKey>::remove(size_t ndx);
+template void Lst<ObjKey>::clear();
 }
 #endif

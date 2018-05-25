@@ -582,9 +582,9 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(key0, links.get(2));
     CHECK_EQUAL(Wed, Days(links[0].get<Int>(day_col)));
 
-    LinkList links1 = links;
+    LnkLst links1 = links;
     CHECK_EQUAL(3, links1.size());
-    LinkList links2;
+    LnkLst links2;
     links2 = links;
     CHECK_EQUAL(3, links2.size());
     ObjList* obj_list = &links2;
@@ -1594,7 +1594,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         TableRef target = group.add_table("target");
         std::vector<ObjKey> origin_keys;
         std::vector<ObjKey> target_keys;
-        std::vector<LinkListPtr> linklists;
+        std::vector<LnkLstPtr> linklists;
         ColKey col_link;
         Fixture()
         {

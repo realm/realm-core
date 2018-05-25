@@ -646,13 +646,13 @@ TEST(Metrics_SubQueries)
     table->create_objects(4, keys);
 
     // see Query_SubtableExpression
-    auto set_int_list = [](ListPtr<Int> list, const std::vector<int64_t>& value_list) {
+    auto set_int_list = [](LstPtr<Int> list, const std::vector<int64_t>& value_list) {
         list->clear();
         for (auto i : value_list) {
             list->add(i);
         }
     };
-    auto set_string_list = [](ListPtr<String> list, const std::vector<int64_t>& value_list) {
+    auto set_string_list = [](LstPtr<String> list, const std::vector<int64_t>& value_list) {
         list->clear();
         for (auto i : value_list) {
             if (i < 100) {
@@ -678,10 +678,10 @@ TEST(Metrics_SubQueries)
     table->get_object(keys[1]).set(col_other, StringData("str"));
     table->get_object(keys[2]).set(col_other, StringData("str_9_baa"));
 
-    Query q0 = table->column<List<Int>>(col_list_int) == 10;
-    Query q1 = table->column<List<Int>>(col_list_int).max() > 5;
-    Query q2 = table->column<List<String>>(col_list_string).begins_with("Str");
-    Query q3 = table->column<List<String>>(col_list_string) == "Str_0";
+    Query q0 = table->column<Lst<Int>>(col_list_int) == 10;
+    Query q1 = table->column<Lst<Int>>(col_list_int).max() > 5;
+    Query q2 = table->column<Lst<String>>(col_list_string).begins_with("Str");
+    Query q3 = table->column<Lst<String>>(col_list_string) == "Str_0";
 
     CHECK_THROW(q0.find_all(), SerialisationError);
     CHECK_THROW(q1.find_all(), SerialisationError);

@@ -175,7 +175,7 @@ public:
     ConstTableView(const Table* parent);
     ConstTableView(const Table* parent, Query& query, size_t start, size_t end, size_t limit);
     ConstTableView(const Table* parent, ColKey column, const ConstObj& obj);
-    ConstTableView(const Table* parent, ConstLinkListPtr link_list);
+    ConstTableView(const Table* parent, ConstLnkLstPtr link_list);
 
     enum DistinctViewTag { DistinctView };
     ConstTableView(DistinctViewTag, const Table* parent, ColKey column_key);
@@ -347,7 +347,7 @@ protected:
     ConstObj m_linked_obj;
 
     // If this TableView was created from a LinkList, then this reference points to it. Otherwise it's 0
-    mutable ConstLinkListPtr m_linklist_source;
+    mutable ConstLnkLstPtr m_linklist_source;
 
     // m_distinct_column_source != ColKey() if this view was created from distinct values in a column of m_table.
     ColKey m_distinct_column_source;
@@ -436,14 +436,14 @@ public:
 private:
     TableView(Table& parent);
     TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
-    TableView(Table& parent, ConstLinkListPtr);
+    TableView(Table& parent, ConstLnkLstPtr);
 
     TableView(DistinctViewTag, Table& parent, ColKey column_key);
 
     friend class ConstTableView;
     friend class Table;
     friend class Query;
-    friend class LinkList;
+    friend class LnkLst;
 };
 
 
@@ -497,7 +497,7 @@ inline ConstTableView::ConstTableView(DistinctViewTag, const Table* parent, ColK
     }
 }
 
-inline ConstTableView::ConstTableView(const Table* parent, ConstLinkListPtr link_list)
+inline ConstTableView::ConstTableView(const Table* parent, ConstLnkLstPtr link_list)
     : ObjList(&m_table_view_key_values, parent) // Throws
     , m_linklist_source(std::move(link_list))
     , m_table_view_key_values(Allocator::get_default())
@@ -513,7 +513,7 @@ inline ConstTableView::ConstTableView(const ConstTableView& tv)
     : ObjList(&m_table_view_key_values, tv.m_table)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj(tv.m_linked_obj)
-    , m_linklist_source(tv.m_linklist_source ? tv.m_linklist_source->clone() : LinkListPtr{})
+    , m_linklist_source(tv.m_linklist_source ? tv.m_linklist_source->clone() : LnkLstPtr{})
     , m_distinct_column_source(tv.m_distinct_column_source)
     , m_descriptor_ordering(tv.m_descriptor_ordering)
     , m_query(tv.m_query)
@@ -577,7 +577,7 @@ inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
     m_limit = tv.m_limit;
     m_source_column_key = tv.m_source_column_key;
     m_linked_obj = tv.m_linked_obj;
-    m_linklist_source = tv.m_linklist_source ? tv.m_linklist_source->clone() : LinkListPtr{};
+    m_linklist_source = tv.m_linklist_source ? tv.m_linklist_source->clone() : LnkLstPtr{};
     m_descriptor_ordering = tv.m_descriptor_ordering;
     m_distinct_column_source = tv.m_distinct_column_source;
 
@@ -649,7 +649,7 @@ inline TableView::TableView(Table& parent, Query& query, size_t start, size_t en
 {
 }
 
-inline TableView::TableView(Table& parent, ConstLinkListPtr link_list)
+inline TableView::TableView(Table& parent, ConstLnkLstPtr link_list)
     : ConstTableView(&parent, std::move(link_list))
 {
 }

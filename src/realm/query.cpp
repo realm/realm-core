@@ -49,7 +49,7 @@ Query::Query(Table& table, ConstTableView* tv)
     create();
 }
 
-Query::Query(const Table& table, const LinkList& list)
+Query::Query(const Table& table, const LnkLst& list)
     : m_table((const_cast<Table&>(table)).get_table_ref())
     , m_source_link_list(list.clone())
 {
@@ -62,7 +62,7 @@ Query::Query(const Table& table, const LinkList& list)
     create();
 }
 
-Query::Query(const Table& table, LinkListPtr&& ll)
+Query::Query(const Table& table, LnkLstPtr&& ll)
     : m_table((const_cast<Table&>(table)).get_table_ref())
     , m_source_link_list(std::move(ll))
 {
@@ -118,7 +118,7 @@ Query::Query(const Query& source)
         // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
         // turn `m_source_table_view` into a dangling reference.
         m_source_table_view = source.m_source_table_view;
-        m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone() : LinkListPtr{};
+        m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone() : LnkLstPtr{};
     }
     if (m_source_table_view) {
         m_view = m_source_table_view;
@@ -146,7 +146,7 @@ Query& Query::operator=(const Query& source)
             m_source_table_view = source.m_source_table_view;
             m_owned_source_table_view = nullptr;
 
-            m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone() : LinkListPtr{};
+            m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone() : LnkLstPtr{};
         }
         if (m_source_table_view) {
             m_view = m_source_table_view;

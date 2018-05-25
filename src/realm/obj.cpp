@@ -36,10 +36,10 @@ namespace realm {
 
 /********************************* ConstObj **********************************/
 
-ConstObj::ConstObj(const ClusterTree* tree_top, ref_type ref, ObjKey key, size_t row_ndx)
+ConstObj::ConstObj(const ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx)
     : m_table(tree_top->get_owner())
     , m_key(key)
-    , m_mem(ref, tree_top->get_alloc())
+    , m_mem(mem)
     , m_row_ndx(row_ndx)
     , m_valid(true)
 {
@@ -158,9 +158,9 @@ TableRef ConstObj::get_target_table(ColKey col_key) const
     return _impl::TableFriend::get_opposite_link_table(*m_table, col_key);
 }
 
-Obj::Obj(ClusterTree* tree_top, ref_type ref, ObjKey key, size_t row_ndx)
-    : ConstObj(tree_top, ref, key, row_ndx)
-    , m_writeable(!tree_top->get_alloc().is_read_only(ref))
+Obj::Obj(ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx)
+    : ConstObj(tree_top, mem, key, row_ndx)
+    , m_writeable(!tree_top->get_alloc().is_read_only(mem.get_ref()))
 {
 }
 

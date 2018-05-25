@@ -524,7 +524,7 @@ TEST(Query_TableInitialization)
         helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).sum() > 0); });
         helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).average() > 0); });
 
-        auto list_int = [&] { return get_table().template column<List<Int>>(col_list_int); };
+        auto list_int = [&] { return get_table().template column<Lst<Int>>(col_list_int); };
 
         helper([&](Query&, auto&& test) { test(list_int().size() == 1); });
         helper([&](Query&, auto&& test) { test(list_int() > 0); });
