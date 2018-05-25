@@ -30,6 +30,7 @@
 #include "realm/index_string.hpp"
 #include "realm/cluster_tree.hpp"
 #include "realm/spec.hpp"
+#include "realm/table_view.hpp"
 #include "realm/replication.hpp"
 
 namespace realm {
@@ -403,6 +404,13 @@ ObjKey ConstObj::get_backlink(const Table& origin, ColKey origin_col_key, size_t
     size_t backlink_col_key = get_spec().find_backlink_column(origin_key, origin_col_key);
 
     return get_backlink(backlink_col_key, backlink_ndx);
+}
+
+TableView ConstObj::get_backlink_view(Table* src_table, ColKey src_col_key)
+{
+    TableView tv(src_table, src_col_key, *this);
+    tv.do_sync();
+    return tv;
 }
 
 size_t ConstObj::get_backlink_count(size_t backlink_col_ndx) const

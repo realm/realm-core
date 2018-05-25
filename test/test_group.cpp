@@ -600,9 +600,10 @@ TEST(Group_RemoveTableWithColumns)
     delta->add_column(type_Int, "delta-1");
     epsilon->add_column_link(type_Link, "epsilon-1", *delta);
 
-    ObjKey k = delta->create_object().get_key();
+    Obj obj = delta->create_object();
+    ObjKey k = obj.get_key();
     beta->create_object().set<ObjKey>(col_link, k);
-    auto view = delta->get_backlink_view(k, beta, col_link);
+    auto view = obj.get_backlink_view(beta, col_link);
     CHECK_EQUAL(view.size(), 1);
 
     // Remove table with columns, but no link columns, and table is not a link

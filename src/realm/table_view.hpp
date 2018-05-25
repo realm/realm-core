@@ -373,6 +373,7 @@ private:
     Timestamp minmax_timestamp(ColKey column_key, ObjKey* return_key) const;
 
     friend class Table;
+    friend class ConstObj;
     friend class Query;
     friend class DB;
 };

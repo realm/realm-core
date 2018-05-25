@@ -28,6 +28,7 @@
 
 namespace realm {
 
+class TableView;
 class LstBase;
 
 template <class>
@@ -113,6 +114,7 @@ public:
     size_t get_backlink_count(bool only_strong_links = false) const;
     size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
     ObjKey get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const;
+    TableView get_backlink_view(Table* src_table, ColKey src_col_key);
 
     // To be used by the query system when a single object should
     // be tested. Will allow a function to be called in the context
