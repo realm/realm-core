@@ -1328,16 +1328,6 @@ void Group::to_string(std::ostream& out) const
 }
 
 
-
-// In general, this class cannot assume more than minimal accessor consistency
-// (See AccessorConsistencyLevels., it can however assume that replication
-// instruction arguments are meaningfull with respect to the current state of
-// the accessor hierarchy. For example, a column index argument of `i` is known
-// to refer to the `i`'th entry of Table::m_cols.
-//
-// FIXME: There is currently no checking on valid instruction arguments such as
-// column index within bounds. Consider whether we can trust the contents of the
-// transaction log enough to skip these checks.
 class Group::TransactAdvancer {
 public:
     TransactAdvancer(Group&, bool& schema_changed)
@@ -1345,24 +1335,20 @@ public:
     {
     }
 
-    bool insert_group_level_table(TableKey, size_t, StringData) noexcept
+    bool insert_group_level_table(TableKey) noexcept
     {
         m_schema_changed = true;
-
         return true;
     }
 
-    bool erase_group_level_table(TableKey, size_t) noexcept
+    bool erase_group_level_table(TableKey) noexcept
     {
         m_schema_changed = true;
-
         return true;
     }
 
-    bool rename_group_level_table(TableKey, StringData) noexcept
+    bool rename_group_level_table(TableKey) noexcept
     {
-        // No-op since table names are properties of the group, and the group
-        // accessor is always refreshed
         m_schema_changed = true;
         return true;
     }
@@ -1387,132 +1373,17 @@ public:
         return true;
     }
 
-    bool set_int(ColKey, ObjKey, int_fast64_t, _impl::Instruction, size_t) noexcept
+    bool modify_object(ColKey, ObjKey) noexcept
     {
         return true; // No-op
     }
 
-    bool add_int(ColKey, ObjKey, int_fast64_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_bool(ColKey, ObjKey, bool, _impl::Instruction) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_float(ColKey, ObjKey, float, _impl::Instruction) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_double(ColKey, ObjKey, double, _impl::Instruction) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_string(ColKey, ObjKey, StringData, _impl::Instruction, size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_binary(ColKey, ObjKey, BinaryData, _impl::Instruction) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_timestamp(ColKey, ObjKey, Timestamp, _impl::Instruction) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_null(ColKey, ObjKey, _impl::Instruction, size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_link(ColKey, ObjKey, ObjKey, TableKey, _impl::Instruction) noexcept
+    bool list_set(size_t)
     {
         return true;
     }
 
-    bool insert_substring(ColKey, ObjKey, size_t, StringData)
-    {
-        return true; // No-op
-    }
-
-    bool erase_substring(ColKey, ObjKey, size_t, size_t)
-    {
-        return true; // No-op
-    }
-
-    bool list_set_int(size_t, int64_t)
-    {
-        return true;
-    }
-
-    bool list_set_bool(size_t, bool)
-    {
-        return true;
-    }
-
-    bool list_set_float(size_t, float)
-    {
-        return true;
-    }
-
-    bool list_set_double(size_t, double)
-    {
-        return true;
-    }
-
-    bool list_set_string(size_t, StringData)
-    {
-        return true;
-    }
-
-    bool list_set_binary(size_t, BinaryData)
-    {
-        return true;
-    }
-
-    bool list_set_timestamp(size_t, Timestamp)
-    {
-        return true;
-    }
-
-    bool list_insert_int(size_t, int64_t, size_t)
-    {
-        return true;
-    }
-
-    bool list_insert_bool(size_t, bool, size_t)
-    {
-        return true;
-    }
-
-    bool list_insert_float(size_t, float, size_t)
-    {
-        return true;
-    }
-
-    bool list_insert_double(size_t, double, size_t)
-    {
-        return true;
-    }
-
-    bool list_insert_string(size_t, StringData, size_t)
-    {
-        return true;
-    }
-
-    bool list_insert_binary(size_t, BinaryData, size_t)
-    {
-        return true;
-    }
-
-    bool list_insert_timestamp(size_t, Timestamp, size_t)
+    bool list_insert(size_t)
     {
         return true;
     }
@@ -1522,61 +1393,25 @@ public:
         return true; // No-op
     }
 
-    bool insert_column(ColKey, DataType, StringData, bool, bool)
+    bool insert_column(ColKey)
     {
         m_schema_changed = true;
-
-        return true;
-    }
-
-    bool insert_link_column(ColKey, DataType, StringData, TableKey, ColKey)
-    {
-        m_schema_changed = true;
-
         return true;
     }
 
     bool erase_column(ColKey)
     {
         m_schema_changed = true;
-
         return true;
     }
 
-    bool erase_link_column(ColKey, TableKey, ColKey)
-    {
-        m_schema_changed = true;
-
-        return true;
-    }
-
-    bool rename_column(ColKey, StringData) noexcept
+    bool rename_column(ColKey) noexcept
     {
         m_schema_changed = true;
         return true; // No-op
     }
 
-    bool add_search_index(ColKey) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool remove_search_index(ColKey) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool add_primary_key(size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool remove_primary_key() noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_link_type(ColKey, LinkType) noexcept
+    bool set_link_type(ColKey) noexcept
     {
         return true; // No-op
     }
@@ -1584,21 +1419,6 @@ public:
     bool select_list(ColKey, ObjKey) noexcept
     {
         return true; // No-op
-    }
-
-    bool list_set_link(size_t, ObjKey) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool list_insert_link(size_t, ObjKey, size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool list_insert_null(size_t, size_t)
-    {
-        return true;
     }
 
     bool list_move(size_t, size_t) noexcept
@@ -1611,22 +1431,12 @@ public:
         return true; // No-op
     }
 
-    bool list_erase(size_t, size_t) noexcept
+    bool list_erase(size_t) noexcept
     {
         return true; // No-op
     }
 
     bool list_clear(size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool nullify_link(ColKey, ObjKey, TableKey)
-    {
-        return true; // No-op
-    }
-
-    bool link_list_nullify(size_t, size_t)
     {
         return true; // No-op
     }

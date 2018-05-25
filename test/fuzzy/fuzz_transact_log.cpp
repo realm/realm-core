@@ -59,13 +59,5 @@ int main(int argc, const char* argv[])
     _impl::NoCopyInputStreamAdaptor in_aa{in_a, buffer.data(), buffer.size()};
 
     Group group;
-
-    try {
-        Replication::apply_changeset(in_aa, group);
-    }
-    catch (_impl::TransactLogParser::BadTransactLog) {
-        return 0;
-    }
-
     return 0;
 }

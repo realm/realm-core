@@ -599,9 +599,6 @@ void Table::add_search_index(ColKey col_key)
     attr = m_spec.get_column_attr(column_ndx);
     attr.set(col_attr_Indexed);
     m_spec.set_column_attr(column_ndx, attr); // Throws
-
-    if (Replication* repl = get_repl())
-        repl->add_search_index(this, col_key); // Throws
 }
 
 void Table::remove_search_index(ColKey col_key)
@@ -629,9 +626,6 @@ void Table::remove_search_index(ColKey col_key)
     attr = m_spec.get_column_attr(column_ndx);
     attr.reset(col_attr_Indexed);
     m_spec.set_column_attr(column_ndx, attr); // Throws
-
-    if (Replication* repl = get_repl())
-        repl->remove_search_index(this, col_key); // Throws
 }
 
 void Table::enumerate_string_column(ColKey col_key)
@@ -642,9 +636,6 @@ void Table::enumerate_string_column(ColKey col_key)
     ColumnType type = m_spec.get_column_type(column_ndx);
     if (type == col_type_String && !m_spec.is_string_enum_type(column_ndx)) {
         m_clusters.enumerate_string_column(column_ndx);
-
-        if (Replication* repl = get_repl())
-            repl->enumerate_string_column(this, col_key); // Throws
     }
 }
 
