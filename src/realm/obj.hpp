@@ -142,6 +142,7 @@ protected:
     mutable uint64_t m_storage_version;
     mutable uint64_t m_instance_version;
     mutable bool m_valid;
+
     bool is_in_sync() const;
     void do_update() const;
     bool update_if_needed() const;
@@ -175,7 +176,6 @@ protected:
 class Obj : public ConstObj {
 public:
     Obj()
-        : m_writeable(false)
     {
     }
     Obj(ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx);
@@ -221,11 +221,8 @@ private:
     friend class Lst;
     friend class LnkLst;
 
-    mutable bool m_writeable;
-
     Obj(const ConstObj& other)
         : ConstObj(other)
-        , m_writeable(false)
     {
     }
     template <class Val>
@@ -233,12 +230,7 @@ private:
     template <class Head, class... Tail>
     Obj& _set(size_t col_ndx, Head v, Tail... tail);
     ColKey ndx2colkey(size_t col_ndx);
-    bool update_if_needed() const;
-    bool is_writeable() const
-    {
-        return m_writeable;
-    }
-    void ensure_writeable();
+    bool ensure_writeable();
     void bump_content_version();
     void bump_both_versions();
     template <class T>

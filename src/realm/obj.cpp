@@ -161,7 +161,6 @@ TableRef ConstObj::get_target_table(ColKey col_key) const
 
 Obj::Obj(ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx)
     : ConstObj(tree_top, mem, key, row_ndx)
-    , m_writeable(!tree_top->get_alloc().is_read_only(mem.get_ref()))
 {
 }
 
@@ -442,21 +441,13 @@ ObjKey ConstObj::get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) cons
 
 /*********************************** Obj *************************************/
 
-bool Obj::update_if_needed() const
+bool Obj::ensure_writeable()
 {
-    bool updated = ConstObj::update_if_needed();
-    if (updated) {
-        m_writeable = !get_alloc().is_read_only(m_mem.get_ref());
-    }
-    return updated;
-}
-
-void Obj::ensure_writeable()
-{
-    if (!m_writeable) {
+    if (get_alloc().is_read_only(m_mem.get_ref())) {
         m_mem = const_cast<ClusterTree*>(get_tree_top())->ensure_writeable(m_key);
-        m_writeable = true;
+        return true;
     }
+    return false;
 }
 
 void Obj::bump_content_version()

@@ -554,8 +554,7 @@ protected:
     }
     void ensure_writeable()
     {
-        if (!m_obj.is_writeable()) {
-            m_obj.ensure_writeable();
+        if (m_obj.ensure_writeable()) {
             m_tree->init_from_parent();
         }
     }
