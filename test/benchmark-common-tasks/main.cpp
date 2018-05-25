@@ -915,7 +915,7 @@ struct BenchmarkGetLinkList : Benchmark {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table(name());
 #ifdef REALM_CLUSTER_IF
-        std::vector<ConstLinkListPtr> linklists(rows);
+        std::vector<ConstLnkLstPtr> linklists(rows);
         for (size_t i = 0; i < rows; ++i) {
             auto obj = table->get_object(m_keys[i]);
             linklists[i] = obj.get_linklist_ptr(m_col_link);
