@@ -28,6 +28,7 @@
 
 namespace realm {
 
+class TableView;
 class LstBase;
 
 template <class>
@@ -113,6 +114,7 @@ public:
     size_t get_backlink_count(bool only_strong_links = false) const;
     size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
     ObjKey get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const;
+    TableView get_backlink_view(Table* src_table, ColKey src_col_key);
 
     // To be used by the query system when a single object should
     // be tested. Will allow a function to be called in the context
@@ -140,6 +142,7 @@ protected:
     mutable uint64_t m_storage_version;
     mutable uint64_t m_instance_version;
     mutable bool m_valid;
+
     bool is_in_sync() const;
     void do_update() const;
     bool update_if_needed() const;
@@ -173,7 +176,6 @@ protected:
 class Obj : public ConstObj {
 public:
     Obj()
-        : m_writeable(false)
     {
     }
     Obj(ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx);
@@ -219,11 +221,8 @@ private:
     friend class Lst;
     friend class LnkLst;
 
-    mutable bool m_writeable;
-
     Obj(const ConstObj& other)
         : ConstObj(other)
-        , m_writeable(false)
     {
     }
     template <class Val>
@@ -231,12 +230,7 @@ private:
     template <class Head, class... Tail>
     Obj& _set(size_t col_ndx, Head v, Tail... tail);
     ColKey ndx2colkey(size_t col_ndx);
-    bool update_if_needed() const;
-    bool is_writeable() const
-    {
-        return m_writeable;
-    }
-    void ensure_writeable();
+    bool ensure_writeable();
     void bump_content_version();
     void bump_both_versions();
     template <class T>

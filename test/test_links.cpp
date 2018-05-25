@@ -79,9 +79,10 @@ TEST(Links_Columns)
 
     // set some links
     table1->get_object(table_1_keys[0]).set(col_link2, table_2_keys[1]);
+    Obj obj = table2->get_object(table_2_keys[1]);
     CHECK_EQUAL(1, table2->get_object(table_2_keys[1]).get_backlink_count(*table1, col_link2));
-    CHECK_EQUAL(table_1_keys[0], table2->get_object(table_2_keys[1]).get_backlink(*table1, col_link2, 0));
-    auto tv = table2->get_backlink_view(table_2_keys[1], table1, col_link2);
+    CHECK_EQUAL(table_1_keys[0], obj.get_backlink(*table1, col_link2, 0));
+    auto tv = obj.get_backlink_view(table1, col_link2);
     CHECK_EQUAL(tv.size(), 1);
 #ifdef LEGACY_TESTS
     // remove a column (moving link column back)'

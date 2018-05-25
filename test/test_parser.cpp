@@ -384,7 +384,7 @@ TEST(Parser_ConstrainedQuery)
     list_0.add(obj0.get_key());
     list_0.add(obj1.get_key());
 
-    TableView tv = t->get_backlink_view(obj0.get_key(), t, list_col);
+    TableView tv = obj0.get_backlink_view(t, list_col);
     Query q(const_cast<const Table&>(*t), &tv);
     CHECK_EQUAL(q.count(), 1);
     q.and_query(t->column<Int>(int_col) <= 0);

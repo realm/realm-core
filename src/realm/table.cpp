@@ -1732,16 +1732,6 @@ ConstTableView Table::get_sorted_view(SortDescriptor order) const
 }
 
 
-TableView Table::get_backlink_view(ObjKey key, Table* src_table, ColKey src_col_key)
-{
-    // FIXME: Assert not possible as get_column_link_base no longer exists
-    // REALM_ASSERT(&src_table->get_column_link_base(src_col_ndx).get_target_table() == this);
-    TableView tv(src_table, src_col_key, get_object(key));
-    tv.do_sync();
-    return tv;
-}
-
-
 const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain) const
 {
     const Table* table = this;

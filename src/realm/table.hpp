@@ -414,8 +414,6 @@ public:
     TableView get_sorted_view(SortDescriptor order);
     ConstTableView get_sorted_view(SortDescriptor order) const;
 
-    TableView get_backlink_view(ObjKey key, Table* src_table, ColKey src_col_key);
-
     // Report the current content version. This is a 64-bit value which is bumped whenever
     // the content in the table changes.
     uint_fast64_t get_content_version() const noexcept;
