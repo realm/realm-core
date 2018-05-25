@@ -60,7 +60,7 @@ public:
         , m_valid(false)
     {
     }
-    ConstObj(const ClusterTree* tree_top, ref_type ref, ObjKey key, size_t row_ndx);
+    ConstObj(const ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx);
 
     Allocator& get_alloc() const;
 
@@ -176,7 +176,7 @@ public:
         : m_writeable(false)
     {
     }
-    Obj(ClusterTree* tree_top, ref_type ref, ObjKey key, size_t row_ndx);
+    Obj(ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx);
 
     template <typename U>
     Obj& set(ColKey col_key, U value, bool is_default = false);
