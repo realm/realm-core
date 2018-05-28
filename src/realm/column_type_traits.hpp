@@ -84,8 +84,15 @@ struct ColumnTypeTraits<util::Optional<int64_t>> {
 };
 
 template <>
-struct ColumnTypeTraits<bool> : ColumnTypeTraits<int64_t> {
+struct ColumnTypeTraits<bool> {
     using cluster_leaf_type = ArrayBool;
+    static const DataType id = type_Bool;
+    static const ColumnType column_id = col_type_Bool;
+};
+
+template <>
+struct ColumnTypeTraits<util::Optional<bool>> {
+    using cluster_leaf_type = ArrayBoolNull;
     static const DataType id = type_Bool;
     static const ColumnType column_id = col_type_Bool;
 };
@@ -95,13 +102,6 @@ struct ColumnTypeTraits<ObjKey> {
     using cluster_leaf_type = ArrayKey;
     static const DataType id = type_Link;
     static const ColumnType column_id = col_type_Link;
-};
-
-template <>
-struct ColumnTypeTraits<util::Optional<bool>> : ColumnTypeTraits<util::Optional<int64_t>> {
-    using cluster_leaf_type = ArrayBoolNull;
-    static const DataType id = type_Bool;
-    static const ColumnType column_id = col_type_Bool;
 };
 
 template <>

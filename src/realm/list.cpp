@@ -69,8 +69,13 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key, DataType type)
     return {};
 }
 
-
 /********************************* LstBase **********************************/
+
+ConstLstBase::ConstLstBase(ColKey col_key, const ConstObj* obj)
+    : m_const_obj(obj)
+    , m_col_key(col_key)
+{
+}
 
 template <class T>
 ConstLst<T>::ConstLst(const ConstObj& obj, ColKey col_key)
@@ -78,6 +83,7 @@ ConstLst<T>::ConstLst(const ConstObj& obj, ColKey col_key)
     , ConstLstIf<T>(obj.get_alloc())
     , m_obj(obj)
 {
+    this->m_nullable = obj.get_table()->is_nullable(col_key);
     this->init_from_parent();
 }
 
@@ -124,15 +130,18 @@ void ConstLstBase::clear_repl(Replication* repl) const
 template <class T>
 Lst<T>::Lst(const Obj& obj, ColKey col_key)
     : ConstLstBase(col_key, &m_obj)
-    , ConstLstIf<T>(obj.m_table->get_alloc())
+    , ConstLstIf<T>(obj.get_alloc())
     , m_obj(obj)
 {
+    this->m_nullable = obj.m_table->is_nullable(col_key);
     this->init_from_parent();
 }
 
 namespace realm {
 template ConstLst<int64_t>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<util::Optional<Int>>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<bool>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<util::Optional<bool>>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<float>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<double>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<StringData>::ConstLst(const ConstObj& obj, ColKey col_key);
@@ -141,7 +150,9 @@ template ConstLst<Timestamp>::ConstLst(const ConstObj& obj, ColKey col_key);
 template ConstLst<ObjKey>::ConstLst(const ConstObj& obj, ColKey col_key);
 
 template Lst<int64_t>::Lst(const Obj& obj, ColKey col_key);
+template Lst<util::Optional<Int>>::Lst(const Obj& obj, ColKey col_key);
 template Lst<bool>::Lst(const Obj& obj, ColKey col_key);
+template Lst<util::Optional<bool>>::Lst(const Obj& obj, ColKey col_key);
 template Lst<float>::Lst(const Obj& obj, ColKey col_key);
 template Lst<double>::Lst(const Obj& obj, ColKey col_key);
 template Lst<StringData>::Lst(const Obj& obj, ColKey col_key);
@@ -299,9 +310,31 @@ void Lst<Int>::set_repl(Replication* repl, size_t ndx, int64_t value)
 }
 
 template <>
+void Lst<util::Optional<Int>>::set_repl(Replication* repl, size_t ndx, util::Optional<Int> value)
+{
+    if (value) {
+        repl->list_set_int(*this, ndx, *value);
+    }
+    else {
+        repl->list_set_null(*this, ndx);
+    }
+}
+
+template <>
 void Lst<Bool>::set_repl(Replication* repl, size_t ndx, bool value)
 {
     repl->list_set_bool(*this, ndx, value);
+}
+
+template <>
+void Lst<util::Optional<bool>>::set_repl(Replication* repl, size_t ndx, util::Optional<bool> value)
+{
+    if (value) {
+        repl->list_set_bool(*this, ndx, *value);
+    }
+    else {
+        repl->list_set_null(*this, ndx);
+    }
 }
 
 template <>
@@ -348,9 +381,31 @@ void Lst<Int>::insert_repl(Replication* repl, size_t ndx, int64_t value)
 }
 
 template <>
+void Lst<util::Optional<Int>>::insert_repl(Replication* repl, size_t ndx, util::Optional<Int> value)
+{
+    if (value) {
+        repl->list_insert_int(*this, ndx, *value);
+    }
+    else {
+        repl->list_insert_null(*this, ndx);
+    }
+}
+
+template <>
 void Lst<Bool>::insert_repl(Replication* repl, size_t ndx, bool value)
 {
     repl->list_insert_bool(*this, ndx, value);
+}
+
+template <>
+void Lst<util::Optional<bool>>::insert_repl(Replication* repl, size_t ndx, util::Optional<bool> value)
+{
+    if (value) {
+        repl->list_insert_bool(*this, ndx, *value);
+    }
+    else {
+        repl->list_insert_null(*this, ndx);
+    }
 }
 
 template <>

@@ -127,7 +127,7 @@ public:
     static const size_t max_column_name_length = 63;
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
     ColKey add_column(DataType type, StringData name, bool nullable = false);
-    ColKey add_column_list(DataType type, StringData name);
+    ColKey add_column_list(DataType type, StringData name, bool nullable = false);
     ColKey add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
 
     // Pass a ColKey() as first argument to have a new colkey generated
@@ -413,8 +413,6 @@ public:
 
     TableView get_sorted_view(SortDescriptor order);
     ConstTableView get_sorted_view(SortDescriptor order) const;
-
-    TableView get_backlink_view(ObjKey key, Table* src_table, ColKey src_col_key);
 
     // Report the current content version. This is a 64-bit value which is bumped whenever
     // the content in the table changes.

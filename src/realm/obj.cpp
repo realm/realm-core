@@ -30,6 +30,7 @@
 #include "realm/index_string.hpp"
 #include "realm/cluster_tree.hpp"
 #include "realm/spec.hpp"
+#include "realm/table_view.hpp"
 #include "realm/replication.hpp"
 
 namespace realm {
@@ -160,7 +161,6 @@ TableRef ConstObj::get_target_table(ColKey col_key) const
 
 Obj::Obj(ClusterTree* tree_top, MemRef mem, ObjKey key, size_t row_ndx)
     : ConstObj(tree_top, mem, key, row_ndx)
-    , m_writeable(!tree_top->get_alloc().is_read_only(mem.get_ref()))
 {
 }
 
@@ -308,7 +308,7 @@ bool ConstObj::is_null(ColKey col_key) const
     update_if_needed();
     ColumnAttrMask attr = get_spec().get_column_attr(col_ndx);
 
-    if (attr.test(col_attr_Nullable)) {
+    if (attr.test(col_attr_Nullable) && !attr.test(col_attr_List)) {
         switch (get_spec().get_column_type(col_ndx)) {
             case col_type_Int:
                 return do_is_null<ArrayIntNull>(col_ndx);
@@ -405,6 +405,13 @@ ObjKey ConstObj::get_backlink(const Table& origin, ColKey origin_col_key, size_t
     return get_backlink(backlink_col_key, backlink_ndx);
 }
 
+TableView ConstObj::get_backlink_view(Table* src_table, ColKey src_col_key)
+{
+    TableView tv(src_table, src_col_key, *this);
+    tv.do_sync();
+    return tv;
+}
+
 size_t ConstObj::get_backlink_count(size_t backlink_col_ndx) const
 {
     REALM_ASSERT(backlink_col_ndx != realm::npos);
@@ -434,21 +441,13 @@ ObjKey ConstObj::get_backlink(size_t backlink_col_ndx, size_t backlink_ndx) cons
 
 /*********************************** Obj *************************************/
 
-bool Obj::update_if_needed() const
+bool Obj::ensure_writeable()
 {
-    bool updated = ConstObj::update_if_needed();
-    if (updated) {
-        m_writeable = !get_alloc().is_read_only(m_mem.get_ref());
-    }
-    return updated;
-}
-
-void Obj::ensure_writeable()
-{
-    if (!m_writeable) {
+    if (get_alloc().is_read_only(m_mem.get_ref())) {
         m_mem = const_cast<ClusterTree*>(get_tree_top())->ensure_writeable(m_key);
-        m_writeable = true;
+        return true;
     }
+    return false;
 }
 
 void Obj::bump_content_version()
