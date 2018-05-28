@@ -524,7 +524,7 @@ void RealmCoordinator::commit_write(Realm& realm)
         // skip version
         std::lock_guard<std::mutex> l(m_notifier_mutex);
 
-        transaction::commit(Realm::Internal::get_transaction(realm));
+        Realm::Internal::get_transaction(realm).commit_and_continue_as_read();
 
         // Don't need to check m_new_notifiers because those don't skip versions
         bool have_notifiers = std::any_of(m_notifiers.begin(), m_notifiers.end(),

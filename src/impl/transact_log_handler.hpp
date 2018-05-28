@@ -48,10 +48,6 @@ void advance(Transaction& sg, BindingContext* binding_context, VersionID);
 // most recent read transaction and sent notifications to delegate
 void begin(const std::shared_ptr<Transaction>& sg,
            BindingContext* binding_context, NotifierPackage&);
-void begin_without_validation(Transaction& sg);
-
-// Commit a write transaction
-void commit(Transaction& sg);
 
 // Cancel a write transaction and roll back all changes, with change notifications
 // for reverting to the old values sent to delegate

@@ -36,6 +36,8 @@ class Query;
 class Realm;
 class Results;
 class SortDescriptor;
+struct ColKey;
+struct ObjKey;
 template <typename T> class ThreadSafeReference;
 
 namespace _impl {
@@ -45,7 +47,7 @@ class ListNotifier;
 class List {
 public:
     List() noexcept;
-    List(std::shared_ptr<Realm> r, Table& parent_table, size_t col, size_t row);
+    List(std::shared_ptr<Realm> r, Obj& parent_obj, ColKey col);
 //    List(std::shared_ptr<Realm> r, LinkViewRef l) noexcept;
     List(std::shared_ptr<Realm> r, TableRef l) noexcept;
     ~List();

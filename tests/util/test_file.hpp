@@ -22,7 +22,6 @@
 #include "shared_realm.hpp"
 #include "util/tagged_bool.hpp"
 
-#include <realm/group_shared.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 
@@ -32,16 +31,16 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
 
-namespace realm {
-struct SyncConfig;
-class Schema;
-enum class SyncSessionStopPolicy;
-}
-
 // {"identity":"test", "access": ["download", "upload"]}
 static const std::string s_test_token = "eyJpZGVudGl0eSI6InRlc3QiLCAiYWNjZXNzIjogWyJkb3dubG9hZCIsICJ1cGxvYWQiXX0=";
+#endif // REALM_ENABLE_SYNC
 
-#endif
+namespace realm {
+class Schema;
+enum class SyncSessionStopPolicy;
+struct DBOptions;
+struct SyncConfig;
+}
 
 class JoiningThread {
 public:
@@ -59,13 +58,7 @@ struct TestFile : realm::Realm::Config {
     TestFile();
     ~TestFile();
 
-    auto options() const
-    {
-        realm::SharedGroupOptions options;
-        options.durability = in_memory ? realm::SharedGroupOptions::Durability::MemOnly
-                                       : realm::SharedGroupOptions::Durability::Full;
-        return options;
-    }
+    realm::DBOptions options() const;
 };
 
 struct InMemoryTestFile : TestFile {

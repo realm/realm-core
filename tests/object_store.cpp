@@ -26,11 +26,11 @@
 #include "schema.hpp"
 
 #include <realm/string_data.hpp>
+#include <realm/table.hpp>
 
 using namespace realm;
 
 TEST_CASE("ObjectStore: table_name_for_object_type()") {
-
     SECTION("should work with strings that aren't null-terminated") {
         auto input = StringData("good_no_bad", 4);
         auto result = ObjectStore::table_name_for_object_type(input);
@@ -38,6 +38,7 @@ TEST_CASE("ObjectStore: table_name_for_object_type()") {
     }
 }
 
+#if 0
 TEST_CASE("ObjectStore:: property_for_column_index()") {
     SECTION("Property should match the schema") {
         Schema schema = {
@@ -86,3 +87,4 @@ TEST_CASE("ObjectStore:: property_for_column_index()") {
         }
    }
 }
+#endif

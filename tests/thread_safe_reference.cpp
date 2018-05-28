@@ -47,6 +47,7 @@ static Object create_object(SharedRealm const& realm, StringData object_type, An
     return Object::create(ctx, realm, object_type, util::Any(value));
 }
 
+#if 0
 TEST_CASE("thread safe reference") {
     using namespace std::string_literals;
 
@@ -69,7 +70,6 @@ TEST_CASE("thread safe reference") {
     };
 
     InMemoryTestFile config;
-    config.cache = false;
     config.automatic_change_notifications = false;
     SharedRealm r = Realm::get_shared_realm(config);
     r->update_schema(schema);
@@ -689,3 +689,4 @@ TEST_CASE("thread safe reference") {
         REQUIRE_THROWS(r->resolve_thread_safe_reference(std::move(ref)));
     }
 }
+#endif

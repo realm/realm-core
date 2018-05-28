@@ -87,7 +87,7 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
             throw ReadOnlyPropertyException(m_object_schema->name, property.name);
 
         ContextType child_ctx(ctx, property);
-        List list(m_realm, *m_obj.get_table(), col, m_obj.get_key());
+        List list(m_realm, m_obj, col);
         list.assign(child_ctx, value, try_update);
         ctx.did_change();
         return;
@@ -138,7 +138,7 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
     if (is_nullable(property.type) && m_obj.is_null(column))
         return ctx.null_value();
     if (is_array(property.type) && property.type != PropertyType::LinkingObjects)
-        return ctx.box(List(m_realm, *m_obj.get_table(), column, m_obj.get_key()));
+        return ctx.box(List(m_realm, m_obj, column));
 
     switch (property.type & ~PropertyType::Flags) {
         case PropertyType::Bool:   return ctx.box(m_obj.get<bool>(column));

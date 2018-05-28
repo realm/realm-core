@@ -32,6 +32,7 @@ using namespace realm;
 
 namespace {
 
+#if 0
 class KVOAdapter : public _impl::TransactionChangeInfo {
 public:
     KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context);
@@ -228,9 +229,11 @@ struct MarkDirtyMixin  {
     bool modify_object(size_t c, size_t r) { return mark_dirty(r, c); }
 };
 
+#endif
+
 class TransactLogValidationMixin {
-    // Index of currently selected table
-    size_t m_current_table = 0;
+    // The currently selected table
+    TableKey m_current_table;
 
     REALM_NORETURN
     REALM_NOINLINE
@@ -240,48 +243,49 @@ class TransactLogValidationMixin {
     }
 
 protected:
-    size_t current_table() const noexcept { return m_current_table; }
+    TableKey current_table() const noexcept { return m_current_table; }
 
 public:
 
-    bool select_table(size_t group_level_ndx, int, const size_t*) noexcept
+    bool select_table(TableKey key) noexcept
     {
-        m_current_table = group_level_ndx;
+        m_current_table = key;
         return true;
     }
 
     // Removing or renaming things while a Realm is open is never supported
-    bool erase_group_level_table(size_t, size_t) { schema_error(); }
-    bool rename_group_level_table(size_t, StringData) { schema_error(); }
-    bool erase_column(size_t) { schema_error(); }
-    bool rename_column(size_t, StringData) { schema_error(); }
+    bool erase_group_level_table(TableKey) { schema_error(); }
+    bool rename_group_level_table(TableKey) { schema_error(); }
+    bool erase_column(ColKey) { schema_error(); }
+    bool rename_column(ColKey) { schema_error(); }
 
     // Additive changes and reorderings are supported
-    bool insert_group_level_table(size_t, size_t, StringData) { return true; }
-    bool insert_column(size_t, DataType, StringData, bool) { return true; }
-    bool set_link_type(size_t, LinkType) { return true; }
+    bool insert_group_level_table(TableKey) { return true; }
+    bool insert_column(ColKey) { return true; }
+    bool set_link_type(ColKey) { return true; }
 
     // Non-schema changes are all allowed
     void parse_complete() { }
     bool create_object(ObjKey) { return true; }
     bool remove_object(ObjKey) { return true; }
     bool clear_table(size_t=0) noexcept { return true; }
-    bool link_list_set(size_t, size_t, size_t) { return true; }
-    bool link_list_insert(size_t, size_t, size_t) { return true; }
-    bool link_list_erase(size_t, size_t) { return true; }
-    bool link_list_nullify(size_t, size_t) { return true; }
-    bool link_list_clear(size_t) { return true; }
-    bool link_list_move(size_t, size_t) { return true; }
-    bool link_list_swap(size_t, size_t) { return true; }
+    bool list_set(size_t) { return true; }
+    bool list_insert(size_t) { return true; }
+    bool list_erase(size_t) { return true; }
+    bool list_clear(size_t) { return true; }
+    bool list_move(size_t, size_t) { return true; }
+    bool list_swap(size_t, size_t) { return true; }
 };
 
 
 // A transaction log handler that just validates that all operations made are
 // ones supported by the object store
-struct TransactLogValidator : public TransactLogValidationMixin, public MarkDirtyMixin<TransactLogValidator> {
-    void mark_dirty(size_t, size_t) { }
+struct TransactLogValidator : public TransactLogValidationMixin {
+    bool modify_object(ColKey, ObjKey) { return true; }
+    bool select_list(ColKey, ObjKey) { return true; }
 };
 
+#if 0
 // Move the value at container[from] to container[to], shifting everything in
 // between, or do nothing if either are out of bounds
 template<typename Container>
@@ -673,6 +677,7 @@ void advance_with_notifications(BindingContext* context, const std::unique_ptr<T
         context->did_send_notifications();
 }
 
+#endif
 } // anonymous namespace
 
 namespace realm {
@@ -686,35 +691,36 @@ UnsupportedSchemaChange::UnsupportedSchemaChange()
 namespace transaction {
 void advance(Transaction& sg, BindingContext*, VersionID version)
 {
-    LangBindHelper::advance_read(sg, TransactLogValidator(), version);
+    TransactLogValidator validator;
+    sg.advance_read(&validator, version);
 }
 
-void advance(const std::unique_ptr<Transaction>& sg, BindingContext* context, NotifierPackage& notifiers)
+void advance(const std::shared_ptr<Transaction>& sg, BindingContext* context, NotifierPackage& notifiers)
 {
+    TransactLogValidator validator;
+    sg->advance_read(&validator, notifiers.version().value_or(VersionID{}));
+#if 0
     advance_with_notifications(context, sg, [&](auto&&... args) {
         LangBindHelper::advance_read(*sg, std::move(args)..., notifiers.version().value_or(VersionID{}));
     }, notifiers);
+#endif
 }
 
-void begin_without_validation(Transaction& sg)
+void begin(const std::shared_ptr<Transaction>& sg, BindingContext* context, NotifierPackage& notifiers)
 {
-    LangBindHelper::promote_to_write(sg);
-}
-
-void begin(const std::unique_ptr<Transaction>& sg, BindingContext* context, NotifierPackage& notifiers)
-{
+    TransactLogValidator validator;
+    sg->promote_to_write(&validator);
+#if 0
     advance_with_notifications(context, sg, [&](auto&&... args) {
         LangBindHelper::promote_to_write(*sg, std::move(args)...);
     }, notifiers);
-}
-
-void commit(Transaction& sg)
-{
-    LangBindHelper::commit_and_continue_as_read(sg);
+#endif
 }
 
 void cancel(Transaction& sg, BindingContext* context)
 {
+    sg.rollback_and_continue_as_read();
+#if 0
     std::vector<BindingContext::ObserverState> observers;
     if (context) {
         observers = context->get_observed_rows();
@@ -726,16 +732,20 @@ void cancel(Transaction& sg, BindingContext* context)
 
     _impl::NotifierPackage notifiers;
     LangBindHelper::rollback_and_continue_as_read(sg, KVOTransactLogObserver(observers, context, notifiers, sg));
+#endif
 }
 
 void advance(Transaction& sg, TransactionChangeInfo& info, VersionID version)
 {
+    sg.advance_read(version);
+#if 0
     if (!info.track_all && info.table_modifications_needed.empty() && info.lists.empty()) {
         LangBindHelper::advance_read(sg, version);
     }
     else {
         LangBindHelper::advance_read(sg, TransactLogObserver(info), version);
     }
+#endif
 }
 
 } // namespace transaction

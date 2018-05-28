@@ -28,12 +28,11 @@
 #include "object_schema.hpp"
 #include "schema.hpp"
 
-#include <realm/group_shared.hpp>
 #include <realm/history.hpp>
-#include <realm/link_view.hpp>
 
 using namespace realm;
 
+#if 0
 class CaptureHelper {
 public:
     CaptureHelper(TestFile const& config, SharedRealm const& r, LinkViewRef lv, size_t table_ndx)
@@ -1233,7 +1232,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
     }
 
     SECTION("object change information") {
-        config.cache = false;
         auto realm = Realm::get_shared_realm(config);
         realm->update_schema({
             {"origin", {
@@ -2445,3 +2443,4 @@ TEST_CASE("DeepChangeChecker") {
         REQUIRE(checker(0));
     }
 }
+#endif

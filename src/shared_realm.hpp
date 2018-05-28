@@ -416,6 +416,7 @@ private:
 
     Transaction& transaction();
     Transaction& transaction() const;
+    std::shared_ptr<Transaction> transaction_ref();
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;

@@ -116,6 +116,9 @@ public:
 
     std::shared_ptr<Group> begin_read(VersionID version={});
 
+    // Check if advance_to_ready() would actually advance the Realm's read version
+    bool can_advance(Realm& realm);
+
     // Advance the Realm to the most recent transaction version which all async
     // work is complete for
     void advance_to_ready(Realm& realm);

@@ -27,6 +27,7 @@
 #include "schema.hpp"
 #endif
 
+#include <realm/db.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/history.hpp>
 #include <realm/string_data.hpp>
@@ -81,6 +82,15 @@ TestFile::TestFile()
 TestFile::~TestFile()
 {
     unlink(path.c_str());
+}
+
+DBOptions TestFile::options() const
+{
+    DBOptions options;
+    options.durability = in_memory
+                       ? DBOptions::Durability::MemOnly
+                       : DBOptions::Durability::Full;
+    return options;
 }
 
 InMemoryTestFile::InMemoryTestFile()
@@ -284,7 +294,7 @@ void advance_and_notify(Realm& realm)
 
 void advance_and_notify(Realm& realm)
 {
-    _impl::RealmCoordinator::get_existing_coordinator(realm.config().path)->on_change();
+    _impl::RealmCoordinator::get_coordinator(realm.config().path)->on_change();
     realm.notify();
 }
 #endif

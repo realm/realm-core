@@ -35,14 +35,14 @@
 #include "impl/realm_coordinator.hpp"
 #include "impl/object_accessor_impl.hpp"
 
-#include <realm/group_shared.hpp>
-#include <realm/link_view.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/version.hpp>
 
 #include <numeric>
 
 using namespace realm;
+
+#if 0
 
 template<PropertyType prop_type, typename T>
 struct Base {
@@ -281,7 +281,6 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
 
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
-    config.cache = false;
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Array|TestType::property_type()}
@@ -820,3 +819,5 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
     }
 #endif
 }
+
+#endif

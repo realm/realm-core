@@ -23,7 +23,6 @@
 #include "property.hpp"
 #include "schema.hpp"
 
-#include <realm/descriptor.hpp>
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 
@@ -83,6 +82,7 @@ struct StringMaker<SchemaChange> {
 #define REQUIRE_THROWS_CONTAINING(expr, msg) \
     REQUIRE_THROWS_WITH(expr, Catch::Matchers::Contains(msg))
 
+#if 0
 TEST_CASE("ObjectSchema") {
     SECTION("from a Group") {
         Group g;
@@ -223,6 +223,7 @@ TEST_CASE("ObjectSchema") {
         REQUIRE(ObjectSchema(g, "table").primary_key_property() == nullptr);
     }
 }
+#endif
 
 TEST_CASE("Schema") {
     SECTION("validate()") {

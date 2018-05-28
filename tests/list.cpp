@@ -33,18 +33,16 @@
 #include "impl/realm_coordinator.hpp"
 #include "impl/object_accessor_impl.hpp"
 
-#include <realm/group_shared.hpp>
-#include <realm/link_view.hpp>
 #include <realm/version.hpp>
 
 #include <cstdint>
 
 using namespace realm;
 
+#if 0
 TEST_CASE("list") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
-    config.cache = false;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"origin", {
@@ -934,3 +932,4 @@ TEST_CASE("list") {
         REQUIRE(obj.row().get_index() == 1);
     }
 }
+#endif

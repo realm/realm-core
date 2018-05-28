@@ -291,7 +291,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     // Either the schema version has changed or we need to do non-migration changes
 
     if (!in_transaction) {
-        transaction::begin_without_validation(transaction());
+        transaction().promote_to_write();
 
         // Beginning the write transaction may have advanced the version and left
         // us with nothing to do if someone else initialized the schema on disk
@@ -395,9 +395,6 @@ void Realm::add_schema_change_handler()
 
 void Realm::cache_new_schema()
 {
-    if (!m_shared_group)
-        return;
-
     auto new_version = transaction().get_version_of_current_transaction().version;
     if (m_new_schema)
         m_coordinator->cache_schema(std::move(*m_new_schema),
@@ -496,7 +493,7 @@ void Realm::begin_transaction()
     // state, but that's unavoidable.
     if (m_is_sending_notifications) {
         _impl::NotifierPackage notifiers;
-        transaction::begin(m_shared_group, m_binding_context.get(), notifiers);
+        transaction::begin(transaction_ref(), m_binding_context.get(), notifiers);
         return;
     }
 
@@ -540,7 +537,7 @@ void Realm::cancel_transaction()
         throw InvalidTransactionException("Can't cancel a non-existing write transaction");
     }
 
-    transaction::cancel(*m_shared_group, m_binding_context.get());
+    transaction::cancel(transaction(), m_binding_context.get());
     invalidate_permission_cache();
 }
 
@@ -620,7 +617,7 @@ void Realm::notify()
     }
 
     auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
-    if (!transaction().has_changed()) {
+    if (!m_coordinator->can_advance(*this)) {
         m_is_sending_notifications = true;
         m_coordinator->process_available_async(*this);
         return;
@@ -631,7 +628,7 @@ void Realm::notify()
 
         // changes_available() may have advanced the read version, and if
         // so we don't need to do anything further
-        if (!transaction().has_changed())
+        if (!m_coordinator->can_advance(*this))
             return;
     }
 
@@ -796,8 +793,8 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
 
         // If the reference's version is behind, advance it to our version
         if (reference_version < current_version) {
-            auto transaction = m_coordinator->begin_read(reference_version);
-            T imported_value = std::move(reference).import_into(transaction);
+            auto transaction = std::static_pointer_cast<Transaction>(m_coordinator->begin_read(reference_version));
+            T imported_value = std::move(reference).import_into(*transaction);
             transaction->advance_read(current_version);
             if (!imported_value.is_valid())
                 return T{};
