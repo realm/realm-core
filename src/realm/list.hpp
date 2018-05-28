@@ -110,14 +110,11 @@ protected:
 
     const ConstObj* m_const_obj;
     ColKey m_col_key;
+    bool m_nullable = false;
 
     mutable std::vector<size_t> m_deleted;
 
-    ConstLstBase(ColKey col_key, const ConstObj* obj)
-        : m_const_obj(obj)
-        , m_col_key(col_key)
-    {
-    }
+    ConstLstBase(ColKey col_key, const ConstObj* obj);
     virtual void init_from_parent() const = 0;
 
     ref_type get_child_ref(size_t) const noexcept override;
@@ -363,6 +360,7 @@ public:
         , ConstLstIf<T>(std::move(other))
         , m_obj(std::move(other.m_obj))
     {
+        ConstLstBase::m_nullable = other.ConstLstBase::m_nullable;
     }
 
 private:
@@ -383,6 +381,7 @@ public:
     virtual ~LstBase()
     {
     }
+    virtual void set_null(size_t ndx) = 0;
     virtual void insert_null(size_t ndx) = 0;
     virtual void resize(size_t new_size) = 0;
     virtual void remove(size_t from, size_t to) = 0;
@@ -419,9 +418,14 @@ public:
         ConstLstIf<T>::m_valid = true;
     }
 
+    void set_null(size_t ndx) override
+    {
+        set(ndx, BPlusTree<T>::default_value(m_nullable));
+    }
+
     void insert_null(size_t ndx) override
     {
-        insert(ndx, BPlusTree<T>::default_value());
+        insert(ndx, BPlusTree<T>::default_value(m_nullable));
     }
 
     void resize(size_t new_size) override
@@ -582,6 +586,7 @@ Lst<T>::Lst(const Lst<T>& other)
     , ConstLstIf<T>(other)
     , m_obj(other.m_obj)
 {
+    m_nullable = other.m_nullable;
 }
 
 template <class T>
@@ -590,6 +595,7 @@ Lst<T>::Lst(Lst<T>&& other)
     , ConstLstIf<T>(std::move(other))
     , m_obj(std::move(other.m_obj))
 {
+    m_nullable = other.m_nullable;
 }
 
 template <class T>
@@ -597,6 +603,7 @@ Lst<T>& Lst<T>::operator=(const Lst& other)
 {
     ConstLstIf<T>::operator=(other);
     m_obj = other.m_obj;
+    m_nullable = other.m_nullable;
     return *this;
 }
 

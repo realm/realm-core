@@ -2722,6 +2722,60 @@ TEST(Table_list_basic)
         auto list2 = obj.get_list<int64_t>(list_col);
         list2.set(50, 747);
         CHECK_EQUAL(list1.get(50), 747);
+        list1.resize(101);
+        CHECK_EQUAL(list1.get(100), 0);
+        list1.resize(50);
+        CHECK_EQUAL(list1.size(), 50);
+    }
+    {
+        Obj obj = table.create_object(ObjKey(7));
+        auto list = obj.get_list<int64_t>(list_col);
+        list.resize(10);
+        CHECK_EQUAL(list.size(), 10);
+        for (int i = 0; i < 10; i++) {
+            CHECK_EQUAL(list.get(i), 0);
+        }
+    }
+    table.remove_object(ObjKey(5));
+}
+
+TEST(Table_list_nullable)
+{
+    Table table;
+    auto list_col = table.add_column_list(type_Int, "int_list", true);
+
+    {
+        Obj obj = table.create_object(ObjKey(5));
+        CHECK_NOT(obj.is_null(list_col));
+        auto list = obj.get_list<util::Optional<Int>>(list_col);
+        CHECK_NOT(obj.is_null(list_col));
+        CHECK(list.is_empty());
+        for (int i = 0; i < 100; i++) {
+            list.add(i + 1000);
+        }
+    }
+    {
+        Obj obj = table.get_object(ObjKey(5));
+        auto list1 = obj.get_list<util::Optional<Int>>(list_col);
+        CHECK_EQUAL(list1.size(), 100);
+        CHECK_EQUAL(list1.get(0), 1000);
+        CHECK_EQUAL(list1.get(99), 1099);
+        auto list2 = obj.get_list<util::Optional<Int>>(list_col);
+        list2.set(50, 747);
+        CHECK_EQUAL(list1.get(50), 747);
+        list1.set_null(50);
+        CHECK_NOT(list1.get(50));
+        list1.resize(101);
+        CHECK_NOT(list1.get(100));
+    }
+    {
+        Obj obj = table.create_object(ObjKey(7));
+        auto list = obj.get_list<util::Optional<Int>>(list_col);
+        list.resize(10);
+        CHECK_EQUAL(list.size(), 10);
+        for (int i = 0; i < 10; i++) {
+            CHECK_NOT(list.get(i));
+        }
     }
     table.remove_object(ObjKey(5));
 }

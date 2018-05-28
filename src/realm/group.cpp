@@ -1596,6 +1596,11 @@ public:
         return true; // No-op
     }
 
+    bool list_set_null(size_t)
+    {
+        return true;
+    }
+
     bool list_insert_null(size_t, size_t)
     {
         return true;

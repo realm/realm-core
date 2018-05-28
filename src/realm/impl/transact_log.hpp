@@ -69,7 +69,7 @@ enum Instruction {
     instr_SetLinkType = 30,          // Strong/weak
     instr_SelectList = 31,
     instr_ListSet = 32,         // Assign to list entry
-    instr_ListInsertNull = 33,  // Insert null entry into list, only used to revert deletion
+    instr_ListInsert = 33,      // Insert list entry
     instr_ListMove = 34,        // Move an entry within a link list
     instr_ListSwap = 35,        // Swap two entries within a list
     instr_ListErase = 36,       // Remove an entry from a list
@@ -79,7 +79,6 @@ enum Instruction {
     instr_CreateObject = 40,
     instr_RemoveObject = 41,
     instr_InsertListColumn = 42, // Insert list column
-    instr_ListInsert = 43,       // Insert list entry
 };
 
 class TransactLogStream {
@@ -323,6 +322,10 @@ public:
     }
 
     // Must have linklist selected:
+    bool list_set_null(size_t)
+    {
+        return true;
+    }
     bool list_insert_null(size_t, size_t)
     {
         return true;
@@ -428,6 +431,7 @@ public:
     bool set_link_type(ColKey col_key, LinkType);
 
     // Must have linklist selected:
+    bool list_set_null(size_t ndx);
     bool list_insert_null(size_t ndx, size_t prior_size);
     bool list_set_link(size_t link_ndx, ObjKey value);
     bool list_insert_link(size_t link_ndx, ObjKey value, size_t prior_size);
@@ -545,16 +549,16 @@ public:
     virtual void insert_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, StringData);
     virtual void erase_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, size_t size);
 
-    virtual void list_set_int(const Lst<Int>& list, size_t list_ndx, int64_t value);
-    virtual void list_set_bool(const Lst<Bool>& list, size_t list_ndx, bool value);
+    virtual void list_set_int(const ConstLstBase& list, size_t list_ndx, int64_t value);
+    virtual void list_set_bool(const ConstLstBase& list, size_t list_ndx, bool value);
     virtual void list_set_float(const Lst<Float>& list, size_t list_ndx, float value);
     virtual void list_set_double(const Lst<Double>& list, size_t list_ndx, double value);
     virtual void list_set_string(const Lst<String>& list, size_t list_ndx, StringData value);
     virtual void list_set_binary(const Lst<Binary>& list, size_t list_ndx, BinaryData value);
     virtual void list_set_timestamp(const Lst<Timestamp>& list, size_t list_ndx, Timestamp value);
 
-    virtual void list_insert_int(const Lst<Int>& list, size_t list_ndx, int64_t value);
-    virtual void list_insert_bool(const Lst<Bool>& list, size_t list_ndx, bool value);
+    virtual void list_insert_int(const ConstLstBase& list, size_t list_ndx, int64_t value);
+    virtual void list_insert_bool(const ConstLstBase& list, size_t list_ndx, bool value);
     virtual void list_insert_float(const Lst<Float>& list, size_t list_ndx, float value);
     virtual void list_insert_double(const Lst<Double>& list, size_t list_ndx, double value);
     virtual void list_insert_string(const Lst<String>& list, size_t list_ndx, StringData value);
@@ -571,6 +575,7 @@ public:
     virtual void clear_table(const Table*, size_t prior_num_rows);
     virtual void enumerate_string_column(const Table*, ColKey col_key);
 
+    virtual void list_set_null(const ConstLstBase&, size_t ndx);
     virtual void list_insert_null(const ConstLstBase&, size_t ndx);
     virtual void list_set_link(const Lst<ObjKey>&, size_t link_ndx, ObjKey value);
     virtual void list_insert_link(const Lst<ObjKey>&, size_t link_ndx, ObjKey value);
@@ -1356,7 +1361,7 @@ inline bool TransactLogEncoder::list_set_int(size_t list_ndx, int64_t value)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::list_set_int(const Lst<Int>& list, size_t list_ndx, int64_t value)
+inline void TransactLogConvenientEncoder::list_set_int(const ConstLstBase& list, size_t list_ndx, int64_t value)
 {
     select_list(list);                       // Throws
     m_encoder.list_set_int(list_ndx, value); // Throws
@@ -1368,7 +1373,7 @@ inline bool TransactLogEncoder::list_set_bool(size_t list_ndx, bool value)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::list_set_bool(const Lst<Bool>& list, size_t list_ndx, bool value)
+inline void TransactLogConvenientEncoder::list_set_bool(const ConstLstBase& list, size_t list_ndx, bool value)
 {
     select_list(list);                        // Throws
     m_encoder.list_set_bool(list_ndx, value); // Throws
@@ -1443,7 +1448,7 @@ inline bool TransactLogEncoder::list_insert_int(size_t list_ndx, int64_t value, 
     return true;
 }
 
-inline void TransactLogConvenientEncoder::list_insert_int(const Lst<Int>& list, size_t list_ndx, int64_t value)
+inline void TransactLogConvenientEncoder::list_insert_int(const ConstLstBase& list, size_t list_ndx, int64_t value)
 {
     select_list(list);                                       // Throws
     m_encoder.list_insert_int(list_ndx, value, list.size()); // Throws
@@ -1455,7 +1460,7 @@ inline bool TransactLogEncoder::list_insert_bool(size_t list_ndx, bool value, si
     return true;
 }
 
-inline void TransactLogConvenientEncoder::list_insert_bool(const Lst<Bool>& list, size_t list_ndx, bool value)
+inline void TransactLogConvenientEncoder::list_insert_bool(const ConstLstBase& list, size_t list_ndx, bool value)
 {
     select_list(list);                                        // Throws
     m_encoder.list_insert_bool(list_ndx, value, list.size()); // Throws
@@ -1613,9 +1618,21 @@ inline void TransactLogConvenientEncoder::enumerate_string_column(const Table* t
     m_encoder.enumerate_string_column(col_key); // Throws
 }
 
+inline bool TransactLogEncoder::list_set_null(size_t list_ndx)
+{
+    append_simple_instr(instr_ListSet, set_null_sentinel(), list_ndx); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::list_set_null(const ConstLstBase& list, size_t list_ndx)
+{
+    select_list(list);                 // Throws
+    m_encoder.list_set_null(list_ndx); // Throws
+}
+
 inline bool TransactLogEncoder::list_insert_null(size_t list_ndx, size_t prior_size)
 {
-    append_simple_instr(instr_ListInsertNull, list_ndx, prior_size); // Throws
+    append_simple_instr(instr_ListInsert, set_null_sentinel(), list_ndx, prior_size); // Throws
     return true;
 }
 
@@ -1842,6 +1859,12 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_ListSet: {
             int type = read_int<int>(); // Throws
             size_t list_ndx = read_int<size_t>();
+            if (type == TransactLogEncoder::set_null_sentinel()) {
+                // Special case for set_null
+                if (!handler.list_set_null(list_ndx)) // Throws
+                    parser_error();
+                return;
+            }
             switch (DataType(type)) {
                 case type_Int: {
                     int_fast64_t value = read_int<int64_t>();   // Throws
@@ -1967,17 +1990,16 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-        case instr_ListInsertNull: {
-            size_t list_ndx = read_int<size_t>();                    // Throws
-            size_t prior_size = read_int<size_t>();                  // Throws
-            if (!handler.list_insert_null(list_ndx, prior_size))     // Throws
-                parser_error();
-            return;
-        }
         case instr_ListInsert: {
             int type = read_int<int>(); // Throws
             size_t list_ndx = read_int<size_t>();
             size_t prior_size = read_int<size_t>(); // Throws
+            if (type == TransactLogEncoder::set_null_sentinel()) {
+                // Special case for set_null
+                if (!handler.list_insert_null(list_ndx, prior_size)) // Throws
+                    parser_error();
+                return;
+            }
             switch (DataType(type)) {
                 case type_Int: {
                     int_fast64_t value = read_int<int64_t>();                  // Throws
@@ -2698,6 +2720,13 @@ public:
     bool list_insert_link(size_t list_ndx, ObjKey, size_t prior_size)
     {
         m_encoder.list_erase(list_ndx, prior_size);
+        append_instruction();
+        return true;
+    }
+
+    bool list_set_null(size_t ndx)
+    {
+        m_encoder.list_set_null(ndx);
         append_instruction();
         return true;
     }

@@ -717,6 +717,17 @@ public:
         return true;
     }
 
+    bool list_set_null(size_t list_ndx)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(list_ndx > m_list->size())))
+            return false;
+        log("list_set_null->insert(%1);", list_ndx); // Throws
+        m_list->set_null(list_ndx);                  // Throws
+        return true;
+    }
+
     bool list_insert_null(size_t list_ndx, size_t prior_size)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_list)))
@@ -726,7 +737,7 @@ public:
         if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_list->size())))
             return false;
         static_cast<void>(prior_size);
-        log("list_insert_null->insert(%1, %2);", list_ndx); // Throws
+        log("list_insert_null->insert(%1);", list_ndx);     // Throws
         m_list->insert_null(list_ndx);                      // Throws
         return true;
     }

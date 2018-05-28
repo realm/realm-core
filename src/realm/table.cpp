@@ -284,10 +284,10 @@ ColKey Table::add_column(DataType type, StringData name, bool nullable)
     return insert_column(ColKey(), type, name, nullable); // Throws
 }
 
-ColKey Table::add_column_list(DataType type, StringData name)
+ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
 {
     LinkTargetInfo invalid_link;
-    return do_insert_column(ColKey(), type, name, invalid_link, false, true); // Throws
+    return do_insert_column(ColKey(), type, name, invalid_link, nullable, true); // Throws
 }
 
 ColKey Table::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
