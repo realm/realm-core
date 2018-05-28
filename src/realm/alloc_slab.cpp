@@ -600,7 +600,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // in the shared slab allocator, because we always create a minimal group
     // representation in memory, even in a read-transaction, if the file is empty.
     // m_is_read_only = cfg.read_only;
-
+    set_read_only(false);
     m_file.open(path.c_str(), access, create, 0); // Throws
     auto physical_file_size = m_file.get_size();
     // Note that get_size() may (will) return a different size before and after
