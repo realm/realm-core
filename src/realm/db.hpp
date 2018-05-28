@@ -331,11 +331,11 @@ private:
     // Member variables
     size_t m_free_space = 0;
     size_t m_used_space = 0;
-    uint_fast32_t m_local_max_entry;
+    uint_fast32_t m_local_max_entry = 0;
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
-    bool m_wait_for_change_enabled;
+    bool m_wait_for_change_enabled = true; // Initially wait_for_change is enabled
     std::string m_lockfile_path;
     std::string m_lockfile_prefix;
     std::string m_db_path;
@@ -360,10 +360,8 @@ private:
 #if REALM_METRICS
     std::shared_ptr<metrics::Metrics> m_metrics;
 #endif // REALM_METRICS
-    struct PrivateKey {
-    };  // classic trick for "privatizing" the constructor
-public: // not really - pseudo-private, but needed to allow for use of make_shared<>
-    explicit DB(PrivateKey, const DBOptions options = DBOptions());
+protected:
+    explicit DB(const DBOptions& options);
 
 private:
     /// Attach this DB instance to the specified database file.
@@ -716,11 +714,6 @@ private:
 
 struct DB::BadVersion : std::exception {
 };
-
-inline DB::DB(PrivateKey, const DBOptions options)
-    : m_upgrade_callback(std::move(options.upgrade_callback))
-{
-}
 
 inline bool DB::is_attached() const noexcept
 {

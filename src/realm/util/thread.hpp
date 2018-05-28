@@ -89,7 +89,7 @@ public:
     // If supported by the platform, this function assigns the name of the
     // calling thread to \a name, and returns true, otherwise it does nothing
     // and returns false.
-    static bool get_name(std::string& name);
+    static bool get_name(std::string& name) noexcept;
 
 private:
 

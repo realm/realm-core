@@ -755,7 +755,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
     m_coordination_dir = path + ".management";
     m_lockfile_path = path + ".lock";
     try_make_dir(m_coordination_dir);
-    m_key = options.encryption_key;
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     SlabAlloc& alloc = m_alloc;
     m_alloc.set_read_only(false);
@@ -1009,7 +1008,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             // close previously, but wasn't (perhaps due to the process crashing)
             cfg.clear_file = (options.durability == Durability::MemOnly && begin_new_session);
 
-            cfg.encryption_key = options.encryption_key;
+            cfg.encryption_key = m_key;
             ref_type top_ref;
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
@@ -1106,7 +1105,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 if (Replication* repl = m_alloc.get_replication())
                     repl->initiate_session(version); // Throws
 
-                if (options.encryption_key) {
+                if (m_key) {
 #ifdef _WIN32
                     uint64_t pid = GetCurrentProcessId();
 #else
@@ -1155,7 +1154,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 uint64_t pid = getpid();
 #endif
 
-                if (options.encryption_key && info->session_initiator_pid != pid) {
+                if (m_key && info->session_initiator_pid != pid) {
                     std::stringstream ss;
                     ss << path << ": Encrypted interprocess sharing is currently unsupported."
                        << "SharedGroup has been opened by pid: " << info->session_initiator_pid << ". Current pid is "
@@ -1229,9 +1228,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 REALM_ASSERT(!info->sync_agent_present);
                 info->sync_agent_present = 1; // Set to true
             }
-
-            // Initially wait_for_change is enabled
-            m_wait_for_change_enabled = true;
 
             // Keep the mappings and file open:
             alloc_detach_guard.release();
@@ -2441,16 +2437,32 @@ std::unique_ptr<ConstTableView> Transaction::import_copy_of(ConstTableView& tv, 
     return tv.clone_for_handover(this, policy);
 }
 
+inline DB::DB(const DBOptions& options)
+    : m_key(options.encryption_key)
+    , m_upgrade_callback(std::move(options.upgrade_callback))
+{
+}
+
+namespace {
+class DBInit : public DB {
+public:
+    explicit DBInit(const DBOptions& options)
+        : DB(options)
+    {
+    }
+};
+}
+
 DBRef DB::create(const std::string& file, bool no_create, const DBOptions options)
 {
-    DBRef retval = std::make_shared<DB>(PrivateKey());
+    DBRef retval = std::make_shared<DBInit>(options);
     retval->open(file, no_create, options);
     return retval;
 }
 
 DBRef DB::create(Replication& repl, const DBOptions options)
 {
-    DBRef retval = std::make_shared<DB>(PrivateKey());
+    DBRef retval = std::make_shared<DBInit>(options);
     retval->open(repl, options);
     return retval;
 }

@@ -835,7 +835,7 @@ private:
     // holds the ndx in the lower bits, the tag in the higher bit to save an indirection
     // when validating colkeys.
     std::vector<uint64_t> m_colkey2ndx;
-    uint64_t m_in_file_version_at_transaction_boundary;
+    uint64_t m_in_file_version_at_transaction_boundary = 0;
 
     static constexpr int top_position_for_spec = 0;
     static constexpr int top_position_for_columns = 1;
