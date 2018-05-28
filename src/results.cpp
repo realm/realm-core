@@ -78,7 +78,6 @@ Results::Results(Results&& other)
 , m_object_schema(std::move(other.m_object_schema))
 , m_query(std::move(other.m_query))
 , m_table_view(std::move(other.m_table_view))
-, m_link_view(std::move(other.m_link_view))
 , m_table(std::move(other.m_table))
 , m_descriptor_ordering(std::move(other.m_descriptor_ordering))
 , m_notifier(std::move(other.m_notifier))
@@ -101,10 +100,11 @@ Results& Results::operator=(Results&& other)
 
 bool Results::is_valid() const
 {
-    if (m_realm)
+    if (m_realm) {
         m_realm->verify_thread();
+    }
 
-    if (m_table && !m_table->is_attached())
+    if (m_table && !m_table->is_valid())
         return false;
 
     return true;

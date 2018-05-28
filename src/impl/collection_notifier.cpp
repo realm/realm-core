@@ -27,7 +27,6 @@ using namespace realm;
 using namespace realm::_impl;
 
 #if 0
-
 std::function<bool (size_t)>
 CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
                                              Table const& root_table)
@@ -52,6 +51,7 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
 
     return DeepChangeChecker(info, root_table, m_related_tables);
 }
+#endif
 
 void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Table const& table)
 {
@@ -75,6 +75,7 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Tabl
     }
 }
 
+#if 0
 DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info,
                                      Table const& root_table,
                                      std::vector<RelatedTable> const& related_tables)

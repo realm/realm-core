@@ -25,7 +25,6 @@
 #include <string>
 
 namespace realm {
-class LinkView;
 class List;
 class Object;
 class Query;
@@ -33,6 +32,7 @@ class Realm;
 class Results;
 class TableView;
 class Transaction;
+template <class> class Lst;
 
 // Opaque type representing an object for handover
 class ThreadSafeReferenceBase {
@@ -44,25 +44,8 @@ public:
     ThreadSafeReferenceBase();
     virtual ~ThreadSafeReferenceBase();
 
-    bool is_invalidated() const { return m_source_realm == nullptr; };
-
-protected:
-    // Precondition: The associated Realm is for the current thread and is not in a write transaction;.
-    ThreadSafeReferenceBase(std::shared_ptr<Realm> source_realm);
-
-//    Transaction& get_source_shared_group() const;
-
-    template <typename V, typename T>
-    V invalidate_after_import(Realm& destination_realm, T construct_with_shared_group);
-
 private:
     friend Realm;
-
-    VersionID m_version_id;
-    std::shared_ptr<Realm> m_source_realm; // Strong reference keeps alive so version stays pinned! Don't touch!!
-
-    bool has_same_config(Realm& realm) const;
-    void invalidate();
 };
 
 template <typename T>

@@ -98,6 +98,24 @@ Group& Realm::read_group()
     return *m_group;
 }
 
+Transaction& Realm::transaction()
+{
+    REALM_ASSERT(!m_config.immutable());
+    return static_cast<Transaction&>(read_group());
+}
+
+Transaction& Realm::transaction() const
+{
+    REALM_ASSERT(!m_config.immutable());
+    // FIXME: read_group() is not even remotly const
+    return static_cast<Transaction&>(const_cast<Realm*>(this)->read_group());
+}
+
+std::shared_ptr<Transaction> Realm::transaction_ref()
+{
+    return std::static_pointer_cast<Transaction>(m_group);
+}
+
 void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
 {
     realm.begin_read(version_id);
@@ -760,29 +778,23 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
     if (is_in_transaction()) {
         throw InvalidTransactionException("Cannot resolve thread safe reference during a write transaction.");
     }
-    if (reference.is_invalidated()) {
-        throw std::logic_error("Cannot resolve thread safe reference more than once.");
-    }
-    if (!reference.has_same_config(*this)) {
-        throw MismatchedRealmException("Cannot resolve thread safe reference in Realm with different configuration "
-                                       "than the source Realm.");
-    }
     invalidate_permission_cache();
 
     // Any of the callbacks to user code below could drop the last remaining
     // strong reference to `this`
     auto retain_self = shared_from_this();
 
+//    VersionID reference_version(reference.m_version_id);
+    VersionID reference_version; // FIXME
+
     // Ensure we're on the same version as the reference
     if (!m_group) {
         // A read transaction doesn't yet exist, so create at the reference's version
-        begin_read(reference.m_version_id);
+        begin_read(reference_version);
     }
     else {
         // A read transaction does exist, but let's make sure that its version matches the reference's
         auto current_version = transaction().get_version_of_current_transaction();
-        VersionID reference_version(reference.m_version_id);
-
         if (reference_version == current_version) {
             return std::move(reference).import_into_realm(shared_from_this());
         }

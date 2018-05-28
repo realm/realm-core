@@ -372,6 +372,12 @@ void RealmCoordinator::open_db()
     }
 }
 
+std::shared_ptr<Group> RealmCoordinator::begin_read(VersionID version)
+{
+    open_db();
+    return m_db->start_read(version);
+}
+
 bool RealmCoordinator::get_cached_schema(Schema& schema, uint64_t& schema_version,
                                          uint64_t& transaction) const noexcept
 {

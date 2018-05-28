@@ -1261,7 +1261,7 @@ TEST_CASE("SharedRealm: compact on launch") {
 
         // Registering for a collection notification shouldn't crash when compact on launch is used.
         Results results(r, *r->read_group().get_table("class_object"));
-        results.async([](std::exception_ptr) { });
+        results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) { });
         r->close();
     }
 

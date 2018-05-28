@@ -28,56 +28,11 @@
 
 using namespace realm;
 
-#if 0
-
-ThreadSafeReferenceBase::ThreadSafeReferenceBase(SharedRealm source_realm) : m_source_realm(std::move(source_realm))
-{
-    m_source_realm->verify_thread();
-    if (m_source_realm->is_in_transaction()) {
-        throw InvalidTransactionException("Cannot obtain thread safe reference during a write transaction.");
-    }
-
-    try {
-        m_version_id = get_source_shared_group().pin_version();
-    } catch (...) {
-        invalidate();
-        throw;
-    }
-}
-
 ThreadSafeReferenceBase::~ThreadSafeReferenceBase()
 {
-    if (!is_invalidated())
-        invalidate();
 }
 
-template <typename V, typename T>
-V ThreadSafeReferenceBase::invalidate_after_import(Realm& destination_realm, T construct_with_shared_group) {
-    destination_realm.verify_thread();
-    REALM_ASSERT_DEBUG(!m_source_realm->is_in_transaction());
-    REALM_ASSERT_DEBUG(!is_invalidated());
-
-    Transaction& destination_shared_group = *Realm::Internal::get_shared_group(destination_realm);
-    auto unpin_version = util::make_scope_exit([&]() noexcept { invalidate(); });
-
-    return construct_with_shared_group(destination_shared_group);
-}
-
-Transaction& ThreadSafeReferenceBase::get_source_shared_group() const {
-    return *Realm::Internal::get_shared_group(*m_source_realm);
-}
-
-bool ThreadSafeReferenceBase::has_same_config(Realm& realm) const {
-    return &Realm::Internal::get_coordinator(*m_source_realm) == &Realm::Internal::get_coordinator(realm);
-}
-
-void ThreadSafeReferenceBase::invalidate() {
-    REALM_ASSERT_DEBUG(m_source_realm);
-    SharedRealm thread_local_realm = Realm::Internal::get_coordinator(*m_source_realm).get_realm();
-    Realm::Internal::get_shared_group(*thread_local_realm)->unpin_version(m_version_id);
-    m_source_realm = nullptr;
-}
-
+#if 0
 ThreadSafeReference<List>::ThreadSafeReference(List const& list)
 : ThreadSafeReferenceBase(list.get_realm())
 , m_link_view(get_source_shared_group().export_linkview_for_handover(list.m_link_view))
@@ -123,5 +78,4 @@ Results ThreadSafeReference<Results>::import_into_realm(SharedRealm realm) && {
         return Results(std::move(realm), std::move(query), std::move(descriptors));
     });
 }
-
 #endif

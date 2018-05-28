@@ -158,7 +158,7 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
             auto target_object_schema = m_realm->schema().find(property.object_type);
             auto link_property = target_object_schema->property_for_name(property.link_origin_property_name);
             TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), target_object_schema->name);
-            auto tv = const_cast<Table*>(m_obj.get_table())->get_backlink_view(m_obj.get_key(), table, ColKey(link_property->column_key));
+            auto tv = m_obj.get_backlink_view(table, ColKey(link_property->column_key));
             return ctx.box(Results(m_realm, std::move(tv)));
         }
         default: REALM_UNREACHABLE();

@@ -43,7 +43,7 @@ public:
     Results(std::shared_ptr<Realm> r, Table& table);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
-//    Results(std::shared_ptr<Realm> r, LinkViewRef lv, util::Optional<Query> q = {}, SortDescriptor s = {});
+    Results(std::shared_ptr<Realm> r, LstBase& list, util::Optional<Query> q = {}, SortDescriptor s = {});
     ~Results();
 
     // Results is copyable and moveable
@@ -189,8 +189,6 @@ public:
     // Create an async query from this Results
     // The query will be run on a background thread and delivered to the callback,
     // and then rerun after each commit (if needed) and redelivered if it changed
-    template<typename Func>
-    NotificationToken async(Func&& target);
     NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
 
     bool wants_background_updates() const { return m_wants_background_updates; }
@@ -226,9 +224,9 @@ private:
     mutable const ObjectSchema *m_object_schema = nullptr;
     Query m_query;
     TableView m_table_view;
-//    LinkViewRef m_link_view;
     TableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
+    std::shared_ptr<LnkLst> m_link_list;
 
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifier> m_notifier;
 
@@ -259,14 +257,6 @@ private:
     template<typename Fn>
     auto dispatch(Fn&&) const;
 };
-
-template<typename Func>
-NotificationToken Results::async(Func&& target)
-{
-    return this->add_notification_callback([target = std::forward<Func>(target)](CollectionChangeSet const&, std::exception_ptr e) {
-        target(e);
-    });
-}
 
 template<typename Fn>
 auto Results::dispatch(Fn&& fn) const

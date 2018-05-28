@@ -32,7 +32,6 @@ using namespace realm;
 
 namespace {
 
-#if 0
 class KVOAdapter : public _impl::TransactionChangeInfo {
 public:
     KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context);
@@ -49,7 +48,6 @@ private:
         BindingContext::ObserverState* observer;
         _impl::CollectionChangeBuilder builder;
         ColKey col;
-        size_t initial_size;
     };
     std::vector<ListInfo> m_lists;
     VersionID m_version;
@@ -76,11 +74,8 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     for (auto& observer : observers) {
         auto table = group.get_table(TableKey(observer.table_key));
         for (auto key : table->get_column_keys()) {
-            auto type = table->get_column_type(key);
-            if (type == type_LinkList)
-                m_lists.push_back({&observer, {}, key, size_t(-1)});
-//            else if (type == type_Table)
-//                m_lists.push_back({&observer, {}, i, table->get_subtable_size(i, observer.row_ndx)});
+            if (table->get_column_attr(key).test(col_attr_List))
+                m_lists.push_back({&observer, {}, key});
         }
     }
 
@@ -92,8 +87,9 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     }
     for (auto& list : m_lists)
         lists.push_back({list.observer->table_key,
-            list.observer->obj_key, list.col, &list.builder});
+            list.observer->obj_key, list.col.value, &list.builder});
 }
+#if 0
 
 void KVOAdapter::before(Transaction& sg)
 {
@@ -205,6 +201,7 @@ void KVOAdapter::before(Transaction& sg)
     }
     m_context->will_change(m_observers, m_invalidated);
 }
+#endif
 
 void KVOAdapter::after(Transaction& sg)
 {
@@ -214,22 +211,6 @@ void KVOAdapter::after(Transaction& sg)
                           m_version != VersionID{} &&
                           m_version != sg.get_version_of_current_transaction());
 }
-
-template<typename Derived>
-struct MarkDirtyMixin  {
-    bool mark_dirty(size_t row, size_t col, _impl::Instruction instr=_impl::instr_Set)
-    {
-        // Ignore SetDefault and SetUnique as those conceptually cannot be
-        // changes to existing rows
-        if (instr == _impl::instr_Set)
-            static_cast<Derived *>(this)->mark_dirty(row, col);
-        return true;
-    }
-
-    bool modify_object(size_t c, size_t r) { return mark_dirty(r, c); }
-};
-
-#endif
 
 class TransactLogValidationMixin {
     // The currently selected table
@@ -285,83 +266,19 @@ struct TransactLogValidator : public TransactLogValidationMixin {
     bool select_list(ColKey, ObjKey) { return true; }
 };
 
-#if 0
-// Move the value at container[from] to container[to], shifting everything in
-// between, or do nothing if either are out of bounds
-template<typename Container>
-void rotate(Container& container, size_t from, size_t to)
-{
-    REALM_ASSERT(from != to);
-    if (from >= container.size() && to >= container.size())
-        return;
-    if (from >= container.size() || to >= container.size())
-        container.resize(std::max(from, to) + 1);
-    if (from < to)
-        std::rotate(begin(container) + from, begin(container) + from + 1, begin(container) + to + 1);
-    else
-        std::rotate(begin(container) + to, begin(container) + from, begin(container) + from + 1);
-}
-
-// Insert a default-initialized value at pos if there is anything after pos in the container.
-template<typename Container>
-void insert_empty_at(Container& container, size_t pos)
-{
-    if (pos < container.size())
-        container.emplace(container.begin() + pos);
-}
-
-// Shift `value` to reflect a move from `from` to `to`
-void adjust_for_move(size_t& value, size_t from, size_t to)
-{
-    if (value == from)
-        value = to;
-    else if (value > from && value <= to)
-        --value;
-    else if (value < from && value >= to)
-        ++value;
-}
-
-void adjust_for_move(std::vector<size_t>& values, size_t from, size_t to)
-{
-    for (auto& value : values)
-        adjust_for_move(value, from, to);
-}
-
-void expand_to(std::vector<size_t>& cols, size_t i)
-{
-    auto old_size = cols.size();
-    if (old_size > i)
-        return;
-
-    cols.resize(std::max(old_size * 2, i + 1));
-    std::iota(begin(cols) + old_size, end(cols), old_size == 0 ? 0 : cols[old_size - 1] + 1);
-}
-
-void adjust_ge(std::vector<size_t>& values, size_t i)
-{
-    for (auto& value : values) {
-        if (value >= i)
-            ++value;
-    }
-}
-
 // Extends TransactLogValidator to track changes made to LinkViews
-class TransactLogObserver : public TransactLogValidationMixin, public MarkDirtyMixin<TransactLogObserver> {
+class TransactLogObserver : public TransactLogValidationMixin {
     _impl::TransactionChangeInfo& m_info;
     _impl::CollectionChangeBuilder* m_active_list = nullptr;
     _impl::CollectionChangeBuilder* m_active_table = nullptr;
-    _impl::CollectionChangeBuilder* m_active_descriptor = nullptr;
 
-    bool m_need_move_info = false;
-    bool m_is_top_level_table = true;
-
-    _impl::CollectionChangeBuilder* find_list(size_t tbl, size_t col, size_t row)
+    _impl::CollectionChangeBuilder* find_list(ObjKey obj)
     {
         // When there are multiple source versions there could be multiple
         // change objects for a single LinkView, in which case we need to use
         // the last one
         for (auto it = m_info.lists.rbegin(), end = m_info.lists.rend(); it != end; ++it) {
-            if (it->table_key == tbl && it->row_ndx == row && it->col_ndx == col)
+            if (it->row_key == obj.value)
                 return it->changes;
         }
         return nullptr;
@@ -390,65 +307,59 @@ public:
         TransactLogValidationMixin::select_table(key);
         m_active_table = nullptr;
 
-        auto tbl_ndx = current_table();
-        if (!m_info.track_all && !m_info.table_modifications_needed[tbl_ndx])
+        size_t tbl_ndx = current_table().value;
+        if (!m_info.track_all && !m_info.table_modifications_needed.count(tbl_ndx))
             return true;
 
-        m_need_move_info = m_info.track_all || m_info.table_moves_needed[tbl_ndx]);
         if (m_info.tables.size() <= tbl_ndx)
             m_info.tables.resize(std::max(m_info.tables.size() * 2, tbl_ndx + 1));
         m_active_table = &m_info.tables[tbl_ndx];
         return true;
     }
 
-    bool select_link_list(size_t col, size_t row, size_t)
+    bool select_link_list(ColKey col, ObjKey obj)
     {
-        mark_dirty(row, col);
-        m_active_list = find_list(current_table(), col, row);
+        modify_object(col, obj);
+        m_active_list = find_list(obj);
         return true;
     }
 
-    bool link_list_set(size_t index)
+    bool list_set(size_t index)
     {
         if (m_active_list)
             m_active_list->modify(index);
         return true;
     }
 
-    bool link_list_insert(size_t index)
+    bool list_insert(size_t index)
     {
         if (m_active_list)
             m_active_list->insert(index);
         return true;
     }
 
-    bool link_list_erase(size_t index)
+    bool list_erase(size_t index)
     {
         if (m_active_list)
             m_active_list->erase(index);
         return true;
     }
 
-    bool link_list_nullify(size_t index)
+    bool list_swap(size_t index1, size_t index2)
     {
-        return link_list_erase(index);
-    }
-
-    bool link_list_swap(size_t index1, size_t index2)
-    {
-        link_list_set(index1, 0, npos);
-        link_list_set(index2, 0, npos);
+        list_set(index1);
+        list_set(index2);
         return true;
     }
 
-    bool link_list_clear(size_t old_size)
+    bool list_clear(size_t old_size)
     {
         if (m_active_list)
             m_active_list->clear(old_size);
         return true;
     }
 
-    bool link_list_move(size_t from, size_t to)
+    bool list_move(size_t from, size_t to)
     {
         if (m_active_list)
             m_active_list->move(from, to);
@@ -458,147 +369,64 @@ public:
     bool create_object(ObjKey key)
     {
         if (m_active_table)
-            m_active_table->insert(row_ndx, num_rows_to_insert, m_need_move_info);
+            m_active_table->insertions.add(key.value);
         return true;
     }
 
-    bool erase_rows(size_t row_ndx, size_t, size_t prior_num_rows, bool unordered)
+    bool delete_object(ObjKey key)
     {
-        if (!unordered) {
-            if (m_active_table)
-                m_active_table->erase(row_ndx);
+        if (!m_active_table)
             return true;
-        }
-        size_t last_row = prior_num_rows - 1;
-        if (m_active_table)
-            m_active_table->move_over(row_ndx, last_row, m_need_move_info);
+        m_active_table->insertions.remove(key.value);
+        m_active_table->modifications.remove(key.value);
 
-        if (!m_is_top_level_table)
-            return true;
         for (size_t i = 0; i < m_info.lists.size(); ++i) {
             auto& list = m_info.lists[i];
-            if (list.table_key != current_table())
+            if (list.table_key != current_table().value)
                 continue;
-            if (list.row_ndx == row_ndx) {
+            if (list.row_key == key.value) {
                 if (i + 1 < m_info.lists.size())
                     m_info.lists[i] = std::move(m_info.lists.back());
                 m_info.lists.pop_back();
                 continue;
             }
-            if (list.row_ndx == last_row)
-                list.row_ndx = row_ndx;
         }
 
         return true;
     }
 
-    bool swap_rows(size_t row_ndx_1, size_t row_ndx_2) {
-        REALM_ASSERT(row_ndx_1 < row_ndx_2);
-        if (!m_is_top_level_table) {
-            if (m_active_table) {
-                m_active_table->move(row_ndx_1, row_ndx_2);
-                if (row_ndx_1 + 1 != row_ndx_2)
-                    m_active_table->move(row_ndx_2 - 1, row_ndx_1);
-            }
-            return true;
-        }
-
-        if (m_active_table)
-            m_active_table->swap(row_ndx_1, row_ndx_2, m_need_move_info);
-        for (auto& list : m_info.lists) {
-            if (list.table_key == current_table()) {
-                if (list.row_ndx == row_ndx_1)
-                    list.row_ndx = row_ndx_2;
-                else if (list.row_ndx == row_ndx_2)
-                    list.row_ndx = row_ndx_1;
-            }
-        }
-        return true;
-    }
-
-    bool move_row(size_t from_ndx, size_t to_ndx) {
-        // Move row is not supported for top level tables:
-        REALM_ASSERT(!m_active_table || !m_is_top_level_table);
-
-        if (m_active_table)
-            m_active_table->move(from_ndx, to_ndx);
-        return true;
-    }
-
-    bool merge_rows(size_t from, size_t to)
+    bool modify_object(ColKey, ObjKey key)
     {
         if (m_active_table)
-            m_active_table->subsume(from, to, m_need_move_info);
-        if (!m_is_top_level_table)
-            return true;
-        for (auto& list : m_info.lists) {
-            if (list.table_key == current_table() && list.row_ndx == from)
-                list.row_ndx = to;
-        }
+            m_active_table->modifications.add(key.value);
         return true;
     }
 
-    bool clear_table(size_t=0)
+    bool clear_table(size_t old_size)
     {
-        auto tbl_ndx = current_table();
+        auto tbl_ndx = current_table().value;
         if (m_active_table)
-            m_active_table->clear(std::numeric_limits<size_t>::max());
-        if (!m_is_top_level_table)
-            return true;
+            m_active_table->clear(old_size);
         auto it = remove_if(begin(m_info.lists), end(m_info.lists),
                             [&](auto const& lv) { return lv.table_key == tbl_ndx; });
         m_info.lists.erase(it, end(m_info.lists));
         return true;
     }
 
-    bool insert_column(size_t ndx, DataType, StringData, bool)
+    bool insert_column(ColKey)
     {
         m_info.schema_changed = true;
-
-        if (m_active_descriptor)
-            m_active_descriptor->insert_column(ndx);
-        if (m_active_descriptor != m_active_table || !m_is_top_level_table)
-            return true;
-        for (auto& list : m_info.lists) {
-            if (list.table_key == current_table() && list.col_ndx >= ndx)
-                ++list.col_ndx;
-        }
-        if (m_info.column_indices.size() <= current_table())
-            m_info.column_indices.resize(current_table() + 1);
-        auto& indices = m_info.column_indices[current_table()];
-        expand_to(indices, ndx);
-        insert_empty_at(indices, ndx);
-        indices[ndx] = npos;
         return true;
     }
 
-    void prepare_table_indices()
-    {
-        if (m_info.table_indices.empty() && !m_info.table_modifications_needed.empty()) {
-            m_info.table_indices.resize(m_info.table_modifications_needed.size());
-            std::iota(begin(m_info.table_indices), end(m_info.table_indices), 0);
-        }
-    }
-
-    bool insert_group_level_table(size_t ndx, size_t, StringData)
+    bool insert_group_level_table(TableKey)
     {
         m_info.schema_changed = true;
-
-        for (auto& list : m_info.lists) {
-            if (list.table_key >= ndx)
-                ++list.table_key;
-        }
-        prepare_table_indices();
-        adjust_ge(m_info.table_indices, ndx);
-        insert_empty_at(m_info.tables, ndx);
-        insert_empty_at(m_info.table_moves_needed, ndx);
-        insert_empty_at(m_info.table_modifications_needed, ndx);
         return true;
     }
-
-    bool insert_link_column(size_t ndx, DataType type, StringData name, size_t, size_t) { return insert_column(ndx, type, name, false); }
 };
 
+#if 0
 class KVOTransactLogObserver : public TransactLogObserver {
     KVOAdapter m_adapter;
     _impl::NotifierPackage& m_notifiers;
@@ -676,8 +504,8 @@ void advance_with_notifications(BindingContext* context, const std::unique_ptr<T
     if (context)
         context->did_send_notifications();
 }
-
 #endif
+
 } // anonymous namespace
 
 namespace realm {

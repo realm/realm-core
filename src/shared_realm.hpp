@@ -348,11 +348,8 @@ public:
 
         // ResultsNotifier and ListNotifier need access to the Transaction
         // to be able to call the handover functions, which are not very wrappable
-        static Transaction& get_transaction(Realm& realm);
-//        {
-//            return static_cast<Transaction&>(*realm.m_group);
-//        }
-        static std::shared_ptr<Transaction> get_transaction_ref(Realm& realm);
+        static Transaction& get_transaction(Realm& realm) { return realm.transaction(); }
+        static std::shared_ptr<Transaction> get_transaction_ref(Realm& realm) { return realm.transaction_ref(); }
 
         // CollectionNotifier needs to be able to access the owning
         // coordinator to wake up the worker thread when a callback is

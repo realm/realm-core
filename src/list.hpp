@@ -24,7 +24,7 @@
 #include "property.hpp"
 
 #include <realm/mixed.hpp>
-#include <realm/table_ref.hpp>
+#include <realm/list.hpp>
 
 #include <functional>
 #include <memory>
@@ -48,8 +48,6 @@ class List {
 public:
     List() noexcept;
     List(std::shared_ptr<Realm> r, Obj& parent_obj, ColKey col);
-//    List(std::shared_ptr<Realm> r, LinkViewRef l) noexcept;
-    List(std::shared_ptr<Realm> r, TableRef l) noexcept;
     ~List();
 
     List(const List&);
@@ -59,10 +57,10 @@ public:
 
     const std::shared_ptr<Realm>& get_realm() const { return m_realm; }
     Query get_query() const;
-    size_t get_origin_row_index() const;
+    ObjKey get_parent_object_key() const;
 
     // Get the type of the values contained in this List
-    PropertyType get_type() const;
+    PropertyType get_type() const { return m_type; }
 
     // Get the ObjectSchema of the values in this List
     // Only valid if get_type() returns PropertyType::Object
@@ -154,21 +152,35 @@ private:
     friend ThreadSafeReference<List>;
 
     std::shared_ptr<Realm> m_realm;
+    PropertyType m_type;
     mutable const ObjectSchema* m_object_schema = nullptr;
-//    LinkViewRef m_link_view;
-    TableRef m_table;
     _impl::CollectionNotifier::Handle<_impl::CollectionNotifier> m_notifier;
+    std::unique_ptr<LstBase> m_list_base;
 
     void verify_valid_row(size_t row_ndx, bool insertion = false) const;
     void validate(Obj) const;
 
     template<typename Fn>
     auto dispatch(Fn&&) const;
+    template<typename T>
+    auto& as() const;
 
     size_t to_table_ndx(size_t row) const noexcept;
 
     friend struct std::hash<List>;
 };
+
+template<typename T>
+auto& List::as() const
+{
+    return static_cast<Lst<T>&>(*m_list_base);
+}
+
+template<>
+auto& List::as<Obj>() const
+{
+    return static_cast<LnkLst&>(*m_list_base);
+}
 
 template<typename Fn>
 auto List::dispatch(Fn&& fn) const

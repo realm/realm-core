@@ -162,9 +162,12 @@ static auto switch_on_type(PropertyType type, Fn&& fn)
     bool is_optional = is_nullable(type);
     switch (type & ~PropertyType::Flags) {
         case PT::Int:    return is_optional ? fn((util::Optional<int64_t>*)0) : fn((int64_t*)0);
-        case PT::Bool:   return is_optional ? fn((util::Optional<bool>*)0)    : fn((bool*)0);
-        case PT::Float:  return is_optional ? fn((util::Optional<float>*)0)   : fn((float*)0);
-        case PT::Double: return is_optional ? fn((util::Optional<double>*)0)  : fn((double*)0);
+//        case PT::Bool:   return is_optional ? fn((util::Optional<bool>*)0)    : fn((bool*)0);
+//        case PT::Float:  return is_optional ? fn((util::Optional<float>*)0)   : fn((float*)0);
+//        case PT::Double: return is_optional ? fn((util::Optional<double>*)0)  : fn((double*)0);
+        case PT::Bool:   return fn((bool*)0);
+        case PT::Float:  return fn((float*)0);
+        case PT::Double: return fn((double*)0);
         case PT::String: return fn((StringData*)0);
         case PT::Data:   return fn((BinaryData*)0);
         case PT::Date:   return fn((Timestamp*)0);
