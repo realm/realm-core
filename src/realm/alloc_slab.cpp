@@ -405,11 +405,13 @@ void SlabAlloc::do_free(ref_type ref, const char* addr)
 
 #ifdef REALM_DEBUG
     // Check for double free
+
     for (auto& c : free_space) {
         if ((ref >= c.ref && ref < (c.ref + c.size)) || (ref < c.ref && ref_end > c.ref)) {
             REALM_ASSERT(false && "Double Free");
         }
     }
+
 #endif
 
     // Check if we can merge with adjacent succeeding free block
@@ -1022,13 +1024,13 @@ void SlabAlloc::update_reader_view(size_t file_size)
         // then the old baseline) is still below the old base of the slab area.
         auto mapping_index = old_num_sections - 1 - m_sections_in_compatibility_mapping;
         if (file_size < old_slab_base) {
-            auto ok = m_mappings[mapping_index].extend(m_file, File::access_ReadOnly, file_size);
+            size_t section_start_offset = get_section_base(old_num_sections - 1);
+            size_t section_size = file_size - section_start_offset;
+            auto ok = m_mappings[mapping_index].extend(m_file, File::access_ReadOnly, section_size);
             ok = randomly_false_in_debug(ok);
             if (!ok) {
                 requires_new_translation = true;
-                size_t section_start_offset = get_section_base(old_num_sections - 1);
                 size_t section_reservation = get_section_base(old_num_sections) - section_start_offset;
-                size_t section_size = file_size - section_start_offset;
                 // save the old mapping/keep it open
                 OldMapping oldie(m_youngest_live_version, m_mappings[mapping_index]);
                 m_old_mappings.emplace_back(std::move(oldie));
@@ -1044,19 +1046,20 @@ void SlabAlloc::update_reader_view(size_t file_size)
             // 1. figure out if there is a partially completed mapping, that we need to extend
             // to cover a full mapping section
             if (old_baseline < old_slab_base) {
-                auto ok = m_mappings[mapping_index].extend(m_file, File::access_ReadOnly, old_slab_base);
+                size_t section_start_offset = get_section_base(old_num_sections - 1);
+                size_t section_size = old_slab_base - section_start_offset;
+                auto ok = m_mappings[mapping_index].extend(m_file, File::access_ReadOnly, section_size);
                 ok = randomly_false_in_debug(ok);
                 if (!ok) {
                     // we could not extend the old mapping, so replace it with a full, new one
                     requires_new_translation = true;
-                    size_t section_start_offset = get_section_base(old_num_sections - 1);
                     size_t section_reservation = get_section_base(old_num_sections) - section_start_offset;
-                    size_t section_size = old_slab_base - section_start_offset;
                     REALM_ASSERT(section_size == section_reservation);
                     // save the old mapping/keep it open
                     OldMapping oldie(m_youngest_live_version, m_mappings[mapping_index]);
                     m_old_mappings.emplace_back(std::move(oldie));
-                    m_mappings[mapping_index].map(m_file, File::access_ReadOnly, section_size);
+                    m_mappings[mapping_index] =
+                        util::File::Map<char>(m_file, section_start_offset, File::access_ReadOnly, section_size);
                     m_mapping_version++;
                 }
             }

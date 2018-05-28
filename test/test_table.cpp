@@ -3029,8 +3029,8 @@ TEST(Table_QuickSort2)
 TEST(Table_object_sequential)
 {
 #ifdef PERFORMACE_TESTING
-    int nb_rows = 100000;
-    int num_runs = 100;
+    int nb_rows = 10000000;
+    int num_runs = 1;
 #else
     int nb_rows = 1024;
     int num_runs = 1;
@@ -3151,11 +3151,13 @@ TEST(Table_object_sequential)
             table->remove_object(ObjKey(i));
 #ifdef REALM_DEBUG
             CHECK_EQUAL(table->size(), nb_rows - i - 1);
+
             for (int j = i + 1; j < nb_rows; j += nb_rows / 100) {
                 Obj o = table->get_object(ObjKey(j));
                 CHECK_EQUAL(j << 2, o.get<int64_t>(c0));
                 CHECK_EQUAL(j << 1, o.get<util::Optional<int64_t>>(c1));
             }
+
 #endif
         }
         auto t2 = steady_clock::now();
