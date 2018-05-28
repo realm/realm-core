@@ -284,10 +284,10 @@ ColKey Table::add_column(DataType type, StringData name, bool nullable)
     return insert_column(ColKey(), type, name, nullable); // Throws
 }
 
-ColKey Table::add_column_list(DataType type, StringData name)
+ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
 {
     LinkTargetInfo invalid_link;
-    return do_insert_column(ColKey(), type, name, invalid_link, false, true); // Throws
+    return do_insert_column(ColKey(), type, name, invalid_link, nullable, true); // Throws
 }
 
 ColKey Table::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
@@ -1729,16 +1729,6 @@ TableView Table::get_sorted_view(SortDescriptor order)
 ConstTableView Table::get_sorted_view(SortDescriptor order) const
 {
     return const_cast<Table*>(this)->get_sorted_view(std::move(order));
-}
-
-
-TableView Table::get_backlink_view(ObjKey key, Table* src_table, ColKey src_col_key)
-{
-    // FIXME: Assert not possible as get_column_link_base no longer exists
-    // REALM_ASSERT(&src_table->get_column_link_base(src_col_ndx).get_target_table() == this);
-    TableView tv(src_table, src_col_key, get_object(key));
-    tv.do_sync();
-    return tv;
 }
 
 

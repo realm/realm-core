@@ -66,6 +66,48 @@ public:
     {
         return Array::get(ndx) != 0;
     }
+    void add(bool value)
+    {
+        Array::add(value);
+    }
+    void insert(size_t ndx, bool value)
+    {
+        Array::insert(ndx, value);
+    }
+
+    size_t find_first(util::Optional<bool> value, size_t begin = 0, size_t end = npos) const noexcept
+    {
+        if (value) {
+            return Array::find_first(*value, begin, end);
+        }
+        else {
+            return Array::find_first(null_value, begin, end);
+        }
+    }
+
+protected:
+    // We can still be in two bits as small values are considered unsigned
+    static constexpr int null_value = 3;
+};
+
+class ArrayBoolNull : public ArrayBool {
+public:
+    using value_type = util::Optional<bool>;
+    using ArrayBool::ArrayBool;
+
+    static util::Optional<bool> default_value(bool nullable)
+    {
+        return nullable ? util::none : util::some<bool>(false);
+    }
+    void set(size_t ndx, util::Optional<bool> value)
+    {
+        if (value) {
+            Array::set(ndx, *value);
+        }
+        else {
+            Array::set(ndx, null_value);
+        }
+    }
     void add(util::Optional<bool> value)
     {
         if (value) {
@@ -83,31 +125,6 @@ public:
         else {
             Array::insert(ndx, null_value);
         }
-    }
-
-    size_t find_first(util::Optional<bool> value, size_t begin = 0, size_t end = npos) const noexcept
-    {
-        if (value) {
-            return Array::find_first(*value, begin, end);
-        }
-        else {
-            return Array::find_first(null_value, begin, end);
-        }
-    }
-
-protected:
-    // We can still be in two bits as small values are considered unsigned
-    static constexpr int null_value = 2;
-};
-
-class ArrayBoolNull : public ArrayBool {
-public:
-    using value_type = util::Optional<bool>;
-    using ArrayBool::ArrayBool;
-
-    static util::Optional<bool> default_value(bool nullable)
-    {
-        return nullable ? util::none : util::some<bool>(false);
     }
     void set_null(size_t ndx)
     {

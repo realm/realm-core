@@ -2198,7 +2198,7 @@ TEST(TableView_IsInTableOrder)
     auto col_id = target->add_column(type_Int, "id");
     // target->add_search_index(col_id);
 
-    target->create_object(ObjKey(7));
+    Obj obj7 = target->create_object(ObjKey(7));
     Obj src_obj = source->create_object();
     src_obj.get_list<ObjKey>(col_link).add(ObjKey(7));
 
@@ -2224,7 +2224,7 @@ TEST(TableView_IsInTableOrder)
     CHECK_EQUAL(false, tv.is_in_table_order());
 
     // Backlinks are not guaranteed to be in table order.
-    tv = target->get_backlink_view(ObjKey(7), source, col_link);
+    tv = obj7.get_backlink_view(source, col_link);
     CHECK_EQUAL(false, tv.is_in_table_order());
 
     // Views derived from a LinkView are not guaranteed to be in table order.

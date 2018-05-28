@@ -335,9 +335,9 @@ public:
 
     /************ Tree manipulation functions ************/
 
-    static T default_value()
+    static T default_value(bool nullable = false)
     {
-        return LeafArray::default_value(false);
+        return LeafArray::default_value(nullable);
     }
 
     void add(T value)
