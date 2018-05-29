@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/bplustree.hpp>
+#include <realm/impl/destroy_guard.hpp>
 
 using namespace realm;
 
@@ -680,11 +681,14 @@ BPlusTreeBase& BPlusTreeBase::operator=(BPlusTreeBase&& rhs)
 void BPlusTreeBase::create()
 {
     REALM_ASSERT(!is_attached());
-    m_root = create_leaf_node();
-    m_root->set_parent(m_parent, m_ndx_in_parent);
+    m_root = create_leaf_node(); // Throws
     if (m_parent) {
-        m_parent->update_child_ref(m_ndx_in_parent, get_ref());
+        ref_type ref = get_ref();
+        _impl::DeepArrayRefDestroyGuard destroy_guard{ref, get_alloc()};
+        m_parent->update_child_ref(m_ndx_in_parent, ref); // Throws
+        destroy_guard.release();
     }
+    m_root->set_parent(m_parent, m_ndx_in_parent);
 }
 
 void BPlusTreeBase::destroy()
