@@ -20,6 +20,7 @@
 #define REALM_BPLUSTREE_HPP
 
 #include <realm/column_type_traits.hpp>
+#include <realm/timestamp.hpp>
 #include <iostream>
 
 namespace realm {
@@ -301,6 +302,62 @@ struct SwapBufferType<BinaryData> {
 template <class T>
 class BPlusTree : public BPlusTreeBase {
 public:
+    using LeafArray = typename LeafTypeTrait<T>::type;
+
+    /**
+     * Actual class for the leaves. Maps the abstract interface defined
+     * in BPlusTreeNode onto the specific array class
+     **/
+    class LeafNode : public BPlusTreeLeaf, public LeafArray {
+    public:
+        LeafNode(BPlusTreeBase* tree)
+            : BPlusTreeLeaf(tree)
+            , LeafArray(tree->get_alloc())
+        {
+        }
+
+        void init_from_ref(ref_type ref) noexcept override
+        {
+            LeafArray::init_from_ref(ref);
+        }
+
+        ref_type get_ref() const override
+        {
+            return LeafArray::get_ref();
+        }
+
+        void set_parent(realm::ArrayParent* p, size_t n) override
+        {
+            LeafArray::set_parent(p, n);
+        }
+
+        void update_parent() override
+        {
+            LeafArray::update_parent();
+        }
+
+        size_t get_node_size() const override
+        {
+            return LeafArray::size();
+        }
+
+        size_t get_tree_size() const override
+        {
+            return LeafArray::size();
+        }
+
+        void move(BPlusTreeNode* new_node, size_t ndx, int64_t) override
+        {
+            LeafNode* dst(static_cast<LeafNode*>(new_node));
+            size_t end = get_node_size();
+
+            for (size_t j = ndx; j < end; j++) {
+                dst->add(LeafArray::get(j));
+            }
+            LeafArray::truncate_and_destroy_children(ndx);
+        }
+    };
+
     BPlusTree(Allocator& alloc)
         : BPlusTreeBase(alloc)
         , m_leaf_cache(this)
@@ -443,6 +500,11 @@ public:
         m_size = 0;
     }
 
+    void traverse(BPlusTreeNode::TraverseFunc& func) const
+    {
+        m_root->bptree_traverse(func);
+    }
+
     size_t find_first(T value) const noexcept
     {
         size_t result = realm::npos;
@@ -480,62 +542,6 @@ public:
     }
 
 protected:
-    using LeafArray = typename LeafTypeTrait<T>::type;
-
-    /**
-     * Actual class for the leaves. Maps the abstract interface defined
-     * in BPlusTreeNode onto the specific array class
-     **/
-    class LeafNode : public BPlusTreeLeaf, public LeafArray {
-    public:
-        LeafNode(BPlusTreeBase* tree)
-            : BPlusTreeLeaf(tree)
-            , LeafArray(tree->get_alloc())
-        {
-        }
-
-        void init_from_ref(ref_type ref) noexcept override
-        {
-            LeafArray::init_from_ref(ref);
-        }
-
-        ref_type get_ref() const override
-        {
-            return LeafArray::get_ref();
-        }
-
-        void set_parent(realm::ArrayParent* p, size_t n) override
-        {
-            LeafArray::set_parent(p, n);
-        }
-
-        void update_parent() override
-        {
-            LeafArray::update_parent();
-        }
-
-        size_t get_node_size() const override
-        {
-            return LeafArray::size();
-        }
-
-        size_t get_tree_size() const override
-        {
-            return LeafArray::size();
-        }
-
-        void move(BPlusTreeNode* new_node, size_t ndx, int64_t) override
-        {
-            LeafNode* dst(static_cast<LeafNode*>(new_node));
-            size_t end = get_node_size();
-
-            for (size_t j = ndx; j < end; j++) {
-                dst->add(LeafArray::get(j));
-            }
-            LeafArray::truncate_and_destroy_children(ndx);
-        }
-    };
-
     LeafNode m_leaf_cache;
 
     /******** Implementation of abstract interface *******/
@@ -557,7 +563,145 @@ protected:
         m_leaf_cache.init_from_mem(mem);
         return &m_leaf_cache;
     }
+
+    template <class R>
+    friend R bptree_sum(const BPlusTree<T>& tree);
 };
+
+template <class T>
+inline bool bptree_aggregate_not_null(T)
+{
+    return true;
+}
+template <class R, class T>
+inline R bptree_aggregate_value(T val)
+{
+    return val;
+}
+template <>
+inline bool bptree_aggregate_not_null(util::Optional<int64_t> val)
+{
+    return !!val;
+}
+template <>
+inline bool bptree_aggregate_not_null(Timestamp val)
+{
+    return !val.is_null();
+}
+template <>
+inline bool bptree_aggregate_not_null(float val)
+{
+    return !null::is_null_float(val);
+}
+template <>
+inline bool bptree_aggregate_not_null(double val)
+{
+    return !null::is_null_float(val);
+}
+template <>
+inline int64_t bptree_aggregate_value(util::Optional<int64_t> val)
+{
+    return *val;
+}
+
+template <class T>
+typename ColumnTypeTraits<T>::sum_type bptree_sum(const BPlusTree<T>& tree, size_t* return_cnt = nullptr)
+{
+    using ResultType = typename AggregateResultType<T, act_Sum>::result_type;
+    ResultType result{};
+    size_t cnt = 0;
+
+    BPlusTreeNode::TraverseFunc func = [&result, &cnt](BPlusTreeNode* node, size_t) {
+        auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
+        size_t sz = leaf->size();
+        for (size_t i = 0; i < sz; i++) {
+            auto val = leaf->get(i);
+            if (bptree_aggregate_not_null(val)) {
+                result += bptree_aggregate_value<ResultType>(val);
+                cnt++;
+            }
+        }
+        return false;
+    };
+
+    tree.traverse(func);
+
+    if (return_cnt)
+        *return_cnt = cnt;
+
+    return result;
+}
+
+template <class T>
+typename ColumnTypeTraits<T>::minmax_type bptree_maximum(const BPlusTree<T>& tree, size_t* return_ndx = nullptr)
+{
+    using ResultType = typename AggregateResultType<T, act_Max>::result_type;
+    ResultType max = std::numeric_limits<ResultType>::min();
+
+    BPlusTreeNode::TraverseFunc func = [&max, return_ndx](BPlusTreeNode* node, size_t offset) {
+        auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
+        size_t sz = leaf->size();
+        for (size_t i = 0; i < sz; i++) {
+            auto val_or_null = leaf->get(i);
+            if (bptree_aggregate_not_null(val_or_null)) {
+                auto val = bptree_aggregate_value<ResultType>(val_or_null);
+                if (val > max) {
+                    max = val;
+                    if (return_ndx) {
+                        *return_ndx = i + offset;
+                    }
+                }
+            }
+        }
+        return false;
+    };
+
+    tree.traverse(func);
+
+    return max;
+}
+
+template <class T>
+typename ColumnTypeTraits<T>::minmax_type bptree_minimum(const BPlusTree<T>& tree, size_t* return_ndx = nullptr)
+{
+    using ResultType = typename AggregateResultType<T, act_Max>::result_type;
+    ResultType min = std::numeric_limits<ResultType>::max();
+
+    BPlusTreeNode::TraverseFunc func = [&min, return_ndx](BPlusTreeNode* node, size_t offset) {
+        auto leaf = static_cast<typename BPlusTree<T>::LeafNode*>(node);
+        size_t sz = leaf->size();
+        for (size_t i = 0; i < sz; i++) {
+            auto val_or_null = leaf->get(i);
+            if (bptree_aggregate_not_null(val_or_null)) {
+                auto val = bptree_aggregate_value<ResultType>(val_or_null);
+                if (val < min) {
+                    min = val;
+                    if (return_ndx) {
+                        *return_ndx = i + offset;
+                    }
+                }
+            }
+        }
+        return false;
+    };
+
+    tree.traverse(func);
+
+    return min;
+}
+
+template <class T>
+double bptree_average(const BPlusTree<T>& tree, size_t* return_cnt = nullptr)
+{
+    size_t cnt;
+    auto sum = bptree_sum(tree, &cnt);
+    double avg{};
+    if (cnt != 0)
+        avg = double(sum) / cnt;
+    if (return_cnt)
+        *return_cnt = cnt;
+    return avg;
+}
 }
 
 #endif /* REALM_BPLUSTREE_HPP */

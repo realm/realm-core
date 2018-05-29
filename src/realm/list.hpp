@@ -287,6 +287,10 @@ public:
     {
         return m_tree->find_first(value);
     }
+    const BPlusTree<T>& get_tree() const
+    {
+        return *m_tree;
+    }
 
 protected:
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
@@ -774,6 +778,30 @@ inline LnkLst Obj::get_linklist(ColKey col_key)
 inline LnkLstPtr Obj::get_linklist_ptr(ColKey col_key)
 {
     return std::make_unique<LnkLst>(*this, col_key);
+}
+
+template <class T>
+inline typename ColumnTypeTraits<T>::sum_type list_sum(const ConstLstIf<T>& list, size_t* return_cnt = nullptr)
+{
+    return bptree_sum(list.get_tree(), return_cnt);
+}
+
+template <class T>
+inline typename ColumnTypeTraits<T>::minmax_type list_maximum(const ConstLstIf<T>& list, size_t* return_ndx = nullptr)
+{
+    return bptree_maximum(list.get_tree(), return_ndx);
+}
+
+template <class T>
+inline typename ColumnTypeTraits<T>::minmax_type list_minimum(const ConstLstIf<T>& list, size_t* return_ndx = nullptr)
+{
+    return bptree_minimum(list.get_tree(), return_ndx);
+}
+
+template <class T>
+inline double list_average(const ConstLstIf<T>& list, size_t* return_cnt = nullptr)
+{
+    return bptree_average(list.get_tree(), return_cnt);
 }
 }
 

@@ -2702,6 +2702,7 @@ TEST(Table_list_basic)
 {
     Table table;
     auto list_col = table.add_column_list(type_Int, "int_list");
+    int sum = 0;
 
     {
         Obj obj = table.create_object(ObjKey(5));
@@ -2711,6 +2712,7 @@ TEST(Table_list_basic)
         CHECK(list.is_empty());
         for (int i = 0; i < 100; i++) {
             list.add(i + 1000);
+            sum += (i + 1000);
         }
     }
     {
@@ -2719,6 +2721,12 @@ TEST(Table_list_basic)
         CHECK_EQUAL(list1.size(), 100);
         CHECK_EQUAL(list1.get(0), 1000);
         CHECK_EQUAL(list1.get(99), 1099);
+
+        CHECK_EQUAL(list_sum(list1), sum);
+        CHECK_EQUAL(list_maximum(list1), 1099);
+        CHECK_EQUAL(list_minimum(list1), 1000);
+        CHECK_EQUAL(list_average(list1), double(sum) / 100);
+
         auto list2 = obj.get_list<int64_t>(list_col);
         list2.set(50, 747);
         CHECK_EQUAL(list1.get(50), 747);
@@ -2743,6 +2751,7 @@ TEST(Table_list_nullable)
 {
     Table table;
     auto list_col = table.add_column_list(type_Int, "int_list", true);
+    int sum = 0;
 
     {
         Obj obj = table.create_object(ObjKey(5));
@@ -2752,6 +2761,7 @@ TEST(Table_list_nullable)
         CHECK(list.is_empty());
         for (int i = 0; i < 100; i++) {
             list.add(i + 1000);
+            sum += (i + 1000);
         }
     }
     {
@@ -2760,6 +2770,12 @@ TEST(Table_list_nullable)
         CHECK_EQUAL(list1.size(), 100);
         CHECK_EQUAL(list1.get(0), 1000);
         CHECK_EQUAL(list1.get(99), 1099);
+
+        CHECK_EQUAL(list_sum(list1), sum);
+        CHECK_EQUAL(list_maximum(list1), 1099);
+        CHECK_EQUAL(list_minimum(list1), 1000);
+        CHECK_EQUAL(list_average(list1), double(sum) / 100);
+
         auto list2 = obj.get_list<util::Optional<Int>>(list_col);
         list2.set(50, 747);
         CHECK_EQUAL(list1.get(50), 747);
