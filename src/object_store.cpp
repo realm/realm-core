@@ -270,7 +270,7 @@ void ObjectStore::set_primary_key_for_object(Group& group, StringData object_typ
         if (key)
             obj = table->get_object(key);
         else {
-            auto obj = table->create_object();
+            obj = table->create_object();
             obj.set(c_primaryKeyObjectClassColumnName, object_type);
         }
         obj.set(c_primaryKeyPropertyNameColumnName, primary_key);
