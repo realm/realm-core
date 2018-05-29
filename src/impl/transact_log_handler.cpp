@@ -79,17 +79,13 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
         }
     }
 
-    table_modifications_needed.reserve(tables_needed.size());
-    table_moves_needed.reserve(tables_needed.size());
-    for (auto& tbl : tables_needed) {
-        table_modifications_needed.insert(tbl);
-        table_moves_needed.insert(tbl);
-    }
+    tables.reserve(tables_needed.size());
+    for (auto& tbl : tables_needed)
+        tables[tbl] = {};
     for (auto& list : m_lists)
         lists.push_back({list.observer->table_key,
             list.observer->obj_key, list.col.value, &list.builder});
 }
-#if 0
 
 void KVOAdapter::before(Transaction& sg)
 {
@@ -101,23 +97,21 @@ void KVOAdapter::before(Transaction& sg)
         return;
 
     for (auto& observer : m_observers) {
-        if (observer.table_key >= tables.size())
+        auto it = tables.find(observer.table_key);
+        if (it == tables.end())
             continue;
 
-        auto const& table = tables[observer.table_key];
-        auto const& moves = table.moves;
+        auto const& table = it->second;
         auto idx = observer.obj_key;
         if (table.deletions.contains(idx)) {
             m_invalidated.push_back(observer.info);
             continue;
         }
         if (table.modifications.contains(idx)) {
-            observer.changes.resize(table.columns.size());
-            size_t i = 0;
+            observer.changes.reserve(table.columns.size());
             for (auto& c : table.columns) {
-                auto& change = observer.changes[i];
-                if (c.contains(idx))
-                    change.kind = BindingContext::ColumnInfo::Kind::Set;
+                if (c.second.contains(idx))
+                    observer.changes[c.first].kind = BindingContext::ColumnInfo::Kind::Set;
             }
         }
     }
@@ -127,19 +121,19 @@ void KVOAdapter::before(Transaction& sg)
             // We may have pre-emptively marked the column as modified if the
             // LinkList was selected but the actual changes made ended up being
             // a no-op
-            if (list.col < list.observer->changes.size())
-                list.observer->changes[list.col].kind = BindingContext::ColumnInfo::Kind::None;
+            list.observer->changes.erase(list.col.value);
             continue;
         }
         // If the containing row was deleted then changes will be empty
         if (list.observer->changes.empty()) {
-            REALM_ASSERT_DEBUG(tables[new_table_key(list.observer->table_key)].deletions.contains(list.observer->row_ndx));
+            REALM_ASSERT_DEBUG(tables[list.observer->table_key].deletions.contains(list.observer->obj_key));
             continue;
         }
         // otherwise the column should have been marked as modified
-        REALM_ASSERT(list.col < list.observer->changes.size());
+        auto it = list.observer->changes.find(list.col.value);
+        REALM_ASSERT(it != list.observer->changes.end());
         auto& builder = list.builder;
-        auto& changes = list.observer->changes[list.col];
+        auto& changes = it->second;
 
         builder.modifications.remove(builder.insertions);
 
@@ -191,17 +185,11 @@ void KVOAdapter::before(Transaction& sg)
         else {
             REALM_ASSERT(!builder.deletions.empty());
             changes.kind = BindingContext::ColumnInfo::Kind::Remove;
-            // Table clears don't come with the size, so we need to fix up the
-            // notification to make it just delete all rows that actually existed
-            if (std::prev(builder.deletions.end())->second > list.initial_size)
-                changes.indices.set(list.initial_size);
-            else
-                changes.indices = builder.deletions;
+            changes.indices = builder.deletions;
         }
     }
     m_context->will_change(m_observers, m_invalidated);
 }
-#endif
 
 void KVOAdapter::after(Transaction& sg)
 {
@@ -272,13 +260,14 @@ class TransactLogObserver : public TransactLogValidationMixin {
     _impl::CollectionChangeBuilder* m_active_list = nullptr;
     _impl::CollectionChangeBuilder* m_active_table = nullptr;
 
-    _impl::CollectionChangeBuilder* find_list(ObjKey obj)
+    _impl::CollectionChangeBuilder* find_list(ObjKey obj, ColKey col)
     {
         // When there are multiple source versions there could be multiple
         // change objects for a single LinkView, in which case we need to use
         // the last one
+        auto table = current_table().value;
         for (auto it = m_info.lists.rbegin(), end = m_info.lists.rend(); it != end; ++it) {
-            if (it->row_key == obj.value)
+            if (it->table_key == table && it->row_key == obj.value == it->col_key == col.value)
                 return it->changes;
         }
         return nullptr;
@@ -288,16 +277,8 @@ public:
     TransactLogObserver(_impl::TransactionChangeInfo& info)
     : m_info(info) { }
 
-    void mark_dirty(size_t row, size_t col)
-    {
-        if (m_active_table)
-            m_active_table->modify(row, col);
-    }
-
     void parse_complete()
     {
-        for (auto& table : m_info.tables)
-            table.parse_complete();
         for (auto& list : m_info.lists)
             list.changes->clean_up_stale_moves();
     }
@@ -305,22 +286,24 @@ public:
     bool select_table(TableKey key) noexcept
     {
         TransactLogValidationMixin::select_table(key);
-        m_active_table = nullptr;
 
-        size_t tbl_ndx = current_table().value;
-        if (!m_info.track_all && !m_info.table_modifications_needed.count(tbl_ndx))
-            return true;
-
-        if (m_info.tables.size() <= tbl_ndx)
-            m_info.tables.resize(std::max(m_info.tables.size() * 2, tbl_ndx + 1));
-        m_active_table = &m_info.tables[tbl_ndx];
+        int64_t table_key = current_table().value;
+        if (m_info.track_all)
+            m_active_table = &m_info.tables[table_key];
+        else {
+            auto it = m_info.tables.find(table_key);
+            if (it == m_info.tables.end())
+                m_active_table = nullptr;
+            else
+                m_active_table = &it->second;
+        }
         return true;
     }
 
-    bool select_link_list(ColKey col, ObjKey obj)
+    bool select_list(ColKey col, ObjKey obj)
     {
         modify_object(col, obj);
-        m_active_list = find_list(obj);
+        m_active_list = find_list(obj, col);
         return true;
     }
 
@@ -426,7 +409,6 @@ public:
     }
 };
 
-#if 0
 class KVOTransactLogObserver : public TransactLogObserver {
     KVOAdapter m_adapter;
     _impl::NotifierPackage& m_notifiers;
@@ -454,14 +436,14 @@ public:
         TransactLogObserver::parse_complete();
         m_adapter.before(m_sg);
 
-        using sgf = _impl::TransactionFriend;
-        m_notifiers.package_and_wait(sgf::get_version_of_latest_snapshot(m_sg));
+        m_notifiers.package_and_wait(m_sg.get_version_of_latest_snapshot());
         m_notifiers.before_advance();
     }
 };
 
 template<typename Func>
-void advance_with_notifications(BindingContext* context, const std::unique_ptr<Transaction>& sg,
+void advance_with_notifications(BindingContext* context,
+                                const std::shared_ptr<Transaction>& sg,
                                 Func&& func, _impl::NotifierPackage& notifiers)
 {
     auto old_version = sg->get_version_of_current_transaction();
@@ -475,7 +457,8 @@ void advance_with_notifications(BindingContext* context, const std::unique_ptr<T
     // version we're going to before we actually advance to that version
     if (observers.empty() && (!notifiers || notifiers.version())) {
         notifiers.before_advance();
-        func(TransactLogValidator());
+        TransactLogValidator validator;
+        func(&validator);
         auto new_version = sg->get_version_of_current_transaction();
         if (context && old_version != new_version)
             context->did_change({}, {});
@@ -497,14 +480,16 @@ void advance_with_notifications(BindingContext* context, const std::unique_ptr<T
 
     if (context)
         context->will_send_notifications();
-    func(KVOTransactLogObserver(observers, context, notifiers, *sg));
+    {
+        KVOTransactLogObserver observer(observers, context, notifiers, *sg);
+        func(&observer);
+    }
     notifiers.package_and_wait(sg->get_version_of_current_transaction().version); // is a no-op if parse_complete() was called
     notifiers.deliver(*sg);
     notifiers.after_advance();
     if (context)
         context->did_send_notifications();
 }
-#endif
 
 } // anonymous namespace
 
@@ -525,55 +510,43 @@ void advance(Transaction& sg, BindingContext*, VersionID version)
 
 void advance(const std::shared_ptr<Transaction>& sg, BindingContext* context, NotifierPackage& notifiers)
 {
-    TransactLogValidator validator;
-    sg->advance_read(&validator, notifiers.version().value_or(VersionID{}));
-#if 0
     advance_with_notifications(context, sg, [&](auto&&... args) {
-        LangBindHelper::advance_read(*sg, std::move(args)..., notifiers.version().value_or(VersionID{}));
+        sg->advance_read(std::move(args)..., notifiers.version().value_or(VersionID{}));
     }, notifiers);
-#endif
 }
 
 void begin(const std::shared_ptr<Transaction>& sg, BindingContext* context, NotifierPackage& notifiers)
 {
-    TransactLogValidator validator;
-    sg->promote_to_write(&validator);
-#if 0
     advance_with_notifications(context, sg, [&](auto&&... args) {
-        LangBindHelper::promote_to_write(*sg, std::move(args)...);
+        sg->promote_to_write(std::move(args)...);
     }, notifiers);
-#endif
 }
 
 void cancel(Transaction& sg, BindingContext* context)
 {
-    sg.rollback_and_continue_as_read();
-#if 0
     std::vector<BindingContext::ObserverState> observers;
     if (context) {
         observers = context->get_observed_rows();
     }
     if (observers.empty()) {
-        LangBindHelper::rollback_and_continue_as_read(sg);
+        sg.rollback_and_continue_as_read();
         return;
     }
 
     _impl::NotifierPackage notifiers;
-    LangBindHelper::rollback_and_continue_as_read(sg, KVOTransactLogObserver(observers, context, notifiers, sg));
-#endif
+    KVOTransactLogObserver o(observers, context, notifiers, sg);
+    sg.rollback_and_continue_as_read(&o);
 }
 
 void advance(Transaction& sg, TransactionChangeInfo& info, VersionID version)
 {
-    sg.advance_read(version);
-#if 0
-    if (!info.track_all && info.table_modifications_needed.empty() && info.lists.empty()) {
-        LangBindHelper::advance_read(sg, version);
+    if (!info.track_all && info.tables.empty() && info.lists.empty()) {
+        sg.advance_read(version);
     }
     else {
-        LangBindHelper::advance_read(sg, TransactLogObserver(info), version);
+        TransactLogObserver o(info);
+        sg.advance_read(&o, version);
     }
-#endif
 }
 
 } // namespace transaction

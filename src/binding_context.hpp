@@ -23,6 +23,7 @@
 
 #include <memory>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace realm {
@@ -154,8 +155,7 @@ public:
     // The Realm parses the transaction log, and populates the `changes` vector
     // in each ObserverState with information about what changes were made.
     struct ObserverState {
-        // Initial table and row which is observed
-        // May be updated by row insertions and removals
+        // Table and row which is observed
         int64_t table_key;
         int64_t obj_key;
 
@@ -165,7 +165,7 @@ public:
         // Populated with information about which columns were changed
         // May be shorter than the actual number of columns if the later columns
         // are not modified
-        std::vector<ColumnInfo> changes;
+        std::unordered_map<int64_t, ColumnInfo> changes;
 
         // Simple lexographic ordering
         friend bool operator<(ObserverState const& lft, ObserverState const& rgt)

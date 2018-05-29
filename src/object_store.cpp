@@ -129,10 +129,11 @@ ColKey add_column(Group& group, Table& table, Property const& property)
     }
 }
 
-void replace_column(Group& group, Table& table, Property const& old_property, Property const& new_property)
+void replace_column(Group& group, Table& table, Property const& old_property,
+                    Property const& new_property)
 {
-    add_column(group, table, new_property);
     table.remove_column(old_property.column_key);
+    add_column(group, table, new_property);
 }
 
 TableRef create_table(Group& group, ObjectSchema const& object_schema)

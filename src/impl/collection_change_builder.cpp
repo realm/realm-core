@@ -53,12 +53,14 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
     auto for_each_col = [&](auto&& f) {
         f(modifications, c.modifications);
         if (m_track_columns) {
+#if 0 // FIXME: need to zip matching columns
             if (columns.size() < c.columns.size())
                 columns.resize(c.columns.size());
             else if (columns.size() > c.columns.size())
                 c.columns.resize(columns.size());
             for (size_t i = 0; i < columns.size(); ++i)
                 f(columns[i], c.columns[i]);
+#endif
         }
     };
 
@@ -153,32 +155,11 @@ void CollectionChangeBuilder::clean_up_stale_moves()
     }), end(moves));
 }
 
-void CollectionChangeBuilder::parse_complete()
-{
-    moves.reserve(m_move_mapping.size());
-    for (auto move : m_move_mapping) {
-        REALM_ASSERT_DEBUG(deletions.contains(move.second));
-        REALM_ASSERT_DEBUG(insertions.contains(move.first));
-        if (move.first == move.second) {
-            deletions.remove(move.second);
-            insertions.remove(move.first);
-        }
-        else
-            moves.push_back({move.second, move.first});
-    }
-    m_move_mapping.clear();
-    std::sort(begin(moves), end(moves),
-              [](auto const& a, auto const& b) { return a.from < b.from; });
-}
-
 void CollectionChangeBuilder::modify(size_t ndx, size_t col)
 {
     modifications.add(ndx);
     if (!m_track_columns || col == IndexSet::npos)
         return;
-
-    if (col >= columns.size())
-        columns.resize(col + 1);
     columns[col].add(ndx);
 }
 
@@ -188,7 +169,7 @@ void CollectionChangeBuilder::for_each_col(Func&& f)
     f(modifications);
     if (m_track_columns) {
         for (auto& col : columns)
-            f(col);
+            f(col.second);
     }
 }
 
@@ -206,24 +187,6 @@ void CollectionChangeBuilder::insert(size_t index, size_t count, bool track_move
         if (move.to >= index)
             move.to += count;
     }
-
-    if (m_move_mapping.empty())
-        return;
-
-    // m_move_mapping is new_ndx -> old_ndx, so updating the keys requires
-    // deleting and re-inserting at the new index
-    std::vector<std::pair<size_t, size_t>> shifted;
-    for (auto it = m_move_mapping.begin(); it != m_move_mapping.end(); ) {
-        if (it->first >= index) {
-            shifted.emplace_back(it->first + count, it->second);
-            it = m_move_mapping.erase(it);
-        }
-        else {
-            ++it;
-        }
-    }
-    for (auto& pair : shifted)
-        m_move_mapping.insert(pair);
 }
 
 void CollectionChangeBuilder::erase(size_t index)
@@ -246,17 +209,14 @@ void CollectionChangeBuilder::erase(size_t index)
 
 void CollectionChangeBuilder::clear(size_t old_size)
 {
-    if (old_size != std::numeric_limits<size_t>::max()) {
-        for (auto range : deletions)
-            old_size += range.second - range.first;
-        for (auto range : insertions)
-            old_size -= range.second - range.first;
-    }
+    for (auto range : deletions)
+        old_size += range.second - range.first;
+    for (auto range : insertions)
+        old_size -= range.second - range.first;
 
     modifications.clear();
     insertions.clear();
     moves.clear();
-    m_move_mapping.clear();
     columns.clear();
     deletions.set(old_size);
 }
@@ -308,174 +268,6 @@ void CollectionChangeBuilder::move(size_t from, size_t to)
     });
 }
 
-void CollectionChangeBuilder::move_over(size_t row_ndx, size_t last_row, bool track_moves)
-{
-    REALM_ASSERT(row_ndx <= last_row);
-    REALM_ASSERT(insertions.empty() || prev(insertions.end())->second - 1 <= last_row);
-    REALM_ASSERT(modifications.empty() || prev(modifications.end())->second - 1 <= last_row);
-
-    if (row_ndx == last_row) {
-        if (track_moves) {
-            auto shifted_from = insertions.erase_or_unshift(row_ndx);
-            if (shifted_from != IndexSet::npos)
-                deletions.add_shifted(shifted_from);
-            m_move_mapping.erase(row_ndx);
-        }
-        for_each_col([=](auto& col) { col.remove(row_ndx); });
-        return;
-    }
-
-    for_each_col([=](auto& col) {
-        bool modified = col.contains(last_row);
-        if (modified) {
-            col.remove(last_row);
-            col.add(row_ndx);
-        }
-        else
-            col.remove(row_ndx);
-    });
-
-    if (!track_moves)
-        return;
-
-    bool row_is_insertion = insertions.contains(row_ndx);
-    bool last_is_insertion = !insertions.empty() && prev(insertions.end())->second == last_row + 1;
-    REALM_ASSERT_DEBUG(insertions.empty() || prev(insertions.end())->second <= last_row + 1);
-
-    // Collapse A -> B, B -> C into a single A -> C move
-    bool last_was_already_moved = false;
-    if (last_is_insertion) {
-        auto it = m_move_mapping.find(last_row);
-        if (it != m_move_mapping.end() && it->first == last_row) {
-            m_move_mapping[row_ndx] = it->second;
-            m_move_mapping.erase(it);
-            last_was_already_moved = true;
-        }
-    }
-
-    // Remove moves to the row being deleted
-    if (row_is_insertion && !last_was_already_moved) {
-        auto it = m_move_mapping.find(row_ndx);
-        if (it != m_move_mapping.end() && it->first == row_ndx)
-            m_move_mapping.erase(it);
-    }
-
-    // Don't report deletions/moves if last_row is newly inserted
-    if (last_is_insertion) {
-        insertions.remove(last_row);
-    }
-    // If it was previously moved, the unshifted source row has already been marked as deleted
-    else if (!last_was_already_moved) {
-        auto shifted_last_row = insertions.unshift(last_row);
-        shifted_last_row = deletions.add_shifted(shifted_last_row);
-        m_move_mapping[row_ndx] = shifted_last_row;
-    }
-
-    // Don't mark the moved-over row as deleted if it was a new insertion
-    if (!row_is_insertion) {
-        deletions.add_shifted(insertions.unshift(row_ndx));
-        insertions.add(row_ndx);
-    }
-    verify();
-}
-
-void CollectionChangeBuilder::swap(size_t ndx_1, size_t ndx_2, bool track_moves)
-{
-    REALM_ASSERT(ndx_1 != ndx_2);
-    // The order of the two indices doesn't matter semantically, but making them
-    // consistent simplifies the logic
-    if (ndx_1 > ndx_2)
-        std::swap(ndx_1, ndx_2);
-
-    for_each_col([=](auto& col) {
-        bool row_1_modified = col.contains(ndx_1);
-        bool row_2_modified = col.contains(ndx_2);
-        if (row_1_modified != row_2_modified) {
-            if (row_1_modified) {
-                col.remove(ndx_1);
-                col.add(ndx_2);
-            }
-            else {
-                col.remove(ndx_2);
-                col.add(ndx_1);
-            }
-        }
-    });
-
-    if (!track_moves)
-        return;
-
-    auto update_move = [&](auto existing_it, auto ndx_1, auto ndx_2) {
-        // update the existing move to ndx_2 to point at ndx_1
-        auto original = existing_it->second;
-        m_move_mapping.erase(existing_it);
-        m_move_mapping[ndx_1] = original;
-
-        // add a move from 1 -> 2 unless 1 was a new insertion
-        if (!insertions.contains(ndx_1)) {
-            m_move_mapping[ndx_2] = deletions.add_shifted(insertions.unshift(ndx_1));
-            insertions.add(ndx_1);
-        }
-        REALM_ASSERT_DEBUG(insertions.contains(ndx_2));
-    };
-
-    auto move_1 = m_move_mapping.find(ndx_1);
-    auto move_2 = m_move_mapping.find(ndx_2);
-    bool have_move_1 = move_1 != end(m_move_mapping) && move_1->first == ndx_1;
-    bool have_move_2 = move_2 != end(m_move_mapping) && move_2->first == ndx_2;
-    if (have_move_1 && have_move_2) {
-        // both are already moves, so just swap the destinations
-        std::swap(move_1->second, move_2->second);
-    }
-    else if (have_move_1) {
-        update_move(move_1, ndx_2, ndx_1);
-    }
-    else if (have_move_2) {
-        update_move(move_2, ndx_1, ndx_2);
-    }
-    else {
-        // ndx_2 needs to be done before 1 to avoid incorrect shifting
-        if (!insertions.contains(ndx_2)) {
-            m_move_mapping[ndx_1] = deletions.add_shifted(insertions.unshift(ndx_2));
-            insertions.add(ndx_2);
-        }
-        if (!insertions.contains(ndx_1)) {
-            m_move_mapping[ndx_2] = deletions.add_shifted(insertions.unshift(ndx_1));
-            insertions.add(ndx_1);
-        }
-    }
-}
-
-void CollectionChangeBuilder::subsume(size_t old_ndx, size_t new_ndx, bool track_moves)
-{
-    REALM_ASSERT(old_ndx != new_ndx);
-
-    for_each_col([=](auto& col) {
-        if (col.contains(old_ndx)) {
-            col.add(new_ndx);
-        }
-    });
-
-    if (!track_moves)
-        return;
-
-    REALM_ASSERT_DEBUG(insertions.contains(new_ndx));
-    REALM_ASSERT_DEBUG(!m_move_mapping.count(new_ndx));
-
-    // If the source row was already moved, update the existing move
-    auto it = m_move_mapping.find(old_ndx);
-    if (it != m_move_mapping.end() && it->first == old_ndx) {
-        m_move_mapping[new_ndx] = it->second;
-        m_move_mapping.erase(it);
-    }
-    // otherwise add a new move unless it was a new insertion
-    else if (!insertions.contains(old_ndx)) {
-        m_move_mapping[new_ndx] = deletions.shift(insertions.unshift(old_ndx));
-    }
-
-    verify();
-}
-
 void CollectionChangeBuilder::verify()
 {
 #ifdef REALM_DEBUG
@@ -484,24 +276,6 @@ void CollectionChangeBuilder::verify()
         REALM_ASSERT(insertions.contains(move.to));
     }
 #endif
-}
-
-void CollectionChangeBuilder::insert_column(size_t ndx)
-{
-    if (ndx < columns.size())
-        columns.insert(columns.begin() + ndx, IndexSet{});
-}
-
-void CollectionChangeBuilder::move_column(size_t from, size_t to)
-{
-    if (from >= columns.size() && to >= columns.size())
-        return;
-    if (from >= columns.size() || to >= columns.size())
-        columns.resize(std::max(from, to) + 1);
-    if (from < to)
-        std::rotate(begin(columns) + from, begin(columns) + from + 1, begin(columns) + to + 1);
-    else
-        std::rotate(begin(columns) + to, begin(columns) + from, begin(columns) + from + 1);
 }
 
 namespace {

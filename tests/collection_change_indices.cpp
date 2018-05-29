@@ -59,16 +59,6 @@ TEST_CASE("collection_change: insert()") {
         c.insert(4);
         REQUIRE_MOVES(c, {10, 6}, {10, 2}, {3, 11});
     }
-
-    SECTION("shifts destination of previous row moves after the insertion point") {
-        c.move_over(10, 30);
-        c.move_over(15, 29);
-        c.move_over(16, 28);
-        c.move_over(20, 27);
-        c.insert(11, 3);
-        c.parse_complete();
-        REQUIRE_MOVES(c, {27, 23}, {28, 19}, {29, 18}, {30, 10});
-    }
 }
 
 TEST_CASE("collection_change: modify()") {
@@ -173,111 +163,6 @@ TEST_CASE("collection_change: erase()") {
         c.moves = {{10, 5}, {10, 2}, {3, 10}};
         c.erase(4);
         REQUIRE_MOVES(c, {10, 4}, {10, 2}, {3, 9});
-    }
-}
-
-TEST_CASE("collection_change: move_over()") {
-    _impl::CollectionChangeBuilder c;
-
-    SECTION("is just erase when row == last_row") {
-        c.move_over(10, 10);
-        c.parse_complete();
-
-        REQUIRE_INDICES(c.deletions, 10);
-        REQUIRE(c.insertions.empty());
-        REQUIRE(c.moves.empty());
-    }
-
-    SECTION("is just erase when row + 1 == last_row") {
-        c.move_over(0, 6);
-        c.move_over(4, 5);
-        c.move_over(0, 4);
-        c.move_over(2, 3);
-        c.parse_complete();
-        c.clean_up_stale_moves();
-
-        REQUIRE_INDICES(c.deletions, 0, 2, 4, 5, 6);
-        REQUIRE_INDICES(c.insertions, 0);
-        REQUIRE_MOVES(c, {5, 0});
-    }
-
-    SECTION("marks the old last row as moved") {
-        c.move_over(5, 8);
-        c.parse_complete();
-        REQUIRE_MOVES(c, {8, 5});
-    }
-
-    SECTION("does not mark the old last row as moved if it was newly inserted") {
-        c.insert(8);
-        c.move_over(5, 8);
-        c.parse_complete();
-        REQUIRE(c.moves.empty());
-    }
-
-    SECTION("removes previous modifications for the removed row") {
-        c.modify(5, 0);
-        c.move_over(5, 8);
-        c.parse_complete();
-        REQUIRE(c.modifications.empty());
-        REQUIRE(c.columns[0].empty());
-    }
-
-    SECTION("updates previous insertions for the old last row") {
-        c.insert(5);
-        c.move_over(3, 5);
-        c.parse_complete();
-        REQUIRE_INDICES(c.insertions, 3);
-    }
-
-    SECTION("updates previous modifications for the old last row") {
-        c.modify(5, 0);
-        c.move_over(3, 5);
-        c.parse_complete();
-        REQUIRE_INDICES(c.modifications, 3);
-        REQUIRE_COLUMN_INDICES(c.columns, 0, 3);
-    }
-
-    SECTION("removes moves to the target") {
-        c.move_over(5, 10);
-        c.move_over(5, 8);
-        c.parse_complete();
-        REQUIRE_MOVES(c, {8, 5});
-    }
-
-    SECTION("updates moves to the source") {
-        c.move_over(8, 10);
-        c.move_over(5, 8);
-        c.parse_complete();
-        REQUIRE_MOVES(c, {10, 5});
-    }
-
-    SECTION("removes moves to the row when row == last_row") {
-        c.move_over(0, 1);
-        c.move_over(0, 0);
-        c.parse_complete();
-
-        REQUIRE_INDICES(c.deletions, 0, 1);
-        REQUIRE(c.insertions.empty());
-        REQUIRE(c.moves.empty());
-    }
-
-    SECTION("is not shifted by previous calls to move_over()") {
-        c.move_over(5, 10);
-        c.move_over(6, 9);
-        c.parse_complete();
-        REQUIRE_INDICES(c.deletions, 5, 6, 9, 10);
-        REQUIRE_INDICES(c.insertions, 5, 6);
-        REQUIRE_MOVES(c, {9, 6}, {10, 5});
-    }
-
-    SECTION("marks the moved-over row as deleted when chaining moves") {
-        c.move_over(5, 10);
-        c.move_over(0, 5);
-        c.parse_complete();
-
-        REQUIRE_INDICES(c.deletions, 0, 5, 10);
-        REQUIRE_INDICES(c.insertions, 0);
-        REQUIRE_MOVES(c, {10, 0});
     }
 }
 
@@ -390,139 +275,6 @@ TEST_CASE("collection_change: move()") {
         c.move(7, 8);
         c.clean_up_stale_moves();
         REQUIRE(c.empty());
-    }
-}
-
-TEST_CASE("collection_change: swap()") {
-    _impl::CollectionChangeBuilder c;
-
-    SECTION("marks both as inserted and deleted") {
-        c.swap(6, 10);
-        c.parse_complete();
-        REQUIRE_INDICES(c.insertions, 6, 10);
-        REQUIRE_INDICES(c.deletions, 6, 10);
-    }
-
-    SECTION("does not mark new insertions as deleted") {
-        c.insert(10);
-        c.swap(5, 10);
-        c.parse_complete();
-        REQUIRE_INDICES(c.insertions, 5, 10);
-        REQUIRE_INDICES(c.deletions, 5);
-    }
-
-    SECTION("adds a pair of moves to represent the swap") {
-        c.swap(5, 10);
-        c.parse_complete();
-        REQUIRE_MOVES(c, {5, 10}, {10, 5});
-    }
-
-    SECTION("collapses away when swapped twice") {
-        c.swap(5, 10);
-        c.swap(5, 10);
-        c.parse_complete();
-        REQUIRE(c.empty());
-    }
-
-    SECTION("updates previous moves to one of the swapped rows") {
-        c.move_over(5, 8);
-        c.swap(3, 5);
-        c.parse_complete();
-        REQUIRE_MOVES(c, {3, 5}, {8, 3});
-    }
-
-    SECTION("does not report a move for newly inserted rows") {
-        c.insert(5);
-        c.swap(5, 10);
-        c.parse_complete();
-        REQUIRE_INDICES(c.insertions, 5, 10);
-        REQUIRE_MOVES(c, {9, 5});
-
-        c = {};
-        c.insert(10);
-        c.swap(5, 10);
-        c.parse_complete();
-        REQUIRE_INDICES(c.insertions, 5, 10);
-        REQUIRE_MOVES(c, {5, 10});
-
-        c = {};
-        c.insert(5);
-        c.insert(10);
-        c.swap(5, 10);
-        c.parse_complete();
-        REQUIRE_INDICES(c.insertions, 5, 10);
-        REQUIRE(c.moves.empty());
-    }
-
-    SECTION("updates previous modifications") {
-        c.modify(6, 0);
-
-        c.swap(6, 10);
-        REQUIRE_INDICES(c.modifications, 10);
-        REQUIRE_COLUMN_INDICES(c.columns, 0, 10);
-
-        c.swap(10, 6);
-        REQUIRE_INDICES(c.modifications, 6);
-        REQUIRE_COLUMN_INDICES(c.columns, 0, 6);
-    }
-}
-
-TEST_CASE("collection_change: subsume()") {
-    _impl::CollectionChangeBuilder c;
-
-    auto subsume = [&](size_t ndx1, size_t ndx2) {
-        c.insert(ndx2);
-        c.insert(ndx2 + 1);
-        c.subsume(ndx1, ndx2);
-        c.move_over(ndx1, ndx2 + 1);
-        c.parse_complete();
-    };
-
-    SECTION("adds a move from the old to the new row") {
-        subsume(5, 10);
-        REQUIRE_MOVES(c, {5, 10});
-    }
-
-    SECTION("updates moves to the old row") {
-        c.move_over(5, 10);
-        c.insert(10);
-        c.insert(11);
-        c.insert(12);
-        c.subsume(5, 11);
-        c.move_over(5, 12);
-        c.parse_complete();
-
-        REQUIRE_MOVES(c, {10, 11});
-        REQUIRE_INDICES(c.insertions, 5, 10, 11);
-    }
-
-    SECTION("collapses away to nothing when the subsuming row is the last one") {
-        c.insert(10);
-        c.subsume(5, 10);
-        c.move_over(5, 10);
-        c.parse_complete();
-        REQUIRE(c.empty());
-    }
-
-    SECTION("marks the new as modified if the old was") {
-        subsume(5, 10);
-        REQUIRE(c.modifications.empty());
-
-        c.modify(3, 0);
-        subsume(3, 15);
-        REQUIRE_INDICES(c.modifications, 15);
-        REQUIRE_COLUMN_INDICES(c.columns, 0, 15);
-    }
-
-    SECTION("leaves the new row marked as modified if it already was") {
-        c.insert(6);
-        c.insert(7);
-        c.modify(6, 0);
-
-        c.subsume(5, 6);
-        c.move_over(5, 7);
-        REQUIRE_INDICES(c.modifications, 6);
-        REQUIRE_COLUMN_INDICES(c.columns, 0, 6);
     }
 }
 
@@ -940,7 +692,7 @@ TEST_CASE("collection_change: merge()") {
 
     SECTION("is a no-op if the new set is empty") {
         c = {{1, 2, 3}, {4, 5}, {6, 7}, {{8, 9}}};
-        c.columns = {{6}, {7}};
+//        c.columns = {{6}, {7}};
         c.merge({});
         REQUIRE_INDICES(c.deletions, 1, 2, 3, 8);
         REQUIRE_INDICES(c.insertions, 4, 5, 9);
@@ -1194,7 +946,7 @@ TEST_CASE("collection_change: merge()") {
     SECTION("column-level modifications") {
         _impl::CollectionChangeBuilder c2;
         c = {{}, {}, {1, 2, 3}, {}};
-        c.columns = {{1}, {2, 3}};
+//        c.columns = {{1}, {2, 3}};
 
         SECTION("preserved on no-op merges") {
             c.merge({});
@@ -1208,7 +960,7 @@ TEST_CASE("collection_change: merge()") {
 
         SECTION("merged with other column-level modifications") {
             c2.modifications = {0, 4};
-            c2.columns = {{1, 2}, {}, {4}};
+//            c2.columns = {{1, 2}, {}, {4}};
             c.merge(std::move(c2));
 
             REQUIRE_COLUMN_INDICES(c.columns, 0, 1, 2);

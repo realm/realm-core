@@ -21,17 +21,20 @@
 
 #include "impl/collection_notifier.hpp"
 
+#include <realm/list.hpp>
+
 namespace realm {
 namespace _impl {
 class ListNotifier : public CollectionNotifier {
 public:
-//    ListNotifier(LinkViewRef lv, std::shared_ptr<Realm> realm);
+    ListNotifier(std::shared_ptr<Realm> realm, LnkLst const& list);
 
 private:
-    // The linkview, in handover form if this has not been attached to the main
-    // Transaction yet
-//    LinkViewRef m_lv;
-//    std::unique_ptr<Transaction::Handover<LinkView>> m_lv_handover;
+    LnkLst m_list;
+
+    TableKey m_table;
+    ColKey m_col;
+    ObjKey m_obj;
 
     // The last-seen size of the LinkView so that we can report row deletions
     // when the LinkView itself is deleted

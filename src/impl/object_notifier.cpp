@@ -28,16 +28,12 @@ ObjectNotifier::ObjectNotifier(std::shared_ptr<Realm> realm, TableKey table, Obj
 , m_table(table)
 , m_obj(obj)
 {
-//    REALM_ASSERT(row.get_table());
-    // FIXME?
-//    set_table(*row.get_table());
 }
 
 bool ObjectNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 {
     m_info = &info;
-    if (m_table)
-        info.table_modifications_needed.insert(m_table.value);
+    info.tables[m_table.value];
     return false;
 }
 
@@ -60,11 +56,9 @@ void ObjectNotifier::run()
     if (!change.modifications.contains(m_obj.value))
         return;
     m_change.modifications.add(0);
-    m_change.columns.reserve(change.columns.size());
     for (auto& col : change.columns) {
-        m_change.columns.emplace_back();
-        if (col.contains(m_obj.value))
-            m_change.columns.back().add(0);
+        if (col.second.contains(m_obj.value))
+            m_change.columns[col.first].add(0);
     }
 }
 

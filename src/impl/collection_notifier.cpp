@@ -26,7 +26,6 @@
 using namespace realm;
 using namespace realm::_impl;
 
-#if 0
 std::function<bool (size_t)>
 CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
                                              Table const& root_table)
@@ -38,20 +37,19 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
     // actually modified. This can be false if there were only insertions, or
     // deletions which were not linked to by any row in the linking table
     auto table_modified = [&](auto& tbl) {
-        return tbl.table_ndx < info.tables.size()
-            && !info.tables[tbl.table_ndx].modifications.empty();
+        auto it = info.tables.find(tbl.table_key);
+        return it != info.tables.end() && !it->second.modifications.empty();
     };
     if (!any_of(begin(m_related_tables), end(m_related_tables), table_modified)) {
         return [](size_t) { return false; };
     }
     if (m_related_tables.size() == 1) {
-        auto& modifications = info.tables[m_related_tables[0].table_key].modifications;
+        auto& modifications = info.tables.find(m_related_tables[0].table_key)->second.modifications;
         return [&](size_t row) { return modifications.contains(row); };
     }
 
     return DeepChangeChecker(info, root_table, m_related_tables);
 }
-#endif
 
 void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Table const& table)
 {
@@ -75,14 +73,16 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Tabl
     }
 }
 
-#if 0
 DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info,
                                      Table const& root_table,
                                      std::vector<RelatedTable> const& related_tables)
 : m_info(info)
 , m_root_table(root_table)
 , m_root_table_key(root_table.get_key().value)
-, m_root_modifications(m_root_table_key < info.tables.size() ? &info.tables[m_root_table_key].modifications : nullptr)
+, m_root_modifications([&] {
+    auto it = info.tables.find(m_root_table_key);
+    return it != info.tables.end() ? &it->second.modifications : nullptr;
+}())
 , m_related_tables(related_tables)
 {
 }
@@ -112,7 +112,7 @@ bool DeepChangeChecker::check_outgoing_links(int64_t table_key, Table const& tab
         return false;
     };
 
-    Obj obj = table.get_object(obj_key);
+    ConstObj obj = table.get_object(ObjKey(obj_key));
     auto linked_object_changed = [&](OutgoingLink const& link) {
         if (already_checking(link.col_key))
             return false;
@@ -124,19 +124,15 @@ bool DeepChangeChecker::check_outgoing_links(int64_t table_key, Table const& tab
         }
 
         auto& target = *table.get_link_target(ColKey(link.col_key));
-        auto lvr = obj.get<List<Obj>>(ColKey(link.col_key), ObjKey(obj_key));
-        for (size_t j = 0, size = lvr->size(); j < size; ++j) {
-            size_t dst = lvr->get(j).get_index();
-            if (check_row(target, dst, depth + 1))
-                return true;
-        }
-        return false;
+        auto lvr = obj.get_linklist(ColKey(link.col_key));
+        return std::any_of(lvr.begin(), lvr.end(),
+                           [&](auto key) { return check_row(target, key.value, depth + 1); });
     };
 
     return std::any_of(begin(it->links), end(it->links), linked_object_changed);
 }
 
-bool DeepChangeChecker::check_row(Table const& table, size_t idx, size_t depth)
+bool DeepChangeChecker::check_row(Table const& table, int64_t key, size_t depth)
 {
     // Arbitrary upper limit on the maximum depth to search
     if (depth >= m_current_path.size()) {
@@ -147,29 +143,28 @@ bool DeepChangeChecker::check_row(Table const& table, size_t idx, size_t depth)
         return false;
     }
 
-    size_t table_ndx = table.get_index_in_group();
-    if (depth > 0 && table_ndx < m_info.tables.size() && m_info.tables[table_ndx].modifications.contains(idx))
-        return true;
-
-    if (m_not_modified.size() <= table_ndx)
-        m_not_modified.resize(table_ndx + 1);
-    if (m_not_modified[table_ndx].contains(idx))
+    int64_t table_key = table.get_key().value;
+    if (depth > 0) {
+        auto it = m_info.tables.find(table_key);
+        if (it != m_info.tables.end() && it->second.modifications.contains(key))
+            return true;
+    }
+    auto& not_modified = m_not_modified[table_key];
+    if (not_modified.contains(key))
         return false;
 
-    bool ret = check_outgoing_links(table_ndx, table, idx, depth);
+    bool ret = check_outgoing_links(table_key, table, key, depth);
     if (!ret && (depth == 0 || !m_current_path[depth - 1].depth_exceeded))
-        m_not_modified[table_ndx].add(idx);
+        not_modified.add(key);
     return ret;
 }
 
-bool DeepChangeChecker::operator()(size_t ndx)
+bool DeepChangeChecker::operator()(int64_t key)
 {
-    if (m_root_modifications && m_root_modifications->contains(ndx))
+    if (m_root_modifications && m_root_modifications->contains(key))
         return true;
-    return check_row(m_root_table, ndx, 0);
+    return check_row(m_root_table, key, 0);
 }
-
-#endif
 
 CollectionNotifier::CollectionNotifier(std::shared_ptr<Realm> realm)
 : m_realm(std::move(realm))
@@ -280,9 +275,9 @@ void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)
         return;
     }
 
-    info.table_modifications_needed.reserve(m_related_tables.size());
+    info.tables.reserve(m_related_tables.size());
     for (auto& tbl : m_related_tables)
-        info.table_modifications_needed.insert(tbl.table_key);
+        info.tables[tbl.table_key];
 }
 
 void CollectionNotifier::prepare_handover()

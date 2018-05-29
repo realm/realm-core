@@ -653,10 +653,7 @@ public:
     {
         if (version != m_sg.get_version_of_current_transaction()) {
             transaction::advance(m_sg, *m_current, version);
-            m_info.push_back({
-                m_current->table_modifications_needed,
-                m_current->table_moves_needed,
-                std::move(m_current->lists)});
+            m_info.push_back({std::move(m_current->lists)});
             m_current = &m_info.back();
             return true;
         }
@@ -675,6 +672,7 @@ public:
         // We now need to combine the transaction change info objects so that all of
         // the notifiers see the complete set of changes from their first version to
         // the most recent one
+        #if 0
         for (size_t i = m_info.size() - 1; i > 0; --i) {
             auto& cur = m_info[i];
             if (cur.tables.empty())
@@ -693,6 +691,7 @@ public:
                 prev.tables.push_back(cur.tables[prev.tables.size()]);
             }
         }
+        #endif
 
         // Copy the list change info if there are multiple LinkViews for the same LinkList
         #if 0

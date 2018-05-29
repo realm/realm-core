@@ -48,12 +48,8 @@ struct ListChangeInfo {
 };
 
 struct TransactionChangeInfo {
-    std::unordered_set<int64_t> table_modifications_needed;
-    std::unordered_set<int64_t> table_moves_needed;
     std::vector<ListChangeInfo> lists;
-    std::vector<CollectionChangeBuilder> tables;
-    std::vector<std::vector<size_t>> column_indices;
-    std::vector<size_t> table_indices;
+    std::unordered_map<int64_t, CollectionChangeBuilder> tables;
     bool track_all;
     bool schema_changed;
 };
@@ -72,7 +68,7 @@ public:
     DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
                       std::vector<RelatedTable> const& related_tables);
 
-    bool operator()(size_t row_ndx);
+    bool operator()(int64_t obj_key);
 
     // Recursively add `table` and all tables it links to to `out`, along with
     // information about the links from them
@@ -83,7 +79,7 @@ private:
     Table const& m_root_table;
     const int64_t m_root_table_key;
     IndexSet const* const m_root_modifications;
-    std::vector<IndexSet> m_not_modified;
+    std::unordered_map<int64_t, IndexSet> m_not_modified;
     std::vector<RelatedTable> const& m_related_tables;
 
     struct Path {

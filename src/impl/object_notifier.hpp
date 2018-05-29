@@ -33,8 +33,6 @@ public:
 private:
     TableKey m_table;
     ObjKey m_obj;
-//    std::unique_ptr<Row> m_row;
-//    std::unique_ptr<Transaction::Handover<Row>> m_handover;
 
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;

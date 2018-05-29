@@ -20,53 +20,43 @@
 
 #include "shared_realm.hpp"
 
-#if 0
-
-#include <realm/link_view.hpp>
+#include <realm/db.hpp>
+#include <realm/group.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
 
-ListNotifier::ListNotifier(LinkViewRef lv, std::shared_ptr<Realm> realm)
+ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, LnkLst const& list)
 : CollectionNotifier(std::move(realm))
-, m_prev_size(lv->size())
+, m_table(list.get_parent().get_key())
+, m_col(list.get_col_key())
+, m_obj(list.ConstLstBase::get_key())
+, m_prev_size(list.size())
 {
-    set_table(lv->get_target_table());
-    m_lv_handover = source_shared_group().export_linkview_for_handover(lv);
 }
 
 void ListNotifier::release_data() noexcept
 {
-    m_lv.reset();
+    m_list = {};
 }
 
 void ListNotifier::do_attach_to(Transaction& sg)
 {
-    REALM_ASSERT(m_lv_handover);
-    REALM_ASSERT(!m_lv);
-    m_lv = sg.import_linkview_from_handover(std::move(m_lv_handover));
+    m_list = sg.get_table(m_table)->get_object(m_obj).get_linklist(m_col);
 }
 
-void ListNotifier::do_detach_from(Transaction& sg)
+void ListNotifier::do_detach_from(Transaction&)
 {
-    REALM_ASSERT(!m_lv_handover);
-    if (m_lv) {
-        m_lv_handover = sg.export_linkview_for_handover(m_lv);
-        m_lv = {};
-    }
+    m_list = {};
 }
 
 bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 {
-    REALM_ASSERT(!m_lv_handover);
-    if (!m_lv || !m_lv->is_attached()) {
+    if (!m_list.is_attached()) {
         return false; // origin row was deleted after the notification was added
     }
 
-    auto& table = m_lv->get_origin_table();
-    size_t row_ndx = m_lv->get_origin_row_index();
-    size_t col_ndx = find_container_column(table, row_ndx, m_lv, type_LinkList, &Table::get_linklist);
-    info.lists.push_back({table.get_index_in_group(), row_ndx, col_ndx, &m_change});
+    info.lists.push_back({m_table.value, m_obj.value, m_col.value, &m_change});
 
     m_info = &info;
     return true;
@@ -74,8 +64,8 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 
 void ListNotifier::run()
 {
-    if (!m_lv || !m_lv->is_attached()) {
-        // LV was deleted, so report all of the rows being removed if this is
+    if (!m_list.is_attached()) {
+        // List was deleted, so report all of the rows being removed if this is
         // the first run after that
         if (m_prev_size) {
             m_change.deletions.set(m_prev_size);
@@ -87,26 +77,25 @@ void ListNotifier::run()
         return;
     }
 
-    auto row_did_change = get_modification_checker(*m_info, m_lv->get_target_table());
-    for (size_t i = 0; i < m_lv->size(); ++i) {
+    auto row_did_change = get_modification_checker(*m_info, m_list.get_target_table());
+    for (size_t i = 0; i < m_list.size(); ++i) {
         if (m_change.modifications.contains(i))
             continue;
-        if (row_did_change(m_lv->get(i).get_index()))
+        if (row_did_change(m_list.get(i).value))
             m_change.modifications.add(i);
     }
 
     for (auto const& move : m_change.moves) {
         if (m_change.modifications.contains(move.to))
             continue;
-        if (row_did_change(m_lv->get(move.to).get_index()))
+        if (row_did_change(m_list.get(move.to).value))
             m_change.modifications.add(move.to);
     }
 
-    m_prev_size = m_lv->size();
+    m_prev_size = m_list.size();
 }
 
 void ListNotifier::do_prepare_handover(Transaction&)
 {
     add_changes(std::move(m_change));
 }
-#endif

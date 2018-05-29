@@ -64,21 +64,7 @@ public:
     void move(size_t from, size_t to);
     // }
 
-    // operations only implemented for Row semantics {
-    void move_over(size_t ndx, size_t last_ndx, bool track_moves=true);
-    // must be followed by move_over(old_ndx, ...)
-    // precondition: `new_ndx` must be a new insertion
-    void subsume(size_t old_ndx, size_t new_ndx, bool track_moves=true);
-    void swap(size_t ndx_1, size_t ndx_2, bool track_moves=true);
-
-    void parse_complete();
-    // }
-
-    void insert_column(size_t ndx);
-    void move_column(size_t from, size_t to);
-
 private:
-    std::unordered_map<size_t, size_t> m_move_mapping;
     bool m_track_columns = true;
 
     template<typename Func>
