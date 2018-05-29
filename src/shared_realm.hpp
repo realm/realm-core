@@ -302,7 +302,7 @@ public:
 
     // Close this Realm. Continuing to use a Realm after closing it will throw ClosedRealmException
     void close();
-    bool is_closed() const { return !m_coordinator; }
+    bool is_closed() const { return !m_group && !m_coordinator; }
 
     // returns the file format version upgraded from if an upgrade took place
     util::Optional<int> file_format_upgraded_from_version() const;
@@ -362,6 +362,9 @@ public:
 private:
     struct MakeSharedTag {};
 
+    std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
+    std::unique_ptr<sync::PermissionsCache> m_permissions_cache;
+
     Config m_config;
     AnyExecutionContextID m_execution_context;
     bool m_auto_refresh = true;
@@ -376,9 +379,6 @@ private:
     // FIXME: this should be a Dynamic schema mode instead, but only once
     // that's actually fully working
     bool m_dynamic_schema = true;
-
-    std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
-    std::unique_ptr<sync::PermissionsCache> m_permissions_cache;
 
     // File format versions populated when a file format upgrade takes place during realm opening
     int upgrade_initial_version = 0, upgrade_final_version = 0;

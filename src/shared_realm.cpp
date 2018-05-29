@@ -57,7 +57,8 @@ Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator
 , m_execution_context(m_config.execution_context)
 {
     if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
-        read_group();
+        m_group = coordinator->begin_read();
+        read_schema_from_group_if_needed();
         coordinator->cache_schema(m_schema, m_schema_version, m_schema_transaction_version);
         m_group = nullptr;
     }
