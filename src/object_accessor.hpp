@@ -148,11 +148,11 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
         case PropertyType::String: return ctx.box(m_obj.get<StringData>(column));
         case PropertyType::Data:   return ctx.box(m_obj.get<BinaryData>(column));
         case PropertyType::Date:   return ctx.box(m_obj.get<Timestamp>(column));
-        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
+//        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
             TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), property.object_type);
-            return ctx.box(Object(m_realm, *linkObjectSchema, m_obj.get<Obj>(column)));
+            return ctx.box(Object(m_realm, *linkObjectSchema, m_obj.get_linked_object(column)));
         }
         case PropertyType::LinkingObjects: {
             auto target_object_schema = m_realm->schema().find(property.object_type);

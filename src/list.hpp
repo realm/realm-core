@@ -177,7 +177,19 @@ auto& List::as() const
 }
 
 template<>
-auto& List::as<Obj>() const
+inline auto& List::as<util::Optional<float>>() const
+{
+    return static_cast<Lst<float>&>(*m_list_base);
+}
+
+template<>
+inline auto& List::as<util::Optional<double>>() const
+{
+    return static_cast<Lst<double>&>(*m_list_base);
+}
+
+template<>
+inline auto& List::as<Obj>() const
 {
     return static_cast<LnkLst&>(*m_list_base);
 }

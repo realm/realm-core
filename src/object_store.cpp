@@ -60,7 +60,7 @@ void create_metadata_tables(Group& group, bool partial_realm) {
 
     if (metadata_table->get_column_count() == 0) {
         metadata_table->add_column(type_Int, c_versionColumnName);
-        metadata_table->create_object().set(c_versionColumnName, ObjectStore::NotVersioned);
+        metadata_table->create_object().set(c_versionColumnName, int64_t(ObjectStore::NotVersioned));
     }
 
     if (pk_table->get_column_count() == 0) {
@@ -173,7 +173,7 @@ void add_initial_columns(Group& group, ObjectSchema const& object_schema)
 
 void copy_property_values(Table& table, PropertyType type, ColKey old_col, ColKey new_col)
 {
-    switch_on_type(type, [&](auto t) {
+    switch_on_type<ObjKey>(type, [&](auto t) {
         using T = std::decay_t<decltype(*t)>;
         for (auto& obj : table) {
             obj.set<T>(new_col, obj.get<T>(old_col));

@@ -28,19 +28,58 @@
 #include "shared_realm.hpp"
 
 namespace {
+using namespace realm;
+
 template<typename T>
 struct ListType {
-    using type = realm::Lst<T>;
+    using type = Lst<T>;
 };
 
 template<>
-struct ListType<realm::Obj> {
-    using type = realm::LnkLst;
+struct ListType<Obj> {
+    using type = LnkLst;
 };
+
+template<>
+struct ListType<util::Optional<float>> {
+    using type = Lst<float>;
+};
+
+template<>
+struct ListType<util::Optional<double>> {
+    using type = Lst<double>;
+};
+
+// Core uses a magic bitpattern to signal nulls in floats, while we use
+// Optional<float>
+template<typename T>
+auto from_optional(T v) { return v; }
+float from_optional(util::Optional<float> v)
+{
+    return v ? *v : null::get_null_float<float>();
+}
+double from_optional(util::Optional<double> v)
+{
+    return v ? *v : null::get_null_float<double>();
+}
+
+template<typename T>
+auto to_optional(T v) { return v; }
+
+template<>
+auto to_optional<util::Optional<float>>(util::Optional<float> v)
+{
+    return null::is_null_float(*v) ? none : v;
+}
+template<>
+auto to_optional<util::Optional<double>>(util::Optional<double> v)
+{
+    return null::is_null_float(*v) ? none : v;
+}
 }
 
 namespace realm {
-using namespace realm::_impl;
+using namespace _impl;
 
 List::List() noexcept = default;
 List::~List() = default;
@@ -144,7 +183,7 @@ template<typename T>
 T List::get(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
-    return as<T>().get(row_ndx);
+    return to_optional<T>(as<T>().get(row_ndx));
 }
 
 template<>
@@ -159,7 +198,7 @@ template<typename T>
 size_t List::find(T const& value) const
 {
     verify_attached();
-    return as<T>().find_first(value);
+    return as<T>().find_first(from_optional(value));
 }
 
 template<>
@@ -190,7 +229,15 @@ template<typename T>
 void List::add(T value)
 {
     verify_in_transaction();
-    as<T>().add(value);
+    as<T>().add(from_optional(value));
+}
+
+template<>
+void List::add(Obj o)
+{
+    verify_in_transaction();
+    validate(o);
+    as<Obj>().add(o.get_key());
 }
 
 template<typename T>
@@ -198,7 +245,7 @@ void List::insert(size_t row_ndx, T value)
 {
     verify_in_transaction();
     verify_valid_row(row_ndx, true);
-    as<T>().insert(row_ndx, value);
+    as<T>().insert(row_ndx, from_optional(value));
 }
 
 void List::move(size_t source_ndx, size_t dest_ndx)
@@ -231,7 +278,7 @@ void List::set(size_t row_ndx, T value)
     verify_in_transaction();
     verify_valid_row(row_ndx);
 //    validate(row);
-    as<T>().set(row_ndx, value);
+    as<T>().set(row_ndx, from_optional(value));
 }
 
 void List::swap(size_t ndx1, size_t ndx2)
@@ -375,14 +422,14 @@ REALM_PRIMITIVE_LIST_TYPE(BinaryData)
 REALM_PRIMITIVE_LIST_TYPE(Timestamp)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<bool>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<int64_t>)
-//REALM_PRIMITIVE_LIST_TYPE(util::Optional<float>)
-//REALM_PRIMITIVE_LIST_TYPE(util::Optional<double>)
+REALM_PRIMITIVE_LIST_TYPE(util::Optional<float>)
+REALM_PRIMITIVE_LIST_TYPE(util::Optional<double>)
 
 #undef REALM_PRIMITIVE_LIST_TYPE
 } // namespace realm
 
 namespace std {
-size_t hash<realm::List>::operator()(realm::List const& list) const
+size_t hash<List>::operator()(List const& list) const
 {
 //    return std::hash<void*>()(list.m_link_view ? list.m_link_view.get() : (void*)list.m_table.get());
     return 0;
