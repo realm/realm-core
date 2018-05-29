@@ -45,8 +45,8 @@ using namespace realm::_impl;
 List::List() noexcept = default;
 List::~List() = default;
 
-//List::List(const List&) = default;
-//List& List::operator=(const List&) = default;
+List::List(const List&) { REALM_UNREACHABLE(); }
+List& List::operator=(const List&) { REALM_UNREACHABLE(); }
 List::List(List&&) = default;
 List& List::operator=(List&&) = default;
 
@@ -373,7 +373,7 @@ REALM_PRIMITIVE_LIST_TYPE(double)
 REALM_PRIMITIVE_LIST_TYPE(StringData)
 REALM_PRIMITIVE_LIST_TYPE(BinaryData)
 REALM_PRIMITIVE_LIST_TYPE(Timestamp)
-//REALM_PRIMITIVE_LIST_TYPE(util::Optional<bool>)
+REALM_PRIMITIVE_LIST_TYPE(util::Optional<bool>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<int64_t>)
 //REALM_PRIMITIVE_LIST_TYPE(util::Optional<float>)
 //REALM_PRIMITIVE_LIST_TYPE(util::Optional<double>)

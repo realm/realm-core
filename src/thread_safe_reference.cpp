@@ -32,6 +32,14 @@ ThreadSafeReferenceBase::~ThreadSafeReferenceBase()
 {
 }
 
+ThreadSafeReference<List>::ThreadSafeReference(List const&) {}
+ThreadSafeReference<Results>::ThreadSafeReference(Results const&) {}
+ThreadSafeReference<Object>::ThreadSafeReference(Object const&) {}
+
+List ThreadSafeReference<List>::import_into(Transaction&) { REALM_TERMINATE("not implemented"); }
+Results ThreadSafeReference<Results>::import_into(Transaction&) { REALM_TERMINATE("not implemented"); }
+Object ThreadSafeReference<Object>::import_into(Transaction&) { REALM_TERMINATE("not implemented"); }
+
 #if 0
 ThreadSafeReference<List>::ThreadSafeReference(List const& list)
 : ThreadSafeReferenceBase(list.get_realm())

@@ -47,6 +47,16 @@ Results::Results(SharedRealm r, Table& table)
 {
 }
 
+Results::Results(SharedRealm, TableView, DescriptorOrdering) { REALM_UNREACHABLE(); }
+Results::Results(std::shared_ptr<Realm>, LstBase&, util::Optional<Query>, SortDescriptor)
+{ REALM_UNREACHABLE(); }
+
+Results::Results(const Results&) = default;
+Results& Results::operator=(const Results&) = default;
+
+Results::Results(Results&&) { REALM_UNREACHABLE(); }
+Results& Results::operator=(Results&&) { REALM_UNREACHABLE(); }
+
 #if 0
 Results::Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q, SortDescriptor s)
 : m_realm(std::move(r))
@@ -175,7 +185,7 @@ auto get(Table& table, size_t row)
 }
 
 template<>
-auto get<RowExpr>(Table& table, size_t row)
+auto get<Obj>(Table& table, size_t row)
 {
     return table.get(row);
 }
@@ -278,7 +288,7 @@ void Results::evaluate_query_if_needed(bool wants_notifications)
 }
 
 template<>
-size_t Results::index_of(RowExpr const& row)
+size_t Results::index_of(Obj const& row)
 {
     validate_read();
     if (!row) {
@@ -749,6 +759,33 @@ void Results::Internal::set_table_view(Results& results, TableView &&tv)
     REALM_ASSERT(results.m_table_view.is_in_sync());
     REALM_ASSERT(results.m_table_view.is_attached());
 }
+#else
+void Results::clear() { REALM_UNREACHABLE(); }
+Results Results::filter(Query&&) const { REALM_UNREACHABLE(); }
+Results Results::sort(SortDescriptor&&) const { REALM_UNREACHABLE(); }
+Results Results::sort(std::vector<std::pair<std::string, bool>> const&) const { REALM_UNREACHABLE(); }
+Results Results::distinct(DistinctDescriptor&&) const { REALM_UNREACHABLE(); }
+Results Results::distinct(std::vector<std::string> const&) const { REALM_UNREACHABLE(); }
+
+Results Results::snapshot() const& { REALM_UNREACHABLE(); }
+Results Results::snapshot() && { REALM_UNREACHABLE(); }
+
+bool Results::is_valid() const { REALM_UNREACHABLE(); }
+size_t Results::size() { REALM_UNREACHABLE(); }
+
+util::Optional<Mixed> Results::min(size_t) { REALM_UNREACHABLE(); }
+util::Optional<Mixed> Results::max(size_t) { REALM_UNREACHABLE(); }
+util::Optional<Mixed> Results::sum(size_t) { REALM_UNREACHABLE(); }
+util::Optional<double> Results::average(size_t) { REALM_UNREACHABLE(); }
+
+NotificationToken Results::add_notification_callback(CollectionChangeCallback) &
+{ REALM_UNREACHABLE(); }
+
+template<typename T> T Results::get(size_t) { REALM_UNREACHABLE(); }
+template<typename T> util::Optional<T> Results::first() { REALM_UNREACHABLE(); }
+template<typename T> util::Optional<T> Results::last() { REALM_UNREACHABLE(); }
+template<typename T> size_t Results::index_of(T const&) { REALM_UNREACHABLE(); }
+#endif
 
 #define REALM_RESULTS_TYPE(T) \
     template T Results::get<T>(size_t); \
@@ -756,9 +793,9 @@ void Results::Internal::set_table_view(Results& results, TableView &&tv)
     template util::Optional<T> Results::last<T>(); \
     template size_t Results::index_of<T>(T const&);
 
-template RowExpr Results::get<RowExpr>(size_t);
-template util::Optional<RowExpr> Results::first<RowExpr>();
-template util::Optional<RowExpr> Results::last<RowExpr>();
+template Obj Results::get<Obj>(size_t);
+template util::Optional<Obj> Results::first<Obj>();
+template util::Optional<Obj> Results::last<Obj>();
 
 REALM_RESULTS_TYPE(bool)
 REALM_RESULTS_TYPE(int64_t)
@@ -778,9 +815,9 @@ Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c
 : std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
 , requested(r), valid_count(c) {}
 
-static std::string unsupported_operation_msg(size_t column, const Table* table, const char* operation)
+static std::string unsupported_operation_msg(ColKey column, const Table* table, const char* operation)
 {
-    const char* column_type = string_for_property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column));
+    const char* column_type = string_for_property_type(ObjectSchema::from_core_type(*table, column));
     if (table->is_group_level())
         return util::format("Cannot %1 property '%2': operation not supported for '%3' properties",
                             operation, table->get_column_name(column), column_type);
@@ -788,13 +825,12 @@ static std::string unsupported_operation_msg(size_t column, const Table* table, 
                         operation, column_type);
 }
 
-Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(size_t column, const Table* table, const char* operation)
-: std::logic_error(unsupported_operation_msg(column, table, operation))
-, column_index(column)
-, column_name(table->get_column_name(column))
-, property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column))
+Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(int64_t column, const Table* table, const char* operation)
+: std::logic_error(unsupported_operation_msg(ColKey(column), table, operation))
+, column_key(column)
+, column_name(table->get_column_name(ColKey(column)))
+, property_type(ObjectSchema::from_core_type(*table, ColKey(column)))
 {
 }
-#endif
 
 } // namespace realm

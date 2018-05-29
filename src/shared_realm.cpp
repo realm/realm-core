@@ -796,7 +796,7 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
         // A read transaction does exist, but let's make sure that its version matches the reference's
         auto current_version = transaction().get_version_of_current_transaction();
         if (reference_version == current_version) {
-            return std::move(reference).import_into_realm(shared_from_this());
+            return std::move(reference).import_into(transaction());
         }
 
         refresh();
@@ -814,7 +814,7 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
         }
     }
 
-    return std::move(reference).import_into_realm(shared_from_this());
+    return std::move(reference).import_into(transaction());
 }
 
 template Object Realm::resolve_thread_safe_reference(ThreadSafeReference<Object> reference);

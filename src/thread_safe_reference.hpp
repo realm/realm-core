@@ -41,7 +41,7 @@ public:
     ThreadSafeReferenceBase& operator=(const ThreadSafeReferenceBase&) = delete;
     ThreadSafeReferenceBase(ThreadSafeReferenceBase&&) = default;
     ThreadSafeReferenceBase& operator=(ThreadSafeReferenceBase&&) = default;
-    ThreadSafeReferenceBase();
+    ThreadSafeReferenceBase() = default;
     virtual ~ThreadSafeReferenceBase();
 
 private:
@@ -62,7 +62,6 @@ class ThreadSafeReference<List>: public ThreadSafeReferenceBase {
     ThreadSafeReference(List const& value);
 
     // Precondition: Realm and handover are on same version.
-    List import_into_realm(std::shared_ptr<Realm> realm) &&;
     List import_into(Transaction& group);
 };
 
@@ -77,7 +76,6 @@ class ThreadSafeReference<Object>: public ThreadSafeReferenceBase {
     ThreadSafeReference(Object const& value);
 
     // Precondition: Realm and handover are on same version.
-    Object import_into_realm(std::shared_ptr<Realm> realm) &&;
     Object import_into(Transaction& group);
 };
 
@@ -92,7 +90,6 @@ class ThreadSafeReference<Results>: public ThreadSafeReferenceBase {
     ThreadSafeReference(Results const& value);
 
     // Precondition: Realm and handover are on same version.
-    Results import_into_realm(std::shared_ptr<Realm> realm) &&;
     Results import_into(Transaction& group);
 };
 }

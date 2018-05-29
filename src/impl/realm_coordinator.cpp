@@ -844,6 +844,12 @@ void RealmCoordinator::run_async_notifiers()
     m_notifier_cv.notify_all();
 }
 
+bool RealmCoordinator::can_advance(Realm& realm)
+{
+    // FIXME
+    return true;
+}
+
 void RealmCoordinator::advance_to_ready(Realm& realm)
 {
     std::unique_lock<std::mutex> lock(m_notifier_mutex);

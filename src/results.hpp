@@ -179,11 +179,11 @@ public:
 
     // The requested aggregate operation is not supported for the column type
     struct UnsupportedColumnTypeException : public std::logic_error {
-        size_t column_index;
+        int64_t column_key;
         StringData column_name;
         PropertyType property_type;
 
-        UnsupportedColumnTypeException(size_t column, const Table* table, const char* operation);
+        UnsupportedColumnTypeException(int64_t column, const Table* table, const char* operation);
     };
 
     // Create an async query from this Results
