@@ -450,8 +450,10 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
 
+            realm->begin_transaction();
             auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             create_objects(*table, 2);
+            realm->commit_transaction();
 
             schema = set_primary_key(schema, "object", "value");
             REQUIRE_THROWS(realm->update_schema(schema, 2, nullptr));
