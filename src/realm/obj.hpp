@@ -202,6 +202,8 @@ public:
     template <class Head, class... Tail>
     Obj& set_all(Head v, Tail... tail);
 
+    Obj get_linked_object(ColKey link_col_key);
+
     template <typename U>
     Lst<U> get_list(ColKey col_key);
     template <typename U>
@@ -261,6 +263,11 @@ inline Optional<double> ConstObj::get<Optional<double>>(ColKey col_key) const
 {
     double f = get<double>(col_key);
     return null::is_null_float(f) ? util::none : util::make_optional(f);
+}
+
+inline Obj Obj::get_linked_object(ColKey link_col_key)
+{
+    return ConstObj::get_linked_object(link_col_key);
 }
 
 template <>
