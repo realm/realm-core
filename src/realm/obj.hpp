@@ -300,6 +300,30 @@ inline Obj& Obj::set(ColKey col_key, realm::null, bool is_default)
     return set_null(col_key, is_default);
 }
 
+template <>
+inline Obj& Obj::set(ColKey col_key, Optional<bool> value, bool is_default)
+{
+    return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
+}
+
+template <>
+inline Obj& Obj::set(ColKey col_key, Optional<int64_t> value, bool is_default)
+{
+    return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
+}
+
+template <>
+inline Obj& Obj::set(ColKey col_key, Optional<float> value, bool is_default)
+{
+    return set(col_key, value ? *value : null::get_null_float<float>(), is_default);
+}
+
+template <>
+inline Obj& Obj::set(ColKey col_key, Optional<double> value, bool is_default)
+{
+    return set(col_key, value ? *value : null::get_null_float<double>(), is_default);
+}
+
 template <typename U>
 Obj& Obj::set_list_values(ColKey col_key, const std::vector<U>& values)
 {
