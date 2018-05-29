@@ -1224,7 +1224,7 @@ TEST(Links_Transactions)
         CHECK(owners->is_null_link(dog_col, tim_row));
     }
 }
-
+#endif
 
 TEST(Links_RemoveTargetRows)
 {
@@ -1232,87 +1232,46 @@ TEST(Links_RemoveTargetRows)
 
     auto target = group.add_table("target");
     test_table_add_columns(target);
-    test_table_add_row(target, "test1", 1, true, Mon);
-    test_table_add_row(target, "test2", 2, false, Tue);
-    test_table_add_row(target, "test3", 3, true, Wed);
+    auto k0 = target->create_object().set_all("test1", 1, true, int(Mon)).get_key();
+    auto k1 = target->create_object().set_all("test2", 2, false, int(Tue)).get_key();
+    auto k2 = target->create_object().set_all("test3", 3, true, int(Wed)).get_key();
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
-    size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
+    auto col_link = origin->add_column_link(type_LinkList, "links", *target);
 
-    origin->add_empty_row();
-    LinkViewRef links = origin->get_linklist(col_link, 0);
-    links->add(2);
-    links->add(1);
-    links->add(0);
+    Obj obj = origin->create_object();
+    auto links = obj.get_linklist(col_link);
+    links.add(k2);
+    links.add(k1);
+    links.add(k0);
 
     // delete target rows through the links one at a time
-    links->remove_target_row(0);
+    links.remove_target_row(0);
     CHECK_EQUAL(2, target->size());
-    CHECK_EQUAL(2, links->size());
+    CHECK_EQUAL(2, links.size());
 
-    links->remove_target_row(1);
+    links.remove_target_row(1);
     CHECK_EQUAL(1, target->size());
-    CHECK_EQUAL(1, links->size());
+    CHECK_EQUAL(1, links.size());
 
-    links->remove_target_row(0);
+    links.remove_target_row(0);
     CHECK_EQUAL(0, target->size());
-    CHECK_EQUAL(0, links->size());
+    CHECK_EQUAL(0, links.size());
 
     // re-add targets and links
-    test_table_add_row(target, "test1", 1, true, Mon);
-    test_table_add_row(target, "test2", 2, false, Tue);
-    test_table_add_row(target, "test3", 3, true, Wed);
-    links->add(2);
-    links->add(1);
-    links->add(0);
+    k0 = target->create_object().set_all("test1", 1, true, int(Mon)).get_key();
+    k1 = target->create_object().set_all("test2", 2, false, int(Tue)).get_key();
+    k2 = target->create_object().set_all("test3", 3, true, int(Wed)).get_key();
+    links.add(k2);
+    links.add(k1);
+    links.add(k0);
 
     // Remove all targets through the links
-    links->remove_all_target_rows();
+    links.remove_all_target_rows();
     CHECK(target->is_empty());
-    CHECK(links->is_empty());
+    CHECK(links.is_empty());
 }
-
-
-TEST(Links_RemoveLastTargetColumn)
-{
-    // When the last ordinary column is removed from a table, its size (number
-    // of rows) must "jump" to zero, even when the table continues to have
-    // "hidden" backlick columns.
-
-    Group group_1;
-    TableRef table = group_1.add_table("table");
-    table->add_column_link(type_Link, "t", *table);
-    table->remove_column(0);
-
-    Group group_2;
-    TableRef origin = group_2.add_table("origin");
-    TableRef target = group_2.add_table("target");
-    target->add_column(type_Int, "t");
-    target->add_empty_row();
-    origin->add_column_link(type_Link, "o_1", *target);
-    origin->add_column_link(type_LinkList, "o_2", *target);
-    origin->add_empty_row();
-    origin->set_link(0, 0, 0);
-    LinkViewRef link_list = origin->get_linklist(1, 0);
-    link_list->add(0);
-    Row target_row_1 = target->get(0);
-    Row target_row_2 = link_list->get(0);
-
-    CHECK_EQUAL(1, target->size());
-    target->remove_column(0);
-    CHECK_EQUAL(0, target->get_column_count());
-    CHECK(target->is_empty());
-    CHECK(origin->is_null_link(0, 0));
-    CHECK(link_list->is_attached());
-    CHECK_EQUAL(link_list, origin->get_linklist(1, 0));
-    CHECK_EQUAL(origin, &link_list->get_origin_table());
-    CHECK_EQUAL(target, &link_list->get_target_table());
-    CHECK_EQUAL(0, link_list->size());
-    CHECK(!target_row_1.is_attached());
-    CHECK(!target_row_2.is_attached());
-}
-
 
 TEST(Links_ClearColumnWithTwoLevelBptree)
 {
@@ -1322,18 +1281,18 @@ TEST(Links_ClearColumnWithTwoLevelBptree)
 
     // The extra columns beyond the first one increase the likelihood of
     // getting unambiguously bad ref
-    target->add_column(type_Int, "");
-    target->add_column(type_Int, "");
-    target->add_column(type_Int, "");
-    target->add_column(type_Int, "");
-    target->add_column(type_Int, "");
-    target->add_empty_row();
+    target->add_column(type_Int, "i1");
+    target->add_column(type_Int, "i2");
+    target->add_column(type_Int, "i3");
+    target->add_column(type_Int, "i4");
+    target->add_column(type_Int, "i5");
+    Obj obj = target->create_object();
 
-    origin->add_column_link(type_LinkList, "", *target);
-    origin->add_empty_row(REALM_MAX_BPNODE_SIZE + 1);
+    auto col = origin->add_column_link(type_LinkList, "", *target);
+    std::vector<ObjKey> keys;
+    origin->create_objects(REALM_MAX_BPNODE_SIZE + 1, keys);
     origin->clear();
-    origin->add_empty_row();
-    origin->get_linklist(0, 0)->add(0);
+    origin->create_object().get_linklist(col).add(obj.get_key());
     group.verify();
 }
 
@@ -1343,17 +1302,17 @@ TEST(Links_ClearLinkListWithTwoLevelBptree)
     Group group;
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
-    origin->add_column_link(type_LinkList, "", *target);
-    target->add_empty_row();
-    origin->add_empty_row();
-    LinkViewRef link_list = origin->get_linklist(0, 0);
+    auto col_link = origin->add_column_link(type_LinkList, "", *target);
+    ObjKey k = target->create_object().get_key();
+    auto ll = origin->create_object().get_linklist(col_link);
     for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
-        link_list->add(0);
-    link_list->clear();
+        ll.add(k);
+    ll.clear();
     group.verify();
 }
 
 
+#ifdef LEGACY_TESTS
 TEST(Links_FormerMemLeakCase)
 {
     SHARED_GROUP_TEST_PATH(path);

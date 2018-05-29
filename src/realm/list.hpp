@@ -674,25 +674,25 @@ public:
     LnkLst(const Obj& owner, ColKey col_key)
         : ConstLstBase(col_key, &m_obj)
         , Lst<ObjKey>(owner, col_key)
-        , ObjList(this->m_tree.get(), &get_target_table())
+        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
     {
     }
     LnkLst(const LnkLst& other)
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(other)
-        , ObjList(this->m_tree.get(), &get_target_table())
+        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
     {
     }
     LnkLst(LnkLst&& other)
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(std::move(other))
-        , ObjList(this->m_tree.get(), &get_target_table())
+        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
     {
     }
     LnkLst& operator=(const LnkLst& other)
     {
         Lst<ObjKey>::operator=(other);
-        this->ObjList::assign(this->m_tree.get(), &get_target_table());
+        this->ObjList::assign(this->m_tree.get(), m_obj.get_target_table(m_col_key));
         return *this;
     }
 
@@ -702,7 +702,7 @@ public:
     }
     Table& get_target_table() const
     {
-        return *m_obj.get_target_table(m_col_key);
+        return const_cast<Table&>(*m_table);
     }
     bool is_in_sync() const override
     {
@@ -713,7 +713,14 @@ public:
         return Lst<ObjKey>::size();
     }
 
-    using ObjList::operator[];
+    Obj get_object(size_t ndx);
+
+    Obj operator[](size_t ndx)
+    {
+        return get_object(ndx);
+    }
+
+    using Lst<ObjKey>::find_first;
 
     TableView get_sorted_view(SortDescriptor order) const;
     TableView get_sorted_view(ColKey column_key, bool ascending = true) const;
