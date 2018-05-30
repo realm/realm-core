@@ -18,7 +18,7 @@
 
 #include "impl/list_notifier.hpp"
 
-#include "shared_realm.hpp"
+#include "list.hpp"
 
 #include <realm/db.hpp>
 #include <realm/group.hpp>
@@ -26,11 +26,13 @@
 using namespace realm;
 using namespace realm::_impl;
 
-ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, LnkLst const& list)
+ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, ConstLstBase const& list,
+                           PropertyType type)
 : CollectionNotifier(std::move(realm))
-, m_table(list.get_parent().get_key())
+, m_type(type)
+, m_table(list.get_table()->get_key())
 , m_col(list.get_col_key())
-, m_obj(list.ConstLstBase::get_key())
+, m_obj(list.get_key())
 , m_prev_size(list.size())
 {
 }
@@ -42,7 +44,8 @@ void ListNotifier::release_data() noexcept
 
 void ListNotifier::do_attach_to(Transaction& sg)
 {
-    m_list = sg.get_table(m_table)->get_object(m_obj).get_linklist(m_col);
+    auto obj = sg.get_table(m_table)->get_object(m_obj);
+    m_list = List::get_list(m_type, obj, m_col);
 }
 
 void ListNotifier::do_detach_from(Transaction&)
@@ -52,9 +55,8 @@ void ListNotifier::do_detach_from(Transaction&)
 
 bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 {
-    if (!m_list.is_attached()) {
+    if (!m_list->is_attached())
         return false; // origin row was deleted after the notification was added
-    }
 
     info.lists.push_back({m_table.value, m_obj.value, m_col.value, &m_change});
 
@@ -64,7 +66,7 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 
 void ListNotifier::run()
 {
-    if (!m_list.is_attached()) {
+    if (!m_list->is_attached()) {
         // List was deleted, so report all of the rows being removed if this is
         // the first run after that
         if (m_prev_size) {
@@ -77,22 +79,25 @@ void ListNotifier::run()
         return;
     }
 
-    auto row_did_change = get_modification_checker(*m_info, m_list.get_target_table());
-    for (size_t i = 0; i < m_list.size(); ++i) {
-        if (m_change.modifications.contains(i))
-            continue;
-        if (row_did_change(m_list.get(i).value))
-            m_change.modifications.add(i);
-    }
+    m_prev_size = m_list->size();
 
-    for (auto const& move : m_change.moves) {
-        if (m_change.modifications.contains(move.to))
-            continue;
-        if (row_did_change(m_list.get(move.to).value))
-            m_change.modifications.add(move.to);
-    }
+    if (m_type == PropertyType::Object) {
+        auto& list = static_cast<LnkLst&>(*m_list);
+        auto row_did_change = get_modification_checker(*m_info, list.get_target_table());
+        for (size_t i = 0; i < list.size(); ++i) {
+            if (m_change.modifications.contains(i))
+                continue;
+            if (row_did_change(list.get(i).value))
+                m_change.modifications.add(i);
+        }
 
-    m_prev_size = m_list.size();
+        for (auto const& move : m_change.moves) {
+            if (m_change.modifications.contains(move.to))
+                continue;
+            if (row_did_change(list.get(move.to).value))
+                m_change.modifications.add(move.to);
+        }
+    }
 }
 
 void ListNotifier::do_prepare_handover(Transaction&)

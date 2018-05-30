@@ -148,13 +148,15 @@ public:
         size_t valid_count;
     };
 
+    static std::unique_ptr<LstBase> get_list(PropertyType type, Obj& parent_obj, ColKey col);
+
 private:
     friend ThreadSafeReference<List>;
 
     std::shared_ptr<Realm> m_realm;
     PropertyType m_type;
     mutable const ObjectSchema* m_object_schema = nullptr;
-    _impl::CollectionNotifier::Handle<_impl::CollectionNotifier> m_notifier;
+    _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
     std::unique_ptr<LstBase> m_list_base;
 
     void verify_valid_row(size_t row_ndx, bool insertion = false) const;

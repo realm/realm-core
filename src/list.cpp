@@ -19,7 +19,6 @@
 #include "list.hpp"
 
 #include "impl/list_notifier.hpp"
-#include "impl/primitive_list_notifier.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
@@ -92,10 +91,15 @@ List& List::operator=(List&&) = default;
 List::List(std::shared_ptr<Realm> r, Obj& parent_obj, ColKey col)
 : m_realm(std::move(r))
 , m_type(ObjectSchema::from_core_type(*parent_obj.get_table(), col) & ~PropertyType::Array)
+, m_list_base(get_list(m_type, parent_obj, col))
 {
-    switch_on_type(m_type, [&](auto t) {
+}
+
+std::unique_ptr<LstBase> List::get_list(PropertyType type, Obj& parent_obj, ColKey col)
+{
+    return switch_on_type(type, [&](auto t) {
         using T = std::decay_t<decltype(*t)>;
-        m_list_base = std::make_unique<typename ListType<T>::type>(parent_obj, col);
+        return std::unique_ptr<LstBase>(new typename ListType<T>::type(parent_obj, col));
     });
 }
 
@@ -389,17 +393,11 @@ NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
     // cleaned up.
     if (m_notifier && !m_notifier->have_callbacks())
         m_notifier.reset();
-    #if 0
     if (!m_notifier) {
-        if (get_type() == PropertyType::Object)
-            m_notifier = std::static_pointer_cast<_impl::CollectionNotifier>(std::make_shared<ListNotifier>(m_link_view, m_realm));
-        else
-            m_notifier = std::static_pointer_cast<_impl::CollectionNotifier>(std::make_shared<PrimitiveListNotifier>(m_table, m_realm));
+        m_notifier = std::make_shared<ListNotifier>(m_realm, *m_list_base, m_type);
         RealmCoordinator::register_notifier(m_notifier);
     }
     return {m_notifier, m_notifier->add_callback(std::move(cb))};
-    #endif
-    return {nullptr, 0};
 }
 
 List::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)

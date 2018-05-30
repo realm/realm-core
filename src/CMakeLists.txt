@@ -15,7 +15,6 @@ set(SOURCES
     impl/collection_notifier.cpp
     impl/list_notifier.cpp
     impl/object_notifier.cpp
-    impl/primitive_list_notifier.cpp
     impl/realm_coordinator.cpp
     impl/results_notifier.cpp
     impl/transact_log_handler.cpp
@@ -51,7 +50,6 @@ set(HEADERS
     impl/notification_wrapper.hpp
     impl/object_accessor_impl.hpp
     impl/object_notifier.hpp
-    impl/primitive_list_notifier.hpp
     impl/realm_coordinator.hpp
     impl/results_notifier.hpp
     impl/transact_log_handler.hpp

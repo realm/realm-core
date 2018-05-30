@@ -21,16 +21,19 @@
 
 #include "impl/collection_notifier.hpp"
 
+#include "property.hpp"
+
 #include <realm/list.hpp>
 
 namespace realm {
 namespace _impl {
 class ListNotifier : public CollectionNotifier {
 public:
-    ListNotifier(std::shared_ptr<Realm> realm, LnkLst const& list);
+    ListNotifier(std::shared_ptr<Realm> realm, ConstLstBase const& list, PropertyType type);
 
 private:
-    LnkLst m_list;
+    PropertyType m_type;
+    std::unique_ptr<LstBase> m_list;
 
     TableKey m_table;
     ColKey m_col;
