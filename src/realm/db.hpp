@@ -93,6 +93,7 @@ using DBRef = std::shared_ptr<DB>;
 
 class DB : public std::enable_shared_from_this<DB> {
 public:
+    // Create a DB and associate it with a file.
     static DBRef create(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
     static DBRef create(Replication& repl, const DBOptions options = DBOptions());
 
@@ -102,13 +103,11 @@ public:
     // instance, open another DB object on the same file. But you don't.
     DB(const DB&) = delete;
     DB& operator=(const DB&) = delete;
-    /// Close any open database, returning to the unattached state.
+    /// Close any open database. Close() is not thread-safe with respect to other calls to close().
+    /// We recommend releasing any DBref and explicitly closing all transactions instead of explicitly
+    /// closing the DB object.
     void close() noexcept;
 
-    /// A DB may be created in the unattached state, and then
-    /// later attached to a file with a call to open(). Calling any
-    /// function other than open(), is_attached(), and ~DB()
-    /// on an unattached instance results in undefined behavior.
     bool is_attached() const noexcept;
 
     Allocator& get_alloc()
@@ -214,12 +213,13 @@ public:
     /// Compact the database file.
     /// - The method will throw if called inside a transaction.
     /// - The method will throw if called in unattached state.
-    /// - The method will return false if other SharedGroups are accessing the
+    /// - The method will return false if other DBs are accessing the
     ///    database in which case compaction is not done. This is not
     ///    necessarily an error.
     /// It will return true following successful compaction.
     /// While compaction is in progress, attempts by other
     /// threads or processes to open the database will wait.
+    /// Likewise, attempts to create new transactions will wait.
     /// Be warned that resource requirements for compaction is proportional to
     /// the amount of live data in the database.
     /// Compaction works by writing the database contents to a temporary
@@ -233,6 +233,8 @@ public:
     ///
     /// WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     /// because it's not crash safe! It may corrupt your database if something fails
+    ///
+    /// WARNING: Compact() is not thread-safe with respect to a concurrent close()
     bool compact();
 
 #ifdef REALM_DEBUG
