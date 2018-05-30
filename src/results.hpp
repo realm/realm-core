@@ -73,8 +73,8 @@ public:
 
     PropertyType get_type() const;
 
-    // Get the LinkView this Results is derived from, if any
-//    LinkViewRef get_linkview() const { return m_link_view; }
+    // Get the LinkList this Results is derived from, if any
+//    LinkListRef get_linkview() const { return m_link_view; }
 
     // Get the size of this results
     // Can be either O(1) or O(N) depending on the state of things
@@ -141,7 +141,7 @@ public:
         Empty, // Backed by nothing (for missing tables)
         Table, // Backed directly by a Table
         Query, // Backed by a query that has not yet been turned into a TableView
-        LinkView,  // Backed directly by a LinkView
+        LinkList,  // Backed directly by a LinkList
         TableView, // Backed by a TableView created from a Query
     };
     // Get the currrent mode of the Results
@@ -191,8 +191,6 @@ public:
     // and then rerun after each commit (if needed) and redelivered if it changed
     NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
 
-    bool wants_background_updates() const { return m_wants_background_updates; }
-
     // Returns whether the rows are guaranteed to be in table order.
     bool is_in_table_order() const;
 
@@ -232,10 +230,8 @@ private:
 
     Mode m_mode = Mode::Empty;
     UpdatePolicy m_update_policy = UpdatePolicy::Auto;
-    bool m_has_used_table_view = false;
-    bool m_wants_background_updates = true;
 
-    bool update_linkview();
+    bool update_linklist();
 
     void validate_read() const;
     void validate_write() const;
@@ -251,8 +247,6 @@ private:
                                     Int agg_int, Float agg_float,
                                     Double agg_double, Timestamp agg_timestamp);
     void prepare_for_aggregate(size_t column, const char* name);
-
-    void set_table_view(TableView&& tv);
 
     template<typename Fn>
     auto dispatch(Fn&&) const;

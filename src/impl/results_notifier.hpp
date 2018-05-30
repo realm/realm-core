@@ -30,37 +30,30 @@ class ResultsNotifier : public CollectionNotifier {
 public:
     ResultsNotifier(Results& target);
 
-    void target_results_moved(Results& old_target, Results& new_target);
+    bool get_tableview(TableView& out);
 
 private:
-    // Target Results to update
-    // Can only be used with lock_target() held
-    Results* m_target_results;
-
-    // The source Query, in handover form iff m_sg is null
-//    std::unique_ptr<Transaction::Handover<Query>> m_query_handover;
-//    std::unique_ptr<Query> m_query;
-//
-//    DescriptorOrdering::HandoverPatch m_ordering_handover;
-//    DescriptorOrdering m_descriptor_ordering;
+    std::unique_ptr<Query> m_query;
+    DescriptorOrdering m_descriptor_ordering;
     bool m_target_is_in_table_order;
 
     // The TableView resulting from running the query. Will be detached unless
     // the query was (re)run since the last time the handover object was created
-    TableView m_tv;
-//    std::unique_ptr<Transaction::Handover<TableView>> m_tv_handover;
-//    std::unique_ptr<Transaction::Handover<TableView>> m_tv_to_deliver;
+    TableView m_run_tv;
+    std::unique_ptr<TableView> m_handover_tv;
+    std::unique_ptr<TableView> m_delivered_tv;
 
     // The table version from the last time the query was run. Used to avoid
     // rerunning the query when there's no chance of it changing.
-    uint_fast64_t m_last_seen_version = -1;
+    TableVersions m_last_seen_version;
 
     // The rows from the previous run of the query, for calculating diffs
-    std::vector<size_t> m_previous_rows;
+    std::vector<int64_t> m_previous_rows;
 
     // The changeset calculated during run() and delivered in do_prepare_handover()
     CollectionChangeBuilder m_changes;
     TransactionChangeInfo* m_info = nullptr;
+    bool m_results_were_used = true;
 
     bool need_to_run();
     void calculate_changes();

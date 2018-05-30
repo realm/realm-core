@@ -20,33 +20,31 @@
 
 #include "shared_realm.hpp"
 
-#if 0
-
 using namespace realm;
 using namespace realm::_impl;
 
 ResultsNotifier::ResultsNotifier(Results& target)
 : CollectionNotifier(target.get_realm())
-, m_target_results(&target)
+, m_query(std::make_unique<Query>(target.get_query()))
+, m_descriptor_ordering(target.get_descriptor_ordering())
 , m_target_is_in_table_order(target.is_in_table_order())
 {
-    Query q = target.get_query();
-    set_table(*q.get_table());
-    m_query_handover = source_shared_group().export_for_handover(q, MutableSourcePayload::Move);
-    DescriptorOrdering::generate_patch(target.get_descriptor_ordering(), m_ordering_handover);
-}
-
-void ResultsNotifier::target_results_moved(Results& old_target, Results& new_target)
-{
-    auto lock = lock_target();
-
-    REALM_ASSERT(m_target_results == &old_target);
-    m_target_results = &new_target;
+    set_table(*m_query->get_table());
 }
 
 void ResultsNotifier::release_data() noexcept
 {
-    m_query = nullptr;
+    m_query = {};
+}
+
+bool ResultsNotifier::get_tableview(TableView& out)
+{
+    if (m_delivered_tv) {
+        out = std::move(*m_delivered_tv);
+        m_delivered_tv.reset();
+        return true;
+    }
+    return false;
 }
 
 // Most of the inter-thread synchronization for run(), prepare_handover(),
@@ -72,9 +70,9 @@ void ResultsNotifier::release_data() noexcept
 
 bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 {
-    REALM_ASSERT(m_query);
     m_info = &info;
 
+    /*
     auto& table = *m_query->get_table();
     if (!table.is_attached())
         return false;
@@ -86,11 +84,7 @@ bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
         size_t col_ndx = find_container_column(parent, row_ndx, &table, type_Table, &Table::get_subtable);
         info.lists.push_back({parent.get_index_in_group(), row_ndx, col_ndx, &m_changes});
     }
-    else { // is a top-level table
-        if (info.table_moves_needed.size() <= table_ndx)
-            info.table_moves_needed.resize(table_ndx + 1);
-        info.table_moves_needed[table_ndx] = true;
-    }
+     */
 
     return has_run() && have_callbacks();
 }
@@ -98,40 +92,43 @@ bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 bool ResultsNotifier::need_to_run()
 {
     REALM_ASSERT(m_info);
-    REALM_ASSERT(!m_tv.is_attached());
 
     {
         auto lock = lock_target();
         // Don't run the query if the results aren't actually going to be used
-        if (!get_realm() || (!have_callbacks() && !m_target_results->wants_background_updates())) {
+        if (!get_realm() || (!have_callbacks() && !m_results_were_used))
             return false;
-        }
     }
 
     // If we've run previously, check if we need to rerun
-    if (has_run() && m_query->sync_view_if_needed() == m_last_seen_version) {
+    if (has_run() && m_query->sync_view_if_needed() == m_last_seen_version)
         return false;
-    }
-
     return true;
 }
 
 void ResultsNotifier::calculate_changes()
 {
-    size_t table_ndx = m_query->get_table()->get_index_in_group();
+    int64_t table_key = m_query->get_table()->get_key().value;
     if (has_run()) {
         CollectionChangeBuilder* changes = nullptr;
-        if (table_ndx == npos)
+        /*
+        if (table_key == npos)
             changes = &m_changes;
         else if (table_ndx < m_info->tables.size())
             changes = &m_info->tables[table_ndx];
+         */
+        auto it = m_info->tables.find(table_key);
+        if (it != m_info->tables.end())
+            changes = &it->second;
 
-        std::vector<size_t> next_rows;
-        next_rows.reserve(m_tv.size());
-        for (size_t i = 0; i < m_tv.size(); ++i)
-            next_rows.push_back(m_tv[i].get_index());
+        std::vector<int64_t> next_rows;
+        next_rows.reserve(m_run_tv.size());
+        for (size_t i = 0; i < m_run_tv.size(); ++i)
+            next_rows.push_back(m_run_tv[i].get_key().value);
 
         util::Optional<IndexSet> move_candidates;
+        /*
+         // This still maybe applies to List-derived queries?
         if (changes) {
             auto const& moves = changes->moves;
             for (auto& idx : m_previous_rows) {
@@ -147,24 +144,25 @@ void ResultsNotifier::calculate_changes()
             if (m_target_is_in_table_order && !m_descriptor_ordering.will_apply_sort())
                 move_candidates = changes->insertions;
         }
+         */
 
-        m_changes = CollectionChangeBuilder::calculate(m_previous_rows, next_rows,
-                                                       get_modification_checker(*m_info, *m_query->get_table()),
-                                                       move_candidates);
+//        m_changes = CollectionChangeBuilder::calculate(m_previous_rows, next_rows,
+//                                                       get_modification_checker(*m_info, *m_query->get_table()),
+//                                                       move_candidates);
 
         m_previous_rows = std::move(next_rows);
     }
     else {
-        m_previous_rows.resize(m_tv.size());
-        for (size_t i = 0; i < m_tv.size(); ++i)
-            m_previous_rows[i] = m_tv[i].get_index();
+        m_previous_rows.resize(m_run_tv.size());
+        for (size_t i = 0; i < m_run_tv.size(); ++i)
+            m_previous_rows[i] = m_run_tv[i].get_key().value;
     }
 }
 
 void ResultsNotifier::run()
 {
     // Table's been deleted, so report all rows as deleted
-    if (!m_query->get_table()->is_attached()) {
+    if (!m_query->get_table()) {
         m_changes = {};
         m_changes.deletions.set(m_previous_rows.size());
         m_previous_rows.clear();
@@ -175,82 +173,46 @@ void ResultsNotifier::run()
         return;
 
     m_query->sync_view_if_needed();
-    m_tv = m_query->find_all();
-    m_tv.apply_descriptor_ordering(m_descriptor_ordering);
-    m_last_seen_version = m_tv.sync_if_needed();
+    m_run_tv = m_query->find_all();
+    m_run_tv.apply_descriptor_ordering(m_descriptor_ordering);
+    m_last_seen_version = m_run_tv.sync_if_needed();
 
     calculate_changes();
 }
 
 void ResultsNotifier::do_prepare_handover(Transaction& sg)
 {
-    if (!m_tv.is_attached()) {
-        // if the table version didn't change we can just reuse the same handover
-        // object and bump its version to the current SG version
-        if (m_tv_handover)
-            m_tv_handover->version = sg.get_version_of_current_transaction();
-
-        // add_changes() needs to be called even if there are no changes to
-        // clear the skip flag on the callbacks
-        add_changes(std::move(m_changes));
-        return;
+    if (m_run_tv.is_attached()) {
+        REALM_ASSERT(m_run_tv.is_in_sync());
+        m_handover_tv = m_run_tv.clone_for_handover(&sg, PayloadPolicy::Move);
+        m_run_tv = {};
     }
 
-    REALM_ASSERT(m_tv.is_in_sync());
-
-    m_tv_handover = sg.export_for_handover(m_tv, MutableSourcePayload::Move);
-
+    // add_changes() needs to be called even if there are no changes to
+    // clear the skip flag on the callbacks
     add_changes(std::move(m_changes));
     REALM_ASSERT(m_changes.empty());
-
-    // detach the TableView as we won't need it again and keeping it around
-    // makes advance_read() much more expensive
-    m_tv = {};
 }
 
-void ResultsNotifier::deliver(Transaction& sg)
+void ResultsNotifier::deliver(Transaction&)
 {
-    auto lock = lock_target();
-
-    // Target realm being null here indicates that we were unregistered while we
-    // were in the process of advancing the Realm version and preparing for
-    // delivery, i.e. the results was destroyed from the "wrong" thread
-    if (!get_realm()) {
-        return;
-    }
-
-    REALM_ASSERT(!m_query_handover);
-    if (m_tv_to_deliver) {
-        Results::Internal::set_table_view(*m_target_results,
-                                          std::move(*sg.import_from_handover(std::move(m_tv_to_deliver))));
-    }
-    REALM_ASSERT(!m_tv_to_deliver);
 }
 
 bool ResultsNotifier::prepare_to_deliver()
 {
     auto lock = lock_target();
+    m_results_were_used = !!m_delivered_tv;
+    m_delivered_tv = std::move(m_handover_tv);
     if (!get_realm())
         return false;
-    m_tv_to_deliver = std::move(m_tv_handover);
     return true;
 }
 
 void ResultsNotifier::do_attach_to(Transaction& sg)
 {
-    REALM_ASSERT(m_query_handover);
-    m_query = sg.import_from_handover(std::move(m_query_handover));
-    m_descriptor_ordering = DescriptorOrdering::create_from_and_consume_patch(m_ordering_handover, *m_query->get_table());
+    m_query = sg.import_copy_of(*m_query, PayloadPolicy::Move);
 }
 
-void ResultsNotifier::do_detach_from(Transaction& sg)
+void ResultsNotifier::do_detach_from(Transaction&)
 {
-    REALM_ASSERT(m_query);
-    REALM_ASSERT(!m_tv.is_attached());
-
-    DescriptorOrdering::generate_patch(m_descriptor_ordering, m_ordering_handover);
-    m_query_handover = sg.export_for_handover(*m_query, MutableSourcePayload::Move);
-    m_query = nullptr;
 }
-
-#endif
