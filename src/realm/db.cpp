@@ -1051,7 +1051,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 throw InvalidDatabase("Unsupported Realm file format version", path);
 
             target_file_format_version =
-                gf::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
+                Group::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
 
             if (begin_new_session) {
                 // Determine version (snapshot number) and check history
@@ -1686,7 +1686,6 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
     // in a fully reliable way inside a transaction.
 
     // First a non-threadsafe but fast check
-    using gf = _impl::GroupFriend;
     int current_file_format_version = m_file_format_version;
     REALM_ASSERT(current_file_format_version <= target_file_format_version);
     REALM_ASSERT(current_hist_schema_version <= target_hist_schema_version);
@@ -1738,7 +1737,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
             // If somebody else has already performed the upgrade, we still need
             // to inform the rest of the core library about the new file format
             // of the attached file.
-            gf::set_file_format_version(*wt, target_file_format_version);
+            wt->set_file_format_version(target_file_format_version);
         }
 
         // History schema upgrade
@@ -1754,7 +1753,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
                 throw FileFormatUpgradeRequired();
             Replication* repl = get_replication();
             repl->upgrade_history_schema(current_hist_schema_version_2);     // Throws
-            gf::set_history_schema_version(*wt, target_hist_schema_version); // Throws
+            wt->set_history_schema_version(target_hist_schema_version);      // Throws
             dirty = true;
         }
 

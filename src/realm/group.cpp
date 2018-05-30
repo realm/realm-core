@@ -776,9 +776,8 @@ void Group::create_and_insert_table(TableKey key, StringData name)
         throw LogicError(LogicError::table_name_too_long);
 
     using namespace _impl;
-    typedef TableFriend tf;
     size_t table_ndx = key2ndx(key);
-    ref_type ref = tf::create_empty_table(m_alloc, key); // Throws
+    ref_type ref = Table::create_empty_table(m_alloc, key); // Throws
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     size_t prior_num_tables = m_tables.size();
     RefOrTagged rot = RefOrTagged::make_ref(ref);
@@ -806,7 +805,6 @@ Table* Group::create_table_accessor(size_t table_ndx)
     REALM_ASSERT(m_tables.size() == m_table_accessors.size());
     REALM_ASSERT(table_ndx < m_table_accessors.size());
 
-    typedef _impl::TableFriend tf;
     RefOrTagged rot = m_tables.get_as_ref_or_tagged(table_ndx);
     ref_type ref = rot.get_as_ref();
     if (ref == 0) {
@@ -833,10 +831,12 @@ Table* Group::create_table_accessor(size_t table_ndx)
         table->init(ref, this, table_ndx, m_is_writable);
     }
     else {
-        table = tf::create_accessor(m_alloc, ref, this, table_ndx, m_is_writable); // Throws
+        std::unique_ptr<Table> new_table(new Table(Table::ref_count_tag(), m_alloc)); // Throws
+        new_table->init(ref, this, table_ndx, m_is_writable);                         // Throws
+        table = new_table.release();
     }
     m_table_accessors[table_ndx] = table;
-    tf::complete_accessor(*table);
+    table->refresh_index_accessors();
     return table;
 }
 
@@ -884,8 +884,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     // tables. Such a behaviour is deemed too obscure, and we shall therefore
     // require that a removed table does not contain foreigh origin backlink
     // columns.
-    typedef _impl::TableFriend tf;
-    if (tf::is_cross_table_link_target(*table))
+    if (table->is_cross_table_link_target())
         throw CrossTableLinkTarget();
 
     // There is no easy way for Group::TransactAdvancer to handle removal of

@@ -324,13 +324,12 @@ void Table::remove_recursive(CascadeState& cascade_state)
         // We will have to re-evaluate size() after each call to clusters.erase
         for (size_t i = 0; i < cascade_state.rows.size(); ++i) {
             CascadeState::row& row = cascade_state.rows[i];
-            typedef _impl::GroupFriend gf;
-            Table& table = gf::get_table(*group, row.table_key);
+            auto table = group->get_table(row.table_key);
             // This might add to the list of objects that should be deleted
-            table.m_clusters.erase(row.key, cascade_state);
+            table->m_clusters.erase(row.key, cascade_state);
         }
         if (group->has_cascade_notification_handler())
-            _impl::GroupFriend::send_cascade_notification(*group, cascade_state);
+            group->send_cascade_notification(cascade_state);
     }
 }
 
@@ -473,50 +472,6 @@ ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, L
     return col_key;
 }
 
-
-ColKey Table::do_insert_column_unless_exists(ColKey col_key, DataType type, StringData name,
-                                             LinkTargetInfo& link_target_info, bool nullable, bool listtype,
-                                             bool* was_inserted)
-{
-    ColKey existing_key = get_column_key(name);
-    if (existing_key) {
-        col_key = existing_key;
-    }
-
-    if (valid_column(col_key)) {
-        StringData existing_name = get_column_name(col_key);
-        if (existing_name == name) {
-            DataType existing_type = get_column_type(col_key);
-            if (existing_type != type) {
-                throw LogicError(LogicError::type_mismatch);
-            }
-            bool existing_is_nullable = is_nullable(col_key);
-            if (existing_is_nullable != nullable) {
-                throw LogicError(LogicError::type_mismatch);
-            }
-            if (is_link_type(ColumnType(type)) &&
-                m_spec.get_opposite_link_table_key(colkey2ndx(col_key)) !=
-                    link_target_info.m_target_table->get_key()) {
-                throw LogicError(LogicError::type_mismatch);
-            }
-
-            // Column existed, and was identical to the requested column -- all is good.
-            if (was_inserted) {
-                *was_inserted = false;
-            }
-            return col_key;
-        }
-        else {
-            REALM_ASSERT(!get_column_key(name));
-        }
-    }
-
-    col_key = do_insert_column(col_key, type, name, link_target_info, nullable, listtype || type == type_LinkList);
-    if (was_inserted) {
-        *was_inserted = true;
-    }
-    return col_key;
-}
 
 void Table::populate_search_index(ColKey col_key)
 {

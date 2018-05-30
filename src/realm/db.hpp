@@ -802,7 +802,8 @@ inline void Transaction::promote_to_write(O* observer)
         // If the group has no top array (top_ref == 0), create a new node
         // structure for an empty group now, to be ready for modifications. See
         // also Group::attach_shared().
-        _impl::GroupFriend::create_empty_group_when_missing(*this); // Throws
+        if (!m_top.is_attached())
+            create_empty_group(); // Throws
     }
     catch (...) {
         db->do_end_write();

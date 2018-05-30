@@ -306,12 +306,11 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
 void Spec::erase_column(size_t column_ndx)
 {
     REALM_ASSERT(column_ndx < m_types.size());
-    typedef _impl::TableFriend tf;
 
     // If the column is a subtable column, we have to delete
     // the subspec(s) as well
     ColumnType type = ColumnType(m_types.get(column_ndx));
-    if (tf::is_link_type(type)) {
+    if (Table::is_link_type(type)) {
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
         m_subspecs.erase(subspec_ndx); // origin table index  : Throws
     }
