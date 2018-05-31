@@ -426,17 +426,11 @@ void Realm::cache_new_schema()
 
 void Realm::translate_schema_error()
 {
-#if 0 // FIXME
-    // Open another copy of the file to read the new (incompatible) schema without changing
-    // our read transaction
-    auto config = m_config;
-    config.schema = util::none;
-    auto realm = Realm::make_shared_realm(std::move(config), nullptr);
-    auto& new_schema = realm->schema();
+    // Read the new (incompatible) schema without changing our read transaction
+    auto new_schema = ObjectStore::schema_from_group(*m_coordinator->begin_read());
 
     // Should always throw
     ObjectStore::verify_valid_external_changes(m_schema.compare(new_schema, true));
-#endif
 
     // Something strange happened so just rethrow the old exception
     throw;
