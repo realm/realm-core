@@ -215,6 +215,7 @@ util::Optional<T> Results::last()
         evaluate_query_if_needed(); // avoid running the query twice (for size() and for get())
     return try_get<T>(size() - 1);
 }
+#endif
 
 bool Results::update_linklist()
 {
@@ -299,6 +300,7 @@ size_t Results::index_of(Obj const& row)
     REALM_COMPILER_HINT_UNREACHABLE();
 }
 
+#if 0
 template<typename T>
 size_t Results::index_of(T const& value)
 {

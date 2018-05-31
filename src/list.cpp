@@ -125,8 +125,9 @@ ObjectSchema const& List::get_object_schema() const
 Query List::get_query() const
 {
     verify_attached();
-    return Query();
-//    return m_link_view ? m_table->where(m_link_view) : m_table->where();
+    if (m_type == PropertyType::Object)
+        return m_list_base->get_table()->where(as<Obj>());
+    REALM_UNREACHABLE();
 }
 
 ObjKey List::get_parent_object_key() const
@@ -219,14 +220,11 @@ size_t List::find(Obj const& o) const
 size_t List::find(Query&& q) const
 {
     verify_attached();
-    #if 0
-    if (m_link_view) {
-        size_t index = get_query().and_query(std::move(q)).find();
-        return index == not_found ? index : m_link_view->find(index);
+    if (m_type == PropertyType::Object) {
+        ObjKey key = get_query().and_query(std::move(q)).find();
+        return key ? as<Obj>().ConstLstIf<ObjKey>::find_first(key) : not_found;
     }
-    return q.find();
-    #endif
-    return 0;
+    REALM_UNREACHABLE();
 }
 
 template<typename T>
@@ -315,15 +313,7 @@ void List::delete_all()
 Results List::sort(SortDescriptor order) const
 {
     verify_attached();
-    #if 0
-    if (m_link_view)
-        return Results(m_realm, m_link_view, util::none, std::move(order));
-
-    DescriptorOrdering new_order;
-    new_order.append_sort(std::move(order));
-    return Results(m_realm, get_query(), std::move(new_order));
-    #endif
-    return Results();
+    return Results(m_realm, *m_list_base, util::none, std::move(order));
 }
 
 Results List::sort(std::vector<std::pair<std::string, bool>> const& keypaths) const
@@ -334,12 +324,7 @@ Results List::sort(std::vector<std::pair<std::string, bool>> const& keypaths) co
 Results List::filter(Query q) const
 {
     verify_attached();
-    #if 0
-    if (m_link_view)
-        return Results(m_realm, m_link_view, get_query().and_query(std::move(q)));
-    return Results(m_realm, get_query().and_query(std::move(q)));
-    #endif
-    return Results();
+    return Results(m_realm, *m_list_base, get_query().and_query(std::move(q)));
 }
 
 Results List::as_results() const
@@ -426,10 +411,22 @@ REALM_PRIMITIVE_LIST_TYPE(util::Optional<double>)
 #undef REALM_PRIMITIVE_LIST_TYPE
 } // namespace realm
 
+namespace {
+size_t hash_combine() { return 0; }
+template<typename T, typename... Rest>
+size_t hash_combine(const T& v, Rest... rest)
+{
+    size_t h = hash_combine(rest...);
+    h ^= std::hash<T>()(v) + 0x9e3779b9 + (h<<6) + (h>>2);
+    return h;
+}
+}
+
 namespace std {
 size_t hash<List>::operator()(List const& list) const
 {
-//    return std::hash<void*>()(list.m_link_view ? list.m_link_view.get() : (void*)list.m_table.get());
-    return 0;
+    auto& impl = *list.m_list_base;
+    return hash_combine(impl.get_key().value, impl.get_table()->get_key().value,
+                        impl.get_col_key().value);
 }
 }
