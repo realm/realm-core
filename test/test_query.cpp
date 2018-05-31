@@ -2344,7 +2344,6 @@ TEST(Query_OnTableView_where)
     }
 }
 
-
 TEST(Query_StrIndex3)
 {
     // Create two columns where query match-density varies alot throughout the rows. This forces the query engine to
@@ -2445,7 +2444,6 @@ TEST(Query_StrIndex3)
             CHECK_EQUAL(vec[t], v.get_key(t));
     }
 }
-
 
 TEST(Query_StrIndex2)
 {

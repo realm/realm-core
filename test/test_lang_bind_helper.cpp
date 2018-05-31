@@ -812,273 +812,6 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     CHECK_EQUAL(17.0f, other->get_float(1, 0));
     //    CHECK_EQUAL(???,   other->get_subtable (2,0));
 }
-
-
-TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist(path);
-    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
-    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
-
-    // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg->start_read() const Group& group = rt;
-    CHECK_EQUAL(0, rt->size());
-
-    // Create 3 mixed columns and 3 rows
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.add_table("t");
-        table_w->add_column(type_Mixed, "a");
-        table_w->add_column(type_Mixed, "b");
-        table_w->add_column(type_Mixed, "c");
-        table_w->add_empty_row(3);
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    // Every cell must have integer type and be zero by default
-    ConstTableRef table = rt->get_table("t");
-    for (size_t row_ndx = 0; row_ndx < 3; ++row_ndx) {
-        for (size_t col_ndx = 0; col_ndx < 3; ++col_ndx) {
-            CHECK_EQUAL(type_Int, table->get_mixed_type(col_ndx, row_ndx)) &&
-                CHECK_EQUAL(0, table->get_mixed(col_ndx, row_ndx).get_int());
-        }
-    }
-
-    using int_type = decltype(Mixed().get_int());
-
-    auto set_subtab = [](TableRef table_w, size_t col_ndx, size_t row_ndx, int_type value) {
-        table_w->set_mixed(col_ndx, row_ndx, Mixed(Mixed::subtable_tag()));
-        TableRef subtab_w = table_w->get_subtable(col_ndx, row_ndx);
-        subtab_w->add_column(type_Int, "");
-        subtab_w->add_empty_row();
-        subtab_w->set_int(0, 0, value);
-    };
-
-    auto check_subtab = [this](ConstTableRef table_r, size_t col_ndx, size_t row_ndx, int_type value) {
-        ConstTableRef subtab = table_r->get_subtable(col_ndx, row_ndx);
-        return CHECK_EQUAL(1, subtab->get_column_count()) && CHECK_EQUAL(type_Int, subtab->get_column_type(0)) &&
-               CHECK_EQUAL(1, subtab->size()) && CHECK_EQUAL(value, subtab->get_int(0, 0));
-    };
-
-    // Change value types (round 1 of 2)
-    char bin_1[] = {'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i'};
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        table_w->set_mixed(0, 0, Mixed(int_type(2)));
-        table_w->set_mixed(0, 1, Mixed(true));
-        table_w->set_mixed(0, 2, Mixed(OldDateTime(3)));
-        table_w->set_mixed(1, 0, Mixed(4.0f));
-        table_w->set_mixed(1, 1, Mixed(5.0));
-        wt.get_group().verify();
-        table_w->set_mixed(1, 2, Mixed(StringData("Hadamard")));
-        table_w->set_mixed(2, 0, Mixed(BinaryData(bin_1)));
-        set_subtab(table_w, 2, 1, 6);
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) && CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 1)) && CHECK_EQUAL(true, table->get_mixed(0, 1).get_bool());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(0, 2)) &&
-        CHECK_EQUAL(OldDateTime(3), table->get_mixed(0, 2).get_olddatetime());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(1, 0)) && CHECK_EQUAL(4.0f, table->get_mixed(1, 0).get_float());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(1, 1)) && CHECK_EQUAL(5.0, table->get_mixed(1, 1).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(1, 2)) &&
-        CHECK_EQUAL("Hadamard", table->get_mixed(1, 2).get_string());
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(2, 0)) &&
-        CHECK_EQUAL(BinaryData(bin_1), table->get_mixed(2, 0).get_binary());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(2, 1)) && check_subtab(table, 2, 1, 6);
-    CHECK_EQUAL(type_Int, table->get_mixed_type(2, 2)) && CHECK_EQUAL(0, table->get_mixed(2, 2).get_int());
-
-    // Change value types (round 2 of 2)
-    char bin_2[] = {'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i'};
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        table_w->set_mixed(0, 1, Mixed(20.0f));
-        table_w->set_mixed(0, 2, Mixed(false));
-        set_subtab(table_w, 1, 0, 30);
-        table_w->set_mixed(1, 1, Mixed(BinaryData(bin_2)));
-        table_w->set_mixed(1, 2, Mixed(int_type(40)));
-        table_w->set_mixed(2, 0, Mixed(50.0));
-        table_w->set_mixed(2, 1, Mixed(StringData("Banach")));
-        table_w->set_mixed(2, 2, Mixed(OldDateTime(60)));
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) && CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 1)) && CHECK_EQUAL(20.0f, table->get_mixed(0, 1).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2)) && CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0)) && check_subtab(table, 1, 0, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 1)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 1).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) && CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) && CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 1)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2, 1).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 2)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 2).get_olddatetime());
-
-    // Insert rows before
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        table_w->insert_empty_row(0, 8);
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 8 + 0)) && CHECK_EQUAL(2, table->get_mixed(0, 8 + 0).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 8 + 1)) &&
-        CHECK_EQUAL(20.0f, table->get_mixed(0, 8 + 1).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 8 + 2)) &&
-        CHECK_EQUAL(false, table->get_mixed(0, 8 + 2).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 8 + 0)) && check_subtab(table, 1, 8 + 0, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 8 + 1)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 8 + 1).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 8 + 2)) && CHECK_EQUAL(40, table->get_mixed(1, 8 + 2).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 8 + 0)) &&
-        CHECK_EQUAL(50.0, table->get_mixed(2, 8 + 0).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 8 + 1)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2, 8 + 1).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 8 + 2)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 8 + 2).get_olddatetime());
-
-    // Move rows by remove() (ordered removal)
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        table_w->remove(4);
-        table_w->remove(2);
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 6 + 0)) && CHECK_EQUAL(2, table->get_mixed(0, 6 + 0).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 6 + 1)) &&
-        CHECK_EQUAL(20.0f, table->get_mixed(0, 6 + 1).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 6 + 2)) &&
-        CHECK_EQUAL(false, table->get_mixed(0, 6 + 2).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 6 + 0)) && check_subtab(table, 1, 6 + 0, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 6 + 1)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 6 + 1).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 6 + 2)) && CHECK_EQUAL(40, table->get_mixed(1, 6 + 2).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 6 + 0)) &&
-        CHECK_EQUAL(50.0, table->get_mixed(2, 6 + 0).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 6 + 1)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2, 6 + 1).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 6 + 2)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 6 + 2).get_olddatetime());
-
-    // Move rows by move_last_over() (unordered removal)
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        table_w->move_last_over(2); // 8 -> 2
-        table_w->move_last_over(4); // 7 -> 4
-        table_w->move_last_over(0); // 6 -> 0
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) && CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 4)) && CHECK_EQUAL(20.0f, table->get_mixed(0, 4).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2)) && CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0)) && check_subtab(table, 1, 0, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 4)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 4).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) && CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) && CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 4)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2, 4).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 2)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 2).get_olddatetime());
-
-    // Swap rows
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        table_w->swap_rows(4, 0);
-        table_w->swap_rows(2, 5);
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 4)) && CHECK_EQUAL(2, table->get_mixed(0, 4).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 0)) && CHECK_EQUAL(20.0f, table->get_mixed(0, 0).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 5)) && CHECK_EQUAL(false, table->get_mixed(0, 5).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 4)) && check_subtab(table, 1, 4, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 0)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 0).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 5)) && CHECK_EQUAL(40, table->get_mixed(1, 5).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 4)) && CHECK_EQUAL(50.0, table->get_mixed(2, 4).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 0)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2, 0).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 5)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 5).get_olddatetime());
-
-    // Insert columns before
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        table_w->insert_column(0, type_Int, "x1");
-        table_w->insert_column(0, type_OldDateTime, "x2");
-        table_w->insert_column(1, type_Float, "x3");
-        table_w->insert_column(0, type_Double, "x4");
-        table_w->insert_column(2, type_String, "x5");
-        table_w->insert_column(1, type_Binary, "x6");
-        table_w->insert_column(3, type_Table, "x7");
-        table_w->insert_column(2, type_Mixed, "x8");
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0 + 8, 4)) && CHECK_EQUAL(2, table->get_mixed(0 + 8, 4).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0 + 8, 0)) &&
-        CHECK_EQUAL(20.0f, table->get_mixed(0 + 8, 0).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0 + 8, 5)) &&
-        CHECK_EQUAL(false, table->get_mixed(0 + 8, 5).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1 + 8, 4)) && check_subtab(table, 1 + 8, 4, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1 + 8, 0)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1 + 8, 0).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1 + 8, 5)) && CHECK_EQUAL(40, table->get_mixed(1 + 8, 5).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2 + 8, 4)) &&
-        CHECK_EQUAL(50.0, table->get_mixed(2 + 8, 4).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2 + 8, 0)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2 + 8, 0).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2 + 8, 5)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2 + 8, 5).get_olddatetime());
-
-    // Remove columns before
-    {
-        WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("t");
-        table_w->remove_column(4);
-        table_w->remove_column(2);
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0 + 6, 4)) && CHECK_EQUAL(2, table->get_mixed(0 + 6, 4).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0 + 6, 0)) &&
-        CHECK_EQUAL(20.0f, table->get_mixed(0 + 6, 0).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0 + 6, 5)) &&
-        CHECK_EQUAL(false, table->get_mixed(0 + 6, 5).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1 + 6, 4)) && check_subtab(table, 1 + 6, 4, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1 + 6, 0)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1 + 6, 0).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1 + 6, 5)) && CHECK_EQUAL(40, table->get_mixed(1 + 6, 5).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2 + 6, 4)) &&
-        CHECK_EQUAL(50.0, table->get_mixed(2 + 6, 4).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2 + 6, 0)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2 + 6, 0).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2 + 6, 5)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2 + 6, 5).get_olddatetime());
-}
 #endif // LEGACY_TESTS
 
 
@@ -2931,38 +2664,40 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     CHECK_EQUAL(1, l.size());
 }
 
-#ifdef LEGACY_TESTS
 TEST(LangBindHelper_RollbackAndContinueAsRead_IntIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    Group& g = const_cast<Group&>(sg.begin_read());
+    auto g = sg->start_read();
+    g->promote_to_write();
 
-    LangBindHelper::promote_to_write(sg);
+    TableRef target = g->add_table("target");
+    ColKey col = target->add_column(type_Int, "pk");
+    target->add_search_index(col);
 
-    TableRef target = g.add_table("target");
-    target->add_column(type_Int, "pk");
-    target->add_search_index(0);
-
-    target->add_empty_row(REALM_MAX_BPNODE_SIZE + 1);
-
-    LangBindHelper::commit_and_continue_as_read(sg);
-    LangBindHelper::promote_to_write(sg);
+    std::vector<ObjKey> keys;
+    target->create_objects(REALM_MAX_BPNODE_SIZE + 1, keys);
+    g->commit_and_continue_as_read();
+    g->promote_to_write();
 
     // Ensure that the index has a different bptree layout so that failing to
     // refresh it will do bad things
-    for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
-        target->set_int(0, i, i);
+    auto it = target->begin();
+    for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i) {
+        it->set<int64_t>(col, i);
+        ++it;
+    }
 
-    LangBindHelper::rollback_and_continue_as_read(sg);
-    LangBindHelper::promote_to_write(sg);
+    g->rollback_and_continue_as_read();
+    g->promote_to_write();
 
     // Crashes if index has an invalid parent ref
     target->clear();
 }
 
 
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -3519,42 +3254,39 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     sg.end_read();
     sg_w.end_read();
 }
+#endif
 
 
 TEST(LangBindHelper_MemOnly)
 {
     SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    DBRef sg = DB::create(hist, DBOptions(DBOptions::Durability::MemOnly));
 
     // Verify that the db is empty after populating and then re-opening a file
     {
-        ShortCircuitHistory hist(path);
-        DBRef sg = DB::create(hist, DBOptions(DBOptions::Durability::MemOnly));
         WriteTransaction wt(sg);
         wt.add_table("table");
         wt.commit();
     }
     {
-        ShortCircuitHistory hist(path);
-        DBRef sg = DB::create(hist, DBOptions(DBOptions::Durability::MemOnly));
-        TransactionRef rt = sg->start_read() CHECK(rt.get_group().is_empty());
+        TransactionRef rt = sg->start_read();
+        CHECK(!rt->is_empty());
     }
+    sg->close();
+    sg = DB::create(hist, DBOptions(DBOptions::Durability::MemOnly));
 
     // Verify that basic replication functionality works
-
-    ShortCircuitHistory hist(path);
-    DB sg_r(hist, DBOptions(DBOptions::Durability::MemOnly));
-    DBRef sg_w = DB::create(hist, DBOptions(DBOptions::Durability::MemOnly));
-    ReadTransactionRef rt(sg_r);
-
+    auto rt = sg->start_read();
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         wt.add_table("table");
         wt.commit();
     }
 
-    CHECK(rt.get_group().is_empty());
-    LangBindHelper::advance_read(sg_r);
-    CHECK(!rt.get_group().is_empty());
+    CHECK(rt->is_empty());
+    rt->advance_read();
+    CHECK(!rt->is_empty());
 }
 
 TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
@@ -3563,60 +3295,54 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    const Group& group = sg.begin_read();
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+    auto rt = sg->start_read();
+    auto group_w = sg->start_read();
 
     // Add initial data
-    LangBindHelper::promote_to_write(sg_w);
-    TableRef table_w = group_w.add_table("table");
-    table_w->add_column(type_Int, "int1");
-    table_w->add_column(type_String, "str");
-    table_w->add_column(type_Int, "int2");
-    table_w->add_empty_row();
-    table_w->set_int(0, 0, 1);
-    table_w->set_string(1, 0, "2");
-    table_w->set_int(2, 0, 3);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    group_w.verify();
+    group_w->promote_to_write();
+    TableRef table_w = group_w->add_table("table");
+    auto c0 = table_w->add_column(type_Int, "int1");
+    auto c1 = table_w->add_column(type_String, "str");
+    auto c2 = table_w->add_column(type_Int, "int2");
+    auto ok = table_w->create_object().set_all(1, "2", 3).get_key();
+    group_w->commit_and_continue_as_read();
+    group_w->verify();
 
     rt->advance_read();
     ConstTableRef table = rt->get_table("table");
-    CHECK_EQUAL(1, table->get_int(0, 0));
-    CHECK_EQUAL("2", table->get_string(1, 0));
-    CHECK_EQUAL(3, table->get_int(2, 0));
+    auto obj = table->get_object(ok);
+    CHECK_EQUAL(1, obj.get<int64_t>(c0));
+    CHECK_EQUAL("2", obj.get<StringData>(c1));
+    CHECK_EQUAL(3, obj.get<int64_t>(c2));
     rt->verify();
 
     // Add search index and re-verify
-    LangBindHelper::promote_to_write(sg_w);
-    table_w->add_search_index(1);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    group_w.verify();
+    group_w->promote_to_write();
+    table_w->add_search_index(c1);
+    group_w->commit_and_continue_as_read();
+    group_w->verify();
 
     rt->advance_read();
-    CHECK_EQUAL(1, table->get_int(0, 0));
-    CHECK_EQUAL("2", table->get_string(1, 0));
-    CHECK_EQUAL(3, table->get_int(2, 0));
-    CHECK(table->has_search_index(1));
+    CHECK_EQUAL(1, obj.get<int64_t>(c0));
+    CHECK_EQUAL("2", obj.get<StringData>(c1));
+    CHECK_EQUAL(3, obj.get<int64_t>(c2));
+    CHECK(table->has_search_index(c1));
     rt->verify();
 
     // Remove search index and re-verify
-    LangBindHelper::promote_to_write(sg_w);
-    table_w->remove_search_index(1);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    group_w.verify();
+    group_w->promote_to_write();
+    table_w->remove_search_index(c1);
+    group_w->commit_and_continue_as_read();
+    group_w->verify();
 
     rt->advance_read();
-    CHECK_EQUAL(1, table->get_int(0, 0));
-    CHECK_EQUAL("2", table->get_string(1, 0));
-    CHECK_EQUAL(3, table->get_int(2, 0));
-    CHECK(!table->has_search_index(1));
+    CHECK_EQUAL(1, obj.get<int64_t>(c0));
+    CHECK_EQUAL("2", obj.get<StringData>(c1));
+    CHECK_EQUAL(3, obj.get<int64_t>(c2));
+    CHECK(!table->has_search_index(c1));
     rt->verify();
 }
 
-#endif
 TEST(LangBindHelper_HandoverQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -4128,22 +3854,26 @@ void handover_verifier(HandoverControl<DB::Handover<TableView>>* control, TestCo
 } // anonymous namespace
 #endif
 
-#ifdef LEGACY_TESTS
 namespace {
 
-void attacher(std::string path)
+void attacher(std::string path, ColKey col)
 {
+    // Creating a new DB in each attacher is on purpose, since we're
+    // testing races in the attachment process, and that only takes place
+    // during creation of the DB object.
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     for (int i = 0; i < 100; ++i) {
-        Group& g = const_cast<Group&>(sg.begin_read());
-        g.verify();
-        auto table = g.get_table("table");
-        LangBindHelper::promote_to_write(sg);
-        table->set_int(0, i, 1 + table->get_int(0, i * 10));
-        LangBindHelper::commit_and_continue_as_read(sg);
-        g.verify();
-        sg.end_read();
+        auto g = sg->start_read();
+        g->verify();
+        auto table = g->get_table("table");
+        g->promote_to_write();
+        auto o = table->get_object(ObjKey(i));
+        auto o2 = table->get_object(ObjKey(i * 10));
+        o.set<int64_t>(col, 1 + o2.get<int64_t>(col));
+        g->commit_and_continue_as_read();
+        g->verify();
+        g->end_read();
     }
 }
 } // anonymous namespace
@@ -4153,24 +3883,25 @@ TEST(LangBindHelper_RacingAttachers)
 {
     const int num_attachers = 10;
     SHARED_GROUP_TEST_PATH(path);
+    ColKey col;
     {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
         DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-        Group& g = sg.begin_write();
-        auto table = g.add_table("table");
-        table->add_column(type_Int, "first");
-        table->add_empty_row(10000);
-        sg.commit();
+        auto g = sg->start_write();
+        auto table = g->add_table("table");
+        col = table->add_column(type_Int, "first");
+        for (int i = 0; i < 1000; ++i)
+            table->create_object(ObjKey(i));
+        g->commit();
     }
     Thread attachers[num_attachers];
     for (int i = 0; i < num_attachers; ++i) {
-        attachers[i].start([&] { attacher(path); });
+        attachers[i].start([&] { attacher(path, col); });
     }
     for (int i = 0; i < num_attachers; ++i) {
         attachers[i].join();
     }
 }
-#endif
 
 #ifdef LEGACY_TESTS
 TEST(LangBindHelper_HandoverBetweenThreads)
@@ -5256,112 +4987,14 @@ TEST(LangBindHelper_VersionControl)
     }
 }
 
-#ifdef LEGACY_TESTS
-TEST(LangBindHelper_LinkListCrash)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    {
-        WriteTransaction wt(sg);
-        TableRef points = wt.add_table("Point");
-        points->add_column(type_Int, "value");
-        wt.commit();
-    }
-
-    std::unique_ptr<Replication> hist2(make_in_realm_history(path));
-    DB sg2(*hist2, DBOptions(crypt_key()));
-    Group& g2 = const_cast<Group&>(sg2.begin_read());
-    for (int i = 0; i < 2; ++i) {
-        WriteTransaction wt(sg);
-        wt.commit();
-    }
-    for (int i = 0; i < 1; ++i) {
-        WriteTransaction wt(sg);
-        wt.get_table("Point")->add_empty_row();
-        wt.commit();
-    }
-    {
-        TransactionRef rt = sg->start_read() rt.get_group().verify();
-    }
-    g2.verify();
-    LangBindHelper::advance_read(sg2);
-    g2.verify();
-}
-
-
-TEST(LangBindHelper_OpenCloseOpen)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-    LangBindHelper::promote_to_write(sg_w);
-    group_w.add_table("bar");
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    sg_w.close();
-    sg_w.open(*hist_w, DBOptions(crypt_key()));
-    sg_w.begin_read();
-    LangBindHelper::promote_to_write(sg_w);
-    group_w.add_table("foo");
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    sg_w.close();
-}
-
-
-TEST(LangBindHelper_MixedCommitSizes)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-
-    Group& g = const_cast<Group&>(sg.begin_read());
-
-    LangBindHelper::promote_to_write(sg);
-    TableRef table = g.add_table("table");
-    table->add_column(type_Binary, "value");
-    LangBindHelper::commit_and_continue_as_read(sg);
-
-    std::unique_ptr<char[]> buffer(new char[65536]);
-    std::fill(buffer.get(), buffer.get() + 65536, 0);
-
-    // 4 large commits so that both write log files are large and fully
-    // initialized (with both iv slots being non-zero when encryption is
-    // enabled), two small commits to shrink both of the log files, then two
-    // large commits to re-expand them
-    for (int i = 0; i < 4; ++i) {
-        LangBindHelper::promote_to_write(sg);
-        table->insert_empty_row(0);
-        table->set_binary(0, 0, BinaryData(buffer.get(), 65536));
-        LangBindHelper::commit_and_continue_as_read(sg);
-        g.verify();
-    }
-
-    for (int i = 0; i < 2; ++i) {
-        LangBindHelper::promote_to_write(sg);
-        table->insert_empty_row(0);
-        table->set_binary(0, 0, BinaryData(buffer.get(), 1024));
-        LangBindHelper::commit_and_continue_as_read(sg);
-        g.verify();
-    }
-
-    for (int i = 0; i < 2; ++i) {
-        LangBindHelper::promote_to_write(sg);
-        table->insert_empty_row(0);
-        table->set_binary(0, 0, BinaryData(buffer.get(), 65536));
-        LangBindHelper::commit_and_continue_as_read(sg);
-        g.verify();
-    }
-}
-
 TEST(LangBindHelper_RollbackToInitialState1)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
-    sg_w.begin_read();
-    LangBindHelper::promote_to_write(sg_w);
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    auto trans = sg_w->start_read();
+    trans->promote_to_write();
+    trans->rollback_and_continue_as_read();
 }
 
 
@@ -5370,10 +5003,9 @@ TEST(LangBindHelper_RollbackToInitialState2)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
-    sg_w.begin_write();
-    sg_w.rollback();
+    auto trans = sg_w->start_write();
+    trans->rollback();
 }
-#endif
 
 TEST(LangBindHelper_Compact)
 {
