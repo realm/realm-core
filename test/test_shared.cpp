@@ -2751,6 +2751,7 @@ TEST(Shared_MovingEnumStringColumn)
         }
     }
 }
+#endif
 
 TEST(Shared_MovingSearchIndex)
 {
@@ -2760,113 +2761,104 @@ TEST(Shared_MovingSearchIndex)
     SHARED_GROUP_TEST_PATH(path);
     DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
 
-    // Create a regular string column and an enumeration strings column, and
-    // equip both with search indexes.
+    // Create an int column, regular string column, and an enumeration strings
+    // column, and equip them with search indexes.
+    ColKey int_col, str_col, enum_col, padding_col;
+    std::vector<ObjKey> obj_keys;
     {
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("foo");
-        table->add_column(type_String, "regular");
-        table->add_column(type_String, "enum");
-        table->add_empty_row(64);
+        padding_col = table->add_column(type_Int, "padding");
+        int_col = table->add_column(type_Int, "int");
+        str_col = table->add_column(type_String, "regular");
+        enum_col = table->add_column(type_String, "enum");
+
+        table->create_objects(64, obj_keys);
         for (int i = 0; i < 64; ++i) {
+            auto obj = table->get_object(obj_keys[i]);
             std::string out(std::string("foo") + util::to_string(i));
-            table->set_string(0, i, out);
-            table->set_string(1, i, "bar");
+            obj.set<Int>(int_col, i);
+            obj.set<String>(str_col, out);
+            obj.set<String>(enum_col, "bar");
         }
-        table->set_string(1, 63, "bar63");
-        table->optimize();
-        CHECK_EQUAL(0, table->get_num_unique_values(0));
-        CHECK_EQUAL(2, table->get_num_unique_values(1));
-        table->add_search_index(0);
-        table->add_search_index(1);
+        table->get_object(obj_keys.back()).set<String>(enum_col, "bar63");
+        table->enumerate_string_column(enum_col);
+        CHECK_EQUAL(0, table->get_num_unique_values(int_col));
+        CHECK_EQUAL(0, table->get_num_unique_values(str_col));
+        CHECK_EQUAL(2, table->get_num_unique_values(enum_col));
+
+        table->add_search_index(int_col);
+        table->add_search_index(str_col);
+        table->add_search_index(enum_col);
+
         wt.get_group().verify();
-        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
-        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+
+        CHECK_EQUAL(obj_keys[61], table->find_first_int(int_col, 61));
+        CHECK_EQUAL(obj_keys[62], table->find_first_string(str_col, "foo62"));
+        CHECK_EQUAL(obj_keys[63], table->find_first_string(enum_col, "bar63"));
         wt.commit();
     }
-    // Insert a new column before the two string columns.
+
+    // Remove the padding column to shift the indexed columns
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("foo");
-        CHECK_EQUAL(0, table->get_num_unique_values(0));
-        CHECK_EQUAL(2, table->get_num_unique_values(1));
-        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
-        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
-        table->insert_column(0, type_Int, "i");
+
+        CHECK(table->has_search_index(int_col));
+        CHECK(table->has_search_index(str_col));
+        CHECK(table->has_search_index(enum_col));
+        CHECK_EQUAL(0, table->get_num_unique_values(int_col));
+        CHECK_EQUAL(0, table->get_num_unique_values(str_col));
+        CHECK_EQUAL(2, table->get_num_unique_values(enum_col));
+        CHECK_EQUAL(ObjKey(), table->find_first_int(int_col, 100));
+        CHECK_EQUAL(ObjKey(), table->find_first_string(str_col, "bad"));
+        CHECK_EQUAL(ObjKey(), table->find_first_string(enum_col, "bad"));
+        CHECK_EQUAL(obj_keys[41], table->find_first_int(int_col, 41));
+        CHECK_EQUAL(obj_keys[42], table->find_first_string(str_col, "foo42"));
+        CHECK_EQUAL(obj_keys[0], table->find_first_string(enum_col, "bar"));
+
+        table->remove_column(padding_col);
         wt.get_group().verify();
-        CHECK_EQUAL(0, table->get_num_unique_values(1));
-        CHECK_EQUAL(2, table->get_num_unique_values(2));
-        CHECK_EQUAL(62, table->find_first_string(1, "foo62"));
-        CHECK_EQUAL(63, table->find_first_string(2, "bar63"));
-        table->set_string(1, 0, "foo_X");
-        table->set_string(2, 0, "bar_X");
+
+        CHECK(table->has_search_index(int_col));
+        CHECK(table->has_search_index(str_col));
+        CHECK(table->has_search_index(enum_col));
+        CHECK_EQUAL(0, table->get_num_unique_values(int_col));
+        CHECK_EQUAL(0, table->get_num_unique_values(str_col));
+        CHECK_EQUAL(2, table->get_num_unique_values(enum_col));
+        CHECK_EQUAL(ObjKey(), table->find_first_int(int_col, 100));
+        CHECK_EQUAL(ObjKey(), table->find_first_string(str_col, "bad"));
+        CHECK_EQUAL(ObjKey(), table->find_first_string(enum_col, "bad"));
+        CHECK_EQUAL(obj_keys[41], table->find_first_int(int_col, 41));
+        CHECK_EQUAL(obj_keys[42], table->find_first_string(str_col, "foo42"));
+        CHECK_EQUAL(obj_keys[0], table->find_first_string(enum_col, "bar"));
+
+        auto obj = table->get_object(obj_keys[1]);
+        obj.set<Int>(int_col, 101);
+        obj.set<String>(str_col, "foo_Y");
+        obj.set<String>(enum_col, "bar_Y");
         wt.get_group().verify();
-        CHECK_EQUAL(0, table->get_num_unique_values(1));
-        CHECK_EQUAL(3, table->get_num_unique_values(2));
-        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
-        CHECK_EQUAL(realm::not_found, table->find_first_string(2, "bad"));
-        CHECK_EQUAL(0, table->find_first_string(1, "foo_X"));
-        CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
-        CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
-        CHECK_EQUAL(62, table->find_first_string(1, "foo62"));
-        CHECK_EQUAL(63, table->find_first_string(1, "foo63"));
-        CHECK_EQUAL(0, table->find_first_string(2, "bar_X"));
-        CHECK_EQUAL(1, table->find_first_string(2, "bar"));
-        CHECK_EQUAL(63, table->find_first_string(2, "bar63"));
+
+        CHECK(table->has_search_index(int_col));
+        CHECK(table->has_search_index(str_col));
+        CHECK(table->has_search_index(enum_col));
+        CHECK_EQUAL(0, table->get_num_unique_values(int_col));
+        CHECK_EQUAL(0, table->get_num_unique_values(str_col));
+        CHECK_EQUAL(3, table->get_num_unique_values(enum_col));
+        CHECK_EQUAL(ObjKey(), table->find_first_int(int_col, 100));
+        CHECK_EQUAL(ObjKey(), table->find_first_string(str_col, "bad"));
+        CHECK_EQUAL(ObjKey(), table->find_first_string(enum_col, "bad"));
+        CHECK_EQUAL(obj_keys[41], table->find_first_int(int_col, 41));
+        CHECK_EQUAL(obj_keys[42], table->find_first_string(str_col, "foo42"));
+        CHECK_EQUAL(obj_keys[0], table->find_first_string(enum_col, "bar"));
+        CHECK_EQUAL(obj_keys[1], table->find_first_int(int_col, 101));
+        CHECK_EQUAL(obj_keys[1], table->find_first_string(str_col, "foo_Y"));
+        CHECK_EQUAL(obj_keys[1], table->find_first_string(enum_col, "bar_Y"));
+        CHECK_EQUAL(obj_keys[63], table->find_first_string(enum_col, "bar63"));
+
         wt.commit();
     }
-    // Remove the recently inserted column
-    {
-        WriteTransaction wt(sg);
-        TableRef table = wt.get_table("foo");
-        CHECK(table->has_search_index(1) && table->has_search_index(2));
-        CHECK_EQUAL(0, table->get_num_unique_values(1));
-        CHECK_EQUAL(3, table->get_num_unique_values(2));
-        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
-        CHECK_EQUAL(realm::not_found, table->find_first_string(2, "bad"));
-        CHECK_EQUAL(0, table->find_first_string(1, "foo_X"));
-        CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
-        CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
-        CHECK_EQUAL(62, table->find_first_string(1, "foo62"));
-        CHECK_EQUAL(63, table->find_first_string(1, "foo63"));
-        CHECK_EQUAL(0, table->find_first_string(2, "bar_X"));
-        CHECK_EQUAL(1, table->find_first_string(2, "bar"));
-        CHECK_EQUAL(63, table->find_first_string(2, "bar63"));
-        table->remove_column(0);
-        wt.get_group().verify();
-        CHECK(table->has_search_index(0) && table->has_search_index(1));
-        CHECK_EQUAL(0, table->get_num_unique_values(0));
-        CHECK_EQUAL(3, table->get_num_unique_values(1));
-        CHECK_EQUAL(realm::not_found, table->find_first_string(0, "bad"));
-        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
-        CHECK_EQUAL(0, table->find_first_string(0, "foo_X"));
-        CHECK_EQUAL(31, table->find_first_string(0, "foo31"));
-        CHECK_EQUAL(61, table->find_first_string(0, "foo61"));
-        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
-        CHECK_EQUAL(63, table->find_first_string(0, "foo63"));
-        CHECK_EQUAL(0, table->find_first_string(1, "bar_X"));
-        CHECK_EQUAL(1, table->find_first_string(1, "bar"));
-        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
-        table->set_string(0, 1, "foo_Y");
-        table->set_string(1, 1, "bar_Y");
-        wt.get_group().verify();
-        CHECK(table->has_search_index(0) && table->has_search_index(1));
-        CHECK_EQUAL(0, table->get_num_unique_values(0));
-        CHECK_EQUAL(4, table->get_num_unique_values(1));
-        CHECK_EQUAL(realm::not_found, table->find_first_string(0, "bad"));
-        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
-        CHECK_EQUAL(0, table->find_first_string(0, "foo_X"));
-        CHECK_EQUAL(1, table->find_first_string(0, "foo_Y"));
-        CHECK_EQUAL(31, table->find_first_string(0, "foo31"));
-        CHECK_EQUAL(61, table->find_first_string(0, "foo61"));
-        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
-        CHECK_EQUAL(63, table->find_first_string(0, "foo63"));
-        CHECK_EQUAL(0, table->find_first_string(1, "bar_X"));
-        CHECK_EQUAL(1, table->find_first_string(1, "bar_Y"));
-        CHECK_EQUAL(2, table->find_first_string(1, "bar"));
-        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
-        wt.commit();
-    }
+    #ifdef LEGACY_TESTS
     // Insert a column after the string columns and remove the indexes
     {
         WriteTransaction wt(sg);
@@ -2925,8 +2917,8 @@ TEST(Shared_MovingSearchIndex)
         CHECK_EQUAL(60, table->find_first_int(2, 60));
         wt.commit();
     }
+    #endif
 }
-#endif
 
 TEST_IF(Shared_BeginReadFailure, _impl::SimulatedFailure::is_enabled())
 {
