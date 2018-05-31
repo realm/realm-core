@@ -200,9 +200,23 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                 throw MissingPropertyValueException(object_schema.name, primary_prop->name);
             primary_value = ctx.null_value();
         }
-        obj = table->get_object(get_for_primary_key_impl(ctx, *table, *primary_prop, *primary_value));
-
-        if (!obj) {
+        auto key = get_for_primary_key_impl(ctx, *table, *primary_prop, *primary_value);
+        if (key) {
+            if (try_update)
+                obj = table->get_object(key);
+            else if (realm->is_in_migration()) {
+                // Creating objects with duplicate primary keys is allowed in migrations
+                // as long as there are no duplicates at the end, as adding an entirely
+                // new column which is the PK will inherently result in duplicates at first
+                obj = table->create_object();
+                created = true;
+            }
+            else {
+                throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value '%2'.",
+                                                    object_schema.name, ctx.print(*primary_value)));
+            }
+        }
+        else {
             created = true;
             if (primary_prop->type == PropertyType::Int) {
 #if REALM_ENABLE_SYNC
@@ -221,19 +235,6 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
             }
             else {
                 REALM_TERMINATE("Unsupported primary key type.");
-            }
-        }
-        else if (!try_update) {
-            if (realm->is_in_migration()) {
-                // Creating objects with duplicate primary keys is allowed in migrations
-                // as long as there are no duplicates at the end, as adding an entirely
-                // new column which is the PK will inherently result in duplicates at first
-                obj = table->create_object();
-                created = true;
-            }
-            else {
-                throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value '%2'.",
-                                                    object_schema.name, ctx.print(*primary_value)));
             }
         }
     }
