@@ -375,6 +375,8 @@ void RealmCoordinator::open_db()
 std::shared_ptr<Group> RealmCoordinator::begin_read(VersionID version)
 {
     open_db();
+    if (m_read_only_group)
+        return m_read_only_group;
     return m_db->start_read(version);
 }
 

@@ -146,7 +146,14 @@ void Realm::set_schema(Schema const& reference, Schema schema)
 
 void Realm::read_schema_from_group_if_needed()
 {
-    REALM_ASSERT(!m_config.immutable());
+    if (m_config.immutable()) {
+        REALM_ASSERT(m_group);
+        if (m_schema.empty()) {
+            m_schema_version = ObjectStore::get_schema_version(*m_group);
+            m_schema = ObjectStore::schema_from_group(*m_group);
+        }
+        return;
+    }
 
     Group& group = read_group();
     auto current_version = transaction().get_version_of_current_transaction().version;
