@@ -185,18 +185,18 @@ void copy_property_values(Table& table, PropertyType type, ColKey old_col, ColKe
 void make_property_optional(Group& group, Table& table, Property property)
 {
     property.type |= PropertyType::Nullable;
-    auto new_key = add_column(group, table, property);
-    copy_property_values(table, property.type, property.column_key, new_key);
-    table.remove_column(property.column_key);
-    property.column_key = new_key.value;
+    auto old_key = property.column_key;
+    table.rename_column(old_key, "");
+    property.column_key = add_column(group, table, property);
+    copy_property_values(table, property.type, old_key, property.column_key);
+    table.remove_column(old_key);
 }
 
 void make_property_required(Group& group, Table& table, Property property)
 {
     property.type &= ~PropertyType::Nullable;
-    auto key = add_column(group, table, property);
     table.remove_column(property.column_key);
-    property.column_key = key.value;
+    property.column_key = add_column(group, table, property).value;
 }
 
 void validate_primary_column_uniqueness(Group const& group, StringData object_type, StringData primary_property)
@@ -616,7 +616,9 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
 
 enum class DidRereadSchema { Yes, No };
 
-static void apply_post_migration_changes(Group& group, std::vector<SchemaChange> const& changes, Schema const& initial_schema,
+static void apply_post_migration_changes(Group& group,
+                                         std::vector<SchemaChange> const& changes,
+                                         Schema const& initial_schema,
                                          DidRereadSchema did_reread_schema)
 {
     using namespace schema_change;
