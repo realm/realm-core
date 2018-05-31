@@ -193,7 +193,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
     config.schema = {};
 
     realm = Realm::make_shared_realm(std::move(config), shared_from_this());
-    if (!m_notifier && m_config.immutable() && m_config.automatic_change_notifications) {
+    if (!m_notifier && !m_config.immutable() && m_config.automatic_change_notifications) {
         try {
             m_notifier = std::make_unique<ExternalCommitHelper>(*this);
         }
