@@ -142,7 +142,7 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
 
     switch (property.type & ~PropertyType::Flags) {
         case PropertyType::Bool:   return ctx.box(m_obj.get<bool>(column));
-        case PropertyType::Int:    return ctx.box(m_obj.get<int64_t>(column));
+        case PropertyType::Int:    return is_nullable(property.type) ? ctx.box(*m_obj.get<util::Optional<int64_t>>(column)) : ctx.box(m_obj.get<int64_t>(column));
         case PropertyType::Float:  return ctx.box(m_obj.get<float>(column));
         case PropertyType::Double: return ctx.box(m_obj.get<double>(column));
         case PropertyType::String: return ctx.box(m_obj.get<StringData>(column));
