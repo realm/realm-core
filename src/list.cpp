@@ -83,8 +83,8 @@ using namespace _impl;
 List::List() noexcept = default;
 List::~List() = default;
 
-List::List(const List&) { REALM_UNREACHABLE(); }
-List& List::operator=(const List&) { REALM_UNREACHABLE(); }
+List::List(const List&) = default;
+List& List::operator=(const List&) = default;
 List::List(List&&) = default;
 List& List::operator=(List&&) = default;
 

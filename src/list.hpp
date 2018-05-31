@@ -157,7 +157,7 @@ private:
     PropertyType m_type;
     mutable const ObjectSchema* m_object_schema = nullptr;
     _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
-    std::unique_ptr<LstBase> m_list_base;
+    std::shared_ptr<LstBase> m_list_base;
 
     void verify_valid_row(size_t row_ndx, bool insertion = false) const;
     void validate(Obj) const;
