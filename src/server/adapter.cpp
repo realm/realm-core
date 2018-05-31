@@ -80,7 +80,7 @@ public:
     ObjectSchema *m_selected_object_schema = nullptr;
     Property *m_selected_primary = nullptr;
 
-    Property *m_list_property = nullptr;
+    std::string m_list_property_name;
     nlohmann::json m_list_parent_identity;
 
     ConstTableRef m_list_target_table;
@@ -233,10 +233,7 @@ public:
         REALM_ASSERT(m_selected_object_schema);
 
         m_list_parent_identity = get_identity(instr.object, *m_selected_table, m_selected_primary);
-
-        m_list_property = m_selected_object_schema->property_for_name(get_string(instr.field));
-        size_t column_index = m_selected_table->get_column_index(get_string(instr.field));
-        REALM_ASSERT(m_list_property->table_column == column_index);
+        m_list_property_name = get_string(instr.field);
 
         std::string link_target_table = get_string(instr.link_target_table);
         select(link_target_table, m_list_target_object_schema, m_list_target_table, m_list_target_primary);
@@ -428,14 +425,14 @@ public:
     // Must have linklist selected:
     void operator()(const Instruction::ArraySet& instr)
     {
-        if (!m_list_property)
+        if (!m_list_property_name.size())
             return; // FIXME
 
         // FIXME: Support arrays of primitives
 
         add_instruction(Adapter::InstructionType::ListSet, {
             {"identity", m_list_parent_identity},
-            {"property", m_list_property->name},
+            {"property", m_list_property_name},
             {"list_index", instr.ndx},
             {"object_identity", get_identity(instr.payload.data.link.target, *m_list_target_table, m_list_target_primary)}
         });
@@ -443,7 +440,7 @@ public:
 
     void operator()(const Instruction::ArrayInsert& instr)
     {
-        if (!m_list_property)
+        if (!m_list_property_name.size())
             return; // FIXME
 
 
@@ -451,7 +448,7 @@ public:
 
         add_instruction(Adapter::InstructionType::ListInsert, {
             {"identity", m_list_parent_identity},
-            {"property", m_list_property->name},
+            {"property", m_list_property_name},
             {"list_index", instr.ndx},
             {"object_identity", get_identity(instr.payload.data.link.target, *m_list_target_table, m_list_target_primary)}
         });
@@ -459,7 +456,7 @@ public:
 
     void operator()(const Instruction::ArrayMove&)
     {
-        if (!m_list_property)
+        if (!m_list_property_name.size())
             return; // FIXME
 
         REALM_TERMINATE("ArrayMove not supported by adapter.");
@@ -467,7 +464,7 @@ public:
 
     void operator()(const Instruction::ArraySwap&)
     {
-        if (!m_list_property)
+        if (!m_list_property_name.size())
             return; // FIXME
 
         REALM_TERMINATE("ArraySwap not supported by adapter.");
@@ -475,24 +472,24 @@ public:
 
     void operator()(const Instruction::ArrayErase& instr)
     {
-        if (!m_list_property)
+        if (!m_list_property_name.size())
             return; // FIXME
 
         add_instruction(Adapter::InstructionType::ListErase, {
             {"identity", m_list_parent_identity},
-            {"property", m_list_property->name},
+            {"property", m_list_property_name},
             {"list_index", instr.ndx},
         });
     }
 
     void operator()(const Instruction::ArrayClear&)
     {
-        if (!m_list_property)
+        if (!m_list_property_name.size())
             return; // FIXME
 
         add_instruction(Adapter::InstructionType::ListClear, {
             {"identity", m_list_parent_identity},
-            {"property", m_list_property->name},
+            {"property", m_list_property_name},
         });
     }
 
