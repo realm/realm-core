@@ -127,7 +127,7 @@ Query List::get_query() const
     verify_attached();
     if (m_type == PropertyType::Object)
         return m_list_base->get_table()->where(as<Obj>());
-    REALM_UNREACHABLE();
+    throw std::runtime_error("not implemented");
 }
 
 ObjKey List::get_parent_object_key() const
@@ -224,7 +224,7 @@ size_t List::find(Query&& q) const
         ObjKey key = get_query().and_query(std::move(q)).find();
         return key ? as<Obj>().ConstLstIf<ObjKey>::find_first(key) : not_found;
     }
-    REALM_UNREACHABLE();
+    throw std::runtime_error("not implemented");
 }
 
 template<typename T>

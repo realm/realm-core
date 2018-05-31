@@ -47,9 +47,9 @@ Results::Results(SharedRealm r, Table& table)
 {
 }
 
-Results::Results(SharedRealm, TableView, DescriptorOrdering) { REALM_UNREACHABLE(); }
+Results::Results(SharedRealm, TableView, DescriptorOrdering) { throw std::runtime_error("not implemented"); }
 Results::Results(std::shared_ptr<Realm>, LstBase&, util::Optional<Query>, SortDescriptor)
-{ REALM_UNREACHABLE(); }
+{ throw std::runtime_error("not implemented"); }
 
 #if 0
 Results::Results(SharedRealm r, LinkListRef lv, util::Optional<Query> q, SortDescriptor s)
@@ -311,7 +311,7 @@ size_t Results::index_of(T const& value)
         case Mode::Table:
             return m_table->find_first(0, value);
         case Mode::LinkList:
-            REALM_UNREACHABLE();
+            throw std::runtime_error("not implemented");
         case Mode::Query:
         case Mode::TableView:
             evaluate_query_if_needed();
@@ -736,24 +736,24 @@ bool Results::is_in_table_order() const
     REALM_COMPILER_HINT_UNREACHABLE();
 }
 
-Results Results::filter(Query&&) const { REALM_UNREACHABLE(); }
-Results Results::sort(SortDescriptor&&) const { REALM_UNREACHABLE(); }
-Results Results::distinct(DistinctDescriptor&&) const { REALM_UNREACHABLE(); }
-Results Results::distinct(std::vector<std::string> const&) const { REALM_UNREACHABLE(); }
+Results Results::filter(Query&&) const { throw std::runtime_error("not implemented"); }
+Results Results::sort(SortDescriptor&&) const { throw std::runtime_error("not implemented"); }
+Results Results::distinct(DistinctDescriptor&&) const { throw std::runtime_error("not implemented"); }
+Results Results::distinct(std::vector<std::string> const&) const { throw std::runtime_error("not implemented"); }
 
-Results Results::snapshot() const& { REALM_UNREACHABLE(); }
-Results Results::snapshot() && { REALM_UNREACHABLE(); }
+Results Results::snapshot() const& { throw std::runtime_error("not implemented"); }
+Results Results::snapshot() && { throw std::runtime_error("not implemented"); }
 
-util::Optional<Mixed> Results::min(size_t) { REALM_UNREACHABLE(); }
-util::Optional<Mixed> Results::max(size_t) { REALM_UNREACHABLE(); }
-util::Optional<Mixed> Results::sum(size_t) { REALM_UNREACHABLE(); }
-util::Optional<double> Results::average(size_t) { REALM_UNREACHABLE(); }
+util::Optional<Mixed> Results::min(size_t) { throw std::runtime_error("not implemented"); }
+util::Optional<Mixed> Results::max(size_t) { throw std::runtime_error("not implemented"); }
+util::Optional<Mixed> Results::sum(size_t) { throw std::runtime_error("not implemented"); }
+util::Optional<double> Results::average(size_t) { throw std::runtime_error("not implemented"); }
 
 
-template<typename T> T Results::get(size_t) { REALM_UNREACHABLE(); }
-template<typename T> util::Optional<T> Results::first() { REALM_UNREACHABLE(); }
-template<typename T> util::Optional<T> Results::last() { REALM_UNREACHABLE(); }
-template<typename T> size_t Results::index_of(T const&) { REALM_UNREACHABLE(); }
+template<typename T> T Results::get(size_t) { throw std::runtime_error("not implemented"); }
+template<typename T> util::Optional<T> Results::first() { throw std::runtime_error("not implemented"); }
+template<typename T> util::Optional<T> Results::last() { throw std::runtime_error("not implemented"); }
+template<typename T> size_t Results::index_of(T const&) { throw std::runtime_error("not implemented"); }
 
 #define REALM_RESULTS_TYPE(T) \
     template T Results::get<T>(size_t); \
