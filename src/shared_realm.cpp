@@ -662,7 +662,8 @@ void Realm::notify()
             catch (_impl::UnsupportedSchemaChange const&) {
                 translate_schema_error();
             }
-            cache_new_schema();
+            if (!is_closed())
+                cache_new_schema();
         }
         else  {
             if (m_binding_context) {
