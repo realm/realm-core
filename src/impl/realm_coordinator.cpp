@@ -909,6 +909,7 @@ std::vector<std::shared_ptr<_impl::CollectionNotifier>> RealmCoordinator::notifi
 bool RealmCoordinator::advance_to_latest(Realm& realm)
 {
     // FIXME: we probably won't actually want a strong pointer here
+    auto self = shared_from_this();
     auto sg = Realm::Internal::get_transaction_ref(realm);
     std::unique_lock<std::mutex> lock(m_notifier_mutex);
     _impl::NotifierPackage notifiers(m_async_error, notifiers_for_realm(realm), this);

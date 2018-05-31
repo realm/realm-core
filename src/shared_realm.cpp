@@ -704,6 +704,8 @@ bool Realm::refresh()
     if (m_group) {
         try {
             bool version_changed = m_coordinator->advance_to_latest(*this);
+            if (is_closed())
+                return false;
             cache_new_schema();
             return version_changed;
         }
@@ -744,6 +746,9 @@ void Realm::close()
 {
     if (m_coordinator) {
         m_coordinator->unregister_realm(this);
+    }
+    if (!m_config.immutable()) {
+        transaction().end_read();
     }
 
     m_permissions_cache = nullptr;

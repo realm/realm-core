@@ -462,18 +462,22 @@ void advance_with_notifications(BindingContext* context,
         auto new_version = sg->get_version_of_current_transaction();
         if (context && old_version != new_version)
             context->did_change({}, {});
-        if (!sg) // did_change() could close the Realm. Just return if it does.
+        // did_change() could close the Realm. Just return if it does.
+        if (sg->get_transact_stage() == DB::transact_Ready)
             return;
         if (context)
             context->will_send_notifications();
-        if (!sg) // will_send_notifications() could close the Realm. Just return if it does.
+        // will_send_notifications() could close the Realm. Just return if it does.
+        if (sg->get_transact_stage() == DB::transact_Ready)
             return;
         // did_change() can change the read version, and if it does we can't
         // deliver notifiers
         if (new_version == sg->get_version_of_current_transaction())
             notifiers.deliver(*sg);
         notifiers.after_advance();
-        if (sg && context)
+        if (sg->get_transact_stage() == DB::transact_Ready)
+            return;
+        if (context)
             context->did_send_notifications();
         return;
     }
