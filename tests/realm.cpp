@@ -329,14 +329,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 #endif
 
-    SECTION("should get different instances on different threads") {
-        auto realm1 = Realm::get_shared_realm(config);
-        std::thread([&]{
-            auto realm2 = Realm::get_shared_realm(config);
-            REQUIRE(realm1 != realm2);
-        }).join();
-    }
-
     SECTION("should detect use of Realm on incorrect thread") {
         auto realm = Realm::get_shared_realm(config);
         std::thread([&]{
@@ -344,33 +336,11 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         }).join();
     }
 
-    SECTION("should get different instances for different explicit execuction contexts") {
-        config.execution_context = 0;
-        auto realm1 = Realm::get_shared_realm(config);
-        config.execution_context = 1;
-        auto realm2 = Realm::get_shared_realm(config);
-        REQUIRE(realm1 != realm2);
-
-        config.execution_context = util::none;
-        auto realm3 = Realm::get_shared_realm(config);
-        REQUIRE(realm1 != realm3);
-        REQUIRE(realm2 != realm3);
-    }
-
     SECTION("can use Realm with explicit execution context on different thread") {
         config.execution_context = 1;
         auto realm = Realm::get_shared_realm(config);
         std::thread([&]{
             REQUIRE_NOTHROW(realm->verify_thread());
-        }).join();
-    }
-
-    SECTION("should get same instance for same explicit execution context on different thread") {
-        config.execution_context = 1;
-        auto realm1 = Realm::get_shared_realm(config);
-        std::thread([&]{
-            auto realm2 = Realm::get_shared_realm(config);
-            REQUIRE(realm1 == realm2);
         }).join();
     }
 
