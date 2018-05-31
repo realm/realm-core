@@ -491,13 +491,14 @@ void Realm::verify_open() const
 bool Realm::is_in_transaction() const noexcept
 {
     return !m_config.immutable()
+        && !is_closed()
         && transaction().get_transact_stage() == DB::transact_Writing;
 }
 
 void Realm::begin_transaction()
 {
-    check_write(this);
     verify_thread();
+    check_write(this);
 
     if (is_in_transaction()) {
         throw InvalidTransactionException("The Realm is already in a write transaction");
