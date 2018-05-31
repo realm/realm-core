@@ -372,6 +372,12 @@ void RealmCoordinator::open_db()
     }
 }
 
+void RealmCoordinator::close()
+{
+    m_db->close();
+    m_db = nullptr;
+}
+
 std::shared_ptr<Group> RealmCoordinator::begin_read(VersionID version)
 {
     open_db();

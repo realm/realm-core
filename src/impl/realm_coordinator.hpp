@@ -142,6 +142,8 @@ public:
     // other Realm instances for that path, including in other processes
     void commit_write(Realm& realm);
 
+    void close();
+
     template<typename Pred>
     std::unique_lock<std::mutex> wait_for_notifiers(Pred&& wait_predicate);
 
