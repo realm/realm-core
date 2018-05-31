@@ -137,7 +137,7 @@ public:
     // This is called on the worker thread to ensure that non-thread-safe things
     // can be destroyed on the correct thread, even if the last reference to the
     // CollectionNotifier is released on a different thread
-    virtual void release_data() noexcept { }
+    virtual void release_data() noexcept;
 
     // Prepare to deliver the new collection and call callbacks.
     // Returns whether or not it has anything to deliver.
@@ -164,11 +164,7 @@ public:
 
     // Attach the handed-over query to `sg`. Must not be already attached to a Transaction.
     // precondition: RealmCoordinator::m_notifier_mutex is locked
-    void attach_to(Transaction& sg);
-    // Create a new query handover object and stop using the previously attached
-    // Transaction
-    // precondition: RealmCoordinator::m_notifier_mutex is locked
-    void detach();
+    void attach_to(std::shared_ptr<Transaction> sg);
 
     // Set `info` as the new ChangeInfo that will be populated by the next
     // transaction advance, and register all required information in it
@@ -195,7 +191,6 @@ protected:
 
 private:
     virtual void do_attach_to(Transaction&) { }
-    virtual void do_detach_from(Transaction&) { }
     virtual void do_prepare_handover(Transaction&) = 0;
     virtual bool do_add_required_change_info(TransactionChangeInfo&) = 0;
     virtual bool prepare_to_deliver() { return true; }
@@ -204,7 +199,7 @@ private:
     std::shared_ptr<Realm> m_realm;
 
     VersionID m_sg_version;
-    Transaction* m_sg = nullptr;
+    std::shared_ptr<Transaction> m_sg;
 
     bool m_has_run = false;
     bool m_error = false;

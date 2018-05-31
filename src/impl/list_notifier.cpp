@@ -40,17 +40,13 @@ ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, ConstLstBase const& lis
 void ListNotifier::release_data() noexcept
 {
     m_list = {};
+    CollectionNotifier::release_data();
 }
 
 void ListNotifier::do_attach_to(Transaction& sg)
 {
     auto obj = sg.get_table(m_table)->get_object(m_obj);
     m_list = List::get_list(m_type, obj, m_col);
-}
-
-void ListNotifier::do_detach_from(Transaction&)
-{
-    m_list = {};
 }
 
 bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)

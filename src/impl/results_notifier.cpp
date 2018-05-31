@@ -35,6 +35,7 @@ ResultsNotifier::ResultsNotifier(Results& target)
 void ResultsNotifier::release_data() noexcept
 {
     m_query = {};
+    CollectionNotifier::release_data();
 }
 
 bool ResultsNotifier::get_tableview(TableView& out)
@@ -211,8 +212,4 @@ bool ResultsNotifier::prepare_to_deliver()
 void ResultsNotifier::do_attach_to(Transaction& sg)
 {
     m_query = sg.import_copy_of(*m_query, PayloadPolicy::Move);
-}
-
-void ResultsNotifier::do_detach_from(Transaction&)
-{
 }

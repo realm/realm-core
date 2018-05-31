@@ -441,15 +441,27 @@ RealmCoordinator::RealmCoordinator()
 
 RealmCoordinator::~RealmCoordinator()
 {
-    std::lock_guard<std::mutex> coordinator_lock(s_coordinator_mutex);
-    for (auto it = s_coordinators_per_path.begin(); it != s_coordinators_per_path.end(); ) {
-        if (it->second.expired()) {
-            it = s_coordinators_per_path.erase(it);
-        }
-        else {
-            ++it;
+    {
+        std::lock_guard<std::mutex> coordinator_lock(s_coordinator_mutex);
+        for (auto it = s_coordinators_per_path.begin(); it != s_coordinators_per_path.end(); ) {
+            if (it->second.expired()) {
+                it = s_coordinators_per_path.erase(it);
+            }
+            else {
+                ++it;
+            }
         }
     }
+    // Waits for the worker thread to join
+    m_notifier = nullptr;
+
+    // Ensure the notifiers aren't holding on to Transactions after we destroy
+    // the History object the DB depends on
+    // No locking needed here because the worker thread is gone
+    for (auto& notifier : m_new_notifiers)
+        notifier->release_data();
+    for (auto& notifier : m_notifiers)
+        notifier->release_data();
 }
 
 void RealmCoordinator::unregister_realm(Realm* realm)
@@ -746,16 +758,17 @@ void RealmCoordinator::run_async_notifiers()
     // Advance all of the new notifiers to the most recent version, if any
     auto new_notifiers = std::move(m_new_notifiers);
     IncrementalChangeInfo new_notifier_change_info(*m_advancer_sg, new_notifiers);
+    auto advancer_sg = std::move(m_advancer_sg);
 
     if (!new_notifiers.empty()) {
-        REALM_ASSERT(m_advancer_sg);
-        REALM_ASSERT_3(m_advancer_sg->get_version_of_current_transaction().version,
+        REALM_ASSERT(advancer_sg);
+        REALM_ASSERT_3(advancer_sg->get_version_of_current_transaction().version,
                        <=, new_notifiers.front()->version().version);
 
         // The advancer SG can be at an older version than the oldest new notifier
         // if a notifier was added and then removed before it ever got the chance
         // to run, as we don't move the pin forward when removing dead notifiers
-        transaction::advance(*m_advancer_sg, nullptr, new_notifiers.front()->version());
+        transaction::advance(*advancer_sg, nullptr, new_notifiers.front()->version());
 
         // Advance each of the new notifiers to the latest version, attaching them
         // to the SG at their handover version. This requires a unique
@@ -766,21 +779,16 @@ void RealmCoordinator::run_async_notifiers()
         // releasing the lock
         for (auto& notifier : new_notifiers) {
             new_notifier_change_info.advance_incremental(notifier->version());
-            notifier->attach_to(*m_advancer_sg);
+            notifier->attach_to(advancer_sg);
             notifier->add_required_change_info(new_notifier_change_info.current());
         }
         new_notifier_change_info.advance_to_final(VersionID{});
-
-        for (auto& notifier : new_notifiers) {
-            notifier->detach();
-        }
 
         // We want to advance the non-new notifiers to the same version as the
         // new notifiers to avoid having to merge changes from any new
         // transaction that happen immediately after this into the new notifier
         // changes
-        version = m_advancer_sg->get_version_of_current_transaction();
-        m_advancer_sg->end_read();
+        version = advancer_sg->get_version_of_current_transaction();
     }
     else {
         // If we have no new notifiers we want to just advance to the latest
@@ -790,7 +798,6 @@ void RealmCoordinator::run_async_notifiers()
         // FIXME: this is comically slow
         version = m_db->start_read()->get_version_of_current_transaction();
     }
-    REALM_ASSERT(m_advancer_sg);
 
     auto skip_version = m_notifier_skip_version;
     m_notifier_skip_version = {0, 0};
@@ -828,7 +835,7 @@ void RealmCoordinator::run_async_notifiers()
 
     // Attach the new notifiers to the main SG and move them to the main list
     for (auto& notifier : new_notifiers) {
-        notifier->attach_to(*m_notifier_sg);
+        notifier->attach_to(m_notifier_sg);
         notifier->run();
     }
 

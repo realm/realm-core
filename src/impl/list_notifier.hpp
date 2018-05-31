@@ -52,7 +52,6 @@ private:
     void do_prepare_handover(Transaction&) override;
 
     void do_attach_to(Transaction& sg) override;
-    void do_detach_from(Transaction& sg) override;
 
     void release_data() noexcept override;
     bool do_add_required_change_info(TransactionChangeInfo& info) override;

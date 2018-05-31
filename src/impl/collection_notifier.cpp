@@ -179,6 +179,11 @@ CollectionNotifier::~CollectionNotifier()
     unregister();
 }
 
+void CollectionNotifier::release_data() noexcept
+{
+    m_sg = nullptr;
+}
+
 uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback)
 {
     m_realm->verify_thread();
@@ -377,19 +382,10 @@ void CollectionNotifier::for_each_callback(Fn&& fn)
     m_callback_index = npos;
 }
 
-void CollectionNotifier::attach_to(Transaction& sg)
+void CollectionNotifier::attach_to(std::shared_ptr<Transaction> sg)
 {
-    REALM_ASSERT(!m_sg);
-
-    m_sg = &sg;
-    do_attach_to(sg);
-}
-
-void CollectionNotifier::detach()
-{
-    REALM_ASSERT(m_sg);
-    do_detach_from(*m_sg);
-    m_sg = nullptr;
+    do_attach_to(*sg);
+    m_sg = std::move(sg);
 }
 
 Transaction& CollectionNotifier::source_shared_group()

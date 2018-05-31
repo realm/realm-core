@@ -66,7 +66,6 @@ private:
 
     void release_data() noexcept override;
     void do_attach_to(Transaction& sg) override;
-    void do_detach_from(Transaction& sg) override;
 };
 
 } // namespace _impl
