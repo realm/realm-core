@@ -583,6 +583,7 @@ void Realm::invalidate()
 bool Realm::compact()
 {
     verify_thread();
+    verify_open();
 
     if (m_config.immutable() || m_config.read_only_alternative()) {
         throw InvalidTransactionException("Can't compact a read-only Realm");
@@ -592,8 +593,7 @@ bool Realm::compact()
     }
 
     m_group = nullptr;
-//    return m_shared_group->compact();
-    return false;
+    return m_coordinator->compact();
 }
 
 void Realm::write_copy(StringData path, BinaryData key)

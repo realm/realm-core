@@ -143,6 +143,7 @@ public:
     void commit_write(Realm& realm);
 
     void close();
+    bool compact();
 
     template<typename Pred>
     std::unique_lock<std::mutex> wait_for_notifiers(Pred&& wait_predicate);

@@ -1003,6 +1003,11 @@ void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, Ve
     m_transaction_callback = std::move(fn);
 }
 
+bool RealmCoordinator::compact()
+{
+    return m_db->compact();
+}
+
 #if REALM_ENABLE_SYNC
 partial_sync::WorkQueue& RealmCoordinator::partial_sync_work_queue()
 {
