@@ -148,36 +148,29 @@ StringData Results::get_object_type() const noexcept
 
     return ObjectStore::object_type_for_table_name(m_table->get_name());
 }
-#if 0
 
-namespace {
 template<typename T>
-auto get(Table& table, size_t row)
+util::Optional<T> Results::try_get(size_t)
 {
-    return table.get<T>(0, row);
+    throw "not implemented";
 }
 
 template<>
-auto get<Obj>(Table& table, size_t row)
-{
-    return table.get(row);
-}
-}
-
-template<typename T>
-util::Optional<T> Results::try_get(size_t row_ndx)
+util::Optional<Obj> Results::try_get(size_t row_ndx)
 {
     validate_read();
     switch (m_mode) {
         case Mode::Empty: break;
         case Mode::Table:
             if (row_ndx < m_table->size())
-                return realm::get<T>(*m_table, row_ndx);
+                return m_table->get_object(row_ndx);
+//                return realm::get<T>(*m_table, row_ndx);
             break;
         case Mode::LinkList:
             if (update_linklist()) {
                 if (row_ndx < m_link_list->size())
-                    return realm::get<T>(*m_table, m_link_list->get(row_ndx).get_index());
+                    m_link_list->get_object(row_ndx);
+//                    return realm::get<T>(*m_table, m_link_list->get(row_ndx).get_index());
                 break;
             }
             REALM_FALLTHROUGH;
@@ -186,9 +179,10 @@ util::Optional<T> Results::try_get(size_t row_ndx)
             evaluate_query_if_needed();
             if (row_ndx >= m_table_view.size())
                 break;
-            if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(row_ndx))
-                return T{};
-            return realm::get<T>(*m_table, m_table_view.get(row_ndx).get_index());
+            if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_obj_valid(row_ndx))
+                return Obj{};
+            return m_table_view.get(row_ndx);
+//            return realm::get<T>(*m_table, m_table_view.get(row_ndx).get_index());
     }
     return util::none;
 }
@@ -215,7 +209,6 @@ util::Optional<T> Results::last()
         evaluate_query_if_needed(); // avoid running the query twice (for size() and for get())
     return try_get<T>(size() - 1);
 }
-#endif
 
 bool Results::update_linklist()
 {
@@ -287,6 +280,7 @@ size_t Results::index_of(Obj const& row)
         case Mode::Empty:
             return not_found;
         case Mode::Table:
+            throw "not implemented";
 //            return m_table->find row.get_index();
         case Mode::LinkList:
             if (update_linklist())
@@ -300,10 +294,11 @@ size_t Results::index_of(Obj const& row)
     REALM_COMPILER_HINT_UNREACHABLE();
 }
 
-#if 0
 template<typename T>
 size_t Results::index_of(T const& value)
 {
+    throw "not implementd";
+#if 0
     validate_read();
     switch (m_mode) {
         case Mode::Empty:
@@ -318,6 +313,7 @@ size_t Results::index_of(T const& value)
             return m_table_view.find_first(0, value);
     }
     REALM_COMPILER_HINT_UNREACHABLE();
+#endif
 }
 
 size_t Results::index_of(Query&& q)
@@ -329,10 +325,11 @@ size_t Results::index_of(Query&& q)
 
     auto query = get_query().and_query(std::move(q));
     query.sync_view_if_needed();
-    size_t row = query.find();
-    return row != not_found ? index_of(m_table->get(row)) : row;
+    ObjKey row = query.find();
+    return row ? index_of(m_table->get_object(row)) : not_found;
 }
 
+#if 0
 void Results::prepare_for_aggregate(size_t column, const char* name)
 {
     if (column > m_table->get_column_count())
@@ -577,8 +574,9 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
 {
     if (keypaths.empty())
         return *this;
-    /*
     if (get_type() != PropertyType::Object) {
+        throw "not implemented";
+#if 0
         if (keypaths.size() != 1)
             throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
                                                      string_for_property_type(get_type())));
@@ -586,8 +584,8 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
             throw std::invalid_argument(util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
                                                      keypaths[0].first, string_for_property_type(get_type())));
         return sort({{{0}}, {keypaths[0].second}});
+#endif
     }
-     */
 
     std::vector<std::vector<ColKey>> column_keys;
     std::vector<bool> ascending;
@@ -602,11 +600,10 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
     return sort({std::move(column_keys), std::move(ascending)});
 }
 
-#if 0
 Results Results::sort(SortDescriptor&& sort) const
 {
     if (m_mode == Mode::LinkList)
-        return Results(m_realm, m_link_list, util::none, std::move(sort));
+        return Results(m_realm, *m_link_list, util::none, std::move(sort));
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_sort(std::move(sort));
     return Results(m_realm, get_query(), std::move(new_order));
@@ -647,20 +644,23 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     if (keypaths.empty())
         return *this;
     if (get_type() != PropertyType::Object) {
+        throw "not implemented";
+#if 0
         if (keypaths.size() != 1)
             throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
                                                      string_for_property_type(get_type())));
         if (keypaths[0] != "self")
             throw std::invalid_argument(util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
                                                      keypaths[0], string_for_property_type(get_type())));
-        return distinct({*m_table, {{0}}});
+        return distinct({{0}});
+#endif
     }
 
-    std::vector<std::vector<size_t>> column_indices;
-    column_indices.reserve(keypaths.size());
+    std::vector<std::vector<ColKey>> column_keys;
+    column_keys.reserve(keypaths.size());
     for (auto& keypath : keypaths)
-        column_indices.push_back(parse_keypath(keypath, m_realm->schema(), &get_object_schema()));
-    return distinct({*m_table, std::move(column_indices)});
+        column_keys.push_back(parse_keypath(keypath, m_realm->schema(), &get_object_schema()));
+    return distinct({std::move(column_keys)});
 }
 
 Results Results::snapshot() const &
@@ -692,7 +692,6 @@ Results Results::snapshot() &&
     }
     REALM_COMPILER_HINT_UNREACHABLE();
 }
-#endif
 
 void Results::prepare_async()
 {
@@ -736,24 +735,11 @@ bool Results::is_in_table_order() const
     REALM_COMPILER_HINT_UNREACHABLE();
 }
 
-Results Results::filter(Query&&) const { throw std::runtime_error("not implemented"); }
-Results Results::sort(SortDescriptor&&) const { throw std::runtime_error("not implemented"); }
-Results Results::distinct(DistinctDescriptor&&) const { throw std::runtime_error("not implemented"); }
-Results Results::distinct(std::vector<std::string> const&) const { throw std::runtime_error("not implemented"); }
-
-Results Results::snapshot() const& { throw std::runtime_error("not implemented"); }
-Results Results::snapshot() && { throw std::runtime_error("not implemented"); }
-
 util::Optional<Mixed> Results::min(size_t) { throw std::runtime_error("not implemented"); }
 util::Optional<Mixed> Results::max(size_t) { throw std::runtime_error("not implemented"); }
 util::Optional<Mixed> Results::sum(size_t) { throw std::runtime_error("not implemented"); }
 util::Optional<double> Results::average(size_t) { throw std::runtime_error("not implemented"); }
 
-
-template<typename T> T Results::get(size_t) { throw std::runtime_error("not implemented"); }
-template<typename T> util::Optional<T> Results::first() { throw std::runtime_error("not implemented"); }
-template<typename T> util::Optional<T> Results::last() { throw std::runtime_error("not implemented"); }
-template<typename T> size_t Results::index_of(T const&) { throw std::runtime_error("not implemented"); }
 
 #define REALM_RESULTS_TYPE(T) \
     template T Results::get<T>(size_t); \
