@@ -706,10 +706,12 @@ void Table::do_erase_root_column(ColKey col_key)
             Array::destroy_deep(index_ref, m_index_refs.get_alloc());
         }
         m_index_refs.erase(ndx);
-        StringIndex* index = m_index_accessors[ndx];
-        if (index)
-            delete index;
+        delete m_index_accessors[ndx];
         m_index_accessors.erase(m_index_accessors.begin() + ndx);
+        for (size_t i = ndx; i < m_index_accessors.size(); ++i) {
+            if (StringIndex* index = m_index_accessors[i])
+                index->set_ndx_in_parent(i);
+        }
     }
 
     m_clusters.remove_column(ndx);

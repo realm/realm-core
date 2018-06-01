@@ -276,7 +276,7 @@ TableView LnkLst::get_sorted_view(SortDescriptor order) const
 
 TableView LnkLst::get_sorted_view(ColKey column_key, bool ascending) const
 {
-    TableView v = get_sorted_view(SortDescriptor(get_target_table(), {{column_key}}, {ascending}));
+    TableView v = get_sorted_view(SortDescriptor({{column_key}}, {ascending}));
     return v;
 }
 

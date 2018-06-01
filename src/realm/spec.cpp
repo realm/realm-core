@@ -322,8 +322,12 @@ void Spec::erase_column(size_t column_ndx)
     else if (is_string_enum_type(column_ndx)) {
         // Enum columns do also have a separate key list
         ref_type keys_ref = m_enumkeys.get_as_ref(column_ndx);
-
         Array::destroy_deep(keys_ref, m_top.get_alloc());
+        m_enumkeys.set(column_ndx, 0);
+    }
+
+    // Remove this column from the enum keys lookup and clean it up if it's now empty
+    if (m_enumkeys.is_attached()) {
         m_enumkeys.erase(column_ndx); // Throws
         bool all_empty = true;
         for (size_t i = 0; i < m_enumkeys.size(); i++) {

@@ -812,9 +812,9 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
         }
 
         if (cur_ordering.is_distinct) {
-            ordering.append_distinct(DistinctDescriptor(*target, property_columns));
+            ordering.append_distinct(DistinctDescriptor(property_columns));
         } else {
-            ordering.append_sort(SortDescriptor(*target, property_columns, ascendings));
+            ordering.append_sort(SortDescriptor(property_columns, ascendings));
         }
     }
 }
