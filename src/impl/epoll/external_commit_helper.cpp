@@ -20,7 +20,7 @@
 #include "impl/realm_coordinator.hpp"
 
 #include <realm/util/assert.hpp>
-#include <realm/group_shared_options.hpp>
+#include <realm/db.hpp>
 
 #include <algorithm>
 #include <errno.h>
@@ -115,7 +115,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
 {
     std::string path;
-    std::string temporary_dir = TransactionOptions::get_sys_tmp_dir();
+    std::string temporary_dir = DBOptions::get_sys_tmp_dir();
     if (temporary_dir.empty()) {
         path = parent.get_path() + ".note";
     } else {

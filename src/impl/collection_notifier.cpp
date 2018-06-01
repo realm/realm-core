@@ -126,7 +126,7 @@ bool DeepChangeChecker::check_outgoing_links(int64_t table_key, Table const& tab
         auto& target = *table.get_link_target(ColKey(link.col_key));
         auto lvr = obj.get_linklist(ColKey(link.col_key));
         return std::any_of(lvr.begin(), lvr.end(),
-                           [&](auto key) { return check_row(target, key.value, depth + 1); });
+                           [&, this](auto key) { return this->check_row(target, key.value, depth + 1); });
     };
 
     return std::any_of(begin(it->links), end(it->links), linked_object_changed);
