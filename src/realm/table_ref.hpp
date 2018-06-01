@@ -34,6 +34,7 @@ public:
     {
     }
     ConstTableRef(const TableRef& other);
+    ConstTableRef(std::nullptr_t) {}
 
     const Table* operator->() const;
     const Table& operator*() const
@@ -83,6 +84,7 @@ public:
         : ConstTableRef(t_ptr)
     {
     }
+    TableRef(std::nullptr_t) {}
     TableRef()
         : ConstTableRef()
     {
