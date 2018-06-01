@@ -618,202 +618,6 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
     rt->verify();
 }
 
-#ifdef LEGACY_TESTS
-TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist(path);
-    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
-    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
-
-    // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg->start_read() const Group& group = rt;
-    CHECK_EQUAL(0, rt->size());
-
-    // Create a table for strings and one for other types
-    {
-        WriteTransaction wt(sg_w);
-        TableRef strings_w = wt.add_table("strings");
-        strings_w->add_column(type_String, "a");
-        strings_w->add_column(type_Binary, "b", true);
-        strings_w->add_column(type_Mixed, "c"); // Strings
-        strings_w->add_column(type_Mixed, "d"); // Binary data
-        strings_w->add_empty_row();
-        TableRef other_w = wt.add_table("other");
-        other_w->add_column(type_Int, "A");
-        other_w->add_column(type_Float, "B");
-        other_w->add_column(type_Table, "C");
-        other_w->add_empty_row();
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    CHECK_EQUAL(2, rt->size());
-    ConstTableRef strings = rt->get_table("strings");
-    CHECK(strings->is_attached());
-    CHECK_EQUAL(4, strings->get_column_count());
-    CHECK_EQUAL(type_String, strings->get_column_type(0));
-    CHECK_EQUAL(type_Binary, strings->get_column_type(1));
-    CHECK_EQUAL(type_Mixed, strings->get_column_type(2));
-    CHECK_EQUAL(type_Mixed, strings->get_column_type(3));
-    CHECK_EQUAL(1, strings->size());
-    ConstTableRef other = rt->get_table("other");
-    CHECK(other->is_attached());
-    CHECK_EQUAL(3, other->get_column_count());
-    CHECK_EQUAL(type_Int, other->get_column_type(0));
-    CHECK_EQUAL(type_Float, other->get_column_type(1));
-    CHECK_EQUAL(type_Table, other->get_column_type(2));
-    CHECK_EQUAL(1, other->size());
-
-    size_t leaf_x4 = 4 * REALM_MAX_BPNODE_SIZE;
-    size_t leaf_x4p16 = leaf_x4 + 16;
-
-    // clang-format off
-    // Change root type in various string columns (including mixed)
-    struct Step { size_t m_str_size, m_num_rows; };
-    Step steps[] = {
-        // 1->max->1
-        { 1,    1 }, { 8191, 1 }, { 1,    1 },
-        // rising, falling
-        { 3,    1 }, { 7,    1 }, { 11,   1 }, { 15,   1 }, { 23,   1 }, { 31,   1 }, { 47,   1 },
-        { 63,   1 }, { 95,   1 }, { 127,  1 }, { 191,  1 }, { 255,  1 }, { 383,  1 }, { 511,  1 },
-        { 767,  1 }, { 1023, 1 }, { 1535, 1 }, { 2047, 1 }, { 3071, 1 }, { 4095, 1 }, { 6143, 1 },
-        { 8191, 1 }, { 6143, 1 }, { 4095, 1 }, { 3071, 1 }, { 2047, 1 }, { 1535, 1 }, { 1023, 1 },
-        { 767,  1 }, { 511,  1 }, { 383,  1 }, { 255,  1 }, { 191,  1 }, { 127,  1 }, { 95,   1 },
-        { 63,   1 }, { 47,   1 }, { 31,   1 }, { 23,   1 }, { 15,   1 }, { 11,   1 }, { 7,    1 },
-        { 3,    1 }, { 1,    1 },
-        // rising -> inner node -> rising
-        { 0, leaf_x4 }, { 3,    1 }, { 0, leaf_x4 }, { 7,    1 }, { 0, leaf_x4 }, { 11,   1 },
-        { 0, leaf_x4 }, { 15,   1 }, { 0, leaf_x4 }, { 23,   1 }, { 0, leaf_x4 }, { 31,   1 },
-        { 0, leaf_x4 }, { 47,   1 }, { 0, leaf_x4 }, { 63,   1 }, { 0, leaf_x4 }, { 95,   1 },
-        { 0, leaf_x4 }, { 127,  1 }, { 0, leaf_x4 }, { 191,  1 }, { 0, leaf_x4 }, { 255,  1 },
-        { 0, leaf_x4 }, { 383,  1 }, { 0, leaf_x4 }, { 511,  1 }, { 0, leaf_x4 }, { 767,  1 },
-        { 0, leaf_x4 }, { 1023, 1 }, { 0, leaf_x4 }, { 1535, 1 }, { 0, leaf_x4 }, { 2047, 1 },
-        { 0, leaf_x4 }, { 3071, 1 }, { 0, leaf_x4 }, { 4095, 1 }, { 0, leaf_x4 }, { 6143, 1 },
-        { 0, leaf_x4 }, { 8191, 1 }
-    };
-    // clang-format on
-    std::ostringstream out;
-    out << std::left;
-
-    for (size_t i = 0; i < sizeof steps / sizeof *steps; ++i) {
-        Step step = steps[i];
-        out.str("");
-        out << std::setfill('x') << std::setw(int(step.m_str_size)) << "A";
-        std::string str_1 = out.str();
-        StringData str(str_1);
-        out.str("");
-        out << std::setfill('x') << std::setw(int(step.m_str_size)) << "B";
-        std::string str_2 = out.str();
-        BinaryData bin(str_2);
-        out.str("");
-        out << std::setfill('x') << std::setw(int(step.m_str_size)) << "C";
-        std::string str_3 = out.str();
-        StringData str_mix(str_3);
-        out.str("");
-        out << std::setfill('x') << std::setw(int(step.m_str_size)) << "D";
-        std::string str_4 = out.str();
-        BinaryData bin_mix(str_4);
-        {
-            WriteTransaction wt(sg_w);
-            TableRef strings_w = wt.get_table("strings");
-            if (step.m_num_rows > strings_w->size()) {
-                strings_w->add_empty_row(step.m_num_rows - strings_w->size());
-            }
-            else if (step.m_num_rows < strings_w->size()) {
-                strings_w->clear();
-                strings_w->add_empty_row(step.m_num_rows);
-            }
-            strings_w->set_string(0, 0, str);
-            strings_w->set_binary(1, 0, bin);
-            strings_w->set_mixed(2, 0, str_mix);
-            strings_w->set_mixed(3, 0, bin_mix);
-            wt.commit();
-        }
-        rt->advance_read();
-        rt->verify();
-        CHECK_EQUAL(2, rt->size());
-        CHECK(strings->is_attached());
-        CHECK_EQUAL(4, strings->get_column_count());
-        CHECK_EQUAL(type_String, strings->get_column_type(0));
-        CHECK_EQUAL(type_Binary, strings->get_column_type(1));
-        CHECK_EQUAL(type_Mixed, strings->get_column_type(2));
-        CHECK_EQUAL(type_Mixed, strings->get_column_type(3));
-        CHECK_EQUAL(step.m_num_rows, strings->size());
-        CHECK_EQUAL(str, strings->get_string(0, 0));
-        CHECK_EQUAL(bin, strings->get_binary(1, 0));
-        CHECK_EQUAL(str_mix, strings->get_mixed(2, 0));
-        CHECK_EQUAL(bin_mix, strings->get_mixed(3, 0));
-        if (step.m_num_rows >= 2) {
-            CHECK_EQUAL(StringData(""), strings->get_string(0, 1));
-            CHECK_EQUAL(BinaryData(), strings->get_binary(1, 1));
-            CHECK_EQUAL(int64_t(), strings->get_mixed(2, 1));
-            CHECK_EQUAL(int64_t(), strings->get_mixed(3, 1));
-        }
-    }
-
-    // Change root type from leaf to inner node in non-string columns
-    CHECK_EQUAL(2, rt->size());
-    CHECK(other->is_attached());
-    CHECK_EQUAL(3, other->get_column_count());
-    CHECK_EQUAL(type_Int, other->get_column_type(0));
-    CHECK_EQUAL(type_Float, other->get_column_type(1));
-    CHECK_EQUAL(type_Table, other->get_column_type(2));
-    CHECK_EQUAL(1, other->size());
-    {
-        WriteTransaction wt(sg_w);
-        TableRef other_w = wt.get_table("other");
-        other_w->add_empty_row(leaf_x4p16 - 1);
-        other_w->set_int(0, (leaf_x4p16 - 16) / 3 + 1, 7);
-        other_w->set_float(1, (leaf_x4p16 - 16) / 3 + 2, 13.0f);
-        other_w->set_subtable(2, (leaf_x4p16 - 16) / 3 + 3, 0); // FIXME: Set something
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    CHECK_EQUAL(2, rt->size());
-    CHECK(other->is_attached());
-    CHECK_EQUAL(3, other->get_column_count());
-    CHECK_EQUAL(type_Int, other->get_column_type(0));
-    CHECK_EQUAL(type_Float, other->get_column_type(1));
-    CHECK_EQUAL(type_Table, other->get_column_type(2));
-    CHECK_EQUAL(leaf_x4p16, other->size());
-    CHECK_EQUAL(0, other->get_int(0, (leaf_x4p16 - 16) / 3 + 0));
-    CHECK_EQUAL(0.0f, other->get_float(1, (leaf_x4p16 - 16) / 3 + 1));
-    //    CHECK_EQUAL(???,   other->get_subtable (2, (leaf_x4p16-16)/3+2));
-    CHECK_EQUAL(7, other->get_int(0, (leaf_x4p16 - 16) / 3 + 1));
-    CHECK_EQUAL(13.0f, other->get_float(1, (leaf_x4p16 - 16) / 3 + 2));
-    //    CHECK_EQUAL(???,   other->get_subtable (2, (leaf_x4p16-16)/3+3));
-    CHECK_EQUAL(0, other->get_int(0, (leaf_x4p16 - 16) / 3 + 2));
-    CHECK_EQUAL(0.0f, other->get_float(1, (leaf_x4p16 - 16) / 3 + 3));
-    //    CHECK_EQUAL(???,   other->get_subtable (2, (leaf_x4p16-16)/3+4));
-
-    // Change root type from inner node to leaf in non-string columns
-    {
-        WriteTransaction wt(sg_w);
-        TableRef other_w = wt.get_table("other");
-        other_w->clear();
-        other_w->add_empty_row(1);
-        other_w->set_int(0, 0, 9);
-        other_w->set_float(1, 0, 17.0f);
-        other_w->set_subtable(2, 0, nullptr); // FIXME: Set something
-        wt.commit();
-    }
-    rt->advance_read();
-    rt->verify();
-    CHECK_EQUAL(2, rt->size());
-    CHECK(other->is_attached());
-    CHECK_EQUAL(3, other->get_column_count());
-    CHECK_EQUAL(type_Int, other->get_column_type(0));
-    CHECK_EQUAL(type_Float, other->get_column_type(1));
-    CHECK_EQUAL(type_Table, other->get_column_type(2));
-    CHECK_EQUAL(1, other->size());
-    CHECK_EQUAL(9, other->get_int(0, 0));
-    CHECK_EQUAL(17.0f, other->get_float(1, 0));
-    //    CHECK_EQUAL(???,   other->get_subtable (2,0));
-}
-#endif // LEGACY_TESTS
-
 
 TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
 {
@@ -1308,6 +1112,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
 }
 
 #ifdef LEGACY_TESTS
+// to be ported
 TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1394,7 +1199,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
     CHECK_EQUAL(target.size(), 0);
 }
 
-
+// to be ported
 TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1609,7 +1414,6 @@ TEST(LangBindHelper_AdvanceReadTransact_UnorderedTableViewClear)
     CHECK_EQUAL(obj.get<int64_t>(col), 2);
 }
 
-#ifdef LEGACY_TESTS
 namespace {
 // A base class for transaction log parsers so that tests which want to test
 // just a single part of the transaction log handling don't have to implement
@@ -1621,12 +1425,12 @@ public:
     {
     }
 
-    size_t get_current_table() const
+    TableKey get_current_table() const
     {
         return m_current_table;
     }
 
-    std::pair<size_t, size_t> get_current_linkview() const
+    std::pair<ColKey, ObjKey> get_current_linkview() const
     {
         return {m_current_linkview_col, m_current_linkview_row};
     }
@@ -1635,25 +1439,32 @@ protected:
     TestContext& test_context;
 
 private:
-    size_t m_current_table = realm::npos;
-    size_t m_current_linkview_col = realm::npos;
-    size_t m_current_linkview_row = realm::npos;
+    TableKey m_current_table;
+    ColKey m_current_linkview_col;
+    ObjKey m_current_linkview_row;
 
 public:
     void parse_complete()
     {
     }
 
-    bool select_table(size_t group_level_ndx, int, const size_t*)
+    bool select_table(TableKey t)
     {
-        m_current_table = group_level_ndx;
+        m_current_table = t;
         return true;
     }
 
-    bool select_link_list(size_t col_ndx, size_t row_ndx, size_t)
+    bool select_link_list(ColKey col_key, ObjKey obj_key, size_t)
     {
-        m_current_linkview_col = col_ndx;
-        m_current_linkview_row = row_ndx;
+        m_current_linkview_col = col_key;
+        m_current_linkview_row = obj_key;
+        return true;
+    }
+
+    bool select_list(ColKey col_key, ObjKey obj_key)
+    {
+        m_current_linkview_col = col_key;
+        m_current_linkview_row = obj_key;
         return true;
     }
 
@@ -1664,27 +1475,27 @@ public:
     }
 
     // Default no-op implmentations of all of the mutation instructions
-    bool insert_group_level_table(size_t, size_t, StringData)
+    bool insert_group_level_table(TableKey)
     {
         return false;
     }
-    bool erase_group_level_table(size_t, size_t)
+    bool erase_group_level_table(TableKey)
     {
         return false;
     }
-    bool rename_group_level_table(size_t, StringData)
+    bool rename_group_level_table(TableKey)
     {
         return false;
     }
-    bool insert_column(size_t, DataType, StringData, bool)
+    bool insert_column(ColKey)
     {
         return false;
     }
-    bool insert_link_column(size_t, DataType, StringData, size_t, size_t)
+    bool insert_link_column(ColKey, DataType, StringData, size_t, size_t)
     {
         return false;
     }
-    bool erase_column(size_t)
+    bool erase_column(ColKey)
     {
         return false;
     }
@@ -1692,7 +1503,7 @@ public:
     {
         return false;
     }
-    bool rename_column(size_t, StringData)
+    bool rename_column(ColKey)
     {
         return false;
     }
@@ -1712,11 +1523,15 @@ public:
     {
         return false;
     }
-    bool set_link_type(size_t, LinkType)
+    bool set_link_type(ColKey)
     {
         return false;
     }
-    bool insert_empty_rows(size_t, size_t, size_t, bool)
+    bool create_object(ObjKey)
+    {
+        return false;
+    }
+    bool modify_object(ColKey, ObjKey)
     {
         return false;
     }
@@ -1724,7 +1539,7 @@ public:
     {
         return false;
     }
-    bool erase_rows(size_t, size_t, size_t, bool)
+    bool remove_object(ObjKey)
     {
         return false;
     }
@@ -1740,15 +1555,15 @@ public:
     {
         return false;
     }
-    bool link_list_set(size_t, size_t, size_t)
+    bool list_set(size_t)
     {
         return false;
     }
-    bool link_list_insert(size_t, size_t, size_t)
+    bool list_clear(size_t)
     {
         return false;
     }
-    bool link_list_erase(size_t, size_t)
+    bool list_erase(size_t)
     {
         return false;
     }
@@ -1756,15 +1571,15 @@ public:
     {
         return false;
     }
-    bool link_list_clear(size_t)
+    bool list_insert(size_t)
     {
         return false;
     }
-    bool link_list_move(size_t, size_t)
+    bool list_move(size_t, size_t)
     {
         return false;
     }
-    bool link_list_swap(size_t, size_t)
+    bool list_swap(size_t, size_t)
     {
         return false;
     }
@@ -1793,10 +1608,6 @@ public:
         return false;
     }
     bool set_binary(size_t, size_t, BinaryData, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction)
     {
         return false;
     }
@@ -1840,38 +1651,37 @@ public:
 
 struct AdvanceReadTransact {
     template <typename Func>
-    static void call(DB& sg, Func&& func)
+    static void call(TransactionRef tr, Func* func)
     {
-        LangBindHelper::advance_read(sg, std::forward<Func&&>(func));
+        tr->advance_read(func);
     }
 };
 
 struct PromoteThenRollback {
     template <typename Func>
-    static void call(DB& sg, Func&& func)
+    static void call(TransactionRef tr, Func* func)
     {
-        LangBindHelper::promote_to_write(sg, std::forward<Func&&>(func));
-        LangBindHelper::rollback_and_continue_as_read(sg);
+        tr->promote_to_write(func);
+        tr->rollback_and_continue_as_read();
     }
 };
 
 } // unnamed namespace
-
 
 TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, PromoteThenRollback)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-
+    ColKey c0, c1;
     {
         WriteTransaction wt(sg);
-        wt.add_table("table 1")->add_column(type_Int, "int");
-        wt.add_table("table 2")->add_column(type_Int, "int");
+        c0 = wt.add_table("table 1")->add_column(type_Int, "int");
+        c1 = wt.add_table("table 2")->add_column(type_Int, "int");
         wt.commit();
     }
 
-    sg.begin_read();
+    auto tr = sg->start_read();
 
     {
         // With no changes, the handler should not be called at all
@@ -1882,16 +1692,13 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 CHECK(false);
             }
         } parser(test_context);
-        TEST_TYPE::call(sg, parser);
+        TEST_TYPE::call(tr, &parser);
     }
-
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
 
     {
         // With an empty change, parse_complete() and nothing else should be called
-        WriteTransaction wt(sg_w);
-        wt.commit();
+        auto wt = sg->start_write();
+        wt->commit();
 
         struct foo : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
@@ -1902,15 +1709,16 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 called = true;
             }
         } parser(test_context);
-        TEST_TYPE::call(sg, parser);
+        TEST_TYPE::call(tr, &parser);
         CHECK(parser.called);
     }
-
+#ifdef LEGACY_TESTS
+    ObjKey o0, o1;
     {
         // Make a simple modification and verify that the appropriate handler is called
-        WriteTransaction wt(sg_w);
-        wt.get_table("table 1")->add_empty_row();
-        wt.get_table("table 2")->add_empty_row();
+        WriteTransaction wt(sg);
+        o0 = wt.get_table("table 1")->create_object().get_key();
+        o1 = wt.get_table("table 2")->create_object().get_key();
         wt.commit();
 
         struct foo : NoOpTransactionLogParser {
@@ -1918,9 +1726,10 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 
             size_t expected_table = 0;
 
-            bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool unordered)
+            bool create_object(ObjKey ok)
             {
-                CHECK_EQUAL(expected_table, get_current_table());
+                CHECK_EQUAL(expected_table ? o1.get_table().get_key() : o0.get_table().get_key(),
+                            get_current_table());
                 ++expected_table;
 
                 CHECK_EQUAL(0, row_ndx);
@@ -1931,29 +1740,29 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 return true;
             }
         } parser(test_context);
-        TEST_TYPE::call(sg, parser);
+        TEST_TYPE::call(tr, &parser);
         CHECK_EQUAL(2, parser.expected_table);
     }
-
+    ColKey c2, c3;
     {
         // Add a table with some links
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef table = wt.add_table("link origin");
-        table->add_column_link(type_Link, "link", *wt.get_table("table 1"));
-        table->add_column_link(type_LinkList, "linklist", *wt.get_table("table 2"));
-        table->add_empty_row();
-        table->set_link(0, 0, 0);
-        table->get_linklist(1, 0)->add(0);
+        c2 = table->add_column_link(type_Link, "link", *wt.get_table("table 1"));
+        c3 = table->add_column_link(type_LinkList, "linklist", *wt.get_table("table 2"));
+        Obj o = table->create_object();
+        o.set(c2, o.get_key());
+        o.get_linklist(c3).add(o.get_key());
         wt.commit();
 
-        rt->advance_read();
+        tr->advance_read();
     }
 
     {
         // Verify that deleting the targets of the links logs link nullifications
-        WriteTransaction wt(sg_w);
-        wt.get_table("table 1")->move_last_over(0);
-        wt.get_table("table 2")->move_last_over(0);
+        WriteTransaction wt(sg);
+        wt.get_table("table 1")->remove_object(o0);
+        wt.get_table("table 2")->remove_object(o1);
         wt.commit();
 
         struct : NoOpTransactionLogParser {
@@ -1986,9 +1795,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 return true;
             }
         } parser(test_context);
-        TEST_TYPE::call(sg, parser);
+        TEST_TYPE::call(tr, &parser);
     }
-
     {
         // Verify that clear() logs the correct rows
         WriteTransaction wt(sg_w);
@@ -2023,9 +1831,12 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         } parser(test_context);
         TEST_TYPE::call(sg, parser);
     }
+#endif
 }
+#ifdef LEGACY_TESTS
+#endif
 
-
+#ifdef LEGACY_TESTS
 TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2138,6 +1949,7 @@ TEST(LangBindHelper_ImplicitTransactions)
 
 
 #ifdef LEGACY_TESTS
+// to be ported
 TEST(LangBindHelper_RollbackAndContinueAsRead)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2432,30 +2244,30 @@ TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
     group->rollback_and_continue_as_read();
 }
 
-#ifdef LEGACY_TESTS
 TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    Group* group = const_cast<Group*>(&sg.begin_read());
+    auto group = sg->start_read();
     TableRef t, t2;
+    ColKey col;
     {
         // add a column
-        LangBindHelper::promote_to_write(sg);
+        group->promote_to_write();
         t = group->get_or_add_table("a_table");
         t2 = group->get_or_add_table("b_table");
-        t->add_column_link(type_Link, "bruno", *t2);
-        CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
-        LangBindHelper::commit_and_continue_as_read(sg);
+        col = t->add_column_link(type_Link, "bruno", *t2);
+        CHECK_EQUAL(1, t->get_column_count());
+        group->commit_and_continue_as_read();
     }
     group->verify();
     {
         // ... but then regret it
-        LangBindHelper::promote_to_write(sg);
-        t->remove_column(0);
-        CHECK_EQUAL(0, t->get_descriptor()->get_column_count());
-        LangBindHelper::rollback_and_continue_as_read(sg);
+        group->promote_to_write();
+        t->remove_column(col);
+        CHECK_EQUAL(0, t->get_column_count());
+        group->rollback_and_continue_as_read();
     }
 }
 
@@ -2465,29 +2277,28 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    Group* group = const_cast<Group*>(&sg.begin_read());
+    auto group = sg->start_read();
     TableRef t;
+    ColKey col;
     {
-        LangBindHelper::promote_to_write(sg);
+        group->promote_to_write();
         t = group->get_or_add_table("a_table");
-        t->add_column(type_Int, "lorelei");
+        col = t->add_column(type_Int, "lorelei");
         t->add_column(type_Int, "riget");
-        t->insert_empty_row(0);
-        t->set_int(0, 0, 43);
-        t->set_int(1, 0, 44);
-        CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
-        LangBindHelper::commit_and_continue_as_read(sg);
+        t->create_object().set_all(43, 44);
+        CHECK_EQUAL(2, t->get_column_count());
+        group->commit_and_continue_as_read();
     }
     group->verify();
     {
         // remove a column but regret it
-        LangBindHelper::promote_to_write(sg);
-        CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
-        t->remove_column(0);
+        group->promote_to_write();
+        CHECK_EQUAL(2, t->get_column_count());
+        t->remove_column(col);
         group->verify();
-        LangBindHelper::rollback_and_continue_as_read(sg);
+        group->rollback_and_continue_as_read();
         group->verify();
-        CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
+        CHECK_EQUAL(2, t->get_column_count());
     }
     group->verify();
 }
@@ -2498,44 +2309,34 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    Group* group = const_cast<Group*>(&sg.begin_read());
-    LangBindHelper::promote_to_write(sg);
+    auto group = sg->start_read();
+    group->promote_to_write();
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
-    origin->add_column_link(type_LinkList, "", *target);
+    auto col0 = origin->add_column_link(type_LinkList, "", *target);
     target->add_column(type_Int, "");
-    origin->add_empty_row();
-    target->add_empty_row();
-    target->add_empty_row();
-    target->add_empty_row();
-    LinkViewRef link_list = origin->get_linklist(0, 0);
-    link_list->add(0);
-    LangBindHelper::commit_and_continue_as_read(sg);
-    CHECK_EQUAL(1, link_list->size());
+    auto o0 = origin->create_object();
+    auto t0 = target->create_object();
+    auto t1 = target->create_object();
+    auto t2 = target->create_object();
+
+    auto link_list = o0.get_linklist(col0);
+    link_list.add(t0.get_key());
+    group->commit_and_continue_as_read();
+    CHECK_EQUAL(1, link_list.size());
     group->verify();
     // now change a link in link list and roll back the change
-    LangBindHelper::promote_to_write(sg);
-    link_list->add(1);
-    link_list->add(2);
-    CHECK_EQUAL(3, link_list->size());
-    LangBindHelper::rollback_and_continue_as_read(sg);
-    CHECK_EQUAL(1, link_list->size());
-    LangBindHelper::promote_to_write(sg);
-    link_list->remove(0);
-    CHECK_EQUAL(0, link_list->size());
-    LangBindHelper::rollback_and_continue_as_read(sg);
-    CHECK_EQUAL(1, link_list->size());
-    // verify that we can do move last over - first set link to last entry in target:
-    LangBindHelper::promote_to_write(sg);
-    link_list->set(0, 2); // link list holds single link to end of target
-    LangBindHelper::commit_and_continue_as_read(sg);
-    // then we test move last over:
-    LangBindHelper::promote_to_write(sg);
-    CHECK_EQUAL(2, link_list->get(0).get_index()); // link restored
-    target->move_last_over(0);
-    CHECK_EQUAL(0, link_list->get(0).get_index()); // link was changed to 0 due to move last over
-    LangBindHelper::rollback_and_continue_as_read(sg);
-    CHECK_EQUAL(2, link_list->get(0).get_index()); // link restored
+    group->promote_to_write();
+    link_list.add(t1.get_key());
+    link_list.add(t2.get_key());
+    CHECK_EQUAL(3, link_list.size());
+    group->rollback_and_continue_as_read();
+    CHECK_EQUAL(1, link_list.size());
+    group->promote_to_write();
+    link_list.remove(0);
+    CHECK_EQUAL(0, link_list.size());
+    group->rollback_and_continue_as_read();
+    CHECK_EQUAL(1, link_list.size());
 }
 
 
@@ -2544,44 +2345,33 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_Links)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    Group* group = const_cast<Group*>(&sg.begin_read());
-    LangBindHelper::promote_to_write(sg);
+    auto group = sg->start_read();
+    group->promote_to_write();
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
-    origin->add_column_link(type_Link, "", *target);
+    auto col0 = origin->add_column_link(type_Link, "", *target);
     target->add_column(type_Int, "");
-    origin->add_empty_row();
-    target->add_empty_row();
-    target->add_empty_row();
-    target->add_empty_row();
-    origin->set_link(0, 0, 2); // points to last row in target
-    CHECK_EQUAL(2, origin->get_link(0, 0));
-    LangBindHelper::commit_and_continue_as_read(sg);
-    // verify that we can reverse a move last over:
-    CHECK_EQUAL(2, origin->get_link(0, 0));
-    LangBindHelper::promote_to_write(sg);
-    target->move_last_over(1);
-    CHECK_EQUAL(1, origin->get_link(0, 0));
-    LangBindHelper::rollback_and_continue_as_read(sg);
-    CHECK_EQUAL(2, origin->get_link(0, 0));
+    auto o0 = origin->create_object();
+    auto t0 = target->create_object();
+    auto t1 = target->create_object();
+    auto t2 = target->create_object();
+
+    o0.set(col0, t2.get_key());
+    CHECK_EQUAL(t2.get_key(), o0.get<ObjKey>(col0));
+    group->commit_and_continue_as_read();
+
     // verify that we can revert a link change:
-    LangBindHelper::promote_to_write(sg);
-    origin->set_link(0, 0, 1);
-    CHECK_EQUAL(1, origin->get_link(0, 0));
-    LangBindHelper::rollback_and_continue_as_read(sg);
-    CHECK_EQUAL(2, origin->get_link(0, 0));
+    group->promote_to_write();
+    o0.set(col0, t1.get_key());
+    CHECK_EQUAL(t1.get_key(), o0.get<ObjKey>(col0));
+    group->rollback_and_continue_as_read();
+    CHECK_EQUAL(t2.get_key(), o0.get<ObjKey>(col0));
     // verify that we can revert addition of a row in target table
-    LangBindHelper::promote_to_write(sg);
-    target->add_empty_row();
-    CHECK_EQUAL(2, origin->get_link(0, 0));
-    LangBindHelper::rollback_and_continue_as_read(sg);
-    CHECK_EQUAL(2, origin->get_link(0, 0));
-    // Verify that we can revert a non-end insertion of a row in target table
-    LangBindHelper::promote_to_write(sg);
-    target->insert_empty_row(0);
-    CHECK_EQUAL(3, origin->get_link(0, 0));
-    LangBindHelper::rollback_and_continue_as_read(sg);
-    CHECK_EQUAL(2, origin->get_link(0, 0));
+    group->promote_to_write();
+    target->create_object();
+    CHECK_EQUAL(t2.get_key(), o0.get<ObjKey>(col0));
+    group->rollback_and_continue_as_read();
+    CHECK_EQUAL(t2.get_key(), o0.get<ObjKey>(col0));
 }
 
 
@@ -2590,47 +2380,47 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_LinkLists)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    Group* group = const_cast<Group*>(&sg.begin_read());
-    LangBindHelper::promote_to_write(sg);
+    auto group = sg->start_read();
+    group->promote_to_write();
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
-    origin->add_column_link(type_LinkList, "", *target);
+    auto col0 = origin->add_column_link(type_LinkList, "", *target);
     target->add_column(type_Int, "");
-    origin->add_empty_row();
-    target->add_empty_row();
-    target->add_empty_row();
-    target->add_empty_row();
-    LinkViewRef link_list = origin->get_linklist(0, 0);
-    link_list->add(0);
-    link_list->add(1);
-    link_list->add(2);
-    link_list->add(0);
-    link_list->add(2);
-    LangBindHelper::commit_and_continue_as_read(sg);
+    auto o0 = origin->create_object();
+    auto t0 = target->create_object();
+    auto t1 = target->create_object();
+    auto t2 = target->create_object();
+
+    auto link_list = o0.get_linklist(col0);
+    link_list.add(t0.get_key());
+    link_list.add(t1.get_key());
+    link_list.add(t2.get_key());
+    link_list.add(t0.get_key());
+    link_list.add(t2.get_key());
+    group->commit_and_continue_as_read();
     // verify that we can reverse a LinkView::move()
-    CHECK_EQUAL(5, link_list->size());
-    CHECK_EQUAL(0, link_list->get(0).get_index());
-    CHECK_EQUAL(1, link_list->get(1).get_index());
-    CHECK_EQUAL(2, link_list->get(2).get_index());
-    CHECK_EQUAL(0, link_list->get(3).get_index());
-    CHECK_EQUAL(2, link_list->get(4).get_index());
-    LangBindHelper::promote_to_write(sg);
-    link_list->move(1, 3);
-    CHECK_EQUAL(5, link_list->size());
-    CHECK_EQUAL(0, link_list->get(0).get_index());
-    CHECK_EQUAL(2, link_list->get(1).get_index());
-    CHECK_EQUAL(0, link_list->get(2).get_index());
-    CHECK_EQUAL(1, link_list->get(3).get_index());
-    CHECK_EQUAL(2, link_list->get(4).get_index());
-    LangBindHelper::rollback_and_continue_as_read(sg);
-    CHECK_EQUAL(5, link_list->size());
-    CHECK_EQUAL(0, link_list->get(0).get_index());
-    CHECK_EQUAL(1, link_list->get(1).get_index());
-    CHECK_EQUAL(2, link_list->get(2).get_index());
-    CHECK_EQUAL(0, link_list->get(3).get_index());
-    CHECK_EQUAL(2, link_list->get(4).get_index());
+    CHECK_EQUAL(5, link_list.size());
+    CHECK_EQUAL(t0.get_key(), link_list.get(0));
+    CHECK_EQUAL(t1.get_key(), link_list.get(1));
+    CHECK_EQUAL(t2.get_key(), link_list.get(2));
+    CHECK_EQUAL(t0.get_key(), link_list.get(3));
+    CHECK_EQUAL(t2.get_key(), link_list.get(4));
+    group->promote_to_write();
+    link_list.move(1, 3);
+    CHECK_EQUAL(5, link_list.size());
+    CHECK_EQUAL(t0.get_key(), link_list.get(0));
+    CHECK_EQUAL(t2.get_key(), link_list.get(1));
+    CHECK_EQUAL(t0.get_key(), link_list.get(2));
+    CHECK_EQUAL(t1.get_key(), link_list.get(3));
+    CHECK_EQUAL(t2.get_key(), link_list.get(4));
+    group->rollback_and_continue_as_read();
+    CHECK_EQUAL(5, link_list.size());
+    CHECK_EQUAL(t0.get_key(), link_list.get(0));
+    CHECK_EQUAL(t1.get_key(), link_list.get(1));
+    CHECK_EQUAL(t2.get_key(), link_list.get(2));
+    CHECK_EQUAL(t0.get_key(), link_list.get(3));
+    CHECK_EQUAL(t2.get_key(), link_list.get(4));
 }
-#endif
 
 
 TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
