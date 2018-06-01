@@ -132,10 +132,15 @@ public:
     // sum() returns 0, except for when it returns none
     // Throws UnsupportedColumnTypeException for sum/average on timestamp or non-numeric column
     // Throws OutOfBoundsIndexException for an out-of-bounds column
-    util::Optional<Mixed> max(size_t column=0);
-    util::Optional<Mixed> min(size_t column=0);
-    util::Optional<double> average(size_t column=0);
-    util::Optional<Mixed> sum(size_t column=0);
+    util::Optional<Mixed> max(ColKey column={});
+    util::Optional<Mixed> min(ColKey column={});
+    util::Optional<double> average(ColKey column={});
+    util::Optional<Mixed> sum(ColKey column={});
+
+    util::Optional<Mixed> max(StringData column_name) { return max(key(column_name)); }
+    util::Optional<Mixed> min(StringData column_name) { return min(key(column_name)); }
+    util::Optional<double> average(StringData column_name) { return average(key(column_name)); }
+    util::Optional<Mixed> sum(StringData column_name) { return sum(key(column_name)); }
 
     enum class Mode {
         Empty, // Backed by nothing (for missing tables)
@@ -179,11 +184,11 @@ public:
 
     // The requested aggregate operation is not supported for the column type
     struct UnsupportedColumnTypeException : public std::logic_error {
-        int64_t column_key;
+        ColKey column_key;
         StringData column_name;
         PropertyType property_type;
 
-        UnsupportedColumnTypeException(int64_t column, const Table* table, const char* operation);
+        UnsupportedColumnTypeException(ColKey column, const Table* table, const char* operation);
     };
 
     // Create an async query from this Results
@@ -238,15 +243,17 @@ private:
 
     void prepare_async();
 
+    ColKey key(StringData) const;
+
     template<typename T>
     util::Optional<T> try_get(size_t);
 
     template<typename Int, typename Float, typename Double, typename Timestamp>
-    util::Optional<Mixed> aggregate(size_t column,
+    util::Optional<Mixed> aggregate(ColKey column,
                                     const char* name,
                                     Int agg_int, Float agg_float,
                                     Double agg_double, Timestamp agg_timestamp);
-    void prepare_for_aggregate(size_t column, const char* name);
+    void prepare_for_aggregate(ColKey column, const char* name);
 
     template<typename Fn>
     auto dispatch(Fn&&) const;

@@ -338,26 +338,75 @@ Results List::snapshot() const
     return as_results().snapshot();
 }
 
-util::Optional<Mixed> List::max(size_t column)
+template<class...> using VoidT = void;
+
+template<class, class = VoidT<>>
+struct HasMinmaxType : std::false_type { };
+template<class T>
+struct HasMinmaxType<T, VoidT<typename ColumnTypeTraits<T>::minmax_type>> : std::true_type { };
+
+template<class, class = VoidT<>>
+struct HasSumType : std::false_type { };
+template<class T>
+struct HasSumType<T, VoidT<typename ColumnTypeTraits<T>::sum_type>> : std::true_type { };
+
+template<bool cond>
+struct If;
+
+template<>
+struct If<true> {
+    template<typename T, typename Then, typename Else>
+    static auto call(T self, Then&& fn, Else&&) { return fn(self); }
+};
+template<>
+struct If<false> {
+    template<typename T, typename Then, typename Else>
+    static auto call(T, Then&&, Else&& fn) { return fn(); }
+};
+
+template<template<class...> class Predicate, typename Fn, typename Err>
+auto List::aggregate(Fn&& fn, Err&& error) const
 {
-    return as_results().max(column);
+    return dispatch([&](auto t) {
+        using T = std::decay_t<decltype(*t)>;
+        return If<Predicate<T>::value>::call(this, [&](auto self) {
+            return fn(self->template as<T>());
+        }, error);
+    });
 }
 
-util::Optional<Mixed> List::min(size_t column)
+util::Optional<Mixed> List::max(size_t)
 {
-    return as_results().min(column);
+    return aggregate<HasMinmaxType>([](auto& list) {
+        size_t out_ndx = not_found;
+        auto result = list_maximum(list, &out_ndx);
+        return out_ndx == not_found ? none : make_optional(Mixed(result));
+    }, []() -> util::Optional<Mixed> { throw "type error"; });
 }
 
-Mixed List::sum(size_t column)
+util::Optional<Mixed> List::min(size_t)
 {
-    // Results::sum() returns none only for Mode::Empty Results, so we can
-    // safely ignore that possibility here
-    return *as_results().sum(column);
+    return aggregate<HasMinmaxType>([](auto& list) {
+        size_t out_ndx = not_found;
+        auto result = list_minimum(list, &out_ndx);
+        return out_ndx == not_found ? none : make_optional(Mixed(result));
+    }, []() -> util::Optional<Mixed> { throw "type error"; });
 }
 
-util::Optional<double> List::average(size_t column)
+Mixed List::sum(size_t)
 {
-    return as_results().average(column);
+    return aggregate<HasSumType>([](auto& list) {
+        return Mixed(list_sum(list));
+    }, []() -> Mixed { throw "type error"; });
+}
+
+util::Optional<double> List::average(size_t)
+{
+    return aggregate<HasSumType>([](auto& list) {
+        size_t count = 0;
+        auto result = list_average(list, &count);
+        return count == 0 ? none : make_optional(result);
+    }, []() -> util::Optional<double> { throw "type error"; });
 }
 
 bool List::operator==(List const& rgt) const noexcept

@@ -329,11 +329,8 @@ size_t Results::index_of(Query&& q)
     return row ? index_of(m_table->get_object(row)) : not_found;
 }
 
-#if 0
-void Results::prepare_for_aggregate(size_t column, const char* name)
+void Results::prepare_for_aggregate(ColKey column, const char* name)
 {
-    if (column > m_table->get_column_count())
-        throw OutOfBoundsIndexException{column, m_table->get_column_count()};
     switch (m_mode) {
         case Mode::Empty: break;
         case Mode::Table: break;
@@ -350,12 +347,12 @@ void Results::prepare_for_aggregate(size_t column, const char* name)
     }
     switch (m_table->get_column_type(column)) {
         case type_Timestamp: case type_Double: case type_Float: case type_Int: break;
-        default: throw UnsupportedColumnTypeException{column, m_table.get(), name};
+        default: throw UnsupportedColumnTypeException{column, m_table, name};
     }
 }
 
 template<typename Int, typename Float, typename Double, typename Timestamp>
-util::Optional<Mixed> Results::aggregate(size_t column,
+util::Optional<Mixed> Results::aggregate(ColKey column,
                                          const char* name,
                                          Int agg_int, Float agg_float,
                                          Double agg_double, Timestamp agg_timestamp)
@@ -377,48 +374,47 @@ util::Optional<Mixed> Results::aggregate(size_t column,
     }
 }
 
-util::Optional<Mixed> Results::max(size_t column)
+util::Optional<Mixed> Results::max(ColKey column)
 {
-    size_t return_ndx = npos;
+    ObjKey return_ndx;
     auto results = aggregate(column, "max",
                              [&](auto const& table) { return table.maximum_int(column, &return_ndx); },
                              [&](auto const& table) { return table.maximum_float(column, &return_ndx); },
                              [&](auto const& table) { return table.maximum_double(column, &return_ndx); },
                              [&](auto const& table) { return table.maximum_timestamp(column, &return_ndx); });
-    return return_ndx == npos ? none : results;
+    return return_ndx ? none : results;
 }
 
-util::Optional<Mixed> Results::min(size_t column)
+util::Optional<Mixed> Results::min(ColKey column)
 {
-    size_t return_ndx = npos;
+    ObjKey return_ndx;
     auto results = aggregate(column, "min",
                              [&](auto const& table) { return table.minimum_int(column, &return_ndx); },
                              [&](auto const& table) { return table.minimum_float(column, &return_ndx); },
                              [&](auto const& table) { return table.minimum_double(column, &return_ndx); },
                              [&](auto const& table) { return table.minimum_timestamp(column, &return_ndx); });
-    return return_ndx == npos ? none : results;
+    return return_ndx ? none : results;
 }
 
-util::Optional<Mixed> Results::sum(size_t column)
+util::Optional<Mixed> Results::sum(ColKey column)
 {
     return aggregate(column, "sum",
                      [=](auto const& table) { return table.sum_int(column); },
                      [=](auto const& table) { return table.sum_float(column); },
                      [=](auto const& table) { return table.sum_double(column); },
-                     [=](auto const&) -> Timestamp { throw UnsupportedColumnTypeException{column, m_table.get(), "sum"}; });
+                     [=](auto const&) -> Timestamp { throw UnsupportedColumnTypeException{column, m_table, "sum"}; });
 }
 
-util::Optional<double> Results::average(size_t column)
+util::Optional<double> Results::average(ColKey column)
 {
     size_t value_count = 0;
     auto results = aggregate(column, "average",
                              [&](auto const& table) { return table.average_int(column, &value_count); },
                              [&](auto const& table) { return table.average_float(column, &value_count); },
                              [&](auto const& table) { return table.average_double(column, &value_count); },
-                             [&](auto const&) -> Timestamp { throw UnsupportedColumnTypeException{column, m_table.get(), "average"}; });
+                             [&](auto const&) -> Timestamp { throw UnsupportedColumnTypeException{column, m_table, "average"}; });
     return value_count == 0 ? none : util::make_optional(results->get_double());
 }
-#endif
 
 void Results::clear()
 {
@@ -735,11 +731,10 @@ bool Results::is_in_table_order() const
     REALM_COMPILER_HINT_UNREACHABLE();
 }
 
-util::Optional<Mixed> Results::min(size_t) { throw std::runtime_error("not implemented"); }
-util::Optional<Mixed> Results::max(size_t) { throw std::runtime_error("not implemented"); }
-util::Optional<Mixed> Results::sum(size_t) { throw std::runtime_error("not implemented"); }
-util::Optional<double> Results::average(size_t) { throw std::runtime_error("not implemented"); }
-
+ColKey Results::key(StringData name) const
+{
+    return m_table->get_column_key(name);
+}
 
 #define REALM_RESULTS_TYPE(T) \
     template T Results::get<T>(size_t); \
@@ -779,10 +774,10 @@ static std::string unsupported_operation_msg(ColKey column, const Table* table, 
                         operation, column_type);
 }
 
-Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(int64_t column, const Table* table, const char* operation)
-: std::logic_error(unsupported_operation_msg(ColKey(column), table, operation))
+Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, const Table* table, const char* operation)
+: std::logic_error(unsupported_operation_msg(column, table, operation))
 , column_key(column)
-, column_name(table->get_column_name(ColKey(column)))
+, column_name(table->get_column_name(column))
 , property_type(ObjectSchema::from_core_type(*table, ColKey(column)))
 {
 }
