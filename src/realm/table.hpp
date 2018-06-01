@@ -106,6 +106,9 @@ public:
     // Whether or not elements can be null.
     bool is_nullable(ColKey col_key) const;
 
+    // Whether or not the column is a list.
+    bool is_list(ColKey col_key) const;
+
     //@{
     /// Conventience functions for inspecting the dynamic table type.
     ///
