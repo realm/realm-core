@@ -19,9 +19,9 @@
 #include "impl/collection_change_builder.hpp"
 
 #include <realm/util/assert.hpp>
-#include <algorithm>
 
 #include <algorithm>
+#include <unordered_set>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -50,17 +50,20 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
     verify();
     c.verify();
 
+    // FIXME: this is comically wasteful
+    std::unordered_set<int64_t> col_keys;
+    if (m_track_columns) {
+        for (auto& col : columns)
+            col_keys.insert(col.first);
+        for (auto& col : c.columns)
+            col_keys.insert(col.first);
+    }
+
     auto for_each_col = [&](auto&& f) {
         f(modifications, c.modifications);
         if (m_track_columns) {
-#if 0 // FIXME: need to zip matching columns
-            if (columns.size() < c.columns.size())
-                columns.resize(c.columns.size());
-            else if (columns.size() > c.columns.size())
-                c.columns.resize(columns.size());
-            for (size_t i = 0; i < columns.size(); ++i)
-                f(columns[i], c.columns[i]);
-#endif
+            for (auto col : col_keys)
+                f(columns[col], c.columns[col]);
         }
     };
 

@@ -89,22 +89,17 @@ TEST_CASE("collection_change: modify()") {
     SECTION("marks the appropriate column as modified when applicable") {
         c.modify(5, 2);
         REQUIRE_INDICES(c.modifications, 5);
-        REQUIRE(c.columns.size() > 2);
-        REQUIRE(c.columns[0].empty());
-        REQUIRE(c.columns[1].empty());
+        REQUIRE(c.columns.size() == 1);
         REQUIRE_INDICES(c.columns[2], 5);
 
         c.modify(4, 2);
         REQUIRE_INDICES(c.modifications, 4, 5);
-        REQUIRE(c.columns.size() > 2);
-        REQUIRE(c.columns[0].empty());
-        REQUIRE(c.columns[1].empty());
+        REQUIRE(c.columns.size() == 1);
         REQUIRE_INDICES(c.columns[2], 4, 5);
 
         c.modify(3, 1);
         REQUIRE_INDICES(c.modifications, 3, 4, 5);
-        REQUIRE(c.columns.size() > 2);
-        REQUIRE(c.columns[0].empty());
+        REQUIRE(c.columns.size() == 2);
         REQUIRE_INDICES(c.columns[1], 3);
         REQUIRE_INDICES(c.columns[2], 4, 5);
     }
@@ -195,15 +190,6 @@ TEST_CASE("collection_change: clear()") {
         c.deletions = {1, 2, 3};
         c.clear(5);
         REQUIRE_INDICES(c.deletions, 0, 1, 2, 3, 4, 5, 6, 7);
-    }
-
-    SECTION("sets deletions SIZE_T_MAX if that if the given previous size") {
-        c.insertions = {1, 2, 3};
-        c.clear(std::numeric_limits<size_t>::max());
-        REQUIRE(!c.deletions.empty());
-        REQUIRE(++c.deletions.begin() == c.deletions.end());
-        REQUIRE(c.deletions.begin()->first == 0);
-        REQUIRE(c.deletions.begin()->second == std::numeric_limits<size_t>::max());
     }
 }
 
@@ -692,7 +678,7 @@ TEST_CASE("collection_change: merge()") {
 
     SECTION("is a no-op if the new set is empty") {
         c = {{1, 2, 3}, {4, 5}, {6, 7}, {{8, 9}}};
-//        c.columns = {{6}, {7}};
+        c.columns = {{0, {6}}, {1, {7}}};
         c.merge({});
         REQUIRE_INDICES(c.deletions, 1, 2, 3, 8);
         REQUIRE_INDICES(c.insertions, 4, 5, 9);
@@ -946,7 +932,7 @@ TEST_CASE("collection_change: merge()") {
     SECTION("column-level modifications") {
         _impl::CollectionChangeBuilder c2;
         c = {{}, {}, {1, 2, 3}, {}};
-//        c.columns = {{1}, {2, 3}};
+        c.columns = {{0, {1}}, {1, {2, 3}}};
 
         SECTION("preserved on no-op merges") {
             c.merge({});
@@ -960,7 +946,7 @@ TEST_CASE("collection_change: merge()") {
 
         SECTION("merged with other column-level modifications") {
             c2.modifications = {0, 4};
-//            c2.columns = {{1, 2}, {}, {4}};
+            c2.columns = {{0, {1, 2}}, {2, {4}}};
             c.merge(std::move(c2));
 
             REQUIRE_COLUMN_INDICES(c.columns, 0, 1, 2);
@@ -980,10 +966,6 @@ TEST_CASE("collection_change: merge()") {
             c.merge(std::move(c2));
             REQUIRE_COLUMN_INDICES(c.columns, 0, 1);
             REQUIRE_COLUMN_INDICES(c.columns, 1, 2, 4);
-        }
-
-        SECTION("updated by moves") {
-
         }
     }
 }
