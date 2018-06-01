@@ -1554,7 +1554,7 @@ TEST(Parser_SortAndDistinctSerialisation)
     TableView tv = people->where().find_all();
     tv.sort(name_col, false);
     tv.sort(age_col, true);
-    tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
+    tv.sort(SortDescriptor({{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
     std::string description = tv.get_descriptor_ordering_description();
     CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC, age ASC, name DESC)") != std::string::npos);
 
@@ -1562,14 +1562,14 @@ TEST(Parser_SortAndDistinctSerialisation)
     tv = people->where().find_all();
     tv.distinct(name_col);
     tv.distinct(age_col);
-    tv.distinct(DistinctDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}));
+    tv.distinct(DistinctDescriptor({{account_col, balance_col}, {account_col, transaction_col}}));
     description = tv.get_descriptor_ordering_description();
     CHECK(description.find("DISTINCT(name) DISTINCT(age) DISTINCT(account.balance, account.num_transactions)") != std::string::npos);
 
     // combined sort and distinct serialisation
     tv = people->where().find_all();
-    tv.distinct(DistinctDescriptor(*people, {{name_col}, {age_col}}));
-    tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
+    tv.distinct(DistinctDescriptor({{name_col}, {age_col}}));
+    tv.sort(SortDescriptor({{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
     description = tv.get_descriptor_ordering_description();
     CHECK(description.find("DISTINCT(name, age)") != std::string::npos);
     CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC)") != std::string::npos);

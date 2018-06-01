@@ -22,28 +22,9 @@
 
 using namespace realm;
 
-CommonDescriptor::CommonDescriptor(Table const& table, std::vector<std::vector<ColKey>> column_indices)
+CommonDescriptor::CommonDescriptor(std::vector<std::vector<ColKey>> column_keys)
+: m_column_keys(std::move(column_keys))
 {
-    m_column_ids.resize(column_indices.size());
-    for (size_t i = 0; i < m_column_ids.size(); ++i) {
-        auto& column_ids = m_column_ids[i];
-        auto& indices = column_indices[i];
-        REALM_ASSERT(!column_indices.empty());
-
-        column_ids.reserve(indices.size());
-        const Table* cur_table = &table;
-        for (auto index : indices) {
-            column_ids.push_back(ColumnId{cur_table, index});
-            DataType col_type = cur_table->get_column_type(index);
-            if (col_type == type_Link) {
-                cur_table = cur_table->get_link_target(index);
-            }
-            else if (column_ids.size() != indices.size()) {
-                // Only last column in link chain is allowed to be non-link
-                throw LogicError(LogicError::type_mismatch);
-            }
-        }
-    }
 }
 
 std::unique_ptr<CommonDescriptor> CommonDescriptor::clone() const
@@ -54,11 +35,11 @@ std::unique_ptr<CommonDescriptor> CommonDescriptor::clone() const
 std::string CommonDescriptor::get_description(ConstTableRef attached_table) const
 {
     std::string description = "DISTINCT(";
-    for (size_t i = 0; i < m_column_ids.size(); ++i) {
-        const size_t chain_size = m_column_ids[i].size();
+    for (size_t i = 0; i < m_column_keys.size(); ++i) {
+        const size_t chain_size = m_column_keys[i].size();
         ConstTableRef cur_link_table = attached_table;
         for (size_t j = 0; j < chain_size; ++j) {
-            ColKey col_key = m_column_ids[i][j].col_key;
+            ColKey col_key = m_column_keys[i][j];
             StringData col_name = cur_link_table->get_column_name(col_key);
             description += std::string(col_name);
             if (j < chain_size - 1) {
@@ -66,7 +47,7 @@ std::string CommonDescriptor::get_description(ConstTableRef attached_table) cons
                 cur_link_table = cur_link_table->get_link_target(col_key);
             }
         }
-        if (i < m_column_ids.size() - 1) {
+        if (i < m_column_keys.size() - 1) {
             description += ", ";
         }
     }
@@ -77,11 +58,11 @@ std::string CommonDescriptor::get_description(ConstTableRef attached_table) cons
 std::string SortDescriptor::get_description(ConstTableRef attached_table) const
 {
     std::string description = "SORT(";
-    for (size_t i = 0; i < m_column_ids.size(); ++i) {
-        const size_t chain_size = m_column_ids[i].size();
+    for (size_t i = 0; i < m_column_keys.size(); ++i) {
+        const size_t chain_size = m_column_keys[i].size();
         ConstTableRef cur_link_table = attached_table;
         for (size_t j = 0; j < chain_size; ++j) {
-            ColKey col_key = m_column_ids[i][j].col_key;
+            ColKey col_key = m_column_keys[i][j];
             StringData col_name = cur_link_table->get_column_name(col_key);
             description += std::string(col_name);
             if (j < chain_size - 1) {
@@ -98,7 +79,7 @@ std::string SortDescriptor::get_description(ConstTableRef attached_table) const
                 description += "DESC";
             }
         }
-        if (i < m_column_ids.size() - 1) {
+        if (i < m_column_keys.size() - 1) {
             description += ", ";
         }
     }
@@ -106,15 +87,15 @@ std::string SortDescriptor::get_description(ConstTableRef attached_table) const
     return description;
 }
 
-SortDescriptor::SortDescriptor(Table const& table, std::vector<std::vector<ColKey>> column_indices,
+SortDescriptor::SortDescriptor(std::vector<std::vector<ColKey>> column_keys,
                                std::vector<bool> ascending)
-    : CommonDescriptor(table, column_indices)
+    : CommonDescriptor(std::move(column_keys))
     , m_ascending(std::move(ascending))
 {
-    REALM_ASSERT_EX(m_ascending.empty() || m_ascending.size() == column_indices.size(), m_ascending.size(),
-                    column_indices.size());
+    REALM_ASSERT_EX(m_ascending.empty() || m_ascending.size() == m_column_keys.size(),
+                    m_ascending.size(), m_column_keys.size());
     if (m_ascending.empty())
-        m_ascending.resize(column_indices.size(), true);
+        m_ascending.resize(m_column_keys.size(), true);
 }
 
 std::unique_ptr<CommonDescriptor> SortDescriptor::clone() const
@@ -124,28 +105,44 @@ std::unique_ptr<CommonDescriptor> SortDescriptor::clone() const
 
 void SortDescriptor::merge_with(SortDescriptor&& other)
 {
-    m_column_ids.insert(m_column_ids.begin(), std::make_move_iterator(other.m_column_ids.begin()),
-                        std::make_move_iterator(other.m_column_ids.end()));
+    m_column_keys.insert(m_column_keys.begin(),
+                        other.m_column_keys.begin(), other.m_column_keys.end());
     // Do not use a move iterator on a vector of bools!
     // It will form a reference to a temporary and return incorrect results.
     m_ascending.insert(m_ascending.begin(), other.m_ascending.begin(), other.m_ascending.end());
 }
 
 
-CommonDescriptor::Sorter::Sorter(std::vector<std::vector<ColumnId>> const& columns,
-                                 std::vector<bool> const& ascending, KeyColumn const& key_values)
+CommonDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_lists,
+                                 std::vector<bool> const& ascending,
+                                 Table const& root_table,
+                                 KeyColumn const& key_values)
 {
-    REALM_ASSERT(!columns.empty());
-    REALM_ASSERT_EX(columns.size() == ascending.size(), columns.size(), ascending.size());
+    REALM_ASSERT(!column_lists.empty());
+    REALM_ASSERT_EX(column_lists.size() == ascending.size(), column_lists.size(), ascending.size());
     size_t num_objs = key_values.size();
 
-    m_columns.reserve(columns.size());
-    for (size_t i = 0; i < columns.size(); ++i) {
-        m_columns.emplace_back(columns[i].back().table, columns[i].back().col_key, ascending[i]);
-        REALM_ASSERT_EX(!columns[i].empty(), i);
-        if (columns[i].size() == 1) { // no link chain
+    m_columns.reserve(column_lists.size());
+    for (size_t i = 0; i < column_lists.size(); ++i) {
+        auto& columns = column_lists[i];
+        REALM_ASSERT_EX(!columns.empty(), i);
+
+        if (columns.size() == 1) { // no link chain
+            m_columns.emplace_back(&root_table, columns[0], ascending[i]);
             continue;
         }
+
+        std::vector<const Table*> tables = {&root_table};
+        tables.resize(columns.size());
+        for (size_t j = 0; j + 1 < columns.size(); ++j) {
+            if (tables[j]->get_column_type(columns[j]) != type_Link) {
+                // Only last column in link chain is allowed to be non-link
+                throw LogicError(LogicError::type_mismatch);
+            }
+            tables[j + 1] = tables[j]->get_link_target(columns[j]);
+        }
+
+        m_columns.emplace_back(tables.back(), columns.back(), ascending[i]);
 
         auto& translated_keys = m_columns.back().translated_keys;
         auto& is_null = m_columns.back().is_null;
@@ -154,44 +151,25 @@ CommonDescriptor::Sorter::Sorter(std::vector<std::vector<ColumnId>> const& colum
 
         for (size_t row_ndx = 0; row_ndx < num_objs; row_ndx++) {
             ObjKey translated_key = ObjKey(key_values.get(row_ndx));
-            for (size_t j = 0; j + 1 < columns[i].size(); ++j) {
-                ConstObj obj = columns[i][j].table->get_object(translated_key);
+            for (size_t j = 0; j + 1 < columns.size(); ++j) {
+                ConstObj obj = tables[j]->get_object(translated_key);
                 // type was checked when creating the CommonDescriptor
-                if (obj.is_null(columns[i][j].col_key)) {
+                if (obj.is_null(columns[j])) {
                     is_null[row_ndx] = true;
                     break;
                 }
-                translated_key = obj.get<ObjKey>(columns[i][j].col_key);
+                translated_key = obj.get<ObjKey>(columns[j]);
             }
             translated_keys[row_ndx] = translated_key;
         }
     }
 }
 
-std::vector<std::vector<ColKey>> CommonDescriptor::export_column_indices() const
+CommonDescriptor::Sorter CommonDescriptor::sorter(Table const& table, KeyColumn const& row_indexes) const
 {
-    std::vector<std::vector<ColKey>> column_indices;
-    column_indices.reserve(m_column_ids.size());
-    for (auto& cols : m_column_ids) {
-        std::vector<ColKey> indices;
-        indices.reserve(cols.size());
-        for (auto col_id : cols)
-            indices.push_back(col_id.col_key);
-        column_indices.push_back(indices);
-    }
-    return column_indices;
-}
-
-std::vector<bool> SortDescriptor::export_order() const
-{
-    return m_ascending;
-}
-
-CommonDescriptor::Sorter CommonDescriptor::sorter(KeyColumn const& row_indexes) const
-{
-    REALM_ASSERT(!m_column_ids.empty());
-    std::vector<bool> ascending(m_column_ids.size(), true);
-    return Sorter(m_column_ids, ascending, row_indexes);
+    REALM_ASSERT(!m_column_keys.empty());
+    std::vector<bool> ascending(m_column_keys.size(), true);
+    return Sorter(m_column_keys, ascending, table, row_indexes);
 }
 
 void CommonDescriptor::execute(IndexPairs& v, const Sorter& predicate, const CommonDescriptor* next) const
@@ -220,10 +198,10 @@ void CommonDescriptor::execute(IndexPairs& v, const Sorter& predicate, const Com
     }
 }
 
-SortDescriptor::Sorter SortDescriptor::sorter(KeyColumn const& row_indexes) const
+SortDescriptor::Sorter SortDescriptor::sorter(Table const& table, KeyColumn const& row_indexes) const
 {
-    REALM_ASSERT(!m_column_ids.empty());
-    return Sorter(m_column_ids, m_ascending, row_indexes);
+    REALM_ASSERT(!m_column_keys.empty());
+    return Sorter(m_column_keys, m_ascending, table, row_indexes);
 }
 
 void SortDescriptor::execute(IndexPairs& v, const Sorter& predicate, const CommonDescriptor* next) const

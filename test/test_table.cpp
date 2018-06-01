@@ -1150,7 +1150,7 @@ TEST(Table_Multi_Sort)
     std::vector<bool> asc = {true, true};
 
     // (0, 10); (1, 10); (1, 14); (2, 10); (2; 14)
-    TableView v_sorted1 = table.get_sorted_view(SortDescriptor{table, col_ndx1, asc});
+    TableView v_sorted1 = table.get_sorted_view(SortDescriptor{col_ndx1, asc});
     CHECK_EQUAL(table.size(), v_sorted1.size());
     CHECK_EQUAL(ObjKey(2), v_sorted1.get_key(0));
     CHECK_EQUAL(ObjKey(0), v_sorted1.get_key(1));
@@ -1161,7 +1161,7 @@ TEST(Table_Multi_Sort)
     std::vector<std::vector<ColKey>> col_ndx2 = {{col_int1}, {col_int0}};
 
     // (0, 10); (1, 10); (2, 10); (1, 14); (2, 14)
-    TableView v_sorted2 = table.get_sorted_view(SortDescriptor{table, col_ndx2, asc});
+    TableView v_sorted2 = table.get_sorted_view(SortDescriptor{col_ndx2, asc});
     CHECK_EQUAL(table.size(), v_sorted2.size());
     CHECK_EQUAL(ObjKey(2), v_sorted2.get_key(0));
     CHECK_EQUAL(ObjKey(0), v_sorted2.get_key(1));

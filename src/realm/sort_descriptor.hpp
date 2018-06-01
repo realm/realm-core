@@ -21,7 +21,6 @@
 
 #include <vector>
 #include <realm/cluster.hpp>
-#include <realm/handover_defs.hpp>
 #include <realm/mixed.hpp>
 
 namespace realm {
@@ -31,8 +30,6 @@ class ConstTableRef;
 
 // CommonDescriptor encapsulates a reference to a set of columns (possibly over
 // links), which is used to indicate the criteria columns for sort and distinct.
-// Although the input is column indices, it does not rely on those indices
-// remaining stable as long as the columns continue to exist.
 class CommonDescriptor {
 public:
     struct IndexPair {
@@ -45,10 +42,6 @@ public:
         size_t index_in_view;
         Mixed cached_value;
     };
-    struct ColumnId {
-        const Table* table;
-        ColKey col_key;
-    };
     using IndexPairs = std::vector<CommonDescriptor::IndexPair>;
 
     CommonDescriptor() = default;
@@ -58,23 +51,25 @@ public:
     virtual ~CommonDescriptor() = default;
 
     // Create a descriptor for the given columns on the given table.
-    // Each vector in `column_indices` represents a chain of columns, where
+    // Each vector in `column_keys` represents a chain of columns, where
     // all but the last are Link columns (n.b.: LinkList and Backlink are not
     // supported), and the final is any column type that can be sorted on.
-    // `column_indices` must be non-empty, and each vector within it must also
+    // `column_keys` must be non-empty, and each vector within it must also
     // be non-empty.
-    CommonDescriptor(Table const& table, std::vector<std::vector<ColKey>> column_indices);
+    CommonDescriptor(std::vector<std::vector<ColKey>> column_keys);
     virtual std::unique_ptr<CommonDescriptor> clone() const;
 
     // returns whether this descriptor is valid and can be used to sort
     bool is_valid() const noexcept
     {
-        return !m_column_ids.empty();
+        return !m_column_keys.empty();
     }
 
     class Sorter {
     public:
-        Sorter(std::vector<std::vector<ColumnId>> const& columns, std::vector<bool> const& ascending,
+        Sorter(std::vector<std::vector<ColKey>> const& columns,
+               std::vector<bool> const& ascending,
+               Table const& root_table,
                KeyColumn const& row_indexes);
         Sorter()
         {
@@ -118,29 +113,23 @@ public:
     {
         return false;
     }
-    virtual Sorter sorter(KeyColumn const& row_indexes) const;
+    virtual Sorter sorter(Table const& table, KeyColumn const& row_indexes) const;
     // Do what you have to do
     virtual void execute(IndexPairs& v, const Sorter& predicate, const CommonDescriptor* next) const;
 
-    // handover support
-    std::vector<std::vector<ColKey>> export_column_indices() const;
-    virtual std::vector<bool> export_order() const
-    {
-        return {};
-    }
     virtual std::string get_description(ConstTableRef attached_table) const;
 
 protected:
-    std::vector<std::vector<ColumnId>> m_column_ids;
+    std::vector<std::vector<ColKey>> m_column_keys;
 };
 
 class SortDescriptor : public CommonDescriptor {
 public:
     // Create a sort descriptor for the given columns on the given table.
-    // See CommonDescriptor for restrictions on `column_indices`.
+    // See CommonDescriptor for restrictions on `column_keys`.
     // The sort order can be specified by using `ascending` which must either be
     // empty or have one entry for each column index chain.
-    SortDescriptor(Table const& table, std::vector<std::vector<ColKey>> column_indices,
+    SortDescriptor(std::vector<std::vector<ColKey>> column_indices,
                    std::vector<bool> ascending = {});
     SortDescriptor() = default;
     ~SortDescriptor() = default;
@@ -152,12 +141,10 @@ public:
     {
         return true;
     }
-    Sorter sorter(KeyColumn const& row_indexes) const override;
+    Sorter sorter(Table const& table, KeyColumn const& row_indexes) const override;
 
     void execute(IndexPairs& v, const Sorter& predicate, const CommonDescriptor* next) const override;
 
-    // handover support
-    std::vector<bool> export_order() const override;
     std::string get_description(ConstTableRef attached_table) const override;
 
 private:

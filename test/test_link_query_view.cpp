@@ -988,12 +988,12 @@ TEST(LinkList_SortLinkView)
 
     v.push_back({col_str2});
     v.push_back({col_str1});
-    tv = list_ptr->get_sorted_view(SortDescriptor{list_ptr->get_target_table(), v, a_false});
+    tv = list_ptr->get_sorted_view(SortDescriptor{v, a_false});
     CHECK_EQUAL(tv.get(0).get_key(), key1);
     CHECK_EQUAL(tv.get(1).get_key(), key2);
     CHECK_EQUAL(tv.get(2).get_key(), key0);
 
-    tv = list_ptr->get_sorted_view(SortDescriptor{list_ptr->get_target_table(), v, a});
+    tv = list_ptr->get_sorted_view(SortDescriptor{v, a});
     CHECK_EQUAL(tv.get(0).get_key(), key0);
     CHECK_EQUAL(tv.get(1).get_key(), key2);
     CHECK_EQUAL(tv.get(2).get_key(), key1);
@@ -1002,7 +1002,7 @@ TEST(LinkList_SortLinkView)
     a.push_back(true);
 
     // The last added column should have no influence
-    tv = list_ptr->get_sorted_view(SortDescriptor{list_ptr->get_target_table(), v, a});
+    tv = list_ptr->get_sorted_view(SortDescriptor{v, a});
     CHECK_EQUAL(tv.get(0).get_key(), key0);
     CHECK_EQUAL(tv.get(1).get_key(), key2);
     CHECK_EQUAL(tv.get(2).get_key(), key1);
