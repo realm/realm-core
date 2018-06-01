@@ -92,6 +92,9 @@ public:
     void add_instruction(Adapter::InstructionType type,
                          nlohmann::json &&inst = {}, bool collapsible = false,
                          util::Optional<std::string> object_type = util::none) {
+        if (!object_type && !m_selected_object_schema) {
+            return; // FIXME: support objects without schemas
+        }
         inst["type"] = Adapter::instruction_type_string(type);
         inst["object_type"] = object_type ? *object_type : m_selected_object_schema->name;
         m_json_instructions.push_back(std::move(inst));
@@ -105,7 +108,7 @@ public:
         // collapse values if inserting/setting values for the last object
         if (m_last_is_collapsible) {
             nlohmann::json &last = m_json_instructions.back();
-            if (identity == last["identity"] && m_selected_object_schema->name == last["object_type"].get<std::string>()) {
+            if (identity == last["identity"] && m_selected_object_schema && m_selected_object_schema->name == last["object_type"].get<std::string>()) {
                 last["values"][column] = value;
                 return;
             }
