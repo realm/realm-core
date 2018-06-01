@@ -8727,20 +8727,19 @@ TEST(Query_SyncViewIfNeeded)
         LnkLst restricting_view = source->begin()->get_linklist(col_links);
         Query q = target->where(restricting_view).less(col_id, 10);
         CHECK_EQUAL(restricting_view.size(), 9);
+        CHECK_EQUAL(q.count(), 4);
 
+        auto content = source->get_content_version();
         // Modify the underlying table to remove rows from the LinkView.
         target->remove_object(ObjKey(7));
         target->remove_object(ObjKey(8));
+        CHECK_NOT_EQUAL(content, source->get_content_version());
 
-        // The view is out of sync.
-        CHECK_EQUAL(false, restricting_view.is_in_sync());
-        // Running the query will update embedded query
-        CHECK_EQUAL(2, q.count());
-        // The view is still out of sync.
-        CHECK_EQUAL(false, restricting_view.is_in_sync());
-        // Accessing it will bring it up to date
-        CHECK_EQUAL(restricting_view.size(), 7);
+        // A LnkLst is always in sync:
         CHECK_EQUAL(true, restricting_view.is_in_sync());
+        CHECK_EQUAL(restricting_view.size(), 7);
+        // The query correctly takes into account the changes to the restricting view
+        CHECK_EQUAL(2, q.count());
 
         // And that syncing the query does nothing.
         auto version = q.sync_view_if_needed();

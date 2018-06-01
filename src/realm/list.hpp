@@ -671,12 +671,7 @@ public:
         , ObjList(this->m_tree.get())
     {
     }
-    LnkLst(const Obj& owner, ColKey col_key)
-        : ConstLstBase(col_key, &m_obj)
-        , Lst<ObjKey>(owner, col_key)
-        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
-    {
-    }
+    LnkLst(const Obj& owner, ColKey col_key);
     LnkLst(const LnkLst& other)
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(other)
@@ -706,7 +701,7 @@ public:
     }
     bool is_in_sync() const override
     {
-        return m_obj.is_in_sync();
+        return true;
     }
     size_t size() const override
     {
@@ -731,7 +726,7 @@ private:
     friend class DB;
     friend class ConstTableView;
     friend class Query;
-
+    TableVersions get_dependencies() const override;
     TableVersions sync_if_needed() const override;
 };
 

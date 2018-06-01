@@ -48,7 +48,7 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
     if (src_version != tr->get_version_of_current_transaction())
         throw realm::LogicError(LogicError::bad_version);
     if (was_in_sync)
-        m_last_seen_versions = outside_version();
+        m_last_seen_versions = get_dependencies();
     else
         m_last_seen_versions.clear();
     if (mode == PayloadPolicy::Copy && src.m_table_view_key_values.is_attached()) {
@@ -427,11 +427,11 @@ bool ConstTableView::depends_on_deleted_object() const
 {
     // outside_version() will call itself recursively for each TableView in the dependency chain
     // and terminate with `max` if the deepest depends on a deleted LinkList or Row
-    return outside_version().empty();
+    return get_dependencies().empty();
 }
 
 // Return version of whatever this TableView depends on
-TableVersions ConstTableView::outside_version() const
+TableVersions ConstTableView::get_dependencies() const
 {
     check_cookie();
 
@@ -469,10 +469,9 @@ bool ConstTableView::is_in_sync() const
     check_cookie();
 
     bool table = bool(m_table);
-    bool version = bool(m_last_seen_versions == outside_version());
-    bool view = bool(m_query.m_view);
+    bool version = bool(m_last_seen_versions == get_dependencies());
 
-    return table && version && (view ? m_query.m_view->is_in_sync() : true);
+    return table && version;
 }
 
 TableVersions ConstTableView::sync_if_needed() const
@@ -490,7 +489,7 @@ void TableView::remove(size_t row_ndx)
     REALM_ASSERT(m_table);
     REALM_ASSERT(row_ndx < m_key_values->size());
 
-    bool sync_to_keep = m_last_seen_versions == outside_version();
+    bool sync_to_keep = m_last_seen_versions == get_dependencies();
 
     ObjKey key = m_key_values->get(row_ndx);
 
@@ -503,7 +502,7 @@ void TableView::remove(size_t row_ndx)
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
-        m_last_seen_versions = outside_version();
+        m_last_seen_versions = get_dependencies();
 
     // Adjustment of row indexes greater than the removed index is done by
     // adj_row_acc_move_over or adj_row_acc_erase_row as sideeffect of the actual
@@ -515,7 +514,7 @@ void TableView::clear()
 {
     REALM_ASSERT(m_table);
 
-    bool sync_to_keep = m_last_seen_versions == outside_version();
+    bool sync_to_keep = m_last_seen_versions == get_dependencies();
 
     _impl::TableFriend::batch_erase_rows(get_parent(), *m_key_values); // Throws
 
@@ -524,7 +523,7 @@ void TableView::clear()
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
-        m_last_seen_versions = outside_version();
+        m_last_seen_versions = get_dependencies();
 }
 
 void ConstTableView::distinct(ColKey column)
@@ -618,7 +617,7 @@ void ConstTableView::do_sync()
 
     do_sort(m_descriptor_ordering);
 
-    m_last_seen_versions = outside_version();
+    m_last_seen_versions = get_dependencies();
 }
 
 bool ConstTableView::is_in_table_order() const
