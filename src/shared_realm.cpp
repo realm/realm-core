@@ -117,6 +117,10 @@ std::shared_ptr<Transaction> Realm::transaction_ref()
     return std::static_pointer_cast<Transaction>(m_group);
 }
 
+std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm) {
+    return realm.m_coordinator->m_db;
+}
+
 void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
 {
     realm.begin_read(version_id);
@@ -492,7 +496,7 @@ bool Realm::is_in_transaction() const noexcept
 {
     return !m_config.immutable()
         && !is_closed()
-        && transaction().get_transact_stage() == DB::transact_Writing;
+        && m_group && transaction().get_transact_stage() == DB::transact_Writing;
 }
 
 void Realm::begin_transaction()
@@ -805,7 +809,7 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
         // A read transaction does exist, but let's make sure that its version matches the reference's
         auto current_version = transaction().get_version_of_current_transaction();
         if (reference_version == current_version) {
-            return std::move(reference).import_into(transaction());
+            return std::move(reference).import_into(retain_self);
         }
 
         refresh();
@@ -815,7 +819,7 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
         // If the reference's version is behind, advance it to our version
         if (reference_version < current_version) {
             auto transaction = std::static_pointer_cast<Transaction>(m_coordinator->begin_read(reference_version));
-            T imported_value = std::move(reference).import_into(*transaction);
+            T imported_value = std::move(reference).import_into(retain_self);
             transaction->advance_read(current_version);
             if (!imported_value.is_valid())
                 return T{};
@@ -823,7 +827,7 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
         }
     }
 
-    return std::move(reference).import_into(transaction());
+    return std::move(reference).import_into(retain_self);
 }
 
 template Object Realm::resolve_thread_safe_reference(ThreadSafeReference<Object> reference);

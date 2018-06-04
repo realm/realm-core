@@ -31,15 +31,14 @@
 
 #include "impl/realm_coordinator.hpp"
 
-#include <realm/group.hpp>
+#include <realm/db.hpp>
 
-#if 0
 namespace realm {
 class TestHelper {
 public:
-    static SharedGroup& get_shared_group(SharedRealm const& shared_realm)
+    static DBRef& get_db(SharedRealm const& shared_realm)
     {
-        return *Realm::Internal::get_shared_group(*shared_realm);
+        return Realm::Internal::get_db(*shared_realm);
     }
 
     static void begin_read(SharedRealm const& shared_realm, VersionID version)
@@ -48,7 +47,6 @@ public:
     }
 };
 }
-#endif
 
 using namespace realm;
 
@@ -226,11 +224,10 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto realm = Realm::get_shared_realm(config);
         REQUIRE(realm->schema().size() == 1);
 
-        #if 0
-        auto& shared_group = TestHelper::get_shared_group(realm);
-        shared_group.begin_read();
-        shared_group.pin_version();
-        VersionID old_version = shared_group.get_version_of_current_transaction();
+        auto& db = TestHelper::get_db(realm);
+        auto rt = db->start_read();
+        VersionID old_version = rt->get_version_of_current_transaction();
+        rt = nullptr;
         realm->close();
 
         config.schema = Schema{
@@ -249,7 +246,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto old_realm = Realm::get_shared_realm(config);
         TestHelper::begin_read(old_realm, old_version);
         REQUIRE(old_realm->schema().size() == 1);
-        #endif
     }
 
     SECTION("should sensibly handle opening an uninitialized file without a schema specified") {
@@ -493,20 +489,20 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
         }},
     };
 
-    #if 0
     SECTION("newly added columns update table columns but are not added to properties") {
+        // Does this test add any value when column keys are stable?
         auto r1 = Realm::get_shared_realm(config);
         auto r2 = Realm::get_shared_realm(config);
         auto test = [&] {
             r2->begin_transaction();
-            r2->read_group().get_table("class_object")->insert_column(0, type_String, "new col");
+            r2->read_group().get_table("class_object")->add_column(type_String, "new col");
             r2->commit_transaction();
 
             auto& object_schema = *r1->schema().find("object");
             REQUIRE(object_schema.persisted_properties.size() == 2);
-            REQUIRE(object_schema.persisted_properties[0].table_column == 0);
+            ColKey col = object_schema.persisted_properties[0].column_key;
             r1->refresh();
-            REQUIRE(object_schema.persisted_properties[0].table_column == 1);
+            REQUIRE(object_schema.persisted_properties[0].column_key == col);
         };
         SECTION("with an active read transaction") {
             r1->read_group();
@@ -522,19 +518,19 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
         auto r = Realm::get_shared_realm(config);
         r->invalidate();
 
-        auto& sg = TestHelper::get_shared_group(r);
-        WriteTransaction wt(sg);
+        auto& db = TestHelper::get_db(r);
+        WriteTransaction wt(db);
         auto& table = *wt.get_table("class_object");
 
         SECTION("removing a property") {
-            table.remove_column(0);
+            table.remove_column(table.get_column_key("value"));
             wt.commit();
             REQUIRE_THROWS_WITH(r->refresh(),
                                 Catch::Matchers::Contains("Property 'object.value' has been removed."));
         }
 
         SECTION("change property type") {
-            table.remove_column(1);
+            table.remove_column(table.get_column_key("value 2"));
             table.add_column(type_Float, "value 2");
             wt.commit();
             REQUIRE_THROWS_WITH(r->refresh(),
@@ -542,7 +538,7 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
         }
 
         SECTION("make property optional") {
-            table.remove_column(1);
+            table.remove_column(table.get_column_key("value 2"));
             table.add_column(type_Int, "value 2", true);
             wt.commit();
             REQUIRE_THROWS_WITH(r->refresh(),
@@ -550,19 +546,18 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
         }
 
         SECTION("recreate column with no changes") {
-            table.remove_column(1);
+            table.remove_column(table.get_column_key("value 2"));
             table.add_column(type_Int, "value 2");
             wt.commit();
             REQUIRE_NOTHROW(r->refresh());
         }
 
         SECTION("remove index from non-PK") {
-            table.remove_search_index(1);
+            table.remove_search_index(table.get_column_key("value 2"));
             wt.commit();
             REQUIRE_NOTHROW(r->refresh());
         }
     }
-    #endif
 }
 
 TEST_CASE("SharedRealm: closed realm") {
@@ -1099,7 +1094,6 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     auto r1 = Realm::get_shared_realm(config);
     r1->m_binding_context.reset(new Context(&schema_changed_called, &changed_fixed_schema));
 
-    #if 0
     SECTION("Fixed schema") {
         SECTION("update_schema") {
             auto new_schema = Schema{
@@ -1109,7 +1103,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
             };
             r1->update_schema(new_schema, 2);
             REQUIRE(schema_changed_called == 1);
-            REQUIRE(changed_fixed_schema.find("object3")->property_for_name("value")->table_column == 0);
+            // REQUIRE(changed_fixed_schema.find("object3")->property_for_name("value")->table_column == 0);
         }
 
         SECTION("Open a new Realm instance with same config won't trigger") {
@@ -1128,17 +1122,17 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
         SECTION("Schema is changed by another Realm") {
             auto r2 = Realm::get_shared_realm(config);
             r2->begin_transaction();
-            r2->read_group().get_table("class_object1")->insert_column(0, type_String, "new col");
+            r2->read_group().get_table("class_object1")->add_column(type_String, "new col");
             r2->commit_transaction();
             r1->refresh();
             REQUIRE(schema_changed_called == 1);
-            REQUIRE(changed_fixed_schema.find("object1")->property_for_name("value")->table_column == 1);
+            // REQUIRE(changed_fixed_schema.find("object1")->property_for_name("value")->table_column == 1);
         }
 
         // This is not a valid use case. m_schema won't be refreshed.
         SECTION("Schema is changed by this Realm won't trigger") {
             r1->begin_transaction();
-            r1->read_group().get_table("class_object1")->insert_column(0, type_String, "new col");
+            r1->read_group().get_table("class_object1")->add_column(type_String, "new col");
             r1->commit_transaction();
             REQUIRE(schema_changed_called == 0);
         }
@@ -1159,29 +1153,28 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
             r2->set_schema_subset(new_schema);
             REQUIRE(schema_changed_called == 0);
             REQUIRE(dynamic_schema_changed_called == 1);
-            REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->table_column == 0);
+            // REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->table_column == 0);
         }
 
-        SECTION("Non schema related transaction will alway trigger in dynamic mode") {
+        SECTION("Non schema related transaction will always trigger in dynamic mode") {
             auto r1 = Realm::get_shared_realm(config);
             // An empty transaction will trigger the schema changes always in dynamic mode.
             r1->begin_transaction();
             r1->commit_transaction();
             r2->refresh();
             REQUIRE(dynamic_schema_changed_called == 1);
-            REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->table_column == 0);
+            // REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->table_column == 0);
         }
 
         SECTION("Schema is changed by another Realm") {
             r1->begin_transaction();
-            r1->read_group().get_table("class_object1")->insert_column(0, type_String, "new col");
+            r1->read_group().get_table("class_object1")->add_column(type_String, "new col");
             r1->commit_transaction();
             r2->refresh();
             REQUIRE(dynamic_schema_changed_called == 1);
-            REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->table_column == 1);
+            // REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->table_column == 1);
         }
     }
-    #endif
 }
 
 #ifndef _WIN32
@@ -1206,11 +1199,8 @@ TEST_CASE("SharedRealm: compact on launch") {
     r->begin_transaction();
     auto table = r->read_group().get_table("class_object");
     size_t count = 1000;
-    #if 0
-    table->add_empty_row(count);
     for (size_t i = 0; i < count; ++i)
-        table->set_string(0, i, util::format("Foo_%1", i % 10).c_str());
-    #endif
+        table->create_object().set_all(util::format("Foo_%1", i % 10).c_str());
     r->commit_transaction();
     REQUIRE(table->size() == count);
     r->close();

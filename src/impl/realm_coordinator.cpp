@@ -324,20 +324,19 @@ void RealmCoordinator::open_db()
             }
         };
 #endif
-        m_db = DB::create(*m_history);
+        m_db = DB::create(*m_history, options);
 
         if (!m_config.should_compact_on_launch_function)
             return;
 
         size_t free_space = -1;
         size_t used_space = -1;
-        #if 0 // FIXME
-        // getting stats requires committing a write transaction beforehand.
-        if (auto transaction = m_db->try_begin_write(group)) {
-            transaction->commit();
-            transaction->get_stats(free_space, used_space);
+        {
+            // FIXME What about try_begin_write ?
+            auto tr = m_db->start_write();
+            tr->commit();
         }
-        #endif
+        m_db->get_stats(free_space, used_space);
         if (free_space > 0 && m_config.should_compact_on_launch_function(free_space + used_space, used_space))
             m_db->compact();
     }

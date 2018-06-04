@@ -20,6 +20,7 @@
 #define REALM_THREAD_SAFE_REFERENCE_HPP
 
 #include <realm/version_id.hpp>
+#include <realm/keys.hpp>
 
 #include <memory>
 #include <string>
@@ -62,21 +63,21 @@ class ThreadSafeReference<List>: public ThreadSafeReferenceBase {
     ThreadSafeReference(List const& value);
 
     // Precondition: Realm and handover are on same version.
-    List import_into(Transaction& group);
+    List import_into(std::shared_ptr<Realm>& r);
 };
 
 template<>
 class ThreadSafeReference<Object>: public ThreadSafeReferenceBase {
     friend class Realm;
 
-//    std::unique_ptr<Transaction::Handover<Row>> m_row;
+    ObjKey m_key;
     std::string m_object_schema_name;
 
     // Precondition: The associated Realm is for the current thread and is not in a write transaction;.
     ThreadSafeReference(Object const& value);
 
     // Precondition: Realm and handover are on same version.
-    Object import_into(Transaction& group);
+    Object import_into(std::shared_ptr<Realm>& r);
 };
 
 template<>
@@ -90,7 +91,7 @@ class ThreadSafeReference<Results>: public ThreadSafeReferenceBase {
     ThreadSafeReference(Results const& value);
 
     // Precondition: Realm and handover are on same version.
-    Results import_into(Transaction& group);
+    Results import_into(std::shared_ptr<Realm>& r);
 };
 }
 

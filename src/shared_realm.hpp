@@ -33,6 +33,7 @@
 
 namespace realm {
 class BindingContext;
+class DB;
 class Group;
 class Realm;
 class Replication;
@@ -346,6 +347,7 @@ public:
             return realm.m_group;
         }
 
+
         // ResultsNotifier and ListNotifier need access to the Transaction
         // to be able to call the handover functions, which are not very wrappable
         static Transaction& get_transaction(Realm& realm) { return realm.transaction(); }
@@ -356,6 +358,7 @@ public:
         // added, and coordinators need to be able to get themselves from a Realm
         static _impl::RealmCoordinator& get_coordinator(Realm& realm) { return *realm.m_coordinator; }
 
+        static std::shared_ptr<DB>& get_db(Realm& realm);
         static void begin_read(Realm&, VersionID);
     };
 

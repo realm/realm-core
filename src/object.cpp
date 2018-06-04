@@ -57,8 +57,13 @@ Object::Object(SharedRealm r, ObjectSchema const& s, Obj const& o)
 Object::Object(SharedRealm r, StringData object_type, ObjKey key)
 : m_realm(std::move(r))
 , m_object_schema(&*m_realm->schema().find(object_type))
-, m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(key))
-{ }
+{
+    try {
+        m_obj = ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(key);
+    }
+    catch (const InvalidKey&) {
+    }
+}
 
 Object::Object() = default;
 Object::~Object() = default;

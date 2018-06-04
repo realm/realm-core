@@ -226,8 +226,8 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
 #endif // REALM_ENABLE_SYNC
             }
             else if (primary_prop->type == PropertyType::String) {
-                auto value = ctx.template unbox<StringData>(*primary_value);
 #if REALM_ENABLE_SYNC
+                auto value = ctx.template unbox<StringData>(*primary_value);
                 row_index = sync::create_object_with_primary_key(realm->read_group(), *table, value);
 #else
                 obj = table->create_object();

@@ -34,11 +34,21 @@ ThreadSafeReferenceBase::~ThreadSafeReferenceBase()
 
 ThreadSafeReference<List>::ThreadSafeReference(List const&) {}
 ThreadSafeReference<Results>::ThreadSafeReference(Results const&) {}
-ThreadSafeReference<Object>::ThreadSafeReference(Object const&) {}
 
-List ThreadSafeReference<List>::import_into(Transaction&) { REALM_TERMINATE("not implemented"); }
-Results ThreadSafeReference<Results>::import_into(Transaction&) { REALM_TERMINATE("not implemented"); }
-Object ThreadSafeReference<Object>::import_into(Transaction&) { REALM_TERMINATE("not implemented"); }
+ThreadSafeReference<Object>::ThreadSafeReference(Object const& object)
+    : ThreadSafeReferenceBase()
+    , m_key(object.obj().get_key())
+    , m_object_schema_name(object.get_object_schema().name)
+{
+}
+
+List ThreadSafeReference<List>::import_into(std::shared_ptr<Realm>&) { REALM_TERMINATE("not implemented"); }
+Results ThreadSafeReference<Results>::import_into(std::shared_ptr<Realm>&) { REALM_TERMINATE("not implemented"); }
+
+Object ThreadSafeReference<Object>::import_into(std::shared_ptr<Realm>& r)
+{
+    return Object(r, m_object_schema_name, m_key);
+}
 
 #if 0
 ThreadSafeReference<List>::ThreadSafeReference(List const& list)
@@ -54,11 +64,6 @@ List ThreadSafeReference<List>::import_into_realm(SharedRealm realm) && {
         return List(std::move(realm), shared_group.import_table_from_handover(std::move(m_table)));
     });
 }
-
-ThreadSafeReference<Object>::ThreadSafeReference(Object const& object)
-: ThreadSafeReferenceBase(object.realm())
-, m_row(get_source_shared_group().export_for_handover(Row(object.row())))
-, m_object_schema_name(object.get_object_schema().name) { }
 
 Object ThreadSafeReference<Object>::import_into_realm(SharedRealm realm) && {
     return invalidate_after_import<Object>(*realm, [&](Transaction& shared_group) {
