@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* None.
+* Don't write history information in `SharedGroup::compact()` for
+  non-syncronized Realms.
 
 ### Breaking changes
 
