@@ -828,20 +828,14 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
         }},
     };
 
-    #if 0
     class ExternalWriter {
     private:
-        std::unique_ptr<Replication> history;
-        std::unique_ptr<SharedGroup> shared_group;
-        std::unique_ptr<Group> read_only_group;
-
+        std::shared_ptr<Realm> m_realm;
     public:
         WriteTransaction wt;
         ExternalWriter(Realm::Config const& config)
-        : wt([&]() -> SharedGroup& {
-            Realm::open_with_config(config, history, shared_group, read_only_group, nullptr);
-            return *shared_group;
-        }())
+        : m_realm(_impl::RealmCoordinator::get_coordinator(config.path)->get_realm(config))
+        , wt(TestHelper::get_db(m_realm))
         {
         }
     };
@@ -866,7 +860,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
         REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
         REQUIRE(cache_sv == 0);
         REQUIRE(cache_schema == schema);
-        REQUIRE(cache_schema.begin()->persisted_properties[0].table_column == 0);
+        REQUIRE(cache_schema.begin()->persisted_properties[0].column_key != ColKey{});
     }
 
     coordinator = nullptr;
@@ -879,7 +873,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
         REQUIRE(cache_sv == 0);
         REQUIRE(cache_tv == 2); // with in-realm history the version doesn't reset
         REQUIRE(cache_schema == schema);
-        REQUIRE(cache_schema.begin()->persisted_properties[0].table_column == 0);
+        REQUIRE(cache_schema.begin()->persisted_properties[0].column_key != ColKey{});
     }
 
     SECTION("transaction version is bumped after a local write") {
@@ -895,7 +889,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
 
         SECTION("non-schema change") {
             external_write(config, [](auto& wt) {
-                wt.get_table("class_object")->add_empty_row();
+                wt.get_table("class_object")->create_object();
             });
         }
         SECTION("schema change") {
@@ -913,7 +907,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     SECTION("notify() with a read transaction bumps transaction version") {
         r->read_group();
         external_write(config, [](auto& wt) {
-            wt.get_table("class_object")->add_empty_row();
+            wt.get_table("class_object")->create_object();
         });
 
         r->notify();
@@ -938,7 +932,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
 
     SECTION("transaction version is bumped after refresh() following external non-schema write") {
         external_write(config, [](auto& wt) {
-            wt.get_table("class_object")->add_empty_row();
+            wt.get_table("class_object")->create_object();
         });
 
         r->refresh();
@@ -1033,7 +1027,6 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
         REQUIRE(cache_schema.size() == 2);
         REQUIRE(cache_schema.find("object 2") != cache_schema.end());
     }
-    #endif
 }
 
 TEST_CASE("SharedRealm: dynamic schema mode doesn't invalidate object schema pointers when schema hasn't changed") {
@@ -1103,7 +1096,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
             };
             r1->update_schema(new_schema, 2);
             REQUIRE(schema_changed_called == 1);
-            // REQUIRE(changed_fixed_schema.find("object3")->property_for_name("value")->table_column == 0);
+            REQUIRE(changed_fixed_schema.find("object3")->property_for_name("value")->column_key != ColKey{});
         }
 
         SECTION("Open a new Realm instance with same config won't trigger") {
@@ -1126,7 +1119,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
             r2->commit_transaction();
             r1->refresh();
             REQUIRE(schema_changed_called == 1);
-            // REQUIRE(changed_fixed_schema.find("object1")->property_for_name("value")->table_column == 1);
+            REQUIRE(changed_fixed_schema.find("object1")->property_for_name("value")->column_key != ColKey{});
         }
 
         // This is not a valid use case. m_schema won't be refreshed.
@@ -1153,7 +1146,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
             r2->set_schema_subset(new_schema);
             REQUIRE(schema_changed_called == 0);
             REQUIRE(dynamic_schema_changed_called == 1);
-            // REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->table_column == 0);
+            REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->column_key != ColKey{});
         }
 
         SECTION("Non schema related transaction will always trigger in dynamic mode") {
@@ -1163,7 +1156,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
             r1->commit_transaction();
             r2->refresh();
             REQUIRE(dynamic_schema_changed_called == 1);
-            // REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->table_column == 0);
+            REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->column_key != ColKey{});
         }
 
         SECTION("Schema is changed by another Realm") {
@@ -1172,7 +1165,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
             r1->commit_transaction();
             r2->refresh();
             REQUIRE(dynamic_schema_changed_called == 1);
-            // REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->table_column == 1);
+            REQUIRE(changed_dynamic_schema.find("object1")->property_for_name("value")->column_key != ColKey{});
         }
     }
 }
@@ -1376,14 +1369,14 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
         }
     }
 
-    #if 0
     SECTION("notify BindingContext before and after sending notifications") {
         static int binding_context_start_notify_calls = 0;
         static int binding_context_end_notify_calls = 0;
         static int notification_calls = 0;
 
-        Results results1(r, table->where().greater_equal(0, 0));
-        Results results2(r, table->where().less(0, 10));
+        auto col = table->get_column_key("value");
+        Results results1(r, table->where().greater_equal(col, 0));
+        Results results2(r, table->where().less(col, 10));
 
         auto token1 = results1.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
@@ -1418,7 +1411,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             notification_calls = 0;
             coordinator->on_change();
             r->begin_transaction();
-            table->add_empty_row();
+            table->create_object();
             r->commit_transaction();
             REQUIRE(binding_context_start_notify_calls == 1);
             REQUIRE(binding_context_end_notify_calls == 1);
@@ -1432,7 +1425,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
                 auto r2 = coordinator->get_realm();
                 r2->begin_transaction();
                 auto table2 = r2->read_group().get_table("class_object");
-                table2->add_empty_row();
+                table2->create_object();
                 r2->commit_transaction();
             });
             advance_and_notify(*r);
@@ -1480,7 +1473,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             JoiningThread([&] {
                 auto r = coordinator->get_realm();
                 r->begin_transaction();
-                r->read_group().get_table("class_object")->add_empty_row();
+                r->read_group().get_table("class_object")->create_object();
                 r->commit_transaction();
             });
 
@@ -1488,13 +1481,14 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             coordinator->on_change();
             r->refresh();
         }
-
+#if 0
+        // FIXME: Depends on RealmCoordinator::can_advance(Realm& realm) being implemented
         SECTION("closed in will_send() for notify()") {
             r->m_binding_context.reset(new CloseOnWillChange(*r));
             coordinator->on_change();
             r->notify();
         }
-
+#endif
         SECTION("closed in will_send() for refresh()") {
             do_close = false;
             coordinator->on_change();
@@ -1504,7 +1498,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             JoiningThread([&] {
                 auto r = coordinator->get_realm();
                 r->begin_transaction();
-                r->read_group().get_table("class_object")->add_empty_row();
+                r->read_group().get_table("class_object")->create_object();
                 r->commit_transaction();
             });
 
@@ -1513,7 +1507,6 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             r->refresh();
         }
     }
-    #endif
 }
 
 #if REALM_PLATFORM_APPLE

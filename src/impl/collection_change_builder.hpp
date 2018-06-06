@@ -44,8 +44,8 @@ public:
     // If `move_candidates` is supplied they it will be used to do more accurate
     // determination of which rows moved. This is only supported when the rows
     // are in table order (i.e. not sorted or from a LinkList)
-    static CollectionChangeBuilder calculate(std::vector<size_t> const& old_rows,
-                                             std::vector<size_t> const& new_rows,
+    static CollectionChangeBuilder calculate(std::vector<int64_t> const& old_rows,
+                                             std::vector<int64_t> const& new_rows,
                                              std::function<bool (size_t)> row_did_change,
                                              util::Optional<IndexSet> const& move_candidates = util::none);
 

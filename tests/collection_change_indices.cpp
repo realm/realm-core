@@ -302,7 +302,7 @@ TEST_CASE("collection_change: calculate() unsorted") {
     }
 
     SECTION("marks npos rows in prev as deleted") {
-        c = _impl::CollectionChangeBuilder::calculate({npos, 1, 2, 3, npos}, {1, 2, 3}, all_modified, empty);
+        c = _impl::CollectionChangeBuilder::calculate({-1, 1, 2, 3, -1}, {1, 2, 3}, all_modified, empty);
         REQUIRE_INDICES(c.deletions, 0, 4);
     }
 
@@ -358,7 +358,7 @@ TEST_CASE("collection_change: calculate() unsorted") {
     }
 
     SECTION("reports moves which can be produced by move_last_over()") {
-        auto calc = [&](std::vector<size_t> values) {
+        auto calc = [&](std::vector<int64_t> values) {
             return _impl::CollectionChangeBuilder::calculate(values, {1, 2, 3}, none_modified, all);
         };
 
@@ -401,7 +401,7 @@ TEST_CASE("collection_change: calculate() sorted") {
     }
 
     SECTION("marks npos rows in prev as deleted") {
-        c = _impl::CollectionChangeBuilder::calculate({npos, 1, 2, 3, npos}, {1, 2, 3}, all_modified);
+        c = _impl::CollectionChangeBuilder::calculate({-1, 1, 2, 3, -1}, {1, 2, 3}, all_modified);
         REQUIRE_INDICES(c.deletions, 0, 4);
     }
 
@@ -457,7 +457,7 @@ TEST_CASE("collection_change: calculate() sorted") {
     }
 
     SECTION("reports inserts/deletes for simple reorderings") {
-        auto calc = [&](std::vector<size_t> old_rows, std::vector<size_t> new_rows) {
+        auto calc = [&](std::vector<int64_t> old_rows, std::vector<int64_t> new_rows) {
             return _impl::CollectionChangeBuilder::calculate(old_rows, new_rows, none_modified);
         };
 
@@ -656,8 +656,8 @@ TEST_CASE("collection_change: calculate() sorted") {
     }
 
     SECTION("properly recurses into smaller subblocks") {
-        std::vector<size_t> prev = {10, 1, 2, 11, 3, 4, 5, 12, 6, 7, 13};
-        std::vector<size_t> next = {13, 1, 2, 12, 3, 4, 5, 11, 6, 7, 10};
+        std::vector<int64_t> prev = {10, 1, 2, 11, 3, 4, 5, 12, 6, 7, 13};
+        std::vector<int64_t> next = {13, 1, 2, 12, 3, 4, 5, 11, 6, 7, 10};
         c = _impl::CollectionChangeBuilder::calculate(prev, next, all_modified);
         REQUIRE_INDICES(c.deletions, 0, 3, 7, 10);
         REQUIRE_INDICES(c.insertions, 0, 3, 7, 10);
@@ -672,11 +672,11 @@ TEST_CASE("collection_change: calculate() sorted") {
                 CAPTURE(insert_pos);
                 CAPTURE(move_to_pos);
 
-                std::vector<size_t> after_insert = {1, 2, 3};
+                std::vector<int64_t> after_insert = {1, 2, 3};
                 after_insert.insert(after_insert.begin() + insert_pos, 4);
                 c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, after_insert, four_modified);
 
-                std::vector<size_t> after_move = {1, 2, 3};
+                std::vector<int64_t> after_move = {1, 2, 3};
                 after_move.insert(after_move.begin() + move_to_pos, 4);
                 c.merge(_impl::CollectionChangeBuilder::calculate(after_insert, after_move, four_modified));
 

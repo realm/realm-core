@@ -73,11 +73,11 @@ bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 {
     m_info = &info;
 
-    /*
-    auto& table = *m_query->get_table();
-    if (!table.is_attached())
+    auto table = m_query->get_table();
+    if (!table)
         return false;
 
+    /*
     auto table_ndx = table.get_index_in_group();
     if (table_ndx == npos) { // is a subtable
         auto& parent = *table.get_parent_table();
@@ -147,9 +147,9 @@ void ResultsNotifier::calculate_changes()
         }
          */
 
-//        m_changes = CollectionChangeBuilder::calculate(m_previous_rows, next_rows,
-//                                                       get_modification_checker(*m_info, *m_query->get_table()),
-//                                                       move_candidates);
+        m_changes = CollectionChangeBuilder::calculate(m_previous_rows, next_rows,
+                                                       get_modification_checker(*m_info, *m_query->get_table()),
+                                                       move_candidates);
 
         m_previous_rows = std::move(next_rows);
     }

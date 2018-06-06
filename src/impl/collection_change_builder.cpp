@@ -529,8 +529,8 @@ void calculate_moves_sorted(std::vector<RowInfo>& rows, CollectionChangeSet& cha
 
 } // Anonymous namespace
 
-CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<size_t> const& prev_rows,
-                                                           std::vector<size_t> const& next_rows,
+CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<int64_t> const& prev_rows,
+                                                           std::vector<int64_t> const& next_rows,
                                                            std::function<bool (size_t)> row_did_change,
                                                            util::Optional<IndexSet> const& move_candidates)
 {
@@ -542,7 +542,7 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<size_t> c
     std::vector<RowInfo> old_rows;
     old_rows.reserve(prev_rows.size());
     for (size_t i = 0; i < prev_rows.size(); ++i) {
-        if (prev_rows[i] == IndexSet::npos) {
+        if (prev_rows[i] == -1) {
             ++deleted;
             ret.deletions.add(i);
         }
