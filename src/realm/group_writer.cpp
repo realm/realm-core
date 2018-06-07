@@ -511,6 +511,7 @@ void GroupWriter::merge_free_space()
         size_t pos1 = to_size_t(m_free_positions.get(i));
         size_t size1 = to_size_t(m_free_lengths.get(i));
         size_t pos2 = to_size_t(m_free_positions.get(i2));
+        REALM_ASSERT_RELEASE_EX(pos1 + size1 <= pos2, pos1, size1, pos2);
         if (pos2 == pos1 + size1) {
             // If this is a shared db, we can only merge
             // segments where no part is currently in use
@@ -531,6 +532,7 @@ void GroupWriter::merge_free_space()
 
             // Merge
             size_t size2 = to_size_t(m_free_lengths.get(i2));
+            REALM_ASSERT_RELEASE_EX(size1 < (1ULL << 63) && size2 < (1ULL << 63), size1, size2);
             m_free_lengths.set(i, size1 + size2);
             m_free_positions.erase(i2);
             m_free_lengths.erase(i2);
@@ -583,6 +585,7 @@ size_t GroupWriter::get_free_space(size_t size)
 inline size_t GroupWriter::split_freelist_chunk(size_t index, size_t start_pos, size_t alloc_pos, size_t chunk_size,
                                                 bool is_shared)
 {
+    REALM_ASSERT_RELEASE_EX(alloc_pos > start_pos, alloc_pos, start_pos);
     m_free_positions.insert(index, start_pos);
     m_free_lengths.insert(index, alloc_pos - start_pos);
     if (is_shared)
