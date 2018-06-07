@@ -2375,4 +2375,24 @@ TEST(Parser_RowIndex) {
     CHECK_THROW_ANY(verify_query(test_context, table, "link == link", 3));
 }
 
+TEST(Parser_LongQuery) {
+    const size_t max_terms = 1088;
+    Group g;
+    TableRef table = g.add_table("table");
+    size_t int_col_ndx = table->add_column(type_Int, "ints", true);
+    table->add_empty_row(1);
+    table->set_int(int_col_ndx, 0, 1);
+
+    std::string query;
+    for(size_t i = 0; i < max_terms; ++i) {
+        if (i > 0) {
+            query += " OR ints == 1";
+        }
+        else {
+            query = "ints == 1";
+        }
+    }
+    verify_query(test_context, table, query, 1);
+}
+
 #endif // TEST_PARSER
