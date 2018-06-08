@@ -532,8 +532,9 @@ void GroupWriter::merge_free_space()
 
             // Merge
             size_t size2 = to_size_t(m_free_lengths.get(i2));
-            REALM_ASSERT_RELEASE_EX(size1 < (1ULL << 63) && size2 < (1ULL << 63), size1, size2);
-            m_free_lengths.set(i, size1 + size2);
+            size_t new_size = size1 + size2;
+            REALM_ASSERT_RELEASE_EX(new_size > size1 && new_size > size2, size1, size2, new_size);
+            m_free_lengths.set(i, new_size);
             m_free_positions.erase(i2);
             m_free_lengths.erase(i2);
             if (is_shared)
