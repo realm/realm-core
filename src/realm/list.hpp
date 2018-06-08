@@ -760,6 +760,11 @@ inline ConstLnkLst ConstObj::get_linklist(ColKey col_key)
     return ConstLnkLst(*this, col_key);
 }
 
+inline ConstLnkLst ConstObj::get_linklist(StringData col_name)
+{
+    return get_linklist(get_column_key(col_name));
+}
+
 inline ConstLnkLstPtr ConstObj::get_linklist_ptr(ColKey col_key)
 {
     Obj obj(*this);
@@ -774,6 +779,11 @@ inline LnkLst Obj::get_linklist(ColKey col_key)
 inline LnkLstPtr Obj::get_linklist_ptr(ColKey col_key)
 {
     return std::make_unique<LnkLst>(*this, col_key);
+}
+
+inline LnkLst Obj::get_linklist(StringData col_name)
+{
+    return get_linklist(get_column_key(col_name));
 }
 }
 

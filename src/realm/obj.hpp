@@ -103,10 +103,16 @@ public:
     ConstLst<U> get_list(ColKey col_key) const;
     template <typename U>
     ConstLstPtr<U> get_list_ptr(ColKey col_key) const;
+    template <typename U>
+    ConstLst<U> get_list(StringData col_name) const
+    {
+        return get_list<U>(get_column_key(col_name));
+    }
 
     ConstLnkLst get_linklist(ColKey col_key);
     ConstLnkLstPtr get_linklist_ptr(ColKey col_key);
-
+    ConstLnkLst get_linklist(StringData col_name);
+    
     size_t get_link_count(ColKey col_key) const;
 
     bool is_null(ColKey col_key) const;
@@ -211,6 +217,7 @@ public:
 
     LnkLst get_linklist(ColKey col_key);
     LnkLstPtr get_linklist_ptr(ColKey col_key);
+    LnkLst get_linklist(StringData col_name);
 
     LstBasePtr get_listbase_ptr(ColKey col_key, DataType type);
 
