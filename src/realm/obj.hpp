@@ -200,6 +200,10 @@ public:
     Obj& set_null(ColKey col_key, bool is_default = false);
 
     Obj& add_int(ColKey col_key, int64_t value);
+    Obj& add_int(StringData col_name, int64_t value)
+    {
+        return add_int(get_column_key(col_name), value);
+    }
 
     template <typename U>
     Obj& set_list_values(ColKey col_key, const std::vector<U>& values);
@@ -214,6 +218,12 @@ public:
     Lst<U> get_list(ColKey col_key);
     template <typename U>
     LstPtr<U> get_list_ptr(ColKey col_key);
+
+    template <typename U>
+    Lst<U> get_list(StringData col_name)
+    {
+        return get_list<U>(get_column_key(col_name));
+    }
 
     LnkLst get_linklist(ColKey col_key);
     LnkLstPtr get_linklist_ptr(ColKey col_key);
