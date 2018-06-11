@@ -344,10 +344,15 @@ public:
     bool is_empty() const noexcept;
     Type get_type() const noexcept;
 
+
     static void add_to_column(IntegerColumn* column, int64_t value);
 
     void insert(size_t ndx, int_fast64_t value);
     void add(int_fast64_t value);
+
+    // Used from ArrayBlob
+    size_t blob_size() const noexcept;
+    ref_type blob_replace(size_t begin, size_t end, const char* data, size_t data_size, bool add_zero_term);
 
     /// This function is guaranteed to not throw if the current width is
     /// sufficient for the specified value (e.g. if you have called
