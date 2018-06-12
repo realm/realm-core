@@ -31,7 +31,7 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
                  const char* enc_key);
 void* mmap_reserve(FileDesc fd, size_t size, size_t offset);
-void munmap(void* addr, size_t size) noexcept;
+void munmap(void* addr, size_t size);
 void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size,
              const char* encryption_key);
 void msync(FileDesc fd, void* addr, size_t size);

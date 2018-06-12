@@ -981,8 +981,8 @@ public:
                                                              m_group.m_top.get_ref(), version, history_type,
                                                              history_schema_version);
             REALM_ASSERT(history_type != Replication::hist_None);
-            if (history_type == Replication::hist_OutOfRealm) {
-                return info; // Cannot write out-of-Realm history, report as none.
+            if (history_type != Replication::hist_SyncClient && history_type != Replication::hist_SyncServer) {
+                return info; // Only sync history should be preserved when writing to a new file
             }
             info.type = history_type;
             info.version = history_schema_version;

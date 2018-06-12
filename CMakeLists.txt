@@ -54,6 +54,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 if(ANDROID)
     # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
     set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+elseif(APPLE)
+    set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 endif()
 
 # Set global warnings settings

@@ -1177,8 +1177,14 @@ TEST(Parser_substitution)
     // double digit index
     verify_query_sub(test_context, t, "age == $10", args, num_args, 1);
 
+    std::string message;
     // referencing a parameter outside of the list size throws
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $0", args, /*num_args*/ 0, 0));
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $0", args, /*num_args*/ 0, 0), message);
+    CHECK_EQUAL(message, "Request for argument at index 0 but no arguments are provided");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $1", args, /*num_args*/ 1, 0), message);
+    CHECK_EQUAL(message, "Request for argument at index 1 but only 1 argument is provided");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $2", args, /*num_args*/ 2, 0), message);
+    CHECK_EQUAL(message, "Request for argument at index 2 but only 2 arguments are provided");
 
     // invalid types
     // int

@@ -229,12 +229,15 @@ endif()
 # We add the headers to the library only so they show up in dev
 # environments. It won't actually affect compilation process.
 add_library(CoreObjects OBJECT ${REALM_SOURCES} ${REALM_INSTALL_ALL_HEADERS})
-target_compile_definitions(CoreObjects PUBLIC
-  "PIC"
+set_target_properties(CoreObjects PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+target_compile_definitions(CoreObjects PRIVATE
   "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
-  "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>")
+  "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>"
+)
 
-  set(REALM_OBJECT_FILES $<TARGET_OBJECTS:CoreObjects>)
+set(REALM_OBJECT_FILES $<TARGET_OBJECTS:CoreObjects>)
 
 if(COMMAND set_target_xcode_attributes)
     set_target_xcode_attributes(CoreObjects)
@@ -267,6 +270,22 @@ endif()
 add_library(Core STATIC ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
 set_target_properties(Core PROPERTIES OUTPUT_NAME "realm")
 add_library(realm ALIAS Core)
+
+target_compile_definitions(Core PUBLIC
+  "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
+  "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>"
+)
+
+# GCC 4.9 does not adhere to the C++11 ABI for std::string. This communicates
+# to dependencies built with newer compilers that the old ABI should be used.
+# Note: We cannot use generator expressions to perform this check, because it
+# will evaluate different when imported downstream.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0.0)
+    message(WARNING "You are compiling with GCC < 5.0. This version of GCC uses a non-compliant C++11 ABI. Downstream components depending on Realm::Core will be built with _GLIBCXX_USE_CXX11_ABI=0.")
+    target_compile_definitions(Core INTERFACE
+        "_GLIBCXX_USE_CXX11_ABI=0"
+    )
+endif()
 
 target_include_directories(Core INTERFACE
                            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src> $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src>

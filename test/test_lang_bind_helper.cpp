@@ -6409,7 +6409,7 @@ TEST(LangBindHelper_callWithLock)
         CHECK(realm_path.compare(path) == 0);
     };
 
-    DB::CallbackWithLock callback_not_called = [this, &path](const std::string&) { CHECK(false); };
+    DB::CallbackWithLock callback_not_called = [=](const std::string&) { CHECK(false); };
 
     // call_with_lock should run the callback if the lock file doesn't exist.
     CHECK_NOT(File::exists(path.get_lock_path()));
