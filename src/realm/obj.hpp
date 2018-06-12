@@ -109,9 +109,9 @@ public:
         return get_list<U>(get_column_key(col_name));
     }
 
-    ConstLnkLst get_linklist(ColKey col_key);
-    ConstLnkLstPtr get_linklist_ptr(ColKey col_key);
-    ConstLnkLst get_linklist(StringData col_name);
+    ConstLnkLst get_linklist(ColKey col_key) const;
+    ConstLnkLstPtr get_linklist_ptr(ColKey col_key) const;
+    ConstLnkLst get_linklist(StringData col_name) const;
     
     size_t get_link_count(ColKey col_key) const;
 
@@ -209,27 +209,27 @@ public:
     Obj& set_list_values(ColKey col_key, const std::vector<U>& values);
 
     template <typename U>
-    std::vector<U> get_list_values(ColKey col_key);
+    std::vector<U> get_list_values(ColKey col_key) const;
 
     template <class Head, class... Tail>
     Obj& set_all(Head v, Tail... tail);
 
     template <typename U>
-    Lst<U> get_list(ColKey col_key);
+    Lst<U> get_list(ColKey col_key) const;
     template <typename U>
-    LstPtr<U> get_list_ptr(ColKey col_key);
+    LstPtr<U> get_list_ptr(ColKey col_key) const;
 
     template <typename U>
-    Lst<U> get_list(StringData col_name)
+    Lst<U> get_list(StringData col_name) const
     {
         return get_list<U>(get_column_key(col_name));
     }
 
-    LnkLst get_linklist(ColKey col_key);
-    LnkLstPtr get_linklist_ptr(ColKey col_key);
-    LnkLst get_linklist(StringData col_name);
+    LnkLst get_linklist(ColKey col_key) const;
+    LnkLstPtr get_linklist_ptr(ColKey col_key) const;
+    LnkLst get_linklist(StringData col_name) const;
 
-    LstBasePtr get_listbase_ptr(ColKey col_key, DataType type);
+    LstBasePtr get_listbase_ptr(ColKey col_key, DataType type) const;
 
 private:
     friend class Cluster;
@@ -353,7 +353,7 @@ Obj& Obj::set_list_values(ColKey col_key, const std::vector<U>& values)
 }
 
 template <typename U>
-std::vector<U> Obj::get_list_values(ColKey col_key)
+std::vector<U> Obj::get_list_values(ColKey col_key) const
 {
     std::vector<U> values;
     auto list = get_list<U>(col_key);
