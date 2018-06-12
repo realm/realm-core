@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 5.6.1 Release notes
 
 ### Bugfixes
 
@@ -6,20 +6,13 @@
 * Don't write history information in `SharedGroup::compact()` for
   non-syncronized Realms.
 
-### Breaking changes
-
-* None.
-
-### Enhancements
-
-* None.
-
 -----------
 
 ### Internals
 
 * Restore -fvisibility-inlines-hidden for the binaries for Apple platforms.
 * Remove a few warnings at compile time.
+* Improve error detection related to memory allocation/release
 
 ----------------------------------------------
 
