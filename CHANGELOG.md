@@ -3,6 +3,8 @@
 ### Bugfixes
 
 * More readable error message in the query parser when requesting an a bad argument.
+* Don't write history information in `SharedGroup::compact()` for
+  non-syncronized Realms.
 
 ### Breaking changes
 
@@ -17,6 +19,7 @@
 ### Internals
 
 * Restore -fvisibility-inlines-hidden for the binaries for Apple platforms.
+* Remove a few warnings at compile time.
 
 ----------------------------------------------
 

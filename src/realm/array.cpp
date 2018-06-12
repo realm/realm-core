@@ -600,6 +600,21 @@ void Array::add_positive_local(int64_t value)
 }
 */
 
+size_t Array::blob_size() const noexcept
+{
+    if (get_context_flag()) {
+        size_t total_size = 0;
+        for (size_t i = 0; i < size(); ++i) {
+            char* header = m_alloc.translate(Array::get_as_ref(i));
+            total_size += Array::get_size_from_header(header);
+        }
+        return total_size;
+    }
+    else {
+        return m_size;
+    }
+}
+
 void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
