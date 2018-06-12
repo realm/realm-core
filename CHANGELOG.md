@@ -2,6 +2,7 @@
 
 ### Bugfixes
 
+* More readable error message in the query parser when requesting an a bad argument.
 * Don't write history information in `SharedGroup::compact()` for
   non-syncronized Realms.
 
