@@ -1406,6 +1406,9 @@ bool DB::compact()
         util::File::move(tmp_path, m_db_path);
 #endif
         tr->close();
+        if (auto repl = m_alloc.get_replication())
+            repl->initialize(*this);
+
         SlabAlloc::Config cfg;
         cfg.session_initiator = true;
         cfg.is_shared = true;

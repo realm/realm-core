@@ -4826,6 +4826,15 @@ TEST(LangBindHelper_Compact)
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
     }
+    {
+        WriteTransaction w(sg);
+        TableRef table = w.get_or_add_table("test");
+        table->create_object().set_all(0);
+        w.commit();
+    }
+    {
+        CHECK_EQUAL(true, sg->compact());
+    }
 }
 
 TEST(LangBindHelper_CompactLargeEncryptedFile)
