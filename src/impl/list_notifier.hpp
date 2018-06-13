@@ -29,7 +29,7 @@ namespace realm {
 namespace _impl {
 class ListNotifier : public CollectionNotifier {
 public:
-    ListNotifier(std::shared_ptr<Realm> realm, ConstLstBase const& list, PropertyType type);
+    ListNotifier(std::shared_ptr<Realm> realm, LstBase const& list, PropertyType type);
 
 private:
     PropertyType m_type;

@@ -34,12 +34,12 @@
 #include "impl/object_accessor_impl.hpp"
 
 #include <realm/version.hpp>
+#include <realm/db.hpp>
 
 #include <cstdint>
 
 using namespace realm;
 
-#if 0
 TEST_CASE("list") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -60,7 +60,7 @@ TEST_CASE("list") {
         }},
     });
 
-    auto& coordinator = *_impl::RealmCoordinator::get_existing_coordinator(config.path);
+    auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
 
     auto origin = r->read_group().get_table("class_origin");
     auto target = r->read_group().get_table("class_target");
@@ -69,36 +69,38 @@ TEST_CASE("list") {
 
     r->begin_transaction();
 
-    target->add_empty_row(10);
+    std::vector<ObjKey> target_keys;
+    target->create_objects(10, target_keys);
     for (int i = 0; i < 10; ++i)
-        target->set_int(0, i, i);
+        target->get_object(target_keys[i]).set_all(i);
 
-    origin->add_empty_row(2);
-    origin->set_int_unique(0, 0, 1);
-    origin->set_int_unique(0, 1, 2);
-    LinkViewRef lv = origin->get_linklist(1, 0);
+    ColKey col_link = origin->get_column_key("array");
+    ColKey col_value = target->get_column_key("value");
+    Obj obj = origin->create_object();
+    auto lv = obj.get_linklist_ptr(col_link);
     for (int i = 0; i < 10; ++i)
-        lv->add(i);
-    LinkViewRef lv2 = origin->get_linklist(1, 1);
+        lv->add(target_keys[i]);
+    auto lv2 = origin->create_object().get_linklist_ptr(col_link);
     for (int i = 0; i < 10; ++i)
-        lv2->add(i);
+        lv2->add(target_keys[i]);
 
-    other_origin->add_empty_row();
-    other_target->add_empty_row(10);
+    std::vector<ObjKey> other_target_keys;
+    other_target->create_objects(10, other_target_keys);
     for (int i = 0; i < 10; ++i)
-        other_target->set_int(0, i, i);
-    LinkViewRef other_lv = other_origin->get_linklist(0, 0);
+        other_target->get_object(other_target_keys[i]).set_all(i);
+    ColKey other_col_link = other_origin->get_column_key("array");
+    auto other_lv = other_origin->create_object().get_linklist_ptr(other_col_link);
     for (int i = 0; i < 10; ++i)
-        other_lv->add(i);
+        other_lv->add(other_target_keys[i]);
 
     r->commit_transaction();
 
     auto r2 = coordinator.get_realm();
-    auto r2_lv = r2->read_group().get_table("class_origin")->get_linklist(1, 0);
+    // auto r2_lv = r2->read_group().get_table("class_origin")->get_linklist(1, 0);
 
     SECTION("add_notification_block()") {
         CollectionChangeSet change;
-        List lst(r, lv);
+        List lst(r, obj, col_link);
 
         auto write = [&](auto&& f) {
             r->begin_transaction();
@@ -139,32 +141,34 @@ TEST_CASE("list") {
 
         SECTION("deleting the list sends a change notification") {
             auto token = require_change();
-            write([&] { origin->move_last_over(0); });
+            write([&] { origin->begin()->remove(); });
             REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
 
             // Should not resend delete all notification after another commit
             change = {};
-            write([&] { target->add_empty_row(); });
+            write([&] { target->create_object(); });
             REQUIRE(change.empty());
         }
 
         SECTION("modifying one of the target rows sends a change notification") {
             auto token = require_change();
-            write([&] { lst.get(5).set_int(0, 6); });
+            write([&] { lst.get(5).set(col_value, 6); });
             REQUIRE_INDICES(change.modifications, 5);
         }
-
+#if 0
+        // FIXME: Why does this not work?
         SECTION("deleting a target row sends a change notification") {
             auto token = require_change();
-            write([&] { target->move_last_over(5); });
+            write([&] { target->remove_object(target_keys[5]); });
             REQUIRE_INDICES(change.deletions, 5);
         }
-
+#endif
         SECTION("adding a row and then modifying the target row does not mark the row as modified") {
             auto token = require_change();
             write([&] {
-                lst.add(5);
-                target->set_int(0, 5, 10);
+                Obj obj = target->get_object(target_keys[5]);
+                lst.add(obj);
+                obj.set(col_value, 10);
             });
             REQUIRE_INDICES(change.insertions, 10);
             REQUIRE_INDICES(change.modifications, 5);
@@ -173,7 +177,7 @@ TEST_CASE("list") {
         SECTION("modifying and then moving a row reports move/insert but not modification") {
             auto token = require_change();
             write([&] {
-                target->set_int(0, 5, 10);
+                target->get_object(target_keys[5]).set(col_value, 10);
                 lst.move(5, 8);
             });
             REQUIRE_INDICES(change.insertions, 8);
@@ -182,6 +186,7 @@ TEST_CASE("list") {
             REQUIRE(change.modifications.empty());
         }
 
+#if 0
         SECTION("modifying a row which appears multiple times in a list marks them all as modified") {
             r->begin_transaction();
             lst.add(5);
@@ -517,8 +522,10 @@ TEST_CASE("list") {
                 REQUIRE_INDICES(change.deletions, 5);
             }
         }
+#endif
     }
 
+#if 0
     SECTION("sorted add_notification_block()") {
         List lst(r, lv);
         Results results = lst.sort({*target, {{0}}, {false}});
@@ -931,5 +938,5 @@ TEST_CASE("list") {
         REQUIRE(obj.is_valid());
         REQUIRE(obj.row().get_index() == 1);
     }
-}
 #endif
+}

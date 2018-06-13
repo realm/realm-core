@@ -247,10 +247,10 @@ macro(build_realm_core)
                         && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_BUILD_LIB_ONLY=YES -G Ninja ..
 
         BUILD_COMMAND cd build.debug
-                   && cmake --build .
+                   && cmake --build . --target Core
                    && cd ..
                    && cd build.release
-                   && cmake --build .
+                   && cmake --build . --target Core
         ${USES_TERMINAL_BUILD}
         ${ARGN}
         )

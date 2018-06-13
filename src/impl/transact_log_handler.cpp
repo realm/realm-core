@@ -267,7 +267,7 @@ class TransactLogObserver : public TransactLogValidationMixin {
         // the last one
         auto table = current_table().value;
         for (auto it = m_info.lists.rbegin(), end = m_info.lists.rend(); it != end; ++it) {
-            if (it->table_key == table && it->row_key == obj.value == it->col_key == col.value)
+            if (it->table_key == table && it->row_key == obj.value && it->col_key == col.value)
                 return it->changes;
         }
         return nullptr;
@@ -356,12 +356,13 @@ public:
         return true;
     }
 
-    bool delete_object(ObjKey key)
+    bool remove_object(ObjKey key)
     {
         if (!m_active_table)
             return true;
         m_active_table->insertions.remove(key.value);
         m_active_table->modifications.remove(key.value);
+        m_active_table->deletions.add(key.value);
 
         for (size_t i = 0; i < m_info.lists.size(); ++i) {
             auto& list = m_info.lists[i];
