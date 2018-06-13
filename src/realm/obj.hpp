@@ -116,6 +116,10 @@ public:
     size_t get_link_count(ColKey col_key) const;
 
     bool is_null(ColKey col_key) const;
+    bool is_null(StringData col_name) const
+    {
+        return is_null(get_column_key(col_name));
+    }
     bool has_backlinks(bool only_strong_links) const;
     size_t get_backlink_count(bool only_strong_links = false) const;
     size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
@@ -198,6 +202,10 @@ public:
     Obj& set(ColKey col_key, util::Optional<U> value, bool is_default = false);
 
     Obj& set_null(ColKey col_key, bool is_default = false);
+    Obj& set_null(StringData col_name, bool is_default = false)
+    {
+        return set_null(get_column_key(col_name), is_default);
+    }
 
     Obj& add_int(ColKey col_key, int64_t value);
     Obj& add_int(StringData col_name, int64_t value)
