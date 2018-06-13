@@ -1531,10 +1531,6 @@ public:
     {
         return false;
     }
-    bool modify_object(ColKey, ObjKey)
-    {
-        return false;
-    }
     bool add_row_with_key(size_t, size_t, size_t, int64_t)
     {
         return false;
@@ -1583,7 +1579,7 @@ public:
     {
         return false;
     }
-    bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t)
+    bool modify_object(ColKey, ObjKey)
     {
         return false;
     }
@@ -1833,35 +1829,32 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
     }
 #endif
 }
-#ifdef LEGACY_TESTS
-#endif
 
-#ifdef LEGACY_TESTS
+
 TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-
+    ColKey col;
+    Obj obj;
     // Add some initial data and then begin a read transaction at that version
     {
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("Table");
-        table->add_column(type_Int, "int");
-        table->add_empty_row();
-        table->set_int(0, 0, 10);
+        col = table->add_column(type_Int, "int");
+        obj = table->create_object().set_all(10);
         wt.commit();
     }
-    const Group& g = sg.begin_read();
+    auto g = sg->start_read();
 
     // Modify the data with a different SG so that we can determine which version
     // the read transaction is using
     {
-        std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-        DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
-        WriteTransaction wt(sg_w);
-        wt.get_table("Table")->set_int(0, 0, 20);
-        wt.commit();
+        auto wt = sg->start_write();
+        Obj o2 = wt->import_copy_of(obj);
+        o2.set<int64_t>(col, 20);
+        wt->commit();
     }
 
     struct ObserverError {
@@ -1870,28 +1863,27 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) const
+            bool modify_object(ColKey, ObjKey) const
             {
                 throw ObserverError();
             }
         } parser(test_context);
-
-        LangBindHelper::advance_read(sg, parser);
+        g->advance_read(&parser);
         CHECK(false); // Should not be reached
     }
     catch (ObserverError) {
     }
 
     // Should still see data from old version
-    CHECK_EQUAL(10, g.get_table("Table")->get_int(0, 0));
+    auto o = g->import_copy_of(obj);
+    CHECK_EQUAL(10, o.get<int64_t>(col));
 
     // Should be able to advance to the new version still
-    rt->advance_read();
+    g->advance_read();
 
     // And see that version's data
-    CHECK_EQUAL(20, g.get_table("Table")->get_int(0, 0));
+    CHECK_EQUAL(20, o.get<int64_t>(col));
 }
-#endif
 
 
 TEST(LangBindHelper_ImplicitTransactions)
@@ -1948,82 +1940,64 @@ TEST(LangBindHelper_ImplicitTransactions)
 }
 
 
-#ifdef LEGACY_TESTS
-// to be ported
 TEST(LangBindHelper_RollbackAndContinueAsRead)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     {
-        Group* group = const_cast<Group*>(&sg.begin_read());
+        ObjKey key;
+        ColKey col;
+        auto group = sg->start_read();
         {
-            LangBindHelper::promote_to_write(sg);
+            group->promote_to_write();
             TableRef origin = group->get_or_add_table("origin");
-            origin->add_column(type_Int, "");
-            origin->add_empty_row();
-            origin->set_int(0, 0, 42);
-            LangBindHelper::commit_and_continue_as_read(sg);
+            col = origin->add_column(type_Int, "");
+            key = origin->create_object().set_all(42).get_key();
+            group->commit_and_continue_as_read();
         }
         group->verify();
         {
             // rollback of group level table insertion
-            LangBindHelper::promote_to_write(sg);
+            group->promote_to_write();
             TableRef o = group->get_or_add_table("nullermand");
             TableRef o2 = group->get_table("nullermand");
             REALM_ASSERT(o2);
-            LangBindHelper::rollback_and_continue_as_read(sg);
+            group->rollback_and_continue_as_read();
             TableRef o3 = group->get_table("nullermand");
             REALM_ASSERT(!o3);
-            REALM_ASSERT(o2->is_attached() == false);
+            REALM_ASSERT(!o2);
         }
 
         TableRef origin = group->get_table("origin");
-        Row row = origin->get(0);
-        CHECK_EQUAL(42, origin->get_int(0, 0));
+        Obj row = origin->get_object(key);
+        CHECK_EQUAL(42, row.get<int64_t>(col));
 
         {
-            LangBindHelper::promote_to_write(sg);
-            origin->insert_empty_row(0);
-            origin->set_int(0, 0, 5746);
-            CHECK_EQUAL(42, origin->get_int(0, 1));
-            CHECK_EQUAL(5746, origin->get_int(0, 0));
-            CHECK_EQUAL(42, row.get_int(0));
+            group->promote_to_write();
+            auto row2 = origin->create_object().set_all(5746);
+            CHECK_EQUAL(42, row.get<int64_t>(col));
+            CHECK_EQUAL(5746, row2.get<int64_t>(col));
             CHECK_EQUAL(2, origin->size());
             group->verify();
-            LangBindHelper::rollback_and_continue_as_read(sg);
+            group->rollback_and_continue_as_read();
         }
         CHECK_EQUAL(1, origin->size());
         group->verify();
-        CHECK_EQUAL(42, origin->get_int(0, 0));
-        CHECK_EQUAL(42, row.get_int(0));
-
+        CHECK_EQUAL(42, row.get<int64_t>(col));
+        Obj row2;
         {
-            LangBindHelper::promote_to_write(sg);
-            origin->add_empty_row();
-            origin->set_int(0, 1, 42);
-            LangBindHelper::commit_and_continue_as_read(sg);
-        }
-        Row row2 = origin->get(1);
-        CHECK_EQUAL(2, origin->size());
-
-        {
-            LangBindHelper::promote_to_write(sg);
-            origin->move_last_over(0);
-            CHECK_EQUAL(1, origin->size());
-            CHECK_EQUAL(42, row2.get_int(0));
-            CHECK_EQUAL(42, origin->get_int(0, 0));
-            group->verify();
-            LangBindHelper::rollback_and_continue_as_read(sg);
+            group->promote_to_write();
+            row2 = origin->create_object().set_all(42);
+            group->commit_and_continue_as_read();
         }
         CHECK_EQUAL(2, origin->size());
         group->verify();
-        CHECK_EQUAL(42, row2.get_int(0));
-        CHECK_EQUAL(42, origin->get_int(0, 1));
-        sg.end_read();
+        CHECK_EQUAL(42, row2.get<int64_t>(col));
+        group->end_read();
     }
 }
-#endif
+
 
 TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 {
@@ -2966,6 +2940,7 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
     CHECK_LESS_EQUAL(File(path).get_size(), 2 * page_size());
 #endif // REALM_ENABLE_ENCRYPTION
 }
+#endif // LEGACY_TESTS
 
 
 TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
@@ -2974,34 +2949,29 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    const Group& group = sg.begin_read();
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+    auto group = sg->start_read();
+    auto group_w = sg->start_write();
 
-    LangBindHelper::promote_to_write(sg_w);
-    TableRef table_w = group_w.add_table("table");
-    table_w->add_column(type_Int, "");
-    table_w->add_empty_row();
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    group_w.verify();
+    TableRef table_w = group_w->add_table("table");
+    auto col = table_w->add_column(type_Int, "");
+    auto obj = table_w->create_object();
+    group_w->commit_and_continue_as_read();
+    group_w->verify();
 
-    rt->advance_read();
-    ConstTableRef table = rt->get_table("table");
-    CHECK_EQUAL(0, table->get_int(0, 0));
-    rt->verify();
+    group->advance_read();
+    ConstTableRef table = group->get_table("table");
+    CHECK_EQUAL(1, table->size());
+    group->verify();
 
-    LangBindHelper::promote_to_write(sg_w);
-    table_w->set_int(0, 0, 1);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    group_w.verify();
+    group_w->promote_to_write();
+    obj.set<int64_t>(col, 1);
+    group_w->commit_and_continue_as_read();
+    group_w->verify();
 
-    rt->advance_read();
-    CHECK_EQUAL(1, table->get_int(0, 0));
-    rt->verify();
-
-    sg.end_read();
-    sg_w.end_read();
+    group->advance_read();
+    auto obj2 = group->import_copy_of(obj);
+    CHECK_EQUAL(1, obj2.get<int64_t>(col));
+    group->verify();
 }
 
 
@@ -3011,40 +2981,35 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    const Group& group = sg.begin_read();
+    auto group = sg->start_read();
+    auto group_w = sg->start_write();
 
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+    TableRef table_w = group_w->add_table("table");
+    auto col = table_w->add_column_link(type_LinkList, "flubber", *table_w);
+    auto obj = table_w->create_object();
+    auto link_list_w = obj.get_linklist(col);
+    link_list_w.add(obj.get_key());
+    // CHECK_EQUAL(1, link_list_w.size()); // avoid this, it hides missing updates
+    group_w->commit_and_continue_as_read();
+    group_w->verify();
 
-    LangBindHelper::promote_to_write(sg_w);
-    TableRef table_w = group_w.add_table("table");
-    table_w->add_column_link(type_LinkList, "", *table_w);
-    table_w->add_empty_row();
-    LinkViewRef link_list_w = table_w->get_linklist(0, 0);
-    link_list_w->add(0);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    group_w.verify();
+    group->advance_read();
+    ConstTableRef table = group->get_table("table");
+    auto link_list = obj.get_linklist(col);
+    CHECK_EQUAL(1, link_list.size());
+    group->verify();
 
-    rt->advance_read();
-    ConstTableRef table = rt->get_table("table");
-    ConstLinkViewRef link_list = table->get_linklist(0, 0);
-    CHECK_EQUAL(1, link_list->size());
-    rt->verify();
+    group_w->promote_to_write();
+    // CHECK_EQUAL(1, link_list_w.size()); // avoid this, it hides missing updates
+    link_list_w.add(obj.get_key());
+    CHECK_EQUAL(2, link_list_w.size());
+    group_w->commit_and_continue_as_read();
+    group_w->verify();
 
-    LangBindHelper::promote_to_write(sg_w);
-    link_list_w->add(0);
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    group_w.verify();
-
-    rt->advance_read();
-    CHECK_EQUAL(2, link_list->size());
-    rt->verify();
-
-    sg.end_read();
-    sg_w.end_read();
+    group->advance_read();
+    CHECK_EQUAL(2, link_list.size());
+    group->verify();
 }
-#endif
 
 
 TEST(LangBindHelper_MemOnly)

@@ -445,7 +445,7 @@ public:
 
     void add(T value)
     {
-        insert(m_tree->size(), value);
+        insert(size(), value);
     }
 
     T set(size_t ndx, T value)
