@@ -295,13 +295,31 @@ void LnkLst::remove_all_target_rows()
     }
 }
 
+LnkLst::LnkLst(const Obj& owner, ColKey col_key)
+    : ConstLstBase(col_key, &m_obj)
+    , Lst<ObjKey>(owner, col_key)
+    , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
+{
+}
+
+TableVersions LnkLst::get_dependencies() const
+{
+    TableVersions versions;
+    if (is_attached()) {
+        auto table = get_table();
+        versions.emplace_back(table->get_key(), table->get_content_version());
+    }
+    return versions;
+}
+
 TableVersions LnkLst::sync_if_needed() const
 {
     TableVersions versions;
     if (this->is_attached()) {
         const_cast<LnkLst*>(this)->update_if_needed();
         auto table = get_table();
-        versions.emplace_back(table->get_key(), table->get_content_version());
+        auto version = table->get_content_version();
+        versions.emplace_back(table->get_key(), version);
     }
     return versions;
 }

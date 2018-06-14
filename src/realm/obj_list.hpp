@@ -76,8 +76,9 @@ public:
     template <class T>
     ObjKey find_first(ColKey column_key, T value);
 
-    // These two methods are overridden by TableView and LinkView.
+    // These three methods are overridden by TableView and ObjList/LnkLst.
     virtual TableVersions sync_if_needed() const = 0;
+    virtual TableVersions get_dependencies() const = 0;
     virtual bool is_in_sync() const = 0;
     void check_cookie() const
     {

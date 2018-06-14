@@ -289,6 +289,11 @@ public:
     {
         return m_clusters.get(ndx);
     }
+    // Get logical index for object. This function is not very efficient
+    size_t get_object_ndx(ObjKey key) const
+    {
+        return m_clusters.get_ndx(key);
+    }
     void dump_objects()
     {
         return m_clusters.dump_objects();

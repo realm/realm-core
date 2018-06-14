@@ -134,6 +134,8 @@ public:
     ConstObj get(size_t ndx) const;
     // Lookup Obj by index
     Obj get(size_t ndx);
+    // Get logical index of object identified by k
+    size_t get_ndx(ObjKey k) const;
     // Find the leaf containing the requested object
     bool get_leaf(ObjKey key, ClusterNode::IteratorState& state) const noexcept;
     // Visit all leaves and call the supplied function. Stop when function returns true.

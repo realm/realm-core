@@ -337,7 +337,7 @@ protected:
     // - Table::get_distinct_view()
     // - Table::get_backlink_view()
     // Return the version of the source it was created from.
-    TableVersions outside_version() const;
+    TableVersions get_dependencies() const override;
 
     void do_sync();
 

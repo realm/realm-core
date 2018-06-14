@@ -1186,6 +1186,11 @@ public:
         return group.m_alloc;
     }
 
+    static ref_type get_top_ref(const Group& group) noexcept
+    {
+        return group.m_top.get_ref();
+    }
+
     static ref_type get_history_ref(Allocator& alloc, ref_type top_ref) noexcept
     {
         Array top(alloc);
