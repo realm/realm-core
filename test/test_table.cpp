@@ -3064,6 +3064,27 @@ TEST(Table_object_forward_iterator)
     CHECK_THROW_ANY(it1->get<int64_t>(c0));
 }
 
+TEST(Table_object_by_index)
+{
+    Table table;
+
+    ObjKeys keys({17, 4, 345, 65, 1, 46, 93, 43, 76, 123, 33, 42, 99, 53, 52, 256, 2}); // 17 elements
+    std::map<ObjKey, size_t> positions;
+    table.create_objects(keys);
+    size_t sz = table.size();
+    CHECK_EQUAL(sz, keys.size());
+    for (size_t i = 0; i < sz; i++) {
+        Obj o = table.get_object(i);
+        auto it = std::find(keys.begin(), keys.end(), o.get_key());
+        CHECK(it != keys.end());
+        positions.emplace(o.get_key(), i);
+    }
+    for (auto k : keys) {
+        size_t ndx = table.get_object_ndx(k);
+        CHECK_EQUAL(ndx, positions[k]);
+    }
+}
+
 // String query benchmark
 TEST(Table_QuickSort2)
 {
@@ -3716,7 +3737,7 @@ TEST(Table_SearchIndexFindAll)
     table.add_search_index(col_int);
     table.add_search_index(col_str);
 
-    std::vector<ObjKey> keys;
+    ObjKeys keys;
     table.create_objects(100, keys);
     for (auto o : table) {
         int64_t key_value = o.get_key().value;

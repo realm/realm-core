@@ -108,6 +108,7 @@ public:
     ref_type insert(ObjKey k, State& state) override;
     void get(ObjKey k, State& state) const override;
     ObjKey get(size_t ndx, State& state) const override;
+    size_t get_ndx(ObjKey key, size_t ndx) const override;
     size_t erase(ObjKey k, CascadeState& state) override;
     void add(ref_type ref, int64_t key_value = 0);
 
@@ -364,6 +365,41 @@ ObjKey ClusterNodeInner::get(size_t ndx, ClusterNode::State& state) const
         ndx -= sub_tree_size;
     }
     return {};
+}
+
+size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const
+{
+    ChildInfo child_info = find_child(key);
+
+    // First figure out how many objects there are in nodes before actual one
+    // then descent in tree
+
+    ref_type child_ref = _get_child_ref(child_info.ndx);
+    char* child_header = m_alloc.translate(child_ref);
+    bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
+    if (child_is_leaf) {
+        for (unsigned i = 0; i < child_info.ndx; i++) {
+            ref_type ref = _get_child_ref(i);
+            char* header = m_alloc.translate(ref);
+            MemRef mem(header, ref, m_alloc);
+            Cluster leaf(0, m_alloc, m_tree_top);
+            leaf.init(mem);
+            ndx += leaf.get_tree_size();
+        }
+        Cluster leaf(child_info.offset + m_offset, m_alloc, m_tree_top);
+        leaf.init(MemRef(child_header, child_ref, m_alloc));
+        return leaf.get_ndx(child_info.key, ndx);
+    }
+    else {
+        for (unsigned i = 0; i < child_info.ndx; i++) {
+            char* header = m_alloc.translate(_get_child_ref(i));
+            ndx += size_t(Array::get(header, s_sub_tree_size)) >> 1;
+        }
+        ClusterNodeInner node(m_alloc, m_tree_top);
+        node.init(MemRef(child_header, child_ref, m_alloc));
+        node.set_offset(child_info.offset + m_offset);
+        return node.get_ndx(child_info.key, ndx);
+    }
 }
 
 size_t ClusterNodeInner::erase(ObjKey key, CascadeState& state)
@@ -1106,6 +1142,24 @@ inline void Cluster::do_erase_key(size_t ndx, size_t col_ndx, CascadeState& stat
     values.erase(ndx);
 }
 
+size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
+{
+    size_t index;
+    if (m_keys.is_attached()) {
+        index = m_keys.lower_bound(uint64_t(k.value));
+        if (index == m_keys.size() || m_keys.get(index) != uint64_t(k.value)) {
+            throw InvalidKey("Key not found");
+        }
+    }
+    else {
+        index = size_t(k.value);
+        if (index >= get_as_ref_or_tagged(0).get_as_int()) {
+            throw InvalidKey("Key not found");
+        }
+    }
+    return index + ndx;
+}
+
 size_t Cluster::erase(ObjKey key, CascadeState& state)
 {
     size_t ndx;
@@ -1590,6 +1644,11 @@ Obj ClusterTree::get(size_t ndx)
     ClusterNode::State state;
     ObjKey k = m_root->get(ndx, state);
     return Obj(this, state.mem, k, state.index);
+}
+
+size_t ClusterTree::get_ndx(ObjKey k) const
+{
+    return m_root->get_ndx(k, 0);
 }
 
 void ClusterTree::erase(ObjKey k, CascadeState& state)
