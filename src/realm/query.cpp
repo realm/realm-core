@@ -179,7 +179,9 @@ Query::Query(const Query* source, Transaction* tr, PayloadPolicy policy)
     for (const auto& cur_group : source->m_groups) {
         m_groups.emplace_back(cur_group, tr);
     }
-    set_table(tr->import_copy_of(source->m_table));
+    if (source->m_table)
+        set_table(tr->import_copy_of(source->m_table));
+    // otherwise: empty query.
 }
 
 Query::Query(std::unique_ptr<Expression> expr)

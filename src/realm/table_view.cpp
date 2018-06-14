@@ -51,8 +51,13 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
         m_last_seen_versions = get_dependencies();
     else
         m_last_seen_versions.clear();
+    m_table = tr->import_copy_of(src.m_table);
+    m_linklist_source = tr->import_copy_of(src.m_linklist_source);
+    if (src.m_source_column_key) {
+        m_linked_obj = tr->import_copy_of(src.m_linked_obj);
+    }
+    // don't use methods which throw after this point...or m_table_view_key_values will leak
     if (mode == PayloadPolicy::Copy && src.m_table_view_key_values.is_attached()) {
-        // FIXME: Doesn't this lead to sharing between the 2 TableViews?
         m_table_view_key_values = src.m_table_view_key_values;
     }
     else if (mode == PayloadPolicy::Move && src.m_table_view_key_values.is_attached())
@@ -62,11 +67,6 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
     }
     if (mode == PayloadPolicy::Move) {
         src.m_last_seen_versions.clear();
-    }
-    m_table = tr->import_copy_of(src.m_table);
-    m_linklist_source = tr->import_copy_of(src.m_linklist_source);
-    if (src.m_source_column_key) {
-        m_linked_obj = tr->import_copy_of(src.m_linked_obj);
     }
     m_descriptor_ordering = src.m_descriptor_ordering;
     m_start = src.m_start;
@@ -425,6 +425,7 @@ void ConstTableView::row_to_string(size_t row_ndx, std::ostream& out) const
 
 bool ConstTableView::depends_on_deleted_object() const
 {
+    // FIXME: This does not work!
     // outside_version() will call itself recursively for each TableView in the dependency chain
     // and terminate with `max` if the deepest depends on a deleted LinkList or Row
     return get_dependencies().empty();
