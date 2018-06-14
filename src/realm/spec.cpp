@@ -306,12 +306,11 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
 void Spec::erase_column(size_t column_ndx)
 {
     REALM_ASSERT(column_ndx < m_types.size());
-    typedef _impl::TableFriend tf;
 
     // If the column is a subtable column, we have to delete
     // the subspec(s) as well
     ColumnType type = ColumnType(m_types.get(column_ndx));
-    if (tf::is_link_type(type)) {
+    if (Table::is_link_type(type)) {
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
         m_subspecs.erase(subspec_ndx); // origin table index  : Throws
     }
@@ -323,8 +322,12 @@ void Spec::erase_column(size_t column_ndx)
     else if (is_string_enum_type(column_ndx)) {
         // Enum columns do also have a separate key list
         ref_type keys_ref = m_enumkeys.get_as_ref(column_ndx);
-
         Array::destroy_deep(keys_ref, m_top.get_alloc());
+        m_enumkeys.set(column_ndx, 0);
+    }
+
+    // Remove this column from the enum keys lookup and clean it up if it's now empty
+    if (m_enumkeys.is_attached()) {
         m_enumkeys.erase(column_ndx); // Throws
         bool all_empty = true;
         for (size_t i = 0; i < m_enumkeys.size(); i++) {

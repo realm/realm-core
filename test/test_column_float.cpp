@@ -244,18 +244,33 @@ TEST(DoubleColumn_Insert)
 template <class C, typename T>
 void BasicColumn_Aggregates(TestContext& test_context, T values[], size_t num_values)
 {
-    static_cast<void>(test_context);
-    static_cast<void>(num_values);
-    static_cast<void>(values);
-
     C c(Allocator::get_default());
     c.create();
 
-    //    double sum = c.sum();
-    //    CHECK_EQUAL(0, sum);
+    CHECK_EQUAL(0.0, bptree_sum(c));
 
-    // todo: add tests for minimum, maximum,
-    // todo !!!
+    for (size_t i = 0; i < num_values; ++i)
+        c.add(values[i]);
+
+    auto x = bptree_sum(c);
+    decltype(x) sum{};
+    for (size_t i = 0; i < num_values; i++) {
+        sum += values[i];
+    }
+    CHECK_EQUAL(x, sum);
+
+    size_t ndx;
+    auto max = bptree_maximum(c, &ndx);
+    CHECK_EQUAL(ndx, 3);
+    CHECK_EQUAL(max, values[3]);
+
+    auto min = bptree_minimum(c, &ndx);
+    CHECK_EQUAL(ndx, 4);
+    CHECK_EQUAL(min, values[4]);
+
+    auto avg = bptree_average(c, &ndx);
+    CHECK_EQUAL(ndx, 5);
+    CHECK_EQUAL(avg, sum / num_values);
 
     c.destroy();
 }

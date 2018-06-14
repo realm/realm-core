@@ -450,10 +450,7 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
     }
 }
 
-#ifdef _MSC_VER
-#pragma warning(disable : 4297) // throw in noexcept
-#endif
-void munmap(void* addr, size_t size) noexcept
+void munmap(void* addr, size_t size)
 {
 #if REALM_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
@@ -470,9 +467,6 @@ void munmap(void* addr, size_t size) noexcept
     }
 #endif
 }
-#ifdef _MSC_VER
-#pragma warning(default : 4297)
-#endif
 
 void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size,
              const char* encryption_key)

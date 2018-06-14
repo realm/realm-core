@@ -68,7 +68,7 @@ Run the following commands to configure, build and test core:
     cmake --build .
     ctest
 
-Where `buildtype` is either `debug` or `delease`
+Where `buildtype` is either `debug` or `release`
     
 ## Building for Android, iOS, watchOS and tvOS
 
@@ -94,6 +94,10 @@ The core library comes with a suite of unit tests. You can run the unit tests li
 
     cd build-dir/test
     ./realm-tests
+    
+or run both unit tests and performance tests with just:
+
+    ctest
 
 or run both unit tests and performance tests with just:
 

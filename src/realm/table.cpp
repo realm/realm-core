@@ -324,13 +324,12 @@ void Table::remove_recursive(CascadeState& cascade_state)
         // We will have to re-evaluate size() after each call to clusters.erase
         for (size_t i = 0; i < cascade_state.rows.size(); ++i) {
             CascadeState::row& row = cascade_state.rows[i];
-            typedef _impl::GroupFriend gf;
-            Table& table = gf::get_table(*group, row.table_key);
+            auto table = group->get_table(row.table_key);
             // This might add to the list of objects that should be deleted
-            table.m_clusters.erase(row.key, cascade_state);
+            table->m_clusters.erase(row.key, cascade_state);
         }
         if (group->has_cascade_notification_handler())
-            _impl::GroupFriend::send_cascade_notification(*group, cascade_state);
+            group->send_cascade_notification(cascade_state);
     }
 }
 
@@ -474,50 +473,6 @@ ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, L
 }
 
 
-ColKey Table::do_insert_column_unless_exists(ColKey col_key, DataType type, StringData name,
-                                             LinkTargetInfo& link_target_info, bool nullable, bool listtype,
-                                             bool* was_inserted)
-{
-    ColKey existing_key = get_column_key(name);
-    if (existing_key) {
-        col_key = existing_key;
-    }
-
-    if (valid_column(col_key)) {
-        StringData existing_name = get_column_name(col_key);
-        if (existing_name == name) {
-            DataType existing_type = get_column_type(col_key);
-            if (existing_type != type) {
-                throw LogicError(LogicError::type_mismatch);
-            }
-            bool existing_is_nullable = is_nullable(col_key);
-            if (existing_is_nullable != nullable) {
-                throw LogicError(LogicError::type_mismatch);
-            }
-            if (is_link_type(ColumnType(type)) &&
-                m_spec.get_opposite_link_table_key(colkey2ndx(col_key)) !=
-                    link_target_info.m_target_table->get_key()) {
-                throw LogicError(LogicError::type_mismatch);
-            }
-
-            // Column existed, and was identical to the requested column -- all is good.
-            if (was_inserted) {
-                *was_inserted = false;
-            }
-            return col_key;
-        }
-        else {
-            REALM_ASSERT(!get_column_key(name));
-        }
-    }
-
-    col_key = do_insert_column(col_key, type, name, link_target_info, nullable, listtype || type == type_LinkList);
-    if (was_inserted) {
-        *was_inserted = true;
-    }
-    return col_key;
-}
-
 void Table::populate_search_index(ColKey col_key)
 {
     size_t col_ndx = colkey2ndx(col_key);
@@ -599,9 +554,6 @@ void Table::add_search_index(ColKey col_key)
     attr = m_spec.get_column_attr(column_ndx);
     attr.set(col_attr_Indexed);
     m_spec.set_column_attr(column_ndx, attr); // Throws
-
-    if (Replication* repl = get_repl())
-        repl->add_search_index(this, col_key); // Throws
 }
 
 void Table::remove_search_index(ColKey col_key)
@@ -629,9 +581,6 @@ void Table::remove_search_index(ColKey col_key)
     attr = m_spec.get_column_attr(column_ndx);
     attr.reset(col_attr_Indexed);
     m_spec.set_column_attr(column_ndx, attr); // Throws
-
-    if (Replication* repl = get_repl())
-        repl->remove_search_index(this, col_key); // Throws
 }
 
 void Table::enumerate_string_column(ColKey col_key)
@@ -642,9 +591,6 @@ void Table::enumerate_string_column(ColKey col_key)
     ColumnType type = m_spec.get_column_type(column_ndx);
     if (type == col_type_String && !m_spec.is_string_enum_type(column_ndx)) {
         m_clusters.enumerate_string_column(column_ndx);
-
-        if (Replication* repl = get_repl())
-            repl->enumerate_string_column(this, col_key); // Throws
     }
 }
 
@@ -760,10 +706,12 @@ void Table::do_erase_root_column(ColKey col_key)
             Array::destroy_deep(index_ref, m_index_refs.get_alloc());
         }
         m_index_refs.erase(ndx);
-        StringIndex* index = m_index_accessors[ndx];
-        if (index)
-            delete index;
+        delete m_index_accessors[ndx];
         m_index_accessors.erase(m_index_accessors.begin() + ndx);
+        for (size_t i = ndx; i < m_index_accessors.size(); ++i) {
+            if (StringIndex* index = m_index_accessors[i])
+                index->set_ndx_in_parent(i);
+        }
     }
 
     m_clusters.remove_column(ndx);

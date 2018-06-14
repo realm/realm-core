@@ -565,7 +565,6 @@ void IndexArray::index_string_all(StringData value, std::vector<ObjKey>& result,
     const char* header;
     uint_least8_t width = m_width;
     bool is_inner_node = m_is_inner_bptree_node;
-    typedef StringIndex::key_type key_type;
     size_t stringoffset = 0;
 
     // Create 4 byte index key

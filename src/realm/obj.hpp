@@ -222,6 +222,8 @@ public:
     template <class Head, class... Tail>
     Obj& set_all(Head v, Tail... tail);
 
+    Obj get_linked_object(ColKey link_col_key);
+
     template <typename U>
     Lst<U> get_list(ColKey col_key) const;
     template <typename U>
@@ -290,6 +292,11 @@ inline Optional<double> ConstObj::get<Optional<double>>(ColKey col_key) const
     return null::is_null_float(f) ? util::none : util::make_optional(f);
 }
 
+inline Obj Obj::get_linked_object(ColKey link_col_key)
+{
+    return ConstObj::get_linked_object(link_col_key);
+}
+
 template <>
 Obj& Obj::set(ColKey, int64_t value, bool is_default);
 
@@ -346,6 +353,30 @@ template <>
 inline Obj& Obj::set(ColKey col_key, realm::null, bool is_default)
 {
     return set_null(col_key, is_default);
+}
+
+template <>
+inline Obj& Obj::set(ColKey col_key, Optional<bool> value, bool is_default)
+{
+    return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
+}
+
+template <>
+inline Obj& Obj::set(ColKey col_key, Optional<int64_t> value, bool is_default)
+{
+    return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
+}
+
+template <>
+inline Obj& Obj::set(ColKey col_key, Optional<float> value, bool is_default)
+{
+    return set(col_key, value ? *value : null::get_null_float<float>(), is_default);
+}
+
+template <>
+inline Obj& Obj::set(ColKey col_key, Optional<double> value, bool is_default)
+{
+    return set(col_key, value ? *value : null::get_null_float<double>(), is_default);
 }
 
 template <typename U>

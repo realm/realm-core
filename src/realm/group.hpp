@@ -1181,110 +1181,22 @@ inline void Group::set_metrics(std::shared_ptr<metrics::Metrics> shared) noexcep
 // not all of the non-public parts of the Group class.
 class _impl::GroupFriend {
 public:
-    static Allocator& get_alloc(Group& group) noexcept
+    static Allocator& get_alloc(const Group& group) noexcept
     {
         return group.m_alloc;
     }
 
-    static const Allocator& get_alloc(const Group& group) noexcept
+    static ref_type get_history_ref(Allocator& alloc, ref_type top_ref) noexcept
     {
-        return group.m_alloc;
+        Array top(alloc);
+        if (top_ref != 0)
+            top.init_from_ref(top_ref);
+        return Group::get_history_ref(top);
     }
 
-    static ref_type get_top_ref(const Group& group) noexcept
+    static ref_type get_history_ref(const Group& group) noexcept
     {
-        return group.m_top.get_ref();
-    }
-
-    static Table& get_table(Group& group, TableKey key)
-    {
-        Group::DescMatcher desc_matcher = 0;                           // Do not check descriptor
-        auto ndx = group.key2ndx(key);
-        Table* table = group.do_get_table(ndx, desc_matcher); // Throws
-        return *table;
-    }
-
-    static const Table& get_table(const Group& group, TableKey key)
-    {
-        Group::DescMatcher desc_matcher = 0;                                 // Do not check descriptor
-        auto ndx = group.key2ndx(key);
-        const Table* table = group.do_get_table(ndx, desc_matcher); // Throws
-        return *table;
-    }
-
-    static Table* get_table(Group& group, StringData name)
-    {
-        Group::DescMatcher desc_matcher = 0;                   // Do not check descriptor
-        Table* table = group.do_get_table(name, desc_matcher); // Throws
-        return table;
-    }
-
-    static const Table* get_table(const Group& group, StringData name)
-    {
-        Group::DescMatcher desc_matcher = 0;                         // Do not check descriptor
-        const Table* table = group.do_get_table(name, desc_matcher); // Throws
-        return table;
-    }
-
-    static Table& add_table(Group& group, StringData name, bool require_unique_name)
-    {
-        return *group.add_table(name, require_unique_name);
-    }
-
-    static Table& get_or_add_table(Group& group, StringData name, bool* was_inserted)
-    {
-        Group::DescMatcher desc_matcher = nullptr; // Do not check descriptor
-        Group::DescSetter desc_setter = nullptr;   // Do not add any columns
-        return *group.do_get_or_add_table(name, desc_matcher, desc_setter, was_inserted);
-    }
-
-    static Table& get_or_add_table(Group& group, TableKey key, StringData name, bool* was_inserted)
-    {
-        Group::DescMatcher desc_matcher = nullptr; // Do not check descriptor
-        Group::DescSetter desc_setter = nullptr;   // Do not add any columns
-        return *group.do_get_or_add_table(key, name, desc_matcher, desc_setter, was_inserted);
-    }
-
-    static void send_cascade_notification(const Group& group, const Group::CascadeNotification& notification)
-    {
-        group.send_cascade_notification(notification);
-    }
-
-    static void detach(Group& group) noexcept
-    {
-        group.detach();
-    }
-
-    static void attach_shared(Group& group, ref_type new_top_ref, size_t new_file_size, bool writable)
-    {
-        group.attach_shared(new_top_ref, new_file_size, writable); // Throws
-    }
-
-    static void reset_free_space_tracking(Group& group)
-    {
-        group.reset_free_space_tracking(); // Throws
-    }
-
-    static void remap(Group& group, size_t new_file_size)
-    {
-        group.remap(new_file_size); // Throws
-    }
-
-    static void remap_and_update_refs(Group& group, ref_type new_top_ref, size_t new_file_size, bool writable)
-    {
-        group.remap_and_update_refs(new_top_ref, new_file_size, writable); // Throws
-    }
-
-    static void advance_transact(Group& group, ref_type new_top_ref, size_t new_file_size,
-                                 _impl::NoCopyInputStream& in, bool writable)
-    {
-        group.advance_transact(new_top_ref, new_file_size, in, writable); // Throws
-    }
-
-    static void create_empty_group_when_missing(Group& group)
-    {
-        if (!group.m_top.is_attached())
-            group.create_empty_group(); // Throws
+        return Group::get_history_ref(group.m_top);
     }
 
     static void get_version_and_history_info(const Allocator& alloc, ref_type top_ref,
@@ -1296,19 +1208,6 @@ public:
         if (top_ref != 0)
             top.init_from_ref(top_ref);
         Group::get_version_and_history_info(top, version, history_type, history_schema_version);
-    }
-
-    static ref_type get_history_ref(const Group& group) noexcept
-    {
-        return Group::get_history_ref(group.m_top);
-    }
-
-    static ref_type get_history_ref(Allocator& alloc, ref_type top_ref) noexcept
-    {
-        Array top(alloc);
-        if (top_ref != 0)
-            top.init_from_ref(top_ref);
-        return Group::get_history_ref(top);
     }
 
     static void set_history_schema_version(Group& group, int version)
@@ -1327,26 +1226,6 @@ public:
                                        int history_schema_version)
     {
         group.prepare_history_parent(history_root, history_type, history_schema_version); // Throws
-    }
-
-    static int get_file_format_version(const Group& group) noexcept
-    {
-        return group.get_file_format_version();
-    }
-
-    static void set_file_format_version(Group& group, int file_format_version) noexcept
-    {
-        group.set_file_format_version(file_format_version);
-    }
-
-    static int get_committed_file_format_version(const Group& group) noexcept
-    {
-        return group.get_committed_file_format_version();
-    }
-
-    static int get_target_file_format_version_for_session(int current_file_format_version, int history_type) noexcept
-    {
-        return Group::get_target_file_format_version_for_session(current_file_format_version, history_type);
     }
 };
 

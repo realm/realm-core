@@ -99,15 +99,16 @@ void Thread::set_name(const std::string& name)
 }
 
 
-bool Thread::get_name(std::string& name)
+bool Thread::get_name(std::string& name) noexcept
 {
 #if (defined _GNU_SOURCE && !REALM_ANDROID) || REALM_PLATFORM_APPLE
     const size_t max = 64;
     char name_2[max];
     pthread_t id = pthread_self();
     int r = pthread_getname_np(id, name_2, max);
-    if (REALM_UNLIKELY(r != 0))
-        throw std::runtime_error("pthread_getname_np() failed.");
+    if (REALM_UNLIKELY(r != 0)) {
+        return false;
+    }
     name_2[max - 1] = '\0';              // Eliminate any risk of buffer overrun in strlen().
     name.assign(name_2, strlen(name_2)); // Throws
     return true;

@@ -206,6 +206,9 @@ public:
     // Throws an LogicError if target column is not a link column.
     LinkType get_link_type(ColKey col_key) const;
 
+    /// True for `col_type_Link` and `col_type_LinkList`.
+    static bool is_link_type(ColumnType) noexcept;
+
     //@{
 
     /// has_search_index() returns true if, and only if a search index has been
@@ -662,8 +665,6 @@ private:
 
     ColKey do_insert_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target_info,
                             bool nullable = false, bool listtype = false);
-    ColKey do_insert_column_unless_exists(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link,
-                                          bool nullable = false, bool listtype = false, bool* was_inserted = nullptr);
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
@@ -714,9 +715,6 @@ private:
     /// Create an empty table with independent spec and return just
     /// the reference to the underlying memory.
     static ref_type create_empty_table(Allocator&, TableKey = TableKey());
-
-    /// True for `col_type_Link` and `col_type_LinkList`.
-    static bool is_link_type(ColumnType) noexcept;
 
     void connect_opposite_link_columns(ColKey link_col_key, Table& target_table, ColKey backlink_col_key) noexcept;
 
@@ -840,7 +838,7 @@ private:
     // holds the ndx in the lower bits, the tag in the higher bit to save an indirection
     // when validating colkeys.
     std::vector<uint64_t> m_colkey2ndx;
-    uint64_t m_in_file_version_at_transaction_boundary;
+    uint64_t m_in_file_version_at_transaction_boundary = 0;
 
     static constexpr int top_position_for_spec = 0;
     static constexpr int top_position_for_columns = 1;
@@ -1244,75 +1242,6 @@ struct LinkTargetInfo {
 // not all of the non-public parts of the Table class.
 class _impl::TableFriend {
 public:
-    static ref_type create_empty_table(Allocator& alloc, TableKey key = TableKey())
-    {
-        return Table::create_empty_table(alloc, key); // Throws
-    }
-
-    static Table* create_accessor(Allocator& alloc, ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent,
-                                  bool is_writable)
-    {
-        std::unique_ptr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
-        table->init(top_ref, parent, ndx_in_parent, is_writable);               // Throws
-        return table.release();
-    }
-
-    // Intended to be used only by Group::create_table_accessor()
-    static Table* create_incomplete_accessor(Allocator& alloc, ref_type top_ref, ArrayParent* parent,
-                                             size_t ndx_in_parent)
-    {
-        std::unique_ptr<Table> table(new Table(Table::ref_count_tag(), alloc)); // Throws
-        bool skip_create_column_accessors = true;
-        table->init(top_ref, parent, ndx_in_parent, skip_create_column_accessors); // Throws
-        return table.release();
-    }
-
-    // Intended to be used only by Group::create_table_accessor()
-    static void complete_accessor(Table& table)
-    {
-        table.refresh_index_accessors(); // Throws
-    }
-
-    static void set_top_parent(Table& table, ArrayParent* parent, size_t ndx_in_parent) noexcept
-    {
-        table.m_top.set_parent(parent, ndx_in_parent);
-    }
-
-    static void update_from_parent(Table& table, size_t old_baseline) noexcept
-    {
-        table.update_from_parent(old_baseline);
-    }
-
-    static void detach(Table& table) noexcept
-    {
-        table.detach();
-    }
-
-    static ColKey find_backlink_column(Table& table, TableKey origin_key, ColKey col_key)
-    {
-        return table.find_backlink_column(origin_key, col_key);
-    }
-
-    static TableKey get_opposite_link_table_key(const Table& table, ColKey col_key)
-    {
-        return get_spec(table).get_opposite_link_table_key(table.colkey2ndx(col_key));
-    }
-
-    static bool compare_objects(const Table& a, const Table& b)
-    {
-        return a.compare_objects(b); // Throws
-    }
-
-    static size_t get_size_from_ref(ref_type ref, Allocator& alloc) noexcept
-    {
-        return Table::get_size_from_ref(ref, alloc);
-    }
-
-    static size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref, Allocator& alloc) noexcept
-    {
-        return Table::get_size_from_ref(spec_ref, columns_ref, alloc);
-    }
-
     static Spec& get_spec(Table& table) noexcept
     {
         return table.m_spec;
@@ -1325,14 +1254,9 @@ public:
 
     static TableRef get_opposite_link_table(const Table& table, ColKey col_key);
 
-    static void do_remove_object(Table& table, ObjKey key)
+    static Group* get_parent_group(const Table& table) noexcept
     {
-        table.do_remove_object(key); // Throws
-    }
-
-    static void do_set_link(Table& table, ColKey col_key, size_t row_ndx, size_t target_row_ndx)
-    {
-        table.do_set_link(col_key, row_ndx, target_row_ndx); // Throws
+        return table.get_parent_group();
     }
 
     static void remove_recursive(Table& table, CascadeState& rows)
@@ -1340,70 +1264,11 @@ public:
         table.remove_recursive(rows); // Throws
     }
 
-    static void insert_column_unless_exists(Table& table, ColKey column_key, DataType type, StringData name,
-                                            LinkTargetInfo link, bool nullable = false, bool listtype = false,
-                                            bool* was_inserted = nullptr)
-    {
-        table.do_insert_column_unless_exists(column_key, type, name, link, nullable, listtype,
-                                             was_inserted); // Throws
-    }
-
-    static void erase_column(Table& table, ColKey col_key)
-    {
-        table.remove_column(col_key); // Throws
-    }
-
-    static void rename_column(Table& table, ColKey col_key, StringData name)
-    {
-        table.rename_column(col_key, name); // Throws
-    }
-
-    static void set_link_type(Table& table, ColKey column_key, LinkType link_type)
-    {
-        table.set_link_type(column_key, link_type); // Throws
-    }
-
     static void batch_erase_rows(Table& table, const KeyColumn& keys)
     {
         table.batch_erase_rows(keys); // Throws
     }
-
-    static void refresh_accessor_tree(Table& table)
-    {
-        table.refresh_accessor_tree(); // Throws
-    }
-
-    static void set_ndx_in_parent(Table& table, size_t ndx_in_parent) noexcept
-    {
-        table.set_ndx_in_parent(ndx_in_parent);
-    }
-
-    static bool is_link_type(ColumnType type) noexcept
-    {
-        return Table::is_link_type(type);
-    }
-
-    static void bump_content_version(Table& table) noexcept
-    {
-        table.bump_content_version();
-    }
-
-    static bool is_cross_table_link_target(const Table& table)
-    {
-        return table.is_cross_table_link_target();
-    }
-
-    static Group* get_parent_group(const Table& table) noexcept
-    {
-        return table.get_parent_group();
-    }
-
-    static Replication* get_repl(Table& table) noexcept
-    {
-        return table.get_repl();
-    }
 };
-
 
 } // namespace realm
 

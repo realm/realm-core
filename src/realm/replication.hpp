@@ -214,20 +214,6 @@ public:
     /// situation where no interruption has occured.
     void clear_interrupt() noexcept;
 
-    /// Apply a changeset to the specified group.
-    ///
-    /// \param changeset The changes to be applied.
-    ///
-    /// \param group The destination group to apply the changeset to.
-    ///
-    /// \param logger If specified, and the library was compiled in debug mode,
-    /// then a line describing each individual operation is writted to the
-    /// specified logger.
-    ///
-    /// \throw BadTransactLog If the changeset could not be successfully parsed,
-    /// or ended prematurely.
-    static void apply_changeset(InputStream& changeset, Group& group, util::Logger* logger = nullptr);
-
     /// CAUTION: These values are stored in Realm files, so value reassignment
     /// is not allowed.
     enum HistoryType {
@@ -423,8 +409,6 @@ protected:
 
     virtual version_type prepare_changeset(const char* data, size_t size, version_type orig_version) = 0;
     virtual void finalize_changeset() noexcept = 0;
-
-    static void apply_changeset(const char* data, size_t size, DB& target, util::Logger* logger = nullptr);
 
     bool is_history_updated() const noexcept;
 

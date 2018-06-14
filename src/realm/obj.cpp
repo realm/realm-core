@@ -589,7 +589,7 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
         }
 
         if (recurse)
-            _impl::TableFriend::remove_recursive(*target_table, state);
+            target_table->remove_recursive(state);
     }
 
     return *this;

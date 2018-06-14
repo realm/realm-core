@@ -1,6 +1,6 @@
 # NEXT RELEASE
 
-This release also includes 5.6.0
+Besides the changes below, this release also includes changes introduced by v5.6.0 and v5.6.1
 
 ### Bugfixes
 
@@ -79,6 +79,24 @@ This release also includes 5.6.0
 
 * Major simplifications and optimizations to management of memory mappings.
 * Speed improvement for Sort().
+
+----------------------------------------------
+
+# 5.6.1 Release notes
+
+### Bugfixes
+
+* More readable error message in the query parser when requesting an a bad argument.
+* Don't write history information in `SharedGroup::compact()` for
+  non-syncronized Realms.
+
+-----------
+
+### Internals
+
+* Restore -fvisibility-inlines-hidden for the binaries for Apple platforms.
+* Remove a few warnings at compile time.
+* Improve error detection related to memory allocation/release
 
 ----------------------------------------------
 

@@ -755,7 +755,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
     m_coordination_dir = path + ".management";
     m_lockfile_path = path + ".lock";
     try_make_dir(m_coordination_dir);
-    m_key = options.encryption_key;
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     SlabAlloc& alloc = m_alloc;
     m_alloc.set_read_only(false);
@@ -1009,7 +1008,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             // close previously, but wasn't (perhaps due to the process crashing)
             cfg.clear_file = (options.durability == Durability::MemOnly && begin_new_session);
 
-            cfg.encryption_key = options.encryption_key;
+            cfg.encryption_key = m_key;
             ref_type top_ref;
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
@@ -1051,7 +1050,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 throw InvalidDatabase("Unsupported Realm file format version", path);
 
             target_file_format_version =
-                gf::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
+                Group::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
 
             if (begin_new_session) {
                 // Determine version (snapshot number) and check history
@@ -1106,7 +1105,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 if (Replication* repl = m_alloc.get_replication())
                     repl->initiate_session(version); // Throws
 
-                if (options.encryption_key) {
+                if (m_key) {
 #ifdef _WIN32
                     uint64_t pid = GetCurrentProcessId();
 #else
@@ -1155,7 +1154,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 uint64_t pid = getpid();
 #endif
 
-                if (options.encryption_key && info->session_initiator_pid != pid) {
+                if (m_key && info->session_initiator_pid != pid) {
                     std::stringstream ss;
                     ss << path << ": Encrypted interprocess sharing is currently unsupported."
                        << "SharedGroup has been opened by pid: " << info->session_initiator_pid << ". Current pid is "
@@ -1229,9 +1228,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 REALM_ASSERT(!info->sync_agent_present);
                 info->sync_agent_present = 1; // Set to true
             }
-
-            // Initially wait_for_change is enabled
-            m_wait_for_change_enabled = true;
 
             // Keep the mappings and file open:
             alloc_detach_guard.release();
@@ -1313,28 +1309,57 @@ void DB::open(Replication& repl, const DBOptions options)
 
 // WARNING / FIXME: compact() should NOT be exposed publicly on Windows because it's not crash safe! It may
 // corrupt your database if something fails
+
+// A note about lock ordering.
+// The local mutex, m_mutex, guards transaction start/stop and map/unmap of the lock file.
+// Except for compact(), open() and close(), it should only be held briefly.
+// The controlmutex guards operations which change the file size, session initialization
+// and session exit.
+// The writemutex guards the integrity of the (write) transaction data.
+// The controlmutex and writemutex resides in the .lock file and thus requires
+// the mapping of the .lock file to work. A straightforward approach would be to lock
+// the m_mutex whenever the other mutexes are taken or released...but that would be too
+// bad for performance of transaction start/stop.
+//
+// The locks are to be taken in this order: writemutex->controlmutex->m_mutex
+//
+// The .lock file is mapped during DB::create() and unmapped by a call to DB::close().
+// Once unmapped, it is never mapped again. Hence any observer with a valid DBRef may
+// only see the transition from mapped->unmapped, never the opposite.
+//
+// Trying to create a transaction if the .lock file is unmapped will result in an assert.
+// Unmapping (during close()) while transactions are live, is not considered an error. There
+// is a potential race between unmapping during close() and any operation carried out by a live
+// transaction. The user must ensure that this race never happens if she uses DB::close().
 bool DB::compact()
 {
-    // Verify that the database file is attached
+    std::string tmp_path = m_db_path + ".tmp_compaction_space";
+
+    // To enter compact, the DB object must already have been attached to a file,
+    // since this happens in DB::create().
+
+    // Verify that the lock file is still attached. There is no attempt to guard against
+    // a race between close() and compact().
     if (is_attached() == false) {
         throw std::runtime_error(m_db_path + ": compact must be done on an open/attached DB");
     }
-    Durability dura;
-    std::string tmp_path = m_db_path + ".tmp_compaction_space";
     {
-        // local lock blocking any transaction from leaving or entering
-        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
-
-        // We should be the only transaction active - otherwise back out
-        if (m_transaction_count != 0)
-            return false;
-
         SharedInfo* info = m_file_map.get_addr();
         std::unique_lock<InterprocessMutex> lock(m_controlmutex); // Throws
 
         // We must be the ONLY DB object attached if we're to do compaction
         if (info->num_participants > 1)
             return false;
+
+        // Holding the controlmutex prevents any other DB from attaching to the file.
+
+        // local lock blocking any transaction from starting (and stopping)
+        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+
+        // We should be the only transaction active - otherwise back out
+        if (m_transaction_count != 0)
+            return false;
+
         // group::write() will throw if the file already exists.
         // To prevent this, we have to remove the file (should it exist)
         // before calling group::write().
@@ -1370,7 +1395,6 @@ bool DB::compact()
             REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
             static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
         }
-        dura = Durability(info->durability);
         // We need to release any shared mapping *before* releasing the control mutex.
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
@@ -1382,15 +1406,25 @@ bool DB::compact()
         util::File::move(tmp_path, m_db_path);
 #endif
         tr->close();
-        close_internal(/* with lock held: */ std::move(lock));
-        // release local lock here.
-    }
-    DBOptions new_options;
-    new_options.durability = dura;
-    new_options.encryption_key = m_key;
-    new_options.allow_file_format_upgrade = false;
-    do_open(m_db_path, true, false, new_options);
+        if (auto repl = m_alloc.get_replication())
+            repl->initialize(*this);
 
+        SlabAlloc::Config cfg;
+        cfg.session_initiator = true;
+        cfg.is_shared = true;
+        cfg.read_only = false;
+        cfg.skip_validate = false;
+        cfg.no_create = true;
+        cfg.clear_file = false;
+        cfg.encryption_key = m_key;
+        ref_type top_ref;
+        top_ref = m_alloc.attach_file(m_db_path, cfg);
+        info->number_of_versions = 1;
+        // info->latest_version_number is unchanged
+        SharedInfo* r_info = m_reader_map.get_addr();
+        size_t file_size = m_alloc.get_baseline();
+        r_info->init_versioning(top_ref, file_size, info->latest_version_number);
+    }
     return true;
 }
 
@@ -1416,10 +1450,6 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
     if (!is_attached())
         return;
 
-    std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
-
-    // All transactions must be closed when reaching this point.
-    REALM_ASSERT(m_transaction_count == 0);
     SharedInfo* info = m_file_map.get_addr();
     {
         bool is_sync_agent = false;
@@ -1456,21 +1486,26 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock) noexcept
         }
         lock.unlock();
     }
-#ifdef REALM_ASYNC_DAEMON
-    m_room_to_write.close();
-    m_work_to_do.close();
-    m_daemon_becomes_ready.close();
-#endif
-    m_new_commit_available.close();
-    m_pick_next_writer.close();
+    {
+        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
 
-    // On Windows it is important that we unmap before unlocking, else a SetEndOfFile() call from another thread may
-    // interleave which is not permitted on Windows. It is permitted on *nix.
-    m_file_map.unmap();
-    m_reader_map.unmap();
-    m_file.unlock();
-    // info->~SharedInfo(); // DO NOT Call destructor
-    m_file.close();
+#ifdef REALM_ASYNC_DAEMON
+        m_room_to_write.close();
+        m_work_to_do.close();
+        m_daemon_becomes_ready.close();
+#endif
+        m_new_commit_available.close();
+        m_pick_next_writer.close();
+
+        // On Windows it is important that we unmap before unlocking, else a SetEndOfFile() call from another thread
+        // may
+        // interleave which is not permitted on Windows. It is permitted on *nix.
+        m_file_map.unmap();
+        m_reader_map.unmap();
+        m_file.unlock();
+        // info->~SharedInfo(); // DO NOT Call destructor
+        m_file.close();
+    }
 }
 
 bool DB::has_changed(TransactionRef tr)
@@ -1650,7 +1685,6 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
     // in a fully reliable way inside a transaction.
 
     // First a non-threadsafe but fast check
-    using gf = _impl::GroupFriend;
     int current_file_format_version = m_file_format_version;
     REALM_ASSERT(current_file_format_version <= target_file_format_version);
     REALM_ASSERT(current_hist_schema_version <= target_hist_schema_version);
@@ -1702,7 +1736,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
             // If somebody else has already performed the upgrade, we still need
             // to inform the rest of the core library about the new file format
             // of the attached file.
-            gf::set_file_format_version(*wt, target_file_format_version);
+            wt->set_file_format_version(target_file_format_version);
         }
 
         // History schema upgrade
@@ -1718,7 +1752,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
                 throw FileFormatUpgradeRequired();
             Replication* repl = get_replication();
             repl->upgrade_history_schema(current_hist_schema_version_2);     // Throws
-            gf::set_history_schema_version(*wt, target_hist_schema_version); // Throws
+            wt->set_history_schema_version(target_hist_schema_version);      // Throws
             dirty = true;
         }
 
@@ -2074,58 +2108,62 @@ void DB::low_level_commit(uint_fast64_t new_version, Group& group)
         std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
         new_top_ref = out.write_group();                         // Throws
     }
-    // protect access to shared variables and m_reader_mapping from here
-    std::lock_guard<std::recursive_mutex> lock_guard(m_mutex);
-    m_free_space = out.get_free_space();
-    m_used_space = out.get_file_size() - m_free_space;
-    // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
-    //     << " Read lock at version " << oldest_version << std::endl;
-    switch (Durability(info->durability)) {
-        case Durability::Full:
-            out.commit(new_top_ref); // Throws
-            break;
-        case Durability::MemOnly:
-        case Durability::Async:
-            // In Durability::MemOnly mode, we just use the file as backing for
-            // the shared memory. So we never actually flush the data to disk
-            // (the OS may do so opportinisticly, or when swapping). So in this
-            // mode the file on disk may very likely be in an invalid state.
-            break;
-    }
-    size_t new_file_size = out.get_file_size();
-    // We must reset the allocators free space tracking before communicating the new
-    // version through the ring buffer. If not, a reader may start updating the allocators
-    // mappings while the allocator is in dirty state.
-    reset_free_space_tracking();
-    // Update reader info. If this fails in any way, the ringbuffer may be corrupted.
-    // This can lead to other readers seing invalid data which is likely to cause them
-    // to crash. Other writers *must* be prevented from writing any further updates
-    // to the database. The flag "commit_in_critical_phase" is used to prevent such updates.
-    info->commit_in_critical_phase = 1;
     {
-        SharedInfo* r_info = m_reader_map.get_addr();
-        if (r_info->readers.is_full()) {
-            // buffer expansion
-            uint_fast32_t entries = r_info->readers.get_num_entries();
-            entries = entries + 32;
-            size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(entries);
-            // std::cout << "resizing: " << entries << " = " << new_info_size << std::endl;
-            m_file.prealloc(new_info_size);                                          // Throws
-            m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
-            r_info = m_reader_map.get_addr();
-            m_local_max_entry = entries;
-            r_info->readers.expand_to(entries);
+        // protect access to shared variables and m_reader_mapping from here
+        std::lock_guard<std::recursive_mutex> lock_guard(m_mutex);
+        m_free_space = out.get_free_space();
+        m_used_space = out.get_file_size() - m_free_space;
+        // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
+        //     << " Read lock at version " << oldest_version << std::endl;
+        switch (Durability(info->durability)) {
+            case Durability::Full:
+                out.commit(new_top_ref); // Throws
+                break;
+            case Durability::MemOnly:
+            case Durability::Async:
+                // In Durability::MemOnly mode, we just use the file as backing for
+                // the shared memory. So we never actually flush the data to disk
+                // (the OS may do so opportinisticly, or when swapping). So in this
+                // mode the file on disk may very likely be in an invalid state.
+                break;
         }
-        Ringbuffer::ReadCount& r = r_info->readers.get_next();
-        r.current_top = new_top_ref;
-        r.filesize = new_file_size;
-        r.version = new_version;
-        r_info->readers.use_next();
+        size_t new_file_size = out.get_file_size();
+        // We must reset the allocators free space tracking before communicating the new
+        // version through the ring buffer. If not, a reader may start updating the allocators
+        // mappings while the allocator is in dirty state.
+        reset_free_space_tracking();
+        // Update reader info. If this fails in any way, the ringbuffer may be corrupted.
+        // This can lead to other readers seing invalid data which is likely to cause them
+        // to crash. Other writers *must* be prevented from writing any further updates
+        // to the database. The flag "commit_in_critical_phase" is used to prevent such updates.
+        info->commit_in_critical_phase = 1;
+        {
+            SharedInfo* r_info = m_reader_map.get_addr();
+            if (r_info->readers.is_full()) {
+                // buffer expansion
+                uint_fast32_t entries = r_info->readers.get_num_entries();
+                entries = entries + 32;
+                size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(entries);
+                // std::cout << "resizing: " << entries << " = " << new_info_size << std::endl;
+                m_file.prealloc(new_info_size);                                          // Throws
+                m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
+                r_info = m_reader_map.get_addr();
+                m_local_max_entry = entries;
+                r_info->readers.expand_to(entries);
+            }
+            Ringbuffer::ReadCount& r = r_info->readers.get_next();
+            r.current_top = new_top_ref;
+            r.filesize = new_file_size;
+            r.version = new_version;
+            r_info->readers.use_next();
+        }
+        // At this point, the ringbuffer has been succesfully updated, and the next writer
+        // can safely proceed once the writemutex has been lifted.
+        info->commit_in_critical_phase = 0;
     }
-    // At this point, the ringbuffer has been succesfully updated, and the next writer
-    // can safely proceed once the writemutex has been lifted.
-    info->commit_in_critical_phase = 0;
     {
+        // protect against concurrent updates to the .lock file.
+        // must release m_mutex before this point to obey lock order
         std::lock_guard<InterprocessMutex> lock(m_controlmutex);
         info->number_of_versions = new_version - oldest_version + 1;
         info->latest_version_number = new_version;
@@ -2229,6 +2267,9 @@ void Transaction::end_read()
     detach();
     db->release_read_lock(m_read_lock);
     set_transact_stage(DB::transact_Ready);
+    // reset the std::shared_ptr to allow the DB object to release resources
+    // as early as possible.
+    db.reset();
 }
 
 TransactionRef Transaction::freeze()
@@ -2296,6 +2337,8 @@ DB::version_type Transaction::commit()
 
 Transaction::~Transaction()
 {
+    // Note that this does not call close() - calling close() is done
+    // implicitly by the deleter.
 }
 
 
@@ -2397,16 +2440,32 @@ std::unique_ptr<ConstTableView> Transaction::import_copy_of(ConstTableView& tv, 
     return tv.clone_for_handover(this, policy);
 }
 
+inline DB::DB(const DBOptions& options)
+    : m_key(options.encryption_key)
+    , m_upgrade_callback(std::move(options.upgrade_callback))
+{
+}
+
+namespace {
+class DBInit : public DB {
+public:
+    explicit DBInit(const DBOptions& options)
+        : DB(options)
+    {
+    }
+};
+}
+
 DBRef DB::create(const std::string& file, bool no_create, const DBOptions options)
 {
-    DBRef retval = std::make_shared<DB>(PrivateKey());
+    DBRef retval = std::make_shared<DBInit>(options);
     retval->open(file, no_create, options);
     return retval;
 }
 
 DBRef DB::create(Replication& repl, const DBOptions options)
 {
-    DBRef retval = std::make_shared<DB>(PrivateKey());
+    DBRef retval = std::make_shared<DBInit>(options);
     retval->open(repl, options);
     return retval;
 }

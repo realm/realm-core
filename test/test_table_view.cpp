@@ -1941,7 +1941,7 @@ struct DistinctDirect {
         std::vector<std::vector<ColKey>> column_indices;
         for (ColKey col : columns)
             column_indices.push_back({col});
-        return SortDescriptor(table, column_indices, ascending);
+        return SortDescriptor(column_indices, ascending);
     }
 
     DistinctDescriptor get_distinct(std::initializer_list<ColKey> columns) const
@@ -1949,7 +1949,7 @@ struct DistinctDirect {
         std::vector<std::vector<ColKey>> column_indices;
         for (ColKey col : columns)
             column_indices.push_back({col});
-        return DistinctDescriptor(table, column_indices);
+        return DistinctDescriptor(column_indices);
     }
 
     ObjKey get_key(const TableView& tv, size_t ndx) const
@@ -1982,7 +1982,7 @@ struct DistinctOverLink {
         std::vector<std::vector<ColKey>> column_indices;
         for (ColKey col : columns)
             column_indices.push_back({m_col_link, col});
-        return SortDescriptor(table, column_indices, ascending);
+        return SortDescriptor(column_indices, ascending);
     }
 
     DistinctDescriptor get_distinct(std::initializer_list<ColKey> columns) const
@@ -1990,7 +1990,7 @@ struct DistinctOverLink {
         std::vector<std::vector<ColKey>> column_indices;
         for (ColKey col : columns)
             column_indices.push_back({m_col_link, col});
-        return DistinctDescriptor(table, column_indices);
+        return DistinctDescriptor(column_indices);
     }
 
     ObjKey get_key(const TableView& tv, size_t ndx) const
@@ -2156,7 +2156,7 @@ TEST(TableView_DistinctOverNullLink)
     origin->create_object(); // link is null
 
     auto tv = origin->where().find_all();
-    tv.distinct(DistinctDescriptor(*origin, {{col_link, col_int}}));
+    tv.distinct(DistinctDescriptor({{col_link, col_int}}));
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get(0).get_linked_object(col_link).get<Int>(col_int), 0);
     CHECK_EQUAL(tv.get(1).get_linked_object(col_link).get<Int>(col_int), 1);
@@ -3421,7 +3421,7 @@ TEST(TableView_RemoveColumnsAfterSort)
         table.create_object().set(col_int, i);
     }
 
-    SortDescriptor desc(table, {{col_int}}, {false}); // sort by the one column in descending order
+    SortDescriptor desc({{col_int}}, {false}); // sort by the one column in descending order
 
     table.remove_column(col_str0);
     auto tv = table.get_sorted_view(desc);

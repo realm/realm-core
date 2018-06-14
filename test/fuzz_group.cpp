@@ -320,21 +320,14 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             }
             else if (instr == CREATE_OBJECT && wt->size() > 0) {
                 TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
-                if (wt->get_table(table_key)->get_column_count() == 0) {
-                    continue; // do not insert rows if there are no columns
-                }
                 size_t num_rows = get_next(s);
                 if (wt->get_table(table_key)->size() + num_rows < max_rows) {
-                    typedef _impl::TableFriend tf;
-                    if (wt->get_table(table_key)->get_column_count() > 0 ||
-                        tf::is_cross_table_link_target(*wt->get_table(table_key))) {
-                        if (log) {
-                            *log << "{ std::vector<ObjKey> keys; wt->get_table(" << table_key << ")->create_objects("
-                                 << num_rows % add_empty_row_max << ", keys); }\n";
-                        }
-                        std::vector<ObjKey> keys;
-                        wt->get_table(table_key)->create_objects(num_rows % add_empty_row_max, keys);
+                    if (log) {
+                        *log << "{ std::vector<ObjKey> keys; wt->get_table(" << table_key << ")->create_objects("
+                             << num_rows % add_empty_row_max << ", keys); }\n";
                     }
+                    std::vector<ObjKey> keys;
+                    wt->get_table(table_key)->create_objects(num_rows % add_empty_row_max, keys);
                 }
             }
             else if (instr == ADD_COLUMN && wt->size() > 0) {

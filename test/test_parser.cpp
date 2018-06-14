@@ -1177,8 +1177,14 @@ TEST(Parser_substitution)
     // double digit index
     verify_query_sub(test_context, t, "age == $10", args, num_args, 1);
 
+    std::string message;
     // referencing a parameter outside of the list size throws
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $0", args, /*num_args*/ 0, 0));
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $0", args, /*num_args*/ 0, 0), message);
+    CHECK_EQUAL(message, "Request for argument at index 0 but no arguments are provided");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $1", args, /*num_args*/ 1, 0), message);
+    CHECK_EQUAL(message, "Request for argument at index 1 but only 1 argument is provided");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $2", args, /*num_args*/ 2, 0), message);
+    CHECK_EQUAL(message, "Request for argument at index 2 but only 2 arguments are provided");
 
     // invalid types
     // int
@@ -1554,7 +1560,7 @@ TEST(Parser_SortAndDistinctSerialisation)
     TableView tv = people->where().find_all();
     tv.sort(name_col, false);
     tv.sort(age_col, true);
-    tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
+    tv.sort(SortDescriptor({{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
     std::string description = tv.get_descriptor_ordering_description();
     CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC, age ASC, name DESC)") != std::string::npos);
 
@@ -1562,14 +1568,14 @@ TEST(Parser_SortAndDistinctSerialisation)
     tv = people->where().find_all();
     tv.distinct(name_col);
     tv.distinct(age_col);
-    tv.distinct(DistinctDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}));
+    tv.distinct(DistinctDescriptor({{account_col, balance_col}, {account_col, transaction_col}}));
     description = tv.get_descriptor_ordering_description();
     CHECK(description.find("DISTINCT(name) DISTINCT(age) DISTINCT(account.balance, account.num_transactions)") != std::string::npos);
 
     // combined sort and distinct serialisation
     tv = people->where().find_all();
-    tv.distinct(DistinctDescriptor(*people, {{name_col}, {age_col}}));
-    tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
+    tv.distinct(DistinctDescriptor({{name_col}, {age_col}}));
+    tv.sort(SortDescriptor({{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
     description = tv.get_descriptor_ordering_description();
     CHECK(description.find("DISTINCT(name, age)") != std::string::npos);
     CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC)") != std::string::npos);

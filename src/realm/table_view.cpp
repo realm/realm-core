@@ -529,7 +529,7 @@ void TableView::clear()
 
 void ConstTableView::distinct(ColKey column)
 {
-    distinct(DistinctDescriptor(*m_table, {{column}}));
+    distinct(DistinctDescriptor({{column}}));
 }
 
 /// Remove rows that are duplicated with respect to the column set passed as argument.
@@ -554,7 +554,7 @@ std::string ConstTableView::get_descriptor_ordering_description() const
 // Sort according to one column
 void ConstTableView::sort(ColKey column, bool ascending)
 {
-    sort(SortDescriptor(*m_table, {{column}}, {ascending}));
+    sort(SortDescriptor({{column}}, {ascending}));
 }
 
 // Sort according to multiple columns, user specified order on each column
