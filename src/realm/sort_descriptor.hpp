@@ -67,10 +67,8 @@ public:
 
     class Sorter {
     public:
-        Sorter(std::vector<std::vector<ColKey>> const& columns,
-               std::vector<bool> const& ascending,
-               Table const& root_table,
-               KeyColumn const& row_indexes);
+        Sorter(std::vector<std::vector<ColKey>> const& columns, std::vector<bool> const& ascending,
+               Table const& root_table, KeyColumn const& row_indexes);
         Sorter()
         {
         }
@@ -129,8 +127,7 @@ public:
     // See CommonDescriptor for restrictions on `column_keys`.
     // The sort order can be specified by using `ascending` which must either be
     // empty or have one entry for each column index chain.
-    SortDescriptor(std::vector<std::vector<ColKey>> column_indices,
-                   std::vector<bool> ascending = {});
+    SortDescriptor(std::vector<std::vector<ColKey>> column_indices, std::vector<bool> ascending = {});
     SortDescriptor() = default;
     ~SortDescriptor() = default;
     std::unique_ptr<CommonDescriptor> clone() const override;
