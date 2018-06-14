@@ -283,7 +283,7 @@ void CollectionChangeBuilder::verify()
 
 namespace {
 struct RowInfo {
-    size_t row_index;
+    int64_t obj_key;
     size_t prev_tv_index;
     size_t tv_index;
     size_t shifted_tv_index;
@@ -320,7 +320,7 @@ void calculate_moves_unsorted(std::vector<RowInfo>& new_rows, IndexSet& removed,
         // First check if this row even could have moved. If it can't, just
         // treat it as a match and move on, and we'll handle the row we were
         // expecting when we hit it later.
-        if (!move_candidates.contains(row.row_index)) {
+        if (!move_candidates.contains(row.obj_key)) {
             expected = row.shifted_tv_index + 1;
             continue;
         }
@@ -344,9 +344,9 @@ void calculate_moves_unsorted(std::vector<RowInfo>& new_rows, IndexSet& removed,
 
 class LongestCommonSubsequenceCalculator {
 public:
-    // A pair of an index in the table and an index in the table view
+    // A pair of an object key and an index in the table view
     struct Row {
-        size_t row_index;
+        int64_t obj_key;
         size_t tv_index;
     };
 
@@ -377,7 +377,7 @@ private:
     IndexSet const& m_modified;
 
     // The two arrays of rows being diffed
-    // a is sorted by tv_index, b is sorted by row_index
+    // a is sorted by tv_index, b is sorted by obj_key
     std::vector<Row> &a, &b;
 
     // Find the longest matching range in (a + begin1, a + end1) and (b + begin2, b + end2)
@@ -412,14 +412,14 @@ private:
         // Iterate over each `j` which has the same row index as a[i] and falls
         // within the range begin2 <= j < end2
         auto for_each_b_match = [&](size_t i, auto&& f) {
-            size_t ai = a[i].row_index;
+            auto ai = a[i].obj_key;
             // Find the TV indicies at which this row appears in the new results
             // There should always be at least one (or it would have been
             // filtered out earlier), but there can be multiple if there are dupes
             auto it = lower_bound(begin(b), end(b), ai,
-                                  [](auto lft, auto rgt) { return lft.row_index < rgt; });
-            REALM_ASSERT(it != end(b) && it->row_index == ai);
-            for (; it != end(b) && it->row_index == ai; ++it) {
+                                  [](auto lft, auto rgt) { return lft.obj_key < rgt; });
+            REALM_ASSERT(it != end(b) && it->obj_key == ai);
+            for (; it != end(b) && it->obj_key == ai; ++it) {
                 size_t j = it->tv_index;
                 if (j < begin2)
                     continue;
@@ -488,17 +488,17 @@ void calculate_moves_sorted(std::vector<RowInfo>& rows, CollectionChangeSet& cha
 
     a.reserve(rows.size());
     for (auto& row : rows) {
-        a.push_back({row.row_index, row.prev_tv_index});
+        a.push_back({row.obj_key, row.prev_tv_index});
     }
     std::sort(begin(a), end(a), [](auto lft, auto rgt) {
-        return std::tie(lft.tv_index, lft.row_index) < std::tie(rgt.tv_index, rgt.row_index);
+        return std::tie(lft.tv_index, lft.obj_key) < std::tie(rgt.tv_index, rgt.obj_key);
     });
 
     // Before constructing `b`, first find the first index in `a` which will
     // actually differ in `b`, and skip everything else if there aren't any
     size_t first_difference = IndexSet::npos;
     for (size_t i = 0; i < a.size(); ++i) {
-        if (a[i].row_index != rows[i].row_index) {
+        if (a[i].obj_key != rows[i].obj_key) {
             first_difference = i;
             break;
         }
@@ -506,12 +506,12 @@ void calculate_moves_sorted(std::vector<RowInfo>& rows, CollectionChangeSet& cha
     if (first_difference == IndexSet::npos)
         return;
 
-    // Note that `b` is sorted by row_index, while `a` is sorted by tv_index
+    // Note that `b` is sorted by obj_key, while `a` is sorted by tv_index
     b.reserve(rows.size());
     for (size_t i = 0; i < rows.size(); ++i)
-        b.push_back({rows[i].row_index, i});
+        b.push_back({rows[i].obj_key, i});
     std::sort(begin(b), end(b), [](auto lft, auto rgt) {
-        return std::tie(lft.row_index, lft.tv_index) < std::tie(rgt.row_index, rgt.tv_index);
+        return std::tie(lft.obj_key, lft.tv_index) < std::tie(rgt.obj_key, rgt.tv_index);
     });
 
     // Calculate the LCS of the two sequences
@@ -553,7 +553,7 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<int64_t> 
             old_rows.push_back({prev_rows[i], IndexSet::npos, i, i - deleted});
     }
     std::sort(begin(old_rows), end(old_rows), [](auto& lft, auto& rgt) {
-        return lft.row_index < rgt.row_index;
+        return lft.obj_key < rgt.obj_key;
     });
 
     std::vector<RowInfo> new_rows;
@@ -562,7 +562,7 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<int64_t> 
         new_rows.push_back({next_rows[i], IndexSet::npos, i, 0});
     }
     std::sort(begin(new_rows), end(new_rows), [](auto& lft, auto& rgt) {
-        return lft.row_index < rgt.row_index;
+        return lft.obj_key < rgt.obj_key;
     });
 
     // Don't add rows which were modified to not match the query to `deletions`
@@ -570,20 +570,20 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<int64_t> 
     // distinguish them from rows which were outright deleted
     IndexSet removed;
 
-    // Now that our old and new sets of rows are sorted by row index, we can
+    // Now that our old and new sets of rows are sorted by key, we can
     // iterate over them and either record old+new TV indices for rows present
     // in both, or mark them as inserted/deleted if they appear only in one
     size_t i = 0, j = 0;
     while (i < old_rows.size() && j < new_rows.size()) {
         auto old_index = old_rows[i];
         auto new_index = new_rows[j];
-        if (old_index.row_index == new_index.row_index) {
+        if (old_index.obj_key == new_index.obj_key) {
             new_rows[j].prev_tv_index = old_rows[i].tv_index;
             new_rows[j].shifted_tv_index = old_rows[i].shifted_tv_index;
             ++i;
             ++j;
         }
-        else if (old_index.row_index < new_index.row_index) {
+        else if (old_index.obj_key < new_index.obj_key) {
             removed.add(old_index.tv_index);
             ++i;
         }
@@ -607,7 +607,7 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<int64_t> 
               [](auto& lft, auto& rgt) { return lft.tv_index < rgt.tv_index; });
 
     for (auto& row : new_rows) {
-        if (row_did_change(row.row_index)) {
+        if (row_did_change(row.obj_key)) {
             ret.modifications.add(row.tv_index);
         }
     }
