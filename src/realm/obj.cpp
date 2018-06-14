@@ -849,6 +849,13 @@ inline void Obj::do_set_null(size_t col_ndx)
 Obj& Obj::set_null(ColKey col_key, bool is_default)
 {
     size_t col_ndx = get_table()->colkey2ndx(col_key);
+    ColumnType col_type = get_spec().get_column_type(col_ndx);
+
+    // Links need special handling
+    if (col_type == col_type_Link) {
+        return set(col_key, null_key);
+    }
+
     if (REALM_UNLIKELY(col_ndx > get_spec().get_public_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
     if (REALM_UNLIKELY(!get_spec().get_column_attr(col_ndx).test(col_attr_Nullable))) {
@@ -862,7 +869,7 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
         index->set(m_key, null{});
     }
 
-    switch (get_spec().get_column_type(col_ndx)) {
+    switch (col_type) {
         case col_type_Int:
             do_set_null<ArrayIntNull>(col_ndx);
             break;
@@ -883,9 +890,6 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
             break;
         case col_type_Timestamp:
             do_set_null<ArrayTimestamp>(col_ndx);
-            break;
-        case col_type_Link:
-            do_set_null<ArrayKey>(col_ndx);
             break;
         default:
             break;
