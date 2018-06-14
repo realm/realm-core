@@ -281,6 +281,12 @@ public:
     {
         for (auto& list : m_info.lists)
             list.changes->clean_up_stale_moves();
+        for (auto it = m_info.tables.begin(); it != m_info.tables.end(); ) {
+            if (it->second.empty())
+                it = m_info.tables.erase(it);
+            else
+                ++it;
+        }
     }
 
     bool select_table(TableKey key) noexcept
@@ -360,9 +366,10 @@ public:
     {
         if (!m_active_table)
             return true;
+        if (!m_active_table->insertions.contains(key.value))
+            m_active_table->deletions.add(key.value);
         m_active_table->insertions.remove(key.value);
         m_active_table->modifications.remove(key.value);
-        m_active_table->deletions.add(key.value);
 
         for (size_t i = 0; i < m_info.lists.size(); ++i) {
             auto& list = m_info.lists[i];
@@ -379,10 +386,10 @@ public:
         return true;
     }
 
-    bool modify_object(ColKey, ObjKey key)
+    bool modify_object(ColKey col, ObjKey key)
     {
         if (m_active_table)
-            m_active_table->modifications.add(key.value);
+            m_active_table->modify(key.value, col.value);
         return true;
     }
 

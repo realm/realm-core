@@ -22,6 +22,7 @@
 #include "util/test_file.hpp"
 
 #include "impl/collection_notifier.hpp"
+#include "impl/realm_coordinator.hpp"
 #include "impl/transact_log_handler.hpp"
 #include "binding_context.hpp"
 #include "property.hpp"
@@ -126,6 +127,7 @@ private:
         }
     }
 };
+#endif
 
 struct ArrayChange {
     BindingContext::ColumnInfo::Kind kind;
@@ -164,22 +166,23 @@ struct StringMaker<ArrayChange> {
 
 class KVOContext : public BindingContext {
 public:
-    KVOContext(std::initializer_list<Row> rows)
+    KVOContext(std::initializer_list<Obj> objects)
     {
-        m_result.reserve(rows.size());
-        for (auto& row : rows) {
-            m_result.push_back(ObserverState{row.get_table()->get_index_in_group(),
-                row.get_index(), (void *)(uintptr_t)m_result.size()});
+        m_result.reserve(objects.size());
+        for (auto& obj : objects) {
+            m_result.push_back(ObserverState{obj.get_table()->get_key().value,
+                obj.get_key().value, (void *)(uintptr_t)m_result.size()});
         }
     }
 
-    bool modified(size_t index, size_t col) const noexcept
+    bool modified(size_t index, int64_t col_key) const noexcept
     {
         auto it = std::find_if(begin(m_result), end(m_result),
                                [=](auto&& change) { return (void *)(uintptr_t)index == change.info; });
-        if (it == m_result.end() || col >= it->changes.size())
+        if (it == m_result.end())
             return false;
-        return it->changes[col].kind != BindingContext::ColumnInfo::Kind::None;
+        auto col = it->changes.find(col_key);
+        return col != it->changes.end() && col->second.kind != BindingContext::ColumnInfo::Kind::None;
     }
 
     bool invalidated(size_t index) const noexcept
@@ -187,23 +190,13 @@ public:
         return std::find(begin(m_invalidated), end(m_invalidated), (void *)(uintptr_t)index) != end(m_invalidated);
     }
 
-
-    ArrayChange array_change(size_t index, size_t col) const noexcept
+    ArrayChange array_change(size_t index, int64_t col_key) const noexcept
     {
         auto& changes = m_result[index].changes;
-        if (changes.size() <= col)
-            return {ColumnInfo::Kind::None, {}};
-        auto& column = changes[col];
-        return {column.kind, column.indices};
-    }
-
-    size_t initial_column_index(size_t index, size_t col) const noexcept
-    {
-        auto it = std::find_if(begin(m_result), end(m_result),
-                               [=](auto&& change) { return (void *)(uintptr_t)index == change.info; });
-        if (it == m_result.end() || col >= it->changes.size())
-            return npos;
-        return it->changes[col].initial_column_index;
+        auto col = changes.find(col_key);
+        return col == changes.end()
+            ? ArrayChange{ColumnInfo::Kind::None, {}}
+            : ArrayChange{col->second.kind, col->second.indices};
     }
 
 private:
@@ -222,7 +215,6 @@ private:
         m_result = observers;
     }
 };
-#endif
 
 TEST_CASE("Transaction log parsing: schema change validation") {
     InMemoryTestFile config;
@@ -276,7 +268,6 @@ TEST_CASE("Transaction log parsing: schema change validation") {
     }
 }
 
-#if 0
 TEST_CASE("Transaction log parsing: changeset calcuation") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -291,203 +282,93 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         });
 
         auto& table = *r->read_group().get_table("class_table");
+        int64_t table_key = table.get_key().value;
+        auto cols = table.get_column_keys();
 
         r->begin_transaction();
-        table.add_empty_row(10);
-        for (int i = 9; i >= 0; --i) {
-            table.set_int_unique(0, i, i);
-            table.set_int(1, i, i);
-        }
+        std::vector<ObjKey> objects;
+        table.create_objects(10, objects);
+        for (int i = 0; i < 10; ++i)
+            table.get_object(objects[i]).set_all(i, i);
         r->commit_transaction();
 
-        auto track_changes = [&](std::vector<bool> tables_needed, auto&& f) {
-            auto history = make_in_realm_history(config.path);
-            Transaction sg(*history, config.options());
-            sg.begin_read();
+        auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
+        auto track_changes = [&](std::vector<int64_t> tables_needed, auto&& f) {
+            auto sg = coordinator->begin_read();
 
             r->begin_transaction();
             f();
             r->commit_transaction();
 
             _impl::TransactionChangeInfo info{};
-            info.table_modifications_needed = tables_needed;
-            info.table_moves_needed = tables_needed;
-            _impl::transaction::advance(sg, info);
+            for (auto table : tables_needed)
+                info.tables[table];
+            _impl::transaction::advance(static_cast<Transaction&>(*sg), info);
             return info;
         };
 
         SECTION("modifying a row marks it as modified") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.set_int(0, 1, 2);
+            auto info = track_changes({table_key}, [&] {
+                table.get_object(objects[1]).set(cols[1], 2);
             });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE_INDICES(info.tables[2].modifications, 1);
+            REQUIRE(info.tables.size() == 1);
+            REQUIRE_INDICES(info.tables[table_key].modifications, 1);
         }
 
         SECTION("modifications to untracked tables are ignored") {
-            auto info = track_changes({false, false, false}, [&] {
-                table.set_int(0, 1, 2);
+            auto info = track_changes({}, [&] {
+                table.get_object(objects[1]).set(cols[1], 2);
             });
             REQUIRE(info.tables.empty());
         }
 
         SECTION("new row additions are reported") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.add_empty_row();
-                table.add_empty_row();
+            auto info = track_changes({table_key}, [&] {
+                table.create_object();
+                table.create_object();
             });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE_INDICES(info.tables[2].insertions, 10, 11);
+            REQUIRE(info.tables.size() == 1);
+            REQUIRE_INDICES(info.tables[table_key].insertions, 10, 11);
         }
 
         SECTION("deleting newly added rows makes them not be reported") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.add_empty_row();
-                table.add_empty_row();
-                table.move_last_over(11);
+            auto info = track_changes({table_key}, [&] {
+                table.create_object();
+                table.remove_object(table.create_object().get_key());
             });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE_INDICES(info.tables[2].insertions, 10);
-            REQUIRE(info.tables[2].deletions.empty());
+            REQUIRE(info.tables.size() == 1);
+            REQUIRE_INDICES(info.tables[table_key].insertions, 10);
+            REQUIRE(info.tables[table_key].deletions.empty());
         }
 
         SECTION("modifying newly added rows is reported as a modification") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.add_empty_row();
-                table.set_int(0, 10, 10);
+            auto info = track_changes({table_key}, [&] {
+                table.create_object().set_all(10, 0);
             });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE_INDICES(info.tables[2].insertions, 10);
-            REQUIRE_INDICES(info.tables[2].modifications, 10);
+            REQUIRE(info.tables.size() == 1);
+            REQUIRE_INDICES(info.tables[table_key].insertions, 10);
+            REQUIRE_INDICES(info.tables[table_key].modifications, 10);
         }
 
-        SECTION("adding a new row with primary key set is not reported as a modification") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.add_row_with_key(0, 10);
-            });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE_INDICES(info.tables[2].insertions, 10);
-            REQUIRE(info.tables[2].modifications.empty());
-        }
-
+#if 0
         SECTION("move_last_over() does not shift rows other than the last one") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.move_last_over(2);
-                table.move_last_over(3);
+            auto info = track_changes({table_key}, [&] {
+                table.remove_object(objects[2]);
+                table.remove_object(objects[3]);
             });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE_INDICES(info.tables[2].deletions, 2, 3, 8, 9);
-            REQUIRE_INDICES(info.tables[2].insertions, 2, 3);
-            REQUIRE_MOVES(info.tables[2], {8, 3}, {9, 2});
+            REQUIRE(info.tables.size() == 1);
+            REQUIRE_INDICES(info.tables[table_key].deletions, 2, 3, 8, 9);
+            REQUIRE_INDICES(info.tables[table_key].insertions, 2, 3);
+            REQUIRE_MOVES(info.tables[table_key], {8, 3}, {9, 2});
         }
-
-        SECTION("inserting new tables does not distrupt change tracking") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.add_empty_row();
-                r->read_group().insert_table(0, "new table");
-                table.add_empty_row();
-            });
-            REQUIRE(info.tables.size() == 4);
-            REQUIRE_INDICES(info.tables[3].insertions, 10, 11);
-        }
-
-        SECTION("swap_rows() reports a pair of moves") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.swap_rows(1, 5);
-            });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE_INDICES(info.tables[2].deletions, 1, 5);
-            REQUIRE_INDICES(info.tables[2].insertions, 1, 5);
-            REQUIRE_MOVES(info.tables[2], {1, 5}, {5, 1});
-        }
-
-        SECTION("swap_rows() preserves modifications from before the swap") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.set_int(1, 8, 15);
-                table.swap_rows(8, 9);
-                table.move_last_over(8);
-            });
-            REQUIRE(info.tables.size() == 3);
-            auto& table = info.tables[2];
-            REQUIRE(table.insertions.empty());
-            REQUIRE(table.moves.empty());
-            REQUIRE_INDICES(table.deletions, 9);
-            REQUIRE_INDICES(table.modifications, 8);
-        }
-
-        SECTION("merge_rows() marks the target row as modified if the source row was") {
-            size_t new_row;
-            auto info = track_changes({false, false, true}, [&] {
-                new_row = table.add_empty_row(2);
-                table.set_int(1, 5, 15);
-                table.merge_rows(5, new_row);
-                table.move_last_over(5);
-            });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE_INDICES(info.tables[2].modifications, new_row);
-
-            info = track_changes({false, false, true}, [&] {
-                new_row = table.add_empty_row(2);
-                table.merge_rows(5, new_row);
-                table.move_last_over(5);
-            });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE(info.tables[2].modifications.empty());
-        }
-
-        SECTION("merge_rows() leaves the target modified if it already was") {
-            size_t new_row;
-            auto info = track_changes({false, false, true}, [&] {
-                new_row = table.add_empty_row(2);
-                table.set_int(1, new_row, 15);
-                table.merge_rows(5, new_row);
-                table.move_last_over(5);
-            });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE_INDICES(info.tables[2].modifications, new_row);
-        }
-
-        SECTION("merge_rows() reports a move from the old to new row") {
-            size_t new_row;
-            auto info = track_changes({false, false, true}, [&] {
-                new_row = table.add_empty_row(2);
-                table.set_int(1, new_row, 15);
-                table.merge_rows(5, new_row);
-                table.move_last_over(5);
-            });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE_MOVES(info.tables[2], {5, new_row});
-            REQUIRE_INDICES(info.tables[2].insertions, 5, new_row);
-            REQUIRE_INDICES(info.tables[2].deletions, 5);
-        }
-
-        SECTION("merge_rows() to a new row followed by move_last_over() produces no net change") {
-            auto info = track_changes({false, false, true}, [&] {
-                size_t new_row = table.add_empty_row();
-                table.merge_rows(5, new_row);
-                table.move_last_over(5);
-            });
-            REQUIRE(info.tables.size() == 3);
-            // new row is inserted at 10, then moved over 5 and assumes the
-            // identity of the one which was at 5, so nothing actually happened
-            REQUIRE(info.tables[2].empty());
-        }
-
-        SECTION("set_int_unique() does not mark a row as modified") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.set_int_unique(0, 0, 20);
-            });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE(info.tables[2].empty());
-        }
+#endif
 
         SECTION("SetDefault does not mark a row as modified") {
-            auto info = track_changes({false, false, true}, [&] {
+            auto info = track_changes({table_key}, [&] {
                 bool is_default = true;
-                table.set_int(0, 0, 1, is_default);
+                table.get_object(objects[0]).set(cols[0], 1, is_default);
             });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE(info.tables[2].empty());
+            REQUIRE(info.tables.empty());
         }
     }
 
@@ -507,6 +388,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 
         r->begin_transaction();
 
+#if 0
         target->add_empty_row(10);
         for (int i = 0; i < 10; ++i)
             target->set_int(0, i, i);
@@ -1110,6 +992,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             }
             REQUIRE_INDICES(changes.insertions, 10, 11, 12);
         }
+        #endif
     }
 
     SECTION("object change information") {
@@ -1135,43 +1018,39 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 
         auto origin = realm->read_group().get_table("class_origin");
         auto target = realm->read_group().get_table("class_target");
+        auto origin_cols = origin->get_column_keys();
+        auto target_cols = target->get_column_keys();
 
         realm->begin_transaction();
 
-        target->add_empty_row(10);
-        for (int i = 0; i < 10; ++i) {
-            if (i > 0)
-                target->set_int_unique(0, i, i);
-            target->set_int(1, i, i);
-            target->set_int(2, i, i);
-        }
-
-        origin->add_empty_row(3);
-        origin->set_int(0, 0, 5);
-        origin->set_int(0, 1, 1);
-        origin->set_int(0, 2, 2);
-
-        origin->set_link(1, 0, 5);
-        origin->set_link(1, 1, 6);
-
-        LinkViewRef lv = origin->get_linklist(2, 0);
+        std::vector<ObjKey> target_keys;
+        target->create_objects(10, target_keys);
         for (int i = 0; i < 10; ++i)
-            lv->add(i);
-        LinkViewRef lv2 = origin->get_linklist(2, 1);
-        lv2->add(0);
+            target->get_object(target_keys[i]).set_all(i, i, i);
 
-        TableRef tr = origin->get_subtable(3, 0);
-        tr->add_empty_row(10);
+        std::vector<ObjKey> origin_keys;
+        origin->create_objects(3, origin_keys);
+        origin->get_object(origin_keys[0]).set_all(5, target_keys[5]);
+        origin->get_object(origin_keys[1]).set_all(5, target_keys[6]);
+
+        auto lv = origin->get_object(origin_keys[0]).get_linklist(origin_cols[2]);
+        for (auto key : target_keys)
+            lv.add(key);
+        auto lv2 = origin->get_object(origin_keys[1]).get_linklist(origin_cols[2]);
+        lv2.add(target_keys[0]);
+
+        auto tr = origin->get_object(origin_keys[0]).get_list<int64_t>(origin_cols[3]);
         for (int i = 0; i < 10; ++i)
-            tr->set_int(0, i, i);
-        TableRef tr2 = origin->get_subtable(3, 1);
-        tr2->add_empty_row(10);
+            tr.add(i);
+        auto tr2 = origin->get_object(origin_keys[1]).get_list<int64_t>(origin_cols[3]);
+        for (int i = 0; i < 10; ++i)
+            tr.add(0);
 
-        realm->read_group().get_table("class_origin 2")->add_empty_row();
+        realm->read_group().get_table("class_origin 2")->create_object();
 
         realm->commit_transaction();
 
-        auto observe = [&](std::initializer_list<Row> rows, auto&& fn) {
+        auto observe = [&](std::initializer_list<Obj> rows, auto&& fn) {
             auto realm2 = Realm::get_shared_realm(config);
             auto& group = realm2->read_group();
 
@@ -1189,7 +1068,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             return observer;
         };
 
-        auto observe_rollback = [&](std::initializer_list<Row> rows, auto&& fn) {
+        auto observe_rollback = [&](std::initializer_list<Obj> rows, auto&& fn) {
             KVOContext observer(rows);
             observer.realm = realm;
             realm->m_binding_context.reset(&observer);
@@ -1203,15 +1082,16 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         };
 
         SECTION("setting a property marks that property as changed") {
-            Row r = target->get(0);
-            auto changes = observe({r}, [&] {
-                r.set_int(0, 1);
+            auto o = target->get_object(target_keys[0]);
+            auto changes = observe({o}, [&] {
+                o.set(target_cols[0], 1);
             });
             REQUIRE(changes.modified(0, 0));
             REQUIRE_FALSE(changes.modified(0, 1));
             REQUIRE_FALSE(changes.modified(0, 2));
         }
 
+#if 0
         SECTION("self-assignment marks as changed") {
             Row r = target->get(0);
             auto changes = observe({r}, [&] {
@@ -1477,51 +1357,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_FALSE(changes.modified(0, 0));
             REQUIRE(changes.modified(0, 1));
             REQUIRE(changes.modified(0, 2));
-        }
-
-        SECTION("inserting a column into an observed table before the modified column") {
-            Row r = target->get(0);
-            auto changes = observe({r}, [&] {
-                r.set_int(1, 5);
-                target->insert_column(0, type_String, "col");
-                r.set_int(3, 5);
-            });
-            REQUIRE_FALSE(changes.modified(0, 0));
-            REQUIRE_FALSE(changes.modified(0, 1));
-            REQUIRE(changes.modified(0, 2));
-            REQUIRE(changes.modified(0, 3));
-
-            REQUIRE(changes.initial_column_index(0, 2) == 1);
-            REQUIRE(changes.initial_column_index(0, 3) == 2);
-        }
-
-        SECTION("inserting a column into an observed table directly at the modified column") {
-            Row r = target->get(0);
-            auto changes = observe({r}, [&] {
-                r.set_int(0, 5);
-                target->insert_column(0, type_String, "col");
-                r.set_int(3, 5);
-            });
-            REQUIRE_FALSE(changes.modified(0, 0));
-            REQUIRE(changes.modified(0, 1));
-            REQUIRE_FALSE(changes.modified(0, 2));
-            REQUIRE(changes.modified(0, 3));
-
-            REQUIRE(changes.initial_column_index(0, 1) == 0);
-            REQUIRE(changes.initial_column_index(0, 3) == 2);
-        }
-
-        SECTION("inserting a column into an observed table after the modified column") {
-            Row r = target->get(0);
-            auto changes = observe({r}, [&] {
-                r.set_int(0, 5);
-                target->insert_column(1, type_String, "col");
-                r.set_int(3, 5);
-            });
-            REQUIRE(changes.modified(0, 0));
-            REQUIRE_FALSE(changes.modified(0, 1));
-            REQUIRE_FALSE(changes.modified(0, 2));
-            REQUIRE(changes.modified(0, 3));
         }
 
         SECTION("modifying a subtable in an observed table does not produce a notification") {
@@ -2051,9 +1886,9 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             });
             REQUIRE(changes.array_change(0, 3) == (ArrayChange{Kind::SetAll, {}}));
         }
+        #endif
     }
 }
-#endif
 
 TEST_CASE("DeepChangeChecker") {
     InMemoryTestFile config;
@@ -2228,64 +2063,6 @@ TEST_CASE("DeepChangeChecker") {
         CHECK(checker3(19));
     }
 
-    SECTION("targets moving is not a change") {
-        r->begin_transaction();
-        objects[0].set(cols[1], objects[9].get_key());
-        objects[0].get_linklist(cols[3]).add(objects[9].get_key());
-        r->commit_transaction();
-
-        auto info = track_changes([&] {
-            table->remove_object(objects[5].get_key());
-        });
-        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(0));
-    }
-
-#if 0
-    SECTION("changes made before a row is moved are reported") {
-        r->begin_transaction();
-        objects[0].set(cols[1], objects[9].get_key());
-        r->commit_transaction();
-
-        auto info = track_changes([&] {
-            objects[9].set(cols[0], 5);
-            table->remove_object(objects[5].get_key());
-        });
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
-
-        r->begin_transaction();
-        objects[0].get_linklist(cols[3]).add(objects[8].get_key());
-        r->commit_transaction();
-
-        info = track_changes([&] {
-            objects[8].set(cols[0], 5);
-            table->remove_object(objects[5].get_key());
-        });
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
-    }
-
-    SECTION("changes made after a row is moved are reported") {
-        r->begin_transaction();
-        objects[0].set(cols[1], objects[9].get_key());
-        r->commit_transaction();
-
-        auto info = track_changes([&] {
-            table->remove_object(objects[5].get_key());
-            objects[5].set(cols[0], 5);
-        });
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
-
-        r->begin_transaction();
-        objects[0].get_linklist(cols[3]).add(objects[8].get_key());
-        r->commit_transaction();
-
-        info = track_changes([&] {
-            table->remove_object(objects[5].get_key());
-            objects[5].set(cols[0], 5);
-        });
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
-    }
-#endif
-
     SECTION("changes made in the 3rd elements in the link list") {
         r->begin_transaction();
         objects[0].get_linklist(cols[3]).add(objects[1].get_key());
@@ -2305,30 +2082,11 @@ TEST_CASE("DeepChangeChecker") {
         REQUIRE(checker(3));
     }
 
-    #if 0
-    SECTION("changes made to subtables mark the containing row as modified") {
-        {
-            std::unique_ptr<Replication> history;
-            std::unique_ptr<Transaction> shared_group;
-            std::unique_ptr<Group> read_only_group;
-            Realm::open_with_config(config, history, shared_group, read_only_group, nullptr);
-
-            WriteTransaction wt(*shared_group);
-            auto table = wt.get_table("class_table");
-            table->insert_column(0, type_Table, "subtable");
-            table->get_subdescriptor(0)->insert_column(0, type_Int, "value");
-            wt.commit();
-        }
-
-        r->refresh();
-        tables.clear();
-        _impl::DeepChangeChecker::find_related_tables(tables, *table);
-
+    SECTION("changes made to lists mark the containing row as modified") {
         auto info = track_changes([&] {
-            table->get_subtable(0, 0)->add_empty_row();
+            objects[0].get_linklist(cols[3]).add(objects[1].get_key());
         });
         _impl::DeepChangeChecker checker(info, *table, tables);
         REQUIRE(checker(0));
     }
-    #endif
 }
