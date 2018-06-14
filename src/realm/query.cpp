@@ -1719,6 +1719,12 @@ TableVersions Query::get_outside_versions() const
                 ++it;
             }
         }
+        if (m_view) {
+            TableVersions view_versions = m_view->get_dependencies();
+            for (auto e : view_versions) {
+                versions.push_back(e);
+            }
+        }
     }
     return versions;
 }

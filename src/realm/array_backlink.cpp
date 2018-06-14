@@ -46,6 +46,7 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
         // FIXME: May have to be moved to Table so that we don't have spec access here.
         // FIXME: This mix of using keys and indexes are not good.
         TableRef source_table = _impl::TableFriend::get_opposite_link_table(*target_table, target_col_key);
+        source_table->bump_content_version();
         const Spec& target_spec = cluster->m_tree_top.get_spec();
         ColKey source_col_key = target_spec.get_origin_column_key(target_col_ndx);
 
