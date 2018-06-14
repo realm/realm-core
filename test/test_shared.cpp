@@ -2858,7 +2858,7 @@ TEST(Shared_MovingSearchIndex)
 
         wt.commit();
     }
-    #ifdef LEGACY_TESTS
+#ifdef LEGACY_TESTS
     // Insert a column after the string columns and remove the indexes
     {
         WriteTransaction wt(sg);
@@ -2917,7 +2917,7 @@ TEST(Shared_MovingSearchIndex)
         CHECK_EQUAL(60, table->find_first_int(2, 60));
         wt.commit();
     }
-    #endif
+#endif
 }
 
 TEST_IF(Shared_BeginReadFailure, _impl::SimulatedFailure::is_enabled())

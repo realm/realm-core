@@ -749,42 +749,52 @@ ConstLstPtr<U> ConstObj::get_list_ptr(ColKey col_key) const
 }
 
 template <typename U>
-Lst<U> Obj::get_list(ColKey col_key)
+Lst<U> Obj::get_list(ColKey col_key) const
 {
     return Lst<U>(*this, col_key);
 }
 
 template <typename U>
-LstPtr<U> Obj::get_list_ptr(ColKey col_key)
+LstPtr<U> Obj::get_list_ptr(ColKey col_key) const
 {
     return std::make_unique<Lst<U>>(*this, col_key);
 }
 
 template <>
-inline LstPtr<ObjKey> Obj::get_list_ptr(ColKey col_key)
+inline LstPtr<ObjKey> Obj::get_list_ptr(ColKey col_key) const
 {
     return get_linklist_ptr(col_key);
 }
 
-inline ConstLnkLst ConstObj::get_linklist(ColKey col_key)
+inline ConstLnkLst ConstObj::get_linklist(ColKey col_key) const
 {
     return ConstLnkLst(*this, col_key);
 }
 
-inline ConstLnkLstPtr ConstObj::get_linklist_ptr(ColKey col_key)
+inline ConstLnkLst ConstObj::get_linklist(StringData col_name) const
+{
+    return get_linklist(get_column_key(col_name));
+}
+
+inline ConstLnkLstPtr ConstObj::get_linklist_ptr(ColKey col_key) const
 {
     Obj obj(*this);
     return obj.get_linklist_ptr(col_key);
 }
 
-inline LnkLst Obj::get_linklist(ColKey col_key)
+inline LnkLst Obj::get_linklist(ColKey col_key) const
 {
     return LnkLst(*this, col_key);
 }
 
-inline LnkLstPtr Obj::get_linklist_ptr(ColKey col_key)
+inline LnkLstPtr Obj::get_linklist_ptr(ColKey col_key) const
 {
     return std::make_unique<LnkLst>(*this, col_key);
+}
+
+inline LnkLst Obj::get_linklist(StringData col_name) const
+{
+    return get_linklist(get_column_key(col_name));
 }
 
 template <class T>

@@ -1586,8 +1586,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
         send_schema_change_notification();
 }
 
-
-void Group::prepare_history_parent(BPlusTreeBase& history_root, int history_type, int history_schema_version)
+void Group::prepare_top_for_history(int history_type, int history_schema_version)
 {
     REALM_ASSERT(m_file_format_version >= 7);
     if (m_top.size() < 10) {
@@ -1610,9 +1609,7 @@ void Group::prepare_history_parent(BPlusTreeBase& history_root, int history_type
         m_top.set(7, RefOrTagged::make_tagged(history_type)); // Throws
         m_top.set(9, RefOrTagged::make_tagged(history_schema_version)); // Throws
     }
-    set_history_parent(history_root);
 }
-
 
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 

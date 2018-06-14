@@ -23,7 +23,7 @@
 using namespace realm;
 
 CommonDescriptor::CommonDescriptor(std::vector<std::vector<ColKey>> column_keys)
-: m_column_keys(std::move(column_keys))
+    : m_column_keys(std::move(column_keys))
 {
 }
 
@@ -87,13 +87,12 @@ std::string SortDescriptor::get_description(ConstTableRef attached_table) const
     return description;
 }
 
-SortDescriptor::SortDescriptor(std::vector<std::vector<ColKey>> column_keys,
-                               std::vector<bool> ascending)
+SortDescriptor::SortDescriptor(std::vector<std::vector<ColKey>> column_keys, std::vector<bool> ascending)
     : CommonDescriptor(std::move(column_keys))
     , m_ascending(std::move(ascending))
 {
-    REALM_ASSERT_EX(m_ascending.empty() || m_ascending.size() == m_column_keys.size(),
-                    m_ascending.size(), m_column_keys.size());
+    REALM_ASSERT_EX(m_ascending.empty() || m_ascending.size() == m_column_keys.size(), m_ascending.size(),
+                    m_column_keys.size());
     if (m_ascending.empty())
         m_ascending.resize(m_column_keys.size(), true);
 }
@@ -105,8 +104,7 @@ std::unique_ptr<CommonDescriptor> SortDescriptor::clone() const
 
 void SortDescriptor::merge_with(SortDescriptor&& other)
 {
-    m_column_keys.insert(m_column_keys.begin(),
-                        other.m_column_keys.begin(), other.m_column_keys.end());
+    m_column_keys.insert(m_column_keys.begin(), other.m_column_keys.begin(), other.m_column_keys.end());
     // Do not use a move iterator on a vector of bools!
     // It will form a reference to a temporary and return incorrect results.
     m_ascending.insert(m_ascending.begin(), other.m_ascending.begin(), other.m_ascending.end());
@@ -114,8 +112,7 @@ void SortDescriptor::merge_with(SortDescriptor&& other)
 
 
 CommonDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_lists,
-                                 std::vector<bool> const& ascending,
-                                 Table const& root_table,
+                                 std::vector<bool> const& ascending, Table const& root_table,
                                  KeyColumn const& key_values)
 {
     REALM_ASSERT(!column_lists.empty());

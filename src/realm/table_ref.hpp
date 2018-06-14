@@ -34,6 +34,7 @@ public:
     {
     }
     ConstTableRef(const TableRef& other);
+    ConstTableRef(std::nullptr_t) {}
 
     const Table* operator->() const;
     const Table& operator*() const
@@ -53,6 +54,11 @@ public:
     bool operator==(const ConstTableRef& other) const
     {
         return m_table == other.m_table && m_instance_version == other.m_instance_version;
+    }
+
+    bool operator!=(const ConstTableRef& other) const
+    {
+        return !(*this == other);
     }
 
     std::ostream& print(std::ostream& o) const
@@ -83,6 +89,7 @@ public:
         : ConstTableRef(t_ptr)
     {
     }
+    TableRef(std::nullptr_t) {}
     TableRef()
         : ConstTableRef()
     {

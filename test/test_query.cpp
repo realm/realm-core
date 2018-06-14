@@ -3521,8 +3521,7 @@ TEST(Query_LinkChainSortErrors)
                       LogicError::type_mismatch);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{backlink_ndx, t2_string_col}})),
                       LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_int_col, t2_string_col}})),
-                      LogicError::type_mismatch);
+    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_int_col, t2_string_col}})), LogicError::type_mismatch);
 }
 
 
@@ -3706,8 +3705,7 @@ TEST(Query_DistinctAndSort)
     {   // distinct on a view sorted descending retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{2, t1_keys[3]}, {1, t1_keys[2]}};
-        tv.sort(SortDescriptor({{t1_str_col}, {t1_int_col}},
-                            {false /* descending */, false /* descending */}));
+        tv.sort(SortDescriptor({{t1_str_col}, {t1_int_col}}, {false /* descending */, false /* descending */}));
         tv.distinct(t1_int_col);
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {

@@ -787,8 +787,11 @@ private:
                                              int& history_type, int& history_schema_version) noexcept;
     static ref_type get_history_ref(const Array& top) noexcept;
     void set_history_schema_version(int version);
-    void set_history_parent(BPlusTreeBase& history_root) noexcept;
-    void prepare_history_parent(BPlusTreeBase& history_root, int history_type, int history_schema_version);
+    template <class Accessor>
+    void set_history_parent(Accessor& history_root) noexcept;
+    void prepare_top_for_history(int history_type, int history_schema_version);
+    template <class Accessor>
+    void prepare_history_parent(Accessor& history_root, int history_type, int history_schema_version);
 
     size_t find_table_index(StringData name) const noexcept;
     TableKey ndx2key(size_t ndx) const;
@@ -1117,9 +1120,17 @@ inline void Group::set_history_schema_version(int version)
     m_top.set(9, RefOrTagged::make_tagged(unsigned(version))); // Throws
 }
 
-inline void Group::set_history_parent(BPlusTreeBase& history_root) noexcept
+template <class Accessor>
+inline void Group::set_history_parent(Accessor& history_root) noexcept
 {
     history_root.set_parent(&m_top, 8);
+}
+
+template <class Accessor>
+void Group::prepare_history_parent(Accessor& history_root, int history_type, int history_schema_version)
+{
+    prepare_top_for_history(history_type, history_schema_version);
+    set_history_parent(history_root);
 }
 
 class Group::TableWriter {
@@ -1199,12 +1210,19 @@ public:
         Group::get_version_and_history_info(top, version, history_type, history_schema_version);
     }
 
-    static void set_history_parent(Group& group, BPlusTreeBase& history_root) noexcept
+    static void set_history_schema_version(Group& group, int version)
+    {
+        group.set_history_schema_version(version); // Throws
+    }
+
+    template <class Accessor>
+    static void set_history_parent(Group& group, Accessor& history_root) noexcept
     {
         group.set_history_parent(history_root);
     }
 
-    static void prepare_history_parent(Group& group, BPlusTreeBase& history_root, int history_type,
+    template <class Accessor>
+    static void prepare_history_parent(Group& group, Accessor& history_root, int history_type,
                                        int history_schema_version)
     {
         group.prepare_history_parent(history_root, history_type, history_schema_version); // Throws

@@ -33,7 +33,7 @@
 
 using namespace realm;
 
-LstBasePtr Obj::get_listbase_ptr(ColKey col_key, DataType type)
+LstBasePtr Obj::get_listbase_ptr(ColKey col_key, DataType type) const
 {
     switch (type) {
         case type_Int: {

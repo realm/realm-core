@@ -103,13 +103,23 @@ public:
     ConstLst<U> get_list(ColKey col_key) const;
     template <typename U>
     ConstLstPtr<U> get_list_ptr(ColKey col_key) const;
+    template <typename U>
+    ConstLst<U> get_list(StringData col_name) const
+    {
+        return get_list<U>(get_column_key(col_name));
+    }
 
-    ConstLnkLst get_linklist(ColKey col_key);
-    ConstLnkLstPtr get_linklist_ptr(ColKey col_key);
-
+    ConstLnkLst get_linklist(ColKey col_key) const;
+    ConstLnkLstPtr get_linklist_ptr(ColKey col_key) const;
+    ConstLnkLst get_linklist(StringData col_name) const;
+    
     size_t get_link_count(ColKey col_key) const;
 
     bool is_null(ColKey col_key) const;
+    bool is_null(StringData col_name) const
+    {
+        return is_null(get_column_key(col_name));
+    }
     bool has_backlinks(bool only_strong_links) const;
     size_t get_backlink_count(bool only_strong_links = false) const;
     size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
@@ -188,16 +198,26 @@ public:
     {
         return set(get_column_key(col_name), value, is_default);
     }
+    template <typename U>
+    Obj& set(ColKey col_key, util::Optional<U> value, bool is_default = false);
 
     Obj& set_null(ColKey col_key, bool is_default = false);
+    Obj& set_null(StringData col_name, bool is_default = false)
+    {
+        return set_null(get_column_key(col_name), is_default);
+    }
 
     Obj& add_int(ColKey col_key, int64_t value);
+    Obj& add_int(StringData col_name, int64_t value)
+    {
+        return add_int(get_column_key(col_name), value);
+    }
 
     template <typename U>
     Obj& set_list_values(ColKey col_key, const std::vector<U>& values);
 
     template <typename U>
-    std::vector<U> get_list_values(ColKey col_key);
+    std::vector<U> get_list_values(ColKey col_key) const;
 
     template <class Head, class... Tail>
     Obj& set_all(Head v, Tail... tail);
@@ -205,14 +225,21 @@ public:
     Obj get_linked_object(ColKey link_col_key);
 
     template <typename U>
-    Lst<U> get_list(ColKey col_key);
+    Lst<U> get_list(ColKey col_key) const;
     template <typename U>
-    LstPtr<U> get_list_ptr(ColKey col_key);
+    LstPtr<U> get_list_ptr(ColKey col_key) const;
 
-    LnkLst get_linklist(ColKey col_key);
-    LnkLstPtr get_linklist_ptr(ColKey col_key);
+    template <typename U>
+    Lst<U> get_list(StringData col_name) const
+    {
+        return get_list<U>(get_column_key(col_name));
+    }
 
-    LstBasePtr get_listbase_ptr(ColKey col_key, DataType type);
+    LnkLst get_linklist(ColKey col_key) const;
+    LnkLstPtr get_linklist_ptr(ColKey col_key) const;
+    LnkLst get_linklist(StringData col_name) const;
+
+    LstBasePtr get_listbase_ptr(ColKey col_key, DataType type) const;
 
 private:
     friend class Cluster;
@@ -284,6 +311,27 @@ inline Obj& Obj::set(ColKey col_key, int value, bool is_default)
 }
 
 template <>
+inline Obj& Obj::set(ColKey col_key, uint_fast64_t value, bool is_default)
+{
+    int_fast64_t value_2;
+    if (REALM_UNLIKELY(int_cast_with_overflow_detect(value, value_2))) {
+        REALM_TERMINATE("Unsigned integer too big.");
+    }
+    return set(col_key, value_2, is_default);
+}
+
+template <class U>
+inline Obj& Obj::set(ColKey col_key, util::Optional<U> value, bool is_default)
+{
+    if (value) {
+        return set(col_key, *value, is_default);
+    }
+    else {
+        return set_null(col_key, is_default);
+    }
+}
+
+template <>
 inline Obj& Obj::set(ColKey col_key, const char* str, bool is_default)
 {
     return set(col_key, StringData(str), is_default);
@@ -344,7 +392,7 @@ Obj& Obj::set_list_values(ColKey col_key, const std::vector<U>& values)
 }
 
 template <typename U>
-std::vector<U> Obj::get_list_values(ColKey col_key)
+std::vector<U> Obj::get_list_values(ColKey col_key) const
 {
     std::vector<U> values;
     auto list = get_list<U>(col_key);
