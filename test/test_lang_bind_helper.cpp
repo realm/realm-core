@@ -1111,57 +1111,59 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     CHECK(epsilon);
 }
 
-#ifdef LEGACY_TESTS
-// to be ported
 TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
     DBRef sg = DB::create(hist, DBOptions(crypt_key()));
-    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
 
+    ColKey col;
     {
-        WriteTransaction wt(sg_w);
-        Table& origin = *wt.add_table("origin");
-        Table& target = *wt.add_table("target");
-        origin.add_column_link(type_Link, "o_1", target, link_Strong);
-        target.add_column(type_Int, "t_1");
+        WriteTransaction wt(sg);
+        auto origin = wt.add_table("origin");
+        auto target = wt.add_table("target");
+        col = origin->add_column_link(type_Link, "o_1", *target, link_Strong);
+        target->add_column(type_Int, "t_1");
         wt.commit();
     }
 
     // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg->start_read() const Group& group = rt;
-    const Table& target = *rt->get_table("target");
+    auto rt = sg->start_read();
+    auto target = rt->get_table("target");
 
-    ConstRow target_row_0, target_row_1;
+    ObjKey target_key0, target_key1;
+    ConstObj target_obj0, target_obj1;
 
     auto perform_change = [&](std::function<void(Table&)> func) {
         // Ensure there are two rows in each table, with each row in `origin`
         // pointing to the corresponding row in `target`
         {
-            WriteTransaction wt(sg_w);
-            Table& origin_w = *wt.get_table("origin");
-            Table& target_w = *wt.get_table("target");
+            WriteTransaction wt(sg);
+            auto origin_w = wt.get_table("origin");
+            auto target_w = wt.get_table("target");
 
-            origin_w.clear();
-            target_w.clear();
-            origin_w.add_empty_row(2);
-            target_w.add_empty_row(2);
-            origin_w[0].set_link(0, 0);
-            origin_w[1].set_link(0, 1);
-
+            origin_w->clear();
+            target_w->clear();
+            auto o0 = origin_w->create_object();
+            auto o1 = origin_w->create_object();
+            auto t0 = target_w->create_object();
+            auto t1 = target_w->create_object();
+            target_key0 = t0.get_key();
+            target_key1 = t1.get_key();
+            o0.set(col, target_key0);
+            o1.set(col, target_key1);
             wt.commit();
         }
 
         // Grab the row accessors before applying the modification being tested
         rt->advance_read();
         rt->verify();
-        target_row_0 = target.get(0);
-        target_row_1 = target.get(1);
+        target_obj0 = target->get_object(target_key0);
+        target_obj1 = target->get_object(target_key1);
 
         // Perform the modification
         {
-            WriteTransaction wt(sg_w);
+            WriteTransaction wt(sg);
             func(*wt.get_table("origin"));
             wt.commit();
         }
@@ -1172,33 +1174,33 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
         // with the changes applied
     };
 
-    // Break link by nullifying
-    perform_change([](Table& origin) { origin[1].nullify_link(0); });
-    CHECK(target_row_0 && !target_row_1);
-    CHECK_EQUAL(target.size(), 1);
-
-    // Break link by reassign
-    perform_change([](Table& origin) { origin[1].set_link(0, 0); });
-    CHECK(target_row_0 && !target_row_1);
-    CHECK_EQUAL(target.size(), 1);
-
-    // Avoid breaking link by reassigning self
-    perform_change([](Table& origin) { origin[1].set_link(0, 1); });
-    // Should not delete anything
-    CHECK(target_row_0 && target_row_1);
-    CHECK_EQUAL(target.size(), 2);
-
-    // Break link by explicit row removal
-    perform_change([](Table& origin) { origin[1].move_last_over(); });
-    CHECK(target_row_0 && !target_row_1);
-    CHECK_EQUAL(target.size(), 1);
-
     // Break link by clearing table
     perform_change([](Table& origin) { origin.clear(); });
-    CHECK(!target_row_0 && !target_row_1);
-    CHECK_EQUAL(target.size(), 0);
+    CHECK(!target_obj0.is_valid());
+    CHECK(!target_obj1.is_valid());
+    CHECK_EQUAL(target->size(), 0);
+
+    // Break link by nullifying
+    perform_change([&](Table& origin) { origin.get_object(1).set_null(col); });
+    CHECK(target_obj0.is_valid());
+    CHECK(!target_obj1.is_valid());
+    CHECK_EQUAL(target->size(), 1);
+
+    // Break link by reassign
+    perform_change([&](Table& origin) { origin.get_object(1).set(col, target_key0); });
+    CHECK(target_obj0.is_valid());
+    CHECK(!target_obj1.is_valid());
+    CHECK_EQUAL(target->size(), 1);
+
+    // Avoid breaking link by reassigning self
+    perform_change([&](Table& origin) { origin.get_object(1).set(col, target_key1); });
+    // Should not delete anything
+    CHECK(target_obj0.is_valid());
+    CHECK(target_obj1.is_valid());
+    CHECK_EQUAL(target->size(), 2);
 }
 
+#ifdef LEGACY_TESTS
 // to be ported
 TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 {
