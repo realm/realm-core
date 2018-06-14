@@ -198,8 +198,6 @@ public:
     {
         return set(get_column_key(col_name), value, is_default);
     }
-    template <typename U>
-    Obj& set(ColKey col_key, util::Optional<U> value, bool is_default = false);
 
     Obj& set_null(ColKey col_key, bool is_default = false);
     Obj& set_null(StringData col_name, bool is_default = false)
@@ -318,17 +316,6 @@ inline Obj& Obj::set(ColKey col_key, uint_fast64_t value, bool is_default)
         REALM_TERMINATE("Unsigned integer too big.");
     }
     return set(col_key, value_2, is_default);
-}
-
-template <class U>
-inline Obj& Obj::set(ColKey col_key, util::Optional<U> value, bool is_default)
-{
-    if (value) {
-        return set(col_key, *value, is_default);
-    }
-    else {
-        return set_null(col_key, is_default);
-    }
 }
 
 template <>
