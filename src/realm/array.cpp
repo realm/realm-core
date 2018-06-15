@@ -1701,7 +1701,7 @@ void Array::alloc(size_t init_size, size_t width)
     size_t needed_bytes = calc_byte_len(init_size, width);
     // this method is not public and callers must (and currently do) ensure that
     // needed_bytes are never larger than max_array_payload.
-    REALM_ASSERT_3(init_size, <=, max_array_size);
+    REALM_ASSERT_RELEASE(init_size <= max_array_size);
 
     if (is_read_only())
         do_copy_on_write(needed_bytes);

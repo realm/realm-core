@@ -99,9 +99,8 @@ inline T no0(T v)
 /// found'. It is similar in function to std::string::npos.
 const size_t npos = size_t(-1);
 
-// Maximum number of bytes that the payload of an array can be
-const size_t max_array_size = 0x00ffffffL;
-const size_t max_array_payload_aligned = 0x07ffffc0L;
+const size_t max_array_size = 0x00ffffffL;            // Maximum number of elements in an array
+const size_t max_array_payload_aligned = 0x07ffffc0L; // Maximum number of bytes that the payload of an array can be
 
 /// Alias for realm::npos.
 const size_t not_found = npos;
