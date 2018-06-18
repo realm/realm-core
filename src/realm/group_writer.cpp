@@ -279,8 +279,11 @@ ref_type GroupWriter::write_group()
     std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_write_time(m_group);
 #endif // REALM_METRICS
 
+    std::cout << "Commit nr " << m_current_version << "   ( from " << m_readlock_version << " )" << std::endl;
+    std::cout << "    In-file freelist before merge: " << m_free_positions.size();
     merge_free_space(); // Throws
-
+    std::cout << "    In-file freelist after merge:  " << m_free_positions.size() << std::endl;
+    std::cout << "    Allocating file space for data:" << std::endl;
     Array& top = m_group.m_top;
     bool is_shared = m_group.m_is_shared;
     REALM_ASSERT_3(m_free_positions.size(), ==, m_free_lengths.size());
@@ -317,6 +320,8 @@ ref_type GroupWriter::write_group()
         }
     }
 
+    std::cout << "    Allocating file space for freelists:" << std::endl;
+
     // We now have a bit of a chicken-and-egg problem. We need to write the
     // free-lists to the file, but the act of writing them will consume free
     // space, and thereby change the free-lists. To solve this problem, we
@@ -337,7 +342,9 @@ ref_type GroupWriter::write_group()
     m_free_lengths.copy_on_write();   // Throws
     if (is_shared)
         m_free_versions.copy_on_write();                                            // Throws
+    std::cout << "        In-mem freelist before consolidation: " << m_group.m_alloc.m_free_read_only.size();
     m_group.m_alloc.consolidate_free_read_only();                                   // Throws
+    std::cout << "    In-mem freelist after consolidation:  " << m_group.m_alloc.m_free_read_only.size() << std::endl;
     const SlabAlloc::chunks& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
     max_free_list_size += new_free_space.size();
 
@@ -376,6 +383,7 @@ ref_type GroupWriter::write_group()
     // clobering the previous database version. Note, however, that this risk
     // would only have been present in the non-transactional case where there is
     // no version tracking on the free-space chunks.
+    std::cout << "    Freelist size after allocations: " << m_free_positions.size() << std::endl;
     for (const auto& free_space : new_free_space) {
         ref_type ref = free_space.ref;
         size_t size = free_space.size;
@@ -400,7 +408,7 @@ ref_type GroupWriter::write_group()
         if (ndx <= reserve_ndx)
             ++reserve_ndx;
     }
-
+    std::cout << "    Freelist size after merge: " << m_free_positions.size() << "   freelist space required: " << max_free_space_needed << std::endl;
     // Before we calculate the actual sizes of the free-list arrays, we must
     // make sure that the final adjustments of the free lists (i.e., the
     // deduction of the actually used space from the reserved chunk,) will not
@@ -708,7 +716,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // lock at this time, and in non-transactional mode it is the responsibility
     // of the user to ensure non-concurrent file mutation.
     m_alloc.resize_file(new_file_size); // Throws
-
+    std::cout << "        ** File extension to " << new_file_size << "     after request for " << requested_size << std::endl;
     //    m_file_map.remap(m_alloc.get_file(), File::access_ReadWrite, new_file_size); // Throws
 
     size_t chunk_ndx = m_free_positions.size();
