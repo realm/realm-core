@@ -1901,6 +1901,7 @@ TEST(Group_StockBug)
 
     for (size_t i = 0; i < 100; ++i) {
         table->verify();
+        group.verify();
         table->insert_empty_row(i);
         table->set_string(0, i, "123456789012345678901234567890123456789");
         table->verify();

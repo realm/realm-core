@@ -492,32 +492,33 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 }
 
 
-void SlabAlloc::consolidate_free_read_only()
+size_t SlabAlloc::consolidate_free_read_only()
 {
     if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         throw InvalidFreeSpace();
-    if (m_free_read_only.empty())
-        return;
+    if (m_free_read_only.size() > 1) {
+        std::sort(begin(m_free_read_only), end(m_free_read_only), [](Chunk& a, Chunk& b) { return a.ref < b.ref; });
 
-    std::sort(begin(m_free_read_only), end(m_free_read_only), [](auto& a, auto& b) { return a.ref < b.ref; });
+        // Combine any adjacent chunks in the freelist, except for when the chunks
+        // are on the edge of an allocation slab
+        auto prev = m_free_read_only.begin();
+        for (auto it = m_free_read_only.begin() + 1; it != m_free_read_only.end(); ++it) {
+            if (prev->ref + prev->size != it->ref) {
+                prev = it;
+                continue;
+            }
 
-    // Combine any adjacent chunks in the freelist, except for when the chunks
-    // are on the edge of an allocation slab
-    auto prev = m_free_read_only.begin();
-    for (auto it = m_free_read_only.begin() + 1; it != m_free_read_only.end(); ++it) {
-        if (prev->ref + prev->size != it->ref) {
-            prev = it;
-            continue;
+            prev->size += it->size;
+            it->size = 0;
         }
 
-        prev->size += it->size;
-        it->size = 0;
+        // Remove all of the now zero-size chunks from the free list
+        m_free_read_only.erase(std::remove_if(begin(m_free_read_only), end(m_free_read_only),
+                                              [](Chunk& chunk) { return chunk.size == 0; }),
+                               end(m_free_read_only));
     }
 
-    // Remove all of the now zero-size chunks from the free list
-    m_free_read_only.erase(
-        std::remove_if(begin(m_free_read_only), end(m_free_read_only), [](auto& chunk) { return chunk.size == 0; }),
-        end(m_free_read_only));
+    return m_free_read_only.size();
 }
 
 
