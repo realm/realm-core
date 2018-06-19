@@ -89,6 +89,19 @@ private:
     uint64_t m_readlock_version;
     size_t m_alloc_position;
 
+    struct FreeSpaceEntry {
+        uint64_t ref;
+        uint64_t released_at_version;
+        uint64_t size;
+    };
+    std::vector<FreeSpaceEntry> m_free_in_file;
+    std::vector<FreeSpaceEntry> m_not_free_in_file;
+
+    void sort_freelist();
+    void merge_adjacent_entries_in_freelist();
+    void filter_empty_entries_in_freelist();
+    void read_in_freelist();
+    void recreate_freelist();
     // Currently cached memory mappings. We keep as many as 16 1MB windows
     // open for writing. The allocator will favor sequential allocation
     // from a modest number of windows, depending upon fragmentation, so
