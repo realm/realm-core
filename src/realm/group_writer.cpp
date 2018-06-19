@@ -333,7 +333,7 @@ ref_type GroupWriter::write_group()
 #if REALM_ALLOC_DEBUG
     std::cout << "    Allocating file space for freelists:" << std::endl;
 #endif
-    
+
     // We now have a bit of a chicken-and-egg problem. We need to write the
     // free-lists to the file, but the act of writing them will consume free
     // space, and thereby change the free-lists. To solve this problem, we
@@ -440,7 +440,8 @@ ref_type GroupWriter::write_group()
         REALM_ASSERT_RELEASE_EX(prev_ref + prev_size <= ref, prev_ref, prev_size, ref, i, limit);
     }
 #if REALM_ALLOC_DEBUG
-    std::cout << "    Freelist size after merge: " << m_free_positions.size() << "   freelist space required: " << max_free_space_needed << std::endl;
+    std::cout << "    Freelist size after merge: " << m_free_positions.size()
+              << "   freelist space required: " << max_free_space_needed << std::endl;
 #endif
     // Before we calculate the actual sizes of the free-list arrays, we must
     // make sure that the final adjustments of the free lists (i.e., the
@@ -587,7 +588,8 @@ void GroupWriter::sort_freelist()
 
 void GroupWriter::merge_adjacent_entries_in_freelist()
 {
-    if (m_free_in_file.size() == 0) return;
+    if (m_free_in_file.size() == 0)
+        return;
     // Combine any adjacent chunks in the freelist
     auto prev = m_free_in_file.begin();
     for (auto it = m_free_in_file.begin() + 1; it != m_free_in_file.end(); ++it) {
@@ -607,8 +609,6 @@ void GroupWriter::filter_empty_entries_in_freelist()
     m_free_in_file.erase(
         std::remove_if(begin(m_free_in_file), end(m_free_in_file), [](auto& chunk) { return chunk.size == 0; }),
         end(m_free_in_file));
-
-
 }
 
 void GroupWriter::merge_free_space()
@@ -781,7 +781,8 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // of the user to ensure non-concurrent file mutation.
     m_alloc.resize_file(new_file_size); // Throws
 #if REALM_ALLOC_DEBUG
-    std::cout << "        ** File extension to " << new_file_size << "     after request for " << requested_size << std::endl;
+    std::cout << "        ** File extension to " << new_file_size << "     after request for " << requested_size
+              << std::endl;
 #endif
     //    m_file_map.remap(m_alloc.get_file(), File::access_ReadWrite, new_file_size); // Throws
 
