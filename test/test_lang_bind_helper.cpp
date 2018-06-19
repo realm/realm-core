@@ -9041,7 +9041,7 @@ void multiple_trackers_writer_thread(std::string path)
     Random random(random_int<unsigned long>());
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 100; ++i) {
         WriteTransaction wt(sg);
         auto tr = wt.get_table("table");
         for (int k = 0; k < 2500000; ++k) {
@@ -9093,10 +9093,10 @@ void multiple_trackers_reader_thread(TestContext& test_context, std::string path
 } // anonymous namespace
 
 
-ONLY(LangBindHelper_ImplicitTransactions_MultipleTrackers)
+TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
-    const int write_thread_count = 7;
-    const int read_thread_count = 3; // must be less than 42 for correct operation
+    const int write_thread_count = 3;
+    const int read_thread_count = 1; // must be less than 42 for correct operation
 
     SHARED_GROUP_TEST_PATH(path);
 
