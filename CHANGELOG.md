@@ -1,3 +1,12 @@
+# 5.6.2 Release notes
+
+### Bugfixes
+
+* Fix curruption of freelist with more than 2M entries.
+  PR [#3059](https://github.com/realm/realm-core/pull/3059).
+
+----------------------------------------------
+
 # 5.6.1 Release notes
 
 ### Bugfixes

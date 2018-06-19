@@ -67,16 +67,16 @@ void set_capacity(char* header, size_t value)
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
-    h[0] = uchar((value >> 16) & 0x000000FF);
-    h[1] = uchar((value >> 8) & 0x000000FF);
-    h[2] = uchar(value & 0x000000FF);
+    h[0] = uchar((value >> 19) & 0x000000FF);
+    h[1] = uchar((value >> 11) & 0x000000FF);
+    h[2] = uchar((value >> 3) & 0x000000FF);
 }
 
 size_t get_capacity(const char* header)
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
-    return (size_t(h[0]) << 16) + (size_t(h[1]) << 8) + h[2];
+    return (size_t(h[0]) << 19) + (size_t(h[1]) << 11) + (h[2] << 3);
 }
 
 } // anonymous namespace
