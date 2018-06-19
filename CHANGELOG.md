@@ -1,23 +1,9 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* None.
-
-### Breaking changes
-
-* None.
+# 5.6.3 Release notes
 
 ### Enhancements
 
 * Improved scalability for in-file freelist handling. This reduces
   commit overhead on large transactions.
-
------------
-
-### Internals
-
-* None.
 
 ----------------------------------------------
 
