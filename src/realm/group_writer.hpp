@@ -92,7 +92,7 @@ private:
     struct FreeSpaceEntry {
         uint64_t ref;
         uint64_t released_at_version;
-        uint32_t size;
+        uint64_t size;
     };
     std::vector<FreeSpaceEntry> m_free_in_file;
     std::vector<FreeSpaceEntry> m_not_free_in_file;
