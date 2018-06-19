@@ -400,19 +400,44 @@ ref_type GroupWriter::write_group()
 #if REALM_ALLOC_DEBUG
     std::cout << "    Freelist size after allocations: " << m_free_positions.size() << std::endl;
 #endif
+    // re-read in the freelist after allocation - we need it for a later check.
+    // from here on m_free_in_file acts as a temporary, collecting all chunks for
+    // a final validity check.
+    read_in_freelist();
+    // all entries should end up in the "real" free list (not the not-yet-free list)
+    REALM_ASSERT_RELEASE(m_free_in_file.size() == m_free_positions.size());
+    // Now, let's update the realm-style freelists, which will later be written to file.
     // do not preserve order of freelist, just append new blocks. Order will be restored
     // anyway by the merge_free_lists in the start of next commit.
     for (const auto& free_space : m_not_free_in_file) {
+        m_free_in_file.push_back(free_space); // not actually freed, but added for a later check
         m_free_positions.add(free_space.ref);
         m_free_lengths.add(free_space.size);
         if (is_shared)
             m_free_versions.add(free_space.released_at_version);
     }
     for (const auto& free_space : new_free_space) {
+        // not actually freed, but added for a later check
+        FreeSpaceEntry entry;
+        entry.ref = free_space.ref;
+        entry.size = free_space.size;
+        entry.released_at_version = m_current_version;
+        m_free_in_file.push_back(entry);
         m_free_positions.add(free_space.ref);
         m_free_lengths.add(free_space.size);
         if (is_shared)
             m_free_versions.add(m_current_version);
+    }
+    // freelist is now back in arrays in form ready to be written. Copy of freelist is also
+    // available in m_free_in_file, so let's use it for a consistency check:
+    sort_freelist(); // requires sorting.
+    // Verify that no block covers part of it's neighbour:
+    auto limit = m_free_in_file.size();
+    for (size_t i = 1; i < limit; ++i) {
+        auto prev_ref = m_free_in_file[i-1].ref;
+        auto prev_size = m_free_in_file[i-1].size;
+        auto ref = m_free_in_file[i].ref;
+        REALM_ASSERT_RELEASE_EX(prev_ref + prev_size <= ref, prev_ref, prev_size, ref, i, limit);
     }
 #if REALM_ALLOC_DEBUG
     std::cout << "    Freelist size after merge: " << m_free_positions.size() << "   freelist space required: " << max_free_space_needed << std::endl;
@@ -518,6 +543,11 @@ void GroupWriter::read_in_freelist()
 {
     bool is_shared = m_group.m_is_shared;
     size_t limit = m_free_lengths.size();
+    auto limit_version = m_readlock_version;
+    // in non-shared mode fake a version of 1 (instead of 0) to force all entries
+    // to be considered truly free (in non shared mode all entries are marked as
+    // released at version 0).
+    if (!is_shared) limit_version = 1;
     for (size_t idx = 0; idx < limit; ++idx) {
         FreeSpaceEntry entry;
         entry.ref = m_free_positions.get(idx);
@@ -527,7 +557,7 @@ void GroupWriter::read_in_freelist()
         else
             entry.released_at_version = 0;
 
-        if (entry.released_at_version < m_readlock_version)
+        if (entry.released_at_version < limit_version)
             m_free_in_file.push_back(entry);
         else
             m_not_free_in_file.push_back(entry);
