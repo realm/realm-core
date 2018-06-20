@@ -356,7 +356,9 @@ ref_type GroupWriter::write_group()
         m_free_versions.copy_on_write();                                            // Throws
 #if REALM_ALLOC_DEBUG
     std::cout << "        In-mem freelist before consolidation: " << m_group.m_alloc.m_free_read_only.size();
+#endif
     m_group.m_alloc.consolidate_free_read_only();                                   // Throws
+#if REALM_ALLOC_DEBUG
     std::cout << "    In-mem freelist after consolidation:  " << m_group.m_alloc.m_free_read_only.size() << std::endl;
 #endif
     const SlabAlloc::chunks& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
