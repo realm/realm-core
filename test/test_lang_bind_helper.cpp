@@ -9041,16 +9041,18 @@ void multiple_trackers_writer_thread(std::string path)
     Random random(random_int<unsigned long>());
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 100; ++i) {
         WriteTransaction wt(sg);
         auto tr = wt.get_table("table");
-        size_t idx = 1 + random.draw_int_mod(tr->size() - 1);
+        for (int k = 0; k < 2500000; ++k) {
+            size_t idx = 1 + random.draw_int_mod(tr->size() - 1);
 
-        if (tr->get_int(0, idx) == 42) {
-            // do nothing
-        }
-        else {
-            insert(tr, idx, 0);
+            if (tr->get_int(0, idx) == 42) {
+                // do nothing
+            }
+            else {
+                insert(tr, idx, 0x10000 + idx);
+            }
         }
         wt.commit();
         std::this_thread::yield();
@@ -9091,10 +9093,10 @@ void multiple_trackers_reader_thread(TestContext& test_context, std::string path
 } // anonymous namespace
 
 
-TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
+ONLY(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
-    const int write_thread_count = 7;
-    const int read_thread_count = 3; // must be less than 42 for correct operation
+    const int write_thread_count = 3;
+    const int read_thread_count = 1; // must be less than 42 for correct operation
 
     SHARED_GROUP_TEST_PATH(path);
 
@@ -9144,6 +9146,10 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
     // cleanup
     sg.end_read(); // FIXME: What cleanup? This seems out of place!?
+    WriteTransaction wt2(sg);
+    wt2.commit();
+    WriteTransaction wt3(sg);
+    wt3.commit();
 }
 
 #ifndef _WIN32

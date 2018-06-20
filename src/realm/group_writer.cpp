@@ -273,7 +273,7 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
     return m_map_windows[0].get();
 }
 
-#define REALM_ALLOC_DEBUG 0
+#define REALM_ALLOC_DEBUG 1
 
 ref_type GroupWriter::write_group()
 {
