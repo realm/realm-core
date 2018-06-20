@@ -1097,3 +1097,8 @@ Group& RealmFriend::read_group_to(Realm& realm, VersionID version)
     realm.begin_read(version);
     return *realm.m_group;
 }
+
+std::size_t Realm::compute_size() {
+    Group& group = read_group();
+    return group.compute_aggregated_byte_size();
+}
