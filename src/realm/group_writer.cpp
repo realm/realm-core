@@ -588,8 +588,8 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
 
     // Copy into arrays while checking consistency
     size_t reserve_ndx = realm::npos;
-    size_t prev_ref = 0;
-    size_t prev_size = 0;
+    uint64_t prev_ref = 0;
+    uint64_t prev_size = 0;
     auto limit = m_free_in_file.size();
     for (size_t i = 0; i < limit; ++i) {
         const auto& free_space = m_free_in_file[i];
