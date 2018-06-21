@@ -530,19 +530,19 @@ void GroupWriter::read_in_freelist()
     if (limit) {
         auto limit_version = is_shared ? m_readlock_version : 0;
         for (size_t idx = 0; idx < limit; ++idx) {
-            uint64_t ref = m_free_positions.get(idx);
-            uint64_t size = m_free_lengths.get(idx);
+            size_t ref = size_t(m_free_positions.get(idx));
+            size_t size = size_t(m_free_lengths.get(idx));
 
             if (is_shared) {
                 uint64_t version = m_free_versions.get(idx);
                 // Entries that are freed in still alive versions are not candidates for merge or allocation
                 if (version >= limit_version) {
-                    m_not_free_in_file.emplace_back(ref, version, size);
+                    m_not_free_in_file.emplace_back(ref, size, version);
                     continue;
                 }
             }
 
-            m_free_in_file.emplace_back(ref, 0, size);
+            m_free_in_file.emplace_back(ref, size, 0);
         }
 
         // This will imply a copy-on-write
@@ -572,24 +572,24 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
     auto entry = m_size_map.begin();
     auto end = m_size_map.end();
     while (entry != end) {
-        m_free_in_file.emplace_back(entry->second, 0, entry->first);
+        m_free_in_file.emplace_back(entry->second, entry->first, 0);
         ++entry;
     }
 
     REALM_ASSERT_RELEASE(m_not_free_in_file.empty() || is_shared);
     for (const auto& free_space : m_not_free_in_file) {
-        m_free_in_file.emplace_back(free_space.ref, free_space.released_at_version, free_space.size);
+        m_free_in_file.emplace_back(free_space.ref, free_space.size, free_space.released_at_version);
     }
     for (const auto& free_space : new_free_space) {
-        m_free_in_file.emplace_back(free_space.ref, m_current_version, free_space.size);
+        m_free_in_file.emplace_back(free_space.ref, free_space.size, m_current_version);
     }
 
     sort_freelist();
 
     // Copy into arrays while checking consistency
     size_t reserve_ndx = realm::npos;
-    uint64_t prev_ref = 0;
-    uint64_t prev_size = 0;
+    size_t prev_ref = 0;
+    size_t prev_size = 0;
     auto limit = m_free_in_file.size();
     for (size_t i = 0; i < limit; ++i) {
         const auto& free_space = m_free_in_file[i];

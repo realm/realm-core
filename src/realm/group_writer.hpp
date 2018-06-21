@@ -91,15 +91,15 @@ private:
     size_t m_window_alignment;
 
     struct FreeSpaceEntry {
-        FreeSpaceEntry(uint64_t r, uint64_t v, uint64_t s)
+        FreeSpaceEntry(size_t r, size_t s, uint64_t v)
             : ref(r)
-            , released_at_version(v)
             , size(s)
+            , released_at_version(v)
         {
         }
-        uint64_t ref;
+        size_t ref;
+        size_t size;
         uint64_t released_at_version;
-        uint64_t size;
     };
     std::vector<FreeSpaceEntry> m_free_in_file;
     std::vector<FreeSpaceEntry> m_not_free_in_file;
