@@ -9095,20 +9095,24 @@ void multiple_trackers_reader_thread(TestContext& test_context, std::string path
 
 ONLY(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
-    const int write_thread_count = 3;
+    const int write_thread_count = 1;
     const int read_thread_count = 1; // must be less than 42 for correct operation
 
-    SHARED_GROUP_TEST_PATH(path);
+    //SHARED_GROUP_TEST_PATH(path);
+    std::string path = "fsa_performance_test.realm";
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     {
         WriteTransaction wt(sg);
-        TableRef tr = wt.add_table("table");
-        tr->add_column(type_Int, "first");
-        tr->add_empty_row(200); // use first entry in table to count readers which have locked on
-        tr->set_int(0, 100, 42);
-        wt.commit();
+        Group& g = wt.get_group();
+        if (g.size() == 0) {
+            TableRef tr = wt.add_table("table");
+            tr->add_column(type_Int, "first");
+            tr->add_empty_row(200); // use first entry in table to count readers which have locked on
+            tr->set_int(0, 100, 42);
+            wt.commit();
+        }
     }
     // FIXME: Use separate arrays for reader and writer threads for safety and readability.
     Thread threads[write_thread_count + read_thread_count];

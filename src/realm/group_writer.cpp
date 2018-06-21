@@ -34,6 +34,7 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::metrics;
 
+
 // Class controlling a memory mapped window into a file
 class GroupWriter::MapWindow {
 public:
@@ -58,7 +59,8 @@ private:
     ref_type base_ref;
     ref_type aligned_to_mmap_block(ref_type start_ref);
     size_t get_window_size(util::File& f, ref_type start_ref, size_t size);
-    static const size_t intended_alignment = 0x100000; // 1MB
+    static size_t intended_alignment;
+    friend class GroupWriter;
 };
 
 // True if a requested block fall within a memory mapping.
@@ -150,6 +152,8 @@ void GroupWriter::MapWindow::encryption_write_barrier(void* start_addr, size_t s
     realm::util::encryption_write_barrier(start_addr, size, map.get_encrypted_mapping());
 }
 
+size_t GroupWriter::MapWindow::intended_alignment = 0;
+
 
 GroupWriter::GroupWriter(Group& group)
     : m_group(group)
@@ -161,6 +165,12 @@ GroupWriter::GroupWriter(Group& group)
     , m_alloc_position(0)
 {
     m_map_windows.reserve(num_map_windows);
+    size_t total_size = m_alloc.get_total_size();
+    size_t window_size = 1;
+    while (total_size > 8) { total_size >>= 1; window_size <<= 1; }
+    if (window_size < 64 * 1024)
+        window_size = 64 * 1024;
+    MapWindow::intended_alignment = window_size;
 
     Array& top = m_group.m_top;
     bool is_shared = m_group.m_is_shared;
@@ -265,7 +275,9 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
     }
     // no window found, make room for a new one at the top
     if (m_map_windows.size() == num_map_windows) {
-        m_map_windows.back()->sync();
+        bool disable_sync = get_disable_sync_to_disk();
+        if (!disable_sync)
+            m_map_windows.back()->sync();
         m_map_windows.pop_back();
     }
     auto new_window = std::make_unique<MapWindow>(m_alloc.get_file(), start_ref, size);
