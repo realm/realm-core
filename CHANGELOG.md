@@ -4,6 +4,9 @@
 
 * Improved scalability for in-file freelist handling. This reduces
   commit overhead on large transactions.
+* Improved scalability for in-file allocation during commit.
+* Minimized use of memory mappings and msync() on large commits
+  on devices which can support large address spaces.
 
 ----------------------------------------------
 
