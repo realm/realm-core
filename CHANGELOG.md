@@ -1,23 +1,12 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* None.
-
-### Breaking changes
-
-* None.
+# 5.6.3 Release notes
 
 ### Enhancements
 
 * Improved scalability for in-file freelist handling. This reduces
   commit overhead on large transactions.
-
------------
-
-### Internals
-
-* None.
+* Improved scalability for in-file allocation during commit.
+* Minimized use of memory mappings and msync() on large commits
+  on devices which can support large address spaces.
 
 ----------------------------------------------
 
