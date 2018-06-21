@@ -37,7 +37,7 @@ using namespace realm::metrics;
 // Class controlling a memory mapped window into a file
 class GroupWriter::MapWindow {
 public:
-    MapWindow(util::File& f, ref_type start_ref, size_t size);
+    MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t initial_size);
     ~MapWindow();
 
     // translate a ref to a pointer
@@ -54,19 +54,19 @@ public:
     bool extends_to_match(util::File& f, ref_type start_ref, size_t size);
 
 private:
-    util::File::Map<char> map;
-    ref_type base_ref;
+    util::File::Map<char> m_map;
+    ref_type m_base_ref;
     ref_type aligned_to_mmap_block(ref_type start_ref);
     size_t get_window_size(util::File& f, ref_type start_ref, size_t size);
-    static const size_t intended_alignment = 0x100000; // 1MB
+    size_t m_alignment;
 };
 
 // True if a requested block fall within a memory mapping.
 bool GroupWriter::MapWindow::matches(ref_type start_ref, size_t size)
 {
-    if (start_ref < base_ref)
+    if (start_ref < m_base_ref)
         return false;
-    if (start_ref + size > base_ref + map.get_size())
+    if (start_ref + size > m_base_ref + m_map.get_size())
         return false;
     return true;
 }
@@ -81,21 +81,21 @@ bool GroupWriter::MapWindow::matches(ref_type start_ref, size_t size)
 ref_type GroupWriter::MapWindow::aligned_to_mmap_block(ref_type start_ref)
 {
     // align to 1MB boundary
-    size_t page_mask = intended_alignment - 1;
+    size_t page_mask = m_alignment - 1;
     return start_ref & ~page_mask;
 }
 
 size_t GroupWriter::MapWindow::get_window_size(util::File& f, ref_type start_ref, size_t size)
 {
-    size_t window_size = start_ref + size - base_ref;
-    // always map at least 1MB
-    if (window_size < intended_alignment)
-        window_size = intended_alignment;
+    size_t window_size = start_ref + size - m_base_ref;
+    // always map at least to match alignment
+    if (window_size < m_alignment)
+        window_size = m_alignment;
     // but never map beyond end of file
     size_t file_size = to_size_t(f.get_size());
     REALM_ASSERT_DEBUG_EX(start_ref + size <= file_size, start_ref + size, file_size);
-    if (window_size > file_size - base_ref)
-        window_size = file_size - base_ref;
+    if (window_size > file_size - m_base_ref)
+        window_size = file_size - m_base_ref;
     return window_size;
 }
 
@@ -110,20 +110,21 @@ size_t GroupWriter::MapWindow::get_window_size(util::File& f, ref_type start_ref
 bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref, size_t size)
 {
     size_t aligned_ref = aligned_to_mmap_block(start_ref);
-    if (aligned_ref != base_ref)
+    if (aligned_ref != m_base_ref)
         return false;
     size_t window_size = get_window_size(f, start_ref, size);
     // FIXME: Add a remap which will work with a offset different from 0
-    map.unmap();
-    map.map(f, File::access_ReadWrite, window_size, 0, base_ref);
+    m_map.unmap();
+    m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
     return true;
 }
 
-GroupWriter::MapWindow::MapWindow(util::File& f, ref_type start_ref, size_t size)
+GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t size)
+    : m_alignment(alignment)
 {
-    base_ref = aligned_to_mmap_block(start_ref);
+    m_base_ref = aligned_to_mmap_block(start_ref);
     size_t window_size = get_window_size(f, start_ref, size);
-    map.map(f, File::access_ReadWrite, window_size, 0, base_ref);
+    m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
 }
 
 GroupWriter::MapWindow::~MapWindow()
@@ -132,22 +133,22 @@ GroupWriter::MapWindow::~MapWindow()
 
 void GroupWriter::MapWindow::sync()
 {
-    map.sync();
+    m_map.sync();
 }
 
 char* GroupWriter::MapWindow::translate(ref_type ref)
 {
-    return map.get_addr() + (ref - base_ref);
+    return m_map.get_addr() + (ref - m_base_ref);
 }
 
 void GroupWriter::MapWindow::encryption_read_barrier(void* start_addr, size_t size)
 {
-    realm::util::encryption_read_barrier(start_addr, size, map.get_encrypted_mapping());
+    realm::util::encryption_read_barrier(start_addr, size, m_map.get_encrypted_mapping());
 }
 
 void GroupWriter::MapWindow::encryption_write_barrier(void* start_addr, size_t size)
 {
-    realm::util::encryption_write_barrier(start_addr, size, map.get_encrypted_mapping());
+    realm::util::encryption_write_barrier(start_addr, size, m_map.get_encrypted_mapping());
 }
 
 
@@ -160,7 +161,21 @@ GroupWriter::GroupWriter(Group& group)
     , m_current_version(0)
 {
     m_map_windows.reserve(num_map_windows);
-
+#if REALM_IOS
+    m_window_alignment = 1 * 1024 * 1024;  // 1M
+#else
+    if (sizeof(int*) == 4) { // 32 bit address space
+        m_window_alignment = 1 * 1024 * 1024; // 1M
+    } else {
+        // large address space - just choose a size so that we have a single window
+        size_t total_size = m_alloc.get_total_size();
+        size_t wanted_size = 1;
+        while (total_size) { total_size >>= 1; wanted_size <<= 1; }
+        if (wanted_size < 1 * 1024 * 1024)
+            wanted_size = 1 * 1024 * 1024; // minimum 1M
+        m_window_alignment = wanted_size;
+    }
+#endif
     Array& top = m_group.m_top;
     bool is_shared = m_group.m_is_shared;
 
@@ -267,7 +282,7 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
         m_map_windows.back()->sync();
         m_map_windows.pop_back();
     }
-    auto new_window = std::make_unique<MapWindow>(m_alloc.get_file(), start_ref, size);
+    auto new_window = std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size);
     m_map_windows.insert(m_map_windows.begin(), std::move(new_window));
     return m_map_windows[0].get();
 }
@@ -406,7 +421,7 @@ ref_type GroupWriter::write_group()
 
 #if REALM_ALLOC_DEBUG
     std::cout << "    Freelist size after merge: " << m_free_positions.size()
-              << "   freelist space required: " << max_free_space_needed << std::endl;
+              << "   freelist space required: " << max_free_space_needed << std::endl << std::endl;
 #endif
     // Before we calculate the actual sizes of the free-list arrays, we must
     // make sure that the final adjustments of the free lists (i.e., the

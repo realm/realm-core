@@ -88,6 +88,7 @@ private:
     ArrayInteger m_free_versions;  // 6th slot in Group::m_top
     uint64_t m_current_version;
     uint64_t m_readlock_version;
+    size_t m_window_alignment;
 
     struct FreeSpaceEntry {
         FreeSpaceEntry(uint64_t r, uint64_t v, uint64_t s)
