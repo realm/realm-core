@@ -1,6 +1,7 @@
 # NEXT RELEASE
 
-Besides the changes below, this release also includes changes introduced by v5.6.0 and v5.6.1
+Besides the changes below, this release also includes changes introduced by v5.6.0,
+v5.6.1, v5.6.2 and v5.6.3
 
 ### Bugfixes
 
@@ -79,6 +80,27 @@ Besides the changes below, this release also includes changes introduced by v5.6
 
 * Major simplifications and optimizations to management of memory mappings.
 * Speed improvement for Sort().
+
+----------------------------------------------
+
+# 5.6.3 Release notes
+
+### Enhancements
+
+* Improved scalability for in-file freelist handling. This reduces
+  commit overhead on large transactions.
+* Improved scalability for in-file allocation during commit.
+* Minimized use of memory mappings and msync() on large commits
+  on devices which can support large address spaces.
+
+----------------------------------------------
+
+# 5.6.2 Release notes
+
+### Bugfixes
+
+* Fix curruption of freelist with more than 2M entries.
+  PR [#3059](https://github.com/realm/realm-core/pull/3059).
 
 ----------------------------------------------
 

@@ -51,11 +51,16 @@ static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
 struct Entry {
     Entry() : Entry(0,0) {}
-    Entry(unsigned s, unsigned l, unsigned v = 0) : start(s), length(l), version(v) {}
+    Entry(uint64_t s, uint64_t l, uint64_t v = 0)
+        : start(s)
+        , length(l)
+        , version(v)
+    {
+    }
     bool operator < (const Entry& rhs) const { return start < rhs.start; }
-    unsigned start;
-    unsigned length;
-    unsigned version;
+    uint64_t start;
+    uint64_t length;
+    uint64_t version;
 };
 
 #ifdef REALM_DEBUG
@@ -89,7 +94,7 @@ void print_free_list()
 class DbEntry {
 public:
     DbEntry() {}
-    DbEntry(std::ifstream& is, unsigned ref, std::set<Entry>& refs);
+    DbEntry(std::ifstream& is, uint64_t ref, std::set<Entry>& refs);
 
     bool is_valid() { return m_is_valid; }
 
@@ -97,7 +102,10 @@ public:
 
     bool is_inner_node() { return m_is_inner_node; }
 
-    std::vector<unsigned> get_refs() { return m_refs; }
+    std::vector<uint64_t> get_refs()
+    {
+        return m_refs;
+    }
 
     size_t get_size() { return m_size; }
 
@@ -105,7 +113,8 @@ public:
 
     unsigned get_width() { return m_width; }
 
-    int get_val(unsigned ndx) {
+    int64_t get_val(unsigned ndx)
+    {
         int64_t val = realm::get_direct(m_data.get(), m_width, ndx);
 
         if (m_has_refs) {
@@ -113,7 +122,7 @@ public:
                 val >>= 1;
             }
         }
-        return int(val);
+        return val;
     }
 
     const char* get_data() { return m_data.get(); }
@@ -148,7 +157,7 @@ private:
     unsigned m_size = 0;
     unsigned m_byte_size = 0;
     unsigned m_width = 0;
-    std::vector<unsigned> m_refs;
+    std::vector<uint64_t> m_refs;
     std::unique_ptr<char> m_data;
 
     void get_refs_from_buffer()
@@ -156,7 +165,7 @@ private:
         for (unsigned i = 0; i < m_size; i++) {
             int64_t val = realm::get_direct(m_data.get(), m_width, i);
             if (val && !(val & 1)) {
-                m_refs.push_back(unsigned(val));
+                m_refs.push_back(uint64_t(val));
             }
         }
     }
@@ -171,22 +180,23 @@ private:
     std::ifstream& m_is;
     std::set<Entry> m_refs;
 
-    void process_group(unsigned ref);
-    std::vector<std::string> process_names(unsigned ref);
-    std::vector<unsigned> process_numbers(unsigned ref);
-    std::vector<std::string> process_types(unsigned ref);
-    void process_free_list(unsigned pos_ref, unsigned size_ref, unsigned version_ref);
-    void process_history(unsigned ref);
-    void process_spec(unsigned ref, std::string table_name, std::vector<unsigned>& column_refs);
+    void process_group(uint64_t ref);
+    std::vector<std::string> process_names(uint64_t ref);
+    std::vector<uint64_t> process_numbers(uint64_t ref);
+    std::vector<std::string> process_types(uint64_t ref);
+    void process_free_list(uint64_t pos_ref, uint64_t size_ref, uint64_t version_ref);
+    void process_history(uint64_t ref);
+    void process_spec(uint64_t ref, std::string table_name, std::vector<uint64_t>& column_refs);
     void process_table(DbEntry& db_entry, std::string name);
-    void add_ref(unsigned ref);
-    void add_column_ref(unsigned ref, std::string lead);
+    void add_ref(uint64_t ref);
+    void add_column_ref(uint64_t ref, std::string lead);
     std::vector<Entry> check_refs();
 };
 
-unsigned suspicious_ref;
+uint64_t suspicious_ref;
 
-DbEntry::DbEntry(std::ifstream& is, unsigned ref, std::set<Entry>& refs) {
+DbEntry::DbEntry(std::ifstream& is, uint64_t ref, std::set<Entry>& refs)
+{
     unsigned char header[8];
     is.seekg (ref, is.beg);
     is.read(reinterpret_cast<char*>(&header), sizeof(header));
@@ -240,7 +250,7 @@ DbEntry::DbEntry(std::ifstream& is, unsigned ref, std::set<Entry>& refs) {
     }
 }
 
-void RealmFile::add_ref(unsigned ref)
+void RealmFile::add_ref(uint64_t ref)
 {
     DbEntry db_entry(m_is, ref, m_refs);
     if (db_entry.is_valid() && !db_entry.is_duplicate()) {
@@ -251,29 +261,31 @@ void RealmFile::add_ref(unsigned ref)
     }
 }
 
-void RealmFile::add_column_ref(unsigned ref, std::string lead)
+void RealmFile::add_column_ref(uint64_t ref, std::string lead)
 {
     DbEntry db_entry(m_is, ref, m_refs);
     if (db_entry.is_valid() && !db_entry.is_duplicate()) {
         auto sub_refs = db_entry.get_refs();
-        if (db_entry.is_inner_node()) {
-            std::cout << lead << "inner node with " << sub_refs.size() << " children" << std::endl;
-        }
-        else {
-            if (!sub_refs.empty()) {
-                std::cout << lead << "leaf with " << sub_refs.size() << " children" << std::endl;
-            }
-            else {
-                std::cout << lead << "leaf size " << db_entry.get_size() << std::endl;
-            }
-        }
+        /*
+                if (db_entry.is_inner_node()) {
+                    std::cout << lead << "inner node with " << sub_refs.size() << " children" << std::endl;
+                }
+                else {
+                    if (!sub_refs.empty()) {
+                        std::cout << lead << "leaf with " << sub_refs.size() << " children" << std::endl;
+                    }
+                    else {
+                        std::cout << lead << "leaf size " << db_entry.get_size() << std::endl;
+                    }
+                }
+        */
         for (unsigned i = 0; i < sub_refs.size(); i++) {
             add_column_ref(sub_refs[i], lead + "    ");
         }
     }
 }
 
-std::vector<std::string> RealmFile::process_names(unsigned ref)
+std::vector<std::string> RealmFile::process_names(uint64_t ref)
 {
     std::vector<std::string> names;
     DbEntry db_entry(m_is, ref, m_refs);
@@ -312,9 +324,9 @@ static std::string columnType_to_str(int t)
     return "Invalid";
 }
 
-std::vector<unsigned> RealmFile::process_numbers(unsigned ref)
+std::vector<uint64_t> RealmFile::process_numbers(uint64_t ref)
 {
-    std::vector<unsigned> numbers;
+    std::vector<uint64_t> numbers;
     DbEntry db_entry(m_is, ref, m_refs);
     if (db_entry.is_valid()) {
         auto sz = db_entry.get_size();
@@ -325,7 +337,7 @@ std::vector<unsigned> RealmFile::process_numbers(unsigned ref)
     return numbers;
 }
 
-std::vector<std::string> RealmFile::process_types(unsigned ref)
+std::vector<std::string> RealmFile::process_types(uint64_t ref)
 {
     std::vector<std::string> type_names;
     DbEntry db_entry(m_is, ref, m_refs);
@@ -339,10 +351,10 @@ std::vector<std::string> RealmFile::process_types(unsigned ref)
     return type_names;
 }
 
-void RealmFile::process_free_list(unsigned pos_ref, unsigned size_ref, unsigned version_ref)
+void RealmFile::process_free_list(uint64_t pos_ref, uint64_t size_ref, uint64_t version_ref)
 {
     std::set<int> version_set;
-    unsigned newest = 0;
+    uint64_t newest = 0;
     auto positions = process_numbers(pos_ref);
     auto sizes = process_numbers(size_ref);
     auto versions = process_numbers(version_ref);
@@ -383,7 +395,7 @@ void RealmFile::process_free_list(unsigned pos_ref, unsigned size_ref, unsigned 
     }
 }
 
-void RealmFile::process_history(unsigned ref)
+void RealmFile::process_history(uint64_t ref)
 {
     DbEntry hist(m_is, ref, m_refs);
     if (hist.is_valid()) {
@@ -403,7 +415,7 @@ void RealmFile::process_history(unsigned ref)
     }
 }
 
-void RealmFile::process_spec(unsigned ref, std::string table_name, std::vector<unsigned>& column_refs)
+void RealmFile::process_spec(uint64_t ref, std::string table_name, std::vector<uint64_t>& column_refs)
 {
     DbEntry spec(m_is, ref, m_refs);
     if (spec.is_valid()) {
@@ -453,10 +465,10 @@ void RealmFile::process_table(DbEntry& table, std::string name)
 {
     if (table.is_valid()) {
         assert(table.get_size() == 2);
-        unsigned spec_ref = table.get_val(0);
-        unsigned column_ref = table.get_val(1);
+        uint64_t spec_ref = table.get_val(0);
+        uint64_t column_ref = table.get_val(1);
 
-        std::vector<unsigned> column_refs;
+        std::vector<uint64_t> column_refs;
         DbEntry columns(m_is, column_ref, m_refs);
         if (columns.is_valid()) {
             auto sz = columns.get_size();
@@ -468,7 +480,7 @@ void RealmFile::process_table(DbEntry& table, std::string name)
     }
 }
 
-void RealmFile::process_group(unsigned ref)
+void RealmFile::process_group(uint64_t ref)
 {
     DbEntry group(m_is, ref, m_refs);
     if (group.is_valid()) {
@@ -546,7 +558,7 @@ void RealmFile::check_leaked()
 RealmFile::RealmFile(std::ifstream& is)
     : m_is(is)
 {
-    unsigned topref = 0;
+    uint64_t topref = 0;
     union Buffer {
         Header file_header;
         StreamingFooter file_footer;
@@ -560,8 +572,8 @@ RealmFile::RealmFile(std::ifstream& is)
             std::cerr << err_txt << "Not a realm file ?" << std::endl;
         }
         else {
-            topref = unsigned(buffer.file_header.m_top_ref[buffer.file_header.m_flags]);
-            if (topref == 0xFFFFFFFFULL && buffer.file_header.m_flags == 0) {
+            topref = buffer.file_header.m_top_ref[buffer.file_header.m_flags];
+            if (topref == 0xFFFFFFFFFFFFFFFFULL && buffer.file_header.m_flags == 0) {
                 // Streaming format
                 is.seekg(0 - sizeof(StreamingFooter), is.end);
                 is.read(buffer.plain, sizeof(StreamingFooter));

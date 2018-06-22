@@ -160,8 +160,8 @@ size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string, size_t begin,
             ref_type ref = get_as_ref(i);
             if (ref) {
                 const char* blob_header = get_alloc().translate(ref);
-                size_t blob_size = get_size_from_header(blob_header);
-                if (blob_size == full_size) {
+                size_t sz = get_size_from_header(blob_header);
+                if (sz == full_size) {
                     const char* blob_value = ArrayBlob::get(blob_header, 0);
                     if (std::equal(blob_value, blob_value + value_size, value.data()))
                         return i;

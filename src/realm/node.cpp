@@ -68,7 +68,7 @@ void Node::alloc(size_t init_size, size_t new_width)
     size_t needed_bytes = calc_byte_len(init_size, new_width);
     // this method is not public and callers must (and currently do) ensure that
     // needed_bytes are never larger than max_array_payload.
-    REALM_ASSERT_3(needed_bytes, <=, max_array_payload);
+    REALM_ASSERT_RELEASE(init_size <= max_array_size);
 
     if (is_read_only())
         do_copy_on_write(needed_bytes);
@@ -126,8 +126,7 @@ void Node::do_copy_on_write(size_t minimum_size)
     size_t new_size = std::max(array_size, minimum_size);
     new_size = (new_size + 0x7) & ~size_t(0x7); // 64bit blocks
     // Plus a bit of matchcount room for expansion
-    if (new_size < max_array_payload - 64)
-        new_size += 64;
+    new_size += 64;
 
     // Create new copy of array
     MemRef mref = m_alloc.alloc(new_size); // Throws

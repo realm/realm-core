@@ -23,9 +23,8 @@
 
 namespace realm {
 
-// Maximum number of bytes that the payload of a node can be
-const size_t max_array_payload = 0x00ffffffL;
-const size_t max_array_payload_aligned = 0x00fffff8L;
+const size_t max_array_size = 0x00ffffffL;            // Maximum number of elements in an array
+const size_t max_array_payload_aligned = 0x07ffffc0L; // Maximum number of bytes that the payload of an array can be
 
 class NodeHeader {
 public:
@@ -118,7 +117,7 @@ public:
     {
         typedef unsigned char uchar;
         const uchar* h = reinterpret_cast<const uchar*>(header);
-        return (size_t(h[0]) << 16) + (size_t(h[1]) << 8) + h[2];
+        return (size_t(h[0]) << 19) + (size_t(h[1]) << 11) + (h[2] << 3);
     }
 
     static Type get_type_from_header(const char* header) noexcept
@@ -179,7 +178,7 @@ public:
 
     static void set_size_in_header(size_t value, char* header) noexcept
     {
-        REALM_ASSERT_3(value, <=, max_array_payload);
+        REALM_ASSERT_3(value, <=, max_array_size);
         typedef unsigned char uchar;
         uchar* h = reinterpret_cast<uchar*>(header);
         h[5] = uchar((value >> 16) & 0x000000FF);
@@ -190,12 +189,12 @@ public:
     // Note: There is a copy of this function is test_alloc.cpp
     static void set_capacity_in_header(size_t value, char* header) noexcept
     {
-        REALM_ASSERT_3(value, <=, max_array_payload);
+        REALM_ASSERT_3(value, <=, (0xffffff << 3));
         typedef unsigned char uchar;
         uchar* h = reinterpret_cast<uchar*>(header);
-        h[0] = uchar((value >> 16) & 0x000000FF);
-        h[1] = uchar((value >> 8) & 0x000000FF);
-        h[2] = uchar(value & 0x000000FF);
+        h[0] = uchar((value >> 19) & 0x000000FF);
+        h[1] = uchar((value >> 11) & 0x000000FF);
+        h[2] = uchar(value >> 3 & 0x000000FF);
     }
 
     static size_t get_byte_size_from_header(const char* header) noexcept

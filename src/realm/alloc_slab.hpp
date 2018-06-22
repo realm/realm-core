@@ -499,7 +499,7 @@ private:
     bool m_debug_out = false;
 
     /// Throws if free-lists are no longer valid.
-    void consolidate_free_read_only();
+    size_t consolidate_free_read_only();
     /// Throws if free-lists are no longer valid.
     const chunks& get_free_read_only() const;
 

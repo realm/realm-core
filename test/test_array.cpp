@@ -95,7 +95,6 @@ void has_zero_byte(TestContext& test_context, int64_t value, size_t reps)
 
 } // anonymous namespace
 
-
 TEST(Array_General)
 {
     Array c(Allocator::get_default());
@@ -1628,4 +1627,21 @@ TEST(Array_AdjustGEFuzzy)
         c.destroy();
     }
 }
+
+TEST(Array_Large)
+{
+    Array c(Allocator::get_default());
+    c.create(Array::type_Normal);
+
+    // TEST(Array_Add0)
+
+    c.add(0x1234567890);
+    for (int i = 0; i < 0x300000; i++) {
+        c.add(i);
+    }
+    CHECK_EQUAL(c.size(), 0x300001);
+    CHECK_EQUAL(c.get(0x300000), 0x300000 - 1);
+    c.destroy();
+}
+
 #endif // TEST_ARRAY
