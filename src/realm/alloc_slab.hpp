@@ -21,7 +21,6 @@
 
 #include <cstdint> // unint8_t etc
 #include <vector>
-#include <map>
 #include <string>
 #include <atomic>
 
@@ -356,40 +355,11 @@ private:
         ref_type ref_end;
         char* addr;
     };
-    struct Chunk { // describes a freed in-file block
+    struct Chunk {
         ref_type ref;
         size_t size;
     };
 
-    // free blocks that are in the slab area are managed using the following structures
-    struct FreeListEntry {
-    	ref_type ref; // ref for this entry. Saves a reverse translate / representing links as refs
-    	FreeListEntry* prev; // circular doubly linked list
-    	FreeListEntry* next;
-    };
-    struct BetweenBlocks { // stores sizes and used/free status of blocks before and after.
-    	int32_t block_before_size; // negated if block is in use,
-    	int32_t block_after_size;  // positive if block is free - and zero at end
-    };
-    const int small_blocks_range = 128;
-    FreeListEntry* m_small_blocks[128];
-    std::map<unsigned int, FreeListEntry*> m_large_blocks;
-
-    FreeListEntry* allocate_first_match(size_t size);
-    FreeListEntry* break_block(FreeListEntry* start, size_t size);
-    void add_free_block(ref_type ref, const char* addr, size_t size);
-    void insert_freelist_entry(FreeListEntry* &header, FreeListEntry* element);
-    void remove_freelist_entry(FreeListEntry* &header, FreeListEntry* element);
-
-    FreeListEntry* pop_freelist_entry(FreeListEntry* &header);
-    void push_freelist_entry(FreeListEntry* &header, FreeListEntry* element);
-
-    // create a single freelist entry with "BetweenBlocks" at both ends and a
-    // single free chunk between them. This free chunk will be of size:
-    //   slab_size - 2 * sizeof(BetweenBlocks)
-    struct FreeListEntry* slab_to_block(Slab* slab, size_t slab_size);
-    void mark_allocated(FreeListEntry* entry);
-    void mark_freed(FreeListEntry* entry);
     // Values of each used bit in m_flags
     enum {
         flags_SelectBit = 1,
@@ -457,6 +427,7 @@ private:
     typedef std::vector<Slab> slabs;
     typedef std::vector<Chunk> chunks;
     slabs m_slabs;
+    chunks m_free_space;
     chunks m_free_read_only;
 
     bool m_debug_out = false;
