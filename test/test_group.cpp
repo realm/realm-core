@@ -1601,13 +1601,14 @@ TEST(Group_CascadeNotify_TableClear)
     // clear() does report nullified links
     origin->get_object(o_keys[1]).set(col_link, t_keys[2]);
     origin->get_object(o_keys[3]).get_linklist(col_link_list).add(t_keys[4]);
+    origin->get_object(o_keys[5]).get_linklist(col_link_list).add(t_keys[4]);
 
     called = false;
     g.set_cascade_notification_handler([&](const Group::CascadeNotification& notification) {
         called = true;
         CHECK_EQUAL(0, notification.rows.size());
 
-        CHECK_EQUAL(2, notification.links.size());
+        CHECK_EQUAL(3, notification.links.size());
         CHECK_EQUAL(col_link, notification.links[0].origin_col_ndx);
         CHECK_EQUAL(o_keys[1], notification.links[0].origin_key);
         CHECK_EQUAL(t_keys[2], notification.links[0].old_target_key);
@@ -1615,10 +1616,15 @@ TEST(Group_CascadeNotify_TableClear)
         CHECK_EQUAL(col_link_list, notification.links[1].origin_col_ndx);
         CHECK_EQUAL(o_keys[3], notification.links[1].origin_key);
         CHECK_EQUAL(t_keys[4], notification.links[1].old_target_key);
+
+        CHECK_EQUAL(col_link_list, notification.links[2].origin_col_ndx);
+        CHECK_EQUAL(o_keys[5], notification.links[2].origin_key);
+        CHECK_EQUAL(t_keys[4], notification.links[2].old_target_key);
     });
     t->clear();
     t_keys.clear();
     CHECK(called);
+    g.verify();
 
     t->create_objects(10, t_keys);
 

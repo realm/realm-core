@@ -75,7 +75,6 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
             for (size_t i = 0; i < sz; i++) {
                 clear_link(ObjKey(backlink_list.get(i)));
             }
-            backlink_list.destroy();
         }
     }
 }
