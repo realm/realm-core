@@ -97,6 +97,8 @@ SlabAlloc::SlabAlloc()
         m_section_bases[i] = compute_section_base(i);
     }
     m_section_bases[m_num_section_bases] = max;
+    for (int j = 0; j < small_blocks_range; ++j)
+    	small_blocks[j] = nullptr;
 }
 
 util::File& SlabAlloc::get_file()
@@ -205,6 +207,9 @@ void SlabAlloc::detach() noexcept
     }
     m_slabs.clear();
 
+    for (auto& e : m_small_blocks) e = nullptr;
+    m_large_blocks.clear();
+
     m_attach_mode = attach_None;
 }
 
@@ -236,7 +241,7 @@ SlabAlloc::~SlabAlloc() noexcept
 }
 
 
-MemRef SlabAlloc::do_alloc(const size_t size)
+MemRef SlabAlloc::do_alloc(size_t size)
 {
 #ifdef REALM_SLAB_ALLOC_TUNE
     static int64_t memstat_requested = 0;
@@ -266,58 +271,80 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 
     m_free_space_state = free_space_Dirty;
 
-    // Do we have a free space we can reuse?
-    {
-        typedef chunks::reverse_iterator iter;
-        iter rend = m_free_space.rend();
-        for (iter i = m_free_space.rbegin(); i != rend; ++i) {
-            if (size <= i->size) {
+    // minimal allocation is sizeof(FreeListEntry)
+    if (size < sizeof(FreeListEntry))
+    	size = sizeof(FreeListEntry);
+    // align to multipla of 8
+    if (size & 0x7)
+    	size = (size + 7) & ~0x7;
 
-#if REALM_ENABLE_MEMDEBUG
-                // Pick a *random* match instead of just the first. This will increase the chance of catching
-                // use-after-free bugs in Core. It's chosen such that the mathematical average of all picked
-                // positions is the middle of the list.
-                iter j = i;
-                while (j != rend && (size > j->size || fastrand() % (m_free_space.size() / 2 + 1) != 0)) {
-                    j++;
-                }
-                if (j != rend)
-                    i = j;
-#endif
-
-                ref_type ref = i->ref;
-                size_t rest = i->size - size;
-
-                // Update free list
-                if (rest == 0) {
-                    // Erase by "move last over"
-                    *i = m_free_space.back();
-                    m_free_space.pop_back();
-                }
-                else {
-                    i->size = rest;
-                    i->ref += size;
-                }
+    FreeListEntry* entry = allocate_first_match(size);
+    mark_allocated(entry);
+    ref_type ref = entry->ref;
 
 #ifdef REALM_DEBUG
-                if (REALM_COVER_NEVER(m_debug_out))
-                    std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
+    if (REALM_COVER_NEVER(m_debug_out))
+    	std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
-                char* addr = translate(ref);
+    char* addr = reinterpret_cast<char*>(entry);
+    REALM_ASSERT(addr == translate(ref))
+
 #if REALM_ENABLE_ALLOC_SET_ZERO
-                std::fill(addr, addr + size, 0);
+    std::fill(addr, addr + size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
-                malloc_debug_map[ref] = malloc(1);
+    malloc_debug_map[ref] = malloc(1);
 #endif
-                REALM_ASSERT_EX(ref >= m_baseline, ref, m_baseline);
-                return MemRef(addr, ref, *this);
-            }
-        }
-    }
+    REALM_ASSERT_EX(ref >= m_baseline, ref, m_baseline);
+    return MemRef(addr, ref, *this);
+}
 
+SlabAlloc::FreeListEntry* SlabAlloc::allocate_first_match(size_t size)
+{
+	int entry = size >> 8;
+	// small block
+	if (entry < small_blocks_range) {
+		if (m_small_blocks[entry] != nullptr) {
+			return pop_freelist_entry(m_small_blocks[entry]);
+		}
+		// look for something larger to break into small pieces.
+		// make sure it is a large block, and holds at least 20 pieces:
+		int num = small_blocks_range / entry;
+		if (num < 20)
+			num = 20;
+		int look_for = num * size + (num - 1) * sizeof(BetweenBlocks);
+		FreeListEntry* e = allocate_first_match(look_for);
+		// break up the returned entry, first to get the one we want to allocate
+		FreeListEntry* retval = break_block(e, size);
+		// then add the rest as individual blocks of same size
+		while (FreeListEntry* new_free = break_block(e, size)) {
+			push_freelist_entry(m_small_blocks[entry], e);
+		}
+		return retval;
+	}
 
+	// we need a large block. Find the first that is large enough
+	auto it = m_large_blocks.lower_bound(entry);
+	if (it != m_large_blocks.end() && it->first == size) {
+		// exact match
+		auto retval = pop_freelist_entry(it->second);
+		if (it->second == nullptr)
+			m_large_blocks.erase(it);
+		return retval;
+	}
+
+	// take care of special case: rest of block must be large enough to allow break up
+	while (it != m_large_blocks.end() && it->first < size + sizeof(FreeListEntry) + sizeof(BetweenBlocks))
+		++it;
+
+	// no block is large enough, so lets add one
+	if (it == m_large_blocks.end()) {
+	}
+
+}
+
+#if 0
     // Allocate new slab. To avoid wasting physical memory, we allocate a page
     size_t new_size = size > page_size() ? size : page_size();
     ref_type ref;
@@ -401,23 +428,20 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     REALM_ASSERT_EX(ref >= m_baseline, ref, m_baseline);
     return MemRef(slab.addr, ref, *this);
 }
+#endif
 
 
 void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 {
     REALM_ASSERT_3(translate(ref), ==, addr);
 
-    // Free space in read only segment is tracked separately
     bool read_only = is_read_only(ref);
-    chunks& free_space = read_only ? m_free_read_only : m_free_space;
-
 #ifdef REALM_SLAB_ALLOC_DEBUG
     free(malloc_debug_map[ref]);
 #endif
 
     // Get size from segment
     size_t size = read_only ? Array::get_byte_size_from_header(addr) : Array::get_capacity_from_header(addr);
-    ref_type ref_end = ref + size;
 
 #ifdef REALM_DEBUG
     if (REALM_COVER_NEVER(m_debug_out))
@@ -433,61 +457,37 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 
     m_free_space_state = free_space_Dirty;
 
-#ifdef REALM_DEBUG
-    // Check for double free
-    for (auto& c : free_space) {
-        if ((ref >= c.ref && ref < (c.ref + c.size)) || (ref < c.ref && ref_end > c.ref)) {
-            REALM_ASSERT(false && "Double Free");
-        }
-    }
-#endif
 
-    // Check if we can merge with adjacent succeeding free block
-    typedef chunks::iterator iter;
-    iter merged_with = free_space.end();
-    if (!read_only) {
-        {
-            iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEq(ref_end));
-            if (i != free_space.end()) {
-                // No consolidation over slab borders
-                if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref_end)) == m_slabs.end()) {
-                    i->ref = ref;
-                    i->size += size;
-                    merged_with = i;
-                }
-            }
-        }
-
-        // Check if we can merge with adjacent preceeding free block (not if that
-        // would cross slab boundary)
-        if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref)) == m_slabs.end()) {
-            iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEndEq(ref));
-            if (i != free_space.end()) {
-                if (merged_with != free_space.end()) {
-                    i->size += merged_with->size;
-                    // Erase by "move last over"
-                    *merged_with = free_space.back();
-                    free_space.pop_back();
-                }
-                else {
-                    i->size += size;
-                }
-                return;
-            }
-        }
-    }
-
-    // Else just add to freelist
-    if (merged_with == free_space.end()) {
-        try {
+    if (read_only) {
+        // Free space in read only segment is tracked separately
+    	try {
             Chunk chunk;
             chunk.ref = ref;
             chunk.size = size;
-            free_space.push_back(chunk); // Throws
+            m_free_read_only.push_back(chunk); // Throws
         }
         catch (...) {
             m_free_space_state = free_space_Invalid;
         }
+    }
+    else {
+    	// fixup size to take into account the allocator's need to store a FreeListEntry in a freed block
+    	if (size < sizeof(FreeListEntry))
+    		size = sizeof(FreeListEntry);
+    	// align to multipla of 8
+    	if (size & 0x7)
+    		size = (size + 7) & ~0x7;
+
+    	// validate size by checking surrounding BeetweenBlocks
+    	const BetweenBlocks* prev_between = reinterpret_cast<const BetweenBlocks*>(addr) - 1;
+    	REALM_ASSERT(prev_between->block_after_size < 0); // block is marked in use
+    	REALM_ASSERT(prev_between->block_after_size == -size);
+    	const BetweenBlocks* next_between = reinterpret_cast<const BetweenBlocks*>(addr + size);
+    	REALM_ASSERT(next_between->block_before_size < 0);
+    	REALM_ASSERT(next_between->block_before_size == -size);
+
+    	// FIXME: cannot use mark_freed, needs to include stuffing in the ref...
+    	add_free_block(ref, addr, size);
     }
 }
 
