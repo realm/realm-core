@@ -1908,7 +1908,7 @@ public:
             while (++i_2 != end) {
                 ref_type prev_ref_end = i_1->ref + i_1->size;
                 REALM_ASSERT_3(prev_ref_end, <=, i_2->ref);
-                if (i_2->ref == prev_ref_end) {
+                if (i_2->ref == prev_ref_end) { // in-file
                     i_1->size += i_2->size; // Merge
                 }
                 else {
@@ -2045,11 +2045,11 @@ void Group::verify() const
     mem_usage_1.canonicalize();
     mem_usage_2.clear();
 
-    // Check the concistency of the allocation of the mutable memory that has
+    // Check the consistency of the allocation of the mutable memory that has
     // been marked as free
-    for (const auto& free_block : m_alloc.m_free_space) {
-        mem_usage_2.add_mutable(free_block.ref, free_block.size);
-    }
+    m_alloc.for_all_free_entries(
+    		[&](ref_type ref, int sz) { mem_usage_2.add_mutable(ref, sz); }
+    		);
     mem_usage_2.canonicalize();
     mem_usage_1.add(mem_usage_2);
     mem_usage_1.canonicalize();

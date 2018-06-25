@@ -21,6 +21,7 @@
 
 #include <cstdint> // unint8_t etc
 #include <vector>
+#include <map>
 #include <string>
 #include <atomic>
 
@@ -300,9 +301,9 @@ public:
 
 protected:
     MemRef do_alloc(const size_t size) override;
-    MemRef do_realloc(ref_type, const char*, size_t old_size, size_t new_size) override;
+    MemRef do_realloc(ref_type, char*, size_t old_size, size_t new_size) override;
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    void do_free(ref_type, const char*) noexcept override;
+    void do_free(ref_type, char*) noexcept override;
     char* do_translate(ref_type) const noexcept override;
 
     /// Returns the first section boundary *above* the given position.
@@ -355,11 +356,103 @@ private:
         ref_type ref_end;
         char* addr;
     };
-    struct Chunk {
+    struct Chunk { // describes a freed in-file block
         ref_type ref;
         size_t size;
     };
 
+    // free blocks that are in the slab area are managed using the following structures:
+    struct FreeBlock {
+    	ref_type ref; // ref for this entry. Saves a reverse translate / representing links as refs
+    	FreeBlock* prev; // circular doubly linked list
+    	FreeBlock* next;
+    };
+    struct BetweenBlocks { // stores sizes and used/free status of blocks before and after.
+    	int32_t block_before_size; // negated if block is in use,
+    	int32_t block_after_size;  // positive if block is free - and zero at end
+    };
+    // Disabling special small blocks handling:
+    // The design provides free/re-allocation of small blocks without merging/breaking.
+    // giving O(1) cost for these operations.
+    // Larger blocks are always merged when possible, resulting in O(log N) cost.
+    // At the moment, we cannot observe the benefit in O(1) for small blocks in
+    // real workloads - and the approach introduces some risk of increased fragmentation.
+    // Setting small_blocks_range to 1 effectively disables special
+    // handling of small blocks, treating all blocks as large blocks.
+    const static int small_blocks_range = 1;
+    FreeBlock* m_small_blocks[small_blocks_range];
+    using FreeListMap = std::map<int, FreeBlock*>;
+    FreeListMap m_large_blocks;
+
+    // abstract notion of a freelist
+    struct FreeList {
+    	int size = 0; // size of every element in the list, 0 if not found
+    	FreeListMap::iterator it;
+    	bool found_something() { return size != 0; }
+    	bool found_exact(int sz) { return size == sz; }
+    };
+
+    // simple helper functions for navigating blocks and betweenblocks (TM)
+    bool is_small_block(int size)
+    {
+    	return size < (small_blocks_range << 3);
+    }
+    BetweenBlocks* bb_before(FreeBlock* entry) const {
+    	return reinterpret_cast<BetweenBlocks*>(entry) - 1;
+    }
+    BetweenBlocks* bb_after(FreeBlock* entry) const {
+    	auto bb = bb_before(entry);
+    	size_t sz = bb->block_after_size;
+    	char* addr = reinterpret_cast<char*>(entry) + sz;
+    	return reinterpret_cast<BetweenBlocks*>(addr);
+    }
+    FreeBlock* block_before(BetweenBlocks* bb) const {
+    	size_t sz = bb->block_before_size;
+    	if (sz <= 0) return nullptr; // only blocks that are not in use
+    	char* addr = reinterpret_cast<char*>(bb) - sz;
+    	return reinterpret_cast<FreeBlock*>(addr);
+    }
+    FreeBlock* block_after(BetweenBlocks* bb) const {
+    	if (bb->block_after_size <= 0)
+    		return nullptr;
+    	return reinterpret_cast<FreeBlock*>(bb + 1);
+    }
+    int block_size(FreeBlock* entry) const {
+    	return bb_before(entry)->block_after_size;
+    }
+    template<typename Func>
+    void for_all_free_entries(Func f) const;
+    FreeBlock* allocate_block(int size);
+    FreeList find(int size);
+    FreeList find_larger(FreeList hint, int size);
+    FreeBlock* pop_freelist_entry(FreeList list);
+    void push_freelist_entry(FreeBlock* entry);
+    void entry_unlink(FreeBlock* entry);
+    int size_from_block(FreeBlock* entry);
+    bool break_block(FreeBlock* block, int new_size, FreeBlock* &remaining_block);
+    FreeBlock* merge_blocks(FreeBlock* first, FreeBlock* second);
+    void produce_many_small_blocks(int block_size);
+    // grow the slab area to accommodate the requested size.
+    // returns a free block large enough to handle the request.
+    FreeBlock* grow_slab_for(int request_size);
+    void rebuild_freelists_from_slab();
+    void clear_freelists();
+    // create a single freelist entry with "BetweenBlocks" at both ends and a
+    // single free chunk between them. This free chunk will be of size:
+    //   slab_size - 2 * sizeof(BetweenBlocks)
+    FreeBlock* slab_to_entry(Slab slab, ref_type ref_start);
+    FreeBlock* get_prev_block_if_mergeable(FreeBlock* block);
+    FreeBlock* get_next_block_if_mergeable(FreeBlock* block);
+
+    void add_free_block(ref_type ref, FreeBlock* addr, size_t size);
+    // void insert_freelist_entry(FreeListEntry* &header, FreeListEntry* element);
+    void remove_freelist_entry(FreeBlock* element);
+
+    FreeBlock* pop_freelist_entry(FreeBlock* &header);
+    void push_freelist_entry(FreeBlock* &header, FreeBlock* element);
+    void mark_allocated(FreeBlock* entry);
+    // mark the entry freed in bordering BetweenBlocks. Also validate size.
+    void mark_freed(FreeBlock* entry, int size);
     // Values of each used bit in m_flags
     enum {
         flags_SelectBit = 1,
@@ -427,7 +520,6 @@ private:
     typedef std::vector<Slab> slabs;
     typedef std::vector<Chunk> chunks;
     slabs m_slabs;
-    chunks m_free_space;
     chunks m_free_read_only;
 
     bool m_debug_out = false;
@@ -469,6 +561,7 @@ private:
     }
 
     friend class Group;
+    friend class MemUsageVerifier;
     friend class SharedGroup;
     friend class GroupWriter;
 };
@@ -566,6 +659,33 @@ inline bool SlabAlloc::matches_section_boundary(size_t pos) const noexcept
 inline size_t SlabAlloc::get_section_base(size_t index) const noexcept
 {
     return m_section_bases[index];
+}
+
+template<typename Func>
+void SlabAlloc::for_all_free_entries(Func f) const
+{
+	ref_type ref = m_baseline;
+	for (auto& e : m_slabs) {
+		BetweenBlocks* bb = reinterpret_cast<BetweenBlocks*>(e.addr);
+		REALM_ASSERT(bb->block_before_size == 0);
+		while (1) {
+			int size = bb->block_after_size;
+			f(ref, sizeof(BetweenBlocks));
+			ref += sizeof(BetweenBlocks);
+			if (size == 0) {
+				break;
+			}
+			if (size > 0) { // freeblock.
+				f(ref, size);
+				bb = reinterpret_cast<BetweenBlocks*>(reinterpret_cast<char*>(bb) + sizeof(BetweenBlocks) + size);
+				ref += size;
+			}
+			else {
+				bb = reinterpret_cast<BetweenBlocks*>(reinterpret_cast<char*>(bb) + sizeof(BetweenBlocks) - size);
+				ref -= size;
+			}
+		}
+	}
 }
 
 } // namespace realm
