@@ -89,7 +89,7 @@ ObjList::ObjList(KeyColumn* key_values)
 }
 
 ObjList::ObjList(KeyColumn* key_values, const Table* parent)
-    : m_table(parent->get_table_ref())
+    : m_table(parent)
     , m_key_values(key_values)
 #ifdef REALM_COOKIE_CHECK
     , m_debug_cookie(cookie_expected)
@@ -109,5 +109,5 @@ ConstObj ObjList::get_object(size_t row_ndx) const
 void ObjList::assign(KeyColumn* key_values, const Table* parent)
 {
     m_key_values = key_values;
-    m_table = parent ? parent->get_table_ref() : TableRef();
+    m_table = ConstTableRef(parent);
 }

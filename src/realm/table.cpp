@@ -2521,8 +2521,12 @@ Table::Iterator Table::end()
 
 TableRef _impl::TableFriend::get_opposite_link_table(const Table& table, ColKey col_key)
 {
-    auto target_table_key = table.m_spec.get_opposite_link_table_key(table.colkey2ndx(col_key));
-    return table.get_parent_group()->get_table(target_table_key);
+    TableRef ret;
+    if (col_key) {
+        auto target_table_key = table.m_spec.get_opposite_link_table_key(table.colkey2ndx(col_key));
+        ret = table.get_parent_group()->get_table(target_table_key);
+    }
+    return ret;
 }
 
 const uint64_t Table::max_num_columns;

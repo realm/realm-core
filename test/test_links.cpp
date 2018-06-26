@@ -583,10 +583,20 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(key0, links.get(2));
     CHECK_EQUAL(Wed, Days(links[0].get<Int>(day_col)));
 
-    LnkLst links1 = links;
+    LnkLst default_list;
+    CHECK_EQUAL(0, default_list.size());
+
+    LnkLst links0 = default_list; // Copy construction from default object
+    CHECK_EQUAL(0, links0.size());
+
+    LnkLst links1 = links; // Copy construction
     CHECK_EQUAL(3, links1.size());
+
     LnkLst links2;
-    links2 = links;
+    links2 = default_list; // Assignment from default
+    CHECK_EQUAL(0, links2.size());
+
+    links2 = links; // Assignment
     CHECK_EQUAL(3, links2.size());
     ObjList* obj_list = &links2;
     CHECK_EQUAL(key2, obj_list->get_key(0));
