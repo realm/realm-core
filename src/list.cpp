@@ -88,18 +88,34 @@ List& List::operator=(const List&) = default;
 List::List(List&&) = default;
 List& List::operator=(List&&) = default;
 
-List::List(std::shared_ptr<Realm> r, Obj& parent_obj, ColKey col)
+List::List(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
 : m_realm(std::move(r))
 , m_type(ObjectSchema::from_core_type(*parent_obj.get_table(), col) & ~PropertyType::Array)
 , m_list_base(get_list(m_type, parent_obj, col))
 {
 }
 
-std::unique_ptr<LstBase> List::get_list(PropertyType type, Obj& parent_obj, ColKey col)
+List::List(std::shared_ptr<Realm> r, const LstBase& list)
+: m_realm(std::move(r))
+, m_type(ObjectSchema::from_core_type(*list.get_table(), list.get_col_key()) & ~PropertyType::Array)
+, m_list_base(get_list(m_type, list))
+{
+}
+
+std::unique_ptr<LstBase> List::get_list(PropertyType type, const Obj& parent_obj, ColKey col)
 {
     return switch_on_type(type, [&](auto t) {
         using T = std::decay_t<decltype(*t)>;
         return std::unique_ptr<LstBase>(new typename ListType<T>::type(parent_obj, col));
+    });
+}
+
+std::unique_ptr<LstBase> List::get_list(PropertyType type, const LstBase& list)
+{
+    return switch_on_type(type, [&](auto t) {
+        using T = std::decay_t<decltype(*t)>;
+        auto& l = static_cast<const typename ListType<T>::type&>(list);
+        return std::unique_ptr<LstBase>(new typename ListType<T>::type(l));
     });
 }
 
@@ -126,7 +142,7 @@ Query List::get_query() const
 {
     verify_attached();
     if (m_type == PropertyType::Object)
-        return m_list_base->get_table()->where(as<Obj>());
+        return static_cast<LnkLst&>(*m_list_base).get_target_table().where(as<Obj>());
     throw std::runtime_error("not implemented");
 }
 
@@ -144,7 +160,7 @@ void List::verify_valid_row(size_t row_ndx, bool insertion) const
     }
 }
 
-void List::validate(Obj obj) const
+void List::validate(const Obj& obj) const
 {
     if (!obj.is_valid())
         throw std::invalid_argument("Object has been deleted or invalidated");
@@ -250,6 +266,15 @@ void List::insert(size_t row_ndx, T value)
     as<T>().insert(row_ndx, from_optional(value));
 }
 
+template<>
+void List::insert(size_t row_ndx, Obj o)
+{
+    verify_in_transaction();
+    verify_valid_row(row_ndx, true);
+    validate(o);
+    as<Obj>().insert(row_ndx, o.get_key());
+}
+
 void List::move(size_t source_ndx, size_t dest_ndx)
 {
     verify_in_transaction();
@@ -283,6 +308,15 @@ void List::set(size_t row_ndx, T value)
     as<T>().set(row_ndx, from_optional(value));
 }
 
+template<>
+void List::set(size_t row_ndx, Obj o)
+{
+    verify_in_transaction();
+    verify_valid_row(row_ndx);
+    validate(o);
+    as<Obj>().set(row_ndx, o.get_key());
+}
+
 void List::swap(size_t ndx1, size_t ndx2)
 {
     verify_in_transaction();
@@ -313,7 +347,7 @@ void List::delete_all()
 Results List::sort(SortDescriptor order) const
 {
     verify_attached();
-    return Results(m_realm, *m_list_base, util::none, std::move(order));
+    return Results(m_realm, std::dynamic_pointer_cast<LnkLst>(m_list_base), util::none, std::move(order));
 }
 
 Results List::sort(std::vector<std::pair<std::string, bool>> const& keypaths) const
@@ -324,13 +358,13 @@ Results List::sort(std::vector<std::pair<std::string, bool>> const& keypaths) co
 Results List::filter(Query q) const
 {
     verify_attached();
-    return Results(m_realm, *m_list_base, get_query().and_query(std::move(q)));
+    return Results(m_realm, std::dynamic_pointer_cast<LnkLst>(m_list_base), get_query().and_query(std::move(q)));
 }
 
 Results List::as_results() const
 {
     verify_attached();
-    return Results(m_realm, *m_list_base);
+    return Results(m_realm, std::dynamic_pointer_cast<LnkLst>(m_list_base));
 }
 
 Results List::snapshot() const
@@ -459,6 +493,7 @@ REALM_PRIMITIVE_LIST_TYPE(double)
 REALM_PRIMITIVE_LIST_TYPE(StringData)
 REALM_PRIMITIVE_LIST_TYPE(BinaryData)
 REALM_PRIMITIVE_LIST_TYPE(Timestamp)
+REALM_PRIMITIVE_LIST_TYPE(ObjKey)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<bool>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<int64_t>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<float>)

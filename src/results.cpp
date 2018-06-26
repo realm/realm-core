@@ -48,16 +48,12 @@ Results::Results(SharedRealm r, Table& table)
 }
 
 Results::Results(SharedRealm, TableView, DescriptorOrdering) { throw std::runtime_error("not implemented"); }
-Results::Results(std::shared_ptr<Realm>, LstBase&, util::Optional<Query>, SortDescriptor)
-{ throw std::runtime_error("not implemented"); }
-
-#if 0
-Results::Results(SharedRealm r, LinkListRef lv, util::Optional<Query> q, SortDescriptor s)
+Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> lv, util::Optional<Query> q, SortDescriptor s)
 : m_realm(std::move(r))
 , m_link_list(lv)
 , m_mode(Mode::LinkList)
 {
-    m_table = lv->get_target_table();
+    m_table = TableRef(&m_link_list->get_target_table());
     if (q) {
         m_query = std::move(*q);
         m_mode = Mode::Query;
@@ -65,6 +61,7 @@ Results::Results(SharedRealm r, LinkListRef lv, util::Optional<Query> q, SortDes
     m_descriptor_ordering.append_sort(std::move(s));
 }
 
+#if 0
 Results::Results(SharedRealm r, TableView tv, DescriptorOrdering o)
 : m_realm(std::move(r))
 , m_table_view(std::move(tv))
@@ -77,8 +74,8 @@ Results::Results(SharedRealm r, TableView tv, DescriptorOrdering o)
 
 Results::Results(const Results&) = default;
 Results& Results::operator=(const Results&) = default;
-Results::Results(Results&& other) = default;
-Results& Results::operator=(Results&& other) = default;
+Results::Results(Results&&) = default;
+Results& Results::operator=(Results&&) = default;
 
 bool Results::is_valid() const
 {
@@ -86,8 +83,8 @@ bool Results::is_valid() const
         m_realm->verify_thread();
     }
 
-//    if (m_table && !m_table->is_valid())
-//        return false;
+    if (((const Table*)m_table) != nullptr)
+        return (bool)m_table;
 
     return true;
 }
@@ -169,7 +166,7 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
         case Mode::LinkList:
             if (update_linklist()) {
                 if (row_ndx < m_link_list->size())
-                    m_link_list->get_object(row_ndx);
+                    return m_link_list->get_object(row_ndx);
 //                    return realm::get<T>(*m_table, m_link_list->get(row_ndx).get_index());
                 break;
             }
@@ -230,7 +227,7 @@ void Results::evaluate_query_if_needed(bool wants_notifications)
         return;
     }
 
-    if (m_notifier)
+    // if (m_notifier) FIXME: Why was this condition added?
 
     switch (m_mode) {
         case Mode::Empty:
@@ -295,7 +292,7 @@ size_t Results::index_of(Obj const& row)
 }
 
 template<typename T>
-size_t Results::index_of(T const& value)
+size_t Results::index_of(T const&)
 {
     throw "not implementd";
 #if 0
@@ -599,7 +596,7 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
 Results Results::sort(SortDescriptor&& sort) const
 {
     if (m_mode == Mode::LinkList)
-        return Results(m_realm, *m_link_list, util::none, std::move(sort));
+        return Results(m_realm, m_link_list, util::none, std::move(sort));
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_sort(std::move(sort));
     return Results(m_realm, get_query(), std::move(new_order));

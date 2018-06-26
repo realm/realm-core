@@ -47,7 +47,8 @@ class ListNotifier;
 class List {
 public:
     List() noexcept;
-    List(std::shared_ptr<Realm> r, Obj& parent_obj, ColKey col);
+    List(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
+    List(std::shared_ptr<Realm> r, const LstBase& list);
     ~List();
 
     List(const List&);
@@ -148,7 +149,8 @@ public:
         size_t valid_count;
     };
 
-    static std::unique_ptr<LstBase> get_list(PropertyType type, Obj& parent_obj, ColKey col);
+    static std::unique_ptr<LstBase> get_list(PropertyType type, const Obj& parent_obj, ColKey col);
+    static std::unique_ptr<LstBase> get_list(PropertyType type, const LstBase& list);
 
 private:
     friend ThreadSafeReference<List>;
@@ -160,7 +162,7 @@ private:
     std::shared_ptr<LstBase> m_list_base;
 
     void verify_valid_row(size_t row_ndx, bool insertion = false) const;
-    void validate(Obj) const;
+    void validate(const Obj&) const;
 
     template<typename Fn>
     auto dispatch(Fn&&) const;

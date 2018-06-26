@@ -43,7 +43,7 @@ public:
     Results(std::shared_ptr<Realm> r, Table& table);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
-    Results(std::shared_ptr<Realm> r, LstBase& list, util::Optional<Query> q = {}, SortDescriptor s = {});
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {}, SortDescriptor s = {});
     ~Results();
 
     // Results is copyable and moveable

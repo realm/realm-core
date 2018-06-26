@@ -66,6 +66,10 @@ TEST_CASE("list") {
     auto target = r->read_group().get_table("class_target");
     auto other_origin = r->read_group().get_table("class_other_origin");
     auto other_target = r->read_group().get_table("class_other_target");
+    ColKey col_link = origin->get_column_key("array");
+    ColKey col_value = target->get_column_key("value");
+    ColKey other_col_link = other_origin->get_column_key("array");
+    ColKey other_col_value = other_target->get_column_key("value");
 
     r->begin_transaction();
 
@@ -74,8 +78,6 @@ TEST_CASE("list") {
     for (int i = 0; i < 10; ++i)
         target->get_object(target_keys[i]).set_all(i);
 
-    ColKey col_link = origin->get_column_key("array");
-    ColKey col_value = target->get_column_key("value");
     Obj obj = origin->create_object();
     auto lv = obj.get_linklist_ptr(col_link);
     for (int i = 0; i < 10; ++i)
@@ -88,7 +90,6 @@ TEST_CASE("list") {
     other_target->create_objects(10, other_target_keys);
     for (int i = 0; i < 10; ++i)
         other_target->get_object(other_target_keys[i]).set_all(i);
-    ColKey other_col_link = other_origin->get_column_key("array");
     auto other_lv = other_origin->create_object().get_linklist_ptr(other_col_link);
     for (int i = 0; i < 10; ++i)
         other_lv->add(other_target_keys[i]);
@@ -96,7 +97,7 @@ TEST_CASE("list") {
     r->commit_transaction();
 
     auto r2 = coordinator.get_realm();
-    // auto r2_lv = r2->read_group().get_table("class_origin")->get_linklist(1, 0);
+    auto r2_lv = r2->read_group().get_table("class_origin")->get_object(0).get_linklist_ptr(col_link);
 
     SECTION("add_notification_block()") {
         CollectionChangeSet change;
@@ -186,24 +187,24 @@ TEST_CASE("list") {
             REQUIRE(change.modifications.empty());
         }
 
-#if 0
         SECTION("modifying a row which appears multiple times in a list marks them all as modified") {
             r->begin_transaction();
-            lst.add(5);
+            lst.add(target_keys[5]);
             r->commit_transaction();
 
             auto token = require_change();
-            write([&] { target->set_int(0, 5, 10); });
+            write([&] { target->get_object(target_keys[5]).set(col_value, 10); });
             REQUIRE_INDICES(change.modifications, 5, 10);
         }
-
+#if 0
+        // FIXME: Why does this not work?
         SECTION("deleting a row which appears multiple times in a list marks them all as modified") {
             r->begin_transaction();
-            lst.add(5);
+            lst.add(target_keys[5]);
             r->commit_transaction();
 
             auto token = require_change();
-            write([&] { target->move_last_over(5); });
+            write([&] { target->remove_object(target_keys[5]); });
             REQUIRE_INDICES(change.deletions, 5, 10);
         }
 
@@ -212,7 +213,7 @@ TEST_CASE("list") {
             write([&] { target->clear(); });
             REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
         }
-
+#endif
         SECTION("moving a target row does not send a change notification") {
             // Remove a row from the LV so that we have one to delete that's not in the list
             r->begin_transaction();
@@ -220,26 +221,27 @@ TEST_CASE("list") {
             r->commit_transaction();
 
             auto token = require_no_change();
-            write([&] { target->move_last_over(2); });
+            write([&] { target->remove_object(target_keys[2]); });
         }
-
-        SECTION("multiple LinkViws for the same LinkList can get notifications") {
+#if 0
+        SECTION("multiple LinkViews for the same LinkList can get notifications") {
             r->begin_transaction();
             target->clear();
-            target->add_empty_row(5);
+            std::vector<ObjKey> keys;
+            target->create_objects(5, keys);
             r->commit_transaction();
 
             auto get_list = [&] {
                 auto r = Realm::get_shared_realm(config);
-                auto lv = r->read_group().get_table("class_origin")->get_linklist(1, 0);
-                return List(r, lv);
+                auto obj = r->read_group().get_table("class_origin")->get_object(0);
+                return List(r, obj, col_link);
             };
             auto change_list = [&] {
                 r->begin_transaction();
                 if (lv->size()) {
-                    target->set_int(0, lv->size() - 1, lv->size());
+                    target->get_object(lv->size() - 1).set(col_value, int64_t(lv->size()));
                 }
-                lv->add(lv->size());
+                lv->add(keys[lv->size()]);
                 r->commit_transaction();
             };
 
@@ -280,13 +282,13 @@ TEST_CASE("list") {
                 REQUIRE_INDICES(changes[i].modifications, 2);
             }
         }
-
+#endif
         SECTION("multiple callbacks for the same Lists can be skipped individually") {
             auto token = require_no_change();
             auto token2 = require_change();
 
             r->begin_transaction();
-            lv->add(0);
+            lv->add(target_keys[0]);
             token.suppress_next();
             r->commit_transaction();
 
@@ -297,14 +299,14 @@ TEST_CASE("list") {
         SECTION("multiple Lists for the same LinkView can be skipped individually") {
             auto token = require_no_change();
 
-            List list2(r, lv);
+            List list2(r, obj, col_link);
             auto token2 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 change = c;
             });
             advance_and_notify(*r);
 
             r->begin_transaction();
-            lv->add(0);
+            lv->add(target_keys[0]);
             token.suppress_next();
             r->commit_transaction();
 
@@ -324,7 +326,7 @@ TEST_CASE("list") {
 
             // should now produce a notification
             r->begin_transaction();
-            lv->add(0);
+            lv->add(target_keys[0]);
             r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE_INDICES(change.insertions, 10);
@@ -332,11 +334,11 @@ TEST_CASE("list") {
 
         SECTION("modifying a different table does not send a change notification") {
             auto token = require_no_change();
-            write([&] { other_lv->add(0); });
+            write([&] { other_lv->add(other_target_keys[0]); });
         }
-
+#if 0
         SECTION("changes are reported correctly for multiple tables") {
-            List list2(r, other_lv);
+            List list2(r, *other_lv);
             CollectionChangeSet other_changes;
             auto token1 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 other_changes = std::move(c);
@@ -344,28 +346,28 @@ TEST_CASE("list") {
             auto token2 = require_change();
 
             write([&] {
-                lv->add(1);
+                lv->add(target_keys[1]);
 
-                other_origin->insert_empty_row(0);
-                other_lv->insert(1, 0);
+                other_origin->create_object();
+                other_lv->insert(1, other_target_keys[0]);
 
-                lv->add(2);
+                lv->add(target_keys[2]);
             });
             REQUIRE_INDICES(change.insertions, 10, 11);
             REQUIRE_INDICES(other_changes.insertions, 1);
 
             write([&] {
-                lv->add(3);
-                other_origin->move_last_over(1);
-                lv->add(4);
+                lv->add(target_keys[3]);
+                other_origin->get_object(1).remove();
+                lv->add(target_keys[4]);
             });
             REQUIRE_INDICES(change.insertions, 12, 13);
             REQUIRE_INDICES(other_changes.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
 
             write([&] {
-                lv->add(5);
+                lv->add(target_keys[5]);
                 other_origin->clear();
-                lv->add(6);
+                lv->add(target_keys[6]);
             });
             REQUIRE_INDICES(change.insertions, 14, 15);
         }
@@ -380,19 +382,19 @@ TEST_CASE("list") {
             });
 
             r2->begin_transaction();
-            r2->read_group().get_table("class_target")->set_int(0, 0, 10);
-            r2->read_group().get_table("class_other_target")->set_int(0, 1, 10);
+            r2->read_group().get_table("class_target")->get_object(0).set(col_value, 10);
+            r2->read_group().get_table("class_other_target")->get_object(1).set(other_col_value, 10);
             r2->commit_transaction();
 
-            List list2(r2, r2->read_group().get_table("class_other_origin")->get_linklist(0, 0));
+            List list2(r2, r2->read_group().get_table("class_other_origin")->get_object(0), other_col_link);
             auto token2 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 changes2 = std::move(c);
             });
 
             auto r3 = coordinator.get_realm();
             r3->begin_transaction();
-            r3->read_group().get_table("class_target")->set_int(0, 2, 10);
-            r3->read_group().get_table("class_other_target")->set_int(0, 3, 10);
+            r3->read_group().get_table("class_target")->get_object(2).set(col_value, 10);
+            r3->read_group().get_table("class_other_target")->get_object(3).set(other_col_value, 10);
             r3->commit_transaction();
 
             advance_and_notify(*r);
@@ -401,13 +403,13 @@ TEST_CASE("list") {
             REQUIRE_INDICES(changes1.modifications, 0, 2);
             REQUIRE_INDICES(changes2.modifications, 3);
         }
-
+#endif
         SECTION("modifications are reported for rows that are moved and then moved back in a second transaction") {
             auto token = require_change();
 
             r2->begin_transaction();
-            r2_lv->get(5).set_int(0, 10);
-            r2_lv->get(1).set_int(0, 10);
+            r2_lv->get_object(5).set(col_value, 10);
+            r2_lv->get_object(1).set(col_value, 10);
             r2_lv->move(5, 8);
             r2_lv->move(1, 2);
             r2->commit_transaction();
@@ -425,6 +427,8 @@ TEST_CASE("list") {
             REQUIRE_MOVES(change, {1, 2});
         }
 
+#if 0
+        // FIXME irrelevant?
         SECTION("moving the list's containing row does not break notifications") {
             auto token = require_change();
 
@@ -464,6 +468,7 @@ TEST_CASE("list") {
             REQUIRE(lst.size() == 14);
             REQUIRE(lst.get(13).get_index() == 4);
         }
+#endif
 
         SECTION("changes are sent in initial notification") {
             auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
@@ -522,13 +527,11 @@ TEST_CASE("list") {
                 REQUIRE_INDICES(change.deletions, 5);
             }
         }
-#endif
     }
 
-#if 0
     SECTION("sorted add_notification_block()") {
-        List lst(r, lv);
-        Results results = lst.sort({*target, {{0}}, {false}});
+        List lst(r, *lv);
+        Results results = lst.sort({{{col_value}}, {false}});
 
         int notification_calls = 0;
         CollectionChangeSet change;
@@ -547,20 +550,20 @@ TEST_CASE("list") {
 
             advance_and_notify(*r);
         };
-
+#if 0
         SECTION("add duplicates") {
             write([&] {
-                lst.add(5);
-                lst.add(5);
-                lst.add(5);
+                lst.add(target_keys[5]);
+                lst.add(target_keys[5]);
+                lst.add(target_keys[5]);
             });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 5, 6, 7);
         }
-
+#endif
         SECTION("change order by modifying target") {
             write([&] {
-                lst.get(5).set_int(0, 15);
+                lst.get(5).set(col_value, 15);
             });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 4);
@@ -583,8 +586,8 @@ TEST_CASE("list") {
     }
 
     SECTION("filtered add_notification_block()") {
-        List lst(r, lv);
-        Results results = lst.filter(target->where().less(0, 9));
+        List lst(r, *lv);
+        Results results = lst.filter(target->where().less(col_value, 9));
 
         int notification_calls = 0;
         CollectionChangeSet change;
@@ -603,17 +606,17 @@ TEST_CASE("list") {
 
             advance_and_notify(*r);
         };
-
+#if 0
         SECTION("add duplicates") {
             write([&] {
-                lst.add(5);
-                lst.add(5);
-                lst.add(5);
+                lst.add(target_keys[5]);
+                lst.add(target_keys[5]);
+                lst.add(target_keys[5]);
             });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 9, 10, 11);
         }
-
+#endif
         SECTION("swap") {
             write([&] {
                 lst.swap(1, 2);
@@ -649,50 +652,50 @@ TEST_CASE("list") {
 
     SECTION("sort()") {
         auto objectschema = &*r->schema().find("target");
-        List list(r, lv);
-        auto results = list.sort({*target, {{0}}, {false}});
+        List list(r, *lv);
+        auto results = list.sort({{{col_value}}, {false}});
 
         REQUIRE(&results.get_object_schema() == objectschema);
-        REQUIRE(results.get_mode() == Results::Mode::LinkView);
+        REQUIRE(results.get_mode() == Results::Mode::LinkList);
         REQUIRE(results.size() == 10);
 
         // Aggregates don't inherently have to convert to TableView, but do
         // because aggregates aren't implemented for LinkView
-        REQUIRE(results.sum(0) == 45);
+        REQUIRE(results.sum(col_value) == 45);
         REQUIRE(results.get_mode() == Results::Mode::TableView);
 
         // Reset to LinkView mode to test implicit conversion to TableView on get()
-        results = list.sort({*target, {{0}}, {false}});
+        results = list.sort({{{col_value}}, {false}});
         for (size_t i = 0; i < 10; ++i)
-            REQUIRE(results.get(i).get_index() == 9 - i);
+            REQUIRE(results.get(i).get_key() == target_keys[9 - i]);
         REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
         REQUIRE(results.get_mode() == Results::Mode::TableView);
 
         // Zero sort columns should leave it in LinkView mode
-        results = list.sort({*target, {}, {}});
+        results = list.sort(SortDescriptor());
         for (size_t i = 0; i < 10; ++i)
-            REQUIRE(results.get(i).get_index() == i);
+            REQUIRE(results.get(i).get_key() == target_keys[i]);
         REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
-        REQUIRE(results.get_mode() == Results::Mode::LinkView);
+        REQUIRE(results.get_mode() == Results::Mode::LinkList);
     }
 
     SECTION("filter()") {
         auto objectschema = &*r->schema().find("target");
-        List list(r, lv);
-        auto results = list.filter(target->where().greater(0, 5));
+        List list(r, *lv);
+        auto results = list.filter(target->where().greater(col_value, 5));
 
         REQUIRE(&results.get_object_schema() == objectschema);
         REQUIRE(results.get_mode() == Results::Mode::Query);
         REQUIRE(results.size() == 4);
 
         for (size_t i = 0; i < 4; ++i) {
-            REQUIRE(results.get(i).get_index() == i + 6);
+            REQUIRE(results.get(i).get_key().value == i + 6);
         }
     }
 
     SECTION("snapshot()") {
         auto objectschema = &*r->schema().find("target");
-        List list(r, lv);
+        List list(r, *lv);
 
         auto snapshot = list.snapshot();
         REQUIRE(&snapshot.get_object_schema() == objectschema);
@@ -705,30 +708,30 @@ TEST_CASE("list") {
         }
         REQUIRE(snapshot.size() == 10);
         for (size_t i = 0; i < snapshot.size(); ++i) {
-            REQUIRE(snapshot.get(i).is_attached());
+            REQUIRE(snapshot.get(i).is_valid());
         }
         for (size_t i = 0; i < 5; ++i) {
-            target->move_last_over(i);
+            target->remove_object(target_keys[i]);
         }
         REQUIRE(snapshot.size() == 10);
         for (size_t i = 0; i < 5; ++i) {
-            REQUIRE(!snapshot.get(i).is_attached());
+            REQUIRE(!snapshot.get(i).is_valid());
         }
         for (size_t i = 5; i < 10; ++i) {
-            REQUIRE(snapshot.get(i).is_attached());
+            REQUIRE(snapshot.get(i).is_valid());
         }
-        list.add(0);
+        list.add(target_keys[5]);
         REQUIRE(snapshot.size() == 10);
     }
 
     SECTION("get_object_schema()") {
-        List list(r, lv);
+        List list(r, *lv);
         auto objectschema = &*r->schema().find("target");
         REQUIRE(&list.get_object_schema() == objectschema);
     }
 
     SECTION("delete_at()") {
-        List list(r, lv);
+        List list(r, *lv);
         r->begin_transaction();
         auto initial_view_size = lv->size();
         auto initial_target_size = target->size();
@@ -739,7 +742,7 @@ TEST_CASE("list") {
     }
 
     SECTION("delete_all()") {
-        List list(r, lv);
+        List list(r, *lv);
         r->begin_transaction();
         list.delete_all();
         REQUIRE(lv->size() == 0);
@@ -748,7 +751,7 @@ TEST_CASE("list") {
     }
 
     SECTION("as_results().clear()") {
-        List list(r, lv);
+        List list(r, *lv);
         r->begin_transaction();
         list.as_results().clear();
         REQUIRE(lv->size() == 0);
@@ -757,7 +760,7 @@ TEST_CASE("list") {
     }
 
     SECTION("snapshot().clear()") {
-        List list(r, lv);
+        List list(r, *lv);
         r->begin_transaction();
         auto snapshot = list.snapshot();
         snapshot.clear();
@@ -769,111 +772,113 @@ TEST_CASE("list") {
     }
 
     SECTION("add(RowExpr)") {
-        List list(r, lv);
+        List list(r, *lv);
         r->begin_transaction();
         SECTION("adds rows from the correct table") {
-            list.add(target->get(5));
+            list.add(target_keys[5]);
             REQUIRE(list.size() == 11);
-            REQUIRE(list.get(10).get_index() == 5);
+            REQUIRE(list.get(10).get_key() == target_keys[5]);
         }
 
         SECTION("throws for rows from the wrong table") {
-            REQUIRE_THROWS(list.add(origin->get(0)));
+            REQUIRE_THROWS(list.add(obj));
         }
         r->cancel_transaction();
     }
 
     SECTION("insert(RowExpr)") {
-        List list(r, lv);
+        List list(r, *lv);
         r->begin_transaction();
 
         SECTION("insert rows from the correct table") {
-            list.insert(0, target->get(5));
+            list.insert(0, target_keys[5]);
             REQUIRE(list.size() == 11);
-            REQUIRE(list.get(0).get_index() == 5);
+            REQUIRE(list.get(0).get_key() == target_keys[5]);
         }
 
         SECTION("throws for rows from the wrong table") {
-            REQUIRE_THROWS(list.insert(0, origin->get(0)));
+            REQUIRE_THROWS(list.insert(0, obj));
         }
 
         SECTION("throws for out of bounds insertions") {
-            REQUIRE_THROWS(list.insert(11, target->get(5)));
-            REQUIRE_NOTHROW(list.insert(10, target->get(5)));
+            REQUIRE_THROWS(list.insert(11, target_keys[5]));
+            REQUIRE_NOTHROW(list.insert(10, target_keys[5]));
         }
         r->cancel_transaction();
     }
 
     SECTION("set(RowExpr)") {
-        List list(r, lv);
+        List list(r, *lv);
         r->begin_transaction();
 
         SECTION("assigns for rows from the correct table") {
-            list.set(0, target->get(5));
+            list.set(0, target_keys[5]);
             REQUIRE(list.size() == 10);
-            REQUIRE(list.get(0).get_index() == 5);
+            REQUIRE(list.get(0).get_key() == target_keys[5]);
         }
 
         SECTION("throws for rows from the wrong table") {
-            REQUIRE_THROWS(list.set(0, origin->get(0)));
+            REQUIRE_THROWS(list.set(0, obj));
         }
 
         SECTION("throws for out of bounds sets") {
-            REQUIRE_THROWS(list.set(10, target->get(5)));
+            REQUIRE_THROWS(list.set(10, target_keys[5]));
         }
         r->cancel_transaction();
     }
 
     SECTION("find(RowExpr)") {
-        List list(r, lv);
+        List list(r, *lv);
+        Obj obj1 = target->get_object(target_keys[1]);
+        Obj obj5 = target->get_object(target_keys[5]);
 
         SECTION("returns index in list for values in the list") {
-            REQUIRE(list.find(target->get(5)) == 5);
+            REQUIRE(list.find(obj5) == 5);
         }
 
         SECTION("returns index in list and not index in table") {
             r->begin_transaction();
             list.remove(1);
-            REQUIRE(list.find(target->get(5)) == 4);
-            REQUIRE(list.as_results().index_of(target->get(5)) == 4);
+            REQUIRE(list.find(obj5) == 4);
+            REQUIRE(list.as_results().index_of(obj5) == 4);
             r->cancel_transaction();
         }
 
         SECTION("returns npos for values not in the list") {
             r->begin_transaction();
             list.remove(1);
-            REQUIRE(list.find(target->get(1)) == npos);
-            REQUIRE(list.as_results().index_of(target->get(1)) == npos);
+            REQUIRE(list.find(obj1) == npos);
+            REQUIRE(list.as_results().index_of(obj1) == npos);
             r->cancel_transaction();
         }
 
         SECTION("throws for row in wrong table") {
-            REQUIRE_THROWS(list.find(origin->get(0)));
-            REQUIRE_THROWS(list.as_results().index_of(origin->get(0)));
+            REQUIRE_THROWS(list.find(obj));
+            REQUIRE_THROWS(list.as_results().index_of(obj));
         }
     }
 
     SECTION("find(Query)") {
-        List list(r, lv);
+        List list(r, *lv);
 
         SECTION("returns index in list for values in the list") {
-            REQUIRE(list.find(std::move(target->where().equal(0, 5))) == 5);
+            REQUIRE(list.find(std::move(target->where().equal(col_value, 5))) == 5);
         }
 
         SECTION("returns index in list and not index in table") {
             r->begin_transaction();
             list.remove(1);
-            REQUIRE(list.find(std::move(target->where().equal(0, 5))) == 4);
+            REQUIRE(list.find(std::move(target->where().equal(col_value, 5))) == 4);
             r->cancel_transaction();
         }
 
         SECTION("returns npos for values not in the list") {
-            REQUIRE(list.find(std::move(target->where().equal(0, 11))) == npos);
+            REQUIRE(list.find(std::move(target->where().equal(col_value, 11))) == npos);
         }
     }
-
+#if 0
     SECTION("add(Context)") {
-        List list(r, lv);
+        List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
         r->begin_transaction();
 
@@ -930,7 +935,7 @@ TEST_CASE("list") {
     }
 
     SECTION("get(Context)") {
-        List list(r, lv);
+        List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
 
         Object obj;
