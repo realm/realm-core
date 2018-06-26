@@ -563,23 +563,22 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
         throw LogicError(LogicError::target_row_index_out_of_range);
     }
 
-    update_if_needed();
-    ensure_writeable();
-
-    Allocator& alloc = get_alloc();
-    alloc.bump_content_version();
-    Array fallback(alloc);
-    Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
-    REALM_ASSERT(col_ndx + 1 < fields.size());
-    ArrayKey values(alloc);
-    values.set_parent(&fields, col_ndx + 1);
-    values.init_from_parent();
-
-    ObjKey old_key = values.get(m_row_ndx);
+    ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
 
     if (target_key != old_key) {
         CascadeState state;
+
+        ensure_writeable();
         bool recurse = replace_backlink(col_key, old_key, target_key, state);
+
+        Allocator& alloc = get_alloc();
+        alloc.bump_content_version();
+        Array fallback(alloc);
+        Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+        REALM_ASSERT(col_ndx + 1 < fields.size());
+        ArrayKey values(alloc);
+        values.set_parent(&fields, col_ndx + 1);
+        values.init_from_parent();
 
         values.set(m_row_ndx, target_key);
 

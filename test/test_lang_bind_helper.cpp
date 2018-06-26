@@ -1014,6 +1014,42 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_LinkToNeighbour)
+{
+    // This test checks that you can insert a link to an object that resides
+    // in the same cluster as the origin object.
+
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
+
+    // Start a read transaction (to be repeatedly advanced)
+    TransactionRef rt = sg->start_read();
+    CHECK_EQUAL(0, rt->size());
+    ColKey col;
+    std::vector<ObjKey> keys;
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_Int, "integers");
+        col = table->add_column_link(type_Link, "links", *table);
+        table->create_objects(10, keys);
+        wt.commit();
+    }
+    rt->advance_read();
+    rt->verify();
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        table->get_object(keys[0]).set(col, keys[1]);
+        table->get_object(keys[1]).set(col, keys[2]);
+        wt.commit();
+    }
+    rt->advance_read();
+    rt->verify();
+}
+
+
 TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
 {
     SHARED_GROUP_TEST_PATH(path);
