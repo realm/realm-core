@@ -8363,6 +8363,28 @@ TEST(Table_KeyRow)
     CHECK_EQUAL(i, 1);
 }
 
+TEST(Table_KeysRow)
+{
+    Table table;
+    table.add_column(type_Int, "int");
+    table.add_column(type_String, "string", true);
+    table.add_search_index(0);
+    table.add_search_index(1);
+
+    table.add_row_with_keys(0, 123, 1, "Hello, ");
+    table.add_row_with_keys(0, 456, 1, StringData());
+
+    size_t i = table.find_first_int(0, 123);
+    CHECK_EQUAL(i, 0);
+    i = table.find_first_int(0, 456);
+    CHECK_EQUAL(i, 1);
+
+    i = table.find_first_string(1, "Hello, ");
+    CHECK_EQUAL(i, 0);
+    i = table.find_first_string(1, StringData());
+    CHECK_EQUAL(i, 1);
+}
+
 TEST(Table_getLinkType)
 {
     Group g;

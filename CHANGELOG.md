@@ -10,7 +10,9 @@
 
 ### Enhancements
 
-* None.
+* Add Table::add_row_with_keys(), which allows
+  sync::create_object_with_primary_key() to avoid updating the index twice when
+  creating an object with a string primary key.
 
 -----------
 
