@@ -2215,21 +2215,27 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
     }
 }
 
-size_t Table::add_row_with_key(size_t key_col_ndx, int64_t key)
+size_t Table::add_row_with_key(size_t key_col_ndx, util::Optional<int64_t> key)
 {
     size_t num_cols = m_spec->get_column_count();
     size_t row_ndx = m_size;
 
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(key_col_ndx, <, num_cols);
-    REALM_ASSERT(!is_nullable(key_col_ndx));
+    REALM_ASSERT(key || is_nullable(key_col_ndx));
 
     bump_version();
 
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         if (col_ndx == key_col_ndx) {
-            IntegerColumn& col = get_column(key_col_ndx);
-            col.insert(row_ndx, key, 1);
+            if (is_nullable(key_col_ndx)) {
+                IntNullColumn& col = get_column_int_null(key_col_ndx);
+                col.insert(row_ndx, key, 1);
+            }
+            else {
+                IntegerColumn& col = get_column(key_col_ndx);
+                col.insert(row_ndx, *key, 1);
+            }
         }
         else {
             ColumnBase& col = get_column_base(col_ndx);
@@ -2241,7 +2247,53 @@ size_t Table::add_row_with_key(size_t key_col_ndx, int64_t key)
 
     if (Replication* repl = get_repl()) {
         size_t prior_num_rows = m_size - 1;
-        repl->add_row_with_key(this, row_ndx, prior_num_rows, key_col_ndx, key); // Throws
+        if (key)
+            repl->add_row_with_key(this, row_ndx, prior_num_rows, key_col_ndx, *key); // Throws
+        else {
+            repl->insert_empty_rows(this, row_ndx, 1, prior_num_rows); // Throws
+            repl->set_null(this, key_col_ndx, row_ndx);
+        }
+    }
+
+    return row_ndx;
+}
+
+
+size_t Table::add_row_with_keys(size_t key_1_col_ndx, int64_t key_1,
+                                size_t key_2_col_ndx, StringData key_2)
+{
+    size_t num_cols = m_spec->get_column_count();
+    size_t row_ndx = m_size;
+
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(key_1_col_ndx, <, num_cols);
+    REALM_ASSERT_3(key_2_col_ndx, <, num_cols);
+    REALM_ASSERT(!is_nullable(key_1_col_ndx));
+    REALM_ASSERT(key_2 || is_nullable(key_2_col_ndx));
+
+    bump_version();
+
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        if (col_ndx == key_1_col_ndx) {
+            IntegerColumn& col = get_column(key_1_col_ndx);
+            col.insert(row_ndx, key_1, 1);
+        }
+        else if (col_ndx == key_2_col_ndx) {
+            StringColumn& col = get_column_string(key_2_col_ndx);
+            col.insert(row_ndx, key_2);
+        }
+        else {
+            ColumnBase& col = get_column_base(col_ndx);
+            bool insert_nulls = is_nullable(col_ndx);
+            col.insert_rows(row_ndx, 1, m_size, insert_nulls); // Throws
+        }
+    }
+    m_size++;
+
+    if (Replication* repl = get_repl()) {
+        size_t prior_num_rows = m_size - 1;
+        repl->add_row_with_key(this, row_ndx, prior_num_rows, key_1_col_ndx, key_1); // Throws
+        repl->set_string(this, key_2_col_ndx, row_ndx, key_2, _impl::instr_SetUnique); // Throws
     }
 
     return row_ndx;
