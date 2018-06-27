@@ -39,9 +39,9 @@ namespace realm {
 ///
 /// At any particular moment an instance of this class stores a
 /// definite value of a definite type. If, for instance, that is an
-/// integer value, you may call get_int() to extract that value. You
+/// integer value, you may call get<int64_t>() to extract that value. You
 /// may call get_type() to discover what type of value is currently
-/// stored. Calling get_int() on an instance that does not store an
+/// stored. Calling get<int64_t>() on an instance that does not store an
 /// integer, has undefined behavior, and likewise for all the other
 /// types that can be stored.
 ///
@@ -105,8 +105,12 @@ public:
     {
     }
 
-    Mixed(bool) noexcept;
+    Mixed(int i) noexcept
+        : Mixed(int64_t(i))
+    {
+    }
     Mixed(int64_t) noexcept;
+    Mixed(bool) noexcept;
     Mixed(float) noexcept;
     Mixed(double) noexcept;
     Mixed(StringData) noexcept;
@@ -124,6 +128,10 @@ public:
         : Mixed(StringData(c_str))
     {
     }
+    Mixed(const std::string& s) noexcept
+        : Mixed(StringData(s))
+    {
+    }
 
     ~Mixed() noexcept
     {
@@ -135,270 +143,257 @@ public:
         return DataType(m_type);
     }
 
-    bool is_null() const
+    template <class T>
+    T get() const noexcept;
+
+    // These functions are kept to be backwards compatible
+    int64_t get_int() const;
+    bool get_bool() const;
+    float get_float() const;
+    double get_double() const;
+    StringData get_string() const;
+    Timestamp get_timestamp() const;
+
+    bool is_null() const;
+    int compare(const Mixed& b) const;
+    bool operator==(const Mixed& other) const
     {
-        if (m_type == null_type)
-            return true;
-
-        switch (get_type()) {
-            case type_String:
-                return get_string().is_null();
-            case type_Timestamp:
-                return get_timestamp().is_null();
-            case type_Link:
-                return get_link() == null_key;
-            default:
-                break;
-        }
-        return false;
+        return compare(other) == 0;
     }
-
-    int64_t get_int() const noexcept;
-    bool get_bool() const noexcept;
-    float get_float() const noexcept;
-    double get_double() const noexcept;
-    StringData get_string() const noexcept;
-    BinaryData get_binary() const noexcept;
-    Timestamp get_timestamp() const noexcept;
-    ObjKey get_link() const noexcept;
-
-    template <class Ch, class Tr>
-    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Mixed&);
-
-    inline int compare(const Mixed& b) {
-        if (is_null()) {
-            return b.is_null() ? 0 : -1;
-        }
-        if (b.is_null())
-            return 1;
-
-        switch (get_type()) {
-            case type_Int:
-                if (get_int() > b.get_int())
-                    return 1;
-                else if (get_int() < b.get_int())
-                    return -1;
-                break;
-            case type_String:
-                if (get_string() > b.get_string())
-                    return 1;
-                else if (get_string() < b.get_string())
-                    return -1;
-                break;
-            case type_Float:
-                if (get_float() > b.get_float())
-                    return 1;
-                else if (get_float() < b.get_float())
-                    return -1;
-                break;
-            case type_Double:
-                if (get_double() > b.get_double())
-                    return 1;
-                else if (get_double() < b.get_double())
-                    return -1;
-                break;
-            case type_Bool:
-                if (get_bool() > b.get_bool())
-                    return 1;
-                else if (get_bool() < b.get_bool())
-                    return -1;
-                break;
-            case type_Timestamp:
-                if (get_timestamp() > b.get_timestamp())
-                    return 1;
-                else if (get_timestamp() < b.get_timestamp())
-                    return -1;
-                break;
-            case type_Link:
-                if (get_link() > b.get_link())
-                    return 1;
-                else if (get_link() < b.get_link())
-                    return -1;
-                break;
-            default:
-                REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
-                break;
-        }
-
-        return 0;        
+    bool operator!=(const Mixed& other) const
+    {
+        return compare(other) != 0;
     }
 
 private:
+    template <class Ch, class Tr>
+    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Mixed&);
+
     static constexpr int null_type = 0x0f;
-    union {
-        int64_t m_int;
-        float m_float;
-        double m_double;
-        const char* m_data;
-    };
-    union {
-        uint32_t m_size; // Strings and binaries cannot be that big
-        int32_t m_nano_seconds;
-    };
     uint8_t m_type;
+
+    union {
+        int64_t int_val;
+        bool bool_val;
+        float float_val;
+        double double_val;
+        StringData string_val;
+        Timestamp date_val;
+    };
 };
 
-// Note: The mixed values are specified as Wrap<Mixed>. If they were
-// not, these operators would apply to simple comparisons, such as int
-// vs int64_t, and cause ambiguity. This is because the constructors
-// of Mixed are not explicit.
-
-// Compare mixed with integer
-template <class T>
-bool operator==(Wrap<Mixed>, const T&) noexcept;
-template <class T>
-bool operator!=(Wrap<Mixed>, const T&) noexcept;
-template <class T>
-bool operator==(const T&, Wrap<Mixed>) noexcept;
-template <class T>
-bool operator!=(const T&, Wrap<Mixed>) noexcept;
-
-// Compare mixed with boolean
-bool operator==(Wrap<Mixed>, bool) noexcept;
-bool operator!=(Wrap<Mixed>, bool) noexcept;
-bool operator==(bool, Wrap<Mixed>) noexcept;
-bool operator!=(bool, Wrap<Mixed>) noexcept;
-
-// Compare mixed with float
-bool operator==(Wrap<Mixed>, float);
-bool operator!=(Wrap<Mixed>, float);
-bool operator==(float, Wrap<Mixed>);
-bool operator!=(float, Wrap<Mixed>);
-
-// Compare mixed with double
-bool operator==(Wrap<Mixed>, double);
-bool operator!=(Wrap<Mixed>, double);
-bool operator==(double, Wrap<Mixed>);
-bool operator!=(double, Wrap<Mixed>);
-
-// Compare mixed with string
-bool operator==(Wrap<Mixed>, StringData) noexcept;
-bool operator!=(Wrap<Mixed>, StringData) noexcept;
-bool operator==(StringData, Wrap<Mixed>) noexcept;
-bool operator!=(StringData, Wrap<Mixed>) noexcept;
-bool operator==(Wrap<Mixed>, const char* c_str) noexcept;
-bool operator!=(Wrap<Mixed>, const char* c_str) noexcept;
-bool operator==(const char* c_str, Wrap<Mixed>) noexcept;
-bool operator!=(const char* c_str, Wrap<Mixed>) noexcept;
-bool operator==(Wrap<Mixed>, char* c_str) noexcept;
-bool operator!=(Wrap<Mixed>, char* c_str) noexcept;
-bool operator==(char* c_str, Wrap<Mixed>) noexcept;
-bool operator!=(char* c_str, Wrap<Mixed>) noexcept;
-
-// Compare mixed with binary data
-bool operator==(Wrap<Mixed>, BinaryData) noexcept;
-bool operator!=(Wrap<Mixed>, BinaryData) noexcept;
-bool operator==(BinaryData, Wrap<Mixed>) noexcept;
-bool operator!=(BinaryData, Wrap<Mixed>) noexcept;
-
-// Compare mixed with Timestamp
-bool operator==(Wrap<Mixed>, Timestamp) noexcept;
-bool operator!=(Wrap<Mixed>, Timestamp) noexcept;
-bool operator==(Timestamp, Wrap<Mixed>) noexcept;
-bool operator!=(Timestamp, Wrap<Mixed>) noexcept;
-
 // Implementation:
-
 
 inline Mixed::Mixed(int64_t v) noexcept
 {
     m_type = type_Int;
-    m_int = v;
+    int_val = v;
 }
 
 inline Mixed::Mixed(bool v) noexcept
 {
     m_type = type_Bool;
-    m_int = v;
+    bool_val = v;
 }
 
 inline Mixed::Mixed(float v) noexcept
 {
     m_type = type_Float;
-    m_float = v;
+    float_val = v;
 }
 
 inline Mixed::Mixed(double v) noexcept
 {
     m_type = type_Double;
-    m_double = v;
+    double_val = v;
 }
 
 inline Mixed::Mixed(StringData v) noexcept
 {
     m_type = type_String;
-    m_data = v.data();
-    m_size = uint32_t(v.size());
+    string_val = v;
 }
 
 inline Mixed::Mixed(BinaryData v) noexcept
 {
     m_type = type_Binary;
-    m_data = v.data();
-    m_size = uint32_t(v.size());
+    string_val = StringData(v.data(), v.size());
 }
 
 inline Mixed::Mixed(Timestamp v) noexcept
 {
     m_type = type_Timestamp;
-    m_int = v.get_seconds();
-    m_nano_seconds = v.get_nanoseconds();
+    date_val = v;
 }
 
 inline Mixed::Mixed(ObjKey v) noexcept
 {
     m_type = type_Link;
-    m_int = v.value;
+    int_val = v.value;
 }
 
-inline int64_t Mixed::get_int() const noexcept
+template <>
+inline int64_t Mixed::get<int64_t>() const noexcept
 {
     REALM_ASSERT(m_type == type_Int);
-    return m_int;
+    return int_val;
 }
 
-inline bool Mixed::get_bool() const noexcept
+inline int64_t Mixed::get_int() const
+{
+    return get<int64_t>();
+}
+
+template <>
+inline bool Mixed::get<bool>() const noexcept
 {
     REALM_ASSERT(m_type == type_Bool);
-    return m_int;
+    return bool_val;
 }
 
-inline float Mixed::get_float() const noexcept
+inline bool Mixed::get_bool() const
+{
+    return get<bool>();
+}
+
+template <>
+inline float Mixed::get<float>() const noexcept
 {
     REALM_ASSERT(m_type == type_Float);
-    return m_float;
+    return float_val;
 }
 
-inline double Mixed::get_double() const noexcept
+inline float Mixed::get_float() const
+{
+    return get<float>();
+}
+
+template <>
+inline double Mixed::get<double>() const noexcept
 {
     REALM_ASSERT(m_type == type_Double);
-    return m_double;
+    return double_val;
 }
 
-inline StringData Mixed::get_string() const noexcept
+inline double Mixed::get_double() const
+{
+    return get<double>();
+}
+
+template <>
+inline StringData Mixed::get<StringData>() const noexcept
 {
     REALM_ASSERT(m_type == type_String);
-    return StringData(m_data, m_size);
+    return string_val;
 }
 
-inline BinaryData Mixed::get_binary() const noexcept
+inline StringData Mixed::get_string() const
+{
+    return get<StringData>();
+}
+
+template <>
+inline BinaryData Mixed::get<BinaryData>() const noexcept
 {
     REALM_ASSERT(m_type == type_Binary);
-    return BinaryData(m_data, m_size);
+    return BinaryData(string_val.data(), string_val.size());
 }
 
-inline Timestamp Mixed::get_timestamp() const noexcept
+template <>
+inline Timestamp Mixed::get<Timestamp>() const noexcept
 {
     REALM_ASSERT(m_type == type_Timestamp);
-    return Timestamp(m_int, m_nano_seconds);
+    return date_val;
 }
 
-inline ObjKey Mixed::get_link() const noexcept
+inline Timestamp Mixed::get_timestamp() const
+{
+    return get<Timestamp>();
+}
+
+template <>
+inline ObjKey Mixed::get<ObjKey>() const noexcept
 {
     REALM_ASSERT(m_type == type_Link);
-    return ObjKey(m_int);
+    return ObjKey(int_val);
 }
 
+inline bool Mixed::is_null() const
+{
+    if (m_type == null_type)
+        return true;
+
+    switch (get_type()) {
+        case type_String:
+            return get<StringData>().is_null();
+        case type_Timestamp:
+            return get<Timestamp>().is_null();
+        case type_Link:
+            return get<ObjKey>() == null_key;
+        default:
+            break;
+    }
+    return false;
+}
+
+inline int Mixed::compare(const Mixed& b) const
+{
+    if (is_null()) {
+        return b.is_null() ? 0 : -1;
+    }
+    if (b.is_null())
+        return 1;
+
+    switch (get_type()) {
+        case type_Int:
+            if (get<int64_t>() > b.get<int64_t>())
+                return 1;
+            else if (get<int64_t>() < b.get<int64_t>())
+                return -1;
+            break;
+        case type_String:
+            if (get<StringData>() > b.get<StringData>())
+                return 1;
+            else if (get<StringData>() < b.get<StringData>())
+                return -1;
+            break;
+        case type_Float:
+            if (get<float>() > b.get<float>())
+                return 1;
+            else if (get<float>() < b.get<float>())
+                return -1;
+            break;
+        case type_Double:
+            if (get<double>() > b.get<double>())
+                return 1;
+            else if (get<double>() < b.get<double>())
+                return -1;
+            break;
+        case type_Bool:
+            if (get<bool>() > b.get<bool>())
+                return 1;
+            else if (get<bool>() < b.get<bool>())
+                return -1;
+            break;
+        case type_Timestamp:
+            if (get<Timestamp>() > b.get<Timestamp>())
+                return 1;
+            else if (get<Timestamp>() < b.get<Timestamp>())
+                return -1;
+            break;
+        case type_Link:
+            if (get<ObjKey>() > b.get<ObjKey>())
+                return 1;
+            else if (get<ObjKey>() < b.get<ObjKey>())
+                return -1;
+            break;
+        default:
+            REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
+            break;
+    }
+
+    return 0;
+}
 
 // LCOV_EXCL_START
 template <class Ch, class Tr>
@@ -407,30 +402,32 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
     out << "Mixed(";
     switch (m.m_type) {
         case type_Int:
-            out << m.m_int;
+            out << m.int_val;
             break;
         case type_Bool:
-            out << m.get_bool();
+            out << (m.bool_val ? "true" : "false");
             break;
         case type_Float:
-            out << m.m_float;
+            out << m.float_val;
             break;
         case type_Double:
-            out << m.m_double;
+            out << m.double_val;
             break;
         case type_String:
-            out << StringData(m.m_data, m.m_size);
+            out << m.string_val;
             break;
         case type_Binary:
-            out << BinaryData(m.m_data, m.m_size);
+            out << BinaryData(m.string_val.data(), m.string_val.size());
             break;
         case type_Timestamp:
-            out << m.get_timestamp();
+            out << m.date_val;
+            break;
+        case type_Link:
+            out << ObjKey(m.int_val);
             break;
         case type_OldDateTime:
         case type_OldTable:
         case type_OldMixed:
-        case type_Link:
         case type_LinkList:
             REALM_ASSERT(false);
     }
@@ -438,211 +435,6 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
     return out;
 }
 // LCOV_EXCL_STOP
-
-
-// Compare mixed with integer
-
-template <class T>
-inline bool operator==(Wrap<Mixed> a, const T& b) noexcept
-{
-    return Mixed(a).get_type() == type_Int && Mixed(a).get_int() == b;
-}
-
-template <class T>
-inline bool operator!=(Wrap<Mixed> a, const T& b) noexcept
-{
-    return Mixed(a).get_type() != type_Int || Mixed(a).get_int() != b;
-}
-
-template <class T>
-inline bool operator==(const T& a, Wrap<Mixed> b) noexcept
-{
-    return type_Int == Mixed(b).get_type() && a == Mixed(b).get_int();
-}
-
-template <class T>
-inline bool operator!=(const T& a, Wrap<Mixed> b) noexcept
-{
-    return type_Int != Mixed(b).get_type() || a != Mixed(b).get_int();
-}
-
-
-// Compare mixed with boolean
-
-inline bool operator==(Wrap<Mixed> a, bool b) noexcept
-{
-    return Mixed(a).get_type() == type_Bool && Mixed(a).get_bool() == b;
-}
-
-inline bool operator!=(Wrap<Mixed> a, bool b) noexcept
-{
-    return Mixed(a).get_type() != type_Bool || Mixed(a).get_bool() != b;
-}
-
-inline bool operator==(bool a, Wrap<Mixed> b) noexcept
-{
-    return type_Bool == Mixed(b).get_type() && a == Mixed(b).get_bool();
-}
-
-inline bool operator!=(bool a, Wrap<Mixed> b) noexcept
-{
-    return type_Bool != Mixed(b).get_type() || a != Mixed(b).get_bool();
-}
-
-
-// Compare mixed with float
-
-inline bool operator==(Wrap<Mixed> a, float b)
-{
-    return Mixed(a).get_type() == type_Float && Mixed(a).get_float() == b;
-}
-
-inline bool operator!=(Wrap<Mixed> a, float b)
-{
-    return Mixed(a).get_type() != type_Float || Mixed(a).get_float() != b;
-}
-
-inline bool operator==(float a, Wrap<Mixed> b)
-{
-    return type_Float == Mixed(b).get_type() && a == Mixed(b).get_float();
-}
-
-inline bool operator!=(float a, Wrap<Mixed> b)
-{
-    return type_Float != Mixed(b).get_type() || a != Mixed(b).get_float();
-}
-
-
-// Compare mixed with double
-
-inline bool operator==(Wrap<Mixed> a, double b)
-{
-    return Mixed(a).get_type() == type_Double && Mixed(a).get_double() == b;
-}
-
-inline bool operator!=(Wrap<Mixed> a, double b)
-{
-    return Mixed(a).get_type() != type_Double || Mixed(a).get_double() != b;
-}
-
-inline bool operator==(double a, Wrap<Mixed> b)
-{
-    return type_Double == Mixed(b).get_type() && a == Mixed(b).get_double();
-}
-
-inline bool operator!=(double a, Wrap<Mixed> b)
-{
-    return type_Double != Mixed(b).get_type() || a != Mixed(b).get_double();
-}
-
-
-// Compare mixed with string
-
-inline bool operator==(Wrap<Mixed> a, StringData b) noexcept
-{
-    return Mixed(a).get_type() == type_String && Mixed(a).get_string() == b;
-}
-
-inline bool operator!=(Wrap<Mixed> a, StringData b) noexcept
-{
-    return Mixed(a).get_type() != type_String || Mixed(a).get_string() != b;
-}
-
-inline bool operator==(StringData a, Wrap<Mixed> b) noexcept
-{
-    return type_String == Mixed(b).get_type() && a == Mixed(b).get_string();
-}
-
-inline bool operator!=(StringData a, Wrap<Mixed> b) noexcept
-{
-    return type_String != Mixed(b).get_type() || a != Mixed(b).get_string();
-}
-
-inline bool operator==(Wrap<Mixed> a, const char* b) noexcept
-{
-    return a == StringData(b);
-}
-
-inline bool operator!=(Wrap<Mixed> a, const char* b) noexcept
-{
-    return a != StringData(b);
-}
-
-inline bool operator==(const char* a, Wrap<Mixed> b) noexcept
-{
-    return StringData(a) == b;
-}
-
-inline bool operator!=(const char* a, Wrap<Mixed> b) noexcept
-{
-    return StringData(a) != b;
-}
-
-inline bool operator==(Wrap<Mixed> a, char* b) noexcept
-{
-    return a == StringData(b);
-}
-
-inline bool operator!=(Wrap<Mixed> a, char* b) noexcept
-{
-    return a != StringData(b);
-}
-
-inline bool operator==(char* a, Wrap<Mixed> b) noexcept
-{
-    return StringData(a) == b;
-}
-
-inline bool operator!=(char* a, Wrap<Mixed> b) noexcept
-{
-    return StringData(a) != b;
-}
-
-
-// Compare mixed with binary data
-
-inline bool operator==(Wrap<Mixed> a, BinaryData b) noexcept
-{
-    return Mixed(a).get_type() == type_Binary && Mixed(a).get_binary() == b;
-}
-
-inline bool operator!=(Wrap<Mixed> a, BinaryData b) noexcept
-{
-    return Mixed(a).get_type() != type_Binary || Mixed(a).get_binary() != b;
-}
-
-inline bool operator==(BinaryData a, Wrap<Mixed> b) noexcept
-{
-    return type_Binary == Mixed(b).get_type() && a == Mixed(b).get_binary();
-}
-
-inline bool operator!=(BinaryData a, Wrap<Mixed> b) noexcept
-{
-    return type_Binary != Mixed(b).get_type() || a != Mixed(b).get_binary();
-}
-
-
-// Compare mixed with Timestamp
-
-inline bool operator==(Wrap<Mixed> a, Timestamp b) noexcept
-{
-    return Mixed(a).get_type() == type_Timestamp && Timestamp(Mixed(a).get_timestamp()) == b;
-}
-
-inline bool operator!=(Wrap<Mixed> a, Timestamp b) noexcept
-{
-    return Mixed(a).get_type() != type_Timestamp || Timestamp(Mixed(a).get_timestamp()) != b;
-}
-
-inline bool operator==(Timestamp a, Wrap<Mixed> b) noexcept
-{
-    return type_Timestamp == Mixed(b).get_type() && a == Timestamp(Mixed(b).get_timestamp());
-}
-
-inline bool operator!=(Timestamp a, Wrap<Mixed> b) noexcept
-{
-    return type_Timestamp != Mixed(b).get_type() || a != Timestamp(Mixed(b).get_timestamp());
-}
 
 } // namespace realm
 
