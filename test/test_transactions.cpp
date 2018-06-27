@@ -980,6 +980,21 @@ TEST(Transactions_RollbackCreateObject)
     CHECK_EQUAL(tr->get_table(tk)->size(), 0);
 }
 
+TEST(Transactions_ObjectLifetime)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
+    TransactionRef tr = sg_w->start_write();
+
+    auto table = tr->add_table("t0");
+    Obj obj = table->create_object();
+
+    CHECK(obj.is_valid());
+    tr->commit();
+    CHECK_NOT(obj.is_valid());
+}
+
 #ifdef LEGACY_TESTS
 
 // Rollback a table move operation and check accessors.
