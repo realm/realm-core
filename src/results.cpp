@@ -47,6 +47,13 @@ Results::Results(SharedRealm r, Table& table)
 {
 }
 
+Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list)
+: m_realm(std::move(r))
+, m_list(list)
+, m_mode(Mode::List)
+{
+}
+
 Results::Results(SharedRealm, TableView, DescriptorOrdering) { throw std::runtime_error("not implemented"); }
 Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> lv, util::Optional<Query> q, SortDescriptor s)
 : m_realm(std::move(r))
@@ -86,6 +93,9 @@ bool Results::is_valid() const
     if (((const Table*)m_table) != nullptr)
         return (bool)m_table;
 
+    if (m_list)
+        return m_list->is_attached();
+
     return true;
 }
 
@@ -109,6 +119,7 @@ size_t Results::size()
     switch (m_mode) {
         case Mode::Empty:    return 0;
         case Mode::Table:    return m_table->size();
+        case Mode::List:     return m_list->size();
         case Mode::LinkList: return m_link_list->size();
         case Mode::Query:
             m_query.sync_view_if_needed();
@@ -147,9 +158,14 @@ StringData Results::get_object_type() const noexcept
 }
 
 template<typename T>
-util::Optional<T> Results::try_get(size_t)
+util::Optional<T> Results::try_get(size_t ndx)
 {
-    throw "not implemented";
+    validate_read();
+    if (m_mode == Mode::List) {
+        if (ndx < m_list->size())
+            return list_get_as<T>(ndx);
+    }
+    return util::none;
 }
 
 template<>
@@ -157,7 +173,9 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
 {
     validate_read();
     switch (m_mode) {
-        case Mode::Empty: break;
+        case Mode::Empty:
+        case Mode::List:
+            break;
         case Mode::Table:
             if (row_ndx < m_table->size())
                 return m_table->get_object(row_ndx);
@@ -232,6 +250,7 @@ void Results::evaluate_query_if_needed(bool wants_notifications)
     switch (m_mode) {
         case Mode::Empty:
         case Mode::Table:
+        case Mode::List:
         case Mode::LinkList:
             return;
         case Mode::Query:
@@ -275,10 +294,10 @@ size_t Results::index_of(Obj const& row)
 
     switch (m_mode) {
         case Mode::Empty:
+        case Mode::List:
             return not_found;
         case Mode::Table:
-            throw "not implemented";
-//            return m_table->find row.get_index();
+            return m_table->get_object_ndx(row.get_key());
         case Mode::LinkList:
             if (update_linklist())
                 return m_link_list->Lst<ObjKey>::find_first(row.get_key());
@@ -444,6 +463,10 @@ void Results::clear()
                 }
             }
             break;
+        case Mode::List:
+            validate_write();
+            m_list->clear();
+            break;
         case Mode::LinkList:
             validate_write();
             m_link_list->remove_all_target_rows();
@@ -454,7 +477,6 @@ void Results::clear()
 PropertyType Results::get_type() const
 {
     validate_read();
-    #if 0
     switch (m_mode) {
         case Mode::Empty:
         case Mode::LinkList:
@@ -462,13 +484,11 @@ PropertyType Results::get_type() const
         case Mode::Query:
         case Mode::TableView:
         case Mode::Table:
-            if (m_table->get_index_in_group() != npos)
-                return PropertyType::Object;
-            return ObjectSchema::from_core_type(*m_table->get_descriptor(), 0);
+            return PropertyType::Object;
+        case Mode::List:
+            return ObjectSchema::from_core_type(*m_list->get_table(), m_list->get_col_key());
     }
     REALM_COMPILER_HINT_UNREACHABLE();
-    #endif
-    return PropertyType::Object;
 }
 
 Query Results::get_query() const
@@ -477,6 +497,7 @@ Query Results::get_query() const
     switch (m_mode) {
         case Mode::Empty:
         case Mode::Query:
+        case Mode::List:
             return m_query;
         case Mode::TableView: {
             // A TableView has an associated Query if it was produced by Query::find_all. This is indicated
@@ -506,6 +527,7 @@ TableView Results::get_tableview()
     validate_read();
     switch (m_mode) {
         case Mode::Empty:
+        case Mode::List:
             return {};
         case Mode::LinkList:
             if (update_linklist())
@@ -678,6 +700,7 @@ Results Results::snapshot() &&
             REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
+        case Mode::List: // FIXME Correct?
             evaluate_query_if_needed(false);
             m_notifier.reset();
             m_update_policy = UpdatePolicy::Never;
@@ -716,6 +739,7 @@ bool Results::is_in_table_order() const
     switch (m_mode) {
         case Mode::Empty:
         case Mode::Table:
+        case Mode::List:
             return true;
         case Mode::LinkList:
             return false;

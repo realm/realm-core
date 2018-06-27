@@ -35,6 +35,7 @@
 #include "impl/realm_coordinator.hpp"
 #include "impl/object_accessor_impl.hpp"
 
+#include <realm/db.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/version.hpp>
 
@@ -42,7 +43,6 @@
 
 using namespace realm;
 
-#if 0
 
 template<PropertyType prop_type, typename T>
 struct Base {
@@ -188,7 +188,7 @@ struct StringifyingContext {
         return ss.str();
     }
 
-    std::string box(RowExpr row) { return util::to_string(row.get_index()); }
+    std::string box(Obj obj) { return util::to_string(obj.get_key().value); }
 };
 
 namespace Catch {
@@ -273,7 +273,8 @@ auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) con
 
 TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary, ::Date,
                    BoxedOptional<::Int>, BoxedOptional<::Bool>, BoxedOptional<::Float>, BoxedOptional<::Double>,
-                   UnboxedOptional<::String>, UnboxedOptional<::Binary>, UnboxedOptional<::Date>) {
+                   UnboxedOptional<::String>, UnboxedOptional<::Binary>, UnboxedOptional<::Date>)
+{
     auto values = TestType::values();
     using T = typename TestType::Type;
     using W = typename TestType::Wrapped;
@@ -290,9 +291,10 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
 
     auto table = r->read_group().get_table("class_object");
     r->begin_transaction();
-    table->add_empty_row();
+    Obj obj = table->create_object();
+    ColKey col = table->get_column_key("value");
 
-    List list(r, *table, 0, 0);
+    List list(r, obj, col);
     auto results = list.as_results();
     CppContext ctx(r);
 
@@ -300,7 +302,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         REQUIRE(list.get_realm() == r);
         REQUIRE(results.get_realm() == r);
     }
-
+#if 0
     SECTION("get_query()") {
         REQUIRE(list.get_query().count() == 0);
         REQUIRE(results.get_query().count() == 0);
@@ -308,11 +310,11 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         REQUIRE(list.get_query().count() == 1);
         REQUIRE(results.get_query().count() == 1);
     }
-
+#endif
     SECTION("get_origin_row_index()") {
-        REQUIRE(list.get_origin_row_index() == 0);
-        table->insert_empty_row(0);
-        REQUIRE(list.get_origin_row_index() == 1);
+        REQUIRE(list.get_parent_object_key() == obj.get_key());
+        table->create_object();
+        REQUIRE(list.get_parent_object_key() == obj.get_key());
     }
 
     SECTION("get_type()") {
@@ -341,7 +343,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         }
 
         SECTION("delete row") {
-            table->move_last_over(0);
+            obj.remove();
             REQUIRE_FALSE(list.is_valid());
             REQUIRE_FALSE(results.is_valid());
         }
@@ -367,7 +369,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         }
 
         SECTION("delete row") {
-            table->move_last_over(0);
+            obj.remove();
             REQUIRE_THROWS(list.verify_attached());
         }
 
@@ -391,7 +393,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         }
 
         SECTION("delete row") {
-            table->move_last_over(0);
+            obj.remove();
             REQUIRE_THROWS(list.verify_in_transaction());
         }
 
@@ -514,7 +516,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
 
         REQUIRE_THROWS(list.set(list.size(), static_cast<T>(values[0])));
     }
-
+#if 0
     SECTION("find()") {
         // cast to T needed for vector<bool>'s wonky proxy
         for (size_t i = 0; i < values.size(); ++i) {
@@ -685,18 +687,18 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         REQUIRE(list.average() == util::none);
         REQUIRE(results.average() == util::none);
     }
-
+#endif
     SECTION("operator==()") {
-        table->add_empty_row();
-        REQUIRE(list == List(r, *table, 0, 0));
-        REQUIRE_FALSE(list == List(r, *table, 0, 1));
+        Obj obj1 = table->create_object();
+        REQUIRE(list == List(r, obj, col));
+        REQUIRE_FALSE(list == List(r, obj1, col));
     }
 
     SECTION("hash") {
-        table->add_empty_row();
+        Obj obj1 = table->create_object();
         std::hash<List> h;
-        REQUIRE(h(list) == h(List(r, *table, 0, 0)));
-        REQUIRE_FALSE(h(list) == h(List(r, *table, 0, 1)));
+        REQUIRE(h(list) == h(List(r, obj, col)));
+        REQUIRE_FALSE(h(list) == h(List(r, obj1, col)));
     }
 
     SECTION("handover") {
@@ -705,12 +707,13 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         auto handover = r->obtain_thread_safe_reference(list);
         auto list2 = r->resolve_thread_safe_reference(std::move(handover));
         REQUIRE(list == list2);
-
+#if 0
         auto results_handover = r->obtain_thread_safe_reference(results);
         auto results2 = r->resolve_thread_safe_reference(std::move(results_handover));
         REQUIRE(results2 == values);
+#endif
     }
-
+#if 0
     SECTION("notifications") {
         r->commit_transaction();
 
@@ -763,7 +766,7 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
             REQUIRE(calls == 2);
 
             r->begin_transaction();
-            table->move_last_over(0);
+            obj.remove();
             r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(calls == 4);
@@ -771,13 +774,13 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
             REQUIRE(rchange.deletions.count() == values.size());
 
             r->begin_transaction();
-            table->add_empty_row();
+            table->create_object();
             r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(calls == 4);
         }
     }
-
+#endif
 #if REALM_ENABLE_SYNC && REALM_HAVE_SYNC_STABLE_IDS
     SECTION("sync compatibility") {
         if (!util::EventLoop::has_implementation())
@@ -819,5 +822,3 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
     }
 #endif
 }
-
-#endif

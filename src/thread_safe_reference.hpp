@@ -56,8 +56,9 @@ template<>
 class ThreadSafeReference<List>: public ThreadSafeReferenceBase {
     friend class Realm;
 
-//    std::unique_ptr<Transaction::Handover<LinkView>> m_link_view;
-//    std::unique_ptr<Transaction::Handover<Table>> m_table;
+    ObjKey m_key;
+    std::string m_object_schema_name;
+    ColKey m_col_key;
 
     // Precondition: The associated Realm is for the current thread and is not in a write transaction;.
     ThreadSafeReference(List const& value);

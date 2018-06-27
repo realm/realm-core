@@ -22,6 +22,7 @@
 #include "list.hpp"
 #include "object.hpp"
 #include "object_schema.hpp"
+#include "object_store.hpp"
 #include "results.hpp"
 
 #include <realm/util/scope_exit.hpp>
@@ -32,7 +33,14 @@ ThreadSafeReferenceBase::~ThreadSafeReferenceBase()
 {
 }
 
-ThreadSafeReference<List>::ThreadSafeReference(List const&) {}
+ThreadSafeReference<List>::ThreadSafeReference(List const& list)
+    : ThreadSafeReferenceBase()
+    , m_key(list.m_list_base->get_key())
+    , m_object_schema_name(list.get_object_schema().name)
+    , m_col_key(list.m_list_base->get_col_key())
+{
+}
+
 ThreadSafeReference<Results>::ThreadSafeReference(Results const&) {}
 
 ThreadSafeReference<Object>::ThreadSafeReference(Object const& object)
@@ -42,7 +50,17 @@ ThreadSafeReference<Object>::ThreadSafeReference(Object const& object)
 {
 }
 
-List ThreadSafeReference<List>::import_into(std::shared_ptr<Realm>&) { REALM_TERMINATE("not implemented"); }
+List ThreadSafeReference<List>::import_into(std::shared_ptr<Realm>& r)
+{
+    try {
+        Obj obj = ObjectStore::table_for_object_type(r->read_group(), m_object_schema_name)->get_object(m_key);
+        return List(r, obj, m_col_key);
+    }
+    catch (const InvalidKey&) {
+    }
+    return {};
+}
+
 Results ThreadSafeReference<Results>::import_into(std::shared_ptr<Realm>&) { REALM_TERMINATE("not implemented"); }
 
 Object ThreadSafeReference<Object>::import_into(std::shared_ptr<Realm>& r)

@@ -41,6 +41,7 @@ public:
     // the tableview as needed
     Results();
     Results(std::shared_ptr<Realm> r, Table& table);
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {}, SortDescriptor s = {});
@@ -145,6 +146,7 @@ public:
     enum class Mode {
         Empty, // Backed by nothing (for missing tables)
         Table, // Backed directly by a Table
+        List,  // Backed by a list-of-primitives that is not a link list.
         Query, // Backed by a query that has not yet been turned into a TableView
         LinkList,  // Backed directly by a LinkList
         TableView, // Backed by a TableView created from a Query
@@ -230,6 +232,7 @@ private:
     TableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
     std::shared_ptr<LnkLst> m_link_list;
+    std::shared_ptr<LstBase> m_list;
 
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifier> m_notifier;
 
@@ -257,6 +260,9 @@ private:
 
     template<typename Fn>
     auto dispatch(Fn&&) const;
+
+    template<typename T>
+    auto list_get_as(size_t ndx) const;
 };
 
 template<typename Fn>
@@ -295,6 +301,28 @@ size_t Results::index_of(Context& ctx, T value)
 {
     return dispatch([&](auto t) { return this->index_of(ctx.template unbox<std::decay_t<decltype(*t)>>(value)); });
 }
+
+template<typename T>
+auto Results::list_get_as(size_t ndx) const
+{
+    auto val = static_cast<Lst<T>&>(*m_list).get(ndx);
+    return util::Optional<T>(val);
+}
+
+template<>
+inline auto Results::list_get_as<util::Optional<float>>(size_t ndx) const
+{
+    auto val = static_cast<Lst<float>&>(*m_list).get(ndx);
+    return null::is_null_float(val) ? util::none : util::Optional<float>(val);
+}
+
+template<>
+inline auto Results::list_get_as<util::Optional<double>>(size_t ndx) const
+{
+    auto val = static_cast<Lst<double>&>(*m_list).get(ndx);
+    return null::is_null_float(val) ? util::none : util::Optional<double>(val);
+}
+
 } // namespace realm
 
 #endif // REALM_RESULTS_HPP
