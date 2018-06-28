@@ -3771,7 +3771,7 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool
                        is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     size_t old_target_row_ndx = do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
-    if (old_target_row_ndx == realm::npos)
+    if (old_target_row_ndx == realm::npos || old_target_row_ndx == target_row_ndx)
         return;
 
     if (col.get_weak_links())
