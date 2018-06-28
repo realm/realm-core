@@ -510,15 +510,19 @@ public:
             if (Replication* repl = this->m_const_obj->get_alloc().get_replication()) {
                 ConstLstBase::move_repl(repl, from, to);
             }
-            T tmp = get(from);
-            int adj = (from < to) ? 1 : -1;
-            while (from != to) {
-                size_t neighbour = from + adj;
-                T val = m_tree->get(neighbour);
-                m_tree->set(from, val);
-                from = neighbour;
+            if (to > from) {
+                to++;
             }
-            m_tree->set(to, tmp);
+            else {
+                from++;
+            }
+            // We use swap here as it handles the special case for StringData where
+            // 'to' and 'from' points into the same array. In this case you cannot
+            // set an entry with the result of a get from another entry in the same
+            // leaf.
+            m_tree->insert(to, BPlusTree<T>::default_value(m_nullable));
+            m_tree->swap(from, to);
+            m_tree->erase(from);
         }
     }
 
