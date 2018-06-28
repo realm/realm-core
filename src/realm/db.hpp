@@ -178,6 +178,9 @@ public:
     using version_type = _impl::History::version_type;
     using VersionID = realm::VersionID;
 
+    /// Returns the version of the latest snapshot.
+    version_type get_version_of_latest_snapshot();
+
     /// Thrown by start_read() if the specified version does not correspond to a
     /// bound (or tethered) snapshot.
     struct BadVersion;
@@ -440,9 +443,6 @@ private:
     void do_begin_write();
     version_type do_commit(Group&);
     void do_end_write() noexcept;
-
-    /// Returns the version of the latest snapshot.
-    version_type get_version_of_latest_snapshot();
 
     // make sure the given index is within the currently mapped area.
     // if not, expand the mapped area. Returns true if the area is expanded.
