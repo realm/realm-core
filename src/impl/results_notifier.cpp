@@ -29,7 +29,10 @@ ResultsNotifier::ResultsNotifier(Results& target)
 , m_descriptor_ordering(target.get_descriptor_ordering())
 , m_target_is_in_table_order(target.is_in_table_order())
 {
-    set_table(*m_query->get_table());
+    auto table = m_query->get_table();
+    if (table) {
+        set_table(*table);
+    }
 }
 
 void ResultsNotifier::release_data() noexcept
@@ -211,5 +214,6 @@ bool ResultsNotifier::prepare_to_deliver()
 
 void ResultsNotifier::do_attach_to(Transaction& sg)
 {
-    m_query = sg.import_copy_of(*m_query, PayloadPolicy::Move);
+    if (m_query->get_table())
+        m_query = sg.import_copy_of(*m_query, PayloadPolicy::Move);
 }

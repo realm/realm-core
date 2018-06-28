@@ -859,8 +859,8 @@ void RealmCoordinator::run_async_notifiers()
 
 bool RealmCoordinator::can_advance(Realm& realm)
 {
-    // FIXME
-    return true;
+    bool changes = realm.last_seen_transaction_version() != m_db->get_version_of_latest_snapshot();
+    return changes;
 }
 
 void RealmCoordinator::advance_to_ready(Realm& realm)

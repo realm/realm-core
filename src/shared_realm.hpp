@@ -272,6 +272,7 @@ public:
     void cancel_transaction();
     bool is_in_transaction() const noexcept;
     bool is_in_read_transaction() const { return !!m_group; }
+    uint64_t last_seen_transaction_version() { return m_schema_transaction_version; }
 
     // Get the version of the current read transaction, or `none` if the Realm
     // is not in a read transaction
