@@ -300,13 +300,6 @@ MemRef SlabAlloc::do_alloc(size_t size)
     return MemRef(addr, ref, *this);
 }
 
-int SlabAlloc::size_from_block(SlabAlloc::FreeBlock* entry)
-{
-	auto bb = bb_before(entry);
-	REALM_ASSERT(bb->block_after_size > 0);
-	return bb->block_after_size;
-}
-
 SlabAlloc::FreeBlock* SlabAlloc::get_prev_block_if_mergeable(SlabAlloc::FreeBlock* entry)
 {
 	auto bb = bb_before(entry);
@@ -527,7 +520,7 @@ void SlabAlloc::rebuild_freelists_from_slab()
 
 bool SlabAlloc::break_block(FreeBlock* block, int new_size, FreeBlock* &remaining_block)
 {
-	int size = block_size(block);
+	int size = size_from_block(block);
 	int remaining_size = size - (new_size + sizeof(BetweenBlocks));
 	if (remaining_size < (int)sizeof(FreeBlock))
 		return false;
@@ -545,8 +538,8 @@ bool SlabAlloc::break_block(FreeBlock* block, int new_size, FreeBlock* &remainin
 
 SlabAlloc::FreeBlock* SlabAlloc::merge_blocks(FreeBlock* first, FreeBlock* last)
 {
-	int size_first = block_size(first);
-	int size_last = block_size(last);
+	int size_first = size_from_block(first);
+	int size_last = size_from_block(last);
 	int new_size = size_first + size_last + sizeof(BetweenBlocks);
 	bb_before(first)->block_after_size = new_size;
 	bb_after(last)->block_before_size = new_size;
@@ -702,11 +695,11 @@ void SlabAlloc::do_free(ref_type ref, char* addr) noexcept
     	// FIXME: cannot use mark_freed, needs to include stuffing in the ref...
     	FreeBlock* e = reinterpret_cast<FreeBlock*>(addr);
     	mark_freed(e, size);
-    	add_free_block(ref, e, size);
+    	free_block(ref, e, size);
     }
 }
 
-void SlabAlloc::add_free_block(ref_type ref, SlabAlloc::FreeBlock* block, size_t size)
+void SlabAlloc::free_block(ref_type ref, SlabAlloc::FreeBlock* block, size_t size)
 {
 	block->ref = ref;
 	if (is_small_block(size)) {

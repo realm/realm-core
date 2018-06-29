@@ -362,6 +362,13 @@ private:
     };
 
     // free blocks that are in the slab area are managed using the following structures:
+    // - FreeBlock: Placed at the start of any free space. Holds the 'ref' corresponding to
+    //              the start of the space, and prev/next links used to place it in a size-specific
+    //              freelist.
+    // - BetweenBlocks: Structure sitting between any two free OR allocated spaces.
+    //                  describes the size of the space before and after.
+    // Each slab (area obtained from the underlying system) has a terminating BetweenBlocks
+    // at the beginning and at the end of the Slab.
     struct FreeBlock {
     	ref_type ref; // ref for this entry. Saves a reverse translate / representing links as refs
     	FreeBlock* prev; // circular doubly linked list
@@ -371,8 +378,9 @@ private:
     	int32_t block_before_size; // negated if block is in use,
     	int32_t block_after_size;  // positive if block is free - and zero at end
     };
+
     // Disabling special small blocks handling:
-    // The design provides free/re-allocation of small blocks without merging/breaking.
+    // The allocator provides free()/re-allocation() of small blocks without merging/breaking.
     // giving O(1) cost for these operations.
     // Larger blocks are always merged when possible, resulting in O(log N) cost.
     // At the moment, we cannot observe the benefit in O(1) for small blocks in
@@ -380,11 +388,12 @@ private:
     // Setting small_blocks_range to 1 effectively disables special
     // handling of small blocks, treating all blocks as large blocks.
     const static int small_blocks_range = 1;
-    FreeBlock* m_small_blocks[small_blocks_range];
-    using FreeListMap = std::map<int, FreeBlock*>;
+    FreeBlock* m_small_blocks[small_blocks_range];  // direct addressing for small blocks
+    using FreeListMap = std::map<int, FreeBlock*>;  // log(N) addressing for larger blocks
     FreeListMap m_large_blocks;
 
-    // abstract notion of a freelist
+    // abstract notion of a freelist - used to hide whether a freelist
+    // is residing in the small blocks or the large blocks structures.
     struct FreeList {
     	int size = 0; // size of every element in the list, 0 if not found
     	FreeListMap::iterator it;
@@ -392,7 +401,7 @@ private:
     	bool found_exact(int sz) { return size == sz; }
     };
 
-    // simple helper functions for navigating blocks and betweenblocks (TM)
+    // simple helper functions for accessing/navigating blocks and betweenblocks (TM)
     bool is_small_block(int size)
     {
     	return size < (small_blocks_range << 3);
@@ -417,42 +426,47 @@ private:
     		return nullptr;
     	return reinterpret_cast<FreeBlock*>(bb + 1);
     }
-    int block_size(FreeBlock* entry) const {
+    int size_from_block(FreeBlock* entry) const {
     	return bb_before(entry)->block_after_size;
     }
+    void mark_allocated(FreeBlock* entry);
+    // mark the entry freed in bordering BetweenBlocks. Also validate size.
+    void mark_freed(FreeBlock* entry, int size);
+
+    // hook for the memory verifier in Group.
     template<typename Func>
     void for_all_free_entries(Func f) const;
+
+    // Main entry points for alloc/free:
     FreeBlock* allocate_block(int size);
+    void free_block(ref_type ref, FreeBlock* addr, size_t size);
+
+    // Searching/manipulating freelists
     FreeList find(int size);
     FreeList find_larger(FreeList hint, int size);
     FreeBlock* pop_freelist_entry(FreeList list);
     void push_freelist_entry(FreeBlock* entry);
+    void remove_freelist_entry(FreeBlock* element);
     void entry_unlink(FreeBlock* entry);
-    int size_from_block(FreeBlock* entry);
-    bool break_block(FreeBlock* block, int new_size, FreeBlock* &remaining_block);
-    FreeBlock* merge_blocks(FreeBlock* first, FreeBlock* second);
+    void rebuild_freelists_from_slab();
+    void clear_freelists();
+
+    // producing blocks from a larger block or from new slab
     void produce_many_small_blocks(int block_size);
     // grow the slab area to accommodate the requested size.
     // returns a free block large enough to handle the request.
     FreeBlock* grow_slab_for(int request_size);
-    void rebuild_freelists_from_slab();
-    void clear_freelists();
-    // create a single freelist entry with "BetweenBlocks" at both ends and a
+    // create a single free chunk with "BetweenBlocks" at both ends and a
     // single free chunk between them. This free chunk will be of size:
     //   slab_size - 2 * sizeof(BetweenBlocks)
     FreeBlock* slab_to_entry(Slab slab, ref_type ref_start);
+
+    // breaking/merging of blocks
     FreeBlock* get_prev_block_if_mergeable(FreeBlock* block);
     FreeBlock* get_next_block_if_mergeable(FreeBlock* block);
+    bool break_block(FreeBlock* block, int new_size, FreeBlock* &remaining_block);
+    FreeBlock* merge_blocks(FreeBlock* first, FreeBlock* second);
 
-    void add_free_block(ref_type ref, FreeBlock* addr, size_t size);
-    // void insert_freelist_entry(FreeListEntry* &header, FreeListEntry* element);
-    void remove_freelist_entry(FreeBlock* element);
-
-    FreeBlock* pop_freelist_entry(FreeBlock* &header);
-    void push_freelist_entry(FreeBlock* &header, FreeBlock* element);
-    void mark_allocated(FreeBlock* entry);
-    // mark the entry freed in bordering BetweenBlocks. Also validate size.
-    void mark_freed(FreeBlock* entry, int size);
     // Values of each used bit in m_flags
     enum {
         flags_SelectBit = 1,

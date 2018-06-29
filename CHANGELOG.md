@@ -10,7 +10,8 @@
 
 ### Enhancements
 
-* None.
+* Improved scalability for the slab allocator. This allows for larger
+  transactions. (PR #3067)
 
 -----------
 
