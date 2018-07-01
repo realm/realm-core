@@ -1,12 +1,4 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* None.
-
-### Breaking changes
-
-* None.
+# 5.6.4 Release notes
 
 ### Enhancements
 
@@ -14,12 +6,6 @@
   sync::create_object_with_primary_key() to avoid updating the index twice when
   creating an object with a string primary key.
 * Improved the performance of setting a link to its current value.
-
------------
-
-### Internals
-
-* None.
 
 ----------------------------------------------
 
