@@ -561,7 +561,6 @@ private:
     }
 
     friend class Group;
-    friend class MemUsageVerifier;
     friend class SharedGroup;
     friend class GroupWriter;
 };
