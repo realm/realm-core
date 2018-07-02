@@ -373,6 +373,7 @@ private:
     	ref_type ref; // ref for this entry. Saves a reverse translate / representing links as refs
     	FreeBlock* prev; // circular doubly linked list
     	FreeBlock* next;
+    	void clear_links() { prev = next = nullptr; }
     };
     struct BetweenBlocks { // stores sizes and used/free status of blocks before and after.
     	int32_t block_before_size; // negated if block is in use,

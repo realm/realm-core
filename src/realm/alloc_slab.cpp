@@ -354,7 +354,7 @@ void SlabAlloc::entry_unlink(FreeBlock* entry)
 	auto prev = entry->prev;
 	next->prev = prev;
 	prev->next = next;
-	entry->next = entry->prev = nullptr;
+	entry->clear_links();
 }
 
 void SlabAlloc::remove_freelist_entry(FreeBlock* entry)
@@ -444,7 +444,7 @@ SlabAlloc::FreeBlock* SlabAlloc::slab_to_entry(Slab slab, ref_type ref_start)
 	int block_size = static_cast<int>(slab.ref_end - ref_start - 2 * sizeof(BetweenBlocks));
 	bb->block_after_size = block_size;
 	auto entry = block_after(bb);
-	entry->prev = entry->next = nullptr;
+	entry->clear_links();
 	entry->ref = ref_start + sizeof(BetweenBlocks);
 	bb = bb_after(entry);
 	bb->block_before_size = block_size;
@@ -481,8 +481,8 @@ SlabAlloc::FreeBlock* SlabAlloc::break_block(FreeBlock* block, int new_size)
 	bb_between->block_after_size = remaining_size;
 	FreeBlock* remaining_block = block_after(bb_between);
 	remaining_block->ref = block->ref + new_size + sizeof(BetweenBlocks);
-	remaining_block->prev = remaining_block->next = nullptr;
-	block->prev = block->next = nullptr;
+	remaining_block->clear_links();
+	block->clear_links();
 	return remaining_block;
 }
 
