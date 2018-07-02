@@ -338,8 +338,7 @@ SlabAlloc::FreeList SlabAlloc::find_larger(FreeList hint, int size)
 
 SlabAlloc::FreeBlock* SlabAlloc::pop_freelist_entry(FreeList list)
 {
-	FreeBlock* retval;
-	retval = list.it->second;
+	FreeBlock* retval = list.it->second;
 	FreeBlock* header = retval->next;
 	if (header == retval)
 		m_block_map.erase(list.it);
@@ -382,19 +381,15 @@ void SlabAlloc::push_freelist_entry(FreeBlock* entry)
 	if (it != m_block_map.end()) {
 		header = it->second;
 		it->second = entry;
-	}
-	else {
-		header = nullptr;
-		m_block_map[size] = entry;
-	}
-	if (header == nullptr) {
-		entry->next = entry->prev = entry;
-	}
-	else {
 		entry->next = header;
 		entry->prev = header->prev;
 		entry->prev->next = entry;
 		entry->next->prev = entry;
+	}
+	else {
+		header = nullptr;
+		m_block_map[size] = entry;
+		entry->next = entry->prev = entry;
 	}
 }
 
@@ -475,7 +470,6 @@ void SlabAlloc::rebuild_freelists_from_slab()
 
 SlabAlloc::FreeBlock* SlabAlloc::break_block(FreeBlock* block, int new_size)
 {
-	FreeBlock* remaining_block;
 	int size = size_from_block(block);
 	int remaining_size = size - (new_size + sizeof(BetweenBlocks));
 	if (remaining_size < static_cast<int>(sizeof(FreeBlock)))
@@ -485,7 +479,7 @@ SlabAlloc::FreeBlock* SlabAlloc::break_block(FreeBlock* block, int new_size)
 	auto bb_between = bb_after(block);
 	bb_between->block_before_size = new_size;
 	bb_between->block_after_size = remaining_size;
-	remaining_block = block_after(bb_between);
+	FreeBlock* remaining_block = block_after(bb_between);
 	remaining_block->ref = block->ref + new_size + sizeof(BetweenBlocks);
 	remaining_block->prev = remaining_block->next = nullptr;
 	block->prev = block->next = nullptr;
